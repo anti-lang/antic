@@ -1,0 +1,13 @@
+//! What the module `forms` imports: a constraint and a function that ends the
+//! program.
+
+extern fn abort() -> never;
+
+/// What has a hash.
+pub constraint Sized = hash;
+
+/// End the program.
+pub fn halt() -> never
+{
+	abort();
+}

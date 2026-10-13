@@ -2660,6 +2660,33 @@ add_test(NAME anti_doc
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_doc.cmake")
 
+# The page of a module that holds one item per form the fixture above
+# lacks: the constants of each kind, the modifiers of a struct and of a
+# class, the fields of a class and the signatures of a function. Its doc
+# text holds the names anti doc links and the ones it leaves as text. The
+# user docs are HTML, and --private shows the fields that are not `pub`.
+foreach(pair "html||com.example.forms.html|forms.expected.html"
+             "private|--markdown\\|--private|com.example.forms.md|forms.private.expected.md")
+    string(REPLACE "\\|" "!" pair "${pair}")
+    string(REPLACE "|" ";" pair "${pair}")
+    list(GET pair 0 case)
+    list(GET pair 1 options)
+    list(GET pair 2 page)
+    list(GET pair 3 expected)
+    string(REPLACE "!" "|" options "${options}")
+    add_test(NAME anti_doc_forms_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/forms.anti|${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/limits.anti"
+            "-DPAGE=${page}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/doc/${expected}"
+            "-DOPTIONS=${options}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc-forms-${case}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_doc_page.cmake")
+endforeach()
+
 # anti bind --header writes the header that antic --lib writes for the
 # same module, from the library file alone. The other cases bind
 # tests/bind/layout.h and raymath through clang and a part of

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>com.example.forms</title>
+<main class="doc">
+<h1>com.example.forms</h1>
+<p>The forms of an item that the page of <code>shapes</code> does not hold, one item each.</p>
+<p>A paragraph with an &amp; and a &quot;quote&quot; in it, and with an ` alone.</p>
+<pre class="code">let x = 1;
+</pre>
+<ul>
+<li>an item of a list</li>
+</ul>
+<pre class="code">let y = 2;
+</pre>
+<ul>
+<li>an item that goes on over a second line</li>
+</ul>
+<p>Names: <a href="com.example.forms.html"><code>com.example.forms</code></a>, <code>forms.Level</code>, <a href="com.example.limits.html#Sized"><code>limits.Sized</code></a>, <a href="#stop"><code>stop()</code></a>, <a href="#Level"><code>com.example.forms.Level</code></a>, <code>forms.none_such</code>, <code>other.Thing</code>, <code>.dot</code>, <code>9nine</code> and <code>a-b</code>. A bracket [alone and a [bracket](without an end.</p>
+<ul>
+<li>a list that ends the text</li>
+</ul>
+<section class="item" id="TOP">
+<h2>TOP</h2>
+<pre class="signature">pub const TOP: byte = 255</pre>
+<p>The largest byte.</p>
+</section>
+<section class="item" id="ON">
+<h2>ON</h2>
+<pre class="signature">pub const ON: bool = true</pre>
+<p>A flag.</p>
+</section>
+<section class="item" id="HALF">
+<h2>HALF</h2>
+<pre class="signature">pub const HALF: float = 0.5</pre>
+<p>A half.</p>
+</section>
+<section class="item" id="NOTHING">
+<h2>NOTHING</h2>
+<pre class="signature">pub const NOTHING: ?*int = none</pre>
+<p>No pointer.</p>
+</section>
+<section class="item" id="NAME">
+<h2>NAME</h2>
+<pre class="signature">pub const NAME: str</pre>
+<p>A text.</p>
+</section>
+<section class="item" id="Same">
+<h2>Same</h2>
+<pre class="signature">pub constraint Same = eq</pre>
+<p>What two values of a type are compared by.</p>
+</section>
+<section class="item" id="Level">
+<h2>Level</h2>
+<pre class="signature">pub enum Level: i32</pre>
+<p>A level.</p>
+<ul class="fields">
+<li><code>Low = 0</code>
+</li>
+<li><code>High = 1</code>
+</li>
+</ul>
+</section>
+<section class="item" id="Tight">
+<h2>Tight</h2>
+<pre class="signature">pub packed struct Tight</pre>
+<p>A struct without padding.</p>
+<ul class="fields">
+<li><code>a: byte</code>
+</li>
+<li><code>b: u32</code>
+</li>
+</ul>
+</section>
+<section class="item" id="Wide">
+<h2>Wide</h2>
+<pre class="signature">pub align(16) struct Wide</pre>
+<p>A struct on a boundary of sixteen bytes.</p>
+<ul class="fields">
+<li><code>a: byte</code>
+</li>
+</ul>
+</section>
+<section class="item" id="Lanes">
+<h2>Lanes</h2>
+<pre class="signature">pub simd struct Lanes</pre>
+<p>Four lanes.</p>
+<ul class="fields">
+<li><code>a: f32</code>
+</li>
+<li><code>b: f32</code>
+</li>
+<li><code>c: f32</code>
+</li>
+<li><code>d: f32</code>
+</li>
+</ul>
+</section>
+<section class="item" id="Word">
+<h2>Word</h2>
+<pre class="signature">pub union Word</pre>
+<p>A word read two ways.</p>
+<ul class="fields">
+<li><code>whole: u32</code>
+</li>
+<li><code>real: f32</code>
+</li>
+</ul>
+</section>
+<section class="item" id="Named">
+<h2>Named</h2>
+<pre class="signature">pub abstract class Named</pre>
+<p>What a named thing gives.</p>
+<ul class="members">
+<li><code>pub abstract fn name(self) -&gt; str</code>
+<p>The name.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="Part">
+<h2>Part</h2>
+<pre class="signature">pub class Part</pre>
+<p>A part another class holds.</p>
+<ul class="fields">
+<li><code>n: int</code>
+<p>A count.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="Base">
+<h2>Base</h2>
+<pre class="signature">pub class Base</pre>
+<p>A base.</p>
+<ul class="fields">
+<li><code>n: int</code>
+<p>A number.</p>
+</li>
+</ul>
+<ul class="members">
+<li><code>pub fn get(self) -&gt; int</code>
+<p>The number.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="Leaf">
+<h2>Leaf</h2>
+<pre class="signature">pub final class Leaf inherits com.example.forms.Base</pre>
+<p>A class with every kind of field.</p>
+<ul class="fields">
+<li><code>own next: ?*Part</code>
+<p>An owned pointer.</p>
+</li>
+<li><code>low: byte : 3</code>
+<p>Three bits.</p>
+</li>
+</ul>
+<ul class="members">
+<li><code>pub concrete fn name(self) -&gt; str</code>
+</li>
+</ul>
+</section>
+<section class="item" id="Watched">
+<h2>Watched</h2>
+<pre class="signature">pub trace class Watched</pre>
+<p>A class whose calls are traced.</p>
+<ul class="fields">
+<li><code>n: int</code>
+<p>A number.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="Locked">
+<h2>Locked</h2>
+<pre class="signature">pub synchronized class Locked</pre>
+<p>Holds a number under the lock of the object.</p>
+<ul class="members">
+<li><code>pub fn get(self) -&gt; int</code>
+<p>The number.</p>
+<p>Runs under the lock of its object.</p>
+</li>
+</ul>
+</section>
+<section class="item" id="Counted">
+<h2>Counted</h2>
+<pre class="signature">pub concurrent class Counted</pre>
+<p>A class of atomic fields.</p>
+</section>
+<section class="item" id="printf">
+<h2>printf</h2>
+<pre class="signature">pub extern fn printf(format: ?*byte, ...) -&gt; i32</pre>
+<p>A function of C with any number of arguments.</p>
+</section>
+<section class="item" id="stop">
+<h2>stop</h2>
+<pre class="signature">pub fn stop() -&gt; never</pre>
+<p>Ends the program.</p>
+</section>
+<section class="item" id="same">
+<h2>same</h2>
+<pre class="signature">pub fn same&lt;A: Same + limits.Sized, B&gt;(a: A, b: B) -&gt; bool</pre>
+<p>Whether a value of one type equals itself, beside one of another.</p>
+</section>
+<section class="item" id="hold">
+<h2>hold</h2>
+<pre class="signature">pub fn hold(keep own f: fn(int) -&gt; int, keep g: fn(int) -&gt; int)</pre>
+<p>Keeps the two functions for a later call.</p>
+</section>
+<section class="item" id="eq">
+<h2>eq</h2>
+<pre class="signature">pub fn eq(a: Tight, b: Tight) -&gt; bool</pre>
+<p>Two levels are equal.</p>
+</section>
+</main>
