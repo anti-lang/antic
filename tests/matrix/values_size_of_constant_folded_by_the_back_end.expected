@@ -1,0 +1,7 @@
+exit 0
+rest 1
+less 0
+more 255
+times 127
+high 4
+uhigh 8

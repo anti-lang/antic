@@ -1,0 +1,26 @@
+//! The default `==` and the default hash of a struct that holds a Mutex,
+//! through two pointers. Both pass over the lock and take the other field.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Guarded
+{
+	n: int,
+	lock: Mutex,
+}
+
+fn main() -> int
+{
+	let a = Guarded { n: 1, lock: Mutex.new() };
+	let b = Guarded { n: 1, lock: Mutex.new() };
+	let pa = &a;
+	let pb = &b;
+	printf("eq same %d\n".ptr, (*pa == *pb) as c_int);
+	printf("hash same %d\n".ptr, (pa.hash() == pb.hash()) as c_int);
+	b.n = 2;
+	printf("eq other %d\n".ptr, (*pa == *pb) as c_int);
+	printf("hash other %d\n".ptr, (pa.hash() == pb.hash()) as c_int);
+	return 0;
+}

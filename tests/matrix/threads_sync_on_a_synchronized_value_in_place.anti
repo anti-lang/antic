@@ -1,0 +1,37 @@
+//! `sync obj { }` on a synchronized object that is a local value, and on a
+//! pointer to it. The first takes the hidden lock at the address of the local.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Counter
+{
+	n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+
+	pub fn add(self, k: int)
+	{
+		self.n += k;
+	}
+}
+
+fn main() -> int
+{
+	let counter = Counter { };
+	sync counter {
+		counter.add(5);
+		counter.add(counter.get());
+	}
+	printf("value %d\n".ptr, counter.get() as c_int);
+	let p = &counter;
+	sync p {
+		p.add(1);
+	}
+	printf("pointer %d\n".ptr, counter.get() as c_int);
+	return 0;
+}

@@ -1,0 +1,30 @@
+//! Constants computed from `size_of` with `%` of an unsigned type, the three
+//! saturating operators and `mul_high` of a signed and of an unsigned type. The
+//! back end folds each once the target is known. `P` is 16 bytes on every
+//! target.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct P
+{
+	a: i64,
+	b: i64,
+}
+
+const REST: u32 = (size_of(P) as u32) % (3 as u32);
+const LESS: u32 = (size_of(P) as u32) -| (20 as u32);
+const MORE: u8 = (size_of(P) as u8) +| (250 as u8);
+const TIMES: i8 = (size_of(P) as i8) *| (100 as i8);
+const HIGH: i64 = mul_high(size_of(P) as i64, 0x4000_0000_0000_0000);
+const UHIGH: u64 = mul_high(size_of(P) as u64, 0x8000_0000_0000_0000);
+
+fn main() -> int
+{
+	printf("rest %d\n".ptr, REST as c_int);
+	printf("less %d\n".ptr, LESS as c_int);
+	printf("more %d\n".ptr, MORE as c_int);
+	printf("times %d\n".ptr, TIMES as c_int);
+	printf("high %d\n".ptr, HIGH as c_int);
+	printf("uhigh %d\n".ptr, UHIGH as c_int);
+	return 0;
+}

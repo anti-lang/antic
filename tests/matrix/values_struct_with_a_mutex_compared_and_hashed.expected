@@ -1,0 +1,5 @@
+exit 0
+eq same 1
+hash same 1
+eq other 0
+hash other 0
