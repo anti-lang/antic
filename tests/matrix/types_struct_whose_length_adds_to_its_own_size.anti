@@ -1,0 +1,12 @@
+//! A struct whose array has the length `size_of(Loop) + 1`, the size of the
+//! struct itself.
+
+struct Loop
+{
+	a: [size_of(Loop) + 1]int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

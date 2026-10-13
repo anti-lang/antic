@@ -1,0 +1,39 @@
+//! The element of `for e in &m` is a tuple that holds a lent pointer, and `let
+//! (k, v) = e;` takes it apart. The tuple is bound by its loop alone.
+
+class Split
+{
+	pub keys: [2]int = [1, 2],
+	pub values: [2]int = [3, 4],
+
+	operator fn iter(self) -> SplitIter
+	{
+		return SplitIter { map: self, at: -1 };
+	}
+}
+
+class SplitIter
+{
+	pub map: *Split,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 2;
+	}
+
+	operator fn value(self) -> (int, lent *int)
+	{
+		return (self.map.keys[self.at], &self.map.values[self.at]);
+	}
+}
+
+fn main() -> int
+{
+	let m = Split { };
+	for e in &m {
+		let (k, v) = e;
+	}
+	return 0;
+}

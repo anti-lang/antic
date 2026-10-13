@@ -1,0 +1,27 @@
+//! A `switch` on an integer with the arm `8` before the arm `size_of(i64)`. The
+//! checker knows no size, so it takes both arms, and the first one runs for 8.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn kind(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		8 => {
+			k = 1;
+		},
+		size_of(i64) => {
+			k = 2;
+		},
+		else => {
+			k = 3;
+		},
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, kind(8) as c_int, kind(9) as c_int);
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! An arm of a `select` that names an integer and binds nothing.
+
+fn main() -> int
+{
+	let n = 1;
+	select {
+		n => { },
+	}
+	return 0;
+}

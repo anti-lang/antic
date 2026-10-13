@@ -1,0 +1,20 @@
+//! A `constraint` of a library that names an interface, on a type parameter of
+//! this module. A class that does not implement the interface is no argument.
+
+import com.example.items;
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn label<T: items.Labelled>(t: *T) -> int
+{
+	return t.name().len;
+}
+
+fn main() -> int
+{
+	let p = Plain { };
+	return label(&p);
+}

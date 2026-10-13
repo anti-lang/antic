@@ -1,0 +1,43 @@
+//! A generic function whose body passes a class to a parameter of an interface
+//! that the base of the class implements. The copy of the body finds the
+//! sub-object of the interface one class up the chain.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn code(self) -> int;
+}
+
+class Base
+{
+	implements named: Named,
+	pub n: int = 3,
+
+	concrete fn code(self) -> int
+	{
+		return 40 + self.n;
+	}
+}
+
+class Derived inherits Base
+{
+	pub m: int = 1,
+}
+
+fn show(n: *Named) -> int
+{
+	return n.code();
+}
+
+fn pick<T>(x: T) -> int
+{
+	let d = Derived { };
+	return show(&d);
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, pick(1) as c_int);
+	return 0;
+}

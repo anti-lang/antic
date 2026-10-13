@@ -1,0 +1,23 @@
+//! A function without `self` of a copy of a generic class, named as a value and
+//! called through the local that holds it. `Base<i16>.make` names the function
+//! of the copy, so the call gives the size of an `i16`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Base<T>
+{
+	pub n: int = 3,
+
+	pub fn make() -> int
+	{
+		return size_of(T) as int;
+	}
+}
+
+fn main() -> int
+{
+	let f = Base<i16>.make;
+	let n = f();
+	printf("%d\n".ptr, n as c_int);
+	return 0;
+}

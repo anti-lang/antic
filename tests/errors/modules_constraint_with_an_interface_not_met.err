@@ -1,0 +1,1 @@
+modules_constraint_with_an_interface_not_met.anti:19:9: error: `Plain` has no `Named`, which `label` needs for `T`

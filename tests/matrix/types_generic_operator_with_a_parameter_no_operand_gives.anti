@@ -1,0 +1,22 @@
+//! A generic `operator fn eq` with a type parameter that neither operand names.
+//! `==` gives the operator no type arguments, so nothing gives `U`.
+
+struct Key<T>
+{
+	k: T,
+}
+
+operator fn eq<T, U>(a: Key<T>, b: Key<T>) -> bool
+{
+	return true;
+}
+
+fn main() -> int
+{
+	let a = Key<int> { k: 1 };
+	let b = Key<int> { k: 1 };
+	if a == b {
+		return 0;
+	}
+	return 1;
+}

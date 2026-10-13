@@ -4,7 +4,9 @@
 //! generic variant, a class, an interface, a class that implements it, a
 //! singleton, a generic class, a generic interface, two aliases, a constraint
 //! and an operator at module level. The client reaches each one by the name of
-//! the module, by an alias of the module and by a direct import.
+//! the module, by an alias of the module and by a direct import. `Labelled`, a
+//! constraint that names an interface, is reached by the refusal
+//! `errors/modules_constraint_with_an_interface_not_met.anti` alone.
 
 pub const LIMIT: int = 40;
 pub const RATIO: f64 = 1.5;
@@ -125,6 +127,8 @@ pub type Points = [2]Point;
 pub type IntPair = Pair<int, int>;
 
 pub constraint Key = eq + hash;
+
+pub constraint Labelled = Named + eq;
 
 pub operator fn add(a: Point, b: Point) -> Point
 {

@@ -1,0 +1,24 @@
+//! A field read straight from `t as Plain`, where `t` is a simd struct of
+//! sixteen bytes and `Plain` a struct of the same bytes.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Two
+{
+	a: i64,
+	b: i64,
+}
+
+struct Plain
+{
+	x: i64,
+	y: i64,
+}
+
+fn main() -> int
+{
+	let t = Two { a: 5, b: 6 };
+	let y = (t as Plain).y;
+	printf("%d\n".ptr, y as c_int);
+	return 0;
+}

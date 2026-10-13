@@ -1,0 +1,13 @@
+//! The flags form `let (r, f) = e;` where `f` is the variable of a `for` over
+//! an array of `Flags`. The form assigns to a `Flags` in scope, and the
+//! variable of a walk is a copy that takes no value.
+
+fn main() -> int
+{
+	let a = 1;
+	let all = [Flags { overflow: false, carry: false, zero: false, negative: false }];
+	for f in all {
+		let (r, f) = a + a;
+	}
+	return 0;
+}

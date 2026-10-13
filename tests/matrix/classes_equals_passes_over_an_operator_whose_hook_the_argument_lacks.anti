@@ -1,0 +1,31 @@
+//! `equals` of two copies of a generic class whose module gives it `operator fn
+//! eq<T: lt>`. `int` has `<`, so `Box<int>` compares through the operator.
+//! `Plain` has none, so `Box<Plain>` compares its fields.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Plain
+{
+	n: int,
+}
+
+class Box<T>
+{
+	pub item: T,
+	pub stamp: int = 0,
+}
+
+operator fn eq<T: lt>(a: *Box<T>, b: *Box<T>) -> bool
+{
+	return !(a.item < b.item) && !(b.item < a.item);
+}
+
+fn main() -> int
+{
+	let a = Box<Plain> { item: Plain { n: 1 }, stamp: 1 };
+	let b = Box<Plain> { item: Plain { n: 1 }, stamp: 2 };
+	let c = Box<int> { item: 1, stamp: 1 };
+	let d = Box<int> { item: 1, stamp: 2 };
+	printf("%d %d\n".ptr, a.equals(&b) as c_int, c.equals(&d) as c_int);
+	return 0;
+}

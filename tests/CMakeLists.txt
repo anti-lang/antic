@@ -2594,6 +2594,16 @@ if(NOT WIN32)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_antic_stack.cmake")
 endif()
 
+# A variant of 65536 cases takes a tag of 32 bits. The runner writes the
+# source and runs the program.
+add_test(NAME variant_wide_tag
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variant-wide-tag"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_variant_wide_tag.cmake")
+
 # A `type` alias of a function type leaves the functions after it as they
 # stand. The source is in the canonical form, so fmt_canonical passes over
 # it until `anti fmt` agrees: finding T025 of docs/audit/tests-findings.md.
@@ -2926,17 +2936,23 @@ add_expect_test(error_regex_damaged STATUS 1
 set_tests_properties(error_regex_damaged PROPERTIES
     FIXTURES_REQUIRED regex_damaged)
 # A call the checker writes against a library of the language that lacks
-# what the call names, as an older library file would. The test `regex_older`
-# reads the library of regex_damaged, and every other one the library of
-# its own tree under tests/modules.
+# what the call names, as an older library file would. A test without a
+# tree reads the library of regex_damaged, and every other one the library
+# of its own tree under tests/modules.
 #   <program>|<tree>|<module>
 foreach(case
         "lang_error_maker|lang_code_alone|lang"
         "lang_error_origin|lang_no_origin|lang"
         "lang_trace_capture|lang_no_capture|lang"
+        "regex_find_all_damaged||"
+        "regex_group_older||"
         "regex_older||"
+        "regex_patch_bytes_older||"
+        "regex_patch_older||"
+        "regex_split_damaged||"
         "text_builder_older|text_older|text"
-        "text_equal_older|text_older|text")
+        "text_equal_older|text_older|text"
+        "text_to_bytes_older|text_older|text")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 tree)
@@ -4173,11 +4189,13 @@ antic_library_files(generic_limits LIBRARIES gen)
 # org.other, and every other case names no package.
 foreach(case
         "modules_constant_assigned|items|"
+        "modules_constraint_with_an_interface_not_met|items|"
         "modules_direct_import_clash|diamond|"
         "modules_export_symbol_twice|exports|"
         "modules_function_as_a_type|items|"
         "modules_generic_function_of_a_class|generic_limits|"
         "modules_generic_function_of_a_generic_class|generic_limits|"
+        "modules_generic_without_its_two_arguments|items|"
         "modules_internal_alias|levels|org.other"
         "modules_internal_class|levels|org.other"
         "modules_internal_class_as_a_base|levels|org.other"
@@ -4223,7 +4241,8 @@ foreach(case
         "modules_private_union|levels|"
         "modules_private_variant|levels|"
         "modules_type_called|items|"
-        "modules_type_nested_in_a_generic_class|generic_limits|")
+        "modules_type_nested_in_a_generic_class|generic_limits|"
+        "modules_variadic_function_as_a_value|items|")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 tree)

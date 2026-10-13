@@ -1,0 +1,14 @@
+//! `m.group` against an `anti.regex` that has no `group`, as an older library
+//! file would give it.
+
+import anti.regex;
+
+fn first(m: Match) -> str
+{
+	return m.group(1);
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+ownership_lent_tuple_taken_apart.anti:36:16: error: `e` holds a lent pointer, and a tuple that holds one is bound by its loop alone

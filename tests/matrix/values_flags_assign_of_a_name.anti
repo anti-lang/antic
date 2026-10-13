@@ -1,0 +1,10 @@
+//! The flags form as an assignment whose value is a name alone, which is no
+//! operation.
+
+fn main() -> int
+{
+	let r = 1;
+	let f = Flags { overflow: false, carry: false, zero: false, negative: false };
+	(r, f) = r;
+	return 0;
+}

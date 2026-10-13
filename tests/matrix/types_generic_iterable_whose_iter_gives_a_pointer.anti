@@ -1,0 +1,50 @@
+//! A walk in a generic function whose constraint is `Iterable<int>`, over a
+//! class whose `operator fn iter` gives a pointer to its iterator.
+
+import anti.collection;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Count
+{
+	pub at: int = 0,
+	pub end: int = 3,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at <= self.end;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+class Three
+{
+	pub count: Count,
+
+	operator fn iter(self) -> *Count
+	{
+		self.count.at = 0;
+		return &self.count;
+	}
+}
+
+fn total<C: collection.Iterable<int>>(c: *C) -> int
+{
+	let n = 0;
+	for x in c {
+		n += x;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let t = Three { };
+	printf("%d\n".ptr, total(&t) as c_int);
+	return 0;
+}

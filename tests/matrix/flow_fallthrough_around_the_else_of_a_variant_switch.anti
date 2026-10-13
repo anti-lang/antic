@@ -1,0 +1,43 @@
+//! A `switch` on a variant whose `else` stands between its arms. A
+//! `fallthrough` before the `else` enters it, and one after it enters the next
+//! arm, which binds nothing.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	Circle { r: int },
+	Square { side: int },
+	Dot,
+	Empty,
+}
+
+fn walk(s: Shape) -> int
+{
+	let acc = 0;
+	switch s {
+		Dot => {
+			acc += 1;
+			fallthrough;
+		},
+		else => {
+			acc += 10;
+		},
+		Empty => {
+			acc += 100;
+			fallthrough;
+		},
+		Square => {
+			acc += 1000;
+		},
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d %d\n".ptr, walk(Shape.Dot) as c_int,
+		walk(Shape.Empty) as c_int, walk(Shape.Square { side: 3 }) as c_int,
+		walk(Shape.Circle { r: 2 }) as c_int);
+	return 0;
+}

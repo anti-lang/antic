@@ -1,0 +1,12 @@
+//! `none` as the default of an `own` field of type `?fn(int) -> int`.
+
+class Button
+{
+	pub own handler: ?fn(int) -> int = none,
+}
+
+fn main() -> int
+{
+	let b = Button { };
+	return 0;
+}

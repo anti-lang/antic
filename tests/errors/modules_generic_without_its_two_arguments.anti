@@ -1,0 +1,10 @@
+//! A generic struct of a library with two type parameters, named as a type
+//! without its arguments.
+
+import com.example.items;
+
+fn main() -> int
+{
+	let p: ?*items.Pair = none;
+	return 0;
+}

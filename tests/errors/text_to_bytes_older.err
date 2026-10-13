@@ -1,0 +1,1 @@
+text_to_bytes_older.anti:8:13: error: `s.to_bytes` calls `anti.text.to_bytes`, which this `anti.text` lacks

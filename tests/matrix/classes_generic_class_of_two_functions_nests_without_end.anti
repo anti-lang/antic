@@ -1,0 +1,28 @@
+//! A function of a generic class that calls itself on a copy of the class with
+//! a wider type argument has no last copy. The class holds a second function,
+//! whose copies stop with the first refusal, so the message stands once.
+
+class Wrap<T>
+{
+	pub n: int = 0,
+
+	pub fn deeper(self, n: int) -> int
+	{
+		if n == 0 {
+			return 0;
+		}
+		let inner = Wrap<Wrap<T>> { n: n };
+		return inner.deeper(n - 1);
+	}
+
+	pub fn other(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let w = Wrap<int> { n: 1 };
+	return w.deeper(3);
+}

@@ -1,0 +1,12 @@
+//! `data.patch` with a byte sequence to find against an `anti.regex` that has
+//! no `patch_bytes_fixed`, as an older library file would give it.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let data: [3]byte = [1, 2, 3];
+	let part = data[0..3];
+	let n = part.patch(b"ab", b"xy");
+	return 0;
+}

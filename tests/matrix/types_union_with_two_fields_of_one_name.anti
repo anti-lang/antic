@@ -1,0 +1,12 @@
+//! A union that declares two fields of one name.
+
+union Both
+{
+	a: int,
+	a: f64,
+}
+
+fn main() -> int
+{
+	return 0;
+}

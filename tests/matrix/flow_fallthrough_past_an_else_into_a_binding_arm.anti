@@ -1,0 +1,37 @@
+//! A `fallthrough` in an arm after the `else` of a `switch` on a variant, into
+//! an arm that binds the fields of its case. Nothing fills those fields on that
+//! path.
+
+variant Shape
+{
+	Circle { r: int },
+	Square { side: int },
+	Dot,
+	Empty,
+}
+
+fn walk(s: Shape) -> int
+{
+	let acc = 0;
+	switch s {
+		Dot => {
+			acc += 1;
+		},
+		else => {
+			acc += 10;
+		},
+		Empty => {
+			acc += 100;
+			fallthrough;
+		},
+		Square q => {
+			acc += q.side;
+		},
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	return walk(Shape.Empty);
+}

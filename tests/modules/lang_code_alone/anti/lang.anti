@@ -1,5 +1,7 @@
 //! An `anti.lang` whose `Error.new` takes a code alone, as an older library
 //! file would give it. `fail "text"` calls it with a code and a message.
+//! `refuse` fails inside the module itself, where the checker finds
+//! `StackTrace` among the items of the module and in no library file.
 
 pub struct SourceLocation
 {
@@ -37,4 +39,9 @@ pub class Error
 	{
 		return alloc Error { code: code };
 	}
+}
+
+pub fn refuse(code: int) may fail
+{
+	fail Error.new(code);
 }

@@ -1,0 +1,1 @@
+flow_walk_with_an_iter_of_two_parameters.anti:26:13: error: `operator fn iter` is written `operator fn iter(b: *Bag) -> I`, where `I` has `operator fn next` and `operator fn value`

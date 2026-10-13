@@ -1,0 +1,17 @@
+//! `data.patch` with a pattern in a variable against an `anti.regex` that has
+//! no `patch`, as an older library file would give it.
+
+import anti.regex;
+
+fn mend(part: []byte, r: ByteRegex) -> int
+{
+	let n = part.patch(r, b"x") catch {
+		return -1;
+	};
+	return n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

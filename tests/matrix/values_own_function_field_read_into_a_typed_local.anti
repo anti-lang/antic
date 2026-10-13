@@ -1,0 +1,32 @@
+//! An `own` field of function type read into a local with no type and into one
+//! declared `fn(int) -> int`. Both borrow the two words, and the object keeps
+//! the snapshot.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Button
+{
+	own f: fn(int) -> int,
+
+	fn construct(self, keep own f: fn(int) -> int)
+	{
+		self.f = f;
+	}
+
+	pub fn press(self, x: int) -> int
+	{
+		let g = self.f;
+		let h: fn(int) -> int = self.f;
+		return g(x) + h(x);
+	}
+}
+
+fn main() -> int
+{
+	let k = 2;
+	let b = Button(snapshot fn(x: int) -> int {
+		return x * k;
+	});
+	printf("%d\n".ptr, b.press(4) as c_int);
+	return 0;
+}

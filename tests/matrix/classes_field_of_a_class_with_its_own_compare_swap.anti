@@ -1,0 +1,37 @@
+//! `compare_swap` called on a field whose class declares a function of that
+//! name, as a value field and through a pointer field. The call is the function
+//! of the class and no atomic operation.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cell
+{
+	pub v: int = 1,
+
+	pub fn compare_swap(self, old: int, new: int) -> bool
+	{
+		if self.v != old {
+			return false;
+		}
+		self.v = new;
+		return true;
+	}
+}
+
+class Holder
+{
+	pub cell: Cell,
+	pub link: *Cell,
+}
+
+fn main() -> int
+{
+	let far = Cell { v: 3 };
+	let h = Holder { link: &far };
+	let first = h.cell.compare_swap(1, 5);
+	let second = h.cell.compare_swap(1, 6);
+	let third = h.link.compare_swap(3, 7);
+	printf("%d %d %d %d %d\n".ptr, first as c_int, second as c_int,
+		third as c_int, h.cell.v as c_int, far.v as c_int);
+	return 0;
+}

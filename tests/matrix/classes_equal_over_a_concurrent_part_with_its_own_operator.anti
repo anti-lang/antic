@@ -1,0 +1,29 @@
+//! The default `==` of a class with a field of a concurrent class whose body
+//! declares `operator fn eq`. The part compares through its operator.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Tally
+{
+	pub atomic hits: int = 0,
+
+	operator fn eq(self, other: *Tally) -> bool
+	{
+		return self.hits.load() == other.hits.load();
+	}
+}
+
+class Board
+{
+	pub left: Tally,
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let a = Board { };
+	let b = Board { };
+	b.left.hits.store(2);
+	printf("%d %d\n".ptr, (a == b) as c_int, (a == a) as c_int);
+	return 0;
+}

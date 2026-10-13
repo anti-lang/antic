@@ -1,0 +1,1 @@
+flow_fallthrough_past_an_else_into_a_binding_arm.anti:25:4: error: `fallthrough` into an arm that binds the fields of `Square`

@@ -1,0 +1,10 @@
+//! `s.find_all` against an `anti.regex` whose `find_all_literal` takes two
+//! parameters where the call passes three.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let found = "abc".find_all(re"b");
+	return 0;
+}

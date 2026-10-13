@@ -1,0 +1,22 @@
+//! An anonymous function that writes the type of its parameter as `keep own f:
+//! fn(int) -> int` and is passed where that form is expected. The caller hands
+//! it a snapshot.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn call(g: fn(keep own fn(int) -> int) -> int) -> int
+{
+	let k = 3;
+	return g(snapshot fn(x: int) -> int {
+		return x + k;
+	});
+}
+
+fn main() -> int
+{
+	let r = call(fn(keep own f: fn(int) -> int) -> int {
+		return f(4);
+	});
+	printf("%d\n".ptr, r as c_int);
+	return 0;
+}

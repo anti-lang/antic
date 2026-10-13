@@ -1,0 +1,10 @@
+//! `s.to_bytes` against an `anti.text` that has no `to_bytes`, as an older
+//! library file would give it.
+
+import anti.text;
+
+fn main() -> int
+{
+	let data = "abc".to_bytes();
+	return 0;
+}

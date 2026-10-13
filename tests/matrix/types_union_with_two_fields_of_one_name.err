@@ -1,0 +1,1 @@
+types_union_with_two_fields_of_one_name.anti:6:2: error: union `Both` has two fields named `a`

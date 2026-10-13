@@ -1,0 +1,1 @@
+flow_walk_with_a_next_of_two_parameters.anti:10:13: error: `operator fn next` is written `operator fn next(c: *Count) -> bool`

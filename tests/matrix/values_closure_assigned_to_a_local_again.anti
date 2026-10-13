@@ -1,0 +1,40 @@
+//! A local that holds a closure takes another closure with `=`. The second one
+//! captures a variable of the same block in `same_block`, and one of a block
+//! further in than the first captured in `inner_block`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn same_block() -> int
+{
+	let x = 4;
+	let f = fn() -> int {
+		return x;
+	};
+	f = fn() -> int {
+		return x + 1;
+	};
+	return f();
+}
+
+fn inner_block() -> int
+{
+	let x = 4;
+	if x > 0 {
+		let y = 5;
+		let f = fn() -> int {
+			return x;
+		};
+		f = fn() -> int {
+			return y + 1;
+		};
+		return f();
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	printf("same block %d\n".ptr, same_block() as c_int);
+	printf("inner block %d\n".ptr, inner_block() as c_int);
+	return 0;
+}

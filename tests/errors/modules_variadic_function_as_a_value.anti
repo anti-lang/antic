@@ -1,0 +1,10 @@
+//! A variadic `extern fn` of a library named as a value. It has no function
+//! pointer type, so the name stands where it is called alone.
+
+import com.example.items;
+
+fn main() -> int
+{
+	let f = items.snprintf;
+	return 0;
+}

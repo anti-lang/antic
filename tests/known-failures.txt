@@ -372,3 +372,8 @@ matrix_modules_export_union_aligned_on_a_bitfield_refused T110 The refusal of an
 matrix_values_function_compared_with_a_nullable_function_dev T111 `==` of a `fn` and a `?fn` of one type is refused, where a `*T` and a `?*T` compare.
 matrix_values_function_compared_with_a_nullable_function_release T111 `==` of a `fn` and a `?fn` of one type is refused, where a `*T` and a `?*T` compare.
 matrix_values_function_compared_with_a_nullable_function_memory_checks T111 `==` of a `fn` and a `?fn` of one type is refused, where a `*T` and a `?*T` compare.
+matrix_classes_function_of_a_generic_copy_as_a_value_dev T112 A function of a copy of a generic class named as a value gives the address of another function.
+matrix_classes_function_of_a_generic_copy_as_a_value_release T112 A function of a copy of a generic class named as a value gives the address of another function.
+matrix_classes_function_of_a_generic_copy_as_a_value_memory_checks T112 A function of a copy of a generic class named as a value gives the address of another function.
+matrix_flow_walk_with_an_iter_of_two_parameters_refused T096 A loop over a struct whose `operator fn iter` is refused gets a second message.
+matrix_flow_walk_with_a_next_of_two_parameters_refused T096 A loop over an iterator whose `operator fn next` is refused gets a second message.

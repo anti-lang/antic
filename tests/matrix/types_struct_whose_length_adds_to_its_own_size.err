@@ -1,0 +1,1 @@
+types_struct_whose_length_adds_to_its_own_size.anti:4:8: error: struct `Loop` contains itself

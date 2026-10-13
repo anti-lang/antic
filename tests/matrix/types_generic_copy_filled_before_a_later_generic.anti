@@ -1,0 +1,37 @@
+//! A copy of a generic struct that is filled while a generic declared after it
+//! is still open. `Early<int>` holds `Mid` twice, and `Mid` holds a copy of
+//! `Late`, which stands last in the file.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct User
+{
+	u: Early<int>,
+}
+
+struct Mid
+{
+	c: Late<int>,
+}
+
+struct Early<T>
+{
+	m: Mid,
+	n: Mid,
+	t: T,
+}
+
+struct Late<T>
+{
+	v: T,
+}
+
+fn main() -> int
+{
+	let one = Mid { c: Late<int> { v: 1 } };
+	let two = Mid { c: Late<int> { v: 2 } };
+	let user = User { u: Early<int> { m: one, n: two, t: 4 } };
+	printf("%d %d\n".ptr, (user.u.m.c.v + user.u.n.c.v + user.u.t) as c_int,
+		size_of(User) as c_int);
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_array_at_level_256_of_a_struct.anti:5:8: error: the values of struct `Top` nest deeper than 256 levels

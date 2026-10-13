@@ -1,0 +1,10 @@
+//! `s.split` against an `anti.regex` whose `split_literal` takes an `int`
+//! first, as a damaged library file would give it.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let parts = "a b".split(re" ");
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_none_into_an_own_function_field.anti:5:37: error: an `own fn` value is not copied by `=`, use `dup`

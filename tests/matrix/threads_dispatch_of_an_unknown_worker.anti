@@ -1,0 +1,14 @@
+//! A `dispatch` whose call names no function of the module.
+
+class Task
+{
+	pub n: int = 1,
+}
+
+fn main() -> int
+{
+	let t = Task { };
+	let p = &t;
+	let job = dispatch p -> nope(1);
+	return 0;
+}

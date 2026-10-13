@@ -1,0 +1,10 @@
+//! The flags form as an assignment whose operation names an unknown variable.
+//! The one message is that of the name.
+
+fn main() -> int
+{
+	let r = 1;
+	let f = Flags { overflow: false, carry: false, zero: false, negative: false };
+	(r, f) = r + nope;
+	return 0;
+}

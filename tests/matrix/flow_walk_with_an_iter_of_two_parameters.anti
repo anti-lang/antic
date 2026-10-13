@@ -1,0 +1,37 @@
+//! `operator fn iter` at module level with a second parameter, and a `for` over
+//! its struct. The declaration is the mistake and gets the one message.
+
+struct Count
+{
+	at: int,
+	end: int,
+}
+
+operator fn next(c: *Count) -> bool
+{
+	c.at += 1;
+	return c.at <= c.end;
+}
+
+operator fn value(c: *Count) -> int
+{
+	return c.at;
+}
+
+struct Bag
+{
+	n: int,
+}
+
+operator fn iter(b: *Bag, from: int) -> Count
+{
+	return Count { at: from, end: b.n };
+}
+
+fn main() -> int
+{
+	let b = Bag { n: 3 };
+	for x in b {
+	}
+	return 0;
+}

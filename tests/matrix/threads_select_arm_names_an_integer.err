@@ -1,0 +1,1 @@
+threads_select_arm_names_an_integer.anti:7:3: error: an arm of a `select` names a channel, found `int`

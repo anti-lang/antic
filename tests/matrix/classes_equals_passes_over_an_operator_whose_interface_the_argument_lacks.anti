@@ -1,0 +1,50 @@
+//! `equals` of two copies of a generic class whose module gives it `operator fn
+//! eq<T: Named>`. `Tag` implements `Named`, so `Box<Tag>` compares through the
+//! operator. `Bare` does not, so `Box<Bare>` compares its fields.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Named
+{
+	abstract fn code(self) -> int;
+}
+
+class Tag
+{
+	implements named: Named,
+	pub n: int = 0,
+
+	concrete fn code(self) -> int
+	{
+		return 7;
+	}
+}
+
+class Bare
+{
+	pub n: int = 0,
+}
+
+class Box<T>
+{
+	pub item: *T,
+	pub stamp: int = 0,
+}
+
+operator fn eq<T: Named>(a: *Box<T>, b: *Box<T>) -> bool
+{
+	return a.item.code() == b.item.code();
+}
+
+fn main() -> int
+{
+	let t1 = Tag { };
+	let t2 = Tag { };
+	let b1 = Bare { };
+	let a = Box<Tag> { item: &t1, stamp: 1 };
+	let b = Box<Tag> { item: &t2, stamp: 2 };
+	let c = Box<Bare> { item: &b1, stamp: 1 };
+	let d = Box<Bare> { item: &b1, stamp: 2 };
+	printf("%d %d\n".ptr, a.equals(&b) as c_int, c.equals(&d) as c_int);
+	return 0;
+}

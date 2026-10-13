@@ -1,0 +1,66 @@
+//! A `construct` that sets its field without a default on the path of a handler
+//! and after it, where the handler belongs to a call after `?.`: as the value
+//! of a `let` in `ByLet`, and as a statement in `ByCall`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+
+	pub fn same(self) -> *Node may fail
+	{
+		if self.n == 0 {
+			fail "zero";
+		}
+		return self;
+	}
+}
+
+class ByLet
+{
+	pub a: int,
+
+	fn construct(self, p: ?*Node)
+	{
+		let q = p?.same() catch e {
+			self.a = -1;
+			return;
+		};
+		if q != none {
+			self.a = q.n;
+		} else {
+			self.a = -2;
+		}
+	}
+}
+
+class ByCall
+{
+	pub a: int,
+
+	fn construct(self, p: ?*Node)
+	{
+		p?.same() catch e {
+			self.a = -1;
+			return;
+		};
+		self.a = 5;
+	}
+}
+
+fn main() -> int
+{
+	let seven = Node { n: 7 };
+	let zero = Node { n: 0 };
+	let a = ByLet(&seven);
+	let b = ByLet(&zero);
+	let c = ByLet(none);
+	let d = ByCall(&seven);
+	let e = ByCall(&zero);
+	printf("%d %d %d %d %d\n".ptr, a.a as c_int, b.a as c_int, c.a as c_int,
+		d.a as c_int, e.a as c_int);
+	return 0;
+}

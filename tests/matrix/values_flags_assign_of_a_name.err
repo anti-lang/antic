@@ -1,0 +1,1 @@
+values_flags_assign_of_a_name.anti:8:11: error: the flags form takes one `+`, `-`, `*`, `<<`, `>>` or unary `-`, found another expression
