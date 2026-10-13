@@ -1476,15 +1476,13 @@ endforeach()
 # drops the call hooks that --trace turned on, which gives the output of
 # release.
 # The value of --trace names a module as well, which reaches every class
-# of it. hook_changed_fields writes the first and the second field of a
-# class and of its base under --trace writes.
+# of it.
 foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
         "hook_trace|trace|--trace|hook_trace.trace.expected"
         "hook_trace|writes|--trace,--trace,writes|hook_trace.writes.expected"
         "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected"
         "hook_trace|trace_no_hooks|--trace,--no-hooks|hook_trace.expected"
         "hook_trace|module|--trace,hook_trace|hook_trace.module.expected"
-        "hook_changed_fields|writes|--trace,--trace,writes|hook_changed_fields.writes.expected"
         "trace_handlers|traced|--trace,--trace,writes|trace_handlers.traced.expected")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 source)
@@ -6342,6 +6340,15 @@ foreach(name objects construct_order)
         OPTIONS "--no-hooks"
         WORK "${MATRIX_WORK}/no-hooks")
 endforeach()
+# The `changed` hook of the first and the second field of a class and of
+# its base, under --trace writes. The matrix runs the program without the
+# option, where it prints no line of the hook, so this case has an expected
+# file of its own beside those of hook_trace.
+antic_program_test(matrix_classes_changed_hook_of_the_second_field_trace_writes
+    "${MATRIX}/classes_changed_hook_of_the_second_field.anti"
+    OPTIONS "--trace,--trace,writes"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_fields.writes.expected"
+    WORK "${MATRIX_WORK}/trace-writes")
 # `join` of a job without a result and `join_all` call the runtime without
 # the `joined` hook under --no-hooks.
 antic_program_test(matrix_threads_jobs_no_hooks
