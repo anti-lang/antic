@@ -1,0 +1,15 @@
+//! A constant conversion to `char` of the values beside the surrogates and of
+//! `0x10FFFF` is taken, by R027 of "Rules of 2026-10-13".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const BEFORE: char = 0xD7FF as u32 as char;
+const AFTER: char = 0xE000 as u32 as char;
+const LAST: char = 0x10FFFF as u32 as char;
+
+fn main() -> int
+{
+	printf("%u %u %u\n".ptr, BEFORE as u32, AFTER as u32, LAST as u32);
+	printf("%u\n".ptr, (0 as u32 as char) as u32);
+	return 0;
+}

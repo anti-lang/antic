@@ -1,0 +1,10 @@
+//! `as` of a constant to a signed type of its own width is refused when the
+//! value is above that type, by R026 of "Rules of 2026-10-13".
+
+const TOP: u8 = 200;
+const SIGNED: i8 = TOP as i8;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! `as` of a constant below zero to an unsigned type is refused, by R026 of
+//! "Rules of 2026-10-13".
+
+fn main() -> int
+{
+	let a = -1 as u32;
+	return 0;
+}

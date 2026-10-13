@@ -1386,7 +1386,7 @@ static struct type *check_cast(struct checker *c, struct expr *e)
                       sema_tn(to));
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (types_is_float(from) && types_is_integer(to) &&
+    if ((types_is_integer(to) || to->kind == TYPE_CHAR) &&
         sema_undefined_on_constants(c, e, to)) {
         return sema_builtin(c, TYPE_ERROR);
     }

@@ -745,6 +745,8 @@ of lowering meet:
 |---|---|---|
 | `values_float_kinds` | `+ - * /`, unary `-` and the comparisons on `f32` and `f64` with a NaN, the infinities and both zeros, folded and computed, and the rounding of an `f64` to an `f32` | |
 | `values_conversion_kinds` | a float to every integer type, an integer to a float with its rounding, and every pair of integer types | |
+| `values_constant_as_past_u8`, `values_constant_as_below_zero_to_u32`, `values_constant_as_past_i8_from_u8`, `values_constant_as_below_i16`, `values_constant_as_at_the_ends` | R026 of "Rules of 2026-10-13": `as` of a constant that the target type cannot hold is refused, and the least and the largest value of each type convert | |
+| `values_constant_surrogate_as_char`, `values_constant_past_the_last_char`, `values_constant_as_char_at_the_ends` | R027: a constant conversion to `char` of a surrogate or of a value past `0x10FFFF` is refused, and the values beside them convert | |
 | `values_fold_least_int_from_float` | the least `int` as a float converts to `int` in a constant | T009 |
 | `values_fold_int_to_f32` | an `int` that needs one rounding to an `f32` and gets two in a constant | T008 |
 | `values_as_other_kinds` | `as` on a `bool`, a `char` and an enum, the rounding of `as f16` and every place an `f16` is stored | |

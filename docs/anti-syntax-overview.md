@@ -1429,7 +1429,7 @@ The value is constant data. `here` in an ordinary expression gives the position 
 
 ## Checks and debugging
 
-In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted, and every target gives the result of ARM64: a division or a remainder by zero gives 0, the least value divided by minus one gives itself, a shift takes its count modulo the width, and a float out of the range of its integer type saturates, with 0 for NaN. `--checks` and `--no-checks`, `--asserts` and `--no-asserts`, `--trace` and `--no-trace` and `-g` override the mode.
+In dev mode every array, slice and `str` index is bounds-checked, signed arithmetic traps on overflow, a narrowing `as` checks its range, a conversion to `char` or to an enum checks the value, division and shifts are checked, `assert` and `show` are active, `-g` writes line information. In release none of it is emitted, and every target gives the result of ARM64: a division or a remainder by zero gives 0, the least value divided by minus one gives itself, a shift takes its count modulo the width, and a float out of the range of its integer type saturates, with 0 for NaN. Where the operand is a constant, the checker refuses an `as` to an integer type that cannot hold the value and an `as` to `char` of a value that is no Unicode scalar value, in every mode. `--checks` and `--no-checks`, `--asserts` and `--no-asserts`, `--trace` and `--no-trace` and `-g` override the mode.
 
 ```anti
 trace class Renderer { }

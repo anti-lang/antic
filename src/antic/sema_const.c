@@ -255,18 +255,46 @@ static void operand_text(struct text *out, const struct expr *e,
         types_symbolic_print(out, v->as.symbolic, false);
     } else if (v->kind == CONST_FLOAT) {
         float_as_literal(out, v->as.floating, v->type->kind == TYPE_F32);
-    } else if (types_is_signed(v->type)) {
+    } else if (types_is_signed(v->type->kind == TYPE_ENUM ? v->type->base
+                                                          : v->type)) {
         text_appendf(out, "%lld", (long long)v->as.integer);
     } else {
         text_appendf(out, "%llu", (unsigned long long)v->as.integer);
     }
 }
 
+/* True when the integer constant a has a value that integer type t
+   holds. A target-sized type is measured at 64 bits, as its constants
+   are computed, and fits_every_target then holds it to its width. An
+   enum counts as its base. */
+static bool integer_fits(const struct const_value *a, const struct type *t)
+{
+    const struct type *from =
+        a->type->kind == TYPE_ENUM ? a->type->base : a->type;
+    int bits = types_is_target_sized(t) ? 64 : types_bits(t);
+    int high = types_is_signed(t) ? bits - 1 : bits;
+
+    if (types_is_signed(from) && sema_signed_bits(a->as.integer) < 0) {
+        return types_is_signed(t) &&
+               (bits == 64 ||
+                sema_signed_bits(a->as.integer) >= -((int64_t)1 << high));
+    }
+    return high == 64 || a->as.integer < (uint64_t)1 << high;
+}
+
+/* True when v is a Unicode scalar value: at most 0x10FFFF and no
+   surrogate. */
+static bool is_scalar_value(uint64_t v)
+{
+    return v <= 0x10FFFF && (v < 0xD800 || v > 0xDFFF);
+}
+
 /* Report an operation on the constant operands a and b that has no value.
    Integer division and remainder fail by zero and for the minimum value by
-   -1. A shift fails for a count outside the bits of the type, and a float
-   conversion outside the range of the integer type. e is a binary
-   expression or a conversion to result, and b is NULL for a conversion. */
+   -1. A shift fails for a count outside the bits of the type. A
+   conversion fails for a value outside the range of the integer type,
+   and for a value that is no `char`. e is a binary expression or a
+   conversion to result, and b is NULL for a conversion. */
 static bool reports_undefined(struct checker *c, const struct expr *e,
                               const struct type *result,
                               const struct const_value *a,
@@ -278,11 +306,21 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
     bool found = false;
 
     if (e->kind == EXPR_CAST) {
-        if (a->kind == CONST_FLOAT && types_is_integer(result) &&
-            !float_fits(a->as.floating, result)) {
+        /* DESIGN: a dev build stops the same conversion of a variable
+           at run time, by R026 and R027 of "Rules of 2026-10-13". */
+        if (types_is_integer(result) &&
+            (a->kind == CONST_FLOAT ? !float_fits(a->as.floating, result)
+             : a->kind == CONST_INT && !integer_fits(a, result))) {
             operand_text(&x, e->as.cast.operand, a);
             sema_error_at(c, e->pos, "`%s as %s` does not fit `%s`",
                           text_cstr(&x), sema_tn(result), sema_tn(result));
+            found = true;
+        } else if (result->kind == TYPE_CHAR && a->kind == CONST_INT &&
+                   !is_scalar_value(a->as.integer)) {
+            operand_text(&x, e->as.cast.operand, a);
+            sema_error_at(c, e->pos,
+                          "`%s as char` is not a Unicode scalar value",
+                          text_cstr(&x));
             found = true;
         }
     } else if (types_is_integer(e->as.binary.left->type) &&
@@ -392,6 +430,10 @@ static bool const_as(struct checker *c, struct expr *e,
         return false;
     }
     out->type = e->type;
+    if (a.kind != CONST_SYMBOLIC &&
+        reports_undefined(c, e, e->type, &a, NULL)) {
+        return false;
+    }
     if (a.kind == CONST_SYMBOLIC) {
         if (!types_is_integer(e->type)) {
             sema_error_at(c, e->pos,
@@ -420,9 +462,6 @@ static bool const_as(struct checker *c, struct expr *e,
     } else if (types_is_integer(e->type)) {
         out->kind = CONST_INT;
         if (a.kind == CONST_FLOAT) {
-            if (reports_undefined(c, e, e->type, &a, NULL)) {
-                return false;
-            }
             out->as.integer = types_is_signed(e->type)
                                   ? (uint64_t)(int64_t)a.as.floating
                                   : (uint64_t)a.as.floating;

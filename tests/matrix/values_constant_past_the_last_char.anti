@@ -1,0 +1,8 @@
+//! A constant conversion to `char` of a value past `0x10FFFF` is refused, by
+//! R027 of "Rules of 2026-10-13".
+
+fn main() -> int
+{
+	let c = 0x110000 as u32 as char;
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_constant_past_the_last_char.anti:6:10: error: `1114112 as char` is not a Unicode scalar value

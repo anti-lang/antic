@@ -1,0 +1,10 @@
+//! `as` of a named constant below the least value of the target type is
+//! refused, by R026 of "Rules of 2026-10-13".
+
+const LOW: int = -32769;
+const SMALL: i16 = LOW as i16;
+
+fn main() -> int
+{
+	return 0;
+}

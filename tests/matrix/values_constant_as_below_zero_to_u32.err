@@ -1,0 +1,1 @@
+values_constant_as_below_zero_to_u32.anti:6:10: error: `-1 as u32` does not fit `u32`

@@ -516,7 +516,7 @@ A dev build inserts a check before each operation of the table. A failed check p
 
 Each message starts with the file and the line, as in `ints.anti:7: overflow in +`. Four cases have a defined result and no check in either mode. The least value divided by `-1` gives the least value, and its remainder is 0. Unary `-` of the least value gives the least value. `<<%` gives 0 for a count at or above the width. An unsigned `+`, `-` or `*` wraps.
 
-The checker folds no check. `7 / 0` and `1 << 70` written as constants compile, and the dev build stops when the line runs.
+With constant operands the checker refuses a division by zero, a shift count out of range and both conversions of the table. `7 / 0`, `1 << 70`, `70000 as i16` and `0xD800 as u32 as char` are compile errors.
 
 The program runs each case in release mode.
 

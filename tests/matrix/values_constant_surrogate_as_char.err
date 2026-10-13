@@ -1,0 +1,1 @@
+values_constant_surrogate_as_char.anti:4:20: error: `55296 as char` is not a Unicode scalar value
