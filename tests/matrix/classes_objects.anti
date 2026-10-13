@@ -5,10 +5,12 @@
 //! parallel, sync block, select arm, generic body, nested type. Each place is a
 //! function of its own, and the program prints one line per place and input.
 //! Every `construct` and every `destruct` counts itself, and the last two lines
-//! hold the counts. A `construct` that fails leaves no object, so no `destruct`
-//! runs for it. A worker deletes no object, so the place worker holds the
-//! values alone, and a `defer` and an `undo` leave the teardown of their local
-//! to the end of the block.
+//! hold the counts. A `construct` that fails leaves no object. The `destruct`
+//! of its own class does not run, and the one of its base does, since the
+//! `construct` of the base finished, by R025 of the rules of 2026-10-13. A
+//! worker deletes no object, so the place worker holds the values alone, and a
+//! `defer` and an `undo` leave the teardown of their local to the end of the
+//! block.
 
 import anti.lang;
 

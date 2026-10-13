@@ -190,9 +190,6 @@ matrix_errors_try_before_an_alloc_dev T050 `try` before `alloc T(args)` is refus
 matrix_errors_try_before_an_alloc_release T050 `try` before `alloc T(args)` is refused.
 matrix_errors_try_before_an_alloc_memory_checks T050 `try` before `alloc T(args)` is refused.
 matrix_errors_unhandled_construct_refused T051 An unhandled `alloc T(args)` gets a second message.
-matrix_errors_derived_construct_fails_after_its_base_dev T052 A derived `construct` that fails leaves what its base took.
-matrix_errors_derived_construct_fails_after_its_base_release T052 A derived `construct` that fails leaves what its base took.
-matrix_errors_derived_construct_fails_after_its_base_memory_checks T052 A derived `construct` that fails leaves what its base took.
 matrix_threads_join_after_join_all_refused T053 A second `join` of one job compiles.
 matrix_threads_join_twice_refused T053 A second `join` of one job compiles.
 check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.

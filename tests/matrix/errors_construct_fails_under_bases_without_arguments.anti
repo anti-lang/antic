@@ -1,0 +1,95 @@
+//! The bases of a class whose `construct` fails, by R025 of the rules of
+//! 2026-10-13. The fields of the failing class go first, and the part of the
+//! base goes after them as an object of the base does: every `destruct`, then
+//! the fields. A base whose `construct` takes no arguments ran before the
+//! failing one, so its `destruct` runs. A base whose `construct` takes
+//! arguments and was never called did not finish, so its `destruct` does not
+//! run, and the fields it holds by default are torn down all the same. A class
+//! value held as a field was built with the object and goes with it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted
+{
+	pub tag: int = 0,
+
+	fn construct(self)
+	{
+		printf(" made".ptr);
+	}
+
+	fn destruct(self)
+	{
+		printf(" gone".ptr);
+	}
+}
+
+class Root
+{
+	fn construct(self)
+	{
+		printf(" root".ptr);
+	}
+
+	fn destruct(self)
+	{
+		printf(" unroot".ptr);
+	}
+}
+
+class Middle inherits Root
+{
+	pub held: Counted = Counted { },
+
+	fn construct(self, n: int) may fail
+	{
+		if n < 0 {
+			fail lang.Error.new(n, "never called here");
+		}
+		printf(" middle".ptr);
+	}
+
+	fn destruct(self)
+	{
+		printf(" unmiddle".ptr);
+	}
+}
+
+class Leaf inherits Middle
+{
+	pub own_part: Counted = Counted { },
+
+	fn construct(self, n: int) may fail
+	{
+		if n > 0 {
+			fail lang.Error.new(n, "the leaf fails");
+		}
+		printf(" leaf".ptr);
+	}
+
+	fn destruct(self)
+	{
+		printf(" unleaf".ptr);
+	}
+}
+
+fn build(n: int)
+{
+	printf("%d:".ptr, n as c_int);
+	let leaf = alloc Leaf(n) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+	printf(",".ptr);
+	delete(leaf);
+	printf("\n".ptr);
+}
+
+fn main() -> int
+{
+	build(1);
+	build(0);
+	return 0;
+}

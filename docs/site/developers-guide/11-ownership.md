@@ -1289,7 +1289,7 @@ For a C++ programmer:
 
 - An argument temporary dies right after its call, before the rest of the full expression runs. A pointer that the call returned into what the temporary owns dangles in the same statement.
 - A value read through a field or used as the object of a call lives to the end of the statement, as in C++.
-- A constructor that fails runs no `destruct`, as [chapter 9]({{% relref "09-classes" %}}) shows.
+- A constructor that fails runs the `destruct` of each base that was built and no `destruct` of its own class, as [chapter 9]({{% relref "09-classes" %}}) shows.
 - `delete` of a pointer to a struct is refused. `destroy(p)` and `free(p)` are the two steps.
 
 ## The rules at a call

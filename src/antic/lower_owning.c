@@ -516,10 +516,12 @@ static struct ir_operand field_at(struct lowerer *l, const struct type *up,
 }
 
 /* The teardown of the field f of level up, in the object at self. Owned
-   memory goes back to the allocator from. */
+   memory goes back to the allocator from. made_only passes over a class
+   value that nothing made yet, whose table is zero. */
 static void teardown_field(struct lowerer *l, const struct type *up,
                            const struct struct_field *f,
-                           struct ir_operand self, struct ir_operand from)
+                           struct ir_operand self, struct ir_operand from,
+                           bool made_only)
 {
     if (f->form != FIELD_PLAIN && f->form != FIELD_USE) {
         return;
@@ -530,8 +532,104 @@ static void teardown_field(struct lowerer *l, const struct type *up,
     }
     if (sema_needs_teardown(f->type)) {
         lower_destroy_owned(l, f->type, field_at(l, up, f, self), from,
-                            false);
+                            made_only);
     }
+}
+
+/* Whether a level of the chain of the class t declares a `construct`
+   that may fail, whose error exits tear down what was built. */
+bool lower_chain_unbuilds(const struct type *t)
+{
+    static const struct name construct_name = {"construct", 9};
+    const struct type *up;
+
+    for (up = t; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
+        const struct item *m = lower_level_fn(up, &construct_name);
+        if (m != NULL && m->may_fail) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The part of the base of the class t in the object at self, torn down
+   as the teardown of an object of the base does: the `destruct` of every
+   level, concrete first, then the fields of every level. A level whose
+   `construct` takes arguments is built once the level below called it
+   and went on, so only then does its `destruct` run. called says so for
+   the base of t itself. Its fields go either way, since the defaults
+   filled them. */
+static void unbuild_base(struct lowerer *l, const struct type *t,
+                         struct ir_operand self, bool called)
+{
+    static const struct name construct_name = {"construct", 9};
+    static const struct name destruct_name = {"destruct", 8};
+    struct ir_operand from = ir_int_op(IR_PTR, 0);
+    const struct type *up;
+    bool built = true;
+    size_t i;
+
+    for (up = t->base; up != NULL && up->base != NULL; up = up->base) {
+        const struct item *made = lower_level_fn(up, &construct_name);
+        const struct item *m = lower_level_fn(up, &destruct_name);
+        bool takes_arguments =
+            made != NULL && made->symbol->type->param_count > 1;
+        built = !takes_arguments || (built && called);
+        if (built && m != NULL) {
+            struct ir_operand arg = self;
+            ir_call(l->f, l->b, IR_VOID,
+                    ir_func_op(lower_callee_function(l, m->symbol)), &arg, 1);
+        }
+        called = made != NULL && lower_base_construct_call(made) != NULL;
+    }
+    for (up = t->base; up != NULL && up->base != NULL; up = up->base) {
+        for (i = up->field_count; i > 0; i--) {
+            teardown_field(l, up, &up->fields[i - 1], self, from, true);
+        }
+    }
+}
+
+/* DESIGN: R025 of "Rules of 2026-10-13". When a `construct` fails, the
+   parts that were built before it are torn down in reverse order. The
+   fields of the class of the `construct` go first, last to first. A
+   field that nothing set holds `none` or a zero table, which the
+   teardown passes over: prepare clears each one. The part of the base
+   goes after them. Where the body calls the `construct` of its base,
+   that part is built once the call gave no error, which base_built
+   holds at run time. On the error path of that call the base tore down
+   its own part, and in the arguments of the call it never ran. The
+   `destruct` of the class itself does not run, since its `construct`
+   did not finish, and no `destroyed` hook does, since no `created` hook
+   did. */
+void lower_unbuild(struct lowerer *l)
+{
+    const struct type *t = l->unbuilds->owner->symbol->type;
+    struct ir_operand self = lower_temp(l, l->f->params[0].temp);
+    struct ir_operand from = ir_int_op(IR_PTR, 0);
+    struct ir_block *built;
+    struct ir_block *after;
+    size_t i;
+
+    for (i = t->field_count; i > 0 && l->b != NULL; i--) {
+        teardown_field(l, t, &t->fields[i - 1], self, from, true);
+    }
+    if (t->base == NULL || l->b == NULL || l->base_stage == BASE_FAILED) {
+        return;
+    }
+    if (l->base_call == NULL || l->base_stage == BASE_NOT_CALLED) {
+        unbuild_base(l, t, self, false);
+        return;
+    }
+    built = lower_new_block(l);
+    after = lower_new_block(l);
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8,
+                                      lower_temp(l, l->base_built),
+                                      ir_int_op(IR_I8, 0))),
+              built, after);
+    l->b = built;
+    unbuild_base(l, t, self, true);
+    join(l, after);
 }
 
 /* DESIGN: the teardown runs the destruct body of every level, concrete
@@ -567,7 +665,7 @@ void lower_class_teardown(struct lowerer *l, const struct type *t)
     }
     for (up = t; up->base != NULL; up = up->base) {
         for (i = up->field_count; i > 0; i--) {
-            teardown_field(l, up, &up->fields[i - 1], self, from);
+            teardown_field(l, up, &up->fields[i - 1], self, from, false);
         }
     }
     ir_ret(l->f, l->b, IR_VOID, lower_none());
@@ -670,6 +768,7 @@ static void prepare(struct lowerer *l, const struct type *t,
                     struct ir_operand dest)
 {
     const struct type *up;
+    bool unbuilds = t->kind == TYPE_CLASS && lower_chain_unbuilds(t);
     size_t i;
 
     /* The table pointer is the first word of every object, and the base
@@ -724,6 +823,19 @@ static void prepare(struct lowerer *l, const struct type *t,
                 ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
                 ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
                          lower_context_word(l, field->type, at));
+            } else if (unbuilds &&
+                       (field->form == FIELD_PLAIN ||
+                        field->form == FIELD_USE)) {
+                /* R025 of "Rules of 2026-10-13": a `construct` of the
+                   chain may fail before it sets this field, and its
+                   teardown then finds nothing here. */
+                if (owns_buffer(field)) {
+                    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                             field_at(l, up, field, dest));
+                } else if (sema_needs_teardown(field->type)) {
+                    lower_clear_owned(l, field->type,
+                                      field_at(l, up, field, dest));
+                }
             }
         }
         value = value != NULL && up->field_count > 0 &&

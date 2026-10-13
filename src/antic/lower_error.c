@@ -110,12 +110,21 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
     struct ir_block *bad = lower_new_block(l);
     struct ir_block *join = lower_new_block(l);
     struct handling scope;
+    struct ir_operand succeeded =
+        lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, err,
+                                ir_int_op(IR_PTR, 0)));
+    bool base_call = l->base_call != NULL && l->base_call->as.expr == call;
     uint32_t error;
 
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, err,
-                                      ir_int_op(IR_PTR, 0))),
-              join, bad);
+    /* R025 of "Rules of 2026-10-13": the base part is built once the
+       `construct` of the base gave no error. On the error path it tore
+       down what it had built, so an exit there leaves the base part
+       alone. */
+    if (base_call) {
+        ir_assign(l->f, l->b, l->base_built, succeeded);
+        l->base_stage = BASE_FAILED;
+    }
+    ir_branch(l->f, l->b, succeeded, join, bad);
     l->b = bad;
     /* A `construct` that fails leaves no object behind, so the memory
        it was given goes back before the handler runs. */

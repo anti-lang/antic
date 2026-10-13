@@ -350,7 +350,7 @@ A constructor of C++ runs the constructors of the bases and members first. A des
 
 - A `construct` without arguments cannot fail. The one of a base runs before the one of a derived class, without a call in the source.
 - `fn construct(self, args)` takes arguments, and the class is then made with `Circle(args)` as a value or `alloc Circle(args)` on the heap.
-- A `construct` that can fail is written `may fail`. It leaves with `fail` and succeeds at its end. The call takes a handler like any failing call, and a failed `alloc` frees the object.
+- A `construct` that can fail is written `may fail`. It leaves with `fail` and succeeds at its end. The call takes a handler like any failing call. A failure tears down what was built before it, and a failed `alloc` frees the object.
 - A class has one `construct`. Another way to make an object is a static function with a name.
 - A derived `construct` that wants a base with arguments initialised calls `self.super.construct(args)` as its first statement. `try` forwards a failure of the base.
 - Every path that succeeds assigns each field that has no default.
@@ -364,7 +364,7 @@ A constructor of C++ runs the constructors of the bases and members first. A des
 3. the `own` fields of [chapter 11]({{% relref "11-ownership" %}}) and the inline class fields, each with its own teardown,
 4. the memory of the object.
 
-`destroy(&v)` does the first three for a value. A local of a class whose chain declares `destruct` or owns something is torn down at the end of its block, on every exit. `destruct` does not run on an object whose `construct` failed.
+`destroy(&v)` does the first three for a value. A local of a class whose chain declares `destruct` or owns something is torn down at the end of its block, on every exit. The `destruct` of a class does not run on an object whose `construct` failed. What was built before the failure is torn down: every field already set, and each base whose `construct` finished, with its `destruct`.
 
 ```anti
 //! name: build
@@ -487,10 +487,12 @@ destruct Part 2
 destruct Part 1
 --
 construct Base
+destruct Part 0
+destruct Base
 failed: a name is not empty
 ```
 
-The third run constructs `Base`, fails in `Named` and runs no `destruct` at all, neither that of `Named` nor that of `Base`. Whatever a `construct` acquired before its `fail` is released by an `undo` of [chapter 4]({{% relref "04-flow" %}}).
+The third run constructs `Base` and fails in `Named`. The `destruct` of `Named` does not run, since its `construct` did not finish. What was built before it is torn down in reverse order: the fields of `Named` first, of which `part` holds a `Part` and `buffer` holds `none`, and then the base, whose `construct` finished, so `destruct Base` runs. A field of `self` that the `construct` set before its `fail` goes the same way. What a `construct` holds in a local at its `fail` is released by an `undo` of [chapter 4]({{% relref "04-flow" %}}).
 
 The checker refuses each of the following.
 
@@ -668,7 +670,7 @@ For a C programmer:
 
 For a C++ programmer:
 
-- A failed `construct` runs no destructor, not even that of a base whose `construct` completed. The failing path releases what it took, with `undo`.
+- A failed `construct` runs the destructor of each base whose `construct` completed and tears down the fields already set, as in C++. The destructor of the failing class itself does not run. An `undo` releases what the failing path holds in a local.
 - The teardown runs `destruct` of the class and its bases first and the fields after them. C++ destroys the members of a class before its bases.
 - No copy constructor exists. `=` copies a class value that owns nothing and is refused for one that owns something, where `dup` copies.
 

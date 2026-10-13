@@ -1,0 +1,9 @@
+exit 0
+heap 1: part1, error 1
+heap 2: part2 base part1, error 2
+heap 3: part3 part2 base part1, error 3
+heap 4: built, leaf base part3 part2 part1
+value 1: part1, error 1
+value 2: part2 base part1, error 2
+value 3: part3 part2 base part1, error 3
+value 4: built, leaf base part3 part2 part1

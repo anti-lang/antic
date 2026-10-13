@@ -1138,7 +1138,12 @@ Where two rules meet, and where three do:
 - A `construct` that may fail, `alloc` and `try`:
   `matrix/errors_try_before_an_alloc`, T050.
 - A `construct` that may fail, a base and an `own` field:
-  `matrix/errors_derived_construct_fails_after_its_base`, T052.
+  `matrix/errors_derived_construct_fails_after_its_base`, by R025 of
+  "Rules of 2026-10-13".
+- A `construct` that fails at each step, the fields it set and the
+  `destruct` of its base: `matrix/errors_construct_fails_in_reverse_order`.
+- A `construct` that fails, a base without arguments and a base it never
+  constructed: `matrix/errors_construct_fails_under_bases_without_arguments`.
 - A synchronized class, a function that may fail and a worker:
   `matrix/errors_synchronized_method_fails`.
 - An atomic, `try` as an operand and `undo`: `matrix/errors_atomics`.

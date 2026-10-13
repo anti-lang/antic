@@ -1,0 +1,107 @@
+//! A `construct` that fails tears down what was built before it, in reverse
+//! order, by R025 of the rules of 2026-10-13. Every field already set goes,
+//! last to first, then the `destruct` of the base whose `construct` finished
+//! runs, then the fields of the base go. The `destruct` of the class whose
+//! `construct` failed does not run, and a field not set yet holds nothing. The
+//! program fails at each step, on the heap and as a value, and then builds and
+//! deletes one object.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Part
+{
+	pub tag: int = 0,
+
+	/// A part that says when it goes.
+	pub fn make(tag: int) -> *Part
+	{
+		let p = alloc Part { };
+		p.tag = tag;
+		return p;
+	}
+
+	fn destruct(self)
+	{
+		printf(" part%d".ptr, self.tag as c_int);
+	}
+}
+
+class Base
+{
+	own first: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		self.first = Part.make(1);
+		if n == 1 {
+			fail lang.Error.new(n, "the base fails");
+		}
+	}
+
+	fn destruct(self)
+	{
+		printf(" base".ptr);
+	}
+}
+
+class Leaf inherits Base
+{
+	own second: ?*Part = none,
+	own third: *Part,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+		if n == 2 {
+			fail lang.Error.new(n, "the leaf fails early");
+		}
+		self.third = Part.make(3);
+		if n == 3 {
+			fail lang.Error.new(n, "the leaf fails late");
+		}
+	}
+
+	fn destruct(self)
+	{
+		printf(" leaf".ptr);
+	}
+}
+
+fn on_the_heap(n: int)
+{
+	printf("heap %d:".ptr, n as c_int);
+	let leaf = alloc Leaf(n) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+	printf(" built,".ptr);
+	delete(leaf);
+	printf("\n".ptr);
+}
+
+fn as_a_value(n: int)
+{
+	printf("value %d:".ptr, n as c_int);
+	let leaf = Leaf(n) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+	printf(" built,".ptr);
+}
+
+fn main() -> int
+{
+	for n in 1..5 {
+		on_the_heap(n);
+	}
+	for n in 1..5 {
+		as_a_value(n);
+		if n == 4 {
+			printf("\n".ptr);
+		}
+	}
+	return 0;
+}

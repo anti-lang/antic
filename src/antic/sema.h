@@ -216,6 +216,11 @@ void sema_strip_generics(struct module *module, struct arena *arena);
 /* The `fallthrough;` that ends the body of a switch arm, the last
    statement of its block, or NULL when the arm ends otherwise. */
 struct stmt *sema_arm_fallthrough(const struct stmt *body);
+
+/* Whether control never goes on to the statement after s, by the rules
+   of the checker for the `else` of a `let`. R003 of "Rules of
+   2026-10-13" adds a `switch` whose every arm and `else` end the path
+   and a `while true` without a `break` of its own. */
 bool sema_ends_path(const struct stmt *s);
 
 /* Whether a field without a written default takes `T { }`: an inline

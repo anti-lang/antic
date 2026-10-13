@@ -3,7 +3,9 @@
 //! `construct` of every class value the object holds inline. `delete`,
 //! `destroy` and the end of a block run `destruct` the other way round, and
 //! then tear down what the object owns. An array goes last to first. A
-//! `construct` that fails leaves no object, so no `destruct` runs for it.
+//! `construct` that fails leaves no object: its own `destruct` does not run,
+//! and what was built before it is torn down, the `destruct` of each base and
+//! then the fields, by R025 of the rules of 2026-10-13.
 
 import anti.lang;
 

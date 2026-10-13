@@ -57,6 +57,7 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->leave = false;
     action->life_end = false;
     action->slot = 0;
+    action->unbuild = false;
 }
 
 /* Record the `leave` hook of the function around the scope. */
@@ -68,6 +69,18 @@ void lower_push_leave_action(struct lowerer *l)
     action = &l->defers->items[l->defers->count++];
     memset(action, 0, sizeof *action);
     action->leave = true;
+}
+
+/* Record the teardown of what a `construct` that may fail built, which
+   the exits that give an error run. */
+void lower_push_unbuild_action(struct lowerer *l)
+{
+    struct exit_action *action;
+
+    l->defers->items = grow_defers(l->defers);
+    action = &l->defers->items[l->defers->count++];
+    memset(action, 0, sizeof *action);
+    action->unbuild = true;
 }
 
 /* Record the delete of the error a handler binds, whose name is sym or
@@ -93,6 +106,7 @@ void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
     action->leave = false;
     action->life_end = false;
     action->slot = 0;
+    action->unbuild = false;
 }
 
 /* Record the unlock of the lock whose address is in mutex, which a
@@ -119,6 +133,7 @@ void lower_push_unlock_action(struct lowerer *l, uint32_t mutex,
     action->leave = false;
     action->life_end = false;
     action->slot = 0;
+    action->unbuild = false;
 }
 
 void lower_jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -1334,6 +1349,16 @@ void lower_stmt(struct lowerer *l, const struct stmt *s)
 
     lower_stmt_kind(l, s);
     lower_end_temps(l, mark, true);
+    /* The call of the base's `construct` is the first statement of the
+       body. A call that cannot fail built the base part once it ended,
+       and the error path of one that can fail said so itself. */
+    if (s == l->base_call) {
+        if (s->as.expr->as.call.handler.kind == HANDLE_NONE &&
+            l->b != NULL) {
+            ir_assign(l->f, l->b, l->base_built, ir_int_op(IR_I8, 1));
+        }
+        l->base_stage = BASE_CALLED;
+    }
 }
 
 /* The test of the arm at of a switch on the value over: the call of
@@ -1773,6 +1798,10 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
             if (!l->leaving) {
                 ir_lifetime(l->f, l->b, IR_LIFE_END,
                             lower_temp(l, action->slot));
+            }
+        } else if (action->unbuild) {
+            if (failing) {
+                lower_unbuild(l);
             }
         } else if (action->leave) {
             if (failing) {

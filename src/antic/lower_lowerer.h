@@ -85,6 +85,18 @@ struct exit_action {
        IR_SLOT gave in slot. */
     bool life_end;
     uint32_t slot;
+    /* A `construct` that may fail: an exit that gives an error tears
+       down what was built before it. See lower_unbuild. */
+    bool unbuild;
+};
+
+/* Where lowering stands in a `construct` that may fail, relative to its
+   call of the `construct` of its base. An error exit reads it to know
+   what of the base part is built. */
+enum base_stage {
+    BASE_NOT_CALLED,    /* in the arguments of the call */
+    BASE_FAILED,        /* on the error path of the call */
+    BASE_CALLED         /* after the call, or in a body without one */
 };
 
 struct defers {
@@ -179,6 +191,15 @@ struct lowerer {
     /* The error of the exit that runs the deferred statements, which the
        `failed` hook takes. */
     struct ir_operand failing_error;
+    /* DESIGN: R025 of "Rules of 2026-10-13". The `construct` that may
+       fail under lowering, or NULL. base_call is its call of the
+       `construct` of its base, the first statement of its body, or NULL.
+       base_built is a temporary that holds 1 once that call gave no
+       error, and base_stage says where lowering stands. */
+    const struct item *unbuilds;
+    const struct stmt *base_call;
+    uint32_t base_built;
+    enum base_stage base_stage;
     /* DESIGN: an anonymous function is lowered after the function it
        stands in, as a function of the module of its own. The list holds
        the ones met and not lowered yet, and count numbers each, which
@@ -415,6 +436,7 @@ struct ir_operand lower_pair(struct lowerer *l, const struct type *t,
                              struct ir_operand context);
 struct ir_operand lower_closure(struct lowerer *l,
                                 const struct expr *e);
+const struct stmt *lower_base_construct_call(const struct item *it);
 
 /* lower_pattern.c */
 
@@ -592,6 +614,7 @@ void lower_select(struct lowerer *l, const struct stmt *s);
 /* lower_stmt.c */
 
 void lower_push_leave_action(struct lowerer *l);
+void lower_push_unbuild_action(struct lowerer *l);
 void lower_push_own_action(struct lowerer *l, const struct symbol *param);
 struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
                                       struct ir_operand value);
@@ -724,6 +747,8 @@ void lower_dup_snapshot(struct lowerer *l, const struct type *t,
                         struct ir_operand from, struct ir_operand into);
 /* The functions `Class.destroy` and `Class.copy` of the class t. */
 void lower_class_teardown(struct lowerer *l, const struct type *t);
+bool lower_chain_unbuilds(const struct type *t);
+void lower_unbuild(struct lowerer *l);
 void lower_class_copy(struct lowerer *l, const struct type *t);
 /* Write the tables, the fields the literal lit names and the defaults of
    every other field into the new object of type t at dest. */

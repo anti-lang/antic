@@ -241,10 +241,65 @@ static void open_body_scope(struct lowerer *l, const struct item *it)
     }
 }
 
+/* Whether s is `self.super.construct(args)`, the call of the base's
+   `construct` that stands first in the body of a `construct`. The
+   checker made it a call of that function by name, and refuses a call of
+   a `construct` anywhere else. */
+static bool calls_base_construct(const struct stmt *s)
+{
+    const struct expr *callee;
+    const struct item *made;
+
+    if (s->kind != STMT_EXPR || s->as.expr->kind != EXPR_CALL) {
+        return false;
+    }
+    callee = s->as.expr->as.call.callee;
+    if (callee == NULL || callee->kind != EXPR_NAME ||
+        callee->symbol == NULL) {
+        return false;
+    }
+    made = callee->symbol->item;
+    return made != NULL && made->owner != NULL &&
+           lower_name_is(&made->name, "construct");
+}
+
+/* The call of the base's `construct` in the `construct` it, or NULL. */
+const struct stmt *lower_base_construct_call(const struct item *it)
+{
+    return it->body != NULL && it->body->count > 0 &&
+                   calls_base_construct(it->body->stmts[0])
+               ? it->body->stmts[0]
+               : NULL;
+}
+
+/* DESIGN: R025 of "Rules of 2026-10-13". A `construct` that may fail
+   tears down what was built before it on every exit that gives an
+   error. The teardown is the last exit action of the scope around the
+   body, so the `undo` and `defer` statements of the body and its locals
+   go first. base_built holds 1 once the call of the base's `construct`
+   gave no error. */
+static void open_unbuild(struct lowerer *l, const struct item *it)
+{
+    if (it->owner == NULL || it->owner->symbol == NULL ||
+        it->owner->symbol->type->kind != TYPE_CLASS || !it->may_fail ||
+        !lower_name_is(&it->name, "construct")) {
+        return;
+    }
+    l->unbuilds = it;
+    l->base_call = lower_base_construct_call(it);
+    l->base_stage = l->base_call != NULL ? BASE_NOT_CALLED : BASE_CALLED;
+    l->base_built = ir_unary(l->f, l->b, IR_COPY, IR_I8, ir_int_op(IR_I8, 0));
+    lower_push_unbuild_action(l);
+}
+
 static void lower_function_body(struct lowerer *l, const struct item *it)
 {
     struct defers around;
     struct ir_block *entry;
+    const struct item *outer_unbuilds = l->unbuilds;
+    const struct stmt *outer_base_call = l->base_call;
+    uint32_t outer_base_built = l->base_built;
+    enum base_stage outer_base_stage = l->base_stage;
 
     l->f = l->m->functions[it->symbol->ir];
     l->f->decl_line = (uint32_t)it->pos.line;
@@ -270,6 +325,9 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
        it runs after the locals of the body are gone. */
     memset(&around, 0, sizeof around);
     l->defers = &around;
+    l->unbuilds = NULL;
+    l->base_call = NULL;
+    open_unbuild(l, it);
     open_body_scope(l, it);
     lower_block(l, it->body);
     if (l->b != NULL) {
@@ -277,6 +335,10 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
     }
     l->defers = NULL;
     free(around.items);
+    l->unbuilds = outer_unbuilds;
+    l->base_call = outer_base_call;
+    l->base_built = outer_base_built;
+    l->base_stage = outer_base_stage;
     /* Semantic analysis rejects a function with a result that can reach
        its end, so only a function without one gets here. A `may fail`
        function reports success there. */
