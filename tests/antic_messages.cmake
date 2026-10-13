@@ -142,6 +142,28 @@ anti_message(llc_does_not_start
     ARGS --runtime "${RUNTIME}" --lto none --llc ./none -o main main.anti
     ERR_MATCH "antic: cannot run \\./none: [^\n]*\nantic: llc failed\n")
 
+# A provider is written as one path, and the module of a function holds
+# dots as its name may. `com.example.app.console.get` is the `get` of the
+# singleton `console` of `com.example.app`, and the function `get` of the
+# module `com.example.app.console` as well.
+function(compile_both_providers)
+    antic_runs(-c -I "${PROJECT}" -o "${PROJECT}/out/com/example/app.antl"
+               "${PROJECT}/com/example/app.anti")
+    antic_runs(-c -I "${PROJECT}/out" -I "${PROJECT}"
+               -o "${PROJECT}/out/com/example/app/console.antl"
+               "${PROJECT}/com/example/app/console.anti")
+endfunction()
+anti_message(provider_names_two_functions
+    FILES com/example/app.anti "/// A logger.\npub abstract class Logger\n{\n\t/// Say it.\n\tpub abstract fn say(self) -> int;\n}\n\n/// The console.\npub singleton class console\n{\n\timplements lg: Logger,\n\n\tconcrete fn say(self) -> int { return 4; }\n}\n"
+          com/example/app/console.anti "import com.example.app;\n\nsingleton class Quiet inherits app.Logger\n{\n\tconcrete fn say(self) -> int { return 5; }\n}\n\n/// The other provider.\npub fn get() -> *app.Logger\n{\n\treturn Quiet.get();\n}\n"
+          main.anti "import com.example.app;\nimport com.example.app.console;\n\nclass Uses\n{\n\tpub inject log: *app.Logger,\n}\n\nfn main() -> int\n{\n\tlet u = Uses { };\n\treturn u.log.say() + console.get().say();\n}\n"
+    DIRECTORIES out/com/example/app
+    SETUP compile_both_providers
+    ARGS ${tools} -S -I out
+         --inject com.example.app.Logger=com.example.app.console.get
+         -o main.s main.anti
+    ERR "main.anti: error: the provider `com.example.app.console.get` of `com.example.app.Logger` names more than one function of the program")
+
 # The index beside a plugin holds the name of the library as a TOML string
 # of one line, which takes a name with one kind of quote. Windows has no
 # file name with a `"`.

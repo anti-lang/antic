@@ -1,0 +1,52 @@
+//! Three providers, of which the second and the third need each other. The walk
+//! reaches their cycle from the first, which stands outside it, and the message
+//! names the cycle alone.
+abstract class Store
+{
+	abstract fn size(self) -> int;
+}
+
+abstract class Logger
+{
+	abstract fn say(self) -> int;
+}
+
+abstract class Clock
+{
+	abstract fn now(self) -> int;
+}
+
+class Uses
+{
+	pub inject st: *Store,
+}
+
+singleton class Disk
+{
+	implements st: Store,
+	inject log: *Logger,
+
+	concrete fn size(self) -> int { return 0; }
+}
+
+singleton class Console
+{
+	implements lg: Logger,
+	inject time: *Clock,
+
+	concrete fn say(self) -> int { return 0; }
+}
+
+singleton class Watch
+{
+	implements ck: Clock,
+	inject log: *Logger,
+
+	concrete fn now(self) -> int { return 0; }
+}
+
+fn main() -> int
+{
+	let d = Disk.get();
+	return d.size();
+}

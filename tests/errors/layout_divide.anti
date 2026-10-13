@@ -1,0 +1,8 @@
+//! A size expression divides by a value that is zero on one target. The checker
+//! holds no size, so the back end refuses it for that target.
+const K: int = 8 / (size_of(c_long) - 8);
+
+fn main() -> int
+{
+	return K;
+}

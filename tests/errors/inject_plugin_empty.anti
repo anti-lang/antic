@@ -1,0 +1,22 @@
+//! `plugin:` names a library, and a provider that ends after the colon names
+//! none.
+abstract class Logger
+{
+	abstract fn say(self) -> int;
+}
+
+class Loud inherits Logger
+{
+	concrete fn say(self) -> int { return 1; }
+}
+
+class Uses
+{
+	pub inject log: *Logger,
+}
+
+fn main() -> int
+{
+	let u = Uses { };
+	return u.log.say();
+}

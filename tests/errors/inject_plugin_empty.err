@@ -1,0 +1,1 @@
+inject_plugin_empty.anti: error: the provider `plugin:` of `inject_plugin_empty.Logger` names no library
