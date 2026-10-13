@@ -1,0 +1,84 @@
+//! The operators of a `c_wchar` at run time. `wchar_t` is signed on some
+//! targets and unsigned on others, and the values here are small and positive,
+//! so every target gives the same result.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn divided(w: c_wchar, by: c_wchar) -> c_wchar
+{
+	return w / by;
+}
+
+fn rest(w: c_wchar, by: c_wchar) -> c_wchar
+{
+	return w % by;
+}
+
+fn shifted(w: c_wchar, by: c_wchar) -> c_wchar
+{
+	return w >> by;
+}
+
+fn at_most(w: c_wchar, limit: c_wchar) -> bool
+{
+	return w <= limit;
+}
+
+fn above(w: c_wchar, limit: c_wchar) -> bool
+{
+	return w > limit;
+}
+
+fn at_least(w: c_wchar, limit: c_wchar) -> bool
+{
+	return w >= limit;
+}
+
+fn from_float(f: f64) -> c_wchar
+{
+	return f as c_wchar;
+}
+
+fn upper_half(w: c_wchar, by: c_wchar) -> c_wchar
+{
+	return mul_high(w, by);
+}
+
+fn added(w: c_wchar, by: c_wchar) -> c_wchar
+{
+	return w +| by;
+}
+
+fn taken(w: c_wchar, by: c_wchar) -> c_wchar
+{
+	return w -| by;
+}
+
+fn times(w: c_wchar, by: c_wchar) -> c_wchar
+{
+	return w *| by;
+}
+
+fn shifted_with_flags(w: c_wchar, by: c_wchar) -> int
+{
+	let (r, f) = w >> by;
+	return r as int * 10 + f.carry as int;
+}
+
+fn main() -> int
+{
+	let w: c_wchar = 200;
+	printf("/ %d\n".ptr, divided(w, 3) as c_int);
+	printf("%% %d\n".ptr, rest(w, 7) as c_int);
+	printf(">> %d\n".ptr, shifted(w, 2) as c_int);
+	printf("<= %d %d\n".ptr, at_most(w, 200) as c_int, at_most(w, 199) as c_int);
+	printf("> %d %d\n".ptr, above(w, 199) as c_int, above(w, 200) as c_int);
+	printf(">= %d %d\n".ptr, at_least(w, 200) as c_int, at_least(w, 201) as c_int);
+	printf("from a float %d\n".ptr, from_float(12.75) as c_int);
+	printf("mul_high %d\n".ptr, upper_half(w, 3) as c_int);
+	printf("+| %d\n".ptr, added(w, 5) as c_int);
+	printf("-| %d\n".ptr, taken(w, 5) as c_int);
+	printf("*| %d\n".ptr, times(w, 5) as c_int);
+	printf(">> with flags %d\n".ptr, shifted_with_flags(w, 4) as c_int);
+	return 0;
+}
