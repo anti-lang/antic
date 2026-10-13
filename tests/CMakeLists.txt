@@ -2553,7 +2553,7 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
 endforeach()
 if(anti_option_six)
     list(APPEND anti_option_cases target_all target_all_cpu targets_default
-         symbols_target)
+         symbols_target bind_target)
 endif()
 # The inventory finds a program by the notice of its file, which
 # anti_symbols reads on the hosts other than Windows.

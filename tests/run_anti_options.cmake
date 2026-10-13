@@ -31,6 +31,8 @@
 #   bind_define_name   `bind -D <name>` reaches clang
 #   bind_define_value  `bind -D <name>=<value>` reaches clang
 #   bind_define_shim   `bind -D` reaches the shim
+#   bind_target        `bind --target` reads the header as clang reads it
+#                      for Linux and for Windows
 #   symbols_from       `symbols inventory --from` reads the archives of
 #                      another directory
 #   symbols_target     `symbols inventory` finds a program that `build
@@ -388,6 +390,27 @@ if(CASE STREQUAL "bind_define_value")
     holds("${plain}" "pub const BOUND: c_int = 3;" "the binding without -D")
     holds("${option}" "pub const BOUND: c_int = 7;"
           "the binding of -D LIMIT=7")
+    return()
+endif()
+
+if(CASE STREQUAL "bind_target")
+    # clang reads the header for the target, whose macros decide a
+    # constant here. Both runs name a target, since the host is one of
+    # the two on some machine.
+    file(WRITE "${WORK}/api.h"
+         "#ifdef _WIN32\nenum { SYSTEM = 1 };\n#else\nenum { SYSTEM = 2 };\n#endif\nint base(int a);\n")
+    foreach(pair "linux|linux-x86_64|2" "windows|windows-x86_64|1"
+            "windows_arm|windows-arm64|1")
+        string(REPLACE "|" ";" parts "${pair}")
+        list(GET parts 0 out)
+        list(GET parts 1 target)
+        list(GET parts 2 value)
+        anti_passes("anti bind --target ${target}" "${WORK}" bind --clang
+                    api.h -o ${out} --runtime "${RUNTIME}" --target ${target})
+        file(READ "${WORK}/${out}/api.anti" bound)
+        holds("${bound}" "pub const SYSTEM: c_int = ${value};"
+              "the binding of --target ${target}")
+    endforeach()
     return()
 endif()
 
