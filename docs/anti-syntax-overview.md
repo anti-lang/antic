@@ -270,7 +270,7 @@ let shape = Shape.Empty;
 let maybe: ?int = none;
 let slot = &y;
 let path = "out.txt";
-let f = fs.open(path, fs.Mode.Write) catch fatal;
+let f = try fs.open(path, fs.Mode.Write);
 ```
 -->
 ```anti
@@ -309,7 +309,7 @@ let v = show(compute(x));
 if x < 0 { unreachable; }
 ```
 
-`switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. `assert` and `show` vanish in release, and a call in the condition of an `assert` is the warning `assert-call`. `unreachable` traps in dev and is undefined in release. Not built yet: `show`, `unreachable` and labels on blocks.
+`switch` on an enum without `else` must cover every value. `switch` on a `str` is a comparison chain. `fallthrough;` as an arm's last statement enters the next arm's body without testing its values, and is refused in the last arm and into an arm that binds a variant's fields. `defer` runs at every exit of the block, `undo` only on an error exit. An `undo` in the block of a `defer` or of another `undo` is refused, and one in a function that cannot fail, outside a `try` block, is the warning `undo-never-runs`. A `yield` inside a `defer` or an `undo` of its handler is refused. `assert` and `show` vanish in release, and a call in the condition of an `assert` is the warning `assert-call`. `unreachable` traps in dev and is undefined in release. Not built yet: `show`, `unreachable` and labels on blocks.
 
 ## Loops
 
@@ -1483,6 +1483,7 @@ Every warning and every safety check has a stable name at the end of its message
 |---|---|
 | `shadowed-catch` | The name a `catch` binds hides a variable of an outer scope. |
 | `never-fails` | A `may fail` function holds no `fail` and no `try`. |
+| `undo-never-runs` | An `undo` stands in a function that cannot fail and in no `try` block. |
 | `assert-call` | The condition of an `assert` calls a function, which a release build does not run. |
 | `unfilled-abstract` | No class of the program fills an abstract class. |
 | `above-vector-cap` | A `simd struct` is above the vector cap, so each operation on it is a loop. |

@@ -1,0 +1,29 @@
+//! A `yield` inside an `undo` of a `catch` handler would leave the statement
+//! before its end, and is refused, by R002 of the rules of 2026-10-13.
+
+import anti.lang;
+
+fn risky(n: int) -> int may fail
+{
+	if n == 2 || n == 3 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn run(n: int) -> int may fail
+{
+	let got = risky(n) catch {
+		undo yield 7;
+		fail "handled";
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	let got = run(2) catch {
+		yield 0;
+	};
+	return got;
+}

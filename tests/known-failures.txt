@@ -23,7 +23,6 @@ matrix_flow_fail_in_defer_refused T001 A `fail` inside a `defer` is not refused.
 matrix_flow_fail_in_undo_refused T001 A `fail` inside an `undo` is not refused.
 matrix_flow_try_in_defer_refused T001 A `try` inside a `defer` is not refused.
 matrix_flow_try_in_undo_refused T001 A `try` inside an `undo` is not refused.
-matrix_flow_yield_in_defer_refused T002 antic crashes on a `yield` inside a `defer` of a handler.
 matrix_flow_defer_failing_call_in_try_dev T003 antic crashes on a failing call that a `defer` in a `try` block holds.
 matrix_flow_defer_failing_call_in_try_release T003 antic crashes on a failing call that a `defer` in a `try` block holds.
 matrix_flow_defer_failing_call_in_try_memory_checks T003 antic crashes on a failing call that a `defer` in a `try` block holds.

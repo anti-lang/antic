@@ -1,0 +1,15 @@
+//! An `undo` runs when its block leaves through an error. In a function that
+//! cannot fail no block does, so the statement is the warning
+//! `undo-never-runs`, by R005 of the rules of 2026-10-13.
+
+fn run(n: int) -> int
+{
+	let acc = n;
+	undo acc += 1;
+	return acc;
+}
+
+fn main() -> int
+{
+	return run(0);
+}

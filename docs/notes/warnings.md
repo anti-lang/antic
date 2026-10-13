@@ -19,6 +19,7 @@ A name stands at the end of its message, `` `e` shadows the outer `e`
 |---|---|---|
 | `shadowed-catch` | The name a `catch` binds is a variable of an outer scope, which the handler hides. | Name the error another way, `catch err`. |
 | `never-fails` | A `may fail` function holds no `fail` and no `try`. | Drop `may fail`, or allow it where an implementation of the contract may fail. |
+| `undo-never-runs` | An `undo` stands in a function that cannot fail and in no `try` block, so no error exit runs it. | Remove the `undo`, or declare the function `may fail`. |
 | `assert-call` | An `assert` condition calls a function, which a release build does not run. | Call the function before the `assert` and test its result. |
 | `unfilled-abstract` | No class of the program fills an abstract class, which a program build reports. | Fill it, or remove it, or allow it where a plugin fills it. |
 | `above-vector-cap` | A `simd struct` is above the vector cap of 256 bytes, so it is an array and each operation on it a loop. | Split it into structs at or below the cap, or allow the loops. |

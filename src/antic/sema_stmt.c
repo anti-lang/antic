@@ -1018,6 +1018,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     struct scope scope;
     struct type *outer_yield = c->yields;
     int outer_depth = c->handler_depth;
+    int outer_deferring = c->handler_deferring;
 
     if (sema_is_error(value)) {
         return value;
@@ -1043,7 +1044,9 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     sema_declare_caught(c, h, error);
     c->yields = types_without_none(c->types, value);
     c->handler_depth++;
+    c->handler_deferring = c->deferring;
     sema_check_block(c, h->body);
+    c->handler_deferring = outer_deferring;
     c->handler_depth = outer_depth;
     c->yields = outer_yield;
     sema_leave_scope(c, &scope);
@@ -1981,6 +1984,28 @@ static void mark_view(struct symbol *sym, const struct expr *value)
     }
 }
 
+/* DESIGN: R005 of "Rules of 2026-10-13". An `undo` runs when its block
+   leaves through an error. The block of a `defer` or of another `undo`
+   leaves through none, since decision 19 refuses `fail` and `try` there,
+   so an `undo` in one is refused. Outside a `try` block, a function that
+   cannot fail has no such exit either, and its `undo` is the warning
+   `undo-never-runs`. False after a refusal. */
+static bool check_undo(struct checker *c, const struct stmt *s)
+{
+    if (c->deferring > 0) {
+        sema_error_at(c, s->pos, "`undo` inside %s",
+                      c->deferred->kind == STMT_DEFER ? "a `defer`"
+                                                      : "an `undo`");
+        return false;
+    }
+    if (!sema_in_failing_function(c) && c->ctx.in_try == NULL) {
+        diagnostics_warn(c->diags, NAME_UNDO_NEVER_RUNS, s->pos.line,
+                         s->pos.column, "an `undo` in a function that "
+                         "cannot fail never runs");
+    }
+    return true;
+}
+
 static void check_stmt(struct checker *c, struct stmt *s)
 {
     struct type *t;
@@ -2077,6 +2102,17 @@ static void check_stmt(struct checker *c, struct stmt *s)
             sema_error_at(c, s->pos, "`yield` stands in a `catch` handler");
             return;
         }
+        /* A `defer` or an `undo` that began inside the handler holds the
+           `yield`, which would leave the statement before its end. R002
+           of "Rules of 2026-10-13" refuses it as decision 19 refuses the
+           other exits. A handler inside the statement takes its own
+           `yield`. */
+        if (c->deferring > c->handler_deferring) {
+            sema_error_at(c, s->pos, "`yield` inside %s",
+                          c->deferred->kind == STMT_DEFER ? "a `defer`"
+                                                          : "an `undo`");
+            return;
+        }
         if (s->as.yielded == NULL) {
             if (c->yields->kind != TYPE_VOID) {
                 sema_error_at(c, s->pos, "`yield` gives a value of type `%s`",
@@ -2132,11 +2168,18 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         return;
     case STMT_DEFER:
-    case STMT_UNDO:
+    case STMT_UNDO: {
+        const struct stmt *outer = c->deferred;
+        if (s->kind == STMT_UNDO && !check_undo(c, s)) {
+            return;
+        }
         c->deferring++;
+        c->deferred = s;
         check_stmt(c, s->as.deferred);
+        c->deferred = outer;
         c->deferring--;
         return;
+    }
     case STMT_FAIL: {
         struct type *error;
         if (!sema_in_failing_function(c)) {
@@ -2774,6 +2817,8 @@ struct body_state {
     bool saw_fail;
     const struct expr *top_call;
     int deferring;
+    const struct stmt *deferred;
+    int handler_deferring;
     const struct expr *field_base;
     const struct held_mutex *held;
 };
@@ -2787,6 +2832,8 @@ static void set_aside(struct checker *c, struct body_state *s)
     s->saw_fail = c->saw_fail;
     s->top_call = c->top_call;
     s->deferring = c->deferring;
+    s->deferred = c->deferred;
+    s->handler_deferring = c->handler_deferring;
     s->field_base = c->field_base;
     s->held = c->held;
     c->loop_depth = 0;
@@ -2794,6 +2841,8 @@ static void set_aside(struct checker *c, struct body_state *s)
     c->yields = NULL;
     c->handler_depth = 0;
     c->deferring = 0;
+    c->deferred = NULL;
+    c->handler_deferring = 0;
     c->field_base = NULL;
     c->held = NULL;
 }
@@ -2807,6 +2856,8 @@ static void take_back(struct checker *c, const struct body_state *s)
     c->saw_fail = s->saw_fail;
     c->top_call = s->top_call;
     c->deferring = s->deferring;
+    c->deferred = s->deferred;
+    c->handler_deferring = s->handler_deferring;
     c->field_base = s->field_base;
     c->held = s->held;
 }

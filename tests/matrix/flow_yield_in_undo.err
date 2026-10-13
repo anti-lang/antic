@@ -1,0 +1,1 @@
+flow_yield_in_undo.anti:17:8: error: `yield` inside an `undo`

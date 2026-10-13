@@ -138,6 +138,8 @@ struct checker {
     bool saw_fail;              /* the body holds a `fail` or a `try` */
     const struct expr *top_call; /* the first statement's call, or NULL */
     int deferring;              /* above 0, a `defer` or `undo` is checked */
+    const struct stmt *deferred;    /* the innermost of them, or NULL */
+    int handler_deferring;      /* deferring where the innermost handler began */
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
     int const_depth;            /* constants evaluated inside each other */

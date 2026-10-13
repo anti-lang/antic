@@ -1,0 +1,30 @@
+//! An anonymous function that cannot fail inside a function that may fail is a
+//! function of its own, so an `undo` in it is the warning `undo-never-runs`, by
+//! R005 of the rules of 2026-10-13.
+
+import anti.lang;
+
+fn apply(f: fn(int) -> int, n: int) -> int
+{
+	return f(n);
+}
+
+fn run(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return apply(fn(v) {
+		let acc = v;
+		undo acc += 1;
+		return acc;
+	}, n);
+}
+
+fn main() -> int
+{
+	let got = run(0) catch {
+		yield 1;
+	};
+	return got;
+}

@@ -1,6 +1,8 @@
 //! An `undo` in a `try` block runs when the block leaves through an error,
 //! before the `defer` of the block and before the handler. The `undo` of the
 //! function around the block does not run, since the function does not fail.
+//! That `undo` is the warning `undo-never-runs` of R005 of the rules of
+//! 2026-10-13, which the `allow` silences, and the one in the block is none.
 
 import anti.lang;
 
@@ -15,6 +17,7 @@ fn step(n: int) may fail
 
 fn run(n: int, log: *int)
 {
+	allow(undo-never-runs, "the program shows that it does not run")
 	undo *log = *log * 10 + 9;
 	try {
 		undo *log = *log * 10 + 7;

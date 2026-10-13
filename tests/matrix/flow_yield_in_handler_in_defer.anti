@@ -1,0 +1,45 @@
+//! A `yield` in the handler of a call that a `defer` or an `undo` holds ends
+//! that handler, which stands inside the statement, so R002 of the rules of
+//! 2026-10-13 does not refuse it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 1 {
+		fail "refused";
+	}
+	return n * 10;
+}
+
+fn in_defer(n: int) -> int
+{
+	let got = 0;
+	{
+		defer got = risky(n) catch {
+			yield 7;
+		};
+	}
+	return got;
+}
+
+fn in_undo(n: int, out: *int) may fail
+{
+	undo *out = risky(n) catch {
+		yield 8;
+	};
+	fail "undone";
+}
+
+fn main() -> int
+{
+	let undone = 0;
+	in_undo(2, &undone) catch {
+		yield;
+	};
+	printf("defer %d %d, undo %d\n".ptr, in_defer(1) as c_int,
+		in_defer(2) as c_int, undone as c_int);
+	return 0;
+}

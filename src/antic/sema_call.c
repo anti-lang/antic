@@ -1126,6 +1126,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
     struct scope scope;
     struct type *outer_yield = c->yields;
     int outer_depth = c->handler_depth;
+    int outer_deferring = c->handler_deferring;
 
     /* DESIGN: `yield` gives the value that takes the place of the
        result, so it is checked against the type the binding holds. A
@@ -1190,7 +1191,9 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         sema_declare_caught(c, h, sema_caught_error(c, fn->result));
         c->yields = result;
         c->handler_depth++;
+        c->handler_deferring = c->deferring;
         sema_check_block(c, h->body);
+        c->handler_deferring = outer_deferring;
         c->handler_depth = outer_depth;
         c->yields = outer_yield;
         sema_leave_scope(c, &scope);

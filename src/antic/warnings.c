@@ -18,6 +18,7 @@ static const struct name_entry NAMES[NAME_COUNT] = {
     [NAME_NONE] = {"", KIND_WARNING},
     [NAME_SHADOWED_CATCH] = {"shadowed-catch", KIND_WARNING},
     [NAME_NEVER_FAILS] = {"never-fails", KIND_WARNING},
+    [NAME_UNDO_NEVER_RUNS] = {"undo-never-runs", KIND_WARNING},
     [NAME_ASSERT_CALL] = {"assert-call", KIND_WARNING},
     [NAME_UNFILLED_ABSTRACT] = {"unfilled-abstract", KIND_WARNING},
     [NAME_ABOVE_VECTOR_CAP] = {"above-vector-cap", KIND_WARNING},

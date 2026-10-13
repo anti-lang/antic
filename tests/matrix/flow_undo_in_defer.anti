@@ -1,0 +1,24 @@
+//! An `undo` in the block of a `defer` is refused, by R005 of the rules of
+//! 2026-10-13: the deferred block leaves through no error.
+
+import anti.lang;
+
+fn run(n: int) -> int may fail
+{
+	let acc = n;
+	defer {
+		undo acc += 1;
+	}
+	if n > 0 {
+		fail "refused";
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	let got = run(0) catch {
+		yield 1;
+	};
+	return got;
+}

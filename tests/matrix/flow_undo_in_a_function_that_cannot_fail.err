@@ -1,0 +1,1 @@
+flow_undo_in_a_function_that_cannot_fail.anti:8:2: error: an `undo` in a function that cannot fail never runs [undo-never-runs]
