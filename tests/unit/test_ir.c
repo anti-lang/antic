@@ -782,6 +782,187 @@ static void out_of_range(void)
     arena_free(&arena);
 }
 
+/* One function per instruction the verifier refuses, each built as the
+   builders write it and then changed in one value. A library file can
+   hold every one of them. */
+static void refused_forms(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_function *callee;
+    struct ir_block *b0;
+    struct ir_field fields[4];
+    struct ir_global *table;
+    struct ir_class *c;
+    struct ir_operand args[1];
+    static const uint8_t zero[8] = {0};
+    static const uint32_t lanes[4] = {3, 2, 1, 0};
+    uint32_t bits;
+    uint32_t vec;
+    uint32_t p;
+    uint32_t x;
+    uint32_t t;
+    size_t i;
+
+    ir_module_init(&m, &arena, "main");
+    memset(fields, 0, sizeof fields);
+    fields[0].name = "plain";
+    fields[0].type = ir_scalar(IR_I32);
+    fields[1].name = "three";
+    fields[1].type = ir_scalar(IR_I32);
+    fields[1].bits = 3;
+    bits = ir_struct_add(&m, IR_AGG_STRUCT, "main.Bits", fields, 2, false, 0);
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < 4; i++) {
+        fields[i].name = "l";
+        fields[i].type = ir_scalar(IR_F32);
+    }
+    vec = ir_simd_add(&m, "main.F4", fields, 4);
+    table = ir_global_add(&m, "main", "table", zero, sizeof zero, 8);
+    callee = ir_function_add(&m, "main", "callee", IR_VOID, IR_NO_AGG);
+    ir_param_add(callee, IR_PTR, IR_NO_AGG);
+    ir_ret(callee, ir_block_add(callee), IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A load of an entry of a table that gives an integer. */
+    f = ir_function_add(&m, "main", "entry", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_load(f, b0, IR_I64, ir_temp_op(f, p));
+    b0->insts[0].field = IR_ACCESS_ENTRY;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A jump to a block the function does not have. */
+    f = ir_function_add(&m, "main", "target", IR_VOID, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_jump(f, b0, ir_block_add(f));
+    ir_ret(f, f->blocks[1], IR_VOID, ir_int_op(IR_I64, 0));
+    b0->insts[0].a.as.index = 9;
+
+    /* A symbolic value the module does not have. */
+    f = ir_function_add(&m, "main", "symbol", IR_I64, IR_NO_AGG);
+    x = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    t = ir_binary(f, b0, IR_ADD, IR_I64, ir_temp_op(f, x),
+                  ir_sym_operand(&m, ir_sym_size_of(&m, ir_aggregate(bits))));
+    b0->insts[0].b.as.index = 99;
+    ir_ret(f, b0, IR_I64, ir_temp_op(f, t));
+
+    /* A slot of an aggregate the module does not have, and a store whose
+       access names one. */
+    f = ir_function_add(&m, "main", "types", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_slot(f, b0, ir_aggregate(bits));
+    b0->insts[0].of.agg = 99;
+    ir_store(f, b0, IR_I32, ir_int_op(IR_I32, 1), ir_temp_op(f, p));
+    ir_type_access(b0, ir_aggregate(bits), 0);
+    b0->insts[1].of.agg = 99;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* The operations on a simd struct of four f32 lanes: lanes of
+       another type, an operation the lanes do not take, a select
+       without its second value, and a shuffle of three lanes and of a
+       lane the struct does not have. */
+    f = ir_function_add(&m, "main", "lanes", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_vbinary(f, b0, IR_FADD, IR_I32, ir_temp_op(f, p), ir_temp_op(f, p),
+               ir_temp_op(f, p), vec);
+    ir_vbinary(f, b0, IR_AND, IR_F32, ir_temp_op(f, p), ir_temp_op(f, p),
+               ir_temp_op(f, p), vec);
+    ir_vbinary(f, b0, IR_FADD, IR_F32, ir_temp_op(f, p), ir_temp_op(f, p),
+               ir_temp_op(f, p), vec);
+    b0->insts[2].field = IR_RET + 1;
+    ir_vselect(f, b0, IR_F32, ir_temp_op(f, p), ir_temp_op(f, p),
+               ir_temp_op(f, p), ir_temp_op(f, p), vec);
+    b0->insts[3].arg_count = 0;
+    ir_vshuffle(f, b0, IR_F32, ir_temp_op(f, p), ir_temp_op(f, p), lanes, 3,
+                vec);
+    ir_vshuffle(f, b0, IR_F32, ir_temp_op(f, p), ir_temp_op(f, p), lanes, 4,
+                vec);
+    b0->insts[5].args[1].as.integer = 4;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A flag after the last of the four, and a flag that follows a
+       plain add. */
+    f = ir_function_add(&m, "main", "flags", IR_VOID, IR_NO_AGG);
+    x = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    t = ir_flag_op(f, b0, IR_ADD_FL, IR_I64, ir_temp_op(f, x),
+                   ir_temp_op(f, x), ir_int_op(IR_I8, 0));
+    ir_flag(f, b0, IR_FLAG_CARRY, ir_temp_op(f, t));
+    b0->insts[1].field = IR_FLAG_NEGATIVE + 1;
+    t = ir_binary(f, b0, IR_ADD, IR_I64, ir_temp_op(f, x), ir_temp_op(f, x));
+    ir_flag(f, b0, IR_FLAG_CARRY, ir_temp_op(f, t));
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* The two conversions of an f16 with the result of the other. */
+    f = ir_function_add(&m, "main", "halves", IR_VOID, IR_NO_AGG);
+    x = ir_param_add(f, IR_I16, IR_NO_AGG);
+    p = ir_param_add(f, IR_F32, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_unary(f, b0, IR_HEXT, IR_F64, ir_temp_op(f, x));
+    ir_unary(f, b0, IR_HTRUNC, IR_I32, ir_temp_op(f, p));
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A bitfield load of a field that is no bitfield. */
+    f = ir_function_add(&m, "main", "field", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_bitload(f, b0, IR_I32, ir_temp_op(f, p), bits, 0);
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A call through a table that names the descriptor and no slot. */
+    f = ir_function_add(&m, "main", "slot", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    args[0] = ir_temp_op(f, p);
+    ir_call_indirect(f, b0, IR_VOID, ir_temp_op(f, p), callee, args, 1);
+    b0->insts[0].c = ir_global_op(table);
+    b0->insts[0].field = 0;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A block without an instruction, which is no predecessor. */
+    f = ir_function_add(&m, "main", "empty", IR_VOID, IR_NO_AGG);
+    ir_ret(f, ir_block_add(f), IR_VOID, ir_int_op(IR_I64, 0));
+    ir_block_add(f);
+
+    /* A class whose init function the module does not have. */
+    c = ir_class_add(&m, "main", "Lost");
+    c->init = 99;
+
+    verified(&m,
+             "class main.Lost names what the module does not hold\n"
+             "main.entry b0: a load of an entry of a table gives ptr, not "
+             "i64\n"
+             "main.target b0: jump names b9, which does not exist\n"
+             "main.symbol b0: add uses a symbolic value that does not "
+             "exist\n"
+             "main.types b0: slot names a type that does not exist\n"
+             "main.types b0: store has the type of an aggregate that does "
+             "not exist\n"
+             "main.lanes b0: vbinary works on lanes of i32 in a simd struct "
+             "of f32\n"
+             "main.lanes b0: vbinary takes no and on lanes of f32\n"
+             "main.lanes b0: vbinary takes no operation on lanes of f32\n"
+             "main.lanes b0: vselect takes one operand after its mask and "
+             "value\n"
+             "main.lanes b0: vshuffle names 3 lanes of a simd struct of 4\n"
+             "main.lanes b0: vshuffle names a lane that is not a constant "
+             "index\n"
+             "main.flags b0: flag reads a flag of a temporary into an i8\n"
+             "main.flags b0: flag does not follow its operation\n"
+             "main.halves b0: hext gives f32, not f64\n"
+             "main.halves b0: htrunc gives i16, not i32\n"
+             "main.field b0: bitload names a field that is not a bitfield\n"
+             "main.slot b0: call names a table that is not a class and a "
+             "slot\n"
+             "main.empty b1: the block does not end with a terminator\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* A global of the runtime and a function of a library have no module.
    The printer and the verifier write the name alone, where they once
    passed the NULL module to %s. */
@@ -824,5 +1005,6 @@ void test_ir(void)
     param_facts();
     arith_facts();
     type_accesses();
+    refused_forms();
     no_module();
 }
