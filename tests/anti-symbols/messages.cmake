@@ -78,3 +78,45 @@ anti_message(archive_no_build_id
     SETUP pack_archive
     ARGS ${resolve}
     ERR "anti: symbols.zip holds no build id")
+
+# An archive of one build whose map names the id. It holds no debug link.
+set(id "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+set(map "# The map of a symbols archive of Anti.\n# build ${id}\n0000000000001000-0000000000002000 good src/good.anti:7\n")
+set(module "module 0 ${id} 0x0000000000000000 prog")
+set(frame "0x0000000000001001 0+0x1001")
+anti_message(trace_not_there
+    FILES archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS symbols resolve none.txt --symbols symbols.zip
+    ERR "anti: cannot read none.txt")
+anti_message(archive_map_no_build_line
+    FILES trace.txt "" archive/prog.map
+          "0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    ERR "anti: symbols.zip holds no build id")
+# Each line leaves as it came in, without the CR of a line of Windows, and
+# the last line gains the newline it lacks.
+anti_message(trace_lines_of_windows
+    STATUS 0
+    FILES trace.txt "first\r\nsecond\r\nlast" archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "first" "second" "last")
+# The map fills what the debug link leaves open, so an archive without
+# the link answers no frame.
+anti_message(archive_map_alone
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame}")
+# An index holds one table per module. A key outside them and a key of a
+# table before the first `module` line name nothing.
+anti_message(archive_index_names_no_module
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n"
+          archive/index.toml "other = 1\n[module.a]\nid = \"${id}\"\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame}")
