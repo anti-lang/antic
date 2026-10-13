@@ -1,0 +1,1 @@
+flow_switch_on_an_integer_without_else_arms_all_return.anti:5:4: error: `name` can reach its end without `return`

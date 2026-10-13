@@ -1,5 +1,8 @@
-//! A function whose `switch` returns in every arm still needs a `return` after
-//! it. No document states the rule, and the test holds what antic 0.2.0 does.
+//! A `switch` on an enum that covers every value and returns in every arm ends
+//! the path of its function, by R003 of the rules of 2026-10-13, so no `return`
+//! follows it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 enum Kind
 {
@@ -21,5 +24,6 @@ fn name(k: Kind) -> int
 
 fn main() -> int
 {
-	return name(Kind.A);
+	printf("%d %d\n".ptr, name(Kind.A) as c_int, name(Kind.B) as c_int);
+	return 0;
 }

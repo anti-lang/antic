@@ -491,7 +491,10 @@ void test_sema(void)
             "`f` can reach its end without `return`");
     accepts("fn f(n: int) -> int { if n > 0 { return 1; } else if n < 0 "
             "{ return -1; } else { return 0; } }");
-    rejects("fn f() -> int { while true do { return 1; } }", 1, 4,
+    /* R003 of "Rules of 2026-10-13": a `while true` without a `break`
+       of its own ends the path, and one with a `break` does not. */
+    accepts("fn f() -> int { while true do { return 1; } }");
+    rejects("fn f() -> int { while true do { break; } }", 1, 4,
             "`f` can reach its end without `return`");
     rejects("fn f() { 1 = 2; }", 1, 10, "cannot assign to this expression");
     rejects("fn f(s: str) { s[0] = 65; }", 1, 16,

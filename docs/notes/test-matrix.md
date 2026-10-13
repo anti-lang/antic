@@ -551,7 +551,8 @@ of lowering meet:
 | `flow_fail_in_catch`, `flow_try_in_catch`, `flow_fail_in_closure`, `flow_try_in_closure`, `flow_catch_in_worker` | `fail` and `try` in a handler and in a closure, and a handler in a worker | |
 | `flow_fail_in_worker_dispatched`, `flow_try_in_worker_parallel`, `flow_fail_in_worker_without_a_result_dispatched` | R013 of "Rules of 2026-10-13": a worker that may fail is refused at `dispatch` and at `parallel`, with a message that names the reason | |
 | `flow_loop_variable_in_closure`, `flow_arm_binding_in_closure`, `flow_bindings_in_defer` | the names a `for`, an arm, an `if let` and a `catch` bind, read by a closure or a `defer` | |
-| `flow_switch_arms_all_return`, `flow_while_true_no_return` | a `switch` whose arms all return and a `while true` do not end the path of a function | |
+| `flow_switch_arms_all_return`, `flow_while_true_no_return`, `flow_let_else_that_leaves_through_a_switch`, `flow_paths_that_end` | R003 of "Rules of 2026-10-13": a `switch` whose every arm and `else` end the path and a `while true` without a `break` of its own end the path of a function, and the `else` of a `let` | |
+| `flow_switch_on_an_integer_without_else_arms_all_return`, `flow_switch_with_an_arm_that_does_not_return`, `flow_while_true_with_a_break` | R003: a `switch` on an integer without `else`, a `switch` with an arm that reaches its end and a `while true` with a `break` do not end the path | |
 | `flow_if_let_case_arms_all_return`, `flow_if_let_arms_all_return` | an `if let` whose arm and `else` return ends the path, on a case of a variant and on a `?T` | T007, the second |
 | `flow_switch_two_else`, `flow_switch_arm_not_statement`, `flow_for_step_not_integer`, `flow_for_range_not_integer` | four refusals of the parser and the checker | |
 | `flow_yield_needs_value`, `flow_yield_takes_no_value`, `flow_yield_outside_handler` | three refusals of `yield` | |

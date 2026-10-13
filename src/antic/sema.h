@@ -216,6 +216,7 @@ void sema_strip_generics(struct module *module, struct arena *arena);
 /* The `fallthrough;` that ends the body of a switch arm, the last
    statement of its block, or NULL when the arm ends otherwise. */
 struct stmt *sema_arm_fallthrough(const struct stmt *body);
+bool sema_ends_path(const struct stmt *s);
 
 /* Whether a field without a written default takes `T { }`: an inline
    class value whose class a literal may write with no field named. */

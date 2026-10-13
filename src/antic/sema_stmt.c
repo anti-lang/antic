@@ -172,12 +172,95 @@ static bool calls_never(const struct stmt *s)
     return t != NULL && t->kind == TYPE_FN && t->never;
 }
 
+/* Whether a statement inside a loop is a `break` of that loop. The walk
+   stops at a loop inside, whose `break` is its own, and never enters an
+   anonymous function. */
+static bool finds_break(void *data, const struct stmt *s)
+{
+    bool *found = data;
+
+    switch (s->kind) {
+    case STMT_BREAK:
+        *found = true;
+        return false;
+    case STMT_WHILE:
+    case STMT_DO_WHILE:
+    case STMT_FOR:
+        return false;
+    default:
+        return true;
+    }
+}
+
+/* DESIGN: R003 of "Rules of 2026-10-13". A `while true` without a
+   `break` of its own never goes on to the statement after it, so it ends
+   the path as `return` does. The rule reads the form alone: the
+   condition is the literal `true`. */
+static bool loops_forever(const struct stmt *s)
+{
+    struct ast_visitor v = {NULL, finds_break, NULL};
+    bool found = false;
+
+    if (s->kind != STMT_WHILE || s->as.loop.cond->kind != EXPR_BOOL ||
+        !s->as.loop.cond->as.boolean) {
+        return false;
+    }
+    v.data = &found;
+    ast_walk_block(&v, s->as.loop.body);
+    return !found;
+}
+
+/* DESIGN: R003 of "Rules of 2026-10-13". A `switch` ends the path when
+   every arm and the `else` end it, by the rule ends. Without an `else`
+   it must run an arm for every value, which a `switch` on an enum or on
+   a variant does, since the checker refuses one that misses a value. A
+   `switch` on an integer or a `str` without `else` runs no arm for the
+   other values and goes on. An arm that ends in `fallthrough` ends where
+   the next arm does. */
+static bool switch_ends(const struct stmt *s,
+                        bool (*ends)(const struct stmt *))
+{
+    const struct type *over = s->as.switch_stmt.value->type;
+    const struct stmt *otherwise = s->as.switch_stmt.otherwise;
+    size_t i;
+
+    if (otherwise == NULL &&
+        (over == NULL ||
+         (over->kind != TYPE_ENUM && over->kind != TYPE_VARIANT))) {
+        return false;
+    }
+    for (i = 0; i < s->as.switch_stmt.count; i++) {
+        const struct stmt *body = s->as.switch_stmt.arms[i].body;
+        if (sema_arm_fallthrough(body) == NULL && !ends(body)) {
+            return false;
+        }
+    }
+    return otherwise == NULL || sema_arm_fallthrough(otherwise) != NULL ||
+           ends(otherwise);
+}
+
+static bool stmt_returns(const struct stmt *s);
+
+/* Whether the arm of a `switch`, a statement or a block, ends the path
+   of its function. */
+static bool arm_returns(const struct stmt *body)
+{
+    return body->kind == STMT_BLOCK ? block_returns(body->as.block)
+                                    : stmt_returns(body);
+}
+
 /* The missing-return rule of chapter 2 decides from the form alone. */
 static bool stmt_returns(const struct stmt *s)
 {
     size_t i;
 
     if (s->kind == STMT_RETURN || s->kind == STMT_FAIL || calls_never(s)) {
+        return true;
+    }
+    if (s->kind == STMT_SWITCH && !s->as.switch_stmt.if_let) {
+        return switch_ends(s, arm_returns);
+    }
+    if (loops_forever(s)) {
         return true;
     }
     /* A `sync` block returns when its last statement does. */
@@ -231,9 +314,13 @@ static bool stmt_leaves(const struct stmt *s)
     case STMT_SYNC:
         return block_leaves(s->as.sync.body);
     case STMT_SWITCH:
-        return s->as.switch_stmt.if_let &&
-               block_leaves(s->as.switch_stmt.arms[0].body->as.block) &&
+        if (!s->as.switch_stmt.if_let) {
+            return switch_ends(s, stmt_leaves);
+        }
+        return block_leaves(s->as.switch_stmt.arms[0].body->as.block) &&
                block_leaves(s->as.switch_stmt.otherwise->as.block);
+    case STMT_WHILE:
+        return loops_forever(s);
     case STMT_IF:
         if (s->as.if_chain.else_body == NULL) {
             return false;
@@ -247,6 +334,13 @@ static bool stmt_leaves(const struct stmt *s)
     default:
         return false;
     }
+}
+
+/* Whether control never goes on to the statement after s. Lowering asks
+   for a `switch` and a loop, whose blocks after them no path reaches. */
+bool sema_ends_path(const struct stmt *s)
+{
+    return stmt_leaves(s);
 }
 
 static bool block_leaves(const struct block *b)

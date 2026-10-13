@@ -1,14 +1,21 @@
-//! The `else` of a `let` leaves the block it stands in, and a `switch` whose
-//! arms all return counts as no such statement.
+//! The `else` of a `let` leaves the block it stands in. A `switch` whose arms
+//! and `else` all return is such a statement, by R003 of the rules of
+//! 2026-10-13.
 
-fn maybe(n: int) -> ?*int
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn maybe(p: *int, n: int) -> ?*int
 {
+	if n > 2 {
+		return p;
+	}
 	return none;
 }
 
 fn pick(n: int) -> int
 {
-	let p = maybe(n) else {
+	let seven = 7;
+	let p = maybe(&seven, n) else {
 		switch n {
 			1 => {
 				return -1;
@@ -23,5 +30,7 @@ fn pick(n: int) -> int
 
 fn main() -> int
 {
-	return pick(1) + 1;
+	printf("%d %d %d\n".ptr, pick(1) as c_int, pick(2) as c_int,
+		pick(3) as c_int);
+	return 0;
 }

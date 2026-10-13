@@ -1476,6 +1476,21 @@ static void lower_switch(struct lowerer *l, const struct stmt *s)
     l->b = join;
 }
 
+/* DESIGN: R003 of "Rules of 2026-10-13". The checker takes a `switch`
+   whose every arm and `else` end the path, and a `while true` without a
+   `break` of its own, as the end of the path. The block after such a
+   statement is one that no path of the program reaches: the exit of the
+   loop, or the test after the last arm of a `switch` that names every
+   value. It ends in IR_UNREACHABLE, so the function needs no `return`
+   there and no exit action runs. */
+static void end_path(struct lowerer *l, const struct stmt *s)
+{
+    if (l->b != NULL && sema_ends_path(s)) {
+        ir_unreachable(l->f, l->b);
+        l->b = NULL;
+    }
+}
+
 static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
 {
     struct ir_operand v;
@@ -1587,6 +1602,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
     case STMT_WHILE:
     case STMT_DO_WHILE:
         lower_loop(l, s);
+        end_path(l, s);
         return;
     case STMT_FOR:
         if (s->as.for_loop.hooks.cursor != NULL) {
@@ -1597,6 +1613,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         return;
     case STMT_SWITCH:
         lower_switch(l, s);
+        end_path(l, s);
         return;
     /* The switch that holds the arm makes the jump. */
     case STMT_FALLTHROUGH:

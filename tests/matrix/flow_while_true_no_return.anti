@@ -1,16 +1,21 @@
-//! A function that ends in a `while true` still needs a `return` after it. No
-//! document states the rule, and the test holds what antic 0.2.0 does.
+//! A `while true` without a `break` of its own ends the path of its function,
+//! by R003 of the rules of 2026-10-13, so no `return` follows it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn forever(n: int) -> int
 {
+	let i = 0;
 	while true do {
-		if n > 0 {
-			return n;
+		if i * i >= n {
+			return i;
 		}
+		i += 1;
 	}
 }
 
 fn main() -> int
 {
-	return forever(1);
+	printf("%d %d\n".ptr, forever(1) as c_int, forever(17) as c_int);
+	return 0;
 }

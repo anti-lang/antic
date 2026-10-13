@@ -1,0 +1,162 @@
+//! The statements that end a path, by R003 of the rules of 2026-10-13. A
+//! `switch` whose every arm and `else` end the path ends it: with `return`,
+//! with `fail`, with a call that never returns, and in the `else` of a `let`
+//! with a `break` or a `continue` of the loop around it. An arm that ends in
+//! `fallthrough` ends where the next arm does. A `while true` ends the path
+//! when no `break` belongs to it: the `break` of a loop inside it and of an
+//! anonymous function do not. Each function prints one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn in_variant(s: Shape) -> int
+{
+	switch s {
+		Circle c => {
+			return c.r;
+		},
+		Empty => {
+			return -1;
+		},
+	}
+}
+
+fn with_fail(n: int) -> int may fail
+{
+	switch n {
+		1 => {
+			return 10;
+		},
+		else => {
+			fail "no arm";
+		},
+	}
+}
+
+fn stop(n: int) -> never
+{
+	printf("never %d\n".ptr, n as c_int);
+	exit(0);
+}
+
+fn with_never(n: int) -> int
+{
+	switch n {
+		1 => {
+			return 20;
+		},
+		else => stop(n),
+	}
+}
+
+fn with_fallthrough(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		1 => {
+			k = 30;
+			fallthrough;
+		},
+		2 => {
+			return k + 2;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn maybe(p: *int, n: int) -> ?*int
+{
+	if n % 2 == 0 {
+		return p;
+	}
+	return none;
+}
+
+fn in_a_loop(count: int) -> int
+{
+	let acc = 0;
+	let one = 1;
+	for i in 0..count {
+		let p = maybe(&one, i) else {
+			switch i {
+				5 => {
+					break;
+				},
+				else => {
+					continue;
+				},
+			}
+		};
+		acc += *p;
+	}
+	return acc;
+}
+
+fn apply(f: fn(int) -> int, n: int) -> int
+{
+	return f(n);
+}
+
+fn inner_breaks(n: int) -> int
+{
+	let turns = 0;
+	while true do {
+		for i in 0..n {
+			if i == 2 {
+				break;
+			}
+			turns += 1;
+		}
+		turns += apply(fn(v) {
+			let w = v;
+			while w > 0 do {
+				break;
+			}
+			return w;
+		}, 10);
+		if turns > 20 {
+			return turns;
+		}
+	}
+}
+
+fn spin(n: int) -> never
+{
+	let i = n;
+	while true do {
+		if i > 2 {
+			stop(i);
+		}
+		i += 1;
+	}
+}
+
+fn main() -> int
+{
+	printf("variant %d %d\n".ptr, in_variant(Shape.Circle { r: 4 }) as c_int,
+		in_variant(Shape.Empty) as c_int);
+	let failed = with_fail(2) catch {
+		yield -10;
+	};
+	let given = with_fail(1) catch {
+		yield -10;
+	};
+	printf("fail %d %d\n".ptr, given as c_int, failed as c_int);
+	printf("never %d\n".ptr, with_never(1) as c_int);
+	printf("fallthrough %d %d %d\n".ptr, with_fallthrough(1) as c_int,
+		with_fallthrough(2) as c_int, with_fallthrough(3) as c_int);
+	printf("loop %d %d\n".ptr, in_a_loop(4) as c_int, in_a_loop(9) as c_int);
+	printf("while true %d\n".ptr, inner_breaks(3) as c_int);
+	spin(0);
+}

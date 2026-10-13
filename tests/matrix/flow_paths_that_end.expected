@@ -1,0 +1,8 @@
+exit 0
+variant 4 -1
+fail 10 -10
+never 20
+fallthrough 32 2 0
+loop 2 3
+while true 24
+never 3

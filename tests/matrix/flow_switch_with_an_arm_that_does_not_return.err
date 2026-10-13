@@ -1,0 +1,1 @@
+flow_switch_with_an_arm_that_does_not_return.anti:4:4: error: `name` can reach its end without `return`

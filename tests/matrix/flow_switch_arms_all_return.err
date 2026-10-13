@@ -1,1 +1,0 @@
-flow_switch_arms_all_return.anti:10:4: error: `name` can reach its end without `return`

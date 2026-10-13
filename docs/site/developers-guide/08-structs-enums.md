@@ -1045,7 +1045,6 @@ export fn next(k: Kind) -> Kind
 		Kind.Square => { return Kind.Empty; },
 		Kind.Empty => { return Kind.Circle; },
 	}
-	return k;
 }
 
 export fn writes(m: Mode) -> bool
@@ -1173,12 +1172,11 @@ define dso_local noundef zeroext range(i8 0, 4) i8 @mode_of(i64 noundef %p0) #0 
 
 ```asm excerpt=kinds target=linux-x86_64 mode=release
 <next>:
-movl %edi, %eax
-cmpl $0x2, %edi
-ja 0x14 <next+0x14>
-movl %eax, %eax
-leaq (%rip), %rcx
-movzbl (%rax,%rcx), %eax
+testl %edi, %edi
+je 0xf <next+0xf>
+cmpl $0x1, %edi
+jne 0x15 <next+0x15>
+movl $0x2, %eax
 retq
 ...
 <writes>:
@@ -1192,7 +1190,7 @@ movq %rdi, %rax
 retq
 ```
 
-`next` is the `switch` over `Kind`. antic writes a chain of compares, and `opt` turns it into a table of three bytes that `movzbl` reads. `writes` tests two values with one mask and one compare. `mode_of` of a release build returns its argument: the conversion is free and unchecked.
+`next` is the `switch` over `Kind`. Its arms name every value and each returns, so the `switch` ends the path of the function and no `return` follows it. antic writes a chain of compares and marks the path after the last one as never reached, so `opt` keeps two compares: a value that is neither `Circle` nor `Square` is `Empty`. `writes` tests two values with one mask and one compare. `mode_of` of a release build returns its argument: the conversion is free and unchecked.
 
 The C header of a library writes an exported enum as an `enum` of C.
 

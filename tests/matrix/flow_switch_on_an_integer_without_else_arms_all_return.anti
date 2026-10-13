@@ -1,0 +1,20 @@
+//! A `switch` on an integer without `else` runs no arm for a value it does not
+//! name, so it does not end the path of its function, although every arm
+//! returns. R003 of the rules of 2026-10-13 asks for every arm and the `else`.
+
+fn name(n: int) -> int
+{
+	switch n {
+		1 => {
+			return 1;
+		},
+		2 => {
+			return 2;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return name(1);
+}

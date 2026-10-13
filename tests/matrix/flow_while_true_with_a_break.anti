@@ -1,0 +1,18 @@
+//! A `while true` with a `break` of its own goes on after the loop, so it does
+//! not end the path of its function, by R003 of the rules of 2026-10-13.
+
+fn first(n: int) -> int
+{
+	let i = 0;
+	while true do {
+		if i > n {
+			break;
+		}
+		i += 1;
+	}
+}
+
+fn main() -> int
+{
+	return first(1);
+}

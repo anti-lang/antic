@@ -1,0 +1,21 @@
+//! A `switch` with an arm that reaches its end does not end the path of its
+//! function, by R003 of the rules of 2026-10-13.
+
+fn name(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		1 => {
+			return 1;
+		},
+		2 => k = 2,
+		else => {
+			return 3;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return name(1);
+}
