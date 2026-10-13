@@ -1,10 +1,11 @@
 # The regions of the front end that no test reached
 
-A step of the test run, in two sessions on 2026-10-12 and 2026-10-13, on
+A step of the test run, in three sessions on 2026-10-12 and 2026-10-13, on
 `main`. Each ran `./c coverage`, read the regions that the suite did not
 reach in `src/antic/lexer.c`, the seven parser files, `pattern.c`, `types.c`
 and the eighteen `sema*.c` files, and wrote tests for them. No file under
-`src/` changed. The step is not finished: see "Left for the next session".
+`src/` changed. The step is finished: every unreached region of the 28 files
+has a test or a reason below.
 
 ## What the step added
 
@@ -21,50 +22,67 @@ and the eighteen `sema*.c` files, and wrote tests for them. No file under
   `types_simd_cast_to_plain_structs` with one function per kind of field,
   `classes_construct_sets_through_sync_and_select` and
   `types_generic_iterable_after_another_interface`.
+- The third session: 15 programs and 17 refusals in `tests/matrix/`, and ten
+  refusals in `tests/errors/` that read a library file.
+- Seven of the ten call `anti.regex`, `anti.text` and the library `items`
+  where the file lacks what the call names. The damaged `anti.regex` of
+  `tests/modules/anti/` gained `split_literal` and `find_all_literal`, and
+  `items` the constraint `Labelled`, which names an interface.
+- `refuse` of `tests/modules/lang_code_alone` fails inside `anti.lang`
+  itself, so `antl_lang_code_alone` reaches the lookup of `StackTrace` among
+  the items of the module. `passed` of `generic_limits` hands a nested type
+  on to a generic function.
+- `variant_wide_tag` runs `tests/run_variant_wide_tag.cmake`, which writes a
+  variant of 65536 cases, compiles it and runs it. The tag is a `u32`.
 
 ## The coverage of each file
 
-The table counts the regions that no test reached at three times: at the
-start of the step, after the first session and now. It gives the share of
-regions the suite reaches at the same three times. The last two columns
-hold the share of lines before and after the second session.
-`build/drive/logs/c2-before-summary.txt` and `c2-after-summary.txt` hold the
-rows of the second session, `cv-before-summary.txt` those of the start.
+The table counts the regions that no test reached at four times: at the
+start of the step, after each of the first two sessions and now. It gives
+the share of regions and of lines the suite reaches before and after the
+third session. `build/drive/logs/c3-before-summary.txt` and
+`c3-after-summary.txt` hold the rows of the third session,
+`cv-before-summary.txt` those of the start and `c2-before-summary.txt` those
+after the first session.
 
-| File | Regions | Missed at the start | Missed after the first | Missed now | Regions at the start | Regions after the first | Regions now | Lines after the first | Lines now |
+| File | Regions | Missed at the start | After the first | After the second | Now | Regions before | Regions now | Lines before | Lines now |
 |---|---|---|---|---|---|---|---|---|---|
-| `lexer.c` | 922 | 36 | 18 | 18 | 96.10% | 98.05% | 98.05% | 98.24% | 98.24% |
-| `parser.c` | 424 | 26 | 4 | 4 | 93.87% | 99.06% | 99.06% | 98.56% | 98.56% |
-| `parser_clause.c` | 138 | 14 | 0 | 0 | 89.86% | 100.00% | 100.00% | 100.00% | 100.00% |
-| `parser_decl.c` | 541 | 52 | 3 | 3 | 90.39% | 99.45% | 99.45% | 99.29% | 99.29% |
-| `parser_expr.c` | 752 | 78 | 2 | 2 | 89.63% | 99.73% | 99.73% | 99.76% | 99.76% |
-| `parser_item.c` | 560 | 40 | 0 | 0 | 92.86% | 100.00% | 100.00% | 100.00% | 100.00% |
-| `parser_stmt.c` | 699 | 86 | 11 | 11 | 87.70% | 98.43% | 98.43% | 98.82% | 98.82% |
-| `parser_type.c` | 331 | 31 | 2 | 2 | 90.63% | 99.40% | 99.40% | 99.44% | 99.44% |
-| `pattern.c` | 818 | 319 | 17 | 17 | 61.00% | 97.92% | 97.92% | 98.19% | 98.19% |
-| `sema.c` | 1930 | 40 | 26 | 14 | 97.93% | 98.65% | 99.27% | 98.30% | 99.33% |
-| `sema_call.c` | 2204 | 49 | 39 | 20 | 97.78% | 98.23% | 99.09% | 97.98% | 99.15% |
-| `sema_chain.c` | 44 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% | 100.00% |
-| `sema_class.c` | 954 | 23 | 19 | 10 | 97.59% | 98.01% | 98.95% | 99.05% | 99.76% |
-| `sema_const.c` | 903 | 68 | 42 | 35 | 92.47% | 95.35% | 96.12% | 96.21% | 96.84% |
-| `sema_copies.c` | 1002 | 46 | 46 | 41 | 95.41% | 95.41% | 95.91% | 94.86% | 95.92% |
-| `sema_doc.c` | 472 | 36 | 5 | 3 | 92.37% | 98.94% | 99.36% | 99.00% | 99.50% |
-| `sema_export.c` | 426 | 4 | 4 | 3 | 99.06% | 99.06% | 99.30% | 99.50% | 99.50% |
-| `sema_expr.c` | 2056 | 59 | 53 | 34 | 97.13% | 97.42% | 98.35% | 97.36% | 98.53% |
-| `sema_generic.c` | 1815 | 119 | 88 | 33 | 93.44% | 95.15% | 98.18% | 95.80% | 98.54% |
-| `sema_hash.c` | 472 | 21 | 12 | 3 | 95.55% | 97.46% | 99.36% | 96.84% | 99.10% |
-| `sema_operator.c` | 686 | 32 | 30 | 13 | 95.34% | 95.63% | 98.10% | 96.61% | 98.15% |
-| `sema_pattern.c` | 674 | 55 | 33 | 16 | 91.84% | 95.10% | 97.63% | 96.37% | 97.85% |
-| `sema_safety.c` | 542 | 29 | 26 | 17 | 94.65% | 95.20% | 96.86% | 96.17% | 97.45% |
-| `sema_simd.c` | 407 | 48 | 42 | 1 | 88.21% | 89.68% | 99.75% | 90.71% | 100.00% |
-| `sema_stmt.c` | 2307 | 130 | 76 | 42 | 94.36% | 96.71% | 98.18% | 96.29% | 97.88% |
-| `sema_thread.c` | 465 | 30 | 23 | 11 | 93.55% | 95.05% | 97.63% | 94.67% | 97.78% |
-| `sema_value.c` | 586 | 19 | 19 | 11 | 96.76% | 96.76% | 98.12% | 96.80% | 98.29% |
-| `types.c` | 1313 | 67 | 24 | 23 | 94.90% | 98.17% | 98.25% | 98.57% | 98.57% |
-| All 28 | 24443 | 1557 | 664 | 387 | 93.63% | 97.28% | 98.42% | 97.41% | 98.52% |
+| `lexer.c` | 922 | 36 | 18 | 18 | 18 | 98.05% | 98.05% | 98.24% | 98.24% |
+| `parser.c` | 424 | 26 | 4 | 4 | 4 | 99.06% | 99.06% | 98.56% | 98.56% |
+| `parser_clause.c` | 138 | 14 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `parser_decl.c` | 541 | 52 | 3 | 3 | 3 | 99.45% | 99.45% | 99.29% | 99.29% |
+| `parser_expr.c` | 752 | 78 | 2 | 2 | 2 | 99.73% | 99.73% | 99.76% | 99.76% |
+| `parser_item.c` | 560 | 40 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `parser_stmt.c` | 699 | 86 | 11 | 11 | 11 | 98.43% | 98.43% | 98.82% | 98.82% |
+| `parser_type.c` | 331 | 31 | 2 | 2 | 2 | 99.40% | 99.40% | 99.44% | 99.44% |
+| `pattern.c` | 818 | 319 | 17 | 17 | 17 | 97.92% | 97.92% | 98.19% | 98.19% |
+| `sema.c` | 1930 | 40 | 26 | 14 | 9 | 99.27% | 99.53% | 99.33% | 99.42% |
+| `sema_call.c` | 2204 | 49 | 39 | 20 | 18 | 99.09% | 99.18% | 99.15% | 99.36% |
+| `sema_chain.c` | 44 | 0 | 0 | 0 | 0 | 100.00% | 100.00% | 100.00% | 100.00% |
+| `sema_class.c` | 954 | 23 | 19 | 10 | 10 | 98.95% | 98.95% | 99.76% | 99.76% |
+| `sema_const.c` | 903 | 68 | 42 | 35 | 35 | 96.12% | 96.12% | 96.84% | 96.84% |
+| `sema_copies.c` | 1002 | 46 | 46 | 41 | 33 | 95.91% | 96.71% | 95.92% | 96.45% |
+| `sema_doc.c` | 472 | 36 | 5 | 3 | 3 | 99.36% | 99.36% | 99.50% | 99.50% |
+| `sema_export.c` | 426 | 4 | 4 | 3 | 3 | 99.30% | 99.30% | 99.50% | 99.50% |
+| `sema_expr.c` | 2056 | 59 | 53 | 34 | 30 | 98.35% | 98.54% | 98.53% | 98.83% |
+| `sema_generic.c` | 1815 | 119 | 88 | 33 | 21 | 98.18% | 98.84% | 98.54% | 99.36% |
+| `sema_hash.c` | 472 | 21 | 12 | 3 | 3 | 99.36% | 99.36% | 99.10% | 99.10% |
+| `sema_operator.c` | 686 | 32 | 30 | 13 | 10 | 98.10% | 98.54% | 98.15% | 98.77% |
+| `sema_pattern.c` | 674 | 55 | 33 | 16 | 6 | 97.63% | 99.11% | 97.85% | 99.19% |
+| `sema_safety.c` | 542 | 29 | 26 | 17 | 17 | 96.86% | 96.86% | 97.45% | 97.45% |
+| `sema_simd.c` | 407 | 48 | 42 | 1 | 1 | 99.75% | 99.75% | 100.00% | 100.00% |
+| `sema_stmt.c` | 2307 | 130 | 76 | 42 | 17 | 98.18% | 99.26% | 97.88% | 98.96% |
+| `sema_thread.c` | 465 | 30 | 23 | 11 | 7 | 97.63% | 98.49% | 97.78% | 98.67% |
+| `sema_value.c` | 586 | 19 | 19 | 11 | 11 | 98.12% | 98.12% | 98.29% | 98.29% |
+| `types.c` | 1313 | 67 | 24 | 23 | 17 | 98.25% | 98.71% | 98.57% | 98.78% |
+| All 28 | 24443 | 1557 | 664 | 387 | 308 | 98.42% | 98.74% | 98.52% | 98.84% |
 
-The checker files held 583 unreached regions before the second session and
-hold 307 now. The other ten files did not change in it.
+The checker files held 307 unreached regions before the third session and
+hold 234 now, and `types.c` went from 23 to 17. The lexer, the parser files
+and `pattern.c` did not change in it. Ten files changed: `sema.c`,
+`sema_call.c`, `sema_copies.c`, `sema_expr.c`, `sema_generic.c`,
+`sema_operator.c`, `sema_pattern.c`, `sema_stmt.c`, `sema_thread.c` and
+`types.c`.
 
 ## The findings
 
@@ -88,6 +106,13 @@ session.
   the union a struct.
 - T111, major: `==` of a `fn` and a `?fn` of one type is refused, where a
   `*T` and a `?*T` compare.
+- T112, severe, of the third session: `let f = Base<i16>.make;` gives `f`
+  the address of the first function of the module, and `f()` calls it. The
+  program prints bytes of its memory. Three tests show it.
+- T113, minor: a receiver with two paths to the interface of a constraint
+  gets two messages in the copy of the generic.
+- Two refusals of the third session show T096 again, a `for` over a type
+  whose `operator fn iter` or `next` is refused. One shows T095 again.
 
 ## Regions no input reaches
 
@@ -151,6 +176,42 @@ type or for a kind that no caller passes.
 The first session listed `sema_const.c` 703 here. It is reached:
 `matrix_classes_default_repeats_over_a_constant_parameter_refused` holds it.
 
+The third session, by file. It settles the lines the second session left.
+
+- `sema_call.c` 372: the nodes a copy reads again name operators and hooks,
+  which have no level, and their operands are read once, in the generic.
+  2320: `Object` is declared in every module, so its lookup finds it.
+- `sema_copies.c` 105: `ty` alone passes no name, and it reports for a copy,
+  which has its generic. 196, 203 and 206: a field the checker recorded
+  stands in a class of the chain, and its copy has the same fields. 451:
+  `types_set_fields` gives every field of a copy the copy as its home.
+- `sema_copies.c` 400, 648 and 715: every generic type of the module and of
+  its library files has an item. A type nested in a generic class of a
+  library stops at `ty` first, which is T095.
+- `sema_copies.c` 600, 627, 687 and 725: the checker records the arguments
+  of the copy on every call of a generic. 671: a callee that is a name has
+  a symbol. 1002: the checker refuses a generic named as a value before a
+  copy is made.
+- `sema_copies.c` 876, 1257 and 1296: a slice and an array meet no `index`,
+  `set_index` or `iter` constraint, so the copy reads `e[i]` and the walk as
+  calls of a hook. 1299: the declaration of `iter` checks its iterator.
+  935, 1419, 1442 and 1450 are guards.
+- `sema_expr.c` 606: `own` refuses a `??fn`, so no quiet reading passes a
+  parameter to an `own fn` place. 1056 is a guard.
+- `sema_generic.c` 681 and 700: a hook the argument lacks is reported before
+  the walking interface is asked. 1841: a constant parameter of the class
+  always has a value.
+- `sema_operator.c` 681: `==` and `!=` have a case of their own before the
+  default. `sema_pattern.c` 730: both callers pass a type that may be `none`.
+- `sema_stmt.c` 129: `sema_implemented_in` on the line before finds every
+  sub-object the loop would. 152: a class of a library names no class of the
+  module that imports it, since a cycle of imports is refused.
+- `sema_thread.c` 39 and 84: the caller passes the name of an atomic
+  variable or a field that it checked.
+- `types.c` 167: the one caller asks `types_holds_lent` first. 1880 is a
+  guard. `pattern.c` 36: the one caller passes a buffer of the size the
+  runtime writes.
+
 ## Rules the documents do not state
 
 The first session:
@@ -192,6 +253,27 @@ The second session:
 - An abstract function without `self` is taken, and a `concrete fn` fills
   it without `self`.
 
+The third session:
+
+- A `switch` on an integer takes the arm `size_of(i64)` beside the arm `8`,
+  and the first of the two runs for 8.
+- `none` into an `own` field of type `?fn(...)`, as a default and with `=`,
+  is refused with ``an `own fn` value is not copied by `=`, use `dup` ``.
+- `operator fn eq<T, U>` whose `U` no operand names is taken where it is
+  declared. `==` is then refused with the message that the call writes `U`
+  out after the name.
+- The module of a generic class gives it an `operator fn eq` with a
+  constraint, a hook or an interface. `equals` of a copy whose argument
+  does not meet it passes over the operator and compares the fields.
+- A receiver with two paths to the interface of a constraint is refused in
+  the body of the generic. The call that names the copy gets no message.
+- A part of a concurrent class whose body declares `operator fn eq` compares
+  through it in the default `==` of the class that holds it.
+- `struct Loop { a: [size_of(Loop) + 1]int }` is refused as a struct that
+  contains itself.
+- `for x in &c` over a parameter with `Iterable<int>` is refused, since the
+  value of such a walk is a copy.
+
 ## Where the task and the code differ
 
 - `./c coverage` ran as `./c coverage part 1/2` and `part 2/2`, since one
@@ -200,20 +282,28 @@ The second session:
   refusals stand in `tests/errors/`.
 - A source that does not lex has no canonical form, so the refusals of the
   lexer are cases of `unit_lexer`.
+- The matrix reads no library file, so the refusals of the third session
+  that need one stand in `tests/errors/` with a case in
+  `tests/CMakeLists.txt`.
+- A probe showed `Box<T>.plain()` refused inside the body of `Box<T>`. The
+  last list of "Generics and collections" in `docs/decisions.md` records
+  that for `SyncList<T>.new`, so it is no finding and got no test.
 
-## Counts and checks of the second session
+## Counts and checks
 
-- Tests on the host: 4135 before, 4383 after. Expected failures: 350
-  before, 361 after.
-- Host suite: 4383 of 4383 passed, 361 of them expected failures, two
-  skipped, in 438 s, in `build/drive/logs/c2-suite-host.log`.
-- ASan and UBSan: 4382 tests each, in three parts, `ctest -I 1,1150`,
-  `-I 1151,2200` and `-I 2201,4382`. Every part passed. `asan` took 267 s,
-  359 s and 265 s, and `ubsan` 236 s, 344 s and 201 s. The second and the
-  third part run the setups of their fixtures again, so the three counts
-  are 1150, 1062 and 2201. The logs are `c2-suite-asan-1.log` to `-3.log` and
-  `c2-suite-ubsan-1.log` to `-3.log`.
-- Coverage: `c2-before-1.log` and `-2.log`, `c2-after-1.log` and `-2.log`.
+- The second session: 4135 tests on the host before and 4383 after, 350
+  expected failures before and 361 after. Its logs are `c2-*.log`.
+- The third session: 4383 tests before and 4456 after, 361 expected failures
+  before and 368 after.
+- Host suite: 4456 of 4456 passed, 368 of them expected failures, two
+  skipped, in 451 s, in `build/drive/logs/c3-suite-host.log`.
+- ASan and UBSan: 4455 tests each, in three parts, `ctest -I 1,1150`,
+  `-I 1151,2200` and `-I 2201,4455`. Every part passed. `asan` took 276 s,
+  360 s and 283 s, and `ubsan` 248 s, 345 s and 209 s. The second and the
+  third part run the setups of their fixtures again, so the three counts are
+  1150, 1062 and 2274. The logs are `c3-suite-asan-1.log` to `-3.log` and
+  `c3-suite-ubsan-1.log` to `-3.log`.
+- Coverage: `c3-before-1.log` and `-2.log`, `c3-after-1.log` and `-2.log`.
 - Every tree built with zero warnings. `emit_identity` and
   `link_identity_macos-arm64` pass, and no expected file of either changed.
 - The docs-style checker reports nothing on `CLAUDE.md`,
@@ -221,50 +311,22 @@ The second session:
 
 ## Proof
 
-`git log --oneline -3` after the push of the tests and of the counts, before
-the commit of this report:
+`git log --oneline -3` after the push of the tests of the third session,
+before the commit of this report:
 
 ```text
-1225e3a9 State the counts of the second coverage session in CLAUDE.md
-13fcc304 Test the operators, the patterns, the simd checks and more statements
-71c207fd Test more regions of the checker that no test reached
+8f2f170e Test a nested type of a library generic handed on to a generic function
+a95b1361 Test two refusals of a generic body that the copy pass and the walk give
+97f73a34 Test the regions of the checker that the second session left open
 ```
 
 `git rev-parse HEAD origin/main` after that push:
 
 ```text
-1225e3a9802c40945231df4a1879422808c70d5c
-1225e3a9802c40945231df4a1879422808c70d5c
+8f2f170ebb3b042e079418a3e6d6a62fcbe75c25
+8f2f170ebb3b042e079418a3e6d6a62fcbe75c25
 ```
 
 `git status --short` printed nothing then. The reply of the session holds
 the three outputs after the last push, since the hash of this commit is not
 known inside it.
-
-## Left for the next session
-
-By file and line of `build/coverage/html/` of the run of 2026-10-13. Every
-other unreached region of the 28 files has its reason above.
-
-- `sema.c` 828: a generic of a library with two parameters named without
-  arguments. 1120: a module of the standard library that compiles itself.
-  1164: a damaged library function with two parameters, a second function
-  of `tests/modules/anti/regex.anti`. 1629: a variant of more than 65535
-  cases. 2483: a union with two fields of one name.
-- `sema_call.c` 372 and 652: an operator of a generic of a library, and a
-  variadic `extern fn` of another module named without a call. Both need a
-  tree under `tests/modules/`. 2320: `Object` named where `anti.lang` is
-  not in reach.
-- `sema_copies.c`, all 25 lines: 105, 196, 203, 206, 280, 400, 451, 600,
-  627, 648, 671, 687, 700, 715, 725, 876, 935, 946, 1002, 1257, 1296, 1299,
-  1419, 1442 and 1450. They read as guards of the copy maker after the
-  check of the generic body, and none is proven.
-- `sema_expr.c` 606, 1056, 1089 and 1116.
-- `sema_generic.c` 403, 681, 685, 700, 788, 792, 1841 and 1892.
-- `sema_operator.c` 222 and 681.
-- `sema_pattern.c` 317, 461, 523, 560 and 610: a library file of
-  `anti.regex` or `anti.text` that lacks a function. 730.
-- `sema_stmt.c` 129, 152, 459, 826, 830, 875, 1136, 1145, 1191, 1289,
-  1436, 1697, 1804, 1969, 2341 and 2838.
-- `sema_thread.c` 39, 84, 88 and 414.
-- `types.c` 167, 1585, 1602, 1656 and 1880, and `pattern.c` 36.
