@@ -2532,7 +2532,8 @@ endforeach()
 # changes nothing of one of Windows. A Mac alone links for macOS, and the
 # other two link from every host whose runtime archive holds the sysroot.
 set(anti_option_cases strip_docs check_root_library check_root_source
-    bind_define_name bind_define_value bind_define_shim)
+    bind_define_name bind_define_value bind_define_shim release_path
+    library_root)
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_option_cases soname_macos)
 endif()
@@ -2551,7 +2552,7 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
     endif()
 endforeach()
 if(anti_option_six)
-    list(APPEND anti_option_cases target_all target_all_cpu)
+    list(APPEND anti_option_cases target_all target_all_cpu targets_default)
 endif()
 # The inventory finds a program by the notice of its file, which
 # anti_symbols reads on the hosts other than Windows.

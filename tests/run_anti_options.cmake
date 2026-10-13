@@ -33,6 +33,12 @@
 #   bind_define_shim   `bind -D` reaches the shim
 #   symbols_from       `symbols inventory --from` reads the archives of
 #                      another directory
+#   targets_default    `default` of `[targets]` in the manifest builds for
+#                      the targets it names and not for the host
+#   release_path       `build --release` builds a path dependency in
+#                      release mode and reads its library there
+#   library_root       a library project builds without the module whose
+#                      path is the name of the package
 #
 # DESIGN: each case runs anti twice, once without the option and once
 # with it, on two copies of the same files, and names what differs. A case
@@ -419,6 +425,107 @@ if(CASE STREQUAL "symbols_from")
         message(FATAL_ERROR "the inventory with --from printed:\n"
                             "${anti_stdout}")
     endif()
+    return()
+endif()
+
+# The directories of one level of a directory, sorted, with a space
+# between them.
+function(directories_of directory out)
+    file(GLOB found RELATIVE "${directory}" "${directory}/*")
+    list(SORT found)
+    list(JOIN found " " line)
+    set(${out} "${line}" PARENT_SCOPE)
+endfunction()
+
+if(CASE STREQUAL "targets_default")
+    foreach(copy plain option)
+        file(COPY "${FIXTURES}/anti-build/app" DESTINATION "${WORK}/${copy}")
+    endforeach()
+    file(APPEND "${WORK}/option/app/anti.toml"
+         "\n[targets]\ndefault = [\"linux-arm64\", \"windows-x86_64\"]\n")
+    foreach(copy plain option)
+        anti_passes("anti build of ${copy}" "${WORK}/${copy}/app" build
+                    --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+        dist_of("${WORK}/${copy}/app" ${copy})
+    endforeach()
+    if(NOT plain STREQUAL HOST)
+        message(FATAL_ERROR "anti build wrote dist/ for `${plain}`, and the "
+                            "test expects ${HOST} alone")
+    endif()
+    if(NOT option STREQUAL "linux-arm64 windows-x86_64")
+        message(FATAL_ERROR "anti build with [targets] wrote dist/ for "
+                            "`${option}`, and the test expects the two "
+                            "targets of the manifest")
+    endif()
+    return()
+endif()
+
+if(CASE STREQUAL "release_path")
+    # A program whose one dependency is the project beside it.
+    foreach(copy plain option)
+        set(root "${WORK}/${copy}")
+        file(COPY "${FIXTURES}/anti-build/shapes" DESTINATION "${root}")
+        file(WRITE "${root}/app/anti.toml"
+             "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\n\n"
+             "[dependencies]\n"
+             "\"com.example.shapes\" = { path = \"../shapes\" }\n")
+        file(WRITE "${root}/app/src/com/example/app.anti"
+             "//! A program that imports the library beside it.\n\n"
+             "import com.example.shapes;\n\n"
+             "fn main() -> int\n{\n\treturn 0;\n}\n")
+    endforeach()
+    anti_passes("anti build" "${WORK}/plain/app" build --runtime "${RUNTIME}"
+                --llvm-mc "${LLVM_MC}")
+    anti_passes("anti build --release" "${WORK}/option/app" build --release
+                --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+    foreach(copy plain option)
+        directories_of("${WORK}/${copy}/shapes/dist/${HOST}" ${copy})
+    endforeach()
+    if(NOT plain STREQUAL "dev")
+        message(FATAL_ERROR "anti build wrote `${plain}` in dist/${HOST} of "
+                            "the dependency, and the test expects dev alone")
+    endif()
+    if(NOT option STREQUAL "release")
+        message(FATAL_ERROR "anti build --release wrote `${option}` in "
+                            "dist/${HOST} of the dependency, and the test "
+                            "expects release alone")
+    endif()
+    return()
+endif()
+
+if(CASE STREQUAL "library_root")
+    # Two modules, the second of which imports the first. The project
+    # `plain` holds the module of the package name beside them.
+    foreach(copy plain option)
+        set(root "${WORK}/${copy}")
+        file(WRITE "${root}/anti.toml"
+             "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\n")
+        file(WRITE "${root}/src/com/example/first.anti"
+             "//! The first module.\n\n/// One.\n"
+             "export fn first_one() -> c_int\n{\n\treturn 1;\n}\n")
+        file(WRITE "${root}/src/com/example/second.anti"
+             "//! The second module.\n\nimport com.example.first;\n\n"
+             "/// Two.\nexport fn second_two() -> c_int\n{\n"
+             "\treturn first.first_one() + 1;\n}\n")
+    endforeach()
+    file(WRITE "${WORK}/plain/src/com/example/app.anti"
+         "//! The module of the package name.\n\n/// Zero.\n"
+         "export fn app_zero() -> c_int\n{\n\treturn 0;\n}\n")
+    foreach(copy plain option)
+        anti_passes("anti build --lib static of ${copy}" "${WORK}/${copy}"
+                    build --lib static ${tools})
+        set(dist "${WORK}/${copy}/dist/${HOST}/dev")
+        directories_of("${dist}" files)
+        if(NOT files MATCHES "^app\\.h (libapp\\.a|app\\.lib)$")
+            message(FATAL_ERROR "the library of ${copy} is `${files}`, and "
+                                "the test expects app.h and the archive")
+        endif()
+        file(READ "${dist}/app.h" header_${copy})
+        holds("${header_${copy}}" "first_one(void)" "the header of ${copy}")
+        holds("${header_${copy}}" "second_two(void)" "the header of ${copy}")
+    endforeach()
+    holds("${header_plain}" "app_zero(void)" "the header of plain")
+    lacks("${header_option}" "app_zero(void)" "the header of option")
     return()
 endif()
 
