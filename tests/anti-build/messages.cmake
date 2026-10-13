@@ -300,6 +300,34 @@ anti_message(lock_digest
     ERR "anti: ./anti.lock names 5b0c, which is no SHA-256 digest, so ./anti.lock is not read"
         "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
+anti_message(lock_package_name
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.2.0\"\nrepo = \"${repo_url}\"\nmodules = [\n    ${units_module},\n]\n\n[[package]]\nname = \"Com/Example\"\nversion = \"1.0.0\"\nrepo = \"${repo_url}\"\nmodules = [\n]\n"
+    ARGS build --offline ${tools}
+    ERR "anti: ./anti.lock names Com/Example, which is no package name, so ./anti.lock is not read"
+        "anti: --offline and no cached index of com.example.units from ${repo_url}"
+        "${no_version}")
+anti_message(lock_repository_with_a_quote
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.2.0\"\nrepo = 'file:///re\"po'\nmodules = [\n    ${units_module},\n]\n"
+    ARGS build --offline ${tools}
+    ERR "anti: ./anti.lock names file:///re\"po, which is no repository URL, so ./anti.lock is not read"
+        "anti: --offline and no cached index of com.example.units from ${repo_url}"
+        "${no_version}")
+# A lock file that no longer answers the manifest is passed over without a
+# word, and the resolver asks the repository again.
+anti_message(lock_of_another_version
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.1.0\"\nrepo = \"${repo_url}\"\nmodules = [\n    ${units_module},\n]\n"
+    ARGS build --offline ${tools}
+    ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
+        "${no_version}")
+anti_message(lock_of_another_repository
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.2.0\"\nrepo = \"file:///elsewhere\"\nmodules = [\n    ${units_module},\n]\n"
+    ARGS build --offline ${tools}
+    ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
+        "${no_version}")
 string(ASCII 127 delete)
 anti_message(lock_path_with_a_control_byte
     FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = \"../un${delete}its\" }\n"
