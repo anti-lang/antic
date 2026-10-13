@@ -1,0 +1,1 @@
+values_index_below_zero_through_a_pointer.anti:8:20: error: the index -1 is outside the array of length 3

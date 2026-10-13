@@ -1,0 +1,23 @@
+//! An assignment that copies a variant with a concurrent class in a case is
+//! refused, by R039 of "Rules of 2026-10-13": the copy would copy the class.
+
+import anti.lang;
+
+concurrent class Hits
+{
+	pub atomic n: int = 0,
+}
+
+variant Slot
+{
+	Full { hits: Hits },
+	Empty,
+}
+
+fn main() -> int
+{
+	let first = Slot.Full { hits: Hits { n: 5 } };
+	let second = Slot.Empty;
+	first = second;
+	return 0;
+}
