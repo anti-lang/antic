@@ -6514,6 +6514,22 @@ antic_program_test(matrix_classes_changed_hook_of_the_second_field_trace_writes
     OPTIONS "--trace,--trace,writes"
     EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_fields.writes.expected"
     WORK "${MATRIX_WORK}/trace-writes")
+# A write to a bitfield of a traced class calls `changed` with the record
+# of the bitfield under --trace writes. T114 of
+# docs/audit/tests-findings.md.
+antic_program_test(matrix_classes_changed_hook_of_a_bitfield_trace_writes
+    "${MATRIX}/classes_changed_hook_of_a_bitfield.anti"
+    OPTIONS "--trace,--trace,writes"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_bitfield.writes.expected"
+    WORK "${MATRIX_WORK}/trace-writes-bitfield")
+# A write to a `transient` field of a traced class calls no `changed`,
+# since the field list of its descriptor holds no record of the field. The
+# write to the field before it calls the hook.
+antic_program_test(matrix_classes_changed_hook_of_a_transient_field_trace_writes
+    "${MATRIX}/classes_changed_hook_of_a_transient_field.anti"
+    OPTIONS "--trace,--trace,writes"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_transient.writes.expected"
+    WORK "${MATRIX_WORK}/trace-writes-transient")
 # `join` of a job without a result and `join_all` call the runtime without
 # the `joined` hook under --no-hooks.
 antic_program_test(matrix_threads_jobs_no_hooks
