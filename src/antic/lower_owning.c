@@ -825,16 +825,17 @@ static void prepare(struct lowerer *l, const struct type *t,
                          lower_context_word(l, field->type, at));
             } else if (unbuilds &&
                        (field->form == FIELD_PLAIN ||
-                        field->form == FIELD_USE)) {
+                        field->form == FIELD_USE) &&
+                       (owns_buffer(field) ||
+                        sema_needs_teardown(field->type))) {
                 /* R025 of "Rules of 2026-10-13": a `construct` of the
                    chain may fail before it sets this field, and its
                    teardown then finds nothing here. */
+                struct ir_operand at = field_at(l, up, field, dest);
                 if (owns_buffer(field)) {
-                    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
-                             field_at(l, up, field, dest));
-                } else if (sema_needs_teardown(field->type)) {
-                    lower_clear_owned(l, field->type,
-                                      field_at(l, up, field, dest));
+                    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+                } else {
+                    lower_clear_owned(l, field->type, at);
                 }
             }
         }
