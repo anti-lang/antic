@@ -103,6 +103,9 @@ static void user_dirs(void)
        than writing into a directory of its own choosing. */
     dir_is(USER_DIR_UNIX, USER_DIR_DATA, "anti", empty, NULL);
     dir_is(USER_DIR_WINDOWS, USER_DIR_DATA, "anti", empty, NULL);
+    dir_is(USER_DIR_UNIX, USER_DIR_BIN, "anti", empty, NULL);
+    dir_is(USER_DIR_UNIX, USER_DIR_CONFIG, "anti", empty, NULL);
+    dir_is(USER_DIR_UNIX, USER_DIR_CACHE, "anti", empty, NULL);
 }
 
 void test_userdirs(void)
