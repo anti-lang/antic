@@ -1,0 +1,167 @@
+//! One exported item per form of the C header that neither `forms` nor another
+//! library of tests/clib holds.
+
+import anti.lang;
+
+/// The levels of a log.
+///
+/// The second paragraph follows an empty line.
+export enum Level: u8
+{
+	Quiet,
+	Loud,
+}
+
+/// Two lanes of a float, eight bytes together.
+export simd struct F32x2 { a: f32, b: f32 }
+
+/// Eight lanes of a float, thirty-two bytes together.
+export simd struct F32x8 { a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32 }
+
+/// A struct whose fields have the names of macros of `<stdint.h>`.
+export struct Limits
+{
+	SIZE_MAX: i32,
+	UINT8_MAX: u8,
+}
+
+/// A link of a chain, which names its own type.
+export struct Link
+{
+	value: i32,
+	next: ?*Link,
+	call: fn(),
+}
+
+/// A union that names its own type.
+export union Either
+{
+	whole: u64,
+	other: ?*Either,
+}
+
+/// A class with a protected field and types of its own.
+export class Box
+{
+	packed struct Header
+	{
+		tag: u8,
+		size: u32,
+	}
+
+	head: Header = Header { tag: 1, size: 2 },
+	protected depth: i32 = 5,
+	pub width: i32 = 4,
+
+	/// The size the header names.
+	pub fn size(self) -> u32
+	{
+		return self.head.size;
+	}
+}
+
+/// What has a name.
+export abstract class Named
+{
+	/// The length of the name.
+	abstract fn length(self) -> c_int;
+}
+
+/// A class that has a name.
+export class Tag
+{
+	implements named: Named,
+	pub id: i32 = 1,
+
+	concrete fn length(self) -> c_int
+	{
+		return 3;
+	}
+}
+
+/// A class that takes its name from its base.
+export class LongTag inherits Tag
+{
+	pub extra: i32 = 2,
+
+	/// The code of an error, or zero for none.
+	pub fn code_of(self, e: ?*lang.Error) -> c_int
+	{
+		if let found = e {
+			return found.code as c_int;
+		}
+		return 0;
+	}
+}
+
+/// A class whose functions run under its lock.
+export synchronized class Tally
+{
+	total: i32 = 0,
+
+	/// Add to the total.
+	pub fn add(self, n: i32)
+	{
+		self.total = self.total + n;
+	}
+
+	/// The total.
+	pub fn sum(self) -> i32
+	{
+		return self.total;
+	}
+}
+
+/// The level after a level.
+export fn louder(l: Level) -> Level
+{
+	return Level.Loud;
+}
+
+/// A value that may be none.
+export fn half(n: i32) -> ?i32
+{
+	if n % 2 != 0 {
+		return none;
+	}
+	return n / 2;
+}
+
+/// The value of a link that the caller keeps.
+export fn value_of(lent l: *Link) -> i32
+{
+	return l.value;
+}
+
+/// The first lane of a vector.
+export fn first(v: F32x2) -> f32
+{
+	return v.a;
+}
+
+/// The sum of the lanes of a wide vector.
+export fn wide_sum(v: F32x8) -> f32
+{
+	return v.sum();
+}
+
+/// The larger of the two limits.
+export fn limit_of(l: Limits) -> i32
+{
+	return l.SIZE_MAX + l.UINT8_MAX as i32;
+}
+
+/// The result of a function that may fail, or zero.
+export fn attempt(f: fn(i32) -> i32 may fail, n: i32) -> i32
+{
+	let v = f(n) catch {
+		return 0;
+	};
+	return v;
+}
+
+/// The whole of a union.
+export fn whole_of(e: Either) -> u64
+{
+	return e.whole;
+}

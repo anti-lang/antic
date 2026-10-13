@@ -10,8 +10,8 @@
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, twice,
 #             simd, classes, failing, tuples, flags, ledger, variants,
-#             nested, names, handlers, generics, optional, forms, never,
-#             never_cpp, ctypes, ctypes_shared or ctypes_bundle
+#             nested, names, handlers, generics, optional, forms, views,
+#             never, never_cpp, ctypes, ctypes_shared or ctypes_bundle
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -321,6 +321,22 @@ elseif(CASE STREQUAL "forms")
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/forms${EXE}" "${SOURCES}/forms.expected")
     run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only "${SOURCES}/forms.cpp")
+elseif(CASE STREQUAL "views")
+    # More forms of a header that no other library holds: an enum, an
+    # optional result, types that name themselves, a field named as a
+    # macro of <stdint.h>, vectors of 8 and of 32 bytes, a lent parameter,
+    # the error in a signature, an interface of a base class, a protected
+    # field, a packed type of a class and a synchronized class. The
+    # header compiles as C++17 as well.
+    library(views static "${dir}")
+    expect_header("${dir}/views.h" views.h)
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    program("${dir}/views${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/views.c"
+            INPUTS "${library_file}" "${runtime_library}")
+    expect_output("${dir}/views${EXE}" "${SOURCES}/views.expected")
+    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only "${SOURCES}/views.cpp")
 elseif(CASE STREQUAL "never" OR CASE STREQUAL "never_cpp")
     # An export function that never returns. The header declares it so,
     # and a C program ends inside the call. never_cpp compiles the header
