@@ -143,12 +143,19 @@ anti_message(archive_map_alone_of_macos
     SETUP pack_archive
     ARGS ${resolve}
     OUT "${module}" "${frame} good src/good.anti:7")
-# An index holds one table per module. A key outside them and a key of a
-# table before the first `module` line name nothing.
+# An index holds one table per module. By R184 of "Rules of 2026-10-13"
+# in docs/decisions.md a key outside them refuses the index. A key of a
+# table before the first `module` line names nothing.
+anti_message(archive_index_key_outside_the_modules
+    FILES trace.txt "${module}\n${frame}\n"
+          archive/index.toml "other = 1\n[module.a]\nmodule = \"a\"\nid = \"${id}\"\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    ERR "anti: symbols.zip holds the key other in index.toml outside a module table")
 anti_message(archive_index_names_no_module
     STATUS 0
     FILES trace.txt "${module}\n${frame}\n"
-          archive/index.toml "other = 1\n[module.a]\nid = \"${id}\"\n"
+          archive/index.toml "[module.a]\nid = \"${id}\"\n"
     SETUP pack_archive
     ARGS ${resolve}
     OUT "${module}" "${frame}")

@@ -28,7 +28,9 @@ its notice, and a file without one is reported and counted as missing.
 The id of an archive of one build is the id of its debug link, whose
 notice carries the id of the plain link. An archive without a link takes
 the id from the `# build` line of its map. An archive of a deployment
-names the id of each directory in its index.
+names the id of each directory in its index. The index holds one table per
+module, and a key outside them refuses the archive, by R184 of "Rules of
+2026-10-13".
 
 ## Resolving a frame
 

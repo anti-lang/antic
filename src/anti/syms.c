@@ -524,8 +524,14 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
         const char *value = (const char *)anti_rt_toml_value(doc, n).ptr;
         const char *field = strrchr(key, '.');
         struct unit *u;
-        if (strncmp(key, "module.", 7) != 0 || field == NULL) {
-            continue;
+        /* R184 of "Rules of 2026-10-13": every key stands in a module
+           table, and one outside them names nothing an index knows. */
+        if (strncmp(key, "module.", 7) != 0 || field == NULL ||
+            field == key + 6) {
+            fprintf(stderr, "anti: %s holds the key %s in %s outside a module "
+                            "table\n", path, key, INDEX_NAME);
+            anti_rt_toml_free(doc);
+            return false;
         }
         if (files_ends_with(key, ".module")) {
             u = units_add(out);
