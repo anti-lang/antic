@@ -561,10 +561,18 @@ static unsigned lower_options(const struct options *o)
 }
 
 /* The path a failed assertion or a failed dev-mode check names: the
-   input under the first search root that holds it. */
-static const char *recorded_file(const struct options *o)
+   input under the first search root that holds it, in memory of arena. */
+static const char *recorded_file(const struct options *o,
+                                 struct arena *arena)
 {
-    return modpath_file_of_source(o->input, o->roots, o->root_count);
+    struct text path = {0};
+    char *kept;
+
+    modpath_file_of_source(o->input, o->roots, o->root_count, &path);
+    kept = arena_alloc(arena, path.length + 1);
+    memcpy(kept, text_cstr(&path), path.length + 1);
+    text_free(&path);
+    return kept;
 }
 
 /* Lower the module into ir and verify the result. file is the path that
@@ -1006,7 +1014,8 @@ static int back_end(const struct options *o, struct module *tree,
     size_t i;
 
     if (tree != NULL &&
-        !lower_checked(o->input, recorded_file(o), tree, module, program,
+        !lower_checked(o->input, recorded_file(o, program->arena), tree,
+                       module, program,
                        lower_options(o), o->trace_patterns,
                        o->trace_pattern_count, o->package_version)) {
         return 1;
@@ -1148,7 +1157,7 @@ static int write_library(const struct options *o, struct module *tree,
     int status = 1;
 
     ir_module_init(&ir, arena, module);
-    if (lower_checked(o->input, recorded_file(o), tree, module, &ir,
+    if (lower_checked(o->input, recorded_file(o, arena), tree, module, &ir,
                       lower_options(o), o->trace_patterns,
                       o->trace_pattern_count, o->package_version) &&
         own_interface(o, tree, module, arena, &iface)) {
@@ -1357,7 +1366,8 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     if (o->dump_ir || o->dump_opt) {
-        status = dump_ir(o->input, recorded_file(o), tree, text_cstr(module),
+        status = dump_ir(o->input, recorded_file(o, program.arena), tree,
+                         text_cstr(module),
                          &program, o->dump_opt, !o->dev, lower_options(o),
                          o->trace_patterns, o->trace_pattern_count, o);
         goto done;
@@ -1793,6 +1803,31 @@ static bool library_options_usable(const struct options *o)
     return true;
 }
 
+/* Whether the directory of -o exists, which every file of the build
+   goes into. By R149 of "Rules of 2026-10-13" the message names it, and
+   not the first file the build would have written. */
+static bool output_directory_exists(const struct options *o)
+{
+    const char *slash;
+    struct text directory = {0};
+    bool exists;
+
+    if (o->output == NULL ||
+        (slash = platform_last_separator(o->output)) == NULL ||
+        slash == o->output) {
+        return true;
+    }
+    text_appendf(&directory, "%.*s", (int)(slash - o->output), o->output);
+    exists = directory_exists(text_cstr(&directory));
+    if (!exists) {
+        fprintf(stderr,
+                "antic: cannot create %s, the directory %s does not exist\n",
+                o->output, text_cstr(&directory));
+    }
+    text_free(&directory);
+    return exists;
+}
+
 int driver_run(const struct options *given)
 {
     struct options resolved = *given;
@@ -1841,6 +1876,9 @@ int driver_run(const struct options *given)
     }
     if (!library_options_usable(o)) {
         return 2;
+    }
+    if (!output_directory_exists(o)) {
+        return 1;
     }
     memset(&extras, 0, sizeof extras);
 

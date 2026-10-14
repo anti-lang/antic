@@ -40,15 +40,16 @@ anti_message(license_text_with_a_nul_byte
     ERR "antic: ${ANTI} contains a NUL byte")
 
 # An output in a directory that is not there.
+# R149 of "Rules of 2026-10-13": the message names the directory.
 anti_message(output_program_no_directory
     FILES main.anti "${program}"
     ARGS ${tools} -o none/main main.anti
-    ERR "antic: cannot create none/main.ll")
+    ERR "antic: cannot create none/main, the directory none does not exist")
 anti_message(output_library_no_directory
     FILES com/example/lib.anti "${library}"
     ARGS ${tools} -c -I "${PROJECT}" -o none/lib.antl
          "${PROJECT}/com/example/lib.anti"
-    ERR "antic: cannot create none/lib.antl")
+    ERR "antic: cannot create none/lib.antl, the directory none does not exist")
 
 # A library file of the command line and of a search root.
 anti_message(library_missing
@@ -72,6 +73,36 @@ anti_message(library_of_the_module_compiled
     FILES com/example/lib.anti "${library}"
     SETUP compile_the_library
     ARGS ${tools} -c -I "${PROJECT}" "${PROJECT}/com/example/lib.anti"
+         com/example/lib.antl
+    ERR "antic: com/example/lib.antl holds module `com.example.lib`, which this command compiles")
+# R147 of "Rules of 2026-10-13": the module path is the path of the source
+# under the search root once both are absolute and normalised, so a root
+# and a source written in two forms agree. The library each setup writes
+# and the command that compiles the module again both name the path.
+function(compile_under_the_current_directory)
+    antic_runs(-c -I . com/example/lib.anti)
+endfunction()
+anti_message(module_path_under_the_current_directory
+    FILES com/example/lib.anti "${library}"
+    SETUP compile_under_the_current_directory
+    ARGS ${tools} -c -I . com/example/lib.anti com/example/lib.antl
+    ERR "antic: com/example/lib.antl holds module `com.example.lib`, which this command compiles")
+function(compile_under_a_root_named_twice)
+    antic_runs(-c -I src ./src/com/example/lib.anti)
+endfunction()
+anti_message(module_path_under_a_root_named_twice
+    FILES src/com/example/lib.anti "${library}"
+    SETUP compile_under_a_root_named_twice
+    ARGS ${tools} -c -I src/../src ./src/com/example/lib.anti
+         src/com/example/lib.antl
+    ERR "antic: src/com/example/lib.antl holds module `com.example.lib`, which this command compiles")
+function(compile_under_an_absolute_root)
+    antic_runs(-c -I "${PROJECT}" com/example/lib.anti)
+endfunction()
+anti_message(module_path_under_an_absolute_root
+    FILES com/example/lib.anti "${library}"
+    SETUP compile_under_an_absolute_root
+    ARGS ${tools} -c -I . "${PROJECT}/com/example/lib.anti"
          com/example/lib.antl
     ERR "antic: com/example/lib.antl holds module `com.example.lib`, which this command compiles")
 # DESIGN: antic refuses the library file of the module it compiles, so no

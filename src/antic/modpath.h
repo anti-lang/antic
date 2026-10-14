@@ -14,8 +14,9 @@
 #define SOURCE_SUFFIX ".anti"
 
 /* Append the module path of source file source to out. The path is the
-   file's path under the first root that holds it, with dots for slashes
-   and without the suffix. Outside every root it is the file name alone.
+   file's path under the first root that holds it, once both are absolute
+   and normalised, with dots for slashes and without the suffix. Outside
+   every root it is the file name alone.
    Returns false and writes a message to error for a segment that is not a
    lowercase identifier or that is a keyword. */
 bool modpath_of_source(const char *source, const char *const *roots,
@@ -23,13 +24,12 @@ bool modpath_of_source(const char *source, const char *const *roots,
                            size_t error_size);
 
 /* DESIGN: the path of source under the first root that holds it, or its
-   file name alone when no root does. It is the form a failed assertion
-   and a failed dev-mode check name, so a library file holds the same
-   bytes whichever checkout compiled it. The module path comes from the
-   same text. Returns a pointer into source. */
-const char *modpath_file_of_source(const char *source,
-                                   const char *const *roots,
-                                   size_t root_count);
+   file name alone when no root does, appended to out. It is the form a
+   failed assertion and a failed dev-mode check name, so a library file
+   holds the same bytes whichever checkout compiled it. The module path
+   comes from the same text. */
+void modpath_file_of_source(const char *source, const char *const *roots,
+                            size_t root_count, struct text *out);
 
 /* Whether path starts with the segment anti, which the language's own
    libraries use. */
