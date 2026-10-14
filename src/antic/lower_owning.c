@@ -6,8 +6,9 @@
 #include "lower_lowerer.h"
 
 /* What one element or one case gets: a teardown, a copy of what it owns
-   into the place at the same position of into, or a clear. */
-enum work { WORK_DESTROY, WORK_COPY, WORK_CLEAR };
+   into the place at the same position of into, a clear, or the clear of
+   memory that holds no value yet. */
+enum work { WORK_DESTROY, WORK_COPY, WORK_CLEAR, WORK_INIT };
 
 static void work_on(struct lowerer *l, const struct type *t,
                     struct ir_operand at, struct ir_operand into,
@@ -17,6 +18,8 @@ static void work_on(struct lowerer *l, const struct type *t,
         lower_copy_owned(l, t, at, into);
     } else if (what == WORK_CLEAR) {
         lower_clear_owned(l, t, at);
+    } else if (what == WORK_INIT) {
+        lower_init_owned(l, t, at);
     } else {
         lower_destroy_owned(l, t, at, from, made_only);
     }
@@ -290,6 +293,48 @@ void lower_clear_owned(struct lowerer *l, const struct type *t,
         each_case(l, t, at, lower_none(), lower_none(), false, WORK_CLEAR);
         return;
     default:
+        return;
+    }
+}
+
+/* DESIGN: a clear reads the tag of a variant to find the case whose
+   tables it zeroes. Memory that holds no value yet holds no tag, and a
+   release build takes the load of a tag outside its range as a path that
+   never runs. Such memory takes the tag of the first case instead, whose
+   fields are then made ready the same way, so a teardown of it passes
+   over every part. */
+void lower_init_owned(struct lowerer *l, const struct type *t,
+                      struct ir_operand at)
+{
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_ARRAY:
+        each_array_element(l, t, at, lower_none(), lower_none(), false,
+                           WORK_INIT);
+        return;
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                sema_needs_teardown(f->type)) {
+                lower_init_owned(
+                    l, f->type,
+                    lower_offset_address(l, at,
+                                         lower_field_offset(l, t, &f->name)));
+            }
+        }
+        return;
+    case TYPE_VARIANT:
+        lower_store_tag(l, t, at, 0);
+        if (t->param_count > 0 && t->params[0] != NULL &&
+            sema_needs_teardown(t->params[0])) {
+            lower_init_owned(l, t->params[0], lower_case_address(l, t, at));
+        }
+        return;
+    default:
+        lower_clear_owned(l, t, at);
         return;
     }
 }
@@ -836,7 +881,7 @@ static void prepare(struct lowerer *l, const struct type *t,
                 if (owns_buffer(field)) {
                     ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
                 } else {
-                    lower_clear_owned(l, field->type, at);
+                    lower_init_owned(l, field->type, at);
                 }
             }
         }

@@ -136,6 +136,15 @@ struct ir_operand lower_load_tag(struct lowerer *l, const struct type *v,
         lower_offset_address(l, address, lower_field_offset(l, v, &tag_name)));
 }
 
+void lower_store_tag(struct lowerer *l, const struct type *v,
+                     struct ir_operand address, size_t index)
+{
+    ir_store(l->f, l->b, lower_ir_type_of(v->base),
+             ir_int_op(lower_ir_type_of(v->base), v->base->fields[index].number),
+             lower_offset_address(l, address,
+                                  lower_field_offset(l, v, &tag_name)));
+}
+
 /* The address of the fields of case index of the variant v at address.
    Every member of the union starts at its offset 0. */
 struct ir_operand lower_case_address(struct lowerer *l, const struct type *v,

@@ -1056,7 +1056,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         struct ir_operand err;
         bool has_out = s->as.let.value->as.call.out != NULL;
         if (has_out && sema_needs_teardown(sym->type)) {
-            lower_clear_owned(l, sym->type, out);
+            lower_init_owned(l, sym->type, out);
         }
         l->out_address = out;
         err = lower_call(l, s->as.let.value);

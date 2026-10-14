@@ -532,6 +532,9 @@ void lower_store_value(struct lowerer *l, const struct type *t,
                        const struct expr *e, struct ir_operand address);
 struct ir_operand lower_load_tag(struct lowerer *l, const struct type *v,
                                  struct ir_operand address);
+/* Write the number of case index of the variant v as the tag at address. */
+void lower_store_tag(struct lowerer *l, const struct type *v,
+                     struct ir_operand address, size_t index);
 struct ir_operand lower_case_address(struct lowerer *l, const struct type *v,
                                      struct ir_operand address);
 void lower_build_into(struct lowerer *l, const struct expr *e,
@@ -759,6 +762,11 @@ void lower_copy_owned(struct lowerer *l, const struct type *t,
    sema_needs_teardown first. */
 void lower_clear_owned(struct lowerer *l, const struct type *t,
                        struct ir_operand at);
+/* The clear of memory of type t at at that holds no value yet, the slot
+   a failing call writes through its out pointer. The caller asks
+   sema_needs_teardown first. */
+void lower_init_owned(struct lowerer *l, const struct type *t,
+                      struct ir_operand at);
 /* The count of elements of the innermost element type of the array t. */
 struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
 void lower_dup_snapshot(struct lowerer *l, const struct type *t,

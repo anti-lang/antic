@@ -1,0 +1,54 @@
+//! A `construct` that may fail and sets a field whose type is a variant with an
+//! owning case. The object is made ready before `construct` runs, so the `=`
+//! into the field and the teardown after a failure find no value there.
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+variant Shape
+{
+	Keyed { k: Key },
+	Empty,
+}
+
+class Holder
+{
+	pub s: Shape,
+
+	fn construct(self, ok: bool) may fail
+	{
+		if !ok {
+			fail "refused";
+		}
+		self.s = Shape.Empty;
+	}
+}
+
+fn main() -> int
+{
+	let a = alloc Holder(true) catch e {
+		printf("the first: refused\n".ptr);
+		return 1;
+	};
+	printf("the first: made, empty %d\n".ptr, (a.s is Shape.Empty) as c_int);
+	let b = alloc Holder(false) catch e {
+		printf("the second: refused\n".ptr);
+		delete(a);
+		return 0;
+	};
+	printf("the second: made\n".ptr);
+	delete(b);
+	delete(a);
+	return 0;
+}

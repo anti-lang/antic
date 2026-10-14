@@ -26,7 +26,7 @@ struct ir_operand lower_handled_operand(struct lowerer *l,
     if (has_out) {
         out = lower_temp(l, ir_entry_slot(l->f, lower_vtype_of(l, e->type)));
         if (sema_needs_teardown(e->type)) {
-            lower_clear_owned(l, e->type, out);
+            lower_init_owned(l, e->type, out);
         }
     }
     l->out_address = out;
