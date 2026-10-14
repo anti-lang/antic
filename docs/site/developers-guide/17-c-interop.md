@@ -46,7 +46,7 @@ The rules of a declaration and of a call:
 - Every pointer of an `extern fn` is written `?*T`, in a parameter and in the result. C gives no promise that a pointer is not null. A result is tested before it is read, as [chapter 7]({{% relref "07-optionals" %}}) describes.
 - `?*byte` stands for `void *` and for `char *`.
 - A call converts nothing. An `int` does not pass where a `c_int` stands, and `n as c_int` is the conversion.
-- A variadic argument has type `i32`, `u32`, `int`, `u64`, `float` or a pointer.
+- A variadic argument has type `i32`, `u32`, `int`, `u64`, `c_long`, `c_ulong`, `float` or a pointer. An `f32` is refused, since C promotes it to `f64`.
 - A struct passes by value as the C struct of the same layout, which [chapter 8]({{% relref "08-structs-enums" %}}) describes.
 - A parameter of function type takes a named function. A closure that captures a variable is refused, since C receives one pointer and no context.
 - A text literal ends in a zero byte, so `"hello".ptr` is a C string. `text.from_c(p)` of `anti.text` gives the `str` of a C string.
@@ -147,7 +147,7 @@ fn size() -> c_size_t
 ```
 
 ```anti refused
-//! error: a variadic argument has type i32, u32, int, u64, float or a pointer, found `str`
+//! error: a variadic argument has type i32, u32, int, u64, c_long, c_ulong, float or a pointer, found `str`
 extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn show() -> c_int

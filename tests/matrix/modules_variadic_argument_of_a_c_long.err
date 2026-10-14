@@ -1,1 +1,0 @@
-modules_variadic_argument_of_a_c_long.anti:9:22: error: a variadic argument has type i32, u32, int, u64, float or a pointer, found `c_long`

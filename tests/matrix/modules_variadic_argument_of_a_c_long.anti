@@ -1,11 +1,12 @@
-//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer. A
-//! `c_long`, whose width follows the target, needs `as`.
+//! R128 of "Rules of 2026-10-13": a `c_long` and a `c_ulong` are variadic
+//! arguments, whose width follows the target as the `long` of C does.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn main() -> int
 {
-	let value: c_long = 7;
-	printf("%ld\n".ptr, value);
+	let value: c_long = -7;
+	let count: c_ulong = 8;
+	printf("%ld %lu\n".ptr, value, count);
 	return 0;
 }

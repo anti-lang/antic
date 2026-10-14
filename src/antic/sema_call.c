@@ -921,6 +921,10 @@ static bool method_call(struct checker *c, struct expr *call)
     return true;
 }
 
+/* DESIGN: a variadic argument is a type C passes as it is: an integer
+   of 32 or 64 bits, `c_long` and `c_ulong` among them, an `f64` or a
+   pointer. C promotes a smaller integer and a `float`, so those take
+   `as`, by R128 of "Rules of 2026-10-13". */
 static bool variadic_ok(const struct type *t)
 {
     switch (t->kind) {
@@ -928,6 +932,8 @@ static bool variadic_ok(const struct type *t)
     case TYPE_U32:
     case TYPE_I64:
     case TYPE_U64:
+    case TYPE_CLONG:
+    case TYPE_CULONG:
     case TYPE_F64:
     case TYPE_POINTER:
         return true;
@@ -2129,10 +2135,15 @@ static struct type *check_call(struct checker *c, struct expr *e,
                            form.fixed == 1 ? e->as.call.args[0] : NULL, arg);
         } else {
             struct type *t = sema_check_expr(c, arg, NULL);
-            if (!sema_is_error(t) && !variadic_ok(t)) {
+            if (!sema_is_error(t) && t->kind == TYPE_F32) {
+                sema_error_at(c, arg->pos, "a variadic argument is never an "
+                              "`f32`, which C promotes to `f64`");
+                ok = false;
+            } else if (!sema_is_error(t) && !variadic_ok(t)) {
                 sema_error_at(c, arg->pos,
                               "a variadic argument has type i32, u32, "
-                              "int, u64, float or a pointer, found `%s`",
+                              "int, u64, c_long, c_ulong, float or a "
+                              "pointer, found `%s`",
                               sema_tn(t));
                 ok = false;
             }

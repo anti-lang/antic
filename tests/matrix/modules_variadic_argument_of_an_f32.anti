@@ -1,5 +1,5 @@
-//! A variadic argument is an integer of 32 or 64 bits, an `f64` or a pointer.
-//! An `f32` needs `as`.
+//! R128 of "Rules of 2026-10-13": an `f32` is no variadic argument. C promotes
+//! a `float` to a `double`, so the program passes an `f64`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

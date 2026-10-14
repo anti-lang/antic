@@ -1603,7 +1603,8 @@ hold what stands in a function.
   `allow` before the imports and an `unchecked` among them, and six
   refusals `matrix/modules_file_*` hold its forms.
 - `matrix/modules_count_read` holds `count` of twelve collections, and
-  `modules_variadic_arguments` every type a variadic argument takes.
+  `modules_variadic_arguments` every type a variadic argument takes, and
+  `modules_variadic_argument_of_a_c_long` the two of R128.
   `modules_doc_comments` holds the four comments of documentation before
   every kind of item.
 - A block `tests` and a block `fixtures` hold functions alone. No build of

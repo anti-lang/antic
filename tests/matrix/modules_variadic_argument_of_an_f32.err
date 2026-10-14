@@ -1,1 +1,1 @@
-modules_variadic_argument_of_an_f32.anti:9:21: error: a variadic argument has type i32, u32, int, u64, float or a pointer, found `f32`
+modules_variadic_argument_of_an_f32.anti:9:21: error: a variadic argument is never an `f32`, which C promotes to `f64`
