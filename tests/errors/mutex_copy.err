@@ -7,4 +7,4 @@ mutex_copy.anti:39:49: error: a `Mutex` cannot be copied, pass a pointer to it
 mutex_copy.anti:42:7: error: `sync` takes a `Mutex` that lives in a place, or a pointer to one
 mutex_copy.anti:45:13: error: `hits` is atomic, so it is read with `load()` and written with `store(v)`
 mutex_copy.anti:46:2: error: `hits` is atomic, so it is read with `load()` and written with `store(v)`
-mutex_copy.anti:47:6: error: an atomic local holds an integer, a `bool`, a `char` or a pointer, found `float`
+mutex_copy.anti:47:6: error: an atomic local holds an integer, a `bool`, a `char` or a pointer, found `f64`

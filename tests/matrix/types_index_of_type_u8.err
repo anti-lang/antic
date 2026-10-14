@@ -1,1 +1,1 @@
-types_index_of_type_u8.anti:7:12: error: expected `int`, found `byte`
+types_index_of_type_u8.anti:7:12: error: expected `int`, found `u8`

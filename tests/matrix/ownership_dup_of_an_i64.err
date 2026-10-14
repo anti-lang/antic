@@ -1,1 +1,1 @@
-ownership_dup_of_an_i64.anti:7:14: error: `dup` needs a class pointer, found `int`
+ownership_dup_of_an_i64.anti:7:14: error: `dup` needs a class pointer, found `i64`

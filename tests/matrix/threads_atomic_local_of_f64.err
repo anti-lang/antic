@@ -1,1 +1,1 @@
-threads_atomic_local_of_f64.anti:6:6: error: an atomic local holds an integer, a `bool`, a `char` or a pointer, found `float`
+threads_atomic_local_of_f64.anti:6:6: error: an atomic local holds an integer, a `bool`, a `char` or a pointer, found `f64`

@@ -1,1 +1,1 @@
-types_enum_negative_value_of_unsigned_base.anti:5:8: error: `-1` does not fit `byte`
+types_enum_negative_value_of_unsigned_base.anti:5:8: error: `-1` does not fit `u8`

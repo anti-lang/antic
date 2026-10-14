@@ -1,1 +1,1 @@
-values_literal_below_u8.anti:5:14: error: `-1` does not fit `byte`
+values_literal_below_u8.anti:5:14: error: `-1` does not fit `u8`

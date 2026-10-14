@@ -1,1 +1,1 @@
-ownership_dup_of_an_f64.anti:7:14: error: `dup` needs a class pointer, found `float`
+ownership_dup_of_an_f64.anti:7:14: error: `dup` needs a class pointer, found `f64`

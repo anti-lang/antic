@@ -13,7 +13,7 @@ constraints.anti:136:9: error: cannot convert `T` to `int`
 constraints.anti:141:5: error: a condition has type `bool`, found `T`
 constraints.anti:149:9: error: `U` has no `lt`, which `max` needs for `T`
 constraints.anti:154:15: error: `Circle` has no `lt`, which `max` needs for `T`. A struct or a class has no default order and declares `operator fn lt`
-constraints.anti:155:14: error: `byte` has no `neg`, which `middle` needs for `T`
+constraints.anti:155:14: error: `u8` has no `neg`, which `middle` needs for `T`
 constraints.anti:156:13: error: `str` has no `add`, which `middle` needs for `T`
 constraints.anti:158:14: error: `Plain` has no `Shape`, which `largest` needs for `T`
 constraints.anti:159:15: error: `bool` has no `add`, which `both` needs for `T`

@@ -15,6 +15,7 @@
 #include "alloc.h"
 #include "parser_parser.h"
 #include "text.h"
+#include "types.h"
 
 void parser_list_push(struct list *l, const void *element)
 {
@@ -623,6 +624,28 @@ static bool link_line(struct parser *p, struct list *out, const char *kind)
     return true;
 }
 
+/* The bits of enum types_spelling for the second names among tokens.
+   DESIGN: by R136 a message names a type as the source spells it. A
+   type holds one node for both of its names, so the spelling is the
+   file's: a file that writes `i64` gets `i64` in its messages, also
+   where one place of it writes `int`. */
+static unsigned spelled_names(const struct token *tokens, size_t count)
+{
+    unsigned spelled = 0;
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        switch (tokens[i].kind) {
+        case TOKEN_I64: spelled |= TYPES_SPELL_I64; break;
+        case TOKEN_U8: spelled |= TYPES_SPELL_U8; break;
+        case TOKEN_F64: spelled |= TYPES_SPELL_F64; break;
+        case TOKEN_UINT_TYPE: spelled |= TYPES_SPELL_UINT; break;
+        default: break;
+        }
+    }
+    return spelled;
+}
+
 bool parser_parse(const char *source, const struct token_list *tokens,
                   struct arena *arena, struct diagnostics *diags,
                   struct module **out)
@@ -646,6 +669,7 @@ bool parser_parse(const char *source, const struct token_list *tokens,
     bool saw_fixtures = false;
 
     count = parser_keep_tokens(tokens->items, tokens->count, kept, origin);
+    m->spelled = spelled_names(kept, count);
     p.tokens = kept;
     p.last = count - 1;
     p.origin = origin;

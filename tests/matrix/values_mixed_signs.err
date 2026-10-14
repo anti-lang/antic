@@ -1,1 +1,1 @@
-values_mixed_signs.anti:8:10: error: the operands of `<` have the types `int` and `u64`
+values_mixed_signs.anti:8:10: error: the operands of `<` have the types `int` and `uint`

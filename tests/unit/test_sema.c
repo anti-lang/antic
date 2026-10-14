@@ -292,7 +292,7 @@ void test_sema(void)
             "the field `s` of export struct `S` has type `str`, which C "
             "cannot represent");
     rejects("struct B { a: i32 }\nexport struct S { d: [size_of(B)]u8 }", 2, 19,
-            "the field `d` of export struct `S` has type `[size_of(B)]byte`, "
+            "the field `d` of export struct `S` has type `[size_of(B)]u8`, "
             "which C cannot represent");
     rejects("export const P: ?*byte = none;", 1, 17,
             "export const `P` has type `?*byte`, and an export const is a "
@@ -317,9 +317,9 @@ void test_sema(void)
     rejects("struct S { a: c_long : 3 }", 1, 15,
             "a bitfield has a sized integer type, found `c_long`");
     rejects("struct S { a: u8 : 9 }", 1, 20,
-            "a bitfield of `byte` has 1 to 8 bits");
+            "a bitfield of `u8` has 1 to 8 bits");
     rejects("struct S { a: u8 : 0 }", 1, 20,
-            "a bitfield of `byte` has 1 to 8 bits");
+            "a bitfield of `u8` has 1 to 8 bits");
     rejects("struct S { a: u8 : 3 }\nfn f(s: S) { let p = &s.a; }", 2, 23,
             "a bitfield has no address");
     /* A zero-width bitfield `_: T : 0` breaks the unit. It holds no value,
@@ -410,19 +410,19 @@ void test_sema(void)
     rejects("fn f() { let c: c_wchar = 65536; }", 1, 27,
             "`65536` does not fit `c_wchar` on every target");
     rejects("fn f(a: c_long) -> i64 { return a; }", 1, 33,
-            "expected `int`, found `c_long`");
+            "expected `i64`, found `c_long`");
     rejects("const BIG: c_ulong = 65536 as c_ulong * 65536 as c_ulong;", 1, 22,
             "the value does not fit `c_ulong` on every target");
     accepts("fn f() { let big = 5_000_000_000; let half: f32 = 0.5; }");
     accepts("fn f() { let x: u8 = 250 + 10; let p: ?*int = none; }");
     /* An unsigned sum wraps where it runs. A constant leaves the range
        of no type, by R029 of "Rules of 2026-10-13". */
-    rejects("const X: u8 = 250 + 10;", 1, 15, "`250 + 10` does not fit `byte`");
+    rejects("const X: u8 = 250 + 10;", 1, 15, "`250 + 10` does not fit `u8`");
     rejects("fn f() { let x: i8 = 100 + 100; }", 1, 22,
             "`100 + 100` does not fit `i8`");
     accepts("fn f(p: *int) -> bool { return p == none; }");
-    rejects("fn f() { let n: u8 = 300; }", 1, 22, "`300` does not fit `byte`");
-    rejects("fn f() { let m: u8 = -1; }", 1, 22, "`-1` does not fit `byte`");
+    rejects("fn f() { let n: u8 = 300; }", 1, 22, "`300` does not fit `u8`");
+    rejects("fn f() { let m: u8 = -1; }", 1, 22, "`-1` does not fit `u8`");
     rejects("fn f() { let g: f32 = 1; }", 1, 23,
             "expected `f32`, found an integer literal");
     rejects("fn f() { let x: int = 1.5; }", 1, 23,
@@ -430,7 +430,7 @@ void test_sema(void)
     rejects("fn f() { let p = none; }", 1, 18,
             "`none` needs a type that may be `none` from its context");
     rejects("fn f(a: u8) { let b = -a; }", 1, 23,
-            "unary `-` needs a signed integer or a float, found `byte`");
+            "unary `-` needs a signed integer or a float, found `u8`");
 
     /* Operators and conversions. */
     accepts("fn f(x: int) -> bool { return (x & 1) == 0 && x < 10 || !true; }");
@@ -439,7 +439,7 @@ void test_sema(void)
     accepts("fn f(p: *int) -> *byte { return p as *byte; }");
     accepts("fn f(b: bool, c: u32) -> char { let n = b as int; return c as char; }");
     rejects("fn f(a: int, b: u8) -> int { return a + b; }", 1, 37,
-            "the operands of `+` have the types `int` and `byte`");
+            "the operands of `+` have the types `int` and `u8`");
     rejects("fn f(x: int) -> bool { return x & 1 == 0; }", 1, 31,
             "the operands of `&` have the types `int` and `bool`");
     rejects("fn f(a: float) -> float { return a % 2.0; }", 1, 34,
@@ -621,7 +621,7 @@ void test_sema(void)
     rejects("fn f() -> i32 { return 30000000000.0 as i32; }", 1, 24,
             "`30000000000.0 as i32` does not fit `i32`");
     rejects("fn f() -> u8 { return -1.5 as u8; }", 1, 23,
-            "`-1.5 as byte` does not fit `byte`");
+            "`-1.5 as u8` does not fit `u8`");
     rejects("fn f() -> int { return (0.0 / 0.0) as int; }", 1, 25,
             "`nan as int` does not fit `int`");
     rejects("struct H { n: i32 }\nfn f() -> int { return size_of(H) >> 64; }",
@@ -646,11 +646,11 @@ void test_sema(void)
     rejects("const N: i32 = 1 <<% -1;", 1, 16,
             "`1 <<% -1` shifts out of range");
     rejects("fn f(a: f64) -> f64 { return a +% a; }", 1, 30,
-            "`+%` needs integer operands, found `float`");
+            "`+%` needs integer operands, found `f64`");
     rejects("fn f(a: f32) -> f32 { return a *| a; }", 1, 30,
             "`*|` needs integer operands, found `f32`");
     rejects("fn f(a: u8, b: i8) -> u8 { return a +| b; }", 1, 35,
-            "the operands of `+|` have the types `byte` and `i8`");
+            "the operands of `+|` have the types `u8` and `i8`");
     rejects("fn f(a: bool) -> bool { return a <<% a; }", 1, 32,
             "`<<%` needs integer operands, found `bool`");
     /* `mul_high` is a built-in of two integers of one type. A function
@@ -663,7 +663,7 @@ void test_sema(void)
     rejects("fn f(a: u64) -> u64 { return mul_high(a); }", 1, 30,
             "`mul_high` takes 2 arguments, found 1");
     rejects("fn f(a: f64) -> f64 { return mul_high(a, a); }", 1, 30,
-            "`mul_high` needs integer operands, found `float`");
+            "`mul_high` needs integer operands, found `f64`");
     rejects("fn f(a: u64, b: u32) -> u64 { return mul_high(a, b); }", 1, 38,
             "the operands of `mul_high` have the types `u64` and `u32`");
     accepts("fn mul_high(a: int) -> int { return a; }\n"
@@ -709,7 +709,7 @@ void test_sema(void)
             "the flags form takes one `+`, `-`, `*`, `<<`, `>>` or unary "
             "`-`, found `+%`");
     rejects("fn f(a: f64, b: f64) { let (r, f) = a + b; }", 1, 37,
-            "the flags form takes an integer type, found `float`");
+            "the flags form takes an integer type, found `f64`");
     rejects("fn f() { let (r, f) = -5; }", 1, 23,
             "a `-` before a literal forms a constant, which has no flags");
     rejects("fn f(a: int) { let x = 1; let (r, x) = a + a; }", 1, 35,
@@ -719,20 +719,20 @@ void test_sema(void)
     rejects("fn f(a: int) { let r = 1; let g = 2; (r, g) = a + a; }", 1, 42,
             "expected `Flags`, found `int`");
     rejects("fn f(a: int, b: u8) { let (r, g) = a + a; (b, g) = a + a; }", 1,
-            52, "expected `byte`, found `int`");
+            52, "expected `u8`, found `int`");
     rejects("fn f(a: int) { let (r, g) = a + a; (r, g) = (a, g); }", 1, 45,
             "the flags form takes one `+`, `-`, `*`, `<<`, `>>` or unary "
             "`-`, found a tuple");
     rejects("fn f(a: int, p: *int) { let (r, g) = a + a; (*p, g) = a + a; }",
             1, 45, "the flags form assigns to two names");
     rejects("fn f(a: u8, g: Flags) -> u8 { return a +% g.carry; }", 1, 38,
-            "the operands of `+%` have the types `byte` and `bool`");
+            "the operands of `+%` have the types `u8` and `bool`");
     rejects("fn f(a: u8, g: Flags) -> u8 { return a * g.carry; }", 1, 38,
-            "the operands of `*` have the types `byte` and `bool`");
+            "the operands of `*` have the types `u8` and `bool`");
     rejects("fn f(a: f64, g: Flags) -> f64 { return a + g.carry; }", 1, 40,
-            "a carry goes into an integer, found `float`");
+            "a carry goes into an integer, found `f64`");
     rejects("fn f(a: u8, g: bool) -> u8 { return a + g; }", 1, 37,
-            "the operands of `+` have the types `byte` and `bool`");
+            "the operands of `+` have the types `u8` and `bool`");
     rejects("const X: int = 1;\nfn f() -> *int { return &X; }", 2, 26,
             "a constant has no address");
     accepts("const GRID: [3]int = [1, 2, 3];\n"
@@ -896,7 +896,7 @@ void test_sema(void)
             "    let n: u8 = 0;\n"
             "    for i, x in items { n = n + i; }\n"
             "    return n;\n"
-            "}\n", 3, 29, "the operands of `+` have the types `byte` and `int`");
+            "}\n", 3, 29, "the operands of `+` have the types `u8` and `int`");
     rejects("fn f(items: []int) { for i, x in items { i = 0; } }\n", 1, 42,
             "`i` is the variable of a `for` and is read-only");
     rejects("fn f(items: []int) { for i, x in items { x = 0; } }\n", 1, 42,
@@ -993,7 +993,7 @@ void test_sema_cycles(void)
              "%sfn f(v: V) { let s = v as [16][1152921504606846977]u8; }",
              vec4);
     rejects(source, 2, 22, "cannot convert `V` to "
-            "`[16][1152921504606846977]byte`, a `simd struct` converts to "
+            "`[16][1152921504606846977]u8`, a `simd struct` converts to "
             "an array or a plain struct of the same bytes");
     snprintf(source, sizeof source,
              "struct P { a: [4611686018427387904][2]u8, "

@@ -1,1 +1,1 @@
-types_length_with_a_size_negated_twice.anti:16:21: error: expected `[-(-size_of(H))]int`, found `[2]int`
+types_length_with_a_size_negated_twice.anti:16:21: error: expected `[-(-size_of(H))]i64`, found `[2]i64`

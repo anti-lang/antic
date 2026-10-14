@@ -1,1 +1,1 @@
-values_char_literal_as_i64.anti:6:15: error: expected `int`, found `char`
+values_char_literal_as_i64.anti:6:15: error: expected `i64`, found `char`

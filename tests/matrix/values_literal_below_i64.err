@@ -1,1 +1,1 @@
-values_literal_below_i64.anti:5:15: error: `-9223372036854775809` does not fit `int`
+values_literal_below_i64.anti:5:15: error: `-9223372036854775809` does not fit `i64`

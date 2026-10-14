@@ -1704,6 +1704,40 @@ void types_name_qualified(struct text *out, const struct type *t)
     print_type(out, t, true);
 }
 
+/* The spelling print_type follows, set for the length of one call of
+   types_name_spelled. DESIGN: a variable of the file, not a parameter,
+   since print_type and the printer of symbolic values call each other
+   at every level. antic runs on one thread. */
+static unsigned spelled_names;
+
+void types_name_spelled(struct text *out, const struct type *t,
+                        unsigned spelled)
+{
+    unsigned outer = spelled_names;
+
+    spelled_names = spelled;
+    print_type(out, t, false);
+    spelled_names = outer;
+}
+
+/* The second name of a builtin type of kind under spelled_names, NULL
+   for the first. */
+static const char *second_name(enum type_kind kind)
+{
+    switch (kind) {
+    case TYPE_I64:
+        return (spelled_names & TYPES_SPELL_I64) != 0 ? "i64" : NULL;
+    case TYPE_U8:
+        return (spelled_names & TYPES_SPELL_U8) != 0 ? "u8" : NULL;
+    case TYPE_F64:
+        return (spelled_names & TYPES_SPELL_F64) != 0 ? "f64" : NULL;
+    case TYPE_U64:
+        return (spelled_names & TYPES_SPELL_UINT) != 0 ? "uint" : NULL;
+    default:
+        return NULL;
+    }
+}
+
 static void print_type(struct text *out, const struct type *t, bool qualified)
 {
     static const char *const builtin_names[TYPE_BUILTIN_COUNT] = {
@@ -1815,9 +1849,11 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
     case TYPE_PARAM:
         text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
         return;
-    default:
-        text_append(out, builtin_names[t->kind]);
+    default: {
+        const char *second = second_name(t->kind);
+        text_append(out, second != NULL ? second : builtin_names[t->kind]);
         return;
+    }
     }
 }
 

@@ -1,1 +1,1 @@
-values_constant_as_past_u8.anti:6:10: error: `300 as byte` does not fit `byte`
+values_constant_as_past_u8.anti:6:10: error: `300 as u8` does not fit `u8`

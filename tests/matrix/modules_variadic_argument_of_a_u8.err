@@ -1,1 +1,1 @@
-modules_variadic_argument_of_a_u8.anti:9:21: error: a variadic argument has type i32, u32, int, u64, c_long, c_ulong, float or a pointer, found `byte`
+modules_variadic_argument_of_a_u8.anti:9:21: error: a variadic argument has type i32, u32, int, u64, c_long, c_ulong, float or a pointer, found `u8`

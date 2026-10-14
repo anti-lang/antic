@@ -62,6 +62,10 @@ void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
    fifth call writes over the first, so a caller that keeps the text
    while it checks more of the tree copies it, as sema_check_field_inits
    does. */
+/* The spelling of the module the checker reads, which sema_tn follows.
+   DESIGN: global for the reason of the buffers below. */
+static unsigned module_spelled;
+
 const char *sema_tn(const struct type *t)
 {
     static char buffers[4][96];
@@ -69,7 +73,7 @@ const char *sema_tn(const struct type *t)
     struct text text = {0};
     char *buffer = buffers[next++ % 4];
 
-    types_name(&text, t);
+    types_name_spelled(&text, t, module_spelled);
     text_format(buffer, sizeof buffers[0], "%s", text_cstr(&text));
     text_free(&text);
     return buffer;
@@ -2943,6 +2947,7 @@ bool sema_check(struct module *module, const char *module_name,
     c.arena = arena;
     c.diags = diags;
     c.module = module;
+    module_spelled = module->spelled;
     c.module_name.text = module_name;
     c.module_name.length = strlen(module_name);
     c.package = package != NULL ? package : module_name;

@@ -842,6 +842,18 @@ uint32_t types_depth_above(struct type *const *parts, size_t count);
 /* The name of t as a program writes it, with int, float and byte for the
    aliased types. */
 void types_name(struct text *out, const struct type *t);
+/* The second names of four types, one bit each. A message names the
+   type by the second name in a file that writes it. */
+enum types_spelling {
+    TYPES_SPELL_I64 = 1,            /* `i64` beside `int` */
+    TYPES_SPELL_U8 = 2,             /* `u8` beside `byte` */
+    TYPES_SPELL_F64 = 4,            /* `f64` beside `float` */
+    TYPES_SPELL_UINT = 8            /* `uint` beside `u64` */
+};
+/* The name of t as types_name gives it, with the second name of each
+   type whose bit stands in spelled. */
+void types_name_spelled(struct text *out, const struct type *t,
+                        unsigned spelled);
 /* The name of t with the module of every struct in it, as main.Vec2. A
    copy of a generic qualifies its arguments as well. */
 void types_name_qualified(struct text *out, const struct type *t);

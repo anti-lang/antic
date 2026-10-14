@@ -1112,6 +1112,9 @@ struct clause {
 
 struct module {
     const char *file;               /* the source path, for a message */
+    /* The bits of enum types_spelling for the second names of four
+       types the file writes, which its messages follow. */
+    unsigned spelled;
     struct doc_text doc;            /* the `//!` text */
     struct doc_text note;           /* the `//#!` text */
     struct import *imports;

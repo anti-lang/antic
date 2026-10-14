@@ -97,7 +97,7 @@ let mode = 0755;
 ```
 
 ```anti refused
-//! error: expected `int`, found `i32`
+//! error: expected `i64`, found `i32`
 let x: i32 = 5;
 let y: i64 = x;
 ```

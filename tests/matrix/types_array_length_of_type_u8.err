@@ -1,1 +1,1 @@
-types_array_length_of_type_u8.anti:7:7: error: an array length has type `int`, found `byte`
+types_array_length_of_type_u8.anti:7:7: error: an array length has type `int`, found `u8`

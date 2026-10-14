@@ -1,1 +1,1 @@
-types_bitfield_width_zero.anti:5:10: error: a bitfield of `byte` has 1 to 8 bits
+types_bitfield_width_zero.anti:5:10: error: a bitfield of `u8` has 1 to 8 bits

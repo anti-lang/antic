@@ -1,1 +1,1 @@
-values_int_literal_as_f64.anti:6:15: error: expected `float`, found an integer literal
+values_int_literal_as_f64.anti:6:15: error: expected `f64`, found an integer literal
