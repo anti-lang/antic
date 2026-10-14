@@ -735,7 +735,7 @@ C and C++ reach the vector instructions through intrinsics such as `_mm_add_ps` 
 
 `simd struct` declares a vector. Each field is one lane.
 
-- Every lane has the same type: `bool`, `char`, an integer of a fixed width, `f16`, `f32` or `f64`.
+- Every lane has the same type: `bool`, an integer of a fixed width, `f16`, `f32` or `f64`. A `char` lane is refused.
 - The count of lanes is a power of two, and the size is a multiple of 8 bytes.
 - A simd struct takes no `packed`, no `align(N)` and no bitfield. Its alignment is its size or 16, whichever is less.
 - A lane is read and written as a field, `v.x`.

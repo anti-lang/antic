@@ -1,1 +1,1 @@
-types_simd_struct_with_type_parameters.anti:6:2: error: a lane of a `simd struct` is an integer of a fixed width, a float, `bool` or `char`, not `T`
+types_simd_struct_with_type_parameters.anti:6:2: error: a lane of a `simd struct` is an integer of a fixed width, a float or `bool`, not `T`

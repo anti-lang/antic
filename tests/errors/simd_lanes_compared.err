@@ -1,1 +1,1 @@
-simd_lanes_compared.anti:6:2: error: a lane of a `simd struct` is an integer of a fixed width, a float, `bool` or `char`, not `str`
+simd_lanes_compared.anti:6:2: error: a lane of a `simd struct` is an integer of a fixed width, a float or `bool`, not `str`
