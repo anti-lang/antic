@@ -39,7 +39,7 @@ b0:
   %t5 = alloca ptr, align 8
   %t6 = alloca i64, align 8
   %t7 = alloca i32, align 4
-  %v0 = call ptr (i64) @malloc(i64 4)
+  %v0 = call ptr (i64, i64, i64, i64) @anti_rt_alloc_aligned(i64 4, i64 1, i64 16, i64 0)
   store ptr %v0, ptr %t0, align 8
   %v1 = load ptr, ptr %t0, align 8
   %v2 = icmp eq ptr %v1, null
@@ -89,7 +89,7 @@ b2:
 @llvm.compiler.used = appending global [1 x ptr] [ptr @args.main], section "llvm.metadata"
 
 declare noundef i32 @printf(ptr noundef, ...) #1
-declare noundef ptr @malloc(i64 noundef) #1
+declare noundef ptr @anti_rt_alloc_aligned(i64 noundef, i64 noundef, i64 noundef, i64 noundef) #1
 
 attributes #0 = { nounwind "frame-pointer"="non-leaf" "target-cpu"="generic" "target-features"="+fp-armv8,+neon,+v8a,-fmv" }
 attributes #1 = { nounwind }

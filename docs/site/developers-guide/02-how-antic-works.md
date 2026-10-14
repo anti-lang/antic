@@ -360,7 +360,7 @@ antic looks for the archive in two places, in this order: the directory above it
 
 A Linux program links statically against the C library musl, and its allocator is mimalloc. The archive `lib/<target>/<level>/libmimalloc.a` stands before `libc.a` on the link line. `malloc`, `free`, `calloc`, `realloc` and `aligned_alloc` of the program, the runtime and musl therefore resolve to mimalloc. `link_command` of `src/antic/linker.c` writes that line. A program that names a library with `link linux` links dynamically against glibc 2.35 and keeps the allocator of glibc.
 
-A macOS program uses the allocator of `libSystem`, and a Windows program the one of `ucrtbase.dll`. The `alloc` and `free` of the language call `malloc` and `free` on every target. [Chapter 12]({{% relref "12-memory" %}}) describes `anti.mem`.
+A macOS program uses the allocator of `libSystem`, and a Windows program the one of `ucrtbase.dll`. The `alloc` and `free` of the language call `malloc` and `free` on every target, `alloc(T, n)` through `anti_rt_alloc_aligned` of the runtime. [Chapter 12]({{% relref "12-memory" %}}) describes `anti.mem`.
 
 ## Contents of an executable
 

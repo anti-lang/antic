@@ -191,11 +191,10 @@ void anti_rt_mem_free(void *p);
    of `alloc T { }`, `alloc T(args)` or a singleton. In src/rt/mem.c. */
 _Noreturn void anti_rt_out_of_memory(int64_t size);
 
-/* Memory for count elements of size bytes each at align, a power of two
-   above the alignment of malloc, or NULL. Every byte is zero when zeroed
-   is not 0. `free` of C releases it. The compiler calls it for
-   `alloc(T, n)` of a type that `align(N)` raises above 16. In
-   src/rt/mem.c. */
+/* Memory for count elements of size bytes each at align, a power of two,
+   or NULL. Every byte is zero when zeroed is not 0. `free` of C releases
+   it. The compiler calls it for `alloc(T, n)`, with 16 or the alignment
+   that `align(N)` raises above it. In src/rt/mem.c. */
 void *anti_rt_alloc_aligned(int64_t count, int64_t size, int64_t align,
                             int64_t zeroed);
 

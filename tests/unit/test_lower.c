@@ -114,8 +114,9 @@ static bool body_holds(const char *source, const char *name,
 
 /* alloc(T, n) of a class fills the memory with zeros, so an element the
    program has not filled has a zero table. A struct and a primitive keep
-   malloc, and the result is a ?*T the program tests. alloc T { } ends the
-   program when malloc gives NULL. */
+   malloc. Each calls the runtime, which checks the count, and the result
+   is a ?*T the program tests. alloc T { } ends the program when malloc
+   gives NULL. */
 static void allocates_zeroed_classes(void)
 {
     static const char source[] =
@@ -126,9 +127,15 @@ static void allocates_zeroed_classes(void)
         "fn bytes(n: int) -> ?*u8 { return alloc(u8, n); }\n"
         "fn one() -> *Item { return alloc Item { n: 1 }; }\n";
 
-    CHECK(body_holds(source, "main.items", "call ptr @calloc(%0, "));
-    CHECK(body_holds(source, "main.points", "call ptr @malloc("));
-    CHECK(body_holds(source, "main.bytes", "call ptr @malloc("));
+    CHECK(body_holds(source, "main.items",
+                     "call ptr @anti_rt_alloc_aligned(%0, size_of main.Item, "
+                     "16, 1)"));
+    CHECK(body_holds(source, "main.points",
+                     "call ptr @anti_rt_alloc_aligned(%0, size_of main.Point, "
+                     "16, 0)"));
+    CHECK(body_holds(source, "main.bytes",
+                     "call ptr @anti_rt_alloc_aligned(%0, size_of i8, 16, "
+                     "0)"));
     CHECK(body_holds(source, "main.one", "call ptr @malloc("));
     CHECK(body_holds(source, "main.one", "call void @anti_rt_out_of_memory("));
     CHECK(!body_holds(source, "main.points", "@anti_rt_out_of_memory("));
@@ -1569,7 +1576,8 @@ void test_lower(void)
            "    ret i64 0\n"
            "}\n");
 
-    /* alloc and free call the C library, and p[i] is an address. */
+    /* alloc calls the runtime, free calls the C library, and p[i] is an
+       address. */
     /* `alloc(T, n)` gives `?*T`, so the program checks it. The `else`
        of the `let` is the one branch the nullable rules emit, and it is
        the one the program wrote. */
@@ -1580,49 +1588,48 @@ void test_lower(void)
            "    free(p);\n"
            "    return v + size_of(i16) as i16;\n"
            "}\n",
-           "extern fn malloc(i64) -> ptr\n"
+           "extern fn anti_rt_alloc_aligned(i64, i64, i64, i64) -> ptr\n"
            "extern fn free(ptr)\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 35 align 1 bytes 6d 61 69 6e 3a 36 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 31 36 00\n"
            "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.k() -> i16 signext {\n"
            "b0:\n"
-           "    %0 = mul i64 4, size_of i16\n"
-           "    %1 = call ptr @malloc(%0)\n"
-           "    %2 = copy ptr %1\n"
-           "    %3 = eq i8 %2, 0\n"
-           "    branch %3, b1, b2\n"
+           "    %0 = call ptr @anti_rt_alloc_aligned(4, size_of i16, 16, 0)\n"
+           "    %1 = copy ptr %0\n"
+           "    %2 = eq i8 %1, 0\n"
+           "    branch %2, b1, b2\n"
            "b1:\n"
            "    ret i16 0\n"
            "b2:\n"
-           "    %4 = mul i64 2, size_of i16\n"
-           "    %5 = ptradd %2, %4\n"
-           "    store i16 7, %5 !type i16\n"
-           "    %6 = mul i64 2, size_of i16\n"
-           "    %7 = ptradd %2, %6\n"
-           "    %8 = load i16 %7 !type i16\n"
-           "    %9 = copy i16 %8\n"
-           "    call void @free(%2)\n"
-           "    %10 = trunc i16 size_of i16\n"
-           "    %11 = sext i64 %10\n"
-           "    %12 = eq i8 %11, size_of i16\n"
-           "    branch %12, b4, b3\n"
+           "    %3 = mul i64 2, size_of i16\n"
+           "    %4 = ptradd %1, %3\n"
+           "    store i16 7, %4 !type i16\n"
+           "    %5 = mul i64 2, size_of i16\n"
+           "    %6 = ptradd %1, %5\n"
+           "    %7 = load i16 %6 !type i16\n"
+           "    %8 = copy i16 %7\n"
+           "    call void @free(%1)\n"
+           "    %9 = trunc i16 size_of i16\n"
+           "    %10 = sext i64 %9\n"
+           "    %11 = eq i8 %10, size_of i16\n"
+           "    branch %11, b4, b3\n"
            "b3:\n"
-           "    %13 = addr @main.0\n"
-           "    call void @anti_rt_check_failed(%13, 34, 2, size_of i16, 0)\n"
+           "    %12 = addr @main.0\n"
+           "    call void @anti_rt_check_failed(%12, 34, 2, size_of i16, 0)\n"
            "    unreachable\n"
            "b4:\n"
-           "    %14 = trunc i16 size_of i16\n"
-           "    %15 = addov nsw i16 %9, %14\n"
-           "    branchov %15, b5, b6\n"
+           "    %13 = trunc i16 size_of i16\n"
+           "    %14 = addov nsw i16 %8, %13\n"
+           "    branchov %14, b5, b6\n"
            "b5:\n"
-           "    %16 = sext i64 %9\n"
-           "    %17 = sext i64 %14\n"
-           "    %18 = addr @main.1\n"
-           "    call void @anti_rt_check_failed(%18, 21, 1, %16, %17)\n"
+           "    %15 = sext i64 %8\n"
+           "    %16 = sext i64 %13\n"
+           "    %17 = addr @main.1\n"
+           "    call void @anti_rt_check_failed(%17, 21, 1, %15, %16)\n"
            "    unreachable\n"
            "b6:\n"
-           "    ret i16 %15\n"
+           "    ret i16 %14\n"
            "}\n");
 
     lowers("fn m(x: f32) -> f64 {\n"

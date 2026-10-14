@@ -2089,7 +2089,6 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
     enum ir_type type;
     struct ir_operand v;
     struct place p;
-    uint32_t size;
 
     if (lower_is_aggregate(e->type)) {
         return lower_address(l, e);
@@ -2183,46 +2182,33 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             return v;
         }
         v = lower_expr(l, e->as.alloc.count);
-        /* DESIGN: malloc and calloc align to 16, and `align(N)` asks for
-           more. The runtime gives the elements of such a type at their
-           alignment, in memory that `free` releases as it releases the
-           memory of malloc. It takes the count and the size apart, so
-           it refuses a product that leaves 64 bits. */
-        if (sema_declared_align(e->type->element) > LOWER_MALLOC_ALIGN) {
+        /* DESIGN: the count form takes its memory from the runtime,
+           which refuses a count below zero and a product that leaves 64
+           bits before any call, and gives the memory of malloc, or of
+           the platform at an alignment that `align(N)` raises above 16.
+           A call of malloc in the program would let LLVM remove it with
+           its free and take its result as memory, so a release build
+           would get memory where a dev build gets none. The elements of
+           a class come zeroed, so one the program has not filled has a
+           zero table, which the zero-table check reports. So do the
+           elements of a type that `=` tears down, a struct, a tuple or a
+           `?T` holding a class value or an owned pointer: `=` into one
+           reads the table and the flag of the old value, and destroys
+           nothing where they are zero. Other elements are C's and come
+           as malloc gives them. */
+        {
             struct ir_operand args[4];
+            uint64_t align = sema_declared_align(e->type->element);
             args[0] = v;
             args[1] = lower_size_operand(l, e->type->element);
-            args[2] = ir_int_op(IR_I64,
-                                sema_declared_align(e->type->element));
+            args[2] = ir_int_op(IR_I64, align > LOWER_MALLOC_ALIGN
+                                            ? align
+                                            : LOWER_MALLOC_ALIGN);
             args[3] = ir_int_op(IR_I64,
                                 e->type->element->kind == TYPE_CLASS ||
                                     sema_needs_teardown(e->type->element));
             return lower_rt_call(l, RT_FN_ALLOC_ALIGNED, args);
         }
-        /* DESIGN: the elements of a class come zeroed, so one the
-           program has not filled has a zero table, which the zero-table
-           check reports. So do the elements of a type that `=` tears
-           down, a struct, a tuple or a `?T` holding a class value or an
-           owned pointer: `=` into one reads the table and the flag of
-           the old value, and destroys nothing where they are zero.
-           Other elements are C's and keep malloc. */
-        if (e->type->element->kind == TYPE_CLASS ||
-            sema_needs_teardown(e->type->element)) {
-            struct ir_operand args[2];
-            args[0] = v;
-            args[1] = lower_size_operand(l, e->type->element);
-            return lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                         ir_func_op(lower_calloc_function(l)),
-                                         args, 2));
-        }
-        size = ir_binary(l->f, l->b, IR_MUL, IR_I64, v,
-                         lower_size_operand(l, e->type->element));
-        v = lower_temp(l, size);
-        return lower_temp(l, ir_call(l->f, l->b, IR_PTR,
-                                     ir_func_op(lower_c_function(l, "malloc",
-                                                                 IR_PTR,
-                                                                 IR_I64)),
-                                     &v, 1));
     case EXPR_FREE:
         v = lower_expr(l, e->as.free_pointer);
         ir_call(l->f, l->b, IR_VOID,

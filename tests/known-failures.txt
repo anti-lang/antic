@@ -104,11 +104,6 @@ qualified_arguments_modules_dev T030 A class built with arguments under the name
 matrix_ownership_dup_of_an_owning_array_dev T031 `dup` of an array whose elements own something is refused.
 matrix_ownership_dup_of_an_owning_array_release T031 `dup` of an array whose elements own something is refused.
 matrix_ownership_dup_of_an_owning_array_memory_checks T031 `dup` of an array whose elements own something is refused.
-matrix_ownership_alloc_of_a_count_past_the_address_space_dev T032 `alloc(T, n)` gives an empty block for a count whose size passes 2^64.
-matrix_ownership_alloc_of_a_count_past_the_address_space_release T032 `alloc(T, n)` gives an empty block for a count whose size passes 2^64.
-matrix_ownership_alloc_of_a_count_past_the_address_space_memory_checks T032 `alloc(T, n)` gives an empty block for a count whose size passes 2^64.
-matrix_ownership_alloc_of_a_negative_count_release T033 A release build takes an `alloc(T, n)` that fails as memory.
-matrix_ownership_alloc_of_a_negative_count_memory_checks T034 `--memory-checks` stops the program at an `alloc(T, n)` that fails.
 matrix_ownership_dup_of_a_value_that_may_be_none_refused T035 `dup` of a `?T` that may be `none` gives two messages.
 matrix_ownership_downcast_in_an_if_let_dev T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
 matrix_ownership_downcast_in_an_if_let_release T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.

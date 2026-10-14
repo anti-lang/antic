@@ -36,7 +36,7 @@ A C pointer is an address with arithmetic: `p + 1`, `p - q` and a cast to and fr
 
 `alloc T { }` never gives `none`: the program ends with a message when no memory is left. `alloc(T, n)` gives `none` then, so its result is tested or bound with `catch`.
 
-The memory of `alloc(T, n)` stands at the alignment of `T`. `malloc` aligns to 16, and a type that `align(N)` raises above that takes its memory from `anti_rt_alloc_aligned` of the runtime, which `free` releases as well. On Windows that memory stands at 16, since the C library there has none above it that `free` releases.
+The memory of `alloc(T, n)` stands at the alignment of `T`. It comes from `anti_rt_alloc_aligned` of the runtime, which gives `none` for a count below zero and for one whose size passes 64 bits before it calls the allocator. `malloc` aligns to 16, and a type that `align(N)` raises above that takes its memory from the allocation of the platform, which `free` releases as well. On Windows that memory stands at 16, since the C library there has none above it that `free` releases.
 
 The memory of `alloc(T, n)` is not written. Its elements hold what the allocator left there, and the program stores each before it reads it. One case differs. Where `T` is a class or owns something, the memory is zeroed. Every element then has a zero table until the program fills it.
 
@@ -231,15 +231,16 @@ b2:
 - `b2` stores `x` at offset 0 and `y` at offset 8, and returns the address.
 - The result is `nonnull`, which the type `*Point` promises every caller.
 
-`alloc(T, n)` multiplies and calls, and tests nothing. The test is the caller's.
+`alloc(T, n)` calls the runtime with the count, the size and the alignment, and tests nothing. The test is the caller's.
 
 ```llvm excerpt=ptrs target=linux-x86_64 mode=release
-  %v2 = shl i64 %p0, 3
-  %v4 = tail call ptr @malloc(i64 %v2)
-  ret ptr %v4
+  %v1 = tail call ptr @anti_rt_alloc_aligned(i64 %p0, i64 8, i64 16, i64 0)
+  ret ptr %v1
 ```
 
-`shl` by 3 is `n` times the 8 bytes of an `int`. For an element type that is a class or owns something, the call is `calloc(n, size)`, which zeroes.
+- `i64 8` is the size of an `int` and `i64 16` the alignment of `malloc`. The last argument asks for zeroed memory, which an element type that is a class or owns something takes, and the runtime then calls `calloc`.
+- The runtime multiplies, and a count below zero or a product past 64 bits gives `none` with no call of the allocator.
+- The call stays a call in a release build. A `malloc` in the program, whose memory goes to `free` alone, is one LLVM removes, and it takes the result as memory. The release build would then get memory where the dev build gets `none`.
 
 The other three functions of the example are one instruction each.
 
@@ -262,7 +263,7 @@ retq
 
 Dev mode adds nothing to a dereference, to `alloc` or to `free`, and a release build removes nothing.
 
-Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/antic/lower_expr.c`, and `lower_new_memory` beside them. `anti_rt_out_of_memory` of `src/rt/mem.c`.
+Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/antic/lower_expr.c`, and `lower_new_memory` beside them. `anti_rt_out_of_memory` and `anti_rt_alloc_aligned` of `src/rt/mem.c`.
 
 ### What it costs
 
@@ -273,7 +274,7 @@ Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/a
 | `*p` and `p.f` | one load or store | the same |
 | `p[i]` | one load or store, no check | the same |
 | `alloc T { }` | one `malloc`, one compare, one branch, one store per field | the same |
-| `alloc(T, n)` | one multiplication, one `malloc` or `calloc`. One call of the runtime for a type aligned above 16 | the same |
+| `alloc(T, n)` | one call of the runtime, one compare of the count, one multiplication, one `malloc` or `calloc` | the same |
 | `free(p)` | one `free` | the same |
 | Checks inserted | none | none |
 | Atomic operations and locks | 0 | 0 |

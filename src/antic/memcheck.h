@@ -26,10 +26,13 @@
    which writes a crash report. The program exits with status 1
    instead, as on Linux. A report walks the stack by the frame pointers,
    since antic writes no CFI on ELF and the unwinder of a fatal report
-   would stop at the first Anti frame. */
+   would stop at the first Anti frame. A malloc that AddressSanitizer
+   cannot serve gives null, as the malloc of C does, so `alloc(T, n)`
+   gives none where it gives none without the checks. */
 #define MEMCHECK_OPTIONS_HOOK "__asan_default_options"
 #define MEMCHECK_OPTIONS \
-    "detect_leaks=1:abort_on_error=0:fast_unwind_on_fatal=1"
+    "detect_leaks=1:abort_on_error=0:fast_unwind_on_fatal=1:" \
+    "allocator_may_return_null=1"
 /* The function of src/rt/rt.h that marks a block of the runtime as kept
    until exit, and the call of the leak checker that it makes in a
    program of --memory-checks. */

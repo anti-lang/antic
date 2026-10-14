@@ -51,6 +51,13 @@ _Noreturn void anti_rt_windows_start(int (*program)(int, char **));
 #define ANTI_RT_ENTRY_LABEL __asm__("anti.rt.main")
 #endif
 
+/* DESIGN: a function of the runtime that stays a call in the program,
+   also where the LTO of a release build could inline it. The allocation
+   of `alloc(T, n)` in src/rt/mem.c needs it, since LLVM removes a malloc
+   that stands in the program with its free and takes its result as
+   memory. */
+#define ANTI_RT_NOINLINE __attribute__((noinline))
+
 /* DESIGN: the C main of src/rt/start.c takes the arguments and the
    environment of the process from the layer, as strings of valid UTF-8
    ended by a NUL. macOS and Linux give bytes, argv and the environment of

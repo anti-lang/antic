@@ -14,6 +14,9 @@
 #include "platform.h"
 #include "std.h"
 
+/* The alignment malloc gives on every target. */
+#define ANTI_RT_MALLOC_ALIGN 16
+
 void *anti_rt_mem_alloc(int64_t size, int64_t align)
 {
     if (size < 0 || align <= 0 || (align & (align - 1)) != 0) {
@@ -33,16 +36,22 @@ void anti_rt_mem_free(void *p)
 }
 
 /* DESIGN: `alloc(T, n)` gives the memory of malloc, which aligns to 16.
-   A type that `align(N)` raises above that takes its elements here, by
-   R050 of "Rules of 2026-10-13". The program releases the memory with
-   `free`, as it releases every other memory of `alloc(T, n)`, so it comes
-   from the allocation of the platform that `free` takes back and not from
-   anti_rt_aligned_alloc. A count below zero and a product that leaves the
-   address space give NULL, as malloc gives for a size it cannot serve. A
-   request of no bytes is one element of alignment, so it gives memory of
-   its own. */
-void *anti_rt_alloc_aligned(int64_t count, int64_t size, int64_t align,
-                            int64_t zeroed)
+   A type that `align(N)` raises above that takes its elements from the
+   allocation of the platform that `free` takes back, by R050 of "Rules of
+   2026-10-13". The program releases the memory with `free`, as it
+   releases every other memory of `alloc(T, n)`, so it never comes from
+   anti_rt_aligned_alloc. A count below zero and a product that leaves
+   the address space give NULL, as malloc gives for a size it cannot
+   serve. A request of no bytes is one element of alignment, so it gives
+   memory of its own.
+
+   The function stays out of line, also under the LTO of a release
+   build. Inlined, its malloc would stand in the program, and LLVM
+   removes a malloc whose memory goes to free alone and takes its result
+   as memory. A release build would then get memory where a dev build
+   gets none. */
+ANTI_RT_NOINLINE void *anti_rt_alloc_aligned(int64_t count, int64_t size,
+                                              int64_t align, int64_t zeroed)
 {
     size_t bytes;
     void *p;
@@ -54,6 +63,9 @@ void *anti_rt_alloc_aligned(int64_t count, int64_t size, int64_t align,
     bytes = (size_t)count * (size_t)size;
     if (bytes == 0) {
         bytes = (size_t)align;
+    }
+    if (align <= ANTI_RT_MALLOC_ALIGN) {
+        return zeroed != 0 ? calloc(bytes, 1) : malloc(bytes);
     }
     p = anti_rt_malloc_aligned(bytes, (size_t)align);
     if (p != NULL && zeroed != 0) {

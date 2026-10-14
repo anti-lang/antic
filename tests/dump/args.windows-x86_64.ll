@@ -39,7 +39,7 @@ b0:
   %t5 = alloca ptr, align 8
   %t6 = alloca i64, align 8
   %t7 = alloca i32, align 4
-  %v0 = call ptr (i64) @malloc(i64 4), !dbg !16
+  %v0 = call ptr (i64, i64, i64, i64) @anti_rt_alloc_aligned(i64 4, i64 1, i64 16, i64 0), !dbg !16
   store ptr %v0, ptr %t0, align 8
   %v1 = load ptr, ptr %t0, align 8
   %v2 = icmp eq ptr %v1, null
@@ -89,7 +89,7 @@ b2:
 @llvm.compiler.used = appending global [1 x ptr] [ptr @_A4args_main], section "llvm.metadata"
 
 declare noundef i32 @printf(ptr noundef, ...) #1
-declare noundef ptr @malloc(i64 noundef) #1
+declare noundef ptr @anti_rt_alloc_aligned(i64 noundef, i64 noundef, i64 noundef, i64 noundef) #1
 
 attributes #0 = { nounwind uwtable(sync) "frame-pointer"="none" "stack-probe-size"="4096" "target-cpu"="x86-64-v3" "target-features"="+avx,+avx2,+bmi,+bmi2,+cmov,+crc32,+cx16,+cx8,+f16c,+fma,+fxsr,+lzcnt,+mmx,+movbe,+popcnt,+sahf,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+ssse3,+x87,+xsave" }
 attributes #1 = { nounwind }
