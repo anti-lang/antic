@@ -111,12 +111,6 @@ matrix_ownership_downcast_in_an_if_let_memory_checks T036 `if let` and `let ... 
 matrix_ownership_downcast_in_a_let_else_dev T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
 matrix_ownership_downcast_in_a_let_else_release T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
 matrix_ownership_downcast_in_a_let_else_memory_checks T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
-matrix_ownership_dispatch_of_a_fresh_owning_value_dev T039 A fresh owning argument of a `dispatch` is never torn down.
-matrix_ownership_dispatch_of_a_fresh_owning_value_release T039 A fresh owning argument of a `dispatch` is never torn down.
-matrix_ownership_dispatch_of_a_fresh_owning_value_memory_checks T039 A fresh owning argument of a `dispatch` is never torn down.
-matrix_ownership_dispatch_moves_a_local_dev T040 A local moved into an `own` parameter of a `dispatch` stops the program.
-matrix_ownership_dispatch_moves_a_local_release T040 A local moved into an `own` parameter of a `dispatch` stops the program.
-matrix_ownership_dispatch_moves_a_local_memory_checks T040 A local moved into an `own` parameter of a `dispatch` stops the program.
 matrix_ownership_temporary_read_by_is_dev T041 A call result read by `is` alone is never torn down.
 matrix_ownership_temporary_read_by_is_release T041 A call result read by `is` alone is never torn down.
 matrix_ownership_temporary_read_by_is_memory_checks T041 A call result read by `is` alone is never torn down.

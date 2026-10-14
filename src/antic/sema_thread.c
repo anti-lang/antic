@@ -488,9 +488,14 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
 }
 
 /* Check the result and the arguments of the call of the worker fn, each
-   a value without a pointer, and give the call its type. */
+   a value without a pointer, and give the call its type.
+
+   DESIGN: the arguments of a `dispatch` are stored per job, by decision
+   23 of "Decisions of 2026-10-11", so the job holds them as a call holds
+   its arguments. A local passed to an `own` parameter moves into the job,
+   when job is true, and the caller tears it down no more. */
 static bool worker_args(struct checker *c, struct expr *call,
-                        const struct type *fn)
+                        const struct type *fn, bool job)
 {
     struct expr *callee = call->kind == EXPR_CALL ? call->as.call.callee : call;
     struct expr **args = call->kind == EXPR_CALL ? call->as.call.args : NULL;
@@ -510,6 +515,9 @@ static bool worker_args(struct checker *c, struct expr *call,
                           fn->params[i + 1]) && ok;
         sema_refuse_lock_copy(c, args[i], param);
         sema_refuse_worker_closure(c, args[i], param);
+        if (job && ok) {
+            sema_note_move(c, callee->symbol, i + 1, NULL, args[i]);
+        }
         /* DESIGN: a worker may take a pointer to a thread-safe object,
            the one exception to the rule that its parameters hold no
            pointer. A Mutex counts, since a worker cannot take a copy of
@@ -604,7 +612,7 @@ struct type *sema_check_parallel(struct checker *c, struct expr *e)
         return sema_builtin(c, TYPE_ERROR);
     }
     ok = worker_type(c, callee->pos, "the chunk", array->element) && ok;
-    ok = worker_args(c, call, fn) && ok;
+    ok = worker_args(c, call, fn, false) && ok;
     return ok ? types_slice(c->types, fn->result) : sema_builtin(c, TYPE_ERROR);
 }
 
@@ -640,7 +648,7 @@ struct type *sema_check_dispatch(struct checker *c, struct expr *e)
                       sema_tn(fn->params[0]), sema_tn(object));
         return sema_builtin(c, TYPE_ERROR);
     }
-    return worker_args(c, call, fn) ? types_job(c->types, fn->result)
+    return worker_args(c, call, fn, true) ? types_job(c->types, fn->result)
                                     : sema_builtin(c, TYPE_ERROR);
 }
 

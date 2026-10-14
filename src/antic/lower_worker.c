@@ -95,6 +95,16 @@ static struct ir_operand pack_context(struct lowerer *l,
                                                 ir_sym_offset_of(l->m, *agg,
                                                                  (uint32_t)i)));
         lower_store_value(l, worker_param(call, i), arg, at);
+        /* A local that moves into an `own` parameter of the worker is
+           the job's now. The error a handler binds holds `none` after
+           it, and any other local a cleared table, so the teardown of
+           the caller passes over it. */
+        if (arg->moves && arg->kind == EXPR_NAME && arg->symbol != NULL &&
+            arg->symbol->caught) {
+            ir_assign(l->f, l->b, arg->symbol->ir, ir_int_op(IR_PTR, 0));
+        } else {
+            lower_clear_moved(l, arg);
+        }
     }
     return lower_temp(l, slot);
 }
@@ -102,18 +112,26 @@ static struct ir_operand pack_context(struct lowerer *l,
 /* The body the two thunks share, written into the entry block of the
    thunk the lowerer is in. It calls the worker of call with first and
    the arguments the context of parameter 0 holds. What the worker gives
-   goes to the address in parameter out. */
+   goes to the address in parameter out.
+
+   DESIGN: a fresh argument of a parameter that is not `own` has no owner
+   but the job of a `dispatch`, as the argument of a call has no owner but
+   its caller. Its thunk tears it down in the context once the worker has
+   returned, when drop is true, and the worker copies what it keeps. A
+   fresh argument of an `own` parameter is the worker's, which tears it
+   down. Every chunk of a `parallel` reads one context, so no chunk tears
+   it down. */
 static void call_worker(struct lowerer *l, const struct expr *call,
                         uint32_t context, struct ir_operand first,
-                        size_t out)
+                        size_t out, bool drop)
 {
     const struct expr *callee = call->kind == EXPR_CALL
                                     ? call->as.call.callee : call;
     const struct type *result = callee->symbol->type->result;
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_function *f = l->f;
-    struct ir_block *entry = l->b;
     struct ir_operand *args = alloc_zeroed(2 * extra + 1, sizeof *args);
+    struct ir_operand *values = alloc_zeroed(extra + 1, sizeof *values);
     struct ir_operand at_out;
     uint32_t value;
     size_t count = 1;
@@ -127,14 +145,13 @@ static void call_worker(struct lowerer *l, const struct expr *call,
                                  ir_sym_operand(l->m,
                                                 ir_sym_offset_of(l->m, context,
                                                                  (uint32_t)i)));
-        lower_push_argument(
-            l, args, &count,
-            lower_is_aggregate(t)
-                ? at
-                : lower_temp(l, ir_load(f, entry, lower_ir_type_of(t), at)),
-            t);
+        values[i] = lower_is_aggregate(t)
+                        ? at
+                        : lower_temp(l, ir_load(f, l->b, lower_ir_type_of(t),
+                                                at));
+        lower_push_argument(l, args, &count, values[i], t);
     }
-    value = ir_call(f, entry, lower_ir_type_of(result),
+    value = ir_call(f, l->b, lower_ir_type_of(result),
                     ir_func_op(lower_callee_function(l, callee->symbol)), args,
                     count);
     free(args);
@@ -142,13 +159,19 @@ static void call_worker(struct lowerer *l, const struct expr *call,
     if (result->kind == TYPE_VOID) {
         /* A worker without a result writes nothing. */
     } else if (lower_is_aggregate(result)) {
-        ir_memcopy(f, entry, at_out, lower_temp(l, value),
+        ir_memcopy(f, l->b, at_out, lower_temp(l, value),
                    lower_vtype_of(l, result));
     } else {
-        ir_store(f, entry, lower_ir_type_of(result), lower_temp(l, value),
+        ir_store(f, l->b, lower_ir_type_of(result), lower_temp(l, value),
                  at_out);
     }
-    ir_ret(f, entry, IR_VOID, lower_none());
+    if (drop && extra > 0) {
+        lower_drop_arguments(l, callee->symbol, callee->symbol->type,
+                             (const struct expr *const *)call->as.call.args,
+                             values, extra, 1);
+    }
+    free(values);
+    ir_ret(f, l->b, IR_VOID, lower_none());
 }
 
 /* DESIGN: the worker pool calls one C signature, and a worker has the
@@ -183,7 +206,8 @@ static struct ir_function *parallel_thunk(struct lowerer *l,
              lower_offset_address(l, lower_temp(l, slot),
                                   lower_field_offset(l, slice,
                                                      &lower_len_name)));
-    call_worker(l, e->as.parallel.call, context, lower_temp(l, slot), 3);
+    call_worker(l, e->as.parallel.call, context, lower_temp(l, slot), 3,
+                false);
     l->f = outer_f;
     l->b = outer_b;
     return f;
@@ -208,7 +232,7 @@ static struct ir_function *dispatch_thunk(struct lowerer *l,
     l->b = ir_block_add(f);
     call_worker(l, e->as.dispatch.call, context,
                 lower_temp(l, f->params[1].temp),
-                2);
+                2, true);
     l->f = outer_f;
     l->b = outer_b;
     return f;
@@ -307,6 +331,37 @@ static struct ir_operand chunk_count(struct lowerer *l, const struct expr *e)
     return count;
 }
 
+/* The caller of a `parallel` tears down the fresh arguments of the
+   parameters that are not `own` in context, of aggregate agg, once every
+   chunk has run, as it tears down the arguments of a call. */
+static void drop_context(struct lowerer *l, const struct expr *call,
+                         struct ir_operand context, uint32_t agg)
+{
+    size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
+    struct ir_operand *values;
+    size_t i;
+
+    if (extra == 0) {
+        return;
+    }
+    values = alloc_zeroed(extra, sizeof *values);
+    for (i = 0; i < extra; i++) {
+        const struct type *t = worker_param(call, i);
+        struct ir_operand at = lower_offset_address(
+            l, context,
+            ir_sym_operand(l->m, ir_sym_offset_of(l->m, agg, (uint32_t)i)));
+        values[i] = lower_is_aggregate(t)
+                        ? at
+                        : lower_temp(l, ir_load(l->f, l->b,
+                                                lower_ir_type_of(t), at));
+    }
+    lower_drop_arguments(l, call->as.call.callee->symbol,
+                         call->as.call.callee->symbol->type,
+                         (const struct expr *const *)call->as.call.args,
+                         values, extra, 1);
+    free(values);
+}
+
 /* DESIGN: `parallel a by n -> f(x)` becomes one call of the runtime. The
    runtime decides the chunk count when n is absent. It therefore
    allocates the array of results and writes back the pointer and the
@@ -352,6 +407,7 @@ struct ir_operand lower_parallel(struct lowerer *l,
     args[7] = lower_temp(l, results);
     args[8] = lower_temp(l, count);
     lower_rt_call(l, RT_FN_PARALLEL, args);
+    drop_context(l, call, context, agg);
     out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
     ir_store(l->f, l->b, IR_PTR, lower_temp(l, ir_load(l->f, l->b, IR_PTR,
                                                        lower_temp(l, results))),
