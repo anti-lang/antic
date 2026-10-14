@@ -1076,6 +1076,26 @@ Where two rules meet, and where three do:
 - `alloc(T, n)`, a count that fails and the optimizer of a release build:
   `matrix/ownership_alloc_of_a_negative_count`, T033 and T034.
 
+The rules of ownership of "Rules of 2026-10-13":
+
+- R075, `delete(c)` of a channel that still holds values:
+  `matrix/ownership_delete_of_a_channel_that_holds_values`. It holds the
+  seven kinds of owning value. It also holds a closed channel, one that
+  wrapped around its queue, an empty one and a deferred `delete`.
+- R079, an owning local in an array literal:
+  `matrix/ownership_array_literal_moves_a_local`, and the refusals
+  `matrix/ownership_named_after_an_array_literal` and
+  `_named_twice_in_an_array_literal`. The seven refusals
+  `matrix/ownership_element_of_a_literal_copies_*` name an element of
+  another array, which stays where it is.
+- R081, an `own` parameter of a pointer type that a generic does not hand
+  on: `matrix/ownership_own_pointer_that_a_generic_does_not_hand_on`, T127.
+- R082, the message after a move into a place without a name:
+  `errors/moved_into_no_name`.
+- R084, `none` in an `own` field of type `?fn(...)`:
+  `matrix/values_none_into_an_own_function_field`, a program since the
+  rule.
+
 ### Errors
 
 | Construct | Held, with the first source that holds it | Open |

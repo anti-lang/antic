@@ -387,3 +387,6 @@ matrix_classes_changed_hook_of_a_bitfield_trace_writes T114 The `changed` hook g
 matrix_classes_default_is_a_copy_of_the_parameter_dev T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
 matrix_classes_default_is_a_copy_of_the_parameter_release T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
 matrix_classes_default_is_a_copy_of_the_parameter_memory_checks T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
+matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_dev T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
+matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_release T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
+matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_memory_checks T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.

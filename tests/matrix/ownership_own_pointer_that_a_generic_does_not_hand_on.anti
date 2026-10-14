@@ -1,0 +1,80 @@
+//! An `own` parameter of a type parameter in a copy whose type argument is a
+//! pointer, by R081 of "Rules of 2026-10-13". A generic that does not hand
+//! the parameter on deletes what it points at when the function ends, as it
+//! tears down a value there. One that hands it on, by `return` or into a
+//! field, deletes nothing. Each `Key` prints its teardown, and each line
+//! prints the keys alive.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+		printf("  teardown of key %d\n".ptr, self.n as c_int);
+	}
+}
+
+struct Slot<T>
+{
+	held: T,
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+fn dropped<T>(own x: T)
+{
+}
+
+fn handed_on<T>(own x: T) -> T
+{
+	return x;
+}
+
+fn on_one_path<T>(yes: bool, own x: T) -> ?T
+{
+	if yes {
+		return x;
+	}
+	return none;
+}
+
+fn in_a_field<T>(own x: T) -> Slot<T>
+{
+	return Slot<T> { held: x };
+}
+
+fn main() -> int
+{
+	dropped<*Key>(alloc Key { n: 1 });
+	printf("not handed on: alive %d\n".ptr, alive());
+	let p = handed_on<*Key>(alloc Key { n: 2 });
+	printf("handed on by return: %d, alive %d\n".ptr, p.n as c_int, alive());
+	delete(p);
+	let gone = on_one_path<*Key>(false, alloc Key { n: 3 });
+	printf("not handed on one path: %d, alive %d\n".ptr, (gone != none) as c_int, alive());
+	let q = on_one_path<*Key>(true, alloc Key { n: 4 }) else {
+		return 1;
+	};
+	printf("handed on the other path: %d, alive %d\n".ptr, q.n as c_int, alive());
+	delete(q);
+	let s = in_a_field<*Key>(alloc Key { n: 5 });
+	printf("handed on into a field: %d, alive %d\n".ptr, s.held.n as c_int, alive());
+	delete(s.held);
+	dropped<Key>(Key { n: 6 });
+	printf("a value that is not handed on: alive %d\n".ptr, alive());
+	return 0;
+}
