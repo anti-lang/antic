@@ -2744,6 +2744,8 @@ The step of threads built R086 to R088, R090 and R092 to R094 on 2026-10-14, and
 
 ### Classes
 
+The step of classes built R105, R109 to R112, R114, R115 and R117 on 2026-10-14, and found or wrote the tests of the rules it keeps. R114 needed one change, for a base of another module. `docs/reports/2026-10-14-rules-classes.md` names the test and the commit of each, and "What the rules run added" holds the readings the step took.
+
 - R100. Eddie. A nested class and the class around it reach the private members of each other.
 - R101. Keep. A class below reaches a protected member on another object of its base.
 - R102. Keep. `T(args)` runs a `construct` without `pub` anywhere in its module.
@@ -2915,6 +2917,11 @@ The steps that built the rules filled these gaps by the gap procedure of `CLAUDE
 - [provisional] R093 refuses a `sync` in any anonymous function inside a `sync` on the same place, a snapshot among them. The dev check covers a Mutex alone, through the locks a dev module took. The hidden lock of an object is taken again, as before. Reason: the checker cannot see when the anonymous function runs, and the rule names the place where it stands.
 - [provisional] R094 refuses a `=` whose target lies outside the object: `*out`, a field of another object or a global. A place in the fields of `self` keeps the pointer, and a local or a parameter that `=` gives one is marked as its `let` would mark it. The four cases of T062 stay open. Reason: the rule names the out parameter and the other object, and the fix run holds T062.
 - [provisional] R097 changes no code. An `own fn` place takes a snapshot, a function that captures nothing, `dup` of an owned value or a `keep own` parameter. A snapshot reads its copies alone and calls no function it captured, so each of them is concurrent. Reason: the rule holds for every value such a field can hold.
+- [provisional] R105 refuses a parameter of `operator fn eq` whose type is a class that holds a Mutex in a field of any level of its chain. The hidden lock of a synchronized class counts as one, so `errors/sync_pairs` gets the refusal where its operator is declared, beside the two at the use. Reason: the checker holds the hidden lock as a Mutex, and a copy would copy it as well.
+- [provisional] R110 refuses every `*` of a pointer to a singleton, `(*Config.get()).level` as well. Reason: the value behind the pointer is the one instance, and the program reaches its fields through the pointer.
+- [provisional] R112 refuses a `get` that the base of a singleton declares as well, at the name of the singleton. Reason: it would stand in place of the one the compiler writes.
+- [provisional] R109 to R112 read the singleton mark of a class of another module from its library file. The file carries it as a flag of the struct, and its format is version 83. Reason: the library file marks no generated `get`, so a singleton of a library was a plain class to a module that imported it.
+- [provisional] R115 gives a class that replaces `destroyed` a teardown, so it follows the value rules of a class that owns something: `=` and `let` refuse a copy of an existing value, and `dup` copies. Reason: a type owns something when its teardown does anything, and the hook runs in the teardown.
 
 ## Open
 

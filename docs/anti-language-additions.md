@@ -831,7 +831,7 @@ pub synchronized class PeopleList
 - `anti doc` and the C header mark every public function of a synchronized class as running under the object's lock. The documentation says it at the function.
 - `sync obj { }` takes the hidden lock of a synchronized object for a whole block, for a sequence that no method covers.
 - `sync a, b { }` takes the hidden locks of two synchronized objects in an order the runtime fixes, by address, and once when `a` and `b` are the same object. Two threads that compare `a == b` and `b == a` therefore cannot deadlock, and the dev check of lock orders accepts it.
-- The default `==` of a synchronized class runs under `sync a, b`, and its default hash under `sync a`. An operator of the module that takes the class through pointers, `operator fn eq(a: *Tally, b: *Tally)`, receives the objects themselves and takes their locks with `sync`. One that takes the class by value is refused at each use, since the copy would copy the lock.
+- The default `==` of a synchronized class runs under `sync a, b`, and its default hash under `sync a`. An operator of the module that takes the class through pointers, `operator fn eq(a: *Tally, b: *Tally)`, receives the objects themselves and takes their locks with `sync`. One that takes the class by value is refused where it is declared, by R105 of "Rules of 2026-10-13" in `docs/decisions.md`, since the copy would copy the lock.
 
 ### Concurrent classes
 

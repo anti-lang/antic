@@ -6,3 +6,4 @@ sync_pairs.anti:88:13: error: `==` is not defined on `Holder`, whose field `c` h
 sync_pairs.anti:91:13: error: `==` is not defined on `Keeper`, whose field `c` has no `eq`
 sync_pairs.anti:94:15: error: `Copied` holds a `Mutex` and cannot be copied, pass a pointer to it
 sync_pairs.anti:94:23: error: `Copied` holds a `Mutex` and cannot be copied, pass a pointer to it
+sync_pairs.anti:47:20: error: `operator fn eq` takes `Copied` by value, and its Mutex is never copied
