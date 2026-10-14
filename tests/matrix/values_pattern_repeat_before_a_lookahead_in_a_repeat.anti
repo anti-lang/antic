@@ -1,13 +1,21 @@
-//! A repeat before a lookahead inside a repeat without an end: the lookahead
-//! takes no text, so the next round starts where the inner repeat stopped.
+//! A repeat before a lookahead inside a repeat without an end. The lookahead
+//! asks for a `b`, and the next round starts with an `a`, so the inner repeat
+//! stops at the `b` alone. The literal passes the check of exponential time,
+//! and a line of the output says whether a text matched.
 
 import anti.lang;
 import anti.regex;
 
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
 fn main() -> int
 {
-	if "aaab".matches(re"(a+(?=b))+") {
-		return 1;
-	}
+	show("run_before_a_b", "aaab".matches(re"(a+(?=b))+") != none);
+	show("run_before_a_c", "aaac".matches(re"(a+(?=b))+") != none);
 	return 0;
 }

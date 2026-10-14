@@ -86,7 +86,11 @@ int64_t pattern_group_number(const char *bytes, size_t length,
    so the check passes over a repeat inside either. Sets of characters
    are exact for ASCII. A character outside ASCII stands for every byte
    from 0x80 up, so two of them always overlap, which errs towards the
-   warning. */
+   warning. An assertion right after the inner repeat narrows the bytes
+   that may follow it, by R140: `\b` after a repeat of word characters
+   alone lets no word character follow, and of others alone no other
+   character, and `(?=x)` lets only the first bytes of x follow. So
+   `(a+\b)+` and `(a+(?=b))+` pass. */
 
 enum node_kind { NODE_SET, NODE_EMPTY, NODE_CAT, NODE_ALT, NODE_GROUP,
                  NODE_REPEAT };
@@ -105,6 +109,8 @@ struct node {
     struct set set;             /* NODE_SET */
     bool atomic;                /* an atomic group, a possessive repeat */
     bool zero_width;            /* a lookaround, which consumes no text */
+    bool boundary;              /* NODE_EMPTY: `\b` */
+    bool ahead;                 /* a zero-width group: `(?=...)` */
     /* A backreference or a call, which may be empty. A condition,
        `(?(...)yes|no)`. The number of a capturing group, or 0. */
     bool unknown;
@@ -564,6 +570,7 @@ static struct node *parse_escape(struct reader *r, size_t start)
         r->unsure = r->unsure || e == 'K';
         r->pos++;
         n = new_node(r, NODE_EMPTY, start);
+        n->boundary = e == 'b';
         n->span.end = r->pos;
         return n;
     case 'E':
@@ -725,6 +732,7 @@ static struct node *parse_group(struct reader *r, size_t start)
     case '!':
         r->pos++;
         group->zero_width = true;
+        group->ahead = c == '=';
         return group_body(r, group);
     case '<':
         if (peek(r, 1) == '=' || peek(r, 1) == '!') {
@@ -1002,24 +1010,99 @@ static bool first_of(const struct node *n, struct set *s)
     return true;
 }
 
+/* Every byte n or a part of it can match, added to s. */
+static void bytes_of(const struct node *n, struct set *s)
+{
+    size_t i;
+
+    if (n->kind == NODE_SET) {
+        set_union(s, &n->set);
+    }
+    for (i = 0; i < n->count; i++) {
+        bytes_of(n->children[i], s);
+    }
+}
+
+/* Whether every byte of s stands in within. */
+static bool set_within(const struct set *s, const struct set *within)
+{
+    size_t i;
+
+    for (i = 0; i < 4; i++) {
+        if ((s->bits[i] & ~within->bits[i]) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void set_meet(struct set *s, const struct set *t)
+{
+    size_t i;
+
+    for (i = 0; i < 4; i++) {
+        s->bits[i] &= t->bits[i];
+    }
+}
+
+/* Narrow allowed to the bytes that the assertion n lets follow inner
+   when n stands right after it. Any other node leaves allowed alone. */
+static void narrow_after(const struct node *inner, const struct node *n,
+                         struct set *allowed)
+{
+    struct set word;
+    struct set other;
+    struct set last;
+
+    if (n->kind == NODE_GROUP && n->ahead && n->count > 0) {
+        struct set first;
+        memset(&first, 0, sizeof first);
+        if (!first_of(n->children[0], &first)) {
+            set_meet(allowed, &first);
+        }
+        return;
+    }
+    if (n->kind != NODE_EMPTY || !n->boundary) {
+        return;
+    }
+    memset(&word, 0, sizeof word);
+    (void)class_escape('w', &word);
+    other = word;
+    set_complement(&other);
+    memset(&last, 0, sizeof last);
+    bytes_of(inner, &last);
+    if (set_within(&last, &word)) {
+        set_meet(allowed, &other);
+    } else if (set_within(&last, &other)) {
+        set_meet(allowed, &word);
+    }
+}
+
 /* The bytes that can come right after inner inside one round of the
    repeat outer that holds it. The first bytes of the next round of outer,
-   or of a repeat between the two, count as well. */
+   or of a repeat between the two, count as well. An assertion met before
+   any of them narrows them all, since every way on passes it. */
 static struct set follow_within(const struct node *inner,
                                 const struct node *outer)
 {
     struct set f;
+    struct set allowed;
     const struct node *child = inner;
     const struct node *at = inner->parent;
     size_t i;
 
     memset(&f, 0, sizeof f);
+    set_all(&allowed);
     while (at != outer) {
         if (at->kind == NODE_CAT) {
             for (i = 0; at->children[i] != child; i++) {
             }
             for (i++; i < at->count; i++) {
+                if (!set_meets(&f, &f)) {
+                    narrow_after(inner, at->children[i], &allowed);
+                }
                 if (!first_of(at->children[i], &f)) {
+                    set_meet(&f, &allowed);
                     return f;
                 }
             }
@@ -1031,6 +1114,7 @@ static struct set follow_within(const struct node *inner,
         at = at->parent;
     }
     (void)first_of(outer->children[0], &f);
+    set_meet(&f, &allowed);
     return f;
 }
 

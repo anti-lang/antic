@@ -1,0 +1,22 @@
+//! An assertion after a repeat inside an unbounded repeat. One that cannot
+//! hold between the last byte of the repeat and the first byte of the next
+//! round leaves the engine one way to split the text, so the pattern passes:
+//! `\b` after a repeat of word characters before a word character, and a
+//! lookahead that names another byte. An assertion that holds there, `\B`, a
+//! lookbehind, a negative lookahead and a repeat of word and other characters
+//! before `\b` fail the check.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let boundary = re"(a+\b)+";
+	let ahead = re"(a+(?=b))+";
+	let boundary_then_space = re"(\w+\b\s?)*";
+	let ahead_of_the_same = re"(a+(?=a))+";
+	let not_boundary_of_words = re"(a+\B)+";
+	let negative_ahead = re"(a+(?!b))+";
+	let behind = re"(a+(?<=a))+";
+	let mixed_before_boundary = re"([a ]+\b)+";
+	return 0;
+}

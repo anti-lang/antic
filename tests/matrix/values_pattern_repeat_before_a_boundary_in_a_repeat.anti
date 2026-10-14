@@ -1,13 +1,21 @@
-//! A repeat before `\\b` inside a repeat without an end: the next round starts
-//! with the text the inner repeat takes.
+//! A repeat before `\\b` inside a repeat without an end. The boundary cannot
+//! stand between two letters, so the inner repeat takes the whole run of
+//! letters and the next round cannot start there. The literal passes the check
+//! of exponential time, and a line of the output says whether a text matched.
 
 import anti.lang;
 import anti.regex;
 
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
 fn main() -> int
 {
-	if "aaab".matches(re"(a+\b)+") {
-		return 1;
-	}
+	show("run_before_a_space", "aa aaa".matches(re"^(a+\b)+") != none);
+	show("run_before_a_letter", "aaab".matches(re"(a+\b)+") != none);
 	return 0;
 }

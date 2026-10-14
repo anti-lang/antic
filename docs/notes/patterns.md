@@ -19,6 +19,12 @@ user of the tools can observe, under "Regular expressions".
   The walk asks each varying repeat for the first bytes of its body. It meets them with the
   bytes that can follow the repeat up to each unbounded repeat around it. It stops at an
   atomic group, a lookaround or a possessive repeat.
+- By R140 an assertion right after the repeat narrows the bytes that can follow it. `\b`
+  after a repeat of word characters alone lets no word character follow, and after a
+  repeat of other characters alone lets only word characters follow. `(?=x)` lets only the
+  first bytes of x follow when x cannot be empty. `(a+\b)+` and `(a+(?=b))+` pass, and
+  `\B`, a lookbehind and a negative lookahead narrow nothing.
+  `pattern_exponential_assertions` of `tests/errors/` holds both sides.
 - The checker takes `Regex` for a type or a literal where no name of the module has it, as
   it takes `Mutex`. A call `Regex.compile(...)` has its callee rewritten to
   `<regex>.compile`, a module name in a scope of its own bound to `anti.regex`, and then
