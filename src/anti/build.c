@@ -481,8 +481,21 @@ static size_t linking_module(const struct build *b)
     return b->unit_count;
 }
 
+/* Whether the project holds the module of path. */
+static bool has_module(const struct build *b, const char *path)
+{
+    size_t i;
+
+    for (i = 0; i < b->unit_count; i++) {
+        if (strcmp(text_cstr(&b->units[i].path), path) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* The module whose path is the package name, which a library for C is
-   built from. Without one the first module of the order stands. */
+   built from. Without one the last module of the order stands. */
 static size_t root_module(const struct build *b)
 {
     size_t i;
@@ -1257,6 +1270,15 @@ static int build_project(const struct build_request *r,
     text_appendf(&b.src, "%s/%s", r->root, text_cstr(&b.m.src));
     if (!read_units(&b)) {
         goto done;
+    }
+    /* R168 of "Rules of 2026-10-13": a library project names its root
+       module by its package name, and one without it builds from the
+       last module of the order, which a user may not expect. */
+    if (linking_module(&b) == b.unit_count &&
+        !has_module(&b, text_cstr(&b.m.name))) {
+        fprintf(stderr, "anti: %s: warning: the library project %s has no "
+                        "module %s\n", text_cstr(&manifest_path),
+                text_cstr(&b.m.name), text_cstr(&b.m.name));
     }
     /* R160 of "Rules of 2026-10-13": run of a library project is a wrong
        use of the command, refused before anything builds. */

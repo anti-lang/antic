@@ -119,6 +119,14 @@ anti_message(run_without_the_host
           ${app_source} "${app_text}"
     ARGS run ${tools}
     ERR "anti: ./dist/${HOST}/dev/app${EXE} was not built, so there is nothing to run")
+# R168 of "Rules of 2026-10-13" in docs/decisions.md: a library project
+# without the module whose path is the name of the package builds, with a
+# warning.
+anti_message(library_without_its_root STATUS 0
+    FILES anti.toml "${manifest_package}"
+          src/com/example/one.anti "${library_text}"
+    ARGS build ${tools}
+    ERR "anti: ./anti.toml: warning: the library project com.example.app has no module com.example.app")
 # R159 of "Rules of 2026-10-13" in docs/decisions.md: run builds a program
 # for this machine, and refuses an option of build that makes none.
 foreach(case "target|--target|linux-x86_64" "lib|--lib|static"

@@ -43,7 +43,7 @@
 #   release_path       `build --release` builds a path dependency in
 #                      release mode and reads its library there
 #   library_root       a library project builds without the module whose
-#                      path is the name of the package
+#                      path is the name of the package, with a warning
 #
 # DESIGN: each case runs anti twice, once without the option and once
 # with it, on two copies of the same files, and names what differs. A case
@@ -83,6 +83,7 @@ function(anti_passes what directory)
         message(FATAL_ERROR "${what} ended with ${status}\n${out}${err}")
     endif()
     set(anti_stdout "${out}" PARENT_SCOPE)
+    set(anti_stderr "${err}" PARENT_SCOPE)
 endfunction()
 
 # Run a tool of the pinned release on a file and give what it prints.
@@ -581,11 +582,17 @@ if(CASE STREQUAL "library_root")
                                 "the test expects app.h and the archive")
         endif()
         file(READ "${dist}/app.h" header_${copy})
+        set(err_${copy} "${anti_stderr}")
         holds("${header_${copy}}" "first_one(void)" "the header of ${copy}")
         holds("${header_${copy}}" "second_two(void)" "the header of ${copy}")
     endforeach()
     holds("${header_plain}" "app_zero(void)" "the header of plain")
     lacks("${header_option}" "app_zero(void)" "the header of option")
+    # R168 of "Rules of 2026-10-13": the project without the module warns.
+    lacks("${err_plain}" "warning" "the standard error of plain")
+    holds("${err_option}"
+          "anti: ./anti.toml: warning: the library project com.example.app has no module com.example.app"
+          "the standard error of option")
     return()
 endif()
 
