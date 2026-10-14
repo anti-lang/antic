@@ -200,7 +200,7 @@ Not built yet: `undefined`.
 
 ## Operators
 
-C precedence, with the differences below. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`, unary `- ! ~`, address `&p` and dereference `*p`. Conversion `x as T`, checked downcast `p as *T`, nullable downcast `p as? *T`, type test `p is *T`, and `v is Shape.Circle` on a variant, `geo.Shape.Circle` for a variant of another module. Wrapping `+% -% *% <<%` and saturating `+| -| *|`, which bind as the operator they extend. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest, `+%=` and `+|=` among them. No `++`, no `?:`.
+C precedence, with the differences below. Arithmetic `+ - * / %`, comparison `== != < <= > >=`, logic `&& || !`, bits `& | ^ ~ << >>`, unary `- ! ~`, address `&p` and dereference `*p`. Conversion `x as T`, which does nothing where `x` has the type `T` already, checked downcast `p as *T`, nullable downcast `p as? *T`, whose `?` stands at `as`, type test `p is *T`, and `v is Shape.Circle` on a variant, `geo.Shape.Circle` for a variant of another module. Wrapping `+% -% *% <<%` and saturating `+| -| *|`, which bind as the operator they extend. Coalescing `??` and chaining `?.` over `none`. Ranges `lo..hi`, half-open. `x in lo..hi`. Compound assignment `+=` and the rest, `+%=` and `+|=` among them. No `++`, no `?:`.
 
 | Binds | Operators |
 |---|---|
@@ -635,7 +635,7 @@ Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus 
 
 ## Enums
 
-A named integer type with C layout, over `c_int` unless the declaration names the type. A value without `=` follows the one before it, and every value fits the underlying type. `as` converts an enum to and from any numeric type, and a dev build checks a conversion to an enum. `==` and `!=` compare two values, and `switch` takes them with their type.
+A named integer type with C layout, over `c_int` unless the declaration names the type. A value without `=` follows the one before it, and every value fits the underlying type. `as` converts an enum to any numeric type and an integer to an enum, and a dev build checks a conversion to an enum. A float and a value of another enum convert to an enum through an integer. `==` and `!=` compare two values, and `switch` takes them with their type.
 
 ```anti
 enum Kind { Circle, Square, Empty }

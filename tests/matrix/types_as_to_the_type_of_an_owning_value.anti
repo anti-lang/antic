@@ -1,0 +1,15 @@
+//! `as` to the type a value has already gives that value and no fresh one, so
+//! `=` refuses the copy of a value that owns memory, as it does without the
+//! `as`. R059 of "Rules of 2026-10-13" takes the conversion.
+
+class Name
+{
+	pub own at: ?*int = none,
+}
+
+fn main() -> int
+{
+	let a = Name { };
+	let b = a as Name;
+	return (b.at == none) as int;
+}

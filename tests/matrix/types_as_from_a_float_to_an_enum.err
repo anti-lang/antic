@@ -1,0 +1,1 @@
+types_as_from_a_float_to_an_enum.anti:13:10: error: cannot convert `float` to `Kind`, convert through an integer

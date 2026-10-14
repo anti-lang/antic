@@ -105,7 +105,7 @@ fn bool_char_enum_part(args: []str) -> int
 	let two = 2 + zero;
 	let square = (two - 1) as Kind;
 	let read = (two as u8 - 1) as Mode;
-	let high = (300.0 * (two as f64 - 1.0)) as Level;
+	let high = (300.0 * (two as f64 - 1.0)) as i16 as Level;
 	printf("int enum %d\n".ptr, (square == Kind.Square) as c_int);
 	printf("u8 enum %d\n".ptr, (read == Mode.Read) as c_int);
 	printf("f64 enum %d\n".ptr, (high == Level.High) as c_int);

@@ -1,0 +1,15 @@
+//! `as` gives no enum from a float, by R055 of "Rules of 2026-10-13". The
+//! program converts through an integer.
+
+enum Kind
+{
+	A = 1,
+	B = 2,
+}
+
+fn main() -> int
+{
+	let f = 1.0;
+	let k = f as Kind;
+	return k as int;
+}

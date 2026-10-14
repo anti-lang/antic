@@ -259,7 +259,8 @@ or `float`.
 
 Conversions are explicit with `as`: `x as i32`, `p as *byte`. The rule "no implicit
 conversions" stands. `as` converts between any two numeric types, between any two
-pointer types, and between `char` and `u32`. `bool` is not a numeric type for `as`:
+pointer types, and between `char` and `u32`. `as` to the type a value has already
+does nothing. `bool` is not a numeric type for `as`:
 `bool as` an integer type gives 0 or 1, and no integer converts to `bool`. Untyped
 literals are not conversions.
 

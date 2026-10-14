@@ -239,6 +239,12 @@ bool sema_reads_existing(const struct expr *e)
         return true;
     case EXPR_UNARY:
         return e->as.unary.op == TOKEN_STAR;
+    case EXPR_CAST:
+        /* `as` to the type a value has already gives that value, by R059
+           of "Rules of 2026-10-13", and no fresh one. */
+        return !e->as.cast.test && e->type != NULL &&
+               e->type == e->as.cast.operand->type &&
+               sema_reads_existing(e->as.cast.operand);
     default:
         return false;
     }

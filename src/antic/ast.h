@@ -315,6 +315,7 @@ struct expr {
             struct expr *operand;
             struct type_expr *type;
             bool checked;           /* `as?`, which gives `none` on a mismatch */
+            bool apart;             /* its `?` stood apart from `as` */
             bool test;              /* `is`, which gives a bool */
             bool from_sub;          /* the source may be a sub-object */
             bool promoted;          /* the checker's read of an f16 */

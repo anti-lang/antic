@@ -1,0 +1,25 @@
+//! `as` and a `?` apart from it are no conversion, by R058 of "Rules of
+//! 2026-10-13". The one that gives `none` is written `as? T`, and `anti fmt`
+//! writes this source so, which is why `fmt_canonical` passes over it. `?*`
+//! written as one is the type of a pointer that may be `none`, and `as`
+//! takes it.
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Sub inherits Base
+{
+}
+
+fn main() -> int
+{
+	let s = Sub { };
+	let b: *Base = &s;
+	let d = b as ? *Sub;
+	if d != none {
+		return 0;
+	}
+	return 1;
+}

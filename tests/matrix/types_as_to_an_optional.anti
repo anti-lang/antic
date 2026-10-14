@@ -1,5 +1,5 @@
-//! `as ?T` reads as the nullable downcast `as? T`, which takes a pointer to a
-//! class.
+//! `as? T` is the nullable downcast, which takes a pointer to a class. No `as`
+//! gives an optional value.
 
 fn main() -> int
 {

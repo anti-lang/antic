@@ -614,6 +614,11 @@ struct ir_operand lower_address(struct lowerer *l,
         (e->as.unary.op == TOKEN_MINUS || e->as.unary.op == TOKEN_TILDE)) {
         return lower_simd_unary(l, e);
     }
+    /* `as` to the type an aggregate has already is the aggregate, by
+       R059 of "Rules of 2026-10-13". */
+    if (e->kind == EXPR_CAST && e->type == e->as.cast.operand->type) {
+        return lower_address(l, e->as.cast.operand);
+    }
     if (e->kind == EXPR_CAST && (types_is_simd(e->type) ||
                                  types_is_simd(e->as.cast.operand->type))) {
         return lower_simd_cast(l, e);
@@ -1575,6 +1580,14 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
 
     if (cast_writes_tables(l, from, to)) {
         l->f->writes_tables = true;
+    }
+    /* `as` to the type the value has already gives the value, by R059 of
+       "Rules of 2026-10-13": a number as it is, and an aggregate at its
+       address. A class pointer keeps the path below, whose `is` gives a
+       bool. */
+    if (from == to && !e->as.cast.test && e->as.cast.variant_case == 0 &&
+        e->as.cast.target == NULL) {
+        return v;
     }
 
     /* An f16 converts to and from an f32 alone, and to itself. */

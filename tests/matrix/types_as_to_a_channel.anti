@@ -1,9 +1,16 @@
-//! `as` converts no channel.
+//! `as` to the type a value has already does nothing, by R059 of "Rules of
+//! 2026-10-13". Both names hold the one channel.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn main() -> int
 {
 	let c = chan int(1);
 	let d = c as chan int;
+	send(d, 5);
+	if let v = recv(c) {
+		printf("%lld\n".ptr, *v);
+	}
 	delete(d);
 	return 0;
 }

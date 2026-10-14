@@ -834,13 +834,19 @@ static struct expr *cast_links(struct parser *p)
     while (e != NULL &&
            (parser_check(p, TOKEN_AS) || parser_check(p, TOKEN_IS))) {
         bool test = parser_check(p, TOKEN_IS);
-        struct expr *c = parser_new_expr(p, EXPR_CAST, parser_next(p));
+        const struct token *word = parser_next(p);
+        size_t after = word->offset + word->length;
+        struct expr *c = parser_new_expr(p, EXPR_CAST, word);
         c->pos = e->pos;
         c->as.cast.operand = e;
         c->as.cast.test = test;
         /* `as?` on a class pointer gives `none` where `as` traps. A `?`
            before `fn` opens a nullable function type, which `as?` never
-           takes, so the type keeps it. */
+           takes, so the type keeps it. A `?` apart from `as` reads as
+           `as?` too, so that `anti fmt` writes it so, and the checker
+           refuses it, by R058 of "Rules of 2026-10-13". */
+        c->as.cast.apart = !test && parser_check(p, TOKEN_QUESTION) &&
+                           parser_peek_at(p, 0)->offset != after;
         c->as.cast.checked = !test && parser_peek_at(p, 1)->kind != TOKEN_FN &&
                              parser_accept(p, TOKEN_QUESTION);
         if ((c->as.cast.type = parser_type(p)) == NULL) {

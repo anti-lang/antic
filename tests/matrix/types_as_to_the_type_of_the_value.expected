@@ -1,0 +1,12 @@
+exit 0
+slice 2 2
+array 3
+str 3
+struct 2
+enum 2
+variant 1
+union 2
+optional 6
+function 8
+alias 17
+bool and char 1 1

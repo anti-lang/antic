@@ -1,0 +1,1 @@
+types_as_with_a_question_mark_before_its_type.anti:20:10: error: `as` takes no `?` before its type, write `as? *Sub`

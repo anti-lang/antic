@@ -1203,7 +1203,8 @@ static bool can_convert(const struct type *from, const struct type *to)
     }
     /* DESIGN: an enum converts to and from its underlying type and to
        any other numeric type, as a C enum does. Its values carry no
-       other meaning to the compiler. */
+       other meaning to the compiler. check_cast refuses a float and
+       another enum as the source of one, by R055. */
     if (from->kind == TYPE_ENUM) {
         from = from->base;
     }
@@ -1377,13 +1378,39 @@ static struct type *check_cast(struct checker *c, struct expr *e)
     if (sema_is_error(from) || sema_is_error(to)) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* DESIGN: `x as ?T` looks like a conversion to an optional value,
+       which no `as` gives, and reads as `as? T`. R058 of "Rules of
+       2026-10-13" refuses the spelling, so the reader sees which of the
+       two the program holds. `?*T` is one token and a type. */
+    if (e->as.cast.checked && e->as.cast.apart) {
+        sema_error_at(c, e->pos, "`as` takes no `?` before its type, write "
+                      "`as? %s`", sema_tn(to));
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (e->as.cast.test || e->as.cast.checked ||
         (from->kind == TYPE_POINTER && from->element->kind == TYPE_CLASS &&
          to->kind == TYPE_POINTER && to->element->kind == TYPE_CLASS)) {
         return check_class_cast(c, e, from, to);
     }
+    /* DESIGN: `as` to the type a value has already is a conversion that
+       does nothing, for every type, by R059 of "Rules of 2026-10-13". An
+       alias and a type parameter may name that type, so the program
+       cannot always leave the `as` out. */
+    if (from == to) {
+        return to;
+    }
     if (types_is_simd(from) || types_is_simd(to)) {
         return sema_check_simd_cast(c, e, from, to);
+    }
+    /* DESIGN: a value of an enum is one of the numbers it declares. A
+       float is none of them, and the values of another enum carry
+       another meaning, so R055 of "Rules of 2026-10-13" asks the program
+       to name the integer between the two. */
+    if (to->kind == TYPE_ENUM &&
+        (from->kind == TYPE_ENUM || types_is_float(from))) {
+        sema_error_at(c, e->pos, "cannot convert `%s` to `%s`, convert "
+                      "through an integer", sema_tn(from), sema_tn(to));
+        return sema_builtin(c, TYPE_ERROR);
     }
     if (!can_convert(from, to)) {
         sema_error_at(c, e->pos, "cannot convert `%s` to `%s`", sema_tn(from),

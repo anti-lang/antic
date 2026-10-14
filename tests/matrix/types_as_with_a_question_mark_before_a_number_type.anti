@@ -1,0 +1,10 @@
+//! `as ?int` gives no optional value, by R058 of "Rules of 2026-10-13", and
+//! its one message names `as? int`. `anti fmt` writes this source so, which
+//! is why `fmt_canonical` passes over it.
+
+fn main() -> int
+{
+	let n = 5;
+	let o = n as ?int;
+	return o ?? 1;
+}

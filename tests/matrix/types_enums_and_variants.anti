@@ -246,8 +246,8 @@ fn conversions()
 	let n = 2;
 	let from_int = n as Plain;
 	let x = 1.7;
-	let from_float = x as Plain;
-	let from_small = Small.Mid as Plain;
+	let from_float = x as int as Plain;
+	let from_small = Small.Mid as u8 as Plain;
 	let wide = 255 as u8;
 	let hi = wide as Small;
 	printf("to an enum %d %d %d %d\n".ptr, (from_int == Plain.C) as c_int,

@@ -85,3 +85,11 @@ fn lends(xs: []int, f: fn(lent  []int, lent[]  []byte))
 {
   f(xs, [][]byte { });
 }
+
+/// The conversion that gives `none`, with its `?` written apart.
+fn narrowed(p: *collection.Iterable<int>) -> bool
+{
+  let q = p as ? *collection.Iterable<int>;
+  let n = 5 as ?int;
+  return q != none;
+}

@@ -1,0 +1,1 @@
+types_as_with_a_question_mark_before_a_number_type.anti:8:10: error: `as` takes no `?` before its type, write `as? int`

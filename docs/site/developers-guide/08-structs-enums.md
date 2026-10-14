@@ -1028,7 +1028,7 @@ An `enum` of C is an `int` with names, and any integer converts to it without a 
 - The underlying type follows the name after a colon, `enum Mode: u8`. Without one it is `c_int`. Every value fits the underlying type.
 - A value is written with its type, `Kind.Circle`, and is a constant expression.
 - `==` and `!=` compare two values of one enum. `<` and the other order comparisons are refused.
-- `as` converts an enum to a number and a number to an enum. A dev build tests a conversion to an enum against the declared values. Any other number ends the program with `value not declared by Mode`. A release build does not test.
+- `as` converts an enum to a number and an integer to an enum. A float and a value of another enum are refused, and the program converts them through an integer, `x as int as Mode`. A dev build tests a conversion to an enum against the declared values. Any other number ends the program with `value not declared by Mode`. A release build does not test.
 - `switch` takes an enum. Its arms name the values with their type, and a `switch` without `else` covers every value.
 - `k.hash()` hashes the value as its integer.
 - A class body may declare an enum, which only that class names.

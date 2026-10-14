@@ -908,6 +908,17 @@ Where two rules meet, and where three do:
 - A bitfield and a failing call, the flags form, a closure, a lent element,
   `==` and the hash: the part `other_rules` of
   `types_bitfields_and_unions`.
+- `as` and an enum, by R055: `types_as_from_a_float_to_an_enum`,
+  `types_as_from_a_float_literal_to_an_enum` and
+  `types_as_from_an_enum_to_another_enum` are refused, and the line
+  `to an enum` of `types_enums_and_variants` converts through an integer.
+- `as` and a `?` apart from it, by R058:
+  `types_as_with_a_question_mark_before_its_type` and
+  `types_as_with_a_question_mark_before_a_number_type`. `fmt/loose` holds
+  what `anti fmt` writes for both.
+- `as` to the type of the value, by R059: `types_as_to_a_tuple`,
+  `types_as_to_a_channel`, `types_as_to_the_type_of_the_value` and the
+  copy `types_as_to_the_type_of_an_owning_value` refuses.
 - `alloc(T, n)` and a type aligned above 16, by R050: the addresses of a
   struct, a class, a union, a variant, an array, a tuple and a `?T` in
   `types_alloc_of_a_type_aligned_above_16`.

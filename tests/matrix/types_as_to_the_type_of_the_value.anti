@@ -1,0 +1,68 @@
+//! `as` to the type a value has already is taken for every kind of type, by
+//! R059 of "Rules of 2026-10-13", and gives the value. A line names its kind.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+enum Kind
+{
+	A = 1,
+	B = 2,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+union Word
+{
+	whole: u32,
+	low: u8,
+}
+
+type Pair = (int, int);
+
+type Maybe = ?int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let s = xs[0..2];
+	let r = s as []int;
+	printf("slice %lld %lld\n".ptr, r.len, r[1]);
+	let a = xs as [3]int;
+	printf("array %lld\n".ptr, a[2]);
+	let text = "abc" as str;
+	printf("str %lld\n".ptr, text.len);
+	let p = Point { x: 1, y: 2 } as Point;
+	printf("struct %lld\n".ptr, (p as Point).y);
+	let k = Kind.B as Kind;
+	printf("enum %d\n".ptr, k as c_int);
+	let v = Shape.Circle { r: 4 } as Shape;
+	printf("variant %d\n".ptr, (v is Shape.Circle) as c_int);
+	let w = Word { whole: 258 } as Word;
+	printf("union %d\n".ptr, w.low as c_int);
+	let o: ?int = 6;
+	let q = o as Maybe;
+	printf("optional %lld\n".ptr, q ?? 0);
+	let f = twice as fn(int) -> int;
+	printf("function %lld\n".ptr, f(4));
+	let t: Pair = (8, 9);
+	printf("alias %lld\n".ptr, (t as Pair).0 + (t as (int, int)).1);
+	let b = true as bool;
+	let c = 'x' as char;
+	printf("bool and char %d %d\n".ptr, b as c_int, (c == 'x') as c_int);
+	return 0;
+}

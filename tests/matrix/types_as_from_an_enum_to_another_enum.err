@@ -1,0 +1,1 @@
+types_as_from_an_enum_to_another_enum.anti:18:10: error: cannot convert `Kind` to `Other`, convert through an integer
