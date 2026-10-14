@@ -74,12 +74,13 @@ anti_message(license_from_archive_no_archive
 anti_message(license_from_archive_absent
     ARGS license --from-archive none.a
     ERR "anti: cannot read none.a")
-# The header of a member holds its size as digits. One with spaces there
-# ends the walk over the members.
+# The header of a member holds its size as digits. By R187 of "Rules of
+# 2026-10-13" in docs/decisions.md an archive whose member holds spaces
+# there is damaged, at the header of that member.
 anti_message(license_from_archive_member_without_a_size
     FILES library.a "!<arch>\nmember.o/       0           0     0     644               `\n"
     ARGS license --from-archive library.a
-    ERR "anti: library.a carries no package header, so it is no static library of `--lib static`")
+    ERR "anti: library.a is damaged at byte 8")
 anti_message(license_from_archive_no_header
     FILES library.a "!<arch>\n"
     ARGS license --from-archive library.a

@@ -376,6 +376,24 @@ static bool member_package(const struct ar_member *m, struct arena *arena,
     return false;
 }
 
+/* Whether the header of the member at offset stands whole in bytes and
+   its size holds no digit. */
+static bool size_without_digit(const struct text *bytes, size_t offset)
+{
+    size_t i;
+
+    if (bytes->length - offset < AR_HEADER) {
+        return false;
+    }
+    for (i = 0; i < AR_SIZE; i++) {
+        char c = bytes->data[offset + AR_SIZE_AT + i];
+        if (c >= '0' && c <= '9') {
+            return false;
+        }
+    }
+    return true;
+}
+
 int licensing_from_archive(const char *archive)
 {
     struct arena arena = {0};
@@ -400,6 +418,15 @@ int licensing_from_archive(const char *archive)
     while (!found && offset < bytes.length) {
         struct ar_member m;
         if (!ar_member_at(&bytes, offset, names, names_size, &m)) {
+            /* R187 of "Rules of 2026-10-13": a member whose size holds
+               no digit makes the archive damaged. */
+            if (size_without_digit(&bytes, offset)) {
+                fprintf(stderr, "anti: %s is damaged at byte %zu\n",
+                        archive, offset);
+                text_free(&bytes);
+                arena_free(&arena);
+                return 1;
+            }
             break;
         }
         if (m.name_length == 2 && memcmp(m.name, "//", 2) == 0) {
