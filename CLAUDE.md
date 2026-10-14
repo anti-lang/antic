@@ -219,6 +219,16 @@ not re-open a settled decision without asking Eddie.
   Mac and on the two VMs of `docs/vm-setup.md`.
 - One commit per logical change. Push to `origin/main` directly, no pull
   requests, after every completed step.
+- The feature freeze of 2026-10-14, Eddie's decision, holds until Eddie
+  lifts it. antic, anti, the runtime and the standard library get no new
+  language feature and no new module or public item of the library. They
+  get no new option and no new command either. A fix may add one only
+  when the defect it fixes cannot be fixed without it. The commit and the
+  report then name the defect and say why. The ten cases of "Rules of
+  2026-10-13" that wait for Eddie stay as they are: R009, R017, R037,
+  R051, R054, R066, R074, R083, R100 and R134. So does the question of
+  R081, the finding T127. No step changes them or their tests. See
+  "Feature freeze of 2026-10-14" in `docs/decisions.md`.
 - The gap procedure. Where a specification is silent, take the smallest option
   that keeps every struct C layout and the IR free of sizes. Record one
   `[provisional]` line in `docs/decisions.md` with its reason, and continue.

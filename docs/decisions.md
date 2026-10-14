@@ -2954,6 +2954,14 @@ The steps that built the rules filled these gaps by the gap procedure of `CLAUDE
 - [provisional] R184 refuses a key that does not start with `module.` and one that names a table of `module` with no field, with `` anti: symbols.zip holds the key other in index.toml outside a module table ``. A field the reader does not know inside a module table and a field before the `module` line of its table stay passed over. Reason: the rule names the key outside the tables, and `anti symbols inventory` writes every key inside one.
 - [provisional] R187 reports `` anti: library.a is damaged at byte 8 `` at the header of a member whose size holds no digit, and ends with 1. A member whose header fails in another way still ends the walk with `carries no package header`, as `license_from_archive` holds for its nine malformed archives. Reason: the rule names the size without a digit, and the other refusals have a test of their own.
 
+## Feature freeze of 2026-10-14
+
+Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is not provisional.
+
+- antic, anti, the runtime and the standard library get no new language feature and no new module or public item of the library. They get no new option and no new command either.
+- A fix may add one only when the defect it fixes cannot be fixed without it. The commit and the report then name the defect and say why.
+- The ten cases of "Rules of 2026-10-13" that wait for Eddie, R009, R017, R037, R051, R054, R066, R074, R083, R100 and R134, stay as they are. So does the question of R081, the finding T127. No step changes them or their tests.
+
 ## Open
 
 - R009 of "Rules of 2026-10-13". `switch` on a `char` is refused today, as on a `bool` and on a value of a type parameter. Does a `switch` take a `char`?
