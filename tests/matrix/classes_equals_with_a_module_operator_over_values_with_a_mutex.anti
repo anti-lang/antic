@@ -1,5 +1,6 @@
-//! `equals` of a class calls the `operator fn eq` its module gives it. One that
-//! takes the class by value copies a Mutex and is not called.
+//! `operator fn eq` takes no class with a Mutex by value, by R105 of the rules
+//! of 2026-10-13. A call would copy the Mutex, so the operator is refused where
+//! it is declared, and `equals` of the class never meets it.
 
 import anti.lang;
 

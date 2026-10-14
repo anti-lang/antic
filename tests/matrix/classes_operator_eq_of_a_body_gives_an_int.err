@@ -1,0 +1,1 @@
+classes_operator_eq_of_a_body_gives_an_int.anti:8:14: error: `operator fn eq` gives `int`, where `==` needs a `bool`

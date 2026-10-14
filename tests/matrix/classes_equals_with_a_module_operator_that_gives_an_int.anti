@@ -1,5 +1,6 @@
-//! `equals` of a class calls the `operator fn eq` its module gives it, where
-//! that operator gives a `bool`.
+//! `operator fn eq` gives a `bool`, by R105 of the rules of 2026-10-13. One
+//! that gives an `int` is refused where it is declared, so `equals` of the
+//! class never meets it.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

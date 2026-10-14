@@ -719,6 +719,49 @@ static void check_hook(struct checker *c, const struct item *m,
     }
 }
 
+/* Whether a value of the class t holds a Mutex, in a field of any level
+   of its chain. */
+static bool class_holds_mutex(const struct type *t)
+{
+    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
+        if (sema_holds_mutex(t)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: R105 of "Rules of 2026-10-13". `operator fn eq` gives the
+   `bool` of `==`, and one that gives another type is refused where it
+   is declared. So is one that takes by value a class with a Mutex, since
+   every call would copy the lock. `equals` of the class then meets no
+   operator it has to pass over. */
+static bool eq_signature_allowed(struct checker *c, const struct item *m)
+{
+    const struct type *fn = m->symbol != NULL ? m->symbol->type : NULL;
+    size_t i;
+
+    if (fn == NULL || fn->kind != TYPE_FN) {
+        return true;
+    }
+    if (fn->result != NULL && !sema_is_error(fn->result) &&
+        fn->result->kind != TYPE_BOOL) {
+        sema_error_at(c, m->name_pos, "`operator fn eq` gives `%s`, where "
+                      "`==` needs a `bool`", sema_tn(fn->result));
+        return false;
+    }
+    for (i = 0; i < m->param_count; i++) {
+        const struct type *p = fn->params[i + (m->has_self ? 1 : 0)];
+        if (p->kind == TYPE_CLASS && class_holds_mutex(p)) {
+            sema_error_at(c, m->params[i].pos, "`operator fn eq` takes `%s` "
+                          "by value, and its Mutex is never copied",
+                          sema_tn(p));
+            return false;
+        }
+    }
+    return true;
+}
+
 /* An `operator fn` carries one of the twenty names the table holds,
    and nothing else, and a hook the signature its construct calls. owner
    is the type the functions belong to. */
@@ -748,6 +791,9 @@ static void check_operator_item(struct checker *c, const struct item *m,
                           sema_tn(first));
             return;
         }
+    }
+    if (sema_name_is(&m->name, "eq") && !eq_signature_allowed(c, m)) {
+        return;
     }
     /* DESIGN: an operator is used as `a == b` and `xs[i]`, which give it
        no type arguments, so every type parameter comes from an operand.

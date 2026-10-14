@@ -1,0 +1,1 @@
+classes_equals_with_a_module_operator_that_gives_an_int.anti:13:13: error: `operator fn eq` gives `int`, where `==` needs a `bool`

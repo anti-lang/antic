@@ -1,0 +1,1 @@
+classes_equals_with_a_module_operator_over_values_with_a_mutex.anti:15:16: error: `operator fn eq` takes `Guarded` by value, and its Mutex is never copied

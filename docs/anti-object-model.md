@@ -281,6 +281,7 @@ Four levels, and each applies where it makes sense:
 - The language hooks extend the table beyond the operators: `iter` on a collection and `next` and `value` on its iterator for `for x in e`, `index` and `set_index` for `e[i]` and `e[i] = v`, and `hash` for a key of a hashing collection. "Language hooks", "Iteration" and "Hashing and order" in `docs/anti-language-additions.md` give them. `operator fn` with a name outside the table is an error listing the valid names, and a hook with the wrong signature is an error that states the right one. An `operator fn` is also an ordinary method, so `a.add(b)` is the same call as `a + b`.
 - For a struct the operator is a free function in the module that declares the type: `operator fn add(a: Vector2, b: Vector2) -> Vector2`.
 - Not overloadable: `=`, `&&`, `||`, `.`, `()`, `as`.
+- `operator fn eq` gives a `bool`. One that gives another type, or that takes by value a class with a Mutex, is refused where it is declared.
 - Without an `operator fn eq`, `==` on a class value or a struct value is undefined, as before. `==` on class pointers is identity, see [Pointers and conversions](#pointers-and-conversions).
 
 ## Static fields and singletons

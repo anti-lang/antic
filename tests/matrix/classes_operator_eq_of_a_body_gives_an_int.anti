@@ -1,0 +1,17 @@
+//! `operator fn eq` gives a `bool`, by R105 of the rules of 2026-10-13. One in
+//! the body of a class that gives an `int` is refused where it is declared.
+
+class Money
+{
+	pub cents: int = 0,
+
+	operator fn eq(self, other: Money) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
