@@ -908,6 +908,11 @@ Where two rules meet, and where three do:
 - A bitfield and a failing call, the flags form, a closure, a lent element,
   `==` and the hash: the part `other_rules` of
   `types_bitfields_and_unions`.
+- The rules of types that R052 and R056 keep: `types_enum_without_values`
+  holds an enum without values, and `types_variant_case_with_empty_braces`
+  a case declared as `A { }` and the literal `Shape.Empty { }`.
+- `--front-end` and a generic that names ever deeper copies of itself, by
+  R068: `error_copies_deep_front_end`.
 - A generic operator and a type parameter no operand names, by R067:
   `types_generic_operator_with_a_parameter_no_operand_gives` and
   `types_generic_operator_with_a_parameter_its_result_alone_names` are

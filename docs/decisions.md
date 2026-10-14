@@ -2674,6 +2674,8 @@ The step of values and of constants built R026, R027, R029 to R034, R039, R043 a
 
 ### Types
 
+The step of types and of generics built R048 to R050, R055, R058 to R063, R065, R067 and R068 on 2026-10-14. It wrote the tests of the rules it keeps. R062 keeps a `bool` lane, and R050 leaves the two Windows targets at the alignment of `malloc`. `docs/reports/2026-10-14-rules-types.md` names the test and the commit of each, and "What the rules run added" holds the readings the step took.
+
 - R048. Change. A constant that does not fit the width of a bitfield is refused. A write and a compound assignment of a value that does not fit stop a dev build, as a narrowing does.
 - R049. Change. `+%=` and `+|=` on a bitfield wrap and saturate at the width of the bitfield.
 - R050. Change. `alloc(T, n)` gives memory aligned to the alignment of `T`, also above 16. This is a defect, and a test holds it.

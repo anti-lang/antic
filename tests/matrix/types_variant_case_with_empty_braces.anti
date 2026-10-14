@@ -1,0 +1,33 @@
+//! A case declared as `A { }` is a case without fields, and a literal of a case
+//! without fields takes `{ }`, by R056 of "Rules of 2026-10-13".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+variant Shape
+{
+	A { },
+	Circle { r: int },
+	Empty,
+}
+
+fn number(s: Shape) -> int
+{
+	let n = 0;
+	switch s {
+		A => n = 1,
+		Circle c => n = c.r,
+		Empty => n = 3,
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let a = Shape.A { };
+	let b = Shape.A;
+	let e = Shape.Empty { };
+	let c = Shape.Circle { r: 2 };
+	printf("%lld %lld %lld %lld %d\n".ptr, number(a), number(b), number(e),
+		number(c), (a.tag == b.tag) as c_int);
+	return 0;
+}

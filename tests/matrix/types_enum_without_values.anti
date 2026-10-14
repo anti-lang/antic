@@ -1,0 +1,24 @@
+//! An enum without values compiles and has the size of `c_int`, by R052 of
+//! "Rules of 2026-10-13". No value of it exists, and a field of it holds the
+//! bytes an integer leaves there.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Nothing
+{
+}
+
+struct Holder
+{
+	lead: u8,
+	n: Nothing,
+}
+
+fn main() -> int
+{
+	let zero = 0;
+	let h = Holder { lead: 1, n: zero as Nothing };
+	printf("%d %d %d\n".ptr, (size_of(Nothing) == size_of(c_int)) as c_int,
+		(size_of(Holder) == 2 * size_of(c_int)) as c_int, h.n as c_int);
+	return 0;
+}
