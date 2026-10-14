@@ -135,6 +135,8 @@
       (PTR, void *))                                                       \
     X(RT_FN_CHAN_DELETE, anti_rt_chan_delete, RETURNS, RT_ANY,             \
       (VOID, void), (PTR, void *))                                         \
+    X(RT_FN_CHAN_HELD, anti_rt_chan_held, RETURNS, RT_ANY, (PTR, void *),  \
+      (PTR, void *), (PTR, void *))                                        \
     X(RT_FN_CHAN_NEW, anti_rt_chan_new, RETURNS, RT_ANY, (PTR, void *),    \
       (I64, int64_t), (I64, int64_t))                                      \
     X(RT_FN_CHAN_RECV, anti_rt_chan_recv, RETURNS, RT_ANY, (PTR, void *),  \

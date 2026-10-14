@@ -47,6 +47,37 @@ struct ir_operand lower_object_lock_address(struct lowerer *l,
                                 lower_field_offset(l, owner, &lock));
 }
 
+/* DESIGN: `delete(c)` of a channel whose values own something tears
+   down every value the channel still holds, the oldest first, by R075 of
+   "Rules of 2026-10-13". The loop takes each one into a slot of the
+   frame, as `recv` does, and tears it down there. A channel of values
+   that own nothing gets no loop. */
+static void destroy_held(struct lowerer *l, const struct type *element,
+                         struct ir_operand handle)
+{
+    struct ir_block *test = lower_new_block(l);
+    struct ir_block *body = lower_new_block(l);
+    struct ir_block *done = lower_new_block(l);
+    uint32_t slot = ir_entry_slot(l->f, lower_vtype_of(l, element));
+    struct ir_operand args[2];
+    struct ir_operand got;
+
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    args[0] = handle;
+    args[1] = lower_temp(l, slot);
+    got = lower_rt_call(l, RT_FN_CHAN_HELD, args);
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, got,
+                                      ir_int_op(IR_PTR, 0))),
+              done, body);
+    l->b = body;
+    lower_destroy_owned(l, element, lower_temp(l, slot),
+                        ir_int_op(IR_PTR, 0), false);
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
 struct ir_operand lower_sync_op(struct lowerer *l,
                                 const struct expr *e)
 {
@@ -96,6 +127,10 @@ struct ir_operand lower_sync_op(struct lowerer *l,
     case SYNC_CLOSE:
     case SYNC_CHAN_DELETE:
         args[0] = lower_load_handle(l, target);
+        if (e->as.sync_op.op == SYNC_CHAN_DELETE
+            && sema_needs_teardown(target->type->element)) {
+            destroy_held(l, target->type->element, args[0]);
+        }
         lower_rt_call(l,
                       e->as.sync_op.op == SYNC_CLOSE ? RT_FN_CHAN_CLOSE
                                                      : RT_FN_CHAN_DELETE,

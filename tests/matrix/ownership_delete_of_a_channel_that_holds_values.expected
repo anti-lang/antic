@@ -1,0 +1,38 @@
+exit 0
+a channel of a class: alive 3
+  teardown of key 1
+  teardown of key 2
+  teardown of key 3
+after delete: alive 0
+  teardown of key 10
+  teardown of key 11
+a channel of an owning struct after delete: alive 0
+  teardown of key 20
+a channel of an owning tuple after delete: alive 0
+  teardown of key 30
+  teardown of key 31
+a channel of an owning variant after delete: alive 0
+  teardown of key 40
+  teardown of key 41
+a channel of an owning optional after delete: alive 0
+  teardown of key 51
+  teardown of key 50
+  teardown of key 53
+  teardown of key 52
+a channel of an owning array after delete: alive 0
+  teardown of key 61
+one value received before: 60, alive 1
+  teardown of key 60
+after its destroy: alive 0
+  teardown of key 70
+  teardown of key 71
+a closed channel after delete: alive 0
+  teardown of key 80
+  teardown of key 81
+  teardown of key 82
+a channel that wrapped around after delete: alive 0
+  teardown of key 90
+an empty channel after delete: alive 0
+a deferred delete: alive 1
+  teardown of key 100
+at the end: alive 0

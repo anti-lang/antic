@@ -736,7 +736,7 @@ A channel is a bounded queue of values that threads share.
 | `send(c, v)` | puts a copy of `v` into the channel and waits while it is full |
 | `recv(c)` | takes the oldest value and waits while the channel is empty and open |
 | `close(c)` | ends what the channel takes |
-| `delete(c)` | frees the channel |
+| `delete(c)` | tears down the values the channel still holds and frees it |
 | `select { a x => stmt, b y => stmt }` | takes from whichever channel is ready |
 
 `chan T` is a type, written in a parameter or a field as it is written in the expression. A value of it is one handle, and a copy names the same channel.

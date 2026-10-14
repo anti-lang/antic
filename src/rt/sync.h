@@ -23,7 +23,13 @@ void *anti_rt_chan_recv(void *handle, void *out);
 /* `close(c)`. A second `close` changes nothing. */
 void anti_rt_chan_close(void *handle);
 
-/* `delete(c)`: free the channel and the values it still holds. */
+/* Take the oldest value the channel holds into out, which the result
+   then names, without waiting. The result is NULL when it holds none.
+   `delete(c)` of a channel of owning values calls it until it does, and
+   tears each value down. */
+void *anti_rt_chan_held(void *handle, void *out);
+
+/* `delete(c)`: free the channel and the memory of its queue. */
 void anti_rt_chan_delete(void *handle);
 
 /* Wait until one of count channels holds a value or is closed, and give

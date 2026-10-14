@@ -174,6 +174,28 @@ void anti_rt_chan_close(void *handle)
     wake_selects();
 }
 
+/* DESIGN: `delete(c)` tears down the values a channel still holds, by
+   R075 of "Rules of 2026-10-13". The program takes each one with this
+   function, which never waits, and tears it down in its own frame, since
+   the teardown of a value is code of the program. The channel has no
+   other user by then: `delete` frees it next. */
+void *anti_rt_chan_held(void *handle, void *out)
+{
+    struct channel *ch = handle;
+    void *got = NULL;
+
+    if (ch == NULL) {
+        return NULL;
+    }
+    anti_rt_monitor_hold(ch->monitor);
+    if (ch->count > 0) {
+        take(ch, out);
+        got = out;
+    }
+    anti_rt_monitor_release(ch->monitor);
+    return got;
+}
+
 void anti_rt_chan_delete(void *handle)
 {
     struct channel *ch = handle;
