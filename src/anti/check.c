@@ -441,10 +441,18 @@ int check_run(const struct check_request *r)
        files this run writes carry the name. The source and the test
        directory are search roots of the run, because the directories
        under them mirror the module paths. */
-    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-        (r->source_count == 0 &&
-         !project_sources(text_cstr(&src), text_cstr(&test), &found)) ||
-        !files_make_dirs(r->work)) {
+    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
+        status = 1;
+        goto done;
+    }
+    /* R160 of "Rules of 2026-10-13": a project without a source is a
+       wrong use of the command, which ends with 2 as `anti doc` does. */
+    if (r->source_count == 0 &&
+        !project_sources(text_cstr(&src), text_cstr(&test), &found)) {
+        status = found.count == 0 ? 2 : 1;
+        goto done;
+    }
+    if (!files_make_dirs(r->work)) {
         status = 1;
         goto done;
     }

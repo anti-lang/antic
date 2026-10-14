@@ -3,7 +3,9 @@
 
 set(check_manifest "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n")
 
-anti_message(no_source
+# A wrong use of the command ends with 2, as `anti doc` ends, by R160 of
+# "Rules of 2026-10-13" in docs/decisions.md.
+anti_message(no_source STATUS 2
     FILES anti.toml "${check_manifest}" src/notes.txt "No module.\n"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "anti: no .anti file under src or test")

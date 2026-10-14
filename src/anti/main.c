@@ -306,6 +306,22 @@ static int build_options(int argc, char **argv, int from,
             return usage(stderr);
         }
     }
+    /* R159 of "Rules of 2026-10-13": run builds a program for this
+       machine and takes the options of its usage alone. */
+    if (request.run) {
+        const char *refused = request.target != NULL      ? "--target"
+                              : request.lib != BUILD_PROGRAM ? "--lib"
+                              : request.bundle_runtime   ? "--bundle-runtime"
+                              : request.soname           ? "--soname"
+                              : request.strip_docs       ? "--strip-docs"
+                              : request.llvm_ar != NULL  ? "--llvm-ar"
+                                                         : NULL;
+        if (refused != NULL) {
+            fprintf(stderr, "anti: run builds a program for this machine, so "
+                            "it takes no %s\n", refused);
+            return 2;
+        }
+    }
     /* DESIGN: antic takes a profile in the one call of release mode, and
        a library for C or the objects of dev mode would leave it out. */
     if ((request.profile_generate || request.profile_use != NULL) &&

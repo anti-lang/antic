@@ -98,11 +98,39 @@ anti_message(program_is_a_directory
           dist/${HOST}/dev/app${EXE}/notes.txt "A directory where the program belongs.\n"
     ARGS build ${tools}
     ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
-anti_message(run_a_library
+# R160 of "Rules of 2026-10-13" in docs/decisions.md: run of a library
+# project refuses before it builds, and ends with 2. The build would
+# write dist/.
+anti_message(run_a_library STATUS 2
     FILES anti.toml "[package]\nname = \"com.example.one\"\nversion = \"0.1.0\"\n"
           src/com/example/one.anti "${library_text}"
+          dist "A file where the build would make a directory.\n"
     ARGS run ${tools}
-    ERR "anti: ./dist/${HOST}/dev/one${EXE} was not built, so there is nothing to run")
+    ERR "anti: com.example.one is a library project, which has no `main` to run")
+# run builds the default targets of the manifest, and one that is not this
+# host writes no program to run here.
+if(HOST STREQUAL "linux-x86_64")
+    set(other_target "linux-arm64")
+else()
+    set(other_target "linux-x86_64")
+endif()
+anti_message(run_without_the_host
+    FILES anti.toml "${manifest_package}\n[targets]\ndefault = [\"${other_target}\"]\n"
+          ${app_source} "${app_text}"
+    ARGS run ${tools}
+    ERR "anti: ./dist/${HOST}/dev/app${EXE} was not built, so there is nothing to run")
+# R159 of "Rules of 2026-10-13" in docs/decisions.md: run builds a program
+# for this machine, and refuses an option of build that makes none.
+foreach(case "target|--target|linux-x86_64" "lib|--lib|static"
+        "bundle_runtime|--bundle-runtime" "soname|--soname"
+        "strip_docs|--strip-docs" "llvm_ar|--llvm-ar|llvm-ar")
+    string(REPLACE "|" ";" parts "${case}")
+    list(POP_FRONT parts name)
+    list(GET parts 0 option)
+    anti_message(run_${name} STATUS 2
+        ARGS run ${parts}
+        ERR "anti: run builds a program for this machine, so it takes no ${option}")
+endforeach()
 anti_message(path_cycle
     FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.one\" = { path = \"../one\" }\n"
           ${app_source} "${app_text}"

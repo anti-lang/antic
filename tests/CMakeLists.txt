@@ -1188,9 +1188,10 @@ foreach(case
     elseif(command STREQUAL "sdk_import")
         set(words sdk import bundle.tar.xz)
     endif()
+    set(line "anti: ${option} needs a value")
     file(WRITE
          "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
-         "anti: ${option} needs a value\n")
+         "${line}\n")
     add_expect_test(anti_option_${command}_${word}_without_a_value STATUS 2
         EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
         COMMAND "$<TARGET_FILE:anti>" ${words} ${option})

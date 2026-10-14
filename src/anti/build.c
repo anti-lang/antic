@@ -1206,6 +1206,14 @@ static int build_project(const struct build_request *r, int depth)
     if (!read_units(&b)) {
         goto done;
     }
+    /* R160 of "Rules of 2026-10-13": run of a library project is a wrong
+       use of the command, refused before anything builds. */
+    if (r->run && linking_module(&b) == b.unit_count) {
+        fprintf(stderr, "anti: %s is a library project, which has no `main` "
+                        "to run\n", text_cstr(&b.m.name));
+        status = 2;
+        goto done;
+    }
     for (i = 0; i < target_count; i++) {
         if (!build_target(&b, targets[i], cpus[i])) {
             goto done;
