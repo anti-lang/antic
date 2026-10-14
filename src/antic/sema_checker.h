@@ -418,6 +418,16 @@ bool sema_simd_method_declared(struct checker *c, const struct type *s,
                                const struct name *name);
 
 /* sema_call.c */
+/* The defaults of the parameters of sym. sema_required_params gives the
+   fewest parameters a call of it writes, of count in all.
+   sema_filled_by_defaults gives how many parameters after the first
+   `given` the defaults fill, and sema_append_defaults appends their
+   arguments to the call e. Each counts in the parameters of the type. */
+size_t sema_required_params(const struct symbol *sym, size_t count);
+size_t sema_filled_by_defaults(const struct symbol *sym, size_t given);
+void sema_append_defaults(struct checker *c, struct expr *e,
+                          const struct symbol *sym, const struct type *fn,
+                          size_t given, size_t filled);
 
 struct type *sema_struct_of(struct type *t);
 bool sema_refuse_abstract_value(struct checker *c, struct pos pos,

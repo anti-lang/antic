@@ -1235,7 +1235,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
    it. */
 /* The fewest parameters of the type that a call of sym gives, which is
    every parameter before the first with a default. */
-static size_t required_params(const struct symbol *sym, size_t count)
+size_t sema_required_params(const struct symbol *sym, size_t count)
 {
     size_t i;
 
@@ -1251,7 +1251,7 @@ static size_t required_params(const struct symbol *sym, size_t count)
 /* How many parameters after the first `given` the defaults of sym fill,
    when every one after them has a default. The count is in the
    parameters of the type, `self` included. */
-static size_t filled_by_defaults(const struct symbol *sym, size_t given)
+size_t sema_filled_by_defaults(const struct symbol *sym, size_t given)
 {
     size_t i;
 
@@ -1292,9 +1292,9 @@ static struct expr *default_argument(struct checker *c, const struct expr *call,
 
 /* Append the arguments of the `filled` parameters after the first
    `given`, which count in the parameters of the type. */
-static void append_defaults(struct checker *c, struct expr *e,
-                            const struct symbol *sym, const struct type *fn,
-                            size_t given, size_t filled)
+void sema_append_defaults(struct checker *c, struct expr *e,
+                          const struct symbol *sym, const struct type *fn,
+                          size_t given, size_t filled)
 {
     size_t have = e->as.call.arg_count;
     struct expr **args =
@@ -1350,9 +1350,10 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     e->as.call.callee->symbol = m->symbol;
     e->as.call.callee->type = fn;
     given = e->as.call.arg_count;
-    filled = filled_by_defaults(m->symbol, given + 1);
+    filled = sema_filled_by_defaults(m->symbol, given + 1);
     if (given + filled + 1 != fn->param_count) {
-        size_t least = required_params(m->symbol, fn->param_count) - 1;
+        size_t least =
+            sema_required_params(m->symbol, fn->param_count) - 1;
         size_t n = given < least ? least : fn->param_count - 1;
         sema_error_at(c, e->pos,
                       "`%s.construct` takes %s%zu argument%s, found %zu",
@@ -1376,7 +1377,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (filled > 0) {
-        append_defaults(c, e, m->symbol, fn, given + 1, filled);
+        sema_append_defaults(c, e, m->symbol, fn, given + 1, filled);
     }
     if (m->may_fail) {
         return check_handled(c, e, fn, expected);
@@ -1993,7 +1994,7 @@ static void refuse_count(struct checker *c, const struct expr *e,
 {
     size_t given = e->as.call.arg_count;
     size_t fixed = form->fixed;
-    size_t least = required_params(sym, fn->param_count);
+    size_t least = sema_required_params(sym, fn->param_count);
     size_t most = sym != NULL && sym->defaults != NULL
                       ? sym->default_count
                       : fn->param_count;
@@ -2093,7 +2094,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
     /* The parameters at the end that the call leaves out take their
        defaults, which are appended once the given ones are checked. */
     given = e->as.call.arg_count;
-    filled = form.variadic ? 0 : filled_by_defaults(sym, given);
+    filled = form.variadic ? 0 : sema_filled_by_defaults(sym, given);
     /* DESIGN: a function that can fail returns `*Error` and writes its
        result through the last parameter. A call that gives one argument
        fewer than the function takes leaves that place to the compiler.
@@ -2150,7 +2151,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (filled > 0) {
-        append_defaults(c, e, sym, fn, given, filled);
+        sema_append_defaults(c, e, sym, fn, given, filled);
     }
     if (is_failing(fn)) {
         return check_handled(c, e, fn, expected);

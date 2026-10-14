@@ -401,6 +401,7 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
     const struct expr *outer_callee = c->callee;
     struct symbol *sym;
     struct type *fn;
+    size_t filled;
 
     if (callee->kind != EXPR_NAME) {
         sema_error_at(c, callee->pos, "`%s` runs a worker named here", form);
@@ -430,19 +431,27 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
                       callee->as.name.text, form);
         return NULL;
     }
+    /* DESIGN: a `parallel` and a `dispatch` fill in the default of every
+       parameter they leave out, as a call does, by R088 of "Rules of
+       2026-10-13". worker_args appends the arguments once it has checked
+       the written ones. */
+    filled = sema_filled_by_defaults(sym, arg_count + 1);
+    /* The copy of a generic worker is recorded on a call, and so are
+       the defaults, so a worker named without arguments becomes a call
+       of none. */
+    if (call->kind != EXPR_CALL &&
+        (filled > 0 ||
+         (sym->item != NULL && sym->item->type_param_count > 0))) {
+        call = sema_new_node(c, EXPR_CALL, callee->pos);
+        call->as.call.callee = callee;
+        *slot = call;
+    }
     if (sym->item == NULL || sym->item->type_param_count == 0) {
         if (callee->type_arg_count > 0) {
             sema_refuse_type_args(c, callee, &callee->as.name);
             return NULL;
         }
-    } else if (fn->param_count == arg_count + 1) {
-        /* The copy is recorded on a call, so a worker named without
-           arguments becomes a call of none. */
-        if (call->kind != EXPR_CALL) {
-            call = sema_new_node(c, EXPR_CALL, callee->pos);
-            call->as.call.callee = callee;
-            *slot = call;
-        }
+    } else if (fn->param_count == arg_count + filled + 1) {
         fn = sema_worker_copy(c, call, fn, sym, given);
         if (fn == NULL) {
             return NULL;
@@ -455,12 +464,17 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
                       first);
         return NULL;
     }
-    if (fn->param_count != arg_count + 1) {
+    if (fn->param_count != arg_count + filled + 1) {
+        size_t least = sema_required_params(sym, fn->param_count) - 1;
+        size_t n = arg_count < least ? least : fn->param_count - 1;
         sema_error_at(c, call->pos,
-                      "`%.*s` takes %zu argument%s beside the %s, "
+                      "`%.*s` takes %s%zu argument%s beside the %s, "
                       "found %zu", (int)callee->as.name.length,
-                      callee->as.name.text, fn->param_count - 1,
-                      fn->param_count == 2 ? "" : "s", first, arg_count);
+                      callee->as.name.text,
+                      least == fn->param_count - 1 ? ""
+                      : arg_count < least          ? "at least "
+                                                   : "at most ",
+                      n, n == 1 ? "" : "s", first, arg_count);
         return NULL;
     }
     return fn;
@@ -501,6 +515,18 @@ static bool worker_args(struct checker *c, struct expr *call,
             ok = worker_type(c, args[i]->pos, "an argument of a worker",
                              fn->params[i + 1]) && ok;
         }
+    }
+    /* The parameters the call leaves out take their defaults. Each is a
+       parameter of a worker as well, so its type holds no pointer. */
+    for (i = arg_count + 1; i < fn->param_count; i++) {
+        if (fn->params[i]->kind != TYPE_FN || fn->params[i]->bound) {
+            ok = worker_type(c, call->pos, "an argument of a worker",
+                             fn->params[i]) && ok;
+        }
+    }
+    if (ok && arg_count + 1 < fn->param_count) {
+        sema_append_defaults(c, call, callee->symbol, fn, arg_count + 1,
+                             fn->param_count - arg_count - 1);
     }
     if (call->kind == EXPR_CALL) {
         call->type = fn->result;
