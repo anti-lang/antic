@@ -123,11 +123,13 @@ anti_message(clang_anonymous_member STATUS 0
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: an anonymous member of `Mixed` is the field `anon0`")
+# _BitInt is C23, which clang reads for every target. A block of Apple
+# would do on macOS alone.
 anti_message(clang_type_does_not_parse STATUS 0
-    FILES api.h "void each(void (^block)(void));\n"
+    FILES api.h "void each(_BitInt(37) n);\n"
     OUT "bind: anti.api from api.h, 0 functions, 1 warning"
     ARGS ${clang_bind}
-    ERR "anti: api.h: warning: `each` is left out: its type `void (void (^)(void))` does not parse")
+    ERR "anti: api.h: warning: `each` is left out: its type `void (_BitInt(37))` does not parse")
 # T098: the function gets a second warning, which names its result.
 anti_message(clang_static_without_a_body STATUS 0
     FILES api.h "static int hidden(void);\nint shown(void);\n"
