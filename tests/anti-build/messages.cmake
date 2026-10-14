@@ -78,6 +78,14 @@ anti_message(cpu_level
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     ARGS build --target linux-x86_64 --cpu v9 ${tools}
     ERR "anti: v9 is no processor level of linux-x86_64")
+# R158 of "Rules of 2026-10-13" in docs/decisions.md: --target all checks
+# every target against the level before it builds any. The source does
+# not compile, so a build of linux-x86_64 would add the message of antic.
+anti_message(cpu_level_of_all_targets
+    FILES anti.toml "${manifest_package}"
+          ${app_source} "fn main() -> int\n{\n\treturn missing;\n}\n"
+    ARGS build --target all --cpu v1 ${tools}
+    ERR "anti: v1 is no processor level of linux-arm64")
 # R156 of "Rules of 2026-10-13" in docs/decisions.md: the build names
 # the path that is a file where its directory belongs, and exits with 1.
 anti_message(dist_is_a_file

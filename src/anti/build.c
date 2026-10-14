@@ -1140,6 +1140,7 @@ static int build_project(const struct build_request *r, int depth)
     struct path_context context;
     struct text manifest_path = {0};
     enum target targets[TARGET_COUNT];
+    enum cpu_level cpus[TARGET_COUNT];
     size_t target_count = 0;
     size_t i;
     int status = 1;
@@ -1170,6 +1171,20 @@ static int build_project(const struct build_request *r, int depth)
         text_appendf(&b.license, "%s/%s", r->root,
                      text_cstr(&b.m.license_text));
     }
+    if (!build_targets(&b, targets, &target_count)) {
+        goto done;
+    }
+    /* R158 of "Rules of 2026-10-13": every target takes the level before
+       the dependencies resolve and any target builds, so a refusal leaves
+       no part of the build. */
+    for (i = 0; i < target_count; i++) {
+        cpus[i] = cpu_default(targets[i]);
+        if (r->cpu != NULL && !cpu_from_name(r->cpu, targets[i], &cpus[i])) {
+            fprintf(stderr, "anti: %s is no processor level of %s\n", r->cpu,
+                    target_name(targets[i]));
+            goto done;
+        }
+    }
     context.r = r;
     context.depth = depth;
     if (!deps_resolve(&b.m, r->root, r->offline, path_dependency, &context,
@@ -1191,17 +1206,8 @@ static int build_project(const struct build_request *r, int depth)
     if (!read_units(&b)) {
         goto done;
     }
-    if (!build_targets(&b, targets, &target_count)) {
-        goto done;
-    }
     for (i = 0; i < target_count; i++) {
-        enum cpu_level cpu = cpu_default(targets[i]);
-        if (r->cpu != NULL && !cpu_from_name(r->cpu, targets[i], &cpu)) {
-            fprintf(stderr, "anti: %s is no processor level of %s\n", r->cpu,
-                    target_name(targets[i]));
-            goto done;
-        }
-        if (!build_target(&b, targets[i], cpu)) {
+        if (!build_target(&b, targets[i], cpus[i])) {
             goto done;
         }
     }
