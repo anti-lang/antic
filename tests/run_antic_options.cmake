@@ -6,6 +6,7 @@
 #   LLVM_MC   the assembler
 #   LLVM_AR   the archiver
 #   READOBJ   llvm-readobj of the pinned release
+#   OBJDUMP   llvm-objdump of the pinned release
 #   SOURCES   tests/, which holds programs/, traps/ and errors/
 #   TARGET    the target of the case target_cpu
 #   EXE       the suffix of a program of this host
@@ -101,6 +102,32 @@ function(lacks text needle what)
     if(NOT at LESS 0)
         message(FATAL_ERROR "${what} holds `${needle}`:\n${text}")
     endif()
+endfunction()
+
+# The names an object or an archive defines, each on a line of its own
+# and without the underscore Mach-O puts before a name of C. llvm-objdump
+# writes `*UND*` in the line of an undefined name of ELF and Mach-O and
+# `(sec  0)` in that of COFF.
+function(defined_symbols out file)
+    execute_process(COMMAND "${OBJDUMP}" --syms "${file}"
+                    OUTPUT_VARIABLE table RESULT_VARIABLE status
+                    ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "llvm-objdump read no symbols of ${file}")
+    endif()
+    string(REPLACE "\r" "" table "${table}")
+    string(REPLACE ";" "," table "${table}")
+    string(REPLACE "\n" ";" lines "${table}")
+    set(names "\n")
+    foreach(line IN LISTS lines)
+        if(line MATCHES "[*]UND[*]" OR line MATCHES "[(]sec +0[)]")
+            continue()
+        endif()
+        if(line MATCHES "[ \t]_?([A-Za-z_][A-Za-z0-9_]*)$")
+            string(APPEND names "${CMAKE_MATCH_1}\n")
+        endif()
+    endforeach()
+    set(${out} "${names}" PARENT_SCOPE)
 endfunction()
 
 # The files of a directory, sorted, as one text with a space between them.
@@ -320,18 +347,16 @@ if(CASE STREQUAL "bundle_static")
                  "${library_source}")
     antic_output(bundle_said --lib static --bundle-runtime ${tools}
                  -o "${WORK}/bundle.a" "${library_source}")
-    execute_process(COMMAND "${LLVM_AR}" t "${WORK}/plain.a"
-                    OUTPUT_VARIABLE plain RESULT_VARIABLE plain_status
-                    ENCODING NONE)
-    execute_process(COMMAND "${LLVM_AR}" t "${WORK}/bundle.a"
-                    OUTPUT_VARIABLE bundle RESULT_VARIABLE bundle_status
-                    ENCODING NONE)
-    if(NOT plain_status EQUAL 0 OR NOT bundle_status EQUAL 0)
-        message(FATAL_ERROR "llvm-ar read no archive")
-    endif()
-    # check.o holds anti_rt_check_failed, a member of every runtime.
-    lacks("${plain}" "check.o" "the archive without --bundle-runtime")
-    holds("${bundle}" "check.o" "the archive of --bundle-runtime")
+    # anti_rt_check_failed is a function of every runtime. The archive
+    # of --bundle-runtime defines it in a member of the runtime on
+    # Mach-O and in the one joined object on ELF and COFF, by the entry
+    # on --bundle-runtime in docs/decisions.md.
+    defined_symbols(plain "${WORK}/plain.a")
+    defined_symbols(bundle "${WORK}/bundle.a")
+    lacks("${plain}" "\nanti_rt_check_failed\n"
+          "the archive without --bundle-runtime")
+    holds("${bundle}" "\nanti_rt_check_failed\n"
+          "the archive of --bundle-runtime")
     # The line antic prints names what the C program links beside the
     # archive: the runtime, unless the archive holds it.
     holds("${plain_said}" "libanti_rt.a"

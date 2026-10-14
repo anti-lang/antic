@@ -1259,6 +1259,7 @@ foreach(case IN LISTS antic_option_cases)
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_AR=${ANTIC_LLVM_AR}"
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}"
             "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-options/${case}"
