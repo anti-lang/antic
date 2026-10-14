@@ -360,6 +360,23 @@ static void const_tree(struct lowerer *l, const struct const_value *v,
         agg->items[1].scalar = IR_I64;
         agg->items[1].integer = v->as.text.length;
         *out = *agg;
+    } else if (t->kind == TYPE_OPTIONAL) {
+        /* DESIGN: a constant of a `?T` is the value of its `T`, or none.
+           Its tree is the struct of the two, with the value and a flag of
+           1, or no value, which leaves zeros, and a flag of 0. */
+        agg = ir_const_agg(l->m, lower_vtype_of(l, t), t->field_count);
+        for (i = 0; i < t->field_count; i++) {
+            const struct name *name = &t->fields[i].name;
+            if (name->length == sizeof OPTIONAL_HAS - 1 &&
+                memcmp(name->text, OPTIONAL_HAS, name->length) == 0) {
+                agg->items[i].kind = IR_CONST_INT;
+                agg->items[i].scalar = IR_I8;
+                agg->items[i].integer = v->kind != CONST_NULL;
+            } else if (v->kind != CONST_NULL) {
+                const_tree(l, v, t->fields[i].type, &agg->items[i]);
+            }
+        }
+        *out = *agg;
     } else if (types_has_fields(t)) {
         agg = ir_const_agg(l->m, lower_vtype_of(l, t), t->field_count);
         for (i = 0; i < t->field_count; i++) {
