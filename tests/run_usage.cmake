@@ -5,6 +5,8 @@
 #   REFUSED  optional. ON for a command line the tool refuses
 #   FIRST    optional, with REFUSED: the line the tool writes before the
 #            usage, without its line break
+#   LISTS    optional, without REFUSED: options separated by |, each of
+#            which the usage lists at the start of a line of its own
 #
 # Without REFUSED the command is the tool and the option that asks for the
 # usage, alone or among other arguments. The option prints it on the
@@ -85,6 +87,19 @@ endif()
 if(NOT asked_out MATCHES "^usage: ${NAME} ")
     message(FATAL_ERROR "the option printed no usage of ${NAME}:\n"
                         "${asked_out}")
+endif()
+if(DEFINED LISTS)
+    string(REPLACE "|" ";" listed "${LISTS}")
+    foreach(option IN LISTS listed)
+        string(FIND "${asked_out}" "\n  ${option} " at)
+        if(at EQUAL -1)
+            string(FIND "${asked_out}" "\n  ${option}\n" at)
+        endif()
+        if(at EQUAL -1)
+            message(FATAL_ERROR "the usage of ${NAME} lists no `${option}`:\n"
+                                "${asked_out}")
+        endif()
+    endforeach()
 endif()
 
 set(command "${tool}")

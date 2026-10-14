@@ -39,6 +39,21 @@ static int usage(FILE *out)
           "                       no runtime and uses the host's\n"
           "  --closed             a program without the dynamic exports\n"
           "                       that a plugin resolves against\n"
+          "  --no-reflect         drop the field and function lists of\n"
+          "                       the descriptors\n"
+          "  --checks             keep the run-time checks, which release\n"
+          "                       mode drops\n"
+          "  --no-checks          drop the run-time checks of dev mode\n"
+          "  --asserts            keep `assert` and `show`, which release\n"
+          "                       mode drops\n"
+          "  --no-asserts         drop `assert` and `show` of dev mode\n"
+          "  --trace              trace the classes that ask for it, which\n"
+          "                       release mode does not\n"
+          "  --trace <pattern>    trace the classes <pattern> names as\n"
+          "                       well, or with `writes` the writes of\n"
+          "                       fields\n"
+          "  --no-trace           trace no class\n"
+          "  --no-hooks           drop every hook site\n"
           "  --llvm-ar <path>     the llvm-ar executable\n"
           "  --linker lld|platform  link with lld of the runtime archive, the\n"
           "                       default, or with the platform linker\n"
@@ -98,7 +113,8 @@ static int usage(FILE *out)
           "  --print-llvm-targets print the triple, the relocation model\n"
           "                       and the data layout of each target and\n"
           "                       the clang -march= value of each level\n"
-          "  --version            print the version\n",
+          "  --version            print the version\n"
+          "  --help               print this usage\n",
           out);
     return out == stderr ? 2 : 0;
 }

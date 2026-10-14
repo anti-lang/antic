@@ -1096,6 +1096,12 @@ add_usage_test(antic option_unknown FIRST "antic: unknown option --bogus"
 add_usage_test(antic second_input FIRST "antic: one input file only"
     ARGS "${usage_source}" "${usage_source}")
 add_usage_test(antic options_without_an_input ARGS -S --dev)
+# R141 of "Rules of 2026-10-13" in docs/decisions.md: the usage of antic
+# lists the options of the modes, the checks and the hooks.
+add_test(NAME antic_usage_lists_options
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:antic>,--help"
+            "-DLISTS=--help|--no-reflect|--asserts|--no-asserts|--checks|--no-checks|--no-hooks|--trace|--no-trace"
+            -DNAME=antic -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
 # R142 of "Rules of 2026-10-13" in docs/decisions.md: `--help` of antic
 # among other arguments prints the usage and ends with 0, and antic
 # compiles nothing.
