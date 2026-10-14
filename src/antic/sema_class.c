@@ -737,6 +737,34 @@ static void check_operator_item(struct checker *c, const struct item *m,
             return;
         }
     }
+    /* DESIGN: an operator is used as `a == b` and `xs[i]`, which give it
+       no type arguments, so every type parameter comes from an operand.
+       One that no operand names stays open in every use, and R067 of
+       "Rules of 2026-10-13" refuses it here. A constant parameter is
+       named by a length, which the walk below does not read. */
+    if (m->symbol != NULL && m->symbol->type != NULL &&
+        m->symbol->type->kind == TYPE_FN) {
+        const struct type *fn = m->symbol->type;
+        size_t i;
+        size_t j;
+        for (i = 0; i < m->type_param_count; i++) {
+            bool named = m->type_params[i].constant ||
+                         m->type_params[i].type == NULL;
+            for (j = 0; !named && j < fn->param_count; j++) {
+                named = sema_names_param(fn->params[j],
+                                         m->type_params[i].type);
+            }
+            if (!named) {
+                sema_error_at(c, m->type_params[i].pos,
+                              "no operand of `operator fn %.*s` names "
+                              "`%.*s`, which no use of the operator can "
+                              "give", (int)m->name.length, m->name.text,
+                              (int)m->type_params[i].name.length,
+                              m->type_params[i].name.text);
+                return;
+            }
+        }
+    }
     check_hook(c, m, owner);
 }
 

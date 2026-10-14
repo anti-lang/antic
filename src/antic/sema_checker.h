@@ -629,6 +629,7 @@ void sema_resolve_generics(struct checker *c);
 struct type *sema_alias_type(struct checker *c, struct symbol *sym);
 void sema_run_pending(struct checker *c);
 bool sema_has_params(const struct type *t);
+bool sema_names_param(const struct type *t, const struct type *param);
 /* The parameters of a generic and what stands in their place, a type or
    a constant, and the generic type whose copy it is. */
 struct generic_map {

@@ -1,5 +1,6 @@
 //! A generic `operator fn eq` with a type parameter that neither operand names.
-//! `==` gives the operator no type arguments, so nothing gives `U`.
+//! `==` gives the operator no type arguments, so nothing gives `U`, and R067 of
+//! "Rules of 2026-10-13" refuses the operator where it is declared.
 
 struct Key<T>
 {

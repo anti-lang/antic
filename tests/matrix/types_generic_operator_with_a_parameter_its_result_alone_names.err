@@ -1,0 +1,1 @@
+types_generic_operator_with_a_parameter_its_result_alone_names.anti:9:17: error: no operand of `operator fn neg` names `R`, which no use of the operator can give

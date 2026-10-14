@@ -1770,13 +1770,100 @@ struct type *sema_copy_in_chain(struct type *t, const struct type *g)
     return NULL;
 }
 
+/* Whether t names the type parameter param: the walk of has_params, for
+   one parameter. A constant parameter stands in a length, which this walk
+   does not read. answered holds the function types, the tuples and the
+   copies met so far, none of which names it. */
+static bool names_param(const struct type *t, const struct type *param,
+                        struct ptr_set *answered)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    switch (t->kind) {
+    case TYPE_PARAM:
+        return t == param;
+    case TYPE_POINTER:
+    case TYPE_SLICE:
+    case TYPE_OPTIONAL:
+    case TYPE_ARRAY:
+        return names_param(t->element, param, answered);
+    case TYPE_FN:
+    case TYPE_TUPLE:
+        if (!ptr_set_add(answered, t)) {
+            return false;
+        }
+        for (i = 0; i < t->param_count; i++) {
+            if (names_param(t->params[i], param, answered)) {
+                return true;
+            }
+        }
+        return t->kind == TYPE_FN && names_param(t->result, param, answered);
+    case TYPE_STRUCT:
+    case TYPE_CLASS:
+    case TYPE_VARIANT:
+        if (types_is_chan(t)) {
+            return names_param(t->element, param, answered);
+        }
+        if (t->generic != NULL && !ptr_set_add(answered, t)) {
+            return false;
+        }
+        for (i = 0; t->generic != NULL && i < t->generic->type_param_count;
+             i++) {
+            if (t->args[i] != NULL &&
+                names_param(t->args[i], param, answered)) {
+                return true;
+            }
+        }
+        for (i = 0; i < t->type_param_count; i++) {
+            if (t->type_params[i] == param) {
+                return true;
+            }
+        }
+        return false;
+    default:
+        return false;
+    }
+}
+
+bool sema_names_param(const struct type *t, const struct type *param)
+{
+    struct ptr_set answered;
+    bool found;
+
+    memset(&answered, 0, sizeof answered);
+    found = names_param(t, param, &answered);
+    free(answered.slots);
+    return found;
+}
+
+/* Whether it is an operator none of whose operands names its type
+   parameter p. The declaration of the operator has the message for that,
+   by R067 of "Rules of 2026-10-13", so a use adds none. fn is the type of
+   it. */
+static bool operator_leaves_open(const struct item *it, const struct type *fn,
+                                 const struct type *p)
+{
+    size_t k;
+
+    if (it == NULL || !it->is_operator || p->param->constant) {
+        return false;
+    }
+    for (k = 0; k < fn->param_count; k++) {
+        if (sema_names_param(fn->params[k], p)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* DESIGN: inference binds a type parameter from an argument that stands
    where a parameter of the function names it. An argument of another
    shape binds nothing, `first(1)` for `values: []T`, and the message that
    nothing gives `T` then sends the reader to the wrong place. R065 of
-   "Rules of 2026-10-13" names the parameter and the shape it needs. A
-   parameter of the function names the open parameter when its type
-   changes with what stands for that one, which two stand-ins show. open
+   "Rules of 2026-10-13" names the parameter and the shape it needs. open
    is the index in map of the parameter nothing gave. True when it
    reported. */
 static bool refuse_shape(struct checker *c, struct expr *e,
@@ -1794,19 +1881,10 @@ static bool refuse_shape(struct checker *c, struct expr *e,
     }
     for (j = fixed; j < e->as.call.arg_count && j < fn->param_count; j++) {
         struct type *given = g->prechecked[j];
-        struct type *one;
-        struct type *other;
         const struct param *named;
         if (given == NULL || sema_is_error(given) ||
-            given->kind == TYPE_NONE || j < skipped) {
-            continue;
-        }
-        map->args[open] = sema_builtin(c, TYPE_BOOL);
-        one = subst(c, fn->params[j], map);
-        map->args[open] = sema_builtin(c, TYPE_I64);
-        other = subst(c, fn->params[j], map);
-        map->args[open] = NULL;
-        if (one == other) {
+            given->kind == TYPE_NONE || j < skipped ||
+            !sema_names_param(fn->params[j], map->params[open])) {
             continue;
         }
         named = &it->params[j - skipped];
@@ -1938,6 +2016,9 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
             if (refuse_shape(c, e, fn, it, fixed, &map, i, g)) {
                 return sema_builtin(c, TYPE_ERROR);
             }
+            if (operator_leaves_open(it, fn, p)) {
+                return sema_builtin(c, TYPE_ERROR);
+            }
             sema_error_at(c, e->pos, "nothing in the arguments gives `%.*s` "
                           "of `%.*s`, so the call writes it out after the "
                           "name", (int)p->name.length, p->name.text,
@@ -1986,6 +2067,10 @@ static struct type *finish_copy(struct checker *c, struct expr *call,
 
     for (i = 0; i < map->count; i++) {
         const struct type *p = map->params[i];
+        if (map->args[i] == NULL && map->values[i] == NULL &&
+            operator_leaves_open(it, fn, p)) {
+            return NULL;
+        }
         if (map->args[i] == NULL && map->values[i] == NULL) {
             sema_error_at(c, call->pos, "nothing in the arguments gives `%.*s` "
                           "of `%.*s`, so the call writes it out after the "

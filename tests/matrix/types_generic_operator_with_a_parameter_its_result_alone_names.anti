@@ -1,0 +1,17 @@
+//! The result of an operator is no operand, so a type parameter it alone names
+//! is refused where the operator is declared, by R067 of "Rules of 2026-10-13".
+
+struct Key
+{
+	k: int,
+}
+
+operator fn neg<R>(a: Key) -> ?R
+{
+	return none;
+}
+
+fn main() -> int
+{
+	return 0;
+}

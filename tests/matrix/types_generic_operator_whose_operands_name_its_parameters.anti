@@ -1,0 +1,29 @@
+//! Each type parameter of a generic operator is named by one of its operands,
+//! the second among them, so R067 of "Rules of 2026-10-13" takes the operator
+//! and each use gives every parameter.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Key<T>
+{
+	k: T,
+}
+
+operator fn add<T, U>(a: Key<T>, b: Key<U>) -> int
+{
+	return size_of(T) * 10 + size_of(U);
+}
+
+operator fn index<T, U>(a: *Key<T>, i: U) -> int
+{
+	return size_of(T) + size_of(U);
+}
+
+fn main() -> int
+{
+	let a = Key<int> { k: 1 };
+	let b = Key<u8> { k: 2 };
+	let i: i16 = 3;
+	printf("%lld %lld %lld\n".ptr, a + b, b + a, a[i]);
+	return 0;
+}

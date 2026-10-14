@@ -1,1 +1,1 @@
-types_generic_operator_with_a_parameter_no_operand_gives.anti:18:5: error: nothing in the arguments gives `U` of `eq`, so the call writes it out after the name
+types_generic_operator_with_a_parameter_no_operand_gives.anti:10:19: error: no operand of `operator fn eq` names `U`, which no use of the operator can give

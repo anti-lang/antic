@@ -908,6 +908,11 @@ Where two rules meet, and where three do:
 - A bitfield and a failing call, the flags form, a closure, a lent element,
   `==` and the hash: the part `other_rules` of
   `types_bitfields_and_unions`.
+- A generic operator and a type parameter no operand names, by R067:
+  `types_generic_operator_with_a_parameter_no_operand_gives` and
+  `types_generic_operator_with_a_parameter_its_result_alone_names` are
+  refused, and `types_generic_operator_whose_operands_name_its_parameters`
+  runs.
 - A generic call and an argument of another shape, by R065: the four
   refusals `types_generic_call_with_*` and
   `types_generic_function_of_a_class_with_another_shape`.
