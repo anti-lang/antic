@@ -170,6 +170,11 @@ not re-open a settled decision without asking Eddie.
   and `ctest -I 2001,4774`: 377 s and 234 s. It ran each sanitizer suite
   as `ctest -I 1,1150`, `ctest -I 1151,2250` and `ctest -I 2251,4772`:
   `asan` 260 s, 371 s and 324 s, `ubsan` 245 s, 347 s and 247 s.
+  The step of the rules of types and of generics measured `host` as
+  `ctest -I 1,2000` and `ctest -I 2001,4825`: 374 s and 239 s. It ran each
+  sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
+  `ctest -I 2251,4823`: `asan` 266 s, 365 s and 339 s, `ubsan` 242 s,
+  346 s and 257 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -713,10 +718,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4774 ctest tests pass on the development Mac, and two of them, the
+- 4825 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   376 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4772 each with the same skips, without
+  The ASan and the UBSan builds run 4823 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
@@ -744,6 +749,18 @@ reports what it finished.
   constant parameter with its argument in place. R034 keeps the operator
   on a union. `docs/reports/2026-10-14-rules-values.md` and
   `docs/reports/2026-10-14-rules-values-2.md` report the two sessions.
+- The rules of types and of generics are built, R048 to R069 apart from
+  R051, R054 and R066, which wait for Eddie. A constant that does not fit
+  the width of a bitfield is refused, a dev build stops any other value
+  that does not fit, and `+|=` clamps at the width. `alloc(T, n)` of a
+  type that `align(N)` raises above 16 takes aligned memory from
+  `anti_rt_alloc_aligned`, on macOS and Linux. `as` to an enum takes an
+  integer alone, `as` to the type of the value does nothing, and `as`
+  with a `?` apart from it is refused. A `char` lane of a simd struct is
+  refused. `--front-end` compiles the copies of the generics, an
+  `operator fn` whose type parameter no operand names is refused, and a
+  generic call names the parameter whose shape an argument misses.
+  `docs/reports/2026-10-14-rules-types.md` reports the step.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A
