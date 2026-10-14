@@ -77,8 +77,11 @@ constraints that pull at each other. That is an error rather than a loop.
 
 A dependency of a path whose directory holds a manifest is a project. The build
 builds it for the host first, in the mode of the build that names it. It then
-reads the library files under its `dist/`. The chain stops after eight, so a
-cycle of path dependencies reports rather than running out of stack.
+reads the library files under its `dist/`. Each build keeps the chain of the
+projects whose builds wait for it, by their resolved directories. A project
+that stands in the chain already closes a cycle, which is refused at any depth
+with the packages named, as `com.example.app -> com.example.one ->
+com.example.app`. That is R165 of "Rules of 2026-10-13".
 
 ## The symbols archive
 

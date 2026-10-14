@@ -137,7 +137,29 @@ anti_message(path_cycle
           ../one/anti.toml "[package]\nname = \"com.example.one\"\nversion = \"0.1.0\"\n\n[dependencies]\n\"com.example.app\" = { path = \"../project\" }\n"
           ../one/src/com/example/one.anti "${library_text}"
     ARGS build ${tools}
-    ERR "anti: ./../one/../project/../one/../project/../one/../project/../one/../project: the path dependencies of this project are more than 8 deep, so one of them is a cycle")
+    ERR "anti: the path dependencies form a cycle: com.example.app -> com.example.one -> com.example.app")
+# R165 of "Rules of 2026-10-13" in docs/decisions.md: a cycle is refused at
+# any depth. Nine projects stand in a chain below this one, and the last
+# names the one before it, nine levels down.
+function(write_chain)
+    foreach(level RANGE 1 9)
+        if(level EQUAL 9)
+            set(next 8)
+        else()
+            math(EXPR next "${level} + 1")
+        endif()
+        file(WRITE "${PROJECT}/../p${level}/anti.toml"
+             "[package]\nname = \"com.example.p${level}\"\nversion = \"0.1.0\"\n\n[dependencies]\n\"com.example.p${next}\" = { path = \"../p${next}\" }\n")
+        file(WRITE "${PROJECT}/../p${level}/src/com/example/p${level}.anti"
+             "${library_text}")
+    endforeach()
+endfunction()
+anti_message(path_cycle_nine_deep
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.p1\" = { path = \"../p1\" }\n"
+          ${app_source} "${app_text}"
+    SETUP write_chain
+    ARGS build ${tools}
+    ERR "anti: the path dependencies form a cycle: com.example.p8 -> com.example.p9 -> com.example.p8")
 
 # The dependencies. The repository of a case is the directory WORK/repo,
 # named by its file:// URL, and the cache of the user is WORK/cache.

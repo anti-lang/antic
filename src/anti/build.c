@@ -33,16 +33,13 @@
 #include "userdirs.h"
 #include "zip.h"
 
-/* A path dependency may be a project, whose build is a build of its own.
-   The chain stops here, so a cycle of path dependencies reports rather
-   than running out of stack. */
-enum { BUILD_DEPTH = 8 };
-
 /* The key of a cached output stands beside it, under its name and this
    suffix. */
 #define BUILD_KEY_SUFFIX ".key"
 
-static int build_project(const struct build_request *r, int depth);
+struct path_context;
+static int build_project(const struct build_request *r,
+                         const struct path_context *outer);
 
 /* A growing list of strings that the option lists point into. */
 struct strings {
@@ -936,12 +933,63 @@ done:
     return ok;
 }
 
-/* The context a path dependency is built with, which is the request of
-   the project that names it. */
+/* The context a path dependency is built with: the request of the
+   project that names it, that project and the chain of the projects whose
+   builds wait for it, outer first.
+
+   DESIGN: a path dependency may be a project, whose build is a build of
+   its own. R165 of "Rules of 2026-10-13": a project that stands in the
+   chain already closes a cycle, which is refused at any depth with the
+   packages of the cycle named. The chain compares the resolved
+   directories, so two spellings of one directory are one project. */
 struct path_context {
     const struct build_request *r;
+    const struct path_context *outer;
+    struct text directory;
+    const char *name;
     int depth;
 };
+
+/* Report the cycle that the project in directory closes, when the chain
+   of c holds it. */
+static bool path_cycle(const struct path_context *c, const char *directory)
+{
+    const struct path_context *at;
+    const struct path_context *first = NULL;
+    struct text resolved = {0};
+    struct text line = {0};
+    const char **names;
+    size_t count = 0;
+    size_t i;
+
+    if (!absolute_path(directory, &resolved)) {
+        text_free(&resolved);
+        return false;
+    }
+    for (at = c; at != NULL && first == NULL; at = at->outer) {
+        count++;
+        if (strcmp(text_cstr(&at->directory), text_cstr(&resolved)) == 0) {
+            first = at;
+        }
+    }
+    text_free(&resolved);
+    if (first == NULL) {
+        return false;
+    }
+    names = files_array(count + 1, sizeof *names);
+    i = count;
+    for (at = c; i > 0; at = at->outer) {
+        names[--i] = at->name;
+    }
+    for (i = 0; i < count; i++) {
+        text_appendf(&line, "%s -> ", names[i]);
+    }
+    fprintf(stderr, "anti: the path dependencies form a cycle: %s%s\n",
+            text_cstr(&line), first->name);
+    text_free(&line);
+    free((void *)names);
+    return true;
+}
 
 /* Where the library files of a path dependency stand. A directory that
    holds a manifest is a project, which is built for the host first. */
@@ -961,10 +1009,7 @@ static bool path_dependency(void *context, const char *directory,
         text_free(&manifest_path);
         return true;
     }
-    if (c->depth + 1 >= BUILD_DEPTH) {
-        fprintf(stderr, "anti: %s: the path dependencies of this project are "
-                        "more than %d deep, so one of them is a cycle\n",
-                directory, BUILD_DEPTH);
+    if (path_cycle(c, directory)) {
         text_free(&manifest_path);
         return false;
     }
@@ -979,7 +1024,7 @@ static bool path_dependency(void *context, const char *directory,
     sub.lib = BUILD_PROGRAM;
     sub.run = false;
     sub.notice = BUILD_NOTICE_BUILD;
-    if (build_project(&sub, c->depth + 1) == 0) {
+    if (build_project(&sub, c) == 0) {
         text_appendf(out, "%s/%s/%s/%s", directory, text_cstr(&m.dist),
                      target_name(host), c->r->release ? "release" : "dev");
         ok = true;
@@ -1134,7 +1179,8 @@ static int run_built(const struct build *b)
     return status;
 }
 
-static int build_project(const struct build_request *r, int depth)
+static int build_project(const struct build_request *r,
+                         const struct path_context *outer)
 {
     struct build b;
     struct path_context context;
@@ -1146,8 +1192,9 @@ static int build_project(const struct build_request *r, int depth)
     int status = 1;
 
     memset(&b, 0, sizeof b);
+    memset(&context, 0, sizeof context);
     b.r = r;
-    b.depth = depth;
+    b.depth = outer != NULL ? outer->depth + 1 : 0;
     text_appendf(&manifest_path, "%s/%s", r->root, MANIFEST_FILE);
     if (!manifest_read(text_cstr(&manifest_path), false, &b.m)) {
         goto done;
@@ -1186,7 +1233,12 @@ static int build_project(const struct build_request *r, int depth)
         }
     }
     context.r = r;
-    context.depth = depth;
+    context.outer = outer;
+    context.name = text_cstr(&b.m.name);
+    context.depth = b.depth;
+    if (!absolute_path(r->root, &context.directory)) {
+        text_append(&context.directory, r->root);
+    }
     if (!deps_resolve(&b.m, r->root, r->offline, path_dependency, &context,
                       &b.graph)) {
         goto done;
@@ -1221,6 +1273,7 @@ static int build_project(const struct build_request *r, int depth)
     }
     status = r->run ? run_built(&b) : 0;
 done:
+    text_free(&context.directory);
     build_free(&b);
     text_free(&manifest_path);
     return status;
@@ -1228,5 +1281,5 @@ done:
 
 int build_run(const struct build_request *r)
 {
-    return build_project(r, 0);
+    return build_project(r, NULL);
 }
