@@ -134,6 +134,10 @@ anti: this host is no target of Anti, so license --project needs --target\n
 # src/anti/project.c
 
 # src/anti/repo.c
+# Stays: no input reaches it. The manifest reader refuses the name of a
+# dependency by R164, and deps.c the name of an index and of a lock file,
+# before index_dir and repo_module read it.
+anti: %s names the package %s, which is no package name\n
 # Stays: no input reaches it. deps.c refuses the module path of an index
 # and of a lock file before repo_module reads it.
 anti: %s names the module %s of %s, which is no module path\n

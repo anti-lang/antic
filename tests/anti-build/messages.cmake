@@ -288,12 +288,19 @@ anti_message(cache_unknown
     ARGS build ${tools}
     ERR "anti: the environment does not say where the cache of the user is"
         "${no_version}")
+# R164 of "Rules of 2026-10-13" in docs/decisions.md: the manifest reader
+# refuses a dependency whose name is no package name, by a repository and
+# by a path alike.
 anti_message(dependency_name
     FILES anti.toml "${manifest_package}\n[repositories]\nlocal = \"${repo_url}\"\n\n[dependencies]\n\"com.example.Units\" = { version = \"1.2.0\", repo = \"local\" }\n"
           ${app_source} "${app_text}"
     ARGS build ${tools}
-    ERR "anti: ${repo_url} names the package com.example.Units, which is no package name"
-        "anti: ${repo_url} has no version of com.example.Units that satisfies every constraint on it")
+    ERR "anti: ./anti.toml: the dependency com.example.Units is no package name")
+anti_message(dependency_name_of_a_path
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com/example/units\" = { path = \"../units\" }\n"
+          ${app_source} "${app_text}"
+    ARGS build ${tools}
+    ERR "anti: ./anti.toml: the dependency com/example/units is no package name")
 
 # A dependency by its path: a directory of library files, or a project.
 set(units_manifest "[package]\nname = \"com.example.units\"\nversion = \"0.1.0\"\n")

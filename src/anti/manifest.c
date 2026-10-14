@@ -375,6 +375,14 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
        and a path says two things about where its modules come from. */
     for (i = 0; i < out->dependency_count; i++) {
         const struct manifest_dependency *d = &out->dependencies[i];
+        /* R164 of "Rules of 2026-10-13": the name stands in the paths of
+           the cache and of the lock file, so the reader refuses it here,
+           before anything is fetched or built. */
+        if (!repo_name_valid(text_cstr(&d->name))) {
+            fprintf(stderr, "anti: %s: the dependency %s is no package name\n",
+                    path, text_cstr(&d->name));
+            goto done;
+        }
         if (d->path.length > 0 && d->repo.length > 0) {
             fprintf(stderr, "anti: %s: the dependency %s names a repository "
                             "and a path\n", path, text_cstr(&d->name));
