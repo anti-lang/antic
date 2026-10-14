@@ -67,6 +67,14 @@ anti_message(license_sources_without_a_last_newline
         "text for mimalloc"
         "The licence of mimalloc."
         "source mimalloc 2.1.7")
+# R188 of "Rules of 2026-10-13" in docs/decisions.md: an archive without
+# the licence of the runtime is named by anti, which ends with 1.
+anti_message(license_runtime_without_its_text
+    FILES archive/LICENSE "The licence of Anti.\n"
+          archive/licenses/mimalloc.txt "The licence of mimalloc.\n"
+          archive/licenses/sources.txt "${license_sources}"
+    ARGS license --runtime archive
+    ERR "anti: cannot read archive/licenses/anti_rt.txt")
 anti_message(license_from_archive_no_archive
     FILES library.a "A text where the archive belongs.\n"
     ARGS license --from-archive library.a

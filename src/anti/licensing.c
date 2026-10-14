@@ -93,6 +93,7 @@ int licensing_plain(const char *runtime)
     struct text dir = {0};
     struct text path = {0};
     struct text own = {0};
+    struct text runtime_text = {0};
     struct text sources = {0};
     struct text notice = {0};
     struct package *packages = NULL;
@@ -114,6 +115,12 @@ int licensing_plain(const char *runtime)
         path.length = 0;
         text_appendf(&path, "%s/%s", runtime, RUNTIME_OWN_LICENSE);
         ok = ok && files_read_reported(text_cstr(&path), &own);
+        /* R188 of "Rules of 2026-10-13": the text of the runtime stands in
+           every notice, so an archive without it gives none. */
+        path.length = 0;
+        text_appendf(&path, "%s/%s%s", text_cstr(&dir), RUNTIME_LICENSE_NAME,
+                     RUNTIME_LICENSE_SUFFIX);
+        ok = ok && files_read_reported(text_cstr(&path), &runtime_text);
     }
     if (ok) {
         /* antic and anti, then the runtime under the name, the version
@@ -157,6 +164,7 @@ int licensing_plain(const char *runtime)
     text_free(&dir);
     text_free(&path);
     text_free(&own);
+    text_free(&runtime_text);
     text_free(&sources);
     text_free(&notice);
     arena_free(&arena);
