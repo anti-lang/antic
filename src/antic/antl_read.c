@@ -1176,6 +1176,10 @@ void antl_read_items(struct reader *r)
                 antl_damaged(r);
             }
         }
+        sym->spelled = antl_get_u32(r);
+        if (sym->spelled >= TYPES_SPELL_C_DOUBLE << 1) {
+            antl_damaged(r);
+        }
         {
             struct name doc = antl_get_name(r);
             sym->doc.text = doc.text;

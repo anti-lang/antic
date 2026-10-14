@@ -15,13 +15,13 @@
 <ul>
 <li>an item that goes on over a second line</li>
 </ul>
-<p>Names: <a href="com.example.forms.html"><code>com.example.forms</code></a>, <code>forms.Level</code>, <a href="com.example.limits.html#Sized"><code>limits.Sized</code></a>, <a href="#stop"><code>stop()</code></a>, <a href="#Level"><code>com.example.forms.Level</code></a>, <code>forms.none_such</code>, <code>other.Thing</code>, <code>.dot</code>, <code>9nine</code> and <code>a-b</code>. A bracket [alone and a [bracket](without an end.</p>
+<p>Names: <a href="com.example.forms.html"><code>com.example.forms</code></a>, <a href="#Level"><code>forms.Level</code></a>, <a href="com.example.limits.html#Sized"><code>limits.Sized</code></a>, <a href="#stop"><code>stop()</code></a>, <a href="#Level"><code>com.example.forms.Level</code></a>, <code>forms.none_such</code>, <code>other.Thing</code>, <code>.dot</code>, <code>9nine</code> and <code>a-b</code>. A bracket [alone and a [bracket](without an end.</p>
 <ul>
 <li>a list that ends the text</li>
 </ul>
 <section class="item" id="TOP">
 <h2>TOP</h2>
-<pre class="signature">pub const TOP: byte = 255</pre>
+<pre class="signature">pub const TOP: u8 = 255</pre>
 <p>The largest byte.</p>
 </section>
 <section class="item" id="ON">
@@ -31,7 +31,7 @@
 </section>
 <section class="item" id="HALF">
 <h2>HALF</h2>
-<pre class="signature">pub const HALF: float = 0.5</pre>
+<pre class="signature">pub const HALF: f64 = 0.5</pre>
 <p>A half.</p>
 </section>
 <section class="item" id="NOTHING">
@@ -51,7 +51,7 @@
 </section>
 <section class="item" id="Level">
 <h2>Level</h2>
-<pre class="signature">pub enum Level: i32</pre>
+<pre class="signature">pub enum Level: c_int</pre>
 <p>A level.</p>
 <ul class="fields">
 <li><code>Low = 0</code>
@@ -65,7 +65,7 @@
 <pre class="signature">pub packed struct Tight</pre>
 <p>A struct without padding.</p>
 <ul class="fields">
-<li><code>a: byte</code>
+<li><code>a: u8</code>
 </li>
 <li><code>b: u32</code>
 </li>
@@ -76,7 +76,7 @@
 <pre class="signature">pub align(16) struct Wide</pre>
 <p>A struct on a boundary of sixteen bytes.</p>
 <ul class="fields">
-<li><code>a: byte</code>
+<li><code>a: u8</code>
 </li>
 </ul>
 </section>
@@ -149,7 +149,7 @@
 <li><code>own next: ?*Part</code>
 <p>An owned pointer.</p>
 </li>
-<li><code>low: byte : 3</code>
+<li><code>low: u8 : 3</code>
 <p>Three bits.</p>
 </li>
 </ul>
@@ -186,7 +186,7 @@
 </section>
 <section class="item" id="printf">
 <h2>printf</h2>
-<pre class="signature">pub extern fn printf(format: ?*byte, ...) -&gt; i32</pre>
+<pre class="signature">pub extern fn printf(format: ?*byte, ...) -&gt; c_int</pre>
 <p>A function of C with any number of arguments.</p>
 </section>
 <section class="item" id="stop">

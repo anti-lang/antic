@@ -21,7 +21,7 @@ and `a-b`. A bracket [alone and a [bracket](without an end.
 ## TOP
 
 ```anti
-pub const TOP: byte = 255
+pub const TOP: u8 = 255
 ```
 
 The largest byte.
@@ -37,7 +37,7 @@ A flag.
 ## HALF
 
 ```anti
-pub const HALF: float = 0.5
+pub const HALF: f64 = 0.5
 ```
 
 A half.
@@ -69,7 +69,7 @@ What two values of a type are compared by.
 ## Level
 
 ```anti
-pub enum Level: i32
+pub enum Level: c_int
 ```
 
 A level.
@@ -85,7 +85,7 @@ pub packed struct Tight
 
 A struct without padding.
 
-- `a: byte`
+- `a: u8`
 - `b: u32`
 
 ## Wide
@@ -96,7 +96,7 @@ pub align(16) struct Wide
 
 A struct on a boundary of sixteen bytes.
 
-- `a: byte`
+- `a: u8`
 
 ## Lanes
 
@@ -171,7 +171,7 @@ A class with every kind of field.
   A part whose functions the class takes.
 - `pub own next: ?*Part`
   An owned pointer.
-- `pub low: byte : 3`
+- `pub low: u8 : 3`
   Three bits.
 
 - `pub concrete fn name(self) -> str`
@@ -215,7 +215,7 @@ A class of atomic fields.
 ## printf
 
 ```anti
-pub extern fn printf(format: ?*byte, ...) -> i32
+pub extern fn printf(format: ?*byte, ...) -> c_int
 ```
 
 A function of C with any number of arguments.

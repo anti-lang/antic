@@ -53,6 +53,22 @@ doc text of the member. It carries the `worker` mark of a function in the flags
 byte of an item. The format version was 51 then. It is 52 since the file
 records the `link framework` lines of a module.
 
+A page writes a type as the declaration of its item spells it, by R178 of
+"Rules of 2026-10-13": `u8` where the item writes `u8` and `byte` where it
+writes `byte`. One type node stands for every name of a type, so
+`types_item_spelled` of `src/antic/types.c` reads the names that the
+parameters, the result, the fields, the cases, the base and the member
+declarations of an item write. A function body is not read. The interface
+keeps them per item, and the library file carries them as a word after the
+flags of an item, which keeps the page of a library file the page of its
+source. A name of C wins over the other names of its type, and an enum
+without a base reads `c_int`, the base the specification gives it. The
+format version is 85 since.
+
+A backtick name such as `forms.Level` links to the item of the page. The last
+segment of the documented module stands there as the last segment of an import
+does. A name after it that is no item stays text.
+
 ## The Markdown subset
 
 The HTML renderer reads the subset of `docs/tooling-addendum.md` line by line.

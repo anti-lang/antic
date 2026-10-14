@@ -1083,6 +1083,9 @@ bool antl_write(struct text *out, const struct interface *iface,
                                   (unsigned)(sym->kind == SYMBOL_FN &&
                                              sym->is_operator)
                                       << 6));
+        /* R178 of "Rules of 2026-10-13": the names the declaration spells
+           its types with, which `anti doc` writes. */
+        antl_put_u32(&w, sym->spelled);
         put_doc(&w, sym->doc.text, sym->doc.length);
         if (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN) {
             size_t j;

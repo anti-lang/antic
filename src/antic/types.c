@@ -1720,22 +1720,123 @@ void types_name_spelled(struct text *out, const struct type *t,
     spelled_names = outer;
 }
 
+unsigned types_spelling_of(enum token_kind kind)
+{
+    switch (kind) {
+    case TOKEN_I64: return TYPES_SPELL_I64;
+    case TOKEN_U8: return TYPES_SPELL_U8;
+    case TOKEN_F64: return TYPES_SPELL_F64;
+    case TOKEN_UINT_TYPE: return TYPES_SPELL_UINT;
+    case TOKEN_C_CHAR: return TYPES_SPELL_C_CHAR;
+    case TOKEN_C_SHORT: return TYPES_SPELL_C_SHORT;
+    case TOKEN_C_INT: return TYPES_SPELL_C_INT;
+    case TOKEN_C_LONGLONG: return TYPES_SPELL_C_LONGLONG;
+    case TOKEN_C_UCHAR: return TYPES_SPELL_C_UCHAR;
+    case TOKEN_C_USHORT: return TYPES_SPELL_C_USHORT;
+    case TOKEN_C_UINT: return TYPES_SPELL_C_UINT;
+    case TOKEN_C_ULONGLONG: return TYPES_SPELL_C_ULONGLONG;
+    case TOKEN_C_SIZE_T: return TYPES_SPELL_C_SIZE_T;
+    case TOKEN_C_FLOAT: return TYPES_SPELL_C_FLOAT;
+    case TOKEN_C_DOUBLE: return TYPES_SPELL_C_DOUBLE;
+    default: return 0;
+    }
+}
+
+static unsigned type_expr_spelled(const struct type_expr *t)
+{
+    unsigned spelled = 0;
+    size_t i;
+
+    if (t == NULL) {
+        return 0;
+    }
+    if (t->kind == TYPEX_BUILTIN) {
+        spelled |= types_spelling_of(t->builtin);
+    }
+    spelled |= type_expr_spelled(t->element);
+    spelled |= type_expr_spelled(t->result);
+    for (i = 0; i < t->param_count; i++) {
+        spelled |= type_expr_spelled(t->params[i]);
+    }
+    for (i = 0; i < t->arg_count; i++) {
+        spelled |= type_expr_spelled(t->args[i]);
+    }
+    return spelled;
+}
+
+static unsigned params_spelled(const struct param *params, size_t count)
+{
+    unsigned spelled = 0;
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        spelled |= type_expr_spelled(params[i].type);
+    }
+    return spelled;
+}
+
+unsigned types_item_spelled(const struct item *it)
+{
+    unsigned spelled;
+    size_t i;
+
+    if (it == NULL) {
+        return 0;
+    }
+    spelled = params_spelled(it->params, it->param_count) |
+              type_expr_spelled(it->result) | type_expr_spelled(it->type) |
+              type_expr_spelled(it->base);
+    if (it->kind == ITEM_ENUM && it->base == NULL) {
+        spelled |= TYPES_SPELL_C_INT;
+    }
+    for (i = 0; i < it->base_arg_count; i++) {
+        spelled |= type_expr_spelled(it->base_args[i]);
+    }
+    for (i = 0; i < it->case_count; i++) {
+        spelled |= params_spelled(it->cases[i].fields,
+                                  it->cases[i].field_count);
+    }
+    for (i = 0; i < it->member_count; i++) {
+        spelled |= types_item_spelled(it->members[i]);
+    }
+    return spelled;
+}
+
 /* The second name of a builtin type of kind under spelled_names, NULL
    for the first. */
 static const char *second_name(enum type_kind kind)
 {
-    switch (kind) {
-    case TYPE_I64:
-        return (spelled_names & TYPES_SPELL_I64) != 0 ? "i64" : NULL;
-    case TYPE_U8:
-        return (spelled_names & TYPES_SPELL_U8) != 0 ? "u8" : NULL;
-    case TYPE_F64:
-        return (spelled_names & TYPES_SPELL_F64) != 0 ? "f64" : NULL;
-    case TYPE_U64:
-        return (spelled_names & TYPES_SPELL_UINT) != 0 ? "uint" : NULL;
-    default:
-        return NULL;
+    /* A name of C first, since an item that spells one is a binding of C
+       and reads as C does. */
+    static const struct {
+        enum type_kind kind;
+        unsigned bit;
+        const char *name;
+    } names[] = {
+        {TYPE_I8, TYPES_SPELL_C_CHAR, "c_char"},
+        {TYPE_I16, TYPES_SPELL_C_SHORT, "c_short"},
+        {TYPE_I32, TYPES_SPELL_C_INT, "c_int"},
+        {TYPE_I64, TYPES_SPELL_C_LONGLONG, "c_longlong"},
+        {TYPE_I64, TYPES_SPELL_I64, "i64"},
+        {TYPE_U8, TYPES_SPELL_C_UCHAR, "c_uchar"},
+        {TYPE_U8, TYPES_SPELL_U8, "u8"},
+        {TYPE_U16, TYPES_SPELL_C_USHORT, "c_ushort"},
+        {TYPE_U32, TYPES_SPELL_C_UINT, "c_uint"},
+        {TYPE_U64, TYPES_SPELL_C_SIZE_T, "c_size_t"},
+        {TYPE_U64, TYPES_SPELL_C_ULONGLONG, "c_ulonglong"},
+        {TYPE_U64, TYPES_SPELL_UINT, "uint"},
+        {TYPE_F32, TYPES_SPELL_C_FLOAT, "c_float"},
+        {TYPE_F64, TYPES_SPELL_C_DOUBLE, "c_double"},
+        {TYPE_F64, TYPES_SPELL_F64, "f64"},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof names / sizeof names[0]; i++) {
+        if (names[i].kind == kind && (spelled_names & names[i].bit) != 0) {
+            return names[i].name;
+        }
     }
+    return NULL;
 }
 
 static void print_type(struct text *out, const struct type *t, bool qualified)

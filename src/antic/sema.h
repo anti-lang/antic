@@ -93,6 +93,9 @@ struct symbol {
     bool walked_part;
     bool variadic;                  /* SYMBOL_EXTERN_FN */
     bool worker;                    /* SYMBOL_FN written `worker fn` */
+    /* The bits of enum types_spelling that the declaration of an item of
+       an interface spells, which the library file carries. */
+    unsigned spelled;
     /* SYMBOL_FN of a library file written `operator fn`, whose item the
        reader does not make. A symbol with an item reads the item. */
     bool is_operator;

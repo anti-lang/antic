@@ -14,6 +14,20 @@
 #include "sema.h"
 #include "types.h"
 
+/* The bits of enum types_spelling of the item being written. DESIGN: by
+   R178 of "Rules of 2026-10-13" a page writes a type as the declaration
+   of its item spells it. One type node stands for every name of a type,
+   so the item records which names its declaration writes, and the
+   library file carries them, which keeps the page of a library file the
+   page of its source. A variable of the file, since every writer of a
+   signature reads it, and anti writes one page at a time. */
+static unsigned spelled_now;
+
+static void doc_type_name(struct text *out, const struct type *t)
+{
+    types_name_spelled(out, t, spelled_now);
+}
+
 static struct doc_entry *entry_add(struct doc_entry **list, size_t *count,
                                    size_t *capacity)
 {
@@ -244,14 +258,14 @@ static void fn_signature(struct text *out, const struct fn_shown *f)
             bare.lent = false;
             text_appendf(out, "lent %.*s: ", (int)f->params[i].length,
                          f->params[i].text);
-            types_name(out, &bare);
+            doc_type_name(out, &bare);
             continue;
         }
         if (f->params != NULL && f->params[i].length > 0) {
             text_appendf(out, "%.*s: ", (int)f->params[i].length,
                          f->params[i].text);
         }
-        types_name(out, p);
+        doc_type_name(out, p);
     }
     if (f->variadic) {
         text_append(out, f->param_count > 0 || f->self ? ", ..." : "...");
@@ -262,7 +276,7 @@ static void fn_signature(struct text *out, const struct fn_shown *f)
     }
     if (result != NULL) {
         text_append(out, " -> ");
-        types_name(out, result);
+        doc_type_name(out, result);
     }
     if (f->type->may_fail) {
         text_append(out, " may fail");
@@ -308,7 +322,7 @@ static void type_signature(struct text *out, const char *lead,
         text_appendf(out, "%senum %.*s", lead, (int)name->length, name->text);
         if (t->base != NULL) {
             text_append(out, ": ");
-            types_name(out, t->base);
+            doc_type_name(out, t->base);
         }
         break;
     case TYPE_VARIANT:
@@ -370,7 +384,7 @@ static bool field_signature(struct text *out, const struct struct_field *f,
         text_append(out, "own ");
     }
     text_appendf(out, "%.*s: ", (int)f->name.length, f->name.text);
-    types_name(out, f->type);
+    doc_type_name(out, f->type);
     if (f->bits > 0) {
         text_appendf(out, " : %u", (unsigned)f->bits);
     }
@@ -404,7 +418,7 @@ static void variant_cases(struct doc_entry *item, const struct type *t)
             text_appendf(&one->signature, "%s%.*s: ", j > 0 ? ", " : "",
                          (int)body->fields[j].name.length,
                          body->fields[j].name.text);
-            types_name(&one->signature, body->fields[j].type);
+            doc_type_name(&one->signature, body->fields[j].type);
         }
         text_append(&one->signature, " }");
     }
@@ -543,7 +557,7 @@ static void alias_signature(struct doc_entry *one, const char *lead,
 {
     text_appendf(&one->signature, "%stype %.*s = ", lead, (int)name->length,
                  name->text);
-    types_name(&one->signature, t);
+    doc_type_name(&one->signature, t);
     if (t->generic != NULL) {
         text_append_bytes(&one->copy_of_module, t->generic->module.text,
                           t->generic->module.length);
@@ -567,6 +581,7 @@ static void interface_item(struct doc_page *p, const struct symbol *sym)
     if (sym->type == NULL || sym->internal) {
         return;
     }
+    spelled_now = sym->spelled;
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     text_append_bytes(&one->name, sym->name.text, sym->name.length);
     doc_copy(&one->doc, &sym->doc);
@@ -609,7 +624,7 @@ static void interface_item(struct doc_page *p, const struct symbol *sym)
     case SYMBOL_CONST:
         text_appendf(&one->signature, "%sconst %.*s: ", lead,
                      (int)sym->name.length, sym->name.text);
-        types_name(&one->signature, sym->type);
+        doc_type_name(&one->signature, sym->type);
         const_value(&one->signature, sym->value);
         break;
     default:
@@ -632,6 +647,7 @@ static void tree_item(struct doc_page *p, const struct item *it, bool notes)
     if (sym == NULL || sym->type == NULL || it->block != BLOCK_NONE) {
         return;
     }
+    spelled_now = types_item_spelled(it);
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     text_append_bytes(&one->name, it->name.text, it->name.length);
     doc_copy(&one->doc, &it->doc);
@@ -672,7 +688,7 @@ static void tree_item(struct doc_page *p, const struct item *it, bool notes)
     case ITEM_CONST:
         text_appendf(&one->signature, "%sconst %.*s: ", lead,
                      (int)it->name.length, it->name.text);
-        types_name(&one->signature, sym->type);
+        doc_type_name(&one->signature, sym->type);
         const_value(&one->signature, sym->value);
         break;
     default:

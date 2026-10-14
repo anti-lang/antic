@@ -320,7 +320,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 84, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 85, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -336,9 +336,13 @@ static const uint8_t scale_antl[] = {
     11,                                             /* 0: uint */
     23, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* 1: fn(int) -> int */
     2, 0, 0, 0,                                     /* items */
-    2, 5, 0, 0, 0, 'S', 'C', 'A', 'L', 'E', 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    2, 5, 0, 0, 0, 'S', 'C', 'A', 'L', 'E', 0, 0, 0, 0, 0,
+    8, 0, 0, 0,                                     /* spells `uint` */
+    0, 0, 0, 0,
     0, 6, 0, 0, 0, 0, 0, 0, 0,                      /* const SCALE = 6 */
-    3, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e', 1, 0, 0, 0, 0, 0, 0, 0, 0,
+    3, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e', 1, 0, 0, 0, 0,
+    8, 0, 0, 0,                                     /* spells `uint` */
+    0, 0, 0, 0,
     1, 0, 0, 0, 'x',                                /* fn scale(x) */
     0, 0, 0, 0,                                     /* no defaults */
     0, 0, 0, 0,                                     /* no own parameters */
@@ -1628,9 +1632,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 85;
+    copy[4] = 86;
     refuses_file(copy, sizeof copy,
-                 "has format version 85, and antic reads version 84");
+                 "has format version 86, and antic reads version 85");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -2613,7 +2617,7 @@ static void put_str(struct text *b, const char *s)
 /* Where the tables sit in scale_antl. The count of the type table comes
    first and the items follow the table. Then come the counts of the
    symbolic values and of the aggregates of the IR. */
-enum { SCALE_TYPES = 67, SCALE_ITEMS = 86, SCALE_SYMS = 175, SCALE_AGGS = 179 };
+enum { SCALE_TYPES = 67, SCALE_ITEMS = 86, SCALE_SYMS = 183, SCALE_AGGS = 187 };
 
 /* The index of link k of a chain of n: each link names the next one
    forward, or the one before it backward. The end of the chain is the

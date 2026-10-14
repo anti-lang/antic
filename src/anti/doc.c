@@ -172,6 +172,14 @@ static bool resolve_name(const struct doc_page *page, const char *s,
         text_appendf(href, "#%.*s", (int)(n - head - 1), dot + 1);
         return true;
     }
+    /* R178 of "Rules of 2026-10-13": the last segment of the documented
+       module names it as the last segment of an import does, where the
+       name after it is an item of the page. */
+    if (same(s, head, modpath_last(text_cstr(&page->module))) &&
+        is_item(page, dot + 1, n - head - 1)) {
+        text_appendf(href, "#%.*s", (int)(n - head - 1), dot + 1);
+        return true;
+    }
     /* A member of an item of the documented module has no place of its
        own on the page. The name links to the item that holds it. */
     if (is_item(page, s, head)) {

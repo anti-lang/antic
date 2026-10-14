@@ -853,8 +853,30 @@ enum types_spelling {
     TYPES_SPELL_I64 = 1,            /* `i64` beside `int` */
     TYPES_SPELL_U8 = 2,             /* `u8` beside `byte` */
     TYPES_SPELL_F64 = 4,            /* `f64` beside `float` */
-    TYPES_SPELL_UINT = 8            /* `uint` beside `u64` */
+    TYPES_SPELL_UINT = 8,           /* `uint` beside `u64` */
+    /* The names of C, which the page of `anti doc` writes as the item
+       spells them, by R178 of "Rules of 2026-10-13". A message never
+       takes them. */
+    TYPES_SPELL_C_CHAR = 16,        /* `c_char` beside `i8` */
+    TYPES_SPELL_C_SHORT = 32,       /* `c_short` beside `i16` */
+    TYPES_SPELL_C_INT = 64,         /* `c_int` beside `i32` */
+    TYPES_SPELL_C_LONGLONG = 128,   /* `c_longlong` beside `int` */
+    TYPES_SPELL_C_UCHAR = 256,      /* `c_uchar` beside `byte` */
+    TYPES_SPELL_C_USHORT = 512,     /* `c_ushort` beside `u16` */
+    TYPES_SPELL_C_UINT = 1024,      /* `c_uint` beside `u32` */
+    TYPES_SPELL_C_ULONGLONG = 2048, /* `c_ulonglong` beside `u64` */
+    TYPES_SPELL_C_SIZE_T = 4096,    /* `c_size_t` beside `u64` */
+    TYPES_SPELL_C_FLOAT = 8192,     /* `c_float` beside `f32` */
+    TYPES_SPELL_C_DOUBLE = 16384    /* `c_double` beside `float` */
 };
+/* The bit of enum types_spelling of the token of a builtin type, 0 for
+   the first name of a type. */
+unsigned types_spelling_of(enum token_kind kind);
+/* The bits of enum types_spelling for the types an item spells in its
+   declaration: its parameters, its result, its fields, its cases, its
+   base and the declarations of its members, without a body. An enum
+   without a base spells `c_int`, which stands for it. */
+unsigned types_item_spelled(const struct item *it);
 /* The name of t as types_name gives it, with the second name of each
    type whose bit stands in spelled. */
 void types_name_spelled(struct text *out, const struct type *t,

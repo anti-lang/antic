@@ -672,6 +672,7 @@ void sema_interface(const struct module *module, const char *module_name,
         sym = arena_alloc(arena, sizeof *sym);
         *sym = *it->symbol;
         sym->internal = it->vis == VIS_INTERNAL;
+        sym->spelled = types_item_spelled(it);
         /* DESIGN: an interface keeps the parameter names of a function,
            which the generated header and anti doc print. */
         if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
