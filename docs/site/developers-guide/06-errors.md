@@ -1019,7 +1019,7 @@ b4:
 The driver then decides per build. Where assertions are off it replaces each branch into an assertion block with a jump to the other side. The ordinary passes then remove the block, the call, the text and the condition. It does the same for the check blocks where checks are off.
 
 ```llvm excerpt=asr target=linux-x86_64 mode=release
-define dso_local noundef i64 @checked(i64 noundef %p0) local_unnamed_addr #3 {
+define dso_local noundef i64 @checked(i64 noundef %p0) local_unnamed_addr #4 {
 b0:
   %v1 = add i64 %p0, 1
   ret i64 %v1

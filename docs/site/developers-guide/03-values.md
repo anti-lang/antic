@@ -437,7 +437,7 @@ b0:
 In release mode `opt` turns the three `alloca` into values in registers and folds the function to its result.
 
 ```llvm excerpt=consts target=linux-x86_64 mode=release
-define dso_local noundef i64 @limit() local_unnamed_addr #3 {
+define dso_local noundef i64 @limit() local_unnamed_addr #4 {
 b0:
   ret i64 96
 }
@@ -705,19 +705,19 @@ The intrinsic gives the sum and the overflow bit. `add nsw` is the sum as a valu
 In release mode the check is gone before the LLVM text is written. `checked` and `wrapping` are then the same function. The add carries no `nsw`, so LLVM may not assume that it stays in range.
 
 ```llvm excerpt=ints target=linux-x86_64 mode=release
-define dso_local noundef i64 @checked(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #3 {
+define dso_local noundef i64 @checked(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #4 {
 b0:
   %v2 = add i64 %p1, %p0
   ret i64 %v2
 }
 ...
-define dso_local noundef i64 @wrapping(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #3 {
+define dso_local noundef i64 @wrapping(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #4 {
 b0:
   %v2 = add i64 %p1, %p0
   ret i64 %v2
 }
 ...
-define dso_local noundef i64 @saturating(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #3 {
+define dso_local noundef i64 @saturating(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #4 {
 b0:
   %v2 = tail call i64 @llvm.sadd.sat.i64(i64 %p0, i64 %p1)
   ret i64 %v2
@@ -742,7 +742,7 @@ The first four instructions compute the clamp value from the sign of the wrapped
 A release build keeps the defined results of a division in the code. The dev check is dropped, and the selects stay.
 
 ```llvm excerpt=ints target=linux-x86_64 mode=release
-define dso_local noundef i64 @divide(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #3 {
+define dso_local noundef i64 @divide(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #4 {
 b0:
   %v2 = icmp eq i64 %p1, 0
   %v3 = icmp eq i64 %p1, -1
@@ -957,7 +957,7 @@ let f: f32 = 1.0e40;
 A float operation is one LLVM instruction: `fadd`, `fsub`, `fmul`, `fdiv` or `fcmp`. The text carries no fast-math flag, so LLVM reorders nothing and fuses no multiply with an add.
 
 ```llvm excerpt=floats target=linux-x86_64 mode=release
-define dso_local noundef double @scale(double noundef %p0, double noundef %p1) local_unnamed_addr #3 {
+define dso_local noundef double @scale(double noundef %p0, double noundef %p1) local_unnamed_addr #4 {
 b0:
   %v2 = fmul double %p0, %p1
   %v4 = fadd double %v2, 5.000000e-01
@@ -1427,7 +1427,7 @@ Two tuple types with the same element types are one type. A header that antic wr
 The calling convention treats a tuple as that struct. On the System V targets a tuple of up to 16 bytes travels in two registers.
 
 ```llvm excerpt=pairs target=linux-x86_64 mode=release
-define dso_local { i64, i64 } @min_max(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #3 {
+define dso_local { i64, i64 } @min_max(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #4 {
 b0:
   %p0.p1 = tail call i64 @llvm.smin.i64(i64 %p0, i64 %p1)
   %p1.p0 = tail call i64 @llvm.smax.i64(i64 %p0, i64 %p1)

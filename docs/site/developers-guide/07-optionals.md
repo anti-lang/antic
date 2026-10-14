@@ -338,7 +338,7 @@ The value stands at offset 0, so the address of a `?T` is the address of its val
 The calling convention treats a `?T` as that struct. A `?int` of 16 bytes travels in two registers on System V and AAPCS64.
 
 ```llvm excerpt=opts target=linux-x86_64 mode=release
-define dso_local { i64, i64 } @positive(i64 noundef %p0) local_unnamed_addr #3 {
+define dso_local { i64, i64 } @positive(i64 noundef %p0) local_unnamed_addr #4 {
 b0:
   %v1 = icmp sgt i64 %p0, 0
   %v14 = insertvalue { i64, i64 } poison, i64 %p0, 0

@@ -233,9 +233,9 @@ define hidden noundef i64 @decl.main() noinline #0 {
 A release build compiles the whole program into one module, and every function that is not exported is `internal`.
 
 ```llvm excerpt=decl target=linux-x86_64 mode=release
-define dso_local noundef range(i64 0, 201) i64 @twice(i64 noundef %p0) local_unnamed_addr #3 {
+define dso_local noundef range(i64 0, 201) i64 @twice(i64 noundef %p0) local_unnamed_addr #4 {
 ...
-define internal noundef i64 @decl.main() #4 {
+define internal noundef i64 @decl.main() #5 {
 ```
 
 Only two functions of the example are left. `opt` inlined `area`, `clamp`, `moved`, `widen`, `width`, `first` and `consume` into `main` and removed them, which `internal` allows. `twice` stays, since C may call it. `opt` also found that its result lies between 0 and 200, the `range` on its result.
@@ -761,7 +761,7 @@ retq
 `hyp2` builds a frame of 48 bytes, stores its two parameters there and calls `square` twice. The target of each `callq` is filled in by the linker. Each result goes through a slot of the frame before the `addq`.
 
 ```llvm excerpt=inl target=linux-x86_64 mode=release
-define dso_local noundef i64 @hyp2(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #3 {
+define dso_local noundef i64 @hyp2(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #4 {
 b0:
   %v2.i = mul i64 %p0, %p0
   %v2.i1 = mul i64 %p1, %p1
@@ -1028,7 +1028,7 @@ A named function such as `show` is passed with a context of null. The callee pas
 A release build often removes all of it. The release module of this example holds one function of the program, `clo.main`. `opt` inlined `each`, `count_even`, `fold`, `show` and the three anonymous functions into it, which leaves no indirect call and no context.
 
 ```llvm excerpt=clo target=linux-x86_64 mode=release
-define internal noundef i64 @clo.main() #3 {
+define internal noundef i64 @clo.main() #4 {
 ...
   call void @anti.text.Builder.append_int(ptr %s2.i, i64 3, i64 10, i8 zeroext 0, i64 0, i8 zeroext 1, i8 zeroext 0)
 ...
@@ -1389,7 +1389,7 @@ A call through a value of one word is an indirect call with the arguments of the
 ```llvm excerpt=fnval target=linux-x86_64 mode=release
 define dso_local noundef i64 @call_it(ptr nofree noundef readonly captures(none) %p0, ptr noundef %p1, i64 noundef %p2, i64 noundef %p3) local_unnamed_addr #0 {
 b0:
-  %v4 = tail call i64 %p0(i64 %p2, i64 %p3, ptr %p1) #5
+  %v4 = tail call i64 %p0(i64 %p2, i64 %p3, ptr %p1) #6
   ret i64 %v4
 }
 ```

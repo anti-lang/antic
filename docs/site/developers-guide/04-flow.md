@@ -225,7 +225,7 @@ The three `alloca` lines are the slots of `x` and of the two conditions. `icmp s
 A release build runs `opt` over the module, which removes the slots and rewrites the branches.
 
 ```llvm excerpt=branch target=linux-x86_64 mode=release
-define dso_local noundef range(i64 -1, 2) i64 @sign(i64 noundef %p0) local_unnamed_addr #3 {
+define dso_local noundef range(i64 -1, 2) i64 @sign(i64 noundef %p0) local_unnamed_addr #4 {
 b0:
   %common.ret.op = tail call i64 @llvm.scmp.i64.i64(i64 %p0, i64 0)
   ret i64 %common.ret.op
