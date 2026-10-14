@@ -2425,13 +2425,17 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             e->as.object.value = true;
             return t;
         }
-        /* DESIGN: `dup` of a struct, a tuple or a variant value gives a
-           copy of it, in which every part that owns something is copied
-           as `dup` copies it. A variant copies the fields of the case its
-           tag names. One that owns nothing gives its bytes. */
+        /* DESIGN: `dup` of a struct, a tuple, a variant or a fixed array
+           value gives a copy of it, in which every part that owns
+           something is copied as `dup` copies it. A variant copies the
+           fields of the case its tag names, and an array each element.
+           A struct, a tuple or a variant that owns nothing gives its
+           bytes. An array that owns nothing is copied by `=`, and R070
+           of "Rules of 2026-10-13" refuses its `dup`. */
         if (e->as.object.op == TOKEN_DUP &&
             (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE ||
-             t->kind == TYPE_VARIANT) &&
+             t->kind == TYPE_VARIANT ||
+             (t->kind == TYPE_ARRAY && sema_type_owns(t))) &&
             !t->is_union && !types_is_chan(t) && !types_is_mutex(t) &&
             !types_is_object_lock(t) && !types_is_job(t)) {
             return t;
