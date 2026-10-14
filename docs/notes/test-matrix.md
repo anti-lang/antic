@@ -1377,6 +1377,48 @@ Where two rules meet, and where three do:
 - Two locks, their two orders and a second run of each: `lock_order_once`,
   T063.
 
+The rules of threads of "Rules of 2026-10-13":
+
+- R086, a worker named `m.f` after the arrow: the client of
+  `threads_modules`, with and without arguments.
+- R087, the count of chunks: `matrix/threads_parallel_split` holds `by 0`,
+  the refusal `matrix/threads_parallel_by_a_count_below_zero` a constant
+  count below zero and `check_parallel_count_below_zero` of `tests/traps/`
+  one the run computes.
+- R088, a default of a worker: the program
+  `matrix/threads_dispatch_leaves_out_a_default_argument`, a refusal before
+  the rule, and the refusal
+  `matrix/threads_dispatch_leaves_out_an_argument_without_a_default`.
+- R089, an atomic `add` that wraps:
+  `matrix/threads_atomic_add_past_the_highest_value`.
+- R090, an atomic local in a snapshot: the refusal
+  `matrix/threads_snapshot_names_an_atomic_local`.
+- R091, an atomic `char` and `and` and `or` of an atomic `bool`:
+  `matrix/threads_atomic_kinds`.
+- R092, a pointer to a guarded field: the program
+  `matrix/threads_pointer_to_a_guarded_field` and six refusals. Five are
+  `matrix/threads_pointer_to_a_guarded_field_*`. They hold a use after its
+  `sync`, in a later `sync` and after a branch that names another place.
+  They also hold one in the next turn of a loop and one in a closure inside
+  its `sync`. The sixth is
+  `matrix/threads_slice_of_a_guarded_field_after_its_sync`.
+- R093, a `sync` on a Mutex its thread holds: the refusal
+  `matrix/threads_sync_in_a_closure_inside_its_sync` beside the two of a
+  nested `sync`, and `check_sync_held` of `tests/traps/`.
+- R094, a pointer into the fields of a thread-safe class: three refusals
+  `matrix/threads_pointer_into_fields_*`. They store it through an out
+  parameter, in another object and through a local that was assigned.
+- R095, a fresh value of a thread-safe class and of a Mutex in a channel:
+  `matrix/threads_channel_kinds` and `matrix/threads_channel_of_a_mutex`.
+- R096, a job in a tuple, in an array and in a closure:
+  `matrix/threads_jobs`.
+- R097, an `own fn` field at a `concurrent` parameter:
+  `matrix/threads_own_function_at_a_concurrent_parameter` and the refusal
+  `matrix/threads_snapshot_for_an_owner_calls_a_function_that_is_not_concurrent`.
+- R098, a `chan f16`: `matrix/threads_channel_kinds`.
+- R099, the default `==` and hash of a struct with a Mutex:
+  `matrix/values_struct_with_a_mutex_compared_and_hashed`.
+
 ### Classes
 
 | Construct | Held, with the first source that holds it | Open |
