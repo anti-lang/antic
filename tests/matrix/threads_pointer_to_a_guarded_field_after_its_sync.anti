@@ -1,0 +1,24 @@
+//! A pointer to a guarded field that was taken inside the `sync` on its lock
+//! reaches the field without the lock after the block, so its use there is
+//! refused.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+
+	pub fn bump(self) -> int
+	{
+		let other = 0;
+		let p = &other;
+		sync self.lock {
+			p = &self.size;
+		}
+		return *p;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

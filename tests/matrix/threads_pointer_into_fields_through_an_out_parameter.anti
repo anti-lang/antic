@@ -1,0 +1,17 @@
+//! A public function of a thread-safe class gives out no pointer into its
+//! fields, through an out parameter as little as through its result.
+
+synchronized class Tally
+{
+	n: int = 0,
+
+	pub fn peek(self, out: **int)
+	{
+		*out = &self.n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

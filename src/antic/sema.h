@@ -103,6 +103,11 @@ struct symbol {
     /* A local whose `let` took a pointer or a slice into the fields of
        the object of a thread-safe class. */
     bool into_fields;
+    /* A local or a parameter that holds a pointer to a guarded field,
+       taken inside a `sync` on its lock: the access of the field and the
+       field. NULL when it holds none. */
+    const struct expr *guarded_place;
+    const struct struct_field *guarded_field;
     /* A local that a `let` or a `=` gave an address that a view by `as`
        made, or that was made from one, see sema_value_view. */
     bool holds_view;

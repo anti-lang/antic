@@ -1946,6 +1946,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           (int)e->as.name.length, e->as.name.text);
             return sema_builtin(c, TYPE_ERROR);
         }
+        sema_check_guarded_pointer(c, e, sym);
         if (sym->snapshot_moved) {
             sema_error_at(c, e->pos, "`%.*s` has moved into an owner on line "
                           "%u and is not named after it",

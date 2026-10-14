@@ -168,6 +168,9 @@ struct checker {
     /* The callee of the call checked now, which may name a generic
        function without its arguments. */
     const struct expr *callee;
+    /* The name that the `=` checked now gives a new value, which is no
+       use of the value it held. */
+    const struct expr *assigned;
     /* The copies named before the functions had their types, whose
        constraints are checked once they do. */
     struct pending_check *pending;
@@ -630,6 +633,12 @@ void sema_check_leak_return(struct checker *c, const struct expr *value,
                             const struct type *result);
 void sema_check_leak_arg(struct checker *c, const struct expr *callee,
                          const struct expr *arg, const struct type *param);
+void sema_check_leak_store(struct checker *c, const struct expr *target,
+                           const struct expr *value, const struct type *to);
+void sema_note_guarded_pointer(struct checker *c, struct symbol *sym,
+                               const struct expr *value);
+void sema_check_guarded_pointer(struct checker *c, const struct expr *e,
+                                const struct symbol *sym);
 bool sema_thread_safe(const struct type *t);
 bool sema_thread_safe_symbol(const struct symbol *sym);
 

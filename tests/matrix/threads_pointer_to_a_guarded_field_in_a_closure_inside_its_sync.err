@@ -1,0 +1,1 @@
+threads_pointer_to_a_guarded_field_in_a_closure_inside_its_sync.anti:16:12: error: `p` points at `size`, which is guarded by `lock`, and no `sync` holds it here [unguarded-field]

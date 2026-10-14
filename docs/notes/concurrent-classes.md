@@ -57,6 +57,16 @@ channels.
   matches a `sync` on the field of that name of any object of the class.
   `construct` and `destruct` of the class, or of the enclosing class, reach it
   freely. A closure checks its body with no `sync` held.
+- A pointer to a guarded field is followed through the variable that holds
+  it, by R092 of "Rules of 2026-10-13". `sema_note_guarded_pointer` records the
+  access of the field in the symbol when a `let` or a `=` gives it `&` of a
+  place in the field, or a copy of such a variable, while a `sync` holds the
+  lock. A `=` of any other value clears the record. Each use of the name goes
+  through `sema_check_guarded_pointer`, which asks `guard_held` for the
+  recorded access and gives `unguarded-field` when no block holds the lock.
+  The record follows no path of the function, so a `=` in one branch frees
+  the variable after both. A pointer inside a struct, a tuple or a result is
+  not followed.
 - A write goes through `sema_note_write`, which assignments, compound
   assignments and `&` already call. A write outside `construct` and `destruct`
   to a field that is neither guarded nor atomic is kept, and
@@ -86,6 +96,13 @@ channels.
   of slice type and a local whose `let` took one of those. A `return` of a
   function with `self` that is not private refuses it, and so does an argument
   of a call through a function value that is a local or a parameter.
+- `sema_check_leak_store` holds R094 of "Rules of 2026-10-13" for a `=` in
+  such a function. A value that points into the fields is refused where the
+  target lies outside the object: `*out`, a field of another object, a global.
+  A target in the fields of `self` keeps it, and a local or a parameter that
+  takes it is marked `into_fields`, as its `let` would mark it. A pointer
+  inside a tuple or a struct and the result of a private function stay open,
+  which is T062 of `docs/audit/tests-findings.md`.
 
 ## Atomic locals and workers
 

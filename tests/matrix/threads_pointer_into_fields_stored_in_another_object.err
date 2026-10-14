@@ -1,0 +1,1 @@
+threads_pointer_into_fields_stored_in_another_object.anti:15:9: error: `show` of the thread-safe class `Tally` stores a pointer into its fields outside the object, store a copy

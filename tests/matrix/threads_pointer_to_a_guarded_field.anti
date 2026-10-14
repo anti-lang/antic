@@ -1,0 +1,56 @@
+//! A pointer to a guarded field that was taken inside the `sync` on its lock
+//! is used where a `sync` holds that lock: in the block that took it, and in a
+//! later block on the same lock. A pointer that names another place since is
+//! used anywhere.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+
+	pub fn in_its_block(self) -> int
+	{
+		sync self.lock {
+			let p = &self.size;
+			*p += 1;
+			return *p;
+		}
+	}
+
+	pub fn in_a_later_block(self) -> int
+	{
+		let other = 0;
+		let p = &other;
+		sync self.lock {
+			p = &self.size;
+		}
+		sync self.lock {
+			*p += 10;
+			return *p;
+		}
+	}
+
+	pub fn named_again(self) -> int
+	{
+		let other = 100;
+		let p = &other;
+		sync self.lock {
+			p = &self.size;
+			*p += 1;
+		}
+		p = &other;
+		return *p;
+	}
+}
+
+fn main() -> int
+{
+	let t = alloc Tally { };
+	printf("in its block: %d\n".ptr, t.in_its_block() as c_int);
+	printf("in a later block: %d\n".ptr, t.in_a_later_block() as c_int);
+	printf("named again: %d\n".ptr, t.named_again() as c_int);
+	delete(t);
+	return 0;
+}

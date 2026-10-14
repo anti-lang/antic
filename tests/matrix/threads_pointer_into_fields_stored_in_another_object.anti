@@ -1,0 +1,22 @@
+//! A public function of a thread-safe class gives out no pointer into its
+//! fields, and stores none in another object.
+
+class View
+{
+	pub p: ?*int = none,
+}
+
+synchronized class Tally
+{
+	n: int = 0,
+
+	pub fn show(self, v: *View)
+	{
+		v.p = &self.n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -837,7 +837,7 @@ pub synchronized class PeopleList
 
 `concurrent class` leaves the locking to the programmer, for finer locks that let unrelated work run at once. The compiler checks that every field is one of three kinds. A field of none of them is a compile error that names the three:
 
-- Guarded: `field: T guarded by lock`, reached only inside `sync` on that lock. The lock is a `Mutex` field of the same object, or of an enclosing object named by its class, `guarded by PeopleList.lock`.
+- Guarded: `field: T guarded by lock`, reached only inside `sync` on that lock. A variable that took a pointer to the field inside the `sync` is used inside a `sync` on that lock alone. The lock is a `Mutex` field of the same object, or of an enclosing object named by its class, `guarded by PeopleList.lock`.
 - Atomic: reached only through atomic operations.
 - Fixed: written only in `construct`, and read-only after that.
 
@@ -883,7 +883,7 @@ pub concurrent class Queue
 
 ### Rules for both
 
-- A public function of a thread-safe class never gives out a pointer or a slice into the object's fields. It does not return one, and it does not pass one to a parameter of function type. It returns and passes copies, since a caller holding such a pointer would reach the data without the lock.
+- A public function of a thread-safe class never gives out a pointer or a slice into the object's fields. It does not return one, and it does not pass one to a parameter of function type. It stores none outside the object either: not through an out parameter, in another object or in a global. It returns, passes and stores copies, since a caller holding such a pointer would reach the data without the lock.
 - A closure passed to a function of a synchronized class runs inside the lock. It runs on one thread at a time, so it is a plain parameter.
 - `atomic` also marks a local: `let hits: atomic int = 0;`. An atomic local is thread-safe.
 - A worker may take a pointer to a thread-safe object. It is the one exception to the rule that a worker's parameters hold no pointer.

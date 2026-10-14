@@ -1,0 +1,1 @@
+threads_pointer_into_fields_through_a_local_that_was_assigned.anti:14:10: error: `peek` of the thread-safe class `Tally` stores a pointer into its fields outside the object, store a copy

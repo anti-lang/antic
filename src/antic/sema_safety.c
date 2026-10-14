@@ -261,6 +261,99 @@ static bool guard_held(const struct checker *c, const struct expr *e,
     return false;
 }
 
+/* Whether the guarded field f, which the field access e reaches, stands
+   where no `sync` holds its lock. `construct` and `destruct` reach it
+   without one, since no other thread sees the object there. */
+static bool guard_missing(const struct checker *c, const struct expr *e,
+                          const struct struct_field *f)
+{
+    const struct type *home = f->home;
+
+    return f->guard.length > 0 && !guard_held(c, e, f) &&
+           !(home != NULL && home->kind == TYPE_CLASS &&
+             in_lifecycle_of(c, home)) &&
+           !(f->guard_class != NULL && in_lifecycle_of(c, f->guard_class));
+}
+
+/* The access of a guarded field that the place e lies in, with the
+   field in *field, or NULL. A place behind a pointer or a slice that the
+   object holds lies outside the object, and in no field of it. */
+static const struct expr *guarded_access(const struct expr *e,
+                                         const struct struct_field **field)
+{
+    e = sema_bare_place(e);
+    while (e->kind == EXPR_FIELD || e->kind == EXPR_INDEX) {
+        const struct expr *base = e->kind == EXPR_FIELD ? e->as.field.base
+                                                        : e->as.index.base;
+        const struct type *s =
+            e->kind == EXPR_FIELD ? sema_struct_of(base->type) : NULL;
+        const struct struct_field *f =
+            s != NULL ? types_find_field(s, &e->as.field.name) : NULL;
+        if (f != NULL && f->guard.length > 0) {
+            *field = f;
+            return e;
+        }
+        if (base->type == NULL || base->type->kind == TYPE_POINTER ||
+            base->type->kind == TYPE_SLICE) {
+            return NULL;
+        }
+        e = base;
+    }
+    return NULL;
+}
+
+/* DESIGN: a pointer to a guarded field reaches the field without its
+   lock, so it is used where a `sync` holds that lock and nowhere else,
+   by R092 of "Rules of 2026-10-13". The checker follows the pointer
+   through the variable that holds it: `&` of a place in a guarded field,
+   taken inside its `sync` by a `let` or a `=`, and a copy of such a
+   variable. A `=` of any other value ends it. A pointer taken in
+   `construct` or `destruct` outside a `sync` is free, as the field is
+   there. The record is one per variable and follows no path, so a
+   branch that names another place frees the variable for the code after
+   it. */
+void sema_note_guarded_pointer(struct checker *c, struct symbol *sym,
+                               const struct expr *value)
+{
+    const struct struct_field *f = NULL;
+    const struct expr *at = NULL;
+
+    if (sym == NULL) {
+        return;
+    }
+    if (value != NULL && value->kind == EXPR_UNARY &&
+        value->as.unary.op == TOKEN_AMP) {
+        at = guarded_access(value->as.unary.operand, &f);
+    } else if (value != NULL && value->kind == EXPR_NAME &&
+               value->symbol != NULL) {
+        at = value->symbol->guarded_place;
+        f = value->symbol->guarded_field;
+    }
+    if (at != NULL && !guard_held(c, at, f)) {
+        at = NULL;
+    }
+    sym->guarded_place = at;
+    sym->guarded_field = at != NULL ? f : NULL;
+}
+
+/* Refuse the use e of the variable sym where it holds a pointer to a
+   guarded field and no `sync` holds the lock. */
+void sema_check_guarded_pointer(struct checker *c, const struct expr *e,
+                                const struct symbol *sym)
+{
+    const struct struct_field *f = sym->guarded_field;
+
+    if (sym->guarded_place == NULL || c->assigned == e ||
+        !guard_missing(c, sym->guarded_place, f)) {
+        return;
+    }
+    sema_check_at(c, NAME_UNGUARDED_FIELD, e->pos,
+                  "`%.*s` points at `%.*s`, which is guarded by `%.*s`, and "
+                  "no `sync` holds it here", (int)sym->name.length,
+                  sym->name.text, (int)f->name.length, f->name.text,
+                  (int)f->guard.length, f->guard.text);
+}
+
 /* DESIGN: a field of a synchronized class is reached by the functions of
    the class alone, which run under its lock, and by `construct` and
    `destruct`, which no other thread sees. A guarded field is reached
@@ -284,9 +377,7 @@ bool sema_check_reach(struct checker *c, const struct expr *e,
                       (int)f->name.length, f->name.text, sema_tn(home));
         return false;
     }
-    if (f->guard.length > 0 && !guard_held(c, e, f) &&
-        !(home->kind == TYPE_CLASS && in_lifecycle_of(c, home)) &&
-        !(f->guard_class != NULL && in_lifecycle_of(c, f->guard_class))) {
+    if (guard_missing(c, e, f)) {
         sema_check_at(c, NAME_UNGUARDED_FIELD, e->pos,
                       "`%.*s` is guarded by `%.*s`, and no `sync` holds it "
                       "here", (int)f->name.length, f->name.text,
@@ -523,6 +614,36 @@ void sema_check_leak_arg(struct checker *c, const struct expr *callee,
                       "value, pass a copy", (int)fn->name.length,
                       fn->name.text, sema_tn(t));
     }
+}
+
+/* DESIGN: a public function of a thread-safe class gives no pointer into
+   its fields away, by R094 of "Rules of 2026-10-13". A `=` that stores
+   one outside the object does: through an out parameter, in another
+   object or in a global. A place in the fields of the object itself
+   keeps it under the lock, and a local or a parameter that takes one
+   gives it out as the pointer itself does, so the `=` marks it. */
+void sema_check_leak_store(struct checker *c, const struct expr *target,
+                           const struct expr *value, const struct type *to)
+{
+    const struct item *fn = sema_named_function(c);
+    const struct type *t = guarded_api(fn);
+
+    if (t == NULL || !sema_points_into_fields(value, fn, to)) {
+        return;
+    }
+    if (target->kind == EXPR_NAME && target->symbol != NULL &&
+        (target->symbol->kind == SYMBOL_LOCAL ||
+         target->symbol->kind == SYMBOL_PARAM)) {
+        target->symbol->into_fields = true;
+        return;
+    }
+    if (in_fields(target, fn)) {
+        return;
+    }
+    sema_error_at(c, value->pos, "`%.*s` of the thread-safe class `%s` "
+                  "stores a pointer into its fields outside the object, "
+                  "store a copy", (int)fn->name.length, fn->name.text,
+                  sema_tn(t));
 }
 
 /* DESIGN: a type is thread-safe when it is built to be changed from more

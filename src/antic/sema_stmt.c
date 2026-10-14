@@ -724,7 +724,12 @@ static void check_assign(struct checker *c, struct stmt *s)
     if (target->kind == EXPR_INDEX && check_set_index(c, s)) {
         return;
     }
+    /* A `=` to a name gives it a new value and reads none, so it is no
+       use of a pointer to a guarded field that the name held. */
+    c->assigned = op == TOKEN_ASSIGN && target->kind == EXPR_NAME ? target
+                                                                  : NULL;
     t = sema_check_storage(c, target);
+    c->assigned = NULL;
     if (sema_is_error(t)) {
         sema_check_expr(c, s->as.assign.value, NULL);
         return;
@@ -820,6 +825,12 @@ static void check_assign(struct checker *c, struct stmt *s)
         }
         sema_bind_value(c, s->as.assign.value, sema_place_name(target), t);
         check_closure_lifetime(c, target, s->as.assign.value);
+        sema_check_leak_store(c, target, s->as.assign.value, t);
+        if (target->kind == EXPR_NAME && target->symbol != NULL &&
+            (target->symbol->kind == SYMBOL_LOCAL ||
+             target->symbol->kind == SYMBOL_PARAM)) {
+            sema_note_guarded_pointer(c, target->symbol, s->as.assign.value);
+        }
         return;
     }
     if ((op == TOKEN_PLUS_ASSIGN || op == TOKEN_MINUS_ASSIGN ||
@@ -1880,6 +1891,7 @@ static void check_let(struct checker *c, struct stmt *s)
         sym->holds = held_deepest(s->as.let.value);
         sym->into_fields = sema_points_into_fields(s->as.let.value,
                                                    c->ctx.function, t);
+        sema_note_guarded_pointer(c, sym, s->as.let.value);
         /* DESIGN: an atomic local lives in memory, where the atomic
            operations reach it through its address. It holds what
            one operation of the runtime moves: an integer, a `bool`,

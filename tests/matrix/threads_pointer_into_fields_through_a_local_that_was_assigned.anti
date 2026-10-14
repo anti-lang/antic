@@ -1,0 +1,21 @@
+//! A public function of a thread-safe class gives out no pointer into its
+//! fields. A local that an assignment gave such a pointer gives it out as the
+//! pointer itself does.
+
+synchronized class Tally
+{
+	n: int = 0,
+
+	pub fn peek(self, out: **int)
+	{
+		let other = 0;
+		let p = &other;
+		p = &self.n;
+		*out = p;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

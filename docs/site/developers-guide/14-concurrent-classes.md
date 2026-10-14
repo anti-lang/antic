@@ -238,7 +238,7 @@ It leaves the following to the programmer.
 
 - A function reaches the fields of another object of its class, `other.count`, under the lock of `self` alone. `sync self, other { }` takes both.
 - A function without `self` may call a private function on an object. That call runs with no lock.
-- A private function may return a pointer into the fields, and a pointer stored in a field leads out of the object. What it points at is not under the lock.
+- A private function may return a pointer into the fields, and a pointer stored in a field of the object leads out of it. What it points at is not under the lock. A function that is not private stores no pointer into the fields through an out parameter or in another object.
 - Two objects locked in opposite orders by two threads wait for each other. The dev build reports the two orders at run time, as a later section describes.
 
 ### How antic builds it
@@ -716,6 +716,7 @@ concurrent class Stock
 The checker reads one function at a time and compares places as they are written. For a concurrent class it proves the following.
 
 - Every read and write of a guarded field stands inside a `sync` block of the same function. The operand of that `sync` is the `Mutex` field the guard names, on the same place the field is read from.
+- A variable that a `let` or a `=` gave `&` of a place in a guarded field, inside the `sync`, is used inside a `sync` on that lock alone. A `=` of another value frees the variable.
 - A field that is neither guarded nor atomic is written by `construct` and `destruct` of the class alone. A write from another module is reported at the write.
 - An atomic field is reached by an atomic operation alone.
 - No function that is not private returns a pointer or a slice into the fields, or passes one to a function value.
@@ -728,7 +729,7 @@ It leaves the following to the programmer.
 - Which fields belong together. Two fields with two locks may each be right and wrong as a pair.
 - A sequence of atomic operations. `load` and then `store` are two operations, and another thread may run between them.
 - A guard of the class around a nested type. `guarded by People.lock` accepts a `sync` on the `lock` of any `People` object, and the checker does not know which list holds the node.
-- What a pointer leads to. A pointer read under the lock is a plain value after the block, and the checker follows it no further.
+- What a pointer leads to. A pointer read under the lock is a plain value after the block, and the checker follows it no further. It follows a pointer to the guarded field itself through the variable that took it, and through no field, tuple or result.
 - A closure. Its body is checked with no `sync` held, so a guarded field inside it needs a `sync` of its own.
 - Every field that `unchecked` marks.
 - The time of `construct`. The checker assumes that no other thread has the object yet.
