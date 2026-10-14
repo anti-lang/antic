@@ -28,7 +28,8 @@
 #   strict_front_end      --warnings-as-errors beside --front-end
 #   strict_dev            --warnings-as-errors beside --dev
 #   bundle_static         --bundle-runtime beside --lib static
-#   bundle_shared         --bundle-runtime beside --lib shared
+#   bundle_shared         --bundle-runtime beside --lib shared, which
+#                         R132 of "Rules of 2026-10-13" refuses
 #   soname_linux          --soname beside --lib shared and
 #                         --package-version, for Linux
 #   soname_static         --soname beside --lib static
@@ -326,13 +327,13 @@ endif()
 if(CASE STREQUAL "bundle_shared")
     antic_output(said --lib shared ${tools} -o "${WORK}/plain.so"
                  "${library_source}")
-    antic_output(said --lib shared --bundle-runtime ${tools}
-                 -o "${WORK}/bundle.so" "${library_source}")
-    file(READ "${WORK}/plain.h" plain)
-    file(READ "${WORK}/bundle.h" bundle)
-    set(note "The archive holds the Anti runtime.")
-    lacks("${plain}" "${note}" "the header without --bundle-runtime")
-    holds("${bundle}" "${note}" "the header of --bundle-runtime")
+    antic(status said err --lib shared --bundle-runtime ${tools}
+          -o "${WORK}/bundle.so" "${library_source}")
+    if(NOT status STREQUAL "2" OR EXISTS "${WORK}/bundle.h")
+        message(FATAL_ERROR "--bundle-runtime beside --lib shared ended "
+                            "with ${status}, and must be refused\n${err}")
+    endif()
+    holds("${err}" "--bundle-runtime" "the refusal")
     return()
 endif()
 

@@ -115,6 +115,24 @@ anti_message(library_exports_nothing_allowed STATUS 0 ANY_OUT
     ARGS ${tools} --lib static -I "${PROJECT}" -o lib.a
          "${PROJECT}/com/example/lib.anti")
 
+# R132 of "Rules of 2026-10-13": three options that do not stand beside
+# the kind of library are refused, each with its message.
+anti_message(library_shared_bundles_the_runtime STATUS 2
+    FILES com/example/lib.anti "${exporting}"
+    ARGS ${tools} --lib shared --bundle-runtime -I "${PROJECT}" -o lib.so
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: --bundle-runtime puts the runtime into a library of --lib static, and a library of --lib shared links it")
+anti_message(library_static_without_the_runtime STATUS 2
+    FILES com/example/lib.anti "${exporting}"
+    ARGS ${tools} --lib static --no-runtime -I "${PROJECT}" -o lib.a
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: --no-runtime builds a plugin, which is a library of --lib shared")
+anti_message(library_static_in_dev_mode STATUS 2
+    FILES com/example/lib.anti "${exporting}"
+    ARGS ${tools} --lib static --dev -I "${PROJECT}" -o lib.a
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: --lib static builds in release mode, without --dev")
+
 # A build that links, without the runtime archive.
 anti_message(lib_without_runtime
     STATUS 2

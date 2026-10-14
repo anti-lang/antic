@@ -1753,6 +1753,33 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
     return ok;
 }
 
+/* DESIGN: three options do not stand beside the kind of library they
+   meet, by R132 of "Rules of 2026-10-13". --bundle-runtime puts the
+   runtime into an archive, and a shared library links it. --no-runtime
+   builds a plugin, a shared library. A library for C is a release
+   build, as --lto and the profiles are. */
+static bool library_options_usable(const struct options *o)
+{
+    if (o->lib == LIB_SHARED && o->bundle_runtime) {
+        fputs("antic: --bundle-runtime puts the runtime into a library of "
+              "--lib static, and a library of --lib shared links it\n",
+              stderr);
+        return false;
+    }
+    if (o->lib == LIB_STATIC && o->no_runtime) {
+        fputs("antic: --no-runtime builds a plugin, which is a library of "
+              "--lib shared\n",
+              stderr);
+        return false;
+    }
+    if (o->lib == LIB_STATIC && o->dev) {
+        fputs("antic: --lib static builds in release mode, without --dev\n",
+              stderr);
+        return false;
+    }
+    return true;
+}
+
 int driver_run(const struct options *given)
 {
     struct options resolved = *given;
@@ -1797,6 +1824,9 @@ int driver_run(const struct options *given)
         fputs("antic: `--no-hooks` drops the hooks that count the objects of "
               "a plugin for `unload`, and `--no-runtime` builds a plugin\n",
               stderr);
+        return 2;
+    }
+    if (!library_options_usable(o)) {
         return 2;
     }
     memset(&extras, 0, sizeof extras);
