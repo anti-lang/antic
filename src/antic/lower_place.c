@@ -75,8 +75,15 @@ struct ir_operand lower_element_address(struct lowerer *l,
 {
     struct ir_operand length;
     struct ir_operand base = lower_first_element(l, e->as.index.base, &length);
-    struct ir_operand index = lower_expr(l, e->as.index.index);
+    struct ir_operand index;
     uint32_t offset;
+
+    /* A fresh array lives to the end of the statement, which tears it
+       down, as a fresh struct does whose field the statement reads. */
+    if (e->as.index.base->type->kind == TYPE_ARRAY) {
+        lower_keep_temp(l, e->as.index.base, base);
+    }
+    index = lower_expr(l, e->as.index.index);
 
     if (length.kind != IR_NONE) {
         lower_bounds_check(l, e, index, length);

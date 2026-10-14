@@ -1159,15 +1159,20 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     if (e->as.binary.equals) {
         return lower_equals(l, e);
     }
-    /* A `?T` of a value compares with `none` by its flag. */
+    /* A `?T` of a value compares with `none` by its flag. A fresh value
+       lives to the end of the statement, which tears it down. */
     if ((op == TOKEN_EQ || op == TOKEN_NE) &&
         (e->as.binary.left->type->kind == TYPE_OPTIONAL ||
          e->as.binary.right->type->kind == TYPE_OPTIONAL)) {
         const struct expr *value = e->as.binary.left->kind == EXPR_NONE
                                        ? e->as.binary.right
                                        : e->as.binary.left;
-        struct ir_operand held =
-            lower_optional_flag(l, value->type, lower_expr(l, value));
+        struct ir_operand at = lower_expr(l, value);
+        struct ir_operand held;
+        if (lower_is_aggregate(value->type)) {
+            lower_keep_temp(l, value, at);
+        }
+        held = lower_optional_flag(l, value->type, at);
         return lower_temp(l, ir_binary(l->f, l->b,
                                        op == TOKEN_EQ ? IR_EQ : IR_NE, IR_I8,
                                        held, ir_int_op(IR_I8, 0)));
@@ -1610,10 +1615,12 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
         return lower_temp(l, ir_unary(l->f, l->b, op, target, v));
     }
     /* `v is Shape.Circle` compares the tag with the number of the case.
-       The operand is a variant, so v is its address. */
+       The operand is a variant, so v is its address. A fresh variant
+       lives to the end of the statement, which tears it down. */
     if (e->as.cast.variant_case != 0) {
         uint32_t index = e->as.cast.variant_case - 1;
         enum ir_type tag = lower_ir_type_of(from->base);
+        lower_keep_temp(l, e->as.cast.operand, v);
         return lower_temp(
             l, ir_binary(l->f, l->b, IR_EQ, IR_I8, lower_load_tag(l, from, v),
                          ir_int_op(tag, from->base->fields[index].number)));
