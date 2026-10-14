@@ -486,8 +486,12 @@ if(CASE STREQUAL "output_program")
                "${${name}}")
         string(STRIP "${${name}}" ${name})
     endforeach()
+    # files_of sorts the names, and `.exe` sorts after `.anti`.
+    set(expected "return42${EXE};return42.anti")
+    list(SORT expected)
+    list(JOIN expected " " expected)
     expect_files("the directory of the build without -o" "${plain}"
-                 "return42${EXE} return42.anti")
+                 "${expected}")
     expect_files("the directory of the build with -o" "${option}"
                  "return42.anti")
     expect_files("the directory -o names" "${out}" "named${EXE}")
