@@ -214,9 +214,6 @@ matrix_classes_abstract_class_in_a_tuple_refused T078 An abstract class compiles
 matrix_classes_abstract_class_as_a_type_argument_refused T078 An abstract class compiles as the type of a value that is held in place.
 matrix_classes_singleton_field_written_through_its_address_refused T079 The address of a field of a singleton that is fixed after creation lets a write through.
 matrix_classes_literal_of_a_type_parameter_refused T080 A literal of a type parameter ends in an error of the back end without a position.
-matrix_classes_copy_replaced_dev T082 `dup` hands a replaced `copy` an object without its table.
-matrix_classes_copy_replaced_release T082 `dup` hands a replaced `copy` an object without its table.
-matrix_classes_copy_replaced_memory_checks T082 `dup` hands a replaced `copy` an object without its table.
 matrix_classes_qualified_body_in_a_nested_class_dev T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
 matrix_classes_qualified_body_in_a_nested_class_release T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
 matrix_classes_qualified_body_in_a_nested_class_memory_checks T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.

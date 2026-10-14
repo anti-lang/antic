@@ -1287,9 +1287,7 @@ void lower_module(struct module *module, const char *module_name,
                 lower_class_construct(&l, it);
             }
             lower_class_teardown(&l, t);
-            if (lower_declared_copy(t) == NULL) {
-                lower_class_copy(&l, t);
-            }
+            lower_class_copy(&l, t);
             if (it->default_eq != NULL) {
                 lower_class_equals(&l, it);
             }

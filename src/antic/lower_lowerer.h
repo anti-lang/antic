@@ -515,6 +515,10 @@ struct ir_function *lower_class_function(struct lowerer *l,
 const struct item *lower_level_fn(const struct type *t,
                                   const struct name *name);
 const struct item *lower_declared_copy(const struct type *t);
+/* The copy the compiler writes for the class t, which fills the copy
+   entry of its table and runs the `copy` its chain declares last. */
+struct ir_function *lower_written_copy(struct lowerer *l,
+                                       const struct type *t);
 struct ir_global *lower_class_table(struct lowerer *l, const struct type *t);
 struct ir_global *lower_interface_table(struct lowerer *l,
                                         const struct type *t,
@@ -778,6 +782,10 @@ void lower_init_owned(struct lowerer *l, const struct type *t,
 struct ir_operand lower_array_count(struct lowerer *l, const struct type *t);
 void lower_dup_snapshot(struct lowerer *l, const struct type *t,
                         struct ir_operand from, struct ir_operand into);
+/* Store the table of the class t and those of its interfaces into the
+   object at dest. */
+void lower_store_tables(struct lowerer *l, const struct type *t,
+                        struct ir_operand dest);
 /* The functions `Class.destroy` and `Class.copy` of the class t. */
 void lower_class_teardown(struct lowerer *l, const struct type *t);
 bool lower_chain_unbuilds(const struct type *t);

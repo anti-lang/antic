@@ -339,14 +339,11 @@ void lower_init_owned(struct lowerer *l, const struct type *t,
     }
 }
 
-/* The copy of the class value t, the one its chain declares or the one
-   the compiler writes. */
+/* The copy of the class value t, which the compiler writes for every
+   class and which runs the one its chain declares. */
 static struct ir_function *copy_of(struct lowerer *l, const struct type *t)
 {
-    const struct item *m = lower_declared_copy(t);
-
-    return m != NULL ? lower_callee_function(l, m->symbol)
-                     : lower_class_function(l, t, "copy");
+    return lower_written_copy(l, t);
 }
 
 void lower_copy_owned(struct lowerer *l, const struct type *t,
@@ -762,10 +759,19 @@ static void copy_field(struct lowerer *l, const struct type *up,
    part the one copy of its type. The object behind a pointer is copied,
    and so is what each element of a buffer owns. A class value held
    inline copies itself with its own copy. Other pointers keep the
-   address. */
+   address.
+
+   DESIGN: a class whose chain replaces `copy` gets a copy written as
+   well, which stores the tables of the class into `to` and then calls
+   the replaced one. The replaced `copy` fills the fields of memory that
+   holds nothing else, so `to as *Stamp` holds, and the replaced copies
+   of the standard library write over it as before. By T082 of
+   docs/audit/tests-findings.md: the replaced `copy` was called with
+   memory that held no table. */
 void lower_class_copy(struct lowerer *l, const struct type *t)
 {
-    struct ir_function *f = lower_class_function(l, t, "copy");
+    struct ir_function *f = lower_written_copy(l, t);
+    const struct item *declared = lower_declared_copy(t);
     const struct type *up;
     struct ir_operand self;
     struct ir_operand to;
@@ -775,6 +781,17 @@ void lower_class_copy(struct lowerer *l, const struct type *t)
     l->b = ir_block_add(f);
     self = lower_temp(l, f->params[0].temp);
     to = lower_temp(l, f->params[1].temp);
+    if (declared != NULL) {
+        struct ir_operand args[2];
+        lower_store_tables(l, t, to);
+        args[0] = self;
+        args[1] = to;
+        ir_call(l->f, l->b, IR_VOID,
+                ir_func_op(lower_callee_function(l, declared->symbol)), args,
+                2);
+        ir_ret(l->f, l->b, IR_VOID, lower_none());
+        return;
+    }
     ir_memcopy(l->f, l->b, to, self, lower_vtype_of(l, t));
     for (up = t; up->base != NULL; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
@@ -782,6 +799,19 @@ void lower_class_copy(struct lowerer *l, const struct type *t)
         }
     }
     ir_ret(l->f, l->b, IR_VOID, lower_none());
+}
+
+/* The table pointer is the first word of every object, and the base of
+   a class sits at offset 0, so it goes at dest. */
+void lower_store_tables(struct lowerer *l, const struct type *t,
+                        struct ir_operand dest)
+{
+    ir_store_access(l->f, l->b,
+                    lower_temp(l, ir_addr(l->f, l->b,
+                                          ir_global_op(
+                                              lower_class_table(l, t)))),
+                    dest, IR_ACCESS_TABLE);
+    lower_store_interface_tables(l, t, dest);
 }
 
 /* Whether the literal lit names the field name. */
@@ -816,15 +846,8 @@ static void prepare(struct lowerer *l, const struct type *t,
     bool unbuilds = t->kind == TYPE_CLASS && lower_chain_unbuilds(t);
     size_t i;
 
-    /* The table pointer is the first word of every object, and the base
-       of a class sits at offset 0, so it goes at dest. */
     if (t->kind == TYPE_CLASS) {
-        ir_store_access(l->f, l->b,
-                        lower_temp(l, ir_addr(l->f, l->b,
-                                              ir_global_op(
-                                                  lower_class_table(l, t)))),
-                        dest, IR_ACCESS_TABLE);
-        lower_store_interface_tables(l, t, dest);
+        lower_store_tables(l, t, dest);
     }
     for (i = 0; lit != NULL && i < lit->as.struct_lit.field_count; i++) {
         const struct field_init *init = &lit->as.struct_lit.fields[i];

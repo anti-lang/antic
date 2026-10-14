@@ -7,6 +7,10 @@
 #include "types.h"
 #include "lower_lowerer.h"
 
+/* The part of the name of the copy the compiler writes for a class whose
+   chain declares `copy`. */
+#define COPY_WRITTEN "copy:written"
+
 bool lower_same_name(const struct name *a, const struct name *b)
 {
     return a->length == b->length &&
@@ -1370,7 +1374,9 @@ bool lower_has_body(const struct item *fn)
    They fill the destruct and the copy entries of its table, and delete,
    destroy and dup reach them through it. Ownership therefore never reads
    the field list, which --no-reflect drops. A chain that declares `copy`
-   keeps that function in the entry, and no copy is written. The
+   gets a written copy as well, which calls that function last. Its name
+   is `Class.copy:written`, since the declared one is `Class.copy`, and
+   no program writes a `:` in a name. The
    teardown takes the anti.mem.Allocator that the memory the object owns
    goes back to, which is zero for the C library. */
 struct ir_function *lower_class_function(struct lowerer *l,
@@ -1395,8 +1401,8 @@ struct ir_function *lower_class_function(struct lowerer *l,
                 : ir_declare_add(l->m, module, text_cstr(&name), result,
                                  IR_NO_AGG);
         ir_param_add(f, IR_PTR, IR_NO_AGG);
-        if (strcmp(part, "copy") == 0 || strcmp(part, "destroy") == 0 ||
-            strcmp(part, "equals") == 0) {
+        if (strcmp(part, "copy") == 0 || strcmp(part, COPY_WRITTEN) == 0 ||
+            strcmp(part, "destroy") == 0 || strcmp(part, "equals") == 0) {
             ir_param_add(f, IR_PTR, IR_NO_AGG);
         }
     }
@@ -1424,6 +1430,13 @@ const struct item *lower_level_fn(const struct type *t,
 }
 
 static const struct name copy_name = {"copy", 4};
+
+struct ir_function *lower_written_copy(struct lowerer *l,
+                                       const struct type *t)
+{
+    return lower_class_function(
+        l, t, lower_declared_copy(t) != NULL ? COPY_WRITTEN : "copy");
+}
 
 /* The `copy` the chain of t declares nearest to t, or NULL when it keeps
    the one of the root and the compiler writes it. */
@@ -1472,9 +1485,8 @@ struct ir_global *lower_class_table(struct lowerer *l, const struct type *t)
         const struct ir_function *written =
             lower_same_name(&table.entries[i].name, &destruct_name)
                 ? lower_class_function(l, t, "destroy")
-            : lower_same_name(&table.entries[i].name, &copy_name) &&
-                    lower_declared_copy(t) == NULL
-                ? lower_class_function(l, t, "copy")
+            : lower_same_name(&table.entries[i].name, &copy_name)
+                ? lower_written_copy(l, t)
             : root && lower_same_name(&table.entries[i].name, &equals_name)
                 ? lower_class_function(l, t, "equals")
             : root && lower_same_name(&table.entries[i].name, &hash_name)
