@@ -220,9 +220,6 @@ matrix_classes_equality_of_an_owned_pointer_memory_checks T081 The default `equa
 matrix_classes_copy_replaced_dev T082 `dup` hands a replaced `copy` an object without its table.
 matrix_classes_copy_replaced_release T082 `dup` hands a replaced `copy` an object without its table.
 matrix_classes_copy_replaced_memory_checks T082 `dup` hands a replaced `copy` an object without its table.
-matrix_classes_identity_of_an_interface_pointer_dev T083 `==` on a pointer to an interface and a pointer to the object or its base compares the addresses.
-matrix_classes_identity_of_an_interface_pointer_release T083 `==` on a pointer to an interface and a pointer to the object or its base compares the addresses.
-matrix_classes_identity_of_an_interface_pointer_memory_checks T083 `==` on a pointer to an interface and a pointer to the object or its base compares the addresses.
 matrix_classes_qualified_body_in_a_nested_class_dev T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
 matrix_classes_qualified_body_in_a_nested_class_release T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
 matrix_classes_qualified_body_in_a_nested_class_memory_checks T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.

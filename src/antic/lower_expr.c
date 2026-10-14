@@ -968,11 +968,18 @@ static struct ir_operand lower_optional(struct lowerer *l,
    side therefore moves back to the start of its object before the
    addresses are compared. A pointer to a concrete class is already there. Only a
    pointer whose static type is abstract can be a sub-object. The runtime
-   does the move, because it also has to answer for `none`. */
+   does the move, because it also has to answer for `none`. One side that
+   may be a sub-object is enough: a pointer to an interface and one to
+   the object itself compare as one object, by T083 of
+   docs/audit/tests-findings.md. */
+static bool class_pointer(const struct type *t)
+{
+    return t->kind == TYPE_POINTER && t->element->kind == TYPE_CLASS;
+}
+
 static bool may_be_sub(const struct type *t)
 {
-    return t->kind == TYPE_POINTER && t->element->kind == TYPE_CLASS &&
-           t->element->has_abstract;
+    return class_pointer(t) && t->element->has_abstract;
 }
 
 static struct ir_operand object_of(struct lowerer *l, struct ir_operand p)
@@ -1154,8 +1161,10 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     struct ir_operand right;
     struct ir_operand checked;
     bool identity = (op == TOKEN_EQ || op == TOKEN_NE) &&
-                    may_be_sub(e->as.binary.left->type) &&
-                    may_be_sub(e->as.binary.right->type);
+                    class_pointer(e->as.binary.left->type) &&
+                    class_pointer(e->as.binary.right->type) &&
+                    (may_be_sub(e->as.binary.left->type) ||
+                     may_be_sub(e->as.binary.right->type));
 
     if (op == TOKEN_AND_AND || op == TOKEN_OR_OR) {
         return short_circuit(l, e);
@@ -1200,8 +1209,10 @@ static struct ir_operand lower_binary(struct lowerer *l, const struct expr *e)
     if (lower_none_in_first_word(e->as.binary.right->type)) {
         right = lower_temp(l, ir_load(l->f, l->b, IR_PTR, right));
     }
-    if (identity) {
+    if (identity && may_be_sub(e->as.binary.left->type)) {
         left = object_of(l, left);
+    }
+    if (identity && may_be_sub(e->as.binary.right->type)) {
         right = object_of(l, right);
     }
     checked = lower_binary_checks(l, op, operands, left, right, e->pos.line);
