@@ -215,6 +215,11 @@ struct lowerer {
     size_t anonymous_named;
 };
 
+/* The alignment of the memory of malloc on every target. `alloc(T, n)` of
+   a type that `align(N)` raises above it takes its memory from the
+   runtime, by R050 of "Rules of 2026-10-13". */
+#define LOWER_MALLOC_ALIGN 16
+
 /* A place is where an assignment writes: a variable that lives in a
    temporary, or an address in memory. */
 struct place {

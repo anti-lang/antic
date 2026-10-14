@@ -80,6 +80,11 @@ void anti_rt_streams_binary(void);
 void *anti_rt_aligned_alloc(size_t size, size_t align);
 void anti_rt_aligned_free(void *p);
 
+/* Memory of size bytes, at least 1, that `free` of C releases, or NULL.
+   It stands at align, a power of two, where the platform has such memory.
+   Windows has none, and its memory stands at the alignment of malloc. */
+void *anti_rt_malloc_aligned(size_t size, size_t align);
+
 /* DESIGN: the processor check of src/rt/cpu.c reads what the machine
    offers. x86_64 reads it with the instructions CPUID and XGETBV, the same
    on every system, which C has no words for, so the layer gives the two.

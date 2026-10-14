@@ -1097,6 +1097,19 @@ void anti_rt_aligned_free(void *p)
     _aligned_free(p);
 }
 
+/* DESIGN: `free` of the Universal C Runtime releases the memory of malloc
+   alone, and the memory of _aligned_malloc corrupts its heap. A program
+   releases the memory of `alloc(T, n)` with `free`, and the runtime
+   releases an `own` slice the same way, so the memory stays that of
+   malloc and stands at 16. "What the rules run added" in
+   docs/decisions.md holds the alignment above it that Windows lacks. */
+void *anti_rt_malloc_aligned(size_t size, size_t align)
+{
+    /* The alignment is one Windows cannot give, see above. */
+    (void)align;
+    return malloc(size);
+}
+
 /* See rt.h. Windows has no leak check in its runtime of
    AddressSanitizer, so no program replaces this definition, and it is
    not weak. */

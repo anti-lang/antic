@@ -6580,6 +6580,17 @@ foreach(source IN LISTS matrix_sources)
         antic_matrix_refusal(${name})
     endif()
 endforeach()
+# R050 of "Rules of 2026-10-13": the Universal C Runtime has no memory above
+# the alignment of malloc that `free` releases, so `alloc(T, n)` of a type
+# aligned above 16 stands at 16 on a Windows host. The entry on R050 under
+# "What the rules run added" in docs/decisions.md holds it. The tests stay
+# registered there, as the tests of --memory-checks do on windows-arm64.
+if(ANTIC_HOST_TARGET MATCHES "^windows-")
+    set_tests_properties(matrix_types_alloc_of_a_type_aligned_above_16_dev
+        matrix_types_alloc_of_a_type_aligned_above_16_release
+        matrix_types_alloc_of_a_type_aligned_above_16_memory_checks
+        PROPERTIES DISABLED TRUE)
+endif()
 # Programs of the classes area once more under an option that takes a part
 # of the class away. --no-reflect drops the field lists, and the default
 # `equals` and `hash`, `is`, `as` and `dup` give what they give with them.

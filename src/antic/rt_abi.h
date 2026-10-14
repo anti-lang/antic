@@ -105,6 +105,9 @@
    every path, which its prototype in src/rt/ declares _Noreturn, and
    RETURNS for every other one. effects is one of the sets above. */
 #define RT_FUNCTIONS(X)                                                    \
+    X(RT_FN_ALLOC_ALIGNED, anti_rt_alloc_aligned, RETURNS, RT_ANY,         \
+      (PTR, void *), (I64, int64_t), (I64, int64_t), (I64, int64_t),       \
+      (I64, int64_t))                                                      \
     X(RT_FN_ASSERT_FAILED, anti_rt_assert_failed, NEVER, RT_ANY,           \
       (VOID, void), (PTR, const unsigned char *), (I64, int64_t))          \
     X(RT_FN_ATOMIC_ADD, anti_rt_atomic_add, RETURNS, RT_ANY,               \

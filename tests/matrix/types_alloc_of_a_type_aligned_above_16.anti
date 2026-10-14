@@ -1,0 +1,120 @@
+//! `alloc(T, n)` gives memory aligned to the alignment of `T`, also above 16,
+//! by R050 of "Rules of 2026-10-13". Each line counts the blocks of one type
+//! that stand at no multiple of its alignment. A block of one byte stands
+//! between two blocks, so the memory of `malloc` would move each by 16.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Address
+{
+	p: ?*byte,
+	n: u64,
+}
+
+struct Wide align(64)
+{
+	a: u8,
+}
+
+struct Inside
+{
+	lead: u8,
+	w: Wide,
+}
+
+class Spread align(32)
+{
+	pub a: u8 = 7,
+	pub b: int = 0,
+}
+
+union Half align(32)
+{
+	a: u8,
+	b: i64,
+}
+
+variant Loose align(128)
+{
+	A { x: int },
+	B,
+}
+
+fn off(p: *byte, align: u64) -> int
+{
+	let a = Address { p: p };
+	return (a.n % align) as int;
+}
+
+fn misaligned<T>(align: u64) -> int
+{
+	let blocks: [4]?*T = [none, none, none, none];
+	let pads: [4]?*u8 = [none, none, none, none];
+	let bad = 0;
+	for i in 0..4 {
+		pads[i] = alloc(u8, 1);
+		let b = alloc(T, i + 1) else {
+			return -1;
+		};
+		blocks[i] = b;
+		if off(b as *byte, align) != 0 {
+			bad += 1;
+		}
+	}
+	for i in 0..4 {
+		free(blocks[i]);
+		free(pads[i]);
+	}
+	return bad;
+}
+
+// The elements of a class come zeroed, and each takes a value.
+fn elements_of_a_class() -> int
+{
+	let pad = alloc(u8, 1);
+	let p = alloc(Spread, 3) else {
+		return -1;
+	};
+	let bytes = p as *byte;
+	let set = 0;
+	for i in 0..3 * size_of(Spread) {
+		if bytes[i] != 0 {
+			set += 1;
+		}
+	}
+	p[2] = Spread { b: 40 };
+	let sum = p[2].a as int + p[2].b + set + off(bytes, 32);
+	free(p);
+	free(pad);
+	return sum;
+}
+
+fn elements_of_a_struct() -> int
+{
+	let pad = alloc(u8, 1);
+	let p = alloc(Wide, 4) else {
+		return -1;
+	};
+	for i in 0..4 {
+		p[i] = Wide { a: (i + 1) as u8 };
+	}
+	let sum = p[0].a as int + p[3].a as int + off(&p[3] as *byte, 64);
+	free(p);
+	free(pad);
+	return sum;
+}
+
+fn main() -> int
+{
+	printf("struct %lld\n".ptr, misaligned<Wide>(64));
+	printf("struct that holds one %lld\n".ptr, misaligned<Inside>(64));
+	printf("class %lld\n".ptr, misaligned<Spread>(32));
+	printf("union %lld\n".ptr, misaligned<Half>(32));
+	printf("variant %lld\n".ptr, misaligned<Loose>(128));
+	printf("array %lld\n".ptr, misaligned<[2]Wide>(64));
+	printf("tuple %lld\n".ptr, misaligned<(u8, Wide)>(64));
+	printf("optional %lld\n".ptr, misaligned<?Half>(32));
+	printf("elements of a class %lld\n".ptr, elements_of_a_class());
+	printf("elements of a struct %lld\n".ptr, elements_of_a_struct());
+	return 0;
+}

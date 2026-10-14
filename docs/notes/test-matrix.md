@@ -908,6 +908,9 @@ Where two rules meet, and where three do:
 - A bitfield and a failing call, the flags form, a closure, a lent element,
   `==` and the hash: the part `other_rules` of
   `types_bitfields_and_unions`.
+- `alloc(T, n)` and a type aligned above 16, by R050: the addresses of a
+  struct, a class, a union, a variant, an array, a tuple and a `?T` in
+  `types_alloc_of_a_type_aligned_above_16`.
 - A bitfield and a constant past its width, by R048: the six refusals
   `types_bitfield_*_past_its_width` and
   `types_bitfield_assigned_a_constant_below_its_range`, and the ends that

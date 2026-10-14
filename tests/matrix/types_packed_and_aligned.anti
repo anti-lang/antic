@@ -275,7 +275,8 @@ fn kinds_at_odd_offsets()
 
 // The address of a value of an aligned type, read as a number through a
 // union. `alloc` gives the memory of `malloc`, which is aligned to 16, so
-// the type it allocates asks for 16.
+// the type it allocates asks for 16. `types_alloc_of_a_type_aligned_above_16`
+// holds a type that asks for more.
 
 union Address
 {

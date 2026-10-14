@@ -36,6 +36,8 @@ A C pointer is an address with arithmetic: `p + 1`, `p - q` and a cast to and fr
 
 `alloc T { }` never gives `none`: the program ends with a message when no memory is left. `alloc(T, n)` gives `none` then, so its result is tested or bound with `catch`.
 
+The memory of `alloc(T, n)` stands at the alignment of `T`. `malloc` aligns to 16, and a type that `align(N)` raises above that takes its memory from `anti_rt_alloc_aligned` of the runtime, which `free` releases as well. On Windows that memory stands at 16, since the C library there has none above it that `free` releases.
+
 The memory of `alloc(T, n)` is not written. Its elements hold what the allocator left there, and the program stores each before it reads it. One case differs. Where `T` is a class or owns something, the memory is zeroed. Every element then has a zero table until the program fills it.
 
 A pointer has no arithmetic. `p + 1` and `q - p` are refused, a pointer does not convert to an integer or back, and `<` does not compare two pointers. `&p[i]` is the one form that moves a pointer.
@@ -271,7 +273,7 @@ Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/a
 | `*p` and `p.f` | one load or store | the same |
 | `p[i]` | one load or store, no check | the same |
 | `alloc T { }` | one `malloc`, one compare, one branch, one store per field | the same |
-| `alloc(T, n)` | one multiplication, one `malloc` or `calloc` | the same |
+| `alloc(T, n)` | one multiplication, one `malloc` or `calloc`. One call of the runtime for a type aligned above 16 | the same |
 | `free(p)` | one `free` | the same |
 | Checks inserted | none | none |
 | Atomic operations and locks | 0 | 0 |

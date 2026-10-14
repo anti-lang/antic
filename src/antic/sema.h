@@ -255,6 +255,8 @@ bool sema_has_body(const struct item *fn);
    struct and a tuple do with a part that does. Lowering tears down what
    this names. */
 bool sema_needs_teardown(const struct type *t);
+/* The largest `align(N)` of t and of the parts it holds in place, or 0. */
+uint64_t sema_declared_align(const struct type *t);
 
 /* One entry of the primary table of a class, after the descriptor: the
    name and the parameters of the function with `self` among them, and

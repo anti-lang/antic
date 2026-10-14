@@ -394,6 +394,49 @@ static bool holds_mutex(const struct type *t, struct ptr_set *answered)
     return false;
 }
 
+/* The largest `align(N)` of t and of the parts it holds in place, or 0.
+   A packed type puts its fields at any offset, so it has its own N
+   alone. answered holds the types with fields met in this walk. */
+static uint64_t declared_align(const struct type *t, struct ptr_set *answered)
+{
+    uint64_t align;
+    size_t i;
+
+    if (t == NULL) {
+        return 0;
+    }
+    if (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
+        return declared_align(t->element, answered);
+    }
+    if ((t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS &&
+         t->kind != TYPE_TUPLE && t->kind != TYPE_VARIANT) ||
+        !ptr_set_add(answered, t)) {
+        return 0;
+    }
+    align = t->align;
+    for (i = 0; !t->packed && i < t->field_count; i++) {
+        uint64_t part = declared_align(t->fields[i].type, answered);
+        align = part > align ? part : align;
+    }
+    return align;
+}
+
+/* DESIGN: every type the language builds in aligns to 16 at most on every
+   target, a simd struct among them. An alignment above that comes from
+   `align(N)` alone, which is a number of the source. The checker therefore
+   knows the alignment of a type that malloc does not cover, without a
+   layout. */
+uint64_t sema_declared_align(const struct type *t)
+{
+    struct ptr_set answered;
+    uint64_t align;
+
+    memset(&answered, 0, sizeof answered);
+    align = declared_align(t, &answered);
+    free(answered.slots);
+    return align;
+}
+
 bool sema_holds_mutex(const struct type *t)
 {
     struct ptr_set answered;

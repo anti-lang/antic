@@ -2159,6 +2159,22 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             return v;
         }
         v = lower_expr(l, e->as.alloc.count);
+        /* DESIGN: malloc and calloc align to 16, and `align(N)` asks for
+           more. The runtime gives the elements of such a type at their
+           alignment, in memory that `free` releases as it releases the
+           memory of malloc. It takes the count and the size apart, so
+           it refuses a product that leaves 64 bits. */
+        if (sema_declared_align(e->type->element) > LOWER_MALLOC_ALIGN) {
+            struct ir_operand args[4];
+            args[0] = v;
+            args[1] = lower_size_operand(l, e->type->element);
+            args[2] = ir_int_op(IR_I64,
+                                sema_declared_align(e->type->element));
+            args[3] = ir_int_op(IR_I64,
+                                e->type->element->kind == TYPE_CLASS ||
+                                    sema_needs_teardown(e->type->element));
+            return lower_rt_call(l, RT_FN_ALLOC_ALIGNED, args);
+        }
         /* DESIGN: the elements of a class come zeroed, so one the
            program has not filled has a zero table, which the zero-table
            check reports. So do the elements of a type that `=` tears

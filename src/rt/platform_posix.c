@@ -816,6 +816,13 @@ void anti_rt_aligned_free(void *p)
     free(p);
 }
 
+/* posix_memalign gives memory that free releases, on macOS, musl with
+   mimalloc and glibc alike. */
+void *anti_rt_malloc_aligned(size_t size, size_t align)
+{
+    return anti_rt_aligned_alloc(size, align);
+}
+
 /* DESIGN: the runtime marks what it keeps until exit through a function
    that a program of --memory-checks replaces, see rt.h. The definition
    here is weak on ELF and Mach-O, so the one of the program wins and

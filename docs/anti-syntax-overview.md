@@ -990,7 +990,7 @@ let g = n catch fatal;    // an anti.lang.NoneDereference on none
 let k = n ?? &default_node;
 ```
 
-`alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
+`alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory at the alignment of `T`. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
 
 `p as *U` between two pointer types is a view, the same address read as another type. Bytes reach any memory, every pointer is one type and an integer meets its other sign. A struct holds its parts, an array its elements and a simd struct its lanes. Two structs of which neither holds the other keep apart. A view used where it stands reaches any memory, and a view passed on is a pointer of its own type. A release build orders loads and stores by these rules. "Aliasing of views" in `docs/anti-language-additions.md` holds them.
 
