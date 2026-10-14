@@ -175,6 +175,10 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
   `ctest -I 2251,4823`: `asan` 266 s, 365 s and 339 s, `ubsan` 242 s,
   346 s and 257 s.
+  The step of the rules of ownership measured `host` as `ctest -I 1,2000`
+  and `ctest -I 2001,4838`: 373 s and 239 s. It ran each sanitizer suite
+  as `ctest -I 1,1150`, `ctest -I 1151,2250` and `ctest -I 2251,4836`:
+  `asan` 266 s, 365 s and 340 s, `ubsan` 244 s, 346 s and 256 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -718,10 +722,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4825 ctest tests pass on the development Mac, and two of them, the
+- 4838 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  376 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4823 each with the same skips, without
+  379 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 4836 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
@@ -761,6 +765,15 @@ reports what it finished.
   `operator fn` whose type parameter no operand names is refused, and a
   generic call names the parameter whose shape an argument misses.
   `docs/reports/2026-10-14-rules-types.md` reports the step.
+- The rules of ownership are built, R070 to R085 apart from R074 and R083,
+  which wait for Eddie, and R081, which the expected failure T127 holds.
+  `delete(c)` tears down every value the channel still holds, the oldest
+  first, through `anti_rt_chan_held` of the runtime. An array literal
+  moves an owning local, as a tuple literal does. A use after a move into
+  a place without a name gives the line of the move. An `own` field of
+  type `?fn(...)` takes `none`, as its default and with `=`, which frees
+  the snapshot it held. `docs/reports/2026-10-14-rules-ownership.md`
+  reports the step and asks about R081.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A
