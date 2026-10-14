@@ -102,6 +102,8 @@ At `95096d2b` on 2026-10-08, on Ubuntu 26.04.1, it passes 1619 of 1619 with six 
 in 153 s. Its sanitizer suites did not run.
 At `9c720c2c` on 2026-10-10 it passes 1627 of 1627 with five skipped, in 276 s, as the
 last phase of step 5 of a release. Its sanitizer suites did not run.
+At `1ce28da6` on 2026-10-14 it passes 4875 of 4875 with five skipped, 309 of them as
+expected failures, in four parts of `ctest -j6 -I`. Its sanitizer suites did not run.
 
 | Untested item | Tests that run it |
 |---|---|
@@ -202,6 +204,10 @@ of `ctest -j4 -I`, against the Windows sysroots of mingw-w64 and no Build Tools.
 At `9c720c2c` on 2026-10-10 it passes 1615 of 1615 with fourteen skipped, in eight parts
 of `ctest -j4 -I` that took 1138 s together, after the install and the check with the
 network off of step 5 of a release.
+At `1ce28da6` on 2026-10-14 it passes 4853 of 4853, 314 of them as expected
+failures, in five parts of `ctest -j4 -I` and two runs of one test.
+`package_keys` takes 460 s alone. A test of a VM takes up to six times as long while the Mac
+runs other work, and the other VM is such work: run one suite on one VM at a time.
 
 ### SSH from the Mac
 
