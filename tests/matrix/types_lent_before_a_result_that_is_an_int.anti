@@ -1,5 +1,6 @@
-//! `lent` before a result is read before `*`, `?` and `?*` alone, so `-> lent
-//! int` is refused.
+//! `lent` before a result belongs to `operator fn value`, and the checker
+//! refuses `-> lent int` of another function as it refuses `-> lent ?int`
+//! there, by R063 of "Rules of 2026-10-13".
 
 class Cell
 {

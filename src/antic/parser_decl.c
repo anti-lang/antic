@@ -61,6 +61,34 @@ void parser_fn_param_marks(struct parser *p, bool *keep, bool *concurrent,
    `lent *T` or `lent ?*T`, or `-> never`. It reports false after an
    error. `lent` is a contextual word, and no type name is followed by `*`
    or `?`. */
+/* DESIGN: `lent` is a contextual word, so a type may carry the name. After
+   `->` it is the mark where a type follows it, and the checker then says
+   what the mark belongs to, by R063 of "Rules of 2026-10-13": `-> lent int`
+   gets the message of `-> lent ?int`. A name follows the mark as a type
+   unless it starts what follows a result, `may fail` or a clause, which
+   leaves `lent` as the type. */
+static bool lent_marks_result(struct parser *p)
+{
+    const struct token *next = parser_peek_at(p, 1);
+
+    switch (next->kind) {
+    case TOKEN_STAR:
+    case TOKEN_QUESTION:
+    case TOKEN_QUESTION_STAR:
+    case TOKEN_LBRACKET:
+    case TOKEN_LPAREN:
+    case TOKEN_FN:
+    case TOKEN_CHAN:
+        return true;
+    case TOKEN_IDENT:
+        return parser_peek_at(p, 2)->kind != TOKEN_LPAREN &&
+               !(parser_is_word(p, next, "may") &&
+                 parser_peek_at(p, 2)->kind == TOKEN_FAIL);
+    default:
+        return lexer_token_is_builtin_type(next->kind);
+    }
+}
+
 bool parser_result_type(struct parser *p, struct item *it)
 {
     if (!parser_accept(p, TOKEN_ARROW)) {
@@ -71,10 +99,7 @@ bool parser_result_type(struct parser *p, struct item *it)
         parser_next(p);
         return true;
     }
-    if (parser_is_word(p, parser_peek(p), "lent") &&
-        (parser_peek_at(p, 1)->kind == TOKEN_STAR ||
-         parser_peek_at(p, 1)->kind == TOKEN_QUESTION ||
-         parser_peek_at(p, 1)->kind == TOKEN_QUESTION_STAR)) {
+    if (parser_is_word(p, parser_peek(p), "lent") && lent_marks_result(p)) {
         it->result_lent = true;
         it->result_lent_pos = parser_pos_of(parser_peek(p));
         parser_next(p);

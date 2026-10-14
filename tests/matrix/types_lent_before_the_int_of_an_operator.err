@@ -1,0 +1,1 @@
+types_lent_before_the_int_of_an_operator.anti:14:29: error: `lent` marks a pointer result, and this one is `int`
