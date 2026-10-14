@@ -94,6 +94,14 @@ Neither has an array member of no length, nor a struct passed by value that
 the API never defines. Each declaration left out gets a warning that says
 why, and the command goes on.
 
+A description leaves out a function without its name or its result and a
+struct without its name, with a warning each. A type that does not parse
+leaves out the function that names it, through an alias or a callback as
+well. Its one warning names the function and the type. A field without
+its name or its type is lost, and the struct without it would have another
+layout than the one of C. The description is then refused. These are R170,
+R171 and R172 of "Rules of 2026-10-13".
+
 A field or a parameter whose C name is a word of Anti takes a trailing `_`,
 which changes neither a layout nor a call. A function with such a name
 cannot be renamed, since its name is its symbol, and is left out.

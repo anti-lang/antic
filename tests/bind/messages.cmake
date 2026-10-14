@@ -48,12 +48,29 @@ anti_message(api_enum_value STATUS 0
     OUT "bind: anti.api from api.json, 0 functions, 1 warning"
     ARGS bind api.json -o "${WORK}/out"
     ERR "anti: api.json: warning: a value of the enum `Mode` is no integer")
+# R170 of "Rules of 2026-10-13" in docs/decisions.md: a type that does not
+# parse gives one warning, which names the type and what is left out.
 anti_message(api_type_does_not_parse STATUS 0
     FILES api.json "{\"functions\": [{\"name\": \"f\", \"returnType\": \"void\", \"params\": [{\"name\": \"p\", \"type\": \"int (\"}]}]}"
-    OUT "bind: anti.api from api.json, 0 functions, 2 warnings"
+    OUT "bind: anti.api from api.json, 0 functions, 1 warning"
     ARGS bind api.json -o "${WORK}/out"
-    ERR "anti: api.json: warning: the type `int (` does not parse"
-        "anti: api.json: warning: `f` is left out: a type does not parse")
+    ERR "anti: api.json: warning: `f` is left out: the type `int (` does not parse")
+# R171 of "Rules of 2026-10-13" in docs/decisions.md: a field without its
+# type gives a warning. By R172 a struct that lost a field is refused,
+# since its layout would differ from that of C.
+anti_message(api_field_without_a_type
+    FILES api.json "{\"functions\": [], \"structs\": [{\"name\": \"Half\", \"fields\": [{\"name\": \"x\"}, {\"name\": \"y\", \"type\": \"int\"}]}]}"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json: warning: the field `x` of `Half` has no type"
+        "anti: api.json: the struct `Half` lost a field, so its layout would differ from that of C")
+anti_message(api_field_without_a_name
+    FILES api.json "{\"functions\": [], \"structs\": [{\"name\": \"Half\", \"fields\": [{\"type\": \"int\"}, {\"name\": \"y\", \"type\": \"int\"}]}]}"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json: the struct `Half` lost a field, so its layout would differ from that of C")
+anti_message(api_field_that_is_no_object
+    FILES api.json "{\"functions\": [], \"structs\": [{\"name\": \"Half\", \"fields\": [3, {\"name\": \"y\", \"type\": \"int\"}]}]}"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json: the struct `Half` lost a field, so its layout would differ from that of C")
 anti_message(api_type_names_itself STATUS 0
     FILES api.json "{\"functions\": [{\"name\": \"f\", \"returnType\": \"void\", \"params\": [{\"name\": \"p\", \"type\": \"Loop\"}]}], \"aliases\": [{\"name\": \"Loop\", \"type\": \"Loop\"}]}"
     OUT "bind: anti.api from api.json, 0 functions, 2 warnings"

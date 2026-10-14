@@ -3,9 +3,4 @@
 
 pub const WHOLE: c_float = 2.0;
 
-pub struct Half
-{
-	y: c_int,
-}
-
 pub extern fn plain() -> c_int;

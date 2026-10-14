@@ -320,8 +320,10 @@ elseif(CASE MATCHES "^api_(parts|callbacks|literals|types)$")
     # Four descriptions in the format of rlparser. api_parts holds
     # entries that lack a part: a function without its name, its result
     # or its parameters, a struct without its name or its list of fields,
-    # a field and a parameter without a type, an enum without its values
-    # and a define without its name, its kind or its value. api_callbacks
+    # a parameter without a type, an enum without its values and a define
+    # without its name, its kind or its value. A struct that lost a field
+    # is refused by R172 of "Rules of 2026-10-13", so the cases of
+    # tests/bind/messages.cmake hold a field without a part. api_callbacks
     # holds callbacks as the types of parameters, a variadic one and ones
     # that lack a part among them, and an enum as a type. api_literals
     # holds the forms of a struct literal that a define may have. api_types

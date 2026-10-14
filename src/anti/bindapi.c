@@ -13,6 +13,8 @@ struct api {
     struct bind_module *b;
     const struct json_value *root;
     int depth;                  /* of the aliases being resolved */
+    const char *unparsed;       /* the first type of an entry that did not
+                                   parse, or NULL */
 };
 
 static const struct json_value *section(const struct api *a, const char *name)
@@ -180,8 +182,11 @@ static const struct bind_type *parse(struct api *a, const char *c)
     a->depth++;
     t = bind_parse_type(a->b, c, &names);
     a->depth--;
-    if (t == NULL) {
-        bind_warn(a->b, "the type `%s` does not parse", c);
+    /* R170 of "Rules of 2026-10-13": the entry that leaves something out
+       names the type in its one warning. The innermost type that does
+       not parse fails first, through an alias or a callback. */
+    if (t == NULL && a->unparsed == NULL) {
+        a->unparsed = bind_strdup(a->b, c);
     }
     return t;
 }
@@ -230,6 +235,7 @@ static bool read_structs(struct api *a)
         const char *name = json_member_string(list->items[i], "name");
         struct bind_record *r;
         if (name == NULL) {
+            bind_warn(a->b, "a struct without a name is left out");
             continue;
         }
         if (!named(a, "struct", name)) {
@@ -260,8 +266,18 @@ static bool read_structs(struct api *a)
             const char *fname = json_member_string(fields->items[j], "name");
             const char *ftype = json_member_string(fields->items[j], "type");
             struct bind_field *f = &r->fields[r->field_count];
+            /* R171 and R172 of "Rules of 2026-10-13": a field without a
+               part is lost, and the struct without it would have another
+               layout than the one of C, so the description is refused. */
+            if (fname != NULL && ftype == NULL) {
+                bind_warn(a->b, "the field `%s` of `%s` has no type", fname,
+                          name);
+            }
             if (fname == NULL || ftype == NULL) {
-                continue;
+                fprintf(stderr, "anti: %s: the struct `%s` lost a field, so "
+                                "its layout would differ from that of C\n",
+                        a->b->source, name);
+                return false;
             }
             if (!named(a, "field", fname)) {
                 return false;
@@ -269,6 +285,7 @@ static bool read_structs(struct api *a)
             f->name = bind_strdup(a->b, fname);
             f->c_type = bind_strdup(a->b, ftype);
             f->bits = -1;
+            a->unparsed = NULL;
             f->type = parse(a, ftype);
             if (f->type == NULL) {
                 struct bind_type *u = bind_type_new(a->b, BIND_UNSUPPORTED);
@@ -342,7 +359,13 @@ static bool read_functions(struct api *a)
         size_t count = params != NULL ? params->count : 0;
         struct bind_function *f;
         bool ok = true;
-        if (name == NULL || result == NULL) {
+        /* R171 of "Rules of 2026-10-13". */
+        if (name == NULL) {
+            bind_warn(a->b, "a function without a name is left out");
+            continue;
+        }
+        if (result == NULL) {
+            bind_warn(a->b, "`%s` is left out: it names no result", name);
             continue;
         }
         if (!named(a, "function", name)) {
@@ -352,6 +375,7 @@ static bool read_functions(struct api *a)
         f->name = bind_strdup(a->b, name);
         f->doc = doc_of(a, item);
         f->c_result = bind_strdup(a->b, result);
+        a->unparsed = NULL;
         f->result = parse(a, result);
         f->params = arena_alloc(&a->b->arena, (count + 1) * sizeof *f->params);
         ok = f->result != NULL;
@@ -376,8 +400,16 @@ static bool read_functions(struct api *a)
             ok = p->type != NULL;
             f->param_count++;
         }
+        if (a->unparsed != NULL) {
+            bind_warn(a->b, "`%s` is left out: the type `%s` does not parse",
+                      name, a->unparsed);
+            continue;
+        }
+        /* A parameter without its type, since a type that does not parse
+           is named above. */
         if (!ok) {
-            bind_warn(a->b, "`%s` is left out: a type does not parse", name);
+            bind_warn(a->b, "`%s` is left out: a parameter names no type",
+                      name);
             continue;
         }
         bind_list_add(&a->b->functions, f);

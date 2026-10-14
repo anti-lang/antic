@@ -1,4 +1,4 @@
 {"functions": [{"returnType": "void"}, {"name": "no_result"}, {"name": "plain", "returnType": "int"}, {"name": "no_type", "returnType": "void", "params": [{"name": "p"}]}],
- "structs": [{"fields": []}, {"name": "NoList", "fields": 3}, {"name": "Half", "fields": [{"name": "x"}, {"type": "int"}, {"name": "y", "type": "int"}]}],
+ "structs": [{"fields": []}, {"name": "NoList", "fields": 3}],
  "enums": [{"name": "NoValues"}, {"values": []}],
  "defines": [{"name": "NO_VALUE", "type": "INT"}, {"type": "INT", "value": 1}, {"name": "NO_KIND", "value": 1}, {"name": "WHOLE", "type": "FLOAT", "value": 2}]}

@@ -1,2 +1,5 @@
-anti: api_parts.json: warning: `no_type` is left out: a type does not parse
+anti: api_parts.json: warning: a struct without a name is left out
+anti: api_parts.json: warning: a function without a name is left out
+anti: api_parts.json: warning: `no_result` is left out: it names no result
+anti: api_parts.json: warning: `no_type` is left out: a parameter names no type
 anti: api_parts.json: warning: `NoList` has no field and is left out

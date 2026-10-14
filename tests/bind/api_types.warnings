@@ -1,17 +1,9 @@
-anti: api_types.json: warning: the type `int .` does not parse
-anti: api_types.json: warning: `t_dot` is left out: a type does not parse
-anti: api_types.json: warning: the type `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA` does not parse
-anti: api_types.json: warning: `t_long_word` is left out: a type does not parse
-anti: api_types.json: warning: the type `int count` does not parse
-anti: api_types.json: warning: `t_named` is left out: a type does not parse
-anti: api_types.json: warning: the type `void (*)(int *` does not parse
-anti: api_types.json: warning: `t_open_list` is left out: a type does not parse
-anti: api_types.json: warning: the type `int [1111111111111111111111111111111111]` does not parse
-anti: api_types.json: warning: `t_long_length` is left out: a type does not parse
-anti: api_types.json: warning: the type `int [3` does not parse
-anti: api_types.json: warning: `t_open_array` is left out: a type does not parse
-anti: api_types.json: warning: the type `void (*` does not parse
-anti: api_types.json: warning: `t_open_group` is left out: a type does not parse
-anti: api_types.json: warning: the type `void (* int)(int)` does not parse
-anti: api_types.json: warning: `t_word_in_group` is left out: a type does not parse
+anti: api_types.json: warning: `t_dot` is left out: the type `int .` does not parse
+anti: api_types.json: warning: `t_long_word` is left out: the type `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA` does not parse
+anti: api_types.json: warning: `t_named` is left out: the type `int count` does not parse
+anti: api_types.json: warning: `t_open_list` is left out: the type `void (*)(int *` does not parse
+anti: api_types.json: warning: `t_long_length` is left out: the type `int [1111111111111111111111111111111111]` does not parse
+anti: api_types.json: warning: `t_open_array` is left out: the type `int [3` does not parse
+anti: api_types.json: warning: `t_open_group` is left out: the type `void (*` does not parse
+anti: api_types.json: warning: `t_word_in_group` is left out: the type `void (* int)(int)` does not parse
 anti: api_types.json: warning: `t_enum_unknown` is left out: Anti has no form for the type of a parameter
