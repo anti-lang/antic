@@ -1,0 +1,1 @@
+classes_singleton_inherited_by_a_singleton.anti:9:25: error: `Config` is a singleton, and no class inherits it

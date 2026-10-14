@@ -1,0 +1,17 @@
+//! The `construct` of a singleton takes no parameters, by R109 of the rules of
+//! 2026-10-13. `get` makes the one instance and has no arguments to pass on.
+
+singleton class Config
+{
+	pub level: int = 2,
+
+	fn construct(self, level: int)
+	{
+		self.level = level;
+	}
+}
+
+fn main() -> int
+{
+	return Config.get().level;
+}

@@ -425,20 +425,11 @@ static bool member_visible(const struct checker *c, const struct type *t,
     return level_allows(c, vis, sema_declaring_class(m), t);
 }
 
-/* Whether t is a class declared `singleton`. */
+/* Whether t is a class declared `singleton`. The library file carries
+   the mark, so a singleton of another module answers the same. */
 bool sema_singleton_type(const struct type *t)
 {
-    size_t i;
-
-    if (t == NULL || t->kind != TYPE_CLASS) {
-        return false;
-    }
-    for (i = 0; i < t->member_count; i++) {
-        if (t->members[i]->singleton_get) {
-            return true;
-        }
-    }
-    return false;
+    return t != NULL && t->kind == TYPE_CLASS && t->is_singleton;
 }
 
 /* Whether the class declares a `construct` that takes arguments. */

@@ -1,0 +1,1 @@
+classes_singleton_construct_with_parameters.anti:8:5: error: `Config` is a singleton, and its `construct` takes no parameters

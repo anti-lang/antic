@@ -739,6 +739,7 @@ static void read_struct_marks(struct reader *r, struct type *t)
     t->is_final = (flags & 8) != 0;
     t->simd = (flags & 16) != 0;
     t->traced = (flags & 32) != 0;
+    t->is_singleton = (flags & 64) != 0;
     safety = antl_get_u8(r);
     t->safety = (enum thread_safety)(safety & 3);
     t->unchecked_fields = (safety >> 2 & 1) != 0;
@@ -747,7 +748,7 @@ static void read_struct_marks(struct reader *r, struct type *t)
     }
     t->compatible = antl_get_name(r);
     t->align = antl_get_u64(r);
-    if (flags > 63 || (t->align & (t->align - 1)) != 0) {
+    if (flags > 127 || (t->align & (t->align - 1)) != 0) {
         antl_damaged(r);
     }
 }

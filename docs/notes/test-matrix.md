@@ -1504,8 +1504,9 @@ The rules of the area, each in a program of its own:
   and `matrix/classes_equality_of_an_owned_pointer`, T081.
 - The levels of a member: `matrix/classes_visibility`, twelve refusals
   `matrix/classes_private_*`, `_protected_*` and `_internal_*`, and T075.
-- A singleton: `matrix/classes_singletons` and seven refusals
-  `matrix/classes_singleton_*`, T079 among them.
+- A singleton: `matrix/classes_singletons` and thirteen refusals
+  `matrix/classes_singleton_*`, T079 among them. Six of them hold R109 to
+  R112 of "Rules of 2026-10-13".
 - `dup` and `copy`: `matrix/classes_copies` and
   `matrix/classes_copy_replaced`, T082.
 - An abstract class where a complete value stands: thirteen refusals

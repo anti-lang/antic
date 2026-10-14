@@ -924,6 +924,14 @@ static struct type *check_unary(struct checker *c, struct expr *e,
                           "in a `let`");
             return sema_builtin(c, TYPE_ERROR);
         }
+        /* R110 of "Rules of 2026-10-13": the value behind a pointer to
+           a singleton is its one instance, and `*` would copy it. The
+           program reaches its fields through the pointer. */
+        if (sema_singleton_type(t->element)) {
+            sema_error_at(c, e->pos, "`%s` is a singleton and is never "
+                          "copied", sema_tn(t->element));
+            return sema_builtin(c, TYPE_ERROR);
+        }
         return sema_usable_pointer(c, operand, t)->element;
     case TOKEN_AMP:
         t = sema_check_storage(c, operand);
@@ -2440,6 +2448,14 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             sema_singleton_type(t->element)) {
             sema_error_at(c, e->pos, "`%s` is a singleton and outlives the "
                           "program", sema_tn(t->element));
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        /* R110 of "Rules of 2026-10-13": a singleton has one instance,
+           and a copy would be a second. */
+        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_POINTER &&
+            sema_singleton_type(t->element)) {
+            sema_error_at(c, e->pos, "`%s` is a singleton and is never "
+                          "copied", sema_tn(t->element));
             return sema_builtin(c, TYPE_ERROR);
         }
         /* DESIGN: `destroy(p)` tears down the value that p points at in

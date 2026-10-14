@@ -1422,7 +1422,21 @@ static void declare_get(struct checker *c, struct item *it)
 
     name.text = get_text;
     name.length = sizeof get_text - 1;
+    /* DESIGN: R112 of "Rules of 2026-10-13". The compiler writes `get`,
+       so the class declares none. A `get` its base declares would stand
+       in place of the one written, and is refused at the class. */
+    for (i = 0; i < it->member_count; i++) {
+        if (sema_same_name(&it->members[i]->name, &name)) {
+            sema_error_at(c, it->members[i]->name_pos,
+                          "`%.*s` is a singleton, and the compiler writes "
+                          "its `get`", (int)it->name.length, it->name.text);
+            return;
+        }
+    }
     if (sema_find_member(t, &name) != NULL) {
+        sema_error_at(c, it->name_pos,
+                      "`%.*s` is a singleton, and the compiler writes "
+                      "its `get`", (int)it->name.length, it->name.text);
         return;
     }
     /* The symbol is `T.get`, as for every function of a body, so the
@@ -2141,6 +2155,7 @@ static void declare_items(struct checker *c)
             it->symbol->type->has_abstract = it->is_abstract;
             it->symbol->type->traced = it->trace;
             it->symbol->type->is_final = it->is_final;
+            it->symbol->type->is_singleton = it->is_singleton;
             sema_safety_declare(it);
             /* DESIGN: `compatible` names the floor of a plugin's
                version, which only an abstract class has a table for. */
@@ -2237,6 +2252,15 @@ static void resolve_base(struct checker *c, struct item *it)
         sema_error_at(c, it->base_pos,
                       "`%.*s` cannot inherit `final` class `%.*s`",
                       (int)it->name.length, it->name.text,
+                      (int)it->base_name.length, it->base_name.text);
+        return;
+    }
+    /* DESIGN: R111 of "Rules of 2026-10-13". No class inherits a
+       singleton. A class below would make more objects of it, and a
+       singleton below would be a second instance of its base. */
+    if (base_type->is_singleton) {
+        sema_error_at(c, it->base_pos,
+                      "`%.*s` is a singleton, and no class inherits it",
                       (int)it->base_name.length, it->base_name.text);
         return;
     }

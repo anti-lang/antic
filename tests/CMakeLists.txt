@@ -4423,6 +4423,8 @@ foreach(case
         "modules_private_struct_as_a_type|levels|"
         "modules_private_union|levels|"
         "modules_private_variant|levels|"
+        "modules_singleton_as_a_base|items|"
+        "modules_singleton_copied_by_dup|items|"
         "modules_type_called|items|"
         "modules_type_nested_in_a_generic_class|generic_limits|"
         "modules_type_nested_in_a_generic_class_passed_on|generic_limits|"

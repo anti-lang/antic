@@ -1,0 +1,17 @@
+//! No class inherits a singleton, by R111 of the rules of 2026-10-13. A
+//! singleton below one is refused as well.
+
+singleton class Config
+{
+	pub level: int = 2,
+}
+
+singleton class Special inherits Config
+{
+}
+
+fn main() -> int
+{
+	Special.get();
+	return 0;
+}

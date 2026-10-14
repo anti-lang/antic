@@ -225,6 +225,8 @@ struct type {
                                        TYPE_CLASS: the class it inherits */
     bool has_abstract;              /* TYPE_CLASS: an open function */
     bool is_final;                  /* TYPE_CLASS: no class inherits it */
+    bool is_singleton;              /* TYPE_CLASS: one instance, which
+                                       the generated `get` makes */
     /* DESIGN: the contextual `trace` on the class. A library file carries
        it, so a write to a field of a class of another module is
        instrumented where the write stands. */

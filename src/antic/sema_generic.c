@@ -1235,6 +1235,7 @@ static void fill_copy(struct checker *c, struct type *copy)
     copy->align = g->align;
     copy->has_abstract = g->has_abstract;
     copy->is_final = g->is_final;
+    copy->is_singleton = g->is_singleton;
     copy->traced = g->traced;
     copy->safety = g->safety;
     copy->unchecked_fields = g->unchecked_fields;

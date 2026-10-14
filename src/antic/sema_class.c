@@ -824,6 +824,12 @@ static void check_one_construct(struct checker *c, const struct item *it)
         } else if (m->param_count == 0 && m->result != NULL) {
             sema_error_at(c, m->name_pos, "a `construct` without "
                           "arguments cannot fail and returns nothing");
+        } else if (it->is_singleton && m->param_count > 0) {
+            /* R109 of "Rules of 2026-10-13": `get` makes the one
+               instance and has no arguments to pass on. */
+            sema_error_at(c, m->name_pos, "`%.*s` is a singleton, and its "
+                          "`construct` takes no parameters",
+                          (int)it->name.length, it->name.text);
         }
     }
 }

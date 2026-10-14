@@ -485,7 +485,8 @@ static void put_type(struct writer *w, const struct type *t)
                                      (unsigned)t->has_abstract << 2 |
                                      (unsigned)t->is_final << 3 |
                                      (unsigned)t->simd << 4 |
-                                     (unsigned)t->traced << 5));
+                                     (unsigned)t->traced << 5 |
+                                     (unsigned)t->is_singleton << 6));
             /* A thread-safe class, and `unchecked(unguarded-field)` in
                its header. */
             antl_put_u8(w, (uint8_t)((unsigned)t->safety |

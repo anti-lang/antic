@@ -1,0 +1,1 @@
+modules_singleton_as_a_base.anti:6:12: error: `Settings` is a singleton, and no class inherits it

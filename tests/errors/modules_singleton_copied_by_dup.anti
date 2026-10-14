@@ -1,0 +1,10 @@
+//! A singleton of a library is never copied in another module, by R110 of the
+//! rules of 2026-10-13. The library file carries the mark.
+
+import com.example.items;
+
+fn main() -> int
+{
+	let s = dup(items.Settings.get());
+	return s.base;
+}

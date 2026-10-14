@@ -1349,9 +1349,11 @@ An atomic field has no `=` and no `+=`, and it is not read by its name alone. It
 
 `atomic` also marks an instance field and a local, which [chapter 13]({{% relref "13-threads" %}}) covers.
 
-`singleton class Config { }` declares a class with one instance. `Config.get()` gives a pointer to it and creates it at the first call, from the defaults and from `construct` when the class declares one without arguments.
+`singleton class Config { }` declares a class with one instance. `Config.get()` gives a pointer to it and creates it at the first call, from the defaults and from `construct` when the class declares one.
 
 - The program writes no literal and no `alloc` of a singleton, and `delete` of it is refused.
+- Its `construct` takes no parameters, and the class declares no `get`, which the compiler writes.
+- No class inherits a singleton, and a singleton is never copied: `dup(Config.get())` and `*Config.get()` are refused.
 - A field without a marker is read-only after creation. `construct` sets it, and nothing else does.
 - An `atomic` field has the operations above.
 - A `mutable` field is an ordinary field that the program writes anywhere, except in a `worker fn` of [chapter 13]({{% relref "13-threads" %}}) and in what one calls. The whole-program pass checks that in every build.

@@ -1,0 +1,13 @@
+//! A singleton is never copied, by R110 of the rules of 2026-10-13. `dup` of
+//! its one instance is refused.
+
+singleton class Config
+{
+	pub level: int = 2,
+}
+
+fn main() -> int
+{
+	let c = dup(Config.get());
+	return c.level;
+}

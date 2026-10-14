@@ -1,0 +1,1 @@
+classes_singleton_copied_by_a_dereference.anti:11:10: error: `Config` is a singleton and is never copied
