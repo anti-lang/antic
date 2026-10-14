@@ -716,7 +716,7 @@ concurrent class Stock
 The checker reads one function at a time and compares places as they are written. For a concurrent class it proves the following.
 
 - Every read and write of a guarded field stands inside a `sync` block of the same function. The operand of that `sync` is the `Mutex` field the guard names, on the same place the field is read from.
-- A variable that a `let` or a `=` gave `&` of a place in a guarded field, inside the `sync`, is used inside a `sync` on that lock alone. A `=` of another value frees the variable.
+- A variable that a `let` or a `=` gave `&` of a place in a guarded field, or a slice of it, inside the `sync`, is used in that block alone. A later block on the same lock is after it. A `=` of another value in the block that declares the variable frees it.
 - A field that is neither guarded nor atomic is written by `construct` and `destruct` of the class alone. A write from another module is reported at the write.
 - An atomic field is reached by an atomic operation alone.
 - No function that is not private returns a pointer or a slice into the fields, or passes one to a function value.

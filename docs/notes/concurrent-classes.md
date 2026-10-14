@@ -58,15 +58,30 @@ channels.
   `construct` and `destruct` of the class, or of the enclosing class, reach it
   freely. A closure checks its body with no `sync` held.
 - A pointer to a guarded field is followed through the variable that holds
-  it, by R092 of "Rules of 2026-10-13". `sema_note_guarded_pointer` records the
-  access of the field in the symbol when a `let` or a `=` gives it `&` of a
-  place in the field, or a copy of such a variable, while a `sync` holds the
-  lock. A `=` of any other value clears the record. Each use of the name goes
-  through `sema_check_guarded_pointer`, which asks `guard_held` for the
-  recorded access and gives `unguarded-field` when no block holds the lock.
-  The record follows no path of the function, so a `=` in one branch frees
-  the variable after both. A pointer inside a struct, a tuple or a result is
-  not followed.
+  it, by R092 of "Rules of 2026-10-13". `sema_note_guarded_pointer` records
+  the operand of the `sync` block in the symbol when a `let` or a `=` gives it
+  `&` of a place in the field, a slice of it, its `ptr`, one of those after
+  `as`, or a copy of such a variable. Each use of the name goes through
+  `sema_check_guarded_pointer`, which looks for that operand among the blocks
+  it holds, by the node and not by the place. No block that holds it gives
+  `unguarded-field`.
+- The lock of that block is the one of the object the pointer leads into,
+  whatever the names of the place hold later. So a later block on the same
+  place does not count, and `sync a.lock { p = &a.size; a = b; *p = 1; }`
+  holds the right lock.
+- A `=` of another value clears the record where it stands in the block that
+  declares the variable. For a parameter that block is the body of the
+  function. One in a block inside it, or in a `defer`, leaves the record: it
+  runs on one path alone.
+- A use before the `sync` in a loop runs after the block in the next turn.
+  `loops_open` of the checker names the loops around a statement. The first
+  use of a variable outside every `sync`, in a loop that began after its
+  declaration, stays in `free_loop` and `free_use` of the symbol. A `sync` of
+  that loop that gives the variable the pointer then refuses that use.
+- The checker does not follow a pointer taken where no `sync` holds the lock.
+  It does not follow one inside a struct, a tuple, a field or a result. The
+  address of the variable itself is not followed either. In a loop, a use
+  under another `sync` before the block is taken.
 - A write goes through `sema_note_write`, which assignments, compound
   assignments and `&` already call. A write outside `construct` and `destruct`
   to a field that is neither guarded nor atomic is kept, and

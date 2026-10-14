@@ -1,0 +1,1 @@
+threads_pointer_to_a_guarded_field_in_the_next_turn.anti:16:10: error: `p` points at `size` in the next turn of the loop, which is guarded by `lock`, and no `sync` holds it here [unguarded-field]

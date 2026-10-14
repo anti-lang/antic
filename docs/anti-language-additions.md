@@ -837,7 +837,7 @@ pub synchronized class PeopleList
 
 `concurrent class` leaves the locking to the programmer, for finer locks that let unrelated work run at once. The compiler checks that every field is one of three kinds. A field of none of them is a compile error that names the three:
 
-- Guarded: `field: T guarded by lock`, reached only inside `sync` on that lock. A variable that took a pointer to the field inside the `sync` is used inside a `sync` on that lock alone. The lock is a `Mutex` field of the same object, or of an enclosing object named by its class, `guarded by PeopleList.lock`.
+- Guarded: `field: T guarded by lock`, reached only inside `sync` on that lock. A variable that took a pointer to the field, or a slice of it, inside the `sync` is used in that block alone, and not after it. The lock is a `Mutex` field of the same object, or of an enclosing object named by its class, `guarded by PeopleList.lock`.
 - Atomic: reached only through atomic operations.
 - Fixed: written only in `construct`, and read-only after that.
 

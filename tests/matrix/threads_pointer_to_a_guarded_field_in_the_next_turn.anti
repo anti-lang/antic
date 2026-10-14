@@ -1,0 +1,28 @@
+//! A use that stands before the `sync` in a loop runs after the block in the
+//! next turn, and is refused.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+	items: [4]int = [0; 4] guarded by lock,
+
+	pub fn bump(self) -> int
+	{
+		let other = 0;
+		let p = &other;
+		let n = 0;
+		for i in 0..2 {
+			n += *p;
+			sync self.lock {
+				p = &self.size;
+			}
+		}
+		return n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

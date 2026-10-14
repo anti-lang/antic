@@ -1,0 +1,1 @@
+threads_slice_of_a_guarded_field_after_its_sync.anti:17:10: error: `part` points at `items`, which is guarded by `lock`, and no `sync` holds it here [unguarded-field]

@@ -2079,7 +2079,7 @@ static void check_for(struct checker *c, struct stmt *s)
         s->as.for_loop.names[0].symbol != NULL) {
         s->as.for_loop.names[0].symbol->loops = c->loop_depth + 1;
     }
-    c->loop_depth++;
+    sema_loop_opens(c, s);
     sema_check_block(c, s->as.for_loop.body);
     c->loop_depth--;
     sema_leave_scope(c, &for_scope);
@@ -2244,7 +2244,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
     }
     case STMT_WHILE:
     case STMT_DO_WHILE:
-        c->loop_depth++;
+        sema_loop_opens(c, s);
         if (s->kind == STMT_WHILE) {
             struct symbol *proved[PROVED_MAX];
             size_t count;
@@ -2985,6 +2985,7 @@ struct body_state {
     const struct stmt *deferred;
     const struct expr *field_base;
     const struct held_mutex *held_outside;
+    const struct stmt *loops_open[LOOPS_OPEN_MAX];
 };
 
 static void set_aside(struct checker *c, struct body_state *s)
@@ -2998,6 +2999,7 @@ static void set_aside(struct checker *c, struct body_state *s)
     s->deferred = c->deferred;
     s->field_base = c->field_base;
     s->held_outside = c->held_outside;
+    memcpy(s->loops_open, c->loops_open, sizeof s->loops_open);
     c->loop_depth = 0;
     c->fallthrough = NULL;
     memset(&c->handler, 0, sizeof c->handler);
@@ -3024,6 +3026,7 @@ static void take_back(struct checker *c, const struct body_state *s)
     c->deferred = s->deferred;
     c->field_base = s->field_base;
     c->held_outside = s->held_outside;
+    memcpy(c->loops_open, s->loops_open, sizeof c->loops_open);
 }
 
 /* The type of the anonymous function it, from the types it writes and

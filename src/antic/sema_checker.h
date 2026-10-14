@@ -107,6 +107,9 @@ struct written_field {
     const struct struct_field *field;
 };
 
+/* The loops inside each other that the checker names, see loops_open. */
+#define LOOPS_OPEN_MAX 16
+
 /* One `sync` that the statement being checked stands in, innermost
    first. */
 struct held_mutex {
@@ -139,6 +142,9 @@ struct checker {
     struct scope module_scope;
     struct context ctx;         /* written by sema_enter and sema_leave */
     int loop_depth;
+    /* The loops around the statement checked now, outermost first, as
+       far as LOOPS_OPEN_MAX. */
+    const struct stmt *loops_open[LOOPS_OPEN_MAX];
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool atomic_place;          /* the place of an atomic operation */
     bool program;               /* the build writes a program, not a library */
@@ -635,10 +641,11 @@ void sema_check_leak_arg(struct checker *c, const struct expr *callee,
                          const struct expr *arg, const struct type *param);
 void sema_check_leak_store(struct checker *c, const struct expr *target,
                            const struct expr *value, const struct type *to);
+void sema_loop_opens(struct checker *c, const struct stmt *loop);
 void sema_note_guarded_pointer(struct checker *c, struct symbol *sym,
                                const struct expr *value);
 void sema_check_guarded_pointer(struct checker *c, const struct expr *e,
-                                const struct symbol *sym);
+                                struct symbol *sym);
 bool sema_thread_safe(const struct type *t);
 bool sema_thread_safe_symbol(const struct symbol *sym);
 

@@ -1,0 +1,27 @@
+//! A `=` inside a branch gives the variable another place on one path alone,
+//! so the pointer to the guarded field is still refused after the branch.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+	items: [4]int = [0; 4] guarded by lock,
+
+	pub fn bump(self, plain: bool) -> int
+	{
+		let other = 0;
+		let p = &other;
+		sync self.lock {
+			p = &self.size;
+		}
+		if plain {
+			p = &other;
+		}
+		return *p;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

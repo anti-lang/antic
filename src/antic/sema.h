@@ -103,11 +103,15 @@ struct symbol {
     /* A local whose `let` took a pointer or a slice into the fields of
        the object of a thread-safe class. */
     bool into_fields;
-    /* A local or a parameter that holds a pointer to a guarded field,
-       taken inside a `sync` on its lock: the access of the field and the
-       field. NULL when it holds none. */
-    const struct expr *guarded_place;
+    /* A local or a parameter that holds a pointer to a guarded field:
+       the operand of the `sync` whose block took it, and the field. NULL
+       when it holds none. free_use is its first use outside every
+       `sync` in the loop free_loop, which began after its declaration,
+       while it held none. */
+    const struct expr *guarded_sync;
     const struct struct_field *guarded_field;
+    const struct stmt *free_loop;
+    struct pos free_use;
     /* A local that a `let` or a `=` gave an address that a view by `as`
        made, or that was made from one, see sema_value_view. */
     bool holds_view;

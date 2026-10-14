@@ -1,0 +1,24 @@
+//! A slice of a guarded array field reaches the field as a pointer to it
+//! does, and its use after the `sync` block is refused.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	size: int = 0 guarded by lock,
+	items: [4]int = [0; 4] guarded by lock,
+
+	pub fn first(self) -> int
+	{
+		let other = [1, 2];
+		let part = other[0..2];
+		sync self.lock {
+			part = self.items[0..2];
+		}
+		return part[0];
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

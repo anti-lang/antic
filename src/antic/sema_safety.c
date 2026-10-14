@@ -229,11 +229,13 @@ void sema_check_guards(struct checker *c)
     }
 }
 
-/* Whether a `sync` around the code checked now holds the lock of field f
-   of the object that e, a field access, reaches. The blocks around an
-   anonymous function do not count, since it may run after them. */
-static bool guard_held(const struct checker *c, const struct expr *e,
-                       const struct struct_field *f)
+/* The `sync` around the code checked now that holds the lock of field f
+   of the object that e, a field access, reaches, or NULL. The blocks
+   around an anonymous function do not count, since it may run after
+   them. */
+static const struct held_mutex *guard_holder(const struct checker *c,
+                                             const struct expr *e,
+                                             const struct struct_field *f)
 {
     const struct held_mutex *h;
 
@@ -246,7 +248,7 @@ static bool guard_held(const struct checker *c, const struct expr *e,
         }
         if (f->guard_class == NULL) {
             if (sema_same_place(m->as.field.base, e->as.field.base)) {
-                return true;
+                return h;
             }
             continue;
         }
@@ -255,24 +257,22 @@ static bool guard_held(const struct checker *c, const struct expr *e,
             owner = owner->element;
         }
         if (owner != NULL && sema_descends_from(owner, f->guard_class)) {
-            return true;
+            return h;
         }
     }
-    return false;
+    return NULL;
 }
 
-/* Whether the guarded field f, which the field access e reaches, stands
-   where no `sync` holds its lock. `construct` and `destruct` reach it
-   without one, since no other thread sees the object there. */
-static bool guard_missing(const struct checker *c, const struct expr *e,
-                          const struct struct_field *f)
+/* Whether the code checked now stands in `construct` or `destruct` of
+   the class that guards field f, where no other thread sees the object
+   and the field is reached without its lock. */
+static bool guard_free(const struct checker *c, const struct struct_field *f)
 {
     const struct type *home = f->home;
 
-    return f->guard.length > 0 && !guard_held(c, e, f) &&
-           !(home != NULL && home->kind == TYPE_CLASS &&
-             in_lifecycle_of(c, home)) &&
-           !(f->guard_class != NULL && in_lifecycle_of(c, f->guard_class));
+    return (home != NULL && home->kind == TYPE_CLASS &&
+            in_lifecycle_of(c, home)) ||
+           (f->guard_class != NULL && in_lifecycle_of(c, f->guard_class));
 }
 
 /* The access of a guarded field that the place e lies in, with the
@@ -302,56 +302,156 @@ static const struct expr *guarded_access(const struct expr *e,
     return NULL;
 }
 
+/* The access of the guarded field that the value e points into, with
+   the field in *field, or NULL: `&` of a place in the field, a slice of
+   it, the `ptr` of one, and any of them converted with `as`. */
+static const struct expr *guarded_target(const struct expr *e,
+                                         const struct struct_field **field)
+{
+    switch (e->kind) {
+    case EXPR_UNARY:
+        return e->as.unary.op == TOKEN_AMP
+                   ? guarded_access(e->as.unary.operand, field) : NULL;
+    case EXPR_SLICE:
+        return guarded_access(e->as.slice.base, field);
+    case EXPR_CAST:
+        return guarded_target(e->as.cast.operand, field);
+    case EXPR_FIELD:
+        if (sema_name_is(&e->as.field.name, "ptr") &&
+            e->as.field.base->type != NULL &&
+            (e->as.field.base->type->kind == TYPE_SLICE ||
+             e->as.field.base->type->kind == TYPE_ARRAY)) {
+            const struct expr *at = guarded_target(e->as.field.base, field);
+            return at != NULL ? at : guarded_access(e->as.field.base, field);
+        }
+        return NULL;
+    default:
+        return NULL;
+    }
+}
+
+/* Record that the loop s opens, and count it. */
+void sema_loop_opens(struct checker *c, const struct stmt *s)
+{
+    if (c->loop_depth >= 0 && c->loop_depth < LOOPS_OPEN_MAX) {
+        c->loops_open[c->loop_depth] = s;
+    }
+    c->loop_depth++;
+}
+
+/* The loop that began first after the declaration of sym and is open
+   now, or NULL: the one whose next turn runs the code before the
+   statement checked now with the value sym has here. */
+static const struct stmt *loop_around(const struct checker *c,
+                                      const struct symbol *sym)
+{
+    if (sym->frame != c->ctx.function || sym->loops < 0 ||
+        sym->loops >= LOOPS_OPEN_MAX || c->loop_depth <= sym->loops) {
+        return NULL;
+    }
+    return c->loops_open[sym->loops];
+}
+
+static void refuse_guarded_pointer(struct checker *c, struct pos pos,
+                                   const struct symbol *sym,
+                                   const char *when)
+{
+    const struct struct_field *f = sym->guarded_field;
+
+    sema_check_at(c, NAME_UNGUARDED_FIELD, pos,
+                  "`%.*s` points at `%.*s`%s, which is guarded by `%.*s`, "
+                  "and no `sync` holds it here", (int)sym->name.length,
+                  sym->name.text, (int)f->name.length, f->name.text, when,
+                  (int)f->guard.length, f->guard.text);
+}
+
 /* DESIGN: a pointer to a guarded field reaches the field without its
-   lock, so it is used where a `sync` holds that lock and nowhere else,
-   by R092 of "Rules of 2026-10-13". The checker follows the pointer
-   through the variable that holds it: `&` of a place in a guarded field,
-   taken inside its `sync` by a `let` or a `=`, and a copy of such a
-   variable. A `=` of any other value ends it. A pointer taken in
-   `construct` or `destruct` outside a `sync` is free, as the field is
-   there. The record is one per variable and follows no path, so a
-   branch that names another place frees the variable for the code after
-   it. */
+   lock, so it is used inside the `sync` block that took it and nowhere
+   after it, by R092 of "Rules of 2026-10-13". The lock that block holds
+   is the one of the object the pointer leads into, whatever the names of
+   the place hold later, so a later block on the same place does not
+   count. The checker follows the pointer through the variable that
+   holds it: a `let` or a `=` gives it `&` of a place in the field, a
+   slice of it, its `ptr`, or a copy of a variable that holds one.
+
+   The record is one per variable. A `=` of another value ends it where
+   the `=` stands in the block that declares the variable and so runs on
+   every path. One in a block inside it leaves the record. A use that
+   stands before the `sync` in a loop runs after the block in the next
+   turn, so the first use of the variable outside every `sync` of a loop
+   is kept and refused once a `sync` of that loop gives it the pointer.
+
+   A pointer taken where no `sync` holds the lock is not followed: in
+   `construct` and `destruct` the field is free, and anywhere else the
+   reach of the field is refused already. A pointer inside a struct, a
+   tuple, a field or a result is not followed either. */
 void sema_note_guarded_pointer(struct checker *c, struct symbol *sym,
                                const struct expr *value)
 {
     const struct struct_field *f = NULL;
-    const struct expr *at = NULL;
+    const struct expr *sync = NULL;
+    const struct expr *at;
 
     if (sym == NULL) {
         return;
     }
-    if (value != NULL && value->kind == EXPR_UNARY &&
-        value->as.unary.op == TOKEN_AMP) {
-        at = guarded_access(value->as.unary.operand, &f);
-    } else if (value != NULL && value->kind == EXPR_NAME &&
-               value->symbol != NULL) {
-        at = value->symbol->guarded_place;
+    if (value != NULL && value->kind == EXPR_NAME && value->symbol != NULL) {
+        sync = value->symbol->guarded_sync;
         f = value->symbol->guarded_field;
+    } else if (value != NULL &&
+               (at = guarded_target(value, &f)) != NULL) {
+        const struct held_mutex *h = guard_holder(c, at, f);
+        sync = h != NULL ? h->mutex : NULL;
     }
-    if (at != NULL && !guard_held(c, at, f)) {
-        at = NULL;
+    if (sync == NULL) {
+        /* The block of a function body stands one block inside its
+           parameters. */
+        int declared = sym->depth + (sym->kind == SYMBOL_PARAM ? 1 : 0);
+        if (c->ctx.scope != NULL && c->ctx.scope->depth <= declared &&
+            c->deferring == 0 && sym->frame == c->ctx.function) {
+            sym->guarded_sync = NULL;
+            sym->guarded_field = NULL;
+        }
+        return;
     }
-    sym->guarded_place = at;
-    sym->guarded_field = at != NULL ? f : NULL;
+    sym->guarded_sync = sync;
+    sym->guarded_field = f;
+    if (sym->free_loop != NULL && sym->free_loop == loop_around(c, sym) &&
+        !guard_free(c, f)) {
+        refuse_guarded_pointer(c, sym->free_use, sym,
+                               " in the next turn of the loop");
+    }
 }
 
 /* Refuse the use e of the variable sym where it holds a pointer to a
-   guarded field and no `sync` holds the lock. */
+   guarded field outside the `sync` block that took it. A use of a
+   variable that holds none, outside every `sync` of a loop, is kept for
+   sema_note_guarded_pointer. */
 void sema_check_guarded_pointer(struct checker *c, const struct expr *e,
-                                const struct symbol *sym)
+                                struct symbol *sym)
 {
-    const struct struct_field *f = sym->guarded_field;
+    const struct held_mutex *h;
 
-    if (sym->guarded_place == NULL || c->assigned == e ||
-        !guard_missing(c, sym->guarded_place, f)) {
+    if (c->assigned == e) {
         return;
     }
-    sema_check_at(c, NAME_UNGUARDED_FIELD, e->pos,
-                  "`%.*s` points at `%.*s`, which is guarded by `%.*s`, and "
-                  "no `sync` holds it here", (int)sym->name.length,
-                  sym->name.text, (int)f->name.length, f->name.text,
-                  (int)f->guard.length, f->guard.text);
+    if (sym->guarded_sync == NULL) {
+        const struct stmt *loop = loop_around(c, sym);
+        if (loop != NULL && c->held == c->held_outside &&
+            sym->free_loop != loop) {
+            sym->free_loop = loop;
+            sym->free_use = e->pos;
+        }
+        return;
+    }
+    for (h = c->held; h != c->held_outside; h = h->outer) {
+        if (h->mutex == sym->guarded_sync) {
+            return;
+        }
+    }
+    if (!guard_free(c, sym->guarded_field)) {
+        refuse_guarded_pointer(c, e->pos, sym, "");
+    }
 }
 
 /* DESIGN: a field of a synchronized class is reached by the functions of
@@ -377,7 +477,8 @@ bool sema_check_reach(struct checker *c, const struct expr *e,
                       (int)f->name.length, f->name.text, sema_tn(home));
         return false;
     }
-    if (guard_missing(c, e, f)) {
+    if (f->guard.length > 0 && guard_holder(c, e, f) == NULL &&
+        !guard_free(c, f)) {
         sema_check_at(c, NAME_UNGUARDED_FIELD, e->pos,
                       "`%.*s` is guarded by `%.*s`, and no `sync` holds it "
                       "here", (int)f->name.length, f->name.text,
