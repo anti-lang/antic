@@ -783,11 +783,11 @@ static bool const_binary(struct checker *c, struct expr *e,
     if (!sema_eval_const(c, e->as.binary.left, &a)) {
         return false;
     }
-    /* A constant pointer is `none`, so `??` gives its right side. */
+    /* `??` is not among the forms of a constant expression, which the
+       entry on `const` under "Declarations and statements" in
+       docs/decisions.md lists, whatever its left side holds. */
     if (op == TOKEN_QUESTION_QUESTION) {
-        return a.kind == CONST_NULL
-                   ? sema_eval_const(c, e->as.binary.right, out)
-                   : fail_const(c, e, "`??`");
+        return fail_const(c, e, "`??`");
     }
     if (op == TOKEN_AND_AND || op == TOKEN_OR_OR) {
         if (a.kind != CONST_SYMBOLIC &&
@@ -1266,6 +1266,70 @@ static void const_deps_of(struct chain_deps *d, const struct expr *e)
         return;
     default:
         return;
+    }
+}
+
+/* DESIGN: the default of a field of a class is a constant expression,
+   and the checker reads it before it declares the types of functions. A
+   call there finds no type yet and gives no message, so the walk refuses
+   it first, with the message of the evaluator. `??` is refused at its
+   place once its left side holds no call. */
+bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e)
+{
+    size_t i;
+
+    if (e == NULL) {
+        return false;
+    }
+    switch (e->kind) {
+    case EXPR_CALL:
+    case EXPR_FREE:
+    case EXPR_OBJECT:
+    case EXPR_ATOMIC:
+        return !fail_const(c, e, "a call");
+    case EXPR_FIELD:
+        return sema_refuse_runtime_parts(c, e->as.field.base);
+    case EXPR_UNARY:
+        return sema_refuse_runtime_parts(c, e->as.unary.operand);
+    case EXPR_BINARY:
+        if (sema_refuse_runtime_parts(c, e->as.binary.left)) {
+            return true;
+        }
+        if (e->as.binary.op == TOKEN_QUESTION_QUESTION) {
+            return !fail_const(c, e, "`??`");
+        }
+        return sema_refuse_runtime_parts(c, e->as.binary.right);
+    case EXPR_CAST:
+        return sema_refuse_runtime_parts(c, e->as.cast.operand);
+    case EXPR_INDEX:
+        return sema_refuse_runtime_parts(c, e->as.index.base) ||
+               sema_refuse_runtime_parts(c, e->as.index.index);
+    case EXPR_ARRAY_LIT:
+        for (i = 0; i < e->as.array_lit.count; i++) {
+            if (sema_refuse_runtime_parts(c, e->as.array_lit.elements[i])) {
+                return true;
+            }
+        }
+        return false;
+    case EXPR_TUPLE:
+        for (i = 0; i < e->as.tuple.count; i++) {
+            if (sema_refuse_runtime_parts(c, e->as.tuple.elements[i])) {
+                return true;
+            }
+        }
+        return false;
+    case EXPR_ARRAY_REPEAT:
+        return sema_refuse_runtime_parts(c, e->as.array_repeat.value);
+    case EXPR_STRUCT_LIT:
+        for (i = 0; i < e->as.struct_lit.field_count; i++) {
+            if (sema_refuse_runtime_parts(c,
+                                          e->as.struct_lit.fields[i].value)) {
+                return true;
+            }
+        }
+        return false;
+    default:
+        return false;
     }
 }
 

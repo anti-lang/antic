@@ -2573,7 +2573,8 @@ static void declare_fields(struct checker *c, struct item *it)
     for (j = 0; j < it->param_count; j++) {
         struct const_value *v;
         struct context sized;
-        if (it->params[j].value == NULL) {
+        if (it->params[j].value == NULL ||
+            sema_refuse_runtime_parts(c, it->params[j].value)) {
             continue;
         }
         sema_enter_sized(c, &sized);

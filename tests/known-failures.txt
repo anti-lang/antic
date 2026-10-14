@@ -86,8 +86,6 @@ matrix_types_if_let_on_a_pointer_to_a_variant_refused T024 An if let on a pointe
 fmt_alias_of_function T025 anti fmt moves the functions after a type alias of a function type.
 matrix_types_is_case_on_a_number_refused T026 is with a case on a value that is no variant names a module that is not there.
 matrix_types_enum_unknown_value_refused T027 An unknown value of an enum is refused as a function.
-matrix_ownership_none_or_of_none_at_module_level_refused T028 `??` whose left side is `none` compiles as the value of a constant.
-matrix_ownership_none_or_of_a_call_as_a_field_default_refused T028 antic crashes on `??` with a call on its left as the default of a field.
 generic_atomic_modules_release T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 generic_atomic_modules_dev T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 qualified_arguments_modules_release T030 A class built with arguments under the name of its module is refused as a type.
@@ -237,7 +235,6 @@ matrix_classes_identity_of_an_interface_pointer_memory_checks T083 `==` on a poi
 matrix_classes_qualified_body_in_a_nested_class_dev T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
 matrix_classes_qualified_body_in_a_nested_class_release T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
 matrix_classes_qualified_body_in_a_nested_class_memory_checks T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
-matrix_classes_call_as_the_default_of_a_field_refused T028 A call as the default of a field is not refused, and antic crashes on it.
 generic_class_constant_modules_release T029 The library file of a generic function that reads a constant of a class cannot be read.
 generic_class_constant_modules_dev T029 The library file of a generic function that reads a constant of a class cannot be read.
 optional_default_modules_release T085 The library file of a class with a field `?int = none` cannot be read.
@@ -302,8 +299,6 @@ matrix_classes_injected_logger_never_called_release T104 A program with an injec
 matrix_classes_injected_logger_never_called_memory_checks T104 A program with an injected `log.Logger` that it never calls fails at the link.
 matrix_classes_equal_with_a_union_in_a_tuple_field_refused T105 A class whose tuple field holds a union gets a default `==`.
 matrix_classes_base_with_an_unknown_type_argument_refused T096 A class whose base is refused gets two more messages on its function and on the base.
-matrix_values_constant_class_literal_with_a_call_in_a_field_refused T106 antic crashes on a field default that is a class literal with a call in a field.
-matrix_values_constant_class_literal_with_a_call_in_a_base_field_refused T106 antic crashes on a field default that is a class literal with a call in a field of its base.
 matrix_types_generic_length_with_a_negated_constant_dev T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
 matrix_types_generic_length_with_a_negated_constant_release T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
 matrix_types_generic_length_with_a_negated_constant_memory_checks T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.

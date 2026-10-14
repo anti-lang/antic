@@ -543,6 +543,9 @@ bool sema_bitfield_constant(struct checker *c, struct expr *value,
                             const struct struct_field *field);
 bool sema_eval_const(struct checker *c, struct expr *e,
                      struct const_value *out);
+/* Refuse the first call or `??` in e, a constant expression, in the order
+   the evaluator meets them. True when it refused. */
+bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e);
 bool sema_const_symbol(struct checker *c, struct symbol *sym,
                        struct pos use);
 
