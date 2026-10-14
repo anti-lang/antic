@@ -898,11 +898,12 @@ static bool lock_module_valid(const char *path, const char *module,
     return true;
 }
 
-/* Read the lock file into a graph. A file that is not there, or that no
-   longer reads, gives an empty graph and is no error. A file that holds
-   a string that is not the grammar of its kind reads as none, with a
-   message naming it. */
-static void lock_read(const char *path, struct dep_graph *out)
+/* Read the lock file into a graph. A file that is not there gives an
+   empty graph and is no error. A file that holds a string that is not the
+   grammar of its kind reads as none, with a message naming it. A file
+   that is no TOML is an error that names it, by R167 of "Rules of
+   2026-10-13", and gives false. */
+static bool lock_read(const char *path, struct dep_graph *out)
 {
     struct text bytes = {0};
     struct anti_toml *doc;
@@ -912,13 +913,14 @@ static void lock_read(const char *path, struct dep_graph *out)
     memset(out, 0, sizeof *out);
     if (!files_read(path, &bytes)) {
         text_free(&bytes);
-        return;
+        return true;
     }
     doc = anti_rt_toml_read((const unsigned char *)bytes.data,
                             (int64_t)bytes.length);
     text_free(&bytes);
     if (doc == NULL) {
-        return;
+        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
+        return false;
     }
     for (i = 0;; i++) {
         const char *name = value_at(doc, "package", i, ".name");
@@ -965,6 +967,7 @@ static void lock_read(const char *path, struct dep_graph *out)
         }
     }
     anti_rt_toml_free(doc);
+    return true;
 }
 
 /* Append `key = "value"` to out. M13: the TOML that anti reads takes no
@@ -1039,8 +1042,10 @@ static bool lock_write(const char *path, const struct dep_graph *g)
 /* Whether the locked graph answers the manifest. Every dependency of a
    repository stands in it, with a version its constraint takes and the
    repository it names. A dependency of a path is read from disk on
-   every build, so the lock does not answer for one. */
-static bool lock_answers(const struct manifest *m, const struct dep_graph *g)
+   every build, so the lock does not answer for one, unless paths is
+   false, which asks about the dependencies of a repository alone. */
+static bool lock_answers(const struct manifest *m, const struct dep_graph *g,
+                         bool paths)
 {
     size_t i;
 
@@ -1052,7 +1057,10 @@ static bool lock_answers(const struct manifest *m, const struct dep_graph *g)
         const struct dep_package *p;
         size_t j;
         if (d->path.length > 0) {
-            return false;
+            if (paths) {
+                return false;
+            }
+            continue;
         }
         p = NULL;
         for (j = 0; j < g->count; j++) {
@@ -1156,8 +1164,10 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
     r.path_of = path_of;
     r.context = context;
     text_appendf(&lock_path, "%s/%s", root, LOCK_FILE);
-    lock_read(text_cstr(&lock_path), &locked);
-    if (lock_answers(m, &locked)) {
+    if (!lock_read(text_cstr(&lock_path), &locked)) {
+        goto done;
+    }
+    if (lock_answers(m, &locked, true)) {
         /* The lock file answers, so the indexes are not read at all. A
            project with no dependency still gets one, because the file is
            what `anti build` writes beside the manifest. */
@@ -1167,6 +1177,13 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
              (files_exists(text_cstr(&lock_path)) ||
               lock_write(text_cstr(&lock_path), out));
         goto done;
+    }
+    /* R167 of "Rules of 2026-10-13": a lock whose entries no longer
+       answer a dependency of a repository says so. One whose project has
+       a path dependency is read again on every build, which is no news. */
+    if (locked.count > 0 && !lock_answers(m, &locked, false)) {
+        fprintf(stderr, "anti: %s no longer answers the manifest, so the "
+                        "build writes it again\n", text_cstr(&lock_path));
     }
     for (i = 0; i < m->dependency_count; i++) {
         const struct manifest_dependency *d = &m->dependencies[i];

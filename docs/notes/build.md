@@ -69,6 +69,12 @@ developer's own and carry no version. A project with one therefore walks. That
 costs an index read per package of a repository, and an index is checked
 against its repository at most once an hour.
 
+A lock file can hold packages and no longer answer a dependency of a
+repository. It then gets the line `anti: ./anti.lock no longer answers the
+manifest, so the build writes it again`, and the build walks. A path dependency alone gives
+no line, since its project walks on every build. A lock file that is no TOML is
+an error that names it. Both are R167 of "Rules of 2026-10-13".
+
 The walk keeps one requirement per constraint and one pick per package. A round
 resolves every package that has no pick. It resolves one whose pick no longer
 satisfies every constraint on it as well. The walk ends when a round changes

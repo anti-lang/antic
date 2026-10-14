@@ -465,26 +465,29 @@ anti_message(lock_repository_with_a_quote
     ERR "anti: ./anti.lock names file:///re\"po, which is no repository URL, so ./anti.lock is not read"
         "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
-# A lock file that no longer answers the manifest is passed over without a
-# word, and the resolver asks the repository again.
+# R167 of "Rules of 2026-10-13" in docs/decisions.md: a lock file that no
+# longer answers the manifest gets one line that says the build writes it
+# again, and the resolver asks the repository.
+set(lock_again "anti: ./anti.lock no longer answers the manifest, so the build writes it again")
 anti_message(lock_of_another_version
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.1.0\"\nrepo = \"${repo_url}\"\nmodules = [\n    ${units_module},\n]\n"
     ARGS build --offline ${tools}
-    ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
+    ERR "${lock_again}"
+        "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
-# So is a lock file that is no TOML.
+# A lock file that is no TOML is an error that names it.
 anti_message(lock_that_is_no_toml
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           anti.lock "][\n"
     ARGS build --offline ${tools}
-    ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
-        "${no_version}")
+    ERR "anti: ./anti.lock is no TOML that anti reads")
 anti_message(lock_of_another_repository
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.2.0\"\nrepo = \"file:///elsewhere\"\nmodules = [\n    ${units_module},\n]\n"
     ARGS build --offline ${tools}
-    ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
+    ERR "${lock_again}"
+        "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
 # R166 of "Rules of 2026-10-13" in docs/decisions.md: the manifest reader
 # refuses a path dependency whose path holds a control byte, before
