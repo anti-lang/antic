@@ -71,6 +71,7 @@ class Texture
 
 	concrete fn copied(self, from: *Object)
 	{
+		Texture.live.add(1);
 		Texture.copies.add(1);
 	}
 
@@ -141,8 +142,8 @@ fn main() -> int
 
 ```text output
 alloc: live 1, copies 0, in flight 0
-dup: live 1, copies 1, in flight 0
-a value in a block: live 2, copies 1, in flight 0
+dup: live 2, copies 1, in flight 0
+a value in a block: live 3, copies 1, in flight 0
 after the block: live 2, copies 1, in flight 0
 dispatch: live 2, copies 1, in flight 1
 join: live 2, copies 1, in flight 0
@@ -150,7 +151,7 @@ delete: live 0, copies 1, in flight 0
 sizes: Texture 16, Plain 16
 ```
 
-The count of `created` and `destroyed` alone does not balance here. The copy of `dup` is destroyed without having been created, and the value in the block is created without being destroyed, since `Texture` has no teardown. A count of live objects adds `copied` to `created`, and the stock `LeakTracker` of the next section does.
+A count of live objects adds `copied` to `created`, since the copy of `dup` runs `copied` and no `created`. The stock `LeakTracker` of the next section counts the same way. The value in the block is destroyed at its end, because `Texture` replaces `destroyed` and so has a teardown.
 
 The five hooks add no field: a `Texture` with five hooks is 16 bytes, as a `Plain` with none.
 
