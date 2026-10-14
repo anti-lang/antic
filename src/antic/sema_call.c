@@ -706,6 +706,41 @@ static bool descends_or_copies(const struct type *a, const struct type *b)
 
 static bool method_call(struct checker *c, struct expr *call);
 
+/* The class of the chain of t whose library file names name among its
+   private functions, NULL for none. */
+static const struct type *private_owner(const struct type *t,
+                                        const struct name *name)
+{
+    const struct type *level;
+    size_t i;
+
+    for (level = t; level != NULL;
+         level = level->kind == TYPE_CLASS ? level->base : NULL) {
+        for (i = 0; i < level->private_fn_count; i++) {
+            if (sema_same_name(&level->private_fns[i], name)) {
+                return level;
+            }
+        }
+    }
+    return NULL;
+}
+
+/* Reports name as private to the class of the chain of t that hides
+   it, by R139. Returns false where no class of another module does. */
+static bool private_of_library(struct checker *c, struct pos pos,
+                               const struct type *t,
+                               const struct name *name)
+{
+    const struct type *owner = private_owner(t, name);
+
+    if (owner == NULL) {
+        return false;
+    }
+    sema_error_at(c, pos, "`%.*s` is private to `%s`", (int)name->length,
+                  name->text, sema_tn(owner));
+    return true;
+}
+
 /* v.f(args) where the module declares no function f that takes the
    struct s of v first. A field of s that promotes f takes the call,
    and otherwise it is refused. Returns false after reporting an error. */
@@ -736,6 +771,9 @@ static bool no_method_call(struct checker *c, struct expr *call,
                       hidden->vis == VIS_PROTECTED ? "protected in"
                                                    : "private to",
                       sema_tn(owner != NULL ? owner : s));
+        return false;
+    }
+    if (private_of_library(c, field->pos, s, &field->as.field.name)) {
         return false;
     }
     sema_error_at(c, field->pos, "`%s` has no function `%.*s`", sema_tn(s),
@@ -2282,8 +2320,10 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (m == NULL) {
-        sema_error_at(c, e->pos, "`%s` has no function `%.*s`", sema_tn(t),
-                      (int)name->length, name->text);
+        if (!private_of_library(c, e->pos, t, name)) {
+            sema_error_at(c, e->pos, "`%s` has no function `%.*s`",
+                          sema_tn(t), (int)name->length, name->text);
+        }
         return sema_builtin(c, TYPE_ERROR);
     }
     if (m->symbol == NULL) {

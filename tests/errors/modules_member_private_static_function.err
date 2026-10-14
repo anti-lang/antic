@@ -1,0 +1,1 @@
+modules_member_private_static_function.anti:8:10: error: `charge` is private to `Account`

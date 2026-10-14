@@ -90,6 +90,29 @@ static size_t public_members(const struct type *t)
     return count;
 }
 
+/* Whether m is a private function of the body of t that the record
+   of t leaves out. */
+static bool is_private_member(const struct type *t, const struct item *m)
+{
+    return m->kind == ITEM_FN && m->vis == VIS_PRIVATE &&
+           !carried_member(t, m);
+}
+
+/* The count of the functions of the body of t that is_private_member
+   names. */
+static size_t private_members(const struct type *t)
+{
+    size_t count = 0;
+    size_t i;
+
+    for (i = 0; t->generic == NULL && i < t->member_count; i++) {
+        if (is_private_member(t, t->members[i])) {
+            count++;
+        }
+    }
+    return count;
+}
+
 static uint8_t struct_form(const struct type *t)
 {
     return t->generic != NULL          ? ANTL_FORM_COPY
@@ -561,6 +584,17 @@ static void put_type(struct writer *w, const struct type *t)
                                                ? &m->symbol->params[j]
                                                : &m->params[j].name;
                     antl_put_bytes(w, n->text, n->length);
+                }
+            }
+            /* DESIGN: by R139 a call of a private function of a class
+               of another module is reported as private. The name of
+               each private function the record leaves out travels
+               alone, without its type or its symbol. */
+            antl_put_count(w, private_members(t));
+            for (i = 0; t->generic == NULL && i < t->member_count; i++) {
+                const struct item *m = t->members[i];
+                if (is_private_member(t, m)) {
+                    antl_put_bytes(w, m->name.text, m->name.length);
                 }
             }
             if (t->type_param_count > 0) {

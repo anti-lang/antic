@@ -724,6 +724,12 @@ static void read_members(struct reader *r, struct field_refs *s)
         sym->doc = m->doc;
         s->members[j] = m;
     }
+    s->s->private_fn_count = antl_get_count(r, 1);
+    s->s->private_fns = antl_allocate(r, s->s->private_fn_count,
+                                      sizeof *s->s->private_fns);
+    for (j = 0; j < s->s->private_fn_count && !r->failed; j++) {
+        s->s->private_fns[j] = antl_get_name(r);
+    }
 }
 
 /* The marks of the struct t: its flags, its thread safety, the version

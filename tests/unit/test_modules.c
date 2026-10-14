@@ -320,7 +320,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 83, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 84, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1628,9 +1628,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 84;
+    copy[4] = 85;
     refuses_file(copy, sizeof copy,
-                 "has format version 84, and antic reads version 83");
+                 "has format version 85, and antic reads version 84");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -2708,7 +2708,8 @@ static void struct_chain(struct text *b, uint32_t n, bool forward)
         put_u8(b, 0);
         put_str(b, "");
         put_str(b, "");
-        put_u32(b, 0);
+        put_u32(b, 0);                  /* no functions */
+        put_u32(b, 0);                  /* no private functions */
     }
     /* No field has a default value. */
     for (k = 0; k < n; k++) {

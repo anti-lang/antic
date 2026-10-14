@@ -1,1 +1,1 @@
-modules_member_private_function_from_a_class_below.anti:10:10: error: `Savings` has no function `fee`
+modules_member_private_function_from_a_class_below.anti:10:10: error: `fee` is private to `Account`

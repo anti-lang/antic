@@ -1,1 +1,1 @@
-modules_member_private_function.anti:9:10: error: `Account` has no function `fee`
+modules_member_private_function.anti:9:10: error: `fee` is private to `Account`

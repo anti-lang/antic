@@ -4412,6 +4412,7 @@ foreach(case
         "modules_member_private_field_in_a_literal|levels|"
         "modules_member_private_function|levels|"
         "modules_member_private_function_from_a_class_below|levels|"
+        "modules_member_private_static_function|levels|"
         "modules_member_protected_field|levels|"
         "modules_member_protected_field_in_a_literal|levels|"
         "modules_member_protected_field_of_another_class|levels|"

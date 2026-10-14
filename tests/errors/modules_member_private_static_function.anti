@@ -1,0 +1,10 @@
+//! A private static function of a class of a library is not called from a
+//! function of another module, and the message says that it is private.
+
+import com.example.levels;
+
+fn main() -> int
+{
+	let n = levels.Account.charge();
+	return 0;
+}

@@ -204,7 +204,7 @@ pub class Account
 
 	fn fee(self) -> int
 	{
-		return self.secret;
+		return self.secret + Account.charge();
 	}
 
 	pub fn make(id: int) -> Account
@@ -215,6 +215,11 @@ pub class Account
 	protected fn rate() -> int
 	{
 		return 3;
+	}
+
+	fn charge() -> int
+	{
+		return 0;
 	}
 }
 

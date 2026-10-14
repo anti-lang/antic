@@ -221,6 +221,11 @@ struct type {
        abstract function is reached through a pointer of two words. */
     struct item **members;
     size_t member_count;
+    /* The names of the private functions of a class of another module,
+       which its library file carries without their bodies, so that a
+       call of one is reported as private. */
+    struct name *private_fns;
+    size_t private_fn_count;
     struct type *base;              /* TYPE_ENUM: the underlying integer,
                                        TYPE_CLASS: the class it inherits */
     bool has_abstract;              /* TYPE_CLASS: an open function */
