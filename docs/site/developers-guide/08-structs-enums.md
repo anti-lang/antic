@@ -557,6 +557,11 @@ kind 15, mode 2, mid -3 -11, high 1000, halves 2 1, byte 2
 sizes: Header 8, Bits 8, Wide 4, Word 8, Odd 3
 ```
 
+```text output windows
+kind 15, mode 2, mid -3 -11, high 1000, halves 2 1, byte 2
+sizes: Header 8, Bits 8, Wide 6, Word 8, Odd 3
+```
+
 `h.kind = 15` is the largest value of four bits, and `h.kind = 16` is refused with `` `16` does not fit the 4 bits of `kind` ``. `set_mid(&b, -11)` stores the five bits `10101`. A dev build stops `set_mid(&b, 21)`, whose five low bits are the same, with `value out of range for the 5 bits of mid: value 21`. `Bits` holds 33 bits: the first three fields fill one `u32`, and `last` starts a second one.
 
 The checker refuses each of the following.

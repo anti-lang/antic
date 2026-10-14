@@ -57,6 +57,10 @@
 #       mode, runs it and compares what it printed with the `text output`
 #       block, or with a bare `text` block, which the overview writes, or
 #       with nothing when neither follows. The program exits with 0.
+#   ```text output windows
+#       right after the `text output` block holds what the program prints
+#       on Windows, where it differs. A Windows host compares that block
+#       and every other host the first one.
 #   ```llvm excerpt=<id> target=<target> mode=<dev|release>
 #   ```asm excerpt=<id> target=<target> mode=<dev|release>
 #       holds up to 20 lines of what antic writes for the named block,
@@ -498,10 +502,15 @@ foreach(document IN LISTS documents)
     set(context "")
     set(block "")
     set(block_line 0)
-    # The program of the last block, which waits for the `text` block that
-    # holds its output, and that output.
+    # The program of the last block, which waits for the `text` blocks
+    # that hold its output, and that output. pending_wanted holds the
+    # output this host compares, and output_host the host of the block
+    # being read, empty for the block of every host.
     set(pending_module "")
     set(pending_exe "")
+    set(pending_output FALSE)
+    set(pending_wanted "")
+    set(output_host "")
     set(wanted "")
     # The header of the excerpt being read.
     set(excerpt_kind "")
@@ -515,8 +524,12 @@ foreach(document IN LISTS documents)
             if(line STREQUAL "```")
                 set(state outside)
                 restore(wanted "${wanted}")
-                run_program("${pending_module}" "${pending_exe}" "${wanted}")
-                set(pending_module "")
+                # The program runs at the next line that is no block of
+                # its output.
+                if(output_host STREQUAL "" OR CMAKE_HOST_WIN32)
+                    set(pending_wanted "${wanted}")
+                endif()
+                set(pending_output TRUE)
                 set(wanted "")
             else()
                 string(APPEND wanted "${line}\n")
@@ -561,12 +574,20 @@ foreach(document IN LISTS documents)
         if(state STREQUAL "outside" AND NOT pending_module STREQUAL "")
             if(line STREQUAL "")
                 continue()
-            elseif(line MATCHES "^```text( output)?$")
+            elseif(NOT pending_output AND line MATCHES "^```text( output)?$")
                 set(state output)
                 continue()
+            elseif(pending_output AND output_host STREQUAL "" AND
+                   line STREQUAL "```text output windows")
+                set(state output)
+                set(output_host windows)
+                continue()
             endif()
-            run_program("${pending_module}" "${pending_exe}" "")
+            run_program("${pending_module}" "${pending_exe}" "${pending_wanted}")
             set(pending_module "")
+            set(pending_output FALSE)
+            set(pending_wanted "")
+            set(output_host "")
         endif()
         if(state STREQUAL "context")
             if(line STREQUAL "-->")
@@ -723,7 +744,7 @@ foreach(document IN LISTS documents)
         endif()
     endforeach()
     if(NOT pending_module STREQUAL "")
-        run_program("${pending_module}" "${pending_exe}" "")
+        run_program("${pending_module}" "${pending_exe}" "${pending_wanted}")
     endif()
     if(NOT context_line EQUAL 0)
         message(FATAL_ERROR
