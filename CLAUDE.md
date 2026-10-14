@@ -192,6 +192,11 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
   `ctest -I 2251,4908`: `asan` 281 s, 382 s and 352 s, `ubsan` 253 s,
   376 s and 278 s.
+  The step of the messages and the options of antic measured `host` as
+  `ctest -I 1,2000` and `ctest -I 2001,4924`: 380 s and 137 s. It ran each
+  sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
+  `ctest -I 2251,4922`: `asan` 275 s, 381 s and 349 s, `ubsan` 256 s,
+  360 s and 271 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -735,10 +740,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4910 ctest tests pass on the development Mac, and two of them, the
+- 4924 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   374 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4908 each with the same skips, without
+  The ASan and the UBSan builds run 4922 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
@@ -816,6 +821,17 @@ reports what it finished.
   beside the wrong kind of library are refused. The load of a plugin that
   lacks a module names it.
   `docs/reports/2026-10-14-rules-modules.md` reports the step.
+- The rules of the messages and the options of antic are built, R136 to
+  R154 and R190 to R197. A message names `uint`, `i64`, `u8` and `f64`
+  in a file that writes them. A call of an enum value, `destroy` of a
+  value and a private function of a class of a library get messages of
+  their own. A boundary or a lookahead after a repeat passes the check
+  `exponential-pattern`. The usage lists every option, `--dev
+  --no-asserts` drops the text of an assertion, and the module path comes
+  from normalised paths. `--soname` beside `--lib static` is refused, a
+  library of macOS has the install name `@rpath/<file name>`, and the link
+  of a Windows library is reproducible.
+  `docs/reports/2026-10-14-rules-messages.md` reports the step.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A
