@@ -562,7 +562,7 @@ sizes: Header 8, Bits 8, Wide 4, Word 8, Odd 3
 The checker refuses each of the following.
 
 ```anti refused
-//! error: a bitfield of `byte` has 1 to 8 bits
+//! error: a bitfield of `u8` has 1 to 8 bits
 struct Flags { kind: u8 : 9 }
 ```
 
@@ -840,7 +840,7 @@ simd struct Three { x: f32, y: f32, z: f32 }
 ```
 
 ```anti refused
-//! error: every lane of `simd struct` `Mixed` is `f32`, and `y` is `float`
+//! error: every lane of `simd struct` `Mixed` is `f32`, and `y` is `f64`
 simd struct Mixed { x: f32, y: f64 }
 ```
 
@@ -1143,7 +1143,7 @@ fn sides(k: Kind) -> int
 ```
 
 ```anti refused
-//! error: `300` does not fit `byte`
+//! error: `300` does not fit `u8`
 enum Mode: u8 { Read = 300 }
 ```
 

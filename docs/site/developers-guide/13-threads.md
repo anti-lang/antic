@@ -1251,7 +1251,7 @@ fn next(s: *Stats) -> int
 ```
 
 ```anti refused
-//! error: an atomic local holds an integer, a `bool`, a `char` or a pointer, found `float`
+//! error: an atomic local holds an integer, a `bool`, a `char` or a pointer, found `f64`
 fn run()
 {
 	let n: atomic f64 = 0.0;

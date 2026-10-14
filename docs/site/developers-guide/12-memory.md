@@ -147,7 +147,7 @@ fn before(p: *int, q: *int) -> bool
 ```
 
 ```anti refused
-//! error: the operands of `==` have the types `*int` and `*float`
+//! error: the operands of `==` have the types `*int` and `*f64`
 fn same(p: *int, q: *f64) -> bool
 {
 	return p == q;
@@ -181,7 +181,7 @@ fn read(n: int) -> int
 ```
 
 ```anti refused
-//! error: expected `*float`, found `*int`
+//! error: expected `*f64`, found `*int`
 fn as_float(p: *int) -> *f64
 {
 	return p;

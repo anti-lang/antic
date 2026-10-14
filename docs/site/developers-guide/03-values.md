@@ -666,7 +666,7 @@ let b = a +% a;
 ```
 
 ```anti refused
-//! error: unary `-` needs a signed integer or a float, found `byte`
+//! error: unary `-` needs a signed integer or a float, found `u8`
 let u: u8 = 5;
 let v = -u;
 ```
@@ -924,7 +924,7 @@ The runtime computes the digits of a float from its exact value with integers an
 The checker refuses each of the following.
 
 ```anti refused
-//! error: expected `float`, found `f32`
+//! error: expected `f64`, found `f32`
 let f: f32 = 1.5;
 let g: f64 = f;
 ```
@@ -1548,7 +1548,7 @@ let a = [1, 2.0];
 ```
 
 ```anti refused
-//! error: expected `int`, found `byte`
+//! error: expected `int`, found `u8`
 fn is_less<T: Ordered>(a: T, b: T) -> bool { return a < b; }
 let small: u8 = 3;
 let n = is_less(4, small);
