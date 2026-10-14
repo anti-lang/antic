@@ -1,5 +1,7 @@
 //! A package with a licence, an attribution line and one function.
 
+allow(nothing-exported, "the static library of the tests carries the notice alone");
+
 /// The area of a rectangle of `w` by `h`.
 pub fn area(w: int, h: int) -> int
 {

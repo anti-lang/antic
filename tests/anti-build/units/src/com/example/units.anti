@@ -1,5 +1,7 @@
 //! A library project, whose build writes library files and no program.
 
+allow(nothing-exported, "the static library of the tests checks its dependencies alone");
+
 /// Twice `n`.
 pub fn twice(n: int) -> int
 {
