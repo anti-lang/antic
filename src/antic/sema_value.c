@@ -219,6 +219,14 @@ static void owns_reason(char *out, size_t size, const struct type *t)
         text_format(out, size, "%s", own_fields_phrase);
         return;
     }
+    /* An element of a tuple is named `_0` upwards inside the compiler,
+       and the program writes it as its number. */
+    if (t->kind == TYPE_TUPLE && f->name.length > 1 && f->name.text[0] == '_') {
+        text_format(out, size, "holds `%s` in `%.*s`, which %s",
+                    sema_tn(inner), (int)f->name.length - 1, f->name.text + 1,
+                    sub);
+        return;
+    }
     text_format(out, size, "holds `%s` in `%.*s`, which %s", sema_tn(inner),
                 (int)f->name.length, f->name.text, sub);
 }
