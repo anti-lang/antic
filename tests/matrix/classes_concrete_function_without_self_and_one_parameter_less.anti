@@ -1,5 +1,6 @@
-//! A `concrete fn` without `self` takes as many parameters as the abstract
-//! function it fills.
+//! An abstract function takes `self`, by R117 of the rules of 2026-10-13. One
+//! without it is refused where it is declared, before the parameters of the
+//! `concrete fn` that fills it are counted.
 
 abstract class Shape
 {

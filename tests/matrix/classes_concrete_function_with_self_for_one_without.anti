@@ -1,5 +1,6 @@
-//! A `concrete fn` takes no `self` where the abstract function it fills takes
-//! none.
+//! An abstract function takes `self`, by R117 of the rules of 2026-10-13. One
+//! without it is refused where it is declared, so no `concrete fn` fills it,
+//! with `self` or without.
 
 abstract class Shape
 {

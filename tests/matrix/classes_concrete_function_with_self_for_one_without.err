@@ -1,1 +1,1 @@
-classes_concrete_function_with_self_for_one_without.anti:13:14: error: `concrete fn sides` takes `self`, and `Shape.sides` does not
+classes_concrete_function_with_self_for_one_without.anti:7:14: error: `abstract fn sides` takes `self` as its first parameter

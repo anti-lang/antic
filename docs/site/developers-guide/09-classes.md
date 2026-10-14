@@ -686,7 +686,7 @@ A function of a class body takes `self`, a `*Class`, as its first parameter. A f
 
 - `pub fn` has an entry in the table of the class and is visible everywhere.
 - `fn` without a marker is private to the class, and `protected fn` reaches the classes below. Neither has a table entry, and both are called directly.
-- `abstract fn f(self) -> R;` has no body and is `pub`. A class with one is an `abstract class`.
+- `abstract fn f(self) -> R;` has no body and is `pub`. It takes `self`, since an object reaches it through its table. A class with one is an `abstract class`.
 - `concrete fn f(self)` replaces an inherited entry. The word is required: a function that matches an inherited one without it is refused, and so is a `concrete fn` that matches nothing.
 - `pub final fn` cannot be replaced, so every call of it is direct.
 - A function without `self` is static and is called as `Circle.unit()`.

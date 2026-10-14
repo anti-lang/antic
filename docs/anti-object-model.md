@@ -116,7 +116,7 @@ class Circle inherits Shape
 - `self` is the receiver, of type `*Class`, written as the first parameter. Fields are reached through `self.x`. A bare `x` in a function body is a local, a parameter or a module item, never a field.
 - A function without `self` is a static function, called as `Class.f(args)`.
 - `pub fn` has an entry in the class's table and is visible everywhere. `protected fn` and `fn` without a marker have no entry and are called directly. See [Visibility](#visibility).
-- `abstract fn f(self) -> R;` is a `pub` function without a body.
+- `abstract fn f(self) -> R;` is a `pub` function without a body. It takes `self`, and one without is refused.
 - `concrete fn` marks a function that replaces an inherited entry. See [Tables and dispatch](#tables-and-dispatch).
 - `final fn` forbids replacement in any derived class.
 - `operator fn` marks a function that an operator calls. See [Operators](#operators).

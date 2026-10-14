@@ -159,6 +159,11 @@ static bool same_signature(struct checker *c, const struct item *m,
         theirs->kind != TYPE_FN) {
         return true;
     }
+    /* An abstract function without `self` is refused where it is
+       declared, by R117, and no signature fills it. */
+    if (entry->contract == FN_ABSTRACT && !entry->has_self) {
+        return false;
+    }
     /* A function of a copy of a generic takes the arguments of the copy
        in place of the parameters. */
     theirs = sema_member_type(c, theirs, owner);
@@ -483,6 +488,13 @@ static void check_contracts(struct checker *c, const struct item *it,
             continue;
         }
         above = matched_above(t, m);
+        /* R117 of "Rules of 2026-10-13": an abstract function is an
+           entry of the table, which an object reaches through `self`. */
+        if (m->contract == FN_ABSTRACT && !m->has_self) {
+            sema_error_at(c, m->name_pos, "`abstract fn %.*s` takes `self` "
+                          "as its first parameter", (int)m->name.length,
+                          m->name.text);
+        }
         if (m->contract == FN_ABSTRACT) {
             continue;
         }
