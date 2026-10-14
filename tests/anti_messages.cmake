@@ -106,12 +106,14 @@ anti_message(sdk_import_sysroot_unknown
     ENV "XDG_DATA_HOME=${WORK}/data"
     ARGS sdk import bundle.tar.xz
     ERR "anti: the system does not say where anti is, so pass --sysroot")
-# The import cannot make the directory of a target, exits with 1 and
-# writes nothing. No document states a message for it.
+# R156 of "Rules of 2026-10-13" in docs/decisions.md: the import names
+# the path that is a file where the directory of a target belongs, and
+# exits with 1.
 anti_message(sdk_import_sysroot_is_a_file
     FILES bundle.tar.xz "A text where the bundle belongs.\n"
           sysroot "A file where the directory of the sysroots belongs.\n"
-    ARGS sdk import bundle.tar.xz --sysroot sysroot)
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: sysroot is a file where a directory belongs")
 # tar writes its own lines on the bundle before the one of anti.
 anti_message(sdk_import_no_bundle
     FILES bundle.tar.xz "A text where the bundle belongs.\n"

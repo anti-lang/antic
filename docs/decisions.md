@@ -2939,6 +2939,7 @@ The steps that built the rules filled these gaps by the gap procedure of `CLAUDE
 - [provisional] R152 passes `/Brepro` to lld-link alone. The link of a program and the platform linker keep their command lines. Reason: the rule names lld-link and the link of a library.
 - [provisional] R115 gives a class that replaces `destroyed` a teardown, so it follows the value rules of a class that owns something: `=` and `let` refuse a copy of an existing value, and `dup` copies. Reason: a type owns something when its teardown does anything, and the hook runs in the teardown.
 - [provisional] R155 reads `--help` and `-h` as the first word of anti, which prints the usage whatever follows. An option that takes a value and stands last gets `` anti: --target needs a value ``, the line antic writes, for every command. A word after such an option is its value, as before. Reason: the rule names the second word, and R143 gives antic the line.
+- [provisional] R156 names the first path from the top that is a file, with `` anti: ./dist is a file where a directory belongs ``, in the form the build writes its paths. A directory anti cannot make for another reason gives `` anti: cannot make <path> ``. Both hold for the directories of a target that `anti build` makes and for those `anti sdk import` makes. Reason: the rule names the path that is a file, and the message of `anti sdk import` that cannot make its stage reads so already.
 
 ## Open
 

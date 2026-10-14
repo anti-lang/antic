@@ -261,7 +261,7 @@ int sdk_import(const char *bundle, const char *sysroot)
         struct text dir = {0};
         bool ok;
         text_appendf(&dir, "%s/%s", sysroot, macos_targets[i]);
-        ok = files_make_dirs(text_cstr(&dir)) &&
+        ok = files_make_dirs_or_say(text_cstr(&dir)) &&
              unpack(bundle, text_cstr(&dir), digest);
         text_free(&dir);
         if (!ok) {

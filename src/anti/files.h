@@ -29,6 +29,11 @@ void *files_grow(void *items, size_t *room, size_t size);
 /* Make the directory path and every missing directory above it. */
 bool files_make_dirs(const char *path);
 
+/* files_make_dirs, which says why it failed on the standard error: the
+   path that is a file where a directory belongs, or the directory it
+   cannot make. R156 of "Rules of 2026-10-13". */
+bool files_make_dirs_or_say(const char *path);
+
 /* Remove path and everything below it. A path that does not exist is
    removed already. A symbolic link is removed, never followed. */
 bool files_remove_tree(const char *path);

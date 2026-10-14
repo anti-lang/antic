@@ -103,6 +103,39 @@ bool files_make_dirs(const char *path)
     return ok;
 }
 
+bool files_make_dirs_or_say(const char *path)
+{
+    struct text t = {0};
+    char separator;
+    char *p;
+    size_t i;
+
+    if (files_make_dirs(path)) {
+        return true;
+    }
+    text_append(&t, path);
+    p = t.data;
+    /* Each directory from the top down, the path itself the last. */
+    for (i = 1; i <= t.length; i++) {
+        if (i < t.length && ((p[i] != '/' && p[i] != '\\') ||
+                             p[i - 1] == ':')) {
+            continue;
+        }
+        separator = p[i];
+        p[i] = '\0';
+        if (platform_kind(p, true) == PLATFORM_FILE) {
+            fprintf(stderr, "anti: %s is a file where a directory belongs\n",
+                    p);
+            text_free(&t);
+            return false;
+        }
+        p[i] = separator;
+    }
+    fprintf(stderr, "anti: cannot make %s\n", path);
+    text_free(&t);
+    return false;
+}
+
 /* A link is removed and never followed, so the tree it leads to stays. */
 bool files_remove_tree(const char *path)
 {

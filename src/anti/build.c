@@ -841,8 +841,8 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
                  text_cstr(&b->m.dist), target_name(t), mode);
     text_appendf(&b->lib_dir, "%s/lib", text_cstr(&b->build_dir));
     text_appendf(&b->obj_dir, "%s/obj", text_cstr(&b->build_dir));
-    if (!files_make_dirs(text_cstr(&b->build_dir)) ||
-        !files_make_dirs(text_cstr(&b->dist_dir))) {
+    if (!files_make_dirs_or_say(text_cstr(&b->build_dir)) ||
+        !files_make_dirs_or_say(text_cstr(&b->dist_dir))) {
         goto done;
     }
     graph_libraries(b, &shared);
