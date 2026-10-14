@@ -63,6 +63,27 @@ for a `c_double`. A macro that is one enumerator
 becomes a constant of the enum. Every other macro is skipped with a
 warning.
 
+The macros `anti bind` skips, each with a warning, by R174 of "Rules of
+2026-10-13":
+
+- A macro that takes parameters, and one without a value, as an include
+  guard.
+- A text with an operator the evaluator does not take: `!`, `==`, `!=`, `<`,
+  `<=`, `>`, `>=`, `&&`, `||`, `?:`, `sizeof`, `defined` and the comma.
+- A text with a character literal, as `'a'`, or a cast to a type that is not
+  arithmetic.
+- A text with a name that is no macro bound before and no enumerator, and two
+  macros that name each other.
+- A value that C does not define or Anti cannot hold. A division by zero, a
+  shift by 64 or more and a float that leaves its range are such values. So
+  are a string in an operation and an integer literal past 64 bits.
+- A string literal with an escape other than the six of Anti, `\n`, `\t`,
+  `\r`, `\\`, `\"` and `\'`. That is `\0`, an octal escape, `\x`, `\u`,
+  `\U`, `\a`, `\b`, `\f`, `\v` and `\?`.
+
+`tests/bind/values.h` and `tests/bind/forms.h` hold such macros, as
+`VALUES_NOT_ZERO`, `(!0)`, and `VALUES_BELL`, `"bell\a"`.
+
 A compound literal of a bound struct, `(Color){ 200, 200, 200, 255 }`,
 becomes a constant of the struct when it gives one constant per field in
 field order. A leading call of a macro whose body is its one parameter, as
