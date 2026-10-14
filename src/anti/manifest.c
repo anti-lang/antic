@@ -325,6 +325,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     struct anti_toml *doc = NULL;
     enum opened opened;
     size_t i;
+    size_t j;
     bool ok = false;
 
     memset(out, 0, sizeof *out);
@@ -382,6 +383,18 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
             fprintf(stderr, "anti: %s: the dependency %s is no package name\n",
                     path, text_cstr(&d->name));
             goto done;
+        }
+        /* R166 of "Rules of 2026-10-13": the path goes into the lock file,
+           which holds no control byte, so the reader refuses it before
+           the dependency builds. */
+        for (j = 0; j < d->path.length; j++) {
+            unsigned char byte = (unsigned char)d->path.data[j];
+            if (byte < 0x20 || byte == 0x7f) {
+                fprintf(stderr, "anti: %s: the path %s of the dependency %s "
+                                "holds a control byte\n", path,
+                        text_cstr(&d->path), text_cstr(&d->name));
+                goto done;
+            }
         }
         if (d->path.length > 0 && d->repo.length > 0) {
             fprintf(stderr, "anti: %s: the dependency %s names a repository "

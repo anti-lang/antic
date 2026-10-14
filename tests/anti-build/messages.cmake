@@ -486,14 +486,28 @@ anti_message(lock_of_another_repository
     ARGS build --offline ${tools}
     ERR "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
+# R166 of "Rules of 2026-10-13" in docs/decisions.md: the manifest reader
+# refuses a path dependency whose path holds a control byte, before
+# anything builds. The project there would build.
 string(ASCII 127 delete)
-anti_message(lock_path_with_a_control_byte
+anti_message(path_with_a_control_byte
     FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = \"../un${delete}its\" }\n"
           ${app_source} "${app_text}"
           ../un${delete}its/anti.toml "${units_manifest}"
           ../un${delete}its/src/com/example/units.anti "${library_text}"
     ARGS build ${tools}
-    ERR "anti: ./anti.lock cannot hold the path ./../un${delete}its/dist/${HOST}/dev, which holds a double quote or a control byte")
+    ERR "anti: ./anti.toml: the path ../un${delete}its of the dependency com.example.units holds a control byte")
+# A double quote stands in a path of POSIX, and the lock file refuses it.
+# Windows takes no such name.
+if(NOT CMAKE_HOST_WIN32)
+    anti_message(lock_path_with_a_double_quote
+        FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = '../un\"its' }\n"
+              ${app_source} "${app_text}"
+              ../un\"its/anti.toml "${units_manifest}"
+              ../un\"its/src/com/example/units.anti "${library_text}"
+        ARGS build ${tools}
+        ERR "anti: ./anti.lock cannot hold the path ./../un\"its/dist/${HOST}/dev, which holds a double quote or a control byte")
+endif()
 
 # The resolver. Each version of one package asks for the version of the
 # other that asks for the other version of it, so no round ends the walk.
