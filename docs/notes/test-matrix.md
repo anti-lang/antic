@@ -908,6 +908,10 @@ Where two rules meet, and where three do:
 - A bitfield and a failing call, the flags form, a closure, a lent element,
   `==` and the hash: the part `other_rules` of
   `types_bitfields_and_unions`.
+- A generic call and an argument of another shape, by R065: the four
+  refusals `types_generic_call_with_*` and
+  `types_generic_function_of_a_class_with_another_shape`.
+  `types_generic_call_that_no_argument_gives` keeps the older message.
 - `as` and an enum, by R055: `types_as_from_a_float_to_an_enum`,
   `types_as_from_a_float_literal_to_an_enum` and
   `types_as_from_an_enum_to_another_enum` are refused, and the line

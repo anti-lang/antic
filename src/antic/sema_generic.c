@@ -1770,6 +1770,56 @@ struct type *sema_copy_in_chain(struct type *t, const struct type *g)
     return NULL;
 }
 
+/* DESIGN: inference binds a type parameter from an argument that stands
+   where a parameter of the function names it. An argument of another
+   shape binds nothing, `first(1)` for `values: []T`, and the message that
+   nothing gives `T` then sends the reader to the wrong place. R065 of
+   "Rules of 2026-10-13" names the parameter and the shape it needs. A
+   parameter of the function names the open parameter when its type
+   changes with what stands for that one, which two stand-ins show. open
+   is the index in map of the parameter nothing gave. True when it
+   reported. */
+static bool refuse_shape(struct checker *c, struct expr *e,
+                         const struct type *fn, const struct item *it,
+                         size_t fixed, struct generic_map *map, size_t open,
+                         const struct generic_call *g)
+{
+    size_t skipped = fn->param_count >= it->param_count
+                         ? fn->param_count - it->param_count
+                         : 0;
+    size_t j;
+
+    if (map->params[open]->param->constant) {
+        return false;
+    }
+    for (j = fixed; j < e->as.call.arg_count && j < fn->param_count; j++) {
+        struct type *given = g->prechecked[j];
+        struct type *one;
+        struct type *other;
+        const struct param *named;
+        if (given == NULL || sema_is_error(given) ||
+            given->kind == TYPE_NONE || j < skipped) {
+            continue;
+        }
+        map->args[open] = sema_builtin(c, TYPE_BOOL);
+        one = subst(c, fn->params[j], map);
+        map->args[open] = sema_builtin(c, TYPE_I64);
+        other = subst(c, fn->params[j], map);
+        map->args[open] = NULL;
+        if (one == other) {
+            continue;
+        }
+        named = &it->params[j - skipped];
+        sema_error_at(c, e->as.call.args[j]->pos,
+                      "`%.*s` of `%.*s` takes `%s`, found `%s`",
+                      (int)named->name.length, named->name.text,
+                      (int)it->name.length, it->name.text,
+                      sema_tn(fn->params[j]), sema_tn(given));
+        return true;
+    }
+    return false;
+}
+
 struct type *sema_generic_call(struct checker *c, struct expr *e,
                                struct type *fn, const struct symbol *sym,
                                size_t fixed, const struct generic_call *g)
@@ -1884,6 +1934,9 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
             const struct type *p = params[i];
             if (i < outer_count && copy == outer) {
                 continue;
+            }
+            if (refuse_shape(c, e, fn, it, fixed, &map, i, g)) {
+                return sema_builtin(c, TYPE_ERROR);
             }
             sema_error_at(c, e->pos, "nothing in the arguments gives `%.*s` "
                           "of `%.*s`, so the call writes it out after the "

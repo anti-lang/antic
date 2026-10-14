@@ -1,0 +1,19 @@
+//! A parameter of type `*Box<T>` takes a pointer to a copy of `Box`, and an
+//! `int` has another shape. The message names the parameter and the shape it
+//! needs, by R065 of "Rules of 2026-10-13".
+
+struct Box<T>
+{
+	v: T,
+}
+
+fn open<T>(count: int, box: *Box<T>) -> T
+{
+	return box.v;
+}
+
+fn main() -> int
+{
+	let n = open(1, 2);
+	return 0;
+}

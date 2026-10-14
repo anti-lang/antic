@@ -1,0 +1,1 @@
+types_generic_function_of_a_class_with_another_shape.anti:19:15: error: `values` of `add` takes `[]T`, found `int`

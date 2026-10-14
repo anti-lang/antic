@@ -1,1 +1,1 @@
-types_generic_call_with_a_tuple_of_three.anti:11:10: error: nothing in the arguments gives `T` of `left`, so the call writes it out after the name
+types_generic_call_with_a_tuple_of_three.anti:11:15: error: `pair` of `left` takes `(T, T)`, found `(int, int, int)`

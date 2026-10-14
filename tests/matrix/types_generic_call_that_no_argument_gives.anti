@@ -1,0 +1,12 @@
+//! No parameter of `make` names `T`, so no argument has another shape, and the
+//! message stays the one that asks for `T` after the name.
+
+fn make<T>(count: int) -> int
+{
+	return count * size_of(T);
+}
+
+fn main() -> int
+{
+	return make(2);
+}

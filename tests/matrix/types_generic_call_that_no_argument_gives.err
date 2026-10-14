@@ -1,0 +1,1 @@
+types_generic_call_that_no_argument_gives.anti:11:9: error: nothing in the arguments gives `T` of `make`, so the call writes it out after the name
