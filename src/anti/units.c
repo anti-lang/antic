@@ -165,14 +165,69 @@ void unit_free(struct unit *u)
     text_free(&u->library);
 }
 
-void unit_order(const struct unit *units, size_t count, size_t *order)
+/* The index of the unit of the run whose module the import names, other
+   than skip and not placed yet, or count when none is. */
+static size_t unit_waiting(const struct unit *units, size_t count,
+                           const bool *done, size_t skip, const char *import)
+{
+    size_t k;
+
+    for (k = 0; k < count; k++) {
+        if (!done[k] && k != skip &&
+            strcmp(text_cstr(&units[k].path), import) == 0) {
+            return k;
+        }
+    }
+    return count;
+}
+
+/* Report the cycle that holds start's path through the units not placed.
+   Every one of them imports another that is not placed, or it would have
+   been placed, so the walk finds a unit it met before. */
+static void unit_report_cycle(const struct unit *units, size_t count,
+                              const bool *done, size_t start)
+{
+    size_t *step = files_array(count + 1, sizeof *step);
+    size_t *seen = files_array(count + 1, sizeof *seen);
+    struct text cycle = {0};
+    size_t length = 0;
+    size_t current = start;
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        seen[i] = count;
+    }
+    while (seen[current] == count) {
+        size_t next = count;
+        seen[current] = length;
+        step[length++] = current;
+        for (i = 0; next == count && i < units[current].import_count; i++) {
+            next = unit_waiting(units, count, done, current,
+                                text_cstr(&units[current].imports[i]));
+        }
+        if (next == count) {
+            break;
+        }
+        current = next;
+    }
+    for (i = seen[current]; i < length; i++) {
+        text_appendf(&cycle, "%s -> ", text_cstr(&units[step[i]].path));
+    }
+    text_append(&cycle, text_cstr(&units[current].path));
+    fprintf(stderr, "anti: the imports form a cycle: %s\n", text_cstr(&cycle));
+    text_free(&cycle);
+    free(seen);
+    free(step);
+}
+
+bool unit_order(const struct unit *units, size_t count, size_t *order)
 {
     bool *done = files_array(count + 1, sizeof *done);
     size_t placed = 0;
     size_t i;
     size_t j;
-    size_t k;
     bool grew = true;
+    bool ordered;
 
     while (grew && placed < count) {
         grew = false;
@@ -182,14 +237,8 @@ void unit_order(const struct unit *units, size_t count, size_t *order)
                 continue;
             }
             for (j = 0; ready && j < units[i].import_count; j++) {
-                for (k = 0; k < count; k++) {
-                    if (!done[k] && k != i &&
-                        strcmp(text_cstr(&units[k].path),
-                               text_cstr(&units[i].imports[j])) == 0) {
-                        ready = false;
-                        break;
-                    }
-                }
+                ready = unit_waiting(units, count, done, i,
+                                     text_cstr(&units[i].imports[j])) == count;
             }
             if (ready) {
                 order[placed++] = i;
@@ -198,10 +247,18 @@ void unit_order(const struct unit *units, size_t count, size_t *order)
             }
         }
     }
+    ordered = placed == count;
+    for (i = 0; !ordered && i < count; i++) {
+        if (!done[i]) {
+            unit_report_cycle(units, count, done, i);
+            break;
+        }
+    }
     for (i = 0; i < count; i++) {
         if (!done[i]) {
             order[placed++] = i;
         }
     }
     free(done);
+    return ordered;
 }

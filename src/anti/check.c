@@ -485,7 +485,10 @@ int check_run(const struct check_request *r)
             r->source_count > 0 ? r->sources[i] : text_cstr(&found.items[i]);
         unit_read(source, path_roots, path_root_count, r->work, &units[i]);
     }
-    unit_order(units, count, order);
+    if (!unit_order(units, count, order)) {
+        status = 1;
+        goto done;
+    }
 
     failed = front_end_class(units, count, order, &base, &counts,
                              r->undocumented, r->all_targets, &targets);

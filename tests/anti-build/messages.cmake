@@ -308,14 +308,23 @@ anti_message(source_name_no_identifier
           src/com/example/bad-name.anti "${library_text}"
     ARGS build ${tools}
     ERR "anti: `bad-name` in ./src/com/example/bad-name.anti is not a lowercase identifier")
-# Two modules of a project that import each other have no order. The
-# first of them compiles before the library file of the second is there.
+# Two modules of a project that import each other have no order, and
+# the message names the cycle, by R125 of "Rules of 2026-10-13" in
+# docs/decisions.md.
 anti_message(modules_import_each_other
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
           src/com/example/a.anti "//! The first.\n\nimport com.example.b;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
           src/com/example/b.anti "//! The second.\n\nimport com.example.a;\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
     ARGS build ${tools}
-    ERR "./src/com/example/a.anti:3:8: error: cannot find module `com.example.b`")
+    ERR "anti: the imports form a cycle: com.example.a -> com.example.b -> com.example.a")
+# The cycle runs through a third module, which imports neither.
+anti_message(modules_import_in_a_cycle_of_three
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+          src/com/example/a.anti "//! The first.\n\nimport com.example.c;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+          src/com/example/b.anti "//! The second.\n\nimport com.example.a;\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
+          src/com/example/c.anti "//! The third.\n\nimport com.example.b;\n\n/// Three.\npub fn three() -> int\n{\n\treturn 3;\n}\n"
+    ARGS build ${tools}
+    ERR "anti: the imports form a cycle: com.example.a -> com.example.c -> com.example.b -> com.example.a")
 
 # `anti run --memory-checks` puts the standard error of the program through
 # Anti's symbolizer. A line that is no frame, a frame without its module in

@@ -32,10 +32,12 @@ that imports nothing of the standard library then needs no runtime
 archive.
 
 The class passes `-c` with it, which writes the interface file of the
-module into the work directory. `order_units` puts a module after every
+module into the work directory. `unit_order` puts a module after every
 module of the run that it imports, so the interface a module needs stands
-there when the module is checked. A cycle among the imports keeps the order
-the files came in, and the compiler reports the cycle.
+there when the module is checked. A cycle among the imports has no order.
+`unit_order` names its modules, as `a -> b -> a`, and the command ends with
+1 before any module is checked. `anti build` and `anti doc` stop there as
+well, by R125 of "Rules of 2026-10-13".
 
 `--doc-warnings` rides on the same call, so the doc warnings cost no second
 pass over the sources. `report_diagnostics` of `src/antic/driver.c` counts the

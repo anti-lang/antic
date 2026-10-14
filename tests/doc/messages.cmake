@@ -28,6 +28,13 @@ anti_message(source_does_not_parse
     FILES one.anti "fn main( -> int\n{\n\treturn 0;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti
     ERR "one.anti:1:10: error: expected identifier")
+# Two modules that import each other have no order, by R125 of "Rules of
+# 2026-10-13" in docs/decisions.md.
+anti_message(modules_import_each_other
+    FILES src/com/example/a.anti "//! The first.\n\nimport com.example.b;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+          src/com/example/b.anti "//! The second.\n\nimport com.example.a;\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}"
+    ERR "anti: the imports form a cycle: com.example.a -> com.example.b -> com.example.a")
 anti_message(source_imports_no_module
     FILES one.anti "//! A module.\n\nimport com.example.gone;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti

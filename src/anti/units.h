@@ -87,9 +87,9 @@ void unit_links_apply(const struct unit_links *links, struct options *o);
 void unit_flat_path(const char *module, struct text *out);
 
 /* The order the modules are compiled in: a module after every module of
-   the run that it imports. A cycle among the imports keeps the order the
-   files came in, and the compiler reports it. order holds one index per
-   unit. */
-void unit_order(const struct unit *units, size_t count, size_t *order);
+   the run that it imports. order holds one index per unit. A cycle among
+   the imports has no order: it is reported with the modules on it, the
+   rest keep the order the files came in, and the result is false. */
+bool unit_order(const struct unit *units, size_t count, size_t *order);
 
 #endif

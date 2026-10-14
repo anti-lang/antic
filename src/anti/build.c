@@ -1070,8 +1070,7 @@ static bool read_units(struct build *b)
             return false;
         }
     }
-    unit_order(b->units, b->unit_count, b->order);
-    return true;
+    return unit_order(b->units, b->unit_count, b->order);
 }
 
 static void build_free(struct build *b)

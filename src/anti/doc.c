@@ -722,7 +722,9 @@ static bool write_interfaces(const char *const *sources, size_t count,
     if (written == 0) {
         return true;
     }
-    unit_order(units, count, order);
+    if (!unit_order(units, count, order)) {
+        return false;
+    }
     for (i = 0; i < count && ok; i++) {
         const struct unit *u = &units[order[i]];
         struct options o = *base;
