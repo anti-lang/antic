@@ -1,5 +1,6 @@
 //! An `own` parameter stored through the pointer a call gives, and named after
-//! the move. The place has no name, so the message names none.
+//! the move. The place has no name, so the message names the line of the move,
+//! by R082 of "Rules of 2026-10-13".
 
 class Box
 {

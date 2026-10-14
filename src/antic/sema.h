@@ -112,9 +112,11 @@ struct symbol {
     int caught_loops;
     const struct symbol *moved_into;
     bool deferred;
-    /* A `keep own` parameter that moved into an owner, and where. */
+    /* A `keep own` parameter that moved into an owner. */
     bool snapshot_moved;
-    struct pos snapshot_move;
+    /* Where the symbol moved: a `keep own` parameter into an owner, and
+       a local or a parameter by the moves of `moved` below. */
+    struct pos moved_at;
     /* DESIGN: a local or a parameter that moved into an `own` parameter,
        or an `own` parameter that moved on by `=` or `let`. It is not
        named after the move in the order of the text. moved_by names the

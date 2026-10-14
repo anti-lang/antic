@@ -780,7 +780,7 @@ static void io_sym_body(struct io *io, struct symbol *s)
     io_csym(io, &s->moved_into);
     io_bool(io, &s->deferred);
     io_bool(io, &s->snapshot_moved);
-    io_pos(io, &s->snapshot_move);
+    io_pos(io, &s->moved_at);
     io_bool(io, &s->moved);
     io_name(io, &s->moved_to);
     io_name(io, &s->moved_by);

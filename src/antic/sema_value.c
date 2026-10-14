@@ -475,7 +475,10 @@ void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
 }
 
 /* Refuse the name e of sym, which moved before it in the order of the
-   text. */
+   text. The message names the place the value moved into and the
+   function that took it. A move into a place without a name, the
+   `*slot(to)` of `*slot(to) = b`, names its line, by R082 of "Rules of
+   2026-10-13". */
 void sema_refuse_moved(struct checker *c, const struct expr *e,
                          const struct symbol *sym)
 {
@@ -485,8 +488,9 @@ void sema_refuse_moved(struct checker *c, const struct expr *e,
                       (int)sym->moved_to.length, sym->moved_to.text,
                       (int)sym->moved_by.length, sym->moved_by.text);
     } else if (sym->moved_by.length == 0 && sym->moved_to.length == 0) {
-        sema_error_at(c, e->pos, "`%.*s` was moved", (int)e->as.name.length,
-                      e->as.name.text);
+        sema_error_at(c, e->pos, "`%.*s` was moved on line %u",
+                      (int)e->as.name.length, e->as.name.text,
+                      (unsigned)sym->moved_at.line);
     } else {
         const struct name *to = sym->moved_by.length > 0 ? &sym->moved_by
                                                          : &sym->moved_to;
@@ -692,6 +696,7 @@ bool sema_move_local(struct checker *c, struct expr *e,
     }
     e->moves = true;
     sym->moved = true;
+    sym->moved_at = e->pos;
     sym->moved_to = *into;
     sym->moved_by = *by;
     return true;

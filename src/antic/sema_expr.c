@@ -600,7 +600,7 @@ static bool require_owned(struct checker *c, struct expr *e,
         }
         e->moves_snapshot = true;
         sym->snapshot_moved = true;
-        sym->snapshot_move = e->pos;
+        sym->moved_at = e->pos;
         return true;
     }
     if (sym != NULL && sym->kind == SYMBOL_PARAM) {
@@ -1945,7 +1945,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             sema_error_at(c, e->pos, "`%.*s` has moved into an owner on line "
                           "%u and is not named after it",
                           (int)e->as.name.length, e->as.name.text,
-                          (unsigned)sym->snapshot_move.line);
+                          (unsigned)sym->moved_at.line);
             return sema_builtin(c, TYPE_ERROR);
         }
         /* A Flags value that is not the base of a field is read whole. */
