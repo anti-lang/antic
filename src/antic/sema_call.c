@@ -1815,6 +1815,14 @@ static bool type_callee(struct checker *c, struct expr *e,
         form->result = form->fn;
         return true;
     }
+    if (form->fn->kind == TYPE_ENUM) {
+        sema_error_at(c, callee->pos, "`%s.%.*s` is an enum value, not a "
+                      "function", sema_tn(owner),
+                      (int)callee->as.field.name.length,
+                      callee->as.field.name.text);
+        form->result = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
     if (form->fn->kind != TYPE_FN) {
         sema_error_at(c, callee->pos, "`%s` is not a function",
                       sema_tn(form->fn));

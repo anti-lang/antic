@@ -2473,6 +2473,11 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             }
             return sema_builtin(c, TYPE_VOID);
         }
+        if (e->as.object.op == TOKEN_DESTROY && t->kind != TYPE_POINTER) {
+            sema_error_at(c, e->as.object.operand->pos,
+                          "`destroy` takes a pointer, found `%s`", sema_tn(t));
+            return sema_builtin(c, TYPE_ERROR);
+        }
         if (t->kind != TYPE_POINTER || t->element->kind != TYPE_CLASS) {
             sema_error_at(c, e->as.object.operand->pos,
                           "`%s` needs a class pointer, found `%s`", what,

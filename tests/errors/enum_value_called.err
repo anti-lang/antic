@@ -1,1 +1,1 @@
-enum_value_called.anti:12:10: error: `Color` is not a function
+enum_value_called.anti:12:10: error: `Color.Red` is an enum value, not a function
