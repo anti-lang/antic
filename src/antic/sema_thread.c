@@ -508,6 +508,28 @@ static bool worker_args(struct checker *c, struct expr *call,
     return ok;
 }
 
+/* DESIGN: `by 0` asks for the count of chunks of the machine, and a count
+   below zero is no count, by R087 of "Rules of 2026-10-13". A constant
+   one is refused here, and lowering checks every other one in a dev
+   build. */
+static bool chunks_below_zero(struct checker *c, struct expr *n)
+{
+    struct const_value v;
+    struct context saved;
+    bool constant;
+
+    sema_enter_quiet(c, &saved);
+    constant = sema_eval_const(c, n, &v);
+    sema_leave(c, &saved);
+    if (!constant || v.kind != CONST_INT ||
+        sema_signed_bits(v.as.integer) >= 0) {
+        return false;
+    }
+    sema_error_at(c, n->pos, "the count of chunks %lld is below zero",
+                  (long long)sema_signed_bits(v.as.integer));
+    return true;
+}
+
 /* Check `parallel a by n -> f(x)`. It splits a into n chunks and runs f
    on each through the worker pool. The results come back in chunk
    order. */
@@ -524,6 +546,7 @@ struct type *sema_check_parallel(struct checker *c, struct expr *e)
         ok = sema_require(c, n,
                           sema_check_expr(c, n, sema_builtin(c, TYPE_I64)),
                           sema_builtin(c, TYPE_I64));
+        ok = !chunks_below_zero(c, n) && ok;
     }
     if (sema_is_error(array)) {
         return sema_builtin(c, TYPE_ERROR);

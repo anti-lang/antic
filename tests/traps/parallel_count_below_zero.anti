@@ -1,0 +1,24 @@
+//! A count of chunks below zero that the run computes. A dev build stops, and a
+//! release build takes the count of the machine, as it does for `by 0`.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+worker fn count(chunk: []int) -> int
+{
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let items = [1, 2, 3, 4, 5, 6, 7];
+	let parts = parallel items[0..7] by opaque(-3) -> count;
+	let n = 0;
+	for part in parts {
+		n += part;
+	}
+	free(parts.ptr);
+	return n;
+}

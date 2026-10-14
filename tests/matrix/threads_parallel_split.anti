@@ -2,8 +2,8 @@
 //! becomes the count of elements, the first chunks take the one element more
 //! that an uneven split leaves, an empty slice gives no chunk, and the results
 //! stand in the order of the chunks. The arguments after the worker reach every
-//! chunk. `by 0` and a count below zero give the count of the machine, so the
-//! program prints the sum of their chunks alone.
+//! chunk. `by 0` gives the count of the machine, so the program prints the sum
+//! of its chunks alone.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -38,13 +38,9 @@ fn main() -> int
 {
 	let items = [1, 2, 3, 4, 5, 6, 7];
 	let zero = 0;
-	let below = -3;
 	let by_zero = parallel items[0..7] by zero -> count;
 	printf("by 0: %d elements\n".ptr, total(by_zero) as c_int);
 	free(by_zero.ptr);
-	let by_below = parallel items[0..7] by below -> count;
-	printf("by -3: %d elements\n".ptr, total(by_below) as c_int);
-	free(by_below.ptr);
 	let plain = parallel items[0..7] -> count;
 	printf("no by: %d elements\n".ptr, total(plain) as c_int);
 	free(plain.ptr);

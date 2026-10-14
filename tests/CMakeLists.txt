@@ -4793,6 +4793,10 @@ if(ANTIC_LLVM_MC)
     antic_check_test(shift_negative "shift count out of range"
         "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64"
         ON)
+    # R087 of "Rules of 2026-10-13": a count of chunks below zero.
+    antic_check_test(parallel_count_below_zero "count of chunks below zero"
+        "parallel_count_below_zero\\.anti:[0-9]+: count of chunks below zero: value -3"
+        ON)
     # The checks on the narrow types, in a compound assignment and in a copy
     # of a generic function. docs/notes/test-matrix.md names them under
     # "Values".

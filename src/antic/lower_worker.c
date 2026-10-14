@@ -288,6 +288,25 @@ struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
                               lower_temp(l, out)));
 }
 
+/* DESIGN: the count after `by`, which a dev build checks against zero, by
+   R087 of "Rules of 2026-10-13". Zero asks the runtime for the count of
+   the machine, and the runtime of a build without the check takes a
+   count below zero as zero. */
+static struct ir_operand chunk_count(struct lowerer *l, const struct expr *e)
+{
+    const struct expr *n = e->as.parallel.chunks;
+    struct ir_operand count = lower_expr(l, n);
+    struct ir_operand ok =
+        lower_temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, count,
+                                ir_int_op(IR_I64, 0)));
+
+    lower_check_branch(l, ok, false,
+                       lower_check_text(l, n->pos.line,
+                                        "count of chunks below zero"),
+                       CHECK_VALUE, count, lower_none(), NULL);
+    return count;
+}
+
 /* DESIGN: `parallel a by n -> f(x)` becomes one call of the runtime. The
    runtime decides the chunk count when n is absent. It therefore
    allocates the array of results and writes back the pointer and the
@@ -324,9 +343,8 @@ struct ir_operand lower_parallel(struct lowerer *l,
                        l, array,
                        lower_field_offset(l, slice, &lower_len_name))));
     args[2] = lower_size_operand(l, slice->element);
-    args[3] = e->as.parallel.chunks != NULL
-                  ? lower_expr(l, e->as.parallel.chunks)
-                  : ir_int_op(IR_I64, 0);
+    args[3] = e->as.parallel.chunks != NULL ? chunk_count(l, e)
+                                            : ir_int_op(IR_I64, 0);
     args[4] = lower_size_operand(l, result);
     struct ir_function *thunk = parallel_thunk(l, e, name, agg);
     args[5] = lower_temp(l, ir_addr(l->f, l->b, ir_func_op(thunk)));
