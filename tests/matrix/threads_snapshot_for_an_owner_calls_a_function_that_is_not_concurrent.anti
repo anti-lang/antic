@@ -1,0 +1,30 @@
+//! What an `own fn` field holds is concurrent, since a snapshot calls no
+//! function it captured: a function value does not copy fully, whether its
+//! parameter is marked `concurrent` or not.
+
+class Scale
+{
+	pub own by: fn(int) -> int = twice,
+
+	pub fn set(self, keep own f: fn(int) -> int)
+	{
+		self.by = f;
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn fill(s: *Scale, f: fn(int) -> int)
+{
+	s.set(snapshot fn(n) -> int {
+		return f(n);
+	});
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+threads_snapshot_for_an_owner_calls_a_function_that_is_not_concurrent.anti:22:8: error: a snapshot holds values that copy fully, and `f` is `fn(int) -> int`
