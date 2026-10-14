@@ -2451,7 +2451,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         }
         /* All three read the table of the object, so all three need a
            pointer the program has checked. `dup(p)` then gives the type
-           of `p`, which is the `*T` this leaves behind. */
+           of `p`, which is the `*T` this leaves behind. A `?T` of a value
+           that may be `none` has had its one message. */
+        if (types_is_nullable(t) && t->kind == TYPE_OPTIONAL) {
+            sema_error_may_be_none(c, e->as.object.operand, t);
+            return sema_builtin(c, TYPE_ERROR);
+        }
         t = sema_usable_pointer(c, e->as.object.operand, t);
         if (e->as.object.op == TOKEN_DELETE && t->kind == TYPE_POINTER &&
             sema_singleton_type(t->element)) {

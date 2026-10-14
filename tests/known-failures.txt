@@ -90,7 +90,6 @@ generic_atomic_modules_release T029 antic cannot read back a library file whose 
 generic_atomic_modules_dev T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 qualified_arguments_modules_release T030 A class built with arguments under the name of its module is refused as a type.
 qualified_arguments_modules_dev T030 A class built with arguments under the name of its module is refused as a type.
-matrix_ownership_dup_of_a_value_that_may_be_none_refused T035 `dup` of a `?T` that may be `none` gives two messages.
 check_slice_of_slice_range T017 A dev build does not check the bounds of a slice of a slice.
 check_slice_range_reversed T017 A dev build does not check a slice whose low bound lies above its high bound.
 check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.
