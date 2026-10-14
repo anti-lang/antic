@@ -1,0 +1,10 @@
+exit 0
+the default: -1
+a snapshot: 11
+none over a snapshot: -1
+none over none: -1
+a snapshot over none: 20
+through a keep own parameter: -1
+in a literal: -1
+a copy: -1 2
+on the heap: -1

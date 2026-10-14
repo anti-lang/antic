@@ -553,13 +553,18 @@ static bool is_fn_dup(const struct expr *e)
 /* DESIGN: an `own fn` place takes a fresh value: a snapshot, a function
    that captures nothing, `dup` of an owned value, or a `keep own`
    parameter of the function, which moves. `=` copies no owned value,
-   since two owners would free one snapshot twice. Returns whether the
-   value e of type got is taken. */
+   since two owners would free one snapshot twice. `none` is no value of
+   another owner, so a place that may hold `none` takes it, by R084 of
+   "Rules of 2026-10-13". Returns whether the value e of type got is
+   taken. */
 static bool require_owned(struct checker *c, struct expr *e,
                           struct type *got)
 {
     struct symbol *sym = e->kind == EXPR_NAME ? e->symbol : NULL;
 
+    if (e->kind == EXPR_NONE) {
+        return true;
+    }
     if (!got->context) {
         e->to_context = true;
         return true;

@@ -1,12 +1,60 @@
-//! `none` as the default of an `own` field of type `?fn(int) -> int`.
+//! `none` in an `own` field of type `?fn(int) -> int`, by R084 of "Rules of
+//! 2026-10-13": as the default of the field, in a literal and written with
+//! `=`. The `=` frees the snapshot the field held, as `=` of a fresh snapshot
+//! does, so `--memory-checks` finds no leak. A field that holds `none` takes a
+//! snapshot afterwards, a `keep own` parameter hands `none` on, and `dup` of an
+//! object copies a field that holds `none` as `none`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Button
 {
 	pub own handler: ?fn(int) -> int = none,
+	pub n: int = 0,
+}
+
+fn pressed(b: *Button, x: int) -> int
+{
+	let f = b.handler else {
+		return -1;
+	};
+	return f(x);
+}
+
+fn hold(b: *Button, keep own f: ?fn(int) -> int)
+{
+	b.handler = f;
 }
 
 fn main() -> int
 {
-	let b = Button { };
+	let k = 10;
+	let b = Button { n: 1 };
+	printf("the default: %d\n".ptr, pressed(&b, 1) as c_int);
+	b.handler = snapshot fn(x: int) -> int {
+		return x + k;
+	};
+	printf("a snapshot: %d\n".ptr, pressed(&b, 1) as c_int);
+	b.handler = none;
+	printf("none over a snapshot: %d\n".ptr, pressed(&b, 1) as c_int);
+	b.handler = none;
+	printf("none over none: %d\n".ptr, pressed(&b, 1) as c_int);
+	b.handler = snapshot fn(x: int) -> int {
+		return x * k;
+	};
+	printf("a snapshot over none: %d\n".ptr, pressed(&b, 2) as c_int);
+	hold(&b, none);
+	printf("through a keep own parameter: %d\n".ptr, pressed(&b, 2) as c_int);
+	let c = Button { handler: none, n: 2 };
+	printf("in a literal: %d\n".ptr, pressed(&c, 1) as c_int);
+	let d = dup(&c);
+	printf("a copy: %d %d\n".ptr, pressed(d, 1) as c_int, d.n as c_int);
+	delete(d);
+	let p = alloc Button { handler: snapshot fn(x: int) -> int {
+		return x - k;
+	} };
+	p.handler = none;
+	printf("on the heap: %d\n".ptr, pressed(p, 1) as c_int);
+	delete(p);
 	return 0;
 }

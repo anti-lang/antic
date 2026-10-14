@@ -290,8 +290,16 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
         return;
     }
     switch (e->kind) {
-    /* `none` of a `?T` writes its flag, and the value stays as it is. */
+    /* `none` of a `?T` writes its flag, and the value stays as it is.
+       `none` in the form of two words has no code and no context, which
+       an `own` field of type `?fn(...)` holds as its default. */
     case EXPR_NONE:
+        if (lower_is_context(t)) {
+            ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), dest);
+            ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
+                     lower_context_word(l, t, dest));
+            break;
+        }
         lower_set_optional(l, t, NULL, dest, 0);
         break;
     /* `T(args)` and `alloc T(args)` build the object in place and run
