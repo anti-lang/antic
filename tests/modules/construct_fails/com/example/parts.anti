@@ -1,0 +1,56 @@
+//! A base class whose `construct` takes a part it owns, for a class of another
+//! module that fails after the base was built, by R114 and R025 of "Rules of
+//! 2026-10-13".
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+pub class Part
+{
+	pub tag: int = 0,
+
+	/// A part that says when it goes.
+	pub fn make(tag: int) -> *Part
+	{
+		let p = alloc Part { };
+		p.tag = tag;
+		return p;
+	}
+
+	fn destruct(self)
+	{
+		printf(" part%d".ptr, self.tag as c_int);
+	}
+}
+
+pub class Base
+{
+	own first: ?*Part = none,
+
+	pub fn construct(self, n: int) may fail
+	{
+		self.first = Part.make(1);
+		if n == 0 {
+			fail lang.Error.new(n, "the base fails");
+		}
+	}
+
+	fn destruct(self)
+	{
+		printf(" base".ptr);
+	}
+}
+
+/// A class of the library that fails after its base was built.
+pub class Failing inherits Base
+{
+	own second: ?*Part = none,
+
+	pub fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+		fail lang.Error.new(n, "the class of the library fails");
+	}
+}

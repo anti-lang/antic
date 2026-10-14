@@ -1,0 +1,245 @@
+//! A `construct` that fails tears down the base whose `construct` finished, by
+//! R114 and R025 of the rules of 2026-10-13, in each kind of class: a copy of a
+//! generic class, a class below a copy of a generic base, a nested class, a
+//! class that implements an interface, a final class and a class two levels
+//! below the base. Each fails after its base was built and after it set a field
+//! of its own. The line of each prints the teardown: the field of the failing
+//! class, the `destruct` of the base, then the field of the base.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Part
+{
+	pub tag: int = 0,
+
+	/// A part that says when it goes.
+	pub fn make(tag: int) -> *Part
+	{
+		let p = alloc Part { };
+		p.tag = tag;
+		return p;
+	}
+
+	fn destruct(self)
+	{
+		printf(" part%d".ptr, self.tag as c_int);
+	}
+}
+
+class Base
+{
+	own first: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		self.first = Part.make(1);
+		if n == 0 {
+			fail lang.Error.new(n, "the base fails");
+		}
+	}
+
+	fn destruct(self)
+	{
+		printf(" base".ptr);
+	}
+}
+
+class Holder<T> inherits Base
+{
+	pub width: int = size_of(T) as int,
+	own second: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+		fail lang.Error.new(n, "the copy fails");
+	}
+}
+
+class GenericBase<T>
+{
+	pub width: int = size_of(T) as int,
+	own first: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		self.first = Part.make(1);
+		if n == 0 {
+			fail lang.Error.new(n, "the generic base fails");
+		}
+	}
+
+	fn destruct(self)
+	{
+		printf(" base".ptr);
+	}
+}
+
+class BelowACopy inherits GenericBase<i16>
+{
+	own second: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+		fail lang.Error.new(n, "the class below a copy fails");
+	}
+}
+
+class Outer
+{
+	pub n: int = 0,
+
+	class Inner inherits Base
+	{
+		own second: ?*Part = none,
+
+		fn construct(self, n: int) may fail
+		{
+			try self.super.construct(n);
+			self.second = Part.make(2);
+			fail lang.Error.new(n, "the nested class fails");
+		}
+	}
+
+	pub fn build(self) -> int
+	{
+		let inner = Inner(3) catch e {
+			return e.code;
+		};
+		return 0;
+	}
+}
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class WithInterface inherits Base
+{
+	implements named: Named,
+	own second: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+		fail lang.Error.new(n, "the class with an interface fails");
+	}
+
+	concrete fn name(self) -> int
+	{
+		return 4;
+	}
+}
+
+final class Closed inherits Base
+{
+	own second: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+		fail lang.Error.new(n, "the final class fails");
+	}
+}
+
+class Middle inherits Base
+{
+	own second: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+	}
+
+	fn destruct(self)
+	{
+		printf(" middle".ptr);
+	}
+}
+
+class Low inherits Middle
+{
+	own third: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.third = Part.make(3);
+		fail lang.Error.new(n, "the class two levels below fails");
+	}
+}
+
+fn generic_copy()
+{
+	printf("generic copy:".ptr);
+	let h = alloc Holder<u8>(1) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+	delete(h);
+}
+
+fn below_a_copy()
+{
+	printf("below a copy:".ptr);
+	let b = BelowACopy(2) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+}
+
+fn nested()
+{
+	printf("nested:".ptr);
+	let outer = Outer { };
+	printf(", error %d\n".ptr, outer.build() as c_int);
+}
+
+fn with_interface()
+{
+	printf("interface:".ptr);
+	let w = alloc WithInterface(4) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+	delete(w);
+}
+
+fn closed()
+{
+	printf("final:".ptr);
+	let f = Closed(5) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+}
+
+fn two_levels()
+{
+	printf("two levels:".ptr);
+	let low = alloc Low(6) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+	delete(low);
+}
+
+fn main() -> int
+{
+	generic_copy();
+	below_a_copy();
+	nested();
+	with_interface();
+	closed();
+	two_levels();
+	return 0;
+}

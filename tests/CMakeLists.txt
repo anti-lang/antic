@@ -4247,6 +4247,16 @@ antic_modules_test(default_lengths_modules
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/default-lengths-modules")
 
+# A `construct` that fails tears down the base whose `construct` finished,
+# by R114 and R025 of "Rules of 2026-10-13", where the base is a class of
+# the library and where the failing class is one.
+antic_modules_test(construct_fails_modules
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/construct_fails"
+    LIBRARIES parts
+    STD lang
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/construct-fails-modules")
+
 # The defaults of a generic class of a library that name its constant
 # parameter, by R045 of "Rules of 2026-10-13". Each copy of the client
 # takes them with its own number in place.

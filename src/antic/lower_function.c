@@ -244,7 +244,9 @@ static void open_body_scope(struct lowerer *l, const struct item *it)
 /* Whether s is `self.super.construct(args)`, the call of the base's
    `construct` that stands first in the body of a `construct`. The
    checker made it a call of that function by name, and refuses a call of
-   a `construct` anywhere else. */
+   a `construct` anywhere else. A function of a class of another module
+   comes from its library file without the item of the class, so `self`
+   marks it, which no module function takes. */
 static bool calls_base_construct(const struct stmt *s)
 {
     const struct expr *callee;
@@ -259,7 +261,7 @@ static bool calls_base_construct(const struct stmt *s)
         return false;
     }
     made = callee->symbol->item;
-    return made != NULL && made->owner != NULL &&
+    return made != NULL && made->has_self &&
            lower_name_is(&made->name, "construct");
 }
 

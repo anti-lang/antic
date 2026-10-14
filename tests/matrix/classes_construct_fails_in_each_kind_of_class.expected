@@ -1,0 +1,7 @@
+exit 0
+generic copy: part2 base part1, error 1
+below a copy: part2 base part1, error 2
+nested: part2 base part1, error 3
+interface: part2 base part1, error 4
+final: part2 base part1, error 5
+two levels: part3 middle base part2 part1, error 6

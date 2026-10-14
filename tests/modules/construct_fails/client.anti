@@ -1,0 +1,47 @@
+//! A `construct` that fails tears down the base whose `construct` finished
+//! when the base is a class of the library `com.example.parts`, and when the
+//! failing class is one, by R114 and R025 of "Rules of 2026-10-13". The
+//! direct import names the class, since T030 refuses `alloc parts.Failing(2)`.
+
+import anti.lang;
+import com.example.parts.{Base, Failing, Part};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Local inherits Base
+{
+	own second: ?*Part = none,
+
+	fn construct(self, n: int) may fail
+	{
+		try self.super.construct(n);
+		self.second = Part.make(2);
+		fail lang.Error.new(n, "the class of the client fails");
+	}
+}
+
+fn local_class()
+{
+	printf("base of the library:".ptr);
+	let local = Local(1) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+}
+
+fn library_class()
+{
+	printf("class of the library:".ptr);
+	let failing = alloc Failing(2) catch e {
+		printf(", error %d\n".ptr, e.code as c_int);
+		return;
+	};
+	delete(failing);
+}
+
+fn main() -> int
+{
+	local_class();
+	library_class();
+	return 0;
+}
