@@ -191,12 +191,6 @@ matrix_classes_abstract_matched_without_concrete_refused T071 One mistake of a c
 matrix_classes_qualifier_names_no_base_refused T071 One mistake of a class declaration gets two messages.
 matrix_classes_own_class_qualifier_beside_a_plain_body_refused T071 One mistake of a class declaration gets two messages.
 matrix_classes_internal_on_a_class_member_refused T071 One mistake of a class declaration gets two messages.
-matrix_classes_constant_of_a_generic_class_dev T072 A constant and a static field of a generic class are one for every copy.
-matrix_classes_constant_of_a_generic_class_release T072 A constant and a static field of a generic class are one for every copy.
-matrix_classes_constant_of_a_generic_class_memory_checks T072 A constant and a static field of a generic class are one for every copy.
-matrix_classes_static_of_a_generic_class_dev T072 A constant and a static field of a generic class are one for every copy.
-matrix_classes_static_of_a_generic_class_release T072 A constant and a static field of a generic class are one for every copy.
-matrix_classes_static_of_a_generic_class_memory_checks T072 A constant and a static field of a generic class are one for every copy.
 matrix_classes_cast_from_an_interface_to_a_base_dev T073 `is` and `as` from a pointer to an interface to the abstract base of the object are refused.
 matrix_classes_cast_from_an_interface_to_a_base_release T073 `is` and `as` from a pointer to an interface to the abstract base of the object are refused.
 matrix_classes_cast_from_an_interface_to_a_base_memory_checks T073 `is` and `as` from a pointer to an interface to the abstract base of the object are refused.

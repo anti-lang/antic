@@ -43,7 +43,7 @@ static struct type *atomic_place(const struct expr *e)
     }
     if (e->symbol != NULL && e->symbol->item != NULL &&
         e->symbol->item->is_static && e->symbol->item->atomic) {
-        return e->symbol->type;
+        return e->type;
     }
     s = e->as.field.base->type != NULL ? sema_struct_of(e->as.field.base->type)
                                        : NULL;

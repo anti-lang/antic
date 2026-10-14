@@ -679,6 +679,10 @@ struct type *sema_subst(struct checker *c, struct type *t,
 const struct symbolic *sema_subst_symbolic(struct checker *c,
                                            const struct symbolic *s,
                                            const struct generic_map *map);
+/* The constant v with the arguments of map in place. */
+const struct const_value *sema_subst_const(struct checker *c,
+                                           const struct const_value *v,
+                                           const struct generic_map *map);
 /* The map of the generic of copy to the arguments of copy. */
 struct generic_map sema_copy_map(const struct type *copy);
 struct type *sema_copy_in_chain(struct type *t, const struct type *g);

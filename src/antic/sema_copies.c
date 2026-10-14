@@ -381,6 +381,33 @@ static struct item *member_copy(struct copies *k, struct item *owner,
     return n;
 }
 
+/* DESIGN: a constant and a static field of a generic class belong to
+   the copy, as its functions do, by T072 of
+   docs/audit/tests-findings.md. The copy of `Box<u8>` computes
+   `size_of(T)` with `u8`, and the static `made` of `Box<int>` is the
+   global `Box<int>.made`, apart from that of `Box<u8>`. */
+static struct item *member_const_copy(struct copies *k, struct item *owner,
+                                      struct type *copy, struct item *member)
+{
+    struct item *n = arena_alloc(k->c->arena, sizeof *n);
+    struct symbol *sym = arena_alloc(k->c->arena, sizeof *sym);
+    struct generic_map map = sema_copy_map(copy);
+
+    sema_const_symbol(k->c, member->symbol, member->name_pos);
+    *n = *member;
+    *sym = *member->symbol;
+    sym->ir = 0;
+    sym->item = n;
+    sym->type = sema_subst(k->c, member->symbol->type, &map);
+    sym->value = sema_subst_const(k->c, member->symbol->value, &map);
+    sym->home = NULL;
+    sym->name = symbol_name(k, copy, &member->name);
+    n->symbol = sym;
+    n->owner = owner;
+    n->home_module = owner->home_module;
+    return n;
+}
+
 /* The item of the concrete copy of a generic struct, class or variant,
    made on its first use. */
 static struct item *type_item(struct copies *k, struct type *copy)
@@ -436,6 +463,10 @@ static struct item *type_item(struct copies *k, struct type *copy)
     made->member_count = 0;
     for (i = 0; i < count; i++) {
         struct item *m = copy->generic->members[i];
+        if (m->kind == ITEM_CONST && m->symbol != NULL) {
+            members[i] = member_const_copy(k, made, copy, m);
+            continue;
+        }
         if (m->kind != ITEM_FN || m->symbol == NULL ||
             m->type_param_count > 0) {
             members[i] = m;
@@ -749,6 +780,37 @@ static bool names_generic(const struct symbol *sym)
             (it->owner != NULL && it->owner->type_param_count > 0));
 }
 
+/* The constant or static field of the copy that e names, where sym is
+   that member of a generic class. type is the class e reaches it
+   through, or NULL for a name in the body of the class. sym itself
+   where the class is still generic. */
+static struct symbol *const_of_copy(struct clone *cl, struct symbol *sym,
+                                    struct type *type, struct pos pos)
+{
+    const struct item *it = sym != NULL ? sym->item : NULL;
+    const struct item *owner = it != NULL ? it->owner : NULL;
+    struct type *g;
+    struct type *copy;
+    size_t i;
+
+    if (it == NULL || it->kind != ITEM_CONST || owner == NULL ||
+        owner->type_param_count == 0 || owner->symbol == NULL) {
+        return sym;
+    }
+    g = owner->symbol->type;
+    copy = sema_copy_in_chain(ty(cl, type != NULL ? type : g, pos), g);
+    if (copy == NULL || copy == g || sema_has_params(copy) ||
+        type_item(cl->k, copy) == NULL) {
+        return sym;
+    }
+    for (i = 0; i < g->member_count; i++) {
+        if (g->members[i] == it) {
+            return copy->members[i]->symbol;
+        }
+    }
+    return sym;
+}
+
 /* Trees */
 
 static struct expr *xe(struct clone *cl, struct expr *e);
@@ -999,6 +1061,7 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     n->to_optional = ty(cl, e->to_optional, e->pos);
     switch (e->kind) {
     case EXPR_NAME:
+        n->symbol = const_of_copy(cl, n->symbol, NULL, e->pos);
         if (names_generic(n->symbol) && !cl->callee) {
             copy_failed(cl, e->pos, &n->symbol->name,
                         "since it is named as a value and not called");
@@ -1091,6 +1154,8 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         break;
     case EXPR_FIELD:
         n->as.field.base = xe(cl, e->as.field.base);
+        n->symbol = const_of_copy(cl, n->symbol, e->as.field.base->type,
+                                  e->pos);
         n->as.field.through =
             xf(cl, e->as.field.base->type, e->as.field.through);
         break;

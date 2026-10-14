@@ -1,0 +1,22 @@
+//! A static field of a generic class has the type of its copy outside the
+//! class: `?*T` of `Box<int>` is `?*int`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub v: T,
+	pub static atomic last: ?*T = none;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	Box<int>.last.store(&n);
+	let p = Box<int>.last.load();
+	if p != none {
+		printf("last: %d\n".ptr, *p as c_int);
+	}
+	printf("other copy: %d\n".ptr, (Box<u8>.last.load() == none) as c_int);
+	return 0;
+}

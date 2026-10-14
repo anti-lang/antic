@@ -1221,6 +1221,27 @@ static bool subst_value(struct checker *c, const struct const_value *v,
     return changed;
 }
 
+/* The constant v with the arguments of map in place, as a copy reads
+   it. */
+const struct const_value *sema_subst_const(struct checker *c,
+                                           const struct const_value *v,
+                                           const struct generic_map *map)
+{
+    struct const_value *out;
+
+    if (v == NULL) {
+        return NULL;
+    }
+    out = arena_alloc(c->arena, sizeof *out);
+    subst_value(c, v, map, out);
+    if (out->kind == CONST_SYMBOLIC && out->as.symbolic != NULL &&
+        out->as.symbolic->kind == SYMBOLIC_INT) {
+        out->kind = CONST_INT;
+        out->as.integer = out->as.symbolic->value;
+    }
+    return out;
+}
+
 /* Give the copy the fields, the base and the cases of its generic with
    the arguments in place. */
 static void fill_copy(struct checker *c, struct type *copy)

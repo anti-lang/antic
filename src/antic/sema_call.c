@@ -2369,6 +2369,12 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
         struct type *fn = sema_deserialize_type(c, e->pos, m->symbol->type);
         return fn != NULL ? fn : sema_builtin(c, TYPE_ERROR);
     }
+    /* A constant and a static field of a copy have the type of the
+       generic's with the arguments in place, `?*int` of `Box<int>` for
+       `?*T`. */
+    if (m->kind == ITEM_CONST && m->symbol->type != NULL) {
+        return sema_member_type_in(c, m->symbol->type, m->owner, t);
+    }
     return m->symbol->type != NULL ? m->symbol->type
                                    : sema_builtin(c, TYPE_ERROR);
 }
