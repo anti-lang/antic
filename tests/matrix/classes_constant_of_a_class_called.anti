@@ -1,0 +1,13 @@
+//! A constant of a class called as a function. The message names the type of
+//! the constant, which is no function.
+
+class Counter
+{
+	pub const LIMIT: int = 3;
+}
+
+fn main() -> int
+{
+	let n = Counter.LIMIT();
+	return 0;
+}
