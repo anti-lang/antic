@@ -448,7 +448,7 @@ static void libraries(void)
     win.executable = "geo.dll";
     shared(TARGET_WINDOWS_ARM64, &win, &def,
            "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /Brepro "
            "/MACHINE:ARM64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
            "/IMPLIB:geo.lib /LIBPATH:/rt/sysroot/t/lib geo.obj "
            "/rt/lib/windows-arm64/armv8.2/anti_rt.lib clang_rt.builtins.lib "
@@ -618,7 +618,7 @@ static void dynamic_modes(void)
         in.extra_count = 1;
         link_shared_command(&c, TARGET_WINDOWS_ARM64, &in, &plugin);
         joined(&c, "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
-                   "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL "
+                   "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /Brepro "
                    "/NOENTRY /MACHINE:ARM64 /OUT:fancy.dll /PDB:fancy.pdb "
                    "/DEF:fancy.def /LIBPATH:/rt/sysroot/t/lib fancy.obj "
                    "host.lib clang_rt.builtins.lib ucrtbase.lib ntdll.lib "
@@ -839,7 +839,7 @@ static void platform_links(void)
     win.executable = "geo";
     shared(TARGET_WINDOWS_X86_64, &win, &none,
            "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /MACHINE:X64 "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /Brepro /MACHINE:X64 "
            "/OUT:geo /PDB:geo.pdb /DEF:geo.def /IMPLIB:geo.lib "
            "/LIBPATH:/rt/sysroot/t/lib geo.obj "
            "/rt/lib/windows-x86_64/v3/anti_rt.lib clang_rt.builtins.lib "
@@ -847,7 +847,7 @@ static void platform_links(void)
     win.executable = "out.d/geo";
     shared(TARGET_WINDOWS_X86_64, &win, &none,
            "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /MACHINE:X64 "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /Brepro /MACHINE:X64 "
            "/OUT:out.d/geo /PDB:out.d/geo.pdb /DEF:geo.def "
            "/IMPLIB:out.d/geo.lib /LIBPATH:/rt/sysroot/t/lib geo.obj "
            "/rt/lib/windows-x86_64/v3/anti_rt.lib clang_rt.builtins.lib "
@@ -927,7 +927,7 @@ static void shared_modes(void)
     in.memory_checks = true;
     shared(TARGET_WINDOWS_X86_64, &in, &def,
            "/rt/bin/lld-link /NOLOGO /lldmingw /lldignoreenv /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:oldnames.lib /NODEFAULTLIB:uuid.lib /DEBUG /PDBALTPATH:%_PDB% "
-           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL "
+           "/pdbsourcepath:. /OPT:REF /OPT:SAFEICF /DLL /Brepro "
            "/MACHINE:X64 /OUT:geo.dll /PDB:geo.pdb /DEF:geo.def "
            "/IMPLIB:geo.lib /LIBPATH:/rt/sysroot/t/lib "
            "/rt/lib/windows-x86_64/clang_rt.asan_dynamic.lib "

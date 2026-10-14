@@ -47,6 +47,9 @@
 #   output_plugin         -o of a plugin without a directory: the index
 #                         stands beside the library and names it
 #   linker_lld            --linker lld beside the default
+#   windows_library_reproducible
+#                         two links of one Windows library write the same
+#                         bytes
 #
 # DESIGN: a case reads the LLVM text of --dump-llvm where the option
 # decides what the back end writes, so no case needs opt, llc and a link
@@ -561,6 +564,26 @@ if(CASE STREQUAL "output_shared")
         wrote(option-${target} other.so)
         if(EXISTS "${WORK}/option-${target}/${shared}")
             message(FATAL_ERROR "-o other.so left ${shared} for ${target}")
+        endif()
+    endforeach()
+    return()
+endif()
+
+# R152 of "Rules of 2026-10-13" in docs/decisions.md: two links of one
+# Windows library in one directory, a second apart, write the same DLL and
+# the same import library.
+if(CASE STREQUAL "windows_library_reproducible")
+    library_in(twice)
+    antic_in(twice --lib shared --target windows-x86_64 named.anti)
+    foreach(file named.dll named.lib)
+        file(SHA256 "${WORK}/twice/${file}" first_${file})
+    endforeach()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E sleep 1.1)
+    antic_in(twice --lib shared --target windows-x86_64 named.anti)
+    foreach(file named.dll named.lib)
+        file(SHA256 "${WORK}/twice/${file}" second)
+        if(NOT second STREQUAL first_${file})
+            message(FATAL_ERROR "two links of one input wrote two ${file}")
         endif()
     endforeach()
     return()

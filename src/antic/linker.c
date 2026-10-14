@@ -1060,6 +1060,13 @@ static void windows_shared(struct link_command *c, enum target t,
     windows_debug(c, in);
     drop_unused(c, t, in);
     add(c, "/DLL");
+    /* DESIGN: by R152 of "Rules of 2026-10-13" the link of a library is
+       reproducible. lld-link writes the time of the link into the export
+       directory of a DLL and into its import library, and /Brepro writes
+       a digest of the output there instead. */
+    if (in->linker == LINKER_LLD) {
+        add(c, "/Brepro");
+    }
     /* DESIGN: a plugin links no C runtime startup, so it has no entry
        point. The host's runtime has started before the load, and
        the loader registers what the plugin carries. */

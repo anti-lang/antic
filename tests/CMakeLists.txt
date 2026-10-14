@@ -1236,6 +1236,9 @@ set(antic_option_cases checks_by_mode checks_last_decides asserts_by_mode
 if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
     list(APPEND antic_option_cases soname_linux)
 endif()
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    list(APPEND antic_option_cases windows_library_reproducible)
+endif()
 foreach(case IN LISTS antic_option_cases)
     add_test(NAME antic_option_${case}
         COMMAND "${CMAKE_COMMAND}"
