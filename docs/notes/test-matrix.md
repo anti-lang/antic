@@ -1361,7 +1361,7 @@ Where two rules meet, and where three do:
 - A thread-safe class, a public function and a pointer inside a tuple, a
   struct or the result of a private function: four refusals
   `matrix/threads_pointer_into_fields_*`, T062.
-- An atomic local, a `snapshot fn` and a `parallel`:
+- An atomic local, a closure and a `parallel`:
   `matrix/threads_atomic_captures`.
 - An atomic, an arithmetic operation and a `bool` or a pointer: ten
   refusals `matrix/threads_atomic_*_on_a_*`, T060.

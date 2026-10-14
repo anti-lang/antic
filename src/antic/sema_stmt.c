@@ -3119,7 +3119,9 @@ static bool snapshot_copies(const struct type *t, bool top)
 /* DESIGN: a snapshot is read-only, so two threads that call it never
    write it at once. It holds values that copy fully: an address would
    copy the address and not what it points at. The first write of a
-   captured value and each capture of another type are refused. */
+   captured value and each capture of another type are refused. An
+   atomic local is shared state, and a copy of it is not, so a snapshot
+   names none, by R090 of "Rules of 2026-10-13". */
 static void check_snapshot(struct checker *c, const struct expr *e)
 {
     const struct item *it = e->as.fn;
@@ -3131,7 +3133,11 @@ static void check_snapshot(struct checker *c, const struct expr *e)
         if (sym->type == NULL || sema_is_error(sym->type)) {
             continue;
         }
-        if (!snapshot_copies(sym->type, true)) {
+        if (sym->atomic) {
+            sema_error_at(c, e->pos, "a snapshot holds copies, and the "
+                          "atomic `%.*s` is shared state",
+                          (int)sym->name.length, sym->name.text);
+        } else if (!snapshot_copies(sym->type, true)) {
             sema_error_at(c, e->pos, "a snapshot holds values that copy "
                           "fully, and `%.*s` is `%s`",
                           (int)sym->name.length, sym->name.text,

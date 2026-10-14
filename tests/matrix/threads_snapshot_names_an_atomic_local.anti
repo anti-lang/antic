@@ -1,0 +1,16 @@
+//! An atomic is shared state, and a copy of it is not. A `snapshot fn` that
+//! names an atomic local is refused.
+
+fn run(f: fn() -> int) -> int
+{
+	return f();
+}
+
+fn main() -> int
+{
+	let hits: atomic int = 3;
+	let copied = snapshot fn() -> int {
+		return hits.load();
+	};
+	return run(copied);
+}

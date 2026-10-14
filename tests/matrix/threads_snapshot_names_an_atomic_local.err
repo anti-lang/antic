@@ -1,0 +1,1 @@
+threads_snapshot_names_an_atomic_local.anti:12:15: error: a snapshot holds copies, and the atomic `hits` is shared state

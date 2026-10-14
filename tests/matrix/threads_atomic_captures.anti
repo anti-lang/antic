@@ -1,8 +1,7 @@
 //! An atomic local that an anonymous function captures. A closure changes the
 //! local itself, at a `concurrent` parameter as well, since an atomic is
-//! thread-safe. A `snapshot fn` copies it, so its operations change the copy
-//! and the local keeps its value. The chunks of a `parallel` add to one atomic
-//! local and to one static atomic field.
+//! thread-safe. The chunks of a `parallel` add to one atomic local and to one
+//! static atomic field.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -34,13 +33,6 @@ fn main() -> int
 	let first = run(bump);
 	let second = run(bump);
 	printf("closure: %d %d, local %d\n".ptr, first as c_int, second as c_int, hits.load() as c_int);
-
-	let copied = snapshot fn() -> int {
-		return hits.add(10);
-	};
-	let third = run(copied);
-	let fourth = run(copied);
-	printf("snapshot: %d %d, local %d\n".ptr, third as c_int, fourth as c_int, hits.load() as c_int);
 
 	let items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 	let sum: atomic int = 0;
