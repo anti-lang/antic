@@ -1,0 +1,9 @@
+exit 0
+local 1 made 1 gone 1
+each_turn 3 made 3 gone 3
+element 3 made 2 gone 2
+field 0 made 1 gone 1
+part 7 made 1 gone 1
+copy 5 made 1 gone 2
+heap 6 made 1 gone 1
+below 7 made 1 gone 1

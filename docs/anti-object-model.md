@@ -192,8 +192,8 @@ Four levels, and each applies where it makes sense:
 - Memory goes back to the allocator it came from, and whoever chose the allocator says which one. `destroy(p, from)` runs the destruct chain of `p` and of everything it owns and returns each piece of owned memory to `from`, an `anti.mem.Allocator`, instead of the C library. `delete(p, from)` does the same and also returns the object itself to `from`. `delete(p)` and `destroy(p)` without an allocator mean the C library's `malloc` and `free` on every system, the same as the language's `alloc` and `free`.
 - Over an `ArenaAllocator`, returning one piece does nothing, so `destroy(p, &arena)` runs every `destruct` and `arena.free_all()` returns the memory in one go.
 - Memory a class takes itself in its `construct` stays its own, and its `destruct` frees it the way it took it.
-- A local of class type whose chain declares `destruct` or has `own` fields is destroyed at the end of its block, as if `destroy(&c)` had been written as the last `defer`. A heap object is never destroyed by itself.
-- A local of array type whose element type has `destruct` or `own` fields is destroyed element by element at the end of its block, last to first.
+- A local of class type whose chain declares `destruct`, replaces the `destroyed` hook or has `own` fields is destroyed at the end of its block, as if `destroy(&c)` had been written as the last `defer`. A heap object is never destroyed by itself.
+- A local array of such a class is destroyed element by element at the end of its block, last to first.
 - A local of an owning struct or tuple is torn down part by part at the end of its block, on every exit. A class value is torn down so too. A local of an owning variant is torn down by its tag: the fields of the case it holds, and nothing else. Held as a field, an array element, a collection element or the value of a `?T`, an owning struct, tuple or variant goes with its owner.
 - An `own` slice of class values destroys its elements last to first before its buffer is freed. Every sequence of class values has that one order.
 - A direct call `c.destruct()` is refused.

@@ -1,0 +1,121 @@
+//! The `destroyed` hook of a class that replaces it runs at the end of the life
+//! of every value of the class, by R115 of the rules of 2026-10-13. The class
+//! has no `destruct` and owns nothing. Each place makes values, and the line of
+//! the place prints how many `created` and `destroyed` counted there: a local,
+//! a local of each turn of a loop, an element of an array, an inline field of a
+//! class, a part of a struct, a copy that `dup` made, an object of the heap
+//! that `delete` ends and a value of a class below the one that replaces the
+//! hook.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Probe
+{
+	pub n: int = 0,
+	pub static atomic made: int = 0;
+	pub static atomic gone: int = 0;
+
+	concrete fn created(self)
+	{
+		Probe.made.add(1);
+	}
+
+	concrete fn destroyed(self)
+	{
+		Probe.gone.add(1);
+	}
+}
+
+class Below inherits Probe
+{
+	pub m: int = 0,
+}
+
+class Holder
+{
+	pub probe: Probe = Probe { },
+}
+
+struct Pair
+{
+	probe: Probe,
+	k: int,
+}
+
+fn local() -> int
+{
+	let p = Probe { n: 1 };
+	return p.n;
+}
+
+fn each_turn() -> int
+{
+	let sum = 0;
+	for i in 0..3 {
+		let p = Probe { n: i };
+		sum += p.n;
+	}
+	return sum;
+}
+
+fn element() -> int
+{
+	let ps = [Probe { n: 1 }, Probe { n: 2 }];
+	return ps[0].n + ps[1].n;
+}
+
+fn field() -> int
+{
+	let h = Holder { };
+	return h.probe.n;
+}
+
+fn part() -> int
+{
+	let pair = Pair { probe: Probe { n: 3 }, k: 4 };
+	return pair.probe.n + pair.k;
+}
+
+fn copy() -> int
+{
+	let p = Probe { n: 5 };
+	let q = dup(p);
+	return q.n;
+}
+
+fn heap() -> int
+{
+	let p = alloc Probe { n: 6 };
+	let n = p.n;
+	delete(p);
+	return n;
+}
+
+fn below() -> int
+{
+	let b = Below { m: 7 };
+	return b.m;
+}
+
+fn report(place: str, value: int)
+{
+	let made = Probe.made.swap(0);
+	let gone = Probe.gone.swap(0);
+	printf("%.*s %d made %d gone %d\n".ptr, place.len as c_int, place.ptr,
+		value as c_int, made as c_int, gone as c_int);
+}
+
+fn main() -> int
+{
+	report("local", local());
+	report("each_turn", each_turn());
+	report("element", element());
+	report("field", field());
+	report("part", part());
+	report("copy", copy());
+	report("heap", heap());
+	report("below", below());
+	return 0;
+}

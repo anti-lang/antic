@@ -40,7 +40,7 @@ The rules of the five:
 
 - `created` runs for an object on the heap and for a class value in a variable. A `construct` that fails leaves no object and runs no `created`.
 - `dup` runs `copied` on the new object and no `created`. A plain copy of a class value, `let b = a;`, runs no hook.
-- `destroyed` runs where a teardown runs: at `delete`, and at the end of the block of a value whose class has a `destruct` or owns something. A value of a class with neither ends without the hook.
+- `destroyed` runs where a teardown runs: at `delete`, and at the end of the block of a value whose class has a `destruct`, owns something or replaces `destroyed`. A class that replaces it therefore has a teardown and follows the value rules of a class that owns something: `let b = a;` is refused and `dup` copies.
 - `dispatched` runs on the thread that wrote `dispatch`, also when the object is in flight and the job is empty. `joined` runs on the thread that wrote `join`.
 - A hook is an ordinary function. It runs on the thread of its site, and a hook of an object that two threads use needs the care any shared function needs.
 

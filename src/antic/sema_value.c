@@ -7,6 +7,28 @@
 
 #include "sema_checker.h"
 
+/* DESIGN: R115 of "Rules of 2026-10-13". The `destroyed` hook of a class
+   that replaces it runs at the end of the life of every value, as
+   `created` runs at its start. The teardown calls the hook, so a level
+   that replaces it asks for a teardown as a `destruct` does. The hook
+   takes `self` alone. The `destroyed` of a TraceHandler takes the object
+   as well and is no hook of its own class. */
+static bool replaces_destroyed(const struct item *m)
+{
+    static const char destroyed[] = ROOT_DESTROYED;
+    size_t params;
+
+    if (m->kind != ITEM_FN || m->runtime != NULL || !sema_has_body(m) ||
+        m->name.length != sizeof destroyed - 1 ||
+        memcmp(m->name.text, destroyed, sizeof destroyed - 1) != 0) {
+        return false;
+    }
+    params = m->symbol != NULL && m->symbol->type != NULL
+                 ? m->symbol->type->param_count
+                 : (size_t)m->param_count + (m->has_self ? 1 : 0);
+    return m->has_self && params == 1;
+}
+
 /* DESIGN: a struct or a tuple is owning when any of its parts owns
    something, transitively. Such a part is a class value that needs a
    teardown, and a collection is one. So is an `own fn`, a `?T` or an
@@ -72,6 +94,9 @@ static bool needs_teardown(const struct type *t, struct ptr_set *answered)
                 memcmp(m->name.text, destruct_name.text,
                        destruct_name.length) == 0 &&
                 m->runtime == NULL && sema_has_body(m)) {
+                return true;
+            }
+            if (replaces_destroyed(m)) {
                 return true;
             }
         }
