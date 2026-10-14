@@ -127,6 +127,13 @@ anti_message(library_static_without_the_runtime STATUS 2
     ARGS ${tools} --lib static --no-runtime -I "${PROJECT}" -o lib.a
          "${PROJECT}/com/example/lib.anti"
     ERR "antic: --no-runtime builds a plugin, which is a library of --lib shared")
+# R150 of "Rules of 2026-10-13": --soname gives a shared library its major
+# version, and an archive has none, so --lib static refuses it.
+anti_message(library_static_with_a_soname STATUS 2
+    FILES com/example/lib.anti "${exporting}"
+    ARGS ${tools} --lib static --soname -I "${PROJECT}" -o lib.a
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: --soname gives a library of --lib shared its major version, and a library of --lib static has none")
 anti_message(library_static_in_dev_mode STATUS 2
     FILES com/example/lib.anti "${exporting}"
     ARGS ${tools} --lib static --dev -I "${PROJECT}" -o lib.a

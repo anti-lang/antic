@@ -32,7 +32,6 @@
 #                         R132 of "Rules of 2026-10-13" refuses
 #   soname_linux          --soname beside --lib shared and
 #                         --package-version, for Linux
-#   soname_static         --soname beside --lib static
 #   output_assembly       -o beside -S
 #   output_library        -o beside -c
 #   output_program        -o of a program
@@ -374,22 +373,6 @@ if(CASE STREQUAL "soname_linux")
     endforeach()
     lacks("${without}" "SONAME" "the library without --soname")
     holds("${with}" "Library soname: [libtwo.so.3]" "the library of --soname")
-    return()
-endif()
-
-if(CASE STREQUAL "soname_static")
-    # A static library has no version in its file, so the option changes
-    # no byte of it, with a version or without one.
-    antic_output(said --lib static ${tools} -o "${WORK}/plain.a"
-                 "${library_source}")
-    file(SHA256 "${WORK}/plain.a" plain)
-    file(REMOVE "${WORK}/plain.a")
-    antic_output(said --lib static --soname ${tools} -o "${WORK}/plain.a"
-                 "${library_source}")
-    file(SHA256 "${WORK}/plain.a" option)
-    if(NOT plain STREQUAL option)
-        message(FATAL_ERROR "--soname changed a static library")
-    endif()
     return()
 endif()
 

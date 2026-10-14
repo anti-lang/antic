@@ -1805,7 +1805,7 @@ The options of `antic` that this page names, and the ones that decide how a prog
 | `--target <name>`, `--cpu <level>` | The target and the processor level, see [Processor levels](#processor-levels). |
 | `--lto full\|thin\|none` | The link of the program and the runtime as bitcode, full by default in a release build, or as objects. |
 | `--profile-generate`, `--profile-use <file>` | Instrument a program, and build with the profile that `llvm-profdata merge` wrote. |
-| `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--no-runtime`, `--closed` | A library for C with its header, the runtime inside the static one, the major version as the soname of the shared one, a plugin without the runtime, and a program without the exports a plugin binds against. `--bundle-runtime` beside `--lib shared`, `--no-runtime` beside `--lib static` and `--lib static` beside `--dev` are refused. |
+| `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--no-runtime`, `--closed` | A library for C with its header, the runtime inside the static one, the major version as the soname of the shared one, a plugin without the runtime, and a program without the exports a plugin binds against. `--bundle-runtime` beside `--lib shared`, `--no-runtime` and `--soname` beside `--lib static` and `--lib static` beside `--dev` are refused. |
 | `--linker lld\|platform` | lld of the package, the default, or the linker of the platform. |
 | `--framework <name>`, `--linux-lib <name>` | What `link framework` and `link linux` pass. |
 | `--inject <I=P>`, `--package-name`, `--package-version` | The provider of an injectable interface, and the package of a library file. |

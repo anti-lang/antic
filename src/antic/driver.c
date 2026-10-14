@@ -1759,11 +1759,12 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
     return ok;
 }
 
-/* DESIGN: three options do not stand beside the kind of library they
-   meet, by R132 of "Rules of 2026-10-13". --bundle-runtime puts the
-   runtime into an archive, and a shared library links it. --no-runtime
-   builds a plugin, a shared library. A library for C is a release
-   build, as --lto and the profiles are. */
+/* DESIGN: four options do not stand beside the kind of library they
+   meet, by R132 and R150 of "Rules of 2026-10-13". --bundle-runtime puts
+   the runtime into an archive, and a shared library links it.
+   --no-runtime builds a plugin, a shared library. A library for C is a
+   release build, as --lto and the profiles are. --soname names the
+   major version of a shared library, and an archive has none. */
 static bool library_options_usable(const struct options *o)
 {
     if (o->lib == LIB_SHARED && o->bundle_runtime) {
@@ -1775,6 +1776,12 @@ static bool library_options_usable(const struct options *o)
     if (o->lib == LIB_STATIC && o->no_runtime) {
         fputs("antic: --no-runtime builds a plugin, which is a library of "
               "--lib shared\n",
+              stderr);
+        return false;
+    }
+    if (o->lib == LIB_STATIC && o->soname) {
+        fputs("antic: --soname gives a library of --lib shared its major "
+              "version, and a library of --lib static has none\n",
               stderr);
         return false;
     }

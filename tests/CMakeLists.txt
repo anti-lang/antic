@@ -1230,7 +1230,7 @@ endforeach()
 set(antic_option_cases checks_by_mode checks_last_decides asserts_by_mode
     warn_undocumented
     strict_library strict_front_end strict_dev bundle_static bundle_shared
-    soname_static output_assembly output_library output_program keep_llvm
+    output_assembly output_library output_program keep_llvm
     output_static output_shared output_dev_library output_plugin linker_lld)
 if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
     list(APPEND antic_option_cases soname_linux)
