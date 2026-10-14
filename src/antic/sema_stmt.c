@@ -2292,9 +2292,16 @@ static void check_stmt(struct checker *c, struct stmt *s)
             sema_check_expr(c, s->as.yielded, NULL);
             return;
         }
-        sema_require(c, s->as.yielded,
-                     sema_check_expr(c, s->as.yielded, c->handler.yields),
-                     c->handler.yields);
+        /* The value of the `catch` takes the yielded value as `let`
+           takes it: a fresh value and an `own` parameter move, and any
+           other existing value that owns something is refused. */
+        if (sema_require(c, s->as.yielded,
+                         sema_check_expr(c, s->as.yielded,
+                                         c->handler.yields),
+                         c->handler.yields)) {
+            static const struct name no_name = {"", 0};
+            sema_bind_value(c, s->as.yielded, no_name, c->handler.yields);
+        }
         return;
     case STMT_TRY:
         check_try(c, s);
@@ -2407,9 +2414,18 @@ static void check_stmt(struct checker *c, struct stmt *s)
             c->lent_use = LENT_RETURNED;
             held = sema_require(c, s->as.return_value, given, result);
             c->lent_use = LENT_STORED;
-            if (held) {
+            /* DESIGN: `return` of a local or a parameter moves it, and
+               the function tears it down no more. Any other value that
+               already stands somewhere, a field, `*p` or an element,
+               keeps its place, so decision 22 of "Decisions of
+               2026-10-11" refuses to copy it by the rule of `=`. */
+            if (held && s->as.return_value->kind == EXPR_NAME) {
                 sema_refuse_caller_value(c, s->as.return_value);
                 sema_refuse_lock_copy(c, s->as.return_value, result);
+            } else if (held) {
+                sema_refuse_owned_copy(c, s->as.return_value, result);
+            }
+            if (held) {
                 sema_check_leak_return(c, s->as.return_value, result);
             }
         }

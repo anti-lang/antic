@@ -1556,6 +1556,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         }
         if (s->as.yielded != NULL && h->has_out) {
             lower_store_value(l, s->as.yielded->type, s->as.yielded, h->out);
+            lower_clear_moved(l, s->as.yielded);
         } else if (s->as.yielded != NULL) {
             lower_expr(l, s->as.yielded);
         }

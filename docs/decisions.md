@@ -2965,6 +2965,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 ## What the solid run decided
 
 - [provisional] Every `alloc(T, n)` calls `anti_rt_alloc_aligned` of `src/rt/mem.c`, which stays out of line under the LTO of a release build. It gives `none` for a count below zero and for a product that leaves the address space before any call, and takes `malloc` or `calloc` at an alignment of 16. Reason: T032 and T033. The program multiplied the count by the size, so a count of 2^61 gave a block of no bytes, and LLVM removed a `malloc` whose memory went to `free` alone and took its result as memory, so a release build got memory where a dev build got `none`. A call of the runtime is no allocation LLVM knows.
+- [provisional] `yield v` gives the value of the `catch` as `let` gives a variable its value. A fresh value and an `own` parameter move, and any other existing value that owns something is refused with the message of `=`. Reason: T038. The value of the `catch` was a copy of the bytes, and the local stayed a second owner. No entry names `yield`, and the rule of `let` is the one that keeps a single owner.
 
 ## Open
 

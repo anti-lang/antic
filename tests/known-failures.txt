@@ -111,22 +111,6 @@ matrix_ownership_downcast_in_an_if_let_memory_checks T036 `if let` and `let ... 
 matrix_ownership_downcast_in_a_let_else_dev T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
 matrix_ownership_downcast_in_a_let_else_release T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
 matrix_ownership_downcast_in_a_let_else_memory_checks T036 `if let` and `let ... else` refuse the result of `as?` as a `*T`.
-matrix_ownership_return_of_a_field_copies_a_class_with_a_destruct_refused T037 `return` of a field that owns something is not refused.
-matrix_ownership_return_of_a_field_copies_a_class_with_an_own_field_refused T037 `return` of a field that owns something is not refused.
-matrix_ownership_return_of_a_field_copies_an_owning_struct_refused T037 `return` of a field that owns something is not refused.
-matrix_ownership_return_of_a_field_copies_an_owning_tuple_refused T037 `return` of a field that owns something is not refused.
-matrix_ownership_return_of_a_field_copies_an_owning_variant_refused T037 `return` of a field that owns something is not refused.
-matrix_ownership_return_of_a_field_copies_an_owning_optional_refused T037 `return` of a field that owns something is not refused.
-matrix_ownership_return_of_a_field_copies_an_owning_array_refused T037 `return` of a field that owns something is not refused.
-matrix_ownership_return_through_a_pointer_copies_refused T037 `return` of `*p` that owns something is not refused.
-matrix_ownership_return_of_an_element_copies_refused T037 `return` of an element that owns something is not refused.
-matrix_ownership_yield_copies_a_class_with_a_destruct_refused T038 `yield` of a local that owns something is not refused.
-matrix_ownership_yield_copies_a_class_with_an_own_field_refused T038 `yield` of a local that owns something is not refused.
-matrix_ownership_yield_copies_an_owning_struct_refused T038 `yield` of a local that owns something is not refused.
-matrix_ownership_yield_copies_an_owning_tuple_refused T038 `yield` of a local that owns something is not refused.
-matrix_ownership_yield_copies_an_owning_variant_refused T038 `yield` of a local that owns something is not refused.
-matrix_ownership_yield_copies_an_owning_optional_refused T038 `yield` of a local that owns something is not refused.
-matrix_ownership_yield_copies_an_owning_array_refused T038 `yield` of a local that owns something is not refused.
 matrix_ownership_dispatch_of_a_fresh_owning_value_dev T039 A fresh owning argument of a `dispatch` is never torn down.
 matrix_ownership_dispatch_of_a_fresh_owning_value_release T039 A fresh owning argument of a `dispatch` is never torn down.
 matrix_ownership_dispatch_of_a_fresh_owning_value_memory_checks T039 A fresh owning argument of a `dispatch` is never torn down.
@@ -178,9 +162,6 @@ matrix_errors_generic_optional_of_a_nullable_pointer_memory_checks T049 `??` in 
 matrix_errors_generic_optional_of_an_optional_value_dev T049 `??` in a generic over a `?int` is refused in the copy.
 matrix_errors_generic_optional_of_an_optional_value_release T049 `??` in a generic over a `?int` is refused in the copy.
 matrix_errors_generic_optional_of_an_optional_value_memory_checks T049 `??` in a generic over a `?int` is refused in the copy.
-matrix_errors_generic_yield_of_an_own_parameter_dev T038 `yield` of an `own` parameter of a type parameter tears the value down twice.
-matrix_errors_generic_yield_of_an_own_parameter_release T038 `yield` of an `own` parameter of a type parameter tears the value down twice.
-matrix_errors_generic_yield_of_an_own_parameter_memory_checks T038 `yield` of an `own` parameter of a type parameter tears the value down twice.
 matrix_errors_try_before_an_alloc_dev T050 `try` before `alloc T(args)` is refused.
 matrix_errors_try_before_an_alloc_release T050 `try` before `alloc T(args)` is refused.
 matrix_errors_try_before_an_alloc_memory_checks T050 `try` before `alloc T(args)` is refused.
