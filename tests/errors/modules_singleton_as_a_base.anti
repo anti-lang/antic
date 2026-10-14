@@ -1,5 +1,5 @@
-//! A singleton of a library is no base of a class of another module, by R111
-//! of the rules of 2026-10-13. The library file carries the mark.
+//! A singleton of a library is no base of a class of another module, by R111 of
+//! the rules of 2026-10-13. The library file carries the mark.
 
 import com.example.items;
 

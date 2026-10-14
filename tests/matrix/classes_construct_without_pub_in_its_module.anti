@@ -1,5 +1,5 @@
-//! `T(args)` runs a `construct` without `pub` anywhere in its module, by R102 of
-//! the rules of 2026-10-13: in a function of the module, in a function of
+//! `T(args)` runs a `construct` without `pub` anywhere in its module, by R102
+//! of the rules of 2026-10-13: in a function of the module, in a function of
 //! another class, in a closure and after `alloc`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;

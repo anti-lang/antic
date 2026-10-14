@@ -1,5 +1,5 @@
-//! A singleton class may not declare `get`, by R112 of the rules of
-//! 2026-10-13. The compiler writes it.
+//! A singleton class may not declare `get`, by R112 of the rules of 2026-10-13.
+//! The compiler writes it.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
