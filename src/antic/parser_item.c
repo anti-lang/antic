@@ -352,6 +352,14 @@ static struct item *item_level(struct parser *p)
          parser_peek_at(p, 1)->kind == TOKEN_VARIANT)) {
         parser_next(p);
         it->packed = true;
+    } else if (parser_is_word(p, parser_peek(p), "packed")) {
+        /* No item starts with a name, so the word is meant as the
+           modifier, and R060 of "Rules of 2026-10-13" names what takes
+           it. An enum, a simd struct and a synchronized class take
+           none. */
+        parser_error_here(p, "`packed` stands before `struct`, `union`, "
+                             "`class` or `variant`");
+        return NULL;
     }
     /* DESIGN: simd is a contextual word as well, and one only directly
        before struct. */
@@ -418,6 +426,12 @@ static struct item *item_level(struct parser *p)
             (it->kind == ITEM_STRUCT && !parser_type_params(p, it))) {
             return NULL;
         }
+        /* A union reads the bytes of one field through another, which a
+           type parameter leaves open, so it takes none, by R060. */
+        if (it->kind == ITEM_UNION && parser_check(p, TOKEN_LT)) {
+            parser_error_here(p, "a union takes no type parameters");
+            return NULL;
+        }
         if (parser_is_word(p, parser_peek(p), "align")) {
             parser_next(p);
             if (!parser_expect(p, TOKEN_LPAREN) ||
@@ -457,8 +471,10 @@ static struct item *item_level(struct parser *p)
             field.unchecked = parser_unchecks_guard(p, mark);
             parser_close_clauses(p, mark, field.pos);
             if (parser_check(p, TOKEN_ASSIGN)) {
-                parser_error_here(p, "a field of a struct has no default, "
-                                     "which belongs to a class");
+                parser_error_here(p, "a field of a %s has no default, "
+                                     "which belongs to a class",
+                                  it->kind == ITEM_UNION ? "union"
+                                                         : "struct");
                 free(fields.data);
                 return NULL;
             }
@@ -535,8 +551,15 @@ static struct item *item_level(struct parser *p)
            `export type PersonList = List<Person>;` offers it to C. */
         parser_next(p);
         it->kind = ITEM_TYPE;
-        if (!parser_expect_name(p, &it->name) ||
-            !parser_expect(p, TOKEN_ASSIGN) ||
+        if (!parser_expect_name(p, &it->name)) {
+            return NULL;
+        }
+        /* An alias names one type, by R060. */
+        if (parser_check(p, TOKEN_LT)) {
+            parser_error_here(p, "a `type` alias takes no type parameters");
+            return NULL;
+        }
+        if (!parser_expect(p, TOKEN_ASSIGN) ||
             (it->type = parser_type(p)) == NULL ||
             !parser_expect(p, TOKEN_SEMICOLON)) {
             return NULL;

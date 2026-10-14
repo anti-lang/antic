@@ -1,1 +1,1 @@
-types_union_field_default.anti:5:10: error: a field of a struct has no default, which belongs to a class
+types_union_field_default.anti:5:10: error: a field of a union has no default, which belongs to a class

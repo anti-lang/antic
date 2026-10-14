@@ -1,1 +1,1 @@
-types_packed_simd_struct.anti:3:1: error: expected an item
+types_packed_simd_struct.anti:3:1: error: `packed` stands before `struct`, `union`, `class` or `variant`

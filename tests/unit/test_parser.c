@@ -779,7 +779,9 @@ void test_parser(void)
         errors("let x = 1;\nfn g() {}\n", e, 1);
     }
     {
-        static const struct expected_error e[] = {{1, 1, "expected an item"}};
+        static const struct expected_error e[] = {
+            {1, 1, "`packed` stands before `struct`, `union`, `class` or "
+                   "`variant`"}};
         errors("packed fn g() {}\n", e, 1);
     }
     {
