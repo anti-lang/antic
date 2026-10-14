@@ -115,13 +115,34 @@ static bool read_text(const char *path, struct text *out)
     return true;
 }
 
+/* Report that path cannot be created. By R149 of "Rules of 2026-10-13"
+   the message names the directory of path when that is not there, as for
+   -o into a directory that does not exist. */
+static void cannot_create(const char *path)
+{
+    const char *slash = platform_last_separator(path);
+    struct text directory = {0};
+
+    if (slash != NULL && slash != path) {
+        text_appendf(&directory, "%.*s", (int)(slash - path), path);
+    }
+    if (directory.length > 0 && !directory_exists(text_cstr(&directory))) {
+        fprintf(stderr,
+                "antic: cannot create %s, the directory %s does not exist\n",
+                path, text_cstr(&directory));
+    } else {
+        fprintf(stderr, "antic: cannot create %s\n", path);
+    }
+    text_free(&directory);
+}
+
 bool driver_write_file(const char *path, const struct text *content)
 {
     FILE *f = platform_open(path, true);
     bool ok;
 
     if (f == NULL) {
-        fprintf(stderr, "antic: cannot create %s\n", path);
+        cannot_create(path);
         return false;
     }
     ok = fwrite(text_cstr(content), 1, content->length, f) == content->length;
@@ -1803,31 +1824,6 @@ static bool library_options_usable(const struct options *o)
     return true;
 }
 
-/* Whether the directory of -o exists, which every file of the build
-   goes into. By R149 of "Rules of 2026-10-13" the message names it, and
-   not the first file the build would have written. */
-static bool output_directory_exists(const struct options *o)
-{
-    const char *slash;
-    struct text directory = {0};
-    bool exists;
-
-    if (o->output == NULL ||
-        (slash = platform_last_separator(o->output)) == NULL ||
-        slash == o->output) {
-        return true;
-    }
-    text_appendf(&directory, "%.*s", (int)(slash - o->output), o->output);
-    exists = directory_exists(text_cstr(&directory));
-    if (!exists) {
-        fprintf(stderr,
-                "antic: cannot create %s, the directory %s does not exist\n",
-                o->output, text_cstr(&directory));
-    }
-    text_free(&directory);
-    return exists;
-}
-
 int driver_run(const struct options *given)
 {
     struct options resolved = *given;
@@ -1876,9 +1872,6 @@ int driver_run(const struct options *given)
     }
     if (!library_options_usable(o)) {
         return 2;
-    }
-    if (!output_directory_exists(o)) {
-        return 1;
     }
     memset(&extras, 0, sizeof extras);
 

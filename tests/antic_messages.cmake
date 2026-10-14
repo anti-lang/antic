@@ -44,7 +44,7 @@ anti_message(license_text_with_a_nul_byte
 anti_message(output_program_no_directory
     FILES main.anti "${program}"
     ARGS ${tools} -o none/main main.anti
-    ERR "antic: cannot create none/main, the directory none does not exist")
+    ERR "antic: cannot create none/main.ll, the directory none does not exist")
 anti_message(output_library_no_directory
     FILES com/example/lib.anti "${library}"
     ARGS ${tools} -c -I "${PROJECT}" -o none/lib.antl
