@@ -197,6 +197,11 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
   `ctest -I 2251,4922`: `asan` 275 s, 381 s and 349 s, `ubsan` 256 s,
   360 s and 271 s.
+  The step of the rules of the commands of anti measured `host` as
+  `ctest -I 1,2000` and `ctest -I 2001,4947`: 379 s and 250 s. It ran each
+  sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
+  `ctest -I 2251,4945`: `asan` 266 s, 369 s and 351 s, `ubsan` 241 s,
+  352 s and 269 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -740,10 +745,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4924 ctest tests pass on the development Mac, and two of them, the
+- 4947 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   374 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4922 each with the same skips, without
+  The ASan and the UBSan builds run 4945 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
@@ -832,6 +837,18 @@ reports what it finished.
   library of macOS has the install name `@rpath/<file name>`, and the link
   of a Windows library is reproducible.
   `docs/reports/2026-10-14-rules-messages.md` reports the step.
+- The rules of the commands of anti are built, R155 to R189. `anti --help`
+  with a second word prints the usage, and an option without its value
+  gets one line. `anti run` takes the options of its usage alone and
+  refuses a library project, and `--target all --cpu` checks every target
+  first. The manifest refuses a dependency that is no package name and a
+  path with a control byte, a cycle of path dependencies is refused at any
+  depth, and a lock file that is no TOML is an error. `anti bind` gives one
+  warning per type of a description and refuses a struct that lost a
+  field. `anti doc` writes a type as its item spells it, which the library
+  file carries, and warns of a fence that nothing closes. `anti symbols
+  resolve` answers a frame through the map alone.
+  `docs/reports/2026-10-14-rules-tools.md` reports the step.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A
