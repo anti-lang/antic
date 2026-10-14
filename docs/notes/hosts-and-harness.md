@@ -144,8 +144,11 @@ asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
 
 ## Windows traps
 
-- CMake's `file(WRITE)` writes CRLF on Windows. A file compared byte for byte is written
-  with `file(CONFIGURE OUTPUT ... CONTENT ... @ONLY NEWLINE_STYLE UNIX)`.
+- CMake's `file(WRITE)` writes CRLF on Windows. A file compared, hashed or read by its
+  lines is written with `write_bytes` of `tests/program_output.cmake`, which gives the text
+  to `cmake -E echo_append` with an `OUTPUT_FILE`. `file(CONFIGURE)` with
+  `NEWLINE_STYLE UNIX` adds a newline after the last line, drops the CR of a CRLF and
+  rewrites a line of `#cmakedefine`.
 - clang for an MSVC target evaluates the arguments of a call from the last to the first.
   Two calls with effects in one argument list give other output there, in antic and in a
   C test program alike. Bind each to a local first.

@@ -51,6 +51,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/pinned_clang.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 if(LIST)
     # No case runs, so no value of a run is read.
@@ -133,7 +134,7 @@ function(anti_message name)
         math(EXPR next "${at} + 1")
         list(GET arg_FILES ${at} path)
         list(GET arg_FILES ${next} text)
-        file(WRITE "${PROJECT}/${path}" "${text}")
+        write_bytes("${PROJECT}/${path}" "${text}")
         math(EXPR at "${at} + 2")
     endwhile()
     foreach(path IN LISTS arg_DIRECTORIES)

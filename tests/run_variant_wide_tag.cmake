@@ -10,6 +10,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
@@ -24,7 +26,8 @@ file(WRITE "${WORK}/variant_wide_tag.anti"
     "\tlet w = Wide.C65535;\n"
     "\tprintf(\"%d %d\\n\".ptr, size_of(Wide) as c_int, w.tag as c_int);\n"
     "\treturn 0;\n}\n")
-file(WRITE "${WORK}/variant_wide_tag.expected" "exit 0\n4 65535\n")
+# The run compares the output with the bytes of the expected file.
+write_bytes("${WORK}/variant_wide_tag.expected" "exit 0\n4 65535\n")
 
 set(SOURCE "${WORK}/variant_wide_tag.anti")
 include("${CMAKE_CURRENT_LIST_DIR}/run_program.cmake")

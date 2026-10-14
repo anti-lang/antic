@@ -13,6 +13,22 @@ function(program_output hex status file)
     set(${status} "${code}" PARENT_SCOPE)
 endfunction()
 
+# Write <text> into <path> as its bytes, and the directories above it.
+# DESIGN: file(WRITE) writes CRLF for each LF on Windows, so a file whose
+# bytes a case compares, hashes or counts the lines of differs there
+# alone. `cmake -E echo_append` into an OUTPUT_FILE writes the bytes of
+# its argument on every host. A CMake text holds no NUL, and a case that
+# needs one writes it with poke_byte.
+function(write_bytes path text)
+    get_filename_component(directory "${path}" DIRECTORY)
+    file(MAKE_DIRECTORY "${directory}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E echo_append "${text}"
+                    OUTPUT_FILE "${path}" RESULT_VARIABLE status)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "cannot write ${path}: ${status}")
+    endif()
+endfunction()
+
 # DESIGN: an expected exit status is the one POSIX shows, which is the
 # low eight bits of what the program returned. Windows reports all
 # thirty-two, so a program that returns 521 gives 521 there and 9 on

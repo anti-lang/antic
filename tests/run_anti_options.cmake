@@ -54,6 +54,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/pinned_clang.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 
 foreach(value ANTI CASE RUNTIME WORK)
     if(NOT DEFINED ${value})
@@ -316,9 +317,10 @@ endif()
 function(shapes_and_program)
     set(project "${WORK}/project")
     file(MAKE_DIRECTORY "${project}/roots/com/example" "${project}/app")
-    file(WRITE "${project}/roots/com/example/shapes.anti"
+    # anti check compares the bytes of each file with what anti fmt writes.
+    write_bytes("${project}/roots/com/example/shapes.anti"
          "//! The shapes.\n\n/// The area of a rectangle of `w` by `h`.\npub fn area(w: int, h: int) -> int\n{\n\treturn w * h;\n}\n")
-    file(WRITE "${project}/app/main.anti"
+    write_bytes("${project}/app/main.anti"
          "//! A program that reads a module of another directory.\nimport com.example.shapes;\n\nfn main() -> int\n{\n\treturn shapes.area(2, 3);\n}\n")
     set(project "${project}" PARENT_SCOPE)
 endfunction()
