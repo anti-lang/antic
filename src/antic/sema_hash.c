@@ -458,9 +458,14 @@ const struct struct_field *sema_class_gap(struct checker *c, struct type *t)
     for (; t != NULL; t = t->base) {
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
+            /* An `own` pointer compares what it points at, and a class
+               there compares through its own `equals`. */
+            struct type *part = f->owned && f->type->kind == TYPE_POINTER &&
+                                        f->type->element->kind != TYPE_CLASS
+                                    ? f->type->element
+                                    : f->type;
             if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                (types_holds_union(f->type) ||
-                 holds_concurrent(c, f->type))) {
+                (types_holds_union(part) || holds_concurrent(c, part))) {
                 return f;
             }
         }
@@ -578,7 +583,7 @@ const char *sema_no_order(const struct type *t, const char *hook)
    hold the call of each operator the fields reach, and lowering writes
    both functions from the type with them. An
    `own` slice reaches the calls of its elements, which it compares one by
-   one. */
+   one, and an `own` pointer those of what it points at. */
 void sema_class_defaults(struct checker *c, struct item *it)
 {
     struct type *t;
@@ -604,7 +609,8 @@ void sema_class_defaults(struct checker *c, struct item *it)
                     continue;
                 }
                 walk_eq(c, e,
-                        f->owned && f->type->kind == TYPE_SLICE
+                        f->owned && (f->type->kind == TYPE_SLICE ||
+                                     f->type->kind == TYPE_POINTER)
                             ? f->type->element
                             : f->type,
                         &walked);
@@ -623,7 +629,11 @@ void sema_class_defaults(struct checker *c, struct item *it)
             for (i = 0; i < up->field_count; i++) {
                 const struct struct_field *f = &up->fields[i];
                 if (f->form == FIELD_PLAIN || f->form == FIELD_USE) {
-                    walk(c, e, f->type, &walked);
+                    walk(c, e,
+                         f->owned && f->type->kind == TYPE_POINTER
+                             ? f->type->element
+                             : f->type,
+                         &walked);
                 }
             }
         }

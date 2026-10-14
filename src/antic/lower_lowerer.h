@@ -709,8 +709,15 @@ enum lower_member {
     LOWER_MEMBER_BITS,     /* a bitfield: its value */
     LOWER_MEMBER_ELEMENTS, /* an `own` slice: its elements */
     LOWER_MEMBER_SNAPSHOT, /* an `own fn`: its code and its snapshot */
+    LOWER_MEMBER_TARGET,   /* an `own` pointer: what it points at */
     LOWER_MEMBER_PART      /* every other field: as a part of a struct */
 };
+
+/* The function of the root that a value of the class t reaches through
+   its own table, `anti_lang_Object_equals` or `anti_lang_Object_hash`
+   for the name `equals` or `hash`. */
+const struct symbol *lower_root_fn(const struct type *t,
+                                   const struct name *name);
 
 enum lower_member lower_member_of(const struct struct_field *f);
 

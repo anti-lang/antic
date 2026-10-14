@@ -416,6 +416,38 @@ struct ir_operand lower_hash(struct lowerer *l, const struct expr *e)
     return hash_value(l, lower_expr(l, receiver), t);
 }
 
+/* The hash of what the `own` pointer of type t at at points at, as the
+   default `equals` compares it: `none` as the address 0, a class through
+   the `hash` of the table of the object and any other type as a part. */
+static struct ir_operand hash_target(struct lowerer *l, const struct expr *e,
+                                     struct ir_operand at,
+                                     const struct type *t)
+{
+    const struct type *target = t->element;
+    struct ir_operand p = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+    uint32_t result = ir_unary(l->f, l->b, IR_COPY, IR_I64,
+                               hash_address(l, ir_int_op(IR_PTR, 0)));
+    struct ir_block *held = lower_new_block(l);
+    struct ir_block *join = lower_new_block(l);
+    struct ir_operand h;
+
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, p,
+                                      ir_int_op(IR_PTR, 0))),
+              held, join);
+    l->b = held;
+    if (target->kind == TYPE_CLASS) {
+        const struct symbol *root = lower_root_fn(target, &hash_name);
+        h = call_hash(l, lower_callee_function(l, root), p);
+    } else {
+        h = hash_at(l, e, p, target);
+    }
+    ir_assign(l->f, l->b, result, h);
+    ir_jump(l->f, l->b, join);
+    l->b = join;
+    return lower_temp(l, result);
+}
+
 /* The hash so far, h, with field index of level up of a class at self,
    taken as lower_member_of says, as the default `equals` compares it. */
 static struct ir_operand hash_member(struct lowerer *l, const struct expr *e,
@@ -453,6 +485,8 @@ static struct ir_operand hash_member(struct lowerer *l, const struct expr *e,
         struct ir_operand rest = hash_address(l, snapshot);
         return combine(l, h, combine(l, part, rest));
     }
+    case LOWER_MEMBER_TARGET:
+        return combine(l, h, hash_target(l, e, at, f->type));
     case LOWER_MEMBER_PART:
         return combine(l, h, hash_at(l, e, at, f->type));
     case LOWER_MEMBER_NONE:
@@ -465,7 +499,8 @@ static struct ir_operand hash_member(struct lowerer *l, const struct expr *e,
 /* DESIGN: the default `hash` of a class is code the compiler writes,
    `C.hash`. It takes the same fields its default `equals` compares, so
    two equal objects hash alike. Each field goes into the hash as a part of a
-   struct does, an `own` slice element by element. The hash of a
+   struct does, an `own` slice element by element and an `own` pointer by
+   what it points at. The hash of a
    synchronized class runs under `sync self`. */
 void lower_class_hash(struct lowerer *l, const struct item *it)
 {

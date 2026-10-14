@@ -1,6 +1,8 @@
 /* The default `==` of a struct, a class value, a tuple, a variant and a
    `?T`, which `a == b` gives on a type without `operator fn eq`. */
 
+#include <string.h>
+
 #include "lower_lowerer.h"
 
 /* DESIGN: the default compares the parts of the two values in order and
@@ -173,7 +175,29 @@ enum lower_member lower_member_of(const struct struct_field *f)
     if (f->owned && f->type->kind == TYPE_FN) {
         return LOWER_MEMBER_SNAPSHOT;
     }
+    if (f->owned && f->type->kind == TYPE_POINTER) {
+        return LOWER_MEMBER_TARGET;
+    }
     return LOWER_MEMBER_PART;
+}
+
+const struct symbol *lower_root_fn(const struct type *t,
+                                   const struct name *name)
+{
+    size_t i;
+
+    while (t->base != NULL) {
+        t = t->base;
+    }
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (m->kind == ITEM_FN && m->runtime != NULL &&
+            m->name.length == name->length &&
+            memcmp(m->name.text, name->text, name->length) == 0) {
+            return m->symbol;
+        }
+    }
+    return NULL;
 }
 
 /* Whether the scalars x and y of type t are equal, as an i8. */
@@ -480,6 +504,46 @@ static void compare_owned(struct lowerer *l, const struct expr *e,
     l->b = done;
 }
 
+/* DESIGN: the default `equals` compares what two `own` pointers point
+   at, by "Ownership and copies" in docs/anti-object-model.md and T081
+   of docs/audit/tests-findings.md. One address, `none` on both sides
+   among it, is equal. `none` on one side alone differs. A class there
+   compares through the `equals` of the table of the object, which the
+   root function of the runtime reaches, so the class the object has
+   decides and not the class of the pointer. Any other type compares as
+   the default `==` of a part of it. */
+static void compare_target(struct lowerer *l, const struct expr *e,
+                           struct comparison *cmp, struct ir_operand a,
+                           struct ir_operand b, const struct type *t)
+{
+    const struct type *target = t->element;
+    struct ir_operand x = lower_temp(l, ir_load(l->f, l->b, IR_PTR, a));
+    struct ir_operand y = lower_temp(l, ir_load(l->f, l->b, IR_PTR, b));
+    struct ir_block *apart = lower_new_block(l);
+    struct ir_block *join = lower_new_block(l);
+    struct ir_operand none_x;
+    struct ir_operand none_y;
+
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, x, y)), join,
+              apart);
+    l->b = apart;
+    none_x = lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, x,
+                                     ir_int_op(IR_PTR, 0)));
+    require(l, cmp, none_x);
+    none_y = lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, y,
+                                     ir_int_op(IR_PTR, 0)));
+    require(l, cmp, none_y);
+    if (target->kind == TYPE_CLASS) {
+        const struct symbol *root = lower_root_fn(target, &equals_name);
+        require(l, cmp, call_eq(l, lower_callee_function(l, root), x, y));
+    } else {
+        compare_at(l, e, cmp, x, y, target);
+    }
+    ir_jump(l->f, l->b, join);
+    l->b = join;
+}
+
 /* The addresses of the field f of level up of a class, at self in *a
    and at other in *b. */
 static void member_at(struct lowerer *l, const struct type *up,
@@ -531,6 +595,10 @@ static void compare_member(struct lowerer *l, const struct expr *e,
         require(l, cmp, same_word(l, a, b, second));
         return;
     }
+    case LOWER_MEMBER_TARGET:
+        member_at(l, up, f, self, other, &a, &b);
+        compare_target(l, e, cmp, a, b, f->type);
+        return;
     case LOWER_MEMBER_PART:
         member_at(l, up, f, self, other, &a, &b);
         compare_at(l, e, cmp, a, b, f->type);
@@ -614,8 +682,8 @@ static void compare_by_operator(struct lowerer *l, const struct item *it,
    The same object is equal to itself. Two objects of different classes
    are never equal, which their descriptors tell. Every field of the chain
    is then compared as the default `==` of a struct compares a part. An
-   `own` slice compares element by element and an `own fn` by its code and
-   its snapshot. A lock, a `transient` field, the sub-object of an
+   `own` slice compares element by element, an `own` pointer by what it
+   points at and an `own fn` by its code and its snapshot. A lock, a `transient` field, the sub-object of an
    interface and a field that holds a union or a Match are passed over.
    A class whose module gives it `operator fn eq` compares through it.
    A synchronized class compares under `sync self, other`, which takes
