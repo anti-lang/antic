@@ -1,0 +1,18 @@
+//! An owning local named after it moved into an array literal. The array holds
+//! the only owner.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	let xs = [a, Key { n: 2 }];
+	return a.n;
+}

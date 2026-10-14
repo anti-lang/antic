@@ -1,6 +1,7 @@
-//! A local that holds a class with a `destruct`, named in an array literal. An
-//! element of an array literal is a copy, and the local would stay a second
-//! owner.
+//! An element of an array that holds a class with a `destruct`, named in an
+//! array literal. The element stays where it is, so the literal would hold a
+//! copy and the array would stay a second owner. A local moves there, by R079
+//! of "Rules of 2026-10-13".
 
 class Counted
 {
@@ -18,7 +19,7 @@ fn counted(n: int) -> Counted
 
 fn main() -> int
 {
-	let a = counted(1);
-	let xs = [a, counted(2)];
+	let held = [counted(1), counted(2)];
+	let xs = [held[0], counted(3)];
 	return 0;
 }

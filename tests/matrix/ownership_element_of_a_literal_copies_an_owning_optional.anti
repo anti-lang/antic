@@ -1,6 +1,7 @@
-//! A local that holds a `?T` of an owning value, named in an array literal. An
-//! element of an array literal is a copy, and the local would stay a second
-//! owner.
+//! An element of an array that holds a `?T` of an owning value, named in an
+//! array literal. The element stays where it is, so the literal would hold a
+//! copy and the array would stay a second owner. A local moves there, by R079
+//! of "Rules of 2026-10-13".
 
 class Leaf
 {
@@ -25,7 +26,7 @@ fn maybe(n: int) -> ?Key
 
 fn main() -> int
 {
-	let a = maybe(1);
-	let xs = [a, maybe(2)];
+	let held = [maybe(1), maybe(2)];
+	let xs = [held[0], maybe(3)];
 	return 0;
 }

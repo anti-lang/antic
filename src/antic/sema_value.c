@@ -549,9 +549,9 @@ bool sema_refuse_caller_value(struct checker *c, const struct expr *value)
     return true;
 }
 
-/* DESIGN: an owning local named in a tuple literal, a struct literal, a
-   class literal or the literal of a variant case moves into it, as into
-   an `own` parameter. A copy would give what it owns two owners, the
+/* DESIGN: an owning local named in a tuple literal, an array literal, a
+   struct literal, a class literal or the literal of a variant case moves
+   into it, as into an `own` parameter. A copy would give what it owns two owners, the
    local and the literal, and both would tear it down. So does an `own`
    parameter, and a local of a type parameter, which may own something in
    a copy. A parameter that is not `own` belongs to the caller, and

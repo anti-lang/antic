@@ -1,0 +1,19 @@
+exit 0
+a class with a destruct: 1 2 3, alive 3
+after the block: alive 0
+a class with an own field: 2 1, alive 2
+an owning struct: 1 2, alive 2
+an owning tuple: 1 2, alive 2
+an owning variant: 1 1, alive 1
+an owning optional: 1 1, alive 2
+an owning array: 101 2, alive 4
+after the blocks: alive 0
+a later element reads the local: 7 8, alive 2
+an own parameter: 9 10, alive 2
+after the function: 9, alive 0
+in a generic: 11 12 13 14, alive 2
+returned: 20 21, alive 4
+on one path: 30, alive 6
+after the path: alive 4
+after the path: alive 5
+a local that owns nothing stays: 5 6 5

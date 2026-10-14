@@ -325,6 +325,9 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
                 lower_offset_address(l, dest,
                                      lower_element_offset(l, t->element, i)));
         }
+        for (i = 0; i < e->as.array_lit.count; i++) {
+            lower_clear_moved(l, e->as.array_lit.elements[i]);
+        }
         break;
     /* `(a, b)` writes one element per field, which is what a struct
        literal of the same types writes. */

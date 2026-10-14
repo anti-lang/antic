@@ -1,0 +1,18 @@
+//! An owning local named twice in one array literal. It moves into the first
+//! element, and the second would hold the same value again.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let a = Key { n: 1 };
+	let xs = [a, a];
+	return 0;
+}

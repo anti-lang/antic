@@ -2223,12 +2223,23 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             } else {
                 ok = sema_require(c, item, it, element) && ok;
             }
-            sema_refuse_owned_copy(c, item, it);
+            /* DESIGN: an owning local moves into an array literal, as
+               into a tuple, by R079 of "Rules of 2026-10-13". */
+            if (sema_literal_moves(item)) {
+                sema_refuse_lock_copy(c, item, it);
+            } else {
+                sema_refuse_owned_copy(c, item, it);
+            }
         }
         if (!ok || sema_is_error(element)) {
             return sema_builtin(c, TYPE_ERROR);
         }
-        return types_array(c->types, element, e->as.array_lit.count);
+        t = types_array(c->types, element, e->as.array_lit.count);
+        for (i = 0; i < e->as.array_lit.count; i++) {
+            sema_move_into_literal(c, e->as.array_lit.elements[i],
+                                   sema_tn(t));
+        }
+        return t;
     }
     /* `(a, b)` builds a tuple of the types of its elements. A context
        that names a tuple of the same count gives each element its type.

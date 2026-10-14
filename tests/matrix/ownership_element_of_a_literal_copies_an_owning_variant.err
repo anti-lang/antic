@@ -1,1 +1,1 @@
-ownership_element_of_a_literal_copies_an_owning_variant.anti:35:12: error: `Shape` owns what its parts own, use `dup` instead of `=`
+ownership_element_of_a_literal_copies_an_owning_variant.anti:36:12: error: `Shape` owns what its parts own, use `dup` instead of `=`

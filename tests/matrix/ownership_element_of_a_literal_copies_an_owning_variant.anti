@@ -1,6 +1,7 @@
-//! A local that holds a variant with an owning case, named in an array literal.
-//! An element of an array literal is a copy, and the local would stay a second
-//! owner.
+//! An element of an array that holds a variant with an owning case, named in an
+//! array literal. The element stays where it is, so the literal would hold a
+//! copy and the array would stay a second owner. A local moves there, by R079
+//! of "Rules of 2026-10-13".
 
 class Leaf
 {
@@ -31,7 +32,7 @@ fn shape(n: int) -> Shape
 
 fn main() -> int
 {
-	let a = shape(1);
-	let xs = [a, shape(2)];
+	let held = [shape(1), shape(2)];
+	let xs = [held[0], shape(3)];
 	return 0;
 }
