@@ -12,4 +12,13 @@
 
 #define ANTI_PLUGIN_INDEX "anti-plugins.toml"
 
+/* DESIGN: antic writes the modules a plugin reaches into its library as
+   the bytes of ANTI_PLUGIN_MODULES_SYMBOL: this text, then each module
+   path after one space, ended by a NUL. A library whose load fails
+   because the host lacks a symbol shows no table, so the loader finds
+   the list in the bytes of the file and names the module of the symbol,
+   by R133 of "Rules of 2026-10-13". */
+#define ANTI_PLUGIN_MODULES "anti-plugin-modules:"
+#define ANTI_PLUGIN_MODULES_SYMBOL "anti_rt_plugin_modules"
+
 #endif

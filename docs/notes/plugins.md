@@ -118,6 +118,18 @@ The version checks of each interface follow, in `docs/notes/versions.md`.
 The classes of the library then join the host's registry, so
 `reflect.new` finds one by name.
 
+A library that uses a module its host does not import fails to open, and
+the platform names the first symbol the host lacks. antic writes the
+modules a plugin reaches into its library as `anti_rt_plugin_modules`,
+the text `anti-plugin-modules:` and each module path after a space. The
+loader finds that text in the bytes of the file and names the longest
+module the symbol starts with: `` libclock.dylib uses `anti.time`, which
+this program does not import ``, by R133 of "Rules of 2026-10-13". A
+reason that names no such symbol stays the message of the platform.
+`src/rt/plugin_index.h` holds the text and the name of the symbol for
+both sides. A Windows plugin links against the import library of its
+host, where the same lack stops the link of the library.
+
 `instance` allocates the size the class descriptor gives, calls the
 function that prepares an object and moves the pointer by the offset of
 the sub-object. A class whose `construct` takes arguments is refused

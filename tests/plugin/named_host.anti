@@ -1,0 +1,23 @@
+//! A host that does not import `anti.time`, which its library uses. The load
+//! fails, and the message names the module after the path of the library, by
+//! R133 of "Rules of 2026-10-13".
+
+import anti.lang;
+import anti.plugin;
+import net.example.tasks;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch e {
+		let reason = e.message[args[1].len..e.message.len];
+		printf("the load failed:%.*s\n".ptr, reason.len, reason.ptr);
+		return 0;
+	};
+	let t = lib.instance(tasks.Tasks) catch fatal;
+	printf("loaded %lld\n".ptr, t.squares(4));
+	delete(t);
+	delete(lib);
+	return 0;
+}

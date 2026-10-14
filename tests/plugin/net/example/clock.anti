@@ -1,0 +1,34 @@
+//! A library that uses one module of the standard library, `anti.time`, which
+//! imports nothing. It carries none of it and resolves it against its host.
+
+import anti.time;
+import net.example.tasks;
+
+provides net.example.tasks.Tasks as Timed;
+
+/// The tasks of the library.
+pub class Timed
+{
+	implements t: tasks.Tasks,
+
+	/// The number a local object of the library holds.
+	pub concrete fn local(self, with_destruct: bool) -> int
+	{
+		return 0;
+	}
+
+	/// The empty text.
+	pub concrete fn label(self, n: int) -> str
+	{
+		return "";
+	}
+
+	/// `n` when the clock runs, and 0 otherwise.
+	pub concrete fn squares(self, n: int) -> int
+	{
+		if time.now() > 0 {
+			return n;
+		}
+		return 0;
+	}
+}

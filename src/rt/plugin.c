@@ -624,6 +624,136 @@ static const char *damage_of(const struct anti_provided *table)
     return NULL;
 }
 
+/* The longest a symbol or a module path of a message of the loader is. */
+enum { ANTI_MODULE_NAME = 256 };
+
+/* The largest library whose bytes the loader reads for the modules it
+   reaches. */
+#define ANTI_LIBRARY_READ_MAX ((size_t)1 << 30)
+
+/* The symbol that the reason of the platform names as missing, without
+   the _ that Mach-O puts before a C name, into out. glibc writes
+   `undefined symbol: name` and dyld `symbol not found in flat namespace
+   '_name'`. Gives 0 when the reason names none. */
+static int missing_symbol(const char *reason, char *out, size_t size)
+{
+    static const char *const forms[] = {
+        "undefined symbol: ", "symbol not found in flat namespace '"};
+    size_t i;
+
+    for (i = 0; i < sizeof forms / sizeof *forms; i++) {
+        const char *at = strstr(reason, forms[i]);
+        size_t length = 0;
+        if (at == NULL) {
+            continue;
+        }
+        at += strlen(forms[i]);
+        if (i == 1 && *at == '_') {
+            at++;
+        }
+        while (at[length] != '\0' && at[length] != '\'' &&
+               at[length] != ' ' && at[length] != ',' && at[length] != '\n') {
+            length++;
+        }
+        if (length == 0 || length >= size) {
+            return 0;
+        }
+        memcpy(out, at, length);
+        out[length] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+/* The bytes of the file at path, which the caller frees, with their count
+   in *length, or NULL. */
+static unsigned char *file_bytes(const char *path, size_t *length)
+{
+    FILE *file = anti_rt_file_open(path, ANTI_FILE_READ);
+    unsigned char *bytes = NULL;
+    size_t capacity = 0;
+    size_t count = 0;
+
+    if (file == NULL) {
+        return NULL;
+    }
+    for (;;) {
+        size_t got;
+        if (count == capacity) {
+            unsigned char *grown;
+            if (capacity >= ANTI_LIBRARY_READ_MAX) {
+                break;
+            }
+            capacity = capacity == 0 ? 65536 : capacity * 2;
+            grown = realloc(bytes, capacity);
+            if (grown == NULL) {
+                break;
+            }
+            bytes = grown;
+        }
+        got = fread(bytes + count, 1, capacity - count, file);
+        count += got;
+        if (got == 0) {
+            break;
+        }
+    }
+    fclose(file);
+    *length = count;
+    return bytes;
+}
+
+/* DESIGN: a library that uses a module its host does not import fails
+   to load, and the platform names the first symbol it lacks. The symbol
+   starts with the path of its module, and the list antic writes into the
+   library, which src/rt/plugin_index.h describes, tells where that path
+   ends: the longest module of the list that the symbol starts with,
+   followed by a dot. Writes it into out, or gives 0 when the reason
+   names no symbol of a module of the list. */
+static int missing_module(const char *path, const char *reason, char *out,
+                          size_t size)
+{
+    static const char marker[] = ANTI_PLUGIN_MODULES;
+    char symbol[ANTI_MODULE_NAME];
+    unsigned char *bytes;
+    size_t length = 0;
+    size_t best = 0;
+    size_t at;
+    size_t symbol_length;
+
+    if (!missing_symbol(reason, symbol, sizeof symbol)) {
+        return 0;
+    }
+    symbol_length = strlen(symbol);
+    bytes = file_bytes(path, &length);
+    if (bytes == NULL) {
+        return 0;
+    }
+    for (at = 0; at + sizeof marker - 1 <= length; at++) {
+        if (memcmp(bytes + at, marker, sizeof marker - 1) == 0) {
+            break;
+        }
+    }
+    at += sizeof marker - 1;
+    while (at < length && bytes[at] == ' ') {
+        size_t start = ++at;
+        size_t module_length;
+        while (at < length && bytes[at] != ' ' && bytes[at] != '\0') {
+            at++;
+        }
+        module_length = at - start;
+        if (module_length > best && module_length < symbol_length &&
+            module_length < size &&
+            memcmp(symbol, bytes + start, module_length) == 0 &&
+            symbol[module_length] == '.') {
+            memcpy(out, bytes + start, module_length);
+            out[module_length] = '\0';
+            best = module_length;
+        }
+    }
+    free(bytes);
+    return best > 0;
+}
+
 /* DESIGN: the library is opened and closed outside the lock of the
    slots. A constructor or a destructor of a library may then make an
    object, whose `created` hook takes the lock, without waiting for
@@ -654,7 +784,14 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
     }
     handle = anti_rt_library_open(name);
     if (handle == NULL) {
-        fail("%s: %s", name, anti_rt_library_error(why, sizeof why));
+        const char *reason = anti_rt_library_error(why, sizeof why);
+        char module[ANTI_MODULE_NAME];
+        if (missing_module(name, reason, module, sizeof module)) {
+            fail("%s uses `%s`, which this program does not import", name,
+                 module);
+        } else {
+            fail("%s: %s", name, reason);
+        }
         return NULL;
     }
     table = anti_rt_library_symbol(handle, "anti_rt_provides");

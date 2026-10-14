@@ -5673,6 +5673,25 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/bare_host.expected"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
 endif()
+# R133 of "Rules of 2026-10-13": the message of such a load names the
+# module the host lacks. The library uses `anti.time` alone, which imports
+# nothing, so one module is missing on every host.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME plugin_module_named
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-module-named"
+            "-DHOST=named_host"
+            "-DLIBRARY=clock"
+            "-DINTERFACE=tasks"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/named_host.expected"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+endif()
 # A provided class that the loader cannot build without arguments: one
 # whose `construct` takes one, and one that holds such a class in a field
 # no default fills. `instance` gives `none` for each, and the link of the

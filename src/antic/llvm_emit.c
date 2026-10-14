@@ -12,6 +12,7 @@
 #include "llvm_debug.h"
 #include "llvm_target.h"
 #include "rt_abi.h"
+#include "../rt/plugin_index.h"
 
 /* DESIGN: the IR is not in SSA form, so every temporary gets an alloca in
    the entry block. A definition stores into it and each use loads from
@@ -3520,6 +3521,53 @@ static void import_table(struct emitter *e)
                  text_cstr(&e->places));
 }
 
+/* Whether module is among the count entries of list. */
+static bool listed(const char *const *list, size_t count, const char *module)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (strcmp(list[i], module) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The list of the modules a plugin reaches, every module of its
+   functions and globals in the order they come, which
+   src/rt/plugin_index.h describes. */
+static void plugin_modules(struct emitter *e, const struct ir_module *m)
+{
+    const char **list;
+    struct text bytes = {0};
+    size_t count = 0;
+    size_t i;
+
+    if (!m->plugin) {
+        return;
+    }
+    list = alloc_zeroed(m->function_count + m->global_count + 1, sizeof *list);
+    for (i = 0; i < m->function_count + m->global_count; i++) {
+        const char *module = i < m->function_count
+                                 ? m->functions[i]->module
+                                 : m->globals[i - m->function_count]->module;
+        if (module != NULL && !listed(list, count, module)) {
+            list[count++] = module;
+        }
+    }
+    text_append(&bytes, ANTI_PLUGIN_MODULES);
+    for (i = 0; i < count; i++) {
+        text_appendf(&bytes, " %s", list[i]);
+    }
+    text_appendf(e->out, "@%s = dso_local constant [%zu x i8] c\"%s\\00\", "
+                         "align 1\n",
+                 ANTI_PLUGIN_MODULES_SYMBOL, bytes.length + 1,
+                 text_cstr(&bytes));
+    text_free(&bytes);
+    free(list);
+}
+
 static void global(struct emitter *e, const struct ir_global *g, bool twin)
 {
     enum target t = e->o->target;
@@ -4070,6 +4118,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     }
     free(symbols);
     import_table(&e);
+    plugin_modules(&e, m);
     constructors(&e, m);
     roots(&e, m);
     if (!e.failed) {
