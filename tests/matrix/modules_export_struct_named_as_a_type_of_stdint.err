@@ -1,0 +1,1 @@
+modules_export_struct_named_as_a_type_of_stdint.anti:4:15: error: the exported name `int_fast16_t` is defined by `<stdint.h>`, which the header includes

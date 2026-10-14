@@ -1,0 +1,12 @@
+//! R130 of "Rules of 2026-10-13": an exported struct takes no name that a
+//! header of the C standard library defines. `<stdint.h>` defines `int_fast16_t`.
+
+export struct int_fast16_t
+{
+	n: i32,
+}
+
+fn main() -> int
+{
+	return 0;
+}

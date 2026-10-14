@@ -317,7 +317,7 @@ A C compiler passes the first arguments in registers and the rest on the stack, 
 | `export const LIMIT: c_int = 8;` | a `#define`, or a `static const` for a `str` |
 | `export type IntList = List<int>;` | one copy of a generic struct or class, under the name `IntList` |
 
-A function without `export` has the symbol `module.name`, with the dot, which no C program can write. Two modules of one program may not export the same name.
+A function without `export` has the symbol `module.name`, with the dot, which no C program can write. Two modules of one program may not export the same name, and an exported name is none that `<stdbool.h>`, `<stddef.h>` or `<stdint.h>` defines, as `SIZE_MAX`, since the header includes the three.
 
 The signature of an `export fn` and the fields of an `export struct` hold types that C can write.
 

@@ -1,0 +1,1 @@
+modules_export_function_named_as_a_macro_of_stddef.anti:4:11: error: the exported name `offsetof` is defined by `<stddef.h>`, which the header includes

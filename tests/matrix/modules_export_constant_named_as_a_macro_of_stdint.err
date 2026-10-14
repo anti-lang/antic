@@ -1,0 +1,1 @@
+modules_export_constant_named_as_a_macro_of_stdint.anti:5:14: error: the exported name `SIZE_MAX` is defined by `<stdint.h>`, which the header includes

@@ -1,0 +1,20 @@
+//! R130 of "Rules of 2026-10-13" refuses an exported name that a header of the
+//! C standard library defines, and a name that only starts as one of them stays
+//! taken: `INTERVAL`, `SIZE_LIMIT` and `uint8_t_count`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+export const INTERVAL: i32 = 5;
+
+export const SIZE_LIMIT: i32 = 7;
+
+export fn uint8_t_count() -> i32
+{
+	return 8;
+}
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, INTERVAL, SIZE_LIMIT, uint8_t_count());
+	return 0;
+}

@@ -328,15 +328,119 @@ static void check_nested_fields(struct checker *c, const struct item *cls,
     }
 }
 
+/* Whether name is one of the count texts of names. */
+static bool name_among(const struct name *name, const char *const *names,
+                       size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (sema_name_is(name, names[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Whether <stdint.h> defines name: a type of a fixed, least or fast
+   width, its limits, its width and its constant macro, and the types and
+   limits of pointers, of the largest integers and of the other types of
+   the header. */
+static bool stdint_defines(const struct name *name)
+{
+    static const char *const fixed[] = {
+        "intptr_t", "uintptr_t", "intmax_t", "uintmax_t", "INTPTR_MIN",
+        "INTPTR_MAX", "INTPTR_WIDTH", "UINTPTR_MAX", "UINTPTR_WIDTH",
+        "INTMAX_MIN", "INTMAX_MAX", "INTMAX_WIDTH", "UINTMAX_MAX",
+        "UINTMAX_WIDTH", "INTMAX_C", "UINTMAX_C", "PTRDIFF_MIN",
+        "PTRDIFF_MAX", "PTRDIFF_WIDTH", "SIG_ATOMIC_MIN", "SIG_ATOMIC_MAX",
+        "SIG_ATOMIC_WIDTH", "SIZE_MAX", "SIZE_WIDTH", "WCHAR_MIN",
+        "WCHAR_MAX", "WCHAR_WIDTH", "WINT_MIN", "WINT_MAX", "WINT_WIDTH"};
+    static const char *const kinds[] = {"", "_least", "_fast"};
+    static const char *const macro_kinds[] = {"", "_LEAST", "_FAST"};
+    static const int widths[] = {8, 16, 32, 64};
+    char made[5][32];
+    size_t k;
+    size_t w;
+    size_t m;
+
+    if (name_among(name, fixed, sizeof fixed / sizeof *fixed)) {
+        return true;
+    }
+    for (k = 0; k < sizeof kinds / sizeof *kinds; k++) {
+        for (w = 0; w < sizeof widths / sizeof *widths; w++) {
+            const char *const each[] = {made[0], made[1], made[2], made[3],
+                                        made[4]};
+            text_format(made[0], sizeof made[0], "int%s%d_t", kinds[k],
+                        widths[w]);
+            text_format(made[1], sizeof made[1], "uint%s%d_t", kinds[k],
+                        widths[w]);
+            text_format(made[2], sizeof made[2], "INT%s%d_MIN",
+                        macro_kinds[k], widths[w]);
+            text_format(made[3], sizeof made[3], "INT%s%d_MAX",
+                        macro_kinds[k], widths[w]);
+            text_format(made[4], sizeof made[4], "UINT%s%d_MAX",
+                        macro_kinds[k], widths[w]);
+            if (name_among(name, each, 5)) {
+                return true;
+            }
+            text_format(made[0], sizeof made[0], "INT%s%d_WIDTH",
+                        macro_kinds[k], widths[w]);
+            text_format(made[1], sizeof made[1], "UINT%s%d_WIDTH",
+                        macro_kinds[k], widths[w]);
+            m = 2;
+            if (k == 0) {
+                text_format(made[2], sizeof made[2], "INT%d_C", widths[w]);
+                text_format(made[3], sizeof made[3], "UINT%d_C", widths[w]);
+                m = 4;
+            }
+            if (name_among(name, each, m)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* The header of the C standard library that defines name, of the three
+   that the header of a library includes, or NULL. */
+static const char *c_library_header(const struct name *name)
+{
+    static const char *const stdbool[] = {"bool", "true", "false",
+                                          "__bool_true_false_are_defined"};
+    static const char *const stddef[] = {
+        "NULL", "offsetof", "ptrdiff_t", "size_t", "max_align_t", "wchar_t",
+        "nullptr_t", "unreachable"};
+
+    if (name_among(name, stdbool, sizeof stdbool / sizeof *stdbool)) {
+        return "<stdbool.h>";
+    }
+    if (name_among(name, stddef, sizeof stddef / sizeof *stddef)) {
+        return "<stddef.h>";
+    }
+    return stdint_defines(name) ? "<stdint.h>" : NULL;
+}
+
 /* DESIGN: an export item has a C symbol and appears in a C header. Its
    types have a C representation, its name is not main, and no other module
-   exports the same name. */
+   exports the same name. Its name is none that a header the generated
+   header includes defines, by R130 of "Rules of 2026-10-13": `<stdbool.h>`,
+   `<stddef.h>` and `<stdint.h>`. A C program that reads the header sees
+   their names before the item's. */
 void sema_check_export(struct checker *c, struct item *it)
 {
     const struct type *t = it->symbol->type;
+    const char *header = c_library_header(&it->name);
     char what[160];
     size_t i;
     size_t j;
+
+    if (header != NULL) {
+        sema_error_at(c, it->name_pos, "the exported name `%.*s` is defined "
+                      "by `%s`, which the header includes",
+                      (int)it->name.length, it->name.text, header);
+        return;
+    }
 
     switch (it->kind) {
     case ITEM_FN:
