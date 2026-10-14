@@ -509,7 +509,7 @@ cc main.c dist/macos-arm64/release/libgeo.a ../build/runtime/lib/macos-arm64/lib
 
 With `--bundle-runtime` after `--lib static`, the same command prints `cc main.c dist/macos-arm64/release/libgeo.a`.
 
-The option `--soname` writes the version from `anti.toml` into a shared library. On Linux the file is `lib<name>.so.<major>` with a `lib<name>.so` symlink, and on macOS the install name and the compatibility version carry it. Windows has no equivalent, and without the option a library carries no version. The major version is the compatibility version. A change to any exported signature or struct requires a new major version. The subcommand `anti publish` enforces it by comparing the exported interface with the previous version in the index.
+The option `--soname` writes the version from `anti.toml` into a shared library. On Linux the file is `lib<name>.so.<major>` with a `lib<name>.so` symlink, and on macOS the compatibility version and the current version carry it. Windows has no equivalent, and without the option a library carries no version. Every library of macOS has the install name `@rpath/<file name>`, with the option and without it, so a program that links one names its directory with `-rpath`. The major version is the compatibility version. A change to any exported signature or struct requires a new major version. The subcommand `anti publish` enforces it by comparing the exported interface with the previous version in the index.
 
 ```sh
 ../build/antic --lib shared --soname --package-version 1.2.4 \

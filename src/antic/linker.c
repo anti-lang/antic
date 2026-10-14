@@ -961,9 +961,13 @@ static void macos_shared(struct link_command *c, enum target t,
     add(c, "-o");
     add(c, in->executable);
     drop_unused(c, t, in);
+    /* DESIGN: by R151 of "Rules of 2026-10-13" every library of macOS
+       has the install name @rpath/<file name>, so a program finds it
+       through its rpath and not at the path the link wrote it to.
+       --soname adds the two versions. */
+    add(c, "-install_name");
+    add(c, text_cstr(install));
     if (s->major != NULL) {
-        add(c, "-install_name");
-        add(c, text_cstr(install));
         add(c, "-compatibility_version");
         add(c, text_cstr(compat));
         add(c, "-current_version");

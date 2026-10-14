@@ -203,9 +203,11 @@ The header states this in its top comment.
 ## Versioning
 
 `anti build --lib shared --soname` writes the version from `anti.toml` into the file:
-`libgeometry.so.1` with a `libgeometry.so` symlink on Linux, `-install_name` and
-`-compatibility_version` on macOS, no equivalent on Windows. Without the flag the
-library carries no version. The major version is the compatibility version. A change to
+`libgeometry.so.1` with a `libgeometry.so` symlink on Linux, `-compatibility_version`
+and `-current_version` on macOS, no equivalent on Windows. Without the flag the library
+carries no version. Every library of macOS has the install name `@rpath/<file name>`,
+with the flag and without it, so a program that links one names its directory with
+`-rpath`. The major version is the compatibility version. A change to
 any exported signature or struct requires a major bump, and `anti publish` compares the
 exported interface of the previous version in the index to enforce it.
 

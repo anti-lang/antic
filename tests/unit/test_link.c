@@ -393,7 +393,8 @@ static void libraries(void)
     in.executable = "libgeo.dylib";
     shared(TARGET_MACOS_ARM64, &in, &none,
            "ld -dylib -S -arch arm64 -platform_version macos 11.0 15.4 "
-           "-syslibroot /sdk -o libgeo.dylib -dead_strip geo.o "
+           "-syslibroot /sdk -o libgeo.dylib -dead_strip -install_name "
+           "@rpath/libgeo.dylib geo.o "
            "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
     shared(TARGET_MACOS_X86_64, &in, &versioned,
            "ld -dylib -S -arch x86_64 -platform_version macos 11.0 15.4 "
@@ -435,8 +436,8 @@ static void libraries(void)
     shared(TARGET_MACOS_ARM64, &in, &none,
            "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos "
            "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib -dead_strip "
-           "--icf=safe geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
-           "-lSystem");
+           "--icf=safe -install_name @rpath/libgeo.dylib geo.o "
+           "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
     in.executable = "libgeo.so.1";
     shared(TARGET_LINUX_X86_64, &in, &versioned,
            "/rt/bin/ld.lld -shared --exclude-libs ALL --strip-debug "
@@ -916,7 +917,8 @@ static void shared_modes(void)
     shared(TARGET_MACOS_ARM64, &in, &none,
            "/rt/bin/ld64.lld -dylib -S -arch arm64 -platform_version macos "
            "11.0 26.5 -syslibroot /rt/sysroot/t -o libgeo.dylib -dead_strip "
-           "--icf=safe geo.o /rt/lib/macos-arm64/armv8.5/libanti_rt.a "
+           "--icf=safe -install_name @rpath/libgeo.dylib geo.o "
+           "/rt/lib/macos-arm64/armv8.5/libanti_rt.a "
            "/rt/lib/macos-arm64/libclang_rt.asan_osx_dynamic.dylib -rpath "
            "/abs/rt/lib/macos-arm64 -lSystem");
     in = lld_windows_inputs;

@@ -16,7 +16,8 @@
 #   strip_docs         `build --strip-docs` writes a library file without
 #                      its doc text
 #   soname_macos       `build --lib shared --soname` writes the install
-#                      name and the two versions of a library of macOS
+#                      name and the two versions of a library of macOS,
+#                      and without it the install name alone
 #   soname_linux       it writes the soname of a library of Linux
 #   soname_linux_dist  and dist/ holds the file that soname names, with
 #                      the link beside it
@@ -179,9 +180,13 @@ if(CASE STREQUAL "soname_macos")
     two_libraries(${HOST})
     dylib_id("${plain}/libshapes.dylib" without)
     dylib_id("${option}/libshapes.dylib" with)
-    if(NOT without MATCHES "^[^@][^ ]* 0\\.0\\.0 0\\.0\\.0$")
-        message(FATAL_ERROR "the library without --soname carries a "
-                            "version: ${without}")
+    # R151 of "Rules of 2026-10-13": without --soname the install name is
+    # @rpath/<file name> as well, and the library carries no version.
+    if(NOT without STREQUAL "@rpath/libshapes.dylib 0.0.0 0.0.0")
+        message(FATAL_ERROR "the library without --soname has the install "
+                            "name and the versions `${without}`, and the "
+                            "test expects `@rpath/libshapes.dylib 0.0.0 "
+                            "0.0.0`")
     endif()
     if(NOT with STREQUAL "@rpath/libshapes.dylib 2.0.1 2.0.0")
         message(FATAL_ERROR "the library of --soname has the install name, "

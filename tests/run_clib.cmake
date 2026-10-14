@@ -128,9 +128,21 @@ endfunction()
 # With SYSROOT the same holds for a macOS target and ld64.lld.
 # A program whose inputs name no runtime of Anti takes the one of the
 # lowest level of the target, for the start of a program it holds.
+# A library of macOS has the install name @rpath/<file name>, by R151 of
+# "Rules of 2026-10-13", so the program takes the directory of each as an
+# rpath.
 function(program output)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "OPTIONS;SOURCES;INPUTS")
     set(objects "")
+    set(rpaths "")
+    set(cc_rpaths "")
+    foreach(input IN LISTS arg_INPUTS)
+        if(input MATCHES "\\.dylib$")
+            get_filename_component(where "${input}" DIRECTORY)
+            list(APPEND rpaths -rpath "${where}")
+            list(APPEND cc_rpaths "-Wl,-rpath,${where}")
+        endif()
+    endforeach()
     if("${TARGET}" MATCHES "^windows-" OR MACOS_LINK)
         foreach(source IN LISTS arg_SOURCES)
             get_filename_component(name "${source}" NAME_WE)
@@ -150,10 +162,11 @@ function(program output)
         run("${LLD_LINK}" ${WINDOWS_LINK} "/OUT:${output}" ${objects}
             ${inputs} ${ANTIC_WINDOWS_LIBRARIES})
     elseif(MACOS_LINK)
-        run("${LD64}" ${MACOS_LINK} ${objects} ${arg_INPUTS} -o "${output}")
-    else()
-        run(${CC} ${arg_OPTIONS} ${arg_SOURCES} ${arg_INPUTS} ${LINK}
+        run("${LD64}" ${MACOS_LINK} ${objects} ${arg_INPUTS} ${rpaths}
             -o "${output}")
+    else()
+        run(${CC} ${arg_OPTIONS} ${arg_SOURCES} ${arg_INPUTS} ${cc_rpaths}
+            ${LINK} -o "${output}")
     endif()
 endfunction()
 
