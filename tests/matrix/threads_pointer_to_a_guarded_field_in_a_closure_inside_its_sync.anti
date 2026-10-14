@@ -1,6 +1,6 @@
 //! A pointer to a guarded field is used inside a `sync` on its lock, of the
-//! same function or of the same closure. An anonymous function inside the
-//! block may run after it, and is refused.
+//! same function or of the same closure. An anonymous function inside the block
+//! may run after it, and is refused.
 
 concurrent class Tally
 {

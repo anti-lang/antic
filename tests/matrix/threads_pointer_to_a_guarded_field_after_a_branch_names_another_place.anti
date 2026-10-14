@@ -1,5 +1,5 @@
-//! A `=` inside a branch gives the variable another place on one path alone,
-//! so the pointer to the guarded field is still refused after the branch.
+//! A `=` inside a branch gives the variable another place on one path alone, so
+//! the pointer to the guarded field is still refused after the branch.
 
 concurrent class Tally
 {

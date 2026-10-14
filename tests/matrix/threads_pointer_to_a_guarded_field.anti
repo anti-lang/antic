@@ -1,5 +1,5 @@
-//! A pointer to a guarded field that was taken inside the `sync` on its lock
-//! is used in the block that took it, in a block inside it as well. A variable
+//! A pointer to a guarded field that was taken inside the `sync` on its lock is
+//! used in the block that took it, in a block inside it as well. A variable
 //! that names another place since is used anywhere.
 
 extern fn printf(format: ?*byte, ...) -> c_int;

@@ -1,5 +1,5 @@
-//! A slice of a guarded array field reaches the field as a pointer to it
-//! does, and its use after the `sync` block is refused.
+//! A slice of a guarded array field reaches the field as a pointer to it does,
+//! and its use after the `sync` block is refused.
 
 concurrent class Tally
 {

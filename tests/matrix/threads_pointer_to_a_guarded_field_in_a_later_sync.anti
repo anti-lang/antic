@@ -1,5 +1,5 @@
-//! A pointer to a guarded field is good inside the `sync` block that took it.
-//! A later block on the same lock is after that block, and a use there is
+//! A pointer to a guarded field is good inside the `sync` block that took it. A
+//! later block on the same lock is after that block, and a use there is
 //! refused.
 
 concurrent class Tally
