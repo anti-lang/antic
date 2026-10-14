@@ -30,6 +30,15 @@ struct stack_call {
     void *context;
 };
 
+/* The tool that names itself in the message of a program it cannot
+   start. R163 of "Rules of 2026-10-13". */
+static const char *tool = "antic";
+
+void platform_set_tool(const char *name)
+{
+    tool = name;
+}
+
 /* DESIGN: the host is fixed when the tools are compiled, from the
    compiler's predefined macros. The antic_host_target test compares the
    result with the name CMake computes. */
@@ -419,8 +428,8 @@ static int start(const char *directory, const char *const argv[],
         wide_directory = platform_widen(directory);
     }
     if (wide == NULL || (directory != NULL && wide_directory == NULL)) {
-        fprintf(stderr, "antic: cannot run %s: a path is not UTF-8\n",
-                argv[0]);
+        fprintf(stderr, "%s: cannot run %s: a path is not UTF-8\n",
+                tool, argv[0]);
         free(wide);
         return -1;
     }
@@ -439,7 +448,7 @@ static int start(const char *directory, const char *const argv[],
     free(wide_directory);
     free(application);
     if (!started) {
-        fprintf(stderr, "antic: cannot run %s: error %lu\n", argv[0],
+        fprintf(stderr, "%s: cannot run %s: error %lu\n", tool, argv[0],
                 (unsigned long)GetLastError());
         return -1;
     }
@@ -728,7 +737,8 @@ static int spawn(const char *const argv[], posix_spawn_file_actions_t *actions,
     int err = posix_spawnp(pid, argv[0], actions, NULL,
                            (char *const *)argv, environ);
     if (err != 0) {
-        fprintf(stderr, "antic: cannot run %s: %s\n", argv[0], strerror(err));
+        fprintf(stderr, "%s: cannot run %s: %s\n", tool, argv[0],
+                strerror(err));
         return -1;
     }
     return 0;
@@ -756,16 +766,17 @@ int process_run_in(const char *directory, const char *const argv[])
     }
     pid = fork();
     if (pid < 0) {
-        fprintf(stderr, "antic: cannot run %s: %s\n", argv[0], strerror(errno));
+        fprintf(stderr, "%s: cannot run %s: %s\n", tool, argv[0],
+                strerror(errno));
         return -1;
     }
     if (pid == 0) {
         if (chdir(directory) != 0) {
-            fprintf(stderr, "antic: cannot enter %s: %s\n", directory,
+            fprintf(stderr, "%s: cannot enter %s: %s\n", tool, directory,
                     strerror(errno));
         } else {
             execvp(argv[0], (char *const *)argv);
-            fprintf(stderr, "antic: cannot run %s: %s\n", argv[0],
+            fprintf(stderr, "%s: cannot run %s: %s\n", tool, argv[0],
                     strerror(errno));
         }
         _exit(127);
@@ -867,7 +878,8 @@ int process_run_lines(const char *const argv[], const char *name,
     free(env);
     text_free(&entry);
     if (err != 0) {
-        fprintf(stderr, "antic: cannot run %s: %s\n", argv[0], strerror(err));
+        fprintf(stderr, "%s: cannot run %s: %s\n", tool, argv[0],
+                strerror(err));
         close(fds[0]);
         return -1;
     }

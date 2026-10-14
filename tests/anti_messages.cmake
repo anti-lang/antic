@@ -149,13 +149,15 @@ if(CMAKE_HOST_APPLE)
         FILES MacOSX.sdk/SDKSettings.json "${settings}"
         ARGS sdk export --sdk MacOSX.sdk -o out
         ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
+    # R163 of "Rules of 2026-10-13" in docs/decisions.md: a program anti
+    # cannot start is reported with the name anti.
     anti_message(sdk_export_no_tar
         FILES MacOSX.sdk/SDKSettings.json "${settings}"
         DIRECTORIES MacOSX.sdk/usr/lib MacOSX.sdk/System/Library/Frameworks
                     empty
         ENV "PATH=${PROJECT}/empty"
         ARGS sdk export --sdk MacOSX.sdk -o out
-        ERR "antic: cannot run tar: No such file or directory"
+        ERR "anti: cannot run tar: No such file or directory"
             "anti: tar could not write out/apple-sdk-14.0.tar.xz")
 else()
     anti_message(sdk_export_no_mac

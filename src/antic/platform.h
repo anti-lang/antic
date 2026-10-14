@@ -74,6 +74,11 @@ bool self_directory(struct text *out);
    `..` by name as it does for every path. */
 bool absolute_path(const char *path, struct text *out);
 
+/* Name the tool in the message of a program that the process functions
+   cannot start: antic, unless the tool that runs gives its own name before
+   it starts any. R163 of "Rules of 2026-10-13". */
+void platform_set_tool(const char *name);
+
 /* Run the program argv[0], found through PATH when it contains no '/',
    with the NULL-terminated argument list argv. Return its exit status, or
    -1 when it could not start or ended by a signal. The program inherits

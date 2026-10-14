@@ -1033,6 +1033,7 @@ int main(int argc, char **argv)
 {
     struct work work;
 
+    platform_set_tool("anti");
     work.argc = argc;
     work.argv = platform_arguments(argv);
     work.status = 1;

@@ -160,11 +160,13 @@ if(NOT CMAKE_HOST_WIN32)
     function(clang_with_a_cut_ast)
         write_clang("for a in \"$@\"; do\n    case \"$a\" in\n    --version) echo 'clang version ${CLANG_VERSION}'; exit 0 ;;\n    -print-resource-dir) echo /nowhere; exit 0 ;;\n    -E) exit 0 ;;\n    esac\ndone\necho '{\"kind\": \"TranslationUnitDecl\", \"inner\": ['\n")
     endfunction()
+    # R163 of "Rules of 2026-10-13" in docs/decisions.md: a program anti
+    # cannot start is reported with the name anti.
     anti_message(clang_missing COPY
         FILES api.h "int count(void);\n" empty/notes.txt "No clang.\n"
         ENV "PATH=${PROJECT}/empty"
         ARGS ${clang_bind}
-        ERR "antic: cannot run clang: No such file or directory"
+        ERR "anti: cannot run clang: No such file or directory"
             "anti: `clang --version` failed. ${clang_where}")
     anti_message(clang_of_another_version COPY
         FILES api.h "int count(void);\n"
