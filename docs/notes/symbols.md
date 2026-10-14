@@ -38,6 +38,11 @@ link starts at the address of `__TEXT`, which the load commands of the
 debug link give. The lookup takes the byte before the return address,
 which lies in the call and names its line, as `symbolize` does.
 
+An archive without the debug link answers through its map alone, by R183
+of "Rules of 2026-10-13". The map of a Mach-O program names the address of
+`__TEXT` on a line `# text`, so its offsets count from there. A map without
+the line counts from 0, as ELF does.
+
 ## Reading an escaped name
 
 A symbol of a copy of a generic escapes each byte an assembler cannot read

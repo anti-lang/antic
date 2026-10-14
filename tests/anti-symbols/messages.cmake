@@ -125,14 +125,24 @@ anti_message(trace_lines_of_windows
     SETUP pack_archive
     ARGS ${resolve}
     OUT "first" "second" "last")
-# The map fills what the debug link leaves open, so an archive without
-# the link answers no frame.
+# R183 of "Rules of 2026-10-13" in docs/decisions.md: an archive without
+# the debug link answers a frame through its map. The offset of a frame of
+# Linux counts from address 0.
 anti_message(archive_map_alone
     STATUS 0
     FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${map}"
     SETUP pack_archive
     ARGS ${resolve}
-    OUT "${module}" "${frame}")
+    OUT "${module}" "${frame} good src/good.anti:7")
+# The offset of a frame of macOS counts from the text, whose address the
+# map of a Mach-O program names.
+set(macho_map "# The map of a symbols archive of Anti.\n# build ${id}\n# target macos-arm64\n# text 0000000100000000\n0000000100001000-0000000100002000 good src/good.anti:7\n")
+anti_message(archive_map_alone_of_macos
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${macho_map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
 # An index holds one table per module. A key outside them and a key of a
 # table before the first `module` line name nothing.
 anti_message(archive_index_names_no_module

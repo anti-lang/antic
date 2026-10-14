@@ -392,6 +392,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
     struct text bytes = {0};
     struct text out = {0};
     struct anti_macho_table table;
+    uint64_t text_address;
     size_t i;
     bool ok;
 
@@ -413,6 +414,12 @@ bool symmap_write(const char *program, enum target t, const char *id,
     text_append(&out, "# The map of a symbols archive of Anti.\n");
     text_appendf(&out, "%s%s\n", SYMMAP_BUILD_LINE, id);
     text_appendf(&out, "# target %s\n", target_name(t));
+    if (info->format == FORMAT_MACHO &&
+        anti_rt_macho_text((const uint8_t *)bytes.data, bytes.length,
+                           &text_address)) {
+        text_appendf(&out, "%s%016llx\n", SYMMAP_TEXT_LINE,
+                     (unsigned long long)text_address);
+    }
     if (info->format == FORMAT_COFF) {
         text_append(&out, "# A Windows program carries no symbol table. The "
                           "PDB of this archive\n# holds the functions, the "

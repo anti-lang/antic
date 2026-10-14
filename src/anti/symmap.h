@@ -14,6 +14,12 @@
    program. It follows the first line of the map. */
 #define SYMMAP_BUILD_LINE "# build "
 
+/* The head of the line of the map of a Mach-O program that names the
+   address of its text, from which the offset of a frame counts. The map
+   alone then answers a frame, by R183 of "Rules of 2026-10-13". A map
+   without the line counts from address 0, as ELF does. */
+#define SYMMAP_TEXT_LINE "# text "
+
 /* The build id and the version of the licence notice in bytes. The id is
    the line after the begin marker of src/rt/license.h, and a line of the
    same form elsewhere in the bytes is passed over. The version is the

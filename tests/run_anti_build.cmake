@@ -143,6 +143,11 @@ file(READ "${WORK}/symbols/app.map" map)
 if(NOT map MATCHES "# build ${id}")
     message(FATAL_ERROR "the map names no build id of the program:\n${map}")
 endif()
+# The map of a Mach-O program names the address of its text, so it answers
+# a frame alone, by R183 of "Rules of 2026-10-13".
+if(HOST MATCHES "^macos-" AND NOT map MATCHES "\n# text [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\n")
+    message(FATAL_ERROR "the map names no address of the text:\n${map}")
+endif()
 # The debug link carries the id of the program, because the digest leaves
 # what -g added out. A trace of the program then finds this archive.
 file(STRINGS "${WORK}/symbols/app.debug" lines REGEX "^build [0-9a-f]+$")

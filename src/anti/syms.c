@@ -478,6 +478,32 @@ static bool map_id(const struct text *map, struct text *id)
     return true;
 }
 
+/* The address of the text that the map of a Mach-O program names, and 0
+   for a map without it. */
+static uint64_t map_text(const struct text *map)
+{
+    static const char line[] = "\n" SYMMAP_TEXT_LINE;
+    const char *at = strstr(text_cstr(map), line);
+    uint64_t address = 0;
+    size_t i;
+
+    if (at == NULL) {
+        return 0;
+    }
+    at += sizeof line - 1;
+    for (i = 0; i < 16; i++) {
+        char c = at[i];
+        unsigned digit = c >= '0' && c <= '9'   ? (unsigned)(c - '0')
+                         : c >= 'a' && c <= 'f' ? (unsigned)(c - 'a' + 10)
+                                                : 16;
+        if (digit == 16) {
+            return 0;
+        }
+        address = address << 4 | digit;
+    }
+    return address;
+}
+
 /* A deployment archive: the index names each unit, and the entries of
    a unit stand under its id. */
 static bool load_deployment(const struct zip_archive *z, const char *path,
@@ -985,8 +1011,20 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
     uint64_t vaddr;
 
     memset(&mapped, 0, sizeof mapped);
+    /* R183 of "Rules of 2026-10-13": an archive without the debug link
+       answers through its map alone. */
     if (twin == NULL) {
-        return false;
+        if (map == NULL ||
+            !map_lookup(map, map_text(map) + offset - 1, &mapped)) {
+            text_free(&mapped.function);
+            text_free(&mapped.where);
+            return false;
+        }
+        text_append(&out->function, text_cstr(&mapped.function));
+        text_append(&out->where, text_cstr(&mapped.where));
+        text_free(&mapped.function);
+        text_free(&mapped.where);
+        return out->function.length > 0;
     }
     /* The offset of a Mach-O frame counts from its text, and the one of
        an ELF frame from address 0. */
