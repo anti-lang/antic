@@ -780,12 +780,14 @@ static bool names_generic(const struct symbol *sym)
             (it->owner != NULL && it->owner->type_param_count > 0));
 }
 
-/* The constant or static field of the copy that e names, where sym is
-   that member of a generic class. type is the class e reaches it
-   through, or NULL for a name in the body of the class. sym itself
-   where the class is still generic. */
-static struct symbol *const_of_copy(struct clone *cl, struct symbol *sym,
-                                    struct type *type, struct pos pos)
+/* The member of the copy that e names, where sym is that member of a
+   generic class: a constant, a static field, or a function named
+   through `T.f` or a value, called or not. type is the class e reaches
+   it through, or NULL for a name in the body of the class. sym itself
+   where the class is still generic, and for a function with type
+   parameters of its own, which its call names. */
+static struct symbol *member_of_copy(struct clone *cl, struct symbol *sym,
+                                     struct type *type, struct pos pos)
 {
     const struct item *it = sym != NULL ? sym->item : NULL;
     const struct item *owner = it != NULL ? it->owner : NULL;
@@ -793,8 +795,13 @@ static struct symbol *const_of_copy(struct clone *cl, struct symbol *sym,
     struct type *copy;
     size_t i;
 
-    if (it == NULL || it->kind != ITEM_CONST || owner == NULL ||
-        owner->type_param_count == 0 || owner->symbol == NULL) {
+    if (it == NULL || owner == NULL || owner->type_param_count == 0 ||
+        owner->symbol == NULL) {
+        return sym;
+    }
+    if (it->kind != ITEM_CONST &&
+        (it->kind != ITEM_FN || sym->kind != SYMBOL_FN || type == NULL ||
+         it->type_param_count > 0)) {
         return sym;
     }
     g = owner->symbol->type;
@@ -1061,7 +1068,7 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     n->to_optional = ty(cl, e->to_optional, e->pos);
     switch (e->kind) {
     case EXPR_NAME:
-        n->symbol = const_of_copy(cl, n->symbol, NULL, e->pos);
+        n->symbol = member_of_copy(cl, n->symbol, NULL, e->pos);
         if (names_generic(n->symbol) && !cl->callee) {
             copy_failed(cl, e->pos, &n->symbol->name,
                         "since it is named as a value and not called");
@@ -1154,8 +1161,8 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         break;
     case EXPR_FIELD:
         n->as.field.base = xe(cl, e->as.field.base);
-        n->symbol = const_of_copy(cl, n->symbol, e->as.field.base->type,
-                                  e->pos);
+        n->symbol = member_of_copy(cl, n->symbol, e->as.field.base->type,
+                                   e->pos);
         n->as.field.through =
             xf(cl, e->as.field.base->type, e->as.field.through);
         break;
