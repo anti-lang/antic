@@ -111,7 +111,7 @@ antic [options] <file.anti> [<library.antl>...] [<object.o> <archive.a>...]
 | `-I <dir>` | a search root: module `a.b` is `a/b.anti` or `a/b.antl` under it |
 | `-g` | write the source positions and keep the debug sections |
 
-`antic --help` prints the options, apart from eight that later chapters name: `--checks`, `--no-checks`, `--asserts`, `--no-asserts`, `--trace`, `--no-trace`, `--no-hooks` and `--no-reflect`. An `import` resolves in one of three places: a library file on the command line, a file under a search root, or `std/` of the package.
+`antic --help` prints the options. Later chapters name eight of them again: `--checks`, `--no-checks`, `--asserts`, `--no-asserts`, `--trace`, `--no-trace`, `--no-hooks` and `--no-reflect`. An `import` resolves in one of three places: a library file on the command line, a file under a search root, or `std/` of the package.
 
 `anti` is the tool for a project. It reads the manifest `anti.toml` and resolves the dependencies. It compiles through the driver of antic, which is linked into `anti`, and starts no `antic` process.
 
