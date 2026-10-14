@@ -1073,6 +1073,11 @@ add_test(NAME anti_help
 add_test(NAME anti_help_short
     COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,-h"
             -DNAME=anti -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
+# R155 of "Rules of 2026-10-13" in docs/decisions.md: `--help` of anti
+# with a second word prints the usage and ends with 0.
+add_test(NAME anti_help_and_a_word
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,--help,extra"
+            -DNAME=anti -P "${CMAKE_CURRENT_SOURCE_DIR}/run_usage.cmake")
 
 # A command line that a tool refuses with its usage: 2, nothing on the
 # standard output and the bytes of `--help` on the standard error. antic
@@ -1113,7 +1118,6 @@ foreach(case
         "command_unknown|bogus"
         "option_unknown|--bogus"
         "version_and_a_word|--version|extra"
-        "help_and_a_word|--help|extra"
         "new_without_a_name|new"
         "new_with_two_names|new|com.example.one|com.example.two"
         "new_with_an_option|new|--bogus"
@@ -1149,7 +1153,9 @@ foreach(case
     list(POP_FRONT parts name)
     add_usage_test(anti ${name} ARGS ${parts})
 endforeach()
-# An option of anti that takes a value, as the last word.
+# An option of anti that takes a value, as the last word. By R155 of
+# "Rules of 2026-10-13" in docs/decisions.md anti writes one line that
+# names the option and ends with 2, as antic does.
 foreach(case
         "build|--target" "build|--cpu" "build|--lto" "build|--lib"
         "build|--profile-use" "build|--runtime" "build|--llvm-mc"
@@ -1182,8 +1188,12 @@ foreach(case
     elseif(command STREQUAL "sdk_import")
         set(words sdk import bundle.tar.xz)
     endif()
-    add_usage_test(anti ${command}_${word}_without_a_value
-        ARGS ${words} ${option})
+    file(WRITE
+         "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
+         "anti: ${option} needs a value\n")
+    add_expect_test(anti_option_${command}_${word}_without_a_value STATUS 2
+        EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
+        COMMAND "$<TARGET_FILE:anti>" ${words} ${option})
 endforeach()
 
 # A wrong value of an option of antic, and an option that takes a value as

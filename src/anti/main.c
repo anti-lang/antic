@@ -866,10 +866,81 @@ done:
     return status;
 }
 
+/* The options of each command that take a value, as one list per
+   command: the name of the command, then its options, then NULL. sdk
+   names the two commands of sdk, and license reads the options of build
+   after --project. */
+static const char *const value_options[] = {
+    "build", "--target", "--cpu", "--lto", "--lib", "--profile-use",
+    "--runtime", "--llvm-mc", "--llvm-ar", NULL,
+    "run", "--target", "--cpu", "--lto", "--lib", "--profile-use",
+    "--runtime", "--llvm-mc", "--llvm-ar", NULL,
+    "check", "--targets", "--work", "--runtime", "-I", NULL,
+    "doc", "-o", "--work", "--runtime", "-I", NULL,
+    "test", "--work", "--runtime", "--llvm-mc", "-I", NULL,
+    "bind", "--header", "--clang", "-o", "--runtime", "--module",
+    "--target", "-I", "-D", NULL,
+    "symbols", "--conf", "--from", "--out", "--symbols", NULL,
+    "sdk", "--sdk", "-o", "--sysroot", NULL,
+    "license", "--from", "--from-archive", "--runtime", "--target",
+    "--cpu", "--lto", "--lib", "--profile-use", "--llvm-mc", "--llvm-ar",
+    NULL,
+    NULL};
+
+/* Whether option takes a value in the command of the list at list. */
+static bool takes_value(const char *const *list, const char *option)
+{
+    for (list++; *list != NULL; list++) {
+        if (strcmp(*list, option) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* R155 of "Rules of 2026-10-13": an option that takes a value and stands
+   last gets one line that names it, and 2, as antic gives. A word after
+   such an option is its value, whatever it looks like, as the parser of
+   each command reads it. Returns false when argv lacks no value. */
+static bool lacks_value(int argc, char **argv)
+{
+    const char *const *list = value_options;
+    int i;
+
+    while (*list != NULL && strcmp(*list, argv[1]) != 0) {
+        while (*list != NULL) {
+            list++;
+        }
+        list++;
+    }
+    if (*list == NULL) {
+        return false;
+    }
+    /* symbols and sdk name a command of their own before the options. */
+    i = strcmp(argv[1], "symbols") == 0 || strcmp(argv[1], "sdk") == 0 ? 3
+                                                                         : 2;
+    for (; i < argc; i++) {
+        if (!takes_value(list, argv[i])) {
+            continue;
+        }
+        if (i + 1 == argc) {
+            fprintf(stderr, "anti: %s needs a value\n", argv[i]);
+            return true;
+        }
+        i++;
+    }
+    return false;
+}
+
 static int command(int argc, char **argv)
 {
-    if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+    /* R155 of "Rules of 2026-10-13": --help prints the usage whatever
+       follows it. */
+    if (argc >= 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
         return usage(stdout);
+    }
+    if (argc >= 3 && lacks_value(argc, argv)) {
+        return 2;
     }
     /* The version of the tool is the version of Anti, which the build
        takes from tools/version. Step 10 of a release reads it from a
