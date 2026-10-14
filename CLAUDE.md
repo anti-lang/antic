@@ -187,6 +187,11 @@ not re-open a settled decision without asking Eddie.
   and `ctest -I 2001,4878`: 389 s and 246 s. It ran each sanitizer suite
   as `ctest -I 1,1150`, `ctest -I 1151,2250` and `ctest -I 2251,4876`:
   `asan` 285 s, 381 s and 338 s, `ubsan` 255 s, 367 s and 271 s.
+  The step of the rules of modules and of C measured `host` as
+  `ctest -I 1,2000` and `ctest -I 2001,4910`: 395 s and 246 s. It ran each
+  sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
+  `ctest -I 2251,4908`: `asan` 281 s, 382 s and 352 s, `ubsan` 253 s,
+  376 s and 278 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -730,10 +735,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4878 ctest tests pass on the development Mac, and two of them, the
+- 4910 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  379 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4876 each with the same skips, without
+  374 of them are the expected failures of `tests/known-failures.txt`.
+  The ASan and the UBSan builds run 4908 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
@@ -801,6 +806,16 @@ reports what it finished.
   `destroyed` has a teardown, so the hook runs at the end of every value.
   An abstract function takes `self`.
   `docs/reports/2026-10-14-rules-classes.md` reports the step.
+- The rules of modules and of C are built, R121 to R135. R134 waits for
+  Eddie. Two modules that import each other are refused with the cycle
+  named. An `extern fn` takes C types alone, a function of the runtime
+  apart, and one C function has one signature in a program. `c_long` and
+  `c_ulong` are variadic arguments. `export` takes no `operator fn` and no
+  name of the three C headers a header includes. `--lib static` of a
+  module that exports nothing gives `nothing-exported`, and three options
+  beside the wrong kind of library are refused. The load of a plugin that
+  lacks a module names it.
+  `docs/reports/2026-10-14-rules-modules.md` reports the step.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A
