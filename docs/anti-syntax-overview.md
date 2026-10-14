@@ -1490,6 +1490,7 @@ Every warning and every safety check has a stable name at the end of its message
 | `unfilled-abstract` | No class of the program fills an abstract class. |
 | `above-vector-cap` | A `simd struct` is above the vector cap, so each operation on it is a loop. |
 | `single-segment-path` | The module path of a library has one segment, which is for a program's own files. |
+| `nothing-exported` | `--lib static` builds a module without an exported item. |
 | `doc-markup` | A doc comment holds markup outside the doc subset. |
 | `doc-unresolved` | A name in backticks of a doc comment resolves to nothing. |
 | `doc-note-only` | A `pub` item has a `//#` note and no `///` comment. |

@@ -440,6 +440,26 @@ static void report_diagnostics(const struct options *o,
     }
 }
 
+/* Whether the module exports an item, or a function of a class body. */
+static bool exports_something(const struct module *tree)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < tree->item_count; i++) {
+        const struct item *it = tree->items[i];
+        if (it->exported) {
+            return true;
+        }
+        for (j = 0; j < it->member_count; j++) {
+            if (it->members[j]->exported) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /* Whether the build writes a program in release mode. */
 static bool release_build(const struct options *o)
 {
@@ -474,6 +494,9 @@ static warnings_ran checks_ran(const struct options *o)
     }
     if (!o->library || o->front_end) {
         ran &= ~WARNINGS_BIT(NAME_SINGLE_SEGMENT_PATH);
+    }
+    if (o->lib != LIB_STATIC) {
+        ran &= ~WARNINGS_BIT(NAME_NOTHING_EXPORTED);
     }
     return ran;
 }
@@ -1280,6 +1303,16 @@ static int compile(const struct options *o, struct text *source,
                     whole_program_check(o))) {
         settle_diagnostics(o, tree, &diags, false);
         goto done;
+    }
+    /* DESIGN: a static library for C of a module that exports nothing
+       offers C no item, which the warning `nothing-exported` says, by R131
+       of "Rules of 2026-10-13". It stands at the top of the file, where a
+       clause of the whole file covers it, and the release build of the
+       library refuses it as every warning. */
+    if (o->lib == LIB_STATIC && !exports_something(tree)) {
+        diagnostics_warn(&diags, NAME_NOTHING_EXPORTED, 1, 1,
+                         "the module exports nothing, and `--lib static` "
+                         "writes a library for C");
     }
     if (o->doc_warnings) {
         sema_doc_warnings(tree, text_cstr(module), libraries, paths.count,

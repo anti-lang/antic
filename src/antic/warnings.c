@@ -30,6 +30,7 @@ static const struct name_entry NAMES[NAME_COUNT] = {
     [NAME_DOC_DROPPED] = {"doc-dropped", KIND_WARNING},
     [NAME_UNUSED_ALLOW] = {"unused-allow", KIND_WARNING},
     [NAME_UNUSED_UNCHECKED] = {"unused-unchecked", KIND_WARNING},
+    [NAME_NOTHING_EXPORTED] = {"nothing-exported", KIND_WARNING},
     [NAME_UNGUARDED_FIELD] = {"unguarded-field", KIND_SAFETY_CHECK},
     [NAME_EXPONENTIAL_PATTERN] = {"exponential-pattern", KIND_SAFETY_CHECK},
 };

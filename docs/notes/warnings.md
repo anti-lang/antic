@@ -31,6 +31,7 @@ A name stands at the end of its message, `` `e` shadows the outer `e`
 | `doc-dropped` | A doc comment stands where no item or field follows it, or a module doc after the first import or item. | Move it before its item, or make it an ordinary comment. |
 | `unused-allow` | An `allow` silences nothing. | Remove the clause. |
 | `unused-unchecked` | An `unchecked` overrules nothing. | Remove the clause. |
+| `nothing-exported` | `--lib static` builds a module without an exported item, so C finds nothing in the library, by R131 of "Rules of 2026-10-13". | Export what C calls, or allow it where the library is linked for its module alone. |
 
 The five doc warnings come with `--doc-warnings` alone, which `anti check`
 passes. They belong to its doc class, which fails nothing. They stay warnings
@@ -68,7 +69,8 @@ one only when the checker ran to its end, since a checker that stopped at an
 error has not written every warning. It reports one only when the check of its
 name ran in this build: the doc warnings run under `--doc-warnings`,
 `undocumented` under `--warn-undocumented` as well, `unfilled-abstract` in a
-program build and `single-segment-path` under `-c`. A clause of another check
+program build, `single-segment-path` under `-c` and `nothing-exported` under
+`--lib static`. A clause of another check
 waits for the build that runs it.
 
 A clause may name `unused-allow` or `unused-unchecked`. The pass then applies

@@ -4481,6 +4481,17 @@ add_expect_test(error_modules_library_with_main STATUS 1
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_with_main.a"
             modules_library_with_main.anti)
+# R131 of "Rules of 2026-10-13": a library for C of a module that exports
+# nothing gives the warning `nothing-exported`, which the release build of
+# the library refuses. tests/antic_messages.cmake holds the clause that
+# silences it.
+add_expect_test(error_modules_library_exports_nothing STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/modules_library_exports_nothing.err"
+    COMMAND "$<TARGET_FILE:antic>" --lib static
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_exports_nothing.a"
+            modules_library_exports_nothing.anti)
 add_expect_test(error_modules_library_kind STATUS 2
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
     PATTERN "--lib takes static or shared[^a-z]+not bundled"

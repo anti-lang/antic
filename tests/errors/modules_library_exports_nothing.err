@@ -1,0 +1,1 @@
+modules_library_exports_nothing.anti:1:1: error: the module exports nothing, and `--lib static` writes a library for C [nothing-exported]

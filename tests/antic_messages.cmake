@@ -7,6 +7,8 @@
 set(program "fn main() -> int\n{\n\treturn 42;\n}\n")
 set(library "//! A library.\n\npub fn twice(x: int) -> int\n{\n\treturn x * 2;\n}\n")
 set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+# A library for C, which exports a function.
+set(exporting "//! A library for C.\n\nexport fn twice(x: c_int) -> c_int\n{\n\treturn x * 2;\n}\n")
 
 # Run antic in the directory of the case, which must succeed.
 function(antic_runs)
@@ -106,6 +108,13 @@ anti_message(source_name_starts_with_a_digit
     ARGS ${tools} -c 1abc.anti
     ERR "antic: `1abc` in 1abc.anti is not a lowercase identifier")
 
+# R131 of "Rules of 2026-10-13": a clause of the whole file silences the
+# warning `nothing-exported` of a library for C that exports nothing.
+anti_message(library_exports_nothing_allowed STATUS 0 ANY_OUT
+    FILES com/example/lib.anti "allow(nothing-exported, \"the library is linked for its module\");\n\n${library}"
+    ARGS ${tools} --lib static -I "${PROJECT}" -o lib.a
+         "${PROJECT}/com/example/lib.anti")
+
 # A build that links, without the runtime archive.
 anti_message(lib_without_runtime
     STATUS 2
@@ -129,7 +138,7 @@ anti_message(dev_library_no_library_file
 # A tool that does not start. The system words the reason, so the cases
 # hold a pattern of that line.
 anti_message(archiver_does_not_start
-    FILES com/example/lib.anti "${library}"
+    FILES com/example/lib.anti "${exporting}"
     ARGS ${tools} --lib static --llvm-ar ./none -I "${PROJECT}" -o lib.a
          "${PROJECT}/com/example/lib.anti"
     ERR_MATCH "antic: cannot run \\./none: [^\n]*\nantic: llvm-ar failed\n")
