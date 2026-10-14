@@ -6093,6 +6093,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "shared_handles|--front-end,--runtime,${ANTIC_RUNTIME_DIR},shared_handles.anti"
         "generic_copies|-S,-o,${LISTINGS}/generic_copies.s,generic_copies.anti"
         "copies_deep|-S,-o,${LISTINGS}/copies_deep.s,copies_deep.anti"
+        "copies_deep_front_end|--front-end,copies_deep_front_end.anti"
         "copies_many|-S,-o,${LISTINGS}/copies_many.s,copies_many.anti"
         "never_result|--front-end,never_result.anti"
         "call_count_of_a_function_value|--front-end,call_count_of_a_function_value.anti"

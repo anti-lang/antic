@@ -25,7 +25,8 @@ wins over one of the runtime archive.
 
 ## The front end
 
-`antic --front-end` stops after semantic analysis. `links` of
+`antic --front-end` stops after semantic analysis, which compiles the copies
+of the generics by R068 of "Rules of 2026-10-13". `links` of
 `src/antic/driver.c` answers false under it, so no link is demanded. A module
 that imports nothing of the standard library then needs no runtime
 archive.

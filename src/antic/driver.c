@@ -1268,7 +1268,12 @@ static int compile(const struct options *o, struct text *source,
                                &program, libraries)) {
         goto done;
     }
-    tree->compile_copies = o->library || (!o->front_end && !o->dump_types);
+    /* DESIGN: the front end compiles the copies of the generics as a build
+       does, so that `--front-end` refuses what `-S` refuses in a copy, by
+       R068 of "Rules of 2026-10-13": a generic that names ever deeper
+       copies of itself has its message there alone. `--dump-types` prints
+       the tree the program wrote and keeps the copies out. */
+    tree->compile_copies = o->library || !o->dump_types;
     tree->no_reflect = o->no_reflect;
     if (!sema_check(tree, text_cstr(module), o->package_name, libraries,
                     paths.count, &types, &arena, &diags,
