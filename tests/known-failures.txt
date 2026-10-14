@@ -326,3 +326,11 @@ matrix_classes_default_is_a_copy_of_the_parameter_memory_checks T126 antic write
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_dev T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_release T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_memory_checks T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
+guide_examples T130 An exported `read` and `write` replace those of musl, and the examples checked and counters crash. host=linux
+antic_option_soname_linux T131 `--soname` runs `ln` of the host, which writes a copy on Windows. host=windows
+anti_test_flow T132 anti writes its last line with CRLF on Windows. host=windows
+anti_test_values T132 anti writes its last line with CRLF on Windows. host=windows
+anti_test_ownership T132 anti writes its last line with CRLF on Windows. host=windows
+anti_test_errors T132 anti writes its last line with CRLF on Windows. host=windows
+anti_test_threads T132 anti writes its last line with CRLF on Windows. host=windows
+anti_test_classes T132 anti writes its last line with CRLF on Windows. host=windows
