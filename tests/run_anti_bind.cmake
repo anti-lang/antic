@@ -19,20 +19,9 @@
 #             refusal of another clang names
 #   HOST      the target name of this host
 
-# anti bind takes the pinned clang of build/deps beside its tree, and
-# otherwise the first clang on PATH. A tree configured with a pinned clang
-# elsewhere, as on the test machines, puts that one first on PATH.
-
 cmake_minimum_required(VERSION 3.21)
 
-if(CLANG_DIR)
-    file(TO_NATIVE_PATH "${CLANG_DIR}/bin" clang_bin)
-    if(HOST MATCHES "^windows-")
-        set(ENV{PATH} "${clang_bin};$ENV{PATH}")
-    else()
-        set(ENV{PATH} "${clang_bin}:$ENV{PATH}")
-    endif()
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/pinned_clang.cmake")
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
 

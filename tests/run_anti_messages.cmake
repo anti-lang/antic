@@ -9,6 +9,8 @@
 #   CLANG_VERSION, CLANG_TAG and CLANG_PAGE
 #            the version of the pinned clang, the tag of its release and
 #            the page of that release, which a refusal of `anti bind` names
+#   CLANG_DIR the pinned clang of the build, which the cases of
+#            `anti bind --clang` take
 #   HOST     the target name of this host
 #   EXE      the suffix of a program of this host
 #   VERSION  the version of anti, which tools/version holds
@@ -47,6 +49,8 @@
 # table is written once.
 
 cmake_minimum_required(VERSION 3.21)
+
+include("${CMAKE_CURRENT_LIST_DIR}/pinned_clang.cmake")
 
 if(LIST)
     # No case runs, so no value of a run is read.

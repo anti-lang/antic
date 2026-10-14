@@ -8,6 +8,7 @@
 #   LLVM_AR   the archiver
 #   OBJDUMP   llvm-objdump of the pinned release
 #   READOBJ   llvm-readobj of the pinned release
+#   CLANG_DIR the pinned clang of the build, which the cases of bind take
 #   FIXTURES  tests/, which holds anti-build/shapes and anti-symbols/tracer
 #   HOST      the target name of this host
 #   WORK      a directory this run writes into
@@ -51,6 +52,8 @@
 # anti takes and ignores.
 
 cmake_minimum_required(VERSION 3.21)
+
+include("${CMAKE_CURRENT_LIST_DIR}/pinned_clang.cmake")
 
 foreach(value ANTI CASE RUNTIME WORK)
     if(NOT DEFINED ${value})

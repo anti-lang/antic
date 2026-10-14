@@ -2551,6 +2551,7 @@ foreach(pair "anti_build|anti-build/messages.cmake"
                 "-DCLANG_VERSION=${ANTI_CLANG_VERSION}"
                 "-DCLANG_TAG=${ANTI_CLANG_TAG}"
                 "-DCLANG_PAGE=${ANTI_CLANG_PAGE}"
+                "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_messages.cmake")
     endforeach()
 endforeach()
@@ -2600,6 +2601,7 @@ foreach(case IN LISTS anti_option_cases)
             "-DLLVM_AR=${ANTIC_LLVM_AR}"
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
             "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-options/${case}"
