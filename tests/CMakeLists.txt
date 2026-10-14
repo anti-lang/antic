@@ -3766,6 +3766,12 @@ antic_dump_test(ast format
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.anti")
 
+# R153 of "Rules of 2026-10-13" in docs/decisions.md: under --tests the
+# tree holds the functions of the `tests` and the `fixtures` block.
+antic_dump_test(ast test_blocks
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/test_blocks.ast"
+    ARGS --tests "${CMAKE_CURRENT_SOURCE_DIR}/dump/test_blocks.anti")
+
 # The nodes of the parsed tree that no other dump holds. The checker would
 # refuse nodes.anti, which the parser takes.
 antic_dump_test(ast nodes

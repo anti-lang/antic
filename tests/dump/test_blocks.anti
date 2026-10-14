@@ -1,0 +1,23 @@
+//! A module with a `tests` and a `fixtures` block. Under `--tests` the syntax
+//! tree holds the functions of both, which are public.
+
+fn twice(x: int) -> int
+{
+	return x * 2;
+}
+
+tests
+{
+	fn doubles()
+	{
+		assert(twice(2) == 4);
+	}
+}
+
+fixtures
+{
+	fn base() -> int
+	{
+		return 1;
+	}
+}

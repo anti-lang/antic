@@ -1,0 +1,25 @@
+module_doc "A module with a `tests` and a `fixtures` block. Under `--tests` the syntax\ntree holds the functions of both, which are public."
+function twice
+  param x
+    type int
+  result
+    type int
+  block
+    return_stmt
+      multiplicative *
+        ident x
+        int_lit 2
+pub function doubles
+  block
+    assert_stmt
+      equality ==
+        call
+          ident twice
+          int_lit 2
+        int_lit 4
+pub function base
+  result
+    type int
+  block
+    return_stmt
+      int_lit 1
