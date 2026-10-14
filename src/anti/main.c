@@ -328,6 +328,17 @@ static int build_options(int argc, char **argv, int from,
               stderr);
         return 2;
     }
+    /* R157 of "Rules of 2026-10-13": both options shape a library for C,
+       and a program would pass them by. */
+    if (request.soname && request.lib == BUILD_PROGRAM) {
+        fputs("anti: --soname builds a library, with --lib\n", stderr);
+        return 2;
+    }
+    if (request.bundle_runtime && request.lib == BUILD_PROGRAM) {
+        fputs("anti: --bundle-runtime builds a library, with --lib\n",
+              stderr);
+        return 2;
+    }
     *out = request;
     return 0;
 }

@@ -458,3 +458,11 @@ anti_message(versions_do_not_settle
 anti_message(profile_without_release STATUS 2
     ARGS build --profile-generate
     ERR "anti: --profile-generate and --profile-use build a program with --release, without --lib")
+# R157 of "Rules of 2026-10-13" in docs/decisions.md: --soname and
+# --bundle-runtime build a library for C, so each needs --lib.
+anti_message(soname_without_lib STATUS 2
+    ARGS build --soname
+    ERR "anti: --soname builds a library, with --lib")
+anti_message(bundle_runtime_without_lib STATUS 2
+    ARGS build --bundle-runtime
+    ERR "anti: --bundle-runtime builds a library, with --lib")
