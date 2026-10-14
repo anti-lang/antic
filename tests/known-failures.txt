@@ -8,6 +8,13 @@
 #
 #   matrix_case_copy_dev T001 A field of a case reads 0 after a copy.
 #
+# A defect that shows on some hosts alone ends its line with `host=` and
+# their systems, `macos`, `linux` or `windows`, with a `,` between two.
+# The suite of such a host expects the test to fail, and that of every
+# other host expects it to pass.
+#
+#   anti_bind_huge_enum T117 A struct of a huge enum lays out wrong. host=macos,linux
+#
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
 # The test known_failures checks the list against the table of the findings.
@@ -304,7 +311,7 @@ matrix_flow_walk_with_an_iter_of_two_parameters_refused T096 A loop over a struc
 matrix_flow_walk_with_a_next_of_two_parameters_refused T096 A loop over an iterator whose `operator fn next` is refused gets a second message.
 matrix_types_generic_receiver_with_two_paths_to_its_interface_refused T113 A receiver with two paths to the interface of a constraint gets a second message in the copy.
 matrix_classes_changed_hook_of_the_second_field_trace_writes T114 The `changed` hook gets the record of the first field of the class for a write of any of its fields.
-anti_bind_huge_enum T117 An enum with a value above the signed 64-bit range is bound with the base `c_int`, and its struct lays out wrong.
+anti_bind_huge_enum T117 An enum with a value above the signed 64-bit range is bound with the base `c_int`, and its struct lays out wrong. host=macos,linux
 anti_bind_nested_enum T118 The enumerators of an enum without a name inside a struct are no constants of the binding.
 anti_bind_message_clang_float_with_a_large_exponent T119 `anti bind` writes a float with the exponent `e+20`, which does not lex, and ends with 1.
 anti_bind_message_clang_cast_of_a_negative_number T120 A macro that casts a negative number is skipped as no constant.

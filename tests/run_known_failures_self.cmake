@@ -4,8 +4,8 @@
 #   RUNNER  tests/run_known_failures.cmake
 #   WORK    a directory for the files
 #
-# Each case writes the four files the runner reads, runs it and states
-# whether it must accept them. A case that must be refused names a text of
+# Each case writes the four files the runner reads, runs it as on a host
+# of Linux and states whether it must accept them. A case that must be refused names a text of
 # the message, so a refusal for another reason fails the case.
 
 cmake_minimum_required(VERSION 3.21)
@@ -47,7 +47,8 @@ function(known_case name verdict)
                             "-DLIST=${dir}/known-failures.txt"
                             "-DFINDINGS=${dir}/tests-findings.md"
                             "-DTESTS=${dir}/tests.txt"
-                            "-DMARKED=${dir}/marked.txt" -P "${RUNNER}"
+                            "-DMARKED=${dir}/marked.txt" -DSYSTEM=linux
+                            -P "${RUNNER}"
                     RESULT_VARIABLE status OUTPUT_VARIABLE out
                     ERROR_VARIABLE err ENCODING NONE)
     if(verdict STREQUAL "accept")
@@ -118,6 +119,34 @@ known_case(not_marked "does not expect matrix_a_dev to fail"
 known_case(marked_alone "expects matrix_a_release to fail"
     LIST "matrix_a_dev T001 The field reads 0.\n" ROWS "${row_1}"
     MARKED "matrix_a_dev\nmatrix_a_release\n")
+
+# A line for this host alone, one for two hosts, and one for another host,
+# whose test the tree expects to pass.
+known_case(host_this accept
+    LIST "matrix_a_dev T001 The field reads 0. host=linux\n" ROWS "${row_1}")
+known_case(host_two accept
+    LIST "matrix_a_dev T001 The field reads 0. host=macos,linux\n"
+    ROWS "${row_1}")
+known_case(host_other accept
+    LIST "matrix_a_dev T001 The field reads 0. host=windows\n"
+    ROWS "${row_1}" NONE_MARKED)
+known_case(host_this_not_marked "does not expect matrix_a_dev to fail"
+    LIST "matrix_a_dev T001 The field reads 0. host=linux\n"
+    ROWS "${row_1}" NONE_MARKED)
+known_case(host_other_marked "for other hosts than linux"
+    LIST "matrix_a_dev T001 The field reads 0. host=macos,windows\n"
+    ROWS "${row_1}" MARKED "matrix_a_dev\n")
+known_case(host_unknown "known-failures.txt:1: no line of the form"
+    LIST "matrix_a_dev T001 The field reads 0. host=plan9\n"
+    ROWS "${row_1}" NONE_MARKED)
+known_case(host_twice "known-failures.txt:1: no line of the form"
+    LIST "matrix_a_dev T001 The field reads 0. host=linux,linux\n"
+    ROWS "${row_1}" NONE_MARKED)
+known_case(host_empty "known-failures.txt:1: no line of the form"
+    LIST "matrix_a_dev T001 The field reads 0. host=\n"
+    ROWS "${row_1}" NONE_MARKED)
+known_case(host_without_sentence "known-failures.txt:1: no line of the form"
+    LIST "matrix_a_dev T001 host=linux\n" ROWS "${row_1}" NONE_MARKED)
 
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "${failures}")

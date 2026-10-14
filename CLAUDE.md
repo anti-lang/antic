@@ -492,6 +492,9 @@ The known failures, by decision 30 of "Decisions of 2026-10-11":
   `docs/audit/tests-findings.md`, whose header describes the row.
 - The test gets one line in `tests/known-failures.txt`: its name, the id and
   one sentence. A second test of the same defect names the same id.
+- A defect that shows on some hosts alone ends its line with
+  `host=linux`, `host=windows` or `host=macos,linux`. The suite of every
+  other host expects the test to pass.
 - `tests/CMakeLists.txt` sets `WILL_FAIL` on every listed test. A listed
   test that passes fails the suite, so a fix removes the line. It also
   writes `fixed` into the row.

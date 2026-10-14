@@ -6,15 +6,20 @@
 #             one per line
 #   MARKED    a file with the names of the tests the build tree expects to
 #             fail, one per line
+#   SYSTEM    the system of the host the tree was configured on, `macos`,
+#             `linux` or `windows`
 #
 # The configure step writes TESTS and MARKED. The test fails when
-#   - a line is no `<test> <id> <sentence>`, or names a test a second time
+#   - a line is no `<test> <id> <sentence>`, with `host=<systems>` after it
+#     or without it, or names a test a second time
+#   - `host=` names a system that is none of the three, or one twice
 #   - a line names no test
 #   - the id of a line has no row in the table, or a row marked fixed
 #   - a row is open and no line names its id
 #   - a row does not end with a grade and a state, or its id has a second
 #     row
-#   - the build tree was configured with another list
+#   - the build tree was configured with another list, or expects a test
+#     to fail on a host its line does not name
 #
 # DESIGN: a row of the table is a line that starts with `| T` and a digit.
 # Its first cell is the id, and its last two are the grade, `severe`,
@@ -25,6 +30,12 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/known_failures.cmake")
+
+foreach(value LIST FINDINGS TESTS MARKED SYSTEM)
+    if(NOT DEFINED ${value})
+        message(FATAL_ERROR "${value} is not set")
+    endif()
+endforeach()
 
 get_filename_component(list_name "${LIST}" NAME)
 get_filename_component(findings_name "${FINDINGS}" NAME)
@@ -57,19 +68,25 @@ endforeach()
 
 # The lines of the list against the tests and the rows.
 file(STRINGS "${TESTS}" tests)
-known_failures_read("${LIST}" names ids wrong)
+known_failures_read("${LIST}" names ids hosts wrong)
 foreach(number IN LISTS wrong)
     string(APPEND faults "${list_name}:${number}: no line of the form "
-                         "`<test> <id> <sentence>`\n")
+                         "`<test> <id> <sentence>` with `host=<systems>` "
+                         "of macos, linux and windows or without it\n")
 endforeach()
 set(seen "")
+set(expected "")
 set(listed_ids "")
-foreach(name id IN ZIP_LISTS names ids)
+foreach(name id systems IN ZIP_LISTS names ids hosts)
     if(name IN_LIST seen)
         string(APPEND faults "${list_name}: ${name} is listed twice\n")
         continue()
     endif()
     list(APPEND seen "${name}")
+    known_failures_expected(here "${systems}" "${SYSTEM}")
+    if(here)
+        list(APPEND expected "${name}")
+    endif()
     list(APPEND listed_ids "${id}")
     if(NOT name IN_LIST tests)
         string(APPEND faults "${list_name}: ${name} names no test\n")
@@ -89,23 +106,29 @@ foreach(id IN LISTS row_ids)
     endif()
 endforeach()
 
-# The list against the one the tree was configured with.
+# The list against the one the tree was configured with, for the system
+# of its host.
 file(STRINGS "${MARKED}" marked)
-foreach(name IN LISTS seen)
+foreach(name IN LISTS expected)
     if(name IN_LIST tests AND NOT name IN_LIST marked)
         string(APPEND faults "the build tree does not expect ${name} to fail, "
-                             "and ${list_name} lists it: configure again\n")
+                             "and ${list_name} lists it for ${SYSTEM}: "
+                             "configure again\n")
     endif()
 endforeach()
 foreach(name IN LISTS marked)
     if(NOT name IN_LIST seen)
         string(APPEND faults "the build tree expects ${name} to fail, and "
                              "${list_name} does not list it: configure again\n")
+    elseif(NOT name IN_LIST expected)
+        string(APPEND faults "the build tree expects ${name} to fail, and "
+                             "${list_name} lists it for other hosts than "
+                             "${SYSTEM}: configure again\n")
     endif()
 endforeach()
 
 if(NOT faults STREQUAL "")
     message(FATAL_ERROR "${faults}")
 endif()
-list(LENGTH seen count)
-message(STATUS "${count} tests are expected to fail")
+list(LENGTH expected count)
+message(STATUS "${count} tests are expected to fail on ${SYSTEM}")

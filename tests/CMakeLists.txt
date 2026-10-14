@@ -6821,6 +6821,7 @@ add_test(NAME known_failures
         "-DFINDINGS=${PROJECT_SOURCE_DIR}/docs/audit/tests-findings.md"
         "-DTESTS=${KNOWN_FAILURES_WORK}/tests.txt"
         "-DMARKED=${KNOWN_FAILURES_WORK}/marked.txt"
+        "-DSYSTEM=${ANTIC_HOST_OS}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_known_failures.cmake")
 # run_known_failures.cmake refuses every list that disagrees with the
 # table or with the tree.
@@ -6829,11 +6830,13 @@ add_test(NAME known_failures_runner
         "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_known_failures.cmake"
         "-DWORK=${KNOWN_FAILURES_WORK}/runner"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_known_failures_self.cmake")
-known_failures_read("${KNOWN_FAILURES}" known_names known_ids known_wrong)
+known_failures_read("${KNOWN_FAILURES}" known_names known_ids known_hosts
+                    known_wrong)
 get_property(known_tests DIRECTORY PROPERTY TESTS)
 set(known_marked "")
-foreach(name IN LISTS known_names)
-    if(TEST ${name} AND NOT name IN_LIST known_marked)
+foreach(name systems IN ZIP_LISTS known_names known_hosts)
+    known_failures_expected(expected "${systems}" "${ANTIC_HOST_OS}")
+    if(expected AND TEST ${name} AND NOT name IN_LIST known_marked)
         set_tests_properties(${name} PROPERTIES WILL_FAIL TRUE)
         list(APPEND known_marked ${name})
     endif()
