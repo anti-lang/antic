@@ -1289,6 +1289,11 @@ static struct type *check_class_cast(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     e->as.cast.target = to->element;
+    /* `as?` gives `none` for an object of another class, so its result
+       is a `?*T`, by "Nullable pointers" in docs/decisions.md. */
+    if (e->as.cast.checked) {
+        return types_pointer_nullable(c->types, to->element);
+    }
     return e->as.cast.test ? sema_builtin(c, TYPE_BOOL) : to;
 }
 
