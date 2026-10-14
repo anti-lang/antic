@@ -2109,6 +2109,17 @@ static struct name declared_name(struct checker *c, struct item *it)
     return sema_shared_name(c->arena, &it->name, &type);
 }
 
+/* DESIGN: `export` before an `operator fn` is refused, at module level
+   and in a class body, by R129 of "Rules of 2026-10-13". C calls no
+   operator, and the header writes none. A public function of an export
+   class still has its C symbol. */
+static void refuse_exported_operator(struct checker *c, const struct item *it)
+{
+    sema_error_at(c, it->name_pos, "`operator fn %.*s` is not exported, "
+                  "since C has no operators", (int)it->name.length,
+                  it->name.text);
+}
+
 /* Declare every item first, so each can be used before its
    declaration. */
 static void declare_items(struct checker *c)
@@ -2127,11 +2138,8 @@ static void declare_items(struct checker *c)
                           it->name.text, (int)type.length, type.text);
             continue;
         }
-        if (it->overloaded && it->exported) {
-            sema_error_at(c, it->name_pos, "`operator fn %.*s` shares its "
-                          "name with another, and C has one function of a "
-                          "name, so it cannot be `export`",
-                          (int)it->name.length, it->name.text);
+        if (it->is_operator && it->exported) {
+            refuse_exported_operator(c, it);
         }
         it->symbol = sema_declare(c, item_symbol_kind(it->kind), &name,
                                   it->name_pos, "`%.*s` is already declared");
@@ -2696,7 +2704,9 @@ static void declare_members(struct checker *c, struct item *it)
         /* DESIGN: every public function of an export class has the
            C symbol `Class_fn`, because the generated header declares
            a prototype for each one. */
-        if (it->exported && m->kind == ITEM_FN && m->pub) {
+        if (m->is_operator && m->exported) {
+            refuse_exported_operator(c, m);
+        } else if (it->exported && m->kind == ITEM_FN && m->pub) {
             m->exported = true;
         }
         sym->kind = m->kind != ITEM_CONST  ? SYMBOL_FN

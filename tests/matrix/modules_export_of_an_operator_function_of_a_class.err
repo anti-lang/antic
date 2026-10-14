@@ -1,0 +1,1 @@
+modules_export_of_an_operator_function_of_a_class.anti:8:21: error: `operator fn eq` is not exported, since C has no operators

@@ -1,0 +1,17 @@
+//! R129 of "Rules of 2026-10-13": `export` before an `operator fn` is refused,
+//! since C has no operators.
+
+export struct Rect
+{
+	w: int,
+}
+
+export operator fn eq(a: Rect, b: Rect) -> bool
+{
+	return a.w == b.w;
+}
+
+fn main() -> int
+{
+	return 0;
+}

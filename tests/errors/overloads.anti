@@ -1,9 +1,9 @@
 //! The refusals of `operator fn` items that share a name. Two of them may not
-//! take the same type first, and one that shares its name cannot be `export`,
-//! since C has one function of a name. Ordinary functions keep one function per
-//! name, and so does an ordinary function beside an `operator fn`. A shared
-//! `operator fn` is reached through its operator or as a method, and a bare
-//! call of its name finds nothing.
+//! take the same type first, and no `operator fn` is `export`, by R129 of
+//! "Rules of 2026-10-13", since C has no operators. Ordinary functions keep one
+//! function per name, and so does an ordinary function beside an `operator fn`.
+//! A shared `operator fn` is reached through its operator or as a method, and a
+//! bare call of its name finds nothing.
 
 struct Point
 {
