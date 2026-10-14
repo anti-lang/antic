@@ -1,10 +1,10 @@
-//! An assertion after a repeat inside an unbounded repeat. One that cannot
-//! hold between the last byte of the repeat and the first byte of the next
-//! round leaves the engine one way to split the text, so the pattern passes:
-//! `\b` after a repeat of word characters before a word character, and a
-//! lookahead that names another byte. An assertion that holds there, `\B`, a
-//! lookbehind, a negative lookahead and a repeat of word and other characters
-//! before `\b` fail the check.
+//! An assertion after a repeat inside an unbounded repeat. One that cannot hold
+//! between the last byte of the repeat and the first byte of the next round
+//! leaves the engine one way to split the text, so the pattern passes: `\b`
+//! after a repeat of word characters before a word character, and a lookahead
+//! that names another byte. An assertion that holds there, `\B`, a lookbehind,
+//! a negative lookahead and a repeat of word and other characters before `\b`
+//! fail the check.
 
 import anti.regex;
 
