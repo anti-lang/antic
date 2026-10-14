@@ -86,9 +86,10 @@ static void odd_sources(void)
         /* A comment in the list of a direct import keeps the list in the
            order it was written, since a comment belongs to a name. */
         {"import a.b.{z, /* c */ a};\n", "import a.b.{z, /* c */ a};\n"},
-        /* A comma before the first name stays there, and the names after
-           it are sorted. */
-        {"import a.c.{, y, x};\n", "import a.c.{, x, y};\n"},
+        /* A comma before the first name goes, by R182 of "Rules of
+           2026-10-13", and the names after it are sorted. */
+        {"import a.c.{, y, x};\n", "import a.c.{x, y};\n"},
+        {"import a.c.{,, y};\n", "import a.c.{y};\n"},
         /* The spaces at the end of a doc line go, and a doc line of
            spaces alone is an empty one. */
         {"/// text   \n///    \n/// more\nfn main()\n{\n}\n",

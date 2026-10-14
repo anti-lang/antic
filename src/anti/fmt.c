@@ -260,6 +260,11 @@ static void sort_import_lists(struct piece_list *l, const char *src)
         close = l->items[open].match;
         l->items[open].import_list = true;
         l->items[close].import_list = true;
+        /* R182 of "Rules of 2026-10-13": a comma before the first name
+           separates nothing and goes. */
+        for (j = open + 1; j < close && kind_at(l, j) == TOKEN_COMMA; j++) {
+            l->items[j].dropped = true;
+        }
         for (j = open + 1; j < close; j++) {
             commented = commented || l->items[j].kind == PIECE_COMMENT;
         }
