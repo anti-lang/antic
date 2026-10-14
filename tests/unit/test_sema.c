@@ -566,8 +566,12 @@ void test_sema(void)
             "expected `int`, found `bool`");
     rejects("extern fn printf(fmt: ?*byte, ...) -> i32;\n"
             "fn f(x: f32) { printf(\"\".ptr, x); }", 2, 31,
-            "a variadic argument has type i32, u32, int, u64, float or a "
-            "pointer, found `f32`");
+            "a variadic argument is never an `f32`, which C promotes to "
+            "`f64`");
+    rejects("extern fn printf(fmt: ?*byte, ...) -> i32;\n"
+            "fn f(x: bool) { printf(\"\".ptr, x); }", 2, 32,
+            "a variadic argument has type i32, u32, int, u64, c_long, "
+            "c_ulong, float or a pointer, found `bool`");
     rejects("fn g() {}\nfn f() { let x = g(); }", 2, 18,
             "`g` returns no value");
 

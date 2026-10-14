@@ -1265,7 +1265,9 @@ static void keeps_halves(void)
 /* A call through a function pointer keeps its signature in the library
    file. */
 /* A C function with an aggregate result keeps its aggregate in a library
-   file, as a function of the module does. */
+   file, as a function of the module does. An `extern fn` takes C types
+   alone, by R126 of "Rules of 2026-10-13", and a function of the runtime
+   is the one that gives a `str`. */
 static void keeps_extern_aggregates(void)
 {
     struct session a;
@@ -1277,9 +1279,9 @@ static void keeps_extern_aggregates(void)
 
     open_session(&a);
     build_library(&a, "wrap",
-                  "extern fn make() -> str;\n"
+                  "extern fn anti_rt_make() -> str;\n"
                   "pub fn wrap() -> str {\n"
-                  "    return make();\n"
+                  "    return anti_rt_make();\n"
                   "}\n",
                   &bytes);
     open_session(&b);
@@ -1295,10 +1297,10 @@ static void keeps_extern_aggregates(void)
         ir_print(&ir, &program);
         CHECK_STR(text_cstr(&ir),
                   "type str = struct { ptr: ptr, len: i64 }\n"
-                  "extern fn make() -> agg str\n"
+                  "extern fn anti_rt_make() -> agg str\n"
                   "fn wrap.wrap() -> agg str {\n"
                   "b0:\n"
-                  "    %0 = call agg @make()\n"
+                  "    %0 = call agg @anti_rt_make()\n"
                   "    ret ptr %0\n"
                   "}\n");
     }
