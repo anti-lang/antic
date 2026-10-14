@@ -1,10 +1,10 @@
 //! `delete(c)` of a channel that still holds values. Each value the channel
 //! holds is torn down, the oldest first, as `recv` would give them: a class
 //! with a `destruct`, a class with an `own` field, an owning struct, tuple,
-//! variant, optional and array. A value the program received before stays
-//! with the program. A channel that was closed, one that wrapped around its
-//! queue and one that holds nothing are deleted the same way. Each `Key`
-//! prints its teardown, so the order shows.
+//! variant, optional and array. A value the program received before stays with
+//! the program. A channel that was closed, one that wrapped around its queue
+//! and one that holds nothing are deleted the same way. Each `Key` prints its
+//! teardown, so the order shows.
 
 import anti.lang;
 

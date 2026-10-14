@@ -1,7 +1,7 @@
-//! An owning local named in an array literal moves into it, as into a tuple,
-//! a struct and a class literal: a class with a `destruct`, a class with an
-//! `own` field, an owning struct, tuple, variant, optional and array. So does
-//! an `own` parameter, and a local of a type parameter in a generic. A later
+//! An owning local named in an array literal moves into it, as into a tuple, a
+//! struct and a class literal: a class with a `destruct`, a class with an `own`
+//! field, an owning struct, tuple, variant, optional and array. So does an
+//! `own` parameter, and a local of a type parameter in a generic. A later
 //! element still reads the local, since it moves once the literal has read
 //! every element. A local that owns nothing is copied and stays. Each line
 //! prints the values alive with the array and after its block, so a teardown

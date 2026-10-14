@@ -1,9 +1,9 @@
 //! An `own` parameter of a type parameter in a copy whose type argument is a
-//! pointer, by R081 of "Rules of 2026-10-13". A generic that does not hand
-//! the parameter on deletes what it points at when the function ends, as it
-//! tears down a value there. One that hands it on, by `return` or into a
-//! field, deletes nothing. Each `Key` prints its teardown, and each line
-//! prints the keys alive.
+//! pointer, by R081 of "Rules of 2026-10-13". A generic that does not hand the
+//! parameter on deletes what it points at when the function ends, as it tears
+//! down a value there. One that hands it on, by `return` or into a field,
+//! deletes nothing. Each `Key` prints its teardown, and each line prints the
+//! keys alive.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

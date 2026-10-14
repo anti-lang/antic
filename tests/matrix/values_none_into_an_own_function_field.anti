@@ -1,7 +1,7 @@
 //! `none` in an `own` field of type `?fn(int) -> int`, by R084 of "Rules of
-//! 2026-10-13": as the default of the field, in a literal and written with
-//! `=`. The `=` frees the snapshot the field held, as `=` of a fresh snapshot
-//! does, so `--memory-checks` finds no leak. A field that holds `none` takes a
+//! 2026-10-13": as the default of the field, in a literal and written with `=`.
+//! The `=` frees the snapshot the field held, as `=` of a fresh snapshot does,
+//! so `--memory-checks` finds no leak. A field that holds `none` takes a
 //! snapshot afterwards, a `keep own` parameter hands `none` on, and `dup` of an
 //! object copies a field that holds `none` as `none`.
 
@@ -50,9 +50,12 @@ fn main() -> int
 	let d = dup(&c);
 	printf("a copy: %d %d\n".ptr, pressed(d, 1) as c_int, d.n as c_int);
 	delete(d);
-	let p = alloc Button { handler: snapshot fn(x: int) -> int {
-		return x - k;
-	} };
+	let p = alloc Button {
+		handler: snapshot fn(x: int) -> int
+		{
+			return x - k;
+		}
+	};
 	p.handler = none;
 	printf("on the heap: %d\n".ptr, pressed(p, 1) as c_int);
 	delete(p);
