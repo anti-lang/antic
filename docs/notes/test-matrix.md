@@ -1288,9 +1288,10 @@ The step `threads` filled the two tables above on 2026-10-12.
 - `modules/threads/com/example/threads` is the library of the test
   `threads_modules`. It holds each construct in a plain function and in a
   generic one. `dispatch`, `join` and `join_all` in a generic function of
-  a library stand in `generic_dispatch_modules`, T061. The client runs two
-  workers of the library. A worker is named alone after the arrow, so a
-  direct import brings each name.
+  a library stand in `generic_dispatch_modules`, T061. The client runs four
+  workers of the library. A direct import brings two of the names, and
+  `threads.keep` and `threads.count` stand after the arrow, by R086 of
+  "Rules of 2026-10-13".
 - A construct that gives a value is refused in a constant: fourteen
   refusals `matrix/threads_*_at_module_level`, and two for the default of
   a field and of a parameter. `join_all`, `m.destroy()`, `close` and

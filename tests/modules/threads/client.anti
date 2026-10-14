@@ -1,7 +1,8 @@
 //! Calls the functions of the library `com.example.threads`, which hold the
 //! constructs of the threads area, and runs two workers of the library from
-//! here. A worker is named alone after the arrow, so a direct import brings
-//! each name.
+//! here. A direct import brings the names `add` and `sum`, and `threads.keep`
+//! and `threads.count` name a worker by its module after the arrow, with and
+//! without arguments.
 
 import anti.lang;
 import com.example.threads.{add, sum};
@@ -24,6 +25,12 @@ fn main() -> int
 	let parts = parallel numbers[0..4] by 2 -> sum(10);
 	printf("chunks %d %d\n".ptr, parts[0] as c_int, parts[1] as c_int);
 	free(parts.ptr);
+	let kept = dispatch t -> threads.keep(3);
+	let result = join(kept);
+	printf("qualified worker %d %d\n".ptr, result as c_int, t.n as c_int);
+	let counts = parallel numbers[0..4] by 2 -> threads.count;
+	printf("qualified chunks %d %d\n".ptr, counts[0] as c_int, counts[1] as c_int);
+	free(counts.ptr);
 	delete(t);
 	return 0;
 }

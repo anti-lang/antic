@@ -403,15 +403,22 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
     struct type *fn;
     size_t filled;
 
-    if (callee->kind != EXPR_NAME) {
+    /* DESIGN: a worker of another module is named `m.f`, as every other
+       call names a function of a module, by R086 of "Rules of
+       2026-10-13". The check of `m.f` rewrites it into the name of the
+       item, so everything after it reads a name. */
+    if (callee->kind != EXPR_NAME &&
+        (callee->kind != EXPR_FIELD || sema_qualifier(c, callee) == NULL)) {
         sema_error_at(c, callee->pos, "`%s` runs a worker named here", form);
         return NULL;
     }
-    sym = sema_lookup(c, &callee->as.name);
-    callee->symbol = sym;
+    if (callee->kind == EXPR_NAME) {
+        callee->symbol = sema_lookup(c, &callee->as.name);
+    }
     c->callee = callee;
     fn = sema_check_expr(c, callee, NULL);
     c->callee = outer_callee;
+    sym = callee->symbol;
     if (sema_is_error(fn)) {
         return NULL;
     }

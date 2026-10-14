@@ -4086,8 +4086,8 @@ antic_modules_test(errors_modules
 
 # The constructs of the threads area in the functions of a library module,
 # plain and generic, as flow_modules holds those of the flow area. The
-# client runs two workers of the library, each named through a direct
-# import.
+# client runs four workers of the library: two named through a direct
+# import, and two named by their module after the arrow.
 antic_modules_test(threads_modules
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/threads"
     LIBRARIES threads

@@ -7,3 +7,5 @@ atomic_places 13 2016
 atomic_arithmetic 54 2070
 worker 42
 chunks 13 17
+qualified worker 0 3
+qualified chunks 2 2
