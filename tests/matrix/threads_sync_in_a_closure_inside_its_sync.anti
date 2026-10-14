@@ -1,0 +1,22 @@
+//! A `sync` on the Mutex that a `sync` around it holds is refused, in an
+//! anonymous function inside the outer block as well, which its thread runs
+//! while it holds the lock.
+
+fn run(f: fn())
+{
+	f();
+}
+
+fn main() -> int
+{
+	let n = 1;
+	let m = Mutex.new();
+	sync m {
+		run(fn() {
+			sync m {
+				n = 2;
+			}
+		});
+	}
+	return n;
+}

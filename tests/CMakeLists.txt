@@ -5071,6 +5071,20 @@ add_test(NAME check_join_twice
         "-DPATTERN=join_twice\\.anti:[0-9]+: .*join"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dev_report.cmake")
 set_tests_properties(check_join_twice PROPERTIES TIMEOUT 120)
+# check_sync_held: a `sync` on a Mutex that its thread holds already, which
+# the checker cannot see, traps in a dev build, by R093 of "Rules of
+# 2026-10-13". The release build waits for itself and is not run.
+add_test(NAME check_sync_held
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/sync_held.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
+        "-DPATTERN=anti: sync_held\\.anti:7 takes a Mutex that its thread holds since sync_held\\.anti:16"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_dev_report.cmake")
+set_tests_properties(check_sync_held PROPERTIES TIMEOUT 120)
 
 # --memory-checks reports a read after free, a double free, a write past a
 # heap block and a leak on every host but windows-arm64, which has no

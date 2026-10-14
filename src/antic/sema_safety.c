@@ -230,13 +230,14 @@ void sema_check_guards(struct checker *c)
 }
 
 /* Whether a `sync` around the code checked now holds the lock of field f
-   of the object that e, a field access, reaches. */
+   of the object that e, a field access, reaches. The blocks around an
+   anonymous function do not count, since it may run after them. */
 static bool guard_held(const struct checker *c, const struct expr *e,
                        const struct struct_field *f)
 {
     const struct held_mutex *h;
 
-    for (h = c->held; h != NULL; h = h->outer) {
+    for (h = c->held; h != c->held_outside; h = h->outer) {
         const struct expr *m = sema_bare_place(h->mutex);
         const struct type *owner;
         if (m->kind != EXPR_FIELD || !sema_same_name(&m->as.field.name,

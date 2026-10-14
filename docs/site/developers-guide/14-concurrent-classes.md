@@ -809,7 +809,7 @@ For a Java programmer:
 For a C programmer:
 
 - `guarded by` names a field of the same object. One lock for a group of objects has no form, since a class has no plain static field.
-- The `Mutex` of a guard is not recursive. A function that holds it and calls another function that takes it waits for itself.
+- The `Mutex` of a guard is not recursive. A function that holds it and calls another function that takes it waits for itself in a release build, and a dev build stops it.
 
 For a C++ programmer:
 

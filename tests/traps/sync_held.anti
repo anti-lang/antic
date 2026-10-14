@@ -1,0 +1,20 @@
+//! A `sync` on a Mutex that its thread holds already, where the checker cannot
+//! see it: the second `sync` reaches the Mutex through a pointer. A dev build
+//! stops before the thread waits for itself.
+
+fn again(p: *Mutex) -> int
+{
+	sync p {
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	let n = 0;
+	sync m {
+		n = again(&m);
+	}
+	return n;
+}

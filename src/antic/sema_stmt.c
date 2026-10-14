@@ -2972,7 +2972,7 @@ struct body_state {
     int deferring;
     const struct stmt *deferred;
     const struct expr *field_base;
-    const struct held_mutex *held;
+    const struct held_mutex *held_outside;
 };
 
 static void set_aside(struct checker *c, struct body_state *s)
@@ -2985,14 +2985,20 @@ static void set_aside(struct checker *c, struct body_state *s)
     s->deferring = c->deferring;
     s->deferred = c->deferred;
     s->field_base = c->field_base;
-    s->held = c->held;
+    s->held_outside = c->held_outside;
     c->loop_depth = 0;
     c->fallthrough = NULL;
     memset(&c->handler, 0, sizeof c->handler);
     c->deferring = 0;
     c->deferred = NULL;
     c->field_base = NULL;
-    c->held = NULL;
+    /* DESIGN: the `sync` blocks around an anonymous function stay on the
+       chain, and held_outside marks where they begin. A guarded field
+       reads the blocks of its own function alone, since the anonymous
+       function may run after the block around it. A `sync` reads the
+       whole chain, by R093 of "Rules of 2026-10-13": a thread that runs
+       the function inside the block takes the Mutex it holds. */
+    c->held_outside = c->held;
 }
 
 static void take_back(struct checker *c, const struct body_state *s)
@@ -3005,7 +3011,7 @@ static void take_back(struct checker *c, const struct body_state *s)
     c->deferring = s->deferring;
     c->deferred = s->deferred;
     c->field_base = s->field_base;
-    c->held = s->held;
+    c->held_outside = s->held_outside;
 }
 
 /* The type of the anonymous function it, from the types it writes and

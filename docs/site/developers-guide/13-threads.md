@@ -1459,7 +1459,7 @@ A `sync` block gives its lock back on every way out: the end of the block, `retu
 
 A `Mutex` cannot be copied. `let k = m;`, a `Mutex` argument by value and an assignment of an object that holds one are refused. A function shares one by its address, and a worker takes a `*Mutex`.
 
-A `Mutex` is not taken twice by one thread. A `sync` inside a `sync` on the same place in one function is refused. The checker calls two operands the same place when they name the same variable or the same path of fields, with `&` and `*` taken off. It does not follow a pointer that was copied into another local.
+A `Mutex` is not taken twice by one thread. A `sync` inside a `sync` on the same place in one function is refused, and so is one in an anonymous function inside the block. The checker calls two operands the same place when they name the same variable or the same path of fields, with `&` and `*` taken off. It does not follow a pointer that was copied into another local. A dev build stops such a `sync` at run time, with the lines of both.
 
 `sync a, b { }` holds two locks, and takes two synchronized objects of [chapter 14]({{% relref "14-concurrent-classes" %}}). Two `Mutex` values are refused there.
 
@@ -1766,7 +1766,7 @@ The record of the order belongs to dev mode. No flag of antic turns it on in a r
 
 For a Java programmer:
 
-- A `Mutex` is not taken again by the thread that holds it. A function that calls another function with a `sync` on the same `Mutex` waits for itself.
+- A `Mutex` is not taken again by the thread that holds it. A function that calls another function with a `sync` on the same `Mutex` waits for itself in a release build, and a dev build stops it.
 - No lock belongs to every object. A plain class has one only as a field, and the hidden lock of [chapter 14]({{% relref "14-concurrent-classes" %}}) is the other form.
 
 For a C programmer:
@@ -1776,6 +1776,6 @@ For a C programmer:
 
 For a C++ programmer:
 
-- `sync m` through a copied pointer inside `sync m` compiles. The checker compares places as written and does not follow the pointer, and the thread waits for itself at run time.
+- `sync m` through a copied pointer inside `sync m` compiles. The checker compares places as written and does not follow the pointer. A dev build stops the thread there, and in a release build it waits for itself.
 - No `try_lock`, no timed lock and no shared lock exist. `Mutex` is exclusive and blocks.
 - A `Mutex` field does not make its class thread-safe for the checker. A worker takes a pointer to the `Mutex` itself, or to a class declared `synchronized` or `concurrent`.

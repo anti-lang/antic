@@ -216,8 +216,27 @@ void anti_rt_mutex_lock(void *word) { anti_rt_word_lock(word); }
 
 void anti_rt_mutex_unlock(void *word) { anti_rt_word_unlock(word); }
 
+/* DESIGN: a Mutex does not count how deep its thread holds it, so a
+   thread that takes one it holds waits for itself. The checker refuses
+   the `sync` it can see, and a dev build stops the others here, by R093
+   of "Rules of 2026-10-13". The stack of the thread holds every lock a
+   dev module took. */
+static void held_already(const void *lock, const char *site)
+{
+    int64_t count = held_count < HELD_MAX ? held_count : HELD_MAX;
+    int64_t i;
+
+    for (i = 0; i < count; i++) {
+        if (held[i].lock == lock) {
+            anti_rt_fail_abort("anti: %s takes a Mutex that its thread "
+                               "holds since %s", site, held[i].site);
+        }
+    }
+}
+
 void anti_rt_mutex_lock_at(void *word, const char *site)
 {
+    held_already(word, site);
     order_take(word, site);
     anti_rt_word_lock(word);
 }

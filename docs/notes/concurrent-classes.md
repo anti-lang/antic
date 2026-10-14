@@ -105,6 +105,14 @@ channels.
   pair of locks in a table open addressed by the two addresses. The check runs
   before the thread waits, so a real deadlock is reported before it hangs. Each
   conflict is reported once.
+- `anti_rt_mutex_lock_at` reads the same stack first. A Mutex that the thread
+  holds already ends the program with the sites of both `sync` blocks, by R093
+  of "Rules of 2026-10-13". The hidden lock of an object counts its depth and
+  is taken again. A `sync` in a release module leaves no entry, so the check
+  sees the locks of dev modules alone.
+- The checker keeps the `sync` blocks around an anonymous function on its
+  chain of held locks. `held_outside` marks where they begin: a guarded field
+  reads the blocks of its own function, and a `sync` reads them all.
 - The records of a lock whose memory is freed without `destroy` stay. A later
   lock at the same address can then meet an order it never took.
 

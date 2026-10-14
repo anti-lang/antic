@@ -149,6 +149,9 @@ struct checker {
     const struct stmt *deferred;    /* the innermost of them, or NULL */
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
+    /* The innermost `sync` around the anonymous function checked now,
+       where the blocks of its own body end, or NULL. */
+    const struct held_mutex *held_outside;
     int const_depth;            /* constants evaluated inside each other */
     int alias_depth;            /* `type` lines resolved inside each other */
     int set_depth;              /* `constraint` sets resolved likewise */
