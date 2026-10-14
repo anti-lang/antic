@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "rt_abi.h"
 #include "sema_checker.h"
 
 /* A copy of the length bytes at text with a NUL after them, in the
@@ -174,28 +175,107 @@ static void check_c_nullable(struct checker *c, struct pos pos,
     }
 }
 
-/* Every pointer of an `extern fn` signature, the C callbacks in it
-   included. */
+/* The first part of t that C has no type for, t itself or a type its
+   pointers, arrays and callbacks reach, or NULL. */
+static const struct type *no_c_type(const struct type *t)
+{
+    const struct type *found = NULL;
+    size_t i;
+
+    if (t == NULL) {
+        return NULL;
+    }
+    switch (t->kind) {
+    case TYPE_STR:
+    case TYPE_SLICE:
+    case TYPE_TUPLE:
+    case TYPE_OPTIONAL:
+        return t;
+    case TYPE_POINTER:
+    case TYPE_ARRAY:
+        return no_c_type(t->element);
+    case TYPE_FN:
+        for (i = 0; found == NULL && i < t->param_count; i++) {
+            found = no_c_type(t->params[i]);
+        }
+        return found != NULL ? found : no_c_type(t->result);
+    default:
+        return NULL;
+    }
+}
+
+/* DESIGN: an `extern fn` takes C types alone, by decision 26 and R126
+   of "Rules of 2026-10-13". A `str`, a slice, a tuple and a `?T` are
+   refused in its signature and in the callbacks and pointers there. A
+   `str` names `?*c_char`, what C takes for a text. `char` stays a 32-bit
+   integer. A function of the runtime is the one exception, since its C
+   side takes the layout antic gives each of those types. Reports the
+   type at pos and gives true, or gives false when t is a C type. what
+   names the place, gives is set for a result. */
+static bool check_extern_type(struct checker *c, struct pos pos,
+                              const char *what, const struct type *t,
+                              bool gives)
+{
+    const struct type *part = no_c_type(t);
+    const char *verb = part == t ? "is" : "holds";
+
+    if (part == NULL) {
+        return false;
+    }
+    if (part->kind == TYPE_STR) {
+        sema_error_at(c, pos, "%s %s a `str`, and C %s `?*c_char`", what,
+                      verb, gives ? "gives" : "takes");
+    } else {
+        sema_error_at(c, pos, "%s %s a `%s`, which C cannot represent", what,
+                      verb, sema_tn(part));
+    }
+    return true;
+}
+
+/* Every type and every pointer of an `extern fn` signature, the C
+   callbacks in it included. */
 void sema_check_extern_fn(struct checker *c, struct item *it)
 {
+    static const char runtime[] = RUNTIME_PREFIX;
     const struct type *t = it->symbol->type;
+    bool of_runtime = it->name.length >= sizeof runtime - 1 &&
+                      memcmp(it->name.text, runtime, sizeof runtime - 1) == 0;
     char what[160];
+    char place[160];
     size_t i;
 
     if (t == NULL || t->kind != TYPE_FN) {
         return;
     }
     for (i = 0; i < it->param_count && i < t->param_count; i++) {
-        text_format(what, sizeof what,
-                    "of the parameter `%.*s` of `extern fn "
-                    "%.*s`", (int)it->params[i].name.length,
-                    it->params[i].name.text, (int)it->name.length,
+        const struct param *p = &it->params[i];
+        if (sema_is_error(t->params[i])) {
+            continue;
+        }
+        if (p->owned) {
+            sema_error_at(c, p->pos, "an `extern fn` takes no `own` "
+                          "parameter, since C tears down nothing");
+            continue;
+        }
+        text_format(place, sizeof place,
+                    "the parameter `%.*s` of `extern fn %.*s`",
+                    (int)p->name.length, p->name.text, (int)it->name.length,
                     it->name.text);
-        check_c_nullable(c, it->params[i].pos, what, t->params[i]);
+        if (!of_runtime &&
+            check_extern_type(c, p->pos, place, t->params[i], false)) {
+            continue;
+        }
+        text_format(what, sizeof what, "of %s", place);
+        check_c_nullable(c, p->pos, what, t->params[i]);
     }
     if (it->result != NULL && t->result->kind != TYPE_VOID) {
-        text_format(what, sizeof what, "of the result of `extern fn %.*s`",
+        text_format(place, sizeof place, "the result of `extern fn %.*s`",
                     (int)it->name.length, it->name.text);
+        if (!of_runtime &&
+            check_extern_type(c, it->result->pos, place, t->result, true)) {
+            return;
+        }
+        text_format(what, sizeof what, "of %s", place);
         check_c_nullable(c, it->result->pos, what, t->result);
     }
 }

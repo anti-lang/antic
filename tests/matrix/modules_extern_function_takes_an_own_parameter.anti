@@ -1,0 +1,14 @@
+//! R126: an `extern fn` takes no `own` parameter. C tears down nothing the
+//! program gives it.
+
+struct Box
+{
+	n: c_int,
+}
+
+extern fn keep_box(own b: ?*Box) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

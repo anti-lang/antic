@@ -1,0 +1,1 @@
+modules_extern_function_callback_takes_a_tuple.anti:4:16: error: the parameter `f` of `extern fn each` holds a `(i32, i32)`, which C cannot represent

@@ -1,0 +1,9 @@
+//! R126: an `extern fn` takes C types alone, and a slice is none. C takes a
+//! pointer and a length.
+
+extern fn sum(xs: []i32) -> i32;
+
+fn main() -> int
+{
+	return 0;
+}

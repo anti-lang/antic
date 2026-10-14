@@ -27,6 +27,12 @@
 #define RUNTIME_MODULE "anti.rt"
 #define RUNTIME_ENTRY "main"
 
+/* The C functions of the runtime carry this prefix. Their C side takes
+   and gives a `str`, a slice, a tuple and a `?T` in the layout antic
+   gives each, so an `extern fn` of the standard library that names one
+   takes those types where C takes none of them. */
+#define RUNTIME_PREFIX "anti_rt_"
+
 /* The runtime defines the functions of the root class anti.lang.Object,
    its descriptor and its ancestors under this C prefix. */
 #define RUNTIME_ROOT "anti_lang_Object_"

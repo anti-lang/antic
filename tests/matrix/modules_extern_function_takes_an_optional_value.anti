@@ -1,0 +1,9 @@
+//! R126: an `extern fn` takes C types alone, and an optional value is none. A
+//! pointer that may be `none` is `?*T`, which C takes.
+
+extern fn pick(n: ?i32) -> i32;
+
+fn main() -> int
+{
+	return 0;
+}

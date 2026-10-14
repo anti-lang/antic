@@ -297,7 +297,7 @@ For a C++ programmer:
 
 - No `extern "C"` block exists. Each function is declared on its own line, and `anti bind` writes the lines from a header.
 - A closure never passes to C. C code that takes a callback and a `void *` context receives a named function and a pointer to the state.
-- `extern fn puts(s: str)` compiles and passes two words, the pointer and the length. C reads the first as its `char *`.
+- `extern fn puts(s: str)` is refused. A `str` is two words, the pointer and the length, and C takes a `?*c_char`. A slice, a tuple, an optional value and an `own` parameter are refused there as well, and a `char` passes as a 32-bit integer.
 
 ## The ABI of a call
 

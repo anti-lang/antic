@@ -1,0 +1,11 @@
+//! R126: an `extern fn` takes a `char` as a 32-bit integer. `putchar` writes
+//! the character whose code it takes.
+
+extern fn putchar(c: char) -> i32;
+
+fn main() -> int
+{
+	putchar('A');
+	putchar('\n');
+	return 0;
+}

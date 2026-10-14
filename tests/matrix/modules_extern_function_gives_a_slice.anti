@@ -1,0 +1,8 @@
+//! R126: the result of an `extern fn` is a C type, and a slice is none.
+
+extern fn items(count: i32) -> []i32;
+
+fn main() -> int
+{
+	return 0;
+}

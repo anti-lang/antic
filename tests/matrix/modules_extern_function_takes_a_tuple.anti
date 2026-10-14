@@ -1,0 +1,8 @@
+//! R126: an `extern fn` takes C types alone, and a tuple is none.
+
+extern fn span(pair: (i32, i32)) -> i32;
+
+fn main() -> int
+{
+	return 0;
+}

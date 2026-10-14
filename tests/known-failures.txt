@@ -301,11 +301,6 @@ matrix_modules_extern_function_in_a_class_refused T087 An `extern fn` in a class
 error_modules_internal_interface T087 An interface that a module does not give gets two more messages.
 error_modules_private_interface T087 An interface that a module does not give gets two more messages.
 error_modules_import_cycle T088 The driver reports a cycle of imports without the position of the import.
-matrix_modules_extern_function_takes_a_str_refused T089 A `str` parameter of an `extern fn` is not refused.
-matrix_modules_extern_function_gives_a_str_refused T089 A `str` result of an `extern fn` is not refused.
-matrix_modules_extern_function_callback_takes_a_str_refused T089 A `str` in a callback of an `extern fn` is not refused.
-matrix_modules_extern_function_takes_a_pointer_to_a_str_refused T089 A pointer to a `str` in an `extern fn` is not refused.
-matrix_modules_variadic_extern_function_takes_a_str_refused T089 A `str` parameter of a variadic `extern fn` is not refused.
 matrix_modules_count_of_a_list_assigned_refused T090 A write of `count` of a `List` outside its module is not refused.
 matrix_modules_count_of_a_list_added_to_refused T090 A compound assignment to `count` of a `List` is not refused.
 matrix_modules_count_of_a_list_assigned_through_a_pointer_refused T090 A write of `count` through a pointer to a `List` is not refused.

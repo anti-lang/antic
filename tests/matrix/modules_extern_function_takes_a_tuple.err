@@ -1,0 +1,1 @@
+modules_extern_function_takes_a_tuple.anti:3:16: error: the parameter `pair` of `extern fn span` is a `(i32, i32)`, which C cannot represent

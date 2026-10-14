@@ -1,0 +1,1 @@
+modules_extern_function_takes_an_own_parameter.anti:9:24: error: an `extern fn` takes no `own` parameter, since C tears down nothing

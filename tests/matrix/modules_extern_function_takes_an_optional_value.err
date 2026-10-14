@@ -1,0 +1,1 @@
+modules_extern_function_takes_an_optional_value.anti:4:16: error: the parameter `n` of `extern fn pick` is a `?i32`, which C cannot represent
