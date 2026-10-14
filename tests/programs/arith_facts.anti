@@ -3,14 +3,17 @@
 //! the object, and its address stays an address beside the field access of the
 //! real object. The step of a range runs up to the last value of the type and
 //! down to the least, by half the range of the type as well, from bounds of
-//! either sign and across the sign of an unsigned byte. An enum reads 0 where
-//! `alloc` zeroed it, though 0 is no value of it, and the full range of a byte.
-//! A local whose address a call takes lives in each turn of a loop, beside one
-//! of the next block, and a local struct returns from its block. The test runs
-//! in release mode and, with `--checks`, with the checks of a dev build in an
-//! optimised program, where the checked `+` at the end of its range passes.
+//! either sign and across the sign of an unsigned byte. An enum reads 0 from
+//! zeroed memory of `alloc`, though 0 is no value of it, and the full range of
+//! a byte. `alloc` writes nothing into the memory of a struct, so `memset`
+//! zeroes it. A local whose address a call takes lives in each turn of a loop,
+//! beside one of the next block, and a local struct returns from its block. The
+//! test runs in release mode and, with `--checks`, with the checks of a dev
+//! build in an optimised program, where the checked `+` at the end of its range
+//! passes.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn memset(p: ?*Box, value: c_int, n: u64) -> ?*Box;
 
 struct Pair
 {
@@ -137,6 +140,7 @@ fn enums()
 	let boxes = alloc(Box, 2) else {
 		return;
 	};
+	memset(boxes, 0, size_of(Box) as u64 * 2);
 	printf("zero %lld %lld\n".ptr, boxes[0].odd as int, boxes[0].full as int);
 	say("zero flag", boxes[0].flag);
 	boxes[1].odd = Odd.Seven;
