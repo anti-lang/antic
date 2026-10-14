@@ -1548,6 +1548,45 @@ static enum ir_op without_overflow(enum ir_op op)
    overflow operation back into its arithmetic, so a build without them
    emits what it emitted before they existed. The arithmetic wraps there,
    so it keeps no wrap fact. */
+/* Mark the literal o names, if it names one, as dropped with the block
+   that holds it. A literal is a global named by a number alone, which
+   lower_literal_global writes. */
+static void drop_literal(struct ir_module *program, const struct ir_operand *o)
+{
+    struct ir_global *g;
+
+    if (o->kind != IR_GLOBAL) {
+        return;
+    }
+    g = program->globals[o->as.index];
+    if (g->bytes != NULL && !g->exported && !g->mutable &&
+        g->reloc_count == 0 && g->name[0] >= '0' && g->name[0] <= '9') {
+        g->dropped = true;
+    }
+}
+
+/* DESIGN: by R145 of "Rules of 2026-10-13" a build without assertions
+   drops the text of each with its call. The object of a module in dev
+   mode keeps every datum of the module, so the literals of the dropped
+   blocks are marked, and the object keeps one only while a function
+   still names it. */
+static void drop_literals(struct ir_module *program,
+                          const struct ir_block *block)
+{
+    size_t k;
+    size_t a;
+
+    for (k = 0; k < block->count; k++) {
+        const struct ir_inst *inst = &block->insts[k];
+        drop_literal(program, &inst->a);
+        drop_literal(program, &inst->b);
+        drop_literal(program, &inst->c);
+        for (a = 0; a < inst->arg_count; a++) {
+            drop_literal(program, &inst->args[a]);
+        }
+    }
+}
+
 void optimize_drop_failures(struct ir_module *program, enum ir_fail kind)
 {
     size_t i;
@@ -1559,6 +1598,9 @@ void optimize_drop_failures(struct ir_module *program, enum ir_fail kind)
         for (b = 0; b < f->block_count; b++) {
             struct ir_block *block = f->blocks[b];
             struct ir_inst *last;
+            if (block->fail == kind) {
+                drop_literals(program, block);
+            }
             if (kind == IR_FAIL_CHECK) {
                 for (k = 0; k < block->count; k++) {
                     struct ir_inst *inst = &block->insts[k];

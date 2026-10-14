@@ -477,6 +477,10 @@ struct ir_global {
        and none writes out. The root's descriptor is the one of them, so
        that two modules of one program share it. */
     bool is_extern;
+    /* A literal that a failure block names, set when the build drops
+       those blocks. It is no entry of the object of its module, which
+       keeps it only while a function still names it. */
+    bool dropped;
 };
 
 /* DESIGN: a class record tells the passes over the whole program what

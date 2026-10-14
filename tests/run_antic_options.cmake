@@ -22,6 +22,8 @@
 #                         last of the two decides, in both modes
 #   asserts_by_mode       --asserts and --no-asserts beside --dev and
 #                         without it
+#   asserts_text_dropped  --no-asserts beside --dev: the text of the
+#                         assertion goes with the call
 #   warn_undocumented     --warn-undocumented beside --doc-warnings and
 #                         without it
 #   strict_library        --warnings-as-errors beside -c
@@ -228,6 +230,19 @@ if(CASE STREQUAL "asserts_by_mode")
     by_mode("${SOURCES}/programs/asserts.anti"
             "call void (ptr, i64) @anti_rt_assert_failed("
             --asserts --no-asserts)
+    return()
+endif()
+
+# R145 of "Rules of 2026-10-13" in docs/decisions.md: --dev --no-asserts
+# drops the text of an assertion with its call.
+if(CASE STREQUAL "asserts_text_dropped")
+    set(source "${SOURCES}/programs/asserts.anti")
+    set(needle "assertion failed: n > 0")
+    antic_output(text --runtime "${RUNTIME}" --dev --dump-llvm "${source}")
+    holds("${text}" "${needle}" "the LLVM text of --dev")
+    antic_output(text --runtime "${RUNTIME}" --dev --no-asserts --dump-llvm
+                 "${source}")
+    lacks("${text}" "${needle}" "the LLVM text of --dev --no-asserts")
     return()
 endif()
 

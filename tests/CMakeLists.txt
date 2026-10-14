@@ -1228,6 +1228,7 @@ endforeach()
 # Options of antic that the driver reads together, one test per case of
 # tests/run_antic_options.cmake, whose header names what each shows.
 set(antic_option_cases checks_by_mode checks_last_decides asserts_by_mode
+    asserts_text_dropped
     warn_undocumented
     strict_library strict_front_end strict_dev bundle_static bundle_shared
     output_assembly output_library output_program keep_llvm
