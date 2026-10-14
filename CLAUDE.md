@@ -183,6 +183,10 @@ not re-open a settled decision without asking Eddie.
   and `ctest -I 2001,4862`: 437 s and 374 s. It ran each sanitizer suite
   as `ctest -I 1,1150`, `ctest -I 1151,2250` and `ctest -I 2251,4860`:
   `asan` 361 s, 399 s and 458 s, `ubsan` 336 s, 358 s and 369 s.
+  The step of the rules of classes measured `host` as `ctest -I 1,2000`
+  and `ctest -I 2001,4878`: 389 s and 246 s. It ran each sanitizer suite
+  as `ctest -I 1,1150`, `ctest -I 1151,2250` and `ctest -I 2251,4876`:
+  `asan` 285 s, 381 s and 338 s, `ubsan` 255 s, 367 s and 271 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -726,10 +730,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4862 ctest tests pass on the development Mac, and two of them, the
+- 4878 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   379 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4860 each with the same skips, without
+  The ASan and the UBSan builds run 4876 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
@@ -788,6 +792,15 @@ reports what it finished.
   function of a thread-safe class stores no pointer into its fields
   outside the object. `docs/reports/2026-10-14-rules-threads.md` reports
   the step.
+- The rules of classes are built, R101 to R120. R100 waits for Eddie.
+  An `operator fn eq` gives a `bool` and takes no class
+  with a Mutex by value. The `construct` of a singleton takes no
+  parameters, no class inherits a singleton, `dup` and `*` of one are
+  refused, and a singleton declares no `get`. A base of another module is
+  torn down when a `construct` below it fails. A class that replaces
+  `destroyed` has a teardown, so the hook runs at the end of every value.
+  An abstract function takes `self`.
+  `docs/reports/2026-10-14-rules-classes.md` reports the step.
 - The wrapping operators `+% -% *% <<%`, the saturating operators `+| -| *|`,
   `mul_high` and the flags form `let (result, flags) = e;` are built, and so are
   the compound assignments `+%=` and `+|=` of each. A
