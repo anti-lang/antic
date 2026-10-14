@@ -37,7 +37,9 @@ anti_message(license_from_notice_without_its_end
     ERR "anti: program carries no licence notice")
 # The last line of a notice and of the record of sources may lack its
 # newline. The record names `musl` with its URL and `mimalloc` without
-# one, and no `other`.
+# one, and no `other`. By R189 of "Rules of 2026-10-13" in
+# docs/decisions.md the last line of the notice gains its newline before
+# the lines of the sources.
 set(license_sources "# The record.\nmusl 1.2.5 https://musl.libc.org/releases/musl-1.2.5.tar.gz\nmimalloc 2.1.7")
 anti_message(license_from_notice_without_a_last_newline
     STATUS 0
@@ -45,7 +47,8 @@ anti_message(license_from_notice_without_a_last_newline
           archive/licenses/sources.txt "${license_sources}"
     ARGS license --from program --runtime archive
     OUT "package com.example.app 1.0 MIT"
-        "text for musl other mimallocsource musl 1.2.5 https://musl.libc.org/releases/musl-1.2.5.tar.gz"
+        "text for musl other mimalloc"
+        "source musl 1.2.5 https://musl.libc.org/releases/musl-1.2.5.tar.gz"
         "source mimalloc 2.1.7")
 # The plain form takes the version of a component from the record, where
 # the line of `mimalloc` ends the file and holds no URL.

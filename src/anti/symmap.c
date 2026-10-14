@@ -354,6 +354,12 @@ bool symmap_license_sources(struct text *notice, const char *runtime)
             text_append_bytes(&out, at, (size_t)(next - at));
             at = next;
         }
+        /* R189 of "Rules of 2026-10-13": the last line of the notice
+           ends with its newline, so the line of a source starts a line
+           of its own. */
+        if (out.length > 0 && out.data[out.length - 1] != '\n') {
+            text_append(&out, "\n");
+        }
         append_sources(&out, &sources, names, names_length);
         notice->length = 0;
         if (out.length > 0) {
