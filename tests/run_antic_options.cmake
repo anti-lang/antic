@@ -358,10 +358,15 @@ if(CASE STREQUAL "bundle_static")
     holds("${bundle}" "\nanti_rt_check_failed\n"
           "the archive of --bundle-runtime")
     # The line antic prints names what the C program links beside the
-    # archive: the runtime, unless the archive holds it.
-    holds("${plain_said}" "libanti_rt.a"
+    # archive: the runtime of the host, unless the archive holds it.
+    if(CMAKE_HOST_WIN32)
+        set(runtime_file "anti_rt.lib")
+    else()
+        set(runtime_file "libanti_rt.a")
+    endif()
+    holds("${plain_said}" "${runtime_file}"
           "the line of the build without --bundle-runtime")
-    lacks("${bundle_said}" "libanti_rt.a"
+    lacks("${bundle_said}" "${runtime_file}"
           "the line of the build with --bundle-runtime")
     return()
 endif()
