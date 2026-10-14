@@ -1,0 +1,9 @@
+//! A module that declares `labs` of C as C declares it.
+
+extern fn labs(n: c_long) -> c_long;
+
+/// The distance of `n` from zero.
+pub fn distance(n: int) -> int
+{
+	return labs(n as c_long) as int;
+}

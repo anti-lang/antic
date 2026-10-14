@@ -581,6 +581,12 @@ static bool lower_checked(const char *input, const char *file,
 
     tree->file = file;
     lower_module(tree, module, ir, options, patterns, pattern_count, version);
+    if (ir->extern_clash != NULL) {
+        fprintf(stderr, "antic: %s declares `extern fn %s` with another "
+                        "signature than a library of the program\n",
+                input, ir->extern_clash);
+        return false;
+    }
     ok = ir_verify(ir, &errors);
     if (!ok) {
         fprintf(stderr, "antic: internal error, the IR of %s fails "

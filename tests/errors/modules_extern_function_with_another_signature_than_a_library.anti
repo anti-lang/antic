@@ -1,0 +1,11 @@
+//! R127 of "Rules of 2026-10-13": the module declares `extern fn labs` with
+//! another signature than a library file of the program, which is refused.
+
+import com.example.first;
+
+extern fn labs(n: i32, m: i32) -> i32;
+
+fn main() -> int
+{
+	return first.distance(-1) + labs(-2, 0) as int;
+}

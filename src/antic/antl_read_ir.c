@@ -823,12 +823,32 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             }
         }
     } else {
+        /* DESIGN: one C function has one signature in a program, by R127
+           of "Rules of 2026-10-13". A second declaration with another
+           result, other parameters or another variadic mark is refused,
+           compared as C passes them: the IR type and the aggregate of
+           each. */
+        bool same = module != NULL ||
+                    (f->result == (enum ir_type)result &&
+                     f->result_agg == result_agg &&
+                     f->variadic == ((flags & 2) != 0) &&
+                     f->param_count == param_count);
         for (i = 0; i < param_count && !r->failed; i++) {
             uint8_t type = antl_get_u8(r);
+            uint32_t agg;
             antl_get_u8(r);
-            read_agg_ref(r, program, maps, type);
+            agg = read_agg_ref(r, program, maps, type);
             antl_get_u8(r);
             antl_get_u32(r);
+            same = same && (module != NULL ||
+                            (f->params[i].type == (enum ir_type)type &&
+                             f->params[i].agg == agg));
+        }
+        if (!same && !r->failed) {
+            antl_fail(r, "declares `extern fn %s` with another signature "
+                         "than a library before it",
+                      name);
+            return 0;
         }
     }
     return f->index;

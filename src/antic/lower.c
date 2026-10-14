@@ -1009,6 +1009,33 @@ bool lower_bound_is_direct(const struct expr *e, const struct type *s)
            (m != NULL && (m->is_final || !types_holds_entry(s, m)));
 }
 
+/* Whether the C function f, which a library file of the program
+   declares, has the signature the `extern fn` of type t gives it, as C
+   passes it: the IR type and the aggregate of the result and of each
+   parameter, and the variadic mark. */
+static bool same_c_signature(struct lowerer *l, const struct ir_function *f,
+                             const struct type *t, const struct item *it)
+{
+    struct ir_function made;
+    bool same;
+    size_t i;
+
+    memset(&made, 0, sizeof made);
+    made.is_extern = true;
+    made.name = f->name;
+    made.result = lower_ir_type_of(t->result);
+    made.result_agg = lower_result_agg(l, t->result);
+    lower_add_params(l, &made, t, it->symbol);
+    same = made.result == f->result && made.result_agg == f->result_agg &&
+           it->variadic == f->variadic && made.param_count == f->param_count;
+    for (i = 0; same && i < made.param_count; i++) {
+        same = made.params[i].type == f->params[i].type &&
+               made.params[i].agg == f->params[i].agg;
+    }
+    free(made.params);
+    return same;
+}
+
 static void declare_function(struct lowerer *l, const struct item *it)
 {
     const struct type *t = it->symbol->type;
@@ -1024,6 +1051,10 @@ static void declare_function(struct lowerer *l, const struct item *it)
 
     f = it->kind == ITEM_EXTERN_FN ? lower_find_function(l->m, NULL,
                                                          name) : NULL;
+    if (f != NULL && l->m->extern_clash == NULL &&
+        !same_c_signature(l, f, t, it)) {
+        l->m->extern_clash = f->name;
+    }
     /* A copy of a generic of another module that a library file of the
        program holds already is that one. */
     if (f == NULL && it->home_module != NULL) {

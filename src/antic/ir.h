@@ -589,6 +589,11 @@ struct ir_module {
        is made, so the LLVM text writes the facts of enum ir_access. The
        pass over the whole program sets it, see whole_program. */
     bool table_facts;
+    /* The name of a C function that the module declares with another
+       signature than a library file of the program, or NULL. Lowering
+       finds it and the driver refuses it, by R127 of "Rules of
+       2026-10-13". */
+    const char *extern_clash;
 };
 
 void ir_module_init(struct ir_module *m, struct arena *arena,

@@ -1,0 +1,10 @@
+//! A module that declares `labs` of C with a second parameter, which is another
+//! signature than the one of `first`.
+
+extern fn labs(n: i32, m: i32) -> i32;
+
+/// The distance of `n` from zero, by the declaration of this module.
+pub fn other_distance(n: i32) -> i32
+{
+	return labs(n, 0);
+}

@@ -4375,6 +4375,7 @@ antic_library_files(diamond LIBRARIES base left right)
 antic_library_files(items LIBRARIES items)
 antic_library_files(exports LIBRARIES exports)
 antic_library_files(generic_limits LIBRARIES gen)
+antic_library_files(externs LIBRARIES first second)
 
 # The refusals at the boundary of a module, one message each. A case names
 # the program of tests/errors, the tree of its library files and the
@@ -4456,6 +4457,28 @@ foreach(case
     set_tests_properties(error_${name} PROPERTIES
         FIXTURES_REQUIRED ${tree}_antl)
 endforeach()
+
+# R127 of "Rules of 2026-10-13": one C function that two declarations of
+# one program give two signatures. The first case holds two library
+# files, whose message names the second of them, and the second a library
+# file and the module that compiles.
+add_expect_test(error_modules_extern_function_with_two_signatures STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "second\\.antl declares `extern fn labs` with another signature than a library before it"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/externs"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_extern_function_with_two_signatures.s"
+            modules_extern_function_with_two_signatures.anti)
+add_expect_test(error_modules_extern_function_with_another_signature_than_a_library STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/modules_extern_function_with_another_signature_than_a_library.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/externs"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_extern_function_with_another_signature_than_a_library.s"
+            modules_extern_function_with_another_signature_than_a_library.anti)
+set_tests_properties(error_modules_extern_function_with_two_signatures
+    error_modules_extern_function_with_another_signature_than_a_library
+    PROPERTIES FIXTURES_REQUIRED externs_antl)
 
 # A library file whose own import no search root holds. The command names
 # the file of the left side of the diamond and no root, so the base is

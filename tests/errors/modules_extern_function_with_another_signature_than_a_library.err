@@ -1,0 +1,1 @@
+antic: modules_extern_function_with_another_signature_than_a_library.anti declares `extern fn labs` with another signature than a library of the program
