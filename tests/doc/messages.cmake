@@ -35,6 +35,18 @@ anti_message(modules_import_each_other
           src/com/example/b.anti "//! The second.\n\nimport com.example.a;\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}"
     ERR "anti: the imports form a cycle: com.example.a -> com.example.b -> com.example.a")
+# R179 of "Rules of 2026-10-13" in docs/decisions.md: a fence that nothing
+# closes gives a warning, and the page is written.
+anti_message(fence_never_closed STATUS 0
+    FILES one.anti "//! A module.\n\n/// One.\n/// ```anti\n/// let n = one();\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "doc: 1 module into ${WORK}/pages"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti
+    ERR "anti: one.anti: warning: the doc comment of `one` holds a fence that nothing closes")
+anti_message(module_fence_never_closed STATUS 0
+    FILES one.anti "//! A module.\n//! ```\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "doc: 1 module into ${WORK}/pages"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti
+    ERR "anti: one.anti: warning: the doc comment of the module holds a fence that nothing closes")
 anti_message(source_imports_no_module
     FILES one.anti "//! A module.\n\nimport com.example.gone;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti

@@ -25,6 +25,7 @@ pub fn add(n: int) -> int
 Adds one to `n`. The block of its example never closes.
 ```anti
 let two = add(1);
+```
 
 ### Internals
 

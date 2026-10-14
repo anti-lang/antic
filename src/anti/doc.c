@@ -433,10 +433,30 @@ static void doc_html(struct text *out, const char *s, size_t n,
     }
 }
 
+/* Whether the doc text ends inside a fenced code block, which no fence
+   after it closes. */
+static bool fence_left_open(const char *s, size_t n)
+{
+    size_t at = 0;
+    bool fenced = false;
+
+    while (at <= n) {
+        size_t end = line_of(s, n, at);
+        size_t lead = lead_of(s, at, end);
+        if (end - lead >= 3 && memcmp(s + lead, "```", 3) == 0) {
+            fenced = !fenced;
+        }
+        at = end + 1;
+    }
+    return fenced;
+}
+
 /* DESIGN: `anti doc --markdown` passes the doc text through unchanged,
    which the addendum asks for, so a Hugo site renders the subset with
    its own renderer. The generator writes the headings and the
-   signatures around it. */
+   signatures around it. By R180 of "Rules of 2026-10-13" a code block
+   that the text leaves open is closed at its end, so the heading after
+   it stays a heading. */
 static void doc_markdown(struct text *out, const char *s, size_t n)
 {
     if (n == 0) {
@@ -446,7 +466,43 @@ static void doc_markdown(struct text *out, const char *s, size_t n)
     if (s[n - 1] != '\n') {
         text_append(out, "\n");
     }
+    if (fence_left_open(s, n)) {
+        text_append(out, "```\n");
+    }
     text_append(out, "\n");
+}
+
+/* R179 of "Rules of 2026-10-13": a doc text that leaves a fence open gets
+   a warning that names its owner, or the module where name is NULL. */
+static void warn_open_fence(const char *source, const struct text *doc,
+                            const struct text *name)
+{
+    if (doc->data == NULL || !fence_left_open(doc->data, doc->length)) {
+        return;
+    }
+    if (name == NULL) {
+        fprintf(stderr, "anti: %s: warning: the doc comment of the module "
+                        "holds a fence that nothing closes\n", source);
+    } else {
+        fprintf(stderr, "anti: %s: warning: the doc comment of `%s` holds a "
+                        "fence that nothing closes\n", source,
+                text_cstr(name));
+    }
+}
+
+/* The warnings of warn_open_fence for an entry and the entries below it. */
+static void warn_open_fences(const char *source, const struct doc_entry *e)
+{
+    size_t i;
+
+    warn_open_fence(source, &e->doc, &e->name);
+    warn_open_fence(source, &e->note, &e->name);
+    for (i = 0; i < e->field_count; i++) {
+        warn_open_fences(source, &e->fields[i]);
+    }
+    for (i = 0; i < e->member_count; i++) {
+        warn_open_fences(source, &e->members[i]);
+    }
 }
 
 static void doc_body(struct text *out, const struct text *doc,
@@ -760,6 +816,7 @@ int doc_run(const struct doc_request *r)
     struct text path = {0};
     size_t search_count = 0;
     size_t i;
+    size_t j;
     int status = 0;
 
     if (r->source_count == 0) {
@@ -802,6 +859,11 @@ int doc_run(const struct doc_request *r)
         if (!antic_doc_page(&o, items, &pages[i])) {
             status = 1;
             goto done;
+        }
+        warn_open_fence(r->sources[i], &pages[i].doc, NULL);
+        warn_open_fence(r->sources[i], &pages[i].note, NULL);
+        for (j = 0; j < pages[i].item_count; j++) {
+            warn_open_fences(r->sources[i], &pages[i].items[j]);
         }
         /* M14: the module path of a library file names the file of its
            page, and a library file may come from a repository. */

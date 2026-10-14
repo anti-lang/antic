@@ -54,7 +54,9 @@ anti_message(format_empty_lines_at_the_end
     ERR "src/com/example/long.anti:8:1: error: the line is not the one `anti fmt` writes")
 
 # The fence of a block. A space after the tag `anti` belongs to no tag,
-# so the block compiles. A fence that no second one closes holds no block.
+# so the block compiles. A fence that no second one closes holds no block,
+# and by R179 of "Rules of 2026-10-13" in docs/decisions.md it gives a doc
+# warning.
 anti_message(block_fence_with_a_space
     STATUS 0
     FILES anti.toml "${check_manifest}"
@@ -70,6 +72,17 @@ anti_message(block_fence_never_closed
           src/com/example/open.anti "//! A module.\n\n/// One.\n///\n/// ```anti\n/// let n = nothing_here();\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     OUT "anti check: front end: 1 file, 1 target, 0 warnings"
         "anti check: doc blocks: 0 blocks"
-        "anti check: doc warnings: 0"
+        "anti check: doc warnings: 1"
         "anti check: formatting: 1 file"
-    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/open.anti:3:1: warning: the doc comment of `one` holds a fence that nothing closes [doc-markup]")
+anti_message(module_fence_never_closed
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/open.anti "//! A module.\n//!\n//! ```anti\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 1"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/open.anti:1:1: warning: the doc comment of the module holds a fence that nothing closes [doc-markup]")

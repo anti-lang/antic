@@ -423,6 +423,19 @@ static void doc_check_text(const struct doc_scope *s,
         }
         start = end + 1;
     }
+    /* R179 of "Rules of 2026-10-13". */
+    if (fenced) {
+        if (owner == NULL) {
+            diagnostics_doc(s->diags, NAME_DOC_MARKUP, doc->line, doc->column,
+                            "the doc comment of the module holds a fence "
+                            "that nothing closes");
+        } else {
+            diagnostics_doc(s->diags, NAME_DOC_MARKUP, doc->line, doc->column,
+                            "the doc comment of `%.*s` holds a fence that "
+                            "nothing closes", (int)owner->length,
+                            owner->text);
+        }
+    }
 }
 
 /* Every doc comment of an item. They are its own two, those of its

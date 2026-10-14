@@ -9,6 +9,9 @@
 #   EXPECTED  the file that holds the page
 #   OPTIONS   further options of anti doc, with | between them
 #   WORK      a directory this run writes into
+#   WARNING   optional, the text of the one warning anti writes on the
+#             source, after `warning: `. Without it the standard error
+#             is empty
 #
 # DESIGN: tests/run_anti_doc.cmake holds the rules of `anti doc` over one
 # fixture. This runner holds one page, so a module that shows the forms of
@@ -31,7 +34,11 @@ execute_process(
             --work "${WORK}/work" -o "${WORK}/out" ${sources}
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
     ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT err STREQUAL "")
+set(wanted_err "")
+if(DEFINED WARNING)
+    set(wanted_err "anti: ${SOURCES}: warning: ${WARNING}\n")
+endif()
+if(NOT status EQUAL 0 OR NOT err STREQUAL wanted_err)
     message(FATAL_ERROR "anti doc ended with ${status}\n${out}${err}")
 endif()
 file(READ "${WORK}/out/${PAGE}" got)

@@ -80,7 +80,12 @@ as it stands, which is what the specification asks for.
 
 `--markdown` writes the doc text unchanged. The headings, the fenced signatures
 and the lists stand around it, so a Hugo site renders the subset with its own
-renderer.
+renderer. A text that ends inside a code block gets the closing fence, so the
+heading after it stays a heading, by R180 of "Rules of 2026-10-13".
+
+By R179, a doc text that ends inside a code block gets a warning of `anti doc`
+on the standard error. It names the source and the owner of the comment.
+The HTML page closes the block as before, and the command ends with 0.
 
 ## The work directory
 

@@ -90,7 +90,10 @@ words and not names.
 The markup rules read one line at a time and skip the lines of a fenced
 block. Each kind is reported once per comment. Emphasis needs text after
 its opening delimiter and text before its closing one, which keeps a
-pointer type and `a * b` in prose out of it.
+pointer type and `a * b` in prose out of it. A comment that ends inside a
+fenced block gets `holds a fence that nothing closes` under the name
+`doc-markup`, by R179 of "Rules of 2026-10-13". Such a block holds no
+`anti` block for the class before.
 
 The class reports and fails nothing. `docs/decisions.md` holds the reason
 under "The check command".

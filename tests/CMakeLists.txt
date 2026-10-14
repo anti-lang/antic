@@ -2764,12 +2764,19 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
     list(GET pair 3 page)
     list(GET pair 4 expected)
     string(REPLACE "!" "|" options "${options}")
+    # The code block of prose never closes, which R179 of "Rules of
+    # 2026-10-13" warns of.
+    set(warning "")
+    if(module STREQUAL "prose")
+        set(warning "-DWARNING=the doc comment of `add` holds a fence that nothing closes")
+    endif()
     add_test(NAME anti_doc_${case}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/${module}.anti"
+            ${warning}
             "-DPAGE=${page}"
             "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/doc/${expected}"
             "-DOPTIONS=${options}"
