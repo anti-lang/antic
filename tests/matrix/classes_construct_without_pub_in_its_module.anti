@@ -1,0 +1,46 @@
+//! `T(args)` runs a `construct` without `pub` anywhere in its module, by R102 of
+//! the rules of 2026-10-13: in a function of the module, in a function of
+//! another class, in a closure and after `alloc`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counter
+{
+	pub n: int = 0,
+
+	fn construct(self, start: int)
+	{
+		self.n = start;
+	}
+}
+
+class Maker
+{
+	pub base: int = 10,
+
+	pub fn make(self) -> int
+	{
+		let c = Counter(self.base + 2);
+		return c.n;
+	}
+}
+
+fn in_a_function() -> int
+{
+	let c = Counter(1);
+	return c.n;
+}
+
+fn main() -> int
+{
+	let m = Maker { };
+	let made = fn() -> int {
+		let c = Counter(3);
+		return c.n;
+	};
+	let p = alloc Counter(4);
+	printf("function %d, class %d, closure %d, alloc %d\n".ptr, in_a_function() as c_int, m.make() as c_int,
+		made() as c_int, p.n as c_int);
+	delete(p);
+	return 0;
+}

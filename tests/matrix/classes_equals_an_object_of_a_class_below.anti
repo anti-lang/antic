@@ -1,0 +1,30 @@
+//! An object equals an object of its own class alone, by R104 of the rules of
+//! 2026-10-13. An object of a class below with the same fields and the same
+//! values is not equal, either way and through `*Object`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 0,
+	pub y: int = 0,
+}
+
+class Marked inherits Point
+{
+}
+
+fn main() -> int
+{
+	let a = Point { x: 1, y: 2 };
+	let same = Point { x: 1, y: 2 };
+	let below = Marked { x: 1, y: 2 };
+	let other = Marked { x: 1, y: 2 };
+	let root: *Object = &below;
+	printf("one class: %d, below: %d\n".ptr, a.equals(&same) as c_int, below.equals(&other) as c_int);
+	printf("a class below: %d, from below: %d, through Object: %d\n".ptr, a.equals(&below) as c_int,
+		below.equals(&a) as c_int, root.equals(&a) as c_int);
+	return 0;
+}
