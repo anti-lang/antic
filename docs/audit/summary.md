@@ -172,8 +172,8 @@ without a directory are in `src/antic/`.
 | S306 | `src/rt/trace.c:128` | 11 | A frame keeps the build id as a pointer into the image of its module. After `unload` of a plugin, `anti_rt_trace_text` reads memory that is gone. `trace.c:323` is the second place. | fixed `06e06339` | rt |
 | S307 | `src/rt/registry.c:94` | 23 | `reflect.new` and `Object.deserialize` give the lock back before `build` calls into the library, so `unload` on another thread closes it first. | fixed `b80a1e46` | rt |
 | S308 | `src/rt/hooks.c:81` | 23 | The `destroyed` hook counts an object out before its `destruct` and field teardown run. `unload` then closes the library under the thread still in it. | fixed `cfa95068` | rt |
-| S309 | `src/rt/plugin.c:383` | 6 | The loader replaces the table of an object with a stub table sized by the interface. A class that inherits the interface at offset 0 then calls past it. Read, not run. | new | rt |
-| S310 | `src/rt/plugin.c:589` | 14, 15 | `damage_of` tests the counts of a plugin table for a sign alone, and `fields_sound` accepts an offset without the width of the field. The test tries -1 and NULL alone. | still open in part, S33 | rt |
+| S309 | `src/rt/plugin.c:383` | 6 | The loader replaces the table of an object with a stub table sized by the interface. A class that inherits the interface at offset 0 then calls past it. Read, not run. | fixed `45aed114` | rt |
+| S310 | `src/rt/plugin.c:589` | 14, 15 | `damage_of` tests the counts of a plugin table for a sign alone, and `fields_sound` accepts an offset without the width of the field. The test tries -1 and NULL alone. | fixed `32400589` | rt |
 | S311 | `src/rt/snapshot.c:30` | 6, 10 | A `str` inside a heap snapshot has no NUL after it, since `lower_function.c:499` sizes the block without one. `s.ptr` as a C string reads past the block. | new | rt |
 | S312 | `src/rt/text.c:155`, `src/std/anti/text.anti:200` | 11, 4 | A builder that gets no memory gives the literal `""`, which the caller is told to free. `log.anti:197` puts it into an `own` field. | new | rt, std |
 | S313 | `src/std/anti/log.anti:404` | 14 | A logger file that names an unknown kind of sink calls `Log.get()` inside `construct` of `Log` and recurses until the stack is gone. Read, not run. | new | std |
@@ -253,7 +253,7 @@ Rule 14, untrusted input:
   `PARSE_DEPTH_MAX`. New. front-end.
 - M309. `src/rt/plugin.c:832`. An empty directory of the search path
   gives a bare name. The digest reads one file and `dlopen` may load
-  another. New. rt.
+  another. New. rt. Fixed `06109ee3`.
 - M310. `src/anti/fmt.c:248`. `anti fmt` sorts the names of a body that
   follows an import without its semicolon. The file is written back
   changed. New. anti-tool.
