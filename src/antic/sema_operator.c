@@ -479,6 +479,24 @@ static bool comparable_pointers(const struct type *a, const struct type *b)
            (a->element->kind == TYPE_CLASS && b->element->kind == TYPE_CLASS);
 }
 
+/* DESIGN: pointers of two unrelated class types are a type error, by
+   "Pointers and conversions" in docs/anti-object-model.md and decision 27
+   of "Decisions of 2026-10-11". A class has one base, so no object is of
+   two complete classes that neither descends from. An abstract class may
+   stand for an interface that a class below the other implements, so a
+   pointer to one compares with any class pointer. */
+static bool unrelated_pointers(const struct type *a, const struct type *b)
+{
+    if (a->kind != TYPE_POINTER || b->kind != TYPE_POINTER ||
+        a->element->kind != TYPE_CLASS || b->element->kind != TYPE_CLASS ||
+        a->element == b->element) {
+        return false;
+    }
+    return !a->element->has_abstract && !b->element->has_abstract &&
+           !sema_descends_from(a->element, b->element) &&
+           !sema_descends_from(b->element, a->element);
+}
+
 static struct type *check_coalesce(struct checker *c, struct expr *e,
                                    struct type *expected);
 
@@ -599,6 +617,14 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             sema_error_at(c, e->pos,
                           "the operands of `%s` have the types `%s` and "
                           "`%s`", o, sema_tn(left), sema_tn(right));
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if ((op == TOKEN_EQ || op == TOKEN_NE) &&
+            unrelated_pointers(left, right)) {
+            sema_error_at(c, e->pos,
+                          "`%s` compares pointers of one chain, and `%s` and "
+                          "`%s` share none", o, sema_tn(left),
+                          sema_tn(right));
             return sema_builtin(c, TYPE_ERROR);
         }
         /* DESIGN: a `str` has the hooks `eq` and `lt`. `==` compares
