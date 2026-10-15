@@ -576,8 +576,9 @@ static bool const_as(struct checker *c, struct expr *e,
         /* An integer converts to an f32 in one rounding, as the program
            does: through an f64 first, a value just above the middle of
            two f32 neighbours lands on the middle and rounds the other
-           way. */
-        const struct type *from = a.type;
+           way. An enum converts as its base. */
+        const struct type *from =
+            a.type->kind == TYPE_ENUM ? a.type->base : a.type;
         bool single = e->type->kind == TYPE_F32;
         out->kind = CONST_FLOAT;
         if (a.kind == CONST_FLOAT) {

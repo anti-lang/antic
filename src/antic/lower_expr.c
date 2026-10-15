@@ -1673,15 +1673,15 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
         }
         op = target == IR_F64 ? IR_FEXT : IR_FTRUNC;
     } else if (types_is_float(from)) {
-        op = types_is_signed(to) ? IR_FTOSI : IR_FTOUI;
+        op = types_is_signed(integer_form(to)) ? IR_FTOSI : IR_FTOUI;
     } else if (types_is_float(to)) {
-        op = types_is_signed(from) ? IR_SITOF : IR_UITOF;
+        op = types_is_signed(integer_form(from)) ? IR_SITOF : IR_UITOF;
     } else if (source == target) {
         return v;
     } else if (lower_narrows(source, target)) {
         op = IR_TRUNC;
     } else {
-        op = types_is_signed(from) ? IR_SEXT : IR_ZEXT;
+        op = types_is_signed(integer_form(from)) ? IR_SEXT : IR_ZEXT;
     }
     return lower_temp(l, ir_unary(l->f, l->b, op, target, v));
 }
