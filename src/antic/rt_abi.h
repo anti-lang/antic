@@ -171,7 +171,7 @@
       (PTR, struct anti_object *))                                         \
     X(RT_FN_DISPATCH, anti_rt_dispatch, RETURNS, RT_ANY, (PTR, void *),    \
       (PTR, void *), (I64, int64_t), (PTR, anti_rt_dispatch_body *),       \
-      (PTR, void *))                                                       \
+      (PTR, const void *), (I64, int64_t))                                 \
     X(RT_FN_DUP, anti_rt_dup, RETURNS, RT_ANY, (PTR, void *),              \
       (PTR, void *), (PTR, const struct anti_descriptor *))                \
     X(RT_FN_F16_TO_F32, anti_rt_f16_to_f32, RETURNS, RT_PURE,              \

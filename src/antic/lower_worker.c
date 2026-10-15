@@ -239,8 +239,12 @@ static struct ir_function *dispatch_thunk(struct lowerer *l,
 }
 
 /* DESIGN: `dispatch` is one call of the runtime with the object, the size
-   of the result, the thunk and the context. The runtime gives a handle
-   back, which the Job holds in its one field. */
+   of the result, the thunk, the context and its size. The runtime gives
+   a handle back, which the Job holds in its one field. The context lies
+   in a slot of the frame, which a later turn of a loop writes again and
+   a return ends, so the runtime copies it into the job: by decision 23
+   of "Decisions of 2026-10-11" each job keeps the arguments of its own
+   `dispatch`. */
 struct ir_operand lower_dispatch(struct lowerer *l,
                                  const struct expr *e)
 {
@@ -250,7 +254,7 @@ struct ir_operand lower_dispatch(struct lowerer *l,
     const struct type *result = callee->symbol->type->result;
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_operand context;
-    struct ir_operand args[4];
+    struct ir_operand args[5];
     struct ir_function *f;
     uint32_t agg;
     struct ir_operand handle;
@@ -265,6 +269,10 @@ struct ir_operand lower_dispatch(struct lowerer *l,
     f = dispatch_thunk(l, e, name, agg);
     args[2] = lower_temp(l, ir_addr(l->f, l->b, ir_func_op(f)));
     args[3] = context;
+    args[4] = agg == IR_NO_AGG
+                  ? ir_int_op(IR_I64, 0)
+                  : ir_sym_operand(l->m, ir_sym_size_of(l->m,
+                                                        ir_aggregate(agg)));
     handle = lower_rt_call(l, RT_FN_DISPATCH, args);
     lower_hook_object(l, HOOK_DISPATCHED, args[0]);
     out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));

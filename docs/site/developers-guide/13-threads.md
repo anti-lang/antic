@@ -331,7 +331,7 @@ b0:
   %s3 = alloca [8 x i8], align 8
   %s9 = alloca [8 x i8], align 8
   store i64 %p1, ptr %s3, align 8
-  %v7 = call ptr @anti_rt_dispatch(ptr nonnull %p0, i64 8, ptr nonnull @workers.dispatch.1, ptr nonnull %s3)
+  %v7 = call ptr @anti_rt_dispatch(ptr nonnull %p0, i64 8, ptr nonnull @workers.dispatch.1, ptr nonnull %s3, i64 8)
   call void @anti_rt_hook(ptr nonnull %p0, i64 3)
   call void @anti_rt_join_hooked(ptr %v7, i64 8, ptr nonnull %s9)
   %v18 = load i64, ptr %s9, align 8
@@ -339,7 +339,7 @@ b0:
 ```
 
 - `%s3` is the context of the `dispatch`, a slot of the frame of `start` that holds the arguments after the object. Here it holds `seed`.
-- `anti_rt_dispatch` takes the object, the 8 bytes of the result, a thunk and the context. It returns the job, one pointer.
+- `anti_rt_dispatch` takes the object, the 8 bytes of the result, a thunk, the context and its 8 bytes. It copies the context into the job. A later turn of a loop or a return of `start` then leaves the arguments of the job as they were. It returns the job, one pointer.
 - `anti_rt_hook` with 3 is the hook `dispatched` of the object, which [chapter 15]({{% relref "15-hooks" %}}) describes.
 - `anti_rt_join_hooked` takes the job, the size of the result and the slot `%s9` that receives it. It calls the hook `joined` of the object after the wait.
 - The `load` reads the result out of the slot.
@@ -366,7 +366,7 @@ define hidden void @workers.dispatch.1(ptr noundef %p0, ptr noundef %p1, ptr nou
 
 A release build inlines the worker into its thunk, so the pool calls the loop of `fill` directly.
 
-The runtime keeps the rest. `anti_rt_dispatch` allocates the job, takes the lock of the pool and walks the list of the objects in flight. It returns no job when it finds the object there. Otherwise it puts the job on a queue and wakes the threads of the pool. A thread of the pool takes the job, calls the thunk and marks the job done. `anti_rt_join` waits for that mark. A job that no thread took yet is run by the joining thread itself, so a pool of no threads still finishes every job.
+The runtime keeps the rest. `anti_rt_dispatch` allocates the job and a copy of the context, takes the lock of the pool and walks the list of the objects in flight. It returns no job when it finds the object there. Otherwise it puts the job on a queue and wakes the threads of the pool. A thread of the pool takes the job, calls the thunk and marks the job done. `anti_rt_join` waits for that mark. A job that no thread took yet is run by the joining thread itself, so a pool of no threads still finishes every job.
 
 The pool starts at the first `dispatch` or `parallel` of the program. Its threads run until the program ends, and nothing joins them.
 

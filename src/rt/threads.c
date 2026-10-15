@@ -296,9 +296,17 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
    The object is in flight from here until the worker returns. A second
    dispatch of the same object gives no job, so two workers never hold
    one object. The result waits in the job until `join` takes it. The
-   job is on the heap, and anti_rt_join frees it, which `join` calls. */
+   job is on the heap, and anti_rt_join frees it, which `join` calls.
+
+   DESIGN: the job holds a copy of the context_size bytes at context,
+   the arguments of the call. The caller writes them into a slot of its
+   frame, which a later turn of a loop writes again and a return ends,
+   and the job may start after either. The copy is malloc memory, so a
+   context needs no alignment above 16, as the memory of `alloc(T, n)`
+   does not. */
 void *anti_rt_dispatch(void *object, int64_t result_size,
-                       anti_rt_dispatch_body *run, void *context)
+                       anti_rt_dispatch_body *run, const void *context,
+                       int64_t context_size)
 {
     struct one *job = calloc(1, sizeof *job);
     struct one *at;
@@ -307,8 +315,14 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
         anti_rt_fail_abort("anti: no memory for a job of dispatch");
     }
     job->run = run;
-    job->context = context;
     job->object = object;
+    if (context_size > 0) {
+        job->context = malloc((size_t)context_size);
+        if (job->context == NULL) {
+            anti_rt_fail_abort("anti: no memory for the arguments of a job");
+        }
+        memcpy(job->context, context, (size_t)context_size);
+    }
     if (result_size > 0) {
         job->result = malloc((size_t)result_size);
         if (job->result == NULL) {
@@ -320,6 +334,7 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
     for (at = in_flight; at != NULL; at = at->live) {
         if (at->object == object) {
             release();
+            free(job->context);
             free(job->result);
             free(job);
             return NULL;
@@ -381,6 +396,7 @@ void anti_rt_join(void *handle, int64_t result_size, void *out)
     if (result_size > 0 && out != NULL) {
         memcpy(out, job->result, (size_t)result_size);
     }
+    free(job->context);
     free(job->result);
     free(job);
 }

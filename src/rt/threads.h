@@ -26,10 +26,11 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
                       void **results_out, int64_t *chunks_out);
 
 /* Give the object to the pool and give back the job that runs it, or
-   NULL when the object is in flight already. anti_rt_join frees the
-   job. */
+   NULL when the object is in flight already. The job runs on a copy of
+   the context_size bytes at context. anti_rt_join frees the job. */
 void *anti_rt_dispatch(void *object, int64_t result_size,
-                       anti_rt_dispatch_body *run, void *context);
+                       anti_rt_dispatch_body *run, const void *context,
+                       int64_t context_size);
 
 /* Wait for the job, write its result into out and end the job. A null
    job carries no work, and `join` of one writes nothing. */

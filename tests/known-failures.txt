@@ -79,12 +79,6 @@ generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library
 matrix_threads_join_after_join_all_refused T053 A second `join` of one job compiles.
 matrix_threads_join_twice_refused T053 A second `join` of one job compiles.
 check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.
-matrix_threads_dispatch_in_a_loop_dev T055 Every job of a `dispatch` in a loop reads the arguments of the last turn.
-matrix_threads_dispatch_in_a_loop_memory_checks T055 Every job of a `dispatch` in a loop reads the arguments of the last turn.
-matrix_threads_dispatch_in_a_loop_release T055 Every job of a `dispatch` in a loop reads the arguments of the last turn.
-matrix_threads_return_before_the_join_dev T055 A job reads its arguments from a frame that returned.
-matrix_threads_return_before_the_join_memory_checks T055 A job reads its arguments from a frame that returned.
-matrix_threads_return_before_the_join_release T055 A job reads its arguments from a frame that returned.
 matrix_threads_static_default_is_a_call_refused T057 The default of a static field that no code reads is not checked.
 matrix_threads_channel_in_a_generic_struct_of_a_pointer_refused T058 A channel of a type parameter takes a pointer.
 matrix_threads_channel_of_a_type_parameter_that_is_a_pointer_refused T058 A channel of a type parameter takes a pointer.
