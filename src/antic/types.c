@@ -1171,7 +1171,10 @@ static bool union_in(const struct type *t, struct ptr_set *answered)
     while (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
         t = t->element;
     }
-    if ((t->kind == TYPE_VARIANT || t->kind == TYPE_STRUCT) &&
+    /* A tuple holds its parts in place as a struct does, by T105 of
+       docs/audit/tests-findings.md. */
+    if ((t->kind == TYPE_VARIANT || t->kind == TYPE_STRUCT ||
+         t->kind == TYPE_TUPLE) &&
         !ptr_set_add(answered, t)) {
         return false;
     }
@@ -1183,7 +1186,7 @@ static bool union_in(const struct type *t, struct ptr_set *answered)
         }
         return false;
     }
-    if (t->kind != TYPE_STRUCT) {
+    if (t->kind != TYPE_STRUCT && t->kind != TYPE_TUPLE) {
         return false;
     }
     if (t->is_union || types_is_match(t)) {
