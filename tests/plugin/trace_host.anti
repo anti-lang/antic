@@ -1,0 +1,42 @@
+//! A host that keeps a trace whose innermost frame lies in a library, unloads
+//! the library and reads the frame again. The build id and the name of the
+//! function stay what they were, and the text of the trace still names the id.
+//! S306 of docs/audit/summary.md.
+
+import anti.lang;
+import anti.plugin;
+import anti.text;
+import net.example.traced;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn strstr(text: ?*byte, part: ?*byte) -> ?*byte;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	let t = lib.instance(traced.Traced) catch fatal;
+	let trace = t.trace();
+	delete(t);
+	if trace.frames.len == 0 {
+		printf("the trace holds no frame\n".ptr);
+		return 1;
+	}
+	let id = f"{trace.frames[0].build_id}";
+	let function = f"{trace.symbolize()[0].function}";
+	printf("the innermost frame has a build id %d and a function %d\n".ptr,
+		(id.len > 0) as c_int, (function.len > 0) as c_int);
+	lib.unload() catch fatal;
+	printf("unloaded\n".ptr);
+	printf("the build id is the same %d\n".ptr,
+		text.equal(id, trace.frames[0].build_id) as c_int);
+	printf("the function is the same %d\n".ptr,
+		text.equal(function, trace.symbolize()[0].function) as c_int);
+	let whole = trace.text();
+	printf("the text names the build id %d\n".ptr,
+		(strstr(whole.ptr, id.ptr) != none) as c_int);
+	free(id.ptr);
+	free(function.ptr);
+	delete(trace);
+	delete(lib);
+	return 0;
+}

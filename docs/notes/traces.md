@@ -54,8 +54,11 @@ path of the first module comes from `/proc/self/exe`. Windows
 asks `GetModuleHandleExW` and `GetModuleFileNameW`. These calls, the walk and
 DbgHelp stand in the platform layer of `src/rt/platform.h`, and the module they
 give carries its format, by which `src/rt/trace.c` picks the reader of the
-tables. The trace keeps the path of each module once for the life of the
-program, so a frame still names a library after it is unloaded.
+tables. The trace keeps the path and the build id of each module once for
+the life of the program, so a frame still names a library after it is
+unloaded. The name of a function that the symbol table of a Mach-O image
+gives is kept as well, since it lies in `__LINKEDIT` of the image. No text
+of a frame points into an image.
 
 The build id comes from the notice of the module. macOS reads the symbol
 `anti_licenses` from the symbol table of the image in memory and keeps the

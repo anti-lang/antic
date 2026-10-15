@@ -1,0 +1,25 @@
+//! A library that takes a trace in its own code and gives it to the host, which
+//! keeps it past the unload of the library. S306 of docs/audit/summary.md.
+
+import anti.lang;
+import net.example.traced;
+
+provides net.example.traced.Traced as Tracer;
+
+/// The class the library provides.
+pub class Tracer
+{
+	implements t: traced.Traced,
+	/// The traces this object took.
+	pub taken: int = 0,
+
+	/// The trace of the call, whose innermost frame is this function. The
+	/// count after the capture keeps the call from being a tail call, which
+	/// leaves no frame of the library.
+	pub concrete fn trace(self) -> *lang.StackTrace
+	{
+		let made = lang.StackTrace.capture();
+		self.taken += 1;
+		return made;
+	}
+}

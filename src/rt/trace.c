@@ -40,10 +40,14 @@ static struct anti_text text_part(const char *s, size_t n)
 }
 
 /* The texts a lookup makes, kept for the life of the program so a frame
-   may point at them. Equal texts are kept once. The paths of the modules
-   stand in a list of their own, which every capture searches, and the
-   names and files that symbolising makes in another. Both are guarded by
-   ANTI_RT_LOCK_TRACE_TEXTS. */
+   may point at them. Equal texts are kept once. The paths and the build
+   ids of the modules stand in a list of their own, which every capture
+   searches, and the names and files that symbolising makes in another.
+   Both are guarded by ANTI_RT_LOCK_TRACE_TEXTS.
+
+   DESIGN: no text of a frame points into the image of a module. A
+   library may be unloaded while a trace that holds a frame of it lives
+   on, since the trace and its error are objects of the host. */
 struct kept {
     struct kept *next;
     size_t length;
@@ -194,7 +198,8 @@ static intptr_t image_slide(const uint8_t *header)
 }
 
 /* The build ids the capture found, by the header of each image, so the
-   symbol table of an image is read once. */
+   symbol table of an image is read once. Each id is a kept copy, which
+   outlives the image. */
 struct known_id {
     const uint8_t *header;
     struct anti_text id;
@@ -232,6 +237,7 @@ static struct anti_text macho_id(const uint8_t *header)
         anti_rt_macho_symbol(&t, "anti_licenses", &vaddr)) {
         id = notice_id((const char *)(uintptr_t)(vaddr + (uint64_t)slide),
                        SIZE_MAX);
+        id = keep_in(&kept_paths, (const char *)id.ptr, (size_t)id.len);
     }
     if (known_count < KNOWN_MAX) {
         known[known_count].header = header;
@@ -266,7 +272,7 @@ static struct anti_text elf_id(const struct anti_rt_module *m)
 }
 
 /* The build id of the module, from the notice the platform layer found
-   or from the reader of its format. */
+   or from the reader of its format. It may point into the image. */
 static struct anti_text module_id(const struct anti_rt_module *m)
 {
     if (m->notice_read) {
@@ -286,6 +292,7 @@ static struct anti_text module_id(const struct anti_rt_module *m)
 void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
 {
     struct anti_rt_module m;
+    struct anti_text id;
 
     memset(out, 0, sizeof *out);
     out->address = address;
@@ -298,7 +305,9 @@ void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out)
     }
     out->module = keep_in(&kept_paths, m.path, strlen(m.path));
     out->base = m.base;
-    out->build_id = module_id(&m);
+    id = module_id(&m);
+    out->build_id =
+        keep_in(&kept_paths, (const char *)id.ptr, (size_t)id.len);
 }
 
 /* The function and the line of address in the Mach-O image at header,
@@ -319,9 +328,11 @@ static void symbolize_macho(const uint8_t *header, uint64_t address,
         return;
     }
     vaddr = address - (uint64_t)slide;
+    /* The name lies in __LINKEDIT of the image, which an unload takes
+       away, so it is kept. */
     if (anti_rt_macho_function(&t, vaddr, &found)) {
         out->function = function_name(found.function, found.function_length,
-                                       true);
+                                       false);
     }
     if (anti_rt_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
         const struct loaded *l = load(object, true);

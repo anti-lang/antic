@@ -1,0 +1,11 @@
+//! The interface that the host of the test plugin_trace shares with its
+//! library.
+
+import anti.lang;
+
+/// Work of a library that gives a trace taken in its own code.
+pub abstract class Traced
+{
+	/// The trace of the call, taken in the code of the library.
+	pub abstract fn trace(self) -> *lang.StackTrace;
+}
