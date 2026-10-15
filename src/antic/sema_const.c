@@ -612,6 +612,8 @@ static bool const_as(struct checker *c, struct expr *e,
     } else if (e->type->kind == TYPE_CHAR) {
         out->kind = CONST_CHAR;
         out->as.character = (uint32_t)a.as.integer;
+    } else if (e->type->kind == TYPE_ENUM) {
+        return fail_const(c, e, "a conversion to an enum");
     } else {
         return fail_const(c, e, "a pointer conversion");
     }
