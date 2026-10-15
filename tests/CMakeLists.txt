@@ -438,9 +438,21 @@ antic_rt_sources(plugin_sources plugin assert loaded atomic digest text toml
 add_executable(rt_plugin_tests unit/test_plugin_race.c ${plugin_sources})
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
+# Fifteen copies of the first library, each in a directory of its own,
+# fill every slot beside it.
+set(plugin_copies "${CMAKE_CURRENT_BINARY_DIR}/plugin-copies")
+foreach(copy RANGE 1 15)
+    add_custom_command(TARGET rt_plugin_tests POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${plugin_copies}/${copy}"
+        COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:plugin_table_one>"
+            "${plugin_copies}/${copy}/$<TARGET_FILE_NAME:plugin_table_one>"
+        VERBATIM)
+endforeach()
 target_compile_definitions(rt_plugin_tests PRIVATE
     "PLUGIN_ONE=\"$<TARGET_FILE:plugin_table_one>\""
-    "PLUGIN_TWO=\"$<TARGET_FILE:plugin_table_two>\"")
+    "PLUGIN_TWO=\"$<TARGET_FILE:plugin_table_two>\""
+    "PLUGIN_COPIES=\"${plugin_copies}\""
+    "PLUGIN_NAME=\"$<TARGET_FILE_NAME:plugin_table_one>\"")
 add_dependencies(rt_plugin_tests plugin_table_one plugin_table_two)
 add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
 

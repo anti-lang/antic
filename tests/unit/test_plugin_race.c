@@ -1,5 +1,6 @@
 /* The table of open libraries under threads that load and unload at once,
-   and the reason of a failure, which each thread reads for itself. The
+   the reason of a failure, which each thread reads for itself, and a
+   second load of a library that is open. The
    loader of the runtime runs here with stand-ins for the rest of the
    runtime, so the sanitizer builds check it. */
 #if defined(__APPLE__)
@@ -203,10 +204,74 @@ static void failures_at_once(void)
     CHECK(pair[1].matched);
 }
 
+/* The path of copy n of the first library, under PLUGIN_COPIES. */
+static void copy_path(char *out, size_t size, int n)
+{
+    snprintf(out, size, "%s/%d/%s", PLUGIN_COPIES, n, PLUGIN_NAME);
+}
+
+/* A library loaded twice is open until both loads gave it back. M303 of
+   docs/audit/summary.md: the second load gave the slot of the first, and
+   the first unload closed the library under the second owner. */
+static void second_load(void)
+{
+    const unsigned char *path = (const unsigned char *)PLUGIN_ONE;
+    int64_t length = (int64_t)strlen(PLUGIN_ONE);
+    void *first = anti_rt_plugin_load(path, length);
+    void *second = anti_rt_plugin_load(path, length);
+
+    CHECK(first != NULL);
+    CHECK(second != NULL);
+    CHECK(anti_rt_plugin_open() == 1);
+    CHECK(anti_rt_plugin_unload(first) == 1);
+    CHECK(anti_rt_plugin_open() == 1);
+    CHECK(anti_rt_plugin_live(second) == 0);
+    CHECK(anti_rt_plugin_message().len == 0);
+    CHECK(anti_rt_plugin_unload(second) == 1);
+    CHECK(anti_rt_plugin_open() == 0);
+}
+
+/* With every slot taken, a second load of a library that is open gives
+   it again, and a load of another library is refused. */
+static void second_load_when_full(void)
+{
+    void *handles[ANTI_PLUGIN_MAX];
+    char path[1024];
+    void *again;
+    int i;
+
+    handles[0] = anti_rt_plugin_load((const unsigned char *)PLUGIN_ONE,
+                                     (int64_t)strlen(PLUGIN_ONE));
+    CHECK(handles[0] != NULL);
+    for (i = 1; i < ANTI_PLUGIN_MAX; i++) {
+        copy_path(path, sizeof path, i);
+        handles[i] = anti_rt_plugin_load((const unsigned char *)path,
+                                         (int64_t)strlen(path));
+        CHECK(handles[i] != NULL);
+    }
+    CHECK(anti_rt_plugin_open() == ANTI_PLUGIN_MAX);
+    CHECK(anti_rt_plugin_load((const unsigned char *)PLUGIN_TWO,
+                              (int64_t)strlen(PLUGIN_TWO)) == NULL);
+    again = anti_rt_plugin_load((const unsigned char *)PLUGIN_ONE,
+                                (int64_t)strlen(PLUGIN_ONE));
+    CHECK(again == handles[0]);
+    if (again != NULL) {
+        CHECK(anti_rt_plugin_unload(again) == 1);
+    }
+    for (i = 0; i < ANTI_PLUGIN_MAX; i++) {
+        if (handles[i] != NULL) {
+            CHECK(anti_rt_plugin_unload(handles[i]) == 1);
+        }
+    }
+    CHECK(anti_rt_plugin_open() == 0);
+}
+
 int main(void)
 {
     loads_at_once();
     failures_at_once();
+    second_load();
+    second_load_when_full();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);
         return 1;

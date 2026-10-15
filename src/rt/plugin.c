@@ -421,7 +421,14 @@ static int matches_host(const char *name, const struct anti_provided *table,
    matches_host passed. The caller holds the lock of the slots. Gives the
    slot, or NULL with the reason in message. *same is 1 when the library
    is open already, in the slot it gives, and the caller then closes the
-   handle it opened. */
+   handle it opened.
+
+   DESIGN: the platform gives one handle per file, so a second load of
+   the same library is the library that is open. Each load counts in the
+   slot, and an unload closes the library at the last, so a handle stays
+   valid for every owner that has not given it back. The open library is
+   found before a free slot, so a second load succeeds with every slot
+   taken. */
 static struct anti_plugin *claim(void *handle,
                                  const struct anti_provided *table,
                                  const void *base, int *same)
@@ -430,6 +437,14 @@ static struct anti_plugin *claim(void *handle,
     int64_t i;
 
     *same = 0;
+    for (i = 0; i < ANTI_PLUGIN_MAX; i++) {
+        struct anti_plugin *open = anti_rt_plugin_at(i);
+        if (open->used != 0 && open->table == table) {
+            open->loads++;
+            *same = 1;
+            return open;
+        }
+    }
     for (i = 0; i < ANTI_PLUGIN_MAX && p == NULL; i++) {
         struct anti_plugin *slot = anti_rt_plugin_at(i);
         if (slot->used == 0) {
@@ -440,15 +455,6 @@ static struct anti_plugin *claim(void *handle,
         fail("%d libraries are open, which is all a program may hold",
              ANTI_PLUGIN_MAX);
         return NULL;
-    }
-    /* The platform gives one handle per file, so a second load of the
-       same library is the library that is open. */
-    for (i = 0; i < ANTI_PLUGIN_MAX; i++) {
-        struct anti_plugin *open = anti_rt_plugin_at(i);
-        if (open->used != 0 && open->table == table) {
-            *same = 1;
-            return open;
-        }
     }
     p->stubbed = NULL;
     for (i = 0; i < table->count; i++) {
@@ -474,6 +480,7 @@ static struct anti_plugin *claim(void *handle,
     p->classes.classes = table->classes;
     p->live = 0;
     p->used = 1;
+    p->loads = 1;
     anti_rt_plugin_opened();
     return p;
 }
@@ -932,11 +939,14 @@ int64_t anti_rt_plugin_live(void *handle)
    hold of the lock. A `created` hook counts under the same lock, and the
    loader counts an object it builds under it before the build starts. An
    object made while the check runs is then either counted before it, or
-   finds no library open. */
+   finds no library open. An unload refuses while an object is alive
+   whatever the loads that remain, so it answers the same for every
+   owner of the handle. */
 int8_t anti_rt_plugin_unload(void *handle)
 {
     struct anti_plugin gone;
     struct anti_plugin *p;
+    int8_t given = 0;
     int8_t closed = 0;
     int64_t live;
 
@@ -948,10 +958,14 @@ int8_t anti_rt_plugin_unload(void *handle)
         if (live != 0) {
             fail("%lld object%s of the library %s alive", (long long)live,
                  live == 1 ? "" : "s", live == 1 ? "is" : "are");
+        } else if (p->loads > 1) {
+            p->loads--;
+            given = 1;
         } else {
             gone = *p;
             memset(p, 0, sizeof *p);
             anti_rt_plugin_closed();
+            given = 1;
             closed = 1;
         }
     }
@@ -960,7 +974,7 @@ int8_t anti_rt_plugin_unload(void *handle)
         free_stubs(&gone, gone.table->count);
         anti_rt_library_close(gone.handle);
     }
-    return closed;
+    return given;
 }
 
 /* Discovery */

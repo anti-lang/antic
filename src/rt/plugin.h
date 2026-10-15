@@ -95,6 +95,9 @@ struct anti_plugin {
     const void ***stubbed;
     int64_t live;
     int64_t used;
+    /* The loads that have not given the library back. A second load of
+       an open library gives its slot again and adds one here. */
+    int64_t loads;
 };
 
 /* Take and give back the lock of the slots. A caller of
@@ -127,7 +130,9 @@ const struct anti_registry *anti_rt_plugin_registry(int64_t index);
    classes into the registry. Gives the handle of the load, or NULL,
    and a failure leaves its reason in anti_rt_plugin_message. The caller
    owns the handle and gives it back with anti_rt_plugin_unload, which
-   refuses while an object of the library is alive. */
+   refuses while an object of the library is alive. A library that is
+   open already gives the same handle again, and stays open until every
+   load of it gave the handle back. */
 void *anti_rt_plugin_load(const unsigned char *path, int64_t length);
 
 /* The reason the last call of this thread failed, empty after one that
@@ -150,8 +155,9 @@ int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
    anti_rt_plugin_created says, and the objects the loader is building. */
 int64_t anti_rt_plugin_live(void *handle);
 
-/* Close the library. Gives 0 while an object of it is alive, and the
-   library stays open. */
+/* Give back one load of the library, and close it when that was the
+   last. Gives 0 while an object of it is alive, and the library stays
+   open. */
 int8_t anti_rt_plugin_unload(void *handle);
 
 /* DESIGN: the objects of each loaded library on the heap are counted,

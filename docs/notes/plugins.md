@@ -146,6 +146,11 @@ of an object is the image the table of its class lies in.
 `anti_rt_library_image` of the platform layer gives it, through `dladdr`
 or `GetModuleHandleExW`.
 
+A second load of a library that is open gives its slot again, and the
+slot counts the loads. `unload` gives one back and closes the library at
+the last. It refuses while an object of the library is alive, whatever
+the loads that remain.
+
 ## Discovery and the providers
 
 `plugin:<path>` and `discover` in the `[inject]` table of the manifest

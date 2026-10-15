@@ -85,6 +85,7 @@ pub class Library
 
 	/// Close the library.
 	///
+	/// A library that `load` opened more than once closes at the last `unload`.
 	/// It fails with `IN_USE` while an object of one of its classes is alive,
 	/// and the library stays open.
 	pub fn unload(self) may fail
