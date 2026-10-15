@@ -1786,6 +1786,33 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
     }
 }
 
+/* DESIGN: a deferred statement runs while its scope is left. A call in
+   it that sends its error to the handler of a `try` block leaves the
+   scope again, and that exit runs the actions that have not run yet,
+   never the statement itself or a scope inside it: the actions declared
+   before it, and in the pass of the `undo` statements the rest of the
+   `defer` statements as well. */
+static void run_deferred_stmt(struct lowerer *l, const struct defers *scope,
+                              size_t at, bool undo_pass)
+{
+    struct defers *outer = l->defers;
+    struct defers rest;
+    size_t j;
+
+    memset(&rest, 0, sizeof rest);
+    rest.outer = scope->outer;
+    for (j = 0; j < scope->count; j++) {
+        if (j < at || (undo_pass && j > at && !scope->items[j].undo)) {
+            rest.items = grow_defers(&rest);
+            rest.items[rest.count++] = scope->items[j];
+        }
+    }
+    l->defers = &rest;
+    lower_stmt(l, scope->items[at].stmt);
+    l->defers = outer;
+    free(rest.items);
+}
+
 /* Run the statements of one block scope, last declared first.
    DESIGN: the statements of `undo` run before the `defer` statements of
    the same block, so the block undoes what it did while its locals are
@@ -1800,7 +1827,7 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
         for (i = scope->count; i > 0 && l->b != NULL; i--) {
             const struct exit_action *action = &scope->items[i - 1];
             if (action->undo) {
-                lower_stmt(l, action->stmt);
+                run_deferred_stmt(l, scope, i - 1, true);
             }
         }
     }
@@ -1840,7 +1867,7 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
                                   action->error_type);
             }
         } else if (action->stmt != NULL) {
-            lower_stmt(l, action->stmt);
+            run_deferred_stmt(l, scope, i - 1, false);
         } else if (action->local != l->moved) {
             destroy_local(l, action->local);
         }
@@ -1852,9 +1879,12 @@ void lower_run_defers_to(struct lowerer *l, const struct defers *stop,
                          bool failing)
 {
     const struct defers *scope;
+    bool outer_leaving = l->leaving;
 
     /* An exit of the function ends every value a statement still keeps,
-       before the locals it was made after. */
+       before the locals it was made after. A deferred statement on the
+       way may leave through an exit of its own, which sets leaving for
+       its own walk alone. */
     if (stop == NULL) {
         lower_end_temps(l, 0, false);
     }
@@ -1862,7 +1892,7 @@ void lower_run_defers_to(struct lowerer *l, const struct defers *stop,
     for (scope = l->defers; scope != stop; scope = scope->outer) {
         lower_run_defers(l, scope, failing);
     }
-    l->leaving = false;
+    l->leaving = outer_leaving;
 }
 
 /* Anti has no labels, so a statement after return, break or continue is
