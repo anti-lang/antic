@@ -523,10 +523,137 @@ static int list_sound(const void *list, int64_t count, size_t size)
                                                1)) == image;
 }
 
-/* Whether a list of fields lies in an image, and each field has a name
-   and an offset inside an object of size bytes. */
-static int fields_sound(const struct anti_field *fields, int64_t count,
-                        int64_t size)
+/* DESIGN: the walks of reflection, serialize and Object.deserialize
+   follow the descriptor of a field into the value it holds, inline or
+   through a pointer, and write every byte of it. The loader therefore
+   checks every descriptor a field reaches, once each. It keeps them in
+   a list that it walks while it grows, so a type that reaches itself
+   through a pointer ends, and no chain of types deepens the stack. */
+struct anti_reached {
+    const struct anti_descriptor **items;
+    int64_t count;
+    int64_t room;
+    int short_of_memory;
+};
+
+/* Add d to the descriptors to check, unless it is there already. */
+static int reach(struct anti_reached *r, const struct anti_descriptor *d)
+{
+    int64_t i;
+
+    for (i = 0; i < r->count; i++) {
+        if (r->items[i] == d) {
+            return 1;
+        }
+    }
+    if (r->count == r->room) {
+        int64_t room = r->room == 0 ? 16 : r->room * 2;
+        const struct anti_descriptor **items =
+            realloc(r->items, (size_t)room * sizeof *items);
+        if (items == NULL) {
+            r->short_of_memory = 1;
+            return 0;
+        }
+        r->items = items;
+        r->room = room;
+    }
+    r->items[r->count++] = d;
+    return 1;
+}
+
+/* The bytes of one element of an array of the type id, whose element
+   carries the descriptor element. A size below 0 there gives one below
+   0 here, which the caller refuses. */
+static int64_t element_width(int64_t type,
+                             const struct anti_descriptor *element)
+{
+    switch (ANTI_TYPE_INNER(type)) {
+    case ANTI_TYPE_STRUCT:
+    case ANTI_TYPE_CLASS:
+    case ANTI_TYPE_TUPLE:
+    case ANTI_TYPE_VARIANT:
+    case ANTI_TYPE_OPTIONAL:
+        return element != NULL ? element->size : 0;
+    default:
+        return (int64_t)anti_rt_type_size(ANTI_TYPE_INNER(type));
+    }
+}
+
+/* The bytes of an array of the type id, whose record carries the
+   descriptor d, or -1 where they pass INT64_MAX or a record of its
+   levels is damaged. An array of more than one level carries one record
+   per level in d, with the length of each and the descriptor of the
+   element in the last, as anti_rt_array_shape reads them. Those records
+   are no fields, and the descriptor of the element joins r instead. */
+static int64_t array_width(int64_t type, const struct anti_descriptor *d,
+                           struct anti_reached *r)
+{
+    int nested = ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_ARRAY;
+    const struct anti_descriptor *element = d;
+    int64_t levels = 1;
+    int64_t width;
+    int64_t i;
+
+    if (nested) {
+        if (d == NULL) {
+            return 0;
+        }
+        levels = d->field_count;
+        if (levels < 1 || levels > ANTI_ARRAY_LEVELS ||
+            !list_sound(d->fields, levels, sizeof *d->fields)) {
+            return -1;
+        }
+        element = d->fields[levels - 1].descriptor;
+    }
+    if (element != NULL &&
+        (!list_sound(element, 1, sizeof *element) || !reach(r, element))) {
+        return -1;
+    }
+    width = element_width(type, element);
+    for (i = 0; i < levels && width >= 0; i++) {
+        int64_t length = nested ? d->fields[i].owned : ANTI_TYPE_COUNT(type);
+        if (length < 0 || (length > 0 && width > INT64_MAX / length)) {
+            return -1;
+        }
+        width *= length;
+    }
+    return width;
+}
+
+/* The bytes a field takes from its offset, or -1 where the record is
+   damaged. A value held inline takes the size of its descriptor, which
+   joins r. So does the descriptor of what a pointer or a slice reaches,
+   apart from the records of the levels of an array, which no walk takes
+   through a pointer or a slice. */
+static int64_t width_of(const struct anti_field *f, struct anti_reached *r)
+{
+    const struct anti_descriptor *d = f->descriptor;
+    int64_t type = anti_rt_type_scalar(f->type);
+
+    if (d != NULL && !list_sound(d, 1, sizeof *d)) {
+        return -1;
+    }
+    if (type == ANTI_TYPE_ARRAY) {
+        return array_width(f->type, d, r);
+    }
+    if (d != NULL && ANTI_TYPE_ELEMENT(f->type) != ANTI_TYPE_ARRAY &&
+        !reach(r, d)) {
+        return -1;
+    }
+    switch (type) {
+    case ANTI_TYPE_STRUCT:
+    case ANTI_TYPE_CLASS:
+    case ANTI_TYPE_TUPLE:
+    case ANTI_TYPE_VARIANT:
+    case ANTI_TYPE_OPTIONAL:
+        return d != NULL ? d->size : 0;
+    default:
+        return (int64_t)anti_rt_type_size(f->type);
+    }
+}
+
+/* Whether a list of records lies in an image and each has a name. */
+static int records_sound(const struct anti_field *fields, int64_t count)
 {
     int64_t i;
 
@@ -534,8 +661,27 @@ static int fields_sound(const struct anti_field *fields, int64_t count,
         return 0;
     }
     for (i = 0; i < count; i++) {
-        if (!text_sound(fields[i].name, fields[i].name_length) ||
-            fields[i].offset < 0 || fields[i].offset > size) {
+        if (!text_sound(fields[i].name, fields[i].name_length)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Whether a list of fields lies in an image, and every byte of each
+   field lies inside an object of size bytes. */
+static int fields_sound(const struct anti_field *fields, int64_t count,
+                        int64_t size, struct anti_reached *r)
+{
+    int64_t i;
+
+    if (!records_sound(fields, count)) {
+        return 0;
+    }
+    for (i = 0; i < count; i++) {
+        int64_t width = width_of(&fields[i], r);
+        if (width < 0 || width > size || fields[i].offset < 0 ||
+            fields[i].offset > size - width) {
             return 0;
         }
     }
@@ -544,18 +690,26 @@ static int fields_sound(const struct anti_field *fields, int64_t count,
 
 /* Whether a descriptor lies in an image of the process, and its name,
    its version, its size and its lists are ones the loader and the walks
-   of reflection and Object.deserialize may use. */
-static int descriptor_sound(const struct anti_descriptor *d)
+   of reflection and Object.deserialize may use. The descriptors its
+   fields reach join r. The record of a type argument holds the size of
+   the argument where a field holds its offset. */
+static int descriptor_sound(const struct anti_descriptor *d,
+                            struct anti_reached *r)
 {
     int64_t i;
 
-    if (d == NULL || anti_rt_plugin_image(d) == NULL ||
+    if (d == NULL || !list_sound(d, 1, sizeof *d) ||
         !text_sound(d->name, d->name_length) ||
-        !text_sound(d->version, d->version_length) || d->size <= 0 ||
-        !fields_sound(d->fields, d->field_count, d->size) ||
-        !fields_sound(d->type_args, d->type_arg_count, INT64_MAX) ||
+        !text_sound(d->version, d->version_length) || d->size < 0 ||
+        !fields_sound(d->fields, d->field_count, d->size, r) ||
+        !records_sound(d->type_args, d->type_arg_count) ||
         !list_sound(d->functions, d->function_count, sizeof *d->functions)) {
         return 0;
+    }
+    for (i = 0; i < d->type_arg_count; i++) {
+        if (d->type_args[i].offset < 0) {
+            return 0;
+        }
     }
     for (i = 0; i < d->function_count; i++) {
         const struct anti_function *f = &d->functions[i];
@@ -572,12 +726,14 @@ static int descriptor_sound(const struct anti_descriptor *d)
 /* Whether a descriptor of a class and every descriptor of its chain are
    sound. The chain holds as many parents as the depth says, and the list
    of ancestors, where there is one, ends in the class itself. */
-static int class_sound(const struct anti_descriptor *d)
+static int class_sound(const struct anti_descriptor *d,
+                       struct anti_reached *r)
 {
     const struct anti_descriptor *up;
     int64_t steps;
 
-    if (!descriptor_sound(d) || d->depth < 0 || d->depth == INT64_MAX ||
+    if (!descriptor_sound(d, r) || d->size <= 0 || d->depth < 0 ||
+        d->depth == INT64_MAX ||
         (d->ancestors != NULL &&
          (!list_sound(d->ancestors, d->depth + 1, sizeof *d->ancestors) ||
           d->ancestors[d->depth] != d))) {
@@ -585,7 +741,7 @@ static int class_sound(const struct anti_descriptor *d)
     }
     up = d->parent;
     for (steps = 0; up != NULL && steps < d->depth; steps++) {
-        if (!descriptor_sound(up)) {
+        if (!descriptor_sound(up, r) || up->size <= 0) {
             return 0;
         }
         up = up->parent;
@@ -593,18 +749,24 @@ static int class_sound(const struct anti_descriptor *d)
     return up == NULL && steps == d->depth;
 }
 
+/* The reason of damage_of where the list of the descriptors to check
+   could not grow. */
+static const char no_memory[] = "out of memory";
+
 /* What is damaged in the table of a library, or NULL when every value
-   the loader reads is sound. */
-static const char *damage_of(const struct anti_provided *table)
+   the loader reads is sound. The descriptors the fields reach join r,
+   and each is checked in turn. */
+static const char *damage_in(const struct anti_provided *table,
+                             struct anti_reached *r)
 {
     int64_t i;
 
     if (!text_sound(table->version, table->version_length)) {
         return "the runtime version";
     }
-    if (table->count < 0 || (table->count > 0 && table->entries == NULL) ||
-        table->class_count < 0 ||
-        (table->class_count > 0 && table->classes == NULL)) {
+    if (!list_sound(table->entries, table->count, sizeof *table->entries) ||
+        !list_sound(table->classes, table->class_count,
+                    sizeof *table->classes)) {
         return "a count";
     }
     for (i = 0; i < table->count; i++) {
@@ -617,7 +779,7 @@ static const char *damage_of(const struct anti_provided *table)
             anti_rt_plugin_image(e->descriptor) == NULL) {
             return "the interface of an entry";
         }
-        if (!class_sound(e->class_of) || e->init == NULL) {
+        if (!class_sound(e->class_of, r) || e->init == NULL) {
             return "the class of an entry";
         }
         /* The loader writes the table pointer of the sub-object. */
@@ -626,18 +788,36 @@ static const char *damage_of(const struct anti_provided *table)
                             (int64_t)sizeof(struct anti_object)) {
             return "the offset of an entry";
         }
-        if (e->chain_length < 1 || e->chain == NULL) {
+        if (e->chain_length < 1 ||
+            !list_sound(e->chain, e->chain_length, sizeof *e->chain)) {
             return "the version chain of an entry";
         }
     }
     for (i = 0; i < table->class_count; i++) {
         const struct anti_class *c = &table->classes[i];
-        if (!class_sound(c->descriptor) || c->init == NULL ||
+        if (!class_sound(c->descriptor, r) || c->init == NULL ||
             !text_sound(c->module, c->module_length)) {
             return "a class";
         }
     }
+    /* The list grows while it is walked. */
+    for (i = 0; i < r->count; i++) {
+        if (!descriptor_sound(r->items[i], r)) {
+            return "a type that a field holds";
+        }
+    }
     return NULL;
+}
+
+/* What is damaged in the table of a library, no_memory, or NULL when
+   every value the loader reads is sound. */
+static const char *damage_of(const struct anti_provided *table)
+{
+    struct anti_reached r = {NULL, 0, 0, 0};
+    const char *damage = damage_in(table, &r);
+
+    free(r.items);
+    return r.short_of_memory ? no_memory : damage;
 }
 
 /* The longest a symbol or a module path of a message of the loader is. */
@@ -816,6 +996,10 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
         goto close;
     }
     damage = damage_of(table);
+    if (damage == no_memory) {
+        fail("out of memory");
+        goto close;
+    }
     if (damage != NULL) {
         fail("%s carries a damaged table of what it provides: %s", name,
              damage);

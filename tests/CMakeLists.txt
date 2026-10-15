@@ -434,7 +434,7 @@ foreach(which one two)
     add_library(plugin_table_${which} SHARED unit/plugin_table.c)
 endforeach()
 antic_rt_sources(plugin_sources plugin assert loaded atomic digest text toml
-    utf platform_posix platform_windows)
+    utf platform_posix platform_windows object json cast)
 add_executable(rt_plugin_tests unit/test_plugin_race.c ${plugin_sources})
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})

@@ -1,6 +1,6 @@
 /* A shared library that rt_plugin_table_tests loads: the table of a
-   plugin with one entry and one class. The table is writable, so the test
-   damages one value of it before each load. */
+   plugin with one entry, one class and one struct. The table is
+   writable, so the test damages one value of it before each load. */
 #include "../binary_stdio.h"
 #include "../../src/rt/plugin.h"
 #include "../../src/rt/registry.h"
@@ -33,6 +33,18 @@ EXPORTED struct anti_function anti_bad_functions[1] = {
 
 EXPORTED struct anti_field anti_bad_fields[1] = {
     {(const unsigned char *)"count", 5, 0, 0, 0, NULL}
+};
+
+/* A struct of eight bytes with one field, which the test puts inside
+   the class as a field of its own. */
+EXPORTED struct anti_field anti_bad_part_fields[1] = {
+    {(const unsigned char *)"value", 5, 0, ANTI_TYPE_I64, 0, NULL}
+};
+
+EXPORTED struct anti_descriptor anti_bad_part = {
+    (const unsigned char *)"Part", 4, NULL, 8, 0, NULL, 1,
+    anti_bad_part_fields, NULL, 0, 0, NULL, (const unsigned char *)"1.0.0", 5,
+    NULL, 0, NULL
 };
 
 EXPORTED struct anti_descriptor anti_bad_class = {

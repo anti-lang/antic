@@ -83,17 +83,6 @@ unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
     return bytes;
 }
 
-const void *anti_rt_body_entry(anti_rt_body body)
-{
-    union {
-        const void *entry;
-        anti_rt_body body;
-    } cast;
-
-    cast.body = body;
-    return cast.entry;
-}
-
 /* The interface the library provides, as the host declares it. */
 static const int64_t chain[1] = {1};
 static struct anti_versions versions = {
@@ -113,6 +102,8 @@ static struct anti_descriptor *class_of;
 static struct anti_class *classes;
 static struct anti_function *functions;
 static struct anti_field *fields;
+static struct anti_descriptor *part;
+static struct anti_field *part_fields;
 static void (**during_init)(void);
 
 static struct anti_provided table_good;
@@ -121,6 +112,8 @@ static struct anti_descriptor class_good;
 static struct anti_class classes_good;
 static struct anti_function functions_good;
 static struct anti_field fields_good;
+static struct anti_descriptor part_good;
+static struct anti_field part_fields_good;
 
 static void *symbol(void *library, const char *name)
 {
@@ -155,10 +148,12 @@ static int open_bad(void)
     classes = symbol(library, "anti_bad_classes");
     functions = symbol(library, "anti_bad_functions");
     fields = symbol(library, "anti_bad_fields");
+    part = symbol(library, "anti_bad_part");
+    part_fields = symbol(library, "anti_bad_part_fields");
     during_init = symbol(library, "anti_bad_during_init");
     if (table == NULL || entry == NULL || class_of == NULL ||
         classes == NULL || functions == NULL || fields == NULL ||
-        during_init == NULL) {
+        part == NULL || part_fields == NULL || during_init == NULL) {
         return 0;
     }
     entry->descriptor = &service;
@@ -168,6 +163,8 @@ static int open_bad(void)
     classes_good = *classes;
     functions_good = *functions;
     fields_good = *fields;
+    part_good = *part;
+    part_fields_good = *part_fields;
     return 1;
 }
 
@@ -179,6 +176,8 @@ static void restore(void)
     *classes = classes_good;
     *functions = functions_good;
     *fields = fields_good;
+    *part = part_good;
+    *part_fields = part_fields_good;
     *during_init = NULL;
     versions.floor = (const unsigned char *)"1.0";
     versions.floor_length = 3;
@@ -269,6 +268,19 @@ static void damaged_counts(void)
     REFUSED();
     entry->chain = NULL;
     REFUSED();
+    /* A count past its list would walk outside the image. */
+    table->count = 100000;
+    REFUSED();
+    table->count = INT64_MAX / 2;
+    REFUSED();
+    table->class_count = 100000;
+    REFUSED();
+    table->class_count = INT64_MAX;
+    REFUSED();
+    entry->chain_length = 100000;
+    REFUSED();
+    entry->chain_length = INT64_MAX;
+    REFUSED();
 }
 
 static void damaged_pointers(void)
@@ -340,6 +352,91 @@ static void damaged_lists(void)
     fields->offset = 4096;
     REFUSED();
     fields->offset = -1;
+    REFUSED();
+}
+
+/* The type id of an array of count elements of the scalar type. */
+static int64_t array_of(int64_t element, int64_t count)
+{
+    return ANTI_TYPE_ARRAY | element << 8 | element << 16 | count << 24;
+}
+
+/* The load succeeds, and the table goes back as the library carries
+   it. */
+static void loaded_with(int line)
+{
+    void *handle = load();
+
+    if (handle == NULL) {
+        struct anti_text why = anti_rt_plugin_message();
+        check_failures++;
+        fprintf(stderr, "line %d: a sound table was refused: %.*s\n", line,
+                (int)why.len, why.ptr);
+    } else {
+        CHECK(anti_rt_plugin_unload(handle) == 1);
+    }
+    restore();
+}
+
+#define LOADED() loaded_with(__LINE__)
+
+/* Every byte of a field lies inside the object, the bytes of a value it
+   holds inline among them, and so does every field of a struct it
+   holds. Object.deserialize writes all of them. */
+static void damaged_widths(void)
+{
+    fields->type = ANTI_TYPE_I64;
+    fields->offset = class_of->size - 8;
+    LOADED();
+    fields->type = ANTI_TYPE_I64;
+    fields->offset = class_of->size - 4;
+    REFUSED();
+    fields->type = ANTI_TYPE_I32;
+    fields->offset = class_of->size;
+    REFUSED();
+    fields->type = ANTI_TYPE_STR;
+    fields->offset = class_of->size - 8;
+    REFUSED();
+    fields->type = array_of(ANTI_TYPE_I32, 4);
+    fields->offset = class_of->size - 16;
+    LOADED();
+    fields->type = array_of(ANTI_TYPE_I32, 4);
+    fields->offset = class_of->size - 12;
+    REFUSED();
+    fields->type = array_of(ANTI_TYPE_I64, (int64_t)1 << 38);
+    fields->offset = 0;
+    REFUSED();
+    fields->type = ANTI_TYPE_STRUCT;
+    fields->descriptor = part;
+    fields->offset = class_of->size - 8;
+    LOADED();
+    fields->type = ANTI_TYPE_STRUCT;
+    fields->descriptor = part;
+    fields->offset = class_of->size - 4;
+    REFUSED();
+    fields->type = ANTI_TYPE_STRUCT;
+    fields->descriptor = part;
+    part->size = 64;
+    REFUSED();
+    /* A field of the struct reaches past the struct. */
+    fields->type = ANTI_TYPE_STRUCT;
+    fields->descriptor = part;
+    part_fields->offset = 4;
+    REFUSED();
+    fields->type = ANTI_TYPE_STRUCT;
+    fields->descriptor = part;
+    part->field_count = 100000;
+    REFUSED();
+    /* A struct reached through an owned pointer is written in memory of
+       its own, which its size gives. */
+    fields->type = ANTI_TYPE_PTR | ANTI_TYPE_STRUCT << 8;
+    fields->owned = 1;
+    fields->descriptor = part;
+    LOADED();
+    fields->type = ANTI_TYPE_PTR | ANTI_TYPE_STRUCT << 8;
+    fields->owned = 1;
+    fields->descriptor = part;
+    part_fields->type = ANTI_TYPE_STR;
     REFUSED();
 }
 
@@ -712,6 +809,7 @@ int main(void)
     damaged_pointers();
     damaged_offsets();
     damaged_lists();
+    damaged_widths();
     damaged_parents();
     other_program();
     unload_waits_for_build();

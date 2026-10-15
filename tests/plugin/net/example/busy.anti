@@ -1,11 +1,45 @@
 //! A library that provides a `Worker`, built with `antic --lib shared
 //! --no-runtime`. Every function takes a kind of value from the host and gives
-//! one back.
+//! one back, and a class of the library holds a field of every kind.
 
 import anti.lang;
 import net.example.kinds;
 
 provides net.example.kinds.Worker as Busy;
+
+/// A struct of the library, which a field of `Holds` keeps inline.
+struct Pair
+{
+	a: int,
+	b: i8,
+}
+
+/// A variant of the library, which a field of `Holds` keeps inline.
+variant Mark
+{
+	Dot { r: int },
+	Empty,
+}
+
+/// A class of the library with a field of every kind. The loader checks the
+/// width of each and the types they hold before the library loads.
+pub class Holds
+{
+	small: i8,
+	text: str,
+	numbers: []int,
+	row: [3]int,
+	grid: [3][2]i16,
+	maybe: ?int,
+	spot: ?*Pair,
+	both: (int, str),
+	pair: Pair,
+	mark: Mark,
+	call: ?fn(int) -> int,
+	own parts: []Pair,
+	own rows: [][]i32,
+	own next: ?*Holds = none,
+}
 
 /// The worker of the library, which counts its calls.
 pub class Busy
