@@ -29,8 +29,6 @@ class_members_modules_release T076 A public static field and a public constant o
 class_members_modules_dev T076 A public static field and a public constant of a class of another module are refused.
 generic_class_constant_modules_release T029 The library file of a generic function that reads a constant of a class cannot be read.
 generic_class_constant_modules_dev T029 The library file of a generic function that reads a constant of a class cannot be read.
-optional_default_modules_release T085 The library file of a class with a field `?int = none` cannot be read.
-optional_default_modules_dev T085 The library file of a class with a field `?int = none` cannot be read.
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.

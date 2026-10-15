@@ -1054,19 +1054,25 @@ void antl_read_types(struct reader *r)
 
 /* A constant of type t. Aggregates hold one value per element or field,
    which the constant evaluator relies on. */
-bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
+bool antl_read_value(struct reader *r, struct type *of, struct const_value *v,
                      int depth)
 {
     uint8_t kind = antl_get_u8(r);
+    struct type *t = of;
     uint32_t i;
     uint32_t n;
 
     memset(v, 0, sizeof *v);
-    v->type = t;
+    v->type = of;
     v->kind = (enum const_kind)kind;
     if (r->failed || depth > 64) {
         antl_damaged(r);
         return false;
+    }
+    /* A constant of a `?T` is `none` or the value of its T, as the tree
+       of lower_store_constant reads it, and keeps the type `?T`. */
+    while (t->kind == TYPE_OPTIONAL && kind != CONST_NULL) {
+        t = t->element;
     }
     switch (kind) {
     case CONST_INT:
@@ -1085,8 +1091,11 @@ bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,
         v->as.character = antl_get_u32(r);
         return !r->failed && t->kind == TYPE_CHAR;
     case CONST_NULL:
-        /* `none` stands for a pointer or a function that may be none. */
-        return (t->kind == TYPE_POINTER || t->kind == TYPE_FN) && t->nullable;
+        /* `none` stands for a pointer or a function that may be none,
+           and for a `?T`. */
+        return ((t->kind == TYPE_POINTER || t->kind == TYPE_FN) &&
+                t->nullable) ||
+               t->kind == TYPE_OPTIONAL;
     case CONST_TEXT: {
         struct name bytes = antl_get_name(r);
         v->as.text.bytes = bytes.text;
