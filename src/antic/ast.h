@@ -1035,9 +1035,6 @@ struct item {
        every module that makes the copy writes the same ones. NULL for
        every other item. */
     const char *home_module;
-    /* The source of that generic, which its lines and its positions
-       name, or NULL. */
-    const char *home_file;
 };
 
 /* One name of the list of a direct import. */

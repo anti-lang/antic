@@ -6,6 +6,8 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "arena.h"
+#include "modpath.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -64,21 +66,38 @@ static bool synchronized_function(const struct item *it)
            !lower_name_is(&it->name, "destruct");
 }
 
-/* The copy of a generic of another module, or an anonymous function of
-   one, and so the source its lines name. NULL for any other function. */
-static const char *home_file_of(const struct item *it)
+/* DESIGN: the source of the copy of a generic of another module, or of
+   an anonymous function of one, which its lines and its positions name.
+   NULL for any other function. The path of a module is the path of its
+   source under its root with `.` for each separator, so the source is
+   that path back, as the module that declares the generic records its
+   own. A library file therefore carries no path. */
+static const char *home_file_of(struct lowerer *l, const struct item *it)
 {
+    size_t n;
+    size_t i;
+    char *file;
+
     while (it->enclosing != NULL) {
         it = it->enclosing;
     }
-    return it->home_file;
+    if (it->home_module == NULL) {
+        return NULL;
+    }
+    n = strlen(it->home_module);
+    file = arena_alloc(l->m->arena, n + sizeof SOURCE_SUFFIX);
+    for (i = 0; i < n; i++) {
+        file[i] = it->home_module[i] == '.' ? '/' : it->home_module[i];
+    }
+    memcpy(file + n, SOURCE_SUFFIX, sizeof SOURCE_SUFFIX);
+    return file;
 }
 
 static void lower_function_body(struct lowerer *l, const struct item *it);
 
 void lower_function(struct lowerer *l, const struct item *it)
 {
-    const char *home = home_file_of(it);
+    const char *home = home_file_of(l, it);
     const char *file = l->file;
     uint32_t file_index = l->file_index;
 

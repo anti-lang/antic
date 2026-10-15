@@ -575,6 +575,7 @@ const struct const_value *lower_location_value(struct lowerer *l,
 {
     struct const_value *v = arena_alloc(l->m->arena, sizeof *v);
     struct text function = {0};
+    const char *module = l->module_name;
     size_t i;
 
     memset(v, 0, sizeof *v);
@@ -585,8 +586,13 @@ const struct const_value *lower_location_value(struct lowerer *l,
     v->as.aggregate.count = t->field_count;
     v->as.aggregate.items =
         arena_alloc(l->m->arena, alloc_product(t->field_count + 1, sizeof *v));
+    /* A copy of a generic of another module names that module, as its
+       symbol does. */
+    if (l->f != NULL && l->f->module != NULL) {
+        module = l->f->module;
+    }
     if (l->f != NULL) {
-        text_appendf(&function, "%s.%s", l->module_name, l->f->name);
+        text_appendf(&function, "%s.%s", module, l->f->name);
     }
     for (i = 0; i < t->field_count; i++) {
         struct const_value *item = &v->as.aggregate.items[i];
@@ -599,7 +605,7 @@ const struct const_value *lower_location_value(struct lowerer *l,
         } else if (lower_name_is(name, LANG_LOCATION_FUNCTION)) {
             text_constant(l, item, text_cstr(&function));
         } else if (lower_name_is(name, LANG_LOCATION_MODULE)) {
-            text_constant(l, item, l->module_name);
+            text_constant(l, item, module);
         } else if (lower_name_is(name, LANG_LOCATION_LINE)) {
             item->as.integer = (uint64_t)pos.line;
         } else if (lower_name_is(name, LANG_LOCATION_COLUMN)) {
