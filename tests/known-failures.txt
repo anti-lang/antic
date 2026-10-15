@@ -102,7 +102,6 @@ check_slice_range_reversed T017 A dev build does not check a slice whose low bou
 check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.
 generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
 generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
-matrix_errors_unhandled_construct_refused T051 An unhandled `alloc T(args)` gets a second message.
 matrix_threads_join_after_join_all_refused T053 A second `join` of one job compiles.
 matrix_threads_join_twice_refused T053 A second `join` of one job compiles.
 check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.

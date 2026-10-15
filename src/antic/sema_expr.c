@@ -2397,8 +2397,11 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             if (e->as.alloc.value->kind == EXPR_CALL) {
                 e->as.alloc.value->as.call.on_heap = true;
                 t = sema_check_expr(c, e->as.alloc.value, expected);
-                if (sema_is_error(t) ||
-                    e->as.alloc.value->as.call.builds == NULL) {
+                /* The call reported its own mistake. */
+                if (sema_is_error(t)) {
+                    return t;
+                }
+                if (e->as.alloc.value->as.call.builds == NULL) {
                     sema_error_at(c, e->as.alloc.value->pos,
                                   "`alloc` of one object takes a literal or a "
                                   "class with arguments");
