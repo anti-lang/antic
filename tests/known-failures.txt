@@ -47,7 +47,6 @@ matrix_flow_undo_directly_in_undo_refused T006 The refusal of an `undo` in an `u
 matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
-matrix_values_is_after_error_refused T015 `is` on a value with an error adds a message about a module.
 check_slice_range T017 A dev build does not check the bounds of a slice of an array.
 matrix_types_enum_value_from_a_call_refused T020 A call as the value of an enum compiles, and the value is 0.
 matrix_types_bitfield_width_from_a_call_refused T020 A call as the width of a bitfield compiles, and the field is no bitfield.
