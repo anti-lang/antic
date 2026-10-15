@@ -207,6 +207,15 @@ struct checker {
     struct written_field *written;
     size_t written_count;
     size_t written_capacity;
+    /* The functions of thread-safe classes that return a pointer into
+       the fields, and the returns of a call of one on self, which the
+       end of the module reports from a public function. */
+    const struct item **leaking;
+    size_t leaking_count;
+    size_t leaking_capacity;
+    struct leak_call *leak_calls;
+    size_t leak_call_count;
+    size_t leak_call_capacity;
     bool ok;
 };
 
@@ -675,6 +684,10 @@ bool sema_check_reach(struct checker *c, const struct expr *e,
                       const struct struct_field *f);
 void sema_note_field_write(struct checker *c, const struct expr *e);
 void sema_report_unfixed(struct checker *c);
+/* Report each public function of a thread-safe class that returns what
+   a function of the class gave, when that is a pointer into the fields,
+   and free the record. */
+void sema_report_leak_calls(struct checker *c);
 bool sema_points_into_fields(const struct expr *e, const struct item *fn,
                              const struct type *to);
 void sema_check_leak_return(struct checker *c, const struct expr *value,

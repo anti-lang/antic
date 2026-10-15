@@ -654,6 +654,8 @@ static bool in_fields(const struct expr *e, const struct item *fn)
 bool sema_points_into_fields(const struct expr *e, const struct item *fn,
                              const struct type *to)
 {
+    size_t i;
+
     if (e == NULL || fn == NULL || fn->self == NULL) {
         return false;
     }
@@ -661,6 +663,45 @@ bool sema_points_into_fields(const struct expr *e, const struct item *fn,
     case EXPR_UNARY:
         return e->as.unary.op == TOKEN_AMP &&
                in_fields(e->as.unary.operand, fn);
+    /* A tuple, an array or a struct that holds such a value gives it
+       out as the value itself does, by T062 of
+       docs/audit/tests-findings.md. */
+    case EXPR_TUPLE:
+        for (i = 0; i < e->as.tuple.count; i++) {
+            const struct type *part =
+                to != NULL && to->kind == TYPE_TUPLE && i < to->param_count
+                    ? to->params[i]
+                    : NULL;
+            if (sema_points_into_fields(e->as.tuple.elements[i], fn, part)) {
+                return true;
+            }
+        }
+        return false;
+    case EXPR_ARRAY_LIT:
+        for (i = 0; i < e->as.array_lit.count; i++) {
+            const struct type *part =
+                to != NULL && to->kind == TYPE_ARRAY ? to->element : NULL;
+            if (sema_points_into_fields(e->as.array_lit.elements[i], fn,
+                                        part)) {
+                return true;
+            }
+        }
+        return false;
+    case EXPR_STRUCT_LIT:
+        for (i = 0; i < e->as.struct_lit.field_count; i++) {
+            const struct field_init *init = &e->as.struct_lit.fields[i];
+            const struct type *s =
+                e->type != NULL && e->as.struct_lit.variant_case == 0
+                    ? sema_struct_of(e->type)
+                    : NULL;
+            const struct struct_field *f =
+                s != NULL ? types_find_field(s, &init->name) : NULL;
+            if (sema_points_into_fields(init->value, fn,
+                                        f != NULL ? f->type : NULL)) {
+                return true;
+            }
+        }
+        return false;
     case EXPR_SLICE:
         return in_fields(e->as.slice.base, fn) ||
                sema_points_into_fields(e->as.slice.base, fn, NULL);
@@ -685,17 +726,149 @@ bool sema_points_into_fields(const struct expr *e, const struct item *fn,
     }
 }
 
+/* A `return` of a call of a function of the class on self. */
+struct leak_call {
+    const struct item *caller;
+    const struct item *callee;
+    struct pos pos;
+};
+
+/* The function of fn's class that value calls on self, or NULL. The
+   checker writes `self.inner()` as the call of `Box.inner` with self as
+   its first argument. */
+static const struct item *self_call(const struct expr *value,
+                                    const struct item *fn)
+{
+    const struct expr *callee;
+    const struct expr *object;
+    const struct item *it;
+
+    if (value->kind != EXPR_CALL || value->as.call.optional) {
+        return NULL;
+    }
+    callee = value->as.call.callee;
+    if (callee->symbol == NULL || callee->symbol->item == NULL) {
+        return NULL;
+    }
+    if (callee->kind == EXPR_FIELD) {
+        object = callee->as.field.base;
+    } else if (callee->kind == EXPR_NAME && value->as.call.arg_count > 0) {
+        object = value->as.call.args[0];
+    } else {
+        return NULL;
+    }
+    it = callee->symbol->item;
+    object = sema_bare_place(object);
+    if (!it->has_self || it->owner != fn->owner ||
+        object->kind != EXPR_NAME || object->symbol != fn->self) {
+        return NULL;
+    }
+    return it;
+}
+
+static void add_leaking(struct checker *c, const struct item *fn)
+{
+    size_t i;
+
+    for (i = 0; i < c->leaking_count; i++) {
+        if (c->leaking[i] == fn) {
+            return;
+        }
+    }
+    c->leaking = alloc_grow(c->leaking, &c->leaking_capacity,
+                            c->leaking_count, sizeof *c->leaking);
+    c->leaking[c->leaking_count++] = fn;
+}
+
+/* DESIGN: a public function of a thread-safe class gives out no pointer
+   into the fields, and a private one may hand one to the class itself.
+   The return of such a private function from a public one gives the
+   pointer out, by T062 of docs/audit/tests-findings.md. A private
+   function may stand after the public one that calls it, so each
+   `return` of a call on self is kept, and the end of the module reports
+   it once the functions that return a pointer into the fields are
+   known. */
 void sema_check_leak_return(struct checker *c, const struct expr *value,
                             const struct type *result)
 {
     const struct item *fn = c->ctx.function;
+    const struct type *owner = class_of(fn);
     const struct type *t = guarded_api(fn);
+    const struct item *callee;
 
-    if (t != NULL && sema_points_into_fields(value, fn, result)) {
-        sema_error_at(c, value->pos, "`%.*s` of the thread-safe class `%s` "
-                      "gives out a pointer into its fields, return a copy",
-                      (int)fn->name.length, fn->name.text, sema_tn(t));
+    if (owner == NULL || owner->safety == SAFETY_NONE || !fn->has_self) {
+        return;
     }
+    if (sema_points_into_fields(value, fn, result)) {
+        if (t != NULL) {
+            sema_error_at(c, value->pos, "`%.*s` of the thread-safe class "
+                          "`%s` gives out a pointer into its fields, return "
+                          "a copy", (int)fn->name.length, fn->name.text,
+                          sema_tn(t));
+        } else if (c->ctx.quiet == 0) {
+            add_leaking(c, fn);
+        }
+        return;
+    }
+    callee = self_call(value, fn);
+    if (callee != NULL && c->ctx.quiet == 0) {
+        c->leak_calls = alloc_grow(c->leak_calls, &c->leak_call_capacity,
+                                   c->leak_call_count, sizeof *c->leak_calls);
+        c->leak_calls[c->leak_call_count].caller = fn;
+        c->leak_calls[c->leak_call_count].callee = callee;
+        c->leak_calls[c->leak_call_count].pos = value->pos;
+        c->leak_call_count++;
+    }
+}
+
+/* Whether fn is one of the functions that return a pointer into the
+   fields. */
+static bool is_leaking(const struct checker *c, const struct item *fn)
+{
+    size_t i;
+
+    for (i = 0; i < c->leaking_count; i++) {
+        if (c->leaking[i] == fn) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void sema_report_leak_calls(struct checker *c)
+{
+    bool changed = true;
+    size_t i;
+
+    while (changed) {
+        changed = false;
+        for (i = 0; i < c->leak_call_count; i++) {
+            const struct leak_call *k = &c->leak_calls[i];
+            if (guarded_api(k->caller) == NULL && is_leaking(c, k->callee) &&
+                !is_leaking(c, k->caller)) {
+                add_leaking(c, k->caller);
+                changed = true;
+            }
+        }
+    }
+    for (i = 0; i < c->leak_call_count; i++) {
+        const struct leak_call *k = &c->leak_calls[i];
+        const struct type *t = guarded_api(k->caller);
+        if (t != NULL && is_leaking(c, k->callee)) {
+            sema_error_at(c, k->pos, "`%.*s` of the thread-safe class `%s` "
+                          "gives out a pointer into its fields, return a "
+                          "copy", (int)k->caller->name.length,
+                          k->caller->name.text, sema_tn(t));
+        }
+    }
+    free(c->leaking);
+    free(c->leak_calls);
+    c->leaking = NULL;
+    c->leak_calls = NULL;
+    c->leaking_count = 0;
+    c->leaking_capacity = 0;
+    c->leak_call_count = 0;
+    c->leak_call_capacity = 0;
 }
 
 void sema_check_leak_arg(struct checker *c, const struct expr *callee,

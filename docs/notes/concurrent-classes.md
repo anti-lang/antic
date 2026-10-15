@@ -115,9 +115,14 @@ channels.
   such a function. A value that points into the fields is refused where the
   target lies outside the object: `*out`, a field of another object, a global.
   A target in the fields of `self` keeps it, and a local or a parameter that
-  takes it is marked `into_fields`, as its `let` would mark it. A pointer
-  inside a tuple or a struct and the result of a private function stay open,
-  which is T062 of `docs/audit/tests-findings.md`.
+  takes it is marked `into_fields`, as its `let` would mark it.
+- A tuple, an array literal or a struct literal that holds such a value gives
+  it out as well. A private function that returns one is recorded, and so is
+  each `return` of a call of a function of the class on `self`.
+  `sema_report_leak_calls` marks the private functions that return the
+  result of a recorded one, at the end of the module. It then refuses the
+  `return` of a call of a recorded function in a function that is not
+  private. T062 of `docs/audit/tests-findings.md` asked for both.
 
 ## Atomic locals and workers
 

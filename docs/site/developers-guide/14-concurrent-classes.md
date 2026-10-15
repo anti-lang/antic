@@ -238,7 +238,7 @@ It leaves the following to the programmer.
 
 - A function reaches the fields of another object of its class, `other.count`, under the lock of `self` alone. `sync self, other { }` takes both.
 - A function without `self` may call a private function on an object. That call runs with no lock.
-- A private function may return a pointer into the fields, and a pointer stored in a field of the object leads out of it. What it points at is not under the lock. A function that is not private stores no pointer into the fields through an out parameter or in another object.
+- A private function may return a pointer into the fields, and a pointer stored in a field of the object leads out of it. What it points at is not under the lock. A function that is not private gives neither out, also inside a tuple or a struct. It does not return the result of such a private function either. A function that is not private stores no pointer into the fields through an out parameter or in another object.
 - Two objects locked in opposite orders by two threads wait for each other. The dev build reports the two orders at run time, as a later section describes.
 
 ### How antic builds it

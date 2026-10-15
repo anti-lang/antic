@@ -3121,6 +3121,7 @@ bool sema_check(struct module *module, const char *module_name,
     report_program(&c);
     check_boundary(&c);
     sema_report_unfixed(&c);
+    sema_report_leak_calls(&c);
     /* The defaults come before the copies, whose pass makes the copies
        their calls name and gives each class copy it makes its own. */
     if (c.ok) {
