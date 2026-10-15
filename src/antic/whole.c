@@ -849,6 +849,7 @@ bool whole_program(struct ir_module *program,
     struct whole *w = whole_build(program);
     struct ir_reach reach;
     size_t inject_errors;
+    bool backtrace;
     bool partial;
     bool calls;
     bool ok;
@@ -872,9 +873,10 @@ bool whole_program(struct ir_module *program,
     } else if (options->bundled) {
         whole_write_registry(program, false);
     }
-    if (!options->plugin &&
-        (whole_asks_backtrace(program, &reach) || options->bundled ||
-         partial)) {
+    backtrace = !options->plugin &&
+                (whole_asks_backtrace(program, &reach) || options->bundled ||
+                 partial);
+    if (backtrace) {
         whole_write_backtrace_default(program, options->release);
     }
     calls = whole_calls_through_reflection(program, &reach);
@@ -900,6 +902,18 @@ bool whole_program(struct ir_module *program,
     }
     ok = ok && errors->length == inject_errors;
     ir_reach_free(&reach);
+    /* DESIGN: the table of the injections names every provider, and a
+       provider may fail where nothing the reach above saw does. The
+       reach is taken again with the table in it, and a program that
+       reaches the reader of the default through a provider alone gets
+       the default as well, by T104 of docs/audit/tests-findings.md. */
+    if (!options->plugin && !backtrace) {
+        ir_reach(program, options->entry, false, &reach);
+        if (whole_asks_backtrace(program, &reach)) {
+            whole_write_backtrace_default(program, options->release);
+        }
+        ir_reach_free(&reach);
+    }
     /* The trampolines come after every reader of the reach, because they
        add functions that it does not cover. */
     if (calls || options->bundled || partial) {
