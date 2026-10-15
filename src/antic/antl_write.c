@@ -90,6 +90,33 @@ static size_t public_members(const struct type *t)
     return count;
 }
 
+/* DESIGN: a class carries every constant and every static field of its
+   body that another module may name, `pub` or `protected`, by T076,
+   with its type and its value. The global of a static field is data of
+   the module of the class, and the checker reads the value of each
+   member it names. A generic carries none,
+   since no copy reaches one through a library file yet. */
+static bool carried_value(const struct type *t, const struct item *m)
+{
+    return m->kind == ITEM_CONST && m->vis != VIS_PRIVATE &&
+           m->symbol != NULL && m->symbol->type != NULL &&
+           t->generic == NULL && t->type_param_count == 0 &&
+           m->symbol->value != NULL;
+}
+
+static size_t carried_values(const struct type *t)
+{
+    size_t count = 0;
+    size_t i;
+
+    for (i = 0; i < t->member_count; i++) {
+        if (carried_value(t, t->members[i])) {
+            count++;
+        }
+    }
+    return count;
+}
+
 /* Whether m is a private function of the body of t that the record
    of t leaves out. */
 static bool is_private_member(const struct type *t, const struct item *m)
@@ -269,6 +296,10 @@ void antl_visit_type(struct writer *w, const struct type *t)
                 if (carried_member(t, m)) {
                     antl_visit_type(w, m->symbol->type);
                     antl_visit_defaults(w, m->symbol);
+                }
+                if (carried_value(t, m)) {
+                    antl_visit_type(w, m->symbol->type);
+                    antl_visit_value(w, m->symbol->value);
                 }
             }
         }
@@ -597,6 +628,17 @@ static void put_type(struct writer *w, const struct type *t)
                     antl_put_bytes(w, m->name.text, m->name.length);
                 }
             }
+            antl_put_count(w, carried_values(t));
+            for (i = 0; i < t->member_count; i++) {
+                const struct item *m = t->members[i];
+                if (carried_value(t, m)) {
+                    antl_put_bytes(w, m->name.text, m->name.length);
+                    antl_put_u8(w, m->is_static);
+                    antl_put_u8(w, (uint8_t)m->vis);
+                    antl_put_type_ref(w, m->symbol->type);
+                    put_doc(w, m->doc.text, m->doc.length);
+                }
+            }
             if (t->type_param_count > 0) {
                 antl_put_count(w, t->type_param_count);
                 for (i = 0; i < t->type_param_count; i++) {
@@ -721,6 +763,14 @@ static void put_defaults(struct writer *w, const struct type *t)
         if (carried_member(t, t->members[i])) {
             antl_put_param_defaults(w, t->members[i]->symbol);
             antl_put_param_owned(w, t->members[i]->symbol);
+        }
+    }
+    /* The values of the constants of the body, in the order of their
+       records. */
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        if (carried_value(t, m)) {
+            antl_put_value(w, m->symbol->value);
         }
     }
 }

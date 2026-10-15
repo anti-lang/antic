@@ -23,8 +23,6 @@ qualified_arguments_modules_dev T030 A class built with arguments under the name
 generic_dispatch_modules_dev T061 The library file of a generic function that holds a `dispatch` cannot be read.
 generic_dispatch_modules_release T061 The library file of a generic function that holds a `dispatch` cannot be read.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
-class_members_modules_release T076 A public static field and a public constant of a class of another module are refused.
-class_members_modules_dev T076 A public static field and a public constant of a class of another module are refused.
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.

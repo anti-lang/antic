@@ -38,8 +38,16 @@ static struct type *atomic_place(const struct expr *e)
     const struct struct_field *f;
     struct type *s;
 
+    /* A static field of a class of another module, `m.C.f`, is a name
+       once the checker rewrote the path. */
     if (e->kind == EXPR_NAME) {
-        return e->symbol != NULL && e->symbol->atomic ? e->symbol->type : NULL;
+        return e->symbol != NULL &&
+                       (e->symbol->atomic ||
+                        (e->symbol->item != NULL &&
+                         e->symbol->item->is_static &&
+                         e->symbol->item->atomic))
+                   ? e->symbol->type
+                   : NULL;
     }
     if (e->kind != EXPR_FIELD) {
         return NULL;

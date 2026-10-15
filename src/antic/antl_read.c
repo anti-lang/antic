@@ -197,6 +197,11 @@ struct field_refs {
     uint32_t member_count;
     struct item **members;
     uint32_t *member_types;
+    /* The constants and the static fields of a body another module may
+       name, with the index of the type of each. */
+    uint32_t value_count;
+    struct item **values;
+    uint32_t *value_types;
 };
 
 /* The defaults of the parameters of sym, whose type is in place. */
@@ -730,6 +735,40 @@ static void read_members(struct reader *r, struct field_refs *s)
     for (j = 0; j < s->s->private_fn_count && !r->failed; j++) {
         s->s->private_fns[j] = antl_get_name(r);
     }
+    s->value_count = antl_get_count(r, 8);
+    s->values = antl_allocate(r, s->value_count, sizeof *s->values);
+    s->value_types =
+        antl_allocate(r, s->value_count, sizeof *s->value_types);
+    for (j = 0; j < s->value_count && !r->failed; j++) {
+        struct item *m = arena_alloc(r->arena, sizeof *m);
+        struct symbol *sym = arena_alloc(r->arena, sizeof *sym);
+        uint8_t is_static;
+        struct name note;
+        memset(m, 0, sizeof *m);
+        memset(sym, 0, sizeof *sym);
+        m->name = antl_get_name(r);
+        is_static = antl_get_u8(r);
+        m->vis = (enum visibility)antl_get_u8(r);
+        s->value_types[j] = antl_get_u32(r);
+        note = antl_get_name(r);
+        if (is_static > 1 || m->vis > VIS_PUB || m->vis == VIS_PRIVATE) {
+            antl_damaged(r);
+        }
+        m->doc.text = note.text;
+        m->doc.length = note.length;
+        m->kind = ITEM_CONST;
+        m->is_static = is_static != 0;
+        /* A static field is atomic, the one form a body declares. */
+        m->atomic = m->is_static;
+        m->pub = m->vis == VIS_PUB;
+        m->symbol = sym;
+        sym->kind = m->is_static ? SYMBOL_GLOBAL : SYMBOL_CONST;
+        sym->item = m;
+        sym->home = r->iface;
+        sym->doc = m->doc;
+        sym->state = EVAL_DONE;
+        s->values[j] = m;
+    }
 }
 
 /* The marks of the struct t: its flags, its thread safety, the version
@@ -975,9 +1014,27 @@ static void bind_struct(struct reader *r, struct field_refs *s,
         m->symbol->name =
             types_member_symbol(r->arena, &s->s->name, m);
     }
-    if (!r->failed && s->member_count > 0) {
-        s->s->members = s->members;
-        s->s->member_count = s->member_count;
+    for (j = 0; j < s->value_count && !r->failed; j++) {
+        struct item *m = s->values[j];
+        if (s->value_types[j] >= count) {
+            antl_damaged(r);
+            break;
+        }
+        m->symbol->type = r->table[s->value_types[j]];
+        m->symbol->name = types_member_symbol(r->arena, &s->s->name, m);
+    }
+    if (!r->failed && s->member_count + s->value_count > 0) {
+        struct item **all = antl_allocate(r, s->member_count + s->value_count,
+                                          sizeof *all);
+        if (s->member_count > 0) {
+            memcpy(all, s->members, s->member_count * sizeof *all);
+        }
+        if (s->value_count > 0) {
+            memcpy(all + s->member_count, s->values,
+                   s->value_count * sizeof *all);
+        }
+        s->s->members = all;
+        s->s->member_count = s->member_count + s->value_count;
     }
 }
 
@@ -1003,6 +1060,16 @@ static void read_struct_defaults(struct reader *r, const struct field_refs *s)
     for (j = 0; j < s->member_count && !r->failed; j++) {
         antl_read_param_defaults(r, s->members[j]->symbol);
         antl_read_param_owned(r, s->members[j]->symbol);
+    }
+    for (j = 0; j < s->value_count && !r->failed; j++) {
+        struct symbol *sym = s->values[j]->symbol;
+        struct const_value *v;
+        v = antl_allocate(r, 1, sizeof *v);
+        if (!antl_read_value(r, sym->type, v, 0)) {
+            antl_damaged(r);
+            break;
+        }
+        sym->value = v;
     }
 }
 
