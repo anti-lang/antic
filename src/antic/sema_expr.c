@@ -2228,6 +2228,15 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         if (sema_is_error(t)) {
             return t;
         }
+        /* A type parameter is stored, copied, passed on and measured
+           alone, and its fields are those of each argument, so no body
+           writes a literal of it, by T080 of
+           docs/audit/tests-findings.md. */
+        if (t->kind == TYPE_PARAM) {
+            sema_error_at(c, e->pos, "`%s` is a type parameter, and a "
+                          "literal names a type the body knows", sema_tn(t));
+            return sema_builtin(c, TYPE_ERROR);
+        }
         if (t->kind == TYPE_VARIANT) {
             sema_error_at(c, e->pos,
                           "a literal of variant `%s` names one of its "
