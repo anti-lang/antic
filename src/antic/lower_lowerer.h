@@ -546,7 +546,6 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
 void lower_bind_value(struct lowerer *l, struct symbol *sym,
                       struct ir_operand v);
 void lower_bind_cursor(struct lowerer *l, const struct iteration *it);
-void lower_bind_error(struct lowerer *l, struct symbol *sym, uint32_t error);
 struct ir_operand lower_address(struct lowerer *l,
                                 const struct expr *e);
 enum ir_op lower_binary_op(enum token_kind op, const struct type *t);
@@ -590,6 +589,7 @@ void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
                           size_t first);
 
 /* lower_error.c */
+void lower_bind_error(struct lowerer *l, struct symbol *sym, uint32_t error);
 
 /* The value of the call e, whose error a handler takes, written into a
    slot of the frame whose tables are zeroed first. An aggregate is the

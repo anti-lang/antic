@@ -1,6 +1,6 @@
 //! A closure reads the name of an `if let` narrowed only when nothing in the
-//! block can assign it. Here the block assigns it, so the closure reads a
-//! value that may be `none`.
+//! block can assign it. Here the block assigns it, so the closure reads a value
+//! that may be `none`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

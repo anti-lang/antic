@@ -496,8 +496,6 @@ void sema_check_handler(struct checker *c, struct handler *h,
 void sema_declare_caught(struct checker *c, struct handler *h,
                          struct type *t);
 bool sema_in_failing_function(const struct checker *c);
-bool sema_refuse_in_deferred(struct checker *c, struct pos pos,
-                             const char *word);
 void sema_refuse_escaping_error(struct checker *c, const struct expr *e);
 struct type *sema_interface_named(struct checker *c,
                                   const struct name *qualifier,
@@ -607,6 +605,8 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
                        struct pos use);
 
 /* sema_stmt.c */
+bool sema_refuse_in_deferred(struct checker *c, struct pos pos,
+                             const char *word);
 /* Refuse a write to the field target of a singleton that is read-only
    after creation, or its address, at pos. Returns whether it refused. */
 bool sema_refuse_singleton_write(struct checker *c, const struct expr *target,
