@@ -647,12 +647,14 @@ static struct stmt *statement_level(struct parser *p)
     case TOKEN_DEFER:
         parser_next(p);
         s = new_stmt(p, STMT_DEFER, t);
-        if ((s->as.deferred = statement(p)) == NULL) {
-            return NULL;
-        }
-        if (s->as.deferred->kind == STMT_DEFER) {
+        /* The message stands at the inner `defer`, the statement it
+           refuses. */
+        if (parser_check(p, TOKEN_DEFER)) {
             parser_error_here(p, "a `defer` holds one statement, not another "
                                  "`defer`");
+            return NULL;
+        }
+        if ((s->as.deferred = statement(p)) == NULL) {
             return NULL;
         }
         return s;
@@ -663,12 +665,14 @@ static struct stmt *statement_level(struct parser *p)
     case TOKEN_UNDO:
         parser_next(p);
         s = new_stmt(p, STMT_UNDO, t);
-        if ((s->as.deferred = statement(p)) == NULL) {
-            return NULL;
-        }
-        if (s->as.deferred->kind == STMT_UNDO) {
+        /* The message stands at the inner `undo`, the statement it
+           refuses. */
+        if (parser_check(p, TOKEN_UNDO)) {
             parser_error_here(p, "an `undo` holds one statement, not another "
                                  "`undo`");
+            return NULL;
+        }
+        if ((s->as.deferred = statement(p)) == NULL) {
             return NULL;
         }
         return s;

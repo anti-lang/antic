@@ -98,11 +98,22 @@ static void depth_limit(void)
         depth(nested("fn f(p: ?*int) -> *int { return ", "p ?? ", n, "q",
                      "", "; }\n"),
               deep);
-        /* `defer defer` is refused after the inner statement is read,
-           so only the deep form reaches the limit first. */
-        if (deep) {
-            depth(nested("fn f() { ", "defer ", n, "g();", "", " }\n"),
-                  deep);
+        /* `defer defer` is refused at the inner `defer`, before any
+           statement inside it is read, so neither form nests. */
+        {
+            struct parsed d;
+            char *source = nested("fn f() { ", "defer ", n, "g();", "",
+                                  " }\n");
+            parsed_run(&d, source);
+            CHECK(!d.ok);
+            CHECK(d.diags.count >= 1);
+            if (d.diags.count >= 1) {
+                CHECK_STR(d.diags.items[0].message,
+                          "a `defer` holds one statement, not another "
+                          "`defer`");
+            }
+            parsed_release(&d);
+            free(source);
         }
         depth(nested("fn f(s: S) { if let A a = s { } ",
                      "else if let A a = s { } ", n, "", "", "}\n"),
