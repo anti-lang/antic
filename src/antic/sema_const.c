@@ -1145,6 +1145,10 @@ bool sema_eval_const(struct checker *c, struct expr *e,
         out->as.text = e->as.text;
         return true;
     case EXPR_NAME:
+        if (e->symbol != NULL && (e->symbol->kind == SYMBOL_FN ||
+                                  e->symbol->kind == SYMBOL_EXTERN_FN)) {
+            return fail_const(c, e, "a function");
+        }
         if (e->symbol == NULL || e->symbol->kind != SYMBOL_CONST) {
             return fail_const(c, e, "a variable");
         }
