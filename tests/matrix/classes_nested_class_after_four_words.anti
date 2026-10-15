@@ -5,7 +5,7 @@ class Outer
 {
 	pub n: int = 0,
 
-	pub singleton final trace class Inner
+	pub internal final synchronized class Inner
 	{
 		pub m: int = 0,
 	}

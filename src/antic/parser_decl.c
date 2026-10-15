@@ -553,7 +553,11 @@ bool parser_starts_nested(const struct parser *p)
 {
     size_t i;
 
-    for (i = 0; i < 4; i++) {
+    /* Every word before the kind is read, however many stand there, so
+       a refused `pub` before four more words is still a type, by T102
+       of docs/audit/tests-findings.md. The end of the source is no word
+       and ends the walk. */
+    for (i = 0;; i++) {
         const struct token *t = parser_peek_at(p, i);
         switch (t->kind) {
         case TOKEN_STRUCT:
@@ -573,12 +577,13 @@ bool parser_starts_nested(const struct parser *p)
             if (!parser_is_word(p, t, "packed") &&
                 !parser_is_word(p, t, "simd") &&
                 !parser_is_word(p, t, "final") &&
-                !parser_is_word(p, t, "trace")) {
+                !parser_is_word(p, t, "trace") &&
+                !parser_is_word(p, t, "synchronized") &&
+                !parser_is_word(p, t, "concurrent")) {
                 return false;
             }
         }
     }
-    return false;
 }
 
 /* DESIGN: a class body may declare a struct, an enum or a class, as

@@ -238,7 +238,6 @@ matrix_values_qualified_struct_literal_with_an_argument_that_is_no_type_refused 
 matrix_values_struct_literal_with_an_argument_that_is_no_type_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
 matrix_values_slice_literal_with_a_value_and_no_name_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
 matrix_values_slice_literal_in_a_condition_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
-matrix_classes_nested_class_after_four_words_refused T102 `pub` before three more words and `class` in a class body gets `expected identifier`.
 matrix_flow_switch_arm_without_a_statement_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
 matrix_flow_switch_arm_assignment_without_a_value_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
 matrix_flow_if_let_with_a_number_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
