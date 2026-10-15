@@ -135,3 +135,5 @@ anti_test_ownership T132 anti writes its last line with CRLF on Windows. host=wi
 anti_test_errors T132 anti writes its last line with CRLF on Windows. host=windows
 anti_test_threads T132 anti writes its last line with CRLF on Windows. host=windows
 anti_test_classes T132 anti writes its last line with CRLF on Windows. host=windows
+clib_tight T133 The header of an export packed class writes the struct without packing.
+clib_tight_aligned T134 The header of a packed struct with align(N) caps the alignment under its pragma pack.

@@ -11,7 +11,8 @@
 #   CASE      static, shared, exports, two, loader, header, bundle, twice,
 #             simd, classes, failing, tuples, flags, ledger, variants,
 #             nested, names, handlers, generics, optional, forms, views,
-#             never, never_cpp, ctypes, ctypes_shared or ctypes_bundle
+#             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
+#             tight or tight_aligned
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -379,6 +380,27 @@ elseif(CASE STREQUAL "flags")
             SOURCES "${SOURCES}/flags.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/flags${EXE}" "${SOURCES}/flags.expected")
+elseif(CASE STREQUAL "tight")
+    # The struct the header writes for a packed class has the size Anti
+    # gives the class.
+    library(tight static "${dir}")
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    program("${dir}/tight${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/tight.c"
+            INPUTS "${library_file}" "${runtime_library}")
+    expect_output("${dir}/tight${EXE}" "${SOURCES}/tight.expected")
+elseif(CASE STREQUAL "tight_aligned")
+    # The struct the header writes for a packed struct with align(16) has
+    # the size and the alignment Anti gives the struct.
+    library(tight static "${dir}")
+    string(STRIP "${run_out}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    program("${dir}/tight_aligned${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/tight_aligned.c"
+            INPUTS "${library_file}" "${runtime_library}")
+    expect_output("${dir}/tight_aligned${EXE}"
+                  "${SOURCES}/tight_aligned.expected")
 elseif(CASE STREQUAL "ledger")
     # A synchronized class crosses with the bytes of its hidden lock, and
     # two threads of C call it without losing an addition.

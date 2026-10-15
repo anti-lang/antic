@@ -5877,7 +5877,7 @@ if(ANTIC_LLVM_AR)
     foreach(case static shared exports two loader header bundle classes
             failing tuples flags variants nested simd names handlers ledger
             generics optional forms views never never_cpp ctypes
-            ctypes_shared ctypes_bundle)
+            ctypes_shared ctypes_bundle tight tight_aligned)
         # The C program of ledger starts its threads with pthreads.
         if(case STREQUAL "ledger" AND WIN32)
             continue()

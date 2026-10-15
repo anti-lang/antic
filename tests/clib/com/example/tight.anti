@@ -1,0 +1,29 @@
+//! A library for C that exports a packed class and a packed struct with
+//! `align(N)`. The header writes the struct of each with the layout of Anti, so
+//! C and Anti agree on its size and its alignment.
+
+/// A byte and a word without the padding between them.
+export packed class Snug
+{
+	pub tag: u8,
+	pub n: i64,
+}
+
+/// A byte and a word without padding, aligned to 16.
+export packed struct Lined align(16)
+{
+	tag: u8,
+	n: i32,
+}
+
+/// The size of `Snug` in Anti.
+export fn snug_size() -> int
+{
+	return size_of(Snug);
+}
+
+/// The size of `Lined` in Anti.
+export fn lined_size() -> int
+{
+	return size_of(Lined);
+}
