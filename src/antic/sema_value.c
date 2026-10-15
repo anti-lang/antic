@@ -624,6 +624,8 @@ void sema_move_into_literal(struct checker *c, struct expr *value,
     char *text;
     size_t length;
 
+    /* The error a handler binds is stored into no literal. */
+    sema_refuse_escaping_error(c, value);
     if (!sema_literal_moves(value)) {
         return;
     }

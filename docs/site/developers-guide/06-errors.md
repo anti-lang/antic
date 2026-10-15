@@ -612,7 +612,7 @@ For a Java programmer:
 For a C programmer:
 
 - `catch { }` with an empty block drops the error on purpose, and deletes it. Nothing leaks.
-- The error is freed at the end of the handler. A pointer to it kept in a variable outside dangles.
+- The error is freed at the end of the handler. The checker refuses a bare `e` stored by `let`, `=` or `yield`, or into a literal, which would dangle. `dup(e)` keeps a copy.
 - `catch fatal` is the `perror` and `exit` pair: it prints the error and ends the program with its code, or with 1 when the code is 0.
 
 For a C++ programmer:

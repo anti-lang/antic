@@ -2186,8 +2186,8 @@ static void check_stmt(struct checker *c, struct stmt *s)
         return;
     }
     case STMT_ASSIGN:
-        sema_refuse_escaping_error(c, s->as.assign.value);
         check_assign(c, s);
+        sema_refuse_escaping_error(c, s->as.assign.value);
         if (s->as.assign.target->kind == EXPR_NAME) {
             mark_view(s->as.assign.target->symbol, s->as.assign.value);
         }
@@ -2281,11 +2281,11 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         /* The value of the `catch` takes the yielded value as `let`
            takes it: a fresh value and an `own` parameter move, and any
-           other existing value that owns something is refused. */
-        if (sema_require(c, s->as.yielded,
-                         sema_check_expr(c, s->as.yielded,
-                                         c->handler.yields),
-                         c->handler.yields)) {
+           other existing value that owns something is refused. The
+           error a handler binds is refused as by `let`. */
+        t = sema_check_expr(c, s->as.yielded, c->handler.yields);
+        sema_refuse_escaping_error(c, s->as.yielded);
+        if (sema_require(c, s->as.yielded, t, c->handler.yields)) {
             static const struct name no_name = {"", 0};
             sema_bind_value(c, s->as.yielded, no_name, c->handler.yields);
         }
