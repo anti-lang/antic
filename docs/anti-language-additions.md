@@ -125,7 +125,7 @@ A function whose result is `never` ends the program on every path. Settled on 20
 - A call of a function that returns `never` ends its path as `return` does. A function with a result may end with one, and `if p == none { stop(1); }` narrows `p` for the rest of the block.
 - The type has no values, so no variable, field or parameter has it. `never` is a contextual word after `->`.
 - `fn(A) -> never` is a function type of its own and converts to no other function type.
-- `Error.fatal` of `anti.lang` is `final fn fatal(self) -> never`, so `catch fatal` calls it directly. The generated header writes `_Noreturn` before an exported function that returns `never`.
+- `Error.fatal` of `anti.lang` is `final fn fatal(self) -> never`, so `catch fatal` calls it directly. The generated header writes `ANTI_NORETURN` before an exported function that returns `never`, which is `_Noreturn` in C and `[[noreturn]]` in C++.
 
 ```anti
 extern fn exit(status: c_int) -> never;

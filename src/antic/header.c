@@ -56,7 +56,8 @@ static const char *const reserved_names[] = {
     "static_cast", "struct", "switch", "template", "this", "thread_local",
     "throw", "true", "try", "typedef", "typeid", "typename", "union",
     "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while",
-    "xor", "xor_eq", "NULL", "ANTI_ALIGNAS", "ANTI_ALIGNED"};
+    "xor", "xor_eq", "NULL", "ANTI_ALIGNAS", "ANTI_ALIGNED",
+    "ANTI_NORETURN"};
 
 /* Whether name is a macro of <stdint.h>: INT8_MAX, UINT64_C, SIZE_MAX and
    the other names of that header that consist of capitals, digits and _. */
@@ -1580,7 +1581,7 @@ static void prototype(struct text *out, const struct symbol *sym)
     }
     text_append(&inner, t->param_count == 0 ? "void)" : ")");
     declaration(&decl, t->result, text_cstr(&inner), NULL);
-    text_appendf(out, "%s%s;\n", t->never ? "_Noreturn " : "",
+    text_appendf(out, "%s%s;\n", t->never ? "ANTI_NORETURN " : "",
                  text_cstr(&decl));
     text_free(&inner);
     text_free(&decl);
@@ -1851,8 +1852,17 @@ void header_write(struct text *out, const char *name,
     write_tuples(&body, ifaces, count, &done);
     write_symbols(&body, ifaces, count, SYMBOL_CONST);
     write_symbols(&body, ifaces, count, SYMBOL_FN);
-    /* The alignment of a type, see aligned_on_type, is defined in a
-       header that names it alone. */
+    /* DESIGN: a function that returns `never` is `_Noreturn` in C and
+       `[[noreturn]]` in C++, which has no `_Noreturn`, by T116. The
+       macro is defined in a header that names it alone, as the
+       alignment of a type, see aligned_on_type, is. */
+    if (strstr(text_cstr(&body), "ANTI_NORETURN ") != NULL) {
+        text_append(out, "#ifdef __cplusplus\n"
+                         "#define ANTI_NORETURN [[noreturn]]\n"
+                         "#else\n"
+                         "#define ANTI_NORETURN _Noreturn\n"
+                         "#endif\n\n");
+    }
     if (strstr(text_cstr(&body), "ANTI_ALIGNED(") != NULL) {
         text_append(out, "#if defined(_MSC_VER) && !defined(__clang__)\n"
                          "#define ANTI_ALIGNED(n) __declspec(align(n))\n"

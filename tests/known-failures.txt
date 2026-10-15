@@ -23,7 +23,6 @@ qualified_arguments_modules_dev T030 A class built with arguments under the name
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
-clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.
 error_modules_import_cycle T088 The driver reports a cycle of imports without the position of the import.
 constant_argument_modules_release T094 A constant of another module is refused as the argument of `N: int`.
 constant_argument_modules_dev T094 A constant of another module is refused as the argument of `N: int`.

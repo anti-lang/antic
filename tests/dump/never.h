@@ -14,8 +14,14 @@ extern "C" {
 #define ANTI_ALIGNAS(n) _Alignas(n)
 #endif
 
+#ifdef __cplusplus
+#define ANTI_NORETURN [[noreturn]]
+#else
+#define ANTI_NORETURN _Noreturn
+#endif
+
 /** Leave the program with the code. */
-_Noreturn void leave(int32_t code);
+ANTI_NORETURN void leave(int32_t code);
 
 #ifdef __cplusplus
 }
