@@ -45,4 +45,3 @@ anti_test_ownership T132 anti writes its last line with CRLF on Windows. host=wi
 anti_test_errors T132 anti writes its last line with CRLF on Windows. host=windows
 anti_test_threads T132 anti writes its last line with CRLF on Windows. host=windows
 anti_test_classes T132 anti writes its last line with CRLF on Windows. host=windows
-anti_bind_message_clang_cast_of_a_negative_number T120 A macro that casts a negative number is skipped as no constant.

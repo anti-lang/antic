@@ -313,6 +313,8 @@ static struct bind_eval converted(struct eval *e, struct bind_eval v,
     return v;
 }
 
+static struct bind_eval unary(struct eval *e);
+
 static struct bind_eval primary(struct eval *e)
 {
     struct bind_eval v;
@@ -340,7 +342,9 @@ static struct bind_eval primary(struct eval *e)
                 if (!enter(e)) {
                     return v;
                 }
-                v = primary(e);
+                /* The operand of a cast is a cast or a unary expression,
+                   as C reads `(int)-3`, by T120. */
+                v = unary(e);
                 leave();
                 if (v.kind == BIND_EVAL_STRING) {
                     fail(e);
@@ -389,8 +393,6 @@ static struct bind_eval primary(struct eval *e)
     fail(e);
     return v;
 }
-
-static struct bind_eval unary(struct eval *e);
 
 /* The operand of a prefix operator, one level deeper. */
 static struct bind_eval operand(struct eval *e)
