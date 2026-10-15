@@ -1465,6 +1465,19 @@ static struct type *check_cast(struct checker *c, struct expr *e)
             return sema_builtin(c, TYPE_ERROR);
         }
     }
+    /* `n is Shape.Circle` on a value that is no variant names the case
+       of a variant of the module, and gets the message of the qualified
+       form, by T026 of docs/audit/tests-findings.md. */
+    if (e->as.cast.test && !sema_is_error(from) &&
+        target->kind == TYPEX_NAMED && target->module.length > 0) {
+        const struct symbol *sym = sema_lookup(c, &target->module);
+        if (sym != NULL && sym->kind == SYMBOL_STRUCT && sym->type != NULL &&
+            sym->type->kind == TYPE_VARIANT) {
+            sema_error_at(c, e->pos, "`is` names a case on a variant alone, "
+                          "found `%s`", sema_tn(from));
+            return sema_builtin(c, TYPE_ERROR);
+        }
+    }
     to = sema_resolve_type(c, e->as.cast.type);
     if (sema_is_error(from) || sema_is_error(to)) {
         return sema_builtin(c, TYPE_ERROR);
