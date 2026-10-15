@@ -336,9 +336,31 @@ static size_t lead_of(const char *s, size_t from, size_t end)
 /* The doc subset of docs/tooling-addendum.md as HTML: paragraphs, fenced
    code blocks with a language tag, inline code, `-` lists and links.
    Everything else is text. */
+/* The text of the paragraph or the list item run holds, through the
+   inline markup, and run empty again. */
+static void flush_run(struct text *out, struct text *run,
+                      const struct doc_page *page)
+{
+    inline_html(out, text_cstr(run), run->length, page);
+    run->length = 0;
+}
+
+/* Add the line s of n bytes to run, after a space where it continues. */
+static void add_run(struct text *run, const char *s, size_t n)
+{
+    if (run->length > 0) {
+        text_append(run, " ");
+    }
+    text_append_bytes(run, s, n);
+}
+
+/* DESIGN: a paragraph and a list item are read whole before their inline
+   markup, so a link or inline code that `anti fmt` wraps over two lines
+   is still one, by T124. */
 static void doc_html(struct text *out, const char *s, size_t n,
                      const struct doc_page *page)
 {
+    struct text run = {0};
     size_t at = 0;
     bool fenced = false;
     bool listed = false;
@@ -350,6 +372,7 @@ static void doc_html(struct text *out, const char *s, size_t n,
         size_t lead = lead_of(s, at, end);
         bool blank = lead == end;
         bool fence = end - lead >= 3 && memcmp(s + lead, "```", 3) == 0;
+        bool bullet = end - lead >= 2 && s[lead] == '-' && s[lead + 1] == ' ';
         if (fenced) {
             if (fence) {
                 text_append(out, "</pre>\n");
@@ -361,39 +384,33 @@ static void doc_html(struct text *out, const char *s, size_t n,
             at = end + 1;
             continue;
         }
-        if (fence) {
+        if (fence || blank || bullet || (!listed && !paragraph)) {
+            flush_run(out, &run, page);
+        }
+        if (fence || blank || (bullet && paragraph)) {
             if (paragraph) {
                 text_append(out, "</p>\n");
                 paragraph = false;
             }
+        }
+        if (fence || blank) {
             if (listed) {
                 text_append(out, item ? "</li>\n</ul>\n" : "</ul>\n");
                 listed = false;
                 item = false;
             }
+        }
+        if (fence) {
             text_append(out, "<pre class=\"" DOC_CLASS_CODE "\">");
             fenced = true;
             at = end + 1;
             continue;
         }
         if (blank) {
-            if (paragraph) {
-                text_append(out, "</p>\n");
-                paragraph = false;
-            }
-            if (listed) {
-                text_append(out, item ? "</li>\n</ul>\n" : "</ul>\n");
-                listed = false;
-                item = false;
-            }
             at = end + 1;
             continue;
         }
-        if (end - lead >= 2 && s[lead] == '-' && s[lead + 1] == ' ') {
-            if (paragraph) {
-                text_append(out, "</p>\n");
-                paragraph = false;
-            }
+        if (bullet) {
             if (!listed) {
                 text_append(out, "<ul>\n");
                 listed = true;
@@ -402,26 +419,24 @@ static void doc_html(struct text *out, const char *s, size_t n,
                 text_append(out, "</li>\n");
             }
             text_append(out, "<li>");
-            inline_html(out, s + lead + 2, end - lead - 2, page);
+            add_run(&run, s + lead + 2, end - lead - 2);
             item = true;
             at = end + 1;
             continue;
         }
         if (listed && item) {
-            text_append(out, " ");
-            inline_html(out, s + lead, end - lead, page);
+            add_run(&run, s + lead, end - lead);
             at = end + 1;
             continue;
         }
         if (!paragraph) {
             text_append(out, "<p>");
             paragraph = true;
-        } else {
-            text_append(out, " ");
         }
-        inline_html(out, s + lead, end - lead, page);
+        add_run(&run, s + lead, end - lead);
         at = end + 1;
     }
+    flush_run(out, &run, page);
     if (paragraph) {
         text_append(out, "</p>\n");
     }
@@ -431,6 +446,7 @@ static void doc_html(struct text *out, const char *s, size_t n,
     if (fenced) {
         text_append(out, "</pre>\n");
     }
+    text_free(&run);
 }
 
 /* Whether the doc text ends inside a fenced code block, which no fence
