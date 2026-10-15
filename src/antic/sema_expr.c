@@ -1278,8 +1278,16 @@ static struct type *check_class_cast(struct checker *c, struct expr *e,
         }
     }
     /* A cast from an interface pointer down to a class that implements
-       it reaches the object through the offset the descriptor holds. */
+       it reaches the object through the offset the descriptor holds. So
+       does a cast from an abstract class to a class of another chain: the
+       object behind it may be of a class below that one, which implements
+       the abstract class as an interface, by T073 of
+       docs/audit/tests-findings.md. */
     if (sema_implemented_in(to->element, from->element)) {
+        e->as.cast.from_sub = true;
+    } else if (!sema_descends_from(to->element, from->element) &&
+               !sema_descends_from(from->element, to->element) &&
+               from->element->has_abstract) {
         e->as.cast.from_sub = true;
     } else if (!sema_descends_from(to->element, from->element) &&
                !sema_descends_from(from->element, to->element)) {
