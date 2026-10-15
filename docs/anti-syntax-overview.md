@@ -1136,7 +1136,7 @@ Config.get().requests.add(1);
 
 A singleton's `construct` takes no parameters, the class declares no `get`, no class inherits it, and `dup` of it and `*` of a pointer to it are refused.
 
-Atomic operations: `load store add sub and or swap compare_swap`, sequentially consistent. `add`, `sub`, `and`, `or` and `swap` give the value the field held before. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
+Atomic operations: `load store add sub and or swap compare_swap`, sequentially consistent. `add`, `sub`, `and`, `or` and `swap` give the value the field held before. `add` and `sub` take an integer, and `and` and `or` an integer or a `bool`. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
 
 ## Threads
 

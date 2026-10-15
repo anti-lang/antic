@@ -197,6 +197,24 @@ bool sema_atomic_call(struct checker *c, struct expr *e, struct type **out)
             *out = sema_builtin(c, TYPE_ERROR);
             return true;
         }
+        /* DESIGN: `add` and `sub` are arithmetic, and `and` and `or`
+           too on a pointer. A `bool` has no arithmetic and takes `and`
+           and `or`, which keep it 0 or 1. A pointer has neither, so it
+           never holds an address the program did not take, nor `none`
+           where `*T` holds none. */
+        if (((atomic_ops[i].op == ATOMIC_ADD ||
+              atomic_ops[i].op == ATOMIC_SUB) && t->kind == TYPE_BOOL) ||
+            ((atomic_ops[i].op == ATOMIC_ADD ||
+              atomic_ops[i].op == ATOMIC_SUB ||
+              atomic_ops[i].op == ATOMIC_AND ||
+              atomic_ops[i].op == ATOMIC_OR) && t->kind == TYPE_POINTER)) {
+            struct name held = sema_place_name(place);
+            sema_error_at(c, e->pos, "`%s` takes an atomic integer, and "
+                          "`%.*s` holds `%s`", atomic_ops[i].name,
+                          (int)held.length, held.text, sema_tn(t));
+            *out = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
         e->as.atomic.a = atomic_ops[i].args > 0 ? e->as.call.args[0] : NULL;
         e->as.atomic.b = atomic_ops[i].args > 1 ? e->as.call.args[1] : NULL;
         e->as.atomic.op = atomic_ops[i].op;

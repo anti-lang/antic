@@ -1347,6 +1347,8 @@ An atomic field has no `=` and no `+=`, and it is not read by its name alone. It
 | `add(v)`, `sub(v)`, `and(v)`, `or(v)`, `swap(v)` | the value the field held before |
 | `compare_swap(expected, new)` | `true` when the field held `expected` and now holds `new` |
 
+`add` and `sub` take an integer field. `and` and `or` take an integer or a `bool`. A pointer field takes `load`, `store`, `swap` and `compare_swap` alone.
+
 `atomic` also marks an instance field and a local, which [chapter 13]({{% relref "13-threads" %}}) covers.
 
 `singleton class Config { }` declares a class with one instance. `Config.get()` gives a pointer to it and creates it at the first call, from the defaults and from `construct` when the class declares one.
