@@ -18,15 +18,11 @@
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
 # The test known_failures checks the list against the table of the findings.
-check_slice_range T017 A dev build does not check the bounds of a slice of an array.
 fmt_alias_of_function T025 anti fmt moves the functions after a type alias of a function type.
 generic_atomic_modules_release T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 generic_atomic_modules_dev T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 qualified_arguments_modules_release T030 A class built with arguments under the name of its module is refused as a type.
 qualified_arguments_modules_dev T030 A class built with arguments under the name of its module is refused as a type.
-check_slice_of_slice_range T017 A dev build does not check the bounds of a slice of a slice.
-check_slice_range_reversed T017 A dev build does not check a slice whose low bound lies above its high bound.
-check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.
 generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
 generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
 check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.

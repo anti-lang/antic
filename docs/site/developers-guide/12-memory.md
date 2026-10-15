@@ -657,14 +657,15 @@ A dev build checks the index of `a[i]`, `s[i]` and `text[i]` against the length.
 main.anti:5: index out of bounds: index 4, length 4
 ```
 
+A dev build checks the bounds of a part `a[lo..hi]` as well. `hi` lies between zero and the length, and `lo` between zero and `hi`. A part outside them ends the program with `slice end out of bounds: index 7, length 3`, or with `slice start out of bounds: index 2, length 1`, where the length is `hi`.
+
 A release build drops the check, with every other check of dev mode. An index out of range then reads or writes whatever stands at that address.
 
 Two options of antic override the mode. `--checks` keeps the checks in a release build, and `--no-checks` drops them from a dev build. The build that compiles the program decides.
 
-Three accesses are not checked in any mode.
+Two accesses are not checked in any mode.
 
 - `p[i]` of a pointer. A pointer has no length.
-- `s[lo..hi]`. The part of a slice is taken without a test of `lo` or `hi` against the length.
 - An index that is a constant. `a[4]` of a `[4]int` compiles, and the check of dev mode finds it when it runs.
 
 `for x in s` walks from the first element to the last by the length of the slice and makes no check per element.
@@ -787,7 +788,7 @@ b0:
 
 In that build of the example, the loop of `total` holds no index check. `i` runs from 0 to below `xs.len`, and the optimizer proves the comparison true. The one call of `anti_rt_check_failed` left in `total` is the overflow check of `sum +=`.
 
-Where it lives: `lower_bounds_check` of `src/antic/lower_check.c` writes the check. `optimize_drop_failures` of `src/antic/optimize.c` removes it, and `back_end` of `src/antic/driver.c` decides by the mode and the four options. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
+Where it lives: `lower_bounds_check` of `src/antic/lower_check.c` writes the check of an index, and `slice_bounds_check` of `src/antic/lower_expr.c` that of a part. `optimize_drop_failures` of `src/antic/optimize.c` removes it, and `back_end` of `src/antic/driver.c` decides by the mode and the four options. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
 
 ### What it costs
 
@@ -797,7 +798,7 @@ Where it lives: `lower_bounds_check` of `src/antic/lower_check.c` writes the che
 | `a[i]` of an array | one compare with a constant, one branch | nothing | the same compare and branch |
 | `s[i]` in `for i in 0..s.len` | the same as `s[i]` | nothing | nothing, where the optimizer proves the range |
 | `p[i]` of a pointer | nothing | nothing | nothing |
-| `s[lo..hi]` | nothing | nothing | nothing |
+| `s[lo..hi]` of a slice, a `str` or an array | two compares, two branches | nothing | two compares, two branches |
 | `for x in s` | nothing per element | nothing | nothing |
 
 Each check adds the text of its message to the read-only data of a build that keeps it, 34 bytes for the check of `pick`. The check calls the runtime only when it fails. It allocates nothing and takes no lock.
@@ -814,7 +815,6 @@ For a Java programmer:
 For a C programmer:
 
 - The check reads the `len` of the slice. An index within `len` passes even when `len` is larger than the memory behind `ptr`.
-- `s[lo..hi]` is unchecked. A part taken past the end gives a slice whose every index then passes the check against the wrong length.
 - A pointer is never checked. A length that must be checked travels as a slice.
 
 For a C++ programmer:

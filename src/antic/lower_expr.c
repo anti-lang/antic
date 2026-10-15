@@ -98,6 +98,29 @@ static void fill_array(struct lowerer *l, const struct expr *e,
     l->b = done;
 }
 
+/* DESIGN: by decision 24 of "Decisions of 2026-10-11" a dev build checks
+   the bounds of a[lo..hi] as it checks an index. hi lies in 0..=length
+   and lo in 0..=hi, and each is one unsigned comparison, since a value
+   below zero is a large unsigned one. The first names the length of a,
+   the second hi as the length that lo indexes. A raw pointer has no
+   length and no check. */
+static void slice_bounds_check(struct lowerer *l, const struct expr *e,
+                               struct ir_operand low, struct ir_operand high,
+                               struct ir_operand whole)
+{
+    int line = e->pos.line;
+    struct ir_operand ok =
+        lower_temp(l, ir_binary(l->f, l->b, IR_ULE, IR_I8, high, whole));
+
+    lower_check_branch(l, ok, false,
+                       lower_check_text(l, line, "slice end out of bounds"),
+                       CHECK_BOUNDS, high, whole, NULL);
+    ok = lower_temp(l, ir_binary(l->f, l->b, IR_ULE, IR_I8, low, high));
+    lower_check_branch(l, ok, false,
+                       lower_check_text(l, line, "slice start out of bounds"),
+                       CHECK_BOUNDS, low, high, NULL);
+}
+
 /* a[lo..hi] points lo elements after element 0 of a and holds hi - lo
    elements. */
 static void build_slice(struct lowerer *l, const struct expr *e,
@@ -111,6 +134,9 @@ static void build_slice(struct lowerer *l, const struct expr *e,
     struct ir_operand at;
     uint32_t offset;
 
+    if (whole.kind != IR_NONE) {
+        slice_bounds_check(l, e, low, high, whole);
+    }
     offset = ir_binary(l->f, l->b, IR_MUL, IR_I64, low,
                        lower_size_operand(l, e->type->element));
     ir_store(l->f, l->b, IR_PTR,

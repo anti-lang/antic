@@ -72,7 +72,7 @@ b0:
   store ptr %s0, ptr %t0, align 8
   store ptr %s1, ptr %t1, align 8
   call void @llvm.lifetime.start.p0(ptr %s0)
-  store ptr @strings.0, ptr %t2, align 8
+  store ptr @strings.2, ptr %t2, align 8
   %v0 = load ptr, ptr %t2, align 8
   %v1 = load ptr, ptr %t1, align 8
   store ptr %v0, ptr %v1, align 8
@@ -90,7 +90,7 @@ b0:
   %v8 = load ptr, ptr %t0, align 8
   %v9 = load ptr, ptr %t4, align 8
   call void @llvm.memcpy.p0.p0.i64(ptr %v8, ptr %v9, i64 16, i1 false)
-  store ptr @strings.1, ptr %t5, align 8
+  store ptr @strings.3, ptr %t5, align 8
   %v10 = load ptr, ptr %t5, align 8
   %v11 = call i32 (ptr) @puts(ptr %v10)
   store i32 %v11, ptr %t6, align 4
@@ -112,8 +112,8 @@ b0:
 
 @anti.rt.main = alias i64 (), ptr @strings.main
 
-@strings.0 = internal constant <{ [6 x i8] }> <{ [6 x i8] c"hello\00" }>, align 1
-@strings.1 = internal constant <{ [3 x i8] }> <{ [3 x i8] c"hi\00" }>, align 1
+@strings.2 = internal constant <{ [6 x i8] }> <{ [6 x i8] c"hello\00" }>, align 1
+@strings.3 = internal constant <{ [3 x i8] }> <{ [3 x i8] c"hi\00" }>, align 1
 @anti_rt_slots = dso_local constant <{ [24 x i8] }> zeroinitializer, align 8
 @anti_rt_injectable = dso_local constant <{ [16 x i8] }> zeroinitializer, align 8
 @llvm.compiler.used = appending global [1 x ptr] [ptr @strings.main], section "llvm.metadata"
