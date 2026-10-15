@@ -1358,6 +1358,13 @@ void sema_check_classes(struct checker *c)
         if (!types_has_fields(t)) {
             continue;
         }
+        /* A class whose base is refused has no chain to check its
+           functions against, and the refusal of the base is the one
+           message, by T096 of docs/audit/tests-findings.md. */
+        if (it->kind == ITEM_CLASS && it->base_name.length > 0 &&
+            t->base == NULL) {
+            continue;
+        }
         check_contracts(c, it, t);
         refuse_redeclared(c, it, t);
         require_abstract_mark(c, it);

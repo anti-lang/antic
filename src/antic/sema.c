@@ -2876,6 +2876,27 @@ static bool filled_or_copied(const struct checker *c, const struct type *t)
    worker can reach and over the abstract classes of the program. It
    changes nothing, so a build that skips it still compiles the same
    program. */
+/* Whether a class of the module names the class it as its base, and
+   that base was refused. The refusal is the one message of the mistake,
+   by T096 of docs/audit/tests-findings.md, and the class it meant to
+   fill is no class that nothing fills. */
+static bool named_by_refused_base(const struct module *module,
+                                  const struct item *it)
+{
+    size_t i;
+
+    for (i = 0; i < module->item_count; i++) {
+        const struct item *below = module->items[i];
+        if (below->kind == ITEM_CLASS && below->base_name.length > 0 &&
+            below->base_module.length == 0 && below->symbol != NULL &&
+            below->symbol->type != NULL && below->symbol->type->base == NULL &&
+            sema_same_name(&below->base_name, &it->name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void report_program(struct checker *c)
 {
     const struct module *module = c->module;
@@ -2903,7 +2924,7 @@ static void report_program(struct checker *c)
         if (it->kind != ITEM_CLASS || !it->is_abstract || t == NULL) {
             continue;
         }
-        if (!filled_or_copied(c, t)) {
+        if (!filled_or_copied(c, t) && !named_by_refused_base(module, it)) {
             diagnostics_warn(c->diags, NAME_UNFILLED_ABSTRACT,
                              it->name_pos.line, it->name_pos.column,
                              "`%.*s` is abstract and no class fills it",

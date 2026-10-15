@@ -237,7 +237,6 @@ matrix_flow_for_tuple_pattern_with_a_number_refused T100 The `}` inside a refuse
 error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
 matrix_classes_injected_logger_never_called_release T104 A program with an injected `log.Logger` that it never calls fails at the link.
 matrix_classes_injected_logger_never_called_memory_checks T104 A program with an injected `log.Logger` that it never calls fails at the link.
-matrix_classes_base_with_an_unknown_type_argument_refused T096 A class whose base is refused gets two more messages on its function and on the base.
 matrix_types_generic_length_with_a_negated_constant_dev T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
 matrix_types_generic_length_with_a_negated_constant_release T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
 matrix_types_generic_length_with_a_negated_constant_memory_checks T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
