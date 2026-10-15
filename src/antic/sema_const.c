@@ -573,13 +573,22 @@ static bool const_as(struct checker *c, struct expr *e,
         out->as.floating =
             anti_rt_f16_widen(anti_rt_f16_narrow((float)a.as.floating));
     } else if (types_is_float(e->type)) {
+        /* An integer converts to an f32 in one rounding, as the program
+           does: through an f64 first, a value just above the middle of
+           two f32 neighbours lands on the middle and rounds the other
+           way. */
+        const struct type *from = a.type;
+        bool single = e->type->kind == TYPE_F32;
         out->kind = CONST_FLOAT;
-        out->as.floating = a.kind == CONST_FLOAT ? a.as.floating
-                           : types_is_signed(a.type)
-                               ? (double)sema_signed_bits(a.as.integer)
-                               : (double)a.as.integer;
-        if (e->type->kind == TYPE_F32) {
-            out->as.floating = (float)out->as.floating;
+        if (a.kind == CONST_FLOAT) {
+            out->as.floating =
+                single ? (float)a.as.floating : a.as.floating;
+        } else if (types_is_signed(from)) {
+            int64_t n = sema_signed_bits(a.as.integer);
+            out->as.floating = single ? (double)(float)n : (double)n;
+        } else {
+            out->as.floating = single ? (double)(float)a.as.integer
+                                      : (double)a.as.integer;
         }
     } else if (types_is_integer(e->type)) {
         out->kind = CONST_INT;

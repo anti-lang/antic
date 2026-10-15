@@ -47,9 +47,6 @@ matrix_flow_undo_directly_in_undo_refused T006 The refusal of an `undo` in an `u
 matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
-matrix_values_fold_int_to_f32_dev T008 A constant `int` as `f32` is rounded twice and differs from the computed value.
-matrix_values_fold_int_to_f32_release T008 A constant `int` as `f32` is rounded twice and differs from the computed value.
-matrix_values_fold_int_to_f32_memory_checks T008 A constant `int` as `f32` is rounded twice and differs from the computed value.
 matrix_values_fold_least_int_from_float_dev T009 The least `int` as a float is refused in a constant conversion to `int`.
 matrix_values_fold_least_int_from_float_release T009 The least `int` as a float is refused in a constant conversion to `int`.
 matrix_values_fold_least_int_from_float_memory_checks T009 The least `int` as a float is refused in a constant conversion to `int`.
