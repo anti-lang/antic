@@ -343,6 +343,14 @@ void parser_sync_statement(struct parser *p, size_t from)
             open--;
         }
     }
+    /* A statement refused before it took a token, as an `if` at the
+       depth limit is, gives up its first token here, so the block that
+       reads it moves on, by T103. */
+    if (p->pos == from && parser_peek(p)->kind != TOKEN_EOF &&
+        parser_peek(p)->kind != TOKEN_RBRACE) {
+        open += parser_peek(p)->kind == TOKEN_LBRACE;
+        parser_next(p);
+    }
     for (;;) {
         enum token_kind kind = parser_peek(p)->kind;
         if (kind == TOKEN_EOF) {
