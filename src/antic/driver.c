@@ -860,7 +860,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     emit.one_module = o->dev || driver_is_plugin(o);
     emit.exports = extras->hosts_plugins;
     emit.local_exports = driver_links_musl(o, extras) &&
-                         has_main(program, module);
+                         has_main(program, module) && o->object_count == 0;
     emit.debug = o->debug;
     emit.optimized = !o->dev;
     emit.spans = &spans;

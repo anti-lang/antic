@@ -225,7 +225,7 @@ define hidden noundef i64 @decl.main() noinline #0 {
 - `width` takes a `Box` by value. `byval([40 x i8])` is a copy of 40 bytes that the caller puts on the stack.
 - `first` takes its slice as two words, the pointer and the length.
 - `consume` takes an `own` pointer, which is `noalias`: no other pointer of the callee reaches the object.
-- `twice` is the `export fn`, under its plain name. A program of Linux links musl statically, so the symbol is `internal` there, kept by `llvm.used`, and no function of the C library takes its place.
+- `twice` is the `export fn`, under its plain name. A program of Linux that links musl statically and no object of C makes the symbol `internal`, kept by `llvm.used`, so that it takes the place of no function of the C library.
 - `main` is `noinline`, so that the runtime finds it as a function.
 
 `#0` is one set of attributes for every function. It holds `nounwind`, since no Anti function throws, and `"frame-pointer"="non-leaf"`.

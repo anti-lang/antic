@@ -3128,13 +3128,15 @@ static bool link_once(const struct emitter *e, const struct ir_function *f)
    on COFF, which has no hidden symbols. An export fn is dso_local with
    default visibility. */
 /* DESIGN: a program that links statically against musl links the C
-   library, mimalloc and the runtime into one image, and nothing outside
-   it calls a function by name. An export fn there named after a function
-   of the C library, as `write`, took the calls of musl and mimalloc to
-   that function, so the program behaved otherwise than on macOS and
-   Windows. Its symbol is local there, with the same name, and llvm.used
-   keeps it as an export fn is kept. In a dev build the module that links
-   holds the program alone, so its own export fns follow the rule. */
+   library, mimalloc and the runtime into one image. An export fn there
+   named after a function of the C library, as `write`, took the calls of
+   musl and mimalloc to that function, so the program behaved otherwise
+   than on macOS and Windows. Where the link takes no object of the user,
+   nothing calls a function by name, and its symbol is local, with the
+   same name, which llvm.used keeps as an export fn is kept. An object of
+   the user may call an export, which then stays global. In a dev build
+   the module that links holds the program alone, so its own export fns
+   follow the rule. */
 static bool local_export(const struct emitter *e, const struct ir_function *f)
 {
     return f->exported && !f->is_extern && e->o->local_exports &&

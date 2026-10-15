@@ -471,7 +471,7 @@ b0:
 }
 ```
 
-A function shows in a release excerpt only when `main` reaches it and `opt` has not inlined every call of it. An example of the later chapters marks a function `export fn` where a release excerpt must show it. `opt` keeps an exported function under its plain name. In a library and in a program of macOS or Windows it is `dso_local`. A program of Linux links musl statically, and there it is `internal` and stands in `llvm.used`, so that the C library and mimalloc keep their own `read` and `write`.
+A function shows in a release excerpt only when `main` reaches it and `opt` has not inlined every call of it. An example of the later chapters marks a function `export fn` where a release excerpt must show it. `opt` keeps an exported function under its plain name. In a library and in a program of macOS or Windows it is `dso_local`. A program of Linux that links musl statically and no object of C makes it `internal` and keeps it in `llvm.used`, so that the C library and mimalloc keep their own `read` and `write`.
 
 ```asm excerpt=hello target=linux-x86_64 mode=release
 <hello.main>:
