@@ -1,0 +1,12 @@
+//! A class with one `abstract fn` whose header does not say `abstract` is
+//! refused, and the message names the one open function.
+
+class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+fn main() -> int
+{
+	return 0;
+}

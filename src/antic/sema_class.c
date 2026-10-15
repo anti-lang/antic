@@ -606,6 +606,49 @@ static void require_filled_chain(struct checker *c, const struct item *it,
     }
 }
 
+/* DESIGN: a class that declares an `abstract fn` has an open function,
+   and is `abstract`, by "Class declaration" in docs/anti-object-model.md
+   and decision 27 of "Decisions of 2026-10-11". The message names every
+   open function the class declares. */
+static void require_abstract_mark(struct checker *c, const struct item *it)
+{
+    struct text names = {0};
+    const struct item *last = NULL;
+    size_t count = 0;
+    size_t j;
+
+    if (it->kind != ITEM_CLASS || it->is_abstract) {
+        return;
+    }
+    for (j = 0; j < it->member_count; j++) {
+        const struct item *m = it->members[j];
+        if (m->kind != ITEM_FN || m->contract != FN_ABSTRACT ||
+            m->type_param_count > 0) {
+            continue;
+        }
+        if (last != NULL) {
+            text_appendf(&names, "%s`%.*s`", count > 1 ? ", " : "",
+                         (int)last->name.length, last->name.text);
+        }
+        last = m;
+        count++;
+    }
+    if (count == 0) {
+        return;
+    }
+    if (count == 1) {
+        sema_error_at(c, it->name_pos, "`%.*s` has the open function `%.*s` "
+                      "and must be `abstract`", (int)it->name.length,
+                      it->name.text, (int)last->name.length, last->name.text);
+    } else {
+        sema_error_at(c, it->name_pos, "`%.*s` has open functions %s and "
+                      "`%.*s` and must be `abstract`", (int)it->name.length,
+                      it->name.text, text_cstr(&names),
+                      (int)last->name.length, last->name.text);
+    }
+    text_free(&names);
+}
+
 /* DESIGN: a language hook has the signature its construct calls, and
    the message states that signature. No hook may fail, since the
    construct that calls it has no place for a handler. `set_index` takes
@@ -1104,6 +1147,7 @@ void sema_check_classes(struct checker *c)
         }
         check_contracts(c, it, t);
         refuse_redeclared(c, it, t);
+        require_abstract_mark(c, it);
         require_filled_chain(c, it, t);
         check_operator_names(c, it, t);
         check_one_construct(c, it);

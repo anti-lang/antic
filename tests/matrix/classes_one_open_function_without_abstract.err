@@ -1,0 +1,1 @@
+classes_one_open_function_without_abstract.anti:4:7: error: `Shape` has the open function `area` and must be `abstract`
