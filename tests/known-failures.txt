@@ -172,7 +172,6 @@ matrix_threads_pointer_into_fields_in_a_tuple_refused T062 A public function of 
 matrix_threads_pointer_into_fields_of_a_concurrent_class_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
-matrix_classes_mutable_field_of_a_plain_class_refused T065 `mutable` on a field of a plain class compiles.
 matrix_classes_equal_pointers_of_unrelated_classes_refused T066 `==` and `!=` on pointers of two unrelated classes compile.
 matrix_classes_unequal_pointers_of_unrelated_classes_refused T066 `==` and `!=` on pointers of two unrelated classes compile.
 matrix_classes_equals_replaced_without_hash_refused T067 A class that replaces one of `equals` and `hash` without the other compiles.

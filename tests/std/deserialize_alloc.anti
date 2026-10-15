@@ -116,7 +116,7 @@ class Lender
 class Counting inherits mem.Allocator
 {
 	pub live: int = 0,
-	pub mutable taken: int = 0,
+	pub taken: int = 0,
 
 	concrete fn alloc(self, size: int, align: int) -> ?*byte
 	{

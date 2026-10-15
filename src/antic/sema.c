@@ -2565,6 +2565,15 @@ static void declare_fields(struct checker *c, struct item *it)
     for (j = 0; j < it->param_count; j++) {
         check_inject_field(c, &fields[j], &it->params[j]);
     }
+    /* `mutable` is a contextual word of a singleton alone, by decision 27
+       of "Decisions of 2026-10-11". */
+    for (j = 0; j < it->param_count; j++) {
+        if (fields[j].writable && !it->is_singleton) {
+            sema_error_at(c, it->params[j].pos, "`mutable` marks a field of "
+                          "a singleton, and `%.*s` is none",
+                          (int)it->name.length, it->name.text);
+        }
+    }
     /* A default is checked against the type of its field, so the
        value that lowering writes is complete and typed. It is a
        constant expression, and its value is kept for the library

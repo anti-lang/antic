@@ -37,7 +37,7 @@ class Plain
 	pub low: u8 : 3 = 5,
 	pub flag: u8 : 1 = 1,
 	pub high: u8 : 4 = 9,
-	pub own mutable f: fn() -> int,
+	pub own f: fn() -> int,
 
 	fn construct(self)
 	{
@@ -55,7 +55,7 @@ class Made
 	pub low: u8 : 3 = 5,
 	pub flag: u8 : 1 = 1,
 	pub high: u8 : 4 = 9,
-	own mutable f: fn() -> int,
+	own f: fn() -> int,
 
 	fn construct(self, n: int)
 	{
