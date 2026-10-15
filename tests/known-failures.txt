@@ -28,7 +28,6 @@ constant_argument_modules_release T094 A constant of another module is refused a
 constant_argument_modules_dev T094 A constant of another module is refused as the argument of `N: int`.
 error_modules_type_nested_in_a_generic_class T095 A message on a copy of a library generic names a line of the library in the file of the client.
 error_modules_type_nested_in_a_generic_class_passed_on T095 A message on a copy of a library generic names a line of the library in the file of the client.
-anti_bind_message_clang_static_without_a_body T098 A `static` function without a body gets a second warning, which names its result.
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
 error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
 llvm_coff_plugin_f16 T121 A plugin that converts an `f16` below x86-64-v3 finds the two conversions of the runtime in no host that converts none itself.

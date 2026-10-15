@@ -97,6 +97,9 @@ struct bind_function {
     enum bind_shim shim;
     const char *doc;
     bool bound;
+    /* The reader left it out and gave its warning, as for a `static`
+       function without a body. */
+    bool left_out;
 };
 
 struct bind_eval;

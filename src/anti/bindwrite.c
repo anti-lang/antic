@@ -191,6 +191,11 @@ void bind_settle(struct bind_module *b)
         struct bind_function *f = b->functions.items[i];
         const char *why = NULL;
         scratch.length = 0;
+        /* One mistake gives one message, by T098. */
+        if (f->left_out) {
+            f->bound = false;
+            continue;
+        }
         if (bind_is_keyword(f->name)) {
             why = "its name is a word of Anti";
         } else if (f->result->kind != BIND_VOID &&

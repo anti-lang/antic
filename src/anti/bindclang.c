@@ -1015,7 +1015,7 @@ static void settle_functions(struct reader *r)
         } else if (e->is_static) {
             bind_warn(r->b, "`%s` is static without a body and is left out",
                       e->f->name);
-            e->f->result = bind_type_new(r->b, BIND_UNSUPPORTED);
+            e->f->left_out = true;
         } else if (e->body && e->is_inline && !e->any_plain && !e->any_extern) {
             e->f->shim = SHIM_INLINE;
         }
