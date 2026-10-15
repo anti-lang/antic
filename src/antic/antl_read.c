@@ -833,6 +833,11 @@ static struct type *read_struct(struct reader *r, uint32_t at, uint8_t kind,
                names_lang(&module, &name, LANG_CHAN)) {
         struct type *element = antl_type_ref(r, at);
         return r->failed ? NULL : types_chan(r->types, element);
+    } else if (kind == TYPE_STRUCT &&
+               names_lang(&module, &name, LANG_JOB)) {
+        struct type *result = antl_type_ref(r, at);
+        return r->failed || result == NULL ? NULL
+                                           : types_job(r->types, result);
     }
     if (kind == TYPE_STRUCT && lang_struct(r, &module, &name, &t)) {
         return t;

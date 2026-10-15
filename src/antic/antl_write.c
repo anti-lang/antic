@@ -266,6 +266,9 @@ void antl_visit_type(struct writer *w, const struct type *t)
         if (types_is_chan(t)) {
             antl_visit_type(w, t->element);
         }
+        if (types_is_job(t)) {
+            antl_visit_type(w, t->result);
+        }
         for (i = 0; i < t->type_param_count; i++) {
             antl_visit_type(w, t->type_params[i]);
         }
@@ -532,6 +535,11 @@ static void put_type(struct writer *w, const struct type *t)
            follows its name. */
         if (types_is_chan(t)) {
             antl_put_type_ref(w, t->element);
+        }
+        /* A `Job` is one struct per result of a worker, so the result
+           follows its name, by T061. */
+        if (types_is_job(t)) {
+            antl_put_type_ref(w, t->result);
         }
         if (is_local_struct(w, t)) {
             antl_put_u8(w, (uint8_t)((unsigned)t->is_union |
