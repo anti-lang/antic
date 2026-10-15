@@ -121,6 +121,6 @@ fn devirt_plugin.Dog.init(%0: ptr) {
 b0:
     %1 = addr @devirt_plugin.Dog.table
     store ptr %1, %0 !table
-    call void @anti_rt_hook(%0, 0)
+    call void @anti_rt_hook(%0, 256)
     ret
 }

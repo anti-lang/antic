@@ -649,6 +649,8 @@ static void records_hook_entries(void)
                                            : "(none)",
                   names[i]);
     }
+    /* The bit of a `created` hook of an object built on the heap. */
+    CHECK(HOOK_ON_HEAP == ANTI_HOOK_ON_HEAP);
     lowered_release(&l);
 }
 

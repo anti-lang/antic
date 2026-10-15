@@ -248,7 +248,7 @@ b2:
 - The three `type` lines are the whole layout: the table pointer, then the fields of each class down the chain.
 - `alloc Circle { r: r }` is a call of `malloc` with the size of the class. A null result ends the program in `anti_rt_out_of_memory`, which is why `alloc` gives a `*Circle` and no `?*Circle`.
 - `store ptr %3, %1 !table` writes the address of the table of `Circle` into the first 8 bytes. That store is what makes the memory an object.
-- The stores that follow write the named field and then every default of the chain. The last instruction of the function, not shown, is `call void @anti_rt_hook(%1, 0)`, the `created` hook of [chapter 15]({{% relref "15-hooks" %}}).
+- The stores that follow write the named field and then every default of the chain. The last instruction of the function, not shown, is `call void @anti_rt_hook(%1, 256)`, the `created` hook of [chapter 15]({{% relref "15-hooks" %}}). The hook is 0. The bit 256 marks an object at the start of memory of its own on the heap. The count of the objects of a plugin reads it.
 
 The table is one read-only global per class. Its entries are pointers.
 
@@ -277,7 +277,7 @@ The last line is cut from the global `@anti_Circle_vtable`, which holds 19 point
 movl $0x28, %edi
 callq 0x15 <fresh+0x15>
 testq %rax, %rax
-je 0x59 <fresh+0x59>
+je 0x5c <fresh+0x5c>
 leaq (%rip), %rcx
 movq %rcx, (%rax)
 vmovss -0xc(%rbp), %xmm0
@@ -601,7 +601,7 @@ b0:
     %4 = ptradd %1, offset_of build.Meter.total
     store i64 0, %4
     call void @build.Meter.construct(%1, %0)
-    call void @anti_rt_hook(%1, 0)
+    call void @anti_rt_hook(%1, 256)
     ret ptr %1
 }
 export fn build.end(%0: ptr nonnull deref(size_of build.Meter)) {
@@ -1539,7 +1539,7 @@ b2:
     %16 = call ptr @anti_rt_atomic_load(%0, size_of ptr)
 ...
     call void @statics.Config.construct(%4)
-    call void @anti_rt_hook(%4, 0)
+    call void @anti_rt_hook(%4, 256)
     %2 = copy ptr %4
     %15 = call i8 @anti_rt_atomic_compare_swap(%0, size_of ptr, 0, %4)
     branch %15, b3, b2

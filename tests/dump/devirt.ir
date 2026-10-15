@@ -219,7 +219,7 @@ b0:
     store ptr %1, %0 !table
     %2 = ptradd %0, offset_of devirt.Only.n
     store i64 1, %2
-    call void @anti_rt_hook(%0, 0)
+    call void @anti_rt_hook(%0, 256)
     ret
 }
 fn devirt.Base.equals(%0: ptr, %1: ptr) -> i8 {
@@ -289,7 +289,7 @@ b0:
     store ptr %1, %0 !table
     %2 = ptradd %0, offset_of devirt.Base.n
     store i64 2, %2
-    call void @anti_rt_hook(%0, 0)
+    call void @anti_rt_hook(%0, 256)
     ret
 }
 fn devirt.Derived.equals(%0: ptr, %1: ptr) -> i8 {
@@ -359,7 +359,7 @@ b0:
     store ptr %1, %0 !table
     %2 = ptradd %0, offset_of devirt.Base.n
     store i64 2, %2
-    call void @anti_rt_hook(%0, 0)
+    call void @anti_rt_hook(%0, 256)
     ret
 }
 fn devirt.Dog.equals(%0: ptr, %1: ptr) -> i8 {
@@ -401,6 +401,6 @@ fn devirt.Dog.init(%0: ptr) {
 b0:
     %1 = addr @devirt.Dog.table
     store ptr %1, %0 !table
-    call void @anti_rt_hook(%0, 0)
+    call void @anti_rt_hook(%0, 256)
     ret
 }

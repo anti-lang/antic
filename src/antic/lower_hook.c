@@ -19,12 +19,31 @@ void lower_hook_object(struct lowerer *l, enum hook_kind hook,
 {
     struct ir_operand args[2];
 
+    uint64_t kind = (uint64_t)hook;
+
     if (!l->hooks || l->b == NULL || object.kind == IR_NONE) {
         return;
     }
+    if (hook == HOOK_CREATED && object.kind == IR_TEMP &&
+        l->heap_object.kind == IR_TEMP && l->heap_function == l->f &&
+        object.as.temp == l->heap_object.as.temp) {
+        kind |= HOOK_ON_HEAP;
+    }
     args[0] = object;
-    args[1] = ir_int_op(IR_I64, (uint64_t)hook);
+    args[1] = ir_int_op(IR_I64, kind);
     lower_rt_call(l, RT_FN_HOOK, args);
+}
+
+/* Record that the object at the temporary at is built at the start of
+   memory of its own on the heap, or no longer when at is IR_NONE. Gives
+   what it replaces, for the caller to put back. */
+struct ir_operand lower_build_on_heap(struct lowerer *l, struct ir_operand at)
+{
+    struct ir_operand before = l->heap_object;
+
+    l->heap_object = at;
+    l->heap_function = l->f;
+    return before;
 }
 
 /* Whether the `--trace` pattern names the module path of the class, a

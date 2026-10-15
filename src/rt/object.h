@@ -238,6 +238,16 @@ enum anti_hook {
     ANTI_HOOK_COUNT
 };
 
+/* DESIGN: the bit the compiler adds to ANTI_HOOK_CREATED where it builds
+   an object at the start of memory of its own on the heap: an `alloc`
+   and the function that prepares an object for the runtime. The runtime
+   counts such an object for the library its class lies in, until
+   anti_rt_delete_from ends it. A value in a frame or inside another
+   value counts nowhere: a value of a class without a teardown ends with
+   no event, and a copy of one starts with none, so no pair of hooks
+   could count it. */
+#define ANTI_HOOK_ON_HEAP 0x100
+
 /* The entry of the hook h in the table of a class. The second gives its
    entry in the table of an anti.lang.TraceHandler, which declares the
    same nine again with the object after `self`. The two enumerations are

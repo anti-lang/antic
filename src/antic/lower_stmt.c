@@ -1040,9 +1040,12 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         struct ir_operand place = lower_temp(l, sym->ir);
         struct ir_operand size = lower_size_operand(l, sym->type->element);
         struct ir_operand object = lower_new_memory(l, size);
+        struct ir_operand before;
         struct ir_operand err;
         ir_store(l->f, l->b, IR_PTR, object, place);
+        before = lower_build_on_heap(l, object);
         err = lower_construct(l, call, object);
+        lower_build_on_heap(l, before);
         if (err.kind != IR_NONE) {
             lower_handle_error(l, call, err, place, true, object);
         }

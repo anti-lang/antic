@@ -230,7 +230,9 @@ void lower_singleton_get(struct lowerer *l, const struct item *it)
     args[0] = lower_size_operand(l, t);
     made = lower_new_memory(l, args[0]);
     lower_prepare_object(l, t, NULL, made);
+    lower_build_on_heap(l, made);
     lower_run_construct(l, t, made);
+    lower_build_on_heap(l, lower_none());
     ir_assign(l->f, l->b, result, made);
     args[0] = address;
     args[1] = ir_sym_operand(l->m, width);
@@ -263,7 +265,11 @@ void lower_class_init(struct lowerer *l, const struct item *it)
     l->b = entry;
     self = lower_temp(l, f->params[0].temp);
     lower_prepare_object(l, t, NULL, self);
+    /* The runtime calls this function on memory of its own on the
+       heap, for `instance`, `reflect.new` and a singleton. */
+    lower_build_on_heap(l, self);
     lower_run_construct(l, t, self);
+    lower_build_on_heap(l, lower_none());
     ir_ret(l->f, l->b, IR_VOID, lower_none());
 }
 

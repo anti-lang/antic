@@ -5,7 +5,9 @@
 
 #include "f16.h"
 #include "json.h"
+#include "hooks.h"
 #include "object.h"
+#include "plugin.h"
 #include "regex.h"
 #include "std.h"
 #include "utf.h"
@@ -1048,6 +1050,7 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type)
         return NULL;
     }
     copy((struct anti_object *)start, (struct anti_object *)made);
+    anti_rt_plugin_created(((struct anti_object *)made)->table);
     return made + ((char *)object - start);
 }
 
@@ -1087,10 +1090,14 @@ void anti_rt_delete_from(void *object, const struct anti_descriptor *type,
 {
     void *start = checked_object(object, type);
 
+    const struct anti_object *before;
+
     if (start == NULL) {
         return;
     }
+    before = anti_rt_hook_deleting(start);
     anti_rt_destroy_from(start, type, from);
+    anti_rt_hook_deleting(before);
     anti_rt_give(from, start);
 }
 

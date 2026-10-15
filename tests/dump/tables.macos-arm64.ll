@@ -85,7 +85,7 @@ b2:
   %v10 = load ptr, ptr %t3, align 8
   store i64 1, ptr %v10, align 8
   %v11 = load ptr, ptr %t0, align 8
-  call void (ptr, i64) @anti_rt_hook(ptr %v11, i64 0)
+  call void (ptr, i64) @anti_rt_hook(ptr %v11, i64 256)
   %v12 = load ptr, ptr %t0, align 8
   %v13 = load ptr, ptr %v12, align 8, !invariant.group !5
   store ptr %v13, ptr %t4, align 8

@@ -146,17 +146,19 @@ void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d);
 int8_t anti_rt_plugin_supports(void *handle, const struct anti_descriptor *d,
                                const unsigned char *name, int64_t length);
 
-/* The objects of the library that are alive, counted through the
-   `created` and `destroyed` hooks, and the objects the loader is
-   building. */
+/* The objects of the library on the heap that are alive, counted as
+   anti_rt_plugin_created says, and the objects the loader is building. */
 int64_t anti_rt_plugin_live(void *handle);
 
 /* Close the library. Gives 0 while an object of it is alive, and the
    library stays open. */
 int8_t anti_rt_plugin_unload(void *handle);
 
-/* DESIGN: the `created` and `destroyed` hooks count the objects of each
-   loaded library, so `unload` refuses while one is alive. The check
+/* DESIGN: the objects of each loaded library on the heap are counted,
+   so `unload` refuses while one is alive. The `created` hook of an
+   object built on the heap and anti_rt_dup add one, and the `destroyed`
+   hook of the object anti_rt_delete_from ends takes one away, see
+   ANTI_HOOK_ON_HEAP. The check
    costs one load and one compare while no library is open, because the
    count of them is the first thing it reads. */
 void anti_rt_plugin_created(const void *table);

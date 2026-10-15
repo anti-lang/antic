@@ -178,6 +178,11 @@ struct lowerer {
     bool no_reflect;            /* --no-reflect: no field list */
     bool dev;                   /* --dev: every dispatch checks its table */
     bool hooks;                 /* the hook sites are written. */
+    /* The memory of its own on the heap that an object is being built
+       at in heap_function, whose `created` hook carries HOOK_ON_HEAP, or
+       IR_NONE. lower_build_on_heap sets both. */
+    struct ir_operand heap_object;
+    const struct ir_function *heap_function;
     bool trace_marked;          /* code marked `trace` is instrumented. */
     bool trace_writes;          /* --trace writes: the changed hook. */
     const char *const *patterns;    /* --trace <pattern>. */
@@ -248,6 +253,9 @@ enum check_kind {
     CHECK_BOUNDS, CHECK_OVERFLOW, CHECK_VALUE, CHECK_VALUE_U, CHECK_LEFT,
     CHECK_LEFT_U, CHECK_SHIFT, CHECK_TEXT
 };
+
+/* ANTI_HOOK_ON_HEAP of src/rt/object.h, which records_hook_entries pins. */
+#define HOOK_ON_HEAP 0x100
 
 /* The nine hooks of enum anti_hook in src/rt/object.h, in its order. The
    unit test records_hook_entries pins the two together, and pins the
@@ -438,6 +446,8 @@ struct ir_operand lower_bitfield_saturate(struct lowerer *l,
 
 void lower_hook_object(struct lowerer *l, enum hook_kind hook,
                        struct ir_operand object);
+struct ir_operand lower_build_on_heap(struct lowerer *l,
+                                      struct ir_operand at);
 bool lower_traced_class(const struct lowerer *l, const struct type *t);
 void lower_hook_call(struct lowerer *l, enum hook_kind hook);
 void lower_hook_failed(struct lowerer *l, struct ir_operand err);

@@ -392,7 +392,7 @@ b0:
   %v4 = load ptr, ptr %t2, align 8
   store i64 0, ptr %v4, align 8
   %v5 = load ptr, ptr %t0, align 8
-  call void (ptr, i64) @anti_rt_hook(ptr %v5, i64 0)
+  call void (ptr, i64) @anti_rt_hook(ptr %v5, i64 256)
   ret void
 }
 
@@ -740,7 +740,7 @@ b0:
   %v7 = load ptr, ptr %t3, align 8
   store i64 0, ptr %v7, align 8
   %v8 = load ptr, ptr %t0, align 8
-  call void (ptr, i64) @anti_rt_hook(ptr %v8, i64 0)
+  call void (ptr, i64) @anti_rt_hook(ptr %v8, i64 256)
   ret void
 }
 

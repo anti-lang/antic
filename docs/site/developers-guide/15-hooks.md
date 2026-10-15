@@ -212,12 +212,12 @@ b2:
   store ptr @anti_Plain_vtable, ptr %v0, align 8
   %v9 = getelementptr i8, ptr %v0, i64 8
   store i64 %p0, ptr %v9, align 8
-  tail call void @anti_rt_hook(ptr nonnull %v0, i64 0)
+  tail call void @anti_rt_hook(ptr nonnull %v0, i64 256)
   ret ptr %v0
 ```
 
 - The two `store` lines write the table pointer and `id`.
-- `anti_rt_hook` with 0 is the site of `created`. `Plain` declares no hook, and the call stands there all the same. The compiler does not know at this site whether a handler is installed, so it writes no test of its own.
+- `anti_rt_hook` with 256 is the site of `created`, 0, with the bit 256 of an object that stands at the start of memory of its own on the heap. The runtime counts such an object for a loaded library its class belongs to, and a local value of a class gives 0 alone. `Plain` declares no hook, and the call stands there all the same. The compiler does not know at this site whether a handler is installed, so it writes no test of its own.
 
 The same function built with `--no-hooks` ends after the stores.
 
@@ -828,7 +828,7 @@ An `inject` field is filled where the defaults of the class are written: in a li
   store ptr %v21, ptr %v17, align 8
   %v25 = getelementptr i8, ptr %v0, i64 24
   store i64 0, ptr %v25, align 8
-  tail call void @anti_rt_hook(ptr nonnull %v0, i64 0)
+  tail call void @anti_rt_hook(ptr nonnull %v0, i64 256)
 ```
 
 - The first `load` reads the slot of `Greeter`, the call runs the provider through it, and the `store` writes the result into `out` at offset 8.
@@ -1131,7 +1131,7 @@ The functions of a `Library`:
 | `plugin.load(path)` | a `*Library`, or fails |
 | `lib.instance(Interface)` | a new object of the class the library provides, as a `?*Interface` |
 | `lib.supports(Interface, "f")` | whether the class of the library has the function `f` |
-| `lib.live()` | the count of objects of the library that are alive |
+| `lib.live()` | the count of objects of the library on the heap that are alive |
 | `lib.unload()` | closes the library, or fails with `IN_USE` while an object of it is alive |
 
 ```anti

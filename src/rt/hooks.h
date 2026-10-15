@@ -20,6 +20,11 @@ void anti_rt_trace_install(struct anti_object *h);
    created, destroyed, dispatched or joined. */
 void anti_rt_hook(struct anti_object *self, int64_t hook);
 
+/* Name the object anti_rt_delete_from is ending on this thread, or NULL.
+   Gives the one it replaces. Its `destroyed` hook takes it off the
+   count of its library. */
+const struct anti_object *anti_rt_hook_deleting(const struct anti_object *o);
+
 /* The copied hook, with the object the copy was made from. */
 void anti_rt_hook_copied(struct anti_object *self, struct anti_object *from);
 

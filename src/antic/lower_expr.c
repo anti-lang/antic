@@ -2231,8 +2231,11 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         /* One object of the literal's type, with the literal written
            into it. The count form multiplies by the element size. */
         if (e->as.alloc.value != NULL) {
+            struct ir_operand before;
             v = lower_new_memory(l, lower_size_operand(l, e->type->element));
+            before = lower_build_on_heap(l, v);
             lower_build_into(l, e->as.alloc.value, v);
+            lower_build_on_heap(l, before);
             return v;
         }
         v = lower_expr(l, e->as.alloc.count);

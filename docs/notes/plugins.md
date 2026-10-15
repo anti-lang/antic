@@ -136,7 +136,8 @@ the sub-object. A class whose `construct` takes arguments is refused
 there, because the host has none to give.
 
 `src/rt/loaded.c` holds the slots of the open libraries, the count of them
-and the two hooks that count their objects. It stands apart from the
+and the two functions that count their objects on the heap, which the
+`created` and `destroyed` hooks call. It stands apart from the
 loader, because every hook site of every program reaches it. The owner
 of an object is the image the table of its class lies in.
 `anti_rt_library_image` of the platform layer gives it, through `dladdr`
