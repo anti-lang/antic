@@ -978,8 +978,16 @@ static bool const_field(struct checker *c, struct expr *e,
         return sema_eval_const(c, e->as.field.base, &a) &&
                fail_const(c, e, "this field");
     }
-    /* A function, a static or a constant of a type is read at run
-       time. */
+    /* A constant of a class, `Name.NAME`, is a constant expression, as
+       "Classes" in docs/anti-object-model.md declares it. */
+    if (e->symbol != NULL && e->symbol->kind == SYMBOL_CONST) {
+        if (!sema_const_symbol(c, e->symbol, e->pos)) {
+            return false;
+        }
+        *out = *e->symbol->value;
+        return true;
+    }
+    /* A function and a static of a type are read at run time. */
     if (e->symbol != NULL) {
         return fail_const(c, e, "this field");
     }

@@ -7,7 +7,7 @@ class Limits
 {
 	pub used: int = 0,
 
-	const MAX: int = 64;
+	pub const MAX: int = 64;
 }
 
 const HALF: int = Limits.MAX / 2;
