@@ -921,7 +921,7 @@ static const struct symbolic *subst_symbolic(struct checker *c,
     case SYMBOLIC_BINARY:
         key.a = subst_symbolic(c, s->a, map);
         key.b = subst_symbolic(c, s->b, map);
-        break;
+        return sema_fold_symbolic(c, types_symbolic(c->types, &key));
     }
     return types_symbolic(c->types, &key);
 }

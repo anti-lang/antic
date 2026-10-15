@@ -590,6 +590,10 @@ bool sema_bitfield_constant(struct checker *c, struct expr *value,
                             const struct struct_field *field);
 bool sema_eval_const(struct checker *c, struct expr *e,
                      struct const_value *out);
+/* s, or the number it is once the operands of its operation are
+   numbers. */
+const struct symbolic *sema_fold_symbolic(struct checker *c,
+                                          const struct symbolic *s);
 /* Refuse the first call or `??` in e, a constant expression, in the order
    the evaluator meets them. True when it refused. */
 bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e);

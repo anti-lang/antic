@@ -28,23 +28,30 @@ static void wrap(struct const_value *v)
     }
 }
 
-/* Report a constant of a target-sized type whose value differs between
-   targets. */
-static bool fits_every_target(struct checker *c, const struct expr *e,
-                              const struct const_value *v)
+/* Whether a constant has one value on every target: one of a
+   target-sized type fits its narrowest width. */
+static bool one_value(const struct const_value *v)
 {
     int bits = types_bits(v->type);
-    bool fits;
 
     if (v->kind != CONST_INT || !types_is_target_sized(v->type)) {
         return true;
     }
-    fits = types_is_signed(v->type)
+    return types_is_signed(v->type)
                ? sema_signed_bits(v->as.integer) >=
                          -((int64_t)1 << (bits - 1)) &&
                      sema_signed_bits(v->as.integer) <
                          ((int64_t)1 << (bits - 1))
                : v->as.integer < ((uint64_t)1 << bits);
+}
+
+/* Report a constant of a target-sized type whose value differs between
+   targets. */
+static bool fits_every_target(struct checker *c, const struct expr *e,
+                              const struct const_value *v)
+{
+    bool fits = one_value(v);
+
     if (!fits) {
         sema_error_at(c, e->pos, "the value does not fit `%s` on every target",
                       sema_tn(v->type));
@@ -784,6 +791,137 @@ static void const_integer(enum token_kind op, const struct type *operand,
     default:
         break;
     }
+}
+
+/* The number s holds, a node of kind SYMBOLIC_INT, as a constant. */
+static void symbolic_number(const struct symbolic *s, struct const_value *out)
+{
+    memset(out, 0, sizeof *out);
+    out->type = s->type;
+    if (s->type->kind == TYPE_BOOL) {
+        out->kind = CONST_BOOL;
+        out->as.boolean = s->value != 0;
+    } else {
+        out->kind = CONST_INT;
+        out->as.integer = s->value;
+    }
+}
+
+/* Whether the integer operation op of the numbers a and b, of type t, has
+   a value in its type, by the rules reports_undefined holds a constant
+   to. */
+static bool defined_integer(enum token_kind op, const struct type *t,
+                            const struct const_value *a,
+                            const struct const_value *b)
+{
+    int bits = types_bits(t);
+    uint64_t mask = bits == 64 ? UINT64_MAX : ((uint64_t)1 << bits) - 1;
+    bool divides = op == TOKEN_SLASH || op == TOKEN_PERCENT;
+    char sign = op == TOKEN_PLUS    ? '+'
+                : op == TOKEN_MINUS ? '-'
+                : op == TOKEN_STAR  ? '*'
+                                    : 0;
+
+    if (divides && b->as.integer == 0) {
+        return false;
+    }
+    if (divides && types_is_signed(t) &&
+        (a->as.integer & mask) == (uint64_t)1 << (bits - 1) &&
+        sema_signed_bits(b->as.integer) == -1) {
+        return false;
+    }
+    if ((op == TOKEN_SHL || op == TOKEN_SHR) &&
+        ((types_is_signed(t) && sema_signed_bits(b->as.integer) < 0) ||
+         b->as.integer >= (uint64_t)bits)) {
+        return false;
+    }
+    if (op == TOKEN_SHL_WRAP && types_is_signed(t) &&
+        sema_signed_bits(b->as.integer) < 0) {
+        return false;
+    }
+    if (op == TOKEN_MUL_HIGH && types_is_target_sized(t)) {
+        return false;
+    }
+    return sign == 0 ||
+           !arith_overflows(sign, a->as.integer, b->as.integer,
+                            types_is_target_sized(t) ? 64 : bits,
+                            types_is_signed(t));
+}
+
+/* DESIGN: a copy of a generic puts the value of each constant parameter
+   in place of it, and an operation whose operands are then numbers is
+   the number the evaluator gives it, by T107 of
+   docs/audit/tests-findings.md. `[-(-N)]int` of `Row<3>` is `[3]int`. An
+   operation without a value in its type stays as it is, and the back
+   end refuses it on each target. */
+const struct symbolic *sema_fold_symbolic(struct checker *c,
+                                          const struct symbolic *s)
+{
+    struct const_value a;
+    struct const_value b;
+    struct const_value out;
+    const struct type *operand;
+
+    if ((s->kind != SYMBOLIC_UNARY && s->kind != SYMBOLIC_BINARY &&
+         s->kind != SYMBOLIC_CAST) ||
+        s->a == NULL || s->a->kind != SYMBOLIC_INT ||
+        (s->kind == SYMBOLIC_BINARY &&
+         (s->b == NULL || s->b->kind != SYMBOLIC_INT))) {
+        return s;
+    }
+    operand = s->a->type;
+    symbolic_number(s->a, &a);
+    memset(&out, 0, sizeof out);
+    out.type = s->type;
+    if (s->kind == SYMBOLIC_CAST) {
+        if (!types_is_integer(operand) || !types_is_integer(s->type) ||
+            !integer_fits(&a, s->type)) {
+            return s;
+        }
+        out.kind = CONST_INT;
+        out.as.integer = a.as.integer;
+    } else if (s->kind == SYMBOLIC_UNARY) {
+        if (s->op == TOKEN_BANG && a.kind == CONST_BOOL) {
+            out.kind = CONST_BOOL;
+            out.as.boolean = !a.as.boolean;
+            return as_symbolic(c, &out);
+        }
+        if (!types_is_integer(operand) ||
+            (s->op != TOKEN_MINUS && s->op != TOKEN_TILDE) ||
+            (s->op == TOKEN_MINUS && types_is_signed(operand) &&
+             arith_overflows('-', 0, a.as.integer,
+                             types_is_target_sized(operand)
+                                 ? 64
+                                 : types_bits(operand),
+                             true))) {
+            return s;
+        }
+        out.kind = CONST_INT;
+        out.as.integer = s->op == TOKEN_MINUS ? (uint64_t)0 - a.as.integer
+                                              : ~a.as.integer;
+    } else {
+        symbolic_number(s->b, &b);
+        if (s->type->kind == TYPE_BOOL &&
+            (s->op == TOKEN_AND_AND || s->op == TOKEN_OR_OR)) {
+            out.kind = CONST_BOOL;
+            out.as.boolean = s->op == TOKEN_AND_AND
+                                 ? a.as.boolean && b.as.boolean
+                                 : a.as.boolean || b.as.boolean;
+            return as_symbolic(c, &out);
+        }
+        if (s->type->kind == TYPE_BOOL) {
+            const_compare(s->op, &a, &b, types_is_signed(operand), &out);
+            return as_symbolic(c, &out);
+        }
+        if (!types_is_integer(operand) ||
+            !defined_integer(s->op, operand, &a, &b)) {
+            return s;
+        }
+        out.kind = CONST_INT;
+        const_integer(s->op, operand, &a, &b, &out);
+    }
+    wrap(&out);
+    return one_value(&out) ? as_symbolic(c, &out) : s;
 }
 
 /* A binary operator on constant operands. */

@@ -106,9 +106,6 @@ error_copy_nests_deep_field T096 A field of a copy that is refused gets a second
 anti_bind_message_clang_static_without_a_body T098 A `static` function without a body gets a second warning, which names its result.
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
 error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
-matrix_types_generic_length_with_a_negated_constant_dev T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
-matrix_types_generic_length_with_a_negated_constant_release T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
-matrix_types_generic_length_with_a_negated_constant_memory_checks T107 A length `-(-N)` of a generic struct stays `[--3]int` in its copy and takes no `[3]int`.
 matrix_modules_export_union_aligned_on_a_bitfield_refused T110 The refusal of an aligned `export union` whose first field is a bitfield calls the union a struct.
 matrix_flow_walk_with_an_iter_of_two_parameters_refused T096 A loop over a struct whose `operator fn iter` is refused gets a second message.
 matrix_flow_walk_with_a_next_of_two_parameters_refused T096 A loop over an iterator whose `operator fn next` is refused gets a second message.
