@@ -162,9 +162,7 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
         break;
     case HANDLE_BLOCK:
         error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
-        if (h->symbol != NULL) {
-            h->symbol->ir = error;
-        }
+        lower_bind_error(l, h->symbol, error);
         scope.join = join;
         scope.out = out;
         scope.has_out = has_out;
@@ -177,6 +175,21 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
         break;
     }
     l->b = join;
+}
+
+/* Give sym, the name a handler binds, the error in the temporary error.
+   A closure in the handler captures the name by reference, so a name
+   whose address is taken gets a slot that holds the error. */
+void lower_bind_error(struct lowerer *l, struct symbol *sym, uint32_t error)
+{
+    if (sym == NULL) {
+        return;
+    }
+    if (sym->address_taken) {
+        lower_bind_value(l, sym, lower_temp(l, error));
+        return;
+    }
+    sym->ir = error;
 }
 
 /* Whether the expression is a call whose error a handler takes. */
@@ -237,9 +250,7 @@ void lower_guard_missing(struct lowerer *l, const struct stmt *s,
         return;
     }
     error = ir_unary(l->f, l->b, IR_COPY, IR_PTR, err);
-    if (h->symbol != NULL) {
-        h->symbol->ir = error;
-    }
+    lower_bind_error(l, h->symbol, error);
     scope.join = join;
     scope.out = place;
     scope.has_out = true;

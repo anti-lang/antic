@@ -1592,9 +1592,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             ir_jump(l->f, l->b, join);
         }
         l->b = handler;
-        if (h->symbol != NULL) {
-            h->symbol->ir = scope.error;
-        }
+        lower_bind_error(l, h->symbol, scope.error);
         /* R014 and R015 of "Rules of 2026-10-13": a `yield;` in the
            handler ends this handler and goes on after the block. The
            block gives no value, so the handling holds no place. */
