@@ -861,6 +861,7 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
     struct type *hint = NULL;
     struct type *left;
     struct type *got;
+    bool nested;
 
     if (expected != NULL && !sema_is_error(expected) &&
         (expected->kind != TYPE_FN || !expected->bound)) {
@@ -883,10 +884,12 @@ static struct type *check_coalesce(struct checker *c, struct expr *e,
         left = types_match_plain(c->types, left);
     }
     /* A right side that may be `none` gives a result that may be, and
-       any other gives the value. */
+       any other gives the value. The value of a `??U` is a `?U`, which
+       a right side that may be `none` reaches. */
     got = sema_check_expr(c, right, left);
-    if (!types_is_nullable(got) && got->kind != TYPE_NONE &&
-        !sema_is_error(got)) {
+    nested = left->kind == TYPE_OPTIONAL && types_is_nullable(left->element);
+    if (!sema_is_error(got) &&
+        (nested || (!types_is_nullable(got) && got->kind != TYPE_NONE))) {
         struct type *bare = types_without_none(c->types, left);
         struct context quiet;
         bool held;

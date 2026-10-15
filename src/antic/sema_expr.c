@@ -787,9 +787,10 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
     /* DESIGN: a T is one of the values a `?T` holds, so it passes where
        a `?T` is expected. Every conversion that reaches T reaches the `?T`
        as well. Lowering writes the flag beside it. The reverse needs a
-       test the program wrote. */
-    if (expected->kind == TYPE_OPTIONAL && got->kind != TYPE_OPTIONAL &&
-        got->kind != TYPE_NONE) {
+       test the program wrote. A `?U` is the T of a `??U`. */
+    if (expected->kind == TYPE_OPTIONAL && got->kind != TYPE_NONE &&
+        (got->kind != TYPE_OPTIONAL ||
+         expected->element->kind == TYPE_OPTIONAL)) {
         struct context quiet;
         bool held;
         sema_enter_quiet(c, &quiet);

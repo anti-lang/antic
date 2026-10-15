@@ -102,15 +102,6 @@ check_slice_range_reversed T017 A dev build does not check a slice whose low bou
 check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.
 generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
 generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
-matrix_errors_optional_of_an_optional_dev T048 A `?int` is refused where a `??int` is expected.
-matrix_errors_optional_of_an_optional_release T048 A `?int` is refused where a `??int` is expected.
-matrix_errors_optional_of_an_optional_memory_checks T048 A `?int` is refused where a `??int` is expected.
-matrix_errors_generic_optional_of_a_nullable_pointer_dev T049 `??` in a generic over a `?*int` gives wrong values.
-matrix_errors_generic_optional_of_a_nullable_pointer_release T049 `??` in a generic over a `?*int` gives wrong values.
-matrix_errors_generic_optional_of_a_nullable_pointer_memory_checks T049 `??` in a generic over a `?*int` gives wrong values.
-matrix_errors_generic_optional_of_an_optional_value_dev T049 `??` in a generic over a `?int` is refused in the copy.
-matrix_errors_generic_optional_of_an_optional_value_release T049 `??` in a generic over a `?int` is refused in the copy.
-matrix_errors_generic_optional_of_an_optional_value_memory_checks T049 `??` in a generic over a `?int` is refused in the copy.
 matrix_errors_unhandled_construct_refused T051 An unhandled `alloc T(args)` gets a second message.
 matrix_threads_join_after_join_all_refused T053 A second `join` of one job compiles.
 matrix_threads_join_twice_refused T053 A second `join` of one job compiles.
