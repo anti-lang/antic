@@ -161,6 +161,7 @@ struct checker {
     const struct expr *discarded;
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct stmt *deferred;    /* the innermost of them, or NULL */
+    int deferred_loops;         /* loop_depth where deferred began */
     const struct expr *field_base; /* the base of the field checked now */
     const struct held_mutex *held; /* the `sync` blocks around it */
     /* The innermost `sync` around the anonymous function checked now,
@@ -492,6 +493,8 @@ void sema_check_handler(struct checker *c, struct handler *h,
 void sema_declare_caught(struct checker *c, struct handler *h,
                          struct type *t);
 bool sema_in_failing_function(const struct checker *c);
+bool sema_refuse_in_deferred(struct checker *c, struct pos pos,
+                             const char *word);
 void sema_refuse_escaping_error(struct checker *c, const struct expr *e);
 struct type *sema_interface_named(struct checker *c,
                                   const struct name *qualifier,

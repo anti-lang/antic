@@ -2153,6 +2153,23 @@ static void mark_view(struct symbol *sym, const struct expr *value)
     }
 }
 
+/* DESIGN: decision 19 of "Decisions of 2026-10-11". A `defer` or an
+   `undo` runs on the way out of its block, so `return`, `break`,
+   `continue`, `fail`, `try` and, by R002 of "Rules of 2026-10-13",
+   `yield` cannot leave the statement. word names the exit refused at
+   pos. False when the checker stands in no such statement. */
+bool sema_refuse_in_deferred(struct checker *c, struct pos pos,
+                             const char *word)
+{
+    if (c->deferring == 0) {
+        return false;
+    }
+    sema_error_at(c, pos, "`%s` inside %s", word,
+                  c->deferred->kind == STMT_DEFER ? "a `defer`"
+                                                  : "an `undo`");
+    return true;
+}
+
 /* DESIGN: R005 of "Rules of 2026-10-13". An `undo` runs when its block
    leaves through an error. The block of a `defer` or of another `undo`
    leaves through none, since decision 19 refuses `fail` and `try` there,
@@ -2161,10 +2178,7 @@ static void mark_view(struct symbol *sym, const struct expr *value)
    `undo-never-runs`. False after a refusal. */
 static bool check_undo(struct checker *c, const struct stmt *s)
 {
-    if (c->deferring > 0) {
-        sema_error_at(c, s->pos, "`undo` inside %s",
-                      c->deferred->kind == STMT_DEFER ? "a `defer`"
-                                                      : "an `undo`");
+    if (sema_refuse_in_deferred(c, s->pos, "undo")) {
         return false;
     }
     if (!sema_in_failing_function(c) && c->ctx.in_try == NULL) {
@@ -2281,9 +2295,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
            other exits. A handler inside the statement takes its own
            `yield`. */
         if (c->deferring > c->handler.deferring) {
-            sema_error_at(c, s->pos, "`yield` inside %s",
-                          c->deferred->kind == STMT_DEFER ? "a `defer`"
-                                                          : "an `undo`");
+            sema_refuse_in_deferred(c, s->pos, "yield");
             return;
         }
         if (s->as.yielded == NULL) {
@@ -2351,18 +2363,28 @@ static void check_stmt(struct checker *c, struct stmt *s)
     case STMT_DEFER:
     case STMT_UNDO: {
         const struct stmt *outer = c->deferred;
+        int outer_loops = c->deferred_loops;
         if (s->kind == STMT_UNDO && !check_undo(c, s)) {
             return;
         }
         c->deferring++;
         c->deferred = s;
+        c->deferred_loops = c->loop_depth;
         check_stmt(c, s->as.deferred);
+        c->deferred_loops = outer_loops;
         c->deferred = outer;
         c->deferring--;
         return;
     }
     case STMT_FAIL: {
         struct type *error;
+        /* The refused `fail` still answers the `may fail` of its
+           function, so the mistake gives one message. */
+        if (sema_refuse_in_deferred(c, s->pos, "fail")) {
+            c->saw_fail = true;
+            sema_check_expr(c, s->as.fail.value, NULL);
+            return;
+        }
         if (!sema_in_failing_function(c)) {
             sema_error_at(c, s->pos, "`fail` outside a function that may fail");
             sema_check_expr(c, s->as.fail.value, NULL);
@@ -2391,9 +2413,23 @@ static void check_stmt(struct checker *c, struct stmt *s)
         if (c->loop_depth == 0) {
             sema_error_at(c, s->pos, "`%s` outside a loop",
                           s->kind == STMT_BREAK ? "break" : "continue");
+            return;
+        }
+        /* R001 of "Rules of 2026-10-13": the loop may stand inside the
+           same `defer` or `undo`. */
+        if (c->loop_depth == c->deferred_loops) {
+            sema_refuse_in_deferred(c, s->pos,
+                                    s->kind == STMT_BREAK ? "break"
+                                                          : "continue");
         }
         return;
     case STMT_RETURN:
+        if (sema_refuse_in_deferred(c, s->pos, "return")) {
+            if (s->as.return_value != NULL) {
+                sema_check_expr(c, s->as.return_value, NULL);
+            }
+            return;
+        }
         if (c->ctx.function->symbol->type->never) {
             char named[128];
             name_function(named, sizeof named, c->ctx.function);
@@ -3010,6 +3046,7 @@ struct body_state {
     const struct expr *top_call;
     int deferring;
     const struct stmt *deferred;
+    int deferred_loops;
     const struct expr *field_base;
     const struct held_mutex *held_outside;
     const struct stmt *loops_open[LOOPS_OPEN_MAX];
@@ -3024,6 +3061,7 @@ static void set_aside(struct checker *c, struct body_state *s)
     s->top_call = c->top_call;
     s->deferring = c->deferring;
     s->deferred = c->deferred;
+    s->deferred_loops = c->deferred_loops;
     s->field_base = c->field_base;
     s->held_outside = c->held_outside;
     memcpy(s->loops_open, c->loops_open, sizeof s->loops_open);
@@ -3032,6 +3070,7 @@ static void set_aside(struct checker *c, struct body_state *s)
     memset(&c->handler, 0, sizeof c->handler);
     c->deferring = 0;
     c->deferred = NULL;
+    c->deferred_loops = 0;
     c->field_base = NULL;
     /* DESIGN: the `sync` blocks around an anonymous function stay on the
        chain, and held_outside marks where they begin. A guarded field
@@ -3051,6 +3090,7 @@ static void take_back(struct checker *c, const struct body_state *s)
     c->top_call = s->top_call;
     c->deferring = s->deferring;
     c->deferred = s->deferred;
+    c->deferred_loops = s->deferred_loops;
     c->field_base = s->field_base;
     c->held_outside = s->held_outside;
     memcpy(c->loops_open, s->loops_open, sizeof c->loops_open);

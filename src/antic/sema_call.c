@@ -1249,6 +1249,10 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         result = expected;
     }
 
+    if (h->kind == HANDLE_TRY && sema_refuse_in_deferred(c, h->pos, "try")) {
+        c->saw_fail = true;
+        return sema_builtin(c, TYPE_ERROR);
+    }
     /* Inside a `try` block every failing call reaches the one handler,
        so it needs none of its own. */
     if (h->kind == HANDLE_NONE && c->ctx.in_try != NULL) {

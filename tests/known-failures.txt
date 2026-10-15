@@ -18,18 +18,6 @@
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
 # The test known_failures checks the list against the table of the findings.
-matrix_flow_return_value_in_defer_refused T001 A `return` of a value inside a `defer` is not refused.
-matrix_flow_return_plain_in_defer_refused T001 A `return` without a value inside a `defer` is not refused.
-matrix_flow_return_value_in_undo_refused T001 A `return` of a value inside an `undo` is not refused.
-matrix_flow_return_plain_in_undo_refused T001 A `return` without a value inside an `undo` is not refused.
-matrix_flow_break_out_of_defer_refused T001 A `break` inside a `defer` is not refused.
-matrix_flow_continue_out_of_defer_refused T001 A `continue` inside a `defer` is not refused.
-matrix_flow_break_out_of_undo_refused T001 A `break` inside an `undo` is not refused.
-matrix_flow_continue_out_of_undo_refused T001 A `continue` inside an `undo` is not refused.
-matrix_flow_fail_in_defer_refused T001 A `fail` inside a `defer` is not refused.
-matrix_flow_fail_in_undo_refused T001 A `fail` inside an `undo` is not refused.
-matrix_flow_try_in_defer_refused T001 A `try` inside a `defer` is not refused.
-matrix_flow_try_in_undo_refused T001 A `try` inside an `undo` is not refused.
 matrix_flow_defer_failing_call_in_try_dev T003 antic crashes on a failing call that a `defer` in a `try` block holds.
 matrix_flow_defer_failing_call_in_try_release T003 antic crashes on a failing call that a `defer` in a `try` block holds.
 matrix_flow_defer_failing_call_in_try_memory_checks T003 antic crashes on a failing call that a `defer` in a `try` block holds.

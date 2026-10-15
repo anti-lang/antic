@@ -1273,6 +1273,17 @@ fn build() -> int
 }
 ```
 
+A deferred statement runs on the way out of its block, so nothing inside it may leave it. The checker refuses `return`, `break`, `continue`, `fail`, `try` and `yield` inside a `defer` or an `undo`. A `break` or a `continue` of a loop that stands inside the same statement stays allowed.
+
+```anti refused
+//! error: `return` inside a `defer`
+fn run(n: int) -> int
+{
+	defer return n + 1;
+	return n;
+}
+```
+
 A local that a `defer` or an `undo` names cannot move into an `own` parameter, since the deferred statement would read it after the move. [Chapter 11]({{% relref "11-ownership" %}}) shows that refusal.
 
 ### How antic builds it
