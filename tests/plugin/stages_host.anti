@@ -1,0 +1,105 @@
+//! A host that tries to unload a library while its main thread runs the code
+//! of the library: while `reflect.new` builds an object of a class of the
+//! library, while `delete` ends one and while `Object.deserialize` builds one. The library holds the main thread in
+//! that code until a worker has tried the unload, so each unload must refuse.
+//! S307 and S308 of docs/audit/summary.md.
+
+import anti.lang;
+import anti.mem;
+import anti.plugin;
+import anti.reflect;
+import net.example.stages;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// What the host hands to the worker and what the worker gives back.
+class Errand
+{
+	pub lib: ?*plugin.Library = none,
+	/// The step the worker waits for before it tries the unload.
+	pub wait: int = 0,
+	/// The code of the error of the unload, or 0 when it closed the library.
+	pub refused: int = 0,
+}
+
+/// Try to unload the library once the step reaches the one the errand names,
+/// and let the library go on.
+worker fn unloader(e: *Errand) -> int
+{
+	stages.wait_for(e.wait);
+	e.refused = 0;
+	let lib = e.lib else {
+		return 0;
+	};
+	lib.unload() catch err {
+		e.refused = err.code;
+	};
+	stages.Step.at.store(e.wait + 1);
+	return 0;
+}
+
+/// Say what the unload of the worker did, and whether the library is still
+/// open.
+fn report(during: str, e: *Errand) -> bool
+{
+	if e.refused != 0 {
+		printf("an unload during %.*s is refused with code %lld\n".ptr,
+			during.len as c_int, during.ptr, e.refused);
+		return true;
+	}
+	printf("an unload during %.*s closes the library\n".ptr,
+		during.len as c_int, during.ptr);
+	return false;
+}
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	let errand = alloc Errand { lib: lib, wait: 1 };
+	let building = dispatch errand -> unloader();
+	let made = reflect.new("net.example.stalls.Starting");
+	join(building);
+	if !report("reflect.new", errand) {
+		return 1;
+	}
+	let built = made else {
+		printf("reflect.new gave none\n".ptr);
+		return 1;
+	};
+	delete(built);
+	printf("after reflect.new, alive %lld\n".ptr, lib.live());
+	let slow = lib.instance(stages.Slow) catch fatal;
+	errand.wait = 3;
+	let ending = dispatch errand -> unloader();
+	delete(slow);
+	join(ending);
+	if !report("delete", errand) {
+		return 1;
+	}
+	printf("after delete, alive %lld\n".ptr, lib.live());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 256);
+	errand.wait = 5;
+	let reading = dispatch errand -> unloader();
+	let read = Object.deserialize("{\"type\":\"net.example.stalls.Reading\"}",
+		&arena);
+	join(reading);
+	if !report("deserialize", errand) {
+		return 1;
+	}
+	if read == none {
+		printf("deserialize gave none\n".ptr);
+		return 1;
+	}
+	delete(read, &arena);
+	printf("after deserialize, alive %lld\n".ptr, lib.live());
+	let refused = Object.deserialize(
+		"{\"type\":\"net.example.stalls.Quiet\",\"n\":\"text\"}", &arena);
+	printf("a deserialize that fails gives none %d, alive %lld\n".ptr,
+		(refused == none) as c_int, lib.live());
+	arena.free_all();
+	lib.unload() catch fatal;
+	printf("unloaded\n".ptr);
+	delete(errand);
+	delete(lib);
+	return 0;
+}

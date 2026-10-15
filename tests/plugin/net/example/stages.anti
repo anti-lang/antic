@@ -1,0 +1,27 @@
+//! The interface that the host of the test plugin_stages shares with its
+//! library, and the step both sides wait for. The step is a field of a class
+//! of this module, which the host defines and the library binds against, so
+//! the two read one word.
+
+/// The step the host and its library have reached.
+pub class Step
+{
+	pub n: int = 0,
+
+	/// The step, which only grows.
+	pub static atomic at: int = 0;
+}
+
+/// Wait until the step reaches `n`.
+pub fn wait_for(n: int)
+{
+	while Step.at.load() < n do {
+	}
+}
+
+/// Work of a library whose objects wait for the host as they end.
+pub abstract class Slow
+{
+	/// A number of the library.
+	pub abstract fn n(self) -> int;
+}

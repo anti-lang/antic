@@ -1,0 +1,8 @@
+an unload during reflect.new is refused with code 2
+after reflect.new, alive 0
+an unload during delete is refused with code 2
+after delete, alive 0
+an unload during deserialize is refused with code 2
+after deserialize, alive 0
+a deserialize that fails gives none 1, alive 0
+unloaded

@@ -5685,6 +5685,25 @@ add_test(NAME plugin_locals
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/locals_host.expected"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
 
+# An unload while another thread runs the code of the library: while
+# `reflect.new` runs the `construct` of a class of the library, and while
+# `delete` runs the `destruct` of an object of it. Each is refused. S307
+# and S308 of docs/audit/summary.md.
+add_test(NAME plugin_stages
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-stages"
+        "-DHOST=stages_host"
+        "-DLIBRARY=stalls"
+        "-DINTERFACE=stages"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stages_host.expected"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_plugin_kinds.cmake")
+
 # A library that uses two modules of the standard library which its host
 # imports and does not use itself. The library resolves them against the
 # host. T093 of docs/audit/tests-findings.md.

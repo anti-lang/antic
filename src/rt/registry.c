@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "atomic.h"
 #include "json.h"
 #include "plugin.h"
 #include "registry.h"
@@ -42,20 +43,26 @@ static const struct anti_class *find_in(const struct anti_registry *r,
 }
 
 /* The class named `Class` or `module.Class`, or NULL when the registry
-   holds none or holds two of the bare name.
+   holds none or holds two of the bare name. *slot is the slot of the
+   library the class lies in, with one object counted against it, or
+   NULL for a class of the program. The caller gives the count back with
+   given once the object is built or the lookup came to nothing.
 
    DESIGN: a name without a dot is the name the descriptor holds, which
    two modules may both declare. It finds a class when one class alone
    has it. `module.Class` names the class of one module and is never in
    doubt. */
 static const struct anti_class *registry_find(const unsigned char *name,
-                                             int64_t length)
+                                             int64_t length,
+                                             struct anti_plugin **slot)
 {
     const struct anti_class *found;
+    struct anti_plugin *in = NULL;
     bool two = false;
     int64_t dot = length;
     int64_t i;
 
+    *slot = NULL;
     while (dot > 0 && name[dot - 1] != '.') {
         dot--;
     }
@@ -67,9 +74,12 @@ static const struct anti_class *registry_find(const unsigned char *name,
        `reflect.new` finds one by name as it finds a class of the
        program. The loader holds the table of each open library. A lookup
        walks them after the program's own, under the lock of the slots.
-       No unload takes a table away during the walk. The class it finds
-       stays mapped while the program keeps its library open, as every
-       object of the library does. */
+       No unload takes a table away during the walk. A class it finds
+       counts one object against its library before the lock is given
+       back, as the loader does for `instance`. An unload on another
+       thread then refuses while the caller reads the descriptor and runs
+       the code of the class. The `created` hook counts the object once
+       `init` has run, and the caller then gives its own count back. */
     anti_rt_plugin_hold();
     for (i = 0; i < ANTI_PLUGIN_MAX && !two; i++) {
         const struct anti_registry *r = anti_rt_plugin_registry(i);
@@ -83,6 +93,7 @@ static const struct anti_class *registry_find(const unsigned char *name,
         }
         if (dot > 0) {
             found = c;
+            in = anti_rt_plugin_at(i);
             break;
         }
         if (found != NULL) {
@@ -90,9 +101,22 @@ static const struct anti_class *registry_find(const unsigned char *name,
             break;
         }
         found = c;
+        in = anti_rt_plugin_at(i);
+    }
+    if (!two && in != NULL) {
+        anti_rt_atomic_add(&in->live, (int64_t)sizeof in->live, 1);
+        *slot = in;
     }
     anti_rt_plugin_release();
     return two ? NULL : found;
+}
+
+/* Give back the count registry_find took against the slot. */
+static void given(struct anti_plugin *slot)
+{
+    if (slot != NULL) {
+        anti_rt_atomic_sub(&slot->live, (int64_t)sizeof slot->live, 1);
+    }
 }
 
 /* A zeroed object of the class, prepared as a literal of it would be. */
@@ -108,15 +132,18 @@ static void *build(const struct anti_class *c)
 
 void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 {
-    const struct anti_class *c = registry_find(name, length);
+    struct anti_plugin *slot;
+    const struct anti_class *c = registry_find(name, length, &slot);
+    void *made = NULL;
 
     /* A construct with arguments has none to take here, and a required
        class field has no value. */
-    if (c == NULL ||
-        (c->flags & (ANTI_CLASS_ARGS | ANTI_CLASS_REQUIRED)) != 0) {
-        return NULL;
+    if (c != NULL &&
+        (c->flags & (ANTI_CLASS_ARGS | ANTI_CLASS_REQUIRED)) == 0) {
+        made = build(c);
     }
-    return build(c);
+    given(slot);
+    return made;
 }
 
 /* Reading JSON */
@@ -848,24 +875,26 @@ static void *read_object(struct reader *r,
     unsigned char name[NAME_ROOM];
     size_t length;
     const struct anti_class *c;
+    struct anti_plugin *slot;
     void *object;
 
     if (!type_of(*r, name, &length)) {
         return NULL;
     }
-    c = registry_find(name, (int64_t)length);
+    c = registry_find(name, (int64_t)length, &slot);
     if (c == NULL || !descends(c->descriptor, expected) ||
-        (c->flags & ANTI_CLASS_REQUIRED) != 0) {
-        return NULL;
-    }
-    if (!room_for_object(r->made)) {
+        (c->flags & ANTI_CLASS_REQUIRED) != 0 ||
+        !room_for_object(r->made)) {
+        given(slot);
         return NULL;
     }
     object = lend(r, (size_t)c->descriptor->size, OBJECT_ALIGN);
     if (object == NULL) {
+        given(slot);
         return NULL;
     }
     c->init(object);
+    given(slot);
     r->made->objects[r->made->object_count].object = object;
     r->made->objects[r->made->object_count].owner = NULL;
     r->made->object_count++;

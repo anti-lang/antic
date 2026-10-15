@@ -1,0 +1,58 @@
+//! A library whose objects wait for the host while the code of the library
+//! runs: one in its `construct`, which `reflect.new` runs, one in its
+//! `construct`, which `Object.deserialize` runs, and one in its `destruct`,
+//! which `delete` runs. S307 and S308 of docs/audit/summary.md.
+
+import net.example.stages;
+
+provides net.example.stages.Slow as Ending;
+
+/// A class whose `construct` reaches step 1 and waits for step 2.
+pub class Starting
+{
+	pub n: int = 0,
+
+	fn construct(self)
+	{
+		stages.Step.at.store(1);
+		stages.wait_for(2);
+		self.n = 1;
+	}
+}
+
+/// A class whose `construct` reaches step 5 and waits for step 6.
+pub class Reading
+{
+	pub n: int = 0,
+
+	fn construct(self)
+	{
+		stages.Step.at.store(5);
+		stages.wait_for(6);
+	}
+}
+
+/// A class that waits for nothing.
+pub class Quiet
+{
+	pub n: int = 0,
+}
+
+/// The class the library provides, whose `destruct` reaches step 3 and waits
+/// for step 4.
+pub class Ending
+{
+	implements s: stages.Slow,
+
+	/// A number of the library.
+	pub concrete fn n(self) -> int
+	{
+		return 3;
+	}
+
+	fn destruct(self)
+	{
+		stages.Step.at.store(3);
+		stages.wait_for(4);
+	}
+}
