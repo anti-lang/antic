@@ -48,11 +48,6 @@ matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and 
 matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 check_slice_range T017 A dev build does not check the bounds of a slice of an array.
-matrix_types_enum_value_from_a_call_refused T020 A call as the value of an enum compiles, and the value is 0.
-matrix_types_bitfield_width_from_a_call_refused T020 A call as the width of a bitfield compiles, and the field is no bitfield.
-matrix_types_align_from_a_call_refused T020 A call as the N of align(N) compiles, and the type takes no alignment.
-matrix_types_field_array_length_from_a_call_refused T020 A call as the length of the array of a field compiles.
-matrix_types_enum_value_from_size_of_refused T021 A value of an enum computed from size_of compiles, and the value is 0.
 matrix_types_atomic_in_packed_class_dev T022 An atomic field that crosses a multiple of 16 in a packed class stops the program with a bus error.
 matrix_types_atomic_in_packed_class_release T022 An atomic field that crosses a multiple of 16 in a packed class stops the program with a bus error.
 matrix_types_atomic_in_packed_class_memory_checks T022 An atomic field that crosses a multiple of 16 in a packed class stops the program with a bus error.

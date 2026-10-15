@@ -557,7 +557,8 @@ struct type *sema_array_of(struct checker *c, struct expr *e,
 {
     struct const_value v;
 
-    if (sema_is_error(sema_check_expr(c, e, sema_builtin(c, TYPE_I64))) ||
+    if (sema_refuse_runtime_parts(c, e) ||
+        sema_is_error(sema_check_expr(c, e, sema_builtin(c, TYPE_I64))) ||
         sema_is_error(element)) {
         return sema_builtin(c, TYPE_ERROR);
     }
@@ -609,7 +610,8 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
                       "found `%s`", sema_tn(t));
         return 0;
     }
-    if (!sema_require(c, e, sema_check_expr(c, e, sema_builtin(c, TYPE_I64)),
+    if (sema_refuse_runtime_parts(c, e) ||
+        !sema_require(c, e, sema_check_expr(c, e, sema_builtin(c, TYPE_I64)),
                       sema_builtin(c, TYPE_I64)) ||
         !sema_eval_const(c, e, &v)) {
         return 0;
@@ -710,7 +712,8 @@ static uint64_t alignment(struct checker *c, struct expr *e)
 {
     struct const_value v;
 
-    if (!sema_require(c, e, sema_check_expr(c, e, sema_builtin(c, TYPE_I64)),
+    if (sema_refuse_runtime_parts(c, e) ||
+        !sema_require(c, e, sema_check_expr(c, e, sema_builtin(c, TYPE_I64)),
                       sema_builtin(c, TYPE_I64)) ||
         !sema_eval_const(c, e, &v)) {
         return 0;
@@ -2363,12 +2366,23 @@ static void declare_enum_values(struct checker *c, struct item *it)
         if (it->params[j].value != NULL) {
             struct const_value v;
             struct type *base = it->symbol->type->base;
-            if (sema_require(c, it->params[j].value,
+            /* DESIGN: every value of an enum is a number the checker
+               knows, since `switch` covers the values and the C header
+               writes them. A value computed from `size_of` differs per
+               target and is refused as the N of `align(N)` is, by T021
+               of `docs/audit/tests-findings.md`. */
+            if (!sema_refuse_runtime_parts(c, it->params[j].value) &&
+                sema_require(c, it->params[j].value,
                              sema_check_expr(c, it->params[j].value, base),
                              base) &&
-                sema_eval_const(c, it->params[j].value, &v) &&
-                v.kind == CONST_INT) {
-                values[j].number = v.as.integer;
+                sema_eval_const(c, it->params[j].value, &v)) {
+                if (v.kind == CONST_INT) {
+                    values[j].number = v.as.integer;
+                } else if (v.kind == CONST_SYMBOLIC) {
+                    sema_error_at(c, it->params[j].value->pos,
+                                  "a value of an enum is a constant, not a "
+                                  "value computed from `size_of`");
+                }
             }
         }
         for (k = 0; k < j; k++) {
@@ -2863,6 +2877,7 @@ static void declare_all_members(struct checker *c)
             declare_get(c, it);
         }
     }
+    c->fns_typed = true;
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_CONST) {

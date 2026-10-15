@@ -1307,7 +1307,12 @@ static void const_deps_of(struct chain_deps *d, const struct expr *e)
    and the checker reads it before it declares the types of functions. A
    call there finds no type yet and gives no message, so the walk refuses
    it first, with the message of the evaluator. `??` is refused at its
-   place once its left side holds no call. */
+   place once its left side holds no call. The value of an enum, the
+   width of a bitfield, the N of `align(N)` and the length of an array
+   are read as early, by T020 of `docs/audit/tests-findings.md`, and take
+   the same walk. So does a constant that one of them names before the
+   functions have their types. Later the check of the call gives the
+   message that names what it calls. */
 bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e)
 {
     size_t i;
@@ -1317,6 +1322,18 @@ bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e)
     }
     switch (e->kind) {
     case EXPR_CALL:
+        /* The built-in `mul_high` becomes an operator, which folds. */
+        if (e->as.call.callee->kind == EXPR_NAME &&
+            sema_name_is(&e->as.call.callee->as.name, MUL_HIGH) &&
+            sema_lookup(c, &e->as.call.callee->as.name) == NULL) {
+            for (i = 0; i < e->as.call.arg_count; i++) {
+                if (sema_refuse_runtime_parts(c, e->as.call.args[i])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return !fail_const(c, e, "a call");
     case EXPR_FREE:
     case EXPR_OBJECT:
     case EXPR_ATOMIC:
@@ -1515,7 +1532,8 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
         }
         ok = false;
     }
-    ok = ok && sema_require(c, value, sema_check_expr(c, value, t), t);
+    ok = ok && (c->fns_typed || !sema_refuse_runtime_parts(c, value)) &&
+         sema_require(c, value, sema_check_expr(c, value, t), t);
     if (ok) {
         struct const_value *made = arena_alloc(c->arena, sizeof *made);
         ok = sema_eval_const(c, value, made);

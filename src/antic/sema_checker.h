@@ -216,6 +216,9 @@ struct checker {
     struct leak_call *leak_calls;
     size_t leak_call_count;
     size_t leak_call_capacity;
+    /* The functions and the functions of class bodies have their types,
+       so a call in a constant finds its callee. */
+    bool fns_typed;
     bool ok;
 };
 

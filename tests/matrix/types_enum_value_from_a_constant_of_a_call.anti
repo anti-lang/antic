@@ -1,0 +1,20 @@
+//! The value of an enum is a constant expression. A constant it names is one as
+//! well, and a call is none, even before the functions have their types.
+
+fn five() -> i32
+{
+	return 5;
+}
+
+const K: i32 = five();
+
+enum Level
+{
+	Low = K,
+	High,
+}
+
+fn main() -> int
+{
+	return Level.Low as int;
+}
