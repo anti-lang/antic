@@ -242,7 +242,8 @@ bool parser_starts_member(const struct parser *p)
         return true;
     default:
         return (parser_is_word(p, parser_peek_at(p, i), "final") ||
-                parser_is_word(p, parser_peek_at(p, i), "operator")) &&
+                parser_is_word(p, parser_peek_at(p, i), "operator") ||
+                parser_is_word(p, parser_peek_at(p, i), "trace")) &&
                parser_peek_at(p, i + 1)->kind == TOKEN_FN;
     }
 }
@@ -519,7 +520,8 @@ bool parser_compatible_line(struct parser *p, struct item *it)
    the header. The message writes the header the programmer means, with
    the base as the body named it. The base and a comma after it are read
    and dropped, so the rest of the body parses and reports its own
-   errors. Returns whether a comma followed. */
+   errors. A `;` after it is read as a comma is, since a member ends with
+   one. Returns whether either followed. */
 bool parser_inherits_in_body(struct parser *p, const struct item *it)
 {
     const struct token *base = parser_peek_at(p, 1);
@@ -542,7 +544,7 @@ bool parser_inherits_in_body(struct parser *p, const struct item *it)
         parser_accept(p, TOKEN_IDENT);
     }
     p->panic = false;
-    return parser_accept(p, TOKEN_COMMA);
+    return parser_accept(p, TOKEN_COMMA) || parser_accept(p, TOKEN_SEMICOLON);
 }
 
 /* Whether the next tokens declare a type in a class body: the words that
@@ -628,6 +630,11 @@ bool parser_nested_type(struct parser *p, struct list *nested)
     }
     parser_list_push(nested, &inner);
     return true;
+}
+
+struct item *parser_member(struct parser *p, const struct item *owner)
+{
+    return member(p, owner);
 }
 
 /* Read the functions and constants of a body into it->members, and the

@@ -6,70 +6,64 @@
 
 #include "parser_parser.h"
 
-/* `class Circle inherits Shape { implements ser: Serializable, ... }`.
-   DESIGN: the base is no member. It sits at offset 0, has no name of its
-   own, is reached as `self.super`, and a class has at most one, so the
-   header names it. `implements` and `use` open the body, because each is
-   a named sub-object with a place in the layout. Then come the fields,
-   then the constants and the functions. */
-static struct item *class_item(struct parser *p, struct item *it)
+/* The index of the `}` that closes the brace before the next token, or
+   the index of the end of the source. */
+static size_t closing_brace(const struct parser *p)
 {
-    struct list fields = {NULL, 0, 0, sizeof(struct param)};
-    struct list nested = {NULL, 0, 0, sizeof(struct item *)};
+    size_t i;
+    int depth = 1;
+
+    for (i = p->pos; i < p->last; i++) {
+        if (p->tokens[i].kind == TOKEN_LBRACE) {
+            depth++;
+        } else if (p->tokens[i].kind == TOKEN_RBRACE && --depth == 0) {
+            return i;
+        }
+    }
+    return p->last;
+}
+
+/* The lines of a class body and its `}`: the fields, the functions and
+   constants and the nested types. Returns false after an error. */
+static bool class_body(struct parser *p, struct item *it, struct list *fields,
+                       struct list *members, struct list *nested)
+{
     size_t mark;
 
-    parser_next(p);
-    it->kind = ITEM_CLASS;
-    if (!parser_expect_name(p, &it->name) || !parser_type_params(p, it)) {
-        return NULL;
-    }
-    /* DESIGN: `align(N)` stays directly after the name, as on a struct,
-       and the base follows it. */
-    if (parser_is_word(p, parser_peek(p), "align")) {
-        parser_next(p);
-        if (!parser_expect(p, TOKEN_LPAREN) ||
-            (it->align = parser_expression(p)) == NULL ||
-            !parser_expect(p, TOKEN_RPAREN)) {
-            return NULL;
-        }
-    }
-    /* The base is one name, qualified by its module or not, and no field
-       of its own. The checker builds the `super` field from it. */
-    if (parser_check(p, TOKEN_INHERITS)) {
-        it->base_pos = parser_pos_of(parser_peek(p));
-        parser_next(p);
-        if (!parser_expect_name(p, &it->base_name) ||
-            (parser_accept(p, TOKEN_DOT) &&
-             (it->base_module = it->base_name,
-              !parser_expect_name(p, &it->base_name)))) {
-            return NULL;
-        }
-        if (parser_check(p, TOKEN_LT) &&
-            (it->base_args =
-                 parser_type_args(p, &it->base_arg_count)) == NULL) {
-            return NULL;
-        }
-        if (parser_check(p, TOKEN_COMMA) || parser_check(p, TOKEN_INHERITS)) {
-            parser_error_here(p, "a class has one base");
-            return NULL;
-        }
-    }
-    mark = p->clauses->count;
-    if (!parser_header_clauses(p) || !parser_expect(p, TOKEN_LBRACE)) {
-        return NULL;
-    }
-    it->unchecked_fields = parser_unchecks_guard(p, mark);
-    /* Fields first, comma separated, then the constants and functions,
-       each ended by its own `;` or block. */
-    while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF) &&
-           (!parser_starts_member(p) || parser_starts_nested(p))) {
+    /* DESIGN: the lines of a class body stand in any order by grammar,
+       by "Class declaration" in docs/anti-object-model.md: a field ends
+       with `,`, a constant or a static field with `;` and a function with
+       its block. The convention puts the fields first. T069 of
+       docs/audit/tests-findings.md: a field after a member was read as a
+       member. A field without its `,` ends a run of fields, and a member
+       or the end of the body follows it. */
+    while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
         struct param field;
+        /* `internal` is a level of a module item. The word is dropped
+           after its message, so the member after it parses and gives
+           no second message, by T071 of docs/audit/tests-findings.md. A
+           nested type has a message of its own for it. */
+        if (parser_check(p, TOKEN_INTERNAL) && !parser_starts_nested(p)) {
+            const struct token *word = parser_peek(p);
+            diagnostics_add(p->diags, word->line, word->column,
+                            "`internal` marks a module item, and a class "
+                            "member is `pub`, `protected` or neither");
+            p->ok = false;
+            parser_next(p);
+            continue;
+        }
         if (parser_starts_nested(p)) {
-            if (!parser_nested_type(p, &nested)) {
-                free(fields.data);
-                free(nested.data);
-                return NULL;
+            if (!parser_nested_type(p, nested)) {
+                return false;
             }
+            continue;
+        }
+        if (parser_starts_member(p)) {
+            struct item *m = parser_member(p, it);
+            if (m == NULL) {
+                return false;
+            }
+            parser_list_push(members, &m);
             continue;
         }
         memset(&field, 0, sizeof field);
@@ -77,16 +71,14 @@ static struct item *class_item(struct parser *p, struct item *it)
         field.note = parser_doc_before(p, TOKEN_NOTE);
         field.pos = parser_pos_of(parser_peek(p));
         if (parser_check(p, TOKEN_INHERITS)) {
-            if (!parser_inherits_in_body(p, it)) {
-                break;
-            }
+            parser_inherits_in_body(p, it);
             continue;
         }
         if (parser_is_word(p, parser_peek(p), "compatible") &&
             (parser_peek_at(p, 1)->kind == TOKEN_INT ||
              parser_peek_at(p, 1)->kind == TOKEN_FLOAT)) {
             if (!parser_compatible_line(p, it)) {
-                break;
+                return false;
             }
             continue;
         }
@@ -159,24 +151,92 @@ static struct item *class_item(struct parser *p, struct item *it)
             (parser_accept(p, TOKEN_ASSIGN) &&
              (field.value = parser_expression(p)) == NULL) ||
             !parser_guard_clause(p, &field) || !parser_field_clauses(p)) {
-            free(fields.data);
-            free(nested.data);
-            return NULL;
+            return false;
         }
         field.unchecked = parser_unchecks_guard(p, mark);
         parser_close_clauses(p, mark, field.pos);
-        parser_list_push(&fields, &field);
-        if (!parser_accept(p, TOKEN_COMMA)) {
-            break;
+        parser_list_push(fields, &field);
+        if (!parser_accept(p, TOKEN_COMMA) && !parser_check(p, TOKEN_RBRACE) &&
+            !parser_starts_member(p)) {
+            return parser_expect(p, TOKEN_COMMA);
         }
     }
-    it->params = parser_list_finish(p, &fields, &it->param_count);
-    if (!parser_members_of(p, it, &nested)) {
-        free(nested.data);
+    return parser_expect(p, TOKEN_RBRACE);
+}
+
+/* `class Circle inherits Shape { implements ser: Serializable, ... }`.
+   DESIGN: the base is no member. It sits at offset 0, has no name of its
+   own, is reached as `self.super`, and a class has at most one, so the
+   header names it. `implements` and `use` open the body, because each is
+   a named sub-object with a place in the layout. By convention the
+   fields come next, then the constants and the functions, and
+   class_body takes them in any order. */
+static struct item *class_item(struct parser *p, struct item *it)
+{
+    struct list fields = {NULL, 0, 0, sizeof(struct param)};
+    struct list members = {NULL, 0, 0, sizeof(struct item *)};
+    struct list nested = {NULL, 0, 0, sizeof(struct item *)};
+    size_t close;
+    size_t mark;
+    bool ok;
+
+    parser_next(p);
+    it->kind = ITEM_CLASS;
+    if (!parser_expect_name(p, &it->name) || !parser_type_params(p, it)) {
         return NULL;
     }
+    /* DESIGN: `align(N)` stays directly after the name, as on a struct,
+       and the base follows it. */
+    if (parser_is_word(p, parser_peek(p), "align")) {
+        parser_next(p);
+        if (!parser_expect(p, TOKEN_LPAREN) ||
+            (it->align = parser_expression(p)) == NULL ||
+            !parser_expect(p, TOKEN_RPAREN)) {
+            return NULL;
+        }
+    }
+    /* The base is one name, qualified by its module or not, and no field
+       of its own. The checker builds the `super` field from it. */
+    if (parser_check(p, TOKEN_INHERITS)) {
+        it->base_pos = parser_pos_of(parser_peek(p));
+        parser_next(p);
+        if (!parser_expect_name(p, &it->base_name) ||
+            (parser_accept(p, TOKEN_DOT) &&
+             (it->base_module = it->base_name,
+              !parser_expect_name(p, &it->base_name)))) {
+            return NULL;
+        }
+        if (parser_check(p, TOKEN_LT) &&
+            (it->base_args =
+                 parser_type_args(p, &it->base_arg_count)) == NULL) {
+            return NULL;
+        }
+        if (parser_check(p, TOKEN_COMMA) || parser_check(p, TOKEN_INHERITS)) {
+            parser_error_here(p, "a class has one base");
+            return NULL;
+        }
+    }
+    mark = p->clauses->count;
+    if (!parser_header_clauses(p) || !parser_expect(p, TOKEN_LBRACE)) {
+        return NULL;
+    }
+    it->unchecked_fields = parser_unchecks_guard(p, mark);
+    close = closing_brace(p);
+    ok = class_body(p, it, &fields, &members, &nested);
+    it->params = parser_list_finish(p, &fields, &it->param_count);
+    it->members = parser_list_finish(p, &members, &it->member_count);
     it->nested = parser_list_finish(p, &nested, &it->nested_count);
-    return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
+    /* DESIGN: a class body that fails to parse is left at its closing
+       brace, so the rest of it never reads as items of the module. One
+       mistake in a body gives one message, by T101 of
+       docs/audit/tests-findings.md. */
+    if (!ok) {
+        if (close > p->pos) {
+            p->pos = close + 1;
+        }
+        return NULL;
+    }
+    return it;
 }
 
 /* DESIGN: a variant body holds its cases and nothing else. A case is a

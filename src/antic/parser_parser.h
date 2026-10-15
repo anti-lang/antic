@@ -150,6 +150,8 @@ bool parser_compatible_line(struct parser *p, struct item *it);
 bool parser_inherits_in_body(struct parser *p, const struct item *it);
 bool parser_starts_nested(const struct parser *p);
 bool parser_nested_type(struct parser *p, struct list *nested);
+/* One function or constant of a body. */
+struct item *parser_member(struct parser *p, const struct item *owner);
 bool parser_members_of(struct parser *p, struct item *it,
                        struct list *nested);
 bool parser_struct_field_only(struct parser *p, const struct item *it);

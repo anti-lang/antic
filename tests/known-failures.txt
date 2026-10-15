@@ -172,9 +172,6 @@ matrix_threads_pointer_into_fields_in_a_tuple_refused T062 A public function of 
 matrix_threads_pointer_into_fields_of_a_concurrent_class_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
-matrix_classes_field_after_a_constant_dev T069 A field after a constant, a static field or a function of a class body is refused.
-matrix_classes_field_after_a_constant_release T069 A field after a constant, a static field or a function of a class body is refused.
-matrix_classes_field_after_a_constant_memory_checks T069 A field after a constant, a static field or a function of a class body is refused.
 matrix_classes_field_of_the_base_again_refused T070 A message of the class checker differs from the text the object model gives.
 matrix_classes_function_of_the_base_again_refused T070 A message of the class checker differs from the text the object model gives.
 matrix_classes_concrete_replaces_nothing_refused T070 A message of the class checker differs from the text the object model gives.
@@ -205,7 +202,6 @@ function_default_modules_release T115 A literal of a library class omits a field
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.
 matrix_modules_import_with_pub_refused T087 `pub` before an `import` gets one message twice.
-matrix_modules_extern_function_in_a_class_refused T087 An `extern fn` in a class body gets a second message.
 error_modules_internal_interface T087 An interface that a module does not give gets two more messages.
 error_modules_private_interface T087 An interface that a module does not give gets two more messages.
 error_modules_import_cycle T088 The driver reports a cycle of imports without the position of the import.
@@ -242,8 +238,6 @@ matrix_values_qualified_struct_literal_with_an_argument_that_is_no_type_refused 
 matrix_values_struct_literal_with_an_argument_that_is_no_type_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
 matrix_values_slice_literal_with_a_value_and_no_name_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
 matrix_values_slice_literal_in_a_condition_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
-matrix_classes_refused_field_before_a_function_refused T101 The parser reads the rest of a class body after a refused member as items of the module.
-matrix_classes_inherits_in_the_body_with_a_semicolon_refused T101 The parser reads the rest of a class body after a refused member as items of the module.
 matrix_classes_nested_class_after_four_words_refused T102 `pub` before three more words and `class` in a class body gets `expected identifier`.
 matrix_flow_switch_arm_without_a_statement_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
 matrix_flow_switch_arm_assignment_without_a_value_refused T100 The `}` inside a refused statement ends the function for the parser, which adds `expected an item`.
