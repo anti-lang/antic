@@ -1,0 +1,1 @@
+threads_static_default_is_a_load.anti:8:28: error: a call is not a constant expression

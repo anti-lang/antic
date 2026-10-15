@@ -77,7 +77,6 @@ check_slice_range_negative T017 A dev build does not check a slice whose low bou
 generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
 generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
 check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.
-matrix_threads_static_default_is_a_call_refused T057 The default of a static field that no code reads is not checked.
 matrix_threads_channel_in_a_generic_struct_of_a_pointer_refused T058 A channel of a type parameter takes a pointer.
 matrix_threads_channel_of_a_type_parameter_that_is_a_pointer_refused T058 A channel of a type parameter takes a pointer.
 matrix_threads_atomic_field_of_a_str_refused T059 An atomic field of a `str` is not refused.

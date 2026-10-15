@@ -1373,7 +1373,8 @@ Where two rules meet, and where three do:
   `matrix/threads_mutex_new_at_module_level`, by R047 of "Rules of
   2026-10-13".
 - A static field, its default and a call:
-  `matrix/threads_static_default_is_a_call`, T057.
+  `matrix/threads_static_default_is_a_call` and
+  `matrix/threads_static_default_is_a_load`, T057.
 - Two locks, their two orders and a second run of each: `lock_order_once`,
   T063.
 

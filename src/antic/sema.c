@@ -2796,6 +2796,18 @@ static void declare_body_constants(struct checker *c)
     }
 }
 
+/* Whether it has type parameters, or is a type nested in a body that
+   has them. */
+static bool in_generic_body(const struct item *it)
+{
+    for (; it != NULL; it = it->outer) {
+        if (it->type_param_count > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* The members of every body, the export mark of every type and the
    constants of the module. */
 static void declare_all_members(struct checker *c)
@@ -2837,6 +2849,26 @@ static void declare_all_members(struct checker *c)
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_CONST) {
             sema_const_symbol(c, it->symbol, it->name_pos);
+        }
+    }
+    /* DESIGN: a static field and a constant of a body hold values of
+       the program text, as a constant of the module does. They are
+       checked whether or not code reads them, by T057 of
+       docs/audit/tests-findings.md, so a default that is no constant
+       expression is refused in a field that nothing reads. A body of a
+       generic type checks them in each copy. */
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        size_t j;
+        if (it->symbol == NULL || it->symbol->type == NULL ||
+            in_generic_body(it)) {
+            continue;
+        }
+        for (j = 0; j < it->member_count; j++) {
+            struct item *m = it->members[j];
+            if (m->kind == ITEM_CONST && m->symbol != NULL) {
+                sema_const_symbol(c, m->symbol, m->name_pos);
+            }
         }
     }
 }
