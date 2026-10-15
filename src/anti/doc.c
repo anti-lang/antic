@@ -777,8 +777,11 @@ static bool write_interfaces(const char *const *sources, size_t count,
         if (is_library(sources[i])) {
             continue;
         }
+        /* A source that does not parse has had its message from the
+           outline, and the front end would give it again, by T123. */
         if (!unit_read(sources[i], base->roots, base->root_count, work,
-                       &units[i])) {
+                       &units[i]) ||
+            !units[i].parsed) {
             return false;
         }
         written++;

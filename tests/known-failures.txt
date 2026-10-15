@@ -31,7 +31,6 @@ error_modules_type_nested_in_a_generic_class_passed_on T095 A message on a copy 
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
 error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
 llvm_coff_plugin_f16 T121 A plugin that converts an `f16` below x86-64-v3 finds the two conversions of the runtime in no host that converts none itself.
-anti_doc_message_source_does_not_parse T123 `anti doc` prints the message of a source that does not parse twice.
 anti_doc_wrapped_link T124 A link of a doc comment whose text `anti fmt` wraps over two lines is written as text.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_dev T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_release T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
