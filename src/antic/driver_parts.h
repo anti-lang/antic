@@ -141,6 +141,7 @@ const char **driver_libraries_with_input(const struct options *o);
 bool driver_find_libraries(const struct options *o, const struct module *tree,
                            struct arena *arena, struct paths *out);
 bool driver_load_libraries(const struct paths *paths, const char *module,
+                           const struct module *tree, const char *input,
                            struct arena *arena, struct types *types,
                            struct ir_module *program,
                            const struct interface **out);

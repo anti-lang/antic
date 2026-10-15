@@ -1328,8 +1328,8 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
-    if (!driver_load_libraries(&paths, text_cstr(module), &arena, &types,
-                               &program, libraries)) {
+    if (!driver_load_libraries(&paths, text_cstr(module), tree, o->input,
+                               &arena, &types, &program, libraries)) {
         goto done;
     }
     /* DESIGN: the front end compiles the copies of the generics as a build
@@ -1523,8 +1523,8 @@ const struct interface *driver_interface(const struct options *o,
         }
         free(listed);
         libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
-        if (!driver_load_libraries(&paths, "", arena, types, program,
-                                   libraries)) {
+        if (!driver_load_libraries(&paths, "", NULL, NULL, arena, types,
+                                   program, libraries)) {
             goto done;
         }
         for (i = 0; i < paths.count; i++) {
@@ -1559,8 +1559,8 @@ const struct interface *driver_interface(const struct options *o,
         goto done;
     }
     libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
-    if (!driver_load_libraries(&paths, text_cstr(&module), arena, types,
-                               program, libraries)) {
+    if (!driver_load_libraries(&paths, text_cstr(&module), parsed, o->input,
+                               arena, types, program, libraries)) {
         goto done;
     }
     /* The types of the module name its path. A page reads the module of
@@ -1628,8 +1628,8 @@ bool driver_library_header(const struct options *o, struct text *out)
         goto done;
     }
     libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
-    if (!driver_load_libraries(&paths, "", &arena, &types, &program,
-                               libraries)) {
+    if (!driver_load_libraries(&paths, "", NULL, NULL, &arena, &types,
+                               &program, libraries)) {
         goto done;
     }
     /* The checker declares the functions of anti.lang.Object, which the
@@ -1712,8 +1712,8 @@ static int compile_library_file(const struct options *o,
         goto done;
     }
     libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
-    if (!driver_load_libraries(&paths, "", &arena, &types, &program,
-                               libraries)) {
+    if (!driver_load_libraries(&paths, "", NULL, NULL, &arena, &types,
+                               &program, libraries)) {
         goto done;
     }
     /* No module is lowered here, so lower_checked does not verify the

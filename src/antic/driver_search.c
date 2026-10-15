@@ -242,10 +242,37 @@ bool driver_linux_libraries(const char *const *paths, size_t count,
     return link_names(paths, count, arena, names, name_count, true);
 }
 
+/* DESIGN: the library file at path holds the module lib, which imports
+   module, the one this command compiles. The `import` of lib in the
+   source tree closes the cycle, and the message stands there as the
+   checker writes it, by T088. A library named on the command line that
+   the source does not import has its path named instead. */
+static void cycle(const struct module *tree, const char *input,
+                  const char *path, const char *lib, const char *module)
+{
+    size_t i;
+
+    for (i = 0; tree != NULL && i < tree->import_count; i++) {
+        const struct import *imp = &tree->imports[i];
+        if (strlen(lib) == imp->module.length &&
+            memcmp(lib, imp->module.text, imp->module.length) == 0) {
+            fprintf(stderr, "%s:%d:%d: error: `%s` depends on `%s`, so the "
+                            "import forms a cycle\n",
+                    input, imp->module_pos.line, imp->module_pos.column, lib,
+                    module);
+            return;
+        }
+    }
+    fprintf(stderr, "antic: %s depends on `%s`, so the import forms a "
+                    "cycle\n",
+            path, module);
+}
+
 /* Read the library files and load each after the libraries it imports,
    whatever the order on the command line. The interfaces go to out in
    load order. */
 bool driver_load_libraries(const struct paths *paths, const char *module,
+                           const struct module *tree, const char *input,
                            struct arena *arena, struct types *types,
                            struct ir_module *program,
                            const struct interface **out)
@@ -316,9 +343,8 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
                 for (j = 0; j < headers[i].import_count && !loaded[i]; j++) {
                     bool provided = false;
                     if (strcmp(headers[i].imports[j], module) == 0) {
-                        fprintf(stderr, "antic: %s depends on `%s`, so the "
-                                        "import forms a cycle\n",
-                                paths->items[i], module);
+                        cycle(tree, input, paths->items[i],
+                              headers[i].module, module);
                         ok = false;
                         break;
                     }
