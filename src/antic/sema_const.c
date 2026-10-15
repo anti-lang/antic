@@ -155,14 +155,16 @@ static bool symbolic_value(struct checker *c, struct const_value *out,
 }
 
 /* True when a float converts to integer type t with a value that t
-   holds after truncation toward zero. */
+   holds after truncation toward zero. The truncated value is compared
+   with the least value, since `lo - 1.0` rounds back to lo at 64 bits
+   and would refuse the least value itself. NaN fits nothing. */
 static bool float_fits(double x, const struct type *t)
 {
     int bits = types_bits(t);
     double lo = types_is_signed(t) ? -ldexp(1.0, bits - 1) : 0.0;
     double hi = types_is_signed(t) ? ldexp(1.0, bits - 1) : ldexp(1.0, bits);
 
-    return x > lo - 1.0 && x < hi;
+    return trunc(x) >= lo && x < hi;
 }
 
 /* Append the float x as an Anti float literal. It has the fewest
