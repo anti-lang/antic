@@ -326,7 +326,7 @@ worker struct Point { x: int }
 A `dispatch` is one call of `anti_rt_dispatch`, and a `join` one call of `anti_rt_join_hooked`. The module below is `start` of the example after opt.
 
 ```llvm excerpt=workers target=linux-x86_64 mode=release
-define dso_local noundef i64 @start(ptr noundef nonnull dereferenceable(32) %p0, i64 noundef %p1)
+define internal noundef i64 @start(ptr noundef nonnull dereferenceable(32) %p0, i64 noundef %p1)
 b0:
   %s3 = alloca [8 x i8], align 8
   %s9 = alloca [8 x i8], align 8
@@ -636,7 +636,7 @@ fn run(a: []int)
 A `parallel` is one call of `anti_rt_parallel`. The module below is `count` of the example after opt.
 
 ```llvm excerpt=chunks target=linux-x86_64 mode=release
-define dso_local noundef i64 @count(ptr noundef nonnull dereferenceable(8) %p0, i64 noundef %p1, i64 noundef %p2)
+define internal noundef i64 @count(ptr noundef nonnull dereferenceable(8) %p0, i64 noundef %p1, i64 noundef %p2)
 b0:
   %s4 = alloca [16 x i8], align 8
   %s7 = alloca [8 x i8], align 8
@@ -985,7 +985,7 @@ export fn feed(c: chan int) { }
 Every operation of a channel is one call of the runtime with the handle. The module below is `relay` of the example after opt.
 
 ```llvm excerpt=pipes target=linux-x86_64 mode=release
-define dso_local noundef i64 @relay(i64 noundef %p0)
+define internal noundef i64 @relay(i64 noundef %p0)
 b0:
   %s3 = alloca [8 x i8], align 8
   %s4 = alloca [8 x i8], align 8
@@ -1675,7 +1675,7 @@ A `Mutex` is one word of the program's own memory, and the system keeps nothing 
 The output of a program that prints `size_of(Mutex)` differs by system, so the example prints a comparison. The constant itself stands in `mutex_bytes` of each target.
 
 ```llvm excerpt=locks target=linux-x86_64 mode=release
-define dso_local noundef i64 @mutex_bytes()
+define internal noundef i64 @mutex_bytes()
 b0:
   ret i64 4
 ```

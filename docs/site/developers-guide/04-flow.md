@@ -205,7 +205,7 @@ b6:
 A dev build writes this IR into the LLVM module one instruction at a time and runs no optimizer. Every local and every temporary is a slot of the frame.
 
 ```llvm excerpt=branch target=linux-x86_64 mode=dev
-define dso_local noundef i64 @sign(i64 noundef %p0) #0 {
+define internal noundef i64 @sign(i64 noundef %p0) #0 {
 b0:
   %t0 = alloca i64, align 8
   %t1 = alloca i8, align 1
@@ -225,7 +225,7 @@ The three `alloca` lines are the slots of `x` and of the two conditions. `icmp s
 A release build runs `opt` over the module, which removes the slots and rewrites the branches.
 
 ```llvm excerpt=branch target=linux-x86_64 mode=release
-define dso_local noundef range(i64 -1, 2) i64 @sign(i64 noundef %p0) local_unnamed_addr #4 {
+define internal noundef range(i64 -1, 2) i64 @sign(i64 noundef %p0) #4 {
 b0:
   %common.ret.op = tail call i64 @llvm.scmp.i64.i64(i64 %p0, i64 0)
   ret i64 %common.ret.op

@@ -214,7 +214,7 @@ define hidden noundef i64 @decl.first(i64 %p0.0, i64 %p0.1) #0 {
 ...
 define hidden noundef i64 @decl.consume(ptr noalias noundef nonnull dereferenceable(16) %p0) #0 {
 ...
-define dso_local noundef i64 @twice(i64 noundef %p0) #0 {
+define internal noundef i64 @twice(i64 noundef %p0) #0 {
 ...
 define hidden noundef i64 @decl.main() noinline #0 {
 ```
@@ -225,7 +225,7 @@ define hidden noundef i64 @decl.main() noinline #0 {
 - `width` takes a `Box` by value. `byval([40 x i8])` is a copy of 40 bytes that the caller puts on the stack.
 - `first` takes its slice as two words, the pointer and the length.
 - `consume` takes an `own` pointer, which is `noalias`: no other pointer of the callee reaches the object.
-- `twice` is the `export fn`. It is `dso_local` under its plain name.
+- `twice` is the `export fn`, under its plain name. A program of Linux links musl statically, so the symbol is `internal` there, kept by `llvm.used`, and no function of the C library takes its place.
 - `main` is `noinline`, so that the runtime finds it as a function.
 
 `#0` is one set of attributes for every function. It holds `nounwind`, since no Anti function throws, and `"frame-pointer"="non-leaf"`.
@@ -233,7 +233,7 @@ define hidden noundef i64 @decl.main() noinline #0 {
 A release build compiles the whole program into one module, and every function that is not exported is `internal`.
 
 ```llvm excerpt=decl target=linux-x86_64 mode=release
-define dso_local noundef range(i64 0, 201) i64 @twice(i64 noundef %p0) local_unnamed_addr #4 {
+define internal noundef range(i64 0, 201) i64 @twice(i64 noundef %p0) #4 {
 ...
 define internal noundef i64 @decl.main() #5 {
 ```
@@ -586,7 +586,7 @@ antic classifies every parameter and every result itself and writes the outcome 
 ```llvm excerpt=conv target=linux-x86_64 mode=dev
 define hidden noundef i64 @conv.Counter.add(ptr noundef nonnull dereferenceable(16) %p0, i64 noundef %p1) #0 {
 ...
-define dso_local { i64, i64 } @flip(i64 %p0.0, i64 %p0.1) #0 {
+define internal { i64, i64 } @flip(i64 %p0.0, i64 %p0.1) #0 {
 ...
 define hidden noundef double @conv.dot(double %p0.0, double %p0.1, double %p1.0, double %p1.1) #0 {
 ...
@@ -619,7 +619,7 @@ retq
 `flip` is two register moves. `p.x` arrives in `rdi` and leaves in `rdx`, the second word of the result.
 
 ```llvm excerpt=conv target=linux-arm64 mode=dev
-define dso_local [2 x i64] @flip([2 x i64] %p0.0) #0 {
+define internal [2 x i64] @flip([2 x i64] %p0.0) #0 {
 ...
 define hidden noundef double @conv.dot([2 x double] %p0.0, [2 x double] %p1.0) #0 {
 ...
@@ -732,7 +732,7 @@ hyp2 25
 A dev build writes the two calls as they stand.
 
 ```llvm excerpt=inl target=linux-x86_64 mode=dev
-define dso_local noundef i64 @hyp2(i64 noundef %p0, i64 noundef %p1) #0 {
+define internal noundef i64 @hyp2(i64 noundef %p0, i64 noundef %p1) #0 {
 ...
   %v1 = call i64 (i64) @inl.square(i64 %v0)
 ...
@@ -761,7 +761,7 @@ retq
 `hyp2` builds a frame of 48 bytes, stores its two parameters there and calls `square` twice. The target of each `callq` is filled in by the linker. Each result goes through a slot of the frame before the `addq`.
 
 ```llvm excerpt=inl target=linux-x86_64 mode=release
-define dso_local noundef i64 @hyp2(i64 noundef %p0, i64 noundef %p1) local_unnamed_addr #4 {
+define internal noundef i64 @hyp2(i64 noundef %p0, i64 noundef %p1) #4 {
 b0:
   %v2.i = mul i64 %p0, %p0
   %v2.i1 = mul i64 %p1, %p1
@@ -1387,7 +1387,7 @@ A function value of one word is the address of the function, a `ptr` in the LLVM
 A call through a value of one word is an indirect call with the arguments of the signature. A call through a value of two words adds the context as the last argument.
 
 ```llvm excerpt=fnval target=linux-x86_64 mode=release
-define dso_local noundef i64 @call_it(ptr nofree noundef readonly captures(none) %p0, ptr noundef %p1, i64 noundef %p2, i64 noundef %p3) local_unnamed_addr #0 {
+define internal noundef i64 @call_it(ptr nofree noundef readonly captures(none) %p0, ptr noundef %p1, i64 noundef %p2, i64 noundef %p3) #0 {
 b0:
   %v4 = tail call i64 %p0(i64 %p2, i64 %p3, ptr %p1) #6
   ret i64 %v4

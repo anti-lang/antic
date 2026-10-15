@@ -286,7 +286,7 @@ antic -o hello hello.anti
 The debug information holds lines and function names. It holds no variable, no parameter and no type.
 
 ```llvm excerpt=levels target=linux-x86_64 mode=dev option=debug
-define dso_local noundef i64 @tick(ptr noundef nonnull dereferenceable(16) %p0) #0 !dbg
+define internal noundef i64 @tick(ptr noundef nonnull dereferenceable(16) %p0) #0 !dbg
 b0:
 ...
   %v3 = atomicrmw add ptr %v2, i64 1 seq_cst, align 8, !dbg

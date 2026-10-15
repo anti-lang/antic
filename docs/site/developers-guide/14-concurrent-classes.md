@@ -1011,7 +1011,7 @@ fn run(a: *Account)
 `sync obj` is the call a function of the class makes at its entry, on the same address. `sync a, b` is one call with both addresses.
 
 ```llvm excerpt=pairs target=linux-x86_64 mode=release
-define dso_local void @transfer(ptr noundef nonnull dereferenceable(40) %p0, ptr noundef nonnull dereferenceable(40) %p1, i64 noundef %p2)
+define internal void @transfer(ptr noundef nonnull dereferenceable(40) %p0, ptr noundef nonnull dereferenceable(40) %p1, i64 noundef %p2)
 b0:
   %v1 = getelementptr inbounds nuw i8, ptr %p0, i64 16
   %v3 = getelementptr inbounds nuw i8, ptr %p1, i64 16
@@ -1036,7 +1036,7 @@ The compare of the addresses is in the runtime, so the module holds no branch fo
 `raise` shows `sync a` with a call inside.
 
 ```llvm excerpt=pairs target=linux-x86_64 mode=release
-define dso_local noundef zeroext range(i8 0, 2) i8 @raise(ptr noundef nonnull dereferenceable(40) %p0, i64 noundef %p1)
+define internal noundef zeroext range(i8 0, 2) i8 @raise(ptr noundef nonnull dereferenceable(40) %p0, i64 noundef %p1)
 b0:
   %v1 = getelementptr inbounds nuw i8, ptr %p0, i64 16
   tail call void @anti_rt_object_lock(ptr nonnull %v1)

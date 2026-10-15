@@ -209,7 +209,7 @@ fn end(n: int)
 A pointer is the type `ptr` of LLVM in both forms. `alloc T { }` is a call of `malloc` with the size of `T`, a test of the result and the stores of the literal.
 
 ```llvm excerpt=ptrs target=linux-x86_64 mode=release
-define dso_local noundef nonnull ptr @make(i64 noundef %p0)
+define internal noundef nonnull ptr @make(i64 noundef %p0)
 b0:
   %v0 = tail call dereferenceable_or_null(16) ptr @malloc(i64 16)
   %v2 = icmp eq ptr %v0, null
@@ -554,7 +554,7 @@ A part of a slice is an address computation and a subtraction. In the release bu
 A view where it stands is a plain load of the other type.
 
 ```llvm excerpt=slices target=linux-x86_64 mode=release
-define dso_local noundef i32 @bits(
+define internal noundef i32 @bits(
 b0:
   %v1 = load i32, ptr %p0, align 4
   ret i32 %v1
@@ -565,7 +565,7 @@ The parameter is a `*f32`, and the load reads an `i32` from the same address. No
 The aliasing rules reach LLVM as type facts on each load and store, the `!tbaa` at the end of a line.
 
 ```llvm excerpt=slices target=linux-x86_64 mode=release
-define dso_local noundef i64 @keep_apart(
+define internal noundef i64 @keep_apart(
 b0:
   store i64 1, ptr %p0, align 8, !tbaa
   store double 2.000000e+00, ptr %p1, align 8, !tbaa
@@ -576,7 +576,7 @@ b0:
 - An `int` and an `f64` are kept apart, so the store through `b` cannot have changed `*a`. The function returns the constant 1 and never loads.
 
 ```llvm excerpt=slices target=linux-x86_64 mode=release
-define dso_local noundef i64 @may_meet(
+define internal noundef i64 @may_meet(
 b0:
   store i64 1, ptr %p0, align 8, !tbaa
   store i8 2, ptr %p1, align 1
@@ -780,7 +780,7 @@ The dev code compares the index in `%rdx` with the length in `%rsi` and jumps to
 A release build with `--checks` keeps the comparison in optimized code.
 
 ```llvm excerpt=bounds target=linux-x86_64 mode=release option=checks
-define dso_local noundef i64 @pick(
+define internal noundef i64 @pick(
 b0:
   %v2 = icmp ult i64 %p2, %p1
   br i1 %v2, label %b2, label %b1

@@ -2156,7 +2156,7 @@ antic writes the default hash inline, from the type. A scalar goes through the f
 The hash of a `Point` of two `int` fields in a release build:
 
 ```llvm excerpt=hashes target=linux-x86_64 mode=release
-define dso_local noundef i64 @point_hash(ptr
+define internal noundef i64 @point_hash(ptr
 b0:
   %v1 = load i64, ptr %p0, align 8
   %v4 = lshr i64 %v1, 33
@@ -2420,7 +2420,7 @@ fn same(m: *HashMap<int, int>, n: *Map<int, int>) -> bool
 The default `==` is code of the function that uses it. antic writes one compare per part and leaves at the first part that differs. `same` of the example in a release build:
 
 ```llvm excerpt=orders target=linux-x86_64 mode=release
-define dso_local noundef zeroext range(i8 0, 2) i8 @same(ptr
+define internal noundef zeroext range(i8 0, 2) i8 @same(ptr
 b0:
   %v1 = load i64, ptr %p0, align 8
   %v3 = load i64, ptr %p1, align 8
@@ -2443,7 +2443,7 @@ b0:
 The two structs of 16 bytes pass as four integers, by the calling convention of [chapter 5]({{% relref "05-functions" %}}). A release build inlines `lt` into `before`:
 
 ```llvm excerpt=orders target=linux-x86_64 mode=release
-define dso_local noundef zeroext range(i8 0, 2) i8 @before(ptr
+define internal noundef zeroext range(i8 0, 2) i8 @before(ptr
 ...
   %v8.not.i = icmp eq i64 %a0.sroa.0.0.copyload, %a1.sroa.0.0.copyload
   %v18.i = icmp slt i64 %a0.sroa.0.0.copyload, %a1.sroa.0.0.copyload

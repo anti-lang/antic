@@ -1490,11 +1490,11 @@ fn close()
 A static field is a global of the module, named after its class, in the writable data of the program. An operation on it is one atomic instruction of LLVM.
 
 ```llvm excerpt=statics target=linux-x86_64 mode=dev
-define dso_local noundef i64 @issued() #0 {
+define internal noundef i64 @issued() #0 {
 ...
   %v1 = load atomic i64, ptr %v0 seq_cst, align 8
 ...
-define dso_local noundef i64 @issue() #0 {
+define internal noundef i64 @issue() #0 {
 ...
   %v1 = atomicrmw add ptr %v0, i64 1 seq_cst, align 8
 ...

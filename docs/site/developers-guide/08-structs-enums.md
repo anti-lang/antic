@@ -194,7 +194,7 @@ The first line is the struct as lowering leaves it: the fields with their IR typ
 The back end lays the struct out by the C rules of the target. Each field goes to the next multiple of its alignment. The struct takes the largest alignment of its fields, and its size is rounded up to it. The LLVM module then holds numbers and no struct type.
 
 ```llvm excerpt=rects target=linux-x86_64 mode=dev
-define dso_local noundef i64 @total(ptr noundef nonnull dereferenceable(32) %p0) #0 {
+define internal noundef i64 @total(ptr noundef nonnull dereferenceable(32) %p0) #0 {
 ...
   %v1 = getelementptr inbounds i8, ptr %v0, i64 16
 ...
@@ -223,7 +223,7 @@ define hidden noundef i64 @rects.main() noinline #0 {
 A copy of a struct is one `memcpy` of its size, which the code generator turns into moves.
 
 ```llvm excerpt=rects target=linux-x86_64 mode=dev
-define dso_local void @put(ptr noundef nonnull dereferenceable(32) %p0, ptr noundef nonnull dereferenceable(32) %p1) #0 {
+define internal void @put(ptr noundef nonnull dereferenceable(32) %p0, ptr noundef nonnull dereferenceable(32) %p1) #0 {
 ...
   call void @llvm.memcpy.p0.p0.i64(ptr %v0, ptr %v1, i64 32, i1 false)
 ```
@@ -410,11 +410,11 @@ type wire.Frame = packed struct align(4) { tag: i8, count: i32 }
 For a packed type the layout gives every field the alignment 1. For `align(N)` it takes `N` as the alignment when `N` is larger than what the fields give, and rounds the size up to it.
 
 ```llvm excerpt=wire target=linux-x86_64 mode=dev
-define dso_local noundef i64 @loose_total(ptr noundef nonnull dereferenceable(24) %p0) #0 {
+define internal noundef i64 @loose_total(ptr noundef nonnull dereferenceable(24) %p0) #0 {
 ...
   %v1 = getelementptr inbounds i8, ptr %v0, i64 16
 ...
-define dso_local noundef i64 @tight_total(ptr noundef nonnull dereferenceable(14) %p0) #0 {
+define internal noundef i64 @tight_total(ptr noundef nonnull dereferenceable(14) %p0) #0 {
 ...
   %v1 = getelementptr inbounds i8, ptr %v0, i64 6
 ...
@@ -630,13 +630,13 @@ type bits.Header = struct { kind: i8 : 4 zeroext, mode: i8 : 4 zeroext, _: i32 :
 The layout gives each bitfield a position in bits. The unit of a bitfield is the integer of 1, 2, 4 or 8 bytes that holds all its bits, starting at the byte of its first bit. An access loads the unit, and shifts and masks.
 
 ```llvm excerpt=bits target=linux-x86_64 mode=dev
-define dso_local noundef i32 @mid(ptr noundef nonnull dereferenceable(8) %p0) #0 {
+define internal noundef i32 @mid(ptr noundef nonnull dereferenceable(8) %p0) #0 {
 ...
   %v1 = load i8, ptr %v0, align 1
   %v2 = ashr i8 %v1, 3
   %v3 = sext i8 %v2 to i32
 ...
-define dso_local void @set_mid(ptr noundef nonnull dereferenceable(8) %p0, i32 noundef %p1) #0 {
+define internal void @set_mid(ptr noundef nonnull dereferenceable(8) %p0, i32 noundef %p1) #0 {
 ...
   %v1 = add i32 %v0, 16
 ...
@@ -684,7 +684,7 @@ retq
 Linux and macOS follow the System V rule for bitfields. A field goes right after the one before it unless it would cross a boundary of its own type. Windows follows the MSVC rule. A field whose type has another size than the unit in use starts a new unit. `Wide` holds a `u8`, a `u16` and a `u8`, and the two rules disagree on it.
 
 ```llvm excerpt=bits target=linux-x86_64 mode=dev
-define dso_local noundef i64 @wide_size() #0 {
+define internal noundef i64 @wide_size() #0 {
 b0:
   ret i64 4
 ```
@@ -921,7 +921,7 @@ An operation on a whole simd struct is one instruction of the IR that works on v
 The LLVM text types a simd struct as a vector, `<N x T>`.
 
 ```llvm excerpt=lanes target=linux-x86_64 mode=dev
-define dso_local <4 x float> @add4(<4 x float> %p0, <4 x float> %p1) #0 {
+define internal <4 x float> @add4(<4 x float> %p0, <4 x float> %p1) #0 {
 b0:
 ...
   %a0 = alloca [16 x i8], align 16
@@ -931,7 +931,7 @@ b0:
   %v5 = fadd <4 x float> %v3, %v4
   store <4 x float> %v5, ptr %v0, align 16
 ...
-define dso_local void @add8(ptr noundef nonnull dereferenceable(32) %p0, ptr noundef nonnull dereferenceable(32) %p1, ptr noundef nonnull dereferenceable(32) %p2) #0 {
+define internal void @add8(ptr noundef nonnull dereferenceable(32) %p0, ptr noundef nonnull dereferenceable(32) %p1, ptr noundef nonnull dereferenceable(32) %p2) #0 {
 ...
   %v5 = fadd <8 x float> %v3, %v4
 ```
@@ -1167,7 +1167,7 @@ enum Kind { Circle, Circle }
 An enum is its underlying integer from lowering on. The IR has no enum type, and a value is a constant. What remains of the type is the range of its values, which antic hands to LLVM.
 
 ```llvm excerpt=kinds target=linux-x86_64 mode=dev
-define dso_local noundef zeroext range(i8 0, 4) i8 @mode_of(i64 noundef %p0) #0 {
+define internal noundef zeroext range(i8 0, 4) i8 @mode_of(i64 noundef %p0) #0 {
 ...
   %v1 = icmp eq i64 %v0, 1
 ...
@@ -1419,7 +1419,7 @@ b0:
 From here a variant is a struct, and the layout of the first section applies. The union aligns to 4 for its `f32` fields, so `u` stands at offset 4.
 
 ```llvm excerpt=shapes target=linux-x86_64 mode=dev
-define dso_local { i64, float } @unit() #0 {
+define internal { i64, float } @unit() #0 {
 b0:
 ...
   %s0 = alloca [12 x i8], align 4
@@ -1430,7 +1430,7 @@ b0:
 ...
   store float 0x3FF0000000000000, ptr %v3, align 4
 ...
-define dso_local noundef zeroext range(i8 0, 2) i8 @round(ptr noundef nonnull dereferenceable(12) %p0) #0 {
+define internal noundef zeroext range(i8 0, 2) i8 @round(ptr noundef nonnull dereferenceable(12) %p0) #0 {
 ...
   %v1 = load i8, ptr %v0, align 1, !range
 ...

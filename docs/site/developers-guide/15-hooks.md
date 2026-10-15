@@ -204,7 +204,7 @@ The table of every class holds its descriptor at entry 0 and the seven functions
 A site is one call of `anti_rt_hook` with the object and the number of the hook: 0 for `created`, 1 for `destroyed`, 3 for `dispatched`. `copied` has a call of its own, `anti_rt_hook_copied`, which also takes the object the copy was made from. The module below is `make` of the example after opt.
 
 ```llvm excerpt=hooks target=linux-x86_64 mode=release
-define dso_local noundef nonnull ptr @make(i64 noundef %p0)
+define internal noundef nonnull ptr @make(i64 noundef %p0)
 b0:
   %v0 = tail call dereferenceable_or_null(16) ptr @malloc(i64 16)
 ...

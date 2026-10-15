@@ -3127,10 +3127,29 @@ static bool link_once(const struct emitter *e, const struct ir_function *f)
    hidden for the other objects, and a copy of a generic weak, in a COMDAT
    on COFF, which has no hidden symbols. An export fn is dso_local with
    default visibility. */
+/* DESIGN: a program that links statically against musl links the C
+   library, mimalloc and the runtime into one image, and nothing outside
+   it calls a function by name. An export fn there named after a function
+   of the C library, as `write`, took the calls of musl and mimalloc to
+   that function, so the program behaved otherwise than on macOS and
+   Windows. Its symbol is local there, with the same name, and llvm.used
+   keeps it as an export fn is kept. In a dev build the module that links
+   holds the program alone, so its own export fns follow the rule. */
+static bool local_export(const struct emitter *e, const struct ir_function *f)
+{
+    return f->exported && !f->is_extern && e->o->local_exports &&
+           (!e->o->one_module ||
+            (f->module != NULL && strcmp(f->module, e->o->module) == 0));
+}
+
 static void linkage(struct emitter *e, const struct ir_function *f)
 {
     bool coff = target_info(e->o->target)->format == FORMAT_COFF;
 
+    if (local_export(e, f)) {
+        text_append(e->out, "internal ");
+        return;
+    }
     if (!f->exported && !e->o->one_module && !e->o->exports) {
         text_append(e->out, "internal ");
         return;
@@ -3882,7 +3901,7 @@ static void roots(struct emitter *e, const struct ir_module *m)
     }
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
-        if (f->by_name && !f->is_extern) {
+        if ((f->by_name && !f->is_extern) || local_export(e, f)) {
             text_append(&entries, count++ > 0 ? ", ptr " : "ptr ");
             function_name(&entries, e->o->target, f);
         }

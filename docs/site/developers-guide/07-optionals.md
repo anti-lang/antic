@@ -154,9 +154,9 @@ fn read(p: ?*int) -> int
 Both types are one machine pointer, and `none` is the address 0. The difference is in what antic tells LLVM about each.
 
 ```llvm excerpt=nodes target=linux-x86_64 mode=dev
-define dso_local noundef i64 @origin_or(ptr noundef %p0) #0 {
+define internal noundef i64 @origin_or(ptr noundef %p0) #0 {
 ...
-define dso_local noundef i64 @x_of(ptr noundef nonnull dereferenceable(16) %p0) #0 {
+define internal noundef i64 @x_of(ptr noundef nonnull dereferenceable(16) %p0) #0 {
 ```
 
 The parameter of `x_of` is a `*Point`. It is `nonnull` and `dereferenceable(16)`: the optimizer may assume 16 readable bytes behind it. The parameter of `origin_or` is a `?*Point` and carries neither.
@@ -164,7 +164,7 @@ The parameter of `x_of` is a `*Point`. It is `nonnull` and `dereferenceable(16)`
 A test of `none` is a compare of the pointer with null, and a narrowed name is the same pointer.
 
 ```llvm excerpt=nodes target=linux-x86_64 mode=release
-define dso_local noundef i64 @origin_or(ptr nofree noundef readonly captures(address_is_null) %p0) local_unnamed_addr #1 {
+define internal noundef i64 @origin_or(ptr nofree noundef readonly captures(address_is_null) %p0) #1 {
 b0:
   %v1 = icmp eq ptr %p0, null
   br i1 %v1, label %common.ret, label %b2
@@ -338,7 +338,7 @@ The value stands at offset 0, so the address of a `?T` is the address of its val
 The calling convention treats a `?T` as that struct. A `?int` of 16 bytes travels in two registers on System V and AAPCS64.
 
 ```llvm excerpt=opts target=linux-x86_64 mode=release
-define dso_local { i64, i64 } @positive(i64 noundef %p0) local_unnamed_addr #4 {
+define internal { i64, i64 } @positive(i64 noundef %p0) #4 {
 b0:
   %v1 = icmp sgt i64 %p0, 0
   %v14 = insertvalue { i64, i64 } poison, i64 %p0, 0

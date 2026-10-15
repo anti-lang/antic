@@ -26,6 +26,9 @@ struct llvm_emit_options {
     bool one_module;
     /* The program loads plugins, which resolve its symbols against it. */
     bool exports;
+    /* The object links into a program that links statically against
+       musl, where an export fn of its module is a local symbol. */
+    bool local_exports;
     /* The function of the runtime that a shared library runs when it
        loads, or NULL. llvm.global_ctors names it beside the function of
        each module that compiles its patterns. */
