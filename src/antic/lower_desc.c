@@ -534,14 +534,20 @@ static void give_fields(struct lowerer *l, struct ir_global *g,
    names the case and holds the offset of the union. The tag of the case
    stands in the word of `own`, and the record carries the descriptor of
    the fields of the case. A case without fields has type id none. A walk reads the tag and
-   then the fields of the case it names. */
+   then the fields of the case it names. A variant whose cases have no
+   fields is its tag alone and has no union, so its case records hold
+   the offset 0, by T023 of docs/audit/tests-findings.md. */
 static const struct ir_global *variant_descriptor(struct lowerer *l,
                                                   const struct type *t)
 {
     static const struct name tag = {VARIANT_TAG, sizeof VARIANT_TAG - 1};
     static const struct name part = {VARIANT_UNION, sizeof VARIANT_UNION - 1};
     uint32_t agg = lower_agg_of(l, t);
-    uint32_t u = (uint32_t)(types_find_field(t, &part) - t->fields);
+    const struct struct_field *union_field = types_find_field(t, &part);
+    uint32_t cases = union_field != NULL ? agg : IR_NO_AGG;
+    uint32_t u = union_field != NULL
+                     ? (uint32_t)(union_field - t->fields)
+                     : 0;
     size_t count = t->param_count + 1;
     struct token_text text;
     struct ir_global *g;
@@ -568,7 +574,7 @@ static const struct ir_global *variant_descriptor(struct lowerer *l,
     for (k = 0; k < t->param_count; k++) {
         const struct type *payload = t->params[k];
         list->items[k + 1] = *field_record(
-            l, &t->base->fields[k].name, agg, u,
+            l, &t->base->fields[k].name, cases, u,
             payload != NULL ? TYPE_ID_STRUCT : TYPE_ID_NONE,
             (uint64_t)t->base->fields[k].number, payload);
     }

@@ -48,9 +48,6 @@ matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and 
 matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 check_slice_range T017 A dev build does not check the bounds of a slice of an array.
-matrix_types_variant_without_fields_as_a_field_dev T023 antic crashes on a field whose type is a variant without fields.
-matrix_types_variant_without_fields_as_a_field_release T023 antic crashes on a field whose type is a variant without fields.
-matrix_types_variant_without_fields_as_a_field_memory_checks T023 antic crashes on a field whose type is a variant without fields.
 matrix_types_switch_on_a_pointer_to_a_variant_refused T024 A switch on a pointer to a variant gives three messages for one mistake.
 matrix_types_if_let_on_a_pointer_to_a_variant_refused T024 An if let on a pointer to a variant gives four messages for one mistake.
 fmt_alias_of_function T025 anti fmt moves the functions after a type alias of a function type.
