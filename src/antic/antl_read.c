@@ -1052,8 +1052,24 @@ static void read_struct_defaults(struct reader *r, const struct field_refs *s)
 
     for (j = 0; j < t->field_count && !r->failed; j++) {
         struct const_value *v;
-        if (antl_get_u8(r) == 0) {
+        uint8_t mark = antl_get_u8(r);
+        if (mark == 0) {
             continue;
+        }
+        if (mark == 2) {
+            r->fn_defaults =
+                alloc_grow(r->fn_defaults, &r->fn_capacity, r->fn_count,
+                           sizeof *r->fn_defaults);
+            r->fn_defaults[r->fn_count].field = &t->fields[j];
+            r->fn_defaults[r->fn_count].name = antl_get_name(r);
+            r->fn_defaults[r->fn_count].type =
+                antl_type_ref(r, r->table_count);
+            r->fn_count++;
+            continue;
+        }
+        if (mark != 1) {
+            antl_damaged(r);
+            break;
         }
         v = antl_allocate(r, 1, sizeof *v);
         if (!antl_read_value(r, t->fields[j].type, v, 0)) {
@@ -1224,6 +1240,49 @@ bool antl_read_value(struct reader *r, struct type *of, struct const_value *v,
     default:
         return false;
     }
+}
+
+void antl_read_fn_defaults(struct reader *r)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < r->fn_count && !r->failed; i++) {
+        struct symbol *found = NULL;
+        struct expr *e;
+        for (j = 0; j < r->iface->item_count && found == NULL; j++) {
+            struct symbol *sym = r->iface->items[j];
+            if (sym->kind == SYMBOL_FN &&
+                name_equals_name(&sym->name, &r->fn_defaults[i].name)) {
+                found = sym;
+            }
+        }
+        /* A function the file does not make public is a symbol of the
+           module alone, which its object defines. */
+        if (found == NULL) {
+            found = arena_alloc(r->arena, sizeof *found);
+            memset(found, 0, sizeof *found);
+            found->kind = SYMBOL_FN;
+            found->name = r->fn_defaults[i].name;
+            found->type = r->fn_defaults[i].type;
+            found->home = r->iface;
+            found->state = EVAL_DONE;
+        }
+        if (found->type == NULL || found->type->kind != TYPE_FN) {
+            antl_damaged(r);
+            break;
+        }
+        e = arena_alloc(r->arena, sizeof *e);
+        memset(e, 0, sizeof *e);
+        e->kind = EXPR_NAME;
+        e->as.name = found->name;
+        e->symbol = found;
+        e->type = found->type;
+        r->fn_defaults[i].field->value = e;
+    }
+    free(r->fn_defaults);
+    r->fn_defaults = NULL;
+    r->fn_count = 0;
 }
 
 void antl_read_items(struct reader *r)

@@ -90,6 +90,21 @@ static size_t public_members(const struct type *t)
     return count;
 }
 
+/* The function of the module that the default of f names, or NULL. */
+static const struct symbol *default_fn(const struct struct_field *f)
+{
+    const struct expr *v = f->value;
+
+    if (f->constant != NULL || v == NULL || v->kind != EXPR_NAME ||
+        v->symbol == NULL || v->symbol->kind != SYMBOL_FN ||
+        v->symbol->item == NULL || v->symbol->item->owner != NULL ||
+        v->symbol->item->type_param_count > 0 || v->symbol->home != NULL ||
+        v->symbol->type == NULL) {
+        return NULL;
+    }
+    return v->symbol;
+}
+
 /* DESIGN: a class carries every constant and every static field of its
    body that another module may name, `pub` or `protected`, by T076,
    with its type and its value. The global of a static field is data of
@@ -292,6 +307,9 @@ void antl_visit_type(struct writer *w, const struct type *t)
                 antl_visit_type(w, t->fields[i].type);
                 if (t->fields[i].constant != NULL) {
                     antl_visit_value(w, t->fields[i].constant);
+                }
+                if (default_fn(&t->fields[i]) != NULL) {
+                    antl_visit_type(w, default_fn(&t->fields[i])->type);
                 }
             }
             for (i = 0; t->generic == NULL && i < t->member_count; i++) {
@@ -760,6 +778,16 @@ static void put_defaults(struct writer *w, const struct type *t)
         return;
     }
     for (i = 0; i < t->field_count; i++) {
+        const struct symbol *fn = default_fn(&t->fields[i]);
+        /* DESIGN: a default that names a function of the module has no
+           constant. It travels as the name and the type of the function,
+           which the object of the module defines, by T115. */
+        if (fn != NULL) {
+            antl_put_u8(w, 2);
+            antl_put_bytes(w, fn->name.text, fn->name.length);
+            antl_put_type_ref(w, fn->type);
+            continue;
+        }
         antl_put_u8(w, t->fields[i].constant != NULL);
         if (t->fields[i].constant != NULL) {
             antl_put_value(w, t->fields[i].constant);

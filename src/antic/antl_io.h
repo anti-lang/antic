@@ -37,6 +37,13 @@ struct writer {
     void *trees;
 };
 
+/* A field whose default names the function name of the file. */
+struct antl_fn_default {
+    struct struct_field *field;
+    struct name name;
+    struct type *type;
+};
+
 struct reader {
     const uint8_t *data;
     size_t size;
@@ -54,7 +61,16 @@ struct reader {
     /* Per item of the interface: bit 5 of its marks, a generic function
        whose declaration the section of the generics holds. */
     bool *marked_generic;
+    /* The fields whose default names a function of the file, which
+       antl_read_fn_defaults resolves once the items are in. */
+    struct antl_fn_default *fn_defaults;
+    size_t fn_count;
+    size_t fn_capacity;
 };
+
+/* Give each field of r->fn_fields the default that names its function
+   among the items of the file. */
+void antl_read_fn_defaults(struct reader *r);
 
 /* DESIGN: one limit bounds how deep the tables of a library file nest,
    TYPES_NEST_MAX of types.h, the limit of the checker as well. It covers

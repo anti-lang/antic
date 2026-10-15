@@ -167,6 +167,7 @@ struct interface *antl_read(const uint8_t *data, size_t size,
     if (!r.failed) {
         antl_read_items(&r);
     }
+    antl_read_fn_defaults(&r);
     if (!r.failed) {
         antl_read_generics(&r);
     }

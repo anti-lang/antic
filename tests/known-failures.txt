@@ -17,8 +17,6 @@
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
 # The test known_failures checks the list against the table of the findings.
-function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
-function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_dev T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_release T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_memory_checks T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.

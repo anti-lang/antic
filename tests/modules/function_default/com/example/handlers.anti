@@ -1,13 +1,19 @@
-//! A class whose field of function type has a function of the module as its
-//! default.
+//! A class whose fields of function type have functions of the module as their
+//! defaults, a public one and a private one.
 
 pub fn twice(x: int) -> int
 {
 	return x * 2;
 }
 
+fn thrice(x: int) -> int
+{
+	return x * 3;
+}
+
 pub class Handler
 {
 	pub call: fn(int) -> int = twice,
 	pub after: int = 4,
+	pub then: fn(int) -> int = thrice,
 }
