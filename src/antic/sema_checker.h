@@ -470,6 +470,7 @@ struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos,
 struct symbol *sema_error_maker(struct checker *c, struct pos pos);
 void sema_resolve_origin(struct checker *c, struct stmt *s);
 struct type *sema_caught_error(struct checker *c, struct type *result);
+void sema_refuse_try_on_optional(struct checker *c, struct pos at);
 void sema_check_handler(struct checker *c, struct handler *h,
                         struct type *yields, bool of_try, bool value);
 void sema_declare_caught(struct checker *c, struct handler *h,

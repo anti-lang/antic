@@ -102,11 +102,8 @@ check_slice_range_reversed T017 A dev build does not check a slice whose low bou
 check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.
 generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
 generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
-matrix_errors_try_on_an_optional_call_refused T045 `try` on a call that gives a `?T` and cannot fail is not refused.
-matrix_errors_try_on_an_optional_pointer_call_refused T045 `try` on a call that gives a `?*T` and cannot fail is not refused.
 matrix_errors_try_on_an_optional_name_refused T046 The refusal of `try` on a `?T` name names neither `let ... else` nor `??`.
 matrix_errors_try_on_an_optional_field_refused T046 The refusal of `try` on a `?T` field names neither `let ... else` nor `??`.
-matrix_errors_try_on_an_optional_operand_refused T046 The refusal of `try` on a `?T` operand names neither `let ... else` nor `??`.
 matrix_errors_caught_error_assigned_to_a_local_refused T047 A caught error assigned to a local is not refused.
 matrix_errors_caught_error_assigned_to_a_field_refused T047 A caught error assigned to a field is not refused.
 matrix_errors_caught_error_yielded_refused T047 `yield` of a caught error is not refused.

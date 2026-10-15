@@ -2118,6 +2118,15 @@ static void refuse_count(struct checker *c, const struct expr *e,
     }
 }
 
+/* DESIGN: decision 21 of "Decisions of 2026-10-11". `try` forwards the
+   error of a call that fails, and `none` is no error, so `try` on an
+   optional is refused with the two forms that test one. */
+void sema_refuse_try_on_optional(struct checker *c, struct pos at)
+{
+    sema_error_at(c, at, "`try` forwards an error, and a value that may be "
+                  "`none` has none: use `let ... else` or `??`");
+}
+
 /* The type of a call of fn that cannot fail, whose handler, if it has
    one, guards a `?*T` result. */
 static struct type *unfailing_result(struct checker *c, struct expr *e,
@@ -2131,6 +2140,11 @@ static struct type *unfailing_result(struct checker *c, struct expr *e,
         sema_error_at(c, e->as.call.handler.pos,
                       "`catch none` counts a failure as `none`, and this "
                       "call cannot fail");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (e->as.call.handler.kind == HANDLE_TRY &&
+        (types_is_nullable(fn->result) || provided != NULL)) {
+        sema_refuse_try_on_optional(c, e->as.call.handler.pos);
         return sema_builtin(c, TYPE_ERROR);
     }
     if (e->as.call.handler.kind != HANDLE_NONE &&
