@@ -366,6 +366,43 @@ static bool copy_into(const char *from, const char *to, const char *name)
     return ok;
 }
 
+/* Whether the library of the build is lib<name>.so.<major> with the
+   link lib<name>.so to it, as antic writes it for --soname on Linux. */
+static bool soname_link(const struct build *b, enum target t)
+{
+    return b->r->soname && b->r->lib == BUILD_LIB_SHARED &&
+           target_info(t)->os == OS_LINUX && b->m.version.length > 0;
+}
+
+/* DESIGN: dist/ of a Linux library of --soname holds the file its soname
+   names and the link beside it, as the build directory does, so a C
+   program linked against dist/ finds what the loader asks for, by T099.
+   The major version is the one antic takes from --package-version. */
+static bool deliver_soname(const struct build *b, const char *deliverable)
+{
+    const char *version = text_cstr(&b->m.version);
+    struct text versioned = {0};
+    struct text from = {0};
+    struct text link = {0};
+    bool ok;
+
+    text_appendf(&versioned, "%s.%.*s", deliverable,
+                 (int)strcspn(version, "."), version);
+    text_appendf(&from, "%s/%s", text_cstr(&b->build_dir),
+                 text_cstr(&versioned));
+    text_appendf(&link, "%s/%s", text_cstr(&b->dist_dir), deliverable);
+    ok = copy_into(text_cstr(&from), text_cstr(&b->dist_dir),
+                   text_cstr(&versioned));
+    if (ok && !platform_symlink(text_cstr(&versioned), text_cstr(&link))) {
+        fprintf(stderr, "anti: cannot write %s\n", text_cstr(&link));
+        ok = false;
+    }
+    text_free(&versioned);
+    text_free(&from);
+    text_free(&link);
+    return ok;
+}
+
 /* The file beside a binary in dist/ that holds the text of its notice. */
 #define NOTICE_FILE "NOTICE.txt"
 
@@ -911,7 +948,9 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     } else {
         ok = build_dev(b, t, cpu, files, main_at, &libraries);
     }
-    if (ok) {
+    if (ok && soname_link(b, t)) {
+        ok = deliver_soname(b, text_cstr(&deliverable));
+    } else if (ok) {
         ok = copy_into(text_cstr(&b->name), text_cstr(&b->dist_dir),
                        text_cstr(&deliverable));
     }
