@@ -23,7 +23,6 @@ generic_atomic_modules_release T029 antic cannot read back a library file whose 
 generic_atomic_modules_dev T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 qualified_arguments_modules_release T030 A class built with arguments under the name of its module is refused as a type.
 qualified_arguments_modules_dev T030 A class built with arguments under the name of its module is refused as a type.
-check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.
 generic_dispatch_modules_dev T061 The library file of a generic function that holds a `dispatch` cannot be read.
 generic_dispatch_modules_release T061 The library file of a generic function that holds a `dispatch` cannot be read.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.

@@ -87,6 +87,9 @@ struct lowered {
 };
 
 void lowered_run(struct lowered *l, const char *source);
+/* lowered_run with the options of lower_module, LOWER_DEV among them. */
+void lowered_run_with(struct lowered *l, const char *source,
+                      unsigned options);
 void lowered_release(struct lowered *l);
 
 /* Append the IR of m to out as ir_print does, without the lines of the

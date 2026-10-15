@@ -51,7 +51,8 @@ enum anti_check {
     ANTI_CHECK_VALUE_U,     /* One unsigned value. */
     ANTI_CHECK_LEFT,        /* The signed left operand of / or %. */
     ANTI_CHECK_LEFT_U,      /* The unsigned left operand of / or %. */
-    ANTI_CHECK_SHIFT        /* A shift count and the width of its type. */
+    ANTI_CHECK_SHIFT,       /* A shift count and the width of its type. */
+    ANTI_CHECK_TEXT         /* No value: the text says it all. */
 };
 
 /* Print the text of a failed check, the values the kind names, and

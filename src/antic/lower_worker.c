@@ -282,11 +282,75 @@ struct ir_operand lower_dispatch(struct lowerer *l,
 
 /* `join` waits for one job and writes its result into a slot, and
    `join_all` walks the slice of jobs. */
+/* DESIGN: by decision 23 of "Decisions of 2026-10-11" a second `join`
+   of one job traps in a dev build where the checker does not see it. The
+   runtime frees a job when it is joined, so a dev build writes the
+   handle JOB_JOINED into the place that held it, and tests for it before
+   every `join`. No allocation gives the address 1, and `none` is the job
+   of a dispatch that found its object in flight, which a `join` takes.
+   A release build writes and tests nothing, and a second `join` there
+   reads a freed job. */
+#define JOB_JOINED 1
+
+static void check_not_joined(struct lowerer *l, struct ir_operand handle,
+                             int line)
+{
+    struct ir_operand ok = lower_temp(
+        l, ir_binary(l->f, l->b, IR_NE, IR_I8, handle,
+                     ir_int_op(IR_PTR, JOB_JOINED)));
+
+    lower_check_branch(l, ok, false,
+                       lower_check_text(l, line,
+                                        "`join` of a job joined already"),
+                       CHECK_TEXT, ir_int_op(IR_I64, 0), lower_none(), NULL);
+}
+
+/* `join_all(jobs)` of a dev build: each job in turn, as `join` takes
+   one, so each is tested and marked. */
+static void join_all_checked(struct lowerer *l, const struct expr *e,
+                             struct ir_operand handles,
+                             struct ir_operand count, struct ir_operand size)
+{
+    struct ir_block *test = lower_new_block(l);
+    struct ir_block *body = lower_new_block(l);
+    struct ir_block *done = lower_new_block(l);
+    uint32_t index = ir_unary(l->f, l->b, IR_COPY, IR_I64,
+                              ir_int_op(IR_I64, 0));
+    struct ir_operand at;
+    struct ir_operand args[3];
+
+    ir_jump(l->f, l->b, test);
+    l->b = test;
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_SLT, IR_I8,
+                                      lower_temp(l, index), count)),
+              body, done);
+    l->b = body;
+    at = lower_temp(
+        l, ir_ptradd(l->f, l->b, handles,
+                     lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
+                                             lower_temp(l, index),
+                                             size))));
+    args[0] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+    check_not_joined(l, args[0], e->pos.line);
+    args[1] = ir_int_op(IR_I64, 0);
+    args[2] = ir_int_op(IR_PTR, 0);
+    lower_rt_call(l, l->hooks ? RT_FN_JOIN_HOOKED : RT_FN_JOIN, args);
+    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, JOB_JOINED), at);
+    ir_assign(l->f, l->b, index,
+              lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64,
+                                      lower_temp(l, index),
+                                      ir_int_op(IR_I64, 1))));
+    ir_jump(l->f, l->b, test);
+    l->b = done;
+}
+
 struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
 {
     const struct type *job = e->as.join.job->type;
     struct ir_operand value = lower_address(l, e->as.join.job);
     struct ir_operand args[3];
+    struct ir_operand result = lower_none();
     uint32_t out;
 
     if (e->as.join.all) {
@@ -296,28 +360,39 @@ struct ir_operand lower_join(struct lowerer *l, const struct expr *e)
                        lower_offset_address(
                            l, value,
                            lower_field_offset(l, job, &lower_len_name))));
+        if (l->dev) {
+            join_all_checked(l, e, args[0], args[1],
+                             lower_size_operand(l, job->element));
+            return lower_none();
+        }
         lower_rt_call(l,
                       l->hooks ? RT_FN_JOIN_ALL_HOOKED : RT_FN_JOIN_ALL,
                       args);
         return lower_none();
     }
     args[0] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, value));
+    if (l->dev) {
+        check_not_joined(l, args[0], e->pos.line);
+    }
     if (e->type->kind == TYPE_VOID) {
         args[1] = ir_int_op(IR_I64, 0);
         args[2] = ir_int_op(IR_PTR, 0);
         lower_rt_call(l, l->hooks ? RT_FN_JOIN_HOOKED : RT_FN_JOIN, args);
-        return lower_none();
+    } else {
+        out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
+        args[1] = lower_size_operand(l, e->type);
+        args[2] = lower_temp(l, out);
+        lower_rt_call(l, l->hooks ? RT_FN_JOIN_HOOKED : RT_FN_JOIN, args);
+        result = lower_is_aggregate(e->type)
+                     ? lower_temp(l, out)
+                     : lower_temp(l, ir_load(l->f, l->b,
+                                             lower_ir_type_of(e->type),
+                                             lower_temp(l, out)));
     }
-    out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
-    args[1] = lower_size_operand(l, e->type);
-    args[2] = lower_temp(l, out);
-    lower_rt_call(l, l->hooks ? RT_FN_JOIN_HOOKED : RT_FN_JOIN, args);
-    if (lower_is_aggregate(e->type)) {
-        return lower_temp(l, out);
+    if (l->dev) {
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, JOB_JOINED), value);
     }
-    return lower_temp(l,
-                      ir_load(l->f, l->b, lower_ir_type_of(e->type),
-                              lower_temp(l, out)));
+    return result;
 }
 
 /* DESIGN: the count after `by`, which a dev build checks against zero, by

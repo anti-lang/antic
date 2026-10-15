@@ -371,7 +371,8 @@ static void fills_access_types(void)
 /* Lower source and check that every call of the failure routine names
    kind or also, and that one names each. also is kind for a source with
    one check. */
-static void checks_kinds_of(const char *source, int kind, int also)
+static void checks_kinds_with(const char *source, unsigned options, int kind,
+                              int also)
 {
     struct lowered l;
     bool found = false;
@@ -380,7 +381,7 @@ static void checks_kinds_of(const char *source, int kind, int also)
     size_t b;
     size_t k;
 
-    lowered_run(&l, source);
+    lowered_run_with(&l, source, options);
     CHECK(l.ok);
     for (i = 0; i < l.ir.function_count; i++) {
         const struct ir_function *f = l.ir.functions[i];
@@ -405,6 +406,11 @@ static void checks_kinds_of(const char *source, int kind, int also)
     CHECK(found);
     CHECK(found_also);
     lowered_release(&l);
+}
+
+static void checks_kinds_of(const char *source, int kind, int also)
+{
+    checks_kinds_with(source, 0, kind, also);
 }
 
 static void checks_kind_of(const char *source, int kind)
@@ -436,6 +442,12 @@ static void records_check_kinds(void)
                    ANTI_CHECK_LEFT_U);
     checks_kind_of("fn f(a: int, b: int) -> int { return a << b; }",
                    ANTI_CHECK_SHIFT);
+    /* A dev build tests a job for the mark of one joined already. */
+    checks_kinds_with("class T { pub n: int = 0, }\n"
+                      "worker fn w(t: *T) -> int { return t.n; }\n"
+                      "fn f(t: *T) -> int { let j = dispatch t -> w(); "
+                      "return join(j); }",
+                      LOWER_DEV, ANTI_CHECK_TEXT, ANTI_CHECK_TEXT);
 }
 
 static void records_classes(void)
@@ -1872,7 +1884,8 @@ void test_lower(void)
            "}\n");
 
     /* An element of a str or a slice lies after the loaded pointer. A
-       slice of a str starts at ptr + lo and holds hi - lo bytes. */
+       slice of a str starts at ptr + lo and holds hi - lo bytes, once hi
+       is checked against the length and lo against hi. */
     lowers("fn g(s: str, a: []i32, i: int) -> i32 {\n"
            "    let t = s[1..3];\n"
            "    return a[i] + s[i] as i32 + t.len as i32;\n"
@@ -1881,9 +1894,11 @@ void test_lower(void)
            "type []i32 = struct { ptr: ptr, len: i64 }\n"
            "type []byte = struct { ptr: ptr, len: i64 }\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 28 align 1 bytes 6d 61 69 6e 3a 33 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "global main.2 size 35 align 1 bytes 6d 61 69 6e 3a 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
+           "global main.0 size 32 align 1 bytes 6d 61 69 6e 3a 32 3a 20 73 6c 69 63 65 20 65 6e 64 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
+           "global main.1 size 34 align 1 bytes 6d 61 69 6e 3a 32 3a 20 73 6c 69 63 65 20 73 74 61 72 74 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
+           "global main.2 size 28 align 1 bytes 6d 61 69 6e 3a 33 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
+           "global main.3 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
+           "global main.4 size 35 align 1 bytes 6d 61 69 6e 3a 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
            "fn main.g(%0: agg str, %1: agg []i32, %2: i64) -> i32 {\n"
            "b0:\n"
            "    %3 = slot []byte\n"
@@ -1891,74 +1906,88 @@ void test_lower(void)
            "    %4 = ptradd %0, offset_of str.len\n"
            "    %5 = load i64 %4\n"
            "    %6 = load ptr %0\n"
-           "    %7 = mul i64 1, size_of i8\n"
-           "    %8 = ptradd %6, %7\n"
-           "    store ptr %8, %3\n"
-           "    %9 = sub i64 3, 1\n"
-           "    %10 = ptradd %3, offset_of []byte.len\n"
-           "    store i64 %9, %10\n"
-           "    %11 = ptradd %1, offset_of []i32.len\n"
-           "    %12 = load i64 %11\n"
-           "    %13 = load ptr %1\n"
-           "    %14 = ult i8 %2, %12\n"
-           "    branch %14, b2, b1\n"
+           "    %7 = ule i8 3, %5\n"
+           "    branch %7, b2, b1\n"
            "b1:\n"
-           "    %15 = addr @main.0\n"
-           "    call void @anti_rt_check_failed(%15, 27, 0, %2, %12)\n"
+           "    %8 = addr @main.0\n"
+           "    call void @anti_rt_check_failed(%8, 31, 0, 3, %5)\n"
            "    unreachable\n"
            "b2:\n"
-           "    %16 = mul i64 %2, size_of i32\n"
-           "    %17 = ptradd %13, %16\n"
-           "    %18 = load i32 %17 !type i32\n"
-           "    %19 = ptradd %0, offset_of str.len\n"
-           "    %20 = load i64 %19\n"
-           "    %21 = load ptr %0\n"
-           "    %22 = ult i8 %2, %20\n"
-           "    branch %22, b4, b3\n"
+           "    %9 = ule i8 1, 3\n"
+           "    branch %9, b4, b3\n"
            "b3:\n"
-           "    %23 = addr @main.0\n"
-           "    call void @anti_rt_check_failed(%23, 27, 0, %2, %20)\n"
+           "    %10 = addr @main.1\n"
+           "    call void @anti_rt_check_failed(%10, 33, 0, 1, 3)\n"
            "    unreachable\n"
            "b4:\n"
-           "    %24 = mul i64 %2, size_of i8\n"
-           "    %25 = ptradd %21, %24\n"
-           "    %26 = load i8 %25\n"
-           "    %27 = zext i32 %26\n"
-           "    %28 = addov nsw i32 %18, %27\n"
-           "    branchov %28, b5, b6\n"
+           "    %11 = mul i64 1, size_of i8\n"
+           "    %12 = ptradd %6, %11\n"
+           "    store ptr %12, %3\n"
+           "    %13 = sub i64 3, 1\n"
+           "    %14 = ptradd %3, offset_of []byte.len\n"
+           "    store i64 %13, %14\n"
+           "    %15 = ptradd %1, offset_of []i32.len\n"
+           "    %16 = load i64 %15\n"
+           "    %17 = load ptr %1\n"
+           "    %18 = ult i8 %2, %16\n"
+           "    branch %18, b6, b5\n"
            "b5:\n"
-           "    %29 = sext i64 %18\n"
-           "    %30 = sext i64 %27\n"
-           "    %31 = addr @main.1\n"
-           "    call void @anti_rt_check_failed(%31, 21, 1, %29, %30)\n"
+           "    %19 = addr @main.2\n"
+           "    call void @anti_rt_check_failed(%19, 27, 0, %2, %16)\n"
            "    unreachable\n"
            "b6:\n"
-           "    %32 = ptradd inbounds %3, offset_of []byte.len\n"
-           "    %33 = load i64 %32 !type i64\n"
-           "    %34 = trunc i32 %33\n"
-           "    %35 = sext i64 %34\n"
-           "    %36 = eq i8 %35, %33\n"
-           "    branch %36, b8, b7\n"
+           "    %20 = mul i64 %2, size_of i32\n"
+           "    %21 = ptradd %17, %20\n"
+           "    %22 = load i32 %21 !type i32\n"
+           "    %23 = ptradd %0, offset_of str.len\n"
+           "    %24 = load i64 %23\n"
+           "    %25 = load ptr %0\n"
+           "    %26 = ult i8 %2, %24\n"
+           "    branch %26, b8, b7\n"
            "b7:\n"
-           "    %37 = addr @main.2\n"
-           "    call void @anti_rt_check_failed(%37, 34, 2, %33, 0)\n"
+           "    %27 = addr @main.2\n"
+           "    call void @anti_rt_check_failed(%27, 27, 0, %2, %24)\n"
            "    unreachable\n"
            "b8:\n"
-           "    %38 = trunc i32 %33\n"
-           "    %39 = addov nsw i32 %28, %38\n"
-           "    branchov %39, b9, b10\n"
+           "    %28 = mul i64 %2, size_of i8\n"
+           "    %29 = ptradd %25, %28\n"
+           "    %30 = load i8 %29\n"
+           "    %31 = zext i32 %30\n"
+           "    %32 = addov nsw i32 %22, %31\n"
+           "    branchov %32, b9, b10\n"
            "b9:\n"
-           "    %40 = sext i64 %28\n"
-           "    %41 = sext i64 %38\n"
-           "    %42 = addr @main.1\n"
-           "    call void @anti_rt_check_failed(%42, 21, 1, %40, %41)\n"
+           "    %33 = sext i64 %22\n"
+           "    %34 = sext i64 %31\n"
+           "    %35 = addr @main.3\n"
+           "    call void @anti_rt_check_failed(%35, 21, 1, %33, %34)\n"
            "    unreachable\n"
            "b10:\n"
-           "    ret i32 %39\n"
+           "    %36 = ptradd inbounds %3, offset_of []byte.len\n"
+           "    %37 = load i64 %36 !type i64\n"
+           "    %38 = trunc i32 %37\n"
+           "    %39 = sext i64 %38\n"
+           "    %40 = eq i8 %39, %37\n"
+           "    branch %40, b12, b11\n"
+           "b11:\n"
+           "    %41 = addr @main.4\n"
+           "    call void @anti_rt_check_failed(%41, 34, 2, %37, 0)\n"
+           "    unreachable\n"
+           "b12:\n"
+           "    %42 = trunc i32 %37\n"
+           "    %43 = addov nsw i32 %32, %42\n"
+           "    branchov %43, b13, b14\n"
+           "b13:\n"
+           "    %44 = sext i64 %32\n"
+           "    %45 = sext i64 %42\n"
+           "    %46 = addr @main.3\n"
+           "    call void @anti_rt_check_failed(%46, 21, 1, %44, %45)\n"
+           "    unreachable\n"
+           "b14:\n"
+           "    ret i32 %43\n"
            "}\n");
 
     /* A slice literal stores its fields, and a slice of an array points
-       into the array. */
+       into the array, within the bounds its checks test. */
     lowers("fn h(p: *u8, n: int) -> ?*u8 {\n"
            "    let arr = [5, 6, 7];\n"
            "    let s = []byte { ptr: p, len: n };\n"
@@ -1968,6 +1997,9 @@ void test_lower(void)
            "type [3]int = array 3 of i64\n"
            "type []byte = struct { ptr: ptr, len: i64 }\n"
            "type []int = struct { ptr: ptr, len: i64 }\n"
+           "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
+           "global main.0 size 32 align 1 bytes 6d 61 69 6e 3a 34 3a 20 73 6c 69 63 65 20 65 6e 64 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
+           "global main.1 size 34 align 1 bytes 6d 61 69 6e 3a 34 3a 20 73 6c 69 63 65 20 73 74 61 72 74 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
            "fn main.h(%0: ptr nonnull deref(size_of i8), %1: i64) -> ptr {\n"
            "b0:\n"
            "    %2 = slot [3]int\n"
@@ -1986,14 +2018,28 @@ void test_lower(void)
            "    %9 = ptradd %3, offset_of []byte.len\n"
            "    store i64 %1, %9\n"
            "    lifestart %4\n"
-           "    %10 = mul i64 0, size_of i64\n"
-           "    %11 = ptradd %2, %10\n"
-           "    store ptr %11, %4\n"
-           "    %12 = sub i64 3, 0\n"
-           "    %13 = ptradd %4, offset_of []int.len\n"
-           "    store i64 %12, %13\n"
-           "    %14 = load ptr %3 !type ptr\n"
-           "    ret ptr %14\n"
+           "    %10 = ule i8 3, 3\n"
+           "    branch %10, b2, b1\n"
+           "b1:\n"
+           "    %11 = addr @main.0\n"
+           "    call void @anti_rt_check_failed(%11, 31, 0, 3, 3)\n"
+           "    unreachable\n"
+           "b2:\n"
+           "    %12 = ule i8 0, 3\n"
+           "    branch %12, b4, b3\n"
+           "b3:\n"
+           "    %13 = addr @main.1\n"
+           "    call void @anti_rt_check_failed(%13, 33, 0, 0, 3)\n"
+           "    unreachable\n"
+           "b4:\n"
+           "    %14 = mul i64 0, size_of i64\n"
+           "    %15 = ptradd %2, %14\n"
+           "    store ptr %15, %4\n"
+           "    %16 = sub i64 3, 0\n"
+           "    %17 = ptradd %4, offset_of []int.len\n"
+           "    store i64 %16, %17\n"
+           "    %18 = load ptr %3 !type ptr\n"
+           "    ret ptr %18\n"
            "}\n");
 
     /* A str constant is data of its own that points at the literal. */

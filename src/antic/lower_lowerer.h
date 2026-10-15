@@ -246,7 +246,7 @@ struct place {
    records_check_kinds pins the two together. */
 enum check_kind {
     CHECK_BOUNDS, CHECK_OVERFLOW, CHECK_VALUE, CHECK_VALUE_U, CHECK_LEFT,
-    CHECK_LEFT_U, CHECK_SHIFT
+    CHECK_LEFT_U, CHECK_SHIFT, CHECK_TEXT
 };
 
 /* The nine hooks of enum anti_hook in src/rt/object.h, in its order. The

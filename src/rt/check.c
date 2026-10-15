@@ -28,6 +28,8 @@ _Noreturn void anti_rt_check_failed(const unsigned char *text,
         anti_rt_fail_abort("%.*s: left %lld", n, at, (long long)a);
     case ANTI_CHECK_LEFT_U:
         anti_rt_fail_abort("%.*s: left %llu", n, at, (unsigned long long)a);
+    case ANTI_CHECK_TEXT:
+        anti_rt_fail_abort("%.*s", n, at);
     default:
         anti_rt_fail_abort("%.*s: count %lld, width %lld", n, at,
                            (long long)a, (long long)b);

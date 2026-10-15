@@ -163,6 +163,12 @@ void rejects_with(const char *source, const char *message)
 
 void lowered_run(struct lowered *l, const char *source)
 {
+    lowered_run_with(l, source, 0);
+}
+
+void lowered_run_with(struct lowered *l, const char *source,
+                      unsigned options)
+{
     checked_run(&l->front, source);
     ir_module_init(&l->ir, &l->front.arena, "main");
     l->ok = l->front.ok;
@@ -172,7 +178,7 @@ void lowered_run(struct lowered *l, const char *source)
                 first_message(&l->front.diags), source);
     }
     if (l->ok) {
-        lower_module(l->front.module, "main", &l->ir, 0, NULL, 0,
+        lower_module(l->front.module, "main", &l->ir, options, NULL, 0,
                      PACKAGE_VERSION_DEFAULT);
     }
 }

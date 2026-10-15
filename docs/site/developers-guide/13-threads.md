@@ -407,7 +407,7 @@ For a Java programmer:
 For a C programmer:
 
 - The job holds a copy of its arguments. A function may return before it joins, and a `dispatch` written once in a loop gives each job the arguments of its own turn.
-- `join` frees the job. A second `join` of a job is refused when a later statement of the block that declares the job holds it. One the checker cannot see, through a copy of the job or inside a branch, reads freed memory.
+- `join` frees the job. A second `join` of a job is refused when a later statement of the block that declares the job holds it. A dev build stops one the checker cannot see with `` `join` of a job joined already ``, since a `join` there marks the job it held. A release build does not, and a copy of the job made before the first `join` carries no mark in either build. Both read freed memory.
 
 For a C++ programmer:
 
