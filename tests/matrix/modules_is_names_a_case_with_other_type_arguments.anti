@@ -1,6 +1,6 @@
-//! `is` on a generic variant may write the type arguments of the variant,
-//! and then they name the type of the value. Other arguments name another
-//! type, whose case the value cannot hold.
+//! `is` on a generic variant may write the type arguments of the variant, and
+//! then they name the type of the value. Other arguments name another type,
+//! whose case the value cannot hold.
 
 variant Maybe<T>
 {
