@@ -2521,8 +2521,13 @@ static bool type_namespace(struct checker *c, struct expr *e,
                 ? sema_library_item(c, outer->home,
                                     &e->as.field.base->as.field.name)
                 : NULL;
+        /* `m.Result<int, str>.Missing` names a case of a copy, as the
+           unqualified form does. */
         if (sym != NULL && sym->kind == SYMBOL_STRUCT) {
-            *member = check_type_member(c, e, sym->type);
+            struct type *t =
+                sema_generic_named(c, e->as.field.base, sym->type,
+                                   &e->as.field.base->as.field.name, NULL);
+            *member = sema_is_error(t) ? t : check_type_member(c, e, t);
             return true;
         }
     }

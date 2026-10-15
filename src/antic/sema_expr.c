@@ -1387,7 +1387,8 @@ static bool is_float_literal(const struct expr *e)
 /* DESIGN: `v is Shape.Circle` tests the tag of v. The case is named by
    its variant, which is the type of v, as a literal names it. A copy of
    a generic variant takes the name of the generic, `r is Result.Ok`,
-   since the type of v gives the arguments. */
+   since the type of v gives the arguments. It may write them as well,
+   `r is Result<int, str>.Ok`, and then they name the type of v. */
 static struct type *check_variant_test(struct checker *c, struct expr *e,
                                        struct type *from)
 {
@@ -1395,23 +1396,40 @@ static struct type *check_variant_test(struct checker *c, struct expr *e,
     const struct type *named = NULL;
     const struct name *which;
     size_t index;
+    bool bare = target->kind != TYPEX_NAMED ||
+                (target->module.length == 0 && target->member.length == 0);
 
     /* A variant without cases has had its message and has no case to
        give as the example. */
-    if ((target->kind != TYPEX_NAMED || target->module.length == 0) &&
-        from->base->field_count == 0) {
+    if (bare && from->base->field_count == 0) {
         sema_error_at(c, e->pos, "`is` on `%s` names one of its cases",
                       sema_tn(from));
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (target->kind != TYPEX_NAMED || target->module.length == 0) {
+    if (bare) {
         sema_error_at(c, e->pos, "`is` on `%s` names one of its cases, as "
                       "`%s.%.*s`", sema_tn(from), sema_tn(from),
                       (int)sema_case_name(from, 0)->length,
                       sema_case_name(from, 0)->text);
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (target->member.length > 0) {
+    if (target->arg_count > 0) {
+        struct type_expr variant = *target;
+
+        variant.member.text = NULL;
+        variant.member.length = 0;
+        named = sema_resolve_type(c, &variant);
+        if (sema_is_error(named)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if (named != from) {
+            sema_error_at(c, e->pos, "`%s.%.*s` is not a case of `%s`",
+                          sema_tn(named), (int)target->member.length,
+                          target->member.text, sema_tn(from));
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        which = &target->member;
+    } else if (target->member.length > 0) {
         named = sema_imported_struct(c, &target->module, &target->name,
                                      target->pos);
         if (sema_is_error(named)) {
@@ -2238,6 +2256,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             if (t->kind != TYPE_VARIANT) {
                 sema_error_at(c, e->pos, "`%s` is not a variant", sema_tn(t));
                 return sema_builtin(c, TYPE_ERROR);
+            }
+            /* A generic variant of another module takes its arguments as
+               one of the module does, `geo.Result<int, str>.Ok { }`. */
+            t = sema_generic_named(c, e, t, name, expected);
+            if (sema_is_error(t)) {
+                return t;
             }
             return sema_variant_literal(c, e, t, &e->as.struct_lit.member);
         }

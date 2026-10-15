@@ -1,0 +1,16 @@
+//! `is` on a generic variant may write the type arguments of the variant,
+//! and then they name the type of the value. Other arguments name another
+//! type, whose case the value cannot hold.
+
+variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+fn main() -> int
+{
+	let some = Maybe<int>.Some { value: 5 };
+	let other = some is Maybe<bool>.Some;
+	return 0;
+}

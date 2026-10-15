@@ -1,0 +1,1 @@
+modules_is_names_a_case_with_other_type_arguments.anti:14:14: error: `Maybe<bool>.Some` is not a case of `Maybe<int>`

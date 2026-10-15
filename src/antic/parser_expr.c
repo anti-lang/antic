@@ -376,16 +376,28 @@ static struct expr *primary(struct parser *p)
             e->type_args = parser_type_args(p, &e->type_arg_count);
             return e->type_args == NULL ? NULL : e;
         }
-        /* `geo.Pair<int, str> { }` names a generic of another module. */
+        /* `geo.Pair<int, str> { }` names a generic of another module,
+           and `geo.Result<int, str>.Ok { }` the case of one. */
         if (!p->no_struct_literal && parser_peek_at(p, 1)->kind == TOKEN_DOT &&
             parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
             (end = parser_generic_end(p, 3)) > 0 &&
-            parser_peek_at(p, end)->kind == TOKEN_LBRACE) {
+            (parser_peek_at(p, end)->kind == TOKEN_LBRACE ||
+             (parser_peek_at(p, end)->kind == TOKEN_DOT &&
+              parser_peek_at(p, end + 1)->kind == TOKEN_IDENT &&
+              parser_peek_at(p, end + 2)->kind == TOKEN_LBRACE))) {
+            bool case_of = parser_peek_at(p, end)->kind == TOKEN_DOT;
             e = parser_new_expr(p, EXPR_STRUCT_LIT, t);
             parser_expect_name(p, &e->as.struct_lit.module);
             parser_next(p);
             parser_expect_name(p, &e->as.struct_lit.name);
-            return literal_type_args(p, e) ? literal_fields(p, e) : NULL;
+            if (!literal_type_args(p, e)) {
+                return NULL;
+            }
+            if (case_of) {
+                parser_next(p);
+                parser_expect_name(p, &e->as.struct_lit.member);
+            }
+            return literal_fields(p, e);
         }
         qualified = parser_peek_at(p, 1)->kind == TOKEN_DOT &&
                     parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
@@ -862,9 +874,13 @@ static struct expr *cast_links(struct parser *p)
             return NULL;
         }
         /* `v is geo.Shape.Circle` names the case of a variant of another
-           module, one name more than a type has. */
+           module, one name more than a type has, and so does
+           `v is Maybe<int>.Some`, which names the case after the type
+           arguments of the variant. */
         if (test && c->as.cast.type->kind == TYPEX_NAMED &&
-            c->as.cast.type->module.length > 0 && parser_check(p, TOKEN_DOT) &&
+            (c->as.cast.type->module.length > 0 ||
+             c->as.cast.type->arg_count > 0) &&
+            parser_check(p, TOKEN_DOT) &&
             parser_peek_at(p, 1)->kind == TOKEN_IDENT) {
             parser_next(p);
             parser_expect_name(p, &c->as.cast.type->member);
