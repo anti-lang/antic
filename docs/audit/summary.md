@@ -169,9 +169,9 @@ without a directory are in `src/antic/`.
 | S303 | `pattern.c:1126` | 3, 16 | The least match length adds in `long` before its cap. On Windows the sum wraps, and a `with` that does not fit compiles there and is refused on the Mac. | still open, the remainder of M44 | front-end |
 | S304 | `antl_verify.c:282` | 14 | The verifier holds no field name of a generic tree to its struct. `lower.c:902` then subtracts from NULL, and `layout.c:451` indexes outside the offsets. | new | library-file |
 | S305 | `antl_read.c:271` | 14 | Pointers, slices, arrays, function types and tuples of the type table nest without a limit. A file of 2 MB overflows the stack in `print_type` and `antl_visit_type`. | new | library-file |
-| S306 | `src/rt/trace.c:128` | 11 | A frame keeps the build id as a pointer into the image of its module. After `unload` of a plugin, `anti_rt_trace_text` reads memory that is gone. `trace.c:323` is the second place. | new | rt |
-| S307 | `src/rt/registry.c:94` | 23 | `reflect.new` and `Object.deserialize` give the lock back before `build` calls into the library, so `unload` on another thread closes it first. | still open in part, S28 | rt |
-| S308 | `src/rt/hooks.c:81` | 23 | The `destroyed` hook counts an object out before its `destruct` and field teardown run. `unload` then closes the library under the thread still in it. | new | rt |
+| S306 | `src/rt/trace.c:128` | 11 | A frame keeps the build id as a pointer into the image of its module. After `unload` of a plugin, `anti_rt_trace_text` reads memory that is gone. `trace.c:323` is the second place. | fixed `06e06339` | rt |
+| S307 | `src/rt/registry.c:94` | 23 | `reflect.new` and `Object.deserialize` give the lock back before `build` calls into the library, so `unload` on another thread closes it first. | fixed `b80a1e46` | rt |
+| S308 | `src/rt/hooks.c:81` | 23 | The `destroyed` hook counts an object out before its `destruct` and field teardown run. `unload` then closes the library under the thread still in it. | fixed `cfa95068` | rt |
 | S309 | `src/rt/plugin.c:383` | 6 | The loader replaces the table of an object with a stub table sized by the interface. A class that inherits the interface at offset 0 then calls past it. Read, not run. | new | rt |
 | S310 | `src/rt/plugin.c:589` | 14, 15 | `damage_of` tests the counts of a plugin table for a sign alone, and `fields_sound` accepts an offset without the width of the field. The test tries -1 and NULL alone. | still open in part, S33 | rt |
 | S311 | `src/rt/snapshot.c:30` | 6, 10 | A `str` inside a heap snapshot has no NUL after it, since `lower_function.c:499` sizes the block without one. `s.ptr` as a C string reads past the block. | new | rt |
@@ -227,7 +227,8 @@ Rule 11, who owns memory:
   storage the runtime overwrites on the next call. Windows shows it. New.
   rt.
 - M303. `src/rt/plugin.c:446`. A second load of a library gives one slot
-  to two owners. The first `unload` closes it for both. New. rt.
+  to two owners. The first `unload` closes it for both. New. rt. Fixed
+  `3d33cbfa`.
 - M304. `src/std/anti/collection/list.anti:189`. `reserve` and `shrink`
   move the room and count no change. A walk then reads freed room with no
   trap. Eleven more places in `list`, `deque`, `map`, `set` and `sorted`.
