@@ -50,6 +50,7 @@ struct work {
     struct item *to;
     struct generic_map map;
     int depth;                      /* the copies made to reach it */
+    struct pos asked;               /* see asked of struct copies */
 };
 
 struct copies {
@@ -67,6 +68,9 @@ struct copies {
     size_t added_capacity;
     int making;                     /* the depth of the body being made */
     bool failed;
+    /* The position in the code of the module that asked for the copy
+       being made, directly or through other copies. */
+    struct pos asked;
 };
 
 /* The making of one copy, or the walk of code that is not generic, which
@@ -83,6 +87,9 @@ struct clone {
     bool callee;
     /* The generic the copy comes from. */
     const struct item *generic;
+    /* That generic belongs to another module, whose source holds the
+       positions of its body. */
+    bool foreign;
 };
 
 /* Refuse a copy of the generic named name that this step of antic does
@@ -98,6 +105,12 @@ static void copy_failed(struct clone *cl, struct pos pos,
     k->failed = true;
     if (name == NULL && cl->generic != NULL) {
         name = &cl->generic->name;
+    }
+    /* DESIGN: a position in the body of a generic of another module
+       names a line of a source the message would not name, so the
+       message stands where the module asked for the copy, by T095. */
+    if (cl->foreign) {
+        pos = k->asked;
     }
     if (name != NULL) {
         sema_error_at(k->c, pos, "antic compiles no copy of `%.*s` yet, %s",
@@ -317,6 +330,7 @@ static void add_work(struct copies *k, const struct item *from, struct item *to,
     k->work[k->work_count].to = to;
     k->work[k->work_count].map = *map;
     k->work[k->work_count].depth = k->making + 1;
+    k->work[k->work_count].asked = k->asked;
     k->work_count++;
 }
 
@@ -1050,6 +1064,9 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     if (e == NULL) {
         return NULL;
     }
+    if (!cl->fresh) {
+        cl->k->asked = e->pos;
+    }
     if (cl->fresh) {
         n = ptr_map_get(&cl->nodes, e);
         if (n != NULL) {
@@ -1575,6 +1592,8 @@ static void make_body(struct copies *k, struct work *w)
     cl.map_capacity = 0;
     cl.fresh = true;
     cl.generic = w->from->owner != NULL ? w->from->owner : w->from;
+    cl.foreign = w->to->home_module != NULL;
+    k->asked = w->asked;
     ptr_map_put(&cl.nodes, w->from, w->to);
     xparams(&cl, w->to, w->from);
     at.function = w->to;
