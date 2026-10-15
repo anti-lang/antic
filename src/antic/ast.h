@@ -818,6 +818,9 @@ struct type_param {
 struct param {
     struct name name;
     struct pos pos;
+    /* The position of the name of a field of a class body, which a
+       message about the field alone names. Zero elsewhere. */
+    struct pos name_pos;
     struct type_expr *type;
     struct symbol *symbol;
     struct doc_text doc;            /* fields only */

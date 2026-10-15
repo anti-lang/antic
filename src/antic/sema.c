@@ -2486,6 +2486,9 @@ static void resolve_fields(struct checker *c, struct item *it,
         size_t k;
         fields[j].name = it->params[j].name;
         fields[j].pos = it->params[j].pos;
+        fields[j].name_pos = it->params[j].name_pos.line != 0
+                                 ? it->params[j].name_pos
+                                 : it->params[j].pos;
         fields[j].doc = it->params[j].doc;
         fields[j].form = it->params[j].form;
         fields[j].vis = it->params[j].vis;
@@ -2564,6 +2567,11 @@ static void declare_fields(struct checker *c, struct item *it)
     }
     for (j = 0; j < it->param_count; j++) {
         check_inject_field(c, &fields[j], &it->params[j]);
+    }
+    for (j = 0; j < it->param_count; j++) {
+        if (fields[j].atomic) {
+            sema_refuse_atomic_field(c, fields[j].name_pos, fields[j].type);
+        }
     }
     /* `mutable` is a contextual word of a singleton alone, by decision 27
        of "Decisions of 2026-10-11". */

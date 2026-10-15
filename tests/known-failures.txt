@@ -79,14 +79,6 @@ generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library
 check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.
 matrix_threads_channel_in_a_generic_struct_of_a_pointer_refused T058 A channel of a type parameter takes a pointer.
 matrix_threads_channel_of_a_type_parameter_that_is_a_pointer_refused T058 A channel of a type parameter takes a pointer.
-matrix_threads_atomic_field_of_a_str_refused T059 An atomic field of a `str` is not refused.
-matrix_threads_atomic_field_of_a_struct_refused T059 An atomic field of a struct is not refused.
-matrix_threads_atomic_field_of_a_type_parameter_that_is_f64_refused T059 An atomic field of a type parameter that is an `f64` is not refused.
-matrix_threads_atomic_field_of_an_enum_refused T059 An atomic field of an enum is not refused.
-matrix_threads_atomic_field_of_an_optional_refused T059 An atomic field of a `?int` is not refused.
-matrix_threads_atomic_field_of_f32_refused T059 An atomic field of an `f32` is not refused.
-matrix_threads_atomic_field_of_f64_refused T059 An atomic field of an `f64` is not refused.
-matrix_threads_static_atomic_of_f64_refused T059 A `static atomic` field of an `f64` compiles.
 generic_dispatch_modules_dev T061 The library file of a generic function that holds a `dispatch` cannot be read.
 generic_dispatch_modules_release T061 The library file of a generic function that holds a `dispatch` cannot be read.
 matrix_threads_pointer_into_fields_in_a_struct_refused T062 A public function of a thread-safe class gives out a pointer into its fields.

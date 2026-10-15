@@ -57,6 +57,28 @@ static struct type *atomic_place(const struct expr *e)
     return f != NULL && f->atomic ? f->type : NULL;
 }
 
+/* DESIGN: an atomic field holds what one operation of the runtime
+   moves, as an atomic local does: an integer, a `bool`, a `char` or a
+   pointer, and an `f16`, whose bits the operations without arithmetic
+   move. A function pointer is a pointer: a plain field of function type
+   holds one C function pointer, as `hook` of `Fatal` in anti.lang
+   does. An `own fn` holds two words. "Static fields and singletons" in docs/anti-object-model.md
+   gives the list, and decision 27 of "Decisions of 2026-10-11" refuses
+   a `static atomic` of `f64`. A field of a type parameter is checked
+   in each copy, where its argument stands. */
+void sema_refuse_atomic_field(struct checker *c, struct pos pos,
+                              const struct type *t)
+{
+    if (sema_is_error(t) || t->kind == TYPE_PARAM || types_is_integer(t) ||
+        t->kind == TYPE_BOOL || t->kind == TYPE_CHAR ||
+        t->kind == TYPE_POINTER || t->kind == TYPE_F16 ||
+        (t->kind == TYPE_FN && !t->owned && !t->bound)) {
+        return;
+    }
+    sema_error_at(c, pos, "an atomic field holds an integer, a `bool`, a "
+                  "`char` or a pointer, found `%s`", sema_tn(t));
+}
+
 /* Whether t is one word an atomic operation of the runtime moves: an
    integer, a `bool` or a pointer. */
 static bool swaps_as_word(const struct type *t)

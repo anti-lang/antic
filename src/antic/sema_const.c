@@ -1488,6 +1488,10 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
     enter_const(c, sym, &saved);
     t = sema_resolve_type(c, type_expr);
     ok = !sema_is_error(t);
+    if (ok && sym->item != NULL && sym->item->is_static &&
+        sym->item->atomic) {
+        sema_refuse_atomic_field(c, sym->item->name_pos, t);
+    }
     /* DESIGN: a class holds its base, its tables and the defaults of
        its fields, which the value of a constant does not carry. A
        constant that holds a class is refused. A default of a field

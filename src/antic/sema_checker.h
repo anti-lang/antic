@@ -508,6 +508,10 @@ struct type *sema_check_mutex_destroy(struct checker *c, struct expr *e,
 struct type *sema_check_sync_op(struct checker *c, struct expr *e);
 struct type *sema_check_parallel(struct checker *c, struct expr *e);
 struct type *sema_check_dispatch(struct checker *c, struct expr *e);
+/* Refuse an atomic field at pos whose type t no atomic operation
+   moves. */
+void sema_refuse_atomic_field(struct checker *c, struct pos pos,
+                              const struct type *t);
 struct type *sema_check_join(struct checker *c, struct expr *e);
 /* The jobs a block has joined, which a second `join` of one of them
    is refused against. sema_join_flow_stmt reads each statement of the

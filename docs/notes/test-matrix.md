@@ -1305,7 +1305,7 @@ The step `threads` filled the two tables above on 2026-10-12.
   pointer. The same kinds of `send` cannot exist, and neither can a lent
   value in either row.
 - An atomic holds no enum. `matrix/types_atomic_local_of_an_enum` refuses
-  the local, and the field compiles, T059.
+  the local, and `matrix/threads_atomic_field_of_an_enum` the field.
 
 The constructs of the area that have no row of their own:
 

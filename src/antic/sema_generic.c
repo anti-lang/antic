@@ -1319,6 +1319,14 @@ static void check_copy(struct checker *c, struct type *copy)
     }
     if (!sema_has_params(copy) && types_has_fields(copy)) {
         sema_check_nesting(c, copy, pos);
+        for (i = 0; i < copy->field_count; i++) {
+            if (copy->fields[i].atomic) {
+                sema_refuse_atomic_field(c, copy->fields[i].name_pos.line != 0
+                                                ? copy->fields[i].name_pos
+                                                : copy->fields[i].pos,
+                                         copy->fields[i].type);
+            }
+        }
     }
 }
 

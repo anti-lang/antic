@@ -82,6 +82,7 @@ enum type_kind {
 struct struct_field {
     struct name name;
     struct pos pos;
+    struct pos name_pos;            /* the name of a field of a class body */
     struct type *type;
     uint8_t bits;                   /* the width of a bitfield, or 0 */
     struct doc_text doc;            /* the /// text */

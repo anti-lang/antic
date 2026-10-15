@@ -140,6 +140,7 @@ static bool class_body(struct parser *p, struct item *it, struct list *fields,
            example of `docs/anti-syntax-overview.md` writes it. A name
            must stand after `inject`, so the position has one reading. */
         mark = p->clauses->count;
+        field.name_pos = parser_pos_of(parser_peek(p));
         if (!(field.injected ? parser_expect_member_name(p, &field.name)
                              : parser_expect_name(p, &field.name)) ||
             !parser_expect(p, TOKEN_COLON) ||
