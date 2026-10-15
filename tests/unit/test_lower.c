@@ -649,8 +649,52 @@ static void records_hook_entries(void)
                                            : "(none)",
                   names[i]);
     }
-    /* The bit of a `created` hook of an object built on the heap. */
-    CHECK(HOOK_ON_HEAP == ANTI_HOOK_ON_HEAP);
+    lowered_release(&l);
+}
+
+/* The hook number of the first call of anti_rt_hook in the function
+   named name, or -1. */
+static int64_t first_hook_of(const struct ir_module *m, const char *name)
+{
+    size_t i;
+    size_t b;
+    size_t k;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (strcmp(f->name, name) != 0) {
+            continue;
+        }
+        for (b = 0; b < f->block_count; b++) {
+            for (k = 0; k < f->blocks[b]->count; k++) {
+                const struct ir_inst *inst = &f->blocks[b]->insts[k];
+                if (inst->op == IR_CALL && inst->a.kind == IR_FUNC &&
+                    strcmp(m->functions[inst->a.as.index]->name,
+                           "anti_rt_hook") == 0 &&
+                    inst->arg_count == 2) {
+                    return (int64_t)inst->args[1].as.integer;
+                }
+            }
+        }
+    }
+    return -1;
+}
+
+/* DESIGN: the `created` hook of an object built at the start of memory
+   of its own on the heap carries ANTI_HOOK_ON_HEAP, which the count of
+   the objects of a plugin reads, and that of a local does not. */
+static void marks_heap_objects(void)
+{
+    struct lowered l;
+
+    lowered_run(&l, "class Cell { pub n: int = 0, }\n"
+                    "fn made() -> *Cell { return alloc Cell { }; }\n"
+                    "fn local() -> int { let c = Cell { n: 2 }; "
+                    "return c.n; }\n");
+    CHECK(l.ok);
+    CHECK(first_hook_of(&l.ir, "made") ==
+          (ANTI_HOOK_CREATED | ANTI_HOOK_ON_HEAP));
+    CHECK(first_hook_of(&l.ir, "local") == ANTI_HOOK_CREATED);
     lowered_release(&l);
 }
 
@@ -2509,6 +2553,7 @@ void test_lower(void)
     records_classes();
     records_type_ids();
     records_hook_entries();
+    marks_heap_objects();
     records_check_kinds();
     allocates_zeroed_classes();
     marks_table_accesses();

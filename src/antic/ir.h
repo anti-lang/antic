@@ -584,6 +584,12 @@ struct ir_module {
        through the GOT, and on COFF through the __imp_ entry the import
        library of the host gives. */
     bool plugin;
+    /* The program is a host of plugins, see whole_hosts_plugins. Every
+       function and every datum it defines is then an entry of ir_reach,
+       since a plugin resolves against any name of a module the host
+       imports. The driver sets it before the passes over the whole
+       program. */
+    bool hosts;
     /* --memory-checks: selection puts a check before every load and
        store, a call of one of these two functions. memcheck_declare of
        src/antic/memcheck.c sets all three. */

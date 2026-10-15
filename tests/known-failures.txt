@@ -36,7 +36,6 @@ function_default_modules_release T115 A literal of a library class omits a field
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.
 error_modules_import_cycle T088 The driver reports a cycle of imports without the position of the import.
-plugin_unused T093 A plugin cannot load when its host imports a module of the standard library and does not use it.
 constant_argument_modules_release T094 A constant of another module is refused as the argument of `N: int`.
 constant_argument_modules_dev T094 A constant of another module is refused as the argument of `N: int`.
 error_modules_type_nested_in_a_generic_class T095 A message on a copy of a library generic names a line of the library in the file of the client.

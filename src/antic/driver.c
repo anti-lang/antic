@@ -1045,18 +1045,21 @@ static int back_end(const struct options *o, struct module *tree,
        whole. That is every build in release mode. In dev mode it is the
        module that links, which has main, and a library for C. A dev
        object of any other module never links. */
+    /* A program that injects an interface or loads a library exports
+       its names, and keeps every one of them. This is read before the
+       passes over the whole program, which reach what it keeps, and
+       before the optimizer, which drops the class records it reads. */
+    program->hosts = !o->closed && o->lib == LIB_NONE && !o->library &&
+                     whole_hosts_plugins(program);
     if ((!o->dev || o->lib != LIB_NONE || has_main(program, module)) &&
         !whole_checked(o->input, program, module, !o->dev,
                        !o->no_reflect, o->bundle_runtime,
                        o->lib != LIB_NONE, o->dev, o)) {
         return 1;
     }
-    /* A program that injects an interface or loads a library exports
-       its names. Both this and the `provides` lines of a plugin are
-       read here, because the optimizer drops the class records that
-       carry them. */
-    extras->hosts_plugins = !o->closed && o->lib == LIB_NONE && !o->library &&
-                            whole_hosts_plugins(program);
+    /* The `provides` lines of a plugin are read here, because the
+       optimizer drops the class records that carry them. */
+    extras->hosts_plugins = program->hosts;
     /* DESIGN: a program that loads libraries keeps the hooks as well,
        which Eddie decided for audit finding S29. A closed one loads
        none. */

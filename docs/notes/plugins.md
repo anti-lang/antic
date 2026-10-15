@@ -76,9 +76,12 @@ exports, which name the runtime's static part of the C runtime.
 ## The host
 
 A program that injects an interface or calls `anti_rt_plugin_load` is a
-host. `whole_hosts_plugins` says so, and the driver reads it before the
-optimizer, for the same reason. The LLVM text then makes every function
-and every datum global and marks none hidden. The link passes
+host. `whole_hosts_plugins` says so, and the driver reads it into
+`hosts` of the program before the passes over the whole program. Every
+function and every datum the host defines is then an entry of
+`ir_reach`, so the optimizer keeps the parts of an imported module the
+host does not use, which a plugin may. The LLVM text then makes every
+function and every datum global and marks none hidden. The link passes
 `-export_dynamic` on macOS. On Linux it links in the glibc mode with
 `--export-dynamic`, since a static program of musl has no loader.
 `--closed` turns all of it off.

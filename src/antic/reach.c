@@ -179,7 +179,8 @@ void ir_reach(const struct ir_module *m, const char *entry, bool all,
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
         if (!f->is_extern &&
-            (entry == NULL || f->exported || ir_is_patterns_start(f) ||
+            (entry == NULL || m->hosts || f->exported ||
+             ir_is_patterns_start(f) ||
              (ir_in_unit(f->module, f->unit, entry) &&
               (!has_main || strcmp(f->name, "main") == 0)))) {
             reach_function(&w, (uint32_t)i);
@@ -187,7 +188,7 @@ void ir_reach(const struct ir_module *m, const char *entry, bool all,
     }
     for (i = 0; i < m->global_count; i++) {
         const struct ir_global *g = m->globals[i];
-        if (g->exported ||
+        if (g->exported || (m->hosts && !g->is_extern && !g->dropped) ||
             (all && entry != NULL && !g->is_extern && !g->dropped &&
              g->module != NULL && ir_in_unit(g->module, g->unit, entry))) {
             reach_global(&w, (uint32_t)i);

@@ -26,7 +26,10 @@ struct ir_reach {
    every datum of the unit is an entry as well, because another module
    may name a descriptor that no function here does. A live declaration
    of a datum reaches the definition of the same module and name, which
-   the program holds beside it once the library files are read. */
+   the program holds beside it once the library files are read. A host
+   of plugins, m->hosts, makes every function and every datum it defines
+   an entry, because a plugin binds against any name of the modules the
+   host imports and of the runtime, whether the host uses it or not. */
 void ir_reach(const struct ir_module *m, const char *entry, bool all,
               struct ir_reach *out);
 
