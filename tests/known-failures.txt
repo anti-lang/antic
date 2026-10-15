@@ -32,8 +32,6 @@ anti_bind_message_clang_static_without_a_body T098 A `static` function without a
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
 error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
 anti_bind_nested_enum T118 The enumerators of an enum without a name inside a struct are no constants of the binding.
-anti_bind_message_clang_float_with_a_large_exponent T119 `anti bind` writes a float with the exponent `e+20`, which does not lex, and ends with 1.
-anti_bind_message_clang_cast_of_a_negative_number T120 A macro that casts a negative number is skipped as no constant.
 llvm_coff_plugin_f16 T121 A plugin that converts an `f16` below x86-64-v3 finds the two conversions of the runtime in no host that converts none itself.
 anti_doc_message_source_does_not_parse T123 `anti doc` prints the message of a source that does not parse twice.
 anti_doc_wrapped_link T124 A link of a doc comment whose text `anti fmt` wraps over two lines is written as text.
@@ -47,3 +45,4 @@ anti_test_ownership T132 anti writes its last line with CRLF on Windows. host=wi
 anti_test_errors T132 anti writes its last line with CRLF on Windows. host=windows
 anti_test_threads T132 anti writes its last line with CRLF on Windows. host=windows
 anti_test_classes T132 anti writes its last line with CRLF on Windows. host=windows
+anti_bind_message_clang_cast_of_a_negative_number T120 A macro that casts a negative number is skipped as no constant.

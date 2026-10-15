@@ -608,14 +608,24 @@ bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
    without either gains `.0`. */
 void bind_float_text(double f, const char *type, struct text *out)
 {
-    size_t start = out->length;
+    struct text number = {0};
     const char *digits;
+    const char *e;
 
-    text_appendf(out, strcmp(type, "c_float") == 0 ? "%.9g" : "%.17g", f);
-    digits = text_cstr(out) + start;
-    if (strchr(digits, '.') == NULL && strchr(digits, 'e') == NULL) {
-        text_append(out, ".0");
+    text_appendf(&number, strcmp(type, "c_float") == 0 ? "%.9g" : "%.17g",
+                 f);
+    digits = text_cstr(&number);
+    e = strchr(digits, 'e');
+    /* A float literal of Anti has a `.` before its exponent, which
+       printf leaves out of a large value as `1e+20`, by T119. */
+    if (strchr(digits, '.') != NULL) {
+        text_append(out, digits);
+    } else if (e != NULL) {
+        text_appendf(out, "%.*s.0%s", (int)(e - digits), digits, e);
+    } else {
+        text_appendf(out, "%s.0", digits);
     }
+    text_free(&number);
 }
 
 static void string_text(const char *s, struct text *out)
