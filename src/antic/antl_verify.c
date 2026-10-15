@@ -62,9 +62,10 @@ enum { MARK_NEW, MARK_BUSY, MARK_DONE, MARK_CASE };
    type, since lowering reads its symbol. The target `c[i]` of an
    assignment on a value of a type parameter has none, since the copy
    pass builds the call of `set_index` anew. The base of a field that is
-   a value of an enum or a function names a type, a name or a field of a
-   module, and needs neither, since lowering reads the number or the
-   symbol of the field and never the base. */
+   a value of an enum, a function, a static atomic field or a constant
+   names a type, a name or a field of a module, and needs neither, since
+   lowering reads the number or the symbol of the field and never the
+   base. */
 enum role { AS_VALUE, AS_CALLEE, AS_TARGET, AS_TYPE };
 
 /* Whether e, at role, has the type and the symbol that lowering reads. */
@@ -202,11 +203,14 @@ static size_t copy_params(const struct expr *callee)
            (it->owner != NULL ? it->owner->type_param_count : 0);
 }
 
-/* Whether sym names a function, whose address lowering takes. */
-static bool names_fn(const struct symbol *sym)
+/* Whether sym names a function, whose address lowering takes, a static
+   atomic field, whose global it reads, or a constant, whose value it
+   reads. The base of a field that names one names a class or a module. */
+static bool names_symbol(const struct symbol *sym)
 {
     return sym != NULL &&
-           (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN);
+           (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN ||
+            sym->kind == SYMBOL_GLOBAL || sym->kind == SYMBOL_CONST);
 }
 
 static bool all_set(struct expr *const *list, size_t count)
@@ -661,7 +665,7 @@ static struct seen walk_at(struct verify *v, const struct expr *e,
     case EXPR_FIELD:
         join(&s, walk_at(v, e->as.field.base, d,
                          role == AS_TYPE || e->as.field.enum_value != 0 ||
-                                 names_fn(e->symbol)
+                                 names_symbol(e->symbol)
                              ? AS_TYPE
                              : AS_VALUE));
         break;

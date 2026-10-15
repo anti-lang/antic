@@ -1323,6 +1323,11 @@ void lower_module(struct module *module, const char *module_name,
             } else if (it->members[j]->kind == ITEM_FN &&
                 it->members[j]->body != NULL) {
                 lower_function(&l, it->members[j]);
+            } else if (it->members[j]->kind == ITEM_CONST &&
+                       it->members[j]->is_static &&
+                       it->members[j]->symbol != NULL &&
+                       it->home_module == NULL) {
+                lower_static_global(&l, it->members[j]->symbol);
             }
         }
         /* The anonymous functions each body met, and the ones those

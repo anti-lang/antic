@@ -127,8 +127,19 @@ struct ir_global *lower_static_global(struct lowerer *l,
     struct ir_module *m = l->m;
     struct ir_const *value;
     char *name = lower_cstr(&sym->name);
-    struct ir_global *g = lower_find_global(m, l->module_name, name);
+    /* DESIGN: a static field is data of the module of its class, which
+       writes it whether its own code names it or not. A module that
+       names the field of a class of another, through a copy of a
+       generic of that module, refers to it. */
+    const char *module = sym->home != NULL ? sym->home->module
+                                           : l->module_name;
+    struct ir_global *g = lower_find_global(m, module, name);
 
+    if (g == NULL && strcmp(module, l->module_name) != 0) {
+        g = ir_global_add(m, module, name, NULL, 0, 1);
+        g->is_extern = true;
+        g->mutable = true;
+    }
     if (g == NULL) {
         value = arena_alloc(m->arena, sizeof *value);
         const_tree(l, sym->value, sym->type, value);

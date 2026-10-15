@@ -4,7 +4,7 @@
 
 pub class Tally
 {
-	static atomic seen: int = 0;
+	pub static atomic seen: int = 0;
 
 	/// The number of calls of `note` and of `Slot.put` so far.
 	pub fn count() -> int
