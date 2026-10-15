@@ -398,19 +398,36 @@ static int64_t signed_value(enum ir_type type, uint64_t v)
 
 /* Apply op to the folded operands a and b of type type. The result has
    the type of the symbolic value. */
+static bool wchar_signed(const struct layouts *l);
+static enum ir_op signed_op(enum ir_op op);
+
+/* The operation of the symbolic value s on the target. An operation on
+   c_wchar takes its signed form where wchar_t is signed, as the
+   instructions of wchar_signedness do, so a constant and a variable of
+   one value agree. */
+static enum ir_op target_op(const struct layouts *l, const struct ir_sym *s)
+{
+    enum ir_op op = (enum ir_op)s->op;
+    bool on_wchar = s->type == IR_CWCHAR ||
+                    l->m->syms[s->a].type == IR_CWCHAR;
+
+    return on_wchar && wchar_signed(l) ? signed_op(op) : op;
+}
+
 static bool fold_op(struct layouts *l, const struct ir_sym *s,
                     enum ir_type type, uint64_t a, uint64_t b, uint64_t *out)
 {
     enum ir_type result = target_type(l, s->type);
+    enum ir_op op = target_op(l, s);
 
-    switch ((enum ir_op)s->op) {
+    switch (op) {
     case IR_NEG: *out = 0 - a; break;
     case IR_NOT: *out = ~a; break;
     case IR_TRUNC:
     case IR_ZEXT: *out = trim(type, a); break;
     case IR_SEXT: *out = (uint64_t)signed_value(type, a); break;
     default:
-        switch (ir_fold_int((enum ir_op)s->op, type, a, b, out)) {
+        switch (ir_fold_int(op, type, a, b, out)) {
         case IR_FOLDED:
             break;
         case IR_FOLD_BY_ZERO:
@@ -431,7 +448,7 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
             return false;
         case IR_FOLD_NOT_BINARY:
             fail(l, "a size expression uses `%s`, which does not fold",
-                 ir_op_name((enum ir_op)s->op));
+                 ir_op_name(op));
             return false;
         }
         break;
