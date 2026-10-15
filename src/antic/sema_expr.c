@@ -2630,6 +2630,26 @@ static struct type *value_expected(const struct expr *e,
     }
 }
 
+/* `try` before e, which is no call. A name is refused by the type it
+   was declared with, which a test before it may have narrowed. The mark
+   goes, so a second check of e gives no second message, and the `try`
+   answers the warning `never-fails` as a `try` before a call does. */
+static struct type *refuse_tried(struct checker *c, struct expr *e,
+                                 const struct type *t)
+{
+    const struct type *declared =
+        e->kind == EXPR_NAME && e->symbol != NULL ? e->symbol->type : t;
+
+    if (types_is_nullable(declared) || types_is_nullable(t)) {
+        sema_refuse_try_on_optional(c, e->tried);
+    } else {
+        sema_error_at(c, e->tried_after, "`try` stands before a call");
+    }
+    e->tried.line = 0;
+    c->saw_fail = true;
+    return sema_builtin(c, TYPE_ERROR);
+}
+
 struct type *sema_check_expr(struct checker *c, struct expr *e,
                              struct type *expected)
 {
@@ -2641,6 +2661,9 @@ struct type *sema_check_expr(struct checker *c, struct expr *e,
         return e->type;
     }
     t = check_expr_inner(c, e, value_expected(e, expected));
+    if (e->tried.line != 0 && !sema_is_error(t)) {
+        t = refuse_tried(c, e, t);
+    }
     e->type = t;
     if (t->kind != TYPE_F16 || e->kind == EXPR_CAST) {
         return t;
@@ -2665,6 +2688,9 @@ struct type *sema_check_storage(struct checker *c, struct expr *e)
         return e->type;
     }
     t = check_expr_inner(c, e, NULL);
+    if (e->tried.line != 0 && !sema_is_error(t)) {
+        t = refuse_tried(c, e, t);
+    }
     e->type = t;
     return t;
 }

@@ -284,6 +284,11 @@ struct expr {
        does so to call a function of that interface. The copy converts
        the value of its argument there. NULL on every other node. */
     struct type *param_type;
+    /* `try` before an operand that is no call: the `try`, and the token
+       after the operand. The checker refuses it once it knows whether
+       the operand may be `none`. A line of 0 marks no `try`. */
+    struct pos tried;
+    struct pos tried_after;
     union {
         uint64_t integer;           /* EXPR_INT */
         uint32_t character;         /* EXPR_CHAR */

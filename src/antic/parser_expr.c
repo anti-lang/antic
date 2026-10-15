@@ -792,21 +792,29 @@ static struct expr *unary_level(struct parser *p)
         return e->as.unary.operand != NULL ? e : NULL;
     }
     /* DESIGN: `try f(args)` is `f(args) catch e { return e; }`, so it
-       stands where the call stands and carries the same handler. */
+       stands where the call stands and carries the same handler. The
+       call of `alloc T(args)` carries it as it carries a `catch`. An
+       operand that is no call is refused by the checker, whose message
+       depends on whether the operand may be `none`. */
     case TOKEN_TRY: {
         struct expr *e;
+        struct expr *call;
         parser_next(p);
         e = postfix(p);
         if (e == NULL) {
             return NULL;
         }
-        if (e->kind != EXPR_CALL) {
-            parser_error_here(p, "`try` stands before a call");
-            return NULL;
+        call = e->kind == EXPR_ALLOC && e->as.alloc.value != NULL
+                   ? e->as.alloc.value
+                   : e;
+        if (call->kind != EXPR_CALL) {
+            e->tried = parser_pos_of(t);
+            e->tried_after = parser_pos_of(parser_peek(p));
+            return e;
         }
-        e->as.call.handler.kind = HANDLE_TRY;
-        e->as.call.handler.pos = parser_pos_of(t);
-        e->as.call.handler.at = e->as.call.handler.pos;
+        call->as.call.handler.kind = HANDLE_TRY;
+        call->as.call.handler.pos = parser_pos_of(t);
+        call->as.call.handler.at = call->as.call.handler.pos;
         return e;
     }
     default:
