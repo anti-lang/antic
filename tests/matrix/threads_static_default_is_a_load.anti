@@ -1,5 +1,5 @@
-//! The default of a static field is a constant expression. The atomic `load`
-//! of another static field is a call, which is refused in a field that no code
+//! The default of a static field is a constant expression. The atomic `load` of
+//! another static field is a call, which is refused in a field that no code
 //! reads as well.
 
 class Counter
