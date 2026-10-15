@@ -602,6 +602,8 @@ static int pack_at(const struct reader *r, int64_t line)
     return value;
 }
 
+static void declare_enum(struct reader *r, const struct json_value *node);
+
 static struct bind_record *declare_record(struct reader *r,
                                           const struct json_value *node,
                                           const char *name);
@@ -629,6 +631,13 @@ static void read_fields(struct reader *r, struct bind_record *rec,
         const char *c;
         int64_t align;
         if (kind == NULL) {
+            continue;
+        }
+        /* C puts an enum declared inside a struct into the scope of the
+           file, so its enumerators are constants of the binding, whether
+           the struct binds or not, by T118. */
+        if (strcmp(kind, "EnumDecl") == 0) {
+            declare_enum(r, item);
             continue;
         }
         if (strcmp(kind, "RecordDecl") == 0) {
