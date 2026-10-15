@@ -2696,6 +2696,24 @@ static void declare_members(struct checker *c, struct item *it)
 {
     size_t j;
 
+    /* DESIGN: a qualifier names a type as the class body writes it, so a
+       type nested in a class is `Vehicle` there. Each qualifier takes the
+       full name of the type it finds, `Garage.Vehicle`, which every later
+       comparison with the names of the chain reads, by T084 of
+       docs/audit/tests-findings.md. */
+    for (j = 0; j < it->member_count; j++) {
+        struct item *m = it->members[j];
+        struct symbol *named;
+        if (m->qualifier.length == 0) {
+            continue;
+        }
+        named = sema_module_find(c, &m->qualifier);
+        if (named != NULL && named->kind == SYMBOL_STRUCT &&
+            named->type != NULL && named->type->kind == TYPE_CLASS &&
+            !sema_same_name(&named->type->name, &m->qualifier)) {
+            m->qualifier = named->type->name;
+        }
+    }
     for (j = 0; j < it->member_count; j++) {
         struct item *m = it->members[j];
         struct symbol *sym = arena_alloc(c->arena, sizeof *sym);

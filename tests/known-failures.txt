@@ -174,9 +174,6 @@ matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A pub
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
 class_members_modules_release T076 A public static field and a public constant of a class of another module are refused.
 class_members_modules_dev T076 A public static field and a public constant of a class of another module are refused.
-matrix_classes_qualified_body_in_a_nested_class_dev T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
-matrix_classes_qualified_body_in_a_nested_class_release T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
-matrix_classes_qualified_body_in_a_nested_class_memory_checks T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
 generic_class_constant_modules_release T029 The library file of a generic function that reads a constant of a class cannot be read.
 generic_class_constant_modules_dev T029 The library file of a generic function that reads a constant of a class cannot be read.
 optional_default_modules_release T085 The library file of a class with a field `?int = none` cannot be read.
