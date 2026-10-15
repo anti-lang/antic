@@ -822,11 +822,12 @@ struct block *parser_block(struct parser *p)
         return NULL;
     }
     while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
+        size_t from = p->pos;
         struct stmt *s = statement(p);
         if (s != NULL) {
             parser_list_push(&stmts, &s);
         } else {
-            parser_sync_statement(p);
+            parser_sync_statement(p, from);
         }
     }
     b->stmts = parser_list_finish(p, &stmts, &b->count);

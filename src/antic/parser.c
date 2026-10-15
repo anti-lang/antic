@@ -315,23 +315,55 @@ struct doc_text parser_doc_before(struct parser *p, enum token_kind kind)
 }
 
 /* Skip to the start of the next statement. That is past a semicolon, or
-   up to a closing brace or a keyword that starts a statement.
+   up to a closing brace or a keyword that starts a statement. from is
+   the index of the first token of the refused statement.
 
    DESIGN: R012 of "Rules of 2026-10-13". The end of the source is no
    place to go on from, so the parser stays in its error there. Every
    block that is still open would report its missing `}` at that one
-   position, and the first report stands for all of them. */
-void parser_sync_statement(struct parser *p)
+   position, and the first report stands for all of them.
+
+   DESIGN: a brace the refused statement opened belongs to it, the `{`
+   of a literal or of a block, whether the parser took it before the
+   mistake or meets it while it skips. Its `}` and the tokens before it
+   are skipped, so the `}` never ends the block around the statement and
+   no keyword inside it starts the next statement, by T100 of
+   docs/audit/tests-findings.md. */
+void parser_sync_statement(struct parser *p, size_t from)
 {
+    int open = 0;
+    size_t i;
+
     p->half = false;
     p->angles = 0;
+    for (i = from; i < p->pos; i++) {
+        if (p->tokens[i].kind == TOKEN_LBRACE) {
+            open++;
+        } else if (p->tokens[i].kind == TOKEN_RBRACE && open > 0) {
+            open--;
+        }
+    }
     for (;;) {
-        switch (parser_peek(p)->kind) {
+        enum token_kind kind = parser_peek(p)->kind;
+        if (kind == TOKEN_EOF) {
+            return;
+        }
+        if (kind == TOKEN_LBRACE) {
+            open++;
+            parser_next(p);
+            continue;
+        }
+        if (open > 0) {
+            if (kind == TOKEN_RBRACE) {
+                open--;
+            }
+            parser_next(p);
+            continue;
+        }
+        switch (kind) {
         case TOKEN_SEMICOLON:
             parser_next(p);
             p->panic = false;
-            return;
-        case TOKEN_EOF:
             return;
         case TOKEN_RBRACE:
         case TOKEN_LET:
