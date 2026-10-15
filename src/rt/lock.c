@@ -140,13 +140,21 @@ static void order_take(const void *lock, const char *site)
         for (i = 0; i < count; i++) {
             const struct held *h = &held[i];
             struct order *reverse;
+            struct order *forward;
             struct order one;
             if (h->lock == lock) {
                 continue;
             }
+            /* DESIGN: the mark of a reported conflict stands on both
+               orders of the pair, so the pair is reported once whichever
+               order runs again, by T063. */
             reverse = order_find(lock, h->lock);
+            forward = order_find(h->lock, lock);
             if (reverse != NULL && !reverse->reported) {
                 reverse->reported = 1;
+                if (forward != NULL) {
+                    forward->reported = 1;
+                }
                 anti_rt_note("anti: two locks are taken in opposite orders "
                              "and can deadlock: %s takes one while holding "
                              "the one of %s, and %s takes that one while "
@@ -154,12 +162,12 @@ static void order_take(const void *lock, const char *site)
                              site, h->site, reverse->second_site,
                              reverse->first_site);
             }
-            if (order_find(h->lock, lock) == NULL) {
+            if (forward == NULL) {
                 one.first = h->lock;
                 one.second = lock;
                 one.first_site = h->site;
                 one.second_site = site;
-                one.reported = 0;
+                one.reported = reverse != NULL;
                 order_put(&one);
             }
         }
