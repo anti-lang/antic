@@ -462,7 +462,8 @@ elseif(CASE STREQUAL "clang_malformed")
            "struct { float b; } f2; };\n"
            "void g(struct L${long} *p);\n")
     # S32. An enumerator without a value after INT64_MAX. The next value
-    # has the bits of 2^63, as a value written above INT64_MAX has.
+    # is 2^63, as a value written above INT64_MAX is, in an enum of
+    # c_ulonglong.
     string(APPEND text "enum Wide : unsigned long long "
            "{ WIDE_TOP = 0x7fffffffffffffff, WIDE_NEXT };\n"
            "void wide(enum Wide w);\n")
@@ -476,7 +477,7 @@ elseif(CASE STREQUAL "clang_malformed")
     file(READ "${WORK}/out/malformed.anti" module)
     foreach(line "pub extern fn f(m: Mode);" "pub const F: c_int = 1;"
             "pub const CHAIN5000: c_int = 1;" "_f1\n{\n\ta: c_int," "_f2\n{\n\tb: c_float,"
-            "WIDE_NEXT = -9223372036854775808," "pub const LATE: c_int = 1;"
+            "pub enum Wide: c_ulonglong" "WIDE_NEXT = 9223372036854775808," "pub const LATE: c_int = 1;"
             "pub extern fn late(p: ?*Late);")
         string(FIND "${module}" "${line}" at)
         if(at EQUAL -1)

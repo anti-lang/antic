@@ -784,6 +784,8 @@ static void declare_enum(struct reader *r, const struct json_value *node)
     int64_t low = 0;
     int64_t high = 0;
     int64_t next = 0;
+    bool is_unsigned = false;
+    bool above_int64 = false;
     size_t i;
 
     entry->id = id != NULL ? bind_strdup(r->b, id) : "";
@@ -797,6 +799,7 @@ static void declare_enum(struct reader *r, const struct json_value *node)
         const struct json_value *item = inner->items[i];
         const char *kind = json_member_string(item, "kind");
         const char *name = json_member_string(item, "name");
+        const char *type;
         if (kind == NULL || strcmp(kind, "EnumConstantDecl") != 0 ||
             name == NULL) {
             continue;
@@ -811,6 +814,12 @@ static void declare_enum(struct reader *r, const struct json_value *node)
                              (uint64_t)e->values[e->value_count - 1].value + 1)
                        : 0;
         }
+        /* clang gives every enumerator of an enum whose values leave
+           int the type of the enum, which says whether it is unsigned. */
+        type = qual_type(item);
+        is_unsigned = is_unsigned ||
+                      (type != NULL && strncmp(type, "unsigned", 8) == 0);
+        above_int64 = above_int64 || next < 0;
         e->values[e->value_count].name = bind_strdup(r->b, name);
         e->values[e->value_count].value = next;
         if (e->values[e->value_count].value < low) {
@@ -823,8 +832,12 @@ static void declare_enum(struct reader *r, const struct json_value *node)
     }
     /* DESIGN: the base of an enum is c_int, the type of an enumerator in
        C, unless a value leaves its range. clang then gives the enum
-       unsigned int when no value is negative. */
-    if (high > 0x7FFFFFFF || low < -0x7FFFFFFF - 1) {
+       unsigned int when no value is negative. An unsigned enum with a
+       value above INT64_MAX, whose bits stand in the int64_t as a
+       negative one, is c_ulonglong. */
+    if (is_unsigned && above_int64) {
+        e->base = "c_ulonglong";
+    } else if (high > 0x7FFFFFFF || low < -0x7FFFFFFF - 1) {
         e->base = low >= 0 && high <= 0xFFFFFFFFll ? "c_uint" : "c_longlong";
     }
     bind_list_add(&r->enums, entry);

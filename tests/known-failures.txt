@@ -13,7 +13,6 @@
 # The suite of such a host expects the test to fail, and that of every
 # other host expects it to pass.
 #
-#   anti_bind_huge_enum T117 A struct of a huge enum lays out wrong. host=macos,linux
 #
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
@@ -43,7 +42,6 @@ error_modules_type_nested_in_a_generic_class_passed_on T095 A message on a copy 
 anti_bind_message_clang_static_without_a_body T098 A `static` function without a body gets a second warning, which names its result.
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
 error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
-anti_bind_huge_enum T117 An enum with a value above the signed 64-bit range is bound with the base `c_int`, and its struct lays out wrong. host=macos,linux
 anti_bind_nested_enum T118 The enumerators of an enum without a name inside a struct are no constants of the binding.
 anti_bind_message_clang_float_with_a_large_exponent T119 `anti bind` writes a float with the exponent `e+20`, which does not lex, and ends with 1.
 anti_bind_message_clang_cast_of_a_negative_number T120 A macro that casts a negative number is skipped as no constant.

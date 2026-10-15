@@ -300,7 +300,12 @@ static void write_enum(const struct bind_enum *e, struct text *out)
         doc_of(e->values[i].doc, "\t", out);
         text_append(out, "\t");
         name_of(e->values[i].name, out);
-        text_appendf(out, " = %lld,\n", (long long)e->values[i].value);
+        if (e->base != NULL && strcmp(e->base, "c_ulonglong") == 0) {
+            text_appendf(out, " = %llu,\n",
+                         (unsigned long long)e->values[i].value);
+        } else {
+            text_appendf(out, " = %lld,\n", (long long)e->values[i].value);
+        }
     }
     text_append(out, "}\n");
 }
