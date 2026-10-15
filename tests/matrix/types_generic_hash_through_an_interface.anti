@@ -17,6 +17,11 @@ class Seven
 	{
 		return 7;
 	}
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		return other is *Seven;
+	}
 }
 
 fn of<T: Hashed>(x: T) -> u64

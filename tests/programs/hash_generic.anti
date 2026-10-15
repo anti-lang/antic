@@ -41,6 +41,14 @@ class Counter
 	{
 		return self.count as u64 * 3;
 	}
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		let c = other as? *Counter else {
+			return false;
+		};
+		return c.count == self.count;
+	}
 }
 
 fn key<T: hash>(v: T) -> u64

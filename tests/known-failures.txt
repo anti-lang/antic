@@ -172,8 +172,6 @@ matrix_threads_pointer_into_fields_in_a_tuple_refused T062 A public function of 
 matrix_threads_pointer_into_fields_of_a_concurrent_class_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
-matrix_classes_equals_replaced_without_hash_refused T067 A class that replaces one of `equals` and `hash` without the other compiles.
-matrix_classes_hash_replaced_without_equals_refused T067 A class that replaces one of `equals` and `hash` without the other compiles.
 matrix_classes_super_destruct_called_directly_refused T068 `self.super.destruct()` compiles and calls nothing.
 matrix_classes_field_after_a_constant_dev T069 A field after a constant, a static field or a function of a class body is refused.
 matrix_classes_field_after_a_constant_release T069 A field after a constant, a static field or a function of a class body is refused.

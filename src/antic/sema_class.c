@@ -606,6 +606,66 @@ static void require_filled_chain(struct checker *c, const struct item *it,
     }
 }
 
+/* Whether a class of the chain of t below the root declares the
+   function name, or the class t alone when chain is false. An `operator
+   fn hash` of a class body is refused where it stands, so it replaces
+   nothing here. Neither does an abstract function, nor a body that fills
+   the table of an interface alone. */
+static bool replaces_root(const struct type *t, const char *name, bool chain)
+{
+    size_t i;
+
+    for (; t != NULL && t->kind == TYPE_CLASS && t->base != NULL;
+         t = chain ? t->base : NULL) {
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            if (m->kind == ITEM_FN && sema_name_is(&m->name, name) &&
+                m->contract != FN_ABSTRACT &&
+                types_body_table(t, m) != BODY_INTERFACE &&
+                (!m->is_operator || strcmp(name, LANG_HOOK_EQ) == 0)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* DESIGN: two objects that `equals` finds equal hash alike, so a class
+   that replaces one of `equals` and `hash` replaces the other in its
+   chain as well. Decision 27 of "Decisions of 2026-10-11" refuses
+   `equals` without `hash`, and "The root class" in
+   docs/anti-object-model.md names the reverse beside it. Beside a
+   replaced `hash`, an `operator fn eq` of the class or of its module
+   stands for `equals`, and beside a replaced `equals` an `operator fn
+   hash` of its module stands for `hash`. */
+static void require_equals_and_hash(struct checker *c, const struct item *it,
+                                    struct type *t)
+{
+    bool own_eq;
+    bool own_hash;
+    bool eq;
+    bool hash;
+
+    if (it->kind != ITEM_CLASS) {
+        return;
+    }
+    own_eq = replaces_root(t, "equals", false);
+    own_hash = replaces_root(t, "hash", false);
+    eq = replaces_root(t, "equals", true) ||
+         replaces_root(t, LANG_HOOK_EQ, true) ||
+         sema_module_operator(c, t, LANG_HOOK_EQ);
+    hash = replaces_root(t, "hash", true) ||
+           sema_module_operator(c, t, LANG_HOOK_HASH);
+    if (own_eq && !hash) {
+        sema_error_at(c, it->name_pos, "`%.*s` replaces `equals` without "
+                      "`hash`", (int)it->name.length, it->name.text);
+    }
+    if (own_hash && !eq) {
+        sema_error_at(c, it->name_pos, "`%.*s` replaces `hash` without "
+                      "`equals`", (int)it->name.length, it->name.text);
+    }
+}
+
 /* DESIGN: a class that declares an `abstract fn` has an open function,
    and is `abstract`, by "Class declaration" in docs/anti-object-model.md
    and decision 27 of "Decisions of 2026-10-11". The message names every
@@ -1148,6 +1208,7 @@ void sema_check_classes(struct checker *c)
         check_contracts(c, it, t);
         refuse_redeclared(c, it, t);
         require_abstract_mark(c, it);
+        require_equals_and_hash(c, it, t);
         require_filled_chain(c, it, t);
         check_operator_names(c, it, t);
         check_one_construct(c, it);

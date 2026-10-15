@@ -56,6 +56,11 @@ class Replaced
 	{
 		return other is *Replaced;
 	}
+
+	concrete fn hash(self) -> u64
+	{
+		return 1;
+	}
 }
 
 fn larger<T: Ordered>(own a: T, own b: T) -> T

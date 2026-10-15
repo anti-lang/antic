@@ -252,7 +252,7 @@ Four levels, and each applies where it makes sense:
 
 - `anti.lang.Object` is the base of every class without `inherits`. It has no fields beyond the table pointer.
 - It declares seven `pub` functions with default bodies over the descriptor: `type_name(self) -> str`, `to_text(self) -> str`, `equals(self, other: *Object) -> bool`, `hash(self) -> u64`, `serialize(self, out: *text.Builder)`, `copy(self, to: *Object)`, and `destruct(self)`, which is empty. A static `Object.deserialize(input, from)` is the counterpart of `serialize`, in the format `anti.json` defines. It takes the object, its strings and the objects it owns from `from`, an `anti.mem.Allocator`. The caller ends the object's life with `destroy(p, from)`, which runs the destruct chain and returns the owned memory to `from`, and then frees what `from` still holds, the object and its strings, through it. A text that fails runs the destruct of every object whose `construct` already ran, newest first, and then gives every block back to `from`.
-- A class may replace any of them with `concrete fn`. Replacing `equals` without `hash`, or the reverse, is a warning. The default bodies walk the field list and are slow by design.
+- A class may replace any of them with `concrete fn`. Replacing `equals` without `hash`, or the reverse, is refused, by decision 27 of "Decisions of 2026-10-11" in `docs/decisions.md`. Beside a replaced `hash`, an `operator fn eq` of the class or of its module stands for `equals`, and beside a replaced `equals` an `operator fn hash` of its module stands for `hash`. The default bodies walk the field list and are slow by design.
 - Every table starts with these seven entries after the descriptor pointer, and the nine hooks that "Hooks and tracing" of `docs/anti-language-additions.md` adds follow them. A C program that has the header of one class knows the head of every table.
 
 ## Operators
@@ -356,7 +356,7 @@ Four levels, and each applies where it makes sense:
 - `` the error of `parse_int` is not handled ``
 - `` `e` outlives its `catch`, use `dup` ``
 - `` `[]Shape` holds no complete values, use `[]*Shape` ``
-- `` `Sprite` replaces `equals` without `hash` `` as a warning
+- `` `Sprite` replaces `equals` without `hash` ``
 - `` `e` shadows the outer `e` [shadowed-catch] `` as a warning
 
 ## Keywords

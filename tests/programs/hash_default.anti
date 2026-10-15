@@ -49,6 +49,14 @@ class Badge
 	{
 		return self.number as u64 + 100;
 	}
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		let b = other as? *Badge else {
+			return false;
+		};
+		return b.number == self.number;
+	}
 }
 
 struct Entry
