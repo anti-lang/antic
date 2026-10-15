@@ -162,9 +162,9 @@ int8_t anti_rt_plugin_unload(void *handle);
 
 /* DESIGN: the objects of each loaded library on the heap are counted,
    so `unload` refuses while one is alive. The `created` hook of an
-   object built on the heap and anti_rt_dup add one, and the `destroyed`
-   hook of the object anti_rt_delete_from ends takes one away, see
-   ANTI_HOOK_ON_HEAP. The check
+   object built on the heap and anti_rt_dup add one, and
+   anti_rt_delete_from takes one away once the teardown and the free of
+   the object returned, see ANTI_HOOK_ON_HEAP. The check
    costs one load and one compare while no library is open, because the
    count of them is the first thing it reads. */
 void anti_rt_plugin_created(const void *table);

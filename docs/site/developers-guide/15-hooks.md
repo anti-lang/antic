@@ -1312,7 +1312,7 @@ The host is built to be bound against. Its functions and data are global and non
 
 The runtime allocates the size the descriptor of the class gives, calls the function that prepares the object and adds the offset of the interface.
 
-The count of live objects is kept in the hooks. `created` and `destroyed` of every object find the image that the table of its class lies in, and add to the count of that library. `unload` reads the count. A build without hooks could not keep it, which is why `--no-hooks` is refused for a host and for a plugin.
+The count of live objects starts in the hooks. `created` of every object on the heap finds the image that the table of its class lies in, and adds to the count of that library. `delete` takes the object off once its `destroyed` hook, its `destruct` and the teardown of its fields have returned, since all three run code of the library. `unload` reads the count. A build without hooks could not keep it, which is why `--no-hooks` is refused for a host and for a plugin.
 
 A provider that is a library fills a slot of the last section in another way than a function does. The slot holds a function, and what a library gives is an object. Every injectable interface therefore has one holder and one thunk that returns what the holder holds. The runtime stores the object in the holder and the thunk in the slot before `main`.
 

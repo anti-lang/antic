@@ -85,14 +85,15 @@ built under `--trace` and `--trace writes`.
 then call `anti_rt_join` and `anti_rt_join_all`, which fire nothing, so
 the option reaches the one site that lives in the runtime.
 
-`unload` counts the objects of a library in the `created` and
-`destroyed` hooks, and the code of the library's classes calls both.
-An object counts when its `created` hook carries `ANTI_HOOK_ON_HEAP` of
-`src/rt/object.h`, which an `alloc` and the function that prepares an
-object for the runtime add, and when `anti_rt_dup` makes it. The
-`destroyed` hook of the object that `anti_rt_delete_from` ends takes it
-off. A value in a frame or inside another value counts nowhere, since a
-value of a class without a teardown ends with no hook.
+`unload` counts the objects of a library from the `created` hook, which
+the code of the library's classes calls. An object counts when its
+`created` hook carries `ANTI_HOOK_ON_HEAP` of `src/rt/object.h`, which
+an `alloc` and the function that prepares an object for the runtime add,
+and when `anti_rt_dup` makes it. `anti_rt_delete_from` takes it off once
+the teardown and the free of the object returned, since the `destroyed`
+hook, every `destruct` and the teardown of the fields run code of the
+library. A value in a frame or inside another value counts nowhere,
+since a value of a class without a teardown ends with no hook.
 `driver_run` of `src/antic/driver.c` therefore refuses `--no-hooks` with
 `--no-runtime`, and `compile` refuses it for a program that loads
 libraries, the one `whole_hosts_plugins` finds and `--closed` does not

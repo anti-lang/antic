@@ -66,17 +66,6 @@ static anti_rt_body handler_hook(struct anti_object *h, int64_t hook)
                : anti_rt_entry_body(h, ANTI_ENTRY_OF_HANDLER((int)hook));
 }
 
-/* The object anti_rt_delete_from is ending on this thread. */
-static _Thread_local const struct anti_object *deleting;
-
-const struct anti_object *anti_rt_hook_deleting(const struct anti_object *o)
-{
-    const struct anti_object *before = deleting;
-
-    deleting = o;
-    return before;
-}
-
 void anti_rt_hook(struct anti_object *self, int64_t hook)
 {
     typedef void (*handler_fn)(struct anti_object *, struct anti_object *);
@@ -90,16 +79,12 @@ void anti_rt_hook(struct anti_object *self, int64_t hook)
     taken = (handler_fn)handler_hook(h, hook);
     own = (object_fn)own_hook(self, hook);
     /* DESIGN: the objects of a loaded library on the heap are counted
-       from the `created` hook of one built there to the `destroyed`
-       hook of the one `delete` ends, so `unload` refuses to take the
-       code of a live object away. A program with no library open pays
-       one load and one compare. */
+       from the `created` hook of one built there until anti_rt_delete_from
+       has ended it, so `unload` refuses to take the code of a live object
+       away. A program with no library open pays one load and one
+       compare. */
     if (on_heap) {
         anti_rt_plugin_created(self != NULL ? self->table : NULL);
-    } else if (hook == ANTI_HOOK_DESTROYED && self != NULL &&
-               self == deleting) {
-        deleting = NULL;
-        anti_rt_plugin_destroyed(self->table);
     }
     if (taken != NULL) {
         taken(h, self);

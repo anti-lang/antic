@@ -5,7 +5,6 @@
 
 #include "f16.h"
 #include "json.h"
-#include "hooks.h"
 #include "object.h"
 #include "plugin.h"
 #include "regex.h"
@@ -1085,20 +1084,24 @@ void anti_rt_destroy_from(void *object, const struct anti_descriptor *type,
     }
 }
 
+/* DESIGN: the object counts off its library after the teardown and the
+   free returned, since both run code of the library: the `destroyed`
+   hook, every `destruct` and the teardown of the fields. An unload on
+   another thread refuses until then. The table is read first, because
+   the free takes the object away. */
 void anti_rt_delete_from(void *object, const struct anti_descriptor *type,
                          struct anti_object *from)
 {
     void *start = checked_object(object, type);
-
-    const struct anti_object *before;
+    const void *table;
 
     if (start == NULL) {
         return;
     }
-    before = anti_rt_hook_deleting(start);
+    table = ((struct anti_object *)start)->table;
     anti_rt_destroy_from(start, type, from);
-    anti_rt_hook_deleting(before);
     anti_rt_give(from, start);
+    anti_rt_plugin_destroyed(table);
 }
 
 void anti_rt_destroy(void *object, const struct anti_descriptor *type)
