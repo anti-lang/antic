@@ -52,9 +52,6 @@ matrix_values_const_fn_refused T014 The refusal of a function in a constant name
 matrix_values_const_may_fail_fn_refused T014 The refusal of a function in a constant names a variable.
 matrix_values_is_after_error_refused T015 `is` on a value with an error adds a message about a module.
 check_slice_range T017 A dev build does not check the bounds of a slice of an array.
-matrix_values_class_constant_as_default_dev T019 antic crashes on a constant of a class as the default of a field.
-matrix_values_class_constant_as_default_release T019 antic crashes on a constant of a class as the default of a field.
-matrix_values_class_constant_as_default_memory_checks T019 antic crashes on a constant of a class as the default of a field.
 matrix_types_enum_value_from_a_call_refused T020 A call as the value of an enum compiles, and the value is 0.
 matrix_types_bitfield_width_from_a_call_refused T020 A call as the width of a bitfield compiles, and the field is no bitfield.
 matrix_types_align_from_a_call_refused T020 A call as the N of align(N) compiles, and the type takes no alignment.

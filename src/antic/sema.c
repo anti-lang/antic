@@ -2716,7 +2716,9 @@ static void declare_members(struct checker *c, struct item *it)
     }
     for (j = 0; j < it->member_count; j++) {
         struct item *m = it->members[j];
-        struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
+        struct symbol *sym = m->symbol != NULL
+                                 ? m->symbol
+                                 : arena_alloc(c->arena, sizeof *sym);
         struct name text;
         size_t k;
         /* A second `construct` has the message of check_one_construct,
@@ -2757,6 +2759,39 @@ static void declare_members(struct checker *c, struct item *it)
         m->symbol = sym;
         if (m->kind == ITEM_FN) {
             sym->type = function_type(c, m);
+        }
+    }
+}
+
+/* DESIGN: the default of a field is checked with the fields, before
+   the members of a body are declared, and it may name a constant of a
+   class, `Name.NAME`, by T019 of docs/audit/tests-findings.md. The
+   symbol of every constant of a body is therefore made first, and
+   declare_members fills in the rest of it. A constant is folded where
+   it is named, so the symbol needs nothing more. */
+static void declare_body_constants(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol == NULL || it->symbol->type == NULL) {
+            continue;
+        }
+        for (j = 0; j < it->member_count; j++) {
+            struct item *m = it->members[j];
+            struct symbol *sym;
+            if (m->kind != ITEM_CONST || m->is_static) {
+                continue;
+            }
+            sym = arena_alloc(c->arena, sizeof *sym);
+            sym->kind = SYMBOL_CONST;
+            sym->name = types_member_symbol(c->arena, &it->name, m);
+            sym->pos = m->name_pos;
+            sym->item = m;
+            m->symbol = sym;
         }
     }
 }
@@ -3023,6 +3058,7 @@ bool sema_check(struct module *module, const char *module_name,
     sema_resolve_generics(&c);
     resolve_bases(&c);
     declare_enums_and_variants(&c);
+    declare_body_constants(&c);
     declare_all_fields(&c);
     sema_check_guards(&c);
     declare_function_types(&c);
