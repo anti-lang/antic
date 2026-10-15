@@ -77,8 +77,6 @@ check_slice_range_negative T017 A dev build does not check a slice whose low bou
 generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
 generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
 check_join_twice T054 A second `join` that the checker cannot see hangs in a dev build.
-matrix_threads_channel_in_a_generic_struct_of_a_pointer_refused T058 A channel of a type parameter takes a pointer.
-matrix_threads_channel_of_a_type_parameter_that_is_a_pointer_refused T058 A channel of a type parameter takes a pointer.
 generic_dispatch_modules_dev T061 The library file of a generic function that holds a `dispatch` cannot be read.
 generic_dispatch_modules_release T061 The library file of a generic function that holds a `dispatch` cannot be read.
 matrix_threads_pointer_into_fields_in_a_struct_refused T062 A public function of a thread-safe class gives out a pointer into its fields.

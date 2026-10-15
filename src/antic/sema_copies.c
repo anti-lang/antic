@@ -1254,6 +1254,14 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         n->as.sync_op.target = xe(cl, e->as.sync_op.target);
         n->as.sync_op.value = xe(cl, e->as.sync_op.value);
         n->as.sync_op.element = xt(cl, e->as.sync_op.element);
+        /* `chan T(n)` of the generic makes a channel of the argument in
+           the copy, which carries values alone as one written out
+           does. */
+        if (cl->fresh && e->as.sync_op.op == SYNC_CHAN_NEW &&
+            n->type != NULL && types_is_chan(n->type)) {
+            sema_refuse_chan_element(cl->k->c, e->as.sync_op.element->pos,
+                                     n->type->element);
+        }
         break;
     case EXPR_SIMD:
         n->as.simd.args = xlist(cl, e->as.simd.args, e->as.simd.arg_count);

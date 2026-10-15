@@ -340,6 +340,10 @@ struct type *sema_imported_struct(struct checker *c,
                                   const struct name *name, struct pos pos);
 bool sema_refuses_half(struct checker *c, struct pos pos,
                        const struct type *t);
+/* Refuse a channel at pos whose element holds a pointer, and give
+   whether it did. */
+bool sema_refuse_chan_element(struct checker *c, struct pos pos,
+                              const struct type *element);
 struct type *sema_chan_element(struct checker *c, struct type_expr *t);
 struct type *sema_resolve_type(struct checker *c, struct type_expr *t);
 struct type *sema_param_form(struct checker *c, struct type *t, bool keep,

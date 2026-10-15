@@ -792,15 +792,25 @@ bool sema_refuses_half(struct checker *c, struct pos pos,
 }
 
 /* DESIGN: a channel carries values under the rule of `parallel`, so
-   no two threads reach one piece of memory through what it carries. */
+   no two threads reach one piece of memory through what it carries. A
+   channel of a type parameter is held to the rule in each copy, where
+   the argument stands, by T058 of docs/audit/tests-findings.md. */
+bool sema_refuse_chan_element(struct checker *c, struct pos pos,
+                              const struct type *element)
+{
+    if (sema_is_error(element) || types_pointer_free(element)) {
+        return false;
+    }
+    sema_error_at(c, pos, "a channel carries values alone, and `%s` holds "
+                  "a pointer", sema_tn(element));
+    return true;
+}
+
 struct type *sema_chan_element(struct checker *c, struct type_expr *t)
 {
     struct type *element = sema_resolve_type(c, t);
 
-    if (!sema_is_error(element) && !types_pointer_free(element)) {
-        sema_error_at(c, t->pos,
-                      "a channel carries values alone, and `%s` holds "
-                      "a pointer", sema_tn(element));
+    if (sema_refuse_chan_element(c, t->pos, element)) {
         return sema_builtin(c, TYPE_ERROR);
     }
     return element;

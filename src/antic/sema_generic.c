@@ -1289,6 +1289,24 @@ static void fill_copy(struct checker *c, struct type *copy)
     types_set_fields(c->types, copy, fields, g->field_count);
 }
 
+/* The position of the element of the channel that field i of copy
+   holds, as its generic writes it, or of the field. */
+static struct pos chan_field_pos(const struct type *copy, size_t i)
+{
+    const struct struct_field *f = &copy->fields[i];
+    const struct item *it = copy->generic->type_params[0]->declared_by;
+    size_t j;
+
+    for (j = 0; it != NULL && j < it->param_count; j++) {
+        const struct type_expr *t = it->params[j].type;
+        if (sema_same_name(&it->params[j].name, &f->name) && t != NULL &&
+            t->kind == TYPEX_CHAN && t->element != NULL) {
+            return t->element->pos;
+        }
+    }
+    return f->name_pos.line != 0 ? f->name_pos : f->pos;
+}
+
 /* DESIGN: the passes that refuse a class that inherits itself and a
    type that contains itself run over the items of the module. A copy
    of a generic filled after them has a base and fields of its own, and
@@ -1320,6 +1338,10 @@ static void check_copy(struct checker *c, struct type *copy)
     if (!sema_has_params(copy) && types_has_fields(copy)) {
         sema_check_nesting(c, copy, pos);
         for (i = 0; i < copy->field_count; i++) {
+            if (types_is_chan(copy->fields[i].type)) {
+                sema_refuse_chan_element(c, chan_field_pos(copy, i),
+                                         copy->fields[i].type->element);
+            }
             if (copy->fields[i].atomic) {
                 sema_refuse_atomic_field(c, copy->fields[i].name_pos.line != 0
                                                 ? copy->fields[i].name_pos
