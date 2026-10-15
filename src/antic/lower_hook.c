@@ -165,13 +165,17 @@ void lower_hook_changed(struct lowerer *l, const struct place *p,
     if (up == NULL) {
         return;
     }
+    /* The record of the field stands index records into the list. The
+       list is an array, which has no fields to take the offset of, by
+       T114 of docs/audit/tests-findings.md. */
     list = lower_temp(l, ir_addr(l->f, l->b,
                                  ir_global_op(lower_class_fields(l, up))));
-    at = ir_sym_operand(l->m,
-                        ir_sym_offset_of(l->m,
-                                         lower_fields_agg(l,
-                                                          lower_own_fields(up)),
-                                         (uint32_t)index));
+    at = ir_sym_operand(
+        l->m, ir_sym_op(l->m, IR_MUL, IR_I64,
+                        ir_sym_size_of(l->m,
+                                       ir_aggregate(rt_record_agg(
+                                           l->m, RT_RECORD_FIELD))),
+                        ir_sym_int(l->m, IR_I64, index)));
     args[0] = p->object;
     args[1] = lower_offset_address(l, list, at);
     lower_rt_call(l, RT_FN_HOOK_CHANGED, args);

@@ -292,7 +292,6 @@ matrix_values_function_compared_with_a_nullable_function_memory_checks T111 `==`
 matrix_flow_walk_with_an_iter_of_two_parameters_refused T096 A loop over a struct whose `operator fn iter` is refused gets a second message.
 matrix_flow_walk_with_a_next_of_two_parameters_refused T096 A loop over an iterator whose `operator fn next` is refused gets a second message.
 matrix_types_generic_receiver_with_two_paths_to_its_interface_refused T113 A receiver with two paths to the interface of a constraint gets a second message in the copy.
-matrix_classes_changed_hook_of_the_second_field_trace_writes T114 The `changed` hook gets the record of the first field of the class for a write of any of its fields.
 anti_bind_huge_enum T117 An enum with a value above the signed 64-bit range is bound with the base `c_int`, and its struct lays out wrong. host=macos,linux
 anti_bind_nested_enum T118 The enumerators of an enum without a name inside a struct are no constants of the binding.
 anti_bind_message_clang_float_with_a_large_exponent T119 `anti bind` writes a float with the exponent `e+20`, which does not lex, and ends with 1.
@@ -301,7 +300,6 @@ llvm_coff_plugin_f16 T121 A plugin that converts an `f16` below x86-64-v3 finds 
 dump_llvm_wchar_constant_macos-arm64 T122 A constant of `c_wchar` computed from `size_of` folds without a sign where `wchar_t` is signed.
 anti_doc_message_source_does_not_parse T123 `anti doc` prints the message of a source that does not parse twice.
 anti_doc_wrapped_link T124 A link of a doc comment whose text `anti fmt` wraps over two lines is written as text.
-matrix_classes_changed_hook_of_a_bitfield_trace_writes T114 The `changed` hook gets the record of the first field of the class for the write of a bitfield.
 matrix_classes_default_is_a_copy_of_the_parameter_dev T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
 matrix_classes_default_is_a_copy_of_the_parameter_release T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
 matrix_classes_default_is_a_copy_of_the_parameter_memory_checks T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
