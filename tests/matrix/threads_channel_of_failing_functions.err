@@ -1,1 +1,1 @@
-threads_channel_of_failing_functions.anti:9:15: error: a channel carries values alone, and `fn(int) -> int may fail` holds a pointer
+threads_channel_of_failing_functions.anti:10:15: error: a channel carries values alone, and `fn(int) -> int may fail` holds a pointer

@@ -17,7 +17,6 @@ set(SKIP
     "${TESTS}/errors/hex_escape_short.anti"
     "${TESTS}/errors/lexical.anti"
     "${TESTS}/errors/syntax.anti"
-    "${TESTS}/fmt/alias_of_function.anti"
     "${TESTS}/fmt/loose.anti"
     "${TESTS}/matrix/types_as_with_a_question_mark_before_a_number_type.anti"
     "${TESTS}/matrix/types_as_with_a_question_mark_before_its_type.anti"

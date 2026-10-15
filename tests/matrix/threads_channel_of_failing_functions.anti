@@ -5,7 +5,8 @@ import anti.lang;
 
 type Step = fn(int) -> int may fail;
 
-fn main() -> int {
+fn main() -> int
+{
 	let c = chan Step(1);
 	delete(c);
 	return 0;

@@ -17,13 +17,14 @@ type Lender = fn(lent *int) -> int;
 type Stopper = fn() -> never;
 type Maybe = ?int;
 
-abstract class Named {
+abstract class Named
+{
 	abstract fn name(self) -> int;
 	abstract fn stop(self) -> never;
 	abstract fn load(self) -> int may fail;
 }
 
-	class Tagged
+class Tagged
 {
 	implements nm: Named,
 	atomic hits: int = 0,

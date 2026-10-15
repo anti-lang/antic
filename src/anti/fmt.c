@@ -1687,6 +1687,12 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
         return;
     case TOKEN_SEMICOLON:
         append_piece(e, p, space_before(e, p));
+        /* A `fn` after `=` that reaches the `;` without a body was the
+           type of `type Op = fn(int) -> int;` and opened no anonymous
+           function, by T025. */
+        if (e->anonymous && e->brackets == e->anonymous_brackets) {
+            e->anonymous = false;
+        }
         if (e->brackets == 0 && e->inlined == 0) {
             /* One statement per line ends the line here, unless an
                ordinary comment stands behind the `;`. A comment keeps
