@@ -1719,6 +1719,27 @@ static void check_switch(struct checker *c, struct stmt *s)
             body = s->as.switch_stmt.arms[i].body;
             scoped = check_variant_arm(c, s, i, over, &arm_scope);
             i++;
+        } else if (sema_is_error(over)) {
+            /* DESIGN: a value that the switch refused, or that has an
+               error of its own, has no type an arm compares with. The
+               arm is checked for its body alone, and the name it binds
+               is a local of the error type, so one mistake gets one
+               message, by T024 of docs/audit/tests-findings.md. */
+            struct switch_arm *arm = &s->as.switch_stmt.arms[i];
+            body = arm->body;
+            if (arm->binds.length > 0) {
+                struct symbol *bound;
+                sema_enter_scope(c, &arm_scope);
+                scoped = true;
+                bound = sema_declare(c, SYMBOL_LOCAL, &arm->binds,
+                                     arm->binds_pos,
+                                     "`%.*s` is already declared in this "
+                                     "block");
+                if (bound != NULL) {
+                    bound->type = over;
+                }
+            }
+            i++;
         } else {
             struct switch_arm *arm = &s->as.switch_stmt.arms[i];
             body = arm->body;
