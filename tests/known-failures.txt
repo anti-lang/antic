@@ -48,9 +48,6 @@ matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and 
 matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 matrix_values_as_enum_in_constant_refused T010 The refusal of a number as an enum in a constant names a pointer conversion.
-matrix_values_array_repeat_widens_dev T013 An array repeat does not take the element type of its context.
-matrix_values_array_repeat_widens_release T013 An array repeat does not take the element type of its context.
-matrix_values_array_repeat_widens_memory_checks T013 An array repeat does not take the element type of its context.
 matrix_values_const_fn_refused T014 The refusal of a function in a constant names a variable.
 matrix_values_const_may_fail_fn_refused T014 The refusal of a function in a constant names a variable.
 matrix_values_is_after_error_refused T015 `is` on a value with an error adds a message about a module.

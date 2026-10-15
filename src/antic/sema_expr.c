@@ -2386,6 +2386,15 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                           "the repeat form copies one value into every "
                           "element", sema_tn(t), sema_owns_phrase(t));
         }
+        /* The value takes the element type of its context, as each
+           value of `[a, b]` does: a T where a `?T` is expected, or a
+           pointer to a class where a pointer to its interface is. */
+        if (element != NULL && !sema_is_error(t)) {
+            if (!sema_require(c, e->as.array_repeat.value, t, element)) {
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            t = element;
+        }
         return sema_array_of(c, e->as.array_repeat.count, t);
     }
     case EXPR_ALLOC:
