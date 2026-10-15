@@ -42,9 +42,6 @@ optional_default_modules_dev T085 The library file of a class with a field `?int
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.
-matrix_modules_import_with_pub_refused T087 `pub` before an `import` gets one message twice.
-error_modules_internal_interface T087 An interface that a module does not give gets two more messages.
-error_modules_private_interface T087 An interface that a module does not give gets two more messages.
 error_modules_import_cycle T088 The driver reports a cycle of imports without the position of the import.
 plugin_locals T092 A local object without `destruct` in a plugin stays counted as alive, and `unload` refuses.
 plugin_unused T093 A plugin cannot load when its host imports a module of the standard library and does not use it.

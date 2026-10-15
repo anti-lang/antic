@@ -793,7 +793,10 @@ bool parser_parse(const char *source, const struct token_list *tokens,
         if (it != NULL) {
             push_item(&p, &items, it);
         } else {
-            if (p.pos == before) {
+            /* An `import` is no item, so an item that stopped at one,
+               as `pub import` does, had its message there. The recovery
+               passes it, so the `import` gets no second message. */
+            if (p.pos == before || parser_check(&p, TOKEN_IMPORT)) {
                 parser_next(&p);
             }
             sync_item(&p);

@@ -304,6 +304,28 @@ static bool may_fill(struct checker *c, const struct item *it,
     return same_signature(c, m, entry, owner);
 }
 
+/* Whether t or a class it inherits implements a type that had its
+   message, such as an interface another module does not make public.
+   Nothing says what a `concrete fn` of t fills from it, so one that
+   fills nothing else gets no second message for the one mistake, by
+   T087 of docs/audit/tests-findings.md. */
+static bool implements_refused(const struct type *t)
+{
+    const struct type *up;
+    size_t k;
+
+    for (up = t; up != NULL; up = sema_inherited(up)) {
+        for (k = 0; k < up->field_count; k++) {
+            if (up->fields[k].form == FIELD_IMPL &&
+                (up->fields[k].type == NULL ||
+                 sema_is_error(up->fields[k].type))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /* The entries a `concrete fn` m of t fills, each compared with m. A
    qualified body fills the table its qualifier names. An unqualified one
    fills the entry of the base chain, unless a body qualified by a base
@@ -356,7 +378,7 @@ static void check_replacement(struct checker *c, const struct item *it,
             filled = filled || entry != NULL;
         }
     }
-    if (!filled) {
+    if (!filled && !implements_refused(t)) {
         sema_error_at(c, m->name_pos, "`%.*s.%.*s` is `concrete` and "
                       "replaces nothing", (int)it->name.length, it->name.text,
                       (int)m->name.length, m->name.text);
@@ -377,6 +399,10 @@ static void check_implements(struct checker *c, const struct item *it,
         const struct type *chain;
         size_t k;
         if (t->fields[j].form != FIELD_IMPL) {
+            continue;
+        }
+        /* A type that had its message is no second mistake. */
+        if (iface != NULL && sema_is_error(iface)) {
             continue;
         }
         if (iface == NULL || iface->kind != TYPE_CLASS ||
@@ -520,6 +546,10 @@ static void check_contracts(struct checker *c, const struct item *it,
             (qualified_table(t, &m->qualifier) == NULL ||
              (sema_same_name(&m->qualifier, &t->name) &&
               declared_twice(it, m)))) {
+            continue;
+        }
+        if (m->contract == FN_CONCRETE && above == NULL &&
+            implements_refused(t)) {
             continue;
         }
         if (m->contract == FN_CONCRETE && above == NULL) {
