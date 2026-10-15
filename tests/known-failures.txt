@@ -46,16 +46,6 @@ matrix_modules_import_with_pub_refused T087 `pub` before an `import` gets one me
 error_modules_internal_interface T087 An interface that a module does not give gets two more messages.
 error_modules_private_interface T087 An interface that a module does not give gets two more messages.
 error_modules_import_cycle T088 The driver reports a cycle of imports without the position of the import.
-matrix_modules_count_of_a_list_assigned_refused T090 A write of `count` of a `List` outside its module is not refused.
-matrix_modules_count_of_a_list_added_to_refused T090 A compound assignment to `count` of a `List` is not refused.
-matrix_modules_count_of_a_list_assigned_through_a_pointer_refused T090 A write of `count` through a pointer to a `List` is not refused.
-matrix_modules_count_of_a_deque_assigned_refused T090 A write of `count` of a `Deque` outside its module is not refused.
-matrix_modules_count_of_a_map_assigned_refused T090 A write of `count` of a `Map` outside its module is not refused.
-matrix_modules_count_of_a_hash_map_assigned_refused T090 A write of `count` of a `HashMap` outside its module is not refused.
-matrix_modules_count_of_a_set_assigned_refused T090 A write of `count` of a `Set` outside its module is not refused.
-matrix_modules_count_of_a_bit_set_assigned_refused T090 A write of `count` of a `BitSet` outside its module is not refused.
-matrix_modules_count_of_a_sorted_set_assigned_refused T090 A write of `count` of a `SortedSet` outside its module is not refused.
-matrix_modules_count_of_a_pool_assigned_refused T090 A write of `count` of a `Pool` outside its module is not refused.
 generic_variant_modules_release T091 A literal of a case of a generic variant under the name of a module does not parse.
 generic_variant_modules_dev T091 A literal of a case of a generic variant under the name of a module does not parse.
 matrix_modules_is_names_a_case_with_its_type_arguments_dev T091 `is` with the type arguments of a generic variant does not parse.

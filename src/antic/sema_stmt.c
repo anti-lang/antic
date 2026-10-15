@@ -774,7 +774,8 @@ static void check_assign(struct checker *c, struct stmt *s)
         sema_check_expr(c, s->as.assign.value, NULL);
         return;
     }
-    if (sema_refuse_singleton_write(c, target, target->pos)) {
+    if (sema_refuse_singleton_write(c, target, target->pos) ||
+        sema_refuse_count_write(c, target, target->pos)) {
         sema_check_expr(c, s->as.assign.value, NULL);
         return;
     }
@@ -3235,6 +3236,68 @@ bool sema_refuse_singleton_write(struct checker *c, const struct expr *target,
                   "creation, and `mutable` marks a field the program writes",
                   (int)target->as.field.name.length, target->as.field.name.text,
                   sema_tn(owner));
+    return true;
+}
+
+/* DESIGN: `count` of a collection is read-only outside its module, by
+   decision 25 of "Decisions of 2026-10-11". The field is `pub count` of
+   `Collection<T>` of `anti.collection`, so the rule of a public field
+   lets every module read it. The module of a collection is the module
+   of any class from the type of the receiver up to that base:
+   `anti.collection.list` writes it for a `List`, `anti.collection` for
+   the base itself, and a class of the program that inherits a
+   collection writes it in its own module. `&` of it is refused as `=`
+   is, since the address would let a write through. */
+bool sema_refuse_count_write(struct checker *c, const struct expr *target,
+                             struct pos pos)
+{
+    const struct expr *receiver;
+    const struct type *owner;
+    const struct type *home;
+    const struct type *t;
+    const struct struct_field *f;
+
+    if (target->kind != EXPR_FIELD ||
+        !sema_name_is(&target->as.field.name, COLLECTION_COUNT)) {
+        return false;
+    }
+    /* The checker reaches an inherited field through the fields it
+       wrote to the base, and the receiver is the collection below them.
+       A `use` field stops the walk, since what it holds is the
+       collection. */
+    receiver = target->as.field.base;
+    while (receiver->kind == EXPR_FIELD && receiver->as.field.promoted) {
+        const struct type *outer = sema_struct_of(receiver->as.field.base->type);
+        const struct struct_field *via =
+            outer != NULL ? types_find_field(outer, &receiver->as.field.name)
+                          : NULL;
+
+        if (via == NULL || via->form != FIELD_BASE) {
+            break;
+        }
+        receiver = receiver->as.field.base;
+    }
+    owner = sema_struct_of(target->as.field.base->type);
+    f = owner != NULL ? types_find_field(owner, &target->as.field.name) : NULL;
+    if (f == NULL || f->home == NULL) {
+        return false;
+    }
+    home = f->home->generic != NULL ? f->home->generic : f->home;
+    if (home->kind != TYPE_CLASS ||
+        !sema_name_is(&home->module, COLLECTION_MODULE) ||
+        !sema_name_is(&home->name, COLLECTION_BASE)) {
+        return false;
+    }
+    for (t = sema_struct_of(receiver->type); t != NULL; t = t->base) {
+        if (sema_same_name(&t->module, &c->module_name)) {
+            return false;
+        }
+        if (t == f->home) {
+            break;
+        }
+    }
+    sema_error_at(c, pos, "`" COLLECTION_COUNT "` of `%s` is read-only "
+                  "outside its module", sema_tn(sema_struct_of(receiver->type)));
     return true;
 }
 

@@ -611,6 +611,8 @@ bool sema_refuse_in_deferred(struct checker *c, struct pos pos,
    after creation, or its address, at pos. Returns whether it refused. */
 bool sema_refuse_singleton_write(struct checker *c, const struct expr *target,
                                  struct pos pos);
+bool sema_refuse_count_write(struct checker *c, const struct expr *target,
+                             struct pos pos);
 
 void sema_walk_worker(struct checker *c, const struct item *worker);
 bool sema_fills(const struct type *t, const struct type *abstract);

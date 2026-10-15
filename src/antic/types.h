@@ -557,6 +557,11 @@ struct type *types_object(struct types *types);
 #define COLLECTION_MODULE "anti.collection"
 #define COLLECTION_ITERABLE "Iterable"
 #define COLLECTION_ITERATOR "Iterator"
+/* DESIGN: `Collection<T>` of `anti.collection` is the base of every
+   collection, and its field `count` is read-only outside the module of
+   the collection, by decision 25 of "Decisions of 2026-10-11". */
+#define COLLECTION_BASE "Collection"
+#define COLLECTION_COUNT "count"
 #define WATCH_CHANGES "changes"
 #define WATCH_COUNT "count"
 #define CHANGES_COUNT "count"

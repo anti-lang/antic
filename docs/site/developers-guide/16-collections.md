@@ -30,7 +30,7 @@ Every collection has the operations of its base `Collection<T>`.
 
 | Operation | Result |
 |---|---|
-| `c.count` | the number of elements, a public field |
+| `c.count` | the number of elements, a public field that the module of the collection alone writes |
 | `c.is_empty()` | whether the count is 0 |
 | `c.find_all(test)` | a `Copies<T>`, a collection of copies of every element `test` accepts |
 | `c.find_first(test)` | a `?T`, a copy of the first match |

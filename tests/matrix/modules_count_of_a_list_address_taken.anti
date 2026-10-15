@@ -1,0 +1,11 @@
+//! Decision 25: `count` of a collection is read-only outside its module. The
+//! address of it would let a write through, so `&` is refused as `=` is.
+
+import anti.collection.list.{List};
+
+fn main() -> int
+{
+	let xs = List<int>.new();
+	let p = &xs.count;
+	return 0;
+}

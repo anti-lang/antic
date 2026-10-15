@@ -1002,7 +1002,8 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             sema_error_at(c, operand->pos, "a bitfield has no address");
             return sema_builtin(c, TYPE_ERROR);
         }
-        if (!ending && sema_refuse_singleton_write(c, operand, e->pos)) {
+        if (!ending && (sema_refuse_singleton_write(c, operand, e->pos) ||
+                        sema_refuse_count_write(c, operand, e->pos))) {
             return sema_builtin(c, TYPE_ERROR);
         }
         sema_mark_address_taken(c, operand);

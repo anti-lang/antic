@@ -1,0 +1,32 @@
+//! Decision 25: `count` of a collection is read-only outside its module. A
+//! class of the program that inherits a collection is a collection of this
+//! module, which writes its `count`.
+
+import anti.collection.list.{List};
+import anti.collection;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counted inherits List<int>
+{
+	pub fn make() -> Counted
+	{
+		return Counted { from: collection.allocator(none) };
+	}
+
+	pub fn forget(self)
+	{
+		self.count = 0;
+	}
+}
+
+fn main() -> int
+{
+	let c = Counted.make();
+	c.push(4);
+	c.push(5);
+	printf("before %lld\n".ptr, c.count);
+	c.forget();
+	printf("after %lld\n".ptr, c.count);
+	return 0;
+}
