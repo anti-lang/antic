@@ -250,7 +250,9 @@ static void owned_by(struct made *m, void *object, void **owner)
    every block go back to the allocator. Each owning field is cleared
    first. The teardown of an object then reaches none of the objects the
    reader made for it, which have their own place on the list. The
-   teardowns give nothing back, since the blocks go back afterwards. */
+   teardowns give nothing back, since the blocks go back afterwards. The
+   `created` hook counted each object against its library, so each counts
+   off once its teardown has returned, as `delete` does. */
 static void give_back(struct reader *r)
 {
     void (*give)(struct anti_object *, void *) =
@@ -265,8 +267,10 @@ static void give_back(struct reader *r)
         }
     }
     while (m->object_count > 0) {
-        anti_rt_destroy_from(m->objects[--m->object_count].object, NULL,
-                             &anti_rt_give_nothing);
+        void *object = m->objects[--m->object_count].object;
+        const void *table = ((struct anti_object *)object)->table;
+        anti_rt_destroy_from(object, NULL, &anti_rt_give_nothing);
+        anti_rt_plugin_destroyed(table);
     }
     while (m->count > 0) {
         give(r->from, m->blocks[--m->count]);
