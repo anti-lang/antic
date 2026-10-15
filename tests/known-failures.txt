@@ -67,15 +67,10 @@ constant_argument_modules_release T094 A constant of another module is refused a
 constant_argument_modules_dev T094 A constant of another module is refused as the argument of `N: int`.
 error_modules_type_nested_in_a_generic_class T095 A message on a copy of a library generic names a line of the library in the file of the client.
 error_modules_type_nested_in_a_generic_class_passed_on T095 A message on a copy of a library generic names a line of the library in the file of the client.
-error_iter_gives_no_iterator T096 A loop over a class whose `operator fn iter` is refused gets a second message.
-error_simd_lanes_compared T096 `==` on a `simd struct` whose lanes are refused gets a second message.
-error_copy_nests_deep_field T096 A field of a copy that is refused gets a second message.
 anti_bind_message_clang_static_without_a_body T098 A `static` function without a body gets a second warning, which names its result.
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
 error_if_at_the_depth_limit T103 antic never ends on an `if` whose statement stands at the last level of the depth limit.
 matrix_modules_export_union_aligned_on_a_bitfield_refused T110 The refusal of an aligned `export union` whose first field is a bitfield calls the union a struct.
-matrix_flow_walk_with_an_iter_of_two_parameters_refused T096 A loop over a struct whose `operator fn iter` is refused gets a second message.
-matrix_flow_walk_with_a_next_of_two_parameters_refused T096 A loop over an iterator whose `operator fn next` is refused gets a second message.
 anti_bind_huge_enum T117 An enum with a value above the signed 64-bit range is bound with the base `c_int`, and its struct lays out wrong. host=macos,linux
 anti_bind_nested_enum T118 The enumerators of an enum without a name inside a struct are no constants of the binding.
 anti_bind_message_clang_float_with_a_large_exponent T119 `anti bind` writes a float with the exponent `e+20`, which does not lex, and ends with 1.

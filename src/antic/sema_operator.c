@@ -302,6 +302,34 @@ bool sema_is_iterator(struct checker *c, struct type *t)
            sema_hook(c, t, LANG_HOOK_VALUE) != NULL;
 }
 
+/* Whether hook, the `operator fn` of the language hook name, has the
+   signature its construct calls. check_hook of sema_class.c refuses one
+   that has not at its declaration, and a construct that would call it
+   gives no second message. A hook without a function type yet is taken
+   as it stands. */
+bool sema_hook_well_formed(struct checker *c, const struct symbol *hook,
+                           const char *name)
+{
+    const struct type *sig = hook != NULL ? hook->type : NULL;
+
+    if (sig == NULL || sig->kind != TYPE_FN) {
+        return true;
+    }
+    if (sig->may_fail || sig->param_count != 1) {
+        return false;
+    }
+    if (strcmp(name, LANG_HOOK_NEXT) == 0) {
+        return sig->result->kind == TYPE_BOOL;
+    }
+    if (strcmp(name, LANG_HOOK_VALUE) == 0) {
+        return sig->result->kind != TYPE_VOID;
+    }
+    if (strcmp(name, LANG_HOOK_ITER) == 0) {
+        return sema_is_iterator(c, sig->result);
+    }
+    return true;
+}
+
 /* The receiver of an operator call: the operand itself, or its address
    when the function takes `self`. */
 static struct expr *operator_receiver(struct checker *c, struct expr *a,

@@ -1677,6 +1677,11 @@ static struct type *check_call(struct checker *c, struct expr *e,
 static void refuse_field(struct checker *c, const struct expr *e,
                          const struct type *t, const struct name *name)
 {
+    /* A copy that a refused chain of copies left unfilled has no
+       fields, and the refusal is the one message. */
+    if (t->generic != NULL && t->unfilled && c->copy_refused) {
+        return;
+    }
     if (e->as.field.bare) {
         sema_error_at(c, e->pos, "no `operator fn %.*s` of the module takes "
                       "`%s` first", (int)name->length, name->text,

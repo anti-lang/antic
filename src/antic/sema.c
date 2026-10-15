@@ -655,7 +655,7 @@ static void check_simd_struct(struct checker *c, struct item *it)
     /* DESIGN: a lane is a number an operator of the processor takes, or
        the `bool` of a mask. A `char` has four bytes of a fixed width and
        no arithmetic, so R062 of "Rules of 2026-10-13" refuses it. */
-    if (types_lane_bytes(lane) == 0 || lane->kind == TYPE_CHAR) {
+    if (sema_simd_lane_refused(lane)) {
         sema_error_at(c, t->fields[0].pos, "a lane of a `simd struct` is an "
                       "integer of a fixed width, a float or `bool`, not `%s`",
                       sema_tn(lane));

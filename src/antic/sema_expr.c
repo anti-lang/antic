@@ -1144,6 +1144,7 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
                   struct iteration *it, struct type **element)
 {
     struct expr *start = e;
+    struct symbol *iter;
 
     /* A value of a type parameter walks as its constraints allow, and so
        does one a pointer reaches, as a collection is walked through one. */
@@ -1154,7 +1155,14 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
         t->element->kind == TYPE_PARAM) {
         return sema_param_iterate(c, e, t->element, element);
     }
-    if (sema_hook(c, t, LANG_HOOK_ITER) != NULL) {
+    iter = sema_hook(c, t, LANG_HOOK_ITER);
+    if (iter != NULL) {
+        /* A hook refused at its declaration has that one message, by
+           T096 of docs/audit/tests-findings.md. */
+        if (!sema_hook_well_formed(c, iter, LANG_HOOK_ITER)) {
+            *element = sema_builtin(c, TYPE_ERROR);
+            return true;
+        }
         start = sema_hook_call(c, e, LANG_HOOK_ITER, NULL, 0);
         t = sema_check_expr(c, start, NULL);
         if (sema_is_error(t)) {
@@ -1177,6 +1185,13 @@ bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
         t = types_pointer(c->types, t);
         start->type = t;
         sema_mark_address_taken(c, e);
+    }
+    if (!sema_hook_well_formed(c, sema_hook(c, t, LANG_HOOK_NEXT),
+                               LANG_HOOK_NEXT) ||
+        !sema_hook_well_formed(c, sema_hook(c, t, LANG_HOOK_VALUE),
+                               LANG_HOOK_VALUE)) {
+        *element = sema_builtin(c, TYPE_ERROR);
+        return true;
     }
     it->start = start;
     it->cursor = sema_declare(c, SYMBOL_LOCAL, &hidden_iterator, e->pos,
@@ -2282,6 +2297,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
         if (sema_refuse_abstract_value(c, e->pos, "a literal", t)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        /* A copy that a refused chain of copies left unfilled has no
+           fields, and the refusal is the one message, by T096 of
+           docs/audit/tests-findings.md. */
+        if (t->generic != NULL && t->unfilled && c->copy_refused) {
             return sema_builtin(c, TYPE_ERROR);
         }
         if (t->is_union && e->as.struct_lit.field_count != 1) {

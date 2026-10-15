@@ -16,12 +16,24 @@ bool sema_simd_numeric(const struct type *lane)
     return types_is_numeric(lane) || lane->kind == TYPE_F16;
 }
 
+/* Whether the declaration of a simd struct refuses lane, the type of
+   its first field, as check_simd_struct of sema.c does. */
+bool sema_simd_lane_refused(const struct type *lane)
+{
+    return types_lane_bytes(lane) == 0 || lane->kind == TYPE_CHAR;
+}
+
 /* Unary `-` and `~` on a simd struct apply lane by lane, with the lanes
    that each takes on one value. */
 struct type *sema_check_simd_unary(struct checker *c, struct expr *e,
                                    struct type *t)
 {
     struct type *lane = types_simd_lane(t);
+
+    /* The declaration refused the lanes, and that is the one message. */
+    if (sema_simd_lane_refused(lane)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
 
     if (e->as.unary.op == TOKEN_MINUS && !types_is_signed(lane) &&
         !types_is_float(lane) && lane->kind != TYPE_F16) {
@@ -57,6 +69,9 @@ struct type *sema_check_simd_binary(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     lane = types_simd_lane(left);
+    if (sema_simd_lane_refused(lane)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
     switch (op) {
     case TOKEN_PLUS:
     case TOKEN_MINUS:

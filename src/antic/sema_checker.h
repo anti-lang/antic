@@ -416,6 +416,8 @@ bool sema_module_operator(struct checker *c, struct type *t,
                           const char *text);
 struct symbol *sema_hook(struct checker *c, struct type *t, const char *text);
 bool sema_is_iterator(struct checker *c, struct type *t);
+bool sema_hook_well_formed(struct checker *c, const struct symbol *hook,
+                           const char *name);
 /* The value of type t that a hidden operand or a value the caller holds
    stands for, `*p`, in the arena of the checker. It is checked already
    and never lowered. */
@@ -437,6 +439,7 @@ struct type *sema_check_in(struct checker *c, struct expr *e);
 /* sema_simd.c */
 
 bool sema_simd_numeric(const struct type *lane);
+bool sema_simd_lane_refused(const struct type *lane);
 struct type *sema_check_simd_unary(struct checker *c, struct expr *e,
                                    struct type *t);
 struct type *sema_check_simd_binary(struct checker *c, struct expr *e,

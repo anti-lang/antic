@@ -783,22 +783,19 @@ static void check_hook(struct checker *c, const struct item *m,
                     sema_tn(sig->params[0]));
     }
     if (sema_name_is(&m->name, LANG_HOOK_NEXT)) {
-        ok = !sig->may_fail && sig->param_count == 1 &&
-             sig->result->kind == TYPE_BOOL;
+        ok = sema_hook_well_formed(c, m->symbol, LANG_HOOK_NEXT);
         if (!ok) {
             sema_error_at(c, m->name_pos, "`operator fn next` is written "
                           "`operator fn next(%s) -> bool`", self);
         }
     } else if (sema_name_is(&m->name, LANG_HOOK_VALUE)) {
-        ok = !sig->may_fail && sig->param_count == 1 &&
-             sig->result->kind != TYPE_VOID;
+        ok = sema_hook_well_formed(c, m->symbol, LANG_HOOK_VALUE);
         if (!ok) {
             sema_error_at(c, m->name_pos, "`operator fn value` is written "
                           "`operator fn value(%s) -> T`", self);
         }
     } else if (sema_name_is(&m->name, LANG_HOOK_ITER)) {
-        ok = !sig->may_fail && sig->param_count == 1 &&
-             sema_is_iterator(c, sig->result);
+        ok = sema_hook_well_formed(c, m->symbol, LANG_HOOK_ITER);
         if (!ok) {
             sema_error_at(c, m->name_pos, "`operator fn iter` is written "
                           "`operator fn iter(%s) -> I`, where `I` has "

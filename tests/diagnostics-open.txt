@@ -54,9 +54,9 @@ expected a type, found a constant
 antic compiles no copy here yet, %s
 
 # src/antic/sema_expr.c
-# Stays: antic gives it as a second message alone, before the refusal of
-# the declaration of the hook. T096, and error_iter_gives_no_iterator holds
-# the one message.
+# Stays: no program reaches it. An `operator fn iter` that gives no
+# iterator is refused at its declaration, and since T096 a loop over it
+# gives no second message, which error_iter_gives_no_iterator holds.
 `operator fn iter` gives `%s`, which has no `operator fn next` and `operator fn value`
 
 # src/antic/sema_generic.c
@@ -73,8 +73,9 @@ antic compiles no copy here yet, %s
 # src/antic/sema_safety.c
 
 # src/antic/sema_simd.c
-# Stays: antic gives it as a second message alone, after the refusal of the
-# lanes it names. T096, and error_simd_lanes_compared holds the one message.
+# Stays: no program reaches it. Every lane the declaration takes has `==`,
+# and since T096 a lane it refuses gives that one message, which
+# error_simd_lanes_compared holds.
 `%s` is not defined on the lanes of `%s`
 
 # src/antic/sema_stmt.c
