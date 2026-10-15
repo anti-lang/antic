@@ -102,7 +102,7 @@ length 12 0
 
 A condition that compares a local or a parameter with `none` narrows that name. In `length` the parameter `p` has type `?*int`. Right of `p != none &&` and inside the block it has type `*int`, so `*p` compiles. A test `p == none` whose block leaves narrows `p` for the rest of the enclosing block. `&&` narrows what follows it, and `||` narrows nothing inside the block, since either side may have been the true one. An assignment to the name ends the narrowing. A field is never narrowed, because any call may write it. [Chapter 7]({{% relref "07-optionals" %}}) holds the full rule, with `if let` and `let ... else`, which bind the checked value to a new name.
 
-A function with a result ends every path in a `return`. The checker reads the form of the last statement alone. An `if` whose every branch leaves, with an `else`, counts. A `switch` whose every arm and `else` end the path counts too, and without an `else` it counts on an enum or a variant, where it names every value. A `while true do { }` counts when no `break` belongs to it.
+A function with a result ends every path in a `return`. The checker reads the form of the last statement alone. An `if` whose every branch leaves, with an `else`, counts, and so does an `if let` whose block and `else` both leave. A block counts when its last statement does. A `switch` whose every arm and `else` end the path counts too, and without an `else` it counts on an enum or a variant, where it names every value. A `while true do { }` counts when no `break` belongs to it.
 
 The checker refuses each of the following.
 

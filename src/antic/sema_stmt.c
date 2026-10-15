@@ -267,6 +267,11 @@ static bool stmt_returns(const struct stmt *s)
     if (s->kind == STMT_SYNC) {
         return block_returns(s->as.sync.body);
     }
+    /* So does a block, which is also the form the checker writes for an
+       `if let` on a `?T`: a `let` and an `if` with an `else`. */
+    if (s->kind == STMT_BLOCK) {
+        return block_returns(s->as.block);
+    }
     /* `if let` is an `if` with an `else`, whose two blocks are the arm
        and the `else` of its switch. */
     if (s->kind == STMT_SWITCH && s->as.switch_stmt.if_let) {

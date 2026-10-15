@@ -20,9 +20,6 @@
 # The test known_failures checks the list against the table of the findings.
 matrix_flow_defer_directly_in_defer_refused T006 The refusal of a `defer` in a `defer` stands at the next statement.
 matrix_flow_undo_directly_in_undo_refused T006 The refusal of an `undo` in an `undo` stands at the next statement.
-matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
-matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
-matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 check_slice_range T017 A dev build does not check the bounds of a slice of an array.
 fmt_alias_of_function T025 anti fmt moves the functions after a type alias of a function type.
 generic_atomic_modules_release T029 antic cannot read back a library file whose generic changes a `static atomic` field.
