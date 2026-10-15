@@ -79,6 +79,10 @@ bool absolute_path(const char *path, struct text *out);
    it starts any. R163 of "Rules of 2026-10-13". */
 void platform_set_tool(const char *name);
 
+/* Put the standard output into binary mode on Windows. Elsewhere it does
+   nothing. */
+void platform_binary_stdout(void);
+
 /* Run the program argv[0], found through PATH when it contains no '/',
    with the NULL-terminated argument list argv. Return its exit status, or
    -1 when it could not start or ended by a signal. The program inherits

@@ -17,8 +17,14 @@
 
 #include "platform.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 #include "alloc.h"
 #include "target.h"
@@ -37,6 +43,18 @@ static const char *tool = "antic";
 void platform_set_tool(const char *name)
 {
     tool = name;
+}
+
+/* DESIGN: by the raw-bytes rule under "Program entry" in
+   docs/decisions.md output is the bytes written on every host. The C
+   streams of Windows start in text mode, which writes CRLF for each LF,
+   so a tool whose standard output is read as bytes puts it into binary
+   mode, by T132. */
+void platform_binary_stdout(void)
+{
+#if defined(_WIN32)
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
 }
 
 /* DESIGN: the host is fixed when the tools are compiled, from the
