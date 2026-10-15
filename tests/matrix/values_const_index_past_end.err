@@ -1,1 +1,1 @@
-values_const_index_past_end.anti:5:25: error: the index 5 is outside the constant array
+values_const_index_past_end.anti:5:25: error: the index 5 is outside the array of length 3

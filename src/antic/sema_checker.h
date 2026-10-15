@@ -542,10 +542,10 @@ void sema_chain_prepare(struct checker *c, struct symbol *root,
 
 bool sema_undefined_on_constants(struct checker *c, struct expr *e,
                                  const struct type *result);
-/* Report a constant index e below zero on a base of the fixed array type
-   array. True when it reported. */
-bool sema_index_below_zero(struct checker *c, struct expr *e,
-                           const struct type *array);
+/* Report a constant index e below zero or past the end on a base of the
+   fixed array type array. True when it reported. */
+bool sema_index_outside(struct checker *c, struct expr *e,
+                        const struct type *array);
 /* Report a constant value that does not fit the width of the bitfield
    field. True when it reported. */
 bool sema_bitfield_constant(struct checker *c, struct expr *value,

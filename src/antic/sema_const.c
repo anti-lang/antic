@@ -480,12 +480,13 @@ bool sema_bitfield_constant(struct checker *c, struct expr *value,
 }
 
 /* DESIGN: a constant index below zero on a fixed array names no element,
-   by R030 of "Rules of 2026-10-13", as decision 24 of "Decisions of
-   2026-10-11" says of one past the end. The length is a number, or the
-   text of a length computed from `size_of`. e is the index expression
-   and array the type of its base. */
-bool sema_index_below_zero(struct checker *c, struct expr *e,
-                           const struct type *array)
+   by R030 of "Rules of 2026-10-13", and neither does one past the end,
+   by decision 24 of "Decisions of 2026-10-11". The length is a number,
+   or the text of a length computed from `size_of`, whose value differs
+   between targets, so an index is held to such a length in dev mode
+   alone. e is the index expression and array the type of its base. */
+bool sema_index_outside(struct checker *c, struct expr *e,
+                        const struct type *array)
 {
     struct const_value v;
     struct context saved;
@@ -496,7 +497,8 @@ bool sema_index_below_zero(struct checker *c, struct expr *e,
     constant = sema_eval_const(c, e, &v);
     sema_leave(c, &saved);
     if (!constant || v.kind != CONST_INT ||
-        sema_signed_bits(v.as.integer) >= 0) {
+        (sema_signed_bits(v.as.integer) >= 0 &&
+         (array->length_of != NULL || v.as.integer < array->length))) {
         return false;
     }
     if (array->length_of != NULL) {
@@ -1061,10 +1063,9 @@ static bool const_index(struct checker *c, struct expr *e,
         return fail_const(c, e, "an element of an array whose length is no "
                           "number");
     }
+    /* The checker refused an index outside the array where it checked
+       the expression, by sema_index_outside, so none reaches the fold. */
     if (b.as.integer >= a.as.aggregate.count) {
-        sema_error_at(c, e->as.index.index->pos,
-                      "the index %lld is outside the "
-                      "constant array", (long long)b.as.integer);
         return false;
     }
     *out = a.as.aggregate.items[b.as.integer];
