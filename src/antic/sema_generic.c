@@ -1201,9 +1201,13 @@ static bool subst_value(struct checker *c, const struct const_value *v,
 
     *out = *v;
     out->type = subst(c, v->type, map);
+    /* A value whose type names a parameter changes with it, as the
+       literal `Cell<T> { }` of a default does, by T126 of
+       docs/audit/tests-findings.md. */
+    changed = changed || out->type != v->type;
     if (v->kind == CONST_SYMBOLIC) {
         out->as.symbolic = subst_symbolic(c, v->as.symbolic, map);
-        return out->as.symbolic != v->as.symbolic;
+        return changed || out->as.symbolic != v->as.symbolic;
     }
     if (v->kind != CONST_ARRAY && v->kind != CONST_STRUCT &&
         v->kind != CONST_REPEAT) {

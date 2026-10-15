@@ -248,9 +248,6 @@ llvm_coff_plugin_f16 T121 A plugin that converts an `f16` below x86-64-v3 finds 
 dump_llvm_wchar_constant_macos-arm64 T122 A constant of `c_wchar` computed from `size_of` folds without a sign where `wchar_t` is signed.
 anti_doc_message_source_does_not_parse T123 `anti doc` prints the message of a source that does not parse twice.
 anti_doc_wrapped_link T124 A link of a doc comment whose text `anti fmt` wraps over two lines is written as text.
-matrix_classes_default_is_a_copy_of_the_parameter_dev T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
-matrix_classes_default_is_a_copy_of_the_parameter_release T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
-matrix_classes_default_is_a_copy_of_the_parameter_memory_checks T126 antic writes LLVM text that opt and llc refuse for a default that is a copy named by the parameter of its class.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_dev T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_release T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
 matrix_ownership_own_pointer_that_a_generic_does_not_hand_on_memory_checks T127 An `own` parameter of a pointer type that a generic does not hand on is not deleted.
