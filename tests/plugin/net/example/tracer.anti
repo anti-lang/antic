@@ -13,9 +13,9 @@ pub class Tracer
 	/// The traces this object took.
 	pub taken: int = 0,
 
-	/// The trace of the call, whose innermost frame is this function. The
-	/// count after the capture keeps the call from being a tail call, which
-	/// leaves no frame of the library.
+	/// The trace of the call, whose innermost frame is this function. The count
+	/// after the capture keeps the call from being a tail call, which leaves no
+	/// frame of the library.
 	pub concrete fn trace(self) -> *lang.StackTrace
 	{
 		let made = lang.StackTrace.capture();

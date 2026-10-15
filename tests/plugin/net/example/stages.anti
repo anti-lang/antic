@@ -1,7 +1,7 @@
 //! The interface that the host of the test plugin_stages shares with its
-//! library, and the step both sides wait for. The step is a field of a class
-//! of this module, which the host defines and the library binds against, so
-//! the two read one word.
+//! library, and the step both sides wait for. The step is a field of a class of
+//! this module, which the host defines and the library binds against, so the
+//! two read one word.
 
 /// The step the host and its library have reached.
 pub class Step

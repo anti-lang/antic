@@ -1,8 +1,8 @@
-//! A host that tries to unload a library while its main thread runs the code
-//! of the library: while `reflect.new` builds an object of a class of the
-//! library, while `delete` ends one and while `Object.deserialize` builds one. The library holds the main thread in
-//! that code until a worker has tried the unload, so each unload must refuse.
-//! S307 and S308 of docs/audit/summary.md.
+//! A host that tries to unload a library while its main thread runs the code of
+//! the library: while `reflect.new` builds an object of a class of the library,
+//! while `delete` ends one and while `Object.deserialize` builds one. The
+//! library holds the main thread in that code until a worker has tried the
+//! unload, so each unload must refuse. S307 and S308 of docs/audit/summary.md.
 
 import anti.lang;
 import anti.mem;
