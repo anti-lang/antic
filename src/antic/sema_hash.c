@@ -88,11 +88,21 @@ static void append(struct checker *c, struct expr ***calls, size_t *count,
     *calls = grown;
 }
 
-/* Add the call of the function of t to e, once per type. */
+/* Add the call of the function of t to e, once per type. An `operator
+   fn hash` of another form than `operator fn hash(x: T) -> u64` has its
+   message on the declaration, and the call the default hash would make
+   gets none of its own, by T109 of docs/audit/tests-findings.md. */
 static void add_call(struct checker *c, struct expr *e, struct type *t)
 {
+    const struct symbol *hook = sema_hook(c, t, LANG_HOOK_HASH);
+    const struct type *sig = hook != NULL ? hook->type : NULL;
     struct expr *call;
 
+    if (sig != NULL && sig->kind == TYPE_FN &&
+        (sig->may_fail || sig->param_count != 1 ||
+         sig->result->kind != TYPE_U64)) {
+        return;
+    }
     if (listed(e->as.call.hash_calls, e->as.call.hash_count, t)) {
         return;
     }
