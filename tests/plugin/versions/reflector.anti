@@ -1,0 +1,49 @@
+//! A host that calls through `reflect.call`, so the loader may write a stub for
+//! a slot of the interface that a library lacks. It calls the function `extra`
+//! of the class the library provides, and then unloads the library once the
+//! object is deleted.
+
+import anti.io;
+import anti.lang;
+import anti.plugin;
+import anti.reflect;
+import anti.text;
+import net.example.greet;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let g = lib.instance(greet.Greeter) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	io.println(g.words());
+	let o: *Object = g;
+	let d = reflect.describe(o as *byte) else {
+		io.println("no descriptor");
+		return 1;
+	};
+	for i in 0..reflect.function_count(d) {
+		if text.equal(reflect.function(d, i).name, "extra") {
+			let none_given = []reflect.Value { ptr: none, len: 0 };
+			let r = reflect.call(o, i, none_given) catch e {
+				io.println(e.message);
+				return 1;
+			};
+			if r.data.i == 42 {
+				io.println("extra 42");
+			}
+		}
+	}
+	delete(g);
+	lib.unload() catch e {
+		io.println(e.message);
+		return 1;
+	};
+	io.println("unloaded");
+	delete(lib);
+	return 0;
+}

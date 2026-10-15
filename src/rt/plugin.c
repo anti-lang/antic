@@ -298,10 +298,19 @@ static void stub(struct anti_object *self)
 }
 
 /* Whether the program may reach a slot through reflection that the
-   library does not carry. */
+   library does not carry.
+
+   DESIGN: a sub-object at offset 0 is the object itself, which a class
+   that inherits the interface has. Its table is the table of the class,
+   whose own functions stand in the slots past those of the interface
+   the library was built with. A stub table there would hide them, and a
+   table on the heap names no library to the count of live objects. Such
+   an object keeps its table. `reflect.call` names a function by the
+   descriptor of the class, so every slot it reaches there is one the
+   library carries. */
 static int needs_stubs(const struct anti_provides *e)
 {
-    return anti_rt_slots.reflect != 0 &&
+    return anti_rt_slots.reflect != 0 && e->offset != 0 &&
            e->descriptor->function_count > e->chain_length - 1;
 }
 

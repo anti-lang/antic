@@ -77,8 +77,11 @@ function, which the function list of the host's descriptor gives by
 slot.
 
 `stubs_of` writes a table for the sub-object of an object the loader
-builds. The library's entries come first and a stub fills every slot
-above them. `build` copies the library's entries into it on the first
-object and points the sub-object at it. The stub reads the table back
+builds, where the sub-object stands past the start of the object. The
+library's entries come first and a stub fills every slot above them.
+`build` copies the library's entries into it on the first object and
+points the sub-object at it. A class that inherits the interface holds it
+at offset 0 and keeps the table of its class, whose own functions follow
+those of the interface. The stub reads the table back
 through the object it was called with. It steps to the header before the
 table and names the class the library provides and its version.

@@ -1,8 +1,10 @@
-# Build one host and six libraries of an interface of the same name, each
-# against another version of it, and load each into the host. A newer
+# Build four hosts and seven libraries of an interface of the same name,
+# each against another version of it, and load each into a host. A newer
 # library and an older one load, and the checks of "Versions" refuse the
 # rest: a field added, a version below the floor, a slot the program
-# calls and the library lacks, and an interface of another structure.
+# calls and the library lacks, and an interface of another structure. A
+# host that calls through reflection loads an older library whose class
+# inherits the interface.
 # Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   LLVM_MC   the llvm-mc executable
@@ -66,6 +68,7 @@ file(REMOVE_RECURSE "${WORK}")
 # Each stands in a directory of its own, so a search root names one.
 foreach(part "base|${SOURCES}|0.0.0" "one|${versions}/one|0.0.0"
              "three|${versions}/three|0.0.0"
+             "inherits|${versions}/inherits|0.0.0"
              "field|${versions}/field|0.0.0"
              "foreign|${versions}/foreign|0.0.0"
              "floor-1.0|${versions}/floor|1.0"
@@ -84,6 +87,7 @@ endforeach()
 # directory and to nothing else. loads builds each on its first use.
 set(root_one "${versions}/one")
 set(root_three "${versions}/three")
+set(root_inherits "${versions}/inherits")
 set(root_field "${versions}/field")
 set(root_foreign "${versions}/foreign")
 set(root_floor-1.0 "${versions}/floor")
@@ -91,7 +95,8 @@ set(root_floor-1.1 "${versions}/floor")
 
 # The hosts. reader calls one function of the interface and caller both,
 # so the bitmap of the second holds the slot of `asked`.
-foreach(part "reader|base" "caller|base" "floor|floor-1.1")
+foreach(part "reader|base" "caller|base" "reflector|base"
+             "floor|floor-1.1")
     string(REPLACE "|" ";" one "${part}")
     list(GET one 0 name)
     list(GET one 1 interface)
@@ -122,3 +127,14 @@ loads(reader foreign no
 # `compatible 1.1;` refuses a library built for 1.0.
 loads(floor floor-1.0 no "this program takes 1.1 and above")
 loads(floor floor-1.1 yes "from the floor library")
+# A program that calls `reflect.call` gets a stub for a slot that the
+# library lacks. A class that inherits the interface holds it at offset
+# 0, and its own functions stand in the slots past those of the earlier
+# interface. The class keeps its table, a call of its own function
+# reaches it, and the library unloads once the object is deleted.
+loads(reflector inherits yes
+      "^from the inheriting library\nextra 42\nunloaded\n$")
+# A class that implements the interface holds it as a sub-object, which
+# gets the table of stubs. The object keeps the table of its class, so
+# the library unloads.
+loads(reflector one yes "^from the older library\nunloaded\n$")
