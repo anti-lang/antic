@@ -1,0 +1,1 @@
+flow_if_let_binding_assigned_in_closure.anti:27:11: error: `h` may be `none`, test it before reading it

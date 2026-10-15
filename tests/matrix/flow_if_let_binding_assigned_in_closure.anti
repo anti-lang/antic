@@ -1,0 +1,38 @@
+//! A closure reads the name of an `if let` narrowed only when nothing in the
+//! block can assign it. Here the block assigns it, so the closure reads a
+//! value that may be `none`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn each(count: int, f: fn(int))
+{
+	for i in 0..count {
+		f(i);
+	}
+}
+
+fn half(n: int) -> ?int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	return none;
+}
+
+fn run(n: int) -> int
+{
+	let acc = 0;
+	if let h = half(n) {
+		each(2, fn(k) {
+			acc += h * 10;
+		});
+		h = none;
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, run(4) as c_int);
+	return 0;
+}

@@ -2069,9 +2069,11 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             }
         }
         /* A closure may run after the variable has changed, so a
-           captured variable keeps its declared type. */
+           captured variable keeps its declared type. The name of an
+           `if let` that its block never assigns holds its value
+           wherever the block reaches. */
         if (sym->type != NULL && types_is_nullable(sym->type) &&
-            sym->frame == c->ctx.function) {
+            (sym->frame == c->ctx.function || sym->steady)) {
             struct type *proved = sema_narrowed_type(c, sym);
             if (proved != NULL) {
                 return proved;

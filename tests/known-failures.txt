@@ -18,9 +18,6 @@
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
 # The test known_failures checks the list against the table of the findings.
-matrix_flow_if_let_binding_in_closure_dev T004 A closure reads the name of an `if let` as a value that may be `none`.
-matrix_flow_if_let_binding_in_closure_release T004 A closure reads the name of an `if let` as a value that may be `none`.
-matrix_flow_if_let_binding_in_closure_memory_checks T004 A closure reads the name of an `if let` as a value that may be `none`.
 matrix_flow_defer_directly_in_defer_refused T006 The refusal of a `defer` in a `defer` stands at the next statement.
 matrix_flow_undo_directly_in_undo_refused T006 The refusal of an `undo` in an `undo` stands at the next statement.
 matrix_flow_if_let_arms_all_return_dev T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.

@@ -144,6 +144,9 @@ struct symbol {
     int loops;
     /* A local or a parameter that a closure captures. */
     bool captured;
+    /* The name of an `if let` on a `?T` that its block never assigns, so
+       a closure in the block reads it narrowed as well. */
+    bool steady;
     /* A parameter written `own`, which the function owns and tears down
        at every exit unless it moves on. */
     bool own_param;

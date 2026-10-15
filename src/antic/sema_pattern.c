@@ -772,12 +772,68 @@ static struct stmt *new_stmt(struct checker *c, enum stmt_kind kind,
     return s;
 }
 
+/* The walk of a block for a statement that may give the name of an
+   `if let` another value. */
+struct name_writes {
+    const struct name *name;
+    bool written;
+};
+
+static bool names_it(const struct name_writes *w, const struct expr *e)
+{
+    return e != NULL && e->kind == EXPR_NAME &&
+           sema_same_name(&e->as.name, w->name);
+}
+
+static bool visit_write_expr(void *data, const struct expr *e);
+
+static bool visit_write_stmt(void *data, const struct stmt *s)
+{
+    struct name_writes *w = data;
+
+    if (s->kind == STMT_ASSIGN && names_it(w, s->as.assign.target)) {
+        w->written = true;
+    }
+    return !w->written;
+}
+
+/* An anonymous function in the block may assign the name too, and `&m`
+   gives a pointer through which anything may. */
+static bool visit_write_expr(void *data, const struct expr *e)
+{
+    struct name_writes *w = data;
+
+    if (e->kind == EXPR_UNARY && e->as.unary.op == TOKEN_AMP &&
+        names_it(w, e->as.unary.operand)) {
+        w->written = true;
+    }
+    if (e->kind == EXPR_FN && e->as.fn != NULL && !w->written) {
+        struct ast_visitor v = {visit_write_expr, visit_write_stmt, w};
+        ast_walk_block(&v, e->as.fn->body);
+    }
+    return !w->written;
+}
+
+/* Whether b may give a name spelled as name another value. The walk
+   reads the spelling before the checker resolves it, so a name of an
+   inner block that shadows it counts as well. */
+static bool block_writes(const struct block *b, const struct name *name)
+{
+    struct name_writes w = {name, false};
+    struct ast_visitor v = {visit_write_expr, visit_write_stmt, &w};
+
+    ast_walk_block(&v, b);
+    return w.written;
+}
+
 /* DESIGN: `if let m = e { } else { }` on a value that may be `none`, a
    match among them, binds m in the first block, where it holds one, and
    runs the `else` where it does not. The checker writes it as the block
    `{ let m = e; if m != none { } else { } }` with m narrowed in the first
    block, so lowering reads a `let` and an `if`. The `else` is checked
-   before m is declared, so it does not see m. */
+   before m is declared, so it does not see m. A closure in the block
+   reads m narrowed when nothing in the block can assign it, which the
+   `if let` form promises: m holds the value. */
 void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
 {
     struct switch_arm *arm = &s->as.switch_stmt.arms[0];
@@ -814,6 +870,7 @@ void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
         cond->symbol = sym;
         cond->type = t;
         test_of(c, cond, t);
+        sym->steady = !block_writes(body, &let->as.let.name);
         sema_enter_scope(c, &inner);
         sema_narrow(c, sym, types_without_none(c->types, t));
         sema_check_block(c, body);
