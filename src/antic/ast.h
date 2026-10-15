@@ -207,7 +207,8 @@ enum handler_kind {
 struct handler {
     enum handler_kind kind;
     struct name name;               /* the error, empty in `catch { }` */
-    struct pos pos;
+    struct pos pos;                 /* the name, or else `catch` */
+    struct pos at;                  /* `catch`, or `try` */
     struct block *body;             /* HANDLE_BLOCK */
     struct symbol *symbol;          /* the error the handler binds */
     /* `catch none`: a HANDLE_BLOCK whose body the parser wrote as

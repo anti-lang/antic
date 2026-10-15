@@ -607,7 +607,7 @@ For a Java programmer:
 
 - `try` is not a block that guards a region. It marks one call and forwards its error. The guarding form is `try { } catch e { }`.
 - A handler has no type list. One handler takes every error, and tests the class inside.
-- A handler that reaches its end without `yield` leaves the name of the `let` without a defined value. The checker accepts it, so every path of such a handler ends in `yield` or leaves the function.
+- A handler whose value a `let`, an assignment or a guard takes ends every path in `yield`, `fail`, `return` or a call that returns `never`. The checker refuses one that can reach its end, since the name would hold no defined value. The handler of a call that stands as a statement may reach its end.
 
 For a C programmer:
 

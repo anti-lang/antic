@@ -705,6 +705,7 @@ static void io_handler(struct io *io, struct handler *h)
     IO_ENUM(io, h->kind, HANDLE_ENCLOSING);
     io_name(io, &h->name);
     io_pos(io, &h->pos);
+    io_pos(io, &h->at);
     io_block(io, &h->body);
     io_sym(io, &h->symbol);
     io_bool(io, &h->none);

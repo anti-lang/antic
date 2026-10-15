@@ -305,6 +305,7 @@ static bool read_handler(struct parser *p, struct handler *out, bool required)
 {
     memset(out, 0, sizeof *out);
     out->pos = parser_pos_of(parser_peek(p));
+    out->at = out->pos;
     if (!parser_accept(p, TOKEN_CATCH)) {
         if (required) {
             parser_error_here(p, "expected `catch`");

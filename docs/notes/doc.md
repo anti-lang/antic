@@ -63,7 +63,7 @@ keeps them per item, and the library file carries them as a word after the
 flags of an item, which keeps the page of a library file the page of its
 source. A name of C wins over the other names of its type, and an enum
 without a base reads `c_int`, the base the specification gives it. The
-format version is 85 since.
+format version was 85 then.
 
 A backtick name such as `forms.Level` links to the item of the page. The last
 segment of the documented module stands there as the last segment of an import

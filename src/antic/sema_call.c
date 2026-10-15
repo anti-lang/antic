@@ -1173,14 +1173,50 @@ static struct type *handled_result(struct checker *c, const struct expr *e,
                : sema_builtin(c, TYPE_VOID);
 }
 
+/* Whether a diagnostic from the one at first on is an error. */
+static bool errors_since(const struct diagnostics *d, size_t first)
+{
+    size_t i;
+
+    for (i = first; i < d->count; i++) {
+        if (!d->items[i].warning) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: decision 20 of "Decisions of 2026-10-11". The handler of a
+   value gives the value that takes the place of the result, so a
+   handler that can reach its end without `yield`, `fail`, `return` or
+   a call that never returns is refused: the binding would hold what
+   stood in its memory. `break` and `continue` leave the statement that
+   takes the value and pass as well. A body with an error of its own
+   gets no second message. */
+static void refuse_handler_end(struct checker *c, const struct handler *h,
+                               size_t first)
+{
+    const struct block *b = h->body;
+
+    if (b == NULL ||
+        (b->count > 0 && sema_ends_path(b->stmts[b->count - 1])) ||
+        errors_since(c->diags, first)) {
+        return;
+    }
+    sema_error_at(c, h->at, "the handler of a value can reach its end "
+                  "without `yield`");
+}
+
 /* Check the block of the handler h, whose `yield` gives a value of type
    yields. The handler of a `try` block gives none. The state of the
    handler around it comes back afterwards, so each `yield` belongs to
-   the innermost handler that holds it. */
+   the innermost handler that holds it. With value set the handler gives
+   the value that something takes, and must not reach its end. */
 void sema_check_handler(struct checker *c, struct handler *h,
-                        struct type *yields, bool of_try)
+                        struct type *yields, bool of_try, bool value)
 {
     struct handler_state outer = c->handler;
+    size_t first = c->diags->count;
 
     c->handler.yields = yields;
     c->handler.depth = outer.depth + 1;
@@ -1188,6 +1224,9 @@ void sema_check_handler(struct checker *c, struct handler *h,
     c->handler.of_try = of_try;
     sema_check_block(c, h->body);
     c->handler = outer;
+    if (value) {
+        refuse_handler_end(c, h, first);
+    }
 }
 
 /* Check the handler of a call that can fail. Every such call carries
@@ -1271,7 +1310,11 @@ static struct type *check_handled(struct checker *c, struct expr *e,
            binds is the `*Error` of that result and needs no check of its
            own. */
         sema_declare_caught(c, h, sema_caught_error(c, fn->result));
-        sema_check_handler(c, h, result, false);
+        /* The value of an expression statement is taken by nothing,
+           and its handler may reach its end. */
+        sema_check_handler(c, h, result, false,
+                           result->kind != TYPE_VOID &&
+                               !sema_is_error(result) && c->discarded != e);
         sema_leave_scope(c, &scope);
         return result;
     }

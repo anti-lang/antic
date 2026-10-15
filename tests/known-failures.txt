@@ -102,15 +102,6 @@ check_slice_range_reversed T017 A dev build does not check a slice whose low bou
 check_slice_range_negative T017 A dev build does not check a slice whose low bound lies below zero.
 generic_origin_modules_release T043 The origin of a `fail` in a generic of a library names the client.
 generic_origin_modules_dev T043 The origin of a `fail` in a generic of a library names the client.
-matrix_errors_handler_reaches_its_end_in_a_let_refused T044 The handler of a `let` that reaches its end is not refused.
-matrix_errors_handler_reaches_its_end_in_an_assignment_refused T044 The handler of an assignment that reaches its end is not refused.
-matrix_errors_handler_reaches_its_end_on_one_path_refused T044 A handler that reaches its end on one path is not refused.
-matrix_errors_handler_without_a_name_reaches_its_end_refused T044 An empty handler without a name on a value is not refused.
-matrix_errors_handler_of_a_pointer_guard_reaches_its_end_refused T044 The handler of a pointer guard that reaches its end is not refused.
-matrix_errors_handler_of_a_value_guard_reaches_its_end_refused T044 The handler of a value guard that reaches its end is not refused.
-matrix_errors_handler_reaches_its_end_after_a_loop_refused T044 A handler that reaches its end after a loop is not refused.
-matrix_errors_handler_reaches_its_end_in_a_generic_refused T044 A handler that reaches its end in a generic function is not refused.
-matrix_errors_handler_of_a_destructuring_reaches_its_end_refused T044 The handler of a destructuring `let` that reaches its end is not refused.
 matrix_errors_try_on_an_optional_call_refused T045 `try` on a call that gives a `?T` and cannot fail is not refused.
 matrix_errors_try_on_an_optional_pointer_call_refused T045 `try` on a call that gives a `?*T` and cannot fail is not refused.
 matrix_errors_try_on_an_optional_name_refused T046 The refusal of `try` on a `?T` name names neither `let ... else` nor `??`.

@@ -1192,7 +1192,7 @@ static struct type *check_pointer_guard(struct checker *c, struct stmt *s,
     }
     sema_enter_scope(c, &scope);
     sema_declare_caught(c, h, error);
-    sema_check_handler(c, h, types_without_none(c->types, value), false);
+    sema_check_handler(c, h, types_without_none(c->types, value), false, true);
     sema_leave_scope(c, &scope);
     return types_without_none(c->types, value);
 }
@@ -1630,7 +1630,7 @@ static void check_try(struct checker *c, struct stmt *s)
                             : sema_builtin(c, TYPE_ERROR));
     /* R014 of "Rules of 2026-10-13": the handler of a `try` block is a
        handler, and `yield;` ends it. */
-    sema_check_handler(c, h, sema_builtin(c, TYPE_VOID), true);
+    sema_check_handler(c, h, sema_builtin(c, TYPE_VOID), true, false);
     sema_leave_scope(c, &try_scope);
 }
 
@@ -2178,9 +2178,13 @@ static void check_stmt(struct checker *c, struct stmt *s)
             sema_const_symbol(c, sym, s->as.let.name_pos);
         }
         return;
-    case STMT_EXPR:
+    case STMT_EXPR: {
+        const struct expr *outer = c->discarded;
+        c->discarded = s->as.expr;
         sema_check_expr(c, s->as.expr, NULL);
+        c->discarded = outer;
         return;
+    }
     case STMT_ASSIGN:
         sema_refuse_escaping_error(c, s->as.assign.value);
         check_assign(c, s);

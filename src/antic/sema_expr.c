@@ -1870,6 +1870,11 @@ static struct type *check_optional(struct checker *c, struct expr *e)
     bound->type = t->kind == TYPE_OPTIONAL
                       ? types_pointer(c->types, t->element)
                       : types_without_none(c->types, t);
+    /* The call after `?.` of an expression statement gives a value that
+       nothing takes, as the statement does. */
+    if (c->discarded == e) {
+        c->discarded = access;
+    }
     result = sema_check_expr(c, access, NULL);
     sema_leave_scope(c, &scope);
     if (sema_is_error(result)) {

@@ -806,6 +806,7 @@ static struct expr *unary_level(struct parser *p)
         }
         e->as.call.handler.kind = HANDLE_TRY;
         e->as.call.handler.pos = parser_pos_of(t);
+        e->as.call.handler.at = e->as.call.handler.pos;
         return e;
     }
     default:
