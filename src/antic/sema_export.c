@@ -552,10 +552,11 @@ void sema_check_export(struct checker *c, struct item *it)
             sema_error_at(c, t->fields[0].pos,
                           "the first field `%.*s` of export "
                           "%s `%.*s` is a bitfield, and the C header aligns "
-                          "the struct on its first field",
+                          "the %s on its first field",
                           (int)t->fields[0].name.length, t->fields[0].name.text,
                           it->kind == ITEM_UNION ? "union" : "struct",
-                          (int)it->name.length, it->name.text);
+                          (int)it->name.length, it->name.text,
+                          it->kind == ITEM_UNION ? "union" : "struct");
         }
         return;
     /* A variant crosses as the struct of its tag and the union of its
