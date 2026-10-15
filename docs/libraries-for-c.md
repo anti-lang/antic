@@ -94,8 +94,11 @@ The header contains, in this order:
 2. `#ifdef __cplusplus extern "C" {` and the matching close.
 3. Every `export struct` and `export union` as a C definition. `c_` types map back to
    C names. Sized types map to `<stdint.h>` names, and `int`, `uint` and `float` to
-   `int64_t`, `uint64_t` and `double`. `packed` becomes `#pragma pack`.
-   `align(N)` becomes `_Alignas(N)`.
+   `int64_t`, `uint64_t` and `double`. `packed` becomes `#pragma pack`, for a
+   class as well. `align(N)` becomes `_Alignas(N)` on the first field. On a
+   packed type and on a class it becomes `ANTI_ALIGNED(N)` on the type, which
+   the header defines as `__attribute__((aligned(N)))`, or
+   `__declspec(align(N))` for MSVC.
 4. Every `export const`.
 5. A prototype per `export fn`. `*byte` becomes `uint8_t*`. Anti has no const
    pointers, so the header has no `const`.

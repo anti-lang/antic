@@ -56,7 +56,7 @@ static const char *const reserved_names[] = {
     "static_cast", "struct", "switch", "template", "this", "thread_local",
     "throw", "true", "try", "typedef", "typeid", "typename", "union",
     "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while",
-    "xor", "xor_eq", "NULL", "ANTI_ALIGNAS"};
+    "xor", "xor_eq", "NULL", "ANTI_ALIGNAS", "ANTI_ALIGNED"};
 
 /* Whether name is a macro of <stdint.h>: INT8_MAX, UINT64_C, SIZE_MAX and
    the other names of that header that consist of capitals, digits and _. */
@@ -565,6 +565,26 @@ static void emit_tuples(struct text *out, const struct type *t,
     }
 }
 
+/* DESIGN: `#pragma pack` caps the alignment of every member, an
+   `_Alignas` on one among them, so the align(N) of a packed type stands
+   on the type, as ANTI_ALIGNED, which no pack caps. A class takes it
+   there as well, packed or not, since its first member is a table
+   pointer or a base. Any other struct keeps the `_Alignas` of its first
+   field. Writes the keyword, the attribute and a space. */
+static bool aligned_on_type(const struct type *t)
+{
+    return t->align != 0 && (t->packed || t->kind == TYPE_CLASS);
+}
+
+static void open_aggregate(struct text *out, const char *keyword,
+                           const struct type *t)
+{
+    text_appendf(out, "%s ", keyword);
+    if (aligned_on_type(t)) {
+        text_appendf(out, "ANTI_ALIGNED(%" PRIu64 ") ", t->align);
+    }
+}
+
 /* DESIGN: an export variant writes the enum of its tags, then the
    typedef of the struct C sees. The field `tag` holds the integer of
    the tag, since an enum of C has the width of an int, and the enum names
@@ -606,8 +626,10 @@ static void variant_view(struct text *out, const struct symbol *sym,
     if (t->packed) {
         text_append(out, "#pragma pack(push, 1)\n");
     }
-    text_appendf(out, "typedef struct %s {\n    ", text_cstr(&name));
-    if (t->align != 0) {
+    text_append(out, "typedef ");
+    open_aggregate(out, "struct", t);
+    text_appendf(out, "%s {\n    ", text_cstr(&name));
+    if (t->align != 0 && !aligned_on_type(t)) {
         text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ", t->align);
     }
     text_appendf(out, "%s " VARIANT_TAG ";\n", scalar_name(tag->base));
@@ -739,7 +761,7 @@ static void struct_fields(struct text *out, const struct type *t)
             uint64_t bytes = types_simd_bytes(t);
             text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ",
                          bytes < 16 ? bytes : 16);
-        } else if (i == 0 && t->align != 0) {
+        } else if (i == 0 && t->align != 0 && !aligned_on_type(t)) {
             text_appendf(out, "ANTI_ALIGNAS(%" PRIu64 ") ", t->align);
         }
         declaration(&field, t->fields[i].type,
@@ -911,7 +933,8 @@ static void nested_views(struct text *out, const struct type *t,
         if (n->packed) {
             text_append(out, "#pragma pack(push, 1)\n");
         }
-        text_appendf(out, "struct %s {\n", text_cstr(&name));
+        open_aggregate(out, "struct", n);
+        text_appendf(out, "%s {\n", text_cstr(&name));
         if (n->kind == TYPE_CLASS) {
             class_fields(out, n);
         } else {
@@ -969,8 +992,10 @@ static void aggregate(struct text *out, const struct symbol *sym,
     if (t->packed) {
         text_append(out, "#pragma pack(push, 1)\n");
     }
-    text_appendf(out, "typedef %s %.*s {\n", kind,
-                 (int)types_c_name(t).length, types_c_name(t).text);
+    text_append(out, "typedef ");
+    open_aggregate(out, kind, t);
+    text_appendf(out, "%.*s {\n", (int)types_c_name(t).length,
+                 types_c_name(t).text);
     struct_fields(out, t);
     text_appendf(out, "} %.*s;\n", (int)types_c_name(t).length,
                  types_c_name(t).text);
@@ -1262,9 +1287,17 @@ static void class_struct(struct text *out, const struct symbol *sym,
     const struct item *made;
 
     doc_comment(out, &sym->doc, "");
-    text_appendf(out, "struct %s {\n", name);
+    if (t->packed) {
+        text_append(out, "#pragma pack(push, 1)\n");
+    }
+    open_aggregate(out, "struct", t);
+    text_appendf(out, "%s {\n", name);
     class_fields(out, t);
-    text_appendf(out, "};\n\n");
+    text_append(out, "};\n");
+    if (t->packed) {
+        text_append(out, "#pragma pack(pop)\n");
+    }
+    text_append(out, "\n");
 
     text_appendf(out, "extern const anti_descriptor anti_%s_descriptor;\n",
                  name);
@@ -1799,24 +1832,36 @@ void header_write(struct text *out, const char *name,
                   bool bundled)
 {
     struct emitted done = {0};
+    struct text body = {0};
     size_t i;
     size_t j;
 
     write_preamble(out, name, ifaces, count, bundled);
-    write_vector_types(out, ifaces, count);
-    write_error_class(out, ifaces, count);
-    write_root(out, ifaces, count);
+    write_vector_types(&body, ifaces, count);
+    write_error_class(&body, ifaces, count);
+    write_root(&body, ifaces, count);
     for (i = 0; i < count; i++) {
         for (j = 0; j < ifaces[i]->item_count; j++) {
             const struct symbol *sym = ifaces[i]->items[j];
             if (sym->exported && sym->kind == SYMBOL_STRUCT) {
-                aggregate(out, sym, ifaces, count, &done);
+                aggregate(&body, sym, ifaces, count, &done);
             }
         }
     }
-    write_tuples(out, ifaces, count, &done);
-    write_symbols(out, ifaces, count, SYMBOL_CONST);
-    write_symbols(out, ifaces, count, SYMBOL_FN);
+    write_tuples(&body, ifaces, count, &done);
+    write_symbols(&body, ifaces, count, SYMBOL_CONST);
+    write_symbols(&body, ifaces, count, SYMBOL_FN);
+    /* The alignment of a type, see aligned_on_type, is defined in a
+       header that names it alone. */
+    if (strstr(text_cstr(&body), "ANTI_ALIGNED(") != NULL) {
+        text_append(out, "#if defined(_MSC_VER) && !defined(__clang__)\n"
+                         "#define ANTI_ALIGNED(n) __declspec(align(n))\n"
+                         "#else\n"
+                         "#define ANTI_ALIGNED(n) __attribute__((aligned(n)))\n"
+                         "#endif\n\n");
+    }
+    text_append(out, text_cstr(&body));
     text_append(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif\n");
+    text_free(&body);
     free((void *)done.items);
 }
