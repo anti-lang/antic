@@ -1173,6 +1173,112 @@ static void refuse_nested_in_signatures(struct checker *c,
 
 /* The checks of every type with fields: its interfaces, its abstract
    fields, then its contracts and the functions of its body. */
+/* DESIGN: an abstract class has no complete value. It stands as a base,
+   as an interface and behind a pointer, and no value of it is held in
+   place: a parameter, a result, the element of a slice, an array or a
+   `?T`, a part of a tuple and a type argument, by "Inheritance" in
+   docs/anti-object-model.md and T078 of docs/audit/tests-findings.md. A
+   plain field, a local, a literal and `alloc` have a refusal of their
+   own, which names what needs the value. held is false for the type a
+   pointer points at and for a field as a whole. */
+static bool abstract_value(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_CLASS && t->has_abstract;
+}
+
+static void refuse_abstract_part(struct checker *c, const struct type_expr *x,
+                                 bool held)
+{
+    const struct type *element;
+    size_t i;
+
+    if (x == NULL) {
+        return;
+    }
+    element = x->element != NULL ? x->element->type : NULL;
+    switch (x->kind) {
+    case TYPEX_NAMED:
+        if (held && abstract_value(x->type)) {
+            sema_error_at(c, x->pos, "`%s` is abstract and has no complete "
+                          "value", sema_tn(x->type));
+            return;
+        }
+        for (i = 0; i < x->arg_count; i++) {
+            refuse_abstract_part(c, x->args[i], true);
+        }
+        return;
+    case TYPEX_SLICE:
+        if (abstract_value(element)) {
+            sema_error_at(c, x->pos, "`%s` holds no complete values, use "
+                          "`[]*%s`", sema_tn(x->type), sema_tn(element));
+            return;
+        }
+        refuse_abstract_part(c, x->element, true);
+        return;
+    case TYPEX_ARRAY:
+    case TYPEX_OPTIONAL:
+    case TYPEX_CHAN:
+        if (abstract_value(element)) {
+            sema_error_at(c, x->pos, "`%s` is abstract and has no complete "
+                          "value", sema_tn(element));
+            return;
+        }
+        refuse_abstract_part(c, x->element, true);
+        return;
+    case TYPEX_POINTER:
+        refuse_abstract_part(c, x->element, false);
+        return;
+    case TYPEX_TUPLE:
+    case TYPEX_FN:
+        for (i = 0; i < x->param_count; i++) {
+            refuse_abstract_part(c, x->params[i], true);
+        }
+        refuse_abstract_part(c, x->result, true);
+        return;
+    default:
+        return;
+    }
+}
+
+/* The parameters and the result of the function it. */
+static void refuse_abstract_signature(struct checker *c, const struct item *it)
+{
+    size_t j;
+
+    for (j = 0; j < it->param_count; j++) {
+        refuse_abstract_part(c, it->params[j].type, true);
+    }
+    refuse_abstract_part(c, it->result, true);
+}
+
+/* Every signature and every field of the module. */
+static void refuse_abstract_values(struct checker *c)
+{
+    const struct module *module = c->module;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < module->item_count; i++) {
+        const struct item *it = module->items[i];
+        if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {
+            refuse_abstract_signature(c, it);
+            continue;
+        }
+        if (it->kind != ITEM_STRUCT && it->kind != ITEM_CLASS &&
+            it->kind != ITEM_UNION) {
+            continue;
+        }
+        for (j = 0; j < it->param_count; j++) {
+            refuse_abstract_part(c, it->params[j].type, false);
+        }
+        for (j = 0; j < it->member_count; j++) {
+            if (it->members[j]->kind == ITEM_FN) {
+                refuse_abstract_signature(c, it->members[j]);
+            }
+        }
+    }
+}
+
 void sema_check_classes(struct checker *c)
 {
     const struct module *module = c->module;
@@ -1197,6 +1303,7 @@ void sema_check_classes(struct checker *c)
         }
     }
     check_free_operators(c);
+    refuse_abstract_values(c);
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         struct type *t = it->symbol != NULL && it->kind != ITEM_TYPE

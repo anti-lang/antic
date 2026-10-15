@@ -192,13 +192,6 @@ class_members_modules_dev T076 A public static field and a public constant of a 
 matrix_classes_static_field_through_self_refused T077 The message for a member of a class reached the wrong way names another kind or denies the member.
 matrix_classes_static_function_through_an_object_refused T077 The message for a member of a class reached the wrong way names another kind or denies the member.
 matrix_classes_singleton_in_a_constant_refused T077 The message for a member of a class reached the wrong way names another kind or denies the member.
-matrix_classes_abstract_class_as_a_parameter_refused T078 An abstract class compiles as the type of a value that is held in place.
-matrix_classes_abstract_class_as_a_result_refused T078 An abstract class compiles as the type of a value that is held in place.
-matrix_classes_abstract_class_in_a_slice_refused T078 An abstract class compiles as the type of a value that is held in place.
-matrix_classes_abstract_class_in_an_array_refused T078 An abstract class compiles as the type of a value that is held in place.
-matrix_classes_abstract_class_in_an_optional_refused T078 An abstract class compiles as the type of a value that is held in place.
-matrix_classes_abstract_class_in_a_tuple_refused T078 An abstract class compiles as the type of a value that is held in place.
-matrix_classes_abstract_class_as_a_type_argument_refused T078 An abstract class compiles as the type of a value that is held in place.
 matrix_classes_singleton_field_written_through_its_address_refused T079 The address of a field of a singleton that is fixed after creation lets a write through.
 matrix_classes_literal_of_a_type_parameter_refused T080 A literal of a type parameter ends in an error of the back end without a position.
 matrix_classes_qualified_body_in_a_nested_class_dev T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
