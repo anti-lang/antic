@@ -2039,6 +2039,24 @@ static bool resolve_callee(struct checker *c, struct expr *e,
 
     if (callee->kind == EXPR_FIELD &&
         (module = sema_qualifier(c, callee)) != NULL) {
+        /* `m.C(args)` builds a class of another module, as `C(args)`
+           does, by T030. */
+        struct symbol *item =
+            sema_library_item(c, module->home, &callee->as.field.name);
+        if (item != NULL && item->kind == SYMBOL_STRUCT &&
+            item->type != NULL && item->type->kind == TYPE_CLASS) {
+            struct name name = callee->as.field.name;
+            struct type *built;
+            callee->kind = EXPR_NAME;
+            callee->as.name = name;
+            callee->symbol = item;
+            built = sema_generic_named(c, callee, item->type,
+                                       &callee->as.name, expected);
+            form->result = sema_is_error(built)
+                               ? built
+                               : check_construct(c, e, built, expected);
+            return true;
+        }
         form->fn = check_qualified(c, callee, module, true);
         callee->type = form->fn;
         if (!sema_is_error(form->fn) &&

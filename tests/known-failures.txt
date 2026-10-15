@@ -17,8 +17,6 @@
 # tests/CMakeLists.txt sets WILL_FAIL on every listed test, so a listed
 # test that passes fails the suite. The fix of a finding removes its lines.
 # The test known_failures checks the list against the table of the findings.
-qualified_arguments_modules_release T030 A class built with arguments under the name of its module is refused as a type.
-qualified_arguments_modules_dev T030 A class built with arguments under the name of its module is refused as a type.
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 constant_argument_modules_release T094 A constant of another module is refused as the argument of `N: int`.
