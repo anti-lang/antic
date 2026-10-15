@@ -21,6 +21,11 @@ FILE *platform_open(const char *path, bool writing);
 /* Remove the file at path. Returns false when it cannot. */
 bool platform_remove(const char *path);
 
+/* Make path a symbolic link to target, in place of any file there.
+   Returns false when it cannot. antic runs no tool of the host for it,
+   by T131. */
+bool platform_symlink(const char *target, const char *path);
+
 /* The value of the environment variable name, or NULL when it is unset.
    The value stays valid until the program ends, and the caller never
    frees it. A value that is no valid UTF-16 on Windows counts as unset. */

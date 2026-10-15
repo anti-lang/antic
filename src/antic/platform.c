@@ -187,6 +187,25 @@ bool platform_remove(const char *path)
     return removed;
 }
 
+/* DESIGN: Windows writes a symbolic link without privilege where the
+   developer mode allows it, which the flag asks for. */
+bool platform_symlink(const char *target, const char *path)
+{
+    wchar_t *wide_target = platform_widen(target);
+    wchar_t *wide_path = platform_widen(path);
+    bool made = false;
+
+    if (wide_target != NULL && wide_path != NULL) {
+        DeleteFileW(wide_path);
+        made = CreateSymbolicLinkW(
+                   wide_path, wide_target,
+                   SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE) != 0;
+    }
+    free(wide_target);
+    free(wide_path);
+    return made;
+}
+
 /* DESIGN: getenv gives storage that the program never frees. _wdupenv_s,
    the call the C runtime names instead, gives a copy the caller frees.
    Its UTF-8 is kept here until the program ends. antic and anti read a
@@ -591,6 +610,14 @@ FILE *platform_open(const char *path, bool writing)
 bool platform_remove(const char *path)
 {
     return remove(path) == 0;
+}
+
+bool platform_symlink(const char *target, const char *path)
+{
+    if (unlink(path) != 0 && errno != ENOENT) {
+        return false;
+    }
+    return symlink(target, path) == 0;
 }
 
 const char *platform_getenv(const char *name)

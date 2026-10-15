@@ -441,10 +441,12 @@ bool driver_build_c_library(const struct options *o, const char *object,
            and lib<name>.so links to it for the C compiler. */
         if (ok && versioned.length > 0) {
             const char *link_name = strrchr(text_cstr(&versioned), '/');
-            const char *argv[] = {"ln", "-sf", NULL, NULL, NULL};
-            argv[2] = link_name != NULL ? link_name + 1 : text_cstr(&versioned);
-            argv[3] = text_cstr(&path);
-            ok = process_run(argv) == 0;
+            const char *target =
+                link_name != NULL ? link_name + 1 : text_cstr(&versioned);
+            ok = platform_symlink(target, text_cstr(&path));
+            if (!ok) {
+                fprintf(stderr, "antic: cannot write %s\n", text_cstr(&path));
+            }
         }
         if (ok && s.plugin) {
             const char *file = strrchr(text_cstr(&path), '/');
