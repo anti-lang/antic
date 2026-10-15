@@ -2,8 +2,11 @@
    operations, the Mutex, channels and `sync`, and the workers that
    `parallel` and `dispatch` run and `join` waits for. */
 
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema_checker.h"
 
 /* Atomic operations */
@@ -243,6 +246,244 @@ bool sema_atomic_call(struct checker *c, struct expr *e, struct type **out)
                   callee->as.field.name.text);
     *out = sema_builtin(c, TYPE_ERROR);
     return true;
+}
+
+/* A second join */
+
+/* DESIGN: `join` ends its job, so decision 23 of "Decisions of
+   2026-10-11" refuses a second `join` of one job where the checker sees
+   it, and a dev build traps on every other. The checker sees a local
+   that the block declares, or an element of one at a constant index,
+   joined by a statement that runs the `join` whenever it runs, and
+   joined again by a later statement of the same block. A statement that
+   names the local apart from such a `join` may give it another job or
+   its address away, so the block follows the local no further from
+   there. A `join` inside a branch, a loop, a closure or the right side
+   of `&&`, `||` and `??` names the local in that sense, and so does a
+   capture by a closure. */
+struct joined {
+    const struct symbol *symbol;
+    int64_t index;              /* the element, or -1 for the local */
+    const struct expr *name;    /* the name of the local in the `join` */
+    const struct expr *at;      /* what the `join` waits for */
+};
+
+/* The joins of one statement. */
+struct join_keys {
+    struct joined *items;
+    size_t count;
+    size_t capacity;
+};
+
+/* The most elements of one `join_all` the checker follows. */
+#define JOIN_ALL_FOLLOWED 64
+
+static void key_add(struct join_keys *keys, const struct expr *name,
+                    int64_t index, const struct expr *at)
+{
+    keys->items = alloc_grow(keys->items, &keys->capacity, keys->count,
+                             sizeof *keys->items);
+    keys->items[keys->count].symbol = name->symbol;
+    keys->items[keys->count].index = index;
+    keys->items[keys->count].name = name;
+    keys->items[keys->count].at = at;
+    keys->count++;
+}
+
+/* The jobs the operand of e names: a local, an element at a constant
+   index, or for `join_all` a slice of a local between constant
+   bounds. */
+static void join_keys_of(const struct expr *e, struct join_keys *keys)
+{
+    const struct expr *job = e->as.join.job;
+    int64_t low;
+    int64_t i;
+
+    if (!e->as.join.all) {
+        if (job->kind == EXPR_NAME && job->symbol != NULL) {
+            key_add(keys, job, -1, job);
+        } else if (job->kind == EXPR_INDEX && !job->as.index.several &&
+                   job->as.index.base->kind == EXPR_NAME &&
+                   job->as.index.base->symbol != NULL &&
+                   job->as.index.index->kind == EXPR_INT &&
+                   job->as.index.index->as.integer <= INT64_MAX) {
+            key_add(keys, job->as.index.base,
+                    (int64_t)job->as.index.index->as.integer, job);
+        }
+        return;
+    }
+    if (job->kind != EXPR_SLICE || job->as.slice.base->kind != EXPR_NAME ||
+        job->as.slice.base->symbol == NULL || job->as.slice.high == NULL ||
+        job->as.slice.high->kind != EXPR_INT ||
+        (job->as.slice.low != NULL && job->as.slice.low->kind != EXPR_INT)) {
+        return;
+    }
+    low = job->as.slice.low == NULL ? 0
+                                    : (int64_t)job->as.slice.low->as.integer;
+    if (job->as.slice.high->as.integer > JOIN_ALL_FOLLOWED || low < 0 ||
+        low > JOIN_ALL_FOLLOWED) {
+        return;
+    }
+    for (i = low; i < (int64_t)job->as.slice.high->as.integer; i++) {
+        key_add(keys, job->as.slice.base, i, job);
+    }
+}
+
+/* Collect the joins that e runs whenever it is evaluated. */
+static void definite_joins(const struct expr *e, struct join_keys *keys)
+{
+    size_t i;
+
+    if (e == NULL) {
+        return;
+    }
+    switch (e->kind) {
+    case EXPR_JOIN:
+        join_keys_of(e, keys);
+        return;
+    case EXPR_BINARY:
+        definite_joins(e->as.binary.left, keys);
+        if (e->as.binary.op != TOKEN_AND_AND &&
+            e->as.binary.op != TOKEN_OR_OR &&
+            e->as.binary.op != TOKEN_QUESTION_QUESTION) {
+            definite_joins(e->as.binary.right, keys);
+        }
+        return;
+    case EXPR_UNARY:
+        definite_joins(e->as.unary.operand, keys);
+        return;
+    case EXPR_CAST:
+        definite_joins(e->as.cast.operand, keys);
+        return;
+    case EXPR_CALL:
+        if (e->as.call.optional) {
+            return;
+        }
+        for (i = 0; i < e->as.call.arg_count; i++) {
+            definite_joins(e->as.call.args[i], keys);
+        }
+        return;
+    default:
+        return;
+    }
+}
+
+/* The index of sym among the locals flow follows, or local_count. */
+static size_t flow_local(const struct join_flow *flow,
+                         const struct symbol *sym)
+{
+    size_t i;
+
+    for (i = 0; i < flow->local_count && flow->locals[i] != sym; i++) {
+    }
+    return i;
+}
+
+struct join_names {
+    struct join_flow *flow;
+    const struct join_keys *keys;
+};
+
+/* Mark a local of the flow that e names apart from a `join` the
+   statement always runs. */
+static bool name_apart(void *data, const struct expr *e)
+{
+    struct join_names *names = data;
+    size_t at;
+    size_t i;
+
+    if (e->kind != EXPR_NAME || e->symbol == NULL) {
+        return true;
+    }
+    at = flow_local(names->flow, e->symbol);
+    if (at == names->flow->local_count) {
+        return true;
+    }
+    for (i = 0; i < names->keys->count; i++) {
+        if (names->keys->items[i].name == e) {
+            return true;
+        }
+    }
+    names->flow->named[at] = true;
+    return true;
+}
+
+void sema_join_flow_stmt(struct checker *c, struct join_flow *flow,
+                         const struct stmt *s)
+{
+    struct join_keys keys = {0};
+    struct join_names names;
+    struct ast_visitor visitor = {name_apart, NULL, NULL};
+    size_t i;
+    size_t j;
+
+    switch (s->kind) {
+    case STMT_LET:
+        definite_joins(s->as.let.value, &keys);
+        break;
+    case STMT_EXPR:
+        definite_joins(s->as.expr, &keys);
+        break;
+    case STMT_ASSIGN:
+        definite_joins(s->as.assign.value, &keys);
+        break;
+    case STMT_RETURN:
+        definite_joins(s->as.return_value, &keys);
+        break;
+    default:
+        break;
+    }
+    names.flow = flow;
+    names.keys = &keys;
+    visitor.data = &names;
+    ast_walk_stmt(&visitor, s);
+    for (i = 0; i < keys.count; i++) {
+        const struct joined *k = &keys.items[i];
+        size_t at = flow_local(flow, k->symbol);
+
+        if (at == flow->local_count || flow->named[at] ||
+            k->symbol->captured) {
+            continue;
+        }
+        for (j = 0; j < flow->count; j++) {
+            if (flow->done[j].symbol == k->symbol &&
+                flow->done[j].index == k->index) {
+                break;
+            }
+        }
+        if (j == flow->count) {
+            flow->done = alloc_grow(flow->done, &flow->capacity, flow->count,
+                                    sizeof *flow->done);
+            flow->done[flow->count++] = *k;
+        } else if (k->index < 0) {
+            sema_error_at(c, k->at->pos, "`%.*s` was joined already, and a "
+                          "job is joined once", (int)k->symbol->name.length,
+                          k->symbol->name.text);
+        } else {
+            sema_error_at(c, k->at->pos, "`%.*s[%lld]` was joined already, "
+                          "and a job is joined once",
+                          (int)k->symbol->name.length, k->symbol->name.text,
+                          (long long)k->index);
+        }
+    }
+    free(keys.items);
+    if (s->kind == STMT_LET && s->as.let.name_count == 0 &&
+        s->as.let.symbol != NULL) {
+        flow->locals = alloc_grow(flow->locals, &flow->local_capacity,
+                                  flow->local_count, sizeof *flow->locals);
+        flow->named = alloc_resize(flow->named, flow->local_capacity,
+                                   sizeof *flow->named);
+        flow->locals[flow->local_count] = s->as.let.symbol;
+        flow->named[flow->local_count] = false;
+        flow->local_count++;
+    }
+}
+
+void sema_join_flow_free(struct join_flow *flow)
+{
+    free(flow->done);
+    free(flow->locals);
+    free(flow->named);
 }
 
 /* Locking and channels */

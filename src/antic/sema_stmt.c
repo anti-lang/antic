@@ -2438,6 +2438,7 @@ static void check_block_narrowing(struct checker *c, struct block *b,
                                   struct symbol **proved, size_t count)
 {
     struct scope scope;
+    struct join_flow joins = {0};
     size_t i;
 
     sema_enter_scope(c, &scope);
@@ -2446,7 +2447,9 @@ static void check_block_narrowing(struct checker *c, struct block *b,
     }
     for (i = 0; i < b->count; i++) {
         check_stmt(c, b->stmts[i]);
+        sema_join_flow_stmt(c, &joins, b->stmts[i]);
     }
+    sema_join_flow_free(&joins);
     sema_leave_scope(c, &scope);
 }
 

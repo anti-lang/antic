@@ -406,9 +406,8 @@ For a Java programmer:
 
 For a C programmer:
 
-- The arguments of a job are in the frame of the dispatching function. A function that returns before it joins leaves the worker a dead frame.
-- A `dispatch` written once and run in a loop has one slot for its arguments. A later turn overwrites the arguments of a job that has not started. Write the values into the object, or write one `dispatch` per job.
-- `join` frees the job. A second `join` of the same job reads freed memory, and the checker does not refuse it.
+- The job holds a copy of its arguments. A function may return before it joins, and a `dispatch` written once in a loop gives each job the arguments of its own turn.
+- `join` frees the job. A second `join` of a job is refused when a later statement of the block that declares the job holds it. One the checker cannot see, through a copy of the job or inside a branch, reads freed memory.
 
 For a C++ programmer:
 

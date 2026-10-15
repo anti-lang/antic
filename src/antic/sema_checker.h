@@ -509,6 +509,24 @@ struct type *sema_check_sync_op(struct checker *c, struct expr *e);
 struct type *sema_check_parallel(struct checker *c, struct expr *e);
 struct type *sema_check_dispatch(struct checker *c, struct expr *e);
 struct type *sema_check_join(struct checker *c, struct expr *e);
+/* The jobs a block has joined, which a second `join` of one of them
+   is refused against. sema_join_flow_stmt reads each statement of the
+   block once it is checked, in the order of the text, and
+   sema_join_flow_free ends the record with the block. */
+struct join_flow {
+    struct joined *done;
+    size_t count;
+    size_t capacity;
+    /* The locals the block declares, the only ones it follows, and
+       whether each was named apart from a `join` since. */
+    const struct symbol **locals;
+    bool *named;
+    size_t local_count;
+    size_t local_capacity;
+};
+void sema_join_flow_stmt(struct checker *c, struct join_flow *flow,
+                         const struct stmt *s);
+void sema_join_flow_free(struct join_flow *flow);
 
 /* sema_class.c */
 
