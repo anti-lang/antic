@@ -49,7 +49,6 @@ matrix_flow_if_let_arms_all_return_release T007 An `if let` on a `?T` whose arm 
 matrix_flow_if_let_arms_all_return_memory_checks T007 An `if let` on a `?T` whose arm and `else` return does not end the path of its function.
 check_slice_range T017 A dev build does not check the bounds of a slice of an array.
 fmt_alias_of_function T025 anti fmt moves the functions after a type alias of a function type.
-matrix_types_enum_unknown_value_refused T027 An unknown value of an enum is refused as a function.
 generic_atomic_modules_release T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 generic_atomic_modules_dev T029 antic cannot read back a library file whose generic changes a `static atomic` field.
 qualified_arguments_modules_release T030 A class built with arguments under the name of its module is refused as a type.

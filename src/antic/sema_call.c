@@ -2402,6 +2402,13 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (ambiguous_member(c, e->pos, t, name, "the name")) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* A name read through an enum names one of its values, by T027 of
+       docs/audit/tests-findings.md. */
+    if (m == NULL && t->kind == TYPE_ENUM) {
+        sema_error_at(c, e->pos, "`%s` has no value `%.*s`", sema_tn(t),
+                      (int)name->length, name->text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (m == NULL) {
         if (!private_of_library(c, e->pos, t, name)) {
             sema_error_at(c, e->pos, "`%s` has no function `%.*s`",
