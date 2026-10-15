@@ -168,7 +168,7 @@ class Texture
 ```
 
 ```anti refused
-//! error: `Object` already has `created`
+//! error: `Texture.created` replaces `Object.created` and needs `concrete`
 class Texture
 {
 	pub id: int = 0,
@@ -178,7 +178,7 @@ class Texture
 ```
 
 ```anti refused
-//! error: `concrete fn made` of `Texture` fills no abstract function
+//! error: `Texture.made` is `concrete` and replaces nothing
 class Texture
 {
 	pub id: int = 0,

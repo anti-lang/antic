@@ -823,7 +823,7 @@ void test_sema(void)
             "{ return self.n; } }\n"
             "class Cat inherits Pet { pub fn tag(self) -> int "
             "{ return 1; } }\n", 2, 33,
-            "`Pet` already has `tag`");
+            "`Cat.tag` replaces `Pet.tag` and needs `concrete`");
     rejects("class Pet { pub n: int = 0,\n"
             "    pub fn make() -> Pet { return Pet { n: 1 }; } }\n"
             "class Cat inherits Pet { pub make: int = 0 }\n", 3, 26,

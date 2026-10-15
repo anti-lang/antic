@@ -357,9 +357,9 @@ static void check_replacement(struct checker *c, const struct item *it,
         }
     }
     if (!filled) {
-        sema_error_at(c, m->name_pos, "`concrete fn %.*s` of `%.*s` fills no "
-                      "abstract function", (int)m->name.length, m->name.text,
-                      (int)it->name.length, it->name.text);
+        sema_error_at(c, m->name_pos, "`%.*s.%.*s` is `concrete` and "
+                      "replaces nothing", (int)it->name.length, it->name.text,
+                      (int)m->name.length, m->name.text);
     }
 }
 
@@ -472,6 +472,20 @@ static const struct item *matched_above(const struct type *t,
    `inherits` fields of every struct and refuses one that leaves a
    contract unfilled, and `check_replacement` compares each `concrete
    fn` with the entries it fills. */
+/* Whether another function of the body of it has the name of m. */
+static bool declared_twice(const struct item *it, const struct item *m)
+{
+    size_t k;
+
+    for (k = 0; k < it->member_count; k++) {
+        if (it->members[k] != m && it->members[k]->kind == ITEM_FN &&
+            sema_same_name(&it->members[k]->name, &m->name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void check_contracts(struct checker *c, const struct item *it,
                             const struct type *t)
 {
@@ -498,10 +512,20 @@ static void check_contracts(struct checker *c, const struct item *it,
         if (m->contract == FN_ABSTRACT) {
             continue;
         }
+        /* A qualifier that names no table, and a body qualified by its
+           own class beside a plain one, have a message of their own in
+           check_qualifiers and in declare_members. One mistake gives one
+           message, by T071 of docs/audit/tests-findings.md. */
+        if (m->contract == FN_CONCRETE && m->qualifier.length > 0 &&
+            (qualified_table(t, &m->qualifier) == NULL ||
+             (sema_same_name(&m->qualifier, &t->name) &&
+              declared_twice(it, m)))) {
+            continue;
+        }
         if (m->contract == FN_CONCRETE && above == NULL) {
-            sema_error_at(c, m->name_pos, "`concrete fn %.*s` of `%.*s` fills "
-                          "no abstract function", (int)m->name.length,
-                          m->name.text, (int)it->name.length, it->name.text);
+            sema_error_at(c, m->name_pos, "`%.*s.%.*s` is `concrete` and "
+                          "replaces nothing", (int)it->name.length,
+                          it->name.text, (int)m->name.length, m->name.text);
         } else if (m->contract == FN_CONCRETE) {
             check_replacement(c, it, t, m);
         } else if (m->contract == FN_PLAIN && above != NULL &&
@@ -529,8 +553,15 @@ static void refuse_redeclared(struct checker *c, const struct item *it,
                 t->fields[j].form == FIELD_TABLE) {
                 continue;
             }
-            if (types_find_field(base, &t->fields[j].name) != NULL ||
-                sema_find_member(base, &t->fields[j].name) != NULL) {
+            /* The messages of "Messages" in docs/anti-object-model.md,
+               by T070 of docs/audit/tests-findings.md. */
+            if (types_find_field(base, &t->fields[j].name) != NULL) {
+                sema_error_at(c, t->fields[j].pos,
+                              "`%.*s` is already a field of `%.*s`",
+                              (int)t->fields[j].name.length,
+                              t->fields[j].name.text,
+                              (int)base->name.length, base->name.text);
+            } else if (sema_find_member(base, &t->fields[j].name) != NULL) {
                 sema_error_at(c, t->fields[j].pos, "`%.*s` already has `%.*s`",
                               (int)base->name.length, base->name.text,
                               (int)t->fields[j].name.length,
@@ -568,7 +599,17 @@ static void refuse_redeclared(struct checker *c, const struct item *it,
                 !shadowed->has_self) {
                 continue;
             }
-            if (types_find_field(base, &m->name) != NULL || shadowed != NULL) {
+            if (m->has_self && types_find_field(base, &m->name) == NULL &&
+                shadowed != NULL && shadowed->kind == ITEM_FN &&
+                shadowed->has_self) {
+                sema_error_at(c, m->name_pos, "`%.*s.%.*s` replaces "
+                              "`%.*s.%.*s` and needs `concrete`",
+                              (int)it->name.length, it->name.text,
+                              (int)m->name.length, m->name.text,
+                              (int)base->name.length, base->name.text,
+                              (int)m->name.length, m->name.text);
+            } else if (types_find_field(base, &m->name) != NULL ||
+                       shadowed != NULL) {
                 sema_error_at(c, m->name_pos, "`%.*s` already has `%.*s`",
                               (int)base->name.length, base->name.text,
                               (int)m->name.length, m->name.text);
@@ -1058,6 +1099,11 @@ static void require_filled_interfaces(struct checker *c,
                 }
                 filled = types_interface_member(t, t->fields[j].type,
                                                 &a->name);
+                /* A plain function that matches it has the message of
+                   check_contracts, which names the missing `concrete`. */
+                if (filled != NULL && filled->contract == FN_PLAIN) {
+                    continue;
+                }
                 if (filled == NULL || filled->contract != FN_CONCRETE) {
                     sema_error_at(c, it->name_pos, "`%.*s` lacks `concrete "
                                   "fn %.*s` of `%s`", (int)it->name.length,

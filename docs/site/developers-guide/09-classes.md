@@ -195,7 +195,7 @@ fn origin() -> Point
 ```
 
 ```anti refused
-//! error: `Base` already has `x`
+//! error: `x` is already a field of `Base`
 class Base { pub x: int = 0, }
 
 class Derived inherits Base { pub x: int = 1, }
@@ -497,7 +497,7 @@ The third run constructs `Base` and fails in `Named`. The `destruct` of `Named` 
 The checker refuses each of the following.
 
 ```anti refused
-//! error: `Size` declares `construct` twice
+//! error: `Size` has one `construct`, and every other maker is a static function
 class Size
 {
 	pub w: int = 0,
@@ -856,7 +856,7 @@ class Circle
 ```
 
 ```anti refused
-//! error: `Animal` already has `speak`
+//! error: `Loud.speak` replaces `Animal.speak` and needs `concrete`
 class Animal
 {
 	pub fn speak(self) -> int { return 1; }
@@ -869,7 +869,7 @@ class Loud inherits Animal
 ```
 
 ```anti refused
-//! error: `concrete fn run` of `Loud` fills no abstract function
+//! error: `Loud.run` is `concrete` and replaces nothing
 class Animal { pub legs: int = 4, }
 
 class Loud inherits Animal

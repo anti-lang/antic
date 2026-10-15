@@ -172,15 +172,6 @@ matrix_threads_pointer_into_fields_in_a_tuple_refused T062 A public function of 
 matrix_threads_pointer_into_fields_of_a_concurrent_class_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
-matrix_classes_field_of_the_base_again_refused T070 A message of the class checker differs from the text the object model gives.
-matrix_classes_function_of_the_base_again_refused T070 A message of the class checker differs from the text the object model gives.
-matrix_classes_concrete_replaces_nothing_refused T070 A message of the class checker differs from the text the object model gives.
-matrix_classes_conversion_with_two_paths_refused T070 A message of the class checker differs from the text the object model gives.
-matrix_classes_two_constructs_refused T071 One mistake of a class declaration gets two messages.
-matrix_classes_abstract_matched_without_concrete_refused T071 One mistake of a class declaration gets two messages.
-matrix_classes_qualifier_names_no_base_refused T071 One mistake of a class declaration gets two messages.
-matrix_classes_own_class_qualifier_beside_a_plain_body_refused T071 One mistake of a class declaration gets two messages.
-matrix_classes_internal_on_a_class_member_refused T071 One mistake of a class declaration gets two messages.
 matrix_classes_operator_with_a_literal_dev T074 A literal as the second operand of an `operator fn` that takes another type is refused.
 matrix_classes_operator_with_a_literal_release T074 A literal as the second operand of an `operator fn` that takes another type is refused.
 matrix_classes_operator_with_a_literal_memory_checks T074 A literal as the second operand of an `operator fn` that takes another type is refused.

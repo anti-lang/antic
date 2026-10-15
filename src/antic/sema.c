@@ -2701,7 +2701,10 @@ static void declare_members(struct checker *c, struct item *it)
         struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
         struct name text;
         size_t k;
-        for (k = 0; k < j; k++) {
+        /* A second `construct` has the message of check_one_construct,
+           which names the static function that stands for another
+           maker. */
+        for (k = 0; k < j && !sema_name_is(&m->name, "construct"); k++) {
             if (sema_same_name(&it->members[k]->name, &m->name) &&
                 same_qualifier(it, it->members[k], m)) {
                 sema_error_at(c, m->name_pos, "`%.*s` declares `%.*s` twice",

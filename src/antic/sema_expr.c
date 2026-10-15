@@ -192,14 +192,14 @@ static bool converts_to_base(const struct type *got,
    moves by its offset, which is the one conversion in the language that
    changes an address. A name two sub-objects both reach has no single
    answer, and the program writes the path itself. */
-static const struct struct_field *converts_to_interface(struct checker *c,
-                                                        const struct expr *e,
-                                                        const struct type *got,
-                                                        const struct type *to)
+static const struct struct_field *interface_path(const struct type *got,
+                                                 const struct type *to,
+                                                 const struct struct_field **second)
 {
     const struct struct_field *found = NULL;
     const struct type *t;
 
+    *second = NULL;
     if (got->kind != TYPE_POINTER || to->kind != TYPE_POINTER ||
         got->element->kind != TYPE_CLASS || to->element->kind != TYPE_CLASS) {
         return NULL;
@@ -212,19 +212,59 @@ static const struct struct_field *converts_to_interface(struct checker *c,
                 continue;
             }
             if (found != NULL) {
-                sema_error_at(c, e->pos,
-                              "`%s` converts to `%s` through `%.*s` and "
-                              "through `%.*s`, name one", sema_tn(got),
-                              sema_tn(to),
-                              (int)found->name.length, found->name.text,
-                              (int)t->fields[i].name.length,
-                              t->fields[i].name.text);
-                return NULL;
+                *second = &t->fields[i];
+                return found;
             }
             found = &t->fields[i];
         }
     }
     return found;
+}
+
+/* Whether a pointer of type got reaches the interface of to through two
+   sub-objects, which converts_to_interface reports. */
+static bool two_paths(const struct type *got, const struct type *to)
+{
+    const struct struct_field *second;
+
+    interface_path(got, to, &second);
+    return second != NULL;
+}
+
+/* The message names the value as the program writes it, `&c` or `p`,
+   by "Messages" in docs/anti-object-model.md and T070 of
+   docs/audit/tests-findings.md, and the type where the value has no
+   short spelling. */
+static const struct struct_field *converts_to_interface(struct checker *c,
+                                                        const struct expr *e,
+                                                        const struct type *got,
+                                                        const struct type *to)
+{
+    const struct struct_field *second;
+    const struct struct_field *found = interface_path(got, to, &second);
+    struct text value = {0};
+
+    if (second == NULL) {
+        return found;
+    }
+    if (e->kind == EXPR_UNARY && e->as.unary.op == TOKEN_AMP) {
+        text_appendf(&value, "&");
+        if (!sema_spell(&value, e->as.unary.operand)) {
+            text_free(&value);
+        }
+    } else if (!sema_spell(&value, e)) {
+        text_free(&value);
+    }
+    if (value.length == 0) {
+        text_appendf(&value, "%s", sema_tn(got));
+    }
+    sema_error_at(c, e->pos,
+                  "`%s` converts to `%s` through `%.*s` and through `%.*s`, "
+                  "name one", text_cstr(&value), sema_tn(to),
+                  (int)found->name.length, found->name.text,
+                  (int)second->name.length, second->name.text);
+    text_free(&value);
+    return NULL;
 }
 
 /* The spelling of e for a message: a name, or a path of field names on
@@ -784,6 +824,9 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
             e->to_iface = iface;
             return true;
         }
+        if (two_paths(got, bare)) {
+            return false;
+        }
     }
     /* A `?*T` where a `*T` is expected is the nullable rule itself, and
        names the value rather than the two types. */
@@ -804,6 +847,10 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
     if ((iface = converts_to_interface(c, e, got, expected)) != NULL) {
         e->to_iface = iface;
         return true;
+    }
+    /* The two paths are one mistake, and its message stands already. */
+    if (two_paths(got, expected)) {
+        return false;
     }
     if (got->kind == TYPE_VOID) {
         if (e->kind == EXPR_CALL && e->as.call.callee->kind == EXPR_NAME) {
