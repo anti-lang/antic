@@ -8,7 +8,7 @@ class Counter
 {
 	pub atomic n: int,
 
-	static atomic total: int = 0;
+	pub static atomic total: int = 0;
 
 	pub fn bump(self) -> int
 	{

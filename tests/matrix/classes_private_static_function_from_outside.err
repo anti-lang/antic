@@ -1,1 +1,1 @@
-classes_private_static_function_from_outside.anti:14:17: error: `helper` is private to `Counter`
+classes_private_static_function_from_outside.anti:14:9: error: `helper` is private to `Counter`

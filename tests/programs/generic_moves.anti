@@ -11,7 +11,7 @@ class Leaf
 {
 	pub n: int = 0,
 
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	fn destruct(self)
 	{
@@ -24,7 +24,7 @@ class Key
 {
 	pub own leaf: ?*Leaf = none,
 
-	static atomic torn: int = 0;
+	pub static atomic torn: int = 0;
 
 	pub fn number(self) -> int
 	{

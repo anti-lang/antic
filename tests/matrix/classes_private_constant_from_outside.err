@@ -1,1 +1,1 @@
-classes_private_constant_from_outside.anti:11:17: error: `STEP` is private to `Counter`
+classes_private_constant_from_outside.anti:11:9: error: `STEP` is private to `Counter`

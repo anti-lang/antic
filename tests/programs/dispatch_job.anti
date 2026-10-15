@@ -9,7 +9,7 @@ class Counter
 {
 	pub n: int = 0,
 
-	static atomic done: int = 0;
+	pub static atomic done: int = 0;
 }
 
 worker fn tally(c: *Counter, add: int) -> int

@@ -2,7 +2,7 @@
 
 class Counter
 {
-	static atomic total: int = 5;
+	pub static atomic total: int = 5;
 }
 
 const SEEN: int = Counter.total.sub(1);

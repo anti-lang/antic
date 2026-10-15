@@ -32,7 +32,7 @@ abstract class Shape inherits Drawable
 	pub x: f32 = 0.0,
 	pub y: f32 = 0.0,
 
-	const MAX_SIDE: f32 = 1000.0;
+	pub const MAX_SIDE: f32 = 1000.0;
 	static atomic count: int = 0;
 
 	abstract fn area(self) -> f32;

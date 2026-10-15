@@ -742,7 +742,7 @@ import anti.text;
 export abstract class Shape
 {
 	pub scale: f32 = 1.0,
-	const UNIT: f32 = 1.0;
+	protected const UNIT: f32 = 1.0;
 
 	abstract fn area(self) -> f32;
 
@@ -1366,7 +1366,7 @@ import anti.text;
 export class Ticket
 {
 	pub number: int = 0,
-	static atomic issued: int = 0;
+	pub static atomic issued: int = 0;
 
 	fn construct(self)
 	{
@@ -1443,7 +1443,7 @@ class Ticket
 class Ticket
 {
 	pub number: int = 0,
-	static atomic count: int = 0;
+	pub static atomic count: int = 0;
 }
 
 fn total() -> int

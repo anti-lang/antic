@@ -1128,7 +1128,7 @@ export class Stats
 	pub atomic small: i8 = 0,
 	pub plain: int = 0,
 
-	static atomic total: int = 0;
+	pub static atomic total: int = 0;
 }
 
 worker fn tally(chunk: []int) -> int

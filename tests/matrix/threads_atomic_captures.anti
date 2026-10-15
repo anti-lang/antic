@@ -7,7 +7,7 @@ extern fn printf(format: ?*byte, ...) -> c_int;
 
 class Counter
 {
-	static atomic total: int = 0;
+	pub static atomic total: int = 0;
 }
 
 fn run(f: fn() -> int) -> int

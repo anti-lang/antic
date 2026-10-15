@@ -11,7 +11,7 @@ class Box
 	pub own inner: ?*Box = none,
 	pub n: int = 0,
 
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	pub fn make(n: int) -> Box
 	{

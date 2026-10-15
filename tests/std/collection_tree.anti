@@ -17,7 +17,7 @@ class Node
 {
 	pub own name: ?*byte = none,
 
-	static atomic torn: int = 0;
+	pub static atomic torn: int = 0;
 
 	pub fn named(s: str) -> Node
 	{
@@ -40,7 +40,7 @@ class Leaf
 {
 	pub n: int = 0,
 
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	fn destruct(self)
 	{
@@ -54,7 +54,7 @@ class Held
 {
 	pub own leaf: ?*Leaf = none,
 
-	static atomic torn: int = 0;
+	pub static atomic torn: int = 0;
 
 	pub fn of(n: int) -> Held
 	{

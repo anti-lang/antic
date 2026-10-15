@@ -316,7 +316,7 @@ A local is mutable. Its type never changes, so `x = "five"` after `let x = 5;` i
 ```anti
 class Limits
 {
-	const MAX: int = 64;
+	pub const MAX: int = 64;
 }
 const STEP: int = 2;
 const BYTES: int = STEP * size_of(int);

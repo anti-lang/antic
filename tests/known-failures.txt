@@ -187,9 +187,6 @@ matrix_classes_internal_on_a_class_member_refused T071 One mistake of a class de
 matrix_classes_operator_with_a_literal_dev T074 A literal as the second operand of an `operator fn` that takes another type is refused.
 matrix_classes_operator_with_a_literal_release T074 A literal as the second operand of an `operator fn` that takes another type is refused.
 matrix_classes_operator_with_a_literal_memory_checks T074 A literal as the second operand of an `operator fn` that takes another type is refused.
-matrix_classes_private_static_function_from_outside_refused T075 A static function, a static field and a constant without a marker are reached from outside their class.
-matrix_classes_private_static_field_from_outside_refused T075 A static function, a static field and a constant without a marker are reached from outside their class.
-matrix_classes_private_constant_from_outside_refused T075 A static function, a static field and a constant without a marker are reached from outside their class.
 class_members_modules_release T076 A public static field and a public constant of a class of another module are refused.
 class_members_modules_dev T076 A public static field and a public constant of a class of another module are refused.
 matrix_classes_static_field_through_self_refused T077 The message for a member of a class reached the wrong way names another kind or denies the member.
@@ -214,7 +211,6 @@ optional_default_modules_dev T085 The library file of a class with a field `?int
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
 clib_never_cpp T116 The header of an export function that never returns holds `_Noreturn`, which is no C++.
-error_modules_member_protected_static_function T086 A protected static function of a class of a library is called from outside the class.
 matrix_modules_import_with_pub_refused T087 `pub` before an `import` gets one message twice.
 matrix_modules_extern_function_in_a_class_refused T087 An `extern fn` in a class body gets a second message.
 error_modules_internal_interface T087 An interface that a module does not give gets two more messages.

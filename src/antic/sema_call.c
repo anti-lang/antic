@@ -2343,6 +2343,22 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (m->symbol == NULL) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* A static function, a static field and a constant keep the level of
+       visibility they are declared with, as every member does, by T075
+       of docs/audit/tests-findings.md. The body of the class reaches its
+       own outside a function too: in the type and the value of a
+       constant and in the default of a field. */
+    if (t->kind == TYPE_CLASS && !member_visible(c, t, m) &&
+        !(sema_checking_class(c) == NULL && c->ctx.within != NULL &&
+          c->ctx.within->symbol != NULL &&
+          c->ctx.within->symbol->type == sema_declaring_class(m))) {
+        const struct type *owner = sema_declaring_class(m);
+        sema_error_at(c, e->pos, "`%.*s` is %s `%s`", (int)name->length,
+                      name->text,
+                      m->vis == VIS_PROTECTED ? "protected in" : "private to",
+                      sema_tn(owner != NULL ? owner : t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
     /* DESIGN: a static field is a global of the class and not a
        constant. Its value is written into the data of the module and
        never folded into a use. The value is still evaluated here,

@@ -17,8 +17,8 @@ fn risky(n: int) -> int may fail
 
 class Tally
 {
-	static atomic seen: int = 0;
-	static atomic bad: int = 0;
+	pub static atomic seen: int = 0;
+	pub static atomic bad: int = 0;
 }
 
 fn add(n: int) may fail

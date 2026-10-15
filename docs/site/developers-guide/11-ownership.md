@@ -62,7 +62,7 @@ class Sprite
 	pub own shadow: ?*Sprite = none,
 	pub atlas: *Texture,
 	pub name: str = "",
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	fn destruct(self)
 	{

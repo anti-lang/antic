@@ -53,7 +53,7 @@ class Item
 {
 	pub n: ?*int = none,
 
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	pub fn of(n: int) -> Item
 	{

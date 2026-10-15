@@ -159,7 +159,7 @@ class Node
 	pub next: ?Shared<Node> = none,
 	pub back: ?*Node = none,
 
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	pub fn of(name: int) -> Node
 	{

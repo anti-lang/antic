@@ -202,7 +202,7 @@ class Tag
 {
 	pub own n: ?*int = none,
 
-	static atomic torn: int = 0;
+	pub static atomic torn: int = 0;
 
 	pub fn of(n: int) -> Tag
 	{

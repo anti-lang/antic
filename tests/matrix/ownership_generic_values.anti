@@ -16,7 +16,7 @@ class Key
 	pub n: int = 0,
 	pub own leaf: ?*Leaf = none,
 
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	fn construct(self)
 	{

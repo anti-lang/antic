@@ -11,7 +11,7 @@ extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
 
 class Tag
 {
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	pub fn make() -> *Tag
 	{

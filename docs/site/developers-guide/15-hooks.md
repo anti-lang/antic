@@ -55,9 +55,9 @@ class Texture
 {
 	pub id: int = 0,
 
-	static atomic live: int = 0;
-	static atomic copies: int = 0;
-	static atomic flights: int = 0;
+	pub static atomic live: int = 0;
+	pub static atomic copies: int = 0;
+	pub static atomic flights: int = 0;
 
 	concrete fn created(self)
 	{

@@ -12,11 +12,11 @@ class Flag
 	pub n: int = 1,
 
 	/* Set once the slow chunk runs, and once the joiner is about to wait. */
-	static atomic started: int = 0;
-	static atomic joining: int = 0;
-	static atomic stop: int = 0;
+	pub static atomic started: int = 0;
+	pub static atomic joining: int = 0;
+	pub static atomic stop: int = 0;
 	/* 0 when the caller of `parallel` waits first, 1 when the joiner does. */
-	static atomic joiner_first: int = 0;
+	pub static atomic joiner_first: int = 0;
 }
 
 /// Runs until main says stop, so its joiner waits past the end of `parallel`.

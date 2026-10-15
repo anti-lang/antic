@@ -27,7 +27,7 @@ class Counter
 {
 	pub atomic hits: int = 0,
 
-	static atomic total: int = 0;
+	pub static atomic total: int = 0;
 }
 
 fn in_function(e: *Env, k: int) -> int

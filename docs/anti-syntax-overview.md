@@ -181,7 +181,7 @@ let pair = [1, 2];
 ```anti
 class Limits
 {
-	const MAX: int = 64;
+	pub const MAX: int = 64;
 }
 
 let x = 5;
@@ -1118,7 +1118,7 @@ A static field belongs to the class and must be atomic. A singleton has one inst
 class Circle
 {
 	r: f32 = 1.0,
-	static atomic count: int = 0;
+	pub static atomic count: int = 0;
 
 	fn construct(self) { Circle.count.add(1); }
 }

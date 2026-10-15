@@ -2,7 +2,7 @@
 
 class Counter
 {
-	static atomic total: int = 5;
+	pub static atomic total: int = 5;
 }
 
 const SWAPPED: bool = Counter.total.compare_swap(5, 1);
