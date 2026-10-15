@@ -1523,6 +1523,14 @@ static struct type *make_copy(struct checker *c, struct type *generic,
     return copy_named(c, generic, args, values);
 }
 
+/* Whether name names an imported module. */
+static bool names_module(struct checker *c, const struct name *name)
+{
+    const struct symbol *sym = sema_lookup(c, name);
+
+    return sym != NULL && sym->kind == SYMBOL_MODULE;
+}
+
 /* The argument of the parameter p of the generic named name, as written
    at a. A type parameter takes a type. A constant one takes an integer
    literal or the name of a constant. */
@@ -1552,8 +1560,14 @@ static bool resolve_arg(struct checker *c, const struct name *name,
         *value = types_symbolic(c->types, &key);
         return true;
     }
-    if (a->kind == TYPEX_NAMED && a->module.length == 0 && a->arg_count == 0) {
-        struct symbol *sym = sema_lookup(c, &a->name);
+    /* `m.COUNT` names a constant of another module, by T094. */
+    if (a->kind == TYPEX_NAMED && a->arg_count == 0 &&
+        (a->module.length == 0 || names_module(c, &a->module))) {
+        struct symbol *sym =
+            a->module.length == 0
+                ? sema_lookup(c, &a->name)
+                : sema_library_item(c, sema_lookup(c, &a->module)->home,
+                                    &a->name);
         if (sym != NULL && sym->kind == SYMBOL_CONST &&
             sema_const_symbol(c, sym, a->pos) && sym->value != NULL &&
             types_is_integer(sym->type)) {

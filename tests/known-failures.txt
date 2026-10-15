@@ -19,8 +19,6 @@
 # The test known_failures checks the list against the table of the findings.
 function_default_modules_release T115 A literal of a library class omits a field whose default names a function and is refused.
 function_default_modules_dev T115 A literal of a library class omits a field whose default names a function and is refused.
-constant_argument_modules_release T094 A constant of another module is refused as the argument of `N: int`.
-constant_argument_modules_dev T094 A constant of another module is refused as the argument of `N: int`.
 error_modules_type_nested_in_a_generic_class T095 A message on a copy of a library generic names a line of the library in the file of the client.
 error_modules_type_nested_in_a_generic_class_passed_on T095 A message on a copy of a library generic names a line of the library in the file of the client.
 anti_option_soname_linux_dist T099 `dist/` of a Linux library of `--soname` holds `libshapes.so` alone, without the file its soname names.
