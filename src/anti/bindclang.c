@@ -288,6 +288,9 @@ struct reader {
     const char *file;           /* of the last location clang wrote */
     int64_t line;
     bool failed;
+    /* The target keeps an enum whose values pass INT64_MAX an int, with
+       the bits of the values, as the ABI of Windows does. */
+    bool int_enums;
 };
 
 static void refuse(struct reader *r, const char *format, ...)
@@ -843,8 +846,8 @@ static void declare_enum(struct reader *r, const struct json_value *node)
        C, unless a value leaves its range. clang then gives the enum
        unsigned int when no value is negative. An unsigned enum with a
        value above INT64_MAX, whose bits stand in the int64_t as a
-       negative one, is c_ulonglong. */
-    if (is_unsigned && above_int64) {
+       negative one, is c_ulonglong, apart from Windows. */
+    if (is_unsigned && above_int64 && !r->int_enums) {
         e->base = "c_ulonglong";
     } else if (high > 0x7FFFFFFF || low < -0x7FFFFFFF - 1) {
         e->base = low >= 0 && high <= 0xFFFFFFFFll ? "c_uint" : "c_longlong";
@@ -1534,6 +1537,7 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
                 q->target != NULL ? q->target : "of this host");
         return false;
     }
+    r.int_enums = target_info(t)->os == OS_WINDOWS;
     find_clang(&clang);
     if (!check_version(text_cstr(&clang))) {
         goto done;
