@@ -769,26 +769,9 @@ static void check_assign(struct checker *c, struct stmt *s)
         sema_check_expr(c, s->as.assign.value, NULL);
         return;
     }
-    /* DESIGN: a field of a singleton is read-only after creation, so
-       that a program has one place to look for the value. `construct`
-       sets it, and `mutable` marks the fields the program may write
-       anywhere. An atomic field has its own operations. */
-    if (target->kind == EXPR_FIELD) {
-        const struct type *owner = sema_struct_of(target->as.field.base->type);
-        const struct struct_field *f =
-            owner != NULL ? types_find_field(owner,
-                                             &target->as.field.name) : NULL;
-        if (f != NULL && !f->writable && sema_singleton_type(owner) &&
-            (c->ctx.function == NULL ||
-             !sema_name_is(&c->ctx.function->name, "construct"))) {
-            sema_error_at(c, target->pos,
-                          "`%.*s` of singleton `%s` is read-only "
-                          "after creation, and `mutable` marks a field the "
-                          "program writes", (int)target->as.field.name.length,
-                          target->as.field.name.text, sema_tn(owner));
-            sema_check_expr(c, s->as.assign.value, NULL);
-            return;
-        }
+    if (sema_refuse_singleton_write(c, target, target->pos)) {
+        sema_check_expr(c, s->as.assign.value, NULL);
+        return;
     }
     if (target->kind == EXPR_FIELD &&
         sema_struct_of(target->as.field.base->type) != NULL &&
@@ -3150,6 +3133,35 @@ static bool snapshot_copies(const struct type *t, bool top)
             return false;
         }
     }
+    return true;
+}
+
+/* DESIGN: a field of a singleton is read-only after creation, so
+   that a program has one place to look for the value. `construct`
+   sets it, and `mutable` marks the fields the program may write
+   anywhere. An atomic field has its own operations. Its address would
+   let a write through, so `&` of one is refused as `=` is, by T079 of
+   docs/audit/tests-findings.md. */
+bool sema_refuse_singleton_write(struct checker *c, const struct expr *target,
+                                 struct pos pos)
+{
+    const struct type *owner;
+    const struct struct_field *f;
+
+    if (target->kind != EXPR_FIELD) {
+        return false;
+    }
+    owner = sema_struct_of(target->as.field.base->type);
+    f = owner != NULL ? types_find_field(owner, &target->as.field.name) : NULL;
+    if (f == NULL || f->writable || f->atomic || !sema_singleton_type(owner) ||
+        (c->ctx.function != NULL &&
+         sema_name_is(&c->ctx.function->name, "construct"))) {
+        return false;
+    }
+    sema_error_at(c, pos, "`%.*s` of singleton `%s` is read-only after "
+                  "creation, and `mutable` marks a field the program writes",
+                  (int)target->as.field.name.length, target->as.field.name.text,
+                  sema_tn(owner));
     return true;
 }
 

@@ -874,6 +874,7 @@ static struct type *check_unary(struct checker *c, struct expr *e,
 {
     struct expr *operand = e->as.unary.operand;
     struct type *t;
+    bool ending;
 
     /* Unary `-` and `~` call `neg` and `not` on a type that declares
        them, as the binary operators call their own. */
@@ -981,6 +982,8 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         }
         return sema_usable_pointer(c, operand, t)->element;
     case TOKEN_AMP:
+        ending = c->ending_object;
+        c->ending_object = false;
         t = sema_check_storage(c, operand);
         if (sema_is_error(t)) {
             return t;
@@ -996,6 +999,9 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         }
         if (sema_bitfield_of(operand) != NULL) {
             sema_error_at(c, operand->pos, "a bitfield has no address");
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if (!ending && sema_refuse_singleton_write(c, operand, e->pos)) {
             return sema_builtin(c, TYPE_ERROR);
         }
         sema_mark_address_taken(c, operand);
@@ -2434,7 +2440,12 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         const char *what = e->as.object.op == TOKEN_DUP      ? "dup"
                            : e->as.object.op == TOKEN_DELETE ? "delete"
                                                              : "destroy";
+        bool was = c->ending_object;
+        c->ending_object = e->as.object.op != TOKEN_DUP &&
+                           e->as.object.operand->kind == EXPR_UNARY &&
+                           e->as.object.operand->as.unary.op == TOKEN_AMP;
         t = sema_check_expr(c, e->as.object.operand, NULL);
+        c->ending_object = was;
         if (sema_is_error(t)) {
             return t;
         }

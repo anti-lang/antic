@@ -147,6 +147,11 @@ struct checker {
     const struct stmt *loops_open[LOOPS_OPEN_MAX];
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool atomic_place;          /* the place of an atomic operation */
+    /* The operand of `delete` or `destroy`. `destroy(&Config.get().part)`
+       of a part of a singleton stays as it is until Eddie decides R083
+       of "Rules of 2026-10-13", so the address of a singleton field
+       there is taken. */
+    bool ending_object;
     bool program;               /* the build writes a program, not a library */
     struct handler_state handler;   /* the handler under check */
     bool saw_fail;              /* the body holds a `fail` or a `try` */
@@ -550,6 +555,10 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
                        struct pos use);
 
 /* sema_stmt.c */
+/* Refuse a write to the field target of a singleton that is read-only
+   after creation, or its address, at pos. Returns whether it refused. */
+bool sema_refuse_singleton_write(struct checker *c, const struct expr *target,
+                                 struct pos pos);
 
 void sema_walk_worker(struct checker *c, const struct item *worker);
 bool sema_fills(const struct type *t, const struct type *abstract);
