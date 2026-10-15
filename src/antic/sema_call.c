@@ -776,6 +776,18 @@ static bool no_method_call(struct checker *c, struct expr *call,
     if (private_of_library(c, field->pos, s, &field->as.field.name)) {
         return false;
     }
+    /* A function without `self` is reached through its class, by T077
+       of docs/audit/tests-findings.md. */
+    if (hidden != NULL && hidden->kind == ITEM_FN && !hidden->has_self) {
+        const struct type *owner = sema_declaring_class(hidden);
+        const char *in = sema_tn(owner != NULL ? owner : s);
+        sema_error_at(c, field->pos, "`%.*s` is a static function of `%s`, "
+                      "called as `%s.%.*s()`", (int)field->as.field.name.length,
+                      field->as.field.name.text, in, in,
+                      (int)field->as.field.name.length,
+                      field->as.field.name.text);
+        return false;
+    }
     sema_error_at(c, field->pos, "`%s` has no function `%.*s`", sema_tn(s),
                   (int)field->as.field.name.length,
                   field->as.field.name.text);
@@ -2494,8 +2506,9 @@ static struct type *check_member_name(struct checker *c, struct expr *e,
        field. */
     if (m != NULL && m->kind == ITEM_CONST) {
         sema_error_at(c, e->pos,
-                      "`%.*s` is a constant of `%s`, reached as "
+                      "`%.*s` is a %s of `%s`, reached as "
                       "`%s.%.*s`", (int)name->length, name->text,
+                      m->is_static ? "static field" : "constant",
                       sema_tn(s),
                       sema_tn(s), (int)name->length, name->text);
         return sema_builtin(c, TYPE_ERROR);

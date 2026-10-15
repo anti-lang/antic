@@ -957,6 +957,13 @@ static bool const_field(struct checker *c, struct expr *e,
             e->type->fields[e->as.field.enum_value - 1].number;
         return true;
     }
+    /* A field of what a call gives names the call, which is the part
+       that is no constant expression, by T077 of
+       docs/audit/tests-findings.md. */
+    if (e->as.field.base->kind == EXPR_CALL) {
+        return sema_eval_const(c, e->as.field.base, &a) &&
+               fail_const(c, e, "this field");
+    }
     /* A function, a static or a constant of a type is read at run
        time. */
     if (e->symbol != NULL) {

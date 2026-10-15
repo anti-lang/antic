@@ -2768,6 +2768,18 @@ static void declare_all_members(struct checker *c)
             it->symbol->type->item_exported = it->exported;
         }
     }
+    /* DESIGN: a singleton has one instance, which `Config.get()` makes
+       on the first call. The program never allocates one, so the checker
+       declares `get` itself, before any body or constant names it. A
+       constant that calls it is then refused as a call, by T077 of
+       docs/audit/tests-findings.md. */
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->kind == ITEM_CLASS && it->is_singleton &&
+            it->symbol != NULL && it->symbol->type != NULL) {
+            declare_get(c, it);
+        }
+    }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_CONST) {
@@ -2799,16 +2811,6 @@ static void check_signatures(struct checker *c)
             }
         }
         sema_leave(c, &outer);
-    }
-    /* DESIGN: a singleton has one instance, which `Config.get()` makes
-       on the first call. The program never allocates one, so the checker
-       declares `get` itself, before any body names it. */
-    for (i = 0; i < module->item_count; i++) {
-        struct item *it = module->items[i];
-        if (it->kind == ITEM_CLASS && it->is_singleton &&
-            it->symbol != NULL && it->symbol->type != NULL) {
-            declare_get(c, it);
-        }
     }
 }
 
