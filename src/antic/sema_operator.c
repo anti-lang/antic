@@ -14,6 +14,35 @@ static bool names_carry(const struct expr *e)
            sema_name_is(&e->as.field.name, FLAGS_CARRY);
 }
 
+static const char *operator_name(enum token_kind op);
+static struct symbol *operator_symbol(struct checker *c, struct type *t,
+                                      const char *text);
+
+/* The type a literal on the right of op takes beside a left operand of
+   type left. An `operator fn` of left gives the type of its second
+   parameter, which is no type of the left operand where the function
+   says so: `m * 2` with `operator fn mul(self, times: int)` takes an
+   `int`, by T074 of docs/audit/tests-findings.md. Any other left operand
+   gives its own type. */
+static struct type *right_literal_type(struct checker *c, enum token_kind op,
+                                       struct type *left)
+{
+    const char *called = operator_name(op);
+    struct symbol *fn;
+    struct type *param;
+
+    if (called == NULL || !types_has_fields(left) || types_is_simd(left)) {
+        return left;
+    }
+    fn = operator_symbol(c, left, called);
+    if (fn == NULL || fn->type == NULL || fn->type->kind != TYPE_FN ||
+        fn->type->param_count < 2) {
+        return left;
+    }
+    param = fn->type->params[1];
+    return sema_has_params(param) ? left : param;
+}
+
 /* Check both operands of a binary operator so that a literal takes the
    type of the other operand. outer is the type the context expects of
    the result, used when both operands are literals. */
@@ -65,9 +94,13 @@ static bool binary_operands(struct checker *c, struct expr *e,
                                                                  : *right);
     } else {
         *left = sema_check_expr(c, l, outer);
-        *right = sema_check_expr(c, r, (*left)->kind == TYPE_F16 ? NULL
-                                       : sema_is_error(*left)    ? outer
-                                                                 : *left);
+        *right = sema_check_expr(
+            c, r,
+            (*left)->kind == TYPE_F16 ? NULL
+            : sema_is_error(*left)    ? outer
+            : sema_is_untyped(r)
+                ? right_literal_type(c, e->as.binary.op, *left)
+                : *left);
     }
     if (sema_refuses_half(c, e->pos, *left) ||
         sema_refuses_half(c, e->pos, *right)) {

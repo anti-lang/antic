@@ -172,9 +172,6 @@ matrix_threads_pointer_into_fields_in_a_tuple_refused T062 A public function of 
 matrix_threads_pointer_into_fields_of_a_concurrent_class_in_a_tuple_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 matrix_threads_pointer_into_fields_through_a_private_function_refused T062 A public function of a thread-safe class gives out a pointer into its fields.
 lock_order_once T063 A pair of locks in opposite orders is reported once per order.
-matrix_classes_operator_with_a_literal_dev T074 A literal as the second operand of an `operator fn` that takes another type is refused.
-matrix_classes_operator_with_a_literal_release T074 A literal as the second operand of an `operator fn` that takes another type is refused.
-matrix_classes_operator_with_a_literal_memory_checks T074 A literal as the second operand of an `operator fn` that takes another type is refused.
 class_members_modules_release T076 A public static field and a public constant of a class of another module are refused.
 class_members_modules_dev T076 A public static field and a public constant of a class of another module are refused.
 matrix_classes_qualified_body_in_a_nested_class_dev T084 A `concrete fn` in a nested class cannot be qualified by a type of the same class body.
