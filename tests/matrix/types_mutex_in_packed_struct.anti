@@ -1,0 +1,25 @@
+//! A Mutex in a packed struct keeps its alignment, so the struct is two words
+//! of a lock: the byte before it and the padding that `packed` leaves, then the
+//! word. `sync` takes and gives back the lock.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+packed struct Held
+{
+	tag: u8,
+	m: Mutex,
+}
+
+fn main() -> int
+{
+	let h = Held { tag: 1, m: Mutex.new() };
+	let n = 0;
+	sync h.m {
+		n += 1;
+	}
+	printf("size %d\n".ptr, (size_of(Held) == 2 * size_of(Mutex)) as c_int);
+	printf("sync %lld %d\n".ptr, n, h.tag as c_int);
+	return 0;
+}

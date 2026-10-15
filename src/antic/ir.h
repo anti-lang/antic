@@ -60,6 +60,7 @@ struct ir_field {
     struct ir_vtype type;
     uint8_t bits;                   /* 0 for a field that is not a bitfield */
     enum ir_ext ext;
+    bool atomic;                    /* `atomic`: read and written by calls */
 };
 
 /* An aggregate type. A struct or union lists its fields, and an array has

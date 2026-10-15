@@ -857,6 +857,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
             put_vtype(w, t->fields[j].type);
             antl_put_u8(w, t->fields[j].bits);
             antl_put_u8(w, (uint8_t)t->fields[j].ext);
+            antl_put_u8(w, (uint8_t)t->fields[j].atomic);
         }
     }
     antl_put_count(w, ir->global_count);

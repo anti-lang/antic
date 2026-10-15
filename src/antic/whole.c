@@ -346,6 +346,7 @@ static bool same_agg(const struct ir_module *m, uint32_t a, uint32_t b)
     for (i = 0; i < x->field_count; i++) {
         if (x->fields[i].bits != y->fields[i].bits ||
             x->fields[i].ext != y->fields[i].ext ||
+            x->fields[i].atomic != y->fields[i].atomic ||
             !same_vtype(m, x->fields[i].type, y->fields[i].type)) {
             return false;
         }

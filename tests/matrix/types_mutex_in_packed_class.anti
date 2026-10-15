@@ -1,7 +1,7 @@
-//! A Mutex in a packed class. `packed` removes the padding, so the word of the
-//! lock stands at offset 14, after the table of the class and six bytes, and
-//! `align(16)` fixes where the object starts. The word then crosses a multiple
-//! of 16. `sync` still takes and gives back the lock.
+//! A Mutex in a packed class. Without its padding the word of the lock would
+//! stand at offset 14, after the table of the class and six bytes, and
+//! `align(16)` fixes where the object starts. The word would then cross a
+//! multiple of 16. `sync` takes and gives back the lock.
 
 import anti.lang;
 

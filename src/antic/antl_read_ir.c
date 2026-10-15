@@ -319,12 +319,16 @@ static void read_tables(struct reader *r, struct ir_module *program,
         t->fields = antl_allocate(r, t->field_count, sizeof *t->fields);
         for (j = 0; j < t->field_count && !r->failed; j++) {
             uint8_t ext;
+            uint8_t atomic;
             t->fields[j].name = antl_get_cstr(r);
             t->fields[j].type = read_vtype(r, false);
             t->fields[j].bits = antl_get_u8(r);
             ext = antl_get_u8(r);
             t->fields[j].ext = (enum ir_ext)ext;
-            if (ext > IR_EXT_ZERO || t->fields[j].type.type == IR_VOID ||
+            atomic = antl_get_u8(r);
+            t->fields[j].atomic = atomic != 0;
+            if (ext > IR_EXT_ZERO || atomic > 1 ||
+                t->fields[j].type.type == IR_VOID ||
                 (t->fields[j].bits != 0 && !ir_bitfield_fits(&t->fields[j]))) {
                 antl_damaged(r);
             }

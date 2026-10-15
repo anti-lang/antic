@@ -205,6 +205,7 @@ uint32_t lower_agg_of(struct lowerer *l, const struct type *t)
             fields[i].ext = t->fields[i].bits == 0 ? IR_EXT_NONE
                             : types_is_signed(t->fields[i].type) ? IR_EXT_SIGN
                                                                 : IR_EXT_ZERO;
+            fields[i].atomic = t->fields[i].atomic;
         }
         agg = t->simd ? ir_simd_add(l->m, name, fields, count)
                       : ir_struct_add(l->m,

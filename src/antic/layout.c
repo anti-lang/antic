@@ -262,6 +262,9 @@ static void compute(struct layouts *l, uint32_t agg)
         align = layout_align(l, element);
         out->unaligned = element.type == IR_AGG &&
                          layout_agg(l, element.agg)->unaligned;
+        out->shared = element.type == IR_LOCK ||
+                      (element.type == IR_AGG &&
+                       layout_agg(l, element.agg)->shared);
     }
     for (i = 0; t->kind != IR_AGG_ARRAY && i < t->field_count; i++) {
         struct ir_vtype type = t->fields[i].type;
@@ -270,8 +273,16 @@ static void compute(struct layouts *l, uint32_t agg)
         uint64_t size_bits = mul_size(size, 8, &overflow);
         uint64_t natural = layout_align(l, type);
         uint64_t natural_bits = mul_size(natural, 8, &overflow);
-        uint64_t field_align = t->packed ? 1 : natural;
+        /* DESIGN: an atomic field and a field that holds a Mutex keep
+           their alignment in a packed aggregate, which takes it as its
+           own. ARM64 refuses an atomic access that crosses 16 bytes, and
+           the lock word of every system is read by atomic instructions,
+           by T022 of docs/audit/tests-findings.md. */
+        bool shared = t->fields[i].atomic || type.type == IR_LOCK ||
+                      (type.type == IR_AGG && layout_agg(l, type.agg)->shared);
+        uint64_t field_align = t->packed && !shared ? 1 : natural;
         uint64_t end = 0;
+        out->shared = out->shared || shared;
         if (is_unit_break(&t->fields[i])) {
             /* DESIGN: a zero-width bitfield breaks the unit as C does.
                System V aligns the next field to T, AAPCS64 outside Apple

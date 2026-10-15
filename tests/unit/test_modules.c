@@ -320,7 +320,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 86, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 87, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1632,9 +1632,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 87;
+    copy[4] = 88;
     refuses_file(copy, sizeof copy,
-                 "has format version 87, and antic reads version 86");
+                 "has format version 88, and antic reads version 87");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -2674,8 +2674,9 @@ static void agg_chain(struct text *b, uint32_t n, bool forward)
         put_str(b, "f");
         put_u8(b, next == UINT32_MAX ? IR_I64 : IR_AGG);
         put_u32(b, next);
-        put_u8(b, 0);
-        put_u8(b, 0);
+        put_u8(b, 0);                   /* no bitfield */
+        put_u8(b, 0);                   /* no extension */
+        put_u8(b, 0);                   /* not atomic */
     }
     text_append_bytes(b, scale_antl + SCALE_AGGS + 4,
                       sizeof scale_antl - SCALE_AGGS - 4);

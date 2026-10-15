@@ -1,7 +1,7 @@
-//! An atomic field of a packed class. `packed` removes the padding, so the
-//! field stands at offset 9, after the table of the class and one byte, and
-//! `align(16)` fixes where the object starts. The eight bytes of the field then
-//! cross a multiple of 16. Every atomic call still works on it.
+//! An atomic field of a packed class. Without its padding the field would stand
+//! at offset 9, after the table of the class and one byte, and `align(16)`
+//! fixes where the object starts. The eight bytes of the field would then cross
+//! a multiple of 16. Every atomic call works on it.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

@@ -494,7 +494,8 @@ static void aggtype(struct text *out, const struct ir_module *m,
     text_append(out, " {");
     for (i = 0; i < t->field_count; i++) {
         const struct ir_field *f = &t->fields[i];
-        text_appendf(out, "%s %s: ", i > 0 ? "," : "", f->name);
+        text_appendf(out, "%s %s%s: ", i > 0 ? "," : "",
+                     f->atomic ? "atomic " : "", f->name);
         ir_vtype_print(out, m, f->type);
         if (f->bits != 0) {
             text_appendf(out, " : %u %s", (unsigned)f->bits,
