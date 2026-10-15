@@ -1329,22 +1329,30 @@ static int discover_in(const char *dir, size_t dir_length,
 }
 
 /* Search every directory of dirs, which are separated by `:`, in
-   order. */
+   order. An empty value names no directory.
+
+   DESIGN: an empty directory between two separators, or before or
+   after one, is the working directory, as in PATH. It is written `.`,
+   so the library is a path and never a bare name. The loader of the
+   system looks for a bare name on its own path, while the digest reads
+   the file of the working directory. */
 static int discover(const char *dirs, const unsigned char *path,
                     int64_t length, char *out, size_t size)
 {
     const char *at = dirs != NULL ? dirs : "";
 
-    while (*at != '\0') {
+    if (*at == '\0') {
+        return 0;
+    }
+    for (;;) {
         size_t n = strcspn(at, ":");
-        int found = discover_in(at, n, path, length, out, size);
-        if (found != 0) {
+        int found = n > 0 ? discover_in(at, n, path, length, out, size)
+                          : discover_in(".", 1, path, length, out, size);
+        if (found != 0 || at[n] == '\0') {
             return found;
         }
-        at += n;
-        at += *at == ':';
+        at += n + 1;
     }
-    return 0;
 }
 
 void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,

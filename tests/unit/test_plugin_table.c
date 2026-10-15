@@ -25,6 +25,7 @@
 #include <windows.h>
 #else
 #include <dlfcn.h>
+#include <unistd.h>
 #endif
 
 int check_failures;
@@ -611,9 +612,11 @@ static int find_plugin(void)
     return ok;
 }
 
-/* Discover the provider of host.Service through an index of length bytes
-   at bytes. want is NULL when the index leads to plugin_bad, and
-   otherwise a part of the refusal. */
+/* Discover the provider of host.Service in search_dirs through an index
+   of length bytes at bytes. want is NULL when the index leads to
+   plugin_bad, and otherwise a part of the refusal. */
+static const char *search_dirs = plugin_dir;
+
 static void discovers_with(int line, const char *bytes, size_t length,
                            const char *want)
 {
@@ -624,7 +627,7 @@ static void discovers_with(int line, const char *bytes, size_t length,
     index_bytes = bytes;
     index_length = length;
     sub = anti_rt_plugin_provider((const unsigned char *)"host.Service", 12,
-                                  (const unsigned char *)"", 0, plugin_dir);
+                                  (const unsigned char *)"", 0, search_dirs);
     index_bytes = NULL;
     why = anti_rt_plugin_message();
     snprintf(text, sizeof text, "%.*s", (int)why.len, why.ptr);
@@ -775,6 +778,48 @@ static void damaged_indexes(void)
               NULL);
 }
 
+/* Make dir the working directory. Gives 0 when it cannot be. */
+static int change_to(const char *dir)
+{
+#if defined(_WIN32)
+    return SetCurrentDirectoryA(dir) != 0;
+#else
+    return chdir(dir) == 0;
+#endif
+}
+
+/* An empty directory of the search path is the working directory, as
+   in PATH. The index and the library are read there, and the library
+   the digest covers is the one that loads, never one of the same name
+   that the loader of the system finds on its own path. */
+static void empty_directory(void)
+{
+    char dir[4096];
+
+#if defined(_WIN32)
+    DWORD written = GetCurrentDirectoryA(sizeof dir, dir);
+    CHECK(written > 0 && written < sizeof dir);
+#else
+    CHECK(getcwd(dir, sizeof dir) != NULL);
+#endif
+    if (!change_to(plugin_dir)) {
+        check_failures++;
+        fprintf(stderr, "cannot enter %s\n", plugin_dir);
+        return;
+    }
+    snprintf(index_path, sizeof index_path, "./anti-plugins.toml");
+    search_dirs = ":nowhere";
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "['host.Service']"), NULL);
+    search_dirs = "nowhere:";
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "['host.Service']"), NULL);
+    search_dirs = plugin_dir;
+    snprintf(index_path, sizeof index_path, "%s/anti-plugins.toml",
+             plugin_dir);
+    CHECK(change_to(dir));
+}
+
 /* A path holds no NUL, which would name another file than the one the
    program gave. The bytes up to it name plugin_bad. */
 static void nul_in_path(void)
@@ -820,6 +865,7 @@ int main(void)
         return 1;
     }
     damaged_indexes();
+    empty_directory();
     nul_in_path();
     good_table_loads();
     if (check_failures != 0) {

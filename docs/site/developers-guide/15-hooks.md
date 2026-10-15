@@ -1316,7 +1316,7 @@ The count of live objects starts in the hooks. `created` of every object on the 
 
 A provider that is a library fills a slot of the last section in another way than a function does. The slot holds a function, and what a library gives is an object. Every injectable interface therefore has one holder and one thunk that returns what the holder holds. The runtime stores the object in the holder and the thunk in the slot before `main`.
 
-Discovery reads the `anti-plugins.toml` of each directory of the key `plugins`, in order, and opens no library to learn what is inside. A library built for another runtime version is passed over. One whose bytes do not match the digest of the index is refused. Two libraries that provide one interface are an error that names both.
+Discovery reads the `anti-plugins.toml` of each directory of the key `plugins`, in order, and opens no library to learn what is inside. An empty directory of the value, as in `--anti.plugins=:plugins`, is the working directory, as in `PATH`. A library built for another runtime version is passed over. One whose bytes do not match the digest of the index is refused. Two libraries that provide one interface are an error that names both.
 
 Where it lives: `whole_write_provides` of `src/antic/whole_tables.c`, `whole_hosts_plugins` of `src/antic/whole.c`, `driver_write_plugin_index` of `src/antic/driver_index.c`, `src/rt/plugin.c` for the loader and its checks, `src/rt/loaded.c` for the open libraries and their counts, and `src/std/anti/plugin.anti`.
 

@@ -165,7 +165,9 @@ holder and puts the thunk in the slot. `[injections]` of the configuration file 
 the file and both over the build.
 
 Discovery reads the `anti-plugins.toml` of each directory of the
-`plugins` key, in order. It opens no library to find out what is inside
-one. A library built for another runtime is logged and passed over. One
+`plugins` key, in order. An empty directory of the value is the working
+directory, as in `PATH`, and `discover` writes it `.`. A library there is
+then a path, never a bare name that `dlopen` would look for on the path
+of the system. It opens no library to find out what is inside one. A library built for another runtime is logged and passed over. One
 whose bytes do not match the digest of the index is refused. Two
 libraries that provide one interface are an error naming both.
