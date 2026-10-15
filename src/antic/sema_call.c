@@ -828,9 +828,11 @@ static bool refuse_lifecycle_call(struct checker *c, const struct expr *call,
     const struct expr *field = call->as.call.callee;
 
     /* `destruct` is the one function a program never calls itself. The
-       compiler chains it, so `delete` and `destroy` are the spellings. */
-    if (member != NULL && member->runtime == NULL &&
-        sema_name_is(&field->as.field.name, "destruct")) {
+       compiler chains it, so `delete` and `destroy` are the spellings.
+       That holds for the `destruct` of the root and for one the program
+       cannot see, which `self.super.destruct()` of a private one reached
+       through the root before, by T068 of docs/audit/tests-findings.md. */
+    if (member != NULL && sema_name_is(&field->as.field.name, "destruct")) {
         sema_error_at(c, field->pos, "`destruct` is never called directly, use "
                       "`delete` or `destroy`");
         return true;
@@ -903,6 +905,10 @@ static bool method_call(struct checker *c, struct expr *call)
 
     if (ambiguous_member(c, field->pos, s, &field->as.field.name,
                          "the call")) {
+        return false;
+    }
+    if (member != NULL && sema_name_is(&field->as.field.name, "destruct") &&
+        refuse_lifecycle_call(c, call, member)) {
         return false;
     }
     f = sema_method_symbol(c, s, &field->as.field.name);
