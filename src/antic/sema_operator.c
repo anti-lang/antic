@@ -500,10 +500,25 @@ struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
    `p != none` is written for. */
 static bool comparable_pointers(const struct type *a, const struct type *b)
 {
+    size_t i;
+
+    /* A function value follows the pointer rule: two of one signature
+       and one form compare whether or not either may hold `none`. Each
+       type keeps a list of parameters of its own, so the lists compare
+       by their elements. */
     if (a->kind == TYPE_FN && b->kind == TYPE_FN) {
-        return a->params == b->params && a->param_count == b->param_count &&
-               a->result == b->result && a->bound == b->bound &&
-               a->may_fail == b->may_fail && a->has_out == b->has_out;
+        if (a->param_count != b->param_count || a->result != b->result ||
+            a->bound != b->bound || a->may_fail != b->may_fail ||
+            a->has_out != b->has_out || a->context != b->context ||
+            a->owned != b->owned) {
+            return false;
+        }
+        for (i = 0; i < a->param_count; i++) {
+            if (a->params[i] != b->params[i]) {
+                return false;
+            }
+        }
+        return true;
     }
     if (a->kind != TYPE_POINTER || b->kind != TYPE_POINTER) {
         return false;
