@@ -3899,6 +3899,21 @@ static void roots(struct emitter *e, const struct ir_module *m)
         text_free(&symbol);
         count++;
     }
+    /* DESIGN: a plugin converts an f16 through the runtime of its host,
+       below x86-64-v3, as the host does. A host whose level converts
+       through the runtime refers to both conversions, so its link takes
+       them and exports them whether it converts one itself or not, by
+       T121. */
+    if (e->o->exports && f16_calls(e)) {
+        runtime_function(e, "float", RT_FN_F16_TO_F32, "i32");
+        runtime_function(e, "i32", RT_FN_F32_TO_F16, "float");
+        text_appendf(e->out, "@anti.f16 = private constant [2 x ptr] "
+                             "[ptr @%s, ptr @%s]\n",
+                     rt_name(RT_FN_F16_TO_F32), rt_name(RT_FN_F32_TO_F16));
+        text_append(&entries, count > 0 ? ", ptr " : "ptr ");
+        text_append(&entries, "@anti.f16");
+        count++;
+    }
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
         if ((f->by_name && !f->is_extern) || local_export(e, f)) {
