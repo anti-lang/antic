@@ -108,6 +108,8 @@ option and no last argument, since the last argument is the source file.
 
 ## The handlers
 
-`anti.trace` holds the seven handlers that fill `TraceHandler`, and the
-`trace` key of the runtime configuration names one of them.
+`anti.trace` holds the seven handlers that fill `TraceHandler`. The
+`trace` key of the runtime configuration names one of six of them, or a
+list of them separated by commas, which `install` gathers in a
+`Composite`.
 `docs/notes/trace-handlers.md` holds their choices.

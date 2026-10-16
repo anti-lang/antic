@@ -101,8 +101,9 @@ channels.
   of a struct's field, which the node of a lock-free queue needs.
 - The library file writes the name of a field's guard and two marks, `hidden`
   and `unchecked`, in the byte of `inject`. The class that a nested type's guard
-  names stays behind, since no other module reaches a nested type. The format is
-  version 57.
+  names stays behind, since no other module reaches a nested type. The marks
+  came in with format version 57, and `ANTL_VERSION` of `src/antic/antl.h`
+  gives the version of today.
 
 ## Pointers into the fields
 

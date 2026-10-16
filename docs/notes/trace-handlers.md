@@ -19,9 +19,19 @@ size at compile time. The sizes are `PROFILE_SLOTS`, `JOURNAL_SLOTS`,
 `MESSAGE_BYTES` and `COMPOSITE_SLOTS`, each a `pub const` of the
 module.
 
-A handler counts with atomic fields. `created` fires on the thread that
-made the object and `joined` on the thread that joined the job. Two
-hooks therefore run at once in a program with workers.
+A handler counts with atomic fields and holds a `Mutex` around every
+table of more than one word. `created` fires on the thread that made
+the object and `joined` on the thread that joined the job. Two hooks
+therefore run at once in a program with workers. `Profiler`,
+`ErrorMonitor` and `ChangeJournal` take their lock in the hook that
+writes a table and in every function that reads one. A hook takes no
+lock but that of its own handler and calls nothing under it that runs a
+hook. `Composite` takes its lock in `add` alone. It writes the slot
+before it stores its atomic count, so a hook reads every slot below the
+count it loaded. The tests `std_trace_profile_threads`,
+`std_trace_errors_threads`, `std_trace_journal_threads` and
+`std_trace_composite_threads` drive one handler each from the chunks of
+a `parallel`.
 
 The reports are written by the program and never by a hook. `report`
 allocates nothing either, because `eprint_int` writes its digits into a
@@ -53,6 +63,9 @@ slot keeps the `str` it was given.
 error a `catch` binds is deleted when the handler exits, so a `str` into
 it points at freed memory once the hook has returned. The code and the
 name of the function are values and constants and need no copy.
+`last_message` gives a `str` into the array, which the next failure
+writes over, so a program reads it once the threads that may fail have
+stopped and calls `report` while they run.
 
 `ChangeJournal` keeps two names per entry, the class of the object and
 the field. Both stand in read-only data: the field record comes from the
@@ -67,10 +80,13 @@ site already follows between the handler and the object's own hook.
 
 ## The key
 
-`start` reads the `trace` key with `anti_rt_conf_get` and hands it to
-`install`. `install` takes one name, or names separated by commas, and
-gives the handler that `Trace.install` now holds. The names are `leaks`,
-`profile`, `calls`, `errors`, `threads` and `writes`.
+`start` reads the `trace` key with `runtime.get` of `anti.runtime` and
+hands it to `install`. `install` takes one name, or names separated by
+commas, and gives the handler that `Trace.install` now holds. The names
+are `leaks`, `profile`, `calls`, `errors`, `threads` and `writes`. A
+name no handler has writes one line to standard error and is passed
+over. So is a name past the `COMPOSITE_SLOTS` handlers of a list, whose
+handler `install` deletes at once.
 
 The program makes the call, as it calls `rt.configure`. Nothing of Anti
 runs between the runtime's start and `main`. A program that does not
@@ -79,7 +95,7 @@ install one for it.
 
 ## The tests
 
-The `tests` block holds seventeen tests and calls the hooks of each
+The `tests` block holds eighteen tests and calls the hooks of each
 handler directly, which is what a hook site does. A block sees every
 private item of its module, so a test reads `Profiler.inside` and
 `CallLogger.depth` where the accessors would hide the answer. The
