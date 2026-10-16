@@ -7,6 +7,7 @@
 
 #include "../binary_stdio.h"
 #include "check.h"
+#include "alloc.h"
 #include "toml.h"
 
 /* Whether the document holds key at all. */
@@ -153,13 +154,10 @@ static void table_repeat_limit(void)
    number when distinct, with one key each. The caller frees it. */
 static char *many_tables(int count, int distinct)
 {
-    char *text = malloc((size_t)count * 24 + 1);
+    char *text = alloc_zeroed((size_t)count * 24 + 1, 1);
     size_t at = 0;
     int i;
 
-    if (text == NULL) {
-        return NULL;
-    }
     for (i = 0; i < count; i++) {
         int written;
         if (distinct) {
@@ -197,11 +195,8 @@ static void table_repeat_cost(void)
     char *same = many_tables(100000, 0);
     char *distinct = many_tables(100000, 1);
 
-    CHECK(same != NULL && distinct != NULL);
-    if (same != NULL && distinct != NULL) {
-        reads_quickly(same, "a.99999.k");
-        reads_quickly(distinct, "a99999.0.k");
-    }
+    reads_quickly(same, "a.99999.k");
+    reads_quickly(distinct, "a99999.0.k");
     free(same);
     free(distinct);
 }
