@@ -148,6 +148,17 @@ static void paths(void)
     }
 }
 
+/* A list of directories splits as PATH does: at `;` on Windows, where
+   `:` follows the letter of a drive, and at `:` elsewhere. */
+static void path_lists(void)
+{
+#if defined(_WIN32)
+    CHECK(anti_rt_path_list_separator() == ';');
+#else
+    CHECK(anti_rt_path_list_separator() == ':');
+#endif
+}
+
 /* The monotonic clock never goes back, and the wall clock stands after
    2026-01-01. A sleep of a millisecond passes at least one on the
    monotonic clock. The entropy fills every byte it is asked for, and two
@@ -617,6 +628,7 @@ int main(int argc, char **argv)
     sleep_steps();
     environment();
     paths();
+    path_lists();
     clocks_and_entropy();
     library_outside_ascii();
     locks_and_threads();

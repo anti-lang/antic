@@ -466,8 +466,9 @@ static int element_of(struct anti_text name, size_t *name_length)
     return 1;
 }
 
-/* The elements of an array value, joined with `:`, the separator that
-   --anti.plugins=dir:dir writes. The reader numbers the elements, so
+/* The elements of an array value, joined with the separator of a list
+   of directories, which --anti.plugins=dir:dir writes, `;` on Windows.
+   The reader numbers the elements, so
    they stand in order under the keys runtime.<name>.0 and further. The
    length of the result goes to length. */
 static char *join_elements(const struct anti_toml *doc, int64_t from,
@@ -503,7 +504,7 @@ static char *join_elements(const struct anti_toml *doc, int64_t from,
         }
         memcpy(grown, out, held);
         if (held > 0) {
-            grown[held++] = ':';
+            grown[held++] = anti_rt_path_list_separator();
         }
         memcpy(grown + held, value, value_length);
         held += value_length;
@@ -689,6 +690,9 @@ static void inspect(void)
     anti_rt_inject_inspect();
 }
 
+/* DESIGN: every `:` of the form of an option's value stands for the
+   separator of a list of directories, so the help of a Windows program
+   shows `<dir;dir>`, the list its discovery splits. */
 static void help(void)
 {
     size_t i;
@@ -699,8 +703,12 @@ static void help(void)
         size_t used = sizeof "--anti." - 1 + strlen(options[i].name) +
                       strlen(options[i].value);
         int pad = used < 34 ? 34 - (int)used : 0;
-        printf("  --anti.%s%s%*s %s\n", options[i].name, options[i].value,
-               pad, "", options[i].what);
+        const char *at;
+        printf("  --anti.%s", options[i].name);
+        for (at = options[i].value; *at != '\0'; at++) {
+            putchar(*at == ':' ? anti_rt_path_list_separator() : *at);
+        }
+        printf("%*s %s\n", pad, "", options[i].what);
     }
 }
 

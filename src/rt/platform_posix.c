@@ -282,6 +282,11 @@ const char *anti_rt_path_last_separator(const char *path)
     return strrchr(path, '/');
 }
 
+char anti_rt_path_list_separator(void)
+{
+    return ':';
+}
+
 FILE *anti_rt_file_open(const char *path, int mode)
 {
     static const char *const modes[] = {"rb", "wb", "ab"};

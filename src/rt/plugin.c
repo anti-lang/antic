@@ -1329,8 +1329,9 @@ static int discover_in(const char *dir, size_t dir_length,
     return found;
 }
 
-/* Search every directory of dirs, which are separated by `:`, in
-   order. An empty value names no directory.
+/* Search every directory of dirs, which are separated as in PATH, by
+   anti_rt_path_list_separator, in order. An empty value names no
+   directory.
 
    DESIGN: an empty directory between two separators, or before or
    after one, is the working directory, as in PATH. It is written `.`,
@@ -1341,12 +1342,13 @@ static int discover(const char *dirs, const unsigned char *path,
                     int64_t length, char *out, size_t size)
 {
     const char *at = dirs != NULL ? dirs : "";
+    const char separator[2] = {anti_rt_path_list_separator(), '\0'};
 
     if (*at == '\0') {
         return 0;
     }
     for (;;) {
-        size_t n = strcspn(at, ":");
+        size_t n = strcspn(at, separator);
         int found = n > 0 ? discover_in(at, n, path, length, out, size)
                           : discover_in(".", 1, path, length, out, size);
         if (found != 0 || at[n] == '\0') {

@@ -5699,7 +5699,9 @@ endforeach()
 # --anti.conf, ANTI_CONF or rt.configure names, the includes of that file
 # and the file of the logger that the key `logger` names. A case is a name, the source in tests/conf, the options of antic
 # and the arguments of the program, then the pattern files of the output
-# and of the error output and the exit status. The runner is the one of
+# and of the error output and the exit status. A pattern file NAME.pattern
+# has NAME.win32.pattern beside it where a Windows program prints `;`,
+# the separator of a list of directories there. The runner is the one of
 # the trace tests, because the layer of a key names an absolute path
 # that a comparison cannot hold.
 set(CONF "${CMAKE_CURRENT_SOURCE_DIR}/conf")
@@ -5759,6 +5761,10 @@ foreach(case
     list(GET parts 4 expected)
     list(GET parts 5 errors)
     list(GET parts 6 status)
+    string(REGEX REPLACE "[.]pattern$" ".win32.pattern" win32 "${expected}")
+    if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${CONF}/${win32}")
+        set(expected "${win32}")
+    endif()
     set(error_patterns "")
     if(NOT errors STREQUAL "")
         set(error_patterns "-DERRORS=${CONF}/${errors}")

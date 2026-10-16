@@ -578,9 +578,8 @@ static void long_versions(void)
 }
 
 /* The directory of plugin_bad, which discovery searches, and the name of
-   the library in it. A Windows path loses its drive, because discovery
-   splits the directories at `:`. The path then names the drive of the
-   test's working directory, which is the drive of the build. */
+   the library in it. A Windows path keeps its drive, since discovery
+   splits the directories at `;` there. */
 static char plugin_dir[4096];
 static const char *plugin_name;
 static char plugin_digest[65];
@@ -594,9 +593,6 @@ static int find_plugin(void)
 
     if (slash == NULL || (size_t)(slash - dir) >= sizeof plugin_dir) {
         return 0;
-    }
-    if (dir[0] != '\0' && dir[1] == ':') {
-        dir += 2;
     }
     memcpy(plugin_dir, dir, (size_t)(slash - dir));
     plugin_dir[slash - dir] = '\0';
@@ -795,6 +791,7 @@ static int change_to(const char *dir)
 static void empty_directory(void)
 {
     char dir[4096];
+    char dirs[16];
 
 #if defined(_WIN32)
     DWORD written = GetCurrentDirectoryA(sizeof dir, dir);
@@ -808,16 +805,32 @@ static void empty_directory(void)
         return;
     }
     snprintf(index_path, sizeof index_path, "./anti-plugins.toml");
-    search_dirs = ":nowhere";
+    snprintf(dirs, sizeof dirs, "%cnowhere", anti_rt_path_list_separator());
+    search_dirs = dirs;
     DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
                              "['host.Service']"), NULL);
-    search_dirs = "nowhere:";
+    snprintf(dirs, sizeof dirs, "nowhere%c", anti_rt_path_list_separator());
     DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
                              "['host.Service']"), NULL);
     search_dirs = plugin_dir;
     snprintf(index_path, sizeof index_path, "%s/anti-plugins.toml",
              plugin_dir);
     CHECK(change_to(dir));
+}
+
+/* The search path splits at the separator of the system alone. A
+   directory that does not exist comes first, and the directory of
+   plugin_bad second, with the letter of its drive on Windows. */
+static void second_directory(void)
+{
+    char dirs[4096 + 16];
+
+    snprintf(dirs, sizeof dirs, "nowhere%c%s", anti_rt_path_list_separator(),
+             plugin_dir);
+    search_dirs = dirs;
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "['host.Service']"), NULL);
+    search_dirs = plugin_dir;
 }
 
 /* A path holds no NUL, which would name another file than the one the
@@ -866,6 +879,7 @@ int main(void)
     }
     damaged_indexes();
     empty_directory();
+    second_directory();
     nul_in_path();
     good_table_loads();
     if (check_failures != 0) {

@@ -328,6 +328,11 @@ const char *anti_rt_path_last_separator(const char *path)
     return back != NULL && (slash == NULL || back > slash) ? back : slash;
 }
 
+char anti_rt_path_list_separator(void)
+{
+    return ';';
+}
+
 /* The table anti_rt_imports of a plugin, which antic writes. */
 struct imports {
     int64_t count;

@@ -244,6 +244,12 @@ int anti_rt_path_is_absolute(const char *path);
    none. `/` on every system, and `\` as well on Windows. */
 const char *anti_rt_path_last_separator(const char *path);
 
+/* The separator of a list of directories, as in PATH: `;` on Windows,
+   where `:` follows the letter of a drive, and `:` elsewhere. The value
+   of the key `plugins` splits at it, by decision 6 of "Decisions of
+   2026-10-11". */
+char anti_rt_path_list_separator(void);
+
 /* DESIGN: a path in the calls of files below is UTF-8 ended by a NUL.
    Each call reports a failure through errno alone, so anti.fs builds
    every error with SystemError.from_errno on every system. Windows takes

@@ -896,7 +896,7 @@ The runtime of a program has six keys, and three layers give a key its value.
 | `backtrace` | `true` or `false` | the capture of the frames of an error, [chapter 6]({{% relref "06-errors" %}}) |
 | `hash_seed` | a number | the hashing collections, [chapter 16]({{% relref "16-collections" %}}) |
 | `logger` | a path | `anti.log`, the file of its sinks |
-| `plugins` | directories, separated by `:` | the discovery of plugins |
+| `plugins` | directories, separated by `:`, or by `;` on Windows as in `PATH` | the discovery of plugins |
 | `threads` | a count from 1 | the worker pool, [chapter 13]({{% relref "13-threads" %}}) |
 | `trace` | names of handlers | `trace.start()` of `anti.trace` |
 
