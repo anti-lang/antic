@@ -177,7 +177,7 @@ without a directory are in `src/antic/`.
 | S311 | `src/rt/snapshot.c:30` | 6, 10 | A `str` inside a heap snapshot has no NUL after it, since `lower_function.c:499` sizes the block without one. `s.ptr` as a C string reads past the block. | fixed `95b0a747` | rt |
 | S312 | `src/rt/text.c:155`, `src/std/anti/text.anti:200` | 11, 4 | A builder that gets no memory gives the literal `""`, which the caller is told to free. `log.anti:197` puts it into an `own` field. | fixed `07caeed4` | rt, std |
 | S313 | `src/std/anti/log.anti:404` | 14 | A logger file that names an unknown kind of sink calls `Log.get()` inside `construct` of `Log` and recurses until the stack is gone. Read, not run. | fixed `d385f56c` | std |
-| S314 | `src/std/anti/trace.anti:230` | 23, 6 | `Profiler`, `ErrorMonitor` and `ChangeJournal` write plain tables from every thread. Two threads take `count` past the array in a release build. | new | std |
+| S314 | `src/std/anti/trace.anti:230` | 23, 6 | `Profiler`, `ErrorMonitor` and `ChangeJournal` write plain tables from every thread. Two threads take `count` past the array in a release build. | fixed `bd5e69c6` | std |
 | S315 | `src/std/anti/collection.anti:761` | 6 | The five place functions of `Collection<T>` are public and index a raw pointer with the `at` they are given. `take_place` on a free slot of a `Pool` links it twice. | fixed `b81ca20c` | std |
 | S316 | `src/std/anti/collection.anti:714` | 5 | The size of a room is an unchecked product in `room_from`, `grid.anti:46`, `map.anti:297`, `sorted.anti:719`, `pool.anti:451` and `concurrent.anti:924`. A release build wraps. | fixed `f393ed52` | std |
 | S317 | `src/std/anti/args.anti:273` | 4 | `declare` writes an option after `reserve` at line 317 gave up without a word, past the slice or through `none`. | fixed `ba344114` | std |
@@ -238,7 +238,7 @@ Rule 12, release:
 
 - M305. `src/std/anti/trace.anti:873`. `install` reads no result of
   `Composite.add`. The ninth handler is built, owned by nothing and never
-  deleted. New. std.
+  deleted. New. std. Fixed `d62175c5`.
 
 Rule 14, untrusted input:
 
@@ -289,6 +289,8 @@ Rule 23, shared state:
 - M318. `src/std/anti/random.anti:89`. State that threads reach is
   guarded in part: `SharedRandom.reseed`, `FileConfig.read` at
   `config.anti:74` and the fields of `Logger` at `log.anti:124`. New. std.
+  Fixed `a7315143` and `58987147`. The fields of `Logger` stay unguarded,
+  and `82850caa` says when a program writes them.
 
 The bar of tests:
 
@@ -460,7 +462,7 @@ A note or a document that describes a design the code no longer has:
   visibility. New. rt.
 - M361. `docs/notes/trace-handlers.md:22`. Two notes describe a handler
   design the code does not have. A third gives format version 57 for 81.
-  New. std.
+  New. std. Fixed `5f15d339`.
 - M362. `docs/notes/warnings.md:40`. The note says the two safety checks
   are not built. Both are. New. anti-tool.
 - M363. `docs/site/build-tool/index.md:30`. The site page of the build
@@ -1056,7 +1058,7 @@ From `std`. The header of a module is its `//!` comment.
 | `src/std/anti/mem.anti` | The interface `Allocator`, its two implementations, and `Shared<T>`. | Says it. |
 | `src/std/anti/runtime.anti` | `configure` and `get` of the runtime configuration. | Says it. |
 | `src/std/anti/simd.anti` | A header alone: the three mask functions the compiler knows by name. | Says it. |
-| `src/std/anti/trace.anti` | The seven stock handlers of the hooks, `install`, `start` and their tests. | Claims atomic counts for all seven and names no `install`. |
+| `src/std/anti/trace.anti` | The seven stock handlers of the hooks, `install`, `start` and their tests. | Claims atomic counts for all seven and names no `install`. Fixed `bd5e69c6`. |
 | `src/std/anti/plugin.anti` | Loading a shared library and asking it for the class it provides. | Says it. |
 | `src/std/anti/regex.anti` | The run-time half of patterns: the errors, `compile`, the iterators, every function the pattern methods call, and `patch`. | The first line names the first two alone. |
 | `src/std/anti/collection/list.anti` | `List<T>`, with `sort`, `sort_by` and `map`. | Says it. |
