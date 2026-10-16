@@ -4,8 +4,20 @@
 
 pub const GOOD: Pix = Pix { r: 1, g: 2 };
 
+pub const HALF: Vec = Vec { x: 1.5, y: 2.0 };
+
+pub const GOOD_R: c_int = 1;
+
+pub const SUM: Pix = Pix { r: 2, g: 1 };
+
 pub struct Pix
 {
 	r: c_uchar,
 	g: c_uchar,
+}
+
+pub struct Vec
+{
+	x: c_float,
+	y: c_float,
 }

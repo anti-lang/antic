@@ -480,7 +480,8 @@ static bool lookup(void *context, const char *name, struct bind_eval *out)
 }
 
 /* A define of the type COLOR, `CLITERAL(Color){ 200, 200, 200, 255 }`,
-   becomes a constant of the struct it names. */
+   becomes a constant of the struct it names, as a compound literal of a
+   header does, by M339. */
 static bool color(struct api *a, const char *name, const char *value,
                   const char *doc)
 {
@@ -488,10 +489,6 @@ static bool color(struct api *a, const char *name, const char *value,
     const char *close = open != NULL ? strchr(open, ')') : NULL;
     const char *brace = close != NULL ? strchr(close, '{') : NULL;
     struct bind_record *r;
-    struct bind_const *c;
-    struct text literal = {0};
-    const char *p;
-    size_t field = 0;
     char type[64];
 
     if (brace == NULL || (size_t)(close - open - 1) >= sizeof type) {
@@ -500,54 +497,8 @@ static bool color(struct api *a, const char *name, const char *value,
     memcpy(type, open + 1, (size_t)(close - open - 1));
     type[close - open - 1] = '\0';
     r = record_of(a, type);
-    if (r == NULL) {
-        return false;
-    }
-    bind_anti_name(r->name, &literal);
-    text_append(&literal, " { ");
-    p = brace + 1;
-    for (;;) {
-        char *end;
-        long long n;
-        while (*p == ' ') {
-            p++;
-        }
-        if (*p == '}') {
-            break;
-        }
-        errno = 0;
-        n = strtoll(p, &end, 10);
-        if (end == p || errno == ERANGE || field >= r->field_count) {
-            text_free(&literal);
-            return false;
-        }
-        text_append(&literal, field > 0 ? ", " : "");
-        bind_anti_name(r->fields[field].name, &literal);
-        text_appendf(&literal, ": %lld", n);
-        field++;
-        p = end;
-        while (*p == ' ') {
-            p++;
-        }
-        if (*p == ',') {
-            p++;
-        }
-    }
-    if (field != r->field_count) {
-        text_free(&literal);
-        return false;
-    }
-    text_append(&literal, " }");
-    c = arena_alloc(&a->b->arena, sizeof *c);
-    c->name = bind_strdup(a->b, name);
-    c->type = bind_strndup(a->b, text_cstr(&literal),
-                           strcspn(text_cstr(&literal), " "));
-    c->value = bind_strdup(a->b, text_cstr(&literal));
-    c->record = r;
-    c->doc = doc;
-    bind_list_add(&a->b->consts, c);
-    text_free(&literal);
-    return true;
+    return r != NULL && bind_struct_const(a->b, name, r, brace + 1, lookup,
+                                          a, doc);
 }
 
 /* DESIGN: rlparser gives each define a kind. INT, FLOAT, FLOAT_MATH,

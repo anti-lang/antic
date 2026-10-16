@@ -51,4 +51,14 @@ void bind_float_text(double f, const char *type, struct text *out);
 bool bind_eval_const(struct bind_module *b, const char *name,
                      const struct bind_eval *v, const char *doc);
 
+/* Add a `pub const` of the struct literal of r whose text after the `{`
+   is elements, the `{ 1, 2.5f }` of a define of a description and of a
+   compound literal of a header alike. Each element is a constant
+   expression, through lookup, of a field that is no bitfield and has a
+   scalar type or none Anti can name. The literal names every field.
+   Returns false for any other literal. */
+bool bind_struct_const(struct bind_module *b, const char *name,
+                       const struct bind_record *r, const char *elements,
+                       bind_lookup lookup, void *context, const char *doc);
+
 #endif

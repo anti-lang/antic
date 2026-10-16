@@ -1,9 +1,14 @@
 {"functions": [],
- "structs": [{"name": "Pix", "fields": [{"name": "r", "type": "unsigned char"}, {"name": "g", "type": "unsigned char"}]}],
+ "structs": [{"name": "Pix", "fields": [{"name": "r", "type": "unsigned char"}, {"name": "g", "type": "unsigned char"}]},
+             {"name": "Vec", "fields": [{"name": "x", "type": "float"}, {"name": "y", "type": "float"}]}],
  "defines": [{"name": "GOOD", "type": "COLOR", "value": "CLITERAL(Pix){ 1, 2 }"},
+             {"name": "HALF", "type": "COLOR", "value": "CLITERAL(Vec){ 1.5f, 2 }"},
+             {"name": "GOOD_R", "type": "INT", "value": 1},
+             {"name": "SUM", "type": "COLOR", "value": "CLITERAL(Pix){ 1 + 1, GOOD_R }"},
              {"name": "NO_BRACE", "type": "COLOR", "value": "CLITERAL(Pix)"},
              {"name": "UNKNOWN", "type": "COLOR", "value": "CLITERAL(Other){ 1, 2 }"},
              {"name": "LONG_NAME", "type": "COLOR", "value": "CLITERAL(Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa){ 1, 2 }"},
              {"name": "TOO_MANY", "type": "COLOR", "value": "CLITERAL(Pix){ 1, 2, 3 }"},
              {"name": "TOO_FEW", "type": "COLOR", "value": "CLITERAL(Pix){ 1 }"},
-             {"name": "NO_NUMBER", "type": "COLOR", "value": "CLITERAL(Pix){ a, b }"}]}
+             {"name": "NO_NUMBER", "type": "COLOR", "value": "CLITERAL(Pix){ a, b }"},
+             {"name": "PAST_LONG_LONG", "type": "COLOR", "value": "CLITERAL(Pix){ 9223372036854775808, 1 }"}]}

@@ -92,6 +92,8 @@ raylib's `CLITERAL(Color)` is, is put in place first.
 rlparser gives each define a kind. `INT`, `FLOAT`, `FLOAT_MATH`, `STRING`
 and `UNKNOWN` go through the same evaluator, so a define and a macro give
 the same constant. `COLOR` becomes a struct literal of the struct it names.
+One function reads it and the compound literal of a header. Each element
+is a constant expression, and a float field takes a float.
 
 ## Functions and the shim
 

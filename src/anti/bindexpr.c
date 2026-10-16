@@ -726,3 +726,85 @@ bool bind_eval_const(struct bind_module *b, const char *name,
     bind_list_add(&b->consts, c);
     return true;
 }
+
+bool bind_struct_const(struct bind_module *b, const char *name,
+                       const struct bind_record *r, const char *elements,
+                       bind_lookup lookup, void *context, const char *doc)
+{
+    const char *s = elements;
+    struct text type = {0};
+    struct text literal = {0};
+    struct bind_const *c;
+    size_t field = 0;
+    bool ok = false;
+
+    bind_anti_name(r->name, &type);
+    text_appendf(&literal, "%s { ", text_cstr(&type));
+    for (;;) {
+        const char *end = s;
+        char element[128];
+        struct bind_eval v;
+        const struct bind_field *f;
+        int depth = 0;
+        while (*end != '\0' && (depth > 0 || (*end != ',' && *end != '}'))) {
+            depth += *end == '(' ? 1 : *end == ')' ? -1 : 0;
+            end++;
+        }
+        if (*end == '\0' || field >= r->field_count ||
+            (size_t)(end - s) >= sizeof element) {
+            goto done;
+        }
+        memcpy(element, s, (size_t)(end - s));
+        element[end - s] = '\0';
+        f = &r->fields[field];
+        /* A field of a type Anti has no form for leaves the struct out,
+           and the constant goes with it, with a warning that says so. */
+        if (f->name == NULL || f->bits >= 0 ||
+            (f->type->kind != BIND_SCALAR &&
+             f->type->kind != BIND_UNSUPPORTED) ||
+            !bind_eval(b, element, lookup, context, &v) ||
+            v.kind == BIND_EVAL_STRING) {
+            goto done;
+        }
+        text_append(&literal, field > 0 ? ", " : "");
+        bind_anti_name(f->name, &literal);
+        text_append(&literal, ": ");
+        if (f->type->kind == BIND_SCALAR && is_float_type(f->type->name)) {
+            bind_float_text(v.kind == BIND_EVAL_FLOAT ? v.f : (double)v.i,
+                            f->type->name, &literal);
+        } else if (v.kind == BIND_EVAL_INT &&
+                   (!bind_is_unsigned_type(v.type) || v.i >= 0)) {
+            /* An integer past a long long leaves the literal out. */
+            text_appendf(&literal, "%lld", (long long)v.i);
+        } else {
+            goto done;
+        }
+        field++;
+        if (*end == '}') {
+            break;
+        }
+        s = end + 1;
+        while (*s == ' ' || *s == '\t') {
+            s++;
+        }
+        if (*s == '}') {
+            break;
+        }
+    }
+    if (field != r->field_count) {
+        goto done;
+    }
+    text_append(&literal, " }");
+    c = arena_alloc(&b->arena, sizeof *c);
+    c->name = bind_strdup(b, name);
+    c->type = bind_strdup(b, text_cstr(&type));
+    c->value = bind_strdup(b, text_cstr(&literal));
+    c->record = r;
+    c->doc = doc;
+    bind_list_add(&b->consts, c);
+    ok = true;
+done:
+    text_free(&type);
+    text_free(&literal);
+    return ok;
+}

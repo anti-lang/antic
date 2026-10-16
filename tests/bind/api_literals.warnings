@@ -4,3 +4,4 @@ anti: api_literals.json: warning: the define `LONG_NAME` is skipped
 anti: api_literals.json: warning: the define `TOO_MANY` is skipped
 anti: api_literals.json: warning: the define `TOO_FEW` is skipped
 anti: api_literals.json: warning: the define `NO_NUMBER` is skipped
+anti: api_literals.json: warning: the define `PAST_LONG_LONG` is skipped

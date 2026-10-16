@@ -1373,19 +1373,17 @@ static const char *expand_identity(struct reader *r, const char *text)
 
 /* DESIGN: a macro may be a compound literal of a bound struct, with one
    constant per field in the order of the fields. It becomes a constant of
-   the struct. raylib writes its colours so. An integer field takes an
-   integer and a float field a number, and any other field or form leaves
-   the macro out. */
+   the struct. raylib writes its colours so. bind_struct_const reads it, as
+   it reads a COLOR define of a description, by M339. An integer field
+   takes an integer and a float field a number. A field of a type Anti has
+   no form for leaves the struct out, and the constant with it. Any other
+   field or form leaves the macro out. */
 static bool compound_literal(struct reader *r, const struct macro *m)
 {
     const char *s = skip_space(expand_identity(r, m->text));
     const char *close;
     const struct bind_type *t;
-    const struct bind_record *rec;
-    struct text literal = {0};
-    struct bind_const *c;
     char type[128];
-    size_t field = 0;
 
     if (*s != '(' || (close = strchr(s, ')')) == NULL ||
         (size_t)(close - s - 1) >= sizeof type) {
@@ -1398,70 +1396,8 @@ static bool compound_literal(struct reader *r, const struct macro *m)
     if (t == NULL || t->kind != BIND_RECORD || *s != '{') {
         return false;
     }
-    rec = t->record;
-    s++;
-    bind_anti_name(rec->name, &literal);
-    text_append(&literal, " { ");
-    for (;;) {
-        const char *end = s;
-        char element[128];
-        struct bind_eval v;
-        const struct bind_field *f;
-        int depth = 0;
-        while (*end != '\0' && (depth > 0 || (*end != ',' && *end != '}'))) {
-            depth += *end == '(' ? 1 : *end == ')' ? -1 : 0;
-            end++;
-        }
-        if (*end == '\0' || field >= rec->field_count ||
-            (size_t)(end - s) >= sizeof element) {
-            text_free(&literal);
-            return false;
-        }
-        memcpy(element, s, (size_t)(end - s));
-        element[end - s] = '\0';
-        f = &rec->fields[field];
-        if (f->name == NULL || f->bits >= 0 || f->type->kind != BIND_SCALAR ||
-            !bind_eval(r->b, element, lookup, r, &v) ||
-            v.kind == BIND_EVAL_STRING) {
-            text_free(&literal);
-            return false;
-        }
-        text_append(&literal, field > 0 ? ", " : "");
-        bind_anti_name(f->name, &literal);
-        text_append(&literal, ": ");
-        if (strcmp(f->type->name, "c_float") == 0 ||
-            strcmp(f->type->name, "c_double") == 0) {
-            bind_float_text(v.kind == BIND_EVAL_FLOAT ? v.f : (double)v.i,
-                            f->type->name, &literal);
-        } else if (v.kind == BIND_EVAL_INT) {
-            text_appendf(&literal, "%lld", (long long)v.i);
-        } else {
-            text_free(&literal);
-            return false;
-        }
-        field++;
-        if (*end == '}') {
-            break;
-        }
-        s = end + 1;
-        if (*skip_space(s) == '}') {
-            break;
-        }
-    }
-    if (field != rec->field_count) {
-        text_free(&literal);
-        return false;
-    }
-    text_append(&literal, " }");
-    c = arena_alloc(&r->b->arena, sizeof *c);
-    c->name = m->name;
-    c->type = bind_strndup(r->b, text_cstr(&literal),
-                           strcspn(text_cstr(&literal), " "));
-    c->value = bind_strdup(r->b, text_cstr(&literal));
-    c->record = rec;
-    bind_list_add(&r->b->consts, c);
-    text_free(&literal);
-    return true;
+    return bind_struct_const(r->b, m->name, t->record, s + 1, lookup, r,
+                             NULL);
 }
 
 static void read_macros(struct reader *r)
