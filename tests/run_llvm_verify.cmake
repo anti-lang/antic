@@ -15,9 +15,15 @@
 # WORK/accepted.txt records each accepted text, one line per program, mode
 # and target. A file that the front end refuses as well, under --dump-opt,
 # is no program, such as an input of the parser dumps, and
-# WORK/skipped.txt records it.
+# WORK/skipped.txt records it. Both runs must end with status 1, the
+# status of a refusal, so a crash fails the test. The files that are no
+# program stand in NO_PROGRAM, as the name of their directory and their
+# name, and the test fails for a skip that the list does not name and for
+# a name of the list that is not skipped.
 
 cmake_minimum_required(VERSION 3.21)
+
+set(NO_PROGRAM dump/format dump/generics_syntax dump/kinds dump/nodes)
 
 string(REPLACE "," ";" directories "${SOURCES}")
 string(REPLACE "|" ";" targets "${TARGETS}")
@@ -36,8 +42,11 @@ foreach(directory IN LISTS directories)
     list(APPEND sources ${found})
 endforeach()
 
+set(skipped_files "")
 foreach(source IN LISTS sources)
     get_filename_component(name "${source}" NAME_WE)
+    get_filename_component(directory "${source}" DIRECTORY)
+    get_filename_component(directory "${directory}" NAME)
     foreach(target IN LISTS targets)
         foreach(mode release dev)
             set(options --runtime "${RUNTIME}" --target "${target}")
@@ -76,14 +85,28 @@ foreach(source IN LISTS sources)
                 RESULT_VARIABLE front
                 OUTPUT_QUIET
                 ERROR_QUIET)
-            if(front EQUAL 0)
-                string(APPEND failures
-                       "${case}: antic failed with ${status}\n${err}\n")
-            else()
+            if(status EQUAL 1 AND front EQUAL 1)
                 string(APPEND skipped "${case}\n")
+                list(APPEND skipped_files "${directory}/${name}")
+            else()
+                string(APPEND failures "${case}: antic failed with ${status} "
+                       "and the front end with ${front}\n${err}\n")
             endif()
         endforeach()
     endforeach()
+endforeach()
+list(REMOVE_DUPLICATES skipped_files)
+foreach(file IN LISTS skipped_files)
+    if(NOT file IN_LIST NO_PROGRAM)
+        string(APPEND failures "${file}: the front end refuses it, and "
+               "NO_PROGRAM does not name it\n")
+    endif()
+endforeach()
+foreach(file IN LISTS NO_PROGRAM)
+    if(NOT file IN_LIST skipped_files)
+        string(APPEND failures "${file}: NO_PROGRAM names it, and it is "
+               "not skipped\n")
+    endif()
 endforeach()
 
 file(WRITE "${WORK}/accepted.txt" "${accepted}")

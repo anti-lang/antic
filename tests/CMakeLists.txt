@@ -626,6 +626,17 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake")
 endforeach()
+# run_llvm_verify.cmake fails for an antic that a signal ends, and for a
+# refused file that its list of the files that are no program lacks.
+add_test(NAME llvm_verify_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify.cmake"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DOPT=${ANTIC_OPT}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DTARGET=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify_runner"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_verify_self.cmake")
 
 # A program of tests/programs built with antic, which runs opt and llc of
 # the runtime archive and links, and run on a target the host runs. MODE is release or dev, and OPTIONS the options of antic
