@@ -98,12 +98,13 @@ never refuses a program that has none.
 
 `anti_rt_injectable` names every interface the program injects, with the
 class and the field that need it and whether it is final. Every program
-carries it, empty where nothing injects, because `src/rt/conf.c` reads it
+carries it, empty where nothing injects, because `src/rt/inject.c` reads it
 before `main`. A `[injections]` line and a `--anti.inject` that name an
 interface the program has not are a startup error naming the ones it
 does have. One that names an `inject final` field says so. One that
-passes both is a startup error while plugins are not built, because the
-value is the path of a library that nothing can load.
+passes both names the library that the start opens once the
+configuration has been read, through the loader of `src/rt/plugin.c`.
+Every program links the loader for that reason.
 
 `--anti.inspect` prints one line per interface, its path and the class,
 the field and `final` in brackets.

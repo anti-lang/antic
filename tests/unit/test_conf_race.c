@@ -17,6 +17,7 @@
 #include "../binary_stdio.h"
 #include "../../src/rt/atomic.h"
 #include "../../src/rt/conf.h"
+#include "../../src/rt/inject.h"
 #include "../../src/rt/plugin.h"
 #include "../../src/rt/rt.h"
 #include "check.h"
@@ -29,7 +30,8 @@
 
 int check_failures;
 
-/* The stand-ins of what src/rt/conf.c calls outside itself. */
+/* The stand-ins of what src/rt/conf.c and src/rt/inject.c call outside
+   themselves. */
 
 int anti_rt_option_backtrace = -1;
 const struct anti_injectables anti_rt_injectable = {0, NULL};

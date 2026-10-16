@@ -5,7 +5,9 @@
    never searches for a file. Without one the program runs as it was
    built. The layers are the command line, then the file with its
    includes, then the build. A key takes the value of the highest layer
-   that named it. */
+   that named it. A line of [injections] or of --anti.inject goes to
+   src/rt/inject.c, which takes the providers from libraries after the
+   configuration has been read. */
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -15,8 +17,8 @@
 
 #include "conf.h"
 #include "conf_include.h"
+#include "inject.h"
 #include "platform.h"
-#include "plugin.h"
 
 #include "rt.h"
 #include "toml.h"
@@ -284,113 +286,6 @@ static void set_key(struct key *k, const char *value, size_t length,
     free(old);
 }
 
-/* The entry of the interface the text names, or NULL. */
-static const struct anti_injectable *injectable_of(const char *name,
-                                                   size_t length)
-{
-    int64_t i;
-
-    for (i = 0; i < anti_rt_injectable.count; i++) {
-        const unsigned char *text = anti_rt_injectable.interfaces[i].name;
-        if (strlen((const char *)text) == length &&
-            memcmp(text, name, length) == 0) {
-            return &anti_rt_injectable.interfaces[i];
-        }
-    }
-    return NULL;
-}
-
-/* The interfaces the program does carry, for the message of a line that
-   names one it has not. */
-static char *list_injectable(void)
-{
-    char *out = format_text("%s", "");
-    int64_t i;
-
-    if (anti_rt_injectable.count == 0) {
-        free(out);
-        return format_text("%s", "none");
-    }
-    for (i = 0; i < anti_rt_injectable.count; i++) {
-        const char *before = i == 0 ? ""
-                             : i + 1 == anti_rt_injectable.count ? " and "
-                                                                 : ", ";
-        char *longer = format_text(
-            "%s%s%s", out, before,
-            (const char *)anti_rt_injectable.interfaces[i].name);
-        free(out);
-        out = longer;
-    }
-    return out;
-}
-
-/* DESIGN: a line that names an interface to take from a library. The
-   interface must be one the program injects, and it must not be
-   `inject final`. The line is kept, and the library is opened once the
-   configuration has been read, because the search directories come
-   from it. The command line wins over the file, and both win over the
-   provider the build named. */
-enum { INJECTION_MAX = 16 };
-
-struct injection {
-    const struct anti_injectable *in;
-    char *library;
-    int layer;
-    char *where;
-};
-
-/* DESIGN: the lines of the command line and of the file layer, which the
-   start reads before main. rt.configure may add to them later from one
-   thread alone, since file_read lets one call read a file. No reader
-   looks at them after the start, so they need no lock. */
-static struct injection injections[INJECTION_MAX];
-static size_t injection_count;
-
-static void injection_named(const char *name, size_t length,
-                            const char *library, const char *where, int layer)
-{
-    const struct anti_injectable *in = injectable_of(name, length);
-    struct injection *slot = NULL;
-    size_t i;
-
-    if (in == NULL) {
-        startup_error("%s: %.*s is no injectable interface of this program, "
-                      "which has %s",
-                      where, (int)length, name, list_injectable());
-    }
-    if (in->final != 0) {
-        startup_error("%s: %s is `inject final` in %s and cannot be replaced",
-                      where, (const char *)in->field,
-                      (const char *)in->owner);
-    }
-    if (in->holder == NULL || in->thunk == NULL) {
-        startup_error("%s: %.*s has no place for a provider of a library",
-                      where, (int)length, name);
-    }
-    for (i = 0; i < injection_count; i++) {
-        if (injections[i].in == in) {
-            slot = &injections[i];
-        }
-    }
-    if (slot == NULL && injection_count == INJECTION_MAX) {
-        startup_error("%s: at most %d interfaces come from a library",
-                      where, INJECTION_MAX);
-    }
-    if (slot == NULL) {
-        slot = &injections[injection_count++];
-        slot->layer = LAYER_BUILD;
-    }
-    if (slot->layer > layer) {
-        return;
-    }
-    free(slot->library);
-    free(slot->where);
-    slot->in = in;
-    slot->library = copy(library, strlen(library));
-    slot->layer = layer;
-    slot->where = copy(where, strlen(where));
-}
-
 static _Noreturn void unknown_option(const char *name, size_t length)
 {
     const char *names[OPTION_COUNT];
@@ -432,8 +327,8 @@ void anti_rt_conf_option(const char *name, int64_t length, const char *value)
                           "as --anti.inject=Interface=path",
                           where);
         }
-        injection_named(value, (size_t)(at - value), at + 1, where,
-                        LAYER_COMMAND);
+        anti_rt_inject_line(value, (size_t)(at - value), at + 1, where,
+                            LAYER_COMMAND);
     } else {
         k = key_of(name, n);
         if (k == NULL) {
@@ -642,8 +537,9 @@ static void read_key(const struct anti_toml *doc, int64_t i,
     }
     if (key_under(name, "injections") && name.len > 11) {
         value = value_text(doc, i, path);
-        injection_named((const char *)name.ptr + 11, (size_t)name.len - 11,
-                        value, position, LAYER_FILE);
+        anti_rt_inject_line((const char *)name.ptr + 11,
+                            (size_t)name.len - 11, value, position,
+                            LAYER_FILE);
         free(value);
         return;
     }
@@ -772,60 +668,6 @@ static char *environment_path(void)
     return text;
 }
 
-/* DESIGN: an interface whose provider is a library gets its object
-   before `main`. The build's `plugin:` and `discover` are the lowest
-   layer. The configuration file stands above them and the command line
-   above both. The runtime stores the object in the holder of the
-   interface and puts the thunk in its slot. Every site of the program
-   then calls through one function, as it did before. */
-static void fill_injections(void)
-{
-    struct anti_text dirs = anti_rt_conf_get((const unsigned char *)"plugins",
-                                             7);
-    int64_t i;
-
-    for (i = 0; i < anti_rt_injectable.count; i++) {
-        const struct anti_injectable *in = &anti_rt_injectable.interfaces[i];
-        const char *library = "";
-        const char *where = "the build";
-        size_t length = 0;
-        int named = 0;
-        void *provider;
-        size_t k;
-        /* An empty path is `discover`, which searches the directories
-           of the `plugins` key. */
-        if (in->discover != 0) {
-            library = in->library != NULL ? (const char *)in->library : "";
-            length = (size_t)in->library_length;
-            named = 1;
-        }
-        for (k = 0; k < injection_count; k++) {
-            if (injections[k].in == in) {
-                library = injections[k].library;
-                length = strlen(library);
-                where = injections[k].where;
-                named = 1;
-            }
-        }
-        if (!named) {
-            continue;
-        }
-        provider = anti_rt_plugin_provider(in->name,
-                                           (int64_t)strlen((const char *)
-                                                           in->name),
-                                           (const unsigned char *)library,
-                                           (int64_t)length,
-                                           (const char *)dirs.ptr);
-        if (provider == NULL) {
-            struct anti_text why = anti_rt_plugin_message();
-            startup_error("%s: %s comes from a library: %.*s", where,
-                          (const char *)in->name, (int)why.len, why.ptr);
-        }
-        *in->holder = provider;
-        in->slot->provider = in->thunk;
-    }
-}
-
 static void inspect(void)
 {
     struct anti_text version = anti_rt_runtime_version();
@@ -842,41 +684,7 @@ static void inspect(void)
         printf("%s = %s (%s)\n", keys[i].name,
                keys[i].value == NULL ? "" : keys[i].value, layer);
     }
-    if (anti_rt_injectable.count == 0) {
-        printf("injectable interfaces: none\n");
-    } else {
-        int64_t k;
-        printf("injectable interfaces:\n");
-        for (k = 0; k < anti_rt_injectable.count; k++) {
-            const struct anti_injectable *in =
-                &anti_rt_injectable.interfaces[k];
-            const struct anti_descriptor *d = in->descriptor;
-            const struct anti_slots *reached =
-                d != NULL ? anti_rt_plugin_slots(d) : NULL;
-            int64_t used = 0;
-            int64_t slot;
-            for (slot = 0; reached != NULL && slot < reached->slot_count;
-                 slot++) {
-                used += (reached->bits[slot / 8] >> (slot % 8)) & 1;
-            }
-            printf("  %s (%s.%s%s) version %.*s, %lld used slot%s\n",
-                   (const char *)in->name, (const char *)in->owner,
-                   (const char *)in->field, in->final != 0 ? ", final" : "",
-                   d != NULL ? (int)d->version_length : 0,
-                   d != NULL ? d->version : (const unsigned char *)"",
-                   (long long)used, used == 1 ? "" : "s");
-        }
-    }
-    if (injection_count == 0) {
-        printf("loaded plugins: none\n");
-    } else {
-        size_t k;
-        printf("loaded plugins:\n");
-        for (k = 0; k < injection_count; k++) {
-            printf("  %s for %s\n", injections[k].library,
-                   (const char *)injections[k].in->name);
-        }
-    }
+    anti_rt_inject_inspect();
 }
 
 static void help(void)
@@ -912,7 +720,9 @@ void anti_rt_conf_start(void)
             read_file(path, NULL, &files, AT_START);
         }
     }
-    fill_injections();
+    anti_rt_inject_start(
+        (const char *)anti_rt_conf_get((const unsigned char *)"plugins", 7)
+            .ptr);
     if (inspect_asked) {
         inspect();
         exit(0);

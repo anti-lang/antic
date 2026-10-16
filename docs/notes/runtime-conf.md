@@ -28,8 +28,8 @@ order of those is the order they came in. Everything else goes to
 `anti_rt_conf_option` with the name after the prefix and the value after
 the first `=`, or no value. Three names are the pass itself rather than a
 key: `conf` remembers the path, `inspect` and `help` set a flag. `inject`
-carries an interface and a path and ends the program, because no program
-has an injectable interface yet.
+carries an interface and a path, which `anti_rt_inject_line` of
+`src/rt/inject.c` keeps, as it keeps a line of `[injections]`.
 
 `anti_rt_conf_start` runs after the pass. It prints the options and ends
 for `--anti.help`, reads the file of `--anti.conf` or of `ANTI_CONF`, and
@@ -66,7 +66,9 @@ other path of the runtime does.
 `src/rt/threads.c`, and `logger` by `from_configuration` of
 `src/std/anti/log.anti` through `anti_rt_conf_get`. `trace` is read the same
 way by `start` of `src/std/anti/trace.anti`, which the program calls.
-Nothing reads `plugins` yet.
+`anti_rt_conf_start` hands `plugins` to `anti_rt_inject_start` of
+`src/rt/inject.c`, which searches its directories for a provider that
+`discover` names.
 
 The version that `--anti.inspect` prints comes from the notice of the
 program, through `anti_rt_runtime_version` of `src/rt/license.c`. That object

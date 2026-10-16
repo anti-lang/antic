@@ -384,11 +384,11 @@ const char *rt_name(enum rt_function f);
     F(RT_SLOT_TABLE_INTERFACES, interfaces, PTR)                           \
     F(RT_SLOT_TABLE_REFLECT, reflect, I64)
 
-/* struct anti_inject_slot of src/rt/conf.h. */
+/* struct anti_inject_slot of src/rt/inject.h. */
 #define RT_INJECT_SLOT_RECORD(F)                                           \
     F(RT_INJECT_SLOT_PROVIDER, provider, PTR)
 
-/* struct anti_injectable of src/rt/conf.h. */
+/* struct anti_injectable of src/rt/inject.h. */
 #define RT_INJECTABLE_RECORD(F)                                            \
     F(RT_INJECTABLE_NAME, name, PTR)                                       \
     F(RT_INJECTABLE_OWNER, owner, PTR)                                     \
@@ -402,7 +402,7 @@ const char *rt_name(enum rt_function f);
     F(RT_INJECTABLE_THUNK, thunk, PTR)                                     \
     F(RT_INJECTABLE_DESCRIPTOR, descriptor, PTR)
 
-/* struct anti_injectables of src/rt/conf.h. */
+/* struct anti_injectables of src/rt/inject.h. */
 #define RT_INJECTABLES_RECORD(F)                                           \
     F(RT_INJECTABLES_COUNT, count, I64)                                    \
     F(RT_INJECTABLES_INTERFACES, interfaces, PTR)

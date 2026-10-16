@@ -5,50 +5,7 @@
 
 #include <stdint.h>
 
-#include "object.h"
 #include "std.h"
-
-/* The slot of one injectable interface, which every site calls through.
-   It holds the function that gives the provider, or NULL until the
-   runtime fills it. */
-struct anti_inject_slot {
-    void *provider;
-};
-
-/* DESIGN: the link step writes the injectable interfaces of the
-   program, one entry per interface. Each names the class and the field
-   that need it, and says whether `inject final` keeps the run-time
-   configuration from replacing the provider. The table stands in every
-   program, empty where nothing injects, because the runtime reads it
-   before `main`. `slot` is the slot that holds the provider. */
-struct anti_injectable {
-    const unsigned char *name;
-    const unsigned char *owner;     /* `module.Class` of the field */
-    const unsigned char *field;
-    int64_t final;
-    struct anti_inject_slot *slot;
-    /* DESIGN: `plugin:<path>` and `discover` of the manifest name a
-       library rather than a function of the program. The slot is then
-       empty at the link, and the runtime fills it before `main`. */
-    const unsigned char *library;   /* the path, or NULL for discovery */
-    int64_t library_length;
-    int64_t discover;               /* the provider names a library */
-    /* A provider that comes from a library is an object, and a slot
-       holds a function. The runtime stores the object in the holder and
-       puts the thunk, which gives it, in the slot. */
-    void **holder;
-    void *thunk;
-    /* The descriptor of the interface, which `--anti.inspect` reads for
-       its version and the slots the program reaches. */
-    const struct anti_descriptor *descriptor;
-};
-
-struct anti_injectables {
-    int64_t count;
-    const struct anti_injectable *interfaces;
-};
-
-extern const struct anti_injectables anti_rt_injectable;
 
 /* Take one argument under --anti., its name without the prefix and the
    value after the `=`, which is NULL when the argument carried none.

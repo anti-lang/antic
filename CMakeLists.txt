@@ -244,7 +244,7 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # which link_identity_macos-arm64 pins, and as bitcode the entry would take
 # main into itself under LTO, and the weak printf family would be strong.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
-    errno f16 fs hash hooks init io json license loaded lock mem object
+    errno f16 fs hash hooks init inject io json license loaded lock mem object
     platform_entry platform_posix platform_stdio platform_windows plugin
     reflect registry signal snapshot start
     symbols sync text threads toml trace utf)

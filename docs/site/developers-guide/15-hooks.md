@@ -1318,7 +1318,7 @@ A provider that is a library fills a slot of the last section in another way tha
 
 Discovery reads the `anti-plugins.toml` of each directory of the key `plugins`, in order, and opens no library to learn what is inside. An empty directory of the value, as in `--anti.plugins=:plugins`, is the working directory, as in `PATH`. A library built for another runtime version is passed over. One whose bytes do not match the digest of the index is refused. Two libraries that provide one interface are an error that names both.
 
-Where it lives: `whole_write_provides` of `src/antic/whole_tables.c`, `whole_hosts_plugins` of `src/antic/whole.c`, `driver_write_plugin_index` of `src/antic/driver_index.c`, `src/rt/plugin.c` for the loader and its checks, `src/rt/loaded.c` for the open libraries and their counts, and `src/std/anti/plugin.anti`.
+Where it lives: `whole_write_provides` of `src/antic/whole_tables.c`, `whole_hosts_plugins` of `src/antic/whole.c`, `driver_write_plugin_index` of `src/antic/driver_index.c`, `src/rt/plugin.c` for the loader and its checks, `src/rt/inject.c` for the providers the start takes from libraries, `src/rt/loaded.c` for the open libraries and their counts, and `src/std/anti/plugin.anti`.
 
 ### What it costs
 
