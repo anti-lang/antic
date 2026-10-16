@@ -74,13 +74,16 @@ void antl_read_fn_defaults(struct reader *r);
 
 /* DESIGN: one limit bounds how deep the tables of a library file nest,
    TYPES_NEST_MAX of types.h, the limit of the checker as well. It covers
-   the structs of the type table and the aggregates and the symbolic
-   values of the IR. The reader recurses no deeper than the limit when it
-   follows an index on demand. A table whose entries point back is read
-   without recursion, and it is refused when it nests deeper. types_nest
-   measures the type table as it measures the types of the source. The
-   checker, the layout and the passes walk the same nesting recursively.
-   See docs/decisions.md. */
+   every entry of the type table, by the depth its constructor gives it,
+   the values its structs nest, the constants and the symbolic values of
+   both tables and the aggregates of the IR. A constant or a symbolic
+   value of a checked program stays inside it, so the reader takes every
+   file the writer writes. The reader recurses no deeper than the limit
+   when it follows an index on demand. A table whose entries point back is
+   read without recursion, and it is refused when it nests deeper.
+   types_nest measures the type table as it measures the types of the
+   source. The checker, the layout and the passes walk the same nesting
+   recursively. See docs/decisions.md. */
 
 /* The type reference that stands for no type in the section of the
    generics. The type table itself never names one. */

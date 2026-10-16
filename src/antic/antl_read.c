@@ -145,7 +145,7 @@ const struct symbolic *antl_read_symbolic(struct reader *r, uint32_t limit,
     memset(&key, 0, sizeof key);
     key.kind = (enum symbolic_kind)kind;
     key.type = antl_type_ref(r, limit);
-    if (r->failed || kind > SYMBOLIC_PARAM || depth > 64) {
+    if (r->failed || kind > SYMBOLIC_PARAM || depth > TYPES_NEST_MAX) {
         antl_damaged(r);
         return NULL;
     }
@@ -1159,7 +1159,7 @@ bool antl_read_value(struct reader *r, struct type *of, struct const_value *v,
     memset(v, 0, sizeof *v);
     v->type = of;
     v->kind = (enum const_kind)kind;
-    if (r->failed || depth > 64) {
+    if (r->failed || depth > TYPES_NEST_MAX) {
         antl_damaged(r);
         return false;
     }

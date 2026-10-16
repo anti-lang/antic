@@ -2866,6 +2866,65 @@ static void copy_depths(void)
     close_session(&a);
 }
 
+/* M329: a library of structs that nest levels deep, a constant of the
+   outermost, which a function keeps as a global of the IR, and an array
+   whose length is a sum of levels terms of `size_of`. */
+static void deep_source(struct text *out, int levels)
+{
+    char line[96];
+    int k;
+
+    for (k = 0; k < levels; k++) {
+        if (k + 1 < levels) {
+            snprintf(line, sizeof line, "pub struct D%d { f: D%d }\n", k,
+                     k + 1);
+        } else {
+            snprintf(line, sizeof line, "pub struct D%d { v: int }\n", k);
+        }
+        text_append(out, line);
+    }
+    text_append(out, "pub struct Wide { b: [size_of(int)");
+    for (k = 1; k < levels; k++) {
+        text_append(out, " + size_of(int)");
+    }
+    text_append(out, "]u8 }\npub const DEEP: D0 = ");
+    for (k = 0; k + 1 < levels; k++) {
+        snprintf(line, sizeof line, "D%d { f: ", k);
+        text_append(out, line);
+    }
+    snprintf(line, sizeof line, "D%d { v: 1 }", levels - 1);
+    text_append(out, line);
+    for (k = 0; k + 1 < levels; k++) {
+        text_append(out, " }");
+    }
+    text_append(out, ";\n"
+                     "pub fn deep() -> D0 {\n"
+                     "    return DEEP;\n"
+                     "}\n"
+                     "pub fn wide(w: Wide) -> int {\n"
+                     "    return 0;\n"
+                     "}\n");
+}
+
+/* M329: one limit bounds how deep the tables of a library file nest, the
+   limit of the checker. A constant of the type table, a constant of the
+   IR and a symbolic value that the checker took read back. */
+static void deep_values(void)
+{
+    struct session s;
+    struct text source = {0};
+    struct text bytes = {0};
+
+    deep_source(&source, 100);
+    open_session(&s);
+    if (build_library(&s, "deepv", text_cstr(&source), &bytes)) {
+        CHECK(reads_file(&bytes));
+    }
+    text_free(&bytes);
+    text_free(&source);
+    close_session(&s);
+}
+
 /* S01: the checked tree of a generic that a library file carries. Each
    test below writes the tree of `tree` with one relation the checker
    never leaves, and the reader refuses the file. */
@@ -3486,6 +3545,7 @@ void test_modules(void)
 {
     deep_types();
     copy_depths();
+    deep_values();
     damaged_trees();
     damaged_bytes();
     tree_counts();

@@ -388,7 +388,7 @@ static struct ir_const *read_const(struct reader *r, struct ir_module *program,
     uint64_t payload;
     uint64_t i;
 
-    if (depth > 32) {
+    if (depth > TYPES_NEST_MAX) {
         antl_damaged(r);
         return NULL;
     }
