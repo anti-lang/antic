@@ -164,8 +164,8 @@ without a directory are in `src/antic/`.
 
 | ID | Place | Rule | Finding | Status | Reports |
 |---|---|---|---|---|---|
-| S301 | `types.c:1987`, `sema_const.c:101` | 14 | A class whose base was refused keeps a NULL base field, set at `sema.c:2516`. `pointer_free` and `class_value` read through it after the error. | new | front-end |
-| S302 | `sema_copies.c:197` | 3 | `xf` compares a field pointer with the bounds of arrays it does not lie in, which C11 6.5.8 leaves undefined. No target misreads it. | new | front-end |
+| S301 | `types.c:1987`, `sema_const.c:101` | 14 | A class whose base was refused keeps a NULL base field, set at `sema.c:2516`. `pointer_free` and `class_value` read through it after the error. | fixed `184e5a39` | front-end |
+| S302 | `sema_copies.c:197` | 3 | `xf` compares a field pointer with the bounds of arrays it does not lie in, which C11 6.5.8 leaves undefined. No target misreads it. | fixed `115e35d9` | front-end |
 | S303 | `pattern.c:1126` | 3, 16 | The least match length adds in `long` before its cap. On Windows the sum wraps, and a `with` that does not fit compiles there and is refused on the Mac. | still open, the remainder of M44 | front-end |
 | S304 | `antl_verify.c:282` | 14 | The verifier holds no field name of a generic tree to its struct. `lower.c:902` then subtracts from NULL, and `layout.c:451` indexes outside the offsets. | new | library-file |
 | S305 | `antl_read.c:271` | 14 | Pointers, slices, arrays, function types and tuples of the type table nest without a limit. A file of 2 MB overflows the stack in `print_type` and `antl_visit_type`. | new | library-file |
@@ -191,8 +191,8 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 
 | ID | Place | Finding | Status | Reports |
 |---|---|---|---|---|
-| S320 | `lexer.h:171` | Seven header sentences state what the code does not do: the error cap at `lexer.h:171` and `178`, `types_object` at `types.h:429`, `types_has_fields` at `types.h:889`, the pointer of two words at `types.h:218`, the copies at `sema_generic.c:16` and `sync` at `sema_thread.c:1`. | new | front-end |
-| S321 | `sema_operator.c:470` | The DESIGN says two pointers compare whether or not either may hold `none`. `comparable_pointers` compares the addresses of two parameter arrays, so `fn(int) == ?fn(int)` is refused. | new | front-end |
+| S320 | `lexer.h:171` | Seven header sentences state what the code does not do: the error cap at `lexer.h:171` and `178`, `types_object` at `types.h:429`, `types_has_fields` at `types.h:889`, the pointer of two words at `types.h:218`, the copies at `sema_generic.c:16` and `sync` at `sema_thread.c:1`. | new, the five outside `lexer.h` fixed `5ec24a80` | front-end |
+| S321 | `sema_operator.c:470` | The DESIGN says two pointers compare whether or not either may hold `none`. `comparable_pointers` compares the addresses of two parameter arrays, so `fn(int) == ?fn(int)` is refused. | fixed `67f75fb8`, as T111 | front-end |
 | S322 | `driver.h:26` | The comments of `opt`, `llc` and `llvm_ar` at line 114 promise a fallback to PATH. `driver_archive_tool` refuses a tool that `bin/` of the archive lacks. | new | back-end |
 | S323 | `docs/decisions.md:1227` | "Build ids" and "Debug information" describe `.file` and `.loc` directives, llvm-mc and `src/antic/debug.c`. The entry on C99 at line 1229 stands against `DW_LANG_C11` in `llvm_debug.c:115`. About twenty more entries from line 916 state the native back end as current. | new | back-end, structure, tool-pass |
 | S324 | `src/rt/json.h:66` | `anti_rt_json_value` and `anti_rt_json_member` are said to take one value of the grammar. `anti_rt_json_skip` takes `+-.e` as a number, and `member` of `anti.json` gives it out. | fixed `7c16ab47` | library-file |
@@ -334,7 +334,8 @@ Each concern in one place:
 
 - M328. `src/antic/sema_stmt.c:361`. `e[i] = v` without a hook checks its
   base twice. An error is reported twice and an `own` argument moves
-  twice. The pattern of M35 on a new path. New. front-end.
+  twice. The pattern of M35 on a new path. New. front-end. Fixed
+  `0b794956`.
 - M329. `src/antic/antl_read.c:1060`. Four limits bound the nesting where
   `antl_io.h:59` names one. antic writes a constant 40 levels deep and
   then calls its own file damaged. New. library-file.
@@ -784,7 +785,7 @@ From `front-end`.
 | `src/antic/ast_dump.c` | Writes the tree, untyped or with the checked types, one node per line for `--dump-ast` and `--dump-types`. | None. The first comment says how node names are chosen. |
 | `src/antic/ast_walk.c` | The one walk over a body that every analysis of the checked tree uses. | Says it. |
 | `src/antic/types.c` | Builds and interns the checked types of a compilation, answers the predicates on them, declares the types of `anti.lang` the compiler knows, names types and measures how deep values nest. | None. `types.h` has it. |
-| `src/antic/types.h` | The same, with the names of five library modules the compiler knows. | Says "The checked types of a compilation" and nothing of the names. Three comments differ from the code, S320. |
+| `src/antic/types.h` | The same, with the names of five library modules the compiler knows. | Says "The checked types of a compilation" and nothing of the names. Three comments differ from the code, S320. Fixed `5ec24a80`. |
 | `src/antic/sema.c` | The shared helpers of the checker, every declaration pass over the items of a module, and `sema_check`, which runs the passes in order. | None. The first comment is the DESIGN of the one-pass checker. |
 | `src/antic/sema.h` | The interface of the checker to the driver, lowering and the header: symbols, constants, the interface of a module, `sema_check` and the queries of the later passes. | None. |
 | `src/antic/sema_checker.h` | The state of the checker and the functions its files share, grouped by defining file. | Says it. The `sema.c` line leaves out `provides`, `link` and the simd declaration. |
@@ -793,13 +794,13 @@ From `front-end`.
 | `src/antic/sema_const.c` | Evaluates constant expressions and gives each constant symbol its value once, in dependency order. | Says it. It also holds `sema_holds_class`. |
 | `src/antic/sema_expr.c` | Checks expressions and the conversions a value makes where it stands, and dispatches over the kinds of expression. | Says less: the conversions and the forms of function values are not named. |
 | `src/antic/sema_call.c` | Checks calls and members: fields and their visibility, functions of a class and their table, `construct`, the handlers of failing calls and the field inits of literals. | Says it, less the literals. |
-| `src/antic/sema_operator.c` | Checks the binary operators, `in` and `??` through the operator table, and finds the `operator fn` functions and language hooks of a type. | Says it. One DESIGN differs from the code, S321. |
+| `src/antic/sema_operator.c` | Checks the binary operators, `in` and `??` through the operator table, and finds the `operator fn` functions and language hooks of a type. | Says it. One DESIGN differs from the code, S321. Fixed `67f75fb8`. |
 | `src/antic/sema_stmt.c` | Checks statements and function bodies, and walks the functions a worker reaches. | Says it, less the views by `as` and `sema_fills`. |
 | `src/antic/sema_value.c` | The value rules: what owns something, what moves, and the copies that `=`, `let`, a literal and a call refuse. | Says it. |
 | `src/antic/sema_safety.c` | The checks of the thread-safe classes: the kind of a class, its base, the hidden lock, the guards and the reach of a field. | Says it. |
 | `src/antic/sema_simd.c` | The checks of simd structs: operators lane by lane, `as` with the C layout it compares, and the built-ins. | Says it. |
-| `src/antic/sema_thread.c` | The atomic operations, `Mutex.new` and `destroy`, the channel operations, and the workers of `parallel` and `dispatch` with `join`. | Says it plus `sync`, which it does not hold. |
-| `src/antic/sema_generic.c` | The generics of the checker: type parameters, constraints, aliases, the copies of generic types, substitution and inference, and the strip of generics before the later passes. | A DESIGN that ends in two stale sentences. |
+| `src/antic/sema_thread.c` | The atomic operations, `Mutex.new` and `destroy`, the channel operations, and the workers of `parallel` and `dispatch` with `join`. | Says it plus `sync`, which it does not hold. Fixed `5ec24a80`. |
+| `src/antic/sema_generic.c` | The generics of the checker: type parameters, constraints, aliases, the copies of generic types, substitution and inference, and the strip of generics before the later passes. | A DESIGN that ends in two stale sentences. Fixed `5ec24a80`. |
 | `src/antic/sema_copies.c` | The compiled copies: clones the checked tree of a generic per use, rechecks the open nodes, and rewrites the calls that name the copies. | Says it. |
 | `src/antic/sema_hash.c` | The checker's part of hashing and of the default `==`, and the default `equals` and `hash` of each class. | Says it. |
 | `src/antic/sema_pattern.c` | The methods of `str`, `[]byte` and a match that become calls of `anti.regex` and `anti.text`, the groups of a literal as fields, the pattern literal with its checks, and `Regex.compile`. | Says it. It also holds `sema_if_let_none`. |
