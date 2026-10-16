@@ -961,6 +961,18 @@ static struct type *read_type(struct reader *r, uint32_t at,
 
 /* Put the types of the fields and the functions of the struct s in
    place, now that the table of count entries is whole. */
+/* Whether a field may have the type t as its form gives it. No field
+   has `void`, the type of `none` or the error type, which the type
+   table carries for the trees. The base of a class is a class. */
+static bool field_type_fits(const struct type *t, enum field_form form)
+{
+    if (t->kind == TYPE_VOID || t->kind == TYPE_NONE ||
+        t->kind == TYPE_ERROR) {
+        return false;
+    }
+    return form != FIELD_BASE || t->kind == TYPE_CLASS;
+}
+
 static void bind_struct(struct reader *r, struct field_refs *s,
                         uint32_t count)
 {
@@ -968,7 +980,9 @@ static void bind_struct(struct reader *r, struct field_refs *s,
 
     for (j = 0; j < s->count; j++) {
         if (s->types[j] >= count ||
-            r->table[s->types[j]]->kind == TYPE_VOID) {
+            !field_type_fits(r->table[s->types[j]], s->fields[j].form) ||
+            (s->fields[j].form == FIELD_BASE &&
+             (j != 0 || s->s->kind != TYPE_CLASS))) {
             antl_damaged(r);
             break;
         }

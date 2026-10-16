@@ -2925,6 +2925,63 @@ static void deep_values(void)
     close_session(&s);
 }
 
+/* scale_antl with an entry of the builtin kind and a struct or a class
+   whose one field has that type and form. */
+static void field_of_kind(struct text *b, uint8_t kind, uint8_t holder,
+                          uint8_t form)
+{
+    text_append_bytes(b, scale_antl, SCALE_TYPES);
+    put_u32(b, 4);
+    text_append_bytes(b, scale_antl + SCALE_TYPES + 4,
+                      SCALE_ITEMS - SCALE_TYPES - 4);
+    put_u8(b, kind);
+    put_u8(b, holder);
+    put_str(b, "scale");
+    put_str(b, "s0");
+    put_u8(b, 0);                       /* a plain struct */
+    put_u8(b, 0);
+    put_u8(b, 0);
+    put_str(b, "");
+    put_u64(b, 0);
+    put_u32(b, 1);
+    put_str(b, "f");
+    put_u32(b, 2);
+    put_u8(b, 0);
+    put_u8(b, form);
+    put_u8(b, VIS_PUB);
+    put_u8(b, 0);
+    put_str(b, "");
+    put_str(b, "");
+    put_u32(b, 0);                      /* no functions */
+    put_u32(b, 0);                      /* no private functions */
+    put_u32(b, 0);                      /* no constants or static fields */
+    put_u8(b, 0);                       /* no default */
+    text_append_bytes(b, scale_antl + SCALE_ITEMS,
+                      sizeof scale_antl - SCALE_ITEMS);
+}
+
+/* Rule 14: the type table carries the type of `none` and the error type
+   for the trees, and no field of a struct has either, as none has
+   `void`. The base of a class is a class. A field of `int` reads. */
+static void field_kinds(void)
+{
+    static const uint8_t refused[] = {TYPE_VOID, TYPE_NONE, TYPE_ERROR};
+    struct text b = {0};
+    size_t i;
+
+    field_of_kind(&b, TYPE_I64, TYPE_STRUCT, FIELD_PLAIN);
+    CHECK(reads_file(&b));
+    text_free(&b);
+    for (i = 0; i < sizeof refused; i++) {
+        field_of_kind(&b, refused[i], TYPE_STRUCT, FIELD_PLAIN);
+        refuses_file((const uint8_t *)b.data, b.length, NULL);
+        text_free(&b);
+    }
+    field_of_kind(&b, TYPE_I64, TYPE_CLASS, FIELD_BASE);
+    refuses_file((const uint8_t *)b.data, b.length, NULL);
+    text_free(&b);
+}
+
 /* S01: the checked tree of a generic that a library file carries. Each
    test below writes the tree of `tree` with one relation the checker
    never leaves, and the reader refuses the file. */
@@ -3546,6 +3603,7 @@ void test_modules(void)
     deep_types();
     copy_depths();
     deep_values();
+    field_kinds();
     damaged_trees();
     damaged_bytes();
     tree_counts();
