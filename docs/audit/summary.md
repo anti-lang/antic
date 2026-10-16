@@ -174,8 +174,8 @@ without a directory are in `src/antic/`.
 | S308 | `src/rt/hooks.c:81` | 23 | The `destroyed` hook counts an object out before its `destruct` and field teardown run. `unload` then closes the library under the thread still in it. | fixed `cfa95068` | rt |
 | S309 | `src/rt/plugin.c:383` | 6 | The loader replaces the table of an object with a stub table sized by the interface. A class that inherits the interface at offset 0 then calls past it. Read, not run. | fixed `45aed114` | rt |
 | S310 | `src/rt/plugin.c:589` | 14, 15 | `damage_of` tests the counts of a plugin table for a sign alone, and `fields_sound` accepts an offset without the width of the field. The test tries -1 and NULL alone. | fixed `32400589` | rt |
-| S311 | `src/rt/snapshot.c:30` | 6, 10 | A `str` inside a heap snapshot has no NUL after it, since `lower_function.c:499` sizes the block without one. `s.ptr` as a C string reads past the block. | new | rt |
-| S312 | `src/rt/text.c:155`, `src/std/anti/text.anti:200` | 11, 4 | A builder that gets no memory gives the literal `""`, which the caller is told to free. `log.anti:197` puts it into an `own` field. | new | rt, std |
+| S311 | `src/rt/snapshot.c:30` | 6, 10 | A `str` inside a heap snapshot has no NUL after it, since `lower_function.c:499` sizes the block without one. `s.ptr` as a C string reads past the block. | fixed `95b0a747` | rt |
+| S312 | `src/rt/text.c:155`, `src/std/anti/text.anti:200` | 11, 4 | A builder that gets no memory gives the literal `""`, which the caller is told to free. `log.anti:197` puts it into an `own` field. | fixed `07caeed4` | rt, std |
 | S313 | `src/std/anti/log.anti:404` | 14 | A logger file that names an unknown kind of sink calls `Log.get()` inside `construct` of `Log` and recurses until the stack is gone. Read, not run. | new | std |
 | S314 | `src/std/anti/trace.anti:230` | 23, 6 | `Profiler`, `ErrorMonitor` and `ChangeJournal` write plain tables from every thread. Two threads take `count` past the array in a release build. | new | std |
 | S315 | `src/std/anti/collection.anti:761` | 6 | The five place functions of `Collection<T>` are public and index a raw pointer with the `at` they are given. `take_place` on a free slot of a `Pool` links it twice. | new | std |
@@ -219,13 +219,13 @@ Rule 4, a result that is not looked at:
 
 - M301. `src/rt/object.c:1047`. `dup` and `anti_rt_copy_buffer` at line
   1145 give NULL when memory runs out. Generated code hands it on as a
-  `*T`. New. rt.
+  `*T`. New. rt. Fixed `43a52d7c`.
 
 Rule 11, who owns memory:
 
 - M302. `src/std/anti/error.anti:29`. A `SystemError` keeps a message in
   storage the runtime overwrites on the next call. Windows shows it. New.
-  rt.
+  rt. Fixed `b06fe3ad`.
 - M303. `src/rt/plugin.c:446`. A second load of a library gives one slot
   to two owners. The first `unload` closes it for both. New. rt. Fixed
   `3d33cbfa`.
@@ -337,7 +337,8 @@ Each concern in one place:
   then calls its own file damaged. New. library-file.
 - M330. `src/std/anti/fs.anti:170`. Memory that runs out is answered five
   ways: stop, fail, drop the bytes, drop the option, or give a literal.
-  New. std.
+  New. std. Fixed `ba344114`, with the builder in `07caeed4`. T139 holds
+  the places of the runtime outside step 3.
 - M331. `tools/release.sh:666`. The release script spells `raylib-6.0`
   beside `tools/raylib-pin`, and no test holds the two together. New.
   build-and-tools.
