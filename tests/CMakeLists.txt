@@ -1376,14 +1376,23 @@ if(ANTIC_LLVM_MC)
 endif()
 
 # A module that writes no function writes no empty CodeView subsection of
-# symbols, which lld-link warns of.
+# symbols, which lld-link warns of. codeview_empty_refuses_<target> feeds
+# the check an object with an empty one, which it must refuse.
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME codeview_empty_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DSTD=${ANTIC_RUNTIME_DIR}/std"
             "-DSOURCE=${ANTIC_RUNTIME_DIR}/std/anti/collection/tree.antl"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/codeview-empty"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_codeview_empty.cmake")
+    add_test(NAME codeview_empty_refuses_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLANG=${CMAKE_C_COMPILER}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DTARGET=${target}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/codeview-empty"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_codeview_empty.cmake")
