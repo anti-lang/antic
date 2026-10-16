@@ -5,7 +5,9 @@
 # memory. The unit tests that link antic_core take their memory from it
 # too, so none of their allocations goes unchecked. Run with cmake -P,
 # ROOT, the root of the repository, and UNIT_SOURCES, the sources of the
-# programs of tests/ that link antic_core joined with |.
+# programs of tests/ that link antic_core joined with |. A relative path
+# is one of tests/. The test reads each C file of tests/ among them, and
+# the sources of src/ that a program compiles beside it stand outside.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -83,12 +85,24 @@ if(UNIT_SOURCES STREQUAL "")
     string(APPEND failures "\nUNIT_SOURCES names no source of a unit test")
 endif()
 string(REPLACE "|" ";" unit_sources "${UNIT_SOURCES}")
+set(read 0)
 foreach(source IN LISTS unit_sources)
-    if(source MATCHES "^unit/.*\\.c$")
-        find_allocations("${ROOT}/tests/${source}" "tests/${source}")
+    if(NOT source MATCHES "\\.c$")
+        continue()
+    endif()
+    if(NOT IS_ABSOLUTE "${source}")
+        set(source "${ROOT}/tests/${source}")
+    endif()
+    file(RELATIVE_PATH shown "${ROOT}" "${source}")
+    if(shown MATCHES "^tests/")
+        find_allocations("${source}" "${shown}")
         string(APPEND failures "${found}")
+        math(EXPR read "${read} + 1")
     endif()
 endforeach()
+if(read EQUAL 0)
+    string(APPEND failures "\nUNIT_SOURCES names no C file of tests/")
+endif()
 
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "allocation outside ${owner}:${failures}")

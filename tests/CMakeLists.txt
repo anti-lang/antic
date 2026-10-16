@@ -135,20 +135,6 @@ add_test(NAME alloc_oom
 
 antic_coverage(antic_unit_tests files_oom_tests alloc_oom_tests)
 
-# antic allocates through src/antic/alloc.c alone, and the front end
-# includes no header of the IR for its memory.
-# The programs of tests/ that link antic_core take their memory from
-# src/antic/alloc.c as well.
-set(core_test_sources
-    "$<TARGET_PROPERTY:antic_unit_tests,SOURCES>"
-    "$<TARGET_PROPERTY:files_oom_tests,SOURCES>"
-    "$<TARGET_PROPERTY:alloc_oom_tests,SOURCES>"
-    "$<TARGET_PROPERTY:symbols_probe,SOURCES>")
-add_test(NAME one_allocator
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        "-DUNIT_SOURCES=$<JOIN:${core_test_sources},|>"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_one_allocator.cmake")
-
 # Every host branch of antic, anti and the runtime stands in their
 # platform layers, src/antic/platform.c and src/anti/platform.c with their
 # headers and src/rt/platform.h with its two files.
@@ -7135,6 +7121,30 @@ add_test(NAME skips_registered_runner
         "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_skips_registered.cmake"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/skips-registered"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_skips_registered_self.cmake")
+
+# antic allocates through src/antic/alloc.c alone, and the front end
+# includes no header of the IR for its memory. The programs of tests/ that
+# link antic_core, itself or through anti_core, take their memory from
+# src/antic/alloc.c as well. The list comes from the targets of this
+# directory, so the test stands after every add_executable of the file.
+get_property(core_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+set(core_test_sources "")
+foreach(target IN LISTS core_test_targets)
+    get_target_property(type ${target} TYPE)
+    get_target_property(libraries ${target} LINK_LIBRARIES)
+    if(NOT type STREQUAL "EXECUTABLE" OR NOT libraries)
+        continue()
+    endif()
+    if("antic_core" IN_LIST libraries OR "anti_core" IN_LIST libraries)
+        get_target_property(sources ${target} SOURCES)
+        list(APPEND core_test_sources ${sources})
+    endif()
+endforeach()
+list(JOIN core_test_sources "|" core_test_sources)
+add_test(NAME one_allocator
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DUNIT_SOURCES=${core_test_sources}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_one_allocator.cmake")
 
 # The known failures, by decision 30 of "Decisions of 2026-10-11" in
 # docs/decisions.md. tests/known-failures.txt lists the tests that show a

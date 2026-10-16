@@ -2,6 +2,7 @@
    replaces every occurrence of one byte string with another. The two are
    of one length, so every length and offset of the file stays valid. A
    library file holds NUL bytes, which a CMake script cannot write. */
+#include "../../src/antic/alloc.h"
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include <stdio.h>
@@ -26,21 +27,18 @@ int main(int argc, char **argv)
     }
     from_length = strlen(argv[3]);
     in = platform_open(argv[1], false);
-    bytes = malloc(capacity);
-    if (in == NULL || bytes == NULL) {
+    if (in == NULL) {
         fprintf(stderr, "antl_rename: cannot read %s\n", argv[1]);
         return 1;
     }
+    /* The memory comes from src/antic/alloc.c, as for every program of
+       tests/ that links antic_core, and the test one_allocator holds it. */
+    bytes = alloc_resize(NULL, capacity, 1);
     while ((n = fread(bytes + size, 1, capacity - size, in)) > 0) {
         size += n;
         if (size == capacity) {
-            char *grown = realloc(bytes, capacity * 2);
-            if (grown == NULL) {
-                fputs("antl_rename: out of memory\n", stderr);
-                return 1;
-            }
-            bytes = grown;
-            capacity *= 2;
+            capacity = alloc_product(capacity, 2);
+            bytes = alloc_resize(bytes, capacity, 1);
         }
     }
     fclose(in);
