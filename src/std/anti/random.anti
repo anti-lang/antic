@@ -132,8 +132,8 @@ fn rotate(x: u64, n: u64) -> u64
 ///
 /// Its seed is the wall clock at the first draw, so two runs of a program draw
 /// two sequences. A program that wants one sequence again makes its own
-/// `Random` from a seed it holds. Every draw takes a mutex, because one
-/// generator serves every thread.
+/// `Random` from a seed it holds. Every draw and every reseed takes a mutex,
+/// because one generator serves every thread.
 pub singleton class SharedRandom inherits Random
 {
 	lock: Mutex,
@@ -141,6 +141,13 @@ pub singleton class SharedRandom inherits Random
 	fn construct(self)
 	{
 		self.reseed(time.wall() as u64);
+	}
+
+	concrete fn reseed(self, seed: u64)
+	{
+		sync self.lock {
+			self.super.reseed(seed);
+		}
 	}
 
 	concrete fn next(self) -> u64

@@ -1,0 +1,88 @@
+//! `reseed` of the shared generator against the draws of another thread.
+//!
+//! One chunk of a `parallel` reseeds `SharedRandom` with 1 again and again
+//! while the other draws from it, in passes that each start with a reseed of
+//! their own. Each draw follows a reseed or a draw before it, so every number
+//! drawn stands among the first numbers of the sequence of seed 1, never a
+//! number of a state that two threads wrote at once. The program runs the race
+//! four times.
+
+import anti.collection.set.{HashSet};
+import anti.random;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The draws of one pass of the drawing chunk.
+const DRAWS: int = 100000;
+
+/// The passes of the drawing chunk.
+const PASSES: int = 10;
+
+/// The races the program runs.
+const RACES: int = 4;
+
+/// The flags of the two chunks.
+class Stop
+{
+	pub static atomic done: bool = false;
+	pub static atomic started: bool = false;
+}
+
+/// Chunk 0 reseeds until chunk 1 is done and gives the reseeds. Chunk 1 draws
+/// and gives the draws that stand outside the sequence of seed 1.
+worker fn race(chunk: []int) -> int
+{
+	let shared = random.SharedRandom.get();
+	if chunk[0] == 0 {
+		Stop.started.store(true);
+		let reseeds = 0;
+		while !Stop.done.load() do {
+			shared.reseed(1);
+			reseeds += 1;
+		}
+		return reseeds;
+	}
+	let valid = HashSet<u64>.new();
+	let r = random.Random.new(1);
+	for i in 0..DRAWS + 1 {
+		valid.add(r.next());
+	}
+	while !Stop.started.load() do { }
+	let torn = 0;
+	for pass in 0..PASSES {
+		shared.reseed(1);
+		for i in 0..DRAWS {
+			if !valid.contains(shared.next()) {
+				torn += 1;
+			}
+		}
+	}
+	Stop.done.store(true);
+	return torn;
+}
+
+fn main() -> int
+{
+	/* main builds the generator, so neither chunk spends its first
+	   draw on that. */
+	let shared = random.SharedRandom.get();
+	shared.reseed(1);
+	let sides: [2]int = [0, 1];
+	let outside = 0;
+	let raced = 0;
+	for i in 0..RACES {
+		Stop.started.store(false);
+		Stop.done.store(false);
+		let torn = parallel sides[0..2] by 2 -> race();
+		outside += torn[1];
+		if torn[0] > 0 {
+			raced += 1;
+		}
+		free(torn.ptr);
+	}
+	printf("races that reseeded: %d of %d\n".ptr, raced as c_int,
+		RACES as c_int);
+	printf("draws outside the sequence of the seed: %d\n".ptr,
+		outside as c_int);
+	return 0;
+}
