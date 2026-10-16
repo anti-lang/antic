@@ -183,10 +183,8 @@ bool antic_outline(const char *path, const char *source, size_t length,
     memset(out, 0, sizeof *out);
     if (!lexer_lex(source, length, arena, &diags, &tokens) ||
         !parser_parse(source, &tokens, arena, &diags, &tree)) {
-        for (i = 0; report && i < diags.count; i++) {
-            fprintf(stderr, "%s:%d:%d: error: %s\n", path,
-                    diags.items[i].line, diags.items[i].column,
-                    diags.items[i].message);
+        if (report) {
+            diagnostics_print(path, &diags);
         }
         goto done;
     }

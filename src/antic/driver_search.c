@@ -256,10 +256,14 @@ static void cycle(const struct module *tree, const char *input,
         const struct import *imp = &tree->imports[i];
         if (strlen(lib) == imp->module.length &&
             memcmp(lib, imp->module.text, imp->module.length) == 0) {
-            fprintf(stderr, "%s:%d:%d: error: `%s` depends on `%s`, so the "
-                            "import forms a cycle\n",
-                    input, imp->module_pos.line, imp->module_pos.column, lib,
-                    module);
+            struct diagnostics diags = {0};
+            diagnostics_add(&diags, imp->module_pos.line,
+                            imp->module_pos.column,
+                            "`%s` depends on `%s`, so the import forms a "
+                            "cycle",
+                            lib, module);
+            diagnostics_print(input, &diags);
+            diagnostics_free(&diags);
             return;
         }
     }

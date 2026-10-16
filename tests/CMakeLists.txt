@@ -1040,6 +1040,11 @@ add_test(NAME no_sdk_fetcher
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_sdk_fetcher.cmake")
 
+# A message at a position has one printer in antic.
+add_test(NAME message_forms
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_message_forms.cmake")
+
 # The warning flags of the build stand in tools/warnings.cmake and
 # src/native/warnings.cmake alone, as docs/c-guidelines.md requires.
 add_test(NAME warning_set

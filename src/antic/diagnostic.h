@@ -75,4 +75,10 @@ void diagnostics_doc(struct diagnostics *d, enum diag_name name, int line,
     ATTRIBUTE_PRINTF(5, 6);
 void diagnostics_free(struct diagnostics *d);
 
+/* Print each diagnostic of d on standard error, one line each, as
+   `path:line:column: kind: message`, with ` [name]` after a message that
+   has a name. It is the one printer of a message at a position of a
+   source, which the test `message_forms` holds. */
+void diagnostics_print(const char *path, const struct diagnostics *d);
+
 #endif

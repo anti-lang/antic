@@ -421,22 +421,6 @@ bool driver_file_exists(const char *path)
     return f != NULL;
 }
 
-static void print_diagnostics(const char *input,
-                              const struct diagnostics *diags)
-{
-    size_t i;
-
-    for (i = 0; i < diags->count; i++) {
-        const struct diagnostic *d = &diags->items[i];
-        fprintf(stderr, "%s:%d:%d: %s: %s", input, d->line, d->column,
-                d->warning ? "warning" : "error", d->message);
-        if (d->name != NAME_NONE) {
-            fprintf(stderr, " [%s]", warnings_name(d->name));
-        }
-        fputc('\n', stderr);
-    }
-}
-
 /* Print the diagnostics of the compilation and count them for the caller
    that asked, which is `anti check`. */
 static void report_diagnostics(const struct options *o,
@@ -444,7 +428,7 @@ static void report_diagnostics(const struct options *o,
 {
     size_t i;
 
-    print_diagnostics(o->input, diags);
+    diagnostics_print(o->input, diags);
     if (o->counts == NULL) {
         return;
     }

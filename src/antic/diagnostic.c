@@ -1,10 +1,12 @@
 #include "diagnostic.h"
 
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "alloc.h"
 #include "text.h"
+#include "warnings.h"
 
 static void add(struct diagnostics *d, enum diag_name name, int line,
                 int column, bool warning, bool doc, const char *format,
@@ -73,4 +75,19 @@ void diagnostics_free(struct diagnostics *d)
     d->items = NULL;
     d->count = 0;
     d->capacity = 0;
+}
+
+void diagnostics_print(const char *path, const struct diagnostics *d)
+{
+    size_t i;
+
+    for (i = 0; i < d->count; i++) {
+        const struct diagnostic *item = &d->items[i];
+        fprintf(stderr, "%s:%d:%d: %s: %s", path, item->line, item->column,
+                item->warning ? "warning" : "error", item->message);
+        if (item->name != NAME_NONE) {
+            fprintf(stderr, " [%s]", warnings_name(item->name));
+        }
+        fputc('\n', stderr);
+    }
 }
