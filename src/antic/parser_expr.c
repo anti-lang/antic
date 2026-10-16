@@ -150,6 +150,12 @@ static struct expr *placeholder(struct parser *p,
     inner.ok = true;
     inner.no_struct_literal = false;
     e = parser_expression(&inner);
+    /* The tree of the expression counts toward the chain around the
+       literal, so a chain in each level stays within PARSE_DEPTH_MAX, by
+       M308 of docs/audit/summary.md. */
+    if (p->reach < inner.reach) {
+        p->reach = inner.reach;
+    }
     if (inner.ok && !parser_check(&inner, TOKEN_EOF)) {
         parser_error_here(&inner, "expected `}` or `:` after the expression");
     }

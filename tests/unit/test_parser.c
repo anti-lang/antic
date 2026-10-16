@@ -164,6 +164,17 @@ static void depth_limit(void)
               i == 1);
         free(chain);
     }
+    /* The tree inside an `{expr}` counts toward the chain around the
+       literal, by M308 of docs/audit/summary.md. */
+    for (i = 0; i < 2; i++) {
+        size_t n = i == 0 ? 100 : 200;
+        char *inner = nested("1", " + 1", n, "", "", "");
+        char *head = nested("fn f() -> int { return f\"{", "", 0, inner, "",
+                            "}\"");
+        depth(nested(head, " + 1", n, "", "", "; }\n"), i == 1);
+        free(head);
+        free(inner);
+    }
 }
 
 /* The expression of an `{expr}` may be an anonymous function, whose
