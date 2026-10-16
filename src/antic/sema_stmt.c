@@ -505,6 +505,24 @@ static bool check_set_index(struct checker *c, struct stmt *s)
     return true;
 }
 
+/* The target `e[i]` of an assignment that check_set_index gave back,
+   which checked e. The reading of the target takes the type of e as it
+   stands, so an error in e is reported once and an `own` argument of a
+   call in e moves once. The mark lasts for this reading alone and the
+   tree keeps none. */
+static struct type *check_index_target(struct checker *c,
+                                       struct expr *target)
+{
+    struct expr *base = target->as.index.base;
+    bool marked = base->prechecked;
+    struct type *t;
+
+    base->prechecked = true;
+    t = sema_check_storage(c, target);
+    base->prechecked = marked;
+    return t;
+}
+
 bool sema_set_index(struct checker *c, struct stmt *s)
 {
     return check_set_index(c, s);
@@ -733,7 +751,8 @@ static void check_assign(struct checker *c, struct stmt *s)
        use of a pointer to a guarded field that the name held. */
     c->assigned = op == TOKEN_ASSIGN && target->kind == EXPR_NAME ? target
                                                                   : NULL;
-    t = sema_check_storage(c, target);
+    t = target->kind == EXPR_INDEX ? check_index_target(c, target)
+                                   : sema_check_storage(c, target);
     c->assigned = NULL;
     if (sema_is_error(t)) {
         sema_check_expr(c, s->as.assign.value, NULL);
