@@ -572,7 +572,8 @@ int64_t anti_rt_regex_group_number(const void *compiled,
     unsigned char text[NAME_ROOM];
     int number;
 
-    if (length <= 0 || length >= NAME_ROOM) {
+    if (length <= 0 || length >= NAME_ROOM ||
+        memchr(name, '\0', (size_t)length) != NULL) {
         return -1;
     }
     memcpy(text, name, (size_t)length);

@@ -1,6 +1,7 @@
 /* The rewriter of a byte pattern of src/rt/regex.c on every prefix of one
-   pattern. Each prefix is a heap copy without a NUL, so AddressSanitizer
-   reports a read past its end. */
+   pattern, and the lookup of a group by a name that holds a NUL. Each
+   prefix is a heap copy without a NUL, so AddressSanitizer reports a read
+   past its end. */
 #include <stdlib.h>
 #include <string.h>
 
@@ -56,7 +57,29 @@ static void every_prefix(void)
     CHECK(compiles("\xC3", 1) == 1);
 }
 
+/* A group name is the bytes it is given. A NUL inside it cuts nothing. */
+static void name_with_a_nul(void)
+{
+    const unsigned char pattern[] = "(?<a>x)(?<b>y)";
+    int32_t code = 0;
+    int64_t offset = 0;
+    void *compiled = anti_rt_regex_compile(pattern, 14, &code, &offset);
+
+    CHECK(compiled != NULL);
+    if (compiled == NULL) {
+        return;
+    }
+    CHECK(anti_rt_regex_group_number(compiled, (const unsigned char *)"a",
+                                     1) == 1);
+    CHECK(anti_rt_regex_group_number(compiled, (const unsigned char *)"b",
+                                     1) == 2);
+    CHECK(anti_rt_regex_group_number(compiled,
+                                     (const unsigned char *)"a\0b", 3) == -1);
+    anti_rt_regex_free(compiled);
+}
+
 void test_regex(void)
 {
     every_prefix();
+    name_with_a_nul();
 }

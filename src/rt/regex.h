@@ -68,8 +68,9 @@ void anti_rt_regex_message_into(int32_t code, unsigned char *out,
 int64_t anti_rt_regex_group_count(const void *compiled);
 
 /* The number of the group of a compiled pattern named by the length bytes
-   at name, or -1 when it has none of that name. `(?J)` allows two groups
-   of one name, and then it is the first. */
+   at name, or -1 when it has none of that name. A name that holds a NUL
+   names no group. `(?J)` allows two groups of one name, and then it is
+   the first. */
 int64_t anti_rt_regex_group_number(const void *compiled,
                                    const unsigned char *name, int64_t length);
 
