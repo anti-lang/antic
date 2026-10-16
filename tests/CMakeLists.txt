@@ -1049,6 +1049,10 @@ add_test(NAME no_workflows
 add_test(NAME no_sdk_fetcher
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_sdk_fetcher.cmake")
+# One function downloads for the whole build.
+add_test(NAME downloads_once
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_downloads_once.cmake")
 
 # A message at a position has one printer in antic, and the platform
 # layer names the tool that runs.
@@ -1639,15 +1643,6 @@ antic_program_test(program_delete_owned_no_reflect
     OPTIONS "--no-reflect"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect")
 
-# The pinned raylib source, which tools/get-raylib.cmake downloads. The
-# directory is named here, before the first test that reads it.
-file(STRINGS "${CMAKE_SOURCE_DIR}/tools/raylib-pin" raylib_version
-     REGEX "^RAYLIB_VERSION=")
-string(REGEX REPLACE "^RAYLIB_VERSION=" "" raylib_version "${raylib_version}")
-antic_shared_path(ANTIC_RAYLIB_DIR
-    "${ANTIC_DEPS_DIR}/raylib/raylib-${raylib_version}"
-    "raylib release source from tools/get-raylib.cmake")
-
 # DESIGN: the output of program_abi_wchar follows the width and signedness
 # of wchar_t, never the host. The C compiler that builds wchar.c names the
 # type as i32, u32 or u16. The file abi_wchar.<type>.expected holds its
@@ -1761,10 +1756,10 @@ if(ANTIC_EMULATED_TARGET)
                 ${emulator}
                 WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-x86_64")
         endforeach()
-        if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
+        if(EXISTS "${ANTIC_RAYLIB_SOURCE}/src/raymath.h")
             abi_x86_64_object(abi_raymath_x86_64 abi/raymath.c)
             target_include_directories(abi_raymath_x86_64 PRIVATE
-                "${ANTIC_RAYLIB_DIR}/src")
+                "${ANTIC_RAYLIB_SOURCE}/src")
             antic_program_test(program_abi_raymath_${emulated}
                 "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.anti"
                 OPTIONS "${ANTIC_X86_64_OPTIONS}"
@@ -2963,7 +2958,7 @@ foreach(case IN LISTS anti_bind_cases)
             "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
             "-DBIND=${CMAKE_CURRENT_SOURCE_DIR}/bind"
             "-DABI=${CMAKE_CURRENT_SOURCE_DIR}/abi"
-            "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
+            "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
             "-DCC=${anti_bind_cc}"
             "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
             "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
@@ -3030,7 +3025,7 @@ else()
                 "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DCLANG=${CMAKE_C_COMPILER}"
                 "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
+                "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_package.cmake")
     # PERF DECISION: the package carries the LLVM tools, and xz compresses
@@ -3042,7 +3037,9 @@ else()
 endif()
 add_test(NAME raylib_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=raylib
-            -DSCRIPT=tools/get-raylib.cmake -DFILES=src/native/raylib.cmake
+            -DSCRIPT=src/native/get-source.cmake
+            -DCALLER=src/native/raylib-source.cmake
+            -DFILES=src/native/raylib.cmake
             -DHASH=SHA256 -DPARTS=2
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_native_pin.cmake")
 # The check of the pins refuses a copy of a version or a digest and passes
@@ -3139,13 +3136,12 @@ set_tests_properties(release_dry_run_runner PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # A small raylib binding: the raymath functions of the pinned raylib
-# release, which tools/get-raylib.cmake downloads. tools/raylib-pin holds
-# the version, so the default of ANTIC_RAYLIB_DIR cannot name another one.
-if(EXISTS "${ANTIC_RAYLIB_DIR}/src/raymath.h")
+# release, which src/native/raylib-source.cmake fetches.
+if(EXISTS "${ANTIC_RAYLIB_SOURCE}/src/raymath.h")
     add_library(abi_raymath OBJECT abi/raymath.c)
     set_target_properties(abi_raymath PROPERTIES MSVC_RUNTIME_LIBRARY "")
     target_compile_options(abi_raymath PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
-    target_include_directories(abi_raymath PRIVATE "${ANTIC_RAYLIB_DIR}/src")
+    target_include_directories(abi_raymath PRIVATE "${ANTIC_RAYLIB_SOURCE}/src")
     if(APPLE)
         target_compile_options(abi_raymath PRIVATE -mmacosx-version-min=11.0)
     endif()
@@ -3166,7 +3162,7 @@ else()
     # Fail rather than skip, so a missing raylib cannot pass unnoticed.
     add_test(NAME program_abi_raymath
         COMMAND "${CMAKE_COMMAND}" -E echo
-            "raylib not found in ${ANTIC_RAYLIB_DIR}: run tools/get-raylib.cmake")
+            "raylib not found in ${ANTIC_RAYLIB_SOURCE}")
     set_tests_properties(program_abi_raymath PROPERTIES
         FAIL_REGULAR_EXPRESSION "raylib not found")
 endif()

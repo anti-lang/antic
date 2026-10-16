@@ -7,23 +7,13 @@
 # compiles the PCRE2 of a packaged antic from the same list.
 #
 # The source comes from the release that tools/pcre2-pin names, which
-# get-pcre2.cmake downloads into build/deps/pcre2 and checks against the
-# pinned digest.
+# antic_get_source of get-source.cmake downloads into
+# build/deps/pcre2 and checks against the pinned digest.
 
 antic_shared_path(ANTIC_PCRE2_DIR "${ANTIC_DEPS_DIR}/pcre2"
-    "the PCRE2 source from src/native/get-pcre2.cmake")
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${ANTIC_PCRE2_DIR}"
-                        -P "${CMAKE_CURRENT_LIST_DIR}/get-pcre2.cmake"
-                RESULT_VARIABLE antic_pcre2_fetched)
-if(NOT antic_pcre2_fetched EQUAL 0)
-    message(FATAL_ERROR "src/native/get-pcre2.cmake failed, so the build has "
-                        "no PCRE2 source")
-endif()
-file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/../../tools/pcre2-pin"
-     antic_pcre2_version REGEX "^PCRE2_VERSION=")
-string(REGEX REPLACE "^PCRE2_VERSION=" "" antic_pcre2_version
-       "${antic_pcre2_version}")
-set(ANTIC_PCRE2_SOURCE "${ANTIC_PCRE2_DIR}/pcre2-${antic_pcre2_version}")
+    "the PCRE2 source from tools/pcre2-pin")
+antic_get_source(ANTIC_PCRE2_SOURCE pcre2 "${ANTIC_PCRE2_DIR}" SHA256
+    src/pcre2.h.generic)
 
 # The three files a build without autotools writes first, as
 # NON-AUTOTOOLS-BUILD of the release describes: config.h and pcre2.h from

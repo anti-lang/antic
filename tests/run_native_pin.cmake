@@ -6,10 +6,16 @@
 #   ROOT    the repository
 #   NAME    the library, as in tools/<NAME>-pin. The keys of the pin are
 #           <NAME>_VERSION, <NAME>_DIGEST and <NAME>_URL in capitals
-#   SCRIPT  the download script, relative to ROOT
+#   SCRIPT  the script of antic_get_source, relative to ROOT, which
+#           hands antic_download the digest of the pin. The test
+#           downloads_once holds the check of the digest in antic_download
+#   CALLER  the file, relative to ROOT, whose call of antic_get_source
+#           fetches the library. It spells neither the version nor the
+#           digest
 #   FILES   optional files relative to ROOT, separated by commas, that
 #           spell neither the version nor the digest either
-#   HASH    the algorithm of EXPECTED_HASH, SHA256 or SHA3_256
+#   HASH    the algorithm of the digest, SHA256 or SHA3_256, which the
+#           call passes on to EXPECTED_HASH
 #   PARTS   the number of parts of the version, 2 or 3
 #   YEAR    optional, ON when the pin also holds <NAME>_YEAR
 #   ABSENT  optional text that the file ABSENT_IN, relative to ROOT, does
@@ -24,9 +30,10 @@ cmake_minimum_required(VERSION 3.21)
 string(TOUPPER "${NAME}" key)
 set(pin "${ROOT}/tools/${NAME}-pin")
 set(script "${ROOT}/${SCRIPT}")
+set(caller "${ROOT}/${CALLER}")
 string(REPLACE "," ";" others "${FILES}")
 list(TRANSFORM others PREPEND "${ROOT}/")
-foreach(file "${pin}" "${script}" ${others})
+foreach(file "${pin}" "${script}" "${caller}" ${others})
     if(NOT EXISTS "${file}")
         message(FATAL_ERROR "${file} is missing")
     endif()
@@ -65,7 +72,7 @@ if(YEAR)
 endif()
 
 # The source comes over HTTPS, from the URL of the pin or one the script
-# spells, and the digest is checked on every download.
+# spells, and the digest of the pin goes with every download.
 file(STRINGS "${script}" urls REGEX "://")
 foreach(line IN LISTS urls)
     string(FIND "${line}" "https://" at)
@@ -74,13 +81,39 @@ foreach(line IN LISTS urls)
     endif()
 endforeach()
 file(READ "${script}" text)
-string(FIND "${text}" "EXPECTED_HASH \"${HASH}=\${${key}_DIGEST}\"" at)
+string(FIND "${text}" "\"\${algorithm}\" \"\${\${key}_DIGEST}\"" at)
 if(at EQUAL -1)
-    message(FATAL_ERROR "${SCRIPT} does not check the download against "
-                        "${key}_DIGEST with ${HASH}")
+    message(FATAL_ERROR "${SCRIPT} does not hand antic_download the digest "
+                        "of the pin")
 endif()
 
-foreach(file "${script}" ${others})
+# The call names the library and the algorithm of its digest, as its
+# second and its fourth argument.
+file(READ "${caller}" text)
+string(REGEX MATCHALL "antic_get_source\\([^)]*\\)" calls "${text}")
+set(asked "")
+foreach(call IN LISTS calls)
+    string(REGEX REPLACE "^antic_get_source\\((.*)\\)$" "\\1" arguments
+           "${call}")
+    separate_arguments(arguments UNIX_COMMAND "${arguments}")
+    list(LENGTH arguments count)
+    if(count EQUAL 5)
+        list(GET arguments 1 name)
+        list(GET arguments 3 algorithm)
+        if(name STREQUAL NAME)
+            set(asked "${algorithm}")
+        endif()
+    endif()
+endforeach()
+if(asked STREQUAL "")
+    message(FATAL_ERROR "${CALLER} does not fetch ${NAME} with antic_get_source")
+endif()
+if(NOT asked STREQUAL HASH)
+    message(FATAL_ERROR "${CALLER} checks ${NAME} with ${asked}, and the pin "
+                        "holds a digest of ${HASH}")
+endif()
+
+foreach(file "${script}" "${caller}" ${others})
     file(READ "${file}" text)
     foreach(literal "${version}" "${digest}")
         string(FIND "${text}" "${literal}" at)

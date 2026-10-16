@@ -120,6 +120,10 @@ antic_refuse_host_tools()
 # literal, and src/rt/regex.c reads pcre2.h as a system header, as the
 # glue of the runtime does, so the flags of the glue never reach it.
 include(tools/sources.cmake)
+# antic_get_source fetches every pinned source of the runtime archive,
+# through antic_download of tools/download.cmake, the one download of the
+# build.
+include(src/native/get-source.cmake)
 include(src/native/pcre2-source.cmake)
 add_library(antic_core STATIC ${ANTIC_CORE_SOURCES})
 target_include_directories(antic_core PUBLIC ${ANTIC_CORE_INCLUDE_DIRS})
@@ -279,6 +283,8 @@ set(ANTIC_TARGETS linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
 # of its own, named after the target with -glibc, the suffix
 # LINUX_GLIBC_SUFFIX of src/antic/linker.h.
 set(ANTIC_GLIBC_TARGETS linux-x86_64-glibc linux-arm64-glibc)
+# The raylib source, which the tests and src/native/ both read.
+include(src/native/raylib-source.cmake)
 foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
     if(EXISTS "${ANTIC_SYSROOT_DIR}/${target}")
         file(COPY "${ANTIC_SYSROOT_DIR}/${target}"

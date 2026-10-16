@@ -3,8 +3,8 @@
 # or mbedtls.lib on Windows.
 #
 # The source comes from the release that tools/mbedtls-pin names, which
-# get-mbedtls.cmake downloads into build/deps/mbedtls and checks against
-# the pinned digest.
+# antic_get_source of get-source.cmake downloads into
+# build/deps/mbedtls and checks against the pinned digest.
 #
 # DESIGN: the release is of the 3.6 LTS line, which "Runtime archive" in
 # docs/decisions.md names beside the 4.x line, whose crypto lives in the
@@ -14,19 +14,9 @@
 # docs/decisions.md.
 
 antic_shared_path(ANTIC_MBEDTLS_DIR "${ANTIC_DEPS_DIR}/mbedtls"
-    "the Mbed TLS source from src/native/get-mbedtls.cmake")
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${ANTIC_MBEDTLS_DIR}"
-                        -P "${CMAKE_CURRENT_SOURCE_DIR}/get-mbedtls.cmake"
-                RESULT_VARIABLE antic_mbedtls_fetched)
-if(NOT antic_mbedtls_fetched EQUAL 0)
-    message(FATAL_ERROR "src/native/get-mbedtls.cmake failed, so the build "
-                        "has no Mbed TLS source")
-endif()
-file(STRINGS "${PROJECT_SOURCE_DIR}/tools/mbedtls-pin" antic_mbedtls_version
-     REGEX "^MBEDTLS_VERSION=")
-string(REGEX REPLACE "^MBEDTLS_VERSION=" "" antic_mbedtls_version
-       "${antic_mbedtls_version}")
-set(ANTIC_MBEDTLS_SOURCE "${ANTIC_MBEDTLS_DIR}/mbedtls-${antic_mbedtls_version}")
+    "the Mbed TLS source from tools/mbedtls-pin")
+antic_get_source(ANTIC_MBEDTLS_SOURCE mbedtls "${ANTIC_MBEDTLS_DIR}" SHA256
+    include/mbedtls/mbedtls_config.h)
 set(ANTIC_MBEDTLS_INCLUDE "${ANTIC_MBEDTLS_SOURCE}/include")
 set(ANTIC_MBEDTLS_WORK "${CMAKE_BINARY_DIR}/native/mbedtls")
 antic_native_license(mbedtls "${ANTIC_MBEDTLS_SOURCE}/LICENSE")
@@ -140,7 +130,7 @@ endforeach()
 add_test(NAME mbedtls_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
             -DNAME=mbedtls
-            -DSCRIPT=src/native/get-mbedtls.cmake
-            "-DFILES=src/native/mbedtls.cmake"
+            -DSCRIPT=src/native/get-source.cmake
+            -DCALLER=src/native/mbedtls.cmake
             -DHASH=SHA256 -DPARTS=3
             -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")

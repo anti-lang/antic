@@ -53,6 +53,7 @@ file(WRITE "${WORK}/apsl.txt" "The text of the APSL\n")
 # names the stand-ins.
 file(MAKE_DIRECTORY "${WORK}/tools")
 file(COPY_FILE "${ROOT}/tools/get-sysroot.cmake" "${WORK}/tools/get-sysroot.cmake")
+file(COPY_FILE "${ROOT}/tools/download.cmake" "${WORK}/tools/download.cmake")
 file(COPY_FILE "${ROOT}/tools/deps-dir.cmake" "${WORK}/tools/deps-dir.cmake")
 file(COPY_FILE "${ROOT}/tools/sysroot-pins" "${WORK}/tools/sysroot-pins")
 function(write_pin zig_digest)

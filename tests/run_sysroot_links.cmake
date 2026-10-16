@@ -35,6 +35,7 @@ file(WRITE "${clang}/licenses/llvm.txt" "llvm\n")
 # A copy of the script beside pins that name the stand-ins.
 file(MAKE_DIRECTORY "${WORK}/tools")
 file(COPY_FILE "${ROOT}/tools/get-sysroot.cmake" "${WORK}/tools/get-sysroot.cmake")
+file(COPY_FILE "${ROOT}/tools/download.cmake" "${WORK}/tools/download.cmake")
 file(COPY_FILE "${ROOT}/tools/zig-stubs-pin" "${WORK}/tools/zig-stubs-pin")
 file(SHA256 "${WORK}/packages/x86_64/musl-dev-1.apk" apk_digest)
 file(SHA256 "${WORK}/packages/musl.tar.gz" source_digest)

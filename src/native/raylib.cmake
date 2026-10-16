@@ -2,21 +2,15 @@
 # ANTIC_MEDIA_TARGETS as lib/<target>/libraylib.a, or raylib.lib on
 # Windows.
 #
-# The source is the release that tools/raylib-pin names, which the
-# bindings use as well. tools/get-raylib.cmake downloads it and checks the
-# pinned digest, and ANTIC_RAYLIB_DIR names the extracted release.
+# The source is the release that tools/raylib-pin names, which
+# raylib-source.cmake fetches as ANTIC_RAYLIB_SOURCE.
 
-if(NOT EXISTS "${ANTIC_RAYLIB_DIR}/src/rcore.c")
-    message(FATAL_ERROR "ANTIC_RAYLIB_DIR is ${ANTIC_RAYLIB_DIR}, which holds "
-                        "no raylib source. Run tools/get-raylib.cmake.")
-endif()
-set(ANTIC_RAYLIB_SOURCE "${ANTIC_RAYLIB_DIR}/src")
 set(ANTIC_RAYLIB_WORK "${CMAKE_BINARY_DIR}/native/raylib")
-antic_native_license(raylib "${ANTIC_RAYLIB_DIR}/LICENSE")
+antic_native_license(raylib "${ANTIC_RAYLIB_SOURCE}/LICENSE")
 # The four headers of raylib_public_headers in src/CMakeLists.txt of the
 # release.
-antic_native_headers(raylib "${ANTIC_RAYLIB_SOURCE}" raylib.h rcamera.h rlgl.h
-    raymath.h)
+antic_native_headers(raylib "${ANTIC_RAYLIB_SOURCE}/src" raylib.h rcamera.h
+    rlgl.h raymath.h)
 
 # The seven modules of the library. rglfw.c holds GLFW, and raudio.c the
 # audio module over miniaudio.
@@ -75,12 +69,12 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     endif()
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2
         ${flags}
-        "-ffile-prefix-map=${ANTIC_RAYLIB_DIR}=."
+        "-ffile-prefix-map=${ANTIC_RAYLIB_SOURCE}=."
         "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
         "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=.")
     set(objects "")
     foreach(source IN LISTS ANTIC_RAYLIB_SOURCES)
-        set(input "${ANTIC_RAYLIB_SOURCE}/${source}.c")
+        set(input "${ANTIC_RAYLIB_SOURCE}/src/${source}.c")
         set(object "${work}/${source}.o")
         # raudio.c reads the declarations of miniaudio alone.
         set(module "")
@@ -101,8 +95,8 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND ${compile} ${ANTIC_RAYLIB_WARNINGS} ${ANTIC_RAYLIB_OPTIONS}
                 ${ANTIC_RAYLIB_DEFINES} ${platform}
-                -I "${ANTIC_RAYLIB_SOURCE}"
-                -I "${ANTIC_RAYLIB_SOURCE}/external/glfw/include"
+                -I "${ANTIC_RAYLIB_SOURCE}/src"
+                -I "${ANTIC_RAYLIB_SOURCE}/src/external/glfw/include"
                 ${module} -c "${input}" -o "${object}"
             DEPENDS "${input}"
             VERBATIM)
@@ -253,6 +247,6 @@ endforeach()
 
 add_test(NAME raylib_miniaudio_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-            "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
+            "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
             "-DMINIAUDIO=${ANTIC_MINIAUDIO_SOURCE}"
             -P "${PROJECT_SOURCE_DIR}/tests/run_raylib_miniaudio_pin.cmake")

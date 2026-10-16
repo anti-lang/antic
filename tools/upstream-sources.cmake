@@ -3,9 +3,9 @@
 # antic_pin_url(<out> <name>) sets <out> to the URL of the source package
 # that tools/<name>-pin names as <NAME>_URL, with @VERSION@ replaced by
 # <NAME>_VERSION, @YEAR@ by <NAME>_YEAR and @NUMBER@ by the version in
-# the form of sqlite.org. The download scripts of src/native/ and
-# tools/get-raylib.cmake take the URL from here, and so does the record
-# below, so each pin holds it once.
+# the form of sqlite.org. antic_get_source of src/native/get-source.cmake
+# takes the URL from here, and so does the record below, so each pin holds
+# it once.
 #
 # antic_write_sources(<path>) writes licenses/sources.txt of the runtime
 # archive: one line per component with its name, its version and the URL

@@ -120,8 +120,9 @@ endforeach()
 add_test(NAME pcre2_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
             -DNAME=pcre2
-            -DSCRIPT=src/native/get-pcre2.cmake
-            "-DFILES=src/native/pcre2.cmake,src/native/pcre2-source.cmake,src/native/pcre2-files.cmake"
+            -DSCRIPT=src/native/get-source.cmake
+            -DCALLER=src/native/pcre2-source.cmake
+            "-DFILES=src/native/pcre2.cmake,src/native/pcre2-files.cmake"
             -DHASH=SHA256 -DPARTS=2
             "-DABSENT=-DSUPPORT_JIT"
             -DABSENT_IN=src/native/pcre2-files.cmake

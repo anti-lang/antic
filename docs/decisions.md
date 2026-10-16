@@ -348,7 +348,7 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
 - mimalloc keeps no detailed statistics. Its build defines `MI_STATS=0` where its Release build gives 1. Eddie decided this on 2026-10-08. Reason: under `MI_NO_GETENV` no program can print them, and code that can never run still has to be audited and can still go wrong. Statistics of the allocator come back only together with a defined way to read them, for example as part of `--memory-checks`. The test `musl_allocator_<target>` refuses a program of musl that holds `binned` or `malloc req~`, two labels that mimalloc prints for those statistics alone. Each program of `tests/bench/` at linux-arm64 grows by about 1.5 KB with it, since the inliner then takes about 4.3 KB more into `_mi_thread_done`.
 - The 1.5 KB that each program of musl grew by with `MI_STATS=0` stands. Eddie decided this on 2026-10-08. Reason: 1.5 KB on a program of 250 KB is the inliner moving code around in a vendored library, and tuning its heuristics has no end.
 - mimalloc keeps no sampled profiling either. Its build defines `MI_PROFILE=0` where its Release build gives 1. Eddie decided this on 2026-10-08. Reason: a program reaches the profiler through mimalloc's API alone, which no Anti program calls, so it is unreachable code as the statistics were. The test `musl_allocator_<target>` refuses a program of musl that holds a symbol of `src/sample-profile.c`.
-- [provisional] The source record of mimalloc is the one of the other native libraries. `tools/mimalloc-pin` names the release and its digest, `src/native/get-mimalloc.cmake` the URL, and `LICENSES/mimalloc.txt` holds its MIT text. Reason: item 30 of CLAUDE.md asks for a record of the exact upstream source of the copyleft parts alone, and mimalloc is MIT.
+- [provisional] The source record of mimalloc is the one of the other native libraries. `tools/mimalloc-pin` names the release, its digest and its URL, which `antic_get_source` of `src/native/get-source.cmake` downloads, and `LICENSES/mimalloc.txt` holds its MIT text. Reason: item 30 of CLAUDE.md asks for a record of the exact upstream source of the copyleft parts alone, and mimalloc is MIT.
 - antic and the runtime archive are published per target, as `anti-<version>-<target>.tar.xz` among the assets of the GitHub release of the tag `v<version>`. A target is published only after the test suite has run on that target, on the Mac or in a VM, natively or under emulation. Reason: a binary that nobody executed is not a release.
 - An install of Anti is local to the user and follows the conventions of the platform. It is never one directory named `~/.anti`. On Linux and macOS the executables `anti` and `antic` go in `~/.local/bin`, the toolchain and the runtime archive in `~/.local/share/anti`, the configuration in `~/.config/anti` and the script-mode cache and the downloads in `~/.cache/anti`. `XDG_BIN_HOME`, `XDG_DATA_HOME`, `XDG_CONFIG_HOME` and `XDG_CACHE_HOME` replace the four roots when they are set. On Windows the executables go in `%LOCALAPPDATA%\Programs\anti\bin`, the toolchain and the runtime archive in `%LOCALAPPDATA%\anti`, and the configuration and the cache in `config\` and `cache\` of that directory. Nothing under `/` or `C:\` outside the user's profile is ever written. Reason: a reset of a user is then four directories and never the machine, and a tool that follows the platform's conventions needs no explaining. The four roots are also what a backup, a sync tool and an administrator already know.
 - `tools/install.sh` and `tools/install.ps1` install those four directories for the user who runs them, and the site serves them at `anti-lang.com/install.sh` and `anti-lang.com/install.ps1`. They need no password. Each adds the bin directory to the user's PATH once and says that it did. Reason: `curl -fsSL https://anti-lang.com/install.sh | bash` is the shortest path from reading about Anti to compiling a program, and a compiler that is not on the PATH is not installed.
@@ -450,11 +450,11 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
 
 - PCRE2 10.48 is pinned in `tools/pcre2-pin` by version and by the SHA-256 of
   `pcre2-10.48.tar.gz`, the digest that the release page of `PCRE2Project/pcre2`
-  publishes. `src/native/get-pcre2.cmake` downloads the archive over HTTPS into
-  `build/deps/pcre2/`, checks the digest and unpacks it there. An archive already on
+  publishes. `antic_get_source` of `src/native/get-source.cmake` downloads the archive
+  over HTTPS into `build/deps/pcre2/`, checks the digest and unpacks it there. An archive already on
   disk with the pinned digest is not downloaded again, so a configure without a network
   works once the source is there. The test `pcre2_pin` checks the pin and refuses a copy
-  of the version or the digest in the script or the recipe.
+  of the version or the digest in the script or the recipes.
 - The library is the 8-bit build with UTF support and JIT off, as "Runtime archive" in
   `docs/decisions.md` settles. `src/native/pcre2.cmake` compiles the 31 sources of the
   list in `NON-AUTOTOOLS-BUILD` of the release with the pinned clang, and llvm-ar writes
@@ -471,9 +471,11 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
   of `src/native/CMakeLists.txt`, a second copy of the arguments that the top-level file
   passes to `anti_cross_runtime`. Reason: the step could change no other line of the
   top-level file. The fold makes both builds read one function.
-- [provisional] The download script is `src/native/get-pcre2.cmake`, beside its recipe,
-  and not in `tools/` beside `tools/get-raylib.cmake`. Reason: `tools/` holds the pin,
-  and the script belongs to the one recipe that runs it.
+- [provisional] The download script of the native sources is
+  `src/native/get-source.cmake`, beside the recipes, and not in `tools/`. Reason:
+  `tools/` holds the pins, and the script belongs to the recipes that run it. It was
+  `src/native/get-pcre2.cmake` until step 16 of "Fix steps" in `docs/audit/summary.md`
+  made the six download scripts one, and raylib has its recipe there since.
 - [provisional] The library keeps the name PCRE2 gives its 8-bit library, `pcre2-8`, as
   `libpcre2-8.a` and `pcre2-8.lib`, the forms of `libanti_rt.a` and `anti_rt.lib`.
   Reason: a C project that links the published file finds it under its usual name.
@@ -515,8 +517,8 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
 - [provisional] miniaudio 0.11.24 is pinned in `tools/miniaudio-pin` by version and by
   the SHA-256 of the source archive of the tag. GitHub publishes no digest for a source
   archive, so the digest is the one of the archive at its first download, as for raylib.
-  `src/native/get-miniaudio.cmake` downloads it into `build/deps/miniaudio/` and checks
-  the digest. Reason: 0.11.24 is the version raylib 6.0 bundles in
+  `antic_get_source` of `src/native/get-source.cmake` downloads it into
+  `build/deps/miniaudio/` and checks the digest. Reason: 0.11.24 is the version raylib 6.0 bundles in
   `src/external/miniaudio.h`, so a program carries one version of miniaudio. The test
   `miniaudio_pin` checks the pin and refuses a copy of it in the script or the recipe.
   The test `raylib_miniaudio_pin` compares it with `RAYLIB_MINIAUDIO_VERSION` of
@@ -693,12 +695,12 @@ libraries named "at run time" are loaded by the library itself and need no link.
   `anti.net` wraps, exists in both lines.
 - Mbed TLS is pinned in `tools/mbedtls-pin` by version and by the SHA-256 of
   `mbedtls-<version>.tar.bz2` that the release publishes in
-  `mbedtls-<version>-sha256sum.txt`. `src/native/get-mbedtls.cmake` downloads it over
-  HTTPS into `build/deps/mbedtls/`, checks the digest and unpacks it, as for PCRE2.
+  `mbedtls-<version>-sha256sum.txt`. `antic_get_source` of `src/native/get-source.cmake`
+  downloads it over HTTPS into `build/deps/mbedtls/`, checks the digest and unpacks it, as for PCRE2.
 - SQLite is pinned in `tools/sqlite-pin` by version, by the year of the directory of
   sqlite.org that holds the release and by the digest of the amalgamation.
-  `src/native/get-sqlite.cmake` downloads `sqlite-amalgamation-<number>.zip` over HTTPS
-  into `build/deps/sqlite/`, where `<number>` is the version in the form 3XXYYZZ.
+  `antic_get_source` of `src/native/get-source.cmake` downloads
+  `sqlite-amalgamation-<number>.zip` over HTTPS into `build/deps/sqlite/`, where `<number>` is the version in the form 3XXYYZZ.
 - [provisional] The digest of SQLite is the SHA3-256 that `sqlite.org/download.html`
   publishes, and not a SHA-256. The script checks it with `EXPECTED_HASH SHA3_256`.
   Reason: the publisher gives no other digest. The other pins take the publisher's digest
@@ -1079,7 +1081,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - antic runs the lld programs from `bin/` of the package alone. It never takes a linker from the search path, and a Windows link never reads the variable `LIB` of an MSVC environment. It replaces the entry that fell back on both. Eddie decided this on 2026-09-27. Reason: the rule of host tools under "Binary distribution".
 - [provisional] A tool that `bin/` of the runtime archive lacks is refused with its path and the line that the package holds it in `bin/` beside antic: the flavour of lld before the compile, opt and llc at the compile, and llvm-ar at the archive of `--lib static`. `--opt`, `--llc` and `--llvm-ar` name a tool elsewhere, as the build does. A Windows link without the sysroot of its target is refused as a Linux or macOS link is, with the line that the sysroot is the package's, and every lld-link command carries `/lldignoreenv` and names the `crt` and `sdk` trees of the sysroot as `/vctoolsdir` and `/winsdkdir`, so a library the sysroot lacks stays missing rather than coming from `LIB` or from the Visual Studio and the Windows SDK a Windows host installed, which lld-link finds through the registry even under `/lldignoreenv`. Until the step `mingw` puts the Windows sysroots into the package, the test `package_keys` stands in those of the runtime archive at the place the package will hold them. Reason: the entry above says what never happens, and a refusal that names the package is the one thing left to do when it does not.
 - The pinned clang compiles the runtime library for every other target that has a sysroot, with `-O2`, hidden visibility and the warnings as errors. llvm-ar archives it into `lib/<target>/`. Reason: a link for a target needs the runtime of that target, and the CMake build otherwise makes it for the host only.
-- raylib is pinned in `tools/raylib-pin` at 6.0. `tools/get-raylib.cmake` downloads the source archive and checks its SHA-256 digest. CMake downloads and unpacks it, so the one script serves macOS, Linux and Windows. GitHub publishes no digest for source archives, so the digest is the one of the archive at its first download. The CMake cache variable `ANTIC_RAYLIB_DIR` names the extracted release, and `program_abi_raymath` fails when it is missing.
+- raylib is pinned in `tools/raylib-pin` at 6.0. The configure step downloads the source archive with `antic_get_source` of `src/native/get-source.cmake` and checks its SHA-256 digest. CMake downloads and unpacks it, so the one script serves macOS, Linux and Windows. GitHub publishes no digest for source archives, so the digest is the one of the archive at its first download. The CMake cache variable `ANTIC_RAYLIB_DIR` names the directory of the download, as `ANTIC_SQLITE_DIR` does for SQLite, and `src/native/raylib-source.cmake` sets `ANTIC_RAYLIB_SOURCE` to the extracted release, which the tests and the recipe read.
 - `src/rt/start.c` always calls `anti.rt.main` with `args` and `env`. All six conventions pass both slices in registers or as pointers in registers, so a `main` with fewer parameters ignores them. The runtime allocates the slices and strings with `malloc` and never frees them.
 - On Linux and macOS the runtime reads `argv` and the POSIX variable `environ`. `src/rt/utf.c` replaces each maximal subpart of an ill-formed UTF-8 sequence with U+FFFD, the practice of section 3.9.6 of the Unicode Standard.
 - On Windows the runtime splits `GetCommandLineW` by the rules of Microsoft's page "Parsing C command-line arguments" and reads `GetEnvironmentStringsW`. It converts UTF-16 to UTF-8 with U+FFFD for an unpaired surrogate. The conversions have unit tests on the development Mac. The Windows code of the start stands in `src/rt/platform_windows.c`, which the cross build compiles for both Windows targets.
@@ -2155,6 +2157,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - The native libraries of the runtime archive are built in this repository, in `src/native/`, and not in a separate native-libs repository. Reason: they compile in minutes rather than hours. Their third-party source is not stored in the repository. Each library is pinned by version and checksum in `tools/`, downloaded into `build/deps/`, verified and built there.
 - The build trees are `build/host/`, `build/asan/` and `build/ubsan/`, the three presets of `CMakePresets.json` with `binaryDir` `${sourceDir}/build/${presetName}`. The pinned downloads, clang, the LLVM tools, the sysroots, raylib and the sources of the native libraries, lie in `build/deps/`, one copy for the three trees. `build/drive/` holds the state of the driver scripts. Nothing under `build/` is committed.
 - `tools/deps-dir.cmake` names `build/deps` once, and the configure step and the `get-*.cmake` scripts include it. Reason: a directory spelled at more than one call site drifts, and the scripts run alone with `-P`, where no cache variable reaches them.
+- One function downloads for the whole build: `antic_download` of `tools/download.cmake`. It keeps a file on disk that has its digest, checks every download against the digest of its pin and removes a file that differs. The sources of the runtime archive, the sysroots and the LLVM release take it alike, and the test `downloads_once` refuses `file(DOWNLOAD` anywhere else in the build. Reason: M340 of the third audit found six copies of one fetch script, one of them diverged, and two more downloads under other names.
 - The cache variable `ANTI_DEPS_DIR` names another directory of pinned downloads, and `tools/deps-dir.cmake` takes it in place of `build/deps` when it is set and not empty. A script run with `-P` takes the same name as `-DANTI_DEPS_DIR`. Each build tree takes it on its own configure, so a worktree passes it to the host, the `asan` and the `ubsan` configure alike. The test `deps_dir` configures a copy of the sources against the downloads of its tree, and the copy downloads nothing and builds. Eddie decided it on 2026-09-23. The directory the test checks is the one the tree was configured with, `ANTI_DEPS_DIR` when set and `build/deps` otherwise. A tree that takes clang, the LLVM tools, the sysroots or raylib from a directory of its own, as the VMs do, passes that directory on to the copy, and the copy's cache names it. Eddie decided this on 2026-09-27, and the VMs keep their setup. Reason: worktrees of the repository share the downloads of the main checkout instead of fetching their own.
 - The keys lie in `tools/keys/`, and `tools/keys/private/` is ignored and untracked, which `release_dry_run` checks. No key file reaches a package. `package_keys` opens a package the packer wrote and fails on any `.pem`, `.gpg` or `.asc` file in it and on anything of `tools/keys/`, and `release_key` fails when the list of files of `tools/` that the packer copies names one under `tools/keys/`. Reason: the rule that refused any key file under `tools/` stood for the package, which carries a named list of files of `tools/` and never the directory. The guard now reads what a user downloads.
 - The platform layer of the C code is the files named platform: `src/rt/platform.h` with `src/rt/platform_posix.c` and `src/rt/platform_windows.c` for the runtime, and `src/antic/platform.c` and `src/anti/platform.c` for the two tools. A `#if` on the host system stands only there, as rule 22 of `docs/c-guidelines.md` says. The rule concerns the host: code that chooses by target through run-time values is not affected. Eddie decided it on 2026-09-23. Reason: a platform branch in one named place per part keeps the rest of the code the same on every host, and a list of files makes the rule checkable.

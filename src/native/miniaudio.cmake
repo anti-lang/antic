@@ -3,24 +3,13 @@
 # on Windows.
 #
 # The source comes from the release that tools/miniaudio-pin names, which
-# get-miniaudio.cmake downloads into build/deps/miniaudio and checks
-# against the pinned digest.
+# antic_get_source of get-source.cmake downloads into
+# build/deps/miniaudio and checks against the pinned digest.
 
 antic_shared_path(ANTIC_MINIAUDIO_DIR "${ANTIC_DEPS_DIR}/miniaudio"
-    "the miniaudio source from src/native/get-miniaudio.cmake")
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${ANTIC_MINIAUDIO_DIR}"
-                        -P "${CMAKE_CURRENT_SOURCE_DIR}/get-miniaudio.cmake"
-                RESULT_VARIABLE antic_miniaudio_fetched)
-if(NOT antic_miniaudio_fetched EQUAL 0)
-    message(FATAL_ERROR "src/native/get-miniaudio.cmake failed, so the build "
-                        "has no miniaudio source")
-endif()
-file(STRINGS "${PROJECT_SOURCE_DIR}/tools/miniaudio-pin"
-     antic_miniaudio_version REGEX "^MINIAUDIO_VERSION=")
-string(REGEX REPLACE "^MINIAUDIO_VERSION=" "" antic_miniaudio_version
-       "${antic_miniaudio_version}")
-set(ANTIC_MINIAUDIO_SOURCE
-    "${ANTIC_MINIAUDIO_DIR}/miniaudio-${antic_miniaudio_version}")
+    "the miniaudio source from tools/miniaudio-pin")
+antic_get_source(ANTIC_MINIAUDIO_SOURCE miniaudio "${ANTIC_MINIAUDIO_DIR}"
+    SHA256 miniaudio.c)
 set(ANTIC_MINIAUDIO_WORK "${CMAKE_BINARY_DIR}/native/miniaudio")
 antic_native_license(miniaudio "${ANTIC_MINIAUDIO_SOURCE}/LICENSE")
 antic_native_headers(miniaudio "${ANTIC_MINIAUDIO_SOURCE}" miniaudio.h)
@@ -118,7 +107,7 @@ endforeach()
 add_test(NAME miniaudio_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
             -DNAME=miniaudio
-            -DSCRIPT=src/native/get-miniaudio.cmake
-            "-DFILES=src/native/miniaudio.cmake"
+            -DSCRIPT=src/native/get-source.cmake
+            -DCALLER=src/native/miniaudio.cmake
             -DHASH=SHA256 -DPARTS=3
             -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")

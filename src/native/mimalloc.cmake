@@ -3,8 +3,8 @@
 # lib/<target>/<level>/libmimalloc.a, beside the runtime of that level.
 #
 # The source comes from the release that tools/mimalloc-pin names, which
-# get-mimalloc.cmake downloads into build/deps/mimalloc and checks against
-# the pinned digest.
+# antic_get_source of get-source.cmake downloads into
+# build/deps/mimalloc and checks against the pinned digest.
 #
 # DESIGN: musl's allocator maps and unmaps every large block, and cost
 # tests/bench/map_work.anti about 30 percent on linux-arm64 against its C
@@ -23,16 +23,9 @@
 # build picks, armv8.1-a on ARM64.
 
 antic_shared_path(ANTIC_MIMALLOC_DIR "${ANTIC_DEPS_DIR}/mimalloc"
-    "the mimalloc source from src/native/get-mimalloc.cmake")
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${ANTIC_MIMALLOC_DIR}"
-                        -P "${CMAKE_CURRENT_SOURCE_DIR}/get-mimalloc.cmake"
-                RESULT_VARIABLE antic_mimalloc_fetched)
-if(NOT antic_mimalloc_fetched EQUAL 0)
-    message(FATAL_ERROR "src/native/get-mimalloc.cmake failed, so the build "
-                        "has no mimalloc source")
-endif()
-set(ANTIC_MIMALLOC_SOURCE
-    "${ANTIC_MIMALLOC_DIR}/mimalloc-${ANTIC_MIMALLOC_VERSION}")
+    "the mimalloc source from tools/mimalloc-pin")
+antic_get_source(ANTIC_MIMALLOC_SOURCE mimalloc "${ANTIC_MIMALLOC_DIR}" SHA256
+    src/static.c)
 set(ANTIC_MIMALLOC_WORK "${CMAKE_BINARY_DIR}/native/mimalloc")
 antic_native_license(mimalloc "${ANTIC_MIMALLOC_SOURCE}/LICENSE")
 
@@ -115,7 +108,7 @@ endforeach()
 add_test(NAME mimalloc_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
             -DNAME=mimalloc
-            -DSCRIPT=src/native/get-mimalloc.cmake
-            "-DFILES=src/native/mimalloc.cmake"
+            -DSCRIPT=src/native/get-source.cmake
+            -DCALLER=src/native/mimalloc.cmake
             -DHASH=SHA256 -DPARTS=3
             -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")

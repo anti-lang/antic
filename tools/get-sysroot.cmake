@@ -59,22 +59,9 @@ foreach(line IN LISTS pins)
 endforeach()
 file(MAKE_DIRECTORY "${DEST}/licenses")
 
-# Download url to file and stop unless its digest is the expected one.
-function(fetch url file digest)
-    if(NOT EXISTS "${file}")
-        file(DOWNLOAD "${url}" "${file}" STATUS status SHOW_PROGRESS)
-        list(GET status 0 code)
-        list(GET status 1 text)
-        if(NOT code EQUAL 0)
-            file(REMOVE "${file}")
-            message(FATAL_ERROR "${url}: ${text}")
-        endif()
-    endif()
-    file(SHA256 "${file}" actual)
-    if(NOT actual STREQUAL digest)
-        message(FATAL_ERROR "${file}: SHA-256 ${actual}, expected ${digest}")
-    endif()
-endfunction()
+# Each download is antic_download, which keeps a file on disk that has its
+# digest and checks every download against it.
+include("${tools_dir}/download.cmake")
 
 # The digest of the regular files under dir: their SHA-256 lines in the
 # order of their paths, hashed once more. Links stay out.
@@ -155,8 +142,8 @@ function(glibc_sysroot target arch triple)
             string(REGEX REPLACE "_.*$" "" debian "${asset}")
             list(APPEND copyrights "${debian}")
         endif()
-        fetch("${GLIBC_${arch}_URL}/${name}" "${work}/${asset}"
-              "${GLIBC_${arch}_${package}_DIGEST}")
+        antic_download("${GLIBC_${arch}_URL}/${name}" "${work}/${asset}"
+                       SHA256 "${GLIBC_${arch}_${package}_DIGEST}")
         file(REMOVE_RECURSE "${work}/deb")
         file(ARCHIVE_EXTRACT INPUT "${work}/${asset}" DESTINATION "${work}/deb")
         file(GLOB data "${work}/deb/data.tar.*")
@@ -217,8 +204,8 @@ function(linux_sysroot target arch musl_digest)
     set(root "${DEST}/${target}")
     set(work "${DEST}/.download/${target}")
     file(MAKE_DIRECTORY "${work}" "${root}/usr/lib")
-    fetch("${ALPINE_URL}/${arch}/musl-dev-${MUSL_APK}.apk"
-          "${work}/musl-dev.apk" "${musl_digest}")
+    antic_download("${ALPINE_URL}/${arch}/musl-dev-${MUSL_APK}.apk"
+                   "${work}/musl-dev.apk" SHA256 "${musl_digest}")
     file(REMOVE_RECURSE "${work}/usr" "${root}/usr/include")
     file(ARCHIVE_EXTRACT INPUT "${work}/musl-dev.apk" DESTINATION "${work}"
          PATTERNS "usr/include/*" "usr/lib/*")
@@ -235,8 +222,8 @@ function(linux_sysroot target arch musl_digest)
                             "Run tools/get-clang.cmake first.")
     endif()
     file(COPY_FILE "${builtins}" "${root}/usr/lib/libclang_rt.builtins.a")
-    fetch("${MUSL_SOURCE_URL}" "${DEST}/.download/musl.tar.gz"
-          "${MUSL_SOURCE_DIGEST}")
+    antic_download("${MUSL_SOURCE_URL}" "${DEST}/.download/musl.tar.gz"
+                   SHA256 "${MUSL_SOURCE_DIGEST}")
     file(ARCHIVE_EXTRACT INPUT "${DEST}/.download/musl.tar.gz"
          DESTINATION "${DEST}/.download"
          PATTERNS "musl-${MUSL_VERSION}/COPYRIGHT")
@@ -286,7 +273,7 @@ function(macos_sysroot target arch)
     set(work "${DEST}/.download/zig")
     set(zig "zig-${ZIG_TAG}")
     string(REPLACE "@TAG@" "${ZIG_TAG}" url "${ZIG_URL}")
-    fetch("${url}" "${work}/${zig}.tar.xz" "${ZIG_DIGEST}")
+    antic_download("${url}" "${work}/${zig}.tar.xz" SHA256 "${ZIG_DIGEST}")
     if(NOT EXISTS "${work}/${zig}/LICENSE")
         file(ARCHIVE_EXTRACT INPUT "${work}/${zig}.tar.xz" DESTINATION "${work}"
              PATTERNS "${zig}/LICENSE" "${zig}/lib/libc/darwin/*"
@@ -302,7 +289,8 @@ function(macos_sysroot target arch)
     string(JSON version GET "${settings}" MinimalDisplayName)
     file(WRITE "${root}/sdk-version" "${version}\n")
     file(COPY_FILE "${work}/${zig}/LICENSE" "${DEST}/licenses/zig.txt")
-    fetch("${APSL_URL}" "${DEST}/.download/apsl.txt" "${APSL_DIGEST}")
+    antic_download("${APSL_URL}" "${DEST}/.download/apsl.txt" SHA256
+                   "${APSL_DIGEST}")
     file(COPY_FILE "${DEST}/.download/apsl.txt" "${DEST}/licenses/apsl.txt")
     if(DEFINED APPLE_SDK)
         apple_sdk("${root}/sdk")
@@ -316,7 +304,8 @@ function(mingw_source out)
     set(name "mingw-w64-v${MINGW_VERSION}")
     string(REPLACE "@VERSION@" "${MINGW_VERSION}" url "${MINGW_URL}")
     file(MAKE_DIRECTORY "${work}")
-    fetch("${url}" "${work}/${name}.tar.bz2" "${MINGW_DIGEST}")
+    antic_download("${url}" "${work}/${name}.tar.bz2" SHA256
+                   "${MINGW_DIGEST}")
     if(NOT EXISTS "${work}/${name}/mingw-w64-headers")
         file(ARCHIVE_EXTRACT INPUT "${work}/${name}.tar.bz2"
              DESTINATION "${work}"

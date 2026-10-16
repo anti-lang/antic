@@ -17,6 +17,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 set(fetch_release_root "${CMAKE_CURRENT_LIST_DIR}/..")
+include("${CMAKE_CURRENT_LIST_DIR}/download.cmake")
 
 # Set <out> to the name of this machine among the six hosts of antic. The
 # host is named as the six targets of antic are, so one spelling serves
@@ -78,31 +79,13 @@ function(fetch_release pin dest)
         endif()
     endif()
 
-    # Download <name> of the release to <file>, and stop on a failure.
-    function(download name file)
-        file(DOWNLOAD "${release}/${name}" "${file}" STATUS status)
-        list(GET status 0 code)
-        list(GET status 1 text)
-        if(NOT code EQUAL 0)
-            file(REMOVE "${file}")
-            message(FATAL_ERROR "${release}/${name}: ${text}")
-        endif()
-    endfunction()
-
     set(downloads "${dest}/downloads")
     file(MAKE_DIRECTORY "${downloads}")
     if(DEFINED ARCHIVE)
         set(archive "${ARCHIVE}")
     else()
         set(archive "${downloads}/${asset}")
-        set(actual "")
-        if(EXISTS "${archive}")
-            file(SHA256 "${archive}" actual)
-        endif()
-        if(NOT actual STREQUAL digest)
-            message(STATUS "download ${asset}")
-            download("${asset}" "${archive}")
-        endif()
+        antic_download("${release}/${asset}" "${archive}" SHA256 "${digest}")
     endif()
     file(SHA256 "${archive}" actual)
     if(NOT actual STREQUAL digest)
@@ -112,8 +95,8 @@ function(fetch_release pin dest)
     # DESIGN: the pin decides which archive is right, and the signature of
     # SHA256SUMS ties the release to the release key. Both must agree, so a
     # release that changed under its tag fails here whichever file changed.
-    download(SHA256SUMS "${downloads}/SHA256SUMS")
-    download(SHA256SUMS.sig "${downloads}/SHA256SUMS.sig")
+    antic_download("${release}/SHA256SUMS" "${downloads}/SHA256SUMS")
+    antic_download("${release}/SHA256SUMS.sig" "${downloads}/SHA256SUMS.sig")
     file(STRINGS "${downloads}/SHA256SUMS" listed REGEX "  ${asset}$")
     string(REGEX REPLACE " .*$" "" listed "${listed}")
     if(NOT listed STREQUAL digest)

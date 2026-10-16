@@ -2,29 +2,15 @@
 # runtime tree as lib/<target>/libsqlite3.a, or sqlite3.lib on Windows.
 #
 # The source is the amalgamation of the release that tools/sqlite-pin
-# names, which get-sqlite.cmake downloads into build/deps/sqlite and checks
-# against the pinned digest.
+# names, which antic_get_source of get-source.cmake downloads into
+# build/deps/sqlite and checks against the pinned digest. sqlite.org
+# publishes the SHA3-256 of the archive, and the directory carries the
+# version in the form of its file names, 3XXYYZZ.
 
 antic_shared_path(ANTIC_SQLITE_DIR "${ANTIC_DEPS_DIR}/sqlite"
-    "the SQLite amalgamation from src/native/get-sqlite.cmake")
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${ANTIC_SQLITE_DIR}"
-                        -P "${CMAKE_CURRENT_SOURCE_DIR}/get-sqlite.cmake"
-                OUTPUT_VARIABLE antic_sqlite_source
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-                RESULT_VARIABLE antic_sqlite_fetched)
-if(NOT antic_sqlite_fetched EQUAL 0)
-    message(FATAL_ERROR "src/native/get-sqlite.cmake failed, so the build "
-                        "has no SQLite source")
-endif()
-# The script names the directory it unpacked on its last line, since the
-# name holds the version in the form of sqlite.org and not as the pin
-# writes it.
-string(REGEX MATCH "[^\n]*$" ANTIC_SQLITE_SOURCE "${antic_sqlite_source}")
-string(REGEX REPLACE "^-- " "" ANTIC_SQLITE_SOURCE "${ANTIC_SQLITE_SOURCE}")
-if(NOT EXISTS "${ANTIC_SQLITE_SOURCE}/sqlite3.c")
-    message(FATAL_ERROR "src/native/get-sqlite.cmake named "
-                        "`${ANTIC_SQLITE_SOURCE}`, which holds no sqlite3.c")
-endif()
+    "the SQLite amalgamation from tools/sqlite-pin")
+antic_get_source(ANTIC_SQLITE_SOURCE sqlite "${ANTIC_SQLITE_DIR}" SHA3_256
+    sqlite3.c)
 set(ANTIC_SQLITE_WORK "${CMAKE_BINARY_DIR}/native/sqlite")
 
 # SQLite is in the public domain and ships no licence file. The comment at
@@ -123,8 +109,8 @@ endforeach()
 add_test(NAME sqlite_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
             -DNAME=sqlite
-            -DSCRIPT=src/native/get-sqlite.cmake
-            "-DFILES=src/native/sqlite.cmake"
+            -DSCRIPT=src/native/get-source.cmake
+            -DCALLER=src/native/sqlite.cmake
             -DHASH=SHA3_256 -DPARTS=3
             -DYEAR=ON
             -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")
