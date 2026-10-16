@@ -182,7 +182,7 @@ without a directory are in `src/antic/`.
 | S316 | `src/std/anti/collection.anti:714` | 5 | The size of a room is an unchecked product in `room_from`, `grid.anti:46`, `map.anti:297`, `sorted.anti:719`, `pool.anti:451` and `concurrent.anti:924`. A release build wraps. | fixed `f393ed52` | std |
 | S317 | `src/std/anti/args.anti:273` | 4 | `declare` writes an option after `reserve` at line 317 gave up without a word, past the slice or through `none`. | fixed `ba344114` | std |
 | S318 | `src/std/anti/collection/concurrent.anti:878` | 12 | `dup` of a `Snapshot` leaves two walks that free one room. `ArenaAllocator`, `FileSink`, `NotOne` and `Changed` have the same shape. Read, not run. | fixed `5518e342`, `0d126d62`, `f223467d`, `a0de8b0c` | std |
-| S319 | `src/anti/bindexpr.c:238` | 6, 14 | A string that ends in a backslash moves the evaluator of `anti bind` one byte past its text, and `space` reads on from there. | new | anti-tool |
+| S319 | `src/anti/bindexpr.c:238` | 6, 14 | A string that ends in a backslash moves the evaluator of `anti bind` one byte past its text, and `space` reads on from there. | fixed `e1a931d8` | anti-tool |
 
 ### Documentation
 
@@ -204,7 +204,7 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 | S330 | `src/rt/patterns.c:695` | `patch` is said to find a misfit before any byte changes. The second pass searches the data it writes, so a lookahead group returns `MISFIT` with the data changed. Read, not run. | fixed `e4688507` | rt |
 | S331 | `src/rt/object.c:13` | Two DESIGN comments describe what was replaced: default bodies that walk the field list, and an array field serialized as null. `object.c:710` is the second. | fixed `510d96a7` | rt |
 | S332 | `src/std/anti/log.anti:15` | The header describes a file of `level`, `format` and `[[sink]]` entries with a level each. `first_sink` reads `kind` and `path`, makes one sink and stops at the eighth entry. | fixed `fd716910` | std |
-| S333 | `src/anti/bindmodel.h:168` | `bind_is_keyword` is said to answer for a word the lexer reserves. It answers true for every text that is no identifier, and the reader of a header holds a name to no rule. | new | anti-tool |
+| S333 | `src/anti/bindmodel.h:168` | `bind_is_keyword` is said to answer for a word the lexer reserves. It answers true for every text that is no identifier, and the reader of a header holds a name to no rule. | fixed `d62c120a` | anti-tool |
 | S334 | `tools/compile.sh:13` | The header says the first build installs the sysroots and raylib. The configure step installs clang and the LLVM tools alone, and a first `./c` stops at `src/native/raylib.cmake:10`. | new | build-and-tools |
 | S335 | `tests/run_codeview_empty.cmake:24` | The test searches the assembly for `DEBUG_S_SYMBOLS` and `S_LPROC32`, spellings of the native back end that antic no longer writes. Both tests pass whatever antic writes. | new | build-and-tools |
 
@@ -260,9 +260,10 @@ Rule 14, untrusted input:
   changed. New. anti-tool.
 - M311. `src/anti/bindexpr.c:497`. A float product past the largest
   float is written as `inf.0`, which no lexer of Anti reads. New.
-  anti-tool.
+  anti-tool. Fixed `2937296e`.
 - M312. `src/anti/bindclang.c:437`. A typedef is resolved again at every
   use. A chain of forty lines asks for 3^40 parses. New. anti-tool.
+  Fixed `678ec24a`, in the reader of a description as well.
 
 Rule 15, tests with malformed input:
 
@@ -368,7 +369,7 @@ Copies that drifted:
   four ways. Ten places split at `/` alone, so a Windows path splits one
   way in the link and another in the library. The pattern of M26. New.
   back-end. Fixed `050b722d`. T140 holds the same split in
-  `src/anti/bindclang.c` for step 14.
+  `src/anti/bindclang.c` for step 14, fixed `89b9938a`.
 - M336. `src/antic/antl_write.c:36`. The types the compiler declares are
   listed three times. The reader lacks `Job`, so a generic with a
   `dispatch` gives a file every importer refuses. New. library-file.
@@ -382,6 +383,8 @@ Copies that drifted:
 - M339. `src/anti/bindwrite.c:633`. Four pairs of copies have drifted.
   They are the test for an unsigned type, a struct constant, the sources
   of a project and the module path of a library file. New. anti-tool.
+  The first two pairs are fixed, `f5887976` and `7be83886`. The last two
+  belong to step 21.
 - M340. `src/native/get-pcre2.cmake:14`. Six fetch scripts are one
   script, and `tools/get-raylib.cmake` has diverged. Two more downloads
   stand under other names. New. build-and-tools.
@@ -521,7 +524,7 @@ directory are in `src/antic/`.
 | 11 | 2 | Returned memory without its owner, `pattern.c:9` (front-end) and `src/rt/registry.h:47` (rt). |
 | 12 | 4 | Releases before each return, `parser_item.c:15` (front-end), `src/rt/regex.c:491` (library-file), fixed `0d2a7566`, `src/rt/platform_posix.c:92` (rt) and `src/anti/main.c:198` (anti-tool). |
 | 13 | 1 | The start of a Windows program aborts without a line, `src/rt/platform_windows.c:1363` (rt). |
-| 14 | 11 | Smaller gaps of the front-end readers, `modpath.c:93` (front-end). Names with a NUL, flag bytes above 1, a narrowed address and a field of type `none`, `antl_tree.c:1459`, `antl_read.c:515`, `antl_read_ir.c:417` and `antl_read.c:917`, and a quadratic scan, `src/rt/toml.c:139` (library-file). The NUL of a group name in `src/rt/regex.c:578` is fixed `9bc09550`, and the scan `b71e491e`. Two readers that take what they should refuse, `src/rt/registry.c:734` (rt). Two forms of `args`, `src/std/anti/args.anti:251` (std). Paths read without the test of a regular file, `src/anti/syms.c:343`, names not held against the words of Anti, `src/anti/bindwrite.c:263`, and zero added to NULL, `src/anti/zip.c:673` (anti-tool). |
+| 14 | 11 | Smaller gaps of the front-end readers, `modpath.c:93` (front-end). Names with a NUL, flag bytes above 1, a narrowed address and a field of type `none`, `antl_tree.c:1459`, `antl_read.c:515`, `antl_read_ir.c:417` and `antl_read.c:917`, and a quadratic scan, `src/rt/toml.c:139` (library-file). The NUL of a group name in `src/rt/regex.c:578` is fixed `9bc09550`, and the scan `b71e491e`. Two readers that take what they should refuse, `src/rt/registry.c:734` (rt). Two forms of `args`, `src/std/anti/args.anti:251` (std). Paths read without the test of a regular file, `src/anti/syms.c:343`, names not held against the words of Anti, `src/anti/bindwrite.c:263`, fixed `8b920c34`, and zero added to NULL, `src/anti/zip.c:673` (anti-tool). |
 | 15 | 1 | Refusals and paths without a test, `sema_copies.c:90` (front-end). |
 | 16 | 1 | Counters of `int`, `parser.c:349` (front-end). |
 | 17 | 1 | The fields of the zip format in `unsigned long`, `src/anti/zip.c:43` (anti-tool). |
