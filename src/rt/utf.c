@@ -131,6 +131,63 @@ size_t anti_rt_utf16_to_utf8(const uint16_t *in, size_t n, unsigned char *out)
     return written;
 }
 
+size_t anti_rt_name_bytes(const uint16_t *in, size_t n, unsigned char *out,
+                          size_t room)
+{
+    size_t written = 0;
+    size_t i;
+
+    for (i = 0; i < n; i++) {
+        unsigned char bytes[4];
+        size_t count;
+        size_t k;
+        uint32_t c = in[i];
+        if (c >= 0xD800 && c <= 0xDBFF && i + 1 < n && in[i + 1] >= 0xDC00 &&
+            in[i + 1] <= 0xDFFF) {
+            c = 0x10000 + ((c - 0xD800) << 10) + (in[i + 1] - 0xDC00u);
+            i++;
+        }
+        count = put_scalar(c, bytes);
+        if (count > room - written) {
+            return SIZE_MAX;
+        }
+        for (k = 0; k < count; k++) {
+            out[written++] = bytes[k];
+        }
+    }
+    return written;
+}
+
+size_t anti_rt_name_units(const unsigned char *in, size_t n, uint16_t *out)
+{
+    size_t written = 0;
+    size_t i = 0;
+
+    while (i < n) {
+        size_t length;
+        uint32_t c;
+        if (in[i] == 0xED && n - i >= 3 && in[i + 1] >= 0xA0 &&
+            in[i + 1] <= 0xBF && in[i + 2] >= 0x80 && in[i + 2] <= 0xBF) {
+            /* A surrogate alone, which anti_rt_name_bytes wrote. */
+            c = 0xD000u | (in[i + 1] & 0x3Fu) << 6 | (in[i + 2] & 0x3Fu);
+            length = 3;
+        } else {
+            c = anti_rt_utf8_decode(in + i, n - i, &length);
+            if (length == 0) {
+                return SIZE_MAX;
+            }
+        }
+        if (c >= 0x10000) {
+            out[written++] = (uint16_t)(0xD800 + ((c - 0x10000) >> 10));
+            out[written++] = (uint16_t)(0xDC00 + ((c - 0x10000) & 0x3FF));
+        } else {
+            out[written++] = (uint16_t)c;
+        }
+        i += length;
+    }
+    return written;
+}
+
 static int is_blank(uint16_t c)
 {
     return c == ' ' || c == '\t';

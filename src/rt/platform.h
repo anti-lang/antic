@@ -7,7 +7,12 @@
    both .c files are compiled for every target. Each holds its code
    inside one `#if` of its own system. The other file of a
    target then compiles to nothing. Every function below takes and gives
-   text as UTF-8, whatever the system uses underneath. */
+   text as UTF-8, whatever the system uses underneath, with one exception
+   by decision 7 of "Decisions of 2026-10-11": a file name keeps the
+   bytes the system holds, UTF-8 or not, so that it opens its file. Linux
+   holds any bytes. Windows holds UTF-16, and a surrogate of a name that
+   pairs with no other stands as the three bytes of its value. macOS
+   holds UTF-8 alone. */
 #ifndef ANTI_RT_PLATFORM_H
 #define ANTI_RT_PLATFORM_H
 
@@ -229,11 +234,13 @@ const void *anti_rt_thread_block(void);
    least 1. */
 int64_t anti_rt_processors(void);
 
-/* The value of the environment variable name in UTF-8, in memory the
-   caller frees, into *value. *value is NULL when the variable is unset
-   or empty. Returns 0, or -1 when memory runs out. Windows reads the
-   variable as UTF-16, so a value of any length and any character comes
-   through. A value that is no valid UTF-16 counts as unset. */
+/* The value of the environment variable name, in memory the caller
+   frees, into *value. *value is NULL when the variable is unset or
+   empty. Returns 0, or -1 when memory runs out. macOS and Linux give the
+   bytes the system holds, so a path keeps the bytes of its file name.
+   Windows reads the variable as UTF-16 and gives it as UTF-8, so a value
+   of any length and any character comes through. A value that is no
+   valid UTF-16 counts as unset there. */
 int anti_rt_getenv(const char *name, char **value);
 
 /* 1 when path names a file without a directory to start from: `/` on
@@ -283,8 +290,9 @@ int anti_rt_file_is_directory(FILE *file);
 int anti_rt_file_remove(const char *path);
 int anti_rt_file_rename(const char *from, const char *to);
 
-/* Call each with the name of every entry of the directory at path, in
-   UTF-8 and the order the system gives them, `.` and `..` included. each
+/* Call each with the name of every entry of the directory at path, as
+   the file name above keeps it and in the order the system gives them,
+   `.` and `..` included. A name is never repaired. each
    returns 0 to go on, or -1 with errno set to stop the listing. Returns
    0, or -1 with errno set, from each or from the system. An empty path
    names no directory and gives ENOENT, and a file gives ENOTDIR. On

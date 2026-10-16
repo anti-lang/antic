@@ -39,6 +39,33 @@ static void converts(const uint16_t *in, size_t n, const char *expected)
     free(out);
 }
 
+/* The bytes of a Windows file name of n units, as hex bytes, and the
+   units read back from them, which are the units it started from. */
+static void names(const uint16_t *in, size_t n, const char *expected)
+{
+    unsigned char out[64];
+    uint16_t back[64];
+    struct text hex = {0};
+    size_t count = anti_rt_name_bytes(in, n, out, sizeof out);
+    size_t units;
+    size_t i;
+
+    CHECK(count != SIZE_MAX);
+    if (count == SIZE_MAX) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        text_appendf(&hex, "%s%02X", i == 0 ? "" : " ", out[i]);
+    }
+    CHECK_STR(text_cstr(&hex), expected);
+    text_free(&hex);
+    units = anti_rt_name_units(out, count, back);
+    CHECK(units == n);
+    for (i = 0; i < n && i < units; i++) {
+        CHECK(back[i] == in[i]);
+    }
+}
+
 /* Split an ASCII command line and join the arguments with '|'. */
 static void splits(const char *line, const char *expected)
 {
@@ -174,6 +201,35 @@ void test_utf(void)
     converts(pair, sizeof pair / sizeof pair[0], "41 C3 A9 F0 90 8C 82");
     converts(lone, sizeof lone / sizeof lone[0],
              "EF BF BD EF BF BD 41 EF BF BD");
+
+    /* A file name of Windows keeps a surrogate that pairs with no other
+       as the three bytes of its value, and comes back from them, by
+       decision 7 of "Decisions of 2026-10-11". A pair is one scalar
+       value. */
+    names(pair, sizeof pair / sizeof pair[0], "41 C3 A9 F0 90 8C 82");
+    names(lone, sizeof lone / sizeof lone[0],
+          "ED B0 80 ED A0 80 41 ED A0 80");
+    {
+        static const uint16_t wide[] = {0xD800, 0xD800, 0xD800};
+        static const unsigned char separate[] = {0xED, 0xA0, 0x80, 0xED,
+                                                 0xB0, 0x80};
+        static const unsigned char no_name[] = {0x41, 0xFF};
+        static const unsigned char cut[] = {0x41, 0xED, 0xA0};
+        unsigned char room[8];
+        uint16_t units[8];
+
+        /* Nine bytes do not fit a room of eight. */
+        CHECK(anti_rt_name_bytes(wide, 3, room, sizeof room) == SIZE_MAX);
+        CHECK(anti_rt_name_bytes(wide, 2, room, sizeof room) == 6);
+        /* The two halves of a pair, each written alone, read back as
+           the pair. */
+        CHECK(anti_rt_name_units(separate, sizeof separate, units) == 2);
+        CHECK(units[0] == 0xD800 && units[1] == 0xDC00);
+        /* Bytes that are no UTF-8 and no unit alone name no file. */
+        CHECK(anti_rt_name_units(no_name, sizeof no_name, units) ==
+              SIZE_MAX);
+        CHECK(anti_rt_name_units(cut, sizeof cut, units) == SIZE_MAX);
+    }
 
     /* The examples of Microsoft's rules for C command-line arguments. */
     splits("prog \"a b c\" d e", "prog|a b c|d|e");

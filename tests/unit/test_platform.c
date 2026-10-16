@@ -386,6 +386,82 @@ static void drive_relative(void)
 }
 #endif
 
+/* A file name that is no UTF-8 keeps its bytes, so the name a listing
+   gives opens the file, by decision 7 of "Decisions of 2026-10-11".
+   Linux takes any bytes but `/` and NUL in a name. Windows takes any
+   units, a surrogate alone among them, which the layer writes as the
+   three bytes of its value. macOS refuses a name that is no UTF-8 with
+   EILSEQ, so it has none to list. */
+#if defined(_WIN32)
+#define RAW_NAME "raw-\xed\xa0\x80.txt"
+#else
+#define RAW_NAME "raw-\xff.txt"
+#endif
+#define RAW_DIR PLUGIN_DIR "/platform-\xc3\xbc"
+
+static int saw_raw(void *context, const unsigned char *name, size_t length)
+{
+    int *found = context;
+
+    if (length == strlen(RAW_NAME) && memcmp(name, RAW_NAME, length) == 0) {
+        (*found)++;
+    }
+    return 0;
+}
+
+static void names_kept(void)
+{
+    int found = 0;
+    FILE *f;
+
+#if defined(_WIN32)
+    /* The name is made through the wide function of the system, so that
+       the layer reads one it did not write. */
+    static const wchar_t name[] = L"/raw-\xD800.txt";
+    wchar_t wide[4096];
+    HANDLE made;
+    int units = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, RAW_DIR,
+                                    -1, wide, 4000);
+
+    CHECK(units > 0);
+    if (units <= 0) {
+        return;
+    }
+    memcpy(wide + units - 1, name, sizeof name);
+    made = CreateFileW(wide, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL, NULL);
+    CHECK(made != INVALID_HANDLE_VALUE);
+    if (made == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    CHECK(CloseHandle(made));
+#else
+    f = fopen(RAW_DIR "/" RAW_NAME, "wb");
+#if defined(__APPLE__)
+    CHECK(f == NULL && errno == EILSEQ);
+    if (f != NULL) {
+        fclose(f);
+        remove(RAW_DIR "/" RAW_NAME);
+    }
+    return;
+#else
+    CHECK(f != NULL);
+    if (f == NULL) {
+        return;
+    }
+    CHECK(fclose(f) == 0);
+#endif
+#endif
+    CHECK(anti_rt_directory_list(RAW_DIR, saw_raw, &found) == 0);
+    CHECK(found == 1);
+    f = anti_rt_file_open(RAW_DIR "/" RAW_NAME, ANTI_FILE_READ);
+    CHECK(f != NULL);
+    if (f != NULL) {
+        CHECK(fclose(f) == 0);
+    }
+    CHECK(anti_rt_file_remove(RAW_DIR "/" RAW_NAME) == 0);
+}
+
 /* A file under a name outside ASCII is written, measured, listed,
    renamed and removed, and each failure reports through errno. */
 static void files(void)
@@ -685,6 +761,7 @@ int main(int argc, char **argv)
     locks_and_threads();
     images();
     files();
+    names_kept();
 #if defined(_WIN32)
     drive_relative();
 #endif

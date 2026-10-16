@@ -212,53 +212,58 @@ static void release(void *p)
     errno = saved;
 }
 
-/* The UTF-16 form of the UTF-8 text, with room for extra more units
-   after its NUL, in memory the caller frees. NULL with errno set: EINVAL
-   when it is no valid UTF-8 or is too long, and ENOMEM when memory runs
+/* The UTF-16 form of the text, a path or a name, with room for extra
+   more units after its NUL, in memory the caller frees. The text is
+   UTF-8, and a surrogate alone stands in it as the three bytes that
+   name_of writes, by decision 7 of "Decisions of 2026-10-11". NULL with
+   errno set: EINVAL when it is neither, and ENOMEM when memory runs
    out. */
 static wchar_t *wide_of(const char *text, size_t extra)
 {
     size_t length = strlen(text);
-    int units;
+    size_t units;
     wchar_t *wide;
 
-    if (length >= INT_MAX) {
-        errno = EINVAL;
+    if (length > (SIZE_MAX / sizeof *wide) - 1 - extra) {
+        errno = ENOMEM;
         return NULL;
     }
-    units = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text,
-                                (int)length + 1, NULL, 0);
-    if (units <= 0) {
-        errno = EINVAL;
-        return NULL;
-    }
-    wide = malloc(((size_t)units + extra) * sizeof *wide);
+    wide = malloc((length + 1 + extra) * sizeof *wide);
     if (wide == NULL) {
         errno = ENOMEM;
         return NULL;
     }
-    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, (int)length + 1,
-                        wide, units);
+    units = anti_rt_name_units((const unsigned char *)text, length,
+                               (uint16_t *)wide);
+    if (units == SIZE_MAX) {
+        free(wide);
+        errno = EINVAL;
+        return NULL;
+    }
+    wide[units] = L'\0';
     return wide;
 }
 
-/* The units UTF-16 units at wide as UTF-8 into the room bytes at out,
-   ended by a NUL. A unit that pairs with no other gives U+FFFD. Gives
-   the bytes before the NUL, and 0 with an empty text when they do not
-   fit. */
-static size_t utf8_of(const wchar_t *wide, size_t units, char *out,
+/* The units UTF-16 units of a name of the system at wide as bytes into
+   the room bytes at out, ended by a NUL. The bytes are UTF-8, and a unit
+   that pairs with no other keeps its value in three bytes, so wide_of
+   gives the name back. Gives the bytes before the NUL, and 0 with an
+   empty text when they do not fit. */
+static size_t name_of(const wchar_t *wide, size_t units, char *out,
                       size_t room)
 {
-    int bytes = 0;
+    size_t bytes = room > 0 ? anti_rt_name_bytes((const uint16_t *)wide,
+                                                 units, (unsigned char *)out,
+                                                 room - 1)
+                            : SIZE_MAX;
 
-    if (units > 0 && units < INT_MAX / 3 && room > 1 && room <= INT_MAX) {
-        bytes = WideCharToMultiByte(CP_UTF8, 0, wide, (int)units, out,
-                                    (int)room - 1, NULL, NULL);
+    if (bytes == SIZE_MAX) {
+        bytes = 0;
     }
     if (room > 0) {
-        out[bytes > 0 ? bytes : 0] = '\0';
+        out[bytes] = '\0';
     }
-    return bytes > 0 ? (size_t)bytes : 0;
+    return bytes;
 }
 
 /* DESIGN: GetEnvironmentVariableW reports the length the value needs, and
@@ -528,7 +533,7 @@ static int find_next(struct find_walk *walk, char *out, size_t room,
         walk->state = -1;
         return end ? 0 : -1;
     }
-    *length = utf8_of(found.name, wcslen(found.name), out, room);
+    *length = name_of(found.name, wcslen(found.name), out, room);
     if (*length == 0 && found.name[0] != L'\0') {
         walk->state = -1;
         errno = ENAMETOOLONG;
@@ -740,7 +745,7 @@ bool anti_rt_module_at(uint64_t address, struct anti_rt_module *out)
     out->base = (uint64_t)(uintptr_t)module;
     n = GetModuleFileNameW(module, name, 1024);
     if (n > 0 && n < 1024) {
-        utf8_of(name, n, out->path, sizeof out->path);
+        name_of(name, n, out->path, sizeof out->path);
     }
     out->notice_read = true;
     if (module ==

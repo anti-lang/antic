@@ -125,7 +125,8 @@ pub fn close(f: *File) may fail
 ///
 /// The names leave out `.` and `..` and come in the order the system gives. The
 /// slice and its names are one block, which the caller frees with
-/// `free(names.ptr)`.
+/// `free(names.ptr)`. A name keeps the bytes the system holds, so it opens its
+/// entry, also where it is no UTF-8.
 pub fn list(path: str) -> []str may fail
 {
 	let count = 0;

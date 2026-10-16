@@ -1050,7 +1050,7 @@ A `String` of Java is an immutable object of UTF-16 code units that the collecto
 
 ### The feature
 
-`str` is a text: a pointer to UTF-8 bytes and their count. It is immutable and owns nothing. Copying a `str` copies the pointer and the count, never the bytes.
+`str` is a text: a pointer to UTF-8 bytes and their count. It is immutable and owns nothing. A file name that the system gives, as `list` of `anti.fs` does, keeps its bytes where they are no UTF-8, so it still opens the file. Copying a `str` copies the pointer and the count, never the bytes.
 
 | Expression | Type | Result |
 |---|---|---|
