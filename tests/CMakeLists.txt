@@ -5453,6 +5453,18 @@ add_test(NAME memory_checks_list
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_list.cmake")
 set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
+# --memory-checks finds a read of a bitfield after free, as it finds the
+# read of a plain field.
+add_test(NAME memory_checks_bitfield
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_bitfield.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_memory_checks_bitfield.cmake")
+set_tests_properties(memory_checks_bitfield PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 # text.Builder appends in place while its room holds the bytes and the NUL.
 # Under --memory-checks a fresh block holds no zeros, so a missing NUL or a
 # write past the room fails here where a plain run passes by chance.
@@ -6401,6 +6413,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "layout_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_divide.s,layout_divide.anti"
         "layout_sum|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_sum.s,layout_sum.anti"
         "layout_span|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_span.s,layout_span.anti"
+        "frame_limit|-S,--runtime,${ANTIC_RUNTIME_DIR},--target,linux-x86_64,-o,${LISTINGS}/frame_limit.s,frame_limit.anti"
         "sizeof|-S,-o,${LISTINGS}/sizeof.s,sizeof.anti"
         "modifiers|-S,-o,${LISTINGS}/modifiers.s,modifiers.anti"
         "geo|-S,-o,${LISTINGS}/geo.s,geo.anti"

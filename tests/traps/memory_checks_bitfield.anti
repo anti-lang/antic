@@ -1,0 +1,21 @@
+//! A read of a bitfield through a pointer to freed memory is a use after free,
+//! which `--memory-checks` finds as it finds the read of a plain field.
+
+struct Flags
+{
+	low: u32 : 4,
+	high: u32 : 12,
+}
+
+fn read_after_free() -> int
+{
+	let p = alloc Flags { low: 3, high: 9 };
+	let q = p;
+	free(p);
+	return q.high as int;
+}
+
+fn main() -> int
+{
+	return read_after_free();
+}

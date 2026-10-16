@@ -1,0 +1,12 @@
+//! A frame of 2^31 bytes or more is a compile error on every target.
+
+fn first(a: *[2147483648]u8) -> int
+{
+	return (*a)[0] as int;
+}
+
+fn main() -> int
+{
+	let a: [2147483648]u8 = [0; 2147483648];
+	return first(&a);
+}
