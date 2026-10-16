@@ -1,0 +1,5 @@
+exit 0
+blocks after the copy: 1
+blocks after a request of the copy: 2
+two requests apart: 1
+blocks after both: 0

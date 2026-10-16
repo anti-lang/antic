@@ -1,0 +1,52 @@
+//! `dup` of an `ArenaAllocator`.
+//!
+//! The copy is an empty allocator over the same allocator, with blocks of the
+//! same size. The blocks of the original stay with the original, so a request
+//! of the copy takes a block of its own, and each gives back its own blocks and
+//! none twice. The counting allocator below reads 0 after both are gone.
+
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// An allocator that counts the blocks it lends and hands every call on to the
+/// C library.
+class Counting inherits mem.Allocator
+{
+	pub live: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.live -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+fn main() -> int
+{
+	let counting = Counting { };
+	{
+		let arena = mem.ArenaAllocator.new(&counting, 256);
+		let first = arena.alloc(32, 8);
+		let copy = dup(arena);
+		printf("blocks after the copy: %d\n".ptr, counting.live as c_int);
+		let second = copy.alloc(32, 8);
+		printf("blocks after a request of the copy: %d\n".ptr,
+			counting.live as c_int);
+		printf("two requests apart: %d\n".ptr,
+			(first != none && second != none && first != second) as c_int);
+	}
+	printf("blocks after both: %d\n".ptr, counting.live as c_int);
+	return 0;
+}

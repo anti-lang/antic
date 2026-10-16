@@ -842,7 +842,7 @@ C has one allocator, `malloc` and `free`, and a program that wants another passe
 `anti.mem` holds two allocators, and a program writes its own by inheriting `Allocator`.
 
 - `LibcAllocator` is the allocator over the C library. It is a singleton, `mem.LibcAllocator.get()`, and the default provider of the interface, `mem.Allocator.default()`.
-- `ArenaAllocator.new(from, block)` hands out memory from blocks that it takes from the allocator `from`. Each block holds `block` bytes, or one larger request alone. A request at an alignment above 16 takes a block of its own. `free` of one allocation gives nothing back. `free_all()` gives back every block at once, and `destruct` gives back what is left.
+- `ArenaAllocator.new(from, block)` hands out memory from blocks that it takes from the allocator `from`. Each block holds `block` bytes, or one larger request alone. A request at an alignment above 16 takes a block of its own. `free` of one allocation gives nothing back. `free_all()` gives back every block at once, and `destruct` gives back what is left. `dup` of one gives an empty allocator over the same `from` with blocks of the same size, since each block has one owner.
 
 Memory goes back to the allocator that gave it. Memory of `LibcAllocator` goes back through its `free` and never through `free` of the language. Windows gives aligned memory back with a function of its own.
 

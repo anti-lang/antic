@@ -92,8 +92,9 @@ struct Block
 /// blocks, takes a block of its own at its alignment. `free` of one allocation
 /// gives nothing back. `free_all` gives back every block and leaves the
 /// allocator empty and ready for more, and `destruct` gives back what is left.
-/// A copy would give the blocks back twice, so a program passes the address of
-/// the one it made.
+/// A copy that `dup` makes is empty, over the same allocator and with blocks of
+/// the same size. The blocks stay with the allocator that took them, so a
+/// program that wants the memory of one passes its address.
 pub class ArenaAllocator inherits Allocator
 {
 	from: *Allocator,
@@ -148,6 +149,21 @@ pub class ArenaAllocator inherits Allocator
 		self.used = 0;
 		self.limit = 0;
 		self.head_align = 0;
+	}
+
+	/// An allocator in `to` without blocks, whose blocks come from the same
+	/// allocator and hold as many bytes, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		/* DESIGN: the blocks have one owner. By S318 of the third audit, a
+		   copy of the bytes gave every block back twice. */
+		memcpy(to as ?*byte, self as ?*byte,
+			size_of(ArenaAllocator) as c_size_t);
+		let made = to as *ArenaAllocator;
+		made.head = none;
+		made.used = 0;
+		made.limit = 0;
+		made.head_align = 0;
 	}
 
 	fn destruct(self)
