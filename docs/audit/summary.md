@@ -282,9 +282,9 @@ Rule 22, one platform layer and one result on every target:
 
 - M316. `src/rt/platform_posix.c:348`. macOS and Linux give file names as
   raw bytes where `platform.h:10` promises UTF-8. `anti_rt_getenv` does
-  the same. New. rt.
+  the same. New. rt. Fixed `c8ee2a81`.
 - M317. `src/rt/plugin.c:995`. The search path of plugins splits at `:`,
-  so it cannot hold a Windows directory. New. rt.
+  so it cannot hold a Windows directory. New. rt. Fixed `4b568e74`.
 
 Rule 23, shared state:
 
@@ -313,7 +313,8 @@ One purpose per module and file:
 
 - M321. `src/rt/std.h:1`. `std.h` declares the functions of nine files
   and both platform files, and `rt.h` holds what has no header. The
-  platform layer's interface stands in three headers. New. rt.
+  platform layer's interface stands in three headers. New. rt. Fixed
+  `a8a16e64`.
 - M322. `src/anti/symmap.c:146`. The file of the symbols map also holds
   the readers of the licence notice and of `sources.txt`. New. anti-tool.
 - M323. `tests/run_release_dry_run.cmake:1`. The two largest runners
@@ -379,7 +380,7 @@ Copies that drifted:
   Fixed `d28e47d5`, the reader's `Job` in `ba14f572` as T061.
 - M337. `src/rt/platform_windows.c:455`. Windows lists a directory in two
   functions. They differ on `C:` and on a name that does not fit. Line
-  1474 is the second. New. rt.
+  1474 is the second. New. rt. Fixed `4b4a9930`.
 - M338. `src/std/anti/collection/concurrent.anti:352`. `ConcurrentMap`
   stamps the key after the change and `SyncMap` before it. A later
   `set_if_version` succeeds on a changed entry. New. std. Fixed `9c1100dd`.
@@ -536,7 +537,7 @@ directory are in `src/antic/`.
 | 19 | 1 | Two files past 3000 lines. `sema_stmt.c` with 3089 returned, and `llvm_emit.c` with 4102 is new (tool-pass, front-end, back-end). |
 | 20 | 1 | Two functions used in one file are exported, `sema_checker.h:392` (front-end). |
 | 21 | 1 | Five includes that contribute nothing, `linker.c:9` (structure). |
-| 22 | 1 | The walk of Windows stops at 64 frames, `src/rt/platform_windows.c:591` (rt). |
+| 22 | 1 | The walk of Windows stops at 64 frames, `src/rt/platform_windows.c:591` (rt), fixed `556f9c07`. |
 | 23 | 2 | A rotating buffer without its comment, `sema_value.c:203` (front-end). Two globals without a guard, with rule 24, `src/rt/assert.c:49` (rt). |
 | 24 | 2 | Casts that remove `const`, `sema_copies.c:152` (front-end) and `memcheck.c:248` (middle). |
 | 25 | 1 | Names outside the prefix of their file, `platform.c:216` (back-end). |
@@ -552,7 +553,7 @@ directory are in `src/antic/`.
 | Dependencies and boundaries | 4 | The doc page of the front end builds an IR module, `docpage.c:13` (tool-pass). The inside header of the library file is included outside it, `antl_io.h:12` (structure). The records every part shares stand in the interface of the tool, `antic.h:4` and `antic.h:111` (structure, back-end). The status 3 of `driver_run` is a number at four places, `src/anti/build.c:333` (anti-tool). |
 | Each concern in one place | 20 | The prefix of a message at every site, `src/anti/bindclang.c:101` (structure). Tables and names defined twice, `sema_class.c:1020` (front-end). The checks of a dev build in four files, `lower_lowerer.h:9` (middle). Errors in three forms, `driver.c:597`, fixed `418a71e8`, and a platform layer that names antic, `platform.h:9`, fixed `482136fd` (back-end). No `ptr_set_free`, `ptrset.h:8` (library-file). A walk built three ways, `queue.anti:75`, a lent key handled three ways, `set.anti:144`, `destruct` declared two ways, `lang.anti:192`, functions without `-> never`, `io.anti:36`, and numbers spelled again, `lang.anti:126` (std). Names of files and directories, `src/anti/main.c:488`, and a JSON file read by `strstr`, `src/anti/sdk.c:41` (anti-tool). A dozen readers of a pin, `tools/upstream-sources.cmake:21`, the six targets in twenty places, `tools/pack-anti.cmake:56`, the host worked out in many ways, `tools/pinned-compiler.cmake:37`, versions outside their pins, `tools/sysroot-pins:4`, CMake 3.20 beside a 3.21 command, `tools/get-sysroot.cmake:30`, fixed `c3e7267b`, three ways to move the downloads, `CMakeLists.txt:42`, and the nm of the host, `tests/run_clib.cmake:391` (build-and-tools). |
 | Copies and small duplication | 4 | Two readings of one grammar that drifted, `parser_stmt.c:165` (front-end). Small copies inside the tools, `tools/release.sh:975` (build-and-tools). Registrations written out, `src/native/pcre2.cmake:97` and `tests/CMakeLists.txt:479`, still open (build-and-tools, tests). Two unit files that run the stages themselves, `tests/unit/test_whole.c:49` (tests). |
-| Left of a replaced feature | 4 | The option `--llvm-mc` through antic, anti, the build files and 57 runners, with `target_block_label` and the attributes column, `driver.h:23` (structure, back-end, build-and-tools, tests). The `Interlocked` branch for Microsoft's compiler, `src/rt/atomic.c:98` (rt). Checks and words of the Microsoft toolchain, `tools/release.sh:688` (build-and-tools). `src/std/.gitkeep` (std). |
+| Left of a replaced feature | 4 | The option `--llvm-mc` through antic, anti, the build files and 57 runners, with `target_block_label` and the attributes column, `driver.h:23` (structure, back-end, build-and-tools, tests). The `Interlocked` branch for Microsoft's compiler, `src/rt/atomic.c:98` (rt), fixed `1a6f9729`. Checks and words of the Microsoft toolchain, `tools/release.sh:688` (build-and-tools). `src/std/.gitkeep` (std). |
 | Placement and names | 15 | A tracked `.pyc` under `tools/docs-style/__pycache__/` (structure). Functions outside the file their sentence names, `sema.c:1925`, and small things, `parser_stmt.c:12` (front-end). The channel design in the file of the workers, `lower_worker.c:349` (middle). Two headers that carry more than their sentence, `src/rt/regex.h:98` (library-file). Names that differ inside one module, `src/rt/object.h:211` (rt). Helpers that are `pub`, `collection.anti:575`, and three left by the closure: `Changed` and `Snapshot`, `synchronized.anti:29`, size and presence, `text.anti:174`, and `""` for what is not there, `args.anti:104`, all still open (std). Two records named `unit`, `src/anti/syms.c:409`, and three helpers in another file, `src/anti/repo.h:20` (anti-tool). Helpers in the file of another purpose, `tools/fetch-release.cmake:25` (build-and-tools). The runners flat in `tests/` and a build file in the order of its history, `tests/CMakeLists.txt:1`, still open (build-and-tools, tests). Test names that do not start with their kind, `tests/CMakeLists.txt:309` (tests). |
 | State without an owner | 2 | Two context fields saved by hand, `sema.c:973` (front-end). The writer changes the tree it writes, `antl_tree.c:845` (library-file). |
 | Tests | 2 | Expected texts that hold more than their subject, `tests/unit/test_lower.c:1277`, and 25 files of antic and anti no unit test reaches, `driver.c:1` (tests). |
