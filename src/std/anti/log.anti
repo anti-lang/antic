@@ -12,10 +12,15 @@
 //! The `logger` key of the runtime configuration names a file of the TOML
 //! subset that the first call reads. `--anti.logger=<path>` and the `[runtime]`
 //! table of the configuration file set that key. The file holds `level`,
-//! `format` and `[[sink]]` entries with `kind`, `path` and `level`. A file that
-//! is missing or outside the subset writes one line to standard error, and the
-//! program goes on with the default, which is standard error at level `info` in
-//! text. A `log.set` in the program takes precedence over the file.
+//! `name`, `format` and `[[sink]]` entries with `kind`, `path` and `level`. A
+//! line below `level` is dropped, and every other line goes to the sink of each
+//! entry whose own `level` takes it. An entry without a `level` takes every
+//! line. An entry whose kind nothing registered, or whose file will not open,
+//! writes one line to standard error and is left out, and a file without an
+//! entry that made a sink writes to standard error. A file that is missing or
+//! outside the subset writes one line to standard error, and the program goes
+//! on with the default, which is standard error at level `info` in text. A
+//! `log.set` in the program takes precedence over the file.
 
 import anti.fs;
 import anti.lang;
@@ -26,6 +31,8 @@ import anti.runtime;
 import anti.text;
 import anti.time;
 import anti.toml;
+
+extern fn anti_rt_out_of_memory(size: int) -> never;
 
 /// How much a logger writes, from everything to nothing but a failure.
 pub enum Level: u8 { Trace, Debug, Info, Warn, Error, Fatal, Off }
@@ -199,9 +206,7 @@ pub class SinkLogger inherits Logger
 	pub fn new(name: str, level: Level, sink: *Sink) -> *SinkLogger
 	{
 		let made = alloc SinkLogger { sink: sink };
-		let copy = text.Builder.new();
-		copy.append(name);
-		let kept = copy.take();
+		let kept = copy_of(name);
 		made.held = kept.ptr;
 		made.name = kept;
 		made.level = level;
@@ -214,29 +219,89 @@ pub class SinkLogger inherits Logger
 			return;
 		}
 		let line = text.Builder.new();
-		if self.format == Format.Json {
-			line.append("{\"time\":");
-			json.write_int(time.wall(), &line);
-			line.append(",\"level\":");
-			json.write_text(level_name(level), &line);
-			line.append(",\"name\":");
-			json.write_text(self.name, &line);
-			line.append(",\"message\":");
-			json.write_text(message, &line);
-			line.append("}\n");
-		} else {
-			line.append_int(time.wall());
-			line.append(" ");
-			line.append(level_name(level));
-			line.append(" ");
-			if self.name.len != 0 {
-				line.append(self.name);
-				line.append(" ");
-			}
-			line.append(message);
-			line.append("\n");
-		}
+		line_of(self, level, message, &line);
 		self.sink.write(line.text());
+	}
+}
+
+/// A copy of `name` in memory of its own, which the caller frees.
+fn copy_of(name: str) -> str
+{
+	let copy = text.Builder.new();
+	copy.append(name);
+	return copy.take();
+}
+
+/// Write the line of `message` at `level` into `line`, in the format of
+/// `logger` and with its name.
+fn line_of(logger: *Logger, level: Level, message: str, line: *text.Builder)
+{
+	if logger.format == Format.Json {
+		line.append("{\"time\":");
+		json.write_int(time.wall(), line);
+		line.append(",\"level\":");
+		json.write_text(level_name(level), line);
+		line.append(",\"name\":");
+		json.write_text(logger.name, line);
+		line.append(",\"message\":");
+		json.write_text(message, line);
+		line.append("}\n");
+		return;
+	}
+	line.append_int(time.wall());
+	line.append(" ");
+	line.append(level_name(level));
+	line.append(" ");
+	if logger.name.len != 0 {
+		line.append(logger.name);
+		line.append(" ");
+	}
+	line.append(message);
+	line.append("\n");
+}
+
+/// The sink of one `[[sink]]` entry of the logger file, and the least level
+/// it takes.
+struct Leg
+{
+	sink: *Sink,
+	level: Level,
+}
+
+/// The logger that a logger file asks for, which writes each line to the sink
+/// of every entry whose level takes it.
+///
+/// DESIGN: by S332 of the third audit. The logger of the file wrote to the
+/// sink of the first entry alone, read no `level` of an entry and stopped at
+/// the eighth, where the header of the module promised every entry with a
+/// level each, as the entry on `anti.log` in `docs/decisions.md` does.
+class FileLogger inherits Logger
+{
+	/// The entries in the order of the file, each with a sink it owns.
+	pub own legs: []Leg,
+	pub count: int = 0,
+	/// The copy of the name of the file, which `name` holds.
+	pub own held: ?*byte = none,
+
+	fn destruct(self)
+	{
+		for i in 0..self.count {
+			delete(self.legs[i].sink);
+		}
+	}
+
+	concrete fn log(self, level: Level, message: str)
+	{
+		if (level as int) < (self.level as int) {
+			return;
+		}
+		let line = text.Builder.new();
+		line_of(self, level, message, &line);
+		for i in 0..self.count {
+			if (level as int) >= (self.legs[i].level as int) {
+				self.legs[i].sink.write(line.text());
+			}
+		}
 	}
 }
 
@@ -406,7 +471,7 @@ pub fn register(name: str, keep make: fn(str) -> *Sink)
 	}
 }
 
-/// The sink of the kind `name`, or `none`.
+/// The sink of the kind `name`, or `none` after one line to standard error.
 fn made(name: str, path: str) -> ?*Sink
 {
 	if text.equal(name, "stderr") {
@@ -428,6 +493,9 @@ fn made(name: str, path: str) -> ?*Sink
 		}
 		one = one.next;
 	}
+	io.eprint("anti.log: no sink of kind ");
+	io.eprint(name);
+	io.eprint("\n");
 	return none;
 }
 
@@ -457,41 +525,74 @@ fn from_configuration() -> *Logger
 		return SinkLogger.new("", Level.Info, StderrSink.new());
 	};
 	free(source.ptr);
-	let level = level_of(doc.text_of("level", "info"), Level.Info);
-	let logger = SinkLogger.new(doc.text_of("name", ""), level,
-		first_sink(&doc));
+	let logger = sinks_of(&doc);
+	let kept = copy_of(doc.text_of("name", ""));
+	logger.held = kept.ptr;
+	logger.name = kept;
+	logger.level = level_of(doc.text_of("level", "info"), Level.Info);
 	if text.equal(doc.text_of("format", "text"), "json") {
 		logger.format = Format.Json;
 	}
 	return logger;
 }
 
-/// The sink of the first `[[sink]]` entry, or standard error.
-fn first_sink(doc: *toml.Document) -> *Sink
+/// The prefix `sink.N.` of `key` when it is the `kind` of an entry
+/// `sink.N.kind`, or the empty text.
+fn entry_of(key: str) -> str
 {
-	let i = 0;
-	while i < 8 do {
-		let key = text.Builder.new();
-		key.append("sink.");
-		key.append_int(i);
-		key.append(".kind");
-		if !doc.has(key.text()) {
-			i += 1;
+	/* 5 is the length of `sink.` and of `.kind`. */
+	if key.len <= 10 || !text.equal(text.slice(key, 0, 5), "sink.")
+		|| !text.equal(text.slice(key, key.len - 5, key.len), ".kind") {
+		return "";
+	}
+	if text.find_byte(text.slice(key, 5, key.len - 5), 0x2E) >= 0 {
+		return "";
+	}
+	return text.slice(key, 0, key.len - 4);
+}
+
+/// The value of the key `field` of the entry whose keys start with `entry`.
+fn field_of(doc: *toml.Document, entry: str, field: str) -> str
+{
+	let key = text.Builder.new();
+	key.append(entry);
+	key.append(field);
+	return doc.text_of(key.text(), "");
+}
+
+/// A logger with the sink of every `[[sink]]` entry of `doc` that makes one,
+/// in the order of the file, or with standard error when none does.
+fn sinks_of(doc: *toml.Document) -> *FileLogger
+{
+	/* The keys of an entry stand in the order of the file, so its `kind`
+	   orders it. A key outside the subset of `[[sink]]` names no entry. */
+	let room = 1;
+	for k in 0..doc.len() {
+		if entry_of(doc.key(k)).len != 0 {
+			room += 1;
+		}
+	}
+	let legs = alloc(Leg, room) else {
+		anti_rt_out_of_memory(room *| size_of(Leg));
+	};
+	let logger = alloc FileLogger { legs: []Leg { ptr: legs, len: room } };
+	for k in 0..doc.len() {
+		let entry = entry_of(doc.key(k));
+		if entry.len == 0 {
 			continue;
 		}
-		let kind = doc.text_of(key.text(), "stderr");
-		let where = text.Builder.new();
-		where.append("sink.");
-		where.append_int(i);
-		where.append(".path");
-		let sink = made(kind, doc.text_of(where.text(), ""));
-		if sink != none {
-			return sink;
-		}
-		io.eprint("anti.log: no sink of kind ");
-		io.eprint(kind);
-		io.eprint("\n");
-		i += 1;
+		let sink = made(doc.value(k), field_of(doc, entry, "path")) else {
+			continue;
+		};
+		logger.legs[logger.count] = Leg {
+			sink: sink,
+			level: level_of(field_of(doc, entry, "level"), Level.Trace),
+		};
+		logger.count += 1;
 	}
-	return StderrSink.new();
+	if logger.count == 0 {
+		logger.legs[0] = Leg { sink: StderrSink.new(), level: Level.Trace };
+		logger.count = 1;
+	}
+	return logger;
 }

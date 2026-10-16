@@ -5623,7 +5623,10 @@ foreach(case
         "hash_seed_range|report||--anti.hash_seed=18446744073709551616|empty.pattern|seed-range.pattern|70"
         "hash_seed_text|report||--anti.conf=${CONF}/seed-text.toml|empty.pattern|seed-text.pattern|70"
         "logger_unknown_kind|logger||--anti.logger=${CONF}/logger-unknown.toml|logger-done.pattern|logger-unknown.pattern|0"
-        "logger_register|logger||--anti.logger=${CONF}/logger-first.toml,register|logger-first.pattern||0")
+        "logger_register|logger||--anti.logger=${CONF}/logger-first.toml,register|logger-first.pattern||0"
+        "logger_sinks|logger||--anti.logger=${CONF}/logger-sinks.toml,register|logger-sinks.pattern||0"
+        "logger_ninth_sink|logger||--anti.logger=${CONF}/logger-ninth.toml,register|logger-first.pattern|logger-ninth.errors.pattern|0"
+        "logger_unopened|logger||--anti.logger=${CONF}/logger-unopened.toml|logger-done.pattern|logger-unopened.pattern|0")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 source)

@@ -1,0 +1,8 @@
+level = "info"
+
+[[sink]]
+kind = "first"
+level = "warn"
+
+[[sink]]
+kind = "second"

@@ -1,0 +1,3 @@
+[[sink]]
+kind = "file"
+path = "logger-no-such-directory/logger.out"

@@ -1,0 +1,6 @@
+second: [0-9]+ info one
+first: [0-9]+ warn two
+second: [0-9]+ warn two
+first: [0-9]+ error three
+second: [0-9]+ error three
+done
