@@ -922,7 +922,7 @@ The form of the library decides how the runtime reaches the C program.
 
 antic prints the link line of a static library when it has written it. Two static libraries of Anti in one C program share the one `libanti_rt.a`. Two bundled libraries in one program fail to link, with the duplicate symbol `anti_rt_bundle`.
 
-A C program calls an exported function without a call that starts anything. A shared library starts its runtime from a constructor that runs when the library loads. A static library starts it at the first use.
+A C program calls an exported function without a call that starts anything. A static or a shared library starts its runtime from a constructor that runs when the library loads. No exported function checks for a start.
 
 Memory crosses as between two C libraries. A library takes its memory from the `malloc` of the process it runs in: `libgeometry.so` imports `malloc` and `free` as open names. C may therefore `free` what an exported function returned. The comment of each function says who frees what.
 
@@ -1017,7 +1017,7 @@ The header writes a C type for each Anti type.
 | `*T` | `T * /* non-null */` |
 | a `packed` struct, `align(N)` | `#pragma pack`, `ANTI_ALIGNAS(N)` |
 
-Where it lives: `src/antic/header.c` writes the header, `src/antic/driver_library.c` the archive and its bundle, and `src/antic/linker.c` the link of a shared library. `src/antic/llvm_emit.c` writes the constructor of a shared library, and `anti_rt_init` of `src/rt/init.c` is the start it runs.
+Where it lives: `src/antic/header.c` writes the header, `src/antic/driver_library.c` the archive and its bundle, and `src/antic/linker.c` the link of a shared library. `src/antic/llvm_emit.c` writes the constructor of a library, and `anti_rt_init` of `src/rt/init.c` is the start it runs.
 
 ### What it costs
 

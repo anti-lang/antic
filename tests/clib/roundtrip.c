@@ -1,5 +1,7 @@
 /* A C program that calls every export fn of the library geo, with structs
-   and unions by value, and prints the results. */
+   and unions by value, and prints the results. The first line is 1 when
+   the runtime started before main, which a static library does from a
+   constructor, by decision 5 of "Decisions of 2026-10-11". */
 #include "../binary_stdio.h"
 #include <stdio.h>
 
@@ -28,6 +30,7 @@ int main(void)
     uint32_t layer;
     int32_t factor = 10;
 
+    printf("%d\n", geo_ready());
     n.d = 7.0;
     half = geo_half(n);
     printf("%d\n", geo_dot(a, b));

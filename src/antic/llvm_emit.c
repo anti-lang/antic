@@ -3933,7 +3933,7 @@ static void roots(struct emitter *e, const struct ir_module *m)
 }
 
 /* DESIGN: the functions that run before main are the one of each module
-   that compiles its patterns and, in a shared library, the constructor of
+   that compiles its patterns and, in a library for C, the constructor of
    the runtime. llvm.global_ctors names them, at the priority of a C
    constructor, and llc writes the section of each format: .init_array,
    __mod_init_func or .CRT$XCU. */

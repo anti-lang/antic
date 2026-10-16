@@ -59,7 +59,7 @@ design the back end was built from.
   program's `main`. That `main` is `noinline` and stands in
   `llvm.compiler.used`, so under LTO it keeps its frame and its own name in a
   trace, a map and a PDB. The function of each module that compiles its pattern
-  literals and, in a shared library, the constructor of the runtime stand in
+  literals and, in a library for C, the constructor of the runtime stand in
   `llvm.global_ctors`. The copy of the package header and the notice are
   constants in sections of their own, which `llvm.used` keeps.
 - A call names the function type that `abi_classify` gives for its callee.

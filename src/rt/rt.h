@@ -3,9 +3,10 @@
 
 #include <stdint.h>
 
-/* The state of the runtime. An executable initialises it in main. A shared
-   library initialises it in a constructor that runs when it loads. A
-   static library for C initialises it on the first use of the runtime. */
+/* The state of the runtime. An executable initialises it in main. A
+   static or a shared library for C initialises it in a constructor that
+   runs when it loads, and a plugin takes the state of its host. A call
+   after the first does nothing. */
 void anti_rt_init(void);
 
 /* 1 after anti_rt_init, else 0. */
@@ -18,8 +19,9 @@ int anti_rt_ready(void);
    the platform layer does nothing. */
 void anti_rt_memory_kept(const void *p);
 
-/* --anti.backtrace of the command line: 1 on, 0 off and -1 when the
-   command line did not name it. src/rt/start.c writes it before main. */
+/* The key `backtrace` of the runtime configuration: 1 on, 0 off and -1
+   when no layer named it. set_key of src/rt/conf.c writes it, from the
+   command line, the file and rt.configure. */
 extern int anti_rt_option_backtrace;
 
 /* The hash of text and bytes, and the seed of the hashing collections, in

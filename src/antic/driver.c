@@ -864,9 +864,11 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     emit.debug = o->debug;
     emit.optimized = !o->dev;
     emit.spans = &spans;
-    /* The host has run the runtime's start already, so a plugin brings
-       no constructor of its own. */
-    if (o->lib == LIB_SHARED && !driver_is_plugin(o)) {
+    /* A library for C starts the runtime from a constructor that runs at
+       load, so no function it exports checks per call, by decision 5 of
+       "Decisions of 2026-10-11". The host has run the runtime's start
+       already, so a plugin brings no constructor of its own. */
+    if (o->lib != LIB_NONE && !driver_is_plugin(o)) {
         emit.constructor = rt_name(RT_FN_INIT);
     }
     /* The notice stays out of --dump-llvm, so its goldens do not follow

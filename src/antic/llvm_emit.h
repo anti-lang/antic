@@ -29,7 +29,7 @@ struct llvm_emit_options {
     /* The object links into a program that links statically against
        musl, where an export fn of its module is a local symbol. */
     bool local_exports;
-    /* The function of the runtime that a shared library runs when it
+    /* The function of the runtime that a library for C runs when it
        loads, or NULL. llvm.global_ctors names it beside the function of
        each module that compiles its patterns. */
     const char *constructor;

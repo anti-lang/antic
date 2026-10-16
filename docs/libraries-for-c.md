@@ -152,9 +152,10 @@ link line:
 cc main.c libgeometry.a /path/to/lib/linux-x86_64/libanti_rt.a -lpthread -lm
 ```
 
-The runtime initialises itself on first use in the static case. The thread pool is
-created by the first `parallel`. Nothing runs before the C program calls an exported
-function.
+The runtime initialises itself from a constructor that runs when the program loads.
+The static case does as the shared one, by decision 5 of "Decisions of 2026-10-11".
+The constructor chooses the seed of the hashing collections, and no exported function
+checks for a start. The thread pool is created by the first `parallel`.
 
 `--bundle-runtime` joins the runtime objects and the library object into one object of
 the static archive for the single-file case, on Linux and Windows. On macOS the archive
