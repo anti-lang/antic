@@ -4,7 +4,9 @@
 # NULL. Each case aborts with the message of the failure routine, which
 # names the bytes asked for. Run with cmake -P and these values:
 #   PROGRAM  rt_oom_tests, built from tests/unit/test_rt_oom.c
+#   CASES    the cases, separated by commas
 #   WORK     a directory this run writes into
+# A case without a count below gives any count of bytes.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -19,7 +21,13 @@ set(bytes_append_count 9223372036854775803)
 set(bytes_fill_count 9223372036854775807)
 set(bytes_copy_buffer 3)
 set(bytes_dup 24)
-foreach(case take append fill append_count fill_count copy_buffer dup)
+string(REPLACE "," ";" cases "${CASES}")
+foreach(case IN LISTS cases)
+    if(DEFINED bytes_${case})
+        set(message ERR "anti: out of memory for ${bytes_${case}} bytes\n")
+    else()
+        set(message ERR_MATCH "^anti: out of memory for [0-9]+ bytes\n$")
+    endif()
     program_expect("rt_oom_${case}" COMMAND "${PROGRAM}" ${case} ABORTS
-                   ERR "anti: out of memory for ${bytes_${case}} bytes\n")
+                   ${message})
 endforeach()

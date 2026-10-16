@@ -1,7 +1,8 @@
 /* S312 and M301. The text builder, the copy of an object and the copy of
    an owned buffer stop the program through anti_rt_out_of_memory when
    the C library refuses their memory, as decision 4 of "Decisions of
-   2026-10-11" says, and never come back with a literal or NULL.
+   2026-10-11" says, and never come back with a literal or NULL. The
+   listing of anti.fs does the same, which T139 holds.
 
    The files of the runtime this program links are compiled with malloc
    and realloc named refused_malloc and refused_realloc, which give NULL
@@ -60,7 +61,7 @@ int main(int argc, char **argv)
 
     if (argc != 2) {
         fputs("usage: rt_oom_tests take|append|fill|append_count|"
-              "fill_count|copy_buffer|dup\n", stderr);
+              "fill_count|copy_buffer|dup|fs_list\n", stderr);
         return 2;
     }
     name = argv[1];
@@ -99,6 +100,13 @@ int main(int argc, char **argv)
         object.table = (const struct anti_descriptor *const *)table;
         refusing = 1;
         made = anti_rt_dup(&object, &one);
+    } else if (strcmp(name, "fs_list") == 0) {
+        /* T139. The listing of anti.fs fails with ENOMEM, and fs.list
+           passes the failure on. */
+        int64_t count = 0;
+
+        refusing = 1;
+        made = anti_rt_fs_list((const unsigned char *)".", 1, &count);
     } else {
         fprintf(stderr, "no case %s\n", name);
         return 2;
