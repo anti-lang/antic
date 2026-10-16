@@ -98,7 +98,7 @@ program_expect(lf COMMAND "${CMAKE_COMMAND}" -E cat "${WORK}/expect_lf.txt"
 # read its output from a file. ARGN and command stand for the helpers of
 # a script that run a tool given as their arguments, and PROBE and RENAME
 # for C tools of the harness.
-set(tools ANTI ANTIC ARGN CC CLANG CMAKE_COMMAND GIT LLD_LINK LLVM_AR
+set(tools ANTI ANTIC ARGN CC CLANG CMAKE_COMMAND CTEST GIT LLD_LINK LLVM_AR
           LLVM_BIN LLVM_DIR LLVM_MC LLVM_OBJDUMP OBJDUMP PROBE READOBJ RENAME
           command compiler copy git)
 file(GLOB scripts "${ROOT}/tests/run_*.cmake")

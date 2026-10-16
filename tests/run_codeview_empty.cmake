@@ -65,7 +65,8 @@ if(DEFINED CLANG)
         "\t.long\t0\n")
     execute_process(COMMAND "${CLANG}" --target=${triple} -c
                             -o "${object}" "${WORK}/broken.${TARGET}.s"
-                    RESULT_VARIABLE status ERROR_VARIABLE err)
+                    RESULT_VARIABLE status ERROR_VARIABLE err
+                    ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "clang failed with ${status}\n${err}")
     endif()
@@ -84,7 +85,7 @@ endif()
 
 execute_process(COMMAND "${READOBJ}" --codeview "${object}"
                 RESULT_VARIABLE status OUTPUT_VARIABLE dump
-                ERROR_VARIABLE err)
+                ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "llvm-readobj failed with ${status}\n${err}")
 endif()

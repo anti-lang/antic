@@ -18,7 +18,7 @@ else()
     execute_process(COMMAND "${CTEST}" --test-dir "${TREE}"
                             --show-only=json-v1
                     OUTPUT_FILE "${list}" RESULT_VARIABLE status
-                    ERROR_VARIABLE err)
+                    ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "ctest --show-only failed with ${status}\n${err}")
     endif()
