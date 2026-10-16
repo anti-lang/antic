@@ -60,7 +60,8 @@ bool anti_rt_json_unsigned(const unsigned char *start, int64_t length,
                            uint64_t *value);
 
 /* Skip one value of any kind, which starts depth levels deep. A value
-   that nests deeper than ANTI_JSON_DEPTH is refused. */
+   that nests deeper than ANTI_JSON_DEPTH is refused, and so is a number
+   that anti_rt_json_valid_number refuses. */
 bool anti_rt_json_skip(struct anti_json *s, int depth);
 
 /* Whether the text between at and end is one value with nothing but

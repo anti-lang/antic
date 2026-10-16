@@ -186,6 +186,46 @@ static void numbers(void)
     CHECK(!anti_rt_json_valid_number(NULL, 0));
 }
 
+/* Whether text is one value with nothing but white space around it. */
+static int whole_value(const char *text)
+{
+    size_t length;
+    unsigned char *bytes = copy(text, &length);
+    struct anti_json s;
+    int ok;
+
+    s.at = bytes;
+    s.end = bytes + length;
+    ok = anti_rt_json_value(&s);
+    CHECK(s.at >= bytes && s.at <= bytes + length);
+    free(bytes);
+    return ok;
+}
+
+/* A number that the grammar refuses is no value, wherever it stands. */
+static void numbers_in_values(void)
+{
+    size_t length;
+    unsigned char *bytes = copy("{\"a\":+-.e}", &length);
+    int64_t start = -1;
+    int64_t value_length = -1;
+
+    CHECK(skips("-0.5e+10") == 1);
+    CHECK(whole_value("[0, -1, 2.5, 1e3, 1E-2]") == 1);
+    CHECK(skips("+-.e") == 0);
+    CHECK(skips("+1") == 0);
+    CHECK(skips("1.") == 0);
+    CHECK(skips(".5") == 0);
+    CHECK(skips("01") == 0);
+    CHECK(skips("-") == 0);
+    CHECK(whole_value("{\"a\":+-.e}") == 0);
+    CHECK(whole_value("[1, 1e]") == 0);
+    CHECK(anti_rt_json_member(bytes, (int64_t)length,
+                              (const unsigned char *)"a", 1, &start,
+                              &value_length) == 0);
+    free(bytes);
+}
+
 static void garbage(void)
 {
     CHECK(skips("") == 0);
@@ -205,5 +245,6 @@ void test_json(void)
     bad_escapes();
     deep_nesting();
     numbers();
+    numbers_in_values();
     garbage();
 }

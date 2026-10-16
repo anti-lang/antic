@@ -33,6 +33,11 @@ trailing comma: none
 after the object: none
 bad later member: none
 bad key: none
+number: [-0.5e+10]
+signs and a point: none
+point without digits: none
+bad later number: none
+bad number in an array: none
 array: none
 empty object: none
 no text: none

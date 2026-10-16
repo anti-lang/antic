@@ -332,7 +332,8 @@ bool anti_rt_json_skip(struct anti_json *s, int depth)
         return anti_rt_json_word(s, "true") ||
                anti_rt_json_word(s, "false") ||
                anti_rt_json_word(s, "null") ||
-               anti_rt_json_number(s, &number, &digits_length);
+               (anti_rt_json_number(s, &number, &digits_length) &&
+                anti_rt_json_valid_number(number, digits_length));
     }
 }
 

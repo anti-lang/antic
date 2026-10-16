@@ -155,6 +155,11 @@ fn main() -> int
 	show_member("after the object", "{\"a\":1}x", "a");
 	show_member("bad later member", "{\"a\":1,\"b\":\"\\q\"}", "a");
 	show_member("bad key", "{\"\\q\":1}", "a");
+	show_member("number", "{\"a\":-0.5e+10}", "a");
+	show_member("signs and a point", "{\"a\":+-.e}", "a");
+	show_member("point without digits", "{\"a\":1.}", "a");
+	show_member("bad later number", "{\"a\":1,\"b\":01}", "a");
+	show_member("bad number in an array", "{\"a\":1,\"b\":[2,-]}", "a");
 	show_member("array", "[1]", "a");
 	show_member("empty object", "{}", "a");
 	show_member("no text", "", "a");
