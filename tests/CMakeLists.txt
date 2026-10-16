@@ -5559,6 +5559,17 @@ if(NOT WIN32)
             "-DCC=${ANTIC_TEST_CC}"
             "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_probe.cmake")
+    # run_probe.cmake reads the exit status of both probes.
+    add_test(NAME abi_probe_runner
+        COMMAND "${CMAKE_COMMAND}"
+            "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_probe.cmake"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-runner"
+            "-DCC=${ANTIC_TEST_CC}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_probe_self.cmake")
 endif()
 
 # A linked program holds the licence notice of its packages.

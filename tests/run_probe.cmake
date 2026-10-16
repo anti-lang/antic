@@ -34,6 +34,11 @@ if(NOT status EQUAL 0)
 endif()
 program_output(c_hex c_status "${WORK}/${NAME}_c.stdout" "${WORK}/${NAME}_c")
 program_output(anti_hex anti_status "${WORK}/${NAME}_anti.stdout" "${WORK}/${NAME}_anti")
+# Each probe ends with 0, so two that stop on the same output fail too.
+if(NOT c_status EQUAL 0 OR NOT anti_status EQUAL 0)
+    message(FATAL_ERROR "the probes ended with ${c_status} in C and "
+                        "${anti_status} in Anti")
+endif()
 if(NOT c_hex STREQUAL anti_hex)
     file(READ "${WORK}/${NAME}_c.stdout" from_c)
     file(READ "${WORK}/${NAME}_anti.stdout" from_anti)
