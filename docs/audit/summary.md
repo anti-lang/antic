@@ -181,7 +181,7 @@ without a directory are in `src/antic/`.
 | S315 | `src/std/anti/collection.anti:761` | 6 | The five place functions of `Collection<T>` are public and index a raw pointer with the `at` they are given. `take_place` on a free slot of a `Pool` links it twice. | fixed `b81ca20c` | std |
 | S316 | `src/std/anti/collection.anti:714` | 5 | The size of a room is an unchecked product in `room_from`, `grid.anti:46`, `map.anti:297`, `sorted.anti:719`, `pool.anti:451` and `concurrent.anti:924`. A release build wraps. | fixed `f393ed52` | std |
 | S317 | `src/std/anti/args.anti:273` | 4 | `declare` writes an option after `reserve` at line 317 gave up without a word, past the slice or through `none`. | new | std |
-| S318 | `src/std/anti/collection/concurrent.anti:878` | 12 | `dup` of a `Snapshot` leaves two walks that free one room. `ArenaAllocator`, `FileSink`, `NotOne` and `Changed` have the same shape. Read, not run. | new | std |
+| S318 | `src/std/anti/collection/concurrent.anti:878` | 12 | `dup` of a `Snapshot` leaves two walks that free one room. `ArenaAllocator`, `FileSink`, `NotOne` and `Changed` have the same shape. Read, not run. | fixed `5518e342`, `0d126d62`, `f223467d`, `a0de8b0c` | std |
 | S319 | `src/anti/bindexpr.c:238` | 6, 14 | A string that ends in a backslash moves the evaluator of `anti bind` one byte past its text, and `space` reads on from there. | new | anti-tool |
 
 ### Documentation
@@ -371,7 +371,7 @@ Copies that drifted:
   1474 is the second. New. rt.
 - M338. `src/std/anti/collection/concurrent.anti:352`. `ConcurrentMap`
   stamps the key after the change and `SyncMap` before it. A later
-  `set_if_version` succeeds on a changed entry. New. std.
+  `set_if_version` succeeds on a changed entry. New. std. Fixed `9c1100dd`.
 - M339. `src/anti/bindwrite.c:633`. Four pairs of copies have drifted.
   They are the test for an unsigned type, a struct constant, the sources
   of a project and the module path of a library file. New. anti-tool.
@@ -476,7 +476,8 @@ A header or a comment that differs from the code:
   read. New. middle.
 - M366. `src/std/anti/collection/map.anti:47`. The growth of a `Map` is
   not what its DESIGN and `docs/decisions.md:2460` say. A full map that
-  removes one entry rebuilds its room on every `add`. New. std.
+  removes one entry rebuilds its room on every `add`. New. std. Fixed
+  `d4a0c9dc`.
 - M367. `CMakeLists.txt:303`. A DESIGN comment says the packer leaves the
   bitcode out of the package. `tools/pack-anti.cmake:388` copies it. New.
   build-and-tools.
