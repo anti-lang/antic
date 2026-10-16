@@ -1,0 +1,77 @@
+//! `config.read` against the readers of other threads.
+//!
+//! One chunk of a `parallel` reads the same TOML file again and again, and
+//! every read replaces the document before it. The other chunks ask for a key
+//! of the file meanwhile. Each answer comes from a whole document, never from
+//! one that another thread deleted.
+
+import anti.config;
+import anti.fs;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const SETTINGS: str = "config-threads-test.toml";
+const SOURCE: str = "[server]\nport = 8080\nname = \"service\"\n";
+
+/// The reads of the reading chunk.
+const READS: int = 4000;
+
+/// The chunks of the `parallel`, the reading one among them.
+const THREADS: int = 4;
+
+/// Whether the reading chunk is done.
+class Stop
+{
+	pub static atomic done: bool = false;
+}
+
+/// The bytes of `s`, which share its memory.
+fn bytes_of(s: str) -> []byte
+{
+	return []byte { ptr: s.ptr, len: s.len };
+}
+
+/// Chunk 0 reads the file `READS` times. Every other chunk asks for the port
+/// until chunk 0 is done, and gives the answers that were wrong.
+worker fn ask(chunk: []int) -> int
+{
+	let settings = config.current();
+	let wrong = 0;
+	for t in chunk {
+		if t == 0 {
+			for i in 0..READS {
+				config.read(SETTINGS) catch fatal;
+			}
+			Stop.done.store(true);
+			continue;
+		}
+		while !Stop.done.load() do {
+			if !settings.has("server.port") {
+				wrong += 1;
+			}
+			if settings.int_of("server.port", -1) != 8080 {
+				wrong += 1;
+			}
+		}
+	}
+	return wrong;
+}
+
+fn main() -> int
+{
+	fs.write_file(SETTINGS, bytes_of(SOURCE)) catch fatal;
+	config.read(SETTINGS) catch fatal;
+	let threads: [THREADS]int = [0; THREADS];
+	for t in 0..THREADS {
+		threads[t] = t;
+	}
+	let wrong = parallel threads[0..THREADS] by THREADS -> ask();
+	let total = 0;
+	for n in wrong {
+		total += n;
+	}
+	free(wrong.ptr);
+	fs.remove(SETTINGS) catch fatal;
+	printf("wrong answers: %d\n".ptr, total as c_int);
+	return 0;
+}

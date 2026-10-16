@@ -54,9 +54,11 @@ pub abstract class Config
 /// The configuration of the program, read from one TOML file.
 ///
 /// It holds no keys until `read` names a file, and answers every key with the
-/// fallback of the call until then.
+/// fallback of the call until then. `lock` guards the document, so a `read` on
+/// one thread deletes no document that a question of another thread reads.
 pub singleton class FileConfig inherits Config
 {
+	lock: Mutex,
 	atomic document: ?*toml.Document = none,
 
 	/// Read the TOML file at `path` as the configuration of the program, which
@@ -71,7 +73,10 @@ pub singleton class FileConfig inherits Config
 		let bytes = try fs.read_file(path);
 		defer free(bytes.ptr);
 		let doc = try toml.Document.open(text.from_bytes(bytes));
-		let before = self.document.swap(doc);
+		let before: ?*toml.Document = none;
+		sync self.lock {
+			before = self.document.swap(doc);
+		}
 		if before != none {
 			delete(before);
 		}
@@ -79,14 +84,39 @@ pub singleton class FileConfig inherits Config
 
 	concrete fn has(self, key: str) -> bool
 	{
-		let doc = self.document.load() else { return false; };
-		return doc.has(key);
+		sync self.lock {
+			let doc = self.document.load() else { return false; };
+			return doc.has(key);
+		}
 	}
 
 	concrete fn text_of(self, key: str, fallback: str) -> str
 	{
-		let doc = self.document.load() else { return fallback; };
-		return doc.text_of(key, fallback);
+		sync self.lock {
+			let doc = self.document.load() else { return fallback; };
+			return doc.text_of(key, fallback);
+		}
+	}
+
+	/// The integer under `key`, read under `lock` from one document.
+	concrete fn int_of(self, key: str, fallback: int) -> int
+	{
+		sync self.lock {
+			let doc = self.document.load() else { return fallback; };
+			if !doc.has(key) {
+				return fallback;
+			}
+			return toml.int_value(doc.text_of(key, ""), fallback);
+		}
+	}
+
+	/// The boolean under `key`, read under `lock` from one document.
+	concrete fn bool_of(self, key: str, fallback: bool) -> bool
+	{
+		sync self.lock {
+			let doc = self.document.load() else { return fallback; };
+			return toml.bool_value(doc.text_of(key, ""), fallback);
+		}
 	}
 }
 
