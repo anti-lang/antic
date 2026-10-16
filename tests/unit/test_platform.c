@@ -562,6 +562,41 @@ static void files(void)
    of a function of the program is the program, and of a function of a
    library that library. The debugger library knows nothing on the
    systems that have none. */
+/* A walk from depth calls of walk_deep below the caller. Each call goes
+   through a volatile pointer and stores its result after the call, so
+   no call is inlined or made a jump, and each keeps its frame. */
+static int64_t walk_deep(int depth, uint64_t *into, int64_t room);
+static int64_t (*volatile deeper)(int, uint64_t *, int64_t) = walk_deep;
+
+static int64_t walk_deep(int depth, uint64_t *into, int64_t room)
+{
+    volatile int64_t n;
+
+    if (depth == 0) {
+        n = anti_rt_trace_walk(into, room, 0);
+    } else {
+        n = deeper(depth - 1, into, room);
+    }
+    return n;
+}
+
+/* The walk keeps as many frames as its room holds, on every system, and
+   counts a skip below zero as zero. Windows stopped at 64 and gave
+   nothing for a skip below zero. */
+static void deep_traces(void)
+{
+    static uint64_t frames[200];
+    int64_t n = deeper(100, frames, 200);
+    uint64_t first[8];
+    int64_t here = anti_rt_trace_walk(first, 8, 0);
+
+    CHECK(n > 100);
+    CHECK(deeper(100, frames, 70) == 70);
+    CHECK(here >= 1);
+    CHECK(anti_rt_trace_walk(first, 8, -1) == here);
+    CHECK(anti_rt_trace_walk(first, -1, 0) == 0);
+}
+
 static void traces(void)
 {
     struct anti_rt_module program;
@@ -766,6 +801,7 @@ int main(int argc, char **argv)
     drive_relative();
 #endif
     traces();
+    deep_traces();
     aligned_memory();
     process_arguments(argc, argv);
     process_environment();

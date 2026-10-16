@@ -326,8 +326,10 @@ const void *anti_rt_library_image(const void *address);
    reader, a value of the run and not a `#if`. */
 
 /* The return addresses of the caller and the calls above it, at most
-   room of them into into, less the skip innermost. Gives the count.
-   anti.lang.StackTrace calls it. */
+   room of them into into, less the skip innermost. Gives the count. A
+   room below one gives none, and a skip below zero counts as zero. The
+   walk has no bound of its own: anti.lang.StackTrace, which calls it,
+   gives the room of the frames it keeps. */
 int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip);
 
 enum anti_rt_image_format {

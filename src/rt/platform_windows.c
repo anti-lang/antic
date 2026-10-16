@@ -670,11 +670,11 @@ int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
     int64_t count = 0;
     int64_t depth;
 
-    if (room > 64) {
-        room = 64;
-    }
-    if (room <= 0 || skip < 0 || skip > 1000) {
+    if (room <= 0) {
         return 0;
+    }
+    if (skip < 0) {
+        skip = 0;
     }
     RtlCaptureContext(&context);
     /* The first frame is the one of anti_rt_trace_walk, which the trace
