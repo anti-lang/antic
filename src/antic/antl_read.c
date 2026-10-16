@@ -871,6 +871,9 @@ static struct type *read_struct(struct reader *r, uint32_t at, uint8_t kind,
         t->generic = generic;
         t->args = args;
         t->values = values;
+        /* A copy stands one level above its arguments, as the checker
+           makes it, so the limit below holds a chain of copies. */
+        t->depth = types_depth_above(args, generic->type_param_count);
         t->next_copy = generic->copies;
         generic->copies = t;
     }
@@ -1103,9 +1106,12 @@ void antl_read_types(struct reader *r)
     uint32_t i;
 
     r->table = antl_allocate(r, count, sizeof *r->table);
+    /* An entry deeper than TYPES_NEST_MAX is refused as the checker
+       refuses one the program writes. Each entry is built over earlier
+       ones, so no entry gets deeper than the limit and one. */
     for (i = 0; i < count && !r->failed; i++) {
         struct type *t = read_type(r, i, structs, &struct_count);
-        if (t == NULL) {
+        if (t == NULL || t->depth > TYPES_NEST_MAX) {
             antl_damaged(r);
         }
         r->table[i] = t;

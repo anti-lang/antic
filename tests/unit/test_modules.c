@@ -2748,6 +2748,124 @@ static void deep_tables(void)
     }
 }
 
+/* scale_antl with n entries of kind after its two types, each built over
+   the entry before it and the first over `uint`. Each stands one level
+   above the entry it is built over. */
+static void type_chain(struct text *b, uint32_t n, uint8_t kind)
+{
+    uint32_t k;
+
+    text_append_bytes(b, scale_antl, SCALE_TYPES);
+    put_u32(b, 2 + n);
+    text_append_bytes(b, scale_antl + SCALE_TYPES + 4,
+                      SCALE_ITEMS - SCALE_TYPES - 4);
+    for (k = 0; k < n; k++) {
+        uint32_t below = k == 0 ? 0 : 1 + k;
+        put_u8(b, kind);
+        switch (kind) {
+        case TYPE_POINTER:
+        case TYPE_SLICE:
+            put_u32(b, below);
+            put_u8(b, 0);               /* no marks */
+            break;
+        case TYPE_ARRAY:
+            put_u32(b, below);
+            put_u8(b, 0);               /* a number of elements */
+            put_u64(b, 2);
+            break;
+        case TYPE_FN:
+            put_u32(b, 0);              /* no parameters */
+            put_u32(b, below);
+            put_u8(b, 0);
+            break;
+        default:                        /* a tuple of two */
+            put_u32(b, 2);
+            put_u32(b, below);
+            put_u32(b, below);
+            break;
+        }
+    }
+    text_append_bytes(b, scale_antl + SCALE_ITEMS,
+                      sizeof scale_antl - SCALE_ITEMS);
+}
+
+/* S305: a pointer, a slice, an array, a function type or a tuple of the
+   type table nests at most TYPES_NEST_MAX levels deep, as the checker
+   holds a type the program writes. A deeper one is refused before a walk
+   over its parts recurses once per level. */
+static void deep_types(void)
+{
+    static const uint8_t kinds[] = {TYPE_POINTER, TYPE_SLICE, TYPE_ARRAY,
+                                    TYPE_FN, TYPE_TUPLE};
+    size_t i;
+
+    for (i = 0; i < sizeof kinds; i++) {
+        struct text b = {0};
+        type_chain(&b, TYPES_NEST_MAX, kinds[i]);
+        CHECK(reads_file(&b));
+        text_free(&b);
+        type_chain(&b, TYPES_NEST_MAX + 1, kinds[i]);
+        refuses_file((const uint8_t *)b.data, b.length, NULL);
+        text_free(&b);
+    }
+}
+
+/* The type of parameter 0 of the item name of lib, or NULL. */
+static const struct type *param_of(const struct interface *lib,
+                                   const char *name)
+{
+    size_t i;
+
+    for (i = 0; lib != NULL && i < lib->item_count; i++) {
+        const struct symbol *sym = lib->items[i];
+        if (sym->name.length == strlen(name) &&
+            memcmp(sym->name.text, name, sym->name.length) == 0 &&
+            sym->type != NULL && sym->type->kind == TYPE_FN &&
+            sym->type->param_count > 0) {
+            return sym->type->params[0];
+        }
+    }
+    return NULL;
+}
+
+/* S305: a copy of a generic the reader makes stands one level above its
+   deepest argument, as the copy the checker makes does, so the limit
+   holds a chain of copies as well. */
+static void copy_depths(void)
+{
+    static const char source[] = "pub struct Box<T> { v: T }\n"
+                                 "pub fn deep(b: Box<Box<Box<int>>>) -> int {\n"
+                                 "    return 0;\n"
+                                 "}\n";
+    struct session a;
+    struct session b;
+    struct text bytes = {0};
+    struct ir_module program;
+    const struct interface *read;
+    const struct type *written;
+    const struct type *got;
+    char error[160] = "";
+
+    open_session(&a);
+    if (!build_library(&a, "boxes", source, &bytes)) {
+        close_session(&a);
+        return;
+    }
+    written = param_of(a.libraries[0], "deep");
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "boxes");
+    read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                     &b.types, &b.arena, &program, error, sizeof error);
+    CHECK_STR(error, "");
+    got = param_of(read, "deep");
+    CHECK(written != NULL && written->depth == 3);
+    CHECK(got != NULL && got->depth == 3);
+    ir_module_free(&program);
+    close_session(&b);
+    text_free(&bytes);
+    close_session(&a);
+}
+
 /* S01: the checked tree of a generic that a library file carries. Each
    test below writes the tree of `tree` with one relation the checker
    never leaves, and the reader refuses the file. */
@@ -3366,6 +3484,8 @@ static void damaged_trees(void)
 
 void test_modules(void)
 {
+    deep_types();
+    copy_depths();
     damaged_trees();
     damaged_bytes();
     tree_counts();
