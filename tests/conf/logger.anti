@@ -1,0 +1,48 @@
+//! The logger that the file of `--anti.logger` asks for. The program writes
+//! one line at each of three levels and then `done`. With the argument
+//! `register` it first adds the kinds of sink `first` and `second`, which
+//! write each line to standard output after their name.
+
+import anti.io;
+import anti.lang;
+import anti.log;
+import anti.text;
+
+/// Write `line` to standard output after the name of the kind `first`.
+fn to_first(line: str)
+{
+	io.print("first: ");
+	io.print(line);
+}
+
+/// Write `line` to standard output after the name of the kind `second`.
+fn to_second(line: str)
+{
+	io.print("second: ");
+	io.print(line);
+}
+
+/// The sink of the kind `first`, whatever the path of its entry.
+fn make_first(path: str) -> *log.Sink
+{
+	return log.CallbackSink.new(to_first);
+}
+
+/// The sink of the kind `second`, whatever the path of its entry.
+fn make_second(path: str) -> *log.Sink
+{
+	return log.CallbackSink.new(to_second);
+}
+
+fn main(args: []str) -> int
+{
+	if args.len > 1 && text.equal(args[1], "register") {
+		log.register("first", make_first);
+		log.register("second", make_second);
+	}
+	log.info("one");
+	log.warn("two");
+	log.error("three");
+	io.println("done");
+	return 0;
+}

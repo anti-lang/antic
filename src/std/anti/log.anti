@@ -247,7 +247,6 @@ pub class SinkLogger inherits Logger
 pub singleton class Log
 {
 	atomic logger: ?*Logger = none,
-	atomic kinds: ?*Kind = none,
 
 	fn construct(self)
 	{
@@ -378,17 +377,30 @@ class Kind
 	pub next: ?*Kind,
 }
 
+/// The kinds of sink that `register` added, newest first.
+///
+/// DESIGN: the kinds stand outside `Log`, whose `construct` reads the file
+/// that names them. By S313 of the third audit: `construct` of `Log` looked
+/// a kind up through `Log.get()`, which found no instance yet, built a second
+/// `Log` and read the file again, until the stack ran out. `register` built
+/// the `Log` as well, so the file never saw the kind it added.
+singleton class Kinds
+{
+	atomic first: ?*Kind = none,
+}
+
 /// Add a kind of sink that a configuration file may name.
 ///
 /// `make` takes the `path` of the entry and gives the sink. A file that names a
 /// kind nothing registered writes one line to standard error and the entry is
-/// left out. The kinds `stderr` and `file` are always there.
+/// left out. The kinds `stderr` and `file` are always there. The first line
+/// the program writes reads the file, so a kind added after it reaches no file.
 pub fn register(name: str, keep make: fn(str) -> *Sink)
 {
 	let one = alloc Kind { name: name, make: make, next: none };
 	while true do {
-		one.next = Log.get().kinds.load();
-		if Log.get().kinds.compare_swap(one.next, one) {
+		one.next = Kinds.get().first.load();
+		if Kinds.get().first.compare_swap(one.next, one) {
 			return;
 		}
 	}
@@ -409,7 +421,7 @@ fn made(name: str, path: str) -> ?*Sink
 		};
 		return sink;
 	}
-	let one = Log.get().kinds.load();
+	let one = Kinds.get().first.load();
 	while one != none do {
 		if text.equal(one.name, name) {
 			return one.make(path);

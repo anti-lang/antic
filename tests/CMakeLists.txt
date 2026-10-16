@@ -5572,8 +5572,8 @@ foreach(case
 endforeach()
 
 # The runtime configuration: the options under --anti., the file that
-# --anti.conf, ANTI_CONF or rt.configure names, and the includes of that
-# file. A case is a name, the source in tests/conf, the options of antic
+# --anti.conf, ANTI_CONF or rt.configure names, the includes of that file
+# and the file of the logger that the key `logger` names. A case is a name, the source in tests/conf, the options of antic
 # and the arguments of the program, then the pattern files of the output
 # and of the error output and the exit status. The runner is the one of
 # the trace tests, because the layer of a key names an absolute path
@@ -5621,7 +5621,9 @@ foreach(case
         "hash_seed_file|seed||--anti.conf=${CONF}/seed.toml|seed.file.pattern||0"
         "hash_seed_configure|seed||${CONF}/seed.toml|seed.configure.pattern||0"
         "hash_seed_range|report||--anti.hash_seed=18446744073709551616|empty.pattern|seed-range.pattern|70"
-        "hash_seed_text|report||--anti.conf=${CONF}/seed-text.toml|empty.pattern|seed-text.pattern|70")
+        "hash_seed_text|report||--anti.conf=${CONF}/seed-text.toml|empty.pattern|seed-text.pattern|70"
+        "logger_unknown_kind|logger||--anti.logger=${CONF}/logger-unknown.toml|logger-done.pattern|logger-unknown.pattern|0"
+        "logger_register|logger||--anti.logger=${CONF}/logger-first.toml,register|logger-first.pattern||0")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 source)

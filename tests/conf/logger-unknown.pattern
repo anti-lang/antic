@@ -1,0 +1,4 @@
+anti\.log: no sink of kind syslog
+[0-9]+ info one
+[0-9]+ warn two
+[0-9]+ error three
