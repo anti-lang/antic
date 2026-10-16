@@ -2,12 +2,17 @@
 
    DESIGN: a trace is taken in two steps. The capture walks the frames.
    Per frame it records the module that holds the address, the build id
-   of that module and its load base. It reads nothing from a file.
-   Symbolising reads the symbol table and the line table. It runs only
-   when a program asks for the names, so an error that is handled costs
-   the walk alone. The walk and the module of an address are calls of
-   the platform layer, and the format of the module chooses the reader
-   of its tables here. */
+   of that module and its load base. macOS and Windows read every build
+   id from the image in memory, and so does Linux for the image of the
+   runtime. Linux reads the id of any other module from the symbol table
+   of its file, which `load` reads whole once and keeps until exit. A
+   program linked against glibc has frames in libc.so.6, so its first
+   trace reads that file. Symbolising reads the symbol table and the line
+   table. It runs only when a program asks for the names, so an error
+   that is handled costs the walk and, on Linux, the first read of the
+   file of each other module. The walk and the module of an address are
+   calls of the platform layer, and the format of the module chooses the
+   reader of its tables here. */
 #include "trace.h"
 
 #include <inttypes.h>
