@@ -1,0 +1,26 @@
+//! A flag given a value with `=` fails with the code `FLAG_WITH_VALUE`, and
+//! the message names the argument.
+import anti.args;
+import anti.io;
+import anti.lang;
+
+/// Read `argv` with `p`, forwarding the error of `parse`.
+fn parse_all(p: *args.Parser, argv: []str) may fail
+{
+	try p.parse(argv);
+}
+
+fn main(argv: []str) -> int
+{
+	let p = args.Parser.new("pin", "");
+	p.flag("verbose", 0x76, "write more about what happens");
+	parse_all(&p, argv) catch e {
+		io.println(e.message);
+		if e.code != args.FLAG_WITH_VALUE {
+			return 2;
+		}
+		return 0;
+	};
+	io.println("taken");
+	return 1;
+}

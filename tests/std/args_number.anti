@@ -1,0 +1,30 @@
+//! An argument of `-` and a digit is one that is no option, unless an option
+//! has that digit as its letter.
+import anti.args;
+import anti.io;
+import anti.lang;
+
+fn main(argv: []str) -> int
+{
+	let p = args.Parser.new("move", "");
+	p.flag("verbose", 0x76, "write more about what happens");
+	p.parse(argv) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	for i in 0..p.len() {
+		io.println(p.at(i) ?? "none");
+	}
+
+	let q = args.Parser.new("move", "");
+	q.flag("five", 0x35, "move five at once");
+	let five: [2]str = ["move", "-5"];
+	q.parse(five[0..2]) catch e {
+		io.println(e.message);
+		return 2;
+	};
+	if !q.given("five") || q.len() != 0 {
+		return 3;
+	}
+	return 0;
+}

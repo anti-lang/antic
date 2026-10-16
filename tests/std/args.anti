@@ -54,13 +54,13 @@ fn main(argv: []str, env: []str) -> int
 
 	let q = args.Parser.new("pin", "");
 	let wrong: [2]str = ["pin", "--missing"];
-	if refused(&q, wrong[0..2]) != 1 {
+	if refused(&q, wrong[0..2]) != args.UNKNOWN_OPTION {
 		return 5;
 	}
 	let r = args.Parser.new("pin", "");
 	r.value("output", 0x6F, "the file to write", "a.out");
 	let bare: [2]str = ["pin", "-o"];
-	if refused(&r, bare[0..2]) != 2 {
+	if refused(&r, bare[0..2]) != args.MISSING_VALUE {
 		return 6;
 	}
 	return 0;

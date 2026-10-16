@@ -1749,7 +1749,7 @@ The 23 modules, with their public items and the functions among them that may fa
 | `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `Changed`, `Snapshot<T>`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `find_one`, `update_one` and `remove_one` of every collection |
 | `anti.toml` | `Document`, `int_value`, `bool_value` | `Document.read` |
 | `anti.config` | `Config`, `FileConfig`, `current`, `read` | `read` |
-| `anti.args` | `Parser` | `Parser.parse` |
+| `anti.args` | `Parser`, `UNKNOWN_OPTION`, `MISSING_VALUE`, `FLAG_WITH_VALUE` | `Parser.parse` |
 | `anti.json` | `write`, `write_text`, `write_int`, `write_bool`, `member`, `unquote` | `unquote` |
 | `anti.log` | `Level`, `Format`, `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger`, `SinkLogger`, `Log`, `logger`, `set`, `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `level_name`, `level_of`, `register` | `FileSink.new` |
 | `anti.debug` | `backtrace` | |

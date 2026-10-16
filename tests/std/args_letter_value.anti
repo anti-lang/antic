@@ -1,0 +1,17 @@
+//! An option that takes a value reads it after `=` in its one-letter form, as
+//! `-o=build` does.
+import anti.args;
+import anti.io;
+import anti.lang;
+
+fn main(argv: []str) -> int
+{
+	let p = args.Parser.new("pin", "");
+	p.value("output", 0x6F, "the file to write", "a.out");
+	p.parse(argv) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	io.println(p.text_of("output") ?? "none");
+	return 0;
+}

@@ -4,17 +4,26 @@
 //! each one by its long name. The help text comes from the same declarations,
 //! so it never falls behind them.
 //!
-//! An option has a long name and one letter. A flag stands for itself. An
-//! option that takes a value reads `--name value`, `--name=value` or `-n
-//! value`. A bare `--` ends the options, and every argument after it is a
-//! positional one, as is any argument that does not start with `-`. `--help`
-//! and `-h` are declared for every parser.
+//! An option has a long name and one letter. A flag stands for itself and
+//! takes no value, so `--name=value` of a flag fails. An option that takes a
+//! value reads `--name value`, `--name=value`, `-n value` or `-n=value`. A bare
+//! `--` ends the options, and every argument after it is a positional one, as
+//! is any argument that does not start with `-`, `-` alone, and `-` before a
+//! digit that is the letter of no option, such as `-5`. `--help` and `-h` are
+//! declared for every parser.
 
 import anti.lang;
 import anti.text;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn anti_rt_out_of_memory(size: int) -> never;
+
+/// The code of the error of an option that no declaration holds.
+pub const UNKNOWN_OPTION: int = 1;
+/// The code of the error of an option that takes a value and has none.
+pub const MISSING_VALUE: int = 2;
+/// The code of the error of a flag given a value with `=`.
+pub const FLAG_WITH_VALUE: int = 3;
 
 /// One declared option, with what the command line gave it.
 struct Option
@@ -71,8 +80,9 @@ pub class Parser
 	/// Read `argv` as the command line, from its second entry on, which may
 	/// fail.
 	///
-	/// An unknown option fails with an error of code 1, and an option that
-	/// takes a value and has none with code 2.
+	/// An unknown option fails with an error of the code `UNKNOWN_OPTION`, an
+	/// option that takes a value and has none with `MISSING_VALUE`, and a flag
+	/// given a value with `FLAG_WITH_VALUE`.
 	pub fn parse(self, argv: []str) may fail
 	{
 		let only_rest = false;
@@ -206,7 +216,15 @@ pub class Parser
 	{
 		/* 0x2D is the byte of `-`, and `-` alone is an argument that
 		   names standard input by convention. */
-		return arg.len > 1 && arg[0] == 0x2D;
+		if arg.len < 2 || arg[0] != 0x2D {
+			return false;
+		}
+		/* A negative number is an argument, unless an option has its
+		   first digit as its letter. 0x30 and 0x39 are `0` and `9`. */
+		if arg[1] >= 0x30 && arg[1] <= 0x39 {
+			return self.index_of_letter(arg[1]) >= 0;
+		}
+		return true;
 	}
 
 	/// The index of the option called `name`, or -1.
@@ -256,16 +274,21 @@ pub class Parser
 			at = self.index_of_letter(body[0]);
 		}
 		if at < 0 {
-			fail lang.Error.new(1, self.say("unknown option: ", arg));
+			fail lang.Error.new(UNKNOWN_OPTION,
+				self.say("unknown option: ", arg));
 		}
 		if !self.options[at].takes {
+			if has_value {
+				fail lang.Error.new(FLAG_WITH_VALUE,
+					self.say("the option takes no value: ", arg));
+			}
 			self.options[at].given = true;
 			return 1;
 		}
 		let taken = 1;
 		if !has_value {
 			if i + 1 >= argv.len {
-				fail lang.Error.new(2,
+				fail lang.Error.new(MISSING_VALUE,
 					self.say("the option has no value: ", arg));
 			}
 			value = argv[i + 1];
