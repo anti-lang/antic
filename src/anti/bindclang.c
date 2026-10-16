@@ -316,6 +316,15 @@ static void refuse(struct reader *r, const char *format, ...)
     r->failed = true;
 }
 
+/* Refuse the header when a name it declares is no identifier of C, as a
+   description is refused, by S333. clang takes `$` in an identifier. */
+static void hold_name(struct reader *r, const char *kind, const char *name)
+{
+    if (!bind_named(r->b, kind, name)) {
+        r->failed = true;
+    }
+}
+
 /* DESIGN: clang writes the file and the line of a location only where
    they differ from the location before it in the document. The reader walks every location in that order and keeps the
    last file and line. `includedFrom` names another file and is no
@@ -705,6 +714,7 @@ static void read_fields(struct reader *r, struct bind_record *rec,
         }
         f->c_type = bind_strdup(r->b, c);
         if (fname != NULL) {
+            hold_name(r, "field", fname);
             f->name = bind_strdup(r->b, fname);
         } else if (!json_member_true(item, "isBitfield")) {
             /* DESIGN: an anonymous member of C11 has no Anti form, so it
@@ -754,6 +764,11 @@ static struct bind_record *declare_record(struct reader *r,
     int64_t align;
 
     if (t == NULL) {
+        /* A record without a tag takes a name the reader checked or
+           made. */
+        if (json_get(node, "name") != NULL) {
+            hold_name(r, is_union ? "union" : "struct", name);
+        }
         t = arena_alloc(&r->b->arena, sizeof *t);
         t->name = bind_strdup(r->b, name);
         t->is_union = is_union;
@@ -821,6 +836,9 @@ static void declare_enum(struct reader *r, const struct json_value *node)
     bool above_int64 = false;
     size_t i;
 
+    if (tag != NULL) {
+        hold_name(r, "enum", tag);
+    }
     entry->id = id != NULL ? bind_strdup(r->b, id) : "";
     entry->tag = tag != NULL ? bind_strdup(r->b, tag) : NULL;
     entry->e = e;
@@ -837,6 +855,7 @@ static void declare_enum(struct reader *r, const struct json_value *node)
             name == NULL) {
             continue;
         }
+        hold_name(r, "value", name);
         /* An enumerator without a value is the one before it plus one,
            and the first is 0. The sum is unsigned, so the one after
            INT64_MAX has the bits of 2^63, as find_constant gives a value
@@ -927,6 +946,7 @@ static void name_owned(struct reader *r, const struct json_value *node)
     }
     e = enum_by_id(r, id);
     if (e != NULL && e->e->name == NULL) {
+        hold_name(r, "enum", name);
         e->e->name = bind_strdup(r->b, name);
         e->e->c_name = e->e->name;
         r->generation++;
@@ -970,6 +990,7 @@ static void declare_function(struct reader *r, const struct json_value *node)
     e = fn_named(r, name);
     if (e == NULL) {
         struct bind_function *f = arena_alloc(&r->b->arena, sizeof *f);
+        hold_name(r, "function", name);
         type = parse(r, c);
         f->name = bind_strdup(r->b, name);
         if (type == NULL || type->kind != BIND_FUNCTION) {
@@ -997,6 +1018,11 @@ static void declare_function(struct reader *r, const struct json_value *node)
                 if (kind == NULL || strcmp(kind, "ParmVarDecl") != 0 ||
                     k >= f->param_count) {
                     continue;
+                }
+                if (json_member_string(inner->items[i], "name") != NULL &&
+                    json_member_string(inner->items[i], "name")[0] != '\0') {
+                    hold_name(r, "parameter",
+                              json_member_string(inner->items[i], "name"));
                 }
                 f->params[k].name =
                     json_member_string(inner->items[i], "name") != NULL
@@ -1205,6 +1231,14 @@ static void read_define(struct reader *r, const char *name)
            (name[n] >= 'A' && name[n] <= 'Z') ||
            (name[n] >= '0' && name[n] <= '9') || name[n] == '_') {
         n++;
+    }
+    if (name[n] != '\0' && name[n] != ' ' && name[n] != '(') {
+        size_t end = n;
+        while (name[end] != '\0' && name[end] != ' ' && name[end] != '(') {
+            end++;
+        }
+        hold_name(r, "macro", bind_strndup(r->b, name, end));
+        return;
     }
     if (name[n] == '(') {
         const char *close = strchr(name + n, ')');
@@ -1440,7 +1474,7 @@ static void read_macros(struct reader *r)
                       m->name);
             continue;
         }
-        if (bind_is_keyword(m->name)) {
+        if (bind_is_anti_word(m->name)) {
             bind_warn(r->b, "the macro `%s` is a word of Anti and is skipped",
                       m->name);
             continue;
@@ -1604,6 +1638,12 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
                 const char *tname = json_member_string(next, "name");
                 if (next_kind != NULL && strcmp(next_kind, "TypedefDecl") == 0 &&
                     tname != NULL) {
+                    const char *tag_used = json_member_string(node, "tagUsed");
+                    hold_name(&r, tag_used != NULL &&
+                                          strcmp(tag_used, "union") == 0
+                                      ? "union"
+                                      : "struct",
+                              tname);
                     declare_record(&r, node, tname);
                 }
             } else if (strcmp(kind, "EnumDecl") == 0) {
@@ -1619,6 +1659,11 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
         }
         track(&r, json_get(node, "range"));
         track(&r, json_get(node, "inner"));
+    }
+    /* A refused header binds nothing, so no function adds a warning to
+       its message. */
+    if (r.failed) {
+        goto done;
     }
     /* The functions come last, when every type they name is known. */
     r.file = NULL;

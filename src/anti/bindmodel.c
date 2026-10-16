@@ -49,11 +49,38 @@ struct bind_type *bind_type_new(struct bind_module *b, enum bind_kind kind)
     return t;
 }
 
-bool bind_is_keyword(const char *name)
+static bool is_c_identifier(const char *name)
 {
-    /* A name is free when the lexer reads it as one identifier. That
-       covers the keywords, the reserved words and `null`. */
-    return !antic_is_identifier(name);
+    size_t i;
+
+    for (i = 0; name[i] != '\0'; i++) {
+        char c = name[i];
+        bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                      c == '_';
+        if (!letter && (i == 0 || c < '0' || c > '9')) {
+            return false;
+        }
+    }
+    return i > 0;
+}
+
+bool bind_named(const struct bind_module *b, const char *kind,
+                const char *name)
+{
+    if (is_c_identifier(name)) {
+        return true;
+    }
+    fprintf(stderr, "anti: %s names the %s `%s`, which is no C identifier\n",
+            b->source, kind, name);
+    return false;
+}
+
+bool bind_is_anti_word(const char *name)
+{
+    /* An identifier of C is free when the lexer reads it as one
+       identifier. The rest are the keywords, the reserved words, `true`,
+       `false` and `none`, by S333. */
+    return is_c_identifier(name) && !antic_is_identifier(name);
 }
 
 /* DESIGN: the frameworks of Apple's SDK that each bundled library needs

@@ -196,7 +196,7 @@ void bind_settle(struct bind_module *b)
             f->bound = false;
             continue;
         }
-        if (bind_is_keyword(f->name)) {
+        if (bind_is_anti_word(f->name)) {
             why = "its name is a word of Anti";
         } else if (f->result->kind != BIND_VOID &&
                    !spell(f->result, AS_RESULT, &scratch)) {
@@ -233,7 +233,7 @@ void bind_settle(struct bind_module *b)
 static void name_of(const char *name, struct text *out)
 {
     text_append(out, name);
-    if (bind_is_keyword(name)) {
+    if (bind_is_anti_word(name)) {
         text_append(out, "_");
     }
 }

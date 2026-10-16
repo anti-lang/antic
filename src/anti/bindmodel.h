@@ -168,8 +168,16 @@ struct bind_names {
 const struct bind_type *bind_parse_type(struct bind_module *b, const char *c,
                                         const struct bind_names *names);
 
-/* Whether name is a word the lexer of Anti reserves. */
-bool bind_is_keyword(const char *name);
+/* Whether name is one identifier of C: a letter or `_`, then letters,
+   digits and `_`. Otherwise say that b names the kind with it, for each
+   reader to refuse its input after. The binding writes every name the
+   readers take into Anti and C as it stands. */
+bool bind_named(const struct bind_module *b, const char *kind,
+                const char *name);
+
+/* Whether name, an identifier of C, is a word of Anti: one the lexer of
+   Anti reads as no identifier, as `fn`, `type` and `none`. */
+bool bind_is_anti_word(const char *name);
 
 /* The frameworks of Apple's SDK that a library links against on macOS,
    from the table of anti bind. Returns the number of names. */

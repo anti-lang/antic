@@ -123,6 +123,11 @@ its name or its type is lost, and the struct without it would have another
 layout than the one of C. The description is then refused. These are R170,
 R171 and R172 of "Rules of 2026-10-13".
 
+An identifier of C is a letter or `_` and then letters, digits and `_`.
+Any other name refuses the input as a whole, a header as a description.
+clang takes `$` in an identifier, and the binding writes every name into
+Anti and C as it stands.
+
 A field or a parameter whose C name is a word of Anti takes a trailing `_`,
 which changes neither a layout nor a call. A function with such a name
 cannot be renamed, since its name is its symbol, and is left out.

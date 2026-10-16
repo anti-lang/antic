@@ -91,6 +91,26 @@ anti_message(api_constant_of_a_struct_left_out STATUS 0
 
 # A header that clang reads and the reader of its AST refuses.
 set(clang_bind bind --clang api.h -o "${WORK}/out" --runtime "${RUNTIME}")
+# S333. A name of a header that is no C identifier is refused, as a name
+# of a description is. clang takes `$` in an identifier. Each case is its
+# name, the header and the kind the message names.
+foreach(case
+        "struct|struct a$b { int x; };\nvoid take(struct a$b *p);\n|struct"
+        "union|union a$b { int x; };\nvoid take(union a$b *p);\n|union"
+        "typedef|typedef struct { int x; } a$b;\nvoid take(a$b *p);\n|struct"
+        "field|struct S { int a$b; };\nvoid take(struct S *p);\n|field"
+        "enum|enum a$b { E0 };\nvoid take(enum a$b e);\n|enum"
+        "enum_typedef|typedef enum { E0 } a$b;\nvoid take(a$b e);\n|enum"
+        "value|enum E { a$b };\nvoid take(enum E e);\n|value"
+        "function|int a$b(void);\n|function"
+        "parameter|int f(int a$b);\n|parameter"
+        "macro|#define a$b 1\n|macro")
+    string(REGEX MATCH "^([^|]*)[|](.*)[|]([^|]*)$" parts "${case}")
+    anti_message(clang_name_${CMAKE_MATCH_1}
+        FILES api.h "${CMAKE_MATCH_2}"
+        ARGS ${clang_bind}
+        ERR "anti: api.h names the ${CMAKE_MATCH_3} `a$b`, which is no C identifier")
+endforeach()
 anti_message(clang_field_aligned
     FILES api.h "struct Wide { int a; _Alignas(16) int b; };\nvoid take(struct Wide *w);\n"
     ARGS ${clang_bind}

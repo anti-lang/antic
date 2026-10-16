@@ -243,29 +243,6 @@ static const struct bind_type *parse(struct api *a, const char *c)
     return t;
 }
 
-/* Whether name is one identifier of C. The binding writes every name the
-   reader takes into Anti and C as it stands, so any other name is refused
-   with a message that names its kind. */
-static bool named(const struct api *a, const char *kind, const char *name)
-{
-    size_t i;
-
-    for (i = 0; name[i] != '\0'; i++) {
-        char c = name[i];
-        bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                      c == '_';
-        if (!letter && (i == 0 || c < '0' || c > '9')) {
-            break;
-        }
-    }
-    if (i > 0 && name[i] == '\0') {
-        return true;
-    }
-    fprintf(stderr, "anti: %s names the %s `%s`, which is no C identifier\n",
-            a->b->source, kind, name);
-    return false;
-}
-
 static const char *doc_of(struct api *a, const struct json_value *v)
 {
     const char *d = json_member_string(v, "description");
@@ -290,7 +267,7 @@ static bool read_structs(struct api *a)
             bind_warn(a->b, "a struct without a name is left out");
             continue;
         }
-        if (!named(a, "struct", name)) {
+        if (!bind_named(a->b, "struct", name)) {
             return false;
         }
         if (record_of(a, name) != NULL) {
@@ -331,7 +308,7 @@ static bool read_structs(struct api *a)
                         a->b->source, name);
                 return false;
             }
-            if (!named(a, "field", fname)) {
+            if (!bind_named(a->b, "field", fname)) {
                 return false;
             }
             f->name = bind_strdup(a->b, fname);
@@ -365,7 +342,7 @@ static bool read_enums(struct api *a)
         if (name == NULL || values == NULL || values->kind != JSON_ARRAY) {
             continue;
         }
-        if (!named(a, "enum", name)) {
+        if (!bind_named(a->b, "enum", name)) {
             return false;
         }
         e = arena_alloc(&a->b->arena, sizeof *e);
@@ -382,7 +359,7 @@ static bool read_enums(struct api *a)
                 bind_warn(a->b, "a value of the enum `%s` is no integer", name);
                 continue;
             }
-            if (!named(a, "value", vname)) {
+            if (!bind_named(a->b, "value", vname)) {
                 return false;
             }
             e->values[e->value_count].name = bind_strdup(a->b, vname);
@@ -420,7 +397,7 @@ static bool read_functions(struct api *a)
             bind_warn(a->b, "`%s` is left out: it names no result", name);
             continue;
         }
-        if (!named(a, "function", name)) {
+        if (!bind_named(a->b, "function", name)) {
             return false;
         }
         f = arena_alloc(&a->b->arena, sizeof *f);
@@ -443,7 +420,7 @@ static bool read_functions(struct api *a)
                 f->variadic = true;
                 continue;
             }
-            if (pname != NULL && !named(a, "parameter", pname)) {
+            if (pname != NULL && !bind_named(a->b, "parameter", pname)) {
                 return false;
             }
             p->name = pname != NULL ? bind_strdup(a->b, pname) : NULL;
@@ -597,7 +574,7 @@ static bool read_defines(struct api *a)
             continue;
         }
         function_like = strchr(name, '(') != NULL;
-        if (!function_like && !named(a, "define", name)) {
+        if (!function_like && !bind_named(a->b, "define", name)) {
             return false;
         }
         if (value->kind == JSON_STRING) {
