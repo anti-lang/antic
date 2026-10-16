@@ -107,6 +107,17 @@ if(NOT installer MATCHES "${block}")
 endif()
 string(REGEX REPLACE "${block}" "${public}" installer "${installer}")
 file(WRITE "${WORK}/install.sh" "${installer}")
+set(installer_script "${WORK}/install.sh")
+# The same copy without the check of the signature, which takes every
+# one. The case of a wrong signature must pass with it, so that case
+# fails for the signature and for nothing else.
+set(check "openssl pkeyutl -verify")
+string(FIND "${installer}" "${check}" at)
+if(at EQUAL -1)
+    message(FATAL_ERROR "tools/install.sh holds no `${check}` to take out")
+endif()
+string(REPLACE "${check}" "true || ${check}" unchecked "${installer}")
+file(WRITE "${WORK}/install-unchecked.sh" "${unchecked}")
 
 # Sign the manifest the way step 6 of ./r signs it.
 run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
@@ -128,7 +139,7 @@ function(install_run name staging out_variable log_variable)
                 "ANTI_HOME=${home}"
                 "ANTI_STAGING=${staging}"
                 ANTI_REPLACE=yes ANTI_PATH=no
-                sh "${WORK}/install.sh"
+                sh "${installer_script}"
         RESULT_VARIABLE failed OUTPUT_VARIABLE out ERROR_VARIABLE err
         ENCODING NONE)
     set("${out_variable}" "${failed}" PARENT_SCOPE)
@@ -148,15 +159,29 @@ if(NOT "${log}" MATCHES "signature")
 endif()
 
 # A signature of another manifest, which is what a changed line of
-# SHA256SUMS leaves behind.
-file(READ "${area}/SHA256SUMS" manifest)
-file(WRITE "${area}/SHA256SUMS" "0000000000000000000000000000000000000000000000000000000000000000  ${asset}\n")
+# SHA256SUMS leaves behind. The manifest and the package stay right, so
+# only the signature is wrong.
+file(RENAME "${area}/SHA256SUMS.sig" "${WORK}/SHA256SUMS.sig")
+file(WRITE "${WORK}/other/SHA256SUMS" "0000000000000000000000000000000000000000000000000000000000000000  ${asset}\n")
+run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
+    -out "${WORK}/other/SHA256SUMS.sha256" "${WORK}/other/SHA256SUMS")
+run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
+    -inkey "${WORK}/private.pem" -in "${WORK}/other/SHA256SUMS.sha256"
+    -out "${area}/SHA256SUMS.sig")
 install_run(wrong no failed log)
-if(failed EQUAL 0 OR NOT "${log}" MATCHES "signature")
+if(failed EQUAL 0 OR
+   NOT "${log}" MATCHES "carries no signature of the key of Anti")
     message(FATAL_ERROR "the installer took a manifest the signature does not "
                         "cover\n${log}")
 endif()
-file(WRITE "${area}/SHA256SUMS" "${manifest}")
+set(installer_script "${WORK}/install-unchecked.sh")
+install_run(wrong_unchecked no failed log)
+set(installer_script "${WORK}/install.sh")
+if(NOT failed EQUAL 0)
+    message(FATAL_ERROR "an installer that takes every signature refused the "
+                        "case of a wrong one, so the case tells nothing\n${log}")
+endif()
+file(RENAME "${WORK}/SHA256SUMS.sig" "${area}/SHA256SUMS.sig")
 
 # No signature at all. The installer stops, and names the file it wants.
 file(RENAME "${area}/SHA256SUMS.sig" "${WORK}/SHA256SUMS.sig")
