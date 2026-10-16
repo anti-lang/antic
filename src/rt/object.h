@@ -362,8 +362,8 @@ void anti_rt_json_write_text(struct anti_builder *b,
 /* Append to b the bytes of the JSON string that the len bytes at bytes
    hold, with white space allowed around it. The string is read as
    Object.deserialize reads one. Gives 1 when it was read and 0 when the
-   text is no JSON string, after the bytes read before the fault. Gives
-   -1 when memory ran out, and b is unchanged then. */
+   text is no JSON string, after the bytes read before the fault. Memory
+   that runs out ends the program, as for every append to b. */
 int32_t anti_rt_json_unquote(struct anti_builder *b,
                              const unsigned char *bytes, int64_t len);
 

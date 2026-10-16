@@ -424,9 +424,6 @@ int32_t anti_rt_json_unquote(struct anti_builder *b,
     }
     if (count > 0) {
         anti_rt_builder_fill(b, at, 0, (int64_t)count);
-        if (b->length != at + (int64_t)count) {
-            return -1;
-        }
         s.at = bytes;
         anti_rt_json_string(&s, b->room + at, count, &count);
     }

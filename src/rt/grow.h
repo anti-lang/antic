@@ -4,9 +4,8 @@
    DESIGN: one rule for every block that grows as it is appended to. The
    room doubles from a first size until it holds what is asked, and a size
    that no int64_t holds fails as memory that runs out does. What a
-   failure means stays with each caller: the search of a pattern ends the
-   program through the failure routine, the text builder keeps what it
-   holds as "Standard library phase" in docs/decisions.md says, a listing
+   failure means stays with each caller: the search of a pattern and the
+   text builder end the program through the failure routine, a listing
    of anti.fs fails with ENOMEM, the compile of a byte pattern fails, and
    the text of a trace is NULL, since the failure routine may be the one
    that builds it. */

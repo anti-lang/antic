@@ -89,22 +89,21 @@ int64_t anti_rt_compare_bytes(const unsigned char *a, int64_t a_length,
     return a_length < b_length ? -1 : a_length > b_length ? 1 : 0;
 }
 
-/* Make room for count more bytes and the NUL after them. Returns false
-   when the memory runs out or no size holds them, and the builder keeps
-   what it holds. */
-static int reserve(struct anti_builder *b, int64_t count)
+/* Make room for count more bytes and the NUL after them. Memory that
+   runs out ends the program through anti_rt_out_of_memory, and so does a
+   count that no size holds, by decision 4 of "Decisions of 2026-10-11". */
+static void reserve(struct anti_builder *b, int64_t count)
 {
-    unsigned char *room;
+    unsigned char *room = NULL;
 
-    if (count > INT64_MAX - 1) {
-        return 0;
+    if (count < INT64_MAX) {
+        room = anti_rt_reserve(b->room, &b->capacity, b->length, count + 1,
+                               32);
     }
-    room = anti_rt_reserve(b->room, &b->capacity, b->length, count + 1, 32);
     if (room == NULL) {
-        return 0;
+        anti_rt_out_of_memory(count);
     }
     b->room = room;
-    return 1;
 }
 
 /* DESIGN: the buffer of `anti.text.Builder` lives here. The default
@@ -121,9 +120,10 @@ static int reserve(struct anti_builder *b, int64_t count)
 void anti_rt_builder_append(struct anti_builder *b,
                             const unsigned char *bytes, int64_t len)
 {
-    if (len <= 0 || !reserve(b, len)) {
+    if (len <= 0) {
         return;
     }
+    reserve(b, len);
     memcpy(b->room + b->length, bytes, (size_t)len);
     b->length += len;
     b->room[b->length] = 0;
@@ -132,9 +132,10 @@ void anti_rt_builder_append(struct anti_builder *b,
 void anti_rt_builder_fill(struct anti_builder *b, int64_t at, int64_t byte,
                           int64_t count)
 {
-    if (count <= 0 || at < 0 || at > b->length || !reserve(b, count)) {
+    if (count <= 0 || at < 0 || at > b->length) {
         return;
     }
+    reserve(b, count);
     memmove(b->room + at + count, b->room + at, (size_t)(b->length - at));
     memset(b->room + at, (int)(byte & 0xFF), (size_t)count);
     b->length += count;
@@ -143,7 +144,9 @@ void anti_rt_builder_fill(struct anti_builder *b, int64_t at, int64_t byte,
 
 /* DESIGN: the bytes an `f"..."` gives belong to the program, which frees
    them with `free(s.ptr)`. An empty builder has no memory, so it takes
-   one byte for the NUL, and every text it gives can be freed alike. */
+   one byte for the NUL, and every text it gives can be freed alike. When
+   that byte finds no memory the program ends, as for every byte of the
+   builder. */
 struct anti_text anti_rt_builder_take(struct anti_builder *b)
 {
     struct anti_text text;
@@ -152,9 +155,7 @@ struct anti_text anti_rt_builder_take(struct anti_builder *b)
     if (room == NULL) {
         room = malloc(1);
         if (room == NULL) {
-            text.ptr = (const unsigned char *)"";
-            text.len = 0;
-            return text;
+            anti_rt_out_of_memory(1);
         }
         room[0] = 0;
     }

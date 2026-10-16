@@ -1,0 +1,29 @@
+//! `text.Builder.take_in(from)` stops the program with the failure routine
+//! when `from` gives no memory for the text. Before the fix it gave the
+//! literal `""`, which the caller is told to give back to `from`.
+
+import anti.mem;
+import anti.text;
+
+/// An allocator that has no memory to give.
+class Empty inherits mem.Allocator
+{
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		return none;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let empty = Empty { };
+	let b = text.Builder.new();
+	b.append("pear");
+	let t = b.take_in(&empty);
+	empty.free(t.ptr);
+	return t.len as int;
+}

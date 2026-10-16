@@ -23,7 +23,7 @@ endfunction()
 
 # The unit tests link anti_core, every file of anti but its main, and the
 # files of the runtime they test.
-antic_rt_sources(unit_rt_sources assert atomic cpu f16 fs platform_posix
+antic_rt_sources(unit_rt_sources assert atomic cpu f16 fs mem platform_posix
     platform_windows text)
 add_executable(antic_unit_tests
     unit/test_main.c
@@ -434,7 +434,7 @@ foreach(which one two)
     add_library(plugin_table_${which} SHARED unit/plugin_table.c)
 endforeach()
 antic_rt_sources(plugin_sources plugin assert loaded atomic digest text toml
-    utf platform_posix platform_windows object json cast)
+    utf platform_posix platform_windows object json cast mem)
 add_executable(rt_plugin_tests unit/test_plugin_race.c ${plugin_sources})
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
@@ -489,10 +489,29 @@ target_compile_definitions(rt_plugin_table_tests PRIVATE
     "PLUGIN_BAD=\"$<TARGET_FILE:plugin_bad>\"")
 add_dependencies(rt_plugin_table_tests plugin_bad)
 add_test(NAME rt_plugin_table COMMAND rt_plugin_table_tests)
+# S312 and M301. The text builder, the copy of an object and the copy of
+# an owned buffer when the C library refuses their memory, in a program of
+# its own, since each case ends the process. The files of the runtime it
+# links build with malloc and realloc named after the stand-ins of the
+# test, which refuse on request.
+antic_rt_sources(oom_sources text object json cast assert mem atomic utf
+    platform_posix platform_windows)
+add_library(rt_oom_runtime OBJECT ${oom_sources})
+target_compile_definitions(rt_oom_runtime PRIVATE
+    malloc=refused_malloc realloc=refused_realloc)
+add_executable(rt_oom_tests unit/test_rt_oom.c
+    $<TARGET_OBJECTS:rt_oom_runtime>)
+target_include_directories(rt_oom_tests PRIVATE ../src/rt)
+target_link_libraries(rt_oom_tests PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+add_test(NAME rt_oom
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROGRAM=$<TARGET_FILE:rt_oom_tests>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-oom"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_oom.cmake")
 # The programs of the runtime above compile its files themselves, so a
 # coverage tree measures src/rt/ through them.
 antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
-    rt_platform_tests rt_plugin_table_tests)
+    rt_platform_tests rt_plugin_table_tests rt_oom_runtime rt_oom_tests)
 
 # add_expect_test(<name> STATUS <status> [DIRECTORY <dir>]
 #                 [TIMEOUT <seconds>]
@@ -5085,10 +5104,12 @@ add_test(NAME trap_table
 # group past those of its pattern, and stops with the count of the
 # pattern. chan_capacity: a channel made for no value stops the program.
 # send_closed and send_closed_waiting: a `send` on a closed channel stops
-# it, one that waits on a full channel included.
+# it, one that waits on a full channel included. take_in_refused: the
+# text that `take_in` makes stops the program when its allocator gives no
+# memory, by decision 4 of "Decisions of 2026-10-11".
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         singleton_memory pattern_limit pattern_group_count chan_capacity
-        send_closed send_closed_waiting)
+        send_closed send_closed_waiting take_in_refused)
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

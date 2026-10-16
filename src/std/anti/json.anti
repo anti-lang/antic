@@ -88,9 +88,6 @@ pub fn member(source: str, name: str, out: *str) -> bool
 pub fn unquote(source: str, out: *text.Builder) may fail
 {
 	let read = anti_rt_json_unquote(out, source.ptr, source.len);
-	if read < 0 {
-		fail lang.Error.new(1, "out of memory");
-	}
 	if read == 0 {
 		fail "the text is no JSON string";
 	}

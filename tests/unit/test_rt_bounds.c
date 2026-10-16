@@ -1,4 +1,4 @@
-/* Integer bounds of the runtime: the growth of a block, the size of a
+/* Integer bounds of the runtime: the growth of a block, the places of a
    text builder and atomic subtraction at the minimum of each width. */
 #include <stdint.h>
 #include <stdlib.h>
@@ -34,8 +34,9 @@ static void block_growth(void)
     free(block);
 }
 
-/* A count that the size of the builder cannot hold is refused, and the
-   builder keeps what it holds. */
+/* A count that the size of the builder cannot hold ends the program as
+   memory that runs out does, which tests/run_rt_oom.cmake checks. A pad
+   before the bytes moves them and keeps their NUL. */
 static void builder_bounds(void)
 {
     struct anti_builder b = {0};
@@ -43,19 +44,11 @@ static void builder_bounds(void)
 
     anti_rt_builder_append(&b, four, 4);
     CHECK(b.length == 4);
-    anti_rt_builder_fill(&b, 0, ' ', INT64_MAX);
-    CHECK(b.length == 4);
-    anti_rt_builder_fill(&b, 2, ' ', INT64_MAX - 4);
-    CHECK(b.length == 4);
-    /* The bytes fit and their NUL does not. */
-    anti_rt_builder_fill(&b, 4, ' ', INT64_MAX - 4);
-    CHECK(b.length == 4);
-    anti_rt_builder_append(&b, four, INT64_MAX - 3);
-    CHECK(b.length == 4);
     CHECK(b.room != NULL && memcmp(b.room, "four", 5) == 0);
-
-    /* A count that fits still pads. */
     anti_rt_builder_fill(&b, 0, '-', 3);
+    CHECK(b.length == 7 && memcmp(b.room, "---four", 8) == 0);
+    /* A place past the bytes writes nothing. */
+    anti_rt_builder_fill(&b, 8, '-', 3);
     CHECK(b.length == 7 && memcmp(b.room, "---four", 8) == 0);
     free(b.room);
 }

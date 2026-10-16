@@ -100,7 +100,9 @@ int64_t anti_rt_compare_bytes(const unsigned char *a, int64_t a_length,
 
 /* The fields of `anti.text.Builder`, which the class declares in this
    order after the table pointer that every object begins with. The
-   runtime appends to one when it serializes an object. */
+   runtime appends to one when it serializes an object. Memory that runs
+   out for its bytes ends the program through anti_rt_out_of_memory, and
+   so does a count of bytes that no size holds. */
 struct anti_builder {
     const void *table;
     unsigned char *room;
@@ -189,7 +191,9 @@ void anti_rt_mem_free(void *p);
 
 /* End the program through the failure routine because size bytes found
    no memory. The compiler calls it where malloc gave NULL for one object
-   of `alloc T { }`, `alloc T(args)` or a singleton. In src/rt/mem.c. */
+   of `alloc T { }`, `alloc T(args)` or a singleton. The runtime and the
+   standard library call it wherever else memory runs out, by decision 4
+   of "Decisions of 2026-10-11". In src/rt/mem.c. */
 _Noreturn void anti_rt_out_of_memory(int64_t size);
 
 /* Memory for count elements of size bytes each at align, a power of two,

@@ -24,6 +24,7 @@ extern fn anti_rt_builder_text(b: ?*Builder) -> str;
 extern fn anti_rt_builder_clear(b: ?*Builder);
 extern fn anti_rt_builder_fill(b: ?*Builder, at: int, value: int, count: int);
 extern fn anti_rt_builder_take(b: ?*Builder) -> str;
+extern fn anti_rt_out_of_memory(size: int) -> never;
 extern fn anti_rt_builder_float(b: ?*Builder, value: f64, precision: int,
 	exponent: int, single: int);
 
@@ -186,7 +187,8 @@ pub class Builder
 	///
 	/// The `str` holds memory of its own from the C library, which
 	/// `free(s.ptr)` returns. The builder is empty afterwards and may collect
-	/// again.
+	/// again. When the C library has no memory for the text, the program
+	/// stops with a message.
 	pub fn take(self) -> str
 	{
 		return anti_rt_builder_take(self);
@@ -197,18 +199,18 @@ pub class Builder
 	///
 	/// `from.free(s.ptr)` gives the memory back, and so does anything that
 	/// gives back every block of `from` at once. The text keeps its NUL. When
-	/// `from` gives no memory, the text is the empty literal, as `take` gives
-	/// it when the C library has none. The builder is empty afterwards and may
-	/// collect again. A text that should live in an arena is built this way.
+	/// `from` gives no memory, the program stops with a message, as `take`
+	/// does when the C library has none. The builder is empty afterwards and
+	/// may collect again. A text that should live in an arena is built this
+	/// way.
 	pub fn take_in(self, from: *mem.Allocator) -> str
 	{
 		let collected = anti_rt_builder_text(self);
-		let made = "";
-		let room = from.alloc(collected.len + 1, 1);
-		if room != none {
-			memcpy(room, collected.ptr, (collected.len + 1) as c_size_t);
-			made = anti_rt_text_slice(room, collected.len);
-		}
+		let room = from.alloc(collected.len + 1, 1) else {
+			anti_rt_out_of_memory(collected.len + 1);
+		};
+		memcpy(room, collected.ptr, (collected.len + 1) as c_size_t);
+		let made = anti_rt_text_slice(room, collected.len);
 		free(self.room);
 		self.room = none;
 		self.length = 0;
