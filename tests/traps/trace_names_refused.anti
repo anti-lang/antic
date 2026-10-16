@@ -7,14 +7,9 @@ import anti.lang;
 
 fn main() -> int
 {
-	let one: [1]lang.RawFrame = [lang.RawFrame {
-		address: 0,
-		module: "",
-		build_id: "",
-		base: 0,
-	}; 1];
+	let frame = lang.RawFrame { address: 0, module: "", build_id: "", base: 0 };
 	let t = alloc lang.StackTrace {
-		frames: []lang.RawFrame { ptr: &one[0], len: 1 << 50 },
+		frames: []lang.RawFrame { ptr: &frame, len: 1 << 50 },
 	};
 	let names = t.symbolize();
 	return (names.len & 0x3F) as int;

@@ -3,6 +3,8 @@
    tests/abi/abi_system_error.anti. Every system but Windows has no Win32
    error to set. */
 #include <errno.h>
+
+#include "../binary_stdio.h"
 #ifdef _WIN32
 #include <windows.h>
 #endif

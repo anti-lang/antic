@@ -1,6 +1,6 @@
-//! `text.Builder.take_in(from)` stops the program with the failure routine
-//! when `from` gives no memory for the text. Before the fix it gave the
-//! literal `""`, which the caller is told to give back to `from`.
+//! `text.Builder.take_in(from)` stops the program with the failure routine when
+//! `from` gives no memory for the text. Before the fix it gave the literal
+//! `""`, which the caller is told to give back to `from`.
 
 import anti.mem;
 import anti.text;

@@ -1,8 +1,7 @@
-//! A `str` that a snapshot on the heap captures keeps a NUL after its
-//! bytes, so its `ptr` is a C string. The bytes of the second text follow
-//! those of the first in the block, so without that NUL strlen of the
-//! first reads on into the second, and strlen of the second reads past
-//! the block.
+//! A `str` that a snapshot on the heap captures keeps a NUL after its bytes, so
+//! its `ptr` is a C string. The bytes of the second text follow those of the
+//! first in the block, so without that NUL strlen of the first reads on into
+//! the second, and strlen of the second reads past the block.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 extern fn strlen(s: ?*byte) -> c_size_t;

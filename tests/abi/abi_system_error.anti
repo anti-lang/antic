@@ -1,8 +1,8 @@
-//! M302. The message of a `SystemError` keeps its text after the next error
-//! of its thread. The system writes a message into storage that its next call
-//! may write over: a buffer of the thread on Windows for every code, and a
-//! static buffer on macOS for a code it does not know. The program copies each
-//! message as its error is made, and compares the two once every error is made.
+//! M302. The message of a `SystemError` keeps its text after the next error of
+//! its thread. The system writes a message into storage that its next call may
+//! write over: a buffer of the thread on Windows for every code, and a static
+//! buffer on macOS for a code it does not know. The program copies each message
+//! as its error is made, and compares the two once every error is made.
 
 import anti.error;
 import anti.text;

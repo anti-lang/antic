@@ -187,8 +187,8 @@ pub class Builder
 	///
 	/// The `str` holds memory of its own from the C library, which
 	/// `free(s.ptr)` returns. The builder is empty afterwards and may collect
-	/// again. When the C library has no memory for the text, the program
-	/// stops with a message.
+	/// again. When the C library has no memory for the text, the program stops
+	/// with a message.
 	pub fn take(self) -> str
 	{
 		return anti_rt_builder_take(self);
@@ -199,10 +199,9 @@ pub class Builder
 	///
 	/// `from.free(s.ptr)` gives the memory back, and so does anything that
 	/// gives back every block of `from` at once. The text keeps its NUL. When
-	/// `from` gives no memory, the program stops with a message, as `take`
-	/// does when the C library has none. The builder is empty afterwards and
-	/// may collect again. A text that should live in an arena is built this
-	/// way.
+	/// `from` gives no memory, the program stops with a message, as `take` does
+	/// when the C library has none. The builder is empty afterwards and may
+	/// collect again. A text that should live in an arena is built this way.
 	pub fn take_in(self, from: *mem.Allocator) -> str
 	{
 		let collected = anti_rt_builder_text(self);

@@ -14,9 +14,9 @@
 //!
 //! Memory that runs out stops the program with a message, in every module of
 //! the standard library and in the runtime: a collection, a text, a copy, an
-//! error and a trace alike. No function fails for it or gives less than it
-//! was asked for. The allocators alone give `none`, as the language's
-//! `alloc(T, n)` does, and the caller of one decides.
+//! error and a trace alike. No function fails for it or gives less than it was
+//! asked for. The allocators alone give `none`, as the language's `alloc(T, n)`
+//! does, and the caller of one decides.
 
 import anti.lang;
 
