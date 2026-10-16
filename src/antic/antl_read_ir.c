@@ -416,8 +416,14 @@ static struct ir_const *read_const(struct reader *r, struct ir_module *program,
         }
         c->sym = map_sym(r, program, maps, (uint32_t)payload);
         break;
+    /* The index is held to 32 bits before it is narrowed, and
+       remap_const holds it to the count of its table. */
     case IR_CONST_ADDR:
     case IR_CONST_FUNC:
+        if (payload > UINT32_MAX) {
+            antl_damaged(r);
+            return NULL;
+        }
         c->global = (uint32_t)payload;
         break;
     case IR_CONST_AGG:

@@ -2435,6 +2435,37 @@ static void damaged_relocations(void)
     close_session(&s);
 }
 
+/* Rule 14: the address of a constant of the IR names a global by an index
+   of 64 bits, which the reader holds to the count of the globals whole.
+   The descriptor of `V2` starts with the address of its name. */
+static void wide_addresses(void)
+{
+    struct session s;
+    struct text bytes = {0};
+    size_t at;
+    uint64_t size;
+    size_t item;
+    const uint8_t high = 1;
+
+    open_session(&s);
+    if (!build_library(&s, "vec", vec_source, &bytes)) {
+        close_session(&s);
+        return;
+    }
+    at = name_end(&bytes, "V2.descriptor", false);
+    size = (uint64_t)u32_at(&bytes, at) | (uint64_t)u32_at(&bytes, at + 4)
+                                              << 32;
+    /* The size, the alignment, the data, no addresses, the marks, and
+       the kind, the type, the count and the aggregate of the value. */
+    item = at + 8 + 8 + (size_t)size + 4 + 1 + 1 + 1 + 8 + 5;
+    CHECK(item + 10 <= bytes.length &&
+          (uint8_t)bytes.data[item] == IR_CONST_ADDR);
+    CHECK(reads_file(&bytes));
+    refuses_poke(&bytes, item + 2 + 4, &high, 1);
+    text_free(&bytes);
+    close_session(&s);
+}
+
 /* A library file keeps the class records, the mark of a `worker fn` and
    the class and slot of a call through a table. The passes over the
    whole program read them. The program read back prints as the module
@@ -3740,6 +3771,7 @@ void test_modules(void)
     field_kinds();
     runtime_names();
     flag_bytes();
+    wide_addresses();
     damaged_trees();
     damaged_bytes();
     tree_counts();
