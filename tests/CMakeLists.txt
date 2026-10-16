@@ -2901,13 +2901,16 @@ endforeach()
 # functions of tests/bind/functions.h, and huge_enum and nested_enum each
 # bind a header of one enum. api_parts, api_callbacks, api_literals and
 # api_types each bind a description of tests/bind in the format of rlparser.
+# clang_of_the_tree runs a copy of anti in a tree whose deps/clang is the
+# pinned clang, with no clang on PATH.
 set(anti_bind_cc ${ANTIC_TEST_CC})
 if(APPLE)
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
 set(anti_bind_cases header clang escaped_path raymath raylib api
     api_malformed clang_malformed forms values functions huge_enum
-    nested_enum api_parts api_callbacks api_literals api_types)
+    nested_enum api_parts api_callbacks api_literals api_types
+    clang_of_the_tree)
 if(NOT WIN32)
     # The cases refusals and ast_malformed stand a shell script in for
     # clang.

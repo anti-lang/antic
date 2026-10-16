@@ -5,7 +5,8 @@
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
 #   CASE      header, clang, escaped_path, raymath, raylib, api, refusals,
-#             api_malformed, clang_malformed or ast_malformed
+#             api_malformed, clang_malformed, ast_malformed or
+#             clang_of_the_tree
 #   SOURCES   tests/clib, for the case header
 #   DUMP      tests/dump, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -562,6 +563,36 @@ cat \"$d/ast\"
                      \"type\": {\"qualType\": \"T0\"}}]}]}")
     file(WRITE "${WORK}/fake/ast" "${ast}")
     expect_refusal("`Packed` is packed to more than one byte" ${fake})
+elseif(CASE STREQUAL "clang_of_the_tree")
+    # A copy of anti in host/ of a tree whose deps/clang is the pinned
+    # clang takes that clang, with no clang on PATH. The tree stands in
+    # WORK, and its deps/clang links to the pinned clang of the build.
+    # anti looked for the directory above its own at `/` alone, so on
+    # Windows, whose path of the executable separates with `\`, it found
+    # no tree and took the first clang on PATH.
+    if(CLANG_DIR)
+        set(pinned "${CLANG_DIR}")
+    else()
+        get_filename_component(pinned "${ANTI}" DIRECTORY)
+        set(pinned "${pinned}/../deps/clang")
+    endif()
+    get_filename_component(pinned "${pinned}" REALPATH)
+    get_filename_component(name "${ANTI}" NAME)
+    file(MAKE_DIRECTORY "${WORK}/tree/host" "${WORK}/tree/deps"
+         "${WORK}/empty")
+    file(COPY_FILE "${ANTI}" "${WORK}/tree/host/${name}")
+    file(CREATE_LINK "${pinned}" "${WORK}/tree/deps/clang" SYMBOLIC)
+    file(WRITE "${WORK}/api.h" "int count(void);\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${WORK}/empty"
+        "${WORK}/tree/host/${name}" bind --clang api.h -o "${WORK}/out"
+        --runtime "${RUNTIME}"
+        WORKING_DIRECTORY "${WORK}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "anti of the tree took no pinned clang: "
+                            "${status}\n${out}${err}")
+    endif()
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
 endif()
