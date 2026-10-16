@@ -1934,9 +1934,10 @@ foreach(name IN ITEMS map map_tuple hash_map set hash_set)
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # The collections threads share, of anti.collection.concurrent, in dev
-# mode. The module stands on the maps, so the link names their object.
+# mode, and the copy of the walk they share with the synchronized ones. The
+# module stands on the maps, so the link names their object.
 foreach(name IN ITEMS concurrent_map concurrent_map_threads
-        concurrent_map_equal spsc_ring spsc_ring_threads)
+        concurrent_map_equal spsc_ring spsc_ring_threads snapshot_dup)
     antic_program_test(std_${name}_dev
         "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
         OPTIONS "--dev"

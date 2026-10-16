@@ -1,0 +1,135 @@
+//! `dup` of a `Snapshot`, the walk of a collection that threads share.
+//!
+//! The copy takes room of its own from the allocator of the snapshot and a copy
+//! of each element, so the copy and the original are torn down apart. Every
+//! element owns a block counted in `Item.live`, and every block of room goes
+//! through a counting allocator, so both read 0 after each case. Each case
+//! walks the copy after the original is gone.
+
+import anti.collection;
+import anti.collection.concurrent.{ConcurrentMap};
+import anti.lang;
+import anti.mem;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+
+/// An allocator over the C library that counts the blocks it holds out.
+class Counting inherits mem.Allocator
+{
+	pub held: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		self.held += 1;
+		return mem.LibcAllocator.get().alloc(size, align);
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.held -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+/// An element that owns memory. Its copy makes a block of its own, and every
+/// block counts in `Item.live`.
+class Item
+{
+	pub n: ?*int = none,
+
+	pub static atomic live: int = 0;
+
+	pub fn of(n: int) -> Item
+	{
+		return Item { n: block(n) };
+	}
+
+	pub fn value(self) -> int
+	{
+		let p = self.n catch fatal;
+		return p[0];
+	}
+
+	concrete fn copy(self, to: *Object)
+	{
+		anti_lang_Object_copy(self as ?*byte, to as ?*byte);
+		let made = to as *Item;
+		made.n = block(self.value());
+	}
+
+	fn destruct(self)
+	{
+		let p = self.n else {
+			return;
+		};
+		self.n = none;
+		Item.live.add(-1);
+		free(p);
+	}
+}
+
+/// A block that holds `n`, counted in `Item.live`.
+fn block(n: int) -> *int
+{
+	let p = alloc(int, 1) catch fatal;
+	p[0] = n;
+	Item.live.add(1);
+	return p;
+}
+
+/// The sum of the elements a walk of `s` gives.
+fn total(s: *collection.Snapshot<Item>) -> int
+{
+	let sum = 0;
+	for x in s {
+		sum += x.value();
+	}
+	return sum;
+}
+
+/// A copy of the snapshot of the values of a map, kept past the original.
+fn values_of_a_map(from: *mem.Allocator) -> collection.Snapshot<Item>
+{
+	let m = ConcurrentMap<int, Item>.new(0, from);
+	m.set(1, Item.of(10));
+	m.set(2, Item.of(20));
+	m.set(3, Item.of(30));
+	let s = m.values();
+	return dup(s);
+}
+
+/// A copy of a snapshot made element by element, kept past the original.
+fn made_by_hand(from: *mem.Allocator) -> collection.Snapshot<Item>
+{
+	let s = collection.Snapshot<Item>.new(from);
+	let i = 1;
+	while i <= 9 do {
+		s.add(Item.of(i));
+		i += 1;
+	}
+	return dup(s);
+}
+
+fn main() -> int
+{
+	let counting = Counting { };
+	let from = &counting;
+	{
+		let c = values_of_a_map(from);
+		printf("values of a map: %d copies, total %d\n".ptr, c.count as c_int,
+			total(&c) as c_int);
+	}
+	printf("after the values: %d items, %d blocks\n".ptr,
+		Item.live.load() as c_int, counting.held as c_int);
+	{
+		let c = made_by_hand(from);
+		printf("made by hand: %d copies, total %d\n".ptr, c.count as c_int,
+			total(&c) as c_int);
+	}
+	printf("after the hand: %d items, %d blocks\n".ptr,
+		Item.live.load() as c_int, counting.held as c_int);
+	return 0;
+}

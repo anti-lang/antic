@@ -168,6 +168,27 @@ pub class Snapshot<T>
 		return dup(items[self.at]);
 	}
 
+	/// A snapshot in `to` with room of its own from the same allocator and a
+	/// copy of each element, at the same place of its walk, as `dup` makes one.
+	concrete fn copy(self, to: *Object)
+	{
+		memcpy(to as ?*byte, self as ?*byte, size_of(Snapshot<T>) as c_size_t);
+		let made = to as *Snapshot<T>;
+		made.items = none;
+		made.capacity = 0;
+		let items = self.items else {
+			return;
+		};
+		let room = room_from<T>(self.from, self.capacity) catch fatal;
+		let i = 0;
+		while i < self.count do {
+			room[i] = dup(items[i]);
+			i += 1;
+		}
+		made.items = room;
+		made.capacity = self.capacity;
+	}
+
 	/// Twice the room, or 8 for the first, with the copies moved into it as
 	/// bytes.
 	fn grow(self)
