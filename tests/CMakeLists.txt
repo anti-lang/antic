@@ -1949,7 +1949,7 @@ endforeach()
 # The maps of anti.collection.map and the sets of anti.collection.set in
 # dev mode, with the object of each module beside those of the modules it
 # imports. The sets stand on the tables of the maps.
-foreach(name IN ITEMS map map_tuple hash_map set hash_set)
+foreach(name IN ITEMS map map_tuple hash_map set hash_set map_growth)
     antic_program_test(std_${name}_dev
         "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
         OPTIONS "--dev"

@@ -45,9 +45,9 @@ internal const TYPE_DEPTH: int = 3;
 /// words, the marked hash and the position. A removed entry keeps its position
 /// with a hash of 0 until the room is rebuilt, and its bucket is marked
 /// `REMOVED`, so no other entry moves and the order stays. The room is rebuilt
-/// when it is full, in place when a quarter of it holds removed entries and
-/// twice as large otherwise. Buckets are at least twice the entries, so a probe
-/// always meets an empty bucket.
+/// when it is full, at the same size when a quarter of it holds removed entries
+/// and twice as large otherwise. Buckets are at least twice the entries, so a
+/// probe always meets an empty bucket.
 pub abstract class EntryTable<E> inherits collection.Collection<E>
 {
 	/// The entries, `used` of them written, some of them removed.
@@ -293,15 +293,18 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 		}
 	}
 
-	/// Room for one more entry: the same room without the removed entries when
-	/// a quarter of it holds them, and twice the room otherwise.
+	/// Room for one more entry: room of the same size without the removed
+	/// entries when a quarter of it holds them, and twice the room otherwise.
 	fn make_room(self)
 	{
+		/* By M366 of the third audit: the room grew to hold `count + 1`,
+		   which a full room with one removed entry already holds, so such a
+		   map rebuilt its room at the same size on every `add`. */
 		let removed = self.used - self.count;
 		if self.room_size > 0 && removed * 4 >= self.room_size {
 			self.rebuild(self.room_size);
 		} else {
-			self.rebuild(self.grown(self.room_size, self.count + 1));
+			self.rebuild(self.grown(self.room_size, self.room_size + 1));
 		}
 	}
 

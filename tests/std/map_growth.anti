@@ -1,0 +1,59 @@
+//! The growth of the room of a `Map` and a `Set`.
+//!
+//! The room is rebuilt when it is full: at its size when a quarter of it holds
+//! removed entries, and twice as large otherwise. A full room with one removed
+//! entry therefore doubles at the next `add`, and one with two of its eight
+//! removed keeps its size. The order of the entries stays as they were added.
+
+import anti.collection.map.{Map};
+import anti.collection.set.{Set};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A map of the keys 1 to 8, which fills its first room.
+fn full_map() -> Map<int, int>
+{
+	let m = Map<int, int>.new();
+	let k = 1;
+	while k <= 8 do {
+		m.set(k, k * 10);
+		k += 1;
+	}
+	return m;
+}
+
+/// The keys of `m` in their order, on one line after `name`.
+fn keys(name: str, m: *Map<int, int>)
+{
+	printf("%.*s: capacity %d, keys".ptr, name.len as c_int, name.ptr,
+		m.capacity() as c_int);
+	for (k, v) in m {
+		printf(" %d".ptr, k as c_int);
+	}
+	printf("\n".ptr);
+}
+
+fn main() -> int
+{
+	let m = full_map();
+	keys("full map", &m);
+	let one = m.remove(1);
+	m.set(9, 90);
+	keys("one removed, one added", &m);
+	let two = full_map();
+	let first = two.remove(1);
+	let second = two.remove(2);
+	two.set(9, 90);
+	keys("two removed, one added", &two);
+	let s = Set<int>.new();
+	let x = 1;
+	while x <= 8 do {
+		s.add(x);
+		x += 1;
+	}
+	s.remove(3);
+	s.add(9);
+	printf("set with one removed, one added: capacity %d\n".ptr,
+		s.capacity() as c_int);
+	return 0;
+}

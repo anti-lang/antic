@@ -1,0 +1,5 @@
+exit 0
+full map: capacity 8, keys 1 2 3 4 5 6 7 8
+one removed, one added: capacity 16, keys 2 3 4 5 6 7 8 9
+two removed, one added: capacity 8, keys 3 4 5 6 7 8 9
+set with one removed, one added: capacity 16
