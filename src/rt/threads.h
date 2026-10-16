@@ -33,7 +33,8 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
                        int64_t context_size);
 
 /* Wait for the job, write its result into out and end the job. A null
-   job carries no work, and `join` of one writes nothing. */
+   job carries no work, and `join` of one writes result_size zero bytes
+   into out. */
 void anti_rt_join(void *handle, int64_t result_size, void *out);
 
 /* Wait for every job of the array, in the order it holds them. */
