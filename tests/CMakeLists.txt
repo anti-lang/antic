@@ -3710,6 +3710,15 @@ add_test(NAME macos_sdk
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macossdk"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_macos_sdk.cmake")
 set_tests_properties(macos_sdk PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+# run_macos_sdk.cmake skips for a missing SDK alone, and fails for one
+# that changed under the pinned name.
+add_test(NAME macos_sdk_runner
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_macos_sdk.cmake"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macossdk-runner"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_macos_sdk_self.cmake")
+set_tests_properties(macos_sdk_runner PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # Without --runtime, antic takes the runtime archive of the user's data
 # directory, which is where an install puts it.

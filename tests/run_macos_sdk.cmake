@@ -3,7 +3,12 @@
 # refused. The packer then links both macOS targets against it.
 #
 #   cmake -DROOT=<repository> -DCLANG=<clang> -DLLVM_BIN=<dir> -DWORK=<dir>
-#         -P tests/run_macos_sdk.cmake
+#         [-DSDKS=<dir>] -P tests/run_macos_sdk.cmake
+#
+# SDKS names the directory that holds the SDK, which the Command Line
+# Tools hold without it. A machine without an SDK of the pinned version
+# reports the test skipped, and every other refusal of
+# tools/macos-sdk.cmake fails it.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -18,15 +23,23 @@ set(script "${ROOT}/tools/macos-sdk.cmake")
 set(pin "${ROOT}/tools/macos-sdk-pin")
 
 # Print the path of the pinned SDK, or fail with what it said.
-execute_process(COMMAND "${CMAKE_COMMAND}" "-DPIN=${pin}" -P "${script}"
+set(sdks "")
+if(DEFINED SDKS)
+    set(sdks "-DSDKS=${SDKS}")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" "-DPIN=${pin}" ${sdks}
+                        -P "${script}"
                 OUTPUT_VARIABLE sdk ERROR_VARIABLE err
                 RESULT_VARIABLE failed
                 OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
 file(STRINGS "${pin}" row REGEX "^MACOS_SDK_VERSION=")
 string(REPLACE "MACOS_SDK_VERSION=" "" version "${row}")
 if(NOT failed EQUAL 0)
-    message("SKIP: macOS SDK ${version} is not installed here\n${err}")
-    return()
+    if(err MATCHES "is on no path of this")
+        message("SKIP: macOS SDK ${version} is not installed here\n${err}")
+        return()
+    endif()
+    message(FATAL_ERROR "tools/macos-sdk.cmake refused the SDK\n${err}")
 endif()
 if(NOT IS_DIRECTORY "${sdk}")
     message(FATAL_ERROR "the pinned SDK is `${sdk}`, which is no directory")
