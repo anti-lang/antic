@@ -23,7 +23,9 @@ struct options {
     /* --llvm-mc, which antic accepts for the tools that pass it and no
        longer runs: llc writes every object. */
     const char *llvm_mc;
-    /* NULL: opt and llc of the runtime archive's bin/, or from PATH. */
+    /* --opt and --llc. NULL: the tool of bin/ of the runtime archive,
+       and antic refuses the build when the archive lacks it, as
+       driver_archive_tool says. No tool comes from the search path. */
     const char *opt;
     const char *llc;
     const char *runtime;        /* Holds lib/<target>/. */
@@ -111,7 +113,9 @@ struct options {
        its runtime symbols and its descriptors. It then loads no plugin,
        because a plugin resolves those symbols against its host. */
     bool closed;
-    const char *llvm_ar;        /* NULL: llvm-ar from PATH. */
+    /* --llvm-ar. NULL: llvm-ar of bin/ of the runtime archive, refused
+       as opt is when the archive lacks it. */
+    const char *llvm_ar;
     const char *const *frameworks;    /* --framework, macOS frameworks of Apple's
                                    SDK. */
     size_t framework_count;
