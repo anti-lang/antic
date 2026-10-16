@@ -166,7 +166,7 @@ without a directory are in `src/antic/`.
 |---|---|---|---|---|---|
 | S301 | `types.c:1987`, `sema_const.c:101` | 14 | A class whose base was refused keeps a NULL base field, set at `sema.c:2516`. `pointer_free` and `class_value` read through it after the error. | fixed `184e5a39` | front-end |
 | S302 | `sema_copies.c:197` | 3 | `xf` compares a field pointer with the bounds of arrays it does not lie in, which C11 6.5.8 leaves undefined. No target misreads it. | fixed `115e35d9` | front-end |
-| S303 | `pattern.c:1126` | 3, 16 | The least match length adds in `long` before its cap. On Windows the sum wraps, and a `with` that does not fit compiles there and is refused on the Mac. | still open, the remainder of M44 | front-end |
+| S303 | `pattern.c:1126` | 3, 16 | The least match length adds in `long` before its cap. On Windows the sum wraps, and a `with` that does not fit compiles there and is refused on the Mac. | fixed `ffeda0a3` | front-end |
 | S304 | `antl_verify.c:282` | 14 | The verifier holds no field name of a generic tree to its struct. `lower.c:902` then subtracts from NULL, and `layout.c:451` indexes outside the offsets. | new | library-file |
 | S305 | `antl_read.c:271` | 14 | Pointers, slices, arrays, function types and tuples of the type table nest without a limit. A file of 2 MB overflows the stack in `print_type` and `antl_visit_type`. | new | library-file |
 | S306 | `src/rt/trace.c:128` | 11 | A frame keeps the build id as a pointer into the image of its module. After `unload` of a plugin, `anti_rt_trace_text` reads memory that is gone. `trace.c:323` is the second place. | fixed `06e06339` | rt |
@@ -191,7 +191,7 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 
 | ID | Place | Finding | Status | Reports |
 |---|---|---|---|---|
-| S320 | `lexer.h:171` | Seven header sentences state what the code does not do: the error cap at `lexer.h:171` and `178`, `types_object` at `types.h:429`, `types_has_fields` at `types.h:889`, the pointer of two words at `types.h:218`, the copies at `sema_generic.c:16` and `sync` at `sema_thread.c:1`. | new, the five outside `lexer.h` fixed `5ec24a80` | front-end |
+| S320 | `lexer.h:171` | Seven header sentences state what the code does not do: the error cap at `lexer.h:171` and `178`, `types_object` at `types.h:429`, `types_has_fields` at `types.h:889`, the pointer of two words at `types.h:218`, the copies at `sema_generic.c:16` and `sync` at `sema_thread.c:1`. | fixed, the five outside `lexer.h` `5ec24a80`, the two of `lexer.h` `dd7cce0d` | front-end |
 | S321 | `sema_operator.c:470` | The DESIGN says two pointers compare whether or not either may hold `none`. `comparable_pointers` compares the addresses of two parameter arrays, so `fn(int) == ?fn(int)` is refused. | fixed `67f75fb8`, as T111 | front-end |
 | S322 | `driver.h:26` | The comments of `opt`, `llc` and `llvm_ar` at line 114 promise a fallback to PATH. `driver_archive_tool` refuses a tool that `bin/` of the archive lacks. | new | back-end |
 | S323 | `docs/decisions.md:1227` | "Build ids" and "Debug information" describe `.file` and `.loc` directives, llvm-mc and `src/antic/debug.c`. The entry on C99 at line 1229 stands against `DW_LANG_C11` in `llvm_debug.c:115`. About twenty more entries from line 916 state the native back end as current. | new | back-end, structure, tool-pass |
@@ -244,13 +244,14 @@ Rule 14, untrusted input:
 
 - M306. `src/antic/lexer.c:1321`. The errors inside an `{expr}` never
   count toward `LEX_ERRORS_MAX`. The flood of diagnostics the cap closed
-  is back on that path. Returned. front-end.
+  is back on that path. Returned. front-end. Fixed `dd7cce0d`.
 - M307. `src/antic/parser_stmt.c:823`. At the depth limit before a
   statement keyword the parser consumes nothing and loops until memory is
-  gone. New. front-end.
+  gone. New. front-end. Fixed `68fd6aa2` as T103, and the one message of
+  a block at the limit `1d0804e0`.
 - M308. `src/antic/parser_expr.c:135`. The tree built inside an `{expr}`
   is not counted by the chain around it. The tree grows past
-  `PARSE_DEPTH_MAX`. New. front-end.
+  `PARSE_DEPTH_MAX`. New. front-end. Fixed `b1e47d47`.
 - M309. `src/rt/plugin.c:832`. An empty directory of the search path
   gives a bare name. The digest reads one file and `dlopen` may load
   another. New. rt. Fixed `06109ee3`.
@@ -771,7 +772,7 @@ From `front-end`.
 | File | Purpose | Header |
 |---|---|---|
 | `src/antic/lexer.c` | Splits a validated UTF-8 source into tokens under caps on size, nesting and errors, decodes literals and doc comments, and lexes each `{expr}` with a nested lexer. | None. The first comment describes the `kinds` table. |
-| `src/antic/lexer.h` | The token kinds, the token and format-piece records, the five entry points, the three caps of the lexer and the depth limit of the parser. | None. Two of its comments differ from the code, S320. |
+| `src/antic/lexer.h` | The token kinds, the token and format-piece records, the five entry points, the three caps of the lexer and the depth limit of the parser. | None. Two of its comments differ from the code, S320. Fixed `dd7cce0d`. |
 | `src/antic/parser.c` | The helpers every parser file shares, and `parser_parse`, which reads the lines at module level. | Says it. |
 | `src/antic/parser.h` | The one entry point of the parser. | The comment of `parser_parse` alone. |
 | `src/antic/parser_parser.h` | The state of the parser and the functions its seven files share, grouped by file. | Says it. |
