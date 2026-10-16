@@ -663,7 +663,7 @@ offline)
     ;;
 suite)
     opts="-DANTIC_CLANG_DIR=\$A/clang -DANTIC_LLVM_DIR=\$A/toolchain"
-    opts="\$opts -DANTIC_SYSROOT_DIR=\$A/sysroot -DANTIC_RAYLIB_DIR=\$A/raylib/raylib-6.0"
+    opts="\$opts -DANTIC_SYSROOT_DIR=\$A/sysroot -DANTIC_RAYLIB_DIR=\$A/raylib"
     cmake -S . -B $host_tree \$opts > "\$logs/release-configure.log" 2>&1
     cmake --build $host_tree -j"\$(nproc)" > "\$logs/release-build.log" 2>&1
     ctest --test-dir $host_tree -j"\$(nproc)" > "\$logs/release-ctest.log" 2>&1
@@ -761,10 +761,10 @@ exit /b 0
 call "%VC%" arm64 > nul
 rem The tools of the VM stand in its data directory, as on the Linux VM
 rem and as docs/vm-setup.md installs them. Without these four options a
-rem fresh build\host downloads clang and the LLVM tools and stops at
-rem raylib, which has no fetcher in the configure.
+rem fresh build\host downloads clang, the LLVM tools, the sysroots and
+rem raylib into the tree that each run replaces.
 set A=%LOCALAPPDATA%/anti-vm
-set OPTS=-DANTIC_CLANG_DIR=%A%/clang -DANTIC_LLVM_DIR=%A%/toolchain -DANTIC_SYSROOT_DIR=%A%/sysroot -DANTIC_RAYLIB_DIR=%A%/raylib/raylib-6.0
+set OPTS=-DANTIC_CLANG_DIR=%A%/clang -DANTIC_LLVM_DIR=%A%/toolchain -DANTIC_SYSROOT_DIR=%A%/sysroot -DANTIC_RAYLIB_DIR=%A%/raylib
 if exist build\host (cmake -S . -B build\host %OPTS% > "%LOGS%\release-configure.log" 2>&1) else (cmake -S . -B build\host -G Ninja %OPTS% > "%LOGS%\release-configure.log" 2>&1)
 if errorlevel 1 (echo the configure failed & exit /b 1)
 cmake --build build\host > "%LOGS%\release-build.log" 2>&1

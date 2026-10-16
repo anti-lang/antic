@@ -22,12 +22,9 @@ sudo apt install -y build-essential cmake git curl xz-utils qemu-user
 git -C /tmp clone --depth 1 git@github.com:anti-lang/antic.git antic
 cmake -DDEST=$HOME/.local/share/anti-vm/clang -P /tmp/antic/tools/get-clang.cmake
 cmake -DDEST=$HOME/.local/share/anti-vm/toolchain -P /tmp/antic/tools/get-llvm.cmake
-cmake -DDEST=$HOME/.local/share/anti-vm/sysroot -DLLVM_BIN=$HOME/.local/share/anti-vm/toolchain/bin \
-  -DCLANG_DIR=$HOME/.local/share/anti-vm/clang \
-  -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
-  -P /tmp/antic/tools/get-sysroot.cmake
-cmake -DDEST=$HOME/.local/share/anti-vm/raylib -P /tmp/antic/tools/get-raylib.cmake
 ```
+
+The configure step of the first test run installs the sysroots of every target and the raylib source into the directories its options name. They are `~/.local/share/anti-vm/sysroot` and `~/.local/share/anti-vm/raylib`, where a later run finds them.
 
 `qemu-user` holds `qemu-x86_64`, which the configure step finds on the path and the tests of linux-x86_64 run their programs with. Without it the suite runs no linux-x86_64 program. The clone only supplies the scripts. If the repository is private, copy `tools/` with `scp -r tools anti-linux:/tmp/antic/` instead. The macOS sysroots hold Zig's stubs, which link every macOS program that names no framework. The Windows sysroots are the headers and the import libraries of mingw-w64, which the script writes from the pinned source release with the pinned clang and llvm-ar.
 
@@ -52,7 +49,7 @@ git archive HEAD | ssh anti-linux 'rm -rf antic-check && mkdir antic-check && ta
   cmake -S . -B build/host -DANTIC_CLANG_DIR="$HOME/.local/share/anti-vm/clang" \
     -DANTIC_LLVM_DIR="$HOME/.local/share/anti-vm/toolchain" \
     -DANTIC_SYSROOT_DIR="$HOME/.local/share/anti-vm/sysroot" \
-    -DANTIC_RAYLIB_DIR="$HOME/.local/share/anti-vm/raylib/raylib-6.0" &&
+    -DANTIC_RAYLIB_DIR="$HOME/.local/share/anti-vm/raylib" &&
   cmake --build build/host -j"$(nproc)" &&
   ctest --test-dir build/host -j"$(nproc)" --output-on-failure'
 ```
@@ -65,7 +62,7 @@ same four directories.
 ```sh
 ssh anti-linux 'cd antic-check && V="$HOME/.local/share/anti-vm" && for p in asan ubsan; do
   cmake --preset $p -DANTIC_CLANG_DIR="$V/clang" -DANTIC_LLVM_DIR="$V/toolchain" \
-    -DANTIC_SYSROOT_DIR="$V/sysroot" -DANTIC_RAYLIB_DIR="$V/raylib/raylib-6.0" &&
+    -DANTIC_SYSROOT_DIR="$V/sysroot" -DANTIC_RAYLIB_DIR="$V/raylib" &&
   cmake --build build/$p -j"$(nproc)" &&
   ctest --test-dir build/$p -j"$(nproc)" --output-on-failure; done'
 ```
@@ -138,31 +135,21 @@ winget install --id Kitware.CMake -e
 winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --includeRecommended"
 ```
 
-The test `program_abi_raymath` compiles a raymath binding, so the VM needs the pinned raylib release. One command downloads it, and `%USERPROFILE%\test.cmd` below passes the directory.
-
-```powershell
-cmake -DDEST=$env:LOCALAPPDATA\anti-vm\raylib -P $env:USERPROFILE\antic-check\tools\get-raylib.cmake
-```
-
-The same commands install the pinned clang and LLVM tools, which `tools/clang-pin` and `tools/llvm-pin` name for Windows on ARM64.
+Two commands install the pinned clang and LLVM tools, which `tools/clang-pin` and `tools/llvm-pin` name for Windows on ARM64.
 
 ```powershell
 cmake -DDEST=$env:LOCALAPPDATA\anti-vm\clang -P $env:USERPROFILE\antic-check\tools\get-clang.cmake
 cmake -DDEST=$env:LOCALAPPDATA\anti-vm\toolchain -P $env:USERPROFILE\antic-check\tools\get-llvm.cmake
 ```
 
-One command installs the sysroots of all six targets. The Windows ones come from the pinned source release of mingw-w64, as on every host, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
-
-```powershell
-cmake -DDEST=$env:LOCALAPPDATA\anti-vm\sysroot -DLLVM_BIN=$env:LOCALAPPDATA\anti-vm\toolchain\bin -DCLANG_DIR=$env:LOCALAPPDATA\anti-vm\clang -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" -P $env:USERPROFILE\antic-check\tools\get-sysroot.cmake
-```
+The configure step of the first test run installs the sysroots of all six targets into `%LOCALAPPDATA%\anti-vm\sysroot`. It installs the raylib source, which the test `program_abi_raymath` compiles against, into `%LOCALAPPDATA%\anti-vm\raylib`. The Windows sysroots come from the pinned source release of mingw-w64, as on every host, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
 
 Create `%USERPROFILE%\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment and puts the Ninja of Visual Studio on the path. antic runs lld-link with `/lldignoreenv`, so the variable `LIB` it sets reaches no link. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
 
 ```bat
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
 cd /d %USERPROFILE%\antic-check
-cmake -S . -B build\host -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=%LOCALAPPDATA%/anti-vm/clang -DANTIC_LLVM_DIR=%LOCALAPPDATA%/anti-vm/toolchain -DANTIC_SYSROOT_DIR=%LOCALAPPDATA%/anti-vm/sysroot -DANTIC_RAYLIB_DIR=%LOCALAPPDATA%/anti-vm/raylib/raylib-6.0
+cmake -S . -B build\host -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=%LOCALAPPDATA%/anti-vm/clang -DANTIC_LLVM_DIR=%LOCALAPPDATA%/anti-vm/toolchain -DANTIC_SYSROOT_DIR=%LOCALAPPDATA%/anti-vm/sysroot -DANTIC_RAYLIB_DIR=%LOCALAPPDATA%/anti-vm/raylib
 cmake --build build\host
 ctest --test-dir build\host --output-on-failure
 ```

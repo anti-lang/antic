@@ -3046,11 +3046,13 @@ else()
     # the rest of the suite runs beside it.
     set_tests_properties(package_keys PROPERTIES COST 300)
 endif()
+# The release script names the directory of the raylib download, never the
+# version of the pin.
 add_test(NAME raylib_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=raylib
             -DSCRIPT=src/native/get-source.cmake
             -DCALLER=src/native/raylib-source.cmake
-            -DFILES=src/native/raylib.cmake
+            -DFILES=src/native/raylib.cmake,tools/release.sh
             -DHASH=SHA256 -DPARTS=2
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_native_pin.cmake")
 # The check of the pins refuses a copy of a version or a digest and passes
