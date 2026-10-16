@@ -196,13 +196,13 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 | S322 | `driver.h:26` | The comments of `opt`, `llc` and `llvm_ar` at line 114 promise a fallback to PATH. `driver_archive_tool` refuses a tool that `bin/` of the archive lacks. | new | back-end |
 | S323 | `docs/decisions.md:1227` | "Build ids" and "Debug information" describe `.file` and `.loc` directives, llvm-mc and `src/antic/debug.c`. The entry on C99 at line 1229 stands against `DW_LANG_C11` in `llvm_debug.c:115`. About twenty more entries from line 916 state the native back end as current. | new | back-end, structure, tool-pass |
 | S324 | `src/rt/json.h:66` | `anti_rt_json_value` and `anti_rt_json_member` are said to take one value of the grammar. `anti_rt_json_skip` takes `+-.e` as a number, and `member` of `anti.json` gives it out. | fixed `7c16ab47` | library-file |
-| S325 | `src/rt/trace.c:5` | The DESIGN says the capture reads nothing from a file. On Linux `elf_id` reads the whole file of every module but the runtime's own. | new | rt |
-| S326 | `src/rt/rt.h:6` | `anti_rt_init` is said to run on the first use of the runtime in a static library for C. No code runs it there. Line 21 names `start.c` as the writer of an option that `conf.c:274` writes. | new | rt |
-| S327 | `src/rt/cpu.c:1` | The header says antic writes the level into the object of `main` and `start.c` passes it. The level is a macro of the runtime's own compile. | new | rt |
-| S328 | `src/rt/plugin.h:80` | Three comments say a program that loads nothing links no loader. `conf.c:813` calls the loader in every program. `plugin.h:49` and `loaded.c:4` are the other two. | new | rt |
-| S329 | `src/rt/threads.h:34` | `join` of a null job is said to write nothing. `threads.c:350` writes `result_size` zero bytes. | new | rt |
+| S325 | `src/rt/trace.c:5` | The DESIGN says the capture reads nothing from a file. On Linux `elf_id` reads the whole file of every module but the runtime's own. | fixed `01610cdb` | rt |
+| S326 | `src/rt/rt.h:6` | `anti_rt_init` is said to run on the first use of the runtime in a static library for C. No code runs it there. Line 21 names `start.c` as the writer of an option that `conf.c:274` writes. | fixed `e82f89dd` | rt |
+| S327 | `src/rt/cpu.c:1` | The header says antic writes the level into the object of `main` and `start.c` passes it. The level is a macro of the runtime's own compile. | fixed `07a7cb67` | rt |
+| S328 | `src/rt/plugin.h:80` | Three comments say a program that loads nothing links no loader. `conf.c:813` calls the loader in every program. `plugin.h:49` and `loaded.c:4` are the other two. | fixed `e2136f49` | rt |
+| S329 | `src/rt/threads.h:34` | `join` of a null job is said to write nothing. `threads.c:350` writes `result_size` zero bytes. | fixed `733f1014` | rt |
 | S330 | `src/rt/patterns.c:695` | `patch` is said to find a misfit before any byte changes. The second pass searches the data it writes, so a lookahead group returns `MISFIT` with the data changed. Read, not run. | fixed `e4688507` | rt |
-| S331 | `src/rt/object.c:13` | Two DESIGN comments describe what was replaced: default bodies that walk the field list, and an array field serialized as null. `object.c:710` is the second. | new | rt |
+| S331 | `src/rt/object.c:13` | Two DESIGN comments describe what was replaced: default bodies that walk the field list, and an array field serialized as null. `object.c:710` is the second. | fixed `510d96a7` | rt |
 | S332 | `src/std/anti/log.anti:15` | The header describes a file of `level`, `format` and `[[sink]]` entries with a level each. `first_sink` reads `kind` and `path`, makes one sink and stops at the eighth entry. | new | std |
 | S333 | `src/anti/bindmodel.h:168` | `bind_is_keyword` is said to answer for a word the lexer reserves. It answers true for every text that is no identifier, and the reader of a header holds a name to no rule. | new | anti-tool |
 | S334 | `tools/compile.sh:13` | The header says the first build installs the sysroots and raylib. The configure step installs clang and the LLVM tools alone, and a first `./c` stops at `src/native/raylib.cmake:10`. | new | build-and-tools |
@@ -320,7 +320,7 @@ One-way dependencies, and a part doing the work of another:
   fails there without a message. New. back-end.
 - M325. `src/rt/conf.c:781`. The configuration fills the injections and
   loads each provider. That call puts the loader in every program. New.
-  rt.
+  rt. Fixed `66b3bd9f`, which moves the injections to `src/rt/inject.c`.
 - M326. `tests/CMakeLists.txt:1050`. The target `llvm_tools` of the test
   directory is the only producer of `runtime/bin`, a part of the product.
   It is keyed on the path of llvm-mc. New. build-and-tools.
