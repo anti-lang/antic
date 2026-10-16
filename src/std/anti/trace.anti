@@ -901,7 +901,8 @@ pub fn start() -> ?*lang.TraceHandler
 ///
 /// `what` is one name, or several separated by commas, which give a `Composite`
 /// in the order they stand. A name that no handler has writes one line to
-/// standard error and is passed over.
+/// standard error and is passed over, and so does a name past the
+/// `COMPOSITE_SLOTS` handlers a composite holds.
 pub fn install(what: str) -> ?*lang.TraceHandler
 {
 	let made = handlers_of(what);
@@ -940,7 +941,14 @@ fn handlers_of(what: str) -> ?*lang.TraceHandler
 			group = c;
 			continue;
 		};
-		several.add(one);
+		if !several.add(one) {
+			delete(one);
+			io.eprint("anti.trace: ");
+			io.eprint(name);
+			io.eprint(" is passed over, since a composite holds ");
+			eprint_int(COMPOSITE_SLOTS);
+			io.eprintln(" handlers");
+		}
 	}
 	return made;
 }
@@ -1322,6 +1330,26 @@ tests
 		assert(first != none);
 		assert(last != none);
 		delete(watch);
+	}
+
+	fn install_deletes_a_handler_past_the_slots()
+	{
+		let watch = LeakTracker.new();
+		lang.Trace.install(watch);
+		let made = handlers_of("leaks,leaks,leaks,leaks,leaks,leaks,leaks,leaks,leaks") else {
+			lang.Trace.install(none);
+			delete(watch);
+			assert(false);
+			return;
+		};
+		let group = made as *Composite;
+		let held = group.len();
+		delete(made);
+		let live = watch.live();
+		lang.Trace.install(none);
+		delete(watch);
+		assert(held == COMPOSITE_SLOTS);
+		assert(live == 0);
 	}
 
 	fn install_passes_over_a_name_no_handler_has()
