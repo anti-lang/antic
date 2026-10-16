@@ -2754,6 +2754,7 @@ static void deep_tables(void)
 static const char tree_source[] =
     "pub variant TShape { Circle { r: int }, Empty }\n"
     "pub enum TColor: u8 { Red, Green }\n"
+    "pub struct TPoint { x: int, y: int }\n"
     "pub fn tpair<T, U>(own x: T, y: U) -> T {\n"
     "    return x;\n"
     "}\n"
@@ -2771,6 +2772,10 @@ static const char tree_source[] =
     "    let tested = s is TShape.Circle;\n"
     "    let made = TShape.Circle { r: n };\n"
     "    let color = TColor.Green;\n"
+    "    let pt = TPoint { x: n, y: 1 };\n"
+    "    let px = pt.x;\n"
+    "    let sl = []int { ptr: none, len: 0 };\n"
+    "    total = total + px + sl.len;\n"
     "    for (a, b) in pairs {\n"
     "        total = total + a + b;\n"
     "    }\n"
@@ -2966,6 +2971,40 @@ static void stmt_twice(struct session *s)
     struct item *it = tree_of(s);
 
     it->body->stmts[0] = nested;
+}
+
+/* S304: a name that no field of the struct holds. */
+static const struct name no_field = {"zz", 2};
+
+/* `pt.zz`, which lowering finds no field for. */
+static void field_past_struct(struct session *s)
+{
+    tree_let(s, "px")->as.field.name = no_field;
+}
+
+/* `TPoint { zz: n, y: 1 }`. */
+static void init_past_struct(struct session *s)
+{
+    tree_let(s, "pt")->as.struct_lit.fields[0].name = no_field;
+}
+
+/* `TShape.Circle { zz: n }`, a name the fields of the case lack. */
+static void init_past_case(struct session *s)
+{
+    tree_let(s, "made")->as.struct_lit.fields[0].name = no_field;
+}
+
+/* A literal of the variant that names no case, whose case lowering
+   counts from 1. */
+static void variant_without_case(struct session *s)
+{
+    tree_let(s, "made")->as.struct_lit.variant_case = 0;
+}
+
+/* `[]int { zz: none, len: 0 }`. */
+static void init_past_slice(struct session *s)
+{
+    tree_let(s, "sl")->as.slice_lit.fields[0].name = no_field;
 }
 
 /* A copy of the symbol that e names, which the file then writes as an
@@ -3313,7 +3352,9 @@ static void damaged_trees(void)
         block_holds_itself,      expr_holds_itself,
         stmt_twice,              deep_chain,
         extern_fn_not_fn,        extern_const_without_value,
-        line_negative};
+        line_negative,           field_past_struct,
+        init_past_struct,        init_past_case,
+        variant_without_case,    init_past_slice};
     size_t i;
 
     tree_file(NULL, true);

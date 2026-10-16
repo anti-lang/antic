@@ -237,6 +237,83 @@ static bool inits_set(const struct field_init *list, size_t count)
     return true;
 }
 
+/* Whether name is a field of the struct, the class or the tuple t, or of
+   a class of its chain, as lowering finds the field it names. */
+static bool names_field(const struct type *t, const struct name *name)
+{
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        if (types_find_field(t, name) != NULL) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Whether the field e reads is one lowering finds. A field that names an
+   enum value, a function, a static field or a constant, and a field of a
+   value without fields, the `len` of a slice among them, are read by
+   their symbol or their name alone. So is the callee of a hook the
+   compiler writes, `hash` of a tuple among them, which has no type. */
+static bool field_found(const struct expr *e)
+{
+    const struct type *t = e->as.field.base->type;
+
+    if (e->symbol != NULL || e->as.field.enum_value != 0 || t == NULL ||
+        e->type == NULL) {
+        return true;
+    }
+    if (t->kind == TYPE_POINTER) {
+        t = t->element;
+    }
+    return t == NULL || !types_has_fields(t) ||
+           names_field(t, &e->as.field.name);
+}
+
+/* Whether every name of the struct literal e is a field of its type, or
+   of the case it builds. A literal of a variant builds a case. */
+static bool inits_found(const struct expr *e)
+{
+    const struct type *t = e->type;
+    uint32_t number = e->as.struct_lit.variant_case;
+    size_t i;
+
+    if (t == NULL) {
+        return true;
+    }
+    if (t->kind == TYPE_VARIANT) {
+        if (!case_of(t, number)) {
+            return false;
+        }
+        t = t->params[number - 1];
+        if (t == NULL) {
+            return e->as.struct_lit.field_count == 0;
+        }
+    } else if (number != 0 || !types_has_fields(t)) {
+        return number == 0;
+    }
+    for (i = 0; i < e->as.struct_lit.field_count; i++) {
+        if (!names_field(t, &e->as.struct_lit.fields[i].name)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* Whether every name of a slice literal is `ptr` or `len`. */
+static bool slice_inits_found(const struct expr *e)
+{
+    size_t i;
+
+    for (i = 0; i < e->as.slice_lit.field_count; i++) {
+        const struct name *n = &e->as.slice_lit.fields[i].name;
+        if (!(n->length == 3 && (memcmp(n->text, "ptr", 3) == 0 ||
+                                 memcmp(n->text, "len", 3) == 0))) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* Whether every name of list has its symbol, with its type. */
 static bool bindings_set(const struct binding *list, size_t count)
 {
@@ -284,7 +361,7 @@ static void check_expr(struct verify *v, const struct expr *e)
         need(v, e->as.slice.base != NULL);
         break;
     case EXPR_FIELD:
-        need(v, e->as.field.base != NULL);
+        need(v, e->as.field.base != NULL && field_found(e));
         need(v, e->as.field.enum_value == 0 ||
                     (e->type != NULL && e->type->kind == TYPE_ENUM &&
                      e->as.field.enum_value <= e->type->field_count));
@@ -294,13 +371,15 @@ static void check_expr(struct verify *v, const struct expr *e)
                           e->as.struct_lit.field_count));
         need(v, e->as.struct_lit.variant_case == 0 ||
                     case_of(e->type, e->as.struct_lit.variant_case));
+        need(v, inits_found(e));
         break;
     case EXPR_TUPLE:
         need(v, all_set(e->as.tuple.elements, e->as.tuple.count));
         break;
     case EXPR_SLICE_LIT:
         need(v, inits_set(e->as.slice_lit.fields,
-                          e->as.slice_lit.field_count));
+                          e->as.slice_lit.field_count) &&
+                    slice_inits_found(e));
         break;
     case EXPR_ARRAY_LIT:
         need(v, all_set(e->as.array_lit.elements, e->as.array_lit.count));
