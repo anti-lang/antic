@@ -1,0 +1,82 @@
+//! Many threads on one `Profiler` at once.
+//!
+//! The chunks of a `parallel` enter and leave the same hundred names, more than
+//! the profiler has slots for, so the threads claim the slots at once. The
+//! profiler then holds every slot once and no more, and every call stands
+//! either in the count of its slot or among the calls it had no slot for.
+
+import anti.text;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The names the threads enter, two bytes each.
+const NAMES: str = "a0a1a2a3a4a5a6a7a8a9b0b1b2b3b4b5b6b7b8b9c0c1c2c3c4c5c6c7c8c9d0d1d2d3d4d5d6d7d8d9e0e1e2e3e4e5e6e7e8e9f0f1f2f3f4f5f6f7f8f9g0g1g2g3g4g5g6g7g8g9h0h1h2h3h4h5h6h7h8h9i0i1i2i3i4i5i6i7i8i9j0j1j2j3j4j5j6j7j8j9";
+
+/// How many names stand in `NAMES`.
+const COUNT: int = 100;
+
+/// How often each thread walks the names.
+const ROUNDS: int = 400;
+
+/// The threads of the `parallel`.
+const THREADS: int = 8;
+
+/// The profiler the threads share.
+class Shared
+{
+	pub static atomic profiler: ?*trace.Profiler = none;
+}
+
+/// The name at `index`.
+fn name_of(index: int) -> str
+{
+	return text.slice(NAMES, 2 * index, 2 * index + 2);
+}
+
+/// Enter and leave every name `ROUNDS` times. Gives the calls it made.
+worker fn hit(chunk: []int) -> int
+{
+	let p = Shared.profiler.load() else {
+		return 0;
+	};
+	let made = 0;
+	for t in chunk {
+		for r in 0..ROUNDS {
+			for i in 0..COUNT {
+				p.enter(p, name_of(i));
+				p.leave(p, name_of(i));
+				made += 1;
+			}
+		}
+	}
+	return made;
+}
+
+fn main() -> int
+{
+	let p = trace.Profiler.new();
+	Shared.profiler.store(p);
+	let threads: [THREADS]int = [0; THREADS];
+	let made = parallel threads[0..THREADS] by THREADS -> hit();
+	let total = 0;
+	for m in made {
+		total += m;
+	}
+	free(made.ptr);
+	let counted = 0;
+	let named = 0;
+	for i in 0..COUNT {
+		let calls = p.calls(name_of(i));
+		counted += calls;
+		if calls > 0 {
+			named += 1;
+		}
+	}
+	printf("slots: %d held, %d named\n".ptr, p.len() as c_int, named as c_int);
+	printf("calls: %d made, %d counted or missed\n".ptr, total as c_int,
+		(counted + p.missed()) as c_int);
+	Shared.profiler.store(none);
+	delete(p);
+	return 0;
+}

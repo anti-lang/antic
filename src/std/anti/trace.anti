@@ -25,10 +25,15 @@
 //! }
 //! ```
 //!
+//! `install` does the same for a text the program gives it.
+//!
 //! A hook runs wherever the object it stands for runs, so a handler counts with
-//! atomic fields. It allocates no object of its own inside a hook: an `alloc`
-//! under `created` would call `created` again. The reports are written by the
-//! program, not by a hook, and each goes to standard error.
+//! atomic fields and holds a `Mutex` around every table of more than one word,
+//! for the hook that writes it and for the function that reads it. A hook takes
+//! no lock but that of its own handler, and calls nothing that runs a hook
+//! while it holds it. It allocates no object of its own inside a hook: an
+//! `alloc` under `created` would call `created` again. The reports are written
+//! by the program, not by a hook, and each goes to standard error.
 
 import anti.io;
 import anti.lang;
@@ -132,9 +137,10 @@ pub class LeakTracker inherits lang.TraceHandler
 ///
 /// The slots are of the whole program and the stack of a call is not, so the
 /// spans of a function that two threads run at once overlap in one slot. The
-/// counts stay right.
+/// counts stay right, since `lock` guards every slot and `count`.
 pub class Profiler inherits lang.TraceHandler
 {
+	lock: Mutex,
 	names: [PROFILE_SLOTS]str,
 	runs: [PROFILE_SLOTS]int,
 	spans: [PROFILE_SLOTS]int,
@@ -158,36 +164,44 @@ pub class Profiler inherits lang.TraceHandler
 	/// The number of functions the profiler has a slot for.
 	pub fn len(self) -> int
 	{
-		return self.count;
+		sync self.lock {
+			return self.count;
+		}
 	}
 
 	/// The name of the function in slot `index`, or the empty text.
 	pub fn name(self, index: int) -> str
 	{
-		if index < 0 || index >= self.count {
-			return "";
+		sync self.lock {
+			if index < 0 || index >= self.count {
+				return "";
+			}
+			return self.names[index];
 		}
-		return self.names[index];
 	}
 
 	/// The calls of `name`, or 0 for a function with no slot.
 	pub fn calls(self, name: str) -> int
 	{
-		let at = self.find(name);
-		if at < 0 {
-			return 0;
+		sync self.lock {
+			let at = self.find(name);
+			if at < 0 {
+				return 0;
+			}
+			return self.runs[at];
 		}
-		return self.runs[at];
 	}
 
 	/// The nanoseconds spent in `name`, or 0 for one with no slot.
 	pub fn nanoseconds(self, name: str) -> int
 	{
-		let at = self.find(name);
-		if at < 0 {
-			return 0;
+		sync self.lock {
+			let at = self.find(name);
+			if at < 0 {
+				return 0;
+			}
+			return self.spans[at];
 		}
-		return self.spans[at];
 	}
 
 	/// The calls that found every slot taken.
@@ -199,20 +213,22 @@ pub class Profiler inherits lang.TraceHandler
 	/// Write one line per slot to standard error.
 	pub fn report(self)
 	{
-		let i = 0;
-		while i < self.count do {
-			io.eprint("anti.trace: ");
-			io.eprint(self.names[i]);
-			io.eprint(" ");
-			eprint_int(self.runs[i]);
-			io.eprint(" calls, ");
-			eprint_int(self.spans[i]);
-			io.eprintln(" ns");
-			i += 1;
+		sync self.lock {
+			let i = 0;
+			while i < self.count do {
+				io.eprint("anti.trace: ");
+				io.eprint(self.names[i]);
+				io.eprint(" ");
+				eprint_int(self.runs[i]);
+				io.eprint(" calls, ");
+				eprint_int(self.spans[i]);
+				io.eprintln(" ns");
+				i += 1;
+			}
 		}
 	}
 
-	/// The slot of `name`, or -1 when it has none.
+	/// The slot of `name`, or -1 when it has none. The caller holds `lock`.
 	fn find(self, name: str) -> int
 	{
 		let i = 0;
@@ -226,7 +242,7 @@ pub class Profiler inherits lang.TraceHandler
 	}
 
 	/// The slot of `name`, a free one when it has none, or -1 when every slot
-	/// is taken.
+	/// is taken. The caller holds `lock`.
 	fn slot(self, name: str) -> int
 	{
 		let at = self.find(name);
@@ -254,27 +270,31 @@ pub class Profiler inherits lang.TraceHandler
 
 	concrete fn enter(self, o: *Object, name: str)
 	{
-		let at = self.slot(name);
-		if at < 0 {
-			self.overflow.add(1);
-			return;
+		sync self.lock {
+			let at = self.slot(name);
+			if at < 0 {
+				self.overflow.add(1);
+				return;
+			}
+			self.runs[at] += 1;
+			if self.inside[at] == 0 {
+				self.opened[at] = time.now();
+			}
+			self.inside[at] += 1;
 		}
-		self.runs[at] += 1;
-		if self.inside[at] == 0 {
-			self.opened[at] = time.now();
-		}
-		self.inside[at] += 1;
 	}
 
 	concrete fn leave(self, o: *Object, name: str)
 	{
-		let at = self.find(name);
-		if at < 0 || self.inside[at] == 0 {
-			return;
-		}
-		self.inside[at] -= 1;
-		if self.inside[at] == 0 {
-			self.spans[at] += time.now() - self.opened[at];
+		sync self.lock {
+			let at = self.find(name);
+			if at < 0 || self.inside[at] == 0 {
+				return;
+			}
+			self.inside[at] -= 1;
+			if self.inside[at] == 0 {
+				self.spans[at] += time.now() - self.opened[at];
+			}
 		}
 	}
 
@@ -376,9 +396,10 @@ pub class CallLogger inherits lang.TraceHandler
 /// `failed` carries the error that a function left with, and the error is
 /// deleted once its handler exits. The monitor therefore copies the message
 /// into itself and keeps the code and the name of the function, never the
-/// pointer.
+/// pointer. `lock` keeps the three of one failure together.
 pub class ErrorMonitor inherits lang.TraceHandler
 {
+	lock: Mutex,
 	atomic total: int = 0,
 	code: int = 0,
 	message: [MESSAGE_BYTES]byte,
@@ -400,32 +421,44 @@ pub class ErrorMonitor inherits lang.TraceHandler
 	/// The code of the last error, or 0 before the first.
 	pub fn last_code(self) -> int
 	{
-		return self.code;
+		sync self.lock {
+			return self.code;
+		}
 	}
 
 	/// The message of the last error, cut to `MESSAGE_BYTES` bytes.
+	///
+	/// The text stands in the monitor, and the next failure writes over it. A
+	/// program reads it once the threads that may fail have stopped, and calls
+	/// `report` while they run.
 	pub fn last_message(self) -> str
 	{
-		return text.from_c(&self.message[0]);
+		sync self.lock {
+			return text.from_c(&self.message[0]);
+		}
 	}
 
 	/// The name of the function that gave the last error.
 	pub fn last_function(self) -> str
 	{
-		return self.name;
+		sync self.lock {
+			return self.name;
+		}
 	}
 
 	/// Write the last failure to standard error.
 	pub fn report(self)
 	{
-		io.eprint("anti.trace: ");
-		eprint_int(self.failures());
-		io.eprint(" failures, last ");
-		io.eprint(self.last_function());
-		io.eprint(" error ");
-		eprint_int(self.code);
-		io.eprint(": ");
-		io.eprintln(self.last_message());
+		sync self.lock {
+			io.eprint("anti.trace: ");
+			eprint_int(self.failures());
+			io.eprint(" failures, last ");
+			io.eprint(self.name);
+			io.eprint(" error ");
+			eprint_int(self.code);
+			io.eprint(": ");
+			io.eprintln(text.from_c(&self.message[0]));
+		}
 	}
 
 	concrete fn created(self, o: *Object) { }
@@ -445,20 +478,22 @@ pub class ErrorMonitor inherits lang.TraceHandler
 	concrete fn failed(self, o: *Object, name: str, e: *lang.Error)
 	{
 		self.total.add(1);
-		self.code = e.code;
-		self.name = name;
 		let room = MESSAGE_BYTES - 1;
 		let n = e.message.len;
 		if n > room {
 			n = room;
 		}
-		let i = 0;
-		while i < n do {
-			self.message[i] = e.message[i];
-			i += 1;
+		sync self.lock {
+			self.code = e.code;
+			self.name = name;
+			let i = 0;
+			while i < n do {
+				self.message[i] = e.message[i];
+				i += 1;
+			}
+			self.message[n] = 0;
+			self.message_len = n;
 		}
-		self.message[n] = 0;
-		self.message_len = n;
 	}
 
 	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
@@ -555,9 +590,11 @@ pub class ThreadMonitor inherits lang.TraceHandler
 /// `changed` carries the record of the field, whose name stands in read-only
 /// data, and the journal reads the name of the object's class from its
 /// descriptor. It keeps both names and never the object, which the program may
-/// delete before the journal is read.
+/// delete before the journal is read. `lock` keeps the two words of each name
+/// and the two names of one write together.
 pub class ChangeJournal inherits lang.TraceHandler
 {
+	lock: Mutex,
 	classes: [JOURNAL_SLOTS]str,
 	fields: [JOURNAL_SLOTS]str,
 	atomic total: int = 0,
@@ -590,38 +627,46 @@ pub class ChangeJournal inherits lang.TraceHandler
 	/// The class of entry `index`, where 0 is the newest.
 	pub fn class_of(self, index: int) -> str
 	{
-		let at = self.place(index);
-		if at < 0 {
-			return "";
+		sync self.lock {
+			let at = self.place(index);
+			if at < 0 {
+				return "";
+			}
+			return self.classes[at];
 		}
-		return self.classes[at];
 	}
 
 	/// The field of entry `index`, where 0 is the newest.
 	pub fn field_of(self, index: int) -> str
 	{
-		let at = self.place(index);
-		if at < 0 {
-			return "";
+		sync self.lock {
+			let at = self.place(index);
+			if at < 0 {
+				return "";
+			}
+			return self.fields[at];
 		}
-		return self.fields[at];
 	}
 
 	/// Write one line per entry to standard error, the newest first.
 	pub fn report(self)
 	{
-		let i = 0;
-		let held = self.len();
-		while i < held do {
-			io.eprint("anti.trace: ");
-			io.eprint(self.class_of(i));
-			io.eprint(".");
-			io.eprintln(self.field_of(i));
-			i += 1;
+		sync self.lock {
+			let i = 0;
+			let held = self.len();
+			while i < held do {
+				let at = self.place(i);
+				io.eprint("anti.trace: ");
+				io.eprint(self.classes[at]);
+				io.eprint(".");
+				io.eprintln(self.fields[at]);
+				i += 1;
+			}
 		}
 	}
 
-	/// The slot of entry `index`, or -1 when the journal has none.
+	/// The slot of entry `index`, or -1 when the journal has none. The caller
+	/// holds `lock`, so `total` stands still.
 	fn place(self, index: int) -> int
 	{
 		if index < 0 || index >= self.len() {
@@ -649,9 +694,12 @@ pub class ChangeJournal inherits lang.TraceHandler
 
 	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
 	{
-		let at = self.total.add(1) % JOURNAL_SLOTS;
-		self.classes[at] = class_name(o);
-		self.fields[at] = field.name;
+		let whose = class_name(o);
+		sync self.lock {
+			let at = self.total.add(1) % JOURNAL_SLOTS;
+			self.classes[at] = whose;
+			self.fields[at] = field.name;
+		}
 	}
 }
 
@@ -661,10 +709,14 @@ pub class ChangeJournal inherits lang.TraceHandler
 /// reaches them in the other order, so the handlers nest around a call as the
 /// handler and the object's own hook do. A composite owns the handlers it holds
 /// and deletes them with itself.
+///
+/// `add` holds `lock`, writes the slot and then stores `count`, so a hook that
+/// loads `count` finds every slot below it written.
 pub class Composite inherits lang.TraceHandler
 {
+	lock: Mutex,
 	handlers: [COMPOSITE_SLOTS]?*lang.TraceHandler,
-	count: int = 0,
+	atomic count: int = 0,
 
 	/// A composite that holds no handler.
 	pub fn new() -> *Composite
@@ -675,24 +727,27 @@ pub class Composite inherits lang.TraceHandler
 	/// Take `h` over, or give `false` when every slot is taken.
 	pub fn add(self, h: *lang.TraceHandler) -> bool
 	{
-		if self.count >= COMPOSITE_SLOTS {
-			return false;
+		sync self.lock {
+			let at = self.count.load();
+			if at >= COMPOSITE_SLOTS {
+				return false;
+			}
+			self.handlers[at] = h;
+			self.count.store(at + 1);
 		}
-		self.handlers[self.count] = h;
-		self.count += 1;
 		return true;
 	}
 
 	/// The handlers the composite holds.
 	pub fn len(self) -> int
 	{
-		return self.count;
+		return self.count.load();
 	}
 
 	/// The handler at `index`, or `none` outside the composite.
 	pub fn at(self, index: int) -> ?*lang.TraceHandler
 	{
-		if index < 0 || index >= self.count {
+		if index < 0 || index >= self.count.load() {
 			return none;
 		}
 		return self.handlers[index];
@@ -700,8 +755,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn created(self, o: *Object)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.created(o);
@@ -712,8 +768,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn destroyed(self, o: *Object)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.destroyed(o);
@@ -724,8 +781,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn copied(self, o: *Object, from: *Object)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.copied(o, from);
@@ -736,8 +794,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn dispatched(self, o: *Object)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.dispatched(o);
@@ -748,8 +807,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn joined(self, o: *Object)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.joined(o);
@@ -760,8 +820,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn enter(self, o: *Object, name: str)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.enter(o, name);
@@ -772,7 +833,7 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn leave(self, o: *Object, name: str)
 	{
-		let i = self.count;
+		let i = self.count.load();
 		while i > 0 do {
 			i -= 1;
 			let h = self.handlers[i];
@@ -784,8 +845,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn failed(self, o: *Object, name: str, e: *lang.Error)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.failed(o, name, e);
@@ -796,8 +858,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				h.changed(o, field);
@@ -808,8 +871,9 @@ pub class Composite inherits lang.TraceHandler
 
 	concrete fn destruct(self)
 	{
+		let held = self.count.load();
 		let i = 0;
-		while i < self.count do {
+		while i < held do {
 			let h = self.handlers[i];
 			if h != none {
 				delete(h);
@@ -817,7 +881,7 @@ pub class Composite inherits lang.TraceHandler
 			self.handlers[i] = none;
 			i += 1;
 		}
-		self.count = 0;
+		self.count.store(0);
 	}
 }
 

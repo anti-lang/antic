@@ -1,0 +1,97 @@
+//! Many threads on one `ChangeJournal` at once.
+//!
+//! The chunks of a `parallel` give the journal their writes, each with a field
+//! name of a length of its own, while one chunk reads the newest entries. Every
+//! entry it reads names one field whole, never the start of one name with the
+//! length of another.
+
+import anti.text;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The bytes the field names are cut from.
+const BYTES: str = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvw";
+
+/// How many writes each writing thread gives.
+const WRITES: int = 200000;
+
+/// The threads of the `parallel`, the reader among them.
+const THREADS: int = 8;
+
+/// The journal the threads share, and the writers that are done.
+class Shared
+{
+	pub static atomic journal: ?*trace.ChangeJournal = none;
+	pub static atomic done: int = 0;
+}
+
+/// The field name of the thread `t`, longer for every thread.
+fn field_of(t: int) -> str
+{
+	return text.slice(BYTES, t, t + 1 + 15 * t);
+}
+
+/// Whether `name` is the field name of one thread.
+fn known(name: str) -> bool
+{
+	for t in 1..THREADS {
+		if text.equal(name, field_of(t)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/// Thread 0 reads the newest entries until the writers are done, and gives the
+/// entries it found torn. Every other thread writes.
+worker fn work(chunk: []int) -> int
+{
+	let j = Shared.journal.load() else {
+		return -1;
+	};
+	let torn = 0;
+	for t in chunk {
+		if t == 0 {
+			while Shared.done.load() < THREADS - 1 do {
+				let name = j.field_of(0);
+				if name.len != 0 && !known(name) {
+					torn += 1;
+				}
+			}
+			continue;
+		}
+		let field = FieldDescriptor {
+			name: field_of(t),
+			offset: 0,
+			type_id: 0,
+			owned: 0,
+			descriptor: none,
+		};
+		for i in 0..WRITES {
+			j.changed(j, &field);
+		}
+		Shared.done.add(1);
+	}
+	return torn;
+}
+
+fn main() -> int
+{
+	let j = trace.ChangeJournal.new();
+	Shared.journal.store(j);
+	let threads: [THREADS]int = [0; THREADS];
+	for t in 0..THREADS {
+		threads[t] = t;
+	}
+	let torn = parallel threads[0..THREADS] by THREADS -> work();
+	let total = 0;
+	for n in torn {
+		total += n;
+	}
+	free(torn.ptr);
+	printf("writes: %d, torn %d\n".ptr, j.writes() as c_int, total as c_int);
+	Shared.journal.store(none);
+	delete(j);
+	return 0;
+}

@@ -1,0 +1,118 @@
+//! Many threads on one `ErrorMonitor` at once.
+//!
+//! The chunks of a `parallel` give their failures to one monitor, each with a
+//! code, a function and a message of a length of its own. Every run ends with
+//! the code, the function and the message of one failure, never parts of two.
+
+import anti.lang;
+import anti.text;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The bytes the messages are cut from.
+const BYTES: str = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvw";
+
+/// The functions the failures name, one byte each.
+const FUNCTIONS: str = "01234567";
+
+/// How many failures each thread gives in one run.
+const FAILURES: int = 200;
+
+/// The threads of the `parallel`.
+const THREADS: int = 8;
+
+/// The runs, each with a monitor of its own.
+const RUNS: int = 4000;
+
+/// The monitor the threads share, and the errors they give it.
+class Shared
+{
+	pub static atomic monitor: ?*trace.ErrorMonitor = none;
+	pub static atomic errors: ?*Errors = none;
+}
+
+/// The error of each thread, made and deleted by `main`.
+class Errors
+{
+	pub list: [THREADS]?*lang.Error,
+}
+
+/// The message of the thread `t`, longer for every thread.
+fn message_of(t: int) -> str
+{
+	return text.slice(BYTES, 0, 7 + 15 * t);
+}
+
+/// The function of the thread `t`.
+fn function_of(t: int) -> str
+{
+	return text.slice(FUNCTIONS, t, t + 1);
+}
+
+/// Give the failures of every thread of `chunk`.
+worker fn fail_all(chunk: []int) -> int
+{
+	let m = Shared.monitor.load() else {
+		return 0;
+	};
+	let errors = Shared.errors.load() else {
+		return 0;
+	};
+	for t in chunk {
+		let e = errors.list[t] else {
+			return 0;
+		};
+		for i in 0..FAILURES {
+			m.failed(e, function_of(t), e);
+		}
+	}
+	return chunk.len;
+}
+
+/// Whether the monitor holds the code, the function and the message of one
+/// thread.
+fn whole(m: *trace.ErrorMonitor) -> bool
+{
+	let t = m.last_code();
+	if t < 0 || t >= THREADS {
+		return false;
+	}
+	return text.equal(m.last_function(), function_of(t))
+		&& text.equal(m.last_message(), message_of(t));
+}
+
+fn main() -> int
+{
+	let threads: [THREADS]int = [0; THREADS];
+	for t in 0..THREADS {
+		threads[t] = t;
+	}
+	let errors = alloc Errors { list: [none; THREADS] };
+	for t in 0..THREADS {
+		errors.list[t] = lang.Error.new(t, message_of(t));
+	}
+	Shared.errors.store(errors);
+	let torn = 0;
+	for run in 0..RUNS {
+		let m = trace.ErrorMonitor.new();
+		Shared.monitor.store(m);
+		let done = parallel threads[0..THREADS] by THREADS -> fail_all();
+		free(done.ptr);
+		if !whole(m) {
+			torn += 1;
+		}
+		Shared.monitor.store(none);
+		delete(m);
+	}
+	Shared.errors.store(none);
+	for t in 0..THREADS {
+		let e = errors.list[t] else {
+			continue;
+		};
+		delete(e);
+	}
+	delete(errors);
+	printf("runs: %d, torn %d\n".ptr, RUNS as c_int, torn as c_int);
+	return 0;
+}

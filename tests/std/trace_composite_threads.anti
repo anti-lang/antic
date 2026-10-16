@@ -1,0 +1,90 @@
+//! Many threads add to one `Composite` at once.
+//!
+//! The chunks of a `parallel` each add one handler to a composite that has room
+//! for fewer. The composite takes as many as it has slots for and refuses the
+//! rest, in every run.
+
+import anti.lang;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The threads of the `parallel`, twice the slots of a composite.
+const THREADS: int = 2 * trace.COMPOSITE_SLOTS;
+
+/// The runs, each with a composite of its own.
+const RUNS: int = 2000;
+
+/// The composite the threads share, and the handlers they add.
+class Shared
+{
+	pub static atomic group: ?*trace.Composite = none;
+	pub static atomic handlers: ?*Handlers = none;
+}
+
+/// The handler of each thread, made by `main`.
+class Handlers
+{
+	pub list: [THREADS]?*lang.TraceHandler,
+}
+
+/// Add the handler of every thread of `chunk`. Gives 1 for one the composite
+/// took.
+worker fn add(chunk: []int) -> int
+{
+	let group = Shared.group.load() else {
+		return -1;
+	};
+	let handlers = Shared.handlers.load() else {
+		return -1;
+	};
+	let taken = 0;
+	for t in chunk {
+		let h = handlers.list[t] else {
+			return -1;
+		};
+		if group.add(h) {
+			taken += 1;
+		}
+	}
+	return taken;
+}
+
+fn main() -> int
+{
+	let threads: [THREADS]int = [0; THREADS];
+	for t in 0..THREADS {
+		threads[t] = t;
+	}
+	let handlers = alloc Handlers { list: [none; THREADS] };
+	Shared.handlers.store(handlers);
+	let wrong = 0;
+	for run in 0..RUNS {
+		for t in 0..THREADS {
+			handlers.list[t] = trace.LeakTracker.new();
+		}
+		let group = trace.Composite.new();
+		Shared.group.store(group);
+		let taken = parallel threads[0..THREADS] by THREADS -> add();
+		let total = 0;
+		for t in 0..THREADS {
+			total += taken[t];
+			if taken[t] == 0 {
+				let h = handlers.list[t] else {
+					continue;
+				};
+				delete(h);
+			}
+		}
+		free(taken.ptr);
+		if total != trace.COMPOSITE_SLOTS || group.len() != total {
+			wrong += 1;
+		}
+		Shared.group.store(none);
+		delete(group);
+	}
+	Shared.handlers.store(none);
+	delete(handlers);
+	printf("runs: %d, wrong %d\n".ptr, RUNS as c_int, wrong as c_int);
+	return 0;
+}
