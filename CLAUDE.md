@@ -651,7 +651,7 @@ the same list.
     builtins, and nothing of Microsoft. The runtime defines the static part
     of the C runtime, the entry point among it, and the C of every Windows
     target compiles for the gnu triple against the mingw-w64 headers.
-    `docs/reports/2026-10-09-dist-mingw.md` reports it.
+    `docs/reports/2026-10-10-dist-mingw.md` reports it.
 33. Done. The tool that fetched the CRT and SDK of Microsoft is gone. Its
     pins left `tools/sysroot-pins`, and `ANTI_MICROSOFT` left
     `tools/release.sh` and the tests of the installers. Step 10 of `./r`
