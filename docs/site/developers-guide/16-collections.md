@@ -235,7 +235,7 @@ An index outside the list stops a dev build with `index out of bounds: index 5, 
 | 0 | the pointer to the table of the class | `Object` |
 | 8 | `count` | `Collection<T>` |
 | 16 | `from`, the allocator | `Collection<T>` |
-| 24 | `changes`, a count of 8 bytes and the `SourceLocation` of the last change of the size, 64 bytes | `Collection<T>` |
+| 24 | `changes`, a count of 8 bytes and the `SourceLocation` of the last change of the size or the room, 64 bytes | `Collection<T>` |
 | 96 | `items`, the block | `Indexed<T>` |
 | 104 | `capacity` | `Indexed<T>` |
 | 112 | `head`, the slot of the first element | `Indexed<T>` |
@@ -1765,7 +1765,7 @@ A type is walked through three hooks. `operator fn iter` gives an iterator. `ope
 
 `Iterable<T>` and `Iterator<T>` of `anti.collection` are the constraints of a generic function that takes any collection or any iterator of an element type.
 
-A dev build stops the program when the size of a collection changes while a `for` walks it. The message names the loop and the place of the change: `` `l` was changed while `for` walked it: changed at app.anti:10 ``. The remove forms of the collection remove while they walk. A release build makes no such test.
+A dev build stops the program when the size of a collection changes while a `for` walks it, and when `reserve` or `shrink` moves its room. The message names the loop and the place of the change: `` `l` was changed while `for` walked it: changed at app.anti:10 ``. The remove forms of the collection remove while they walk. A release build makes no such test.
 
 ```anti
 //! name: walks
@@ -2002,7 +2002,7 @@ The record of the changes is paid in every build, since the fields and the store
 For a Java programmer:
 
 - A release build has no `ConcurrentModificationException`. The check is a tool of dev mode.
-- The check sees a change of the size. `l[i] = x` inside a `for` over `l` is no change of the size and passes.
+- The check sees a change of the size and a move of the room by `reserve` or `shrink`. `l[i] = x` inside a `for` over `l` is neither and passes.
 - `for x in c` copies each element. For a struct of 200 bytes that is 200 bytes per turn, and `for x in &c` copies nothing.
 
 For a C programmer:

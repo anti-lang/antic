@@ -207,8 +207,9 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 	spare: int = -1,
 
 	/// Make room for `n` more elements in one allocation, so that adding them
-	/// allocates nothing.
-	pub fn reserve(self, n: int)
+	/// allocates nothing. A move of the room counts as a change at `at`, which
+	/// a `for` over the collection sees.
+	pub fn reserve(self, n: int, at: lang.SourceLocation = here)
 	{
 		let need = nodes_for(collection.room_plus(self.count, n));
 		if need < self.used {
@@ -216,13 +217,18 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 		}
 		if need > self.nodes {
 			self.resize(need);
+			self.resized(0, at);
 		}
 	}
 
 	/// Give back the room that holds no element. The nodes move down to the
-	/// start of the block first.
-	pub fn shrink(self)
+	/// start of the block first. A move of a node or of the room counts as a
+	/// change at `at`.
+	pub fn shrink(self, at: lang.SourceLocation = here)
 	{
+		if self.nodes > self.live {
+			self.resized(0, at);
+		}
 		self.compact();
 		if self.nodes > self.used {
 			self.resize(self.used);

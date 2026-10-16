@@ -1,0 +1,21 @@
+//! `reserve` moves the room of a `BitSet` while a `for` walks it.
+//! The move counts as a change, finding M304, and the loop of a dev build
+//! stops at the next turn. Before the fix the walk read the freed room.
+
+import anti.collection.set.{BitSet};
+
+fn main() -> int
+{
+	let seen = BitSet.new();
+	seen.add(1);
+	seen.add(2);
+	seen.add(3);
+	let first = true;
+	for n in seen {
+		if first {
+			seen.reserve(10000);
+			first = false;
+		}
+	}
+	return 7;
+}

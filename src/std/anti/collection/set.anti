@@ -481,17 +481,20 @@ pub class BitSet inherits collection.Collection<int>
 		return self.word_count * WORD_BITS;
 	}
 
-	/// Make room for the numbers below `n`, in one allocation.
-	pub fn reserve(self, n: int)
+	/// Make room for the numbers below `n`, in one allocation. A move of the
+	/// room counts as a change at `at`, which a `for` over the set sees.
+	pub fn reserve(self, n: int, at: lang.SourceLocation = here)
 	{
 		let need = collection.room_plus(n, WORD_BITS - 1) / WORD_BITS;
 		if need > self.word_count {
 			self.resize(need);
+			self.resized(0, at);
 		}
 	}
 
-	/// Give back the words above the largest number.
-	pub fn shrink(self)
+	/// Give back the words above the largest number. A move of the room counts
+	/// as a change at `at`.
+	pub fn shrink(self, at: lang.SourceLocation = here)
 	{
 		let need = self.word_count;
 		let words = self.words else {
@@ -502,6 +505,7 @@ pub class BitSet inherits collection.Collection<int>
 		}
 		if need < self.word_count {
 			self.resize(need);
+			self.resized(0, at);
 		}
 	}
 

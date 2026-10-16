@@ -1,0 +1,21 @@
+//! `reserve` moves the room of a `Map<K, V>` while a `for` walks it.
+//! The move counts as a change, finding M304, and the loop of a dev build
+//! stops at the next turn. Before the fix the walk read the freed room.
+
+import anti.collection.map.{Map};
+
+fn main() -> int
+{
+	let ages = Map<int, int>.new();
+	ages.set(1, 10);
+	ages.set(2, 20);
+	ages.set(3, 30);
+	let first = true;
+	for (k, v) in ages {
+		if first {
+			ages.reserve(100);
+			first = false;
+		}
+	}
+	return 7;
+}

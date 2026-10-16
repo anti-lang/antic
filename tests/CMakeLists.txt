@@ -5080,6 +5080,44 @@ if(ANTIC_LLVM_MC)
     antic_check_test(set_changed "was changed while"
         "set_changed\\.anti:12: `seen` was changed while `for` walked it: changed at set_changed\\.anti:13"
         ON DEV lang mem text collection collection/map collection/set)
+    # M304: `reserve` and `shrink` move the room a walk holds, and each
+    # counts the move as a change of the collection.
+    antic_check_test(list_reserve_changed "was changed while"
+        "list_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_reserve_changed\\.anti:16"
+        ON DEV lang mem text collection collection/list)
+    antic_check_test(list_shrink_changed "was changed while"
+        "list_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_shrink_changed\\.anti:16"
+        ON DEV lang mem text collection collection/list)
+    antic_check_test(deque_reserve_changed "was changed while"
+        "deque_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_reserve_changed\\.anti:16"
+        ON DEV lang mem text collection collection/deque)
+    antic_check_test(deque_shrink_changed "was changed while"
+        "deque_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_shrink_changed\\.anti:16"
+        ON DEV lang mem text collection collection/deque)
+    antic_check_test(map_reserve_changed "was changed while"
+        "map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_reserve_changed\\.anti:16"
+        ON DEV lang mem text collection collection/map)
+    antic_check_test(map_shrink_changed "was changed while"
+        "map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_shrink_changed\\.anti:16"
+        ON DEV lang mem text collection collection/map)
+    antic_check_test(hash_map_reserve_changed "was changed while"
+        "hash_map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_reserve_changed\\.anti:16"
+        ON DEV lang mem text collection collection/map)
+    antic_check_test(hash_map_shrink_changed "was changed while"
+        "hash_map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_shrink_changed\\.anti:16"
+        ON DEV lang mem text collection collection/map)
+    antic_check_test(bitset_reserve_changed "was changed while"
+        "bitset_reserve_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_reserve_changed\\.anti:16"
+        ON DEV lang mem text collection collection/map collection/set)
+    antic_check_test(bitset_shrink_changed "was changed while"
+        "bitset_shrink_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_shrink_changed\\.anti:16"
+        ON DEV lang mem text collection collection/map collection/set)
+    antic_check_test(sorted_reserve_changed "was changed while"
+        "sorted_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_reserve_changed\\.anti:16"
+        ON DEV lang mem text collection reflect collection/sorted)
+    antic_check_test(sorted_shrink_changed "was changed while"
+        "sorted_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_shrink_changed\\.anti:16"
+        ON DEV lang mem text collection reflect collection/sorted)
     add_test(NAME checks_override
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
