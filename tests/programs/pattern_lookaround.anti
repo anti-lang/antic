@@ -1,0 +1,39 @@
+//! `data.patch(r, with, into, at)` finds every place before it writes a byte.
+//! A group in a lookahead lies outside its match, and a lookbehind reads the
+//! bytes before it, so a write could change what a later search finds. Neither
+//! does: the lookahead patches the one place that stood before the write, and
+//! the lookbehind patches the one place whose byte before it was `a`.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, n: int, data: []byte)
+{
+	printf("%.*s %lld [%.*s]\n".ptr, label.len as c_int, label.ptr, n,
+		data.len as c_int, data.ptr);
+}
+
+fn main() -> int
+{
+	let ahead = "xyyyy".to_bytes();
+	let r = ByteRegex.compile("x(?=(y+))") catch fatal;
+	let n = ahead.patch(r, b"x", 1, 2) catch e {
+		printf("lookahead failed\n".ptr);
+		yield -1;
+	};
+	show("lookahead", n, ahead);
+	free(ahead.ptr);
+
+	let behind = "abb".to_bytes();
+	let b = ByteRegex.compile("(?<=a)(b)") catch fatal;
+	n = behind.patch(b, b"a", 1, 0) catch e {
+		printf("lookbehind failed\n".ptr);
+		yield -1;
+	};
+	show("lookbehind", n, behind);
+	free(behind.ptr);
+	return 0;
+}

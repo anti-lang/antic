@@ -696,11 +696,13 @@ static bool fits_span(int64_t at, int64_t length, int64_t span)
    group into of every match the limit takes. The data never changes
    length. into 0 takes the one group of a pattern with one, or the whole
    match of a pattern without groups. A pattern with more needs into, by
-   number or by the name of name_length bytes. The walk runs twice over
-   the same matches: once to count and to find that every span takes
-   with, once to write. The limit of a search, a missing group and a with
-   that does not fit are so found before any byte changes. A match whose group did not take part is
-   passed over and not counted. */
+   number or by the name of name_length bytes. One walk finds every match
+   and records where with goes, and the writes follow from the record, so
+   no search reads a byte that a write changed. A group in a lookahead
+   lies outside its match, and a lookbehind reads the bytes before it. The
+   limit of a search, a missing group and a with that does not fit are so
+   found before any byte changes. A match whose group did not take part
+   is passed over and not counted. */
 int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
                             int64_t length, const unsigned char *with,
                             int64_t with_length, int64_t into,
@@ -710,7 +712,11 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
     int64_t count = anti_rt_regex_group_count(pattern);
     int64_t group = into;
     int64_t places = 0;
-    int pass;
+    int64_t status;
+    int64_t i;
+    struct growing offsets = {NULL, 0, 0};
+    struct anti_matches it;
+    pcre2_match_data *md;
 
     if (name_length > 0) {
         group = anti_rt_regex_group_number(pattern, name, name_length);
@@ -728,33 +734,37 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
     if (at < 0) {
         return MISFIT;
     }
-    for (pass = 0; pass < 2; pass++) {
-        struct anti_matches it;
-        pcre2_match_data *md = match_data(pattern, 1);
-        int64_t status = walk_begin(&it, pattern, data, length, limit);
-        places = 0;
-        while (status >= 0 &&
-               (status = advance(&it.cursor, &it.current, md)) == FOUND) {
-            const PCRE2_SIZE *ov = pcre2_get_ovector_pointer(md);
-            int64_t start = (int64_t)ov[2 * group];
-            int64_t end = (int64_t)ov[2 * group + 1];
-            if (ov[2 * group] == PCRE2_UNSET) {
-                continue;
-            }
-            if (!fits_span(at, with_length, end - start)) {
-                status = MISFIT;
-                break;
-            }
-            if (pass == 1 && with_length > 0) {
-                memcpy(data + start + at, with, (size_t)with_length);
-            }
-            places++;
+    md = match_data(pattern, 1);
+    status = walk_begin(&it, pattern, data, length, limit);
+    while (status >= 0 &&
+           (status = advance(&it.cursor, &it.current, md)) == FOUND) {
+        const PCRE2_SIZE *ov = pcre2_get_ovector_pointer(md);
+        int64_t start = (int64_t)ov[2 * group];
+        int64_t end = (int64_t)ov[2 * group + 1];
+        int64_t offset;
+        if (ov[2 * group] == PCRE2_UNSET) {
+            continue;
         }
-        pcre2_match_data_free(md);
-        if (status < 0) {
-            return status;
+        if (!fits_span(at, with_length, end - start)) {
+            status = MISFIT;
+            break;
         }
+        offset = start + at;
+        grow_append(&offsets, (const unsigned char *)&offset, sizeof offset);
+        places++;
     }
+    pcre2_match_data_free(md);
+    if (status < 0) {
+        free(offsets.bytes);
+        return status;
+    }
+    for (i = 0; i < places && with_length > 0; i++) {
+        int64_t offset;
+        memcpy(&offset, offsets.bytes + i * (int64_t)sizeof offset,
+               sizeof offset);
+        memcpy(data + offset, with, (size_t)with_length);
+    }
+    free(offsets.bytes);
     return places;
 }
 
