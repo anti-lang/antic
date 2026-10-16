@@ -107,6 +107,16 @@ uint8_t antl_get_u8(struct reader *r)
     return (uint8_t)get_uint(r, 1);
 }
 
+bool antl_get_flag(struct reader *r)
+{
+    uint8_t flag = antl_get_u8(r);
+
+    if (flag > 1) {
+        antl_damaged(r);
+    }
+    return flag == 1;
+}
+
 uint32_t antl_get_u32(struct reader *r)
 {
     return (uint32_t)get_uint(r, 4);

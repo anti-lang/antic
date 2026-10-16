@@ -2360,7 +2360,7 @@ static void damaged_constants(void)
    replaced by count addresses at offsets, each of global 0. */
 static void with_relocations(const struct text *bytes, const char *name,
                              const uint64_t *offsets, uint32_t count,
-                             struct text *out)
+                             uint8_t to_function, struct text *out)
 {
     size_t at = name_end(bytes, name, false);
     uint64_t size = (uint64_t)u32_at(bytes, at) |
@@ -2382,7 +2382,7 @@ static void with_relocations(const struct text *bytes, const char *name,
         text_append_bytes(out, word, 8);
         poke_u32(word, 0);
         text_append_bytes(out, word, 4);
-        word[0] = 0;
+        word[0] = to_function;
         text_append_bytes(out, word, 1);
     }
     text_append_bytes(out, bytes->data + relocs + 4,
@@ -2412,12 +2412,24 @@ static void damaged_relocations(void)
         close_session(&s);
         return;
     }
-    with_relocations(&bytes, "0", apart, 2, &changed);
+    with_relocations(&bytes, "0", apart, 2, 0, &changed);
     CHECK(reads_file(&changed));
-    with_relocations(&bytes, "0", overlap, 2, &changed);
+    with_relocations(&bytes, "0", overlap, 2, 0, &changed);
     refuses_file((const uint8_t *)changed.data, changed.length, NULL);
-    with_relocations(&bytes, "0", past, 1, &changed);
+    with_relocations(&bytes, "0", past, 1, 0, &changed);
     refuses_file((const uint8_t *)changed.data, changed.length, NULL);
+    /* Rule 14: whether the target is a function is a flag, and the marks
+       of a global take bits 0 to 3. */
+    with_relocations(&bytes, "0", apart, 2, 2, &changed);
+    refuses_file((const uint8_t *)changed.data, changed.length, NULL);
+    {
+        size_t at = name_end(&bytes, "0", false);
+        uint64_t size = (uint64_t)u32_at(&bytes, at) |
+                        (uint64_t)u32_at(&bytes, at + 4) << 32;
+        size_t marks = at + 8 + 8 + (size_t)size + 4;
+        const uint8_t unknown = (uint8_t)(bytes.data[marks] | 16);
+        refuses_poke(&bytes, marks, &unknown, 1);
+    }
     text_free(&changed);
     text_free(&bytes);
     close_session(&s);
@@ -2980,6 +2992,71 @@ static void field_kinds(void)
     field_of_kind(&b, TYPE_I64, TYPE_CLASS, FIELD_BASE);
     refuses_file((const uint8_t *)b.data, b.length, NULL);
     text_free(&b);
+}
+
+/* Read the library file bytes of module name into a new session and
+   write it again into out. False when the reader refuses it. */
+static bool read_and_write(const uint8_t *bytes, size_t length,
+                           const char *name, struct text *out)
+{
+    struct session s;
+    struct ir_module program;
+    struct interface *read;
+    char error[160] = "";
+
+    open_session(&s);
+    ir_module_init(&program, &s.arena, name);
+    read = antl_read(bytes, length, NULL, 0, &s.types, &s.arena, &program,
+                     error, sizeof error);
+    out->length = 0;
+    if (read != NULL) {
+        antl_write(out, read, &program, false);
+    }
+    ir_module_free(&program);
+    close_session(&s);
+    return read != NULL;
+}
+
+/* Rule 14: a byte that holds a flag holds 0 or 1, and the reader refuses
+   any other value. Each byte of 1 is changed to 2 in turn. A reader that
+   took the 2 for a 1 would give the file it was written from when it
+   writes what it read, so the test refuses that outcome. */
+static void flags_refused(const char *name, const char *source)
+{
+    struct session s;
+    struct text bytes = {0};
+    struct text again = {0};
+    uint8_t *copy;
+    size_t at;
+
+    open_session(&s);
+    if (!build_library(&s, name, source, &bytes)) {
+        close_session(&s);
+        return;
+    }
+    CHECK(read_and_write((const uint8_t *)bytes.data, bytes.length, name,
+                         &again));
+    CHECK(again.length == bytes.length &&
+          memcmp(again.data, bytes.data, bytes.length) == 0);
+    copy = alloc_zeroed(bytes.length, 1);
+    for (at = 0; at < bytes.length; at++) {
+        if ((uint8_t)bytes.data[at] != 1) {
+            continue;
+        }
+        memcpy(copy, bytes.data, bytes.length);
+        copy[at] = 2;
+        if (read_and_write(copy, bytes.length, name, &again) &&
+            again.length == bytes.length &&
+            memcmp(again.data, bytes.data, bytes.length) == 0) {
+            check_failures++;
+            fprintf(stderr, "%s: the flag at byte %zu reads 2 as 1\n", name,
+                    at);
+        }
+    }
+    free(copy);
+    text_free(&again);
+    text_free(&bytes);
+    close_session(&s);
 }
 
 /* S01: the checked tree of a generic that a library file carries. Each
@@ -3598,12 +3675,27 @@ static void damaged_trees(void)
     }
 }
 
+/* A variadic C function that a generic calls. */
+static const char variadic_source[] =
+    "extern fn printf(format: ?*c_char, ...) -> c_int;\n"
+    "pub fn say<T>(x: T) -> c_int {\n"
+    "    return printf(none, 1);\n"
+    "}\n";
+
+static void flag_bytes(void)
+{
+    flags_refused("sweep", sweep_source);
+    flags_refused("tt", tree_source);
+    flags_refused("va", variadic_source);
+}
+
 void test_modules(void)
 {
     deep_types();
     copy_depths();
     deep_values();
     field_kinds();
+    flag_bytes();
     damaged_trees();
     damaged_bytes();
     tree_counts();

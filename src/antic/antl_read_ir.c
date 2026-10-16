@@ -1122,7 +1122,7 @@ void antl_read_ir(struct reader *r, struct ir_module *program)
         for (j = 0; j < relocs[i].count && !r->failed; j++) {
             relocs[i].offsets[j] = antl_get_u64(r);
             relocs[i].targets[j] = antl_get_u32(r);
-            relocs[i].functions[j] = antl_get_u8(r) != 0 ? 1 : 0;
+            relocs[i].functions[j] = antl_get_flag(r) ? 1 : 0;
             if (relocs[i].offsets[j] > size ||
                 size - relocs[i].offsets[j] < 8) {
                 antl_damaged(r);
@@ -1137,6 +1137,9 @@ void antl_read_ir(struct reader *r, struct ir_module *program)
             g->exported = (marks & 2) != 0;
             g->is_extern = (marks & 4) != 0;
             g->mutable = (marks & 8) != 0;
+            if (marks > 15) {
+                antl_damaged(r);
+            }
             if ((marks & 1) != 0 && !r->failed) {
                 g->value = read_const(r, program, &maps, 0);
             }

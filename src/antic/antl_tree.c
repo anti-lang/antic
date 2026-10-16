@@ -1438,7 +1438,7 @@ static struct symbol *read_extern(struct reader *r)
         return NULL;
     }
     sym->home = lib;
-    if (antl_get_u8(r) != 0) {
+    if (antl_get_flag(r)) {
         struct item *it = antl_allocate(r, 1, sizeof *it);
         uint8_t flags;
         it->kind = ITEM_FN;
@@ -1465,7 +1465,7 @@ static struct symbol *read_extern(struct reader *r)
         it->symbol = sym;
         sym->item = it;
     }
-    if (antl_get_u8(r) != 0) {
+    if (antl_get_flag(r)) {
         struct const_value *value = antl_allocate(r, 1, sizeof *value);
         if (!antl_read_value(r, sym->type, value, 0)) {
             antl_damaged(r);

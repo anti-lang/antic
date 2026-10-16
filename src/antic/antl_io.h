@@ -115,6 +115,10 @@ bool antl_take(struct reader *r, size_t n);
 /* Read one byte, four and eight, little-endian. Past the end of the
    file each gives 0 and refuses the file. */
 uint8_t antl_get_u8(struct reader *r);
+/* Read a byte that holds a flag, 0 or 1. Any other value refuses the
+   file, since a reader that took 2 for 1 would write another file from
+   what it read. */
+bool antl_get_flag(struct reader *r);
 uint32_t antl_get_u32(struct reader *r);
 uint64_t antl_get_u64(struct reader *r);
 /* Read a signed number of four and eight bytes, two's complement. */

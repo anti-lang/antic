@@ -259,12 +259,10 @@ void antl_read_param_owned(struct reader *r, struct symbol *sym)
     }
     list = antl_allocate(r, count, sizeof *list);
     for (i = 0; i < count && !r->failed; i++) {
-        uint8_t owned = antl_get_u8(r);
-        if (owned > 1) {
-            antl_damaged(r);
-            return;
-        }
-        list[i] = owned == 1;
+        list[i] = antl_get_flag(r);
+    }
+    if (r->failed) {
+        return;
     }
     sym->owned = list;
     sym->owned_count = count;
@@ -517,7 +515,7 @@ static struct type *read_array(struct reader *r, uint32_t at)
     struct type *element = antl_type_ref(r, at);
     struct type *t = NULL;
 
-    if (antl_get_u8(r) != 0) {
+    if (antl_get_flag(r)) {
         const struct symbolic *length = antl_read_symbolic(r, at, 0);
         if (element != NULL && length != NULL) {
             t = types_array_symbolic(r->types, element, length);
@@ -1193,7 +1191,7 @@ bool antl_read_value(struct reader *r, struct type *of, struct const_value *v,
         return !r->failed && (types_is_float(t) || t->kind == TYPE_F16);
     }
     case CONST_BOOL:
-        v->as.boolean = antl_get_u8(r) != 0;
+        v->as.boolean = antl_get_flag(r);
         return !r->failed && t->kind == TYPE_BOOL;
     case CONST_CHAR:
         v->as.character = antl_get_u32(r);
@@ -1370,7 +1368,7 @@ void antl_read_items(struct reader *r)
                 antl_read_param_owned(r, sym);
             }
             if (kind == SYMBOL_EXTERN_FN) {
-                sym->variadic = antl_get_u8(r) != 0;
+                sym->variadic = antl_get_flag(r);
             }
             ok = ok && !r->failed;
             break;
