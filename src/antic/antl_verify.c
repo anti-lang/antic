@@ -30,6 +30,9 @@
    - A number that indexes a type stays inside it: the case of a variant,
      the value of an enum, the lanes of a shuffle and the place of `else`
      among the arms of a `switch`.
+   - A name that lowering looks up names a field of its type: the field
+     a field expression reads and the names of a struct literal, of the
+     case of a variant literal and of a slice literal.
    - A count matches what it counts: the parameters of a function against
      its type, the arguments of the copy of a generic against its type
      parameters, and the names of a pattern against its tuple.
