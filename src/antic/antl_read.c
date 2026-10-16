@@ -63,19 +63,6 @@ static bool name_equals_name(const struct name *a, const struct name *b)
            memcmp(a->text, b->text, a->length) == 0;
 }
 
-/* Whether module and name are those of `anti.lang` and the item text,
-   which the compiler declares. */
-static bool names_lang(const struct name *module, const struct name *name,
-                       const char *text)
-{
-    static const struct name lang = {LANG_MODULE, sizeof LANG_MODULE - 1};
-    struct name wanted;
-
-    wanted.text = text;
-    wanted.length = strlen(text);
-    return name_equals_name(module, &lang) && name_equals_name(name, &wanted);
-}
-
 /* A struct of another module is the struct that module's library file
    declared. */
 static struct type *foreign_struct(struct reader *r, const struct name *module,
@@ -84,17 +71,6 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
     const struct interface *lib;
     size_t i;
 
-    /* The root of every class chain is the compiler's own, not a module
-       any library file declares. */
-    if (names_lang(module, name, LANG_OBJECT)) {
-        return types_object(r->types);
-    }
-    if (names_lang(module, name, LANG_FLAGS)) {
-        return types_flags(r->types);
-    }
-    if (names_lang(module, name, LANG_FIELD_DESCRIPTOR)) {
-        return types_field_descriptor(r->types);
-    }
     lib = antl_library(r, module);
     if (lib == NULL) {
         antl_fail(r, "needs module `%.*s`", (int)module->length, module->text);
@@ -595,29 +571,30 @@ static struct type *read_tuple(struct reader *r, uint32_t at)
     return r->failed ? NULL : types_tuple(r->types, elements, n);
 }
 
-/* Whether module and name name a struct of `anti.lang` that the
-   compiler knows and that carries nothing more, which goes to t. */
-static bool lang_struct(struct reader *r, const struct name *module,
-                        const struct name *name, struct type **t)
+/* A type of `anti.lang` that the compiler declares, of kind and in the
+   form the byte gives, after its module and its name. The file names it
+   in the plain form, with the element of a channel or the result of a
+   Job after the name. A match of a literal is written as the plain
+   match of its form, since the literal stays in the module that wrote
+   it. */
+static struct type *read_declared(struct reader *r, uint32_t at,
+                                  uint8_t kind, uint8_t form,
+                                  const struct name *name, bool with_part,
+                                  enum type_kind declared)
 {
-    if (names_lang(module, name, LANG_MUTEX)) {
-        *t = types_mutex(r->types);
-    } else if (names_lang(module, name, LANG_REGEX)) {
-        *t = types_regex(r->types);
-    } else if (names_lang(module, name, LANG_BYTE_REGEX)) {
-        *t = types_byte_regex(r->types);
-    } else if (names_lang(module, name, LANG_BYTE_MATCH)) {
-        *t = types_match_of(r->types, true);
-    } else if (names_lang(module, name, LANG_MATCH)) {
-        /* A match of a literal is written as the plain match of its
-           form, since the literal stays in the module that wrote it. */
-        *t = types_match(r->types, NULL);
-    } else if (names_lang(module, name, LANG_OBJECT_LOCK)) {
-        *t = types_object_lock(r->types);
-    } else {
-        return false;
+    struct type *part = NULL;
+
+    if (form != ANTL_FORM_PLAIN || kind != (uint8_t)declared) {
+        antl_damaged(r);
+        return NULL;
     }
-    return true;
+    if (with_part) {
+        part = antl_type_ref(r, at);
+        if (r->failed || part == NULL) {
+            return NULL;
+        }
+    }
+    return types_make_declared(r->types, name, part);
 }
 
 /* The fields of the struct s, whose types are indices into the table,
@@ -813,6 +790,8 @@ static struct type *read_struct(struct reader *r, uint32_t at, uint8_t kind,
     struct type *existing = NULL;
     struct field_refs *s;
     struct type *t;
+    enum type_kind declared;
+    bool with_part;
 
     if (r->failed) {
         return NULL;
@@ -821,32 +800,21 @@ static struct type *read_struct(struct reader *r, uint32_t at, uint8_t kind,
         antl_damaged(r);
         return NULL;
     }
+    /* The types the compiler declares carry the path of `anti.lang`,
+       and no library file declares one, that of `anti.lang` included. */
+    if (types_names_declared(&module, &name, &declared, &with_part)) {
+        return read_declared(r, at, kind, struct_form_byte, &name,
+                             with_part, declared);
+    }
     if (struct_form_byte == ANTL_FORM_COPY) {
         generic = read_copy_args(r, at, kind, &args, &values);
         if (generic == NULL) {
             return NULL;
         }
         existing = copy_among(generic, args, values);
-    } else if (kind == TYPE_STRUCT &&
-               names_lang(&module, &name, LANG_CHAN)) {
-        struct type *element = antl_type_ref(r, at);
-        return r->failed ? NULL : types_chan(r->types, element);
-    } else if (kind == TYPE_STRUCT &&
-               names_lang(&module, &name, LANG_JOB)) {
-        struct type *result = antl_type_ref(r, at);
-        return r->failed || result == NULL ? NULL
-                                           : types_job(r->types, result);
     }
-    if (kind == TYPE_STRUCT && lang_struct(r, &module, &name, &t)) {
-        return t;
-    }
-    /* The root carries the path of `anti.lang` and is still
-       no struct of its library file. */
-    if ((struct_form_byte != ANTL_FORM_COPY &&
-         !antl_name_equals(&module, r->iface->module)) ||
-        names_lang(&module, &name, LANG_OBJECT) ||
-        names_lang(&module, &name, LANG_FLAGS) ||
-        names_lang(&module, &name, LANG_FIELD_DESCRIPTOR)) {
+    if (struct_form_byte != ANTL_FORM_COPY &&
+        !antl_name_equals(&module, r->iface->module)) {
         return foreign_struct(r, &module, &name);
     }
     s = &structs[(*struct_count)++];

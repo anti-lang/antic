@@ -27,21 +27,16 @@ static uint64_t float_bits(double d)
     return bits;
 }
 
-/* DESIGN: the compiler declares the root class, a Job, Flags, a Mutex
-   and a channel. It declares a Regex, a Match and the hidden lock of a
-   synchronized class as well. Each carries the path `anti.lang`. The
-   library file of `anti.lang` names them as it names a struct of another
-   module and declares none. A reader so takes the compiler's own. The
-   root is the one class without a base. */
+/* DESIGN: the types the compiler declares carry the path `anti.lang`,
+   and the list of types.c names them. The library file of `anti.lang`
+   names them as it names a struct of another module and declares none.
+   A reader so takes the compiler's own. A `?T` is no struct of a module
+   either. */
 static bool is_local_struct(const struct writer *w, const struct type *t)
 {
     const char *module = w->iface->module;
 
-    if ((t->kind == TYPE_CLASS && t->base == NULL) ||
-        t->kind == TYPE_OPTIONAL || types_is_job(t) ||
-        types_is_flags(t) || types_is_mutex(t) || types_is_chan(t) ||
-        types_is_regex(t) || types_is_match(t) || types_is_object_lock(t) ||
-        types_is_field_descriptor(t)) {
+    if (t->kind == TYPE_OPTIONAL || types_is_declared(t)) {
         return false;
     }
     /* A copy of a generic is written in full wherever it stands, so the
@@ -275,14 +270,11 @@ void antl_visit_type(struct writer *w, const struct type *t)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
-        /* A channel names its element, which comes first. So do the
-           parameters of a generic, and the generic and the arguments of
-           a copy. */
-        if (types_is_chan(t)) {
-            antl_visit_type(w, t->element);
-        }
-        if (types_is_job(t)) {
-            antl_visit_type(w, t->result);
+        /* A channel names its element and a Job its result, which
+           come first. So do the parameters of a generic, and the
+           generic and the arguments of a copy. */
+        if (types_declared_part(t) != NULL) {
+            antl_visit_type(w, types_declared_part(t));
         }
         for (i = 0; i < t->type_param_count; i++) {
             antl_visit_type(w, t->type_params[i]);
@@ -549,15 +541,10 @@ static void put_type(struct writer *w, const struct type *t)
                 }
             }
         }
-        /* `chan T` is one struct per element type, so the element
-           follows its name. */
-        if (types_is_chan(t)) {
-            antl_put_type_ref(w, t->element);
-        }
-        /* A `Job` is one struct per result of a worker, so the result
-           follows its name, by T061. */
-        if (types_is_job(t)) {
-            antl_put_type_ref(w, t->result);
+        /* `chan T` is one struct per element type, and a `Job` one per
+           result of a worker, so that part follows its name. */
+        if (types_declared_part(t) != NULL) {
+            antl_put_type_ref(w, types_declared_part(t));
         }
         if (is_local_struct(w, t)) {
             antl_put_u8(w, (uint8_t)((unsigned)t->is_union |

@@ -708,6 +708,20 @@ bool types_declares(const char *name, size_t length);
    literal set, NULL as well for one that no struct literal builds. */
 struct type *types_declared(struct types *types, const struct name *name,
                             bool literal);
+/* Whether t is a type of `anti.lang` that the compiler declares, which a
+   library file names and never declares. */
+bool types_is_declared(const struct type *t);
+/* What a library file writes after the name of the declared type t: the
+   element of a channel, the result of a Job, or NULL. */
+struct type *types_declared_part(const struct type *t);
+/* Whether module and name name a type the compiler declares. kind gets
+   its kind, and with_part whether a part follows its name. */
+bool types_names_declared(const struct name *module, const struct name *name,
+                          enum type_kind *kind, bool *with_part);
+/* The declared type named name, of part where one follows its name.
+   NULL for a name the list lacks. */
+struct type *types_make_declared(struct types *types, const struct name *name,
+                                 struct type *part);
 /* Whether t is a Job that types_job made. */
 bool types_is_job(const struct type *t);
 /* The struct `anti.lang.Flags`, one for the compilation. */

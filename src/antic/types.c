@@ -722,26 +722,59 @@ static struct type *lang_byte_match(struct types *types)
     return types_match_of(types, true);
 }
 
+static bool is_object(const struct type *t)
+{
+    return lang_item(t, TYPE_CLASS, LANG_OBJECT);
+}
+
+static bool is_plain_regex(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_REGEX);
+}
+
+static bool is_plain_match(const struct type *t)
+{
+    return lang_item(t, TYPE_STRUCT, LANG_MATCH);
+}
+
 /* DESIGN: the types of `anti.lang` that the compiler declares itself,
    which no module holds. This is the one list of them. The checker
    resolves a type name and the name of a struct literal through it, and
-   the doc warnings take its names as known. make is NULL for `Job`, the
-   result of a call of a worker, which a program never names as a type.
-   literal marks the types a struct literal builds. */
+   the doc warnings take its names as known. A library file names each
+   by its module and its name and declares none, so the writer and the
+   reader of library files ask it as well.
+
+   kind is the kind of the type and is says whether a type is it. make
+   gives the one type of the name. A channel and a Job are one type per
+   element and per result, which with gives, and a library file writes
+   that part after the name. named marks the types a program names,
+   which a channel, a Job and the hidden lock of a synchronized class
+   are not, and literal those a struct literal builds. */
 static const struct lang_declared {
     const char *name;
+    enum type_kind kind;
+    bool (*is)(const struct type *t);
     struct type *(*make)(struct types *types);
+    struct type *(*with)(struct types *types, struct type *part);
+    bool named;
     bool literal;
 } lang_declared[] = {
-    {LANG_OBJECT, types_object, false},
-    {LANG_JOB, NULL, false},
-    {LANG_FLAGS, types_flags, true},
-    {LANG_MUTEX, types_mutex, false},
-    {LANG_REGEX, types_regex, true},
-    {LANG_BYTE_REGEX, types_byte_regex, true},
-    {LANG_MATCH, lang_match, false},
-    {LANG_BYTE_MATCH, lang_byte_match, false},
-    {LANG_FIELD_DESCRIPTOR, types_field_descriptor, true},
+    {LANG_OBJECT, TYPE_CLASS, is_object, types_object, NULL, true, false},
+    {LANG_JOB, TYPE_STRUCT, types_is_job, NULL, types_job, false, false},
+    {LANG_CHAN, TYPE_STRUCT, types_is_chan, NULL, types_chan, false, false},
+    {LANG_FLAGS, TYPE_STRUCT, types_is_flags, types_flags, NULL, true, true},
+    {LANG_MUTEX, TYPE_STRUCT, types_is_mutex, types_mutex, NULL, true,
+     false},
+    {LANG_REGEX, TYPE_STRUCT, is_plain_regex, types_regex, NULL, true, true},
+    {LANG_BYTE_REGEX, TYPE_STRUCT, types_is_byte_regex, types_byte_regex,
+     NULL, true, true},
+    {LANG_MATCH, TYPE_STRUCT, is_plain_match, lang_match, NULL, true, false},
+    {LANG_BYTE_MATCH, TYPE_STRUCT, types_is_byte_match, lang_byte_match,
+     NULL, true, false},
+    {LANG_OBJECT_LOCK, TYPE_STRUCT, types_is_object_lock, types_object_lock,
+     NULL, false, false},
+    {LANG_FIELD_DESCRIPTOR, TYPE_STRUCT, types_is_field_descriptor,
+     types_field_descriptor, NULL, true, true},
 };
 
 static const struct lang_declared *find_declared(const char *name,
@@ -758,6 +791,19 @@ static const struct lang_declared *find_declared(const char *name,
     return NULL;
 }
 
+/* The entry of the list that t is, or NULL. */
+static const struct lang_declared *declared_of(const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof lang_declared / sizeof lang_declared[0]; i++) {
+        if (lang_declared[i].is(t)) {
+            return &lang_declared[i];
+        }
+    }
+    return NULL;
+}
+
 bool types_declares(const char *name, size_t length)
 {
     return find_declared(name, length) != NULL;
@@ -768,9 +814,53 @@ struct type *types_declared(struct types *types, const struct name *name,
 {
     const struct lang_declared *d = find_declared(name->text, name->length);
 
-    return d != NULL && d->make != NULL && (d->literal || !literal)
+    return d != NULL && d->named && (d->literal || !literal)
                ? d->make(types)
                : NULL;
+}
+
+bool types_is_declared(const struct type *t)
+{
+    return declared_of(t) != NULL;
+}
+
+struct type *types_declared_part(const struct type *t)
+{
+    const struct lang_declared *d = declared_of(t);
+
+    if (d == NULL || d->with == NULL) {
+        return NULL;
+    }
+    return types_is_chan(t) ? t->element : t->result;
+}
+
+bool types_names_declared(const struct name *module, const struct name *name,
+                          enum type_kind *kind, bool *with_part)
+{
+    const struct lang_declared *d;
+
+    if (module->length != sizeof LANG_MODULE - 1 ||
+        memcmp(module->text, LANG_MODULE, module->length) != 0) {
+        return false;
+    }
+    d = find_declared(name->text, name->length);
+    if (d == NULL) {
+        return false;
+    }
+    *kind = d->kind;
+    *with_part = d->with != NULL;
+    return true;
+}
+
+struct type *types_make_declared(struct types *types, const struct name *name,
+                                 struct type *part)
+{
+    const struct lang_declared *d = find_declared(name->text, name->length);
+
+    if (d == NULL) {
+        return NULL;
+    }
+    return d->with != NULL ? d->with(types, part) : d->make(types);
 }
 
 struct type *types_job(struct types *types, struct type *result)

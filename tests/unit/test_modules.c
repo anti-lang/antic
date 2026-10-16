@@ -2466,6 +2466,113 @@ static void wide_addresses(void)
     close_session(&s);
 }
 
+/* M336: every type of `anti.lang` that the compiler declares, in the
+   signature of a function, in the hidden lock of a synchronized class
+   and in the Job of a generic. */
+static const char declared_source[] =
+    "pub class Task { pub n: int = 0, }\n"
+    "pub worker fn add(t: *Task, k: int) -> int {\n"
+    "    return t.n + k;\n"
+    "}\n"
+    "pub synchronized class Guarded\n"
+    "{\n"
+    "    pub n: int = 0,\n"
+    "    pub fn get(self) -> int\n"
+    "    {\n"
+    "        return self.n;\n"
+    "    }\n"
+    "}\n"
+    "pub fn every(o: *Object, f: *Flags, m: *Mutex, r: *Regex,"
+    " br: *ByteRegex, mt: *Match, bm: *ByteMatch, fd: *FieldDescriptor,"
+    " c: *chan int) -> int {\n"
+    "    return 0;\n"
+    "}\n"
+    "pub fn job<T>(k: int, extra: T) -> int {\n"
+    "    let a = alloc Task { n: 1 };\n"
+    "    let one = dispatch a -> add(k);\n"
+    "    let n = join(one);\n"
+    "    delete(a);\n"
+    "    return n;\n"
+    "}\n";
+
+/* The symbol of the item name of lib, or NULL. */
+static const struct symbol *item_of(const struct interface *lib,
+                                    const char *name)
+{
+    size_t i;
+
+    for (i = 0; lib != NULL && i < lib->item_count; i++) {
+        if (lib->items[i]->name.length == strlen(name) &&
+            memcmp(lib->items[i]->name.text, name, strlen(name)) == 0) {
+            return lib->items[i];
+        }
+    }
+    return NULL;
+}
+
+/* M336: a library file names each type the compiler declares and
+   declares none, and the reader gives the compiler's own type for each
+   name. The file reads back and writes again byte for byte. */
+static void declared_types(void)
+{
+    struct session a;
+    struct session b;
+    struct text bytes = {0};
+    struct text again = {0};
+    struct ir_module program;
+    const struct interface *read;
+    const struct symbol *every;
+    const struct symbol *guarded;
+    char error[160] = "";
+
+    open_session(&a);
+    if (!build_library(&a, "decl", declared_source, &bytes)) {
+        close_session(&a);
+        return;
+    }
+    open_session(&b);
+    ir_module_init(&program, &b.arena, "decl");
+    read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
+                     &b.types, &b.arena, &program, error, sizeof error);
+    CHECK_STR(error, "");
+    every = item_of(read, "every");
+    guarded = item_of(read, "Guarded");
+    CHECK(every != NULL && every->type->param_count == 9);
+    if (every != NULL && every->type->param_count == 9) {
+        struct type *const *p = every->type->params;
+        CHECK(p[0]->element == types_object(&b.types));
+        CHECK(p[1]->element == types_flags(&b.types));
+        CHECK(p[2]->element == types_mutex(&b.types));
+        CHECK(p[3]->element == types_regex(&b.types));
+        CHECK(p[4]->element == types_byte_regex(&b.types));
+        CHECK(p[5]->element == types_match(&b.types, NULL));
+        CHECK(p[6]->element == types_match_of(&b.types, true));
+        CHECK(p[7]->element == types_field_descriptor(&b.types));
+        CHECK(p[8]->element ==
+              types_chan(&b.types, types_builtin(&b.types, TYPE_I64)));
+    }
+    CHECK(guarded != NULL && guarded->type->field_count > 0);
+    if (guarded != NULL) {
+        size_t i;
+        size_t locks = 0;
+        for (i = 0; i < guarded->type->field_count; i++) {
+            locks += guarded->type->fields[i].type ==
+                     types_object_lock(&b.types);
+        }
+        CHECK(locks == 1);
+    }
+    if (read != NULL) {
+        antl_write(&again, read, &program, false);
+        CHECK(again.length == bytes.length &&
+              memcmp(again.data, bytes.data, bytes.length) == 0);
+    }
+    ir_module_free(&program);
+    close_session(&b);
+    text_free(&again);
+    text_free(&bytes);
+    close_session(&a);
+}
+
 /* A library file keeps the class records, the mark of a `worker fn` and
    the class and slot of a call through a table. The passes over the
    whole program read them. The program read back prints as the module
@@ -3772,6 +3879,7 @@ void test_modules(void)
     runtime_names();
     flag_bytes();
     wide_addresses();
+    declared_types();
     damaged_trees();
     damaged_bytes();
     tree_counts();
