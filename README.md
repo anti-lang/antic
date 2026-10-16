@@ -13,24 +13,21 @@ specify all of it.
 
 ## Building
 
-The build needs CMake 3.21 or newer and openssl. The pinned clang compiles it, and
-the configure step installs that clang into `build/deps/clang` and the pinned LLVM tools
-into `build/deps/llvm`. The Linux sysroots take the builtins of the pinned clang, so
-`tools/get-clang.cmake` runs before `tools/get-sysroot.cmake`:
+The build needs CMake 3.21 or newer and openssl. The pinned clang compiles it. The
+configure step installs that clang into `build/deps/clang`, the pinned LLVM tools into
+`build/deps/llvm`, the sysroots of every target into `build/deps/sysroot` with
+`tools/get-sysroot.cmake`, and the raylib source and the sources of the native libraries
+into `build/deps`. So a fresh checkout builds with three commands, or with `./c test`:
 
 ```bash
-cmake -P tools/get-clang.cmake
-cmake -P tools/get-llvm.cmake
-cmake -DDEST=build/deps/sysroot -DLLVM_BIN=build/deps/llvm/bin \
-      -DTARGETS="linux-x86_64;linux-arm64;linux-x86_64-glibc;linux-arm64-glibc;macos-arm64;macos-x86_64;windows-x86_64;windows-arm64" \
-      -P tools/get-sysroot.cmake
-cmake -DDEST=build/deps/raylib -P tools/get-raylib.cmake
 cmake --preset host
 cmake --build build/host -j8
 ctest --test-dir build/host -j8
 ```
 
-The two Windows sysroots are the headers and the import libraries of mingw-w64. The
+A sysroot is installed once. `build/deps/sysroot/.installed/<target>` names the digest of
+the script and its pins, and a configure installs a sysroot again when they change. The
+two Windows sysroots are the headers and the import libraries of mingw-w64. The
 script writes them from the pinned source release with the pinned clang and llvm-ar.
 antic links programs for all six targets on every host, so the build needs the sysroots
 of all six. A Linux program that names a library
@@ -39,7 +36,8 @@ also takes the sysroot `linux-<cpu>-glibc`.
 
 On Windows the configure step takes `-G Ninja`, because the Visual Studio generator
 takes the compiler of its own toolset. A reader who only wants antic from source
-passes `-DANTIC_SYSTEM_COMPILER=ON`, and the compiler of the machine builds it.
+passes `-DANTIC_SYSTEM_COMPILER=ON`, and the compiler of the machine builds it. That
+configure installs no sysroot, since the script takes the builtins of the pinned clang.
 
 `tools/clang-pin`, `tools/llvm-pin`, `tools/sysroot-pins` and `tools/raylib-pin` hold
 the versions and the SHA-256 digest of every archive. Nothing installs into a system
@@ -56,7 +54,8 @@ its own directory, `build/asan` and `build/ubsan`, and reads the downloads of
 A worktree of this repository reads the downloads of the main checkout with
 `-DANTI_DEPS_DIR=<checkout>/build/deps` on each configure, for example
 `cmake --preset host -DANTI_DEPS_DIR=../antic/build/deps`, and fetches none of its
-own. Every `get-*.cmake` script takes the same `-DANTI_DEPS_DIR`.
+own. `tools/get-clang.cmake`, `tools/get-llvm.cmake` and `tools/get-sysroot.cmake`,
+run alone with `-P`, take the same `-DANTI_DEPS_DIR`.
 
 ## Installing
 

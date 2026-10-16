@@ -2235,6 +2235,17 @@ add_test(NAME deps_dir
             "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_deps_dir.cmake")
 
+# The configure of a fresh checkout installs the sysroots and raylib from
+# their archives, as decision 3 of "Decisions of 2026-10-11" asks.
+if(NOT ANTIC_SYSTEM_COMPILER)
+    add_test(NAME first_build
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DTREE=${CMAKE_BINARY_DIR}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/first_build"
+                "-DGENERATOR=${CMAKE_GENERATOR}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_first_build.cmake")
+endif()
+
 # A configure leaves the names of lld alone while the suite runs them.
 add_test(NAME llvm_names
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"

@@ -283,6 +283,53 @@ set(ANTIC_TARGETS linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
 # of its own, named after the target with -glibc, the suffix
 # LINUX_GLIBC_SUFFIX of src/antic/linker.h.
 set(ANTIC_GLIBC_TARGETS linux-x86_64-glibc linux-arm64-glibc)
+# DESIGN: the configure step installs the sysroot of every target, as it
+# installs clang and the LLVM tools, so ./c builds a fresh checkout. That
+# is decision 3 of "Decisions of 2026-10-11". A sysroot is the work of
+# tools/get-sysroot.cmake on its two pins, so .installed/<target> holds
+# the digest of the three files, and a sysroot whose digest is there is
+# left as it is. The script needs the builtins of the pinned clang, so a
+# reader's build with the compiler of the machine installs none, and its
+# runtime takes the sysroots it finds.
+if(NOT ANTIC_SYSTEM_COMPILER)
+    set(antic_sysroot_inputs "")
+    foreach(file tools/get-sysroot.cmake tools/sysroot-pins
+                 tools/zig-stubs-pin)
+        file(SHA256 "${PROJECT_SOURCE_DIR}/${file}" antic_file_digest)
+        string(APPEND antic_sysroot_inputs "${antic_file_digest}  ${file}\n")
+    endforeach()
+    string(SHA256 antic_sysroot_digest "${antic_sysroot_inputs}")
+    set(antic_sysroot_missing "")
+    foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
+        set(antic_stamp "${ANTIC_SYSROOT_DIR}/.installed/${target}")
+        set(antic_stamped "")
+        if(EXISTS "${antic_stamp}" AND EXISTS "${ANTIC_SYSROOT_DIR}/${target}")
+            file(READ "${antic_stamp}" antic_stamped)
+        endif()
+        if(NOT antic_stamped STREQUAL "${antic_sysroot_digest}\n")
+            list(APPEND antic_sysroot_missing "${target}")
+        endif()
+    endforeach()
+    if(antic_sysroot_missing)
+        list(JOIN antic_sysroot_missing " " antic_sysroot_names)
+        message(STATUS "Installing the sysroots of ${antic_sysroot_names}")
+        execute_process(COMMAND "${CMAKE_COMMAND}"
+                                "-DDEST=${ANTIC_SYSROOT_DIR}"
+                                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                                "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+                                "-DTARGETS=${antic_sysroot_missing}"
+                                -P "${PROJECT_SOURCE_DIR}/tools/get-sysroot.cmake"
+                        RESULT_VARIABLE antic_sysroot_failed)
+        if(antic_sysroot_failed)
+            message(FATAL_ERROR "tools/get-sysroot.cmake failed, so the build "
+                                "has no sysroot of ${antic_sysroot_names}")
+        endif()
+        foreach(target IN LISTS antic_sysroot_missing)
+            file(WRITE "${ANTIC_SYSROOT_DIR}/.installed/${target}"
+                 "${antic_sysroot_digest}\n")
+        endforeach()
+    endif()
+endif()
 # The raylib source, which the tests and src/native/ both read.
 include(src/native/raylib-source.cmake)
 foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)

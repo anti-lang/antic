@@ -337,10 +337,10 @@ release adds the LLVM tools of the other five hosts in
 `build/deps/llvm-tools/<host>` for the packer. The
 pinned clang in `build/deps/clang` compiles everything, and the configure step
 installs it and the pinned LLVM tools in `build/deps/llvm/bin` with
-`tools/get-clang.cmake` and `tools/get-llvm.cmake`. The build also needs the
-sysroots in `build/deps/sysroot`, which `tools/get-sysroot.cmake` installs
-after `tools/get-clang.cmake`, and the pinned raylib source in
-`build/deps/raylib`, which `tools/get-raylib.cmake` installs.
+`tools/get-clang.cmake` and `tools/get-llvm.cmake`. It then installs the
+sysroots in `build/deps/sysroot` with `tools/get-sysroot.cmake`, and the
+pinned raylib source in `build/deps/raylib` with `antic_get_source` of
+`src/native/get-source.cmake`, so `./c` builds a fresh checkout.
 `tools/clang-pin`, `tools/llvm-pin`, `tools/sysroot-pins` and
 `tools/raylib-pin` hold the versions and the digests. clang and the LLVM tools
 come from the releases of `anti-lang/llvm-tools`, and openssl checks their
