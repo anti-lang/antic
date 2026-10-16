@@ -1,0 +1,18 @@
+//! `to_text` and `type_name` of a class that replaces neither give the class
+//! name, in every build. `program_object_defaults_no_reflect` runs the program
+//! under `--no-reflect`, which drops the field list and leaves both.
+import anti.io;
+
+class Point
+{
+	pub x: int = 3,
+}
+
+fn main() -> int
+{
+	let p = alloc Point { };
+	io.println(p.to_text());
+	io.println(p.type_name());
+	delete(p);
+	return 0;
+}

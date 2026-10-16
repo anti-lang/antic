@@ -11,11 +11,12 @@
 #include "std.h"
 #include "utf.h"
 
-/* DESIGN: the default bodies of anti.lang.Object walk the field list of the
-   descriptor. They are slow by design: a class that needs speed replaces
-   the one it cares about with a concrete function. A build with
-   --no-reflect has no field list, and these bodies then fall back to the
-   class name and the address. */
+/* DESIGN: of the default bodies of anti.lang.Object, serialize walks the
+   field list of the descriptor. It is slow by design: a class that needs
+   speed replaces it with a concrete function. The compiler writes equals
+   and hash as code, and to_text and type_name give the class name. A
+   build with --no-reflect has no field list, and antic refuses a call of
+   the default serialize there. */
 
 /* DESIGN: the descriptor of the root belongs to the runtime. Every
    module of a program refers to this one, so `p is *Object` compares the
@@ -705,9 +706,10 @@ static void serialize_into(struct anti_builder *b, const void *object,
    An inline struct or class is an object, and so is what an `own`
    pointer points at. An `own` slice is an array of its elements. A
    pointer, a slice and a function pointer the object does not own are
-   null, since each refers to something outside the object. A union, an
-   array, a bitfield and an `own` slice of class values or of slices are
-   null, and a class that wants them replaces the body. */
+   null, since each refers to something outside the object. An array is
+   a JSON array through every level of it. A union, a bitfield and an
+   `own` slice of class values or of slices are null, and a class that
+   wants them replaces the body. */
 void anti_lang_Object_serialize(struct anti_object *self, void *out)
 {
     serialize_into(out, self, anti_rt_descriptor(self));

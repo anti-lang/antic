@@ -1469,6 +1469,12 @@ antic_program_test(program_eq_compiled_no_reflect
     "${CMAKE_CURRENT_SOURCE_DIR}/programs/eq_compiled.anti"
     OPTIONS "--no-reflect"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect")
+# The default to_text and type_name without the field lists, which give
+# the class name as they give it with them.
+antic_program_test(program_object_defaults_no_reflect
+    "${CMAKE_CURRENT_SOURCE_DIR}/programs/object_defaults.anti"
+    OPTIONS "--no-reflect"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect")
 # The default hash in dev mode, which writes it in each module apart, and
 # the patterns of `for`.
 foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived
