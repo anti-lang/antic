@@ -94,15 +94,11 @@ foreach(program antic anti)
         "${CC}" ${ANTIC_C_WARNINGS} -O0 -isysroot "${sdk}" ${HOST_LINK}
         -o "${WORK}/fixture/${program}"
         "${WORK}/fixture/${program}.c")
-    execute_process(COMMAND "${CC}" ${ANTIC_C_WARNINGS} -arch x86_64 -O0
-                            -isysroot "${sdk}" ${HOST_LINK}
-                            -o "${WORK}/fixture/${program}-x86_64"
-                            "${WORK}/fixture/${program}.c"
-                    RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)
-    if(NOT failed EQUAL 0)
-        message("SKIP: this machine compiles nothing for x86_64")
-        return()
-    endif()
+    run("the fixture ${program} did not compile for x86_64"
+        "${CC}" ${ANTIC_C_WARNINGS} -arch x86_64 -O0
+        -isysroot "${sdk}" ${HOST_LINK}
+        -o "${WORK}/fixture/${program}-x86_64"
+        "${WORK}/fixture/${program}.c")
 endforeach()
 
 # The two programs of a Windows host are real COFF executables with a PDB
@@ -120,28 +116,19 @@ foreach(pair "windows-x86_64=x86_64-pc-windows-msvc=X64"
     list(GET parts 1 triple)
     list(GET parts 2 machine)
     file(MAKE_DIRECTORY "${WORK}/fixture/${host}")
-    execute_process(COMMAND "${CC}" ${ANTIC_C_WARNINGS} "--target=${triple}" -c
-                            -o "${WORK}/fixture/${host}/windows.obj"
-                            "${WORK}/fixture/windows.c"
-                    RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)
-    if(NOT failed EQUAL 0)
-        message("SKIP: this machine compiles nothing for ${triple}")
-        return()
-    endif()
+    run("the fixture of ${host} did not compile for ${triple}"
+        "${CC}" ${ANTIC_C_WARNINGS} "--target=${triple}" -c
+        -o "${WORK}/fixture/${host}/windows.obj"
+        "${WORK}/fixture/windows.c")
     foreach(program antic anti)
-        execute_process(
-            COMMAND "${LLVM_BIN}/lld-link" /NOLOGO /DEBUG "/PDBALTPATH:%_PDB%"
-                    /pdbsourcepath:.
-                    /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE /NODEFAULTLIB
-                    "/MACHINE:${machine}"
-                    "/OUT:${WORK}/fixture/${host}/${program}.exe"
-                    "/PDB:${WORK}/fixture/${host}/${program}.pdb"
-                    "${WORK}/fixture/${host}/windows.obj"
-            RESULT_VARIABLE failed OUTPUT_QUIET ERROR_QUIET)
-        if(NOT failed EQUAL 0)
-            message("SKIP: lld-link links nothing for ${host}")
-            return()
-        endif()
+        run("lld-link did not link the fixture ${program} of ${host}"
+            "${LLVM_BIN}/lld-link" /NOLOGO /DEBUG "/PDBALTPATH:%_PDB%"
+            /pdbsourcepath:.
+            /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE /NODEFAULTLIB
+            "/MACHINE:${machine}"
+            "/OUT:${WORK}/fixture/${host}/${program}.exe"
+            "/PDB:${WORK}/fixture/${host}/${program}.pdb"
+            "${WORK}/fixture/${host}/windows.obj")
     endforeach()
 endforeach()
 

@@ -3111,6 +3111,19 @@ add_test(NAME release_dry_run
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_dry_run.cmake")
 set_tests_properties(release_dry_run PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
+# run_release_dry_run.cmake fails with the output of a fixture that does
+# not compile or link, where it reported the whole test skipped.
+add_test(NAME release_dry_run_runner
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_release_dry_run.cmake"
+            "-DCC=${CMAKE_C_COMPILER}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            "-DSDK=${ANTIC_MACOS_SDK}"
+            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-runner"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_dry_run_self.cmake")
+set_tests_properties(release_dry_run_runner PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # A small raylib binding: the raymath functions of the pinned raylib
 # release, which tools/get-raylib.cmake downloads. tools/raylib-pin holds
