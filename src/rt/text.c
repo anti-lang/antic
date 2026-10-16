@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "atomic.h"
 #include "grow.h"
+#include "rt.h"
 #include "std.h"
 #include "utf.h"
 
@@ -14,6 +16,57 @@ struct anti_text anti_rt_text_from_c(const unsigned char *bytes)
 
     text.ptr = bytes;
     text.len = (int64_t)strlen((const char *)bytes);
+    return text;
+}
+
+/* One text that anti_rt_text_kept keeps, and the one kept before it. */
+struct kept_text {
+    struct kept_text *next;
+    int64_t length;
+    unsigned char bytes[];
+};
+
+/* The texts kept so far, the last one first. */
+static struct kept_text *kept_texts;
+
+/* DESIGN: the system writes a message into storage that its next call may
+   write over, M302 of the third audit. An error keeps its message in a
+   str, which `dup` copies as a pointer, so no error can own the bytes.
+   The runtime keeps one copy of each distinct text from its first use to
+   the end of the program, and every error of that text shares it. A
+   system has few texts, about one per code. A thread adds a text with a
+   compare and swap and needs no lock, and two threads that add the same
+   text at once keep a copy each. */
+struct anti_text anti_rt_text_kept(const unsigned char *bytes)
+{
+    size_t length = strlen((const char *)bytes);
+    struct kept_text *k = (struct kept_text *)(intptr_t)anti_rt_atomic_load(
+        &kept_texts, (int64_t)sizeof kept_texts);
+    struct anti_text text;
+    int64_t head;
+
+    while (k != NULL && ((size_t)k->length != length ||
+                         memcmp(k->bytes, bytes, length) != 0)) {
+        k = k->next;
+    }
+    if (k == NULL) {
+        k = malloc(sizeof *k + length + 1);
+        if (k == NULL) {
+            anti_rt_out_of_memory((int64_t)(sizeof *k + length + 1));
+        }
+        k->length = (int64_t)length;
+        memcpy(k->bytes, bytes, length + 1);
+        anti_rt_memory_kept(k);
+        do {
+            head = anti_rt_atomic_load(&kept_texts,
+                                       (int64_t)sizeof kept_texts);
+            k->next = (struct kept_text *)(intptr_t)head;
+        } while (anti_rt_atomic_compare_swap(&kept_texts,
+                                             (int64_t)sizeof kept_texts, head,
+                                             (int64_t)(intptr_t)k) == 0);
+    }
+    text.ptr = k->bytes;
+    text.len = k->length;
     return text;
 }
 

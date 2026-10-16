@@ -11,7 +11,7 @@ extern fn anti_rt_errno() -> c_int;
 extern fn anti_rt_errno_text(code: c_int) -> ?*byte;
 extern fn anti_rt_last_error() -> c_int;
 extern fn anti_rt_last_error_text(code: c_int) -> ?*byte;
-extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
+extern fn anti_rt_text_kept(bytes: ?*byte) -> str;
 
 /// The error of a failing system call, with the number the system gave.
 pub class SystemError inherits lang.Error
@@ -21,26 +21,30 @@ pub class SystemError inherits lang.Error
 	pub errno: int = 0,
 
 	/// The error of the last failing C call, from `errno`.
+	///
+	/// The message is the text of the system, which stays as it is until the
+	/// program ends.
 	pub fn from_errno() -> *SystemError
 	{
 		let number = anti_rt_errno() as int;
 		let e = alloc SystemError { errno: number };
 		e.code = number;
-		e.message = anti_rt_text_from_c(anti_rt_errno_text(number as c_int));
+		e.message = anti_rt_text_kept(anti_rt_errno_text(number as c_int));
 		return e;
 	}
 
 	/// The error of the last failing Win32 call.
 	///
 	/// Every other system gives an error with code 0 and an empty message,
-	/// because it has no Win32 to ask.
+	/// because it has no Win32 to ask. The message stays as it is until the
+	/// program ends.
 	pub fn from_win32() -> *SystemError
 	{
 		let number = anti_rt_last_error() as int;
 		let e = alloc SystemError { errno: number };
 		e.code = number;
 		e.message =
-			anti_rt_text_from_c(anti_rt_last_error_text(number as c_int));
+			anti_rt_text_kept(anti_rt_last_error_text(number as c_int));
 		return e;
 	}
 }

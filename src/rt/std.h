@@ -81,6 +81,11 @@ _Noreturn void anti_rt_table_unset(const unsigned char *name,
 
 /* The str of a NUL-terminated C string, without the NUL. */
 struct anti_text anti_rt_text_from_c(const unsigned char *bytes);
+
+/* The str of a copy of a NUL-terminated C string that the runtime keeps
+   until the program ends, one copy per distinct text. A SystemError keeps
+   its message in one. In src/rt/text.c. */
+struct anti_text anti_rt_text_kept(const unsigned char *bytes);
 struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len);
 
 /* The offset of the first byte of the len bytes at bytes that starts no

@@ -1,0 +1,58 @@
+//! M302. The message of a `SystemError` keeps its text after the next error
+//! of its thread. The system writes a message into storage that its next call
+//! may write over: a buffer of the thread on Windows for every code, and a
+//! static buffer on macOS for a code it does not know. The program copies each
+//! message as its error is made, and compares the two once every error is made.
+
+import anti.error;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn abi_set_errno(code: c_int);
+extern fn abi_set_last_error(code: c_int);
+
+/// The error of `code` as `errno`, or as the Win32 error when `win32` is set.
+fn made(code: int, win32: bool) -> *error.SystemError
+{
+	if win32 {
+		abi_set_last_error(code as c_int);
+		return error.SystemError.from_win32();
+	}
+	abi_set_errno(code as c_int);
+	return error.SystemError.from_errno();
+}
+
+/// Print whether the message of `e` is still `was`, and free both.
+fn report(name: str, own e: *error.SystemError, was: str)
+{
+	let verdict = "changed";
+	if text.equal(e.message, was) {
+		verdict = "kept";
+	}
+	printf("%s %s\n".ptr, name.ptr, verdict.ptr);
+	free(was.ptr);
+	delete(e);
+}
+
+fn main() -> int
+{
+	let a = made(2, false);
+	let a_was = f"{a.message}";
+	let b = made(13, false);
+	let b_was = f"{b.message}";
+	let c = made(9001, false);
+	let c_was = f"{c.message}";
+	let d = made(9002, false);
+	let d_was = f"{d.message}";
+	let e = made(2, true);
+	let e_was = f"{e.message}";
+	let f = made(5, true);
+	let f_was = f"{f.message}";
+	report("errno 2", a, a_was);
+	report("errno 13", b, b_was);
+	report("errno 9001", c, c_was);
+	report("errno 9002", d, d_was);
+	report("win32 2", e, e_was);
+	report("win32 5", f, f_was);
+	return 0;
+}

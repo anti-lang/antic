@@ -2043,6 +2043,22 @@ antic_program_test(program_abi_simd
     OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_simd>,,>"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
 
+# M302. The message of a SystemError keeps its text after the next error
+# of its thread. tests/abi/system_error.c sets the codes each error reads.
+add_library(abi_system_error OBJECT abi/system_error.c)
+set_target_properties(abi_system_error PROPERTIES MSVC_RUNTIME_LIBRARY "")
+target_compile_options(abi_system_error PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
+if(APPLE)
+    target_compile_options(abi_system_error PRIVATE -mmacosx-version-min=11.0)
+endif()
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(abi_system_error PRIVATE -fno-sanitize=all)
+endif()
+antic_program_test(program_abi_system_error
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_system_error.anti"
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_system_error>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
+
 add_library(abi_wchar OBJECT abi/wchar.c)
 set_target_properties(abi_wchar PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_wchar PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
