@@ -175,6 +175,35 @@ static void depth_limit(void)
         free(head);
         free(inner);
     }
+    /* A block at the depth limit gives one message and the parser moves
+       on, whatever word starts its statements and however many there
+       are, by M307 of docs/audit/summary.md. */
+    {
+        static const char *const words[] = {
+            "let x = 1; ", "const x: int = 1; ", "if true { } ", "while true { } ",
+            "do { } while true; ", "return; ", "break; ", "continue; ",
+            "{ } ", "g(); ", "let x = 1; let y = 2; g(); ",
+        };
+        size_t w;
+        size_t n;
+
+        for (w = 0; w < sizeof words / sizeof words[0]; w++) {
+            for (n = 256; n <= 260; n++) {
+                struct parsed p;
+                char *source = nested("fn f() { ", "{ ", n, words[w], "} ",
+                                      "}\n");
+                parsed_run(&p, source);
+                CHECK(!p.ok);
+                CHECK(p.diags.count == 1);
+                if (p.diags.count >= 1) {
+                    CHECK_STR(p.diags.items[0].message,
+                              "nesting deeper than 256 levels");
+                }
+                parsed_release(&p);
+                free(source);
+            }
+        }
+    }
 }
 
 /* The expression of an `{expr}` may be an anonymous function, whose

@@ -816,6 +816,28 @@ static struct stmt *statement(struct parser *p)
     return s;
 }
 
+/* DESIGN: a block at the depth limit refuses every statement it holds,
+   since each statement is one level. The first gives the message of the
+   limit, and the rest of the block is skipped to its `}`, so the source
+   gets one message and not one per statement, by M307 of
+   docs/audit/summary.md. A `do` would otherwise give a second one at its
+   `while`, where the recovery of a statement stops. */
+static void skip_block(struct parser *p)
+{
+    int open = 0;
+
+    while (!parser_check(p, TOKEN_EOF) &&
+           (open > 0 || !parser_check(p, TOKEN_RBRACE))) {
+        if (parser_check(p, TOKEN_LBRACE)) {
+            open++;
+        } else if (parser_check(p, TOKEN_RBRACE)) {
+            open--;
+        }
+        parser_next(p);
+    }
+    parser_accept(p, TOKEN_RBRACE);
+}
+
 struct block *parser_block(struct parser *p)
 {
     struct block *b = parser_node(p, sizeof *b);
@@ -830,6 +852,10 @@ struct block *parser_block(struct parser *p)
         struct stmt *s = statement(p);
         if (s != NULL) {
             parser_list_push(&stmts, &s);
+        } else if (p->depth >= PARSE_DEPTH_MAX) {
+            skip_block(p);
+            free(stmts.data);
+            return NULL;
         } else {
             parser_sync_statement(p, from);
         }
