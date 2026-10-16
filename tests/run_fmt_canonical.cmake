@@ -29,7 +29,9 @@ if(count LESS 300)
     message(FATAL_ERROR "only ${count} sources were found under ${STD} and ${TESTS}")
 endif()
 
-# Run `anti fmt --check` over one batch of sources and keep what it reports.
+# Run `anti fmt --check` over one batch of sources and keep what it
+# reports, with its status, so a run that ends by a signal and prints
+# nothing fails as well.
 set(report "")
 function(check_batch)
     execute_process(
@@ -39,7 +41,9 @@ function(check_batch)
         ERROR_VARIABLE err
         ENCODING NONE)
     if(NOT status EQUAL 0)
-        set(report "${report}${out}${err}" PARENT_SCOPE)
+        set(report
+            "${report}anti fmt --check ended with ${status}\n${out}${err}"
+            PARENT_SCOPE)
     endif()
 endfunction()
 
@@ -59,7 +63,7 @@ foreach(source IN LISTS sources)
     list(APPEND batch "${source}")
 endforeach()
 check_batch()
-if(report)
+if(NOT report STREQUAL "")
     message(FATAL_ERROR
         "these sources are not in the canonical form:\n${report}")
 endif()

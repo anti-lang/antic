@@ -2818,6 +2818,17 @@ add_test(NAME fmt_canonical
         "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
         "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_fmt_canonical.cmake")
+# run_fmt_canonical.cmake fails for an anti that ends by a signal and
+# prints nothing.
+add_test(NAME fmt_canonical_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_fmt_canonical.cmake"
+        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
+        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt-canonical-runner"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_fmt_canonical_self.cmake")
+set_tests_properties(fmt_canonical_runner PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # Every class of `anti check`: the front end on every source of a project,
 # the `anti` blocks of the doc comments, the doc warnings and the formatting
