@@ -210,7 +210,7 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 	/// allocates nothing.
 	pub fn reserve(self, n: int)
 	{
-		let need = nodes_for(self.count + n);
+		let need = nodes_for(collection.room_plus(self.count, n));
 		if need < self.used {
 			need = self.used;
 		}
@@ -419,7 +419,7 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 			self.spare = self.parent(n);
 		} else {
 			if self.used == self.nodes {
-				let size = self.nodes * 2;
+				let size = collection.room_times(self.nodes, 2);
 				if size == 0 {
 					size = 1;
 				}
@@ -716,9 +716,10 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 	/// so the offset of the links in the block.
 	fn slot_bytes(self, n: int) -> int
 	{
-		let bytes = n * NODE_MAX * size_of(T);
+		let bytes = collection.room_times(collection.room_times(n, NODE_MAX),
+			size_of(T));
 		let word = size_of(int);
-		return (bytes + word - 1) / word * word;
+		return collection.room_plus(bytes, word - 1) / word * word;
 	}
 
 	/// Move the first `used` nodes into a new block for `size` nodes, whose
@@ -728,7 +729,8 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 		let made: ?*byte = none;
 		if size > 0 {
 			let elements = self.slot_bytes(size);
-			let bytes = elements + size * LINKS * size_of(int);
+			let bytes = collection.room_plus(elements, collection.room_times(
+				collection.room_times(size, LINKS), size_of(int)));
 			let block = self.from.alloc(bytes, collection.block_align<T>()) catch fatal;
 			memset(block, 0, bytes as c_size_t);
 			if self.used > 0 {

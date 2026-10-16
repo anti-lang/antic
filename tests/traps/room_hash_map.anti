@@ -1,0 +1,12 @@
+//! `HashMap<K, V>.new` with a capacity whose slots no `int` holds as bytes
+//! stops the program as memory that runs out. Before the fix a release build
+//! wrapped the bytes of the marks in the size of the block.
+
+import anti.collection.map.{HashMap};
+
+fn main() -> int
+{
+	let m = HashMap<int, int>.new(1 << 60);
+	m.set(1, 2);
+	return m.count;
+}

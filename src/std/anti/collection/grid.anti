@@ -43,7 +43,7 @@ pub class Grid<T> inherits collection.Indexed<T>
 		if height > 0 {
 			made.height = height;
 		}
-		let cells = made.width * made.height;
+		let cells = collection.room_times(made.width, made.height);
 		made.resize(cells);
 		let room = made.items catch fatal;
 		let i = 0;

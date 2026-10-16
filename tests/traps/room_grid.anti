@@ -1,0 +1,12 @@
+//! A `Grid<T>` whose cells no `int` counts stops the program as memory that
+//! runs out. Before the fix a release build wrapped the product of the width
+//! and the height to 0 and kept both sizes, so `get(3, 3)` passed its test and
+//! read outside the room.
+
+import anti.collection.grid.{Grid};
+
+fn main() -> int
+{
+	let g = Grid<int>.new(1 << 32, 1 << 32, 0);
+	return g.count;
+}

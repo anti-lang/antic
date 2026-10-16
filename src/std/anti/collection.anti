@@ -22,9 +22,14 @@ extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
 extern fn anti_rt_arg_is_str(arg: ?*byte) -> c_int;
+extern fn anti_rt_out_of_memory(size: int) -> never;
 
 /// The capacity a growing collection starts with when it is made without one.
 const FIRST_CAPACITY: int = 8;
+
+/// The largest `int`, the size that memory runs out for when the size of a
+/// room is more than an `int` holds.
+const LARGEST: int = 0x7FFFFFFFFFFFFFFF;
 
 /// A type that `for` walks, giving elements of type `T`.
 ///
@@ -420,7 +425,7 @@ pub abstract class Collection<T>
 			size = FIRST_CAPACITY;
 		}
 		while size < need do {
-			size *= 2;
+			size = room_times(size, 2);
 		}
 		return size;
 	}
@@ -711,11 +716,36 @@ internal fn room_from<T>(from: *mem.Allocator, n: int) -> ?*T
 	if n <= 0 {
 		return none;
 	}
-	let made = from.alloc(n * size_of(T), element_align<T>());
+	let bytes = room_times(n, size_of(T));
+	let made = from.alloc(bytes, element_align<T>());
 	if made != none {
-		memset(made, 0, (n * size_of(T)) as c_size_t);
+		memset(made, 0, bytes as c_size_t);
 	}
 	return made as ?*T;
+}
+
+/// The product of two sizes of a room, such as a count of elements and the
+/// bytes of each. A product that no `int` holds stops the program as memory
+/// that runs out, since no allocator gives that much, in a dev build and a
+/// release build alike.
+internal fn room_times(a: int, b: int) -> int
+{
+	let (product, flags) = a * b;
+	if flags.overflow {
+		anti_rt_out_of_memory(LARGEST);
+	}
+	return product;
+}
+
+/// The sum of two sizes of a room, which stops the program as `room_times`
+/// does when no `int` holds it.
+internal fn room_plus(a: int, b: int) -> int
+{
+	let (sum, flags) = a + b;
+	if flags.overflow {
+		anti_rt_out_of_memory(LARGEST);
+	}
+	return sum;
 }
 
 /// The base of the collections that keep their elements in one block of room
@@ -823,8 +853,9 @@ pub abstract class Indexed<T> inherits Collection<T>
 	/// takes.
 	protected fn make_room(self, n: int)
 	{
-		if self.count + n > self.capacity {
-			self.resize(self.grown(self.capacity, self.count + n));
+		let need = room_plus(self.count, n);
+		if need > self.capacity {
+			self.resize(self.grown(self.capacity, need));
 		}
 	}
 
@@ -834,14 +865,15 @@ pub abstract class Indexed<T> inherits Collection<T>
 	/// the allocator has run out.
 	protected fn resize(self, n: int)
 	{
-		if n + self.spare == 0 {
+		let size = room_plus(n, self.spare);
+		if size == 0 {
 			self.give_back(self.items);
 			self.items = none;
 			self.capacity = 0;
 			self.head = 0;
 			return;
 		}
-		let made = self.room(n + self.spare) catch fatal;
+		let made = self.room(size) catch fatal;
 		if let items = self.items {
 			let first = self.capacity - self.head;
 			if first > self.count {
@@ -877,10 +909,11 @@ pub abstract class Indexed<T> inherits Collection<T>
 		made.items = none;
 		made.capacity = 0;
 		made.head = 0;
-		if n + self.spare == 0 {
+		let size = room_plus(n, self.spare);
+		if size == 0 {
 			return;
 		}
-		let room = self.room(n + self.spare) catch fatal;
+		let room = self.room(size) catch fatal;
 		if let items = self.items {
 			let i = 0;
 			while i < self.count do {

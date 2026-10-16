@@ -482,7 +482,7 @@ pub class BitSet inherits collection.Collection<int>
 	/// Make room for the numbers below `n`, in one allocation.
 	pub fn reserve(self, n: int)
 	{
-		let need = (n + WORD_BITS - 1) / WORD_BITS;
+		let need = collection.room_plus(n, WORD_BITS - 1) / WORD_BITS;
 		if need > self.word_count {
 			self.resize(need);
 		}
@@ -718,7 +718,8 @@ pub class BitSet inherits collection.Collection<int>
 		}
 		let made: ?*u64 = none;
 		if n > 0 {
-			let room = self.from.alloc(n * size_of(u64), size_of(u64)) catch fatal;
+			let room = self.from.alloc(collection.room_times(n, size_of(u64)),
+				size_of(u64)) catch fatal;
 			memset(room, 0, (n * size_of(u64)) as c_size_t);
 			if keep > 0 {
 				memcpy(room, old as ?*byte, (keep * size_of(u64)) as c_size_t);

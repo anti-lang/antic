@@ -16,6 +16,7 @@ import anti.mem;
 
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
+extern fn anti_rt_out_of_memory(size: int) -> never;
 
 /// The number of blocks a pool may hold. With a first block of 8 slots the last
 /// one ends past slot 2^50, more than any memory holds.
@@ -23,6 +24,14 @@ const BLOCKS: int = 48;
 
 /// The log2 of the smallest first block.
 const FIRST_SHIFT: int = 3;
+
+/// The log2 of the largest block an `int` counts the slots of. A block above
+/// it stops the program as memory that runs out.
+const LAST_SHIFT: int = 62;
+
+/// The largest `int`, the size that memory runs out for when the size of a
+/// block is more than an `int` holds.
+const LARGEST: int = 0x7FFFFFFFFFFFFFFF;
 
 /// The words every slot keeps beside its element: the generation, the link and
 /// the version, in that order. A collection over `Slots<T>` adds its own after
@@ -116,9 +125,13 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 	protected extra_words: int = 0,
 
 	/// Make the first block hold `capacity` slots, rounded up to a power of
-	/// two, and allocate it when `capacity` is above 0.
+	/// two, and allocate it when `capacity` is above 0. A capacity above
+	/// 2^`LAST_SHIFT` stops the program as memory that runs out.
 	protected fn prepare(self, capacity: int)
 	{
+		if capacity > 1 << LAST_SHIFT {
+			anti_rt_out_of_memory(LARGEST);
+		}
 		while (1 << self.shift) < capacity do {
 			self.shift += 1;
 		}
@@ -447,8 +460,13 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 	fn make_block(self)
 	{
 		let k = self.blocks_made;
+		if self.shift + k > LAST_SHIFT {
+			anti_rt_out_of_memory(LARGEST);
+		}
 		let n = 1 << (self.shift + k);
-		let bytes = n * (size_of(T) + (SLOT_WORDS + self.extra_words) * size_of(int));
+		let slot = collection.room_plus(size_of(T),
+			collection.room_times(SLOT_WORDS + self.extra_words, size_of(int)));
+		let bytes = collection.room_times(n, slot);
 		let made = self.from.alloc(bytes, collection.block_align<T>()) catch fatal;
 		memset(made, 0, bytes as c_size_t);
 		self.blocks[k] = made;

@@ -1,0 +1,13 @@
+//! `reserve` of a `Deque<T>` for more elements than an `int` counts stops
+//! the program as memory that runs out. Before the fix a release build wrapped
+//! the sum of the count and the request and reserved nothing.
+
+import anti.collection.deque.{Deque};
+
+fn main() -> int
+{
+	let d = Deque<int>.new();
+	d.push_back(5);
+	d.reserve(0x7FFFFFFFFFFFFFFF);
+	return d.count;
+}

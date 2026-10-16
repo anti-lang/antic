@@ -1,0 +1,12 @@
+//! `BitSet.new` with room for more numbers than an `int` holds stops the
+//! program as memory that runs out. Before the fix a release build wrapped the
+//! words it rounds the capacity up to and made a set with no room.
+
+import anti.collection.set.{BitSet};
+
+fn main() -> int
+{
+	let s = BitSet.new(0x7FFFFFFFFFFFFFFF);
+	s.add(5);
+	return s.count;
+}

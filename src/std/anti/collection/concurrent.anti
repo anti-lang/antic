@@ -917,7 +917,7 @@ pub class Snapshot<T>
 	/// bytes.
 	fn grow(self)
 	{
-		let size = self.capacity * 2;
+		let size = collection.room_times(self.capacity, 2);
 		if size == 0 {
 			size = 8;
 		}

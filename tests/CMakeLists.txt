@@ -5146,10 +5146,15 @@ add_test(NAME trap_table
 # error_text_refused and trace_names_refused: the text that `take_in`
 # makes, the text of an error and the names of a trace stop the program
 # when they find no memory, by decision 4 of "Decisions of 2026-10-11".
+# The room_ programs: a collection asked for room whose size no `int`
+# holds stops the program as memory that runs out, finding S316, in a
+# product, a sum, a doubling and a shift of the room of each collection.
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         singleton_memory pattern_limit pattern_group_count chan_capacity
         send_closed send_closed_waiting take_in_refused error_text_refused
-        trace_names_refused)
+        trace_names_refused room_list room_list_reserve room_deque_reserve
+        room_grid room_map room_map_reserve room_hash_map room_sorted
+        room_pool room_pool_shift room_bitset)
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

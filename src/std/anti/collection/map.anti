@@ -79,8 +79,9 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 	/// Make room for `n` more elements, in one allocation.
 	pub fn reserve(self, n: int)
 	{
-		if n > 0 && self.count + n > self.room_size - (self.used - self.count) {
-			self.rebuild(self.count + n);
+		let need = collection.room_plus(self.count, n);
+		if n > 0 && need > self.room_size - (self.used - self.count) {
+			self.rebuild(need);
 		}
 	}
 
@@ -291,12 +292,15 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 		let block: ?*byte = none;
 		if n > 0 {
 			buckets = FIRST_BUCKETS;
-			while buckets < 2 * n do {
-				buckets *= 2;
+			let want = collection.room_times(n, 2);
+			while buckets < want do {
+				buckets = collection.room_times(buckets, 2);
 			}
-			let at_hashes = aligned(n * size_of(E), 8);
-			let at_buckets = at_hashes + 8 * n;
-			let total = at_buckets + 16 * buckets;
+			let at_hashes = aligned(collection.room_times(n, size_of(E)), 8);
+			let at_buckets = collection.room_plus(at_hashes,
+				collection.room_times(n, 8));
+			let total = collection.room_plus(at_buckets,
+				collection.room_times(buckets, 16));
 			let made = self.from.alloc(total, collection.block_align<E>()) catch fatal;
 			memset(made, 0, total as c_size_t);
 			self.entries = made as ?*E;
@@ -381,10 +385,12 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 	/// Make room for `n` more elements, in one allocation.
 	pub fn reserve(self, n: int)
 	{
-		if n > 0 && (self.count + self.removed + n) * 2 > self.size {
+		let need = collection.room_plus(self.count + self.removed, n);
+		if n > 0 && collection.room_times(need, 2) > self.size {
+			let want = collection.room_times(collection.room_plus(self.count, n), 2);
 			let size = FIRST_BUCKETS;
-			while size < 2 * (self.count + n) do {
-				size *= 2;
+			while size < want do {
+				size = collection.room_times(size, 2);
 			}
 			self.resize(size);
 		}
@@ -608,8 +614,10 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 		let old_slots = self.slots;
 		let old_size = self.size;
 		if size > 0 {
-			let at_slots = aligned(8 * size, collection.block_align<E>());
-			let total = at_slots + size * size_of(E);
+			let at_slots = aligned(collection.room_times(size, 8),
+				collection.block_align<E>());
+			let total = collection.room_plus(at_slots,
+				collection.room_times(size, size_of(E)));
 			let made = self.from.alloc(total, collection.block_align<E>()) catch fatal;
 			memset(made, 0, total as c_size_t);
 			self.marks = made as ?*u64;
@@ -1415,7 +1423,8 @@ internal fn numbers(from: *mem.Allocator, n: int) -> *int
 	if count == 0 {
 		count = 1;
 	}
-	let made = from.alloc(count * size_of(int), size_of(int)) catch fatal;
+	let made = from.alloc(collection.room_times(count, size_of(int)),
+		size_of(int)) catch fatal;
 	return made as *int;
 }
 
@@ -1452,5 +1461,5 @@ internal fn sort_by_text(order: *int, n: int, all: str, starts: *int, width: int
 /// `n` rounded up to a multiple of `to`, a power of two.
 fn aligned(n: int, to: int) -> int
 {
-	return (n + to - 1) & -to;
+	return collection.room_plus(n, to - 1) & -to;
 }

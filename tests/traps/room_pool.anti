@@ -1,0 +1,12 @@
+//! `Pool<T>.new` with a first block whose bytes no `int` holds stops the
+//! program as memory that runs out. Before the fix a release build wrapped the
+//! bytes of the block.
+
+import anti.collection.pool.{Pool};
+
+fn main() -> int
+{
+	let p = Pool<int>.new(1 << 61);
+	p.add(5);
+	return p.count;
+}

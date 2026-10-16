@@ -188,8 +188,9 @@ pub class List<T> inherits collection.Indexed<T>
 	/// Room for `n` more elements, in one allocation.
 	pub fn reserve(self, n: int)
 	{
-		if self.count + n > self.capacity {
-			self.resize(self.count + n);
+		let need = collection.room_plus(self.count, n);
+		if need > self.capacity {
+			self.resize(need);
 		}
 	}
 
