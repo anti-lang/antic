@@ -851,11 +851,14 @@ pub abstract class Indexed<T> inherits Collection<T>
 
 	/// Make room for `n` more elements, doubling the capacity as often as it
 	/// takes.
+	///
+	/// PERF DECISION: the sum takes no check of `room_plus`. Every caller adds
+	/// one element, and `count` counts elements that stand in memory, so the
+	/// sum always fits an `int`, and `push` keeps one compare.
 	protected fn make_room(self, n: int)
 	{
-		let need = room_plus(self.count, n);
-		if need > self.capacity {
-			self.resize(self.grown(self.capacity, need));
+		if self.count + n > self.capacity {
+			self.resize(self.grown(self.capacity, self.count + n));
 		}
 	}
 
