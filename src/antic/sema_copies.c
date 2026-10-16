@@ -194,7 +194,9 @@ static struct type_expr *xt(struct clone *cl, struct type_expr *t)
 
 /* The field of the copy that stands where f stands in the type t of the
    generic, found along the chain of bases. A field of a type that is not
-   generic is itself. */
+   generic is itself. The level that declares f is the field's home, so
+   the walk compares no pointer with the bounds of an array f does not
+   lie in. */
 static const struct struct_field *xf(struct clone *cl, struct type *t,
                                      const struct struct_field *f)
 {
@@ -207,8 +209,7 @@ static const struct struct_field *xf(struct clone *cl, struct type *t,
         t = t->element;
     }
     for (up = t; up != NULL; up = up->kind == TYPE_CLASS ? up->base : NULL) {
-        if (up->field_count > 0 && f >= up->fields &&
-            f < up->fields + up->field_count) {
+        if (f->home == up) {
             struct type *copy = ty(cl, up, f->pos);
             size_t index = (size_t)(f - up->fields);
             return copy != NULL && index < copy->field_count

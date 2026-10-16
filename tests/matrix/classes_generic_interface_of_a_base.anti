@@ -1,0 +1,52 @@
+//! A pointer to a copy of a generic class converts to a pointer to the generic
+//! interface its base implements, inside the body of a generic function. The
+//! sub-object stands after two fields of the type parameter, so its place
+//! differs between the copies of `u8` and `i64`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Reader<T>
+{
+	abstract fn read(self) -> T;
+}
+
+class Base<T>
+{
+	pub v: T,
+	pub w: T,
+	implements rd: Reader<T>,
+
+	concrete fn read(self) -> T
+	{
+		return dup(self.w);
+	}
+}
+
+class Derived<T> inherits Base<T>
+{
+	pub tag: int = 0,
+}
+
+fn read_all<T>(r: *Reader<T>) -> T
+{
+	return r.read();
+}
+
+fn through_base<T>(b: *Base<T>) -> T
+{
+	return read_all<T>(b);
+}
+
+fn through_derived<T>(d: *Derived<T>) -> T
+{
+	return read_all<T>(d);
+}
+
+fn main() -> int
+{
+	let small = Derived<u8> { v: 1, w: 2 };
+	let large = Derived<i64> { v: 3, w: 4 };
+	printf("the class that implements it: %d %d\n".ptr, through_base<u8>(&small) as c_int, through_base<i64>(&large) as c_int);
+	printf("a class below it: %d %d\n".ptr, through_derived<u8>(&small) as c_int, through_derived<i64>(&large) as c_int);
+	return 0;
+}
