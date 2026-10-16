@@ -1227,7 +1227,7 @@ Where it lives: `check_snapshot` of `src/antic/sema_stmt.c` and `require_owned` 
 |---|---|---|
 | A `snapshot fn` at a parameter without `keep` | one store per capture into the frame | the same, or nothing when inlined |
 | Making an `own fn` | one call of `anti_rt_snapshot_new`: one `malloc` and one atomic add. One `anti_rt_snapshot_text` per captured `str` | the same |
-| Bytes on the heap | 8 for the size, the size of each capture, and the bytes of each `str` | the same |
+| Bytes on the heap | 8 for the size, the size of each capture, and the bytes of each `str` with a NUL after them | the same |
 | Bytes of an `own fn` value | 16 | 16 |
 | Freeing an `own fn` | one call of `anti_rt_snapshot_free`: one atomic subtract and one `free` | the same |
 | `dup` of an `own fn` | one call of `anti_rt_snapshot_dup`: one `malloc`, one atomic add and one copy of the block | the same |

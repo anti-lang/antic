@@ -310,12 +310,13 @@ b0:
   %t2 = alloca ptr, align 8
   %t3 = alloca i64, align 8
   %t4 = alloca i64, align 8
-  %t5 = alloca ptr, align 8
+  %t5 = alloca i64, align 8
   %t6 = alloca ptr, align 8
   %t7 = alloca ptr, align 8
-  %t8 = alloca i64, align 8
-  %t9 = alloca ptr, align 8
+  %t8 = alloca ptr, align 8
+  %t9 = alloca i64, align 8
   %t10 = alloca ptr, align 8
+  %t11 = alloca ptr, align 8
   %a0 = alloca [16 x i8], align 8
   store i64 %p0.0, ptr %a0, align 8
   %v0 = getelementptr i8, ptr %a0, i64 8
@@ -332,35 +333,38 @@ b0:
   %v6 = add i64 %v5, 24
   store i64 %v6, ptr %t4, align 8
   %v7 = load i64, ptr %t4, align 8
-  %v8 = call ptr (i64) @anti_rt_snapshot_new(i64 %v7)
-  store ptr %v8, ptr %t5, align 8
-  %v9 = load ptr, ptr %t5, align 8
-  %v10 = getelementptr i8, ptr %v9, i64 8
+  %v8 = add i64 %v7, 1
+  store i64 %v8, ptr %t5, align 8
+  %v9 = load i64, ptr %t5, align 8
+  %v10 = call ptr (i64) @anti_rt_snapshot_new(i64 %v9)
   store ptr %v10, ptr %t6, align 8
-  %v11 = load ptr, ptr %t0, align 8
+  %v11 = load ptr, ptr %t6, align 8
   %v12 = getelementptr i8, ptr %v11, i64 8
   store ptr %v12, ptr %t7, align 8
-  %v13 = load ptr, ptr %t7, align 8
-  %v14 = load i64, ptr %v13, align 8
-  store i64 %v14, ptr %t8, align 8
-  %v15 = load ptr, ptr %t0, align 8
-  %v16 = load ptr, ptr %v15, align 8
-  store ptr %v16, ptr %t9, align 8
-  %v17 = load ptr, ptr %t5, align 8
-  %v18 = load ptr, ptr %t9, align 8
-  %v19 = load i64, ptr %t8, align 8
-  call void (ptr, i64, ptr, i64) @anti_rt_snapshot_text(ptr %v17, i64 24, ptr %v18, i64 %v19)
-  %v20 = load ptr, ptr %t6, align 8
-  store i64 24, ptr %v20, align 8
-  %v21 = load ptr, ptr %t6, align 8
-  %v22 = getelementptr i8, ptr %v21, i64 8
-  store ptr %v22, ptr %t10, align 8
-  %v23 = load i64, ptr %t8, align 8
-  %v24 = load ptr, ptr %t10, align 8
-  store i64 %v23, ptr %v24, align 8
-  %v25 = load ptr, ptr %t1, align 8
-  %v26 = load ptr, ptr %t5, align 8
-  call void (ptr, ptr) @effects.hold(ptr %v25, ptr %v26)
+  %v13 = load ptr, ptr %t0, align 8
+  %v14 = getelementptr i8, ptr %v13, i64 8
+  store ptr %v14, ptr %t8, align 8
+  %v15 = load ptr, ptr %t8, align 8
+  %v16 = load i64, ptr %v15, align 8
+  store i64 %v16, ptr %t9, align 8
+  %v17 = load ptr, ptr %t0, align 8
+  %v18 = load ptr, ptr %v17, align 8
+  store ptr %v18, ptr %t10, align 8
+  %v19 = load ptr, ptr %t6, align 8
+  %v20 = load ptr, ptr %t10, align 8
+  %v21 = load i64, ptr %t9, align 8
+  call void (ptr, i64, ptr, i64) @anti_rt_snapshot_text(ptr %v19, i64 24, ptr %v20, i64 %v21)
+  %v22 = load ptr, ptr %t7, align 8
+  store i64 24, ptr %v22, align 8
+  %v23 = load ptr, ptr %t7, align 8
+  %v24 = getelementptr i8, ptr %v23, i64 8
+  store ptr %v24, ptr %t11, align 8
+  %v25 = load i64, ptr %t9, align 8
+  %v26 = load ptr, ptr %t11, align 8
+  store i64 %v25, ptr %v26, align 8
+  %v27 = load ptr, ptr %t1, align 8
+  %v28 = load ptr, ptr %t6, align 8
+  call void (ptr, ptr) @effects.hold(ptr %v27, ptr %v28)
   ret void
 }
 

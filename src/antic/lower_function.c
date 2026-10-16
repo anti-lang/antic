@@ -374,7 +374,8 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
 
 /* DESIGN: a snapshot is one record: its size in bytes, then a copy of
    each value it captures in the order of the captures. A snapshot on
-   the heap holds the bytes of each `str` after the record, and the `ptr`
+   the heap holds the bytes of each `str` after the record, each followed
+   by a NUL so that `ptr` is a C string as of every `str`, and the `ptr`
    of the `str` holds their offset from the start. It then moves and
    copies as a block of bytes, so freeing it and `dup` need nothing of
    the closure. A snapshot in the frame holds each `str` as it was, since
@@ -581,6 +582,8 @@ static struct ir_operand lower_snapshot(struct lowerer *l,
                                                   &lower_len_name))));
             size = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64, size,
                                            len));
+            size = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64, size,
+                                           ir_int_op(IR_I64, 1)));
         }
         block = lower_rt_call(l, RT_FN_SNAPSHOT_NEW, &size);
     } else {
@@ -616,6 +619,8 @@ static struct ir_operand lower_snapshot(struct lowerer *l,
                  lower_offset_address(l, dst, len_offset));
         cursor = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64, cursor,
                                          len));
+        cursor = lower_temp(l, ir_binary(l->f, l->b, IR_ADD, IR_I64, cursor,
+                                         ir_int_op(IR_I64, 1)));
     }
     return lower_pair(l, e->type, code, block);
 }

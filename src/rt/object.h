@@ -379,7 +379,8 @@ void *anti_rt_copy_buffer(const void *from, int64_t bytes);
    It aborts when the memory is not there. */
 void *anti_rt_snapshot_new(int64_t size);
 
-/* Copy length bytes of a captured str into the snapshot at offset at. */
+/* Copy length bytes of a captured str into the snapshot at offset at,
+   and a NUL after them. */
 void anti_rt_snapshot_text(void *snapshot, int64_t at,
                            const unsigned char *bytes, int64_t length);
 

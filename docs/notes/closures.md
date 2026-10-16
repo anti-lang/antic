@@ -98,9 +98,9 @@ choices of `snapshot fn` and `own fn`.
 - A `let` of an owned value takes the form of two words without the flag,
   so a local borrows and never owns.
 - `lower_snapshot` writes the record `<name>.snapshot`: the size, then one
-  field per capture. On the heap the size adds the length of each `str`,
-  `anti_rt_snapshot_new` makes the block, and `anti_rt_snapshot_text`
-  copies the bytes after the record. `snapshot_entry` points each captured
+  field per capture. On the heap the size adds the length of each `str`
+  and one byte for its NUL, `anti_rt_snapshot_new` makes the block, and
+  `anti_rt_snapshot_text` copies the bytes and the NUL after the record. `snapshot_entry` points each captured
   name at its field, and rebuilds a `str` of the heap in a slot.
 - `lower_free_snapshot` frees the context word and writes `none` there. The
   teardown of a class, `=` into an `own fn` field and the exit action of a

@@ -27,12 +27,15 @@ void *anti_rt_snapshot_new(int64_t size)
     return made;
 }
 
+/* The block holds a byte for the NUL after the bytes of each text,
+   which lowering counts in its size. */
 void anti_rt_snapshot_text(void *snapshot, int64_t at,
                            const unsigned char *bytes, int64_t length)
 {
     if (length > 0) {
         memcpy((char *)snapshot + at, bytes, (size_t)length);
     }
+    ((char *)snapshot)[at + (length > 0 ? length : 0)] = 0;
 }
 
 void anti_rt_snapshot_free(void *snapshot)
