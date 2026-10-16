@@ -85,9 +85,11 @@ bool self_directory(struct text *out);
    `..` by name as it does for every path. */
 bool absolute_path(const char *path, struct text *out);
 
-/* Name the tool in the message of a program that the process functions
-   cannot start: antic, unless the tool that runs gives its own name before
-   it starts any. R163 of "Rules of 2026-10-13". */
+/* Name the tool that starts every message of the layer: antic, unless
+   the tool that runs gives its own name before it calls the layer. R163
+   of "Rules of 2026-10-13" named the message of a program the process
+   functions cannot start, and the test `message_forms` refuses a message
+   of the layer that names antic itself. */
 void platform_set_tool(const char *name);
 
 /* Put the standard output into binary mode on Windows. Elsewhere it does

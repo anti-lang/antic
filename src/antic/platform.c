@@ -36,8 +36,9 @@ struct stack_call {
     void *context;
 };
 
-/* The tool that names itself in the message of a program it cannot
-   start. R163 of "Rules of 2026-10-13". */
+/* The tool that names itself in every message of the layer, antic or
+   anti, which serve both. R163 of "Rules of 2026-10-13" named the message
+   of a program the layer cannot start. */
 static const char *tool = "antic";
 
 void platform_set_tool(const char *name)
@@ -412,7 +413,7 @@ static int wait_for(HANDLE process, const char *name)
 
     if (WaitForSingleObject(process, INFINITE) != WAIT_OBJECT_0 ||
         !GetExitCodeProcess(process, &code)) {
-        fprintf(stderr, "antic: waiting for %s: error %lu\n", name,
+        fprintf(stderr, "%s: waiting for %s: error %lu\n", tool, name,
                 (unsigned long)GetLastError());
         return -1;
     }
@@ -525,7 +526,7 @@ int process_capture(const char *const argv[], struct text *out)
     attributes.nLength = sizeof attributes;
     attributes.bInheritHandle = TRUE;
     if (!CreatePipe(&reader, &writer, &attributes, 0)) {
-        fprintf(stderr, "antic: pipe: error %lu\n",
+        fprintf(stderr, "%s: pipe: error %lu\n", tool,
                 (unsigned long)GetLastError());
         return -1;
     }
@@ -569,15 +570,15 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
     thread = CreateThread(NULL, PLATFORM_WORK_STACK, stack_start, &call,
                           STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
     if (thread == NULL) {
-        fprintf(stderr, "antic: cannot start the thread of the work: "
+        fprintf(stderr, "%s: cannot start the thread of the work: "
                         "error %lu\n",
-                (unsigned long)GetLastError());
+                tool, (unsigned long)GetLastError());
         return false;
     }
     if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0) {
-        fprintf(stderr, "antic: cannot wait for the thread of the work: "
+        fprintf(stderr, "%s: cannot wait for the thread of the work: "
                         "error %lu\n",
-                (unsigned long)GetLastError());
+                tool, (unsigned long)GetLastError());
         CloseHandle(thread);
         return false;
     }
@@ -762,7 +763,7 @@ static int wait_for(pid_t pid, const char *name)
 
     while (waitpid(pid, &status, 0) < 0) {
         if (errno != EINTR) {
-            fprintf(stderr, "antic: waiting for %s: %s\n", name,
+            fprintf(stderr, "%s: waiting for %s: %s\n", tool, name,
                     strerror(errno));
             return -1;
         }
@@ -770,7 +771,8 @@ static int wait_for(pid_t pid, const char *name)
     if (WIFEXITED(status)) {
         return WEXITSTATUS(status);
     }
-    fprintf(stderr, "antic: %s ended by signal %d\n", name, WTERMSIG(status));
+    fprintf(stderr, "%s: %s ended by signal %d\n", tool, name,
+            WTERMSIG(status));
     return -1;
 }
 
@@ -839,7 +841,7 @@ int process_capture(const char *const argv[], struct text *out)
     int started;
 
     if (pipe(fds) != 0) {
-        fprintf(stderr, "antic: pipe: %s\n", strerror(errno));
+        fprintf(stderr, "%s: pipe: %s\n", tool, strerror(errno));
         return -1;
     }
     posix_spawn_file_actions_init(&actions);
@@ -907,7 +909,7 @@ int process_run_lines(const char *const argv[], const char *name,
 
     env = environment_with(name, value, &entry);
     if (pipe(fds) != 0) {
-        fprintf(stderr, "antic: pipe: %s\n", strerror(errno));
+        fprintf(stderr, "%s: pipe: %s\n", tool, strerror(errno));
         free(env);
         text_free(&entry);
         return -1;
@@ -976,14 +978,14 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
         pthread_attr_destroy(&attributes);
     }
     if (error != 0) {
-        fprintf(stderr, "antic: cannot start the thread of the work: %s\n",
-                strerror(error));
+        fprintf(stderr, "%s: cannot start the thread of the work: %s\n",
+                tool, strerror(error));
         return false;
     }
     error = pthread_join(thread, NULL);
     if (error != 0) {
-        fprintf(stderr, "antic: cannot wait for the thread of the work: %s\n",
-                strerror(error));
+        fprintf(stderr, "%s: cannot wait for the thread of the work: %s\n",
+                tool, strerror(error));
         return false;
     }
     return true;

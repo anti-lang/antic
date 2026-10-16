@@ -1040,7 +1040,8 @@ add_test(NAME no_sdk_fetcher
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_no_sdk_fetcher.cmake")
 
-# A message at a position has one printer in antic.
+# A message at a position has one printer in antic, and the platform
+# layer names the tool that runs.
 add_test(NAME message_forms
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_message_forms.cmake")
