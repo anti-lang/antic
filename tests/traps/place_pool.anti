@@ -1,6 +1,6 @@
-//! `take_place` of a `Pool<T>` given a free slot stops the program,
-//! finding S315. Before the fix it linked the slot into the free list a
-//! second time, so the next two `add` calls shared one slot.
+//! `take_place` of a `Pool<T>` given a free slot stops the program, finding
+//! S315. Before the fix it linked the slot into the free list a second time, so
+//! the next two `add` calls shared one slot.
 
 import anti.collection.pool.{Pool};
 

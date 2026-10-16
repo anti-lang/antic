@@ -1,6 +1,6 @@
-//! `reserve` moves the room of a `SortedMap<K, V>` while a `for` walks it.
-//! The move counts as a change, finding M304, and the loop of a dev build
-//! stops at the next turn. Before the fix the walk read the freed room.
+//! `reserve` moves the room of a `SortedMap<K, V>` while a `for` walks it. The
+//! move counts as a change, finding M304, and the loop of a dev build stops at
+//! the next turn. Before the fix the walk read the freed room.
 
 import anti.collection.sorted.{SortedMap};
 

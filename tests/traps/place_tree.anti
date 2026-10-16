@@ -1,6 +1,6 @@
-//! `take_place` of a `Tree<T>` given a free slot stops the program,
-//! finding S315. Before the fix it unlinked the slot from the tree a second
-//! time and linked it into the free list twice.
+//! `take_place` of a `Tree<T>` given a free slot stops the program, finding
+//! S315. Before the fix it unlinked the slot from the tree a second time and
+//! linked it into the free list twice.
 
 import anti.collection.tree.{Tree};
 

@@ -1,6 +1,6 @@
-//! `reserve` of a `List<T>` for more elements than an `int` counts stops
-//! the program as memory that runs out. Before the fix a release build wrapped
-//! the sum of the count and the request and reserved nothing.
+//! `reserve` of a `List<T>` for more elements than an `int` counts stops the
+//! program as memory that runs out. Before the fix a release build wrapped the
+//! sum of the count and the request and reserved nothing.
 
 import anti.collection.list.{List};
 

@@ -1,6 +1,6 @@
-//! `Map<K, V>.new` with a capacity whose bytes no `int` holds stops the
-//! program as memory that runs out. Before the fix a release build wrapped the
-//! bytes of the entries in the size of the block.
+//! `Map<K, V>.new` with a capacity whose bytes no `int` holds stops the program
+//! as memory that runs out. Before the fix a release build wrapped the bytes of
+//! the entries in the size of the block.
 
 import anti.collection.map.{Map};
 

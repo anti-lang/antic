@@ -27,8 +27,8 @@ extern fn anti_rt_out_of_memory(size: int) -> never;
 /// The capacity a growing collection starts with when it is made without one.
 const FIRST_CAPACITY: int = 8;
 
-/// The largest `int`, the size that memory runs out for when the size of a
-/// room is more than an `int` holds.
+/// The largest `int`, the size that memory runs out for when the size of a room
+/// is more than an `int` holds.
 const LARGEST: int = 0x7FFFFFFFFFFFFFFF;
 
 /// A type that `for` walks, giving elements of type `T`.
@@ -111,8 +111,8 @@ pub fn allocator(from: ?*mem.Allocator) -> *mem.Allocator
 /// `int` of its own choosing that the order of the collection walks from
 /// `first_place` through `next_place` to `-1`. They serve the functions of this
 /// class, which a collection may replace with faster ones. They are public, as
-/// every abstract function is, so each of the four that takes a place stops
-/// the program when that place holds no element.
+/// every abstract function is, so each of the four that takes a place stops the
+/// program when that place holds no element.
 pub abstract class Collection<T>
 {
 	/// The number of elements.
@@ -750,8 +750,8 @@ internal fn room_times(a: int, b: int) -> int
 	return product;
 }
 
-/// The sum of two sizes of a room, which stops the program as `room_times`
-/// does when no `int` holds it.
+/// The sum of two sizes of a room, which stops the program as `room_times` does
+/// when no `int` holds it.
 internal fn room_plus(a: int, b: int) -> int
 {
 	let (sum, flags) = a + b;

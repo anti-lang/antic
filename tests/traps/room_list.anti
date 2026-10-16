@@ -1,7 +1,7 @@
-//! `List<T>.new` with a capacity whose bytes no `int` holds stops the
-//! program as memory that runs out, by decision 4 of "Decisions of
-//! 2026-10-11". Before the fix a release build wrapped the product to 0 and
-//! kept the capacity of 2^61 elements.
+//! `List<T>.new` with a capacity whose bytes no `int` holds stops the program
+//! as memory that runs out, by decision 4 of "Decisions of 2026-10-11". Before
+//! the fix a release build wrapped the product to 0 and kept the capacity of
+//! 2^61 elements.
 
 import anti.collection.list.{List};
 

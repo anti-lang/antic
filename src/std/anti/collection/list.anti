@@ -185,8 +185,8 @@ pub class List<T> inherits collection.Indexed<T>
 		collection.sort_stable<T>([]T { ptr: self.items, len: self.count }, less);
 	}
 
-	/// Room for `n` more elements, in one allocation. A move of the room
-	/// counts as a change at `at`, which a `for` over the collection sees.
+	/// Room for `n` more elements, in one allocation. A move of the room counts
+	/// as a change at `at`, which a `for` over the collection sees.
 	pub fn reserve(self, n: int, at: lang.SourceLocation = here)
 	{
 		let need = collection.room_plus(self.count, n);
@@ -196,8 +196,8 @@ pub class List<T> inherits collection.Indexed<T>
 		}
 	}
 
-	/// Give back the room past the last element. A move of the room counts as
-	/// a change at `at`.
+	/// Give back the room past the last element. A move of the room counts as a
+	/// change at `at`.
 	pub fn shrink(self, at: lang.SourceLocation = here)
 	{
 		if self.capacity > self.count {

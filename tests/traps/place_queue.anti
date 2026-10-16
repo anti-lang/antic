@@ -1,6 +1,6 @@
-//! `take_place` of a `PriorityQueue<T>` given a place past its elements
-//! stops the program, finding S315. Before the fix a release build moved the
-//! last element over room past it.
+//! `take_place` of a `PriorityQueue<T>` given a place past its elements stops
+//! the program, finding S315. Before the fix a release build moved the last
+//! element over room past it.
 
 import anti.collection.queue.{PriorityQueue};
 

@@ -25,8 +25,8 @@ const BLOCKS: int = 48;
 /// The log2 of the smallest first block.
 const FIRST_SHIFT: int = 3;
 
-/// The log2 of the largest block an `int` counts the slots of. A block above
-/// it stops the program as memory that runs out.
+/// The log2 of the largest block an `int` counts the slots of. A block above it
+/// stops the program as memory that runs out.
 const LAST_SHIFT: int = 62;
 
 /// The largest `int`, the size that memory runs out for when the size of a

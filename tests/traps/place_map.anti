@@ -1,6 +1,6 @@
-//! `copy_place` of a `Map<K, V>` given the place of a removed entry stops
-//! the program, finding S315. Before the fix it gave a copy of the zero bytes
-//! the entry left.
+//! `copy_place` of a `Map<K, V>` given the place of a removed entry stops the
+//! program, finding S315. Before the fix it gave a copy of the zero bytes the
+//! entry left.
 
 import anti.collection.map.{Map};
 

@@ -87,8 +87,8 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 		}
 	}
 
-	/// Give back the room that holds no element. A move of the room counts as
-	/// a change at `at`.
+	/// Give back the room that holds no element. A move of the room counts as a
+	/// change at `at`.
 	pub fn shrink(self, at: lang.SourceLocation = here)
 	{
 		if self.room_size > self.count {
@@ -423,8 +423,8 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 		}
 	}
 
-	/// Give back the room that holds no element. A move of the room counts as
-	/// a change at `at`.
+	/// Give back the room that holds no element. A move of the room counts as a
+	/// change at `at`.
 	pub fn shrink(self, at: lang.SourceLocation = here)
 	{
 		let size = 0;

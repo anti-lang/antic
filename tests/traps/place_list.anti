@@ -1,6 +1,6 @@
 //! `copy_place` of a `List<T>` given a place past its elements stops the
-//! program, finding S315. The place functions are public, and before the fix
-//! a release build read the room past the last element.
+//! program, finding S315. The place functions are public, and before the fix a
+//! release build read the room past the last element.
 
 import anti.collection.list.{List};
 

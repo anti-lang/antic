@@ -1,6 +1,6 @@
 //! `Pool<T>.new` with a capacity above 2^62 stops the program as memory that
-//! runs out. Before the fix the shift that rounds the capacity up to a power
-//! of two passed the width of an `int` and never ended.
+//! runs out. Before the fix the shift that rounds the capacity up to a power of
+//! two passed the width of an `int` and never ended.
 
 import anti.collection.pool.{Pool};
 

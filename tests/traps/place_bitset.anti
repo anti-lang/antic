@@ -1,6 +1,6 @@
 //! `take_place` of a `BitSet` given a number it does not hold stops the
-//! program, finding S315. Before the fix it gave the number as an element,
-//! and a remove form took it off the count.
+//! program, finding S315. Before the fix it gave the number as an element, and
+//! a remove form took it off the count.
 
 import anti.collection.set.{BitSet};
 
