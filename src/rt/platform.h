@@ -287,7 +287,9 @@ int anti_rt_file_rename(const char *from, const char *to);
    UTF-8 and the order the system gives them, `.` and `..` included. each
    returns 0 to go on, or -1 with errno set to stop the listing. Returns
    0, or -1 with errno set, from each or from the system. An empty path
-   names no directory and gives ENOENT. */
+   names no directory and gives ENOENT, and a file gives ENOTDIR. On
+   Windows `C:` names the current directory of the drive, as the system
+   reads it. */
 int anti_rt_directory_list(const char *path,
                            int (*each)(void *context,
                                        const unsigned char *name,

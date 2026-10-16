@@ -455,55 +455,129 @@ int anti_rt_file_rename(const char *from, const char *to)
     return status == 0 ? 0 : -1;
 }
 
+/* DESIGN: one walk of a directory with the find functions, which
+   anti_rt_directory_list and the opendir and readdir of the static C
+   runtime below both take, so the two read a path alike. A path that
+   ends in a separator or in the `:` of a drive takes `*` alone, so `C:`
+   is the current directory of the drive, as Windows reads the path.
+   Every other path takes a separator and `*`. A path that names no
+   directory fails before the walk, with ENOENT or ENOTDIR as on POSIX,
+   and an empty path is ENOENT. A name that the room of the caller
+   cannot hold ends the walk with ENAMETOOLONG, since an empty name
+   would stand for a file that is not there. */
+struct find_walk {
+    intptr_t handle;    /* of _wfindfirst64, or -1 before it and after */
+    int state;          /* 0 before the first entry, 1 after, -1 done */
+    wchar_t *pattern;   /* path\* in UTF-16 */
+};
+
+/* Start a walk of the directory at path. Returns 0, or -1 with errno
+   set. */
+static int find_start(struct find_walk *walk, const char *path)
+{
+    wchar_t *wide = wide_of(path, 2);
+    size_t units;
+    DWORD attributes;
+
+    walk->handle = -1;
+    walk->state = 0;
+    walk->pattern = NULL;
+    if (wide == NULL) {
+        return -1;
+    }
+    units = wcslen(wide);
+    attributes = units == 0 ? INVALID_FILE_ATTRIBUTES
+                            : GetFileAttributesW(wide);
+    if (attributes == INVALID_FILE_ATTRIBUTES ||
+        !(attributes & FILE_ATTRIBUTE_DIRECTORY)) {
+        errno = attributes == INVALID_FILE_ATTRIBUTES ? ENOENT : ENOTDIR;
+        release(wide);
+        return -1;
+    }
+    if (wide[units - 1] != L'/' && wide[units - 1] != L'\\' &&
+        wide[units - 1] != L':') {
+        wide[units++] = L'\\';
+    }
+    wide[units] = L'*';
+    wide[units + 1] = L'\0';
+    walk->pattern = wide;
+    return 0;
+}
+
+/* The next entry of the walk, its name in UTF-8 into the room bytes at
+   out and its length into length. Returns 1, 0 at the end, or -1 with
+   errno set. */
+static int find_next(struct find_walk *walk, char *out, size_t room,
+                     size_t *length)
+{
+    struct _wfinddata64_t found;
+
+    if (walk->state < 0) {
+        return 0;
+    }
+    if (walk->state == 0) {
+        walk->handle = _wfindfirst64(walk->pattern, &found);
+        walk->state = 1;
+        if (walk->handle == -1) {
+            walk->state = -1;
+            return -1;
+        }
+    } else if (_wfindnext64(walk->handle, &found) != 0) {
+        /* The search ends with ENOENT when no entry is left. */
+        int end = errno == ENOENT;
+        walk->state = -1;
+        return end ? 0 : -1;
+    }
+    *length = utf8_of(found.name, wcslen(found.name), out, room);
+    if (*length == 0 && found.name[0] != L'\0') {
+        walk->state = -1;
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    return 1;
+}
+
+/* End the walk and give back what it holds. errno stays as it was. */
+static void find_end(struct find_walk *walk)
+{
+    int saved = errno;
+
+    if (walk->handle != -1) {
+        _findclose(walk->handle);
+        walk->handle = -1;
+    }
+    release(walk->pattern);
+    walk->pattern = NULL;
+    errno = saved;
+}
+
 int anti_rt_directory_list(const char *path,
                            int (*each)(void *context,
                                        const unsigned char *name,
                                        size_t length),
                            void *context)
 {
-    /* The pattern of the search is the directory, a separator and `*`. */
-    wchar_t *pattern = wide_of(path, 2);
-    struct _wfinddata64_t data;
-    char name[3 * (sizeof data.name / sizeof data.name[0]) + 1];
-    intptr_t search = -1;
-    size_t units;
-    int status = 0;
-    int saved;
+    struct find_walk walk;
+    /* Room for a name of MAX_PATH units, each of three bytes at most. */
+    char name[3 * MAX_PATH + 1];
+    size_t length;
+    int status;
 
-    if (pattern == NULL) {
+    if (find_start(&walk, path) != 0) {
         return -1;
     }
-    units = wcslen(pattern);
-    if (units == 0) {
-        errno = ENOENT;
-    } else {
-        if (pattern[units - 1] != L'/' && pattern[units - 1] != L'\\') {
-            pattern[units++] = L'\\';
+    for (;;) {
+        status = find_next(&walk, name, sizeof name, &length);
+        if (status <= 0) {
+            break;
         }
-        pattern[units++] = L'*';
-        pattern[units] = 0;
-        search = _wfindfirst64(pattern, &data);
-    }
-    release(pattern);
-    if (search == -1) {
-        return -1;
-    }
-    do {
-        size_t written =
-            utf8_of(data.name, wcslen(data.name), name, sizeof name);
-        if (each(context, (const unsigned char *)name, written) != 0) {
+        if (each(context, (const unsigned char *)name, length) != 0) {
             status = -1;
             break;
         }
-    } while (_wfindnext64(search, &data) == 0);
-    /* The search ends with ENOENT when no entry is left. */
-    if (status == 0 && errno != ENOENT) {
-        status = -1;
     }
-    saved = errno;
-    _findclose(search);
-    errno = saved;
-    return status;
+    find_end(&walk);
+    return status < 0 ? -1 : 0;
 }
 
 void *anti_rt_library_open(const char *path)
@@ -1473,94 +1547,45 @@ float hypotf(float x, float y)
     return (float)hypot((double)x, (double)y);
 }
 
-/* A directory that opendir opened: the entry readdir gives, the handle
-   of the find functions, the count of the entries read, -1 past the end,
-   and the pattern path\* in UTF-16. The DIR of dirent.h is the type of
-   the library of mingw-w64, which no caller looks into, so its pointer
-   stands for this struct. The names go through UTF-16 and back, as every
-   text of the runtime does, where the library of mingw-w64 takes the
-   code page of the system. */
+/* A directory that opendir opened: the entry readdir gives and the walk
+   of the find functions, which anti_rt_directory_list takes as well. The
+   DIR of dirent.h is the type of the library of mingw-w64, which no
+   caller looks into, so its pointer stands for this struct. The names go
+   through UTF-16 and back, as every text of the runtime does, where the
+   library of mingw-w64 takes the code page of the system. */
 struct open_directory {
     struct dirent entry;
-    intptr_t handle;
-    int state;
-    wchar_t *pattern;
+    struct find_walk walk;
 };
 
 DIR *opendir(const char *path)
 {
     struct open_directory *directory = malloc(sizeof *directory);
-    wchar_t *wide;
-    size_t units;
-    DWORD attributes;
 
     if (directory == NULL) {
         errno = ENOMEM;
         return NULL;
     }
-    wide = wide_of(path, 2);
-    if (wide == NULL) {
+    if (find_start(&directory->walk, path) != 0) {
         free(directory);
         return NULL;
     }
-    units = wcslen(wide);
-    attributes = units == 0 ? INVALID_FILE_ATTRIBUTES
-                            : GetFileAttributesW(wide);
-    if (attributes == INVALID_FILE_ATTRIBUTES ||
-        !(attributes & FILE_ATTRIBUTE_DIRECTORY)) {
-        errno = attributes == INVALID_FILE_ATTRIBUTES ? ENOENT : ENOTDIR;
-        free(wide);
-        free(directory);
-        return NULL;
-    }
-    if (wide[units - 1] != L'/' && wide[units - 1] != L'\\' &&
-        wide[units - 1] != L':') {
-        wide[units++] = L'\\';
-    }
-    wide[units] = L'*';
-    wide[units + 1] = L'\0';
     memset(&directory->entry, 0, sizeof directory->entry);
-    directory->handle = -1;
-    directory->state = 0;
-    directory->pattern = wide;
     return (DIR *)directory;
 }
 
 struct dirent *readdir(DIR *opened)
 {
     struct open_directory *directory = (struct open_directory *)opened;
-    struct _wfinddata64_t found;
-    size_t bytes;
+    size_t bytes = 0;
+    int status = find_next(&directory->walk, directory->entry.d_name,
+                           sizeof directory->entry.d_name, &bytes);
 
-    if (directory->state < 0) {
-        return NULL;
-    }
-    if (directory->state == 0) {
-        directory->handle = _wfindfirst64(directory->pattern, &found);
-        if (directory->handle == -1) {
-            directory->state = -1;
-            return NULL;
-        }
-    } else if (_wfindnext64(directory->handle, &found) != 0) {
+    if (status <= 0) {
         /* The end of the directory is no error of the walk. */
-        if (GetLastError() == ERROR_NO_MORE_FILES) {
+        if (status == 0) {
             errno = 0;
         }
-        _findclose(directory->handle);
-        directory->handle = -1;
-        directory->state = -1;
-        return NULL;
-    }
-    directory->state++;
-    bytes = utf8_of(found.name, wcslen(found.name), directory->entry.d_name,
-                    sizeof directory->entry.d_name);
-    if (bytes == 0 && found.name[0] != L'\0') {
-        /* A name the entry of dirent.h cannot hold ends the walk, since an
-           empty name would stand for a file that is not there. */
-        errno = ENAMETOOLONG;
-        _findclose(directory->handle);
-        directory->handle = -1;
-        directory->state = -1;
         return NULL;
     }
     directory->entry.d_namlen = (unsigned short)bytes;
@@ -1570,14 +1595,10 @@ struct dirent *readdir(DIR *opened)
 int closedir(DIR *opened)
 {
     struct open_directory *directory = (struct open_directory *)opened;
-    int status = 0;
 
-    if (directory->handle != -1) {
-        status = _findclose(directory->handle);
-    }
-    free(directory->pattern);
+    find_end(&directory->walk);
     free(directory);
-    return status;
+    return 0;
 }
 
 #endif

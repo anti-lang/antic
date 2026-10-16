@@ -339,6 +339,53 @@ static int saw(void *context, const unsigned char *name, size_t length)
     return 0;
 }
 
+#if defined(_WIN32)
+/* The file the walk of a drive looks for in the working directory. */
+#define DRIVE_PROBE "rt-platform-drive-probe"
+
+static int saw_probe(void *context, const unsigned char *name, size_t length)
+{
+    int *found = context;
+
+    if (length == strlen(DRIVE_PROBE) &&
+        memcmp(name, DRIVE_PROBE, length) == 0) {
+        (*found)++;
+    }
+    return 0;
+}
+
+/* `C:` names the current directory of the drive, as Windows reads a
+   path, and never its root, in the listing as in the opendir of the
+   static C runtime. The working directory of the test lies below the
+   root, and the listing of its drive names the file the test writes
+   there. */
+static void drive_relative(void)
+{
+    char here[MAX_PATH];
+    char drive[3];
+    int found = 0;
+    DWORD written = GetCurrentDirectoryA(sizeof here, here);
+    FILE *f;
+
+    CHECK(written > 3 && written < sizeof here && here[1] == ':');
+    if (written <= 3 || written >= sizeof here || here[1] != ':') {
+        return;
+    }
+    f = anti_rt_file_open(DRIVE_PROBE, ANTI_FILE_WRITE);
+    CHECK(f != NULL);
+    if (f == NULL) {
+        return;
+    }
+    CHECK(fclose(f) == 0);
+    drive[0] = here[0];
+    drive[1] = ':';
+    drive[2] = '\0';
+    CHECK(anti_rt_directory_list(drive, saw_probe, &found) == 0);
+    CHECK(found == 1);
+    CHECK(anti_rt_file_remove(DRIVE_PROBE) == 0);
+}
+#endif
+
 /* A file under a name outside ASCII is written, measured, listed,
    renamed and removed, and each failure reports through errno. */
 static void files(void)
@@ -395,6 +442,10 @@ static void files(void)
     errno = 0;
     CHECK(anti_rt_directory_list("", saw, &s) == -1);
     CHECK(errno == ENOENT);
+    /* A file is no directory, and the listing says so on every system. */
+    errno = 0;
+    CHECK(anti_rt_directory_list(FILE_UTF8, saw, &s) == -1);
+    CHECK(errno == ENOTDIR);
 
     /* POSIX opens a directory as a stream, and Windows opens none. */
     dir = anti_rt_file_open(PLUGIN_DIR, ANTI_FILE_READ);
@@ -634,6 +685,9 @@ int main(int argc, char **argv)
     locks_and_threads();
     images();
     files();
+#if defined(_WIN32)
+    drive_relative();
+#endif
     traces();
     aligned_memory();
     process_arguments(argc, argv);
