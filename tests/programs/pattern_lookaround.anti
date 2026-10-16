@@ -1,5 +1,5 @@
-//! `data.patch(r, with, into, at)` finds every place before it writes a byte.
-//! A group in a lookahead lies outside its match, and a lookbehind reads the
+//! `data.patch(r, with, into, at)` finds every place before it writes a byte. A
+//! group in a lookahead lies outside its match, and a lookbehind reads the
 //! bytes before it, so a write could change what a later search finds. Neither
 //! does: the lookahead patches the one place that stood before the write, and
 //! the lookbehind patches the one place whose byte before it was `a`.
