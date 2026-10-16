@@ -26,6 +26,10 @@ struct bind_eval {
    so the value is computed rather than converted. */
 int64_t bind_signed(uint64_t x);
 
+/* Whether the scalar Anti type is unsigned: u8 to u64, c_uchar to
+   c_ulonglong and c_size_t. */
+bool bind_is_unsigned_type(const char *type);
+
 /* The value of a name inside an expression, a macro or an enumerator
    evaluated before. Returns false for a name it does not know. */
 typedef bool (*bind_lookup)(void *context, const char *name,

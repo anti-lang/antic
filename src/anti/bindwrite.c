@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bindexpr.h"
 #include "bindmodel.h"
 #include "modpath.h"
 
@@ -641,7 +642,7 @@ static bool settable(const struct bind_module *b, const struct bind_type *t,
     switch (t->kind) {
     case BIND_SCALAR:
         /* A signed bitfield of one bit holds 0 and -1 alone. */
-        if (bits == 1 && t->name[0] != 'u' && strncmp(t->name, "c_u", 3) != 0) {
+        if (bits == 1 && !bind_is_unsigned_type(t->name)) {
             return false;
         }
         text_append(&s->c_value, "1");

@@ -62,7 +62,7 @@ static bool is_float_type(const char *type)
     return strcmp(type, "c_float") == 0 || strcmp(type, "c_double") == 0;
 }
 
-static bool is_unsigned_type(const char *type)
+bool bind_is_unsigned_type(const char *type)
 {
     return type[0] == 'u' || strncmp(type, "c_u", 3) == 0 ||
            strcmp(type, "c_size_t") == 0;
@@ -312,7 +312,8 @@ static struct bind_eval converted(struct eval *e, struct bind_eval v,
                                   const char *type)
 {
     if (is_float_type(type) && v.kind == BIND_EVAL_INT) {
-        v.f = is_unsigned_type(v.type) ? (double)(uint64_t)v.i : (double)v.i;
+        v.f = bind_is_unsigned_type(v.type) ? (double)(uint64_t)v.i
+                                            : (double)v.i;
     } else if (!is_float_type(type) && v.kind == BIND_EVAL_FLOAT) {
         if (!(v.f > -9223372036854775808.0 && v.f < 9223372036854775808.0)) {
             fail(e);
@@ -521,7 +522,7 @@ static struct bind_eval apply(struct eval *e, struct bind_eval a,
     {
         uint64_t x = (uint64_t)a.i;
         uint64_t y = (uint64_t)b.i;
-        bool is_unsigned = is_unsigned_type(type);
+        bool is_unsigned = bind_is_unsigned_type(type);
         switch (op[0]) {
         case '*': x *= y; break;
         case '/':
@@ -701,7 +702,7 @@ bool bind_eval_const(struct bind_module *b, const char *name,
             bind_anti_name(v->enum_value, &value);
         } else {
             c->type = v->type;
-            if (is_unsigned_type(v->type)) {
+            if (bind_is_unsigned_type(v->type)) {
                 text_appendf(&value, "%llu", (unsigned long long)v->i);
             } else {
                 text_appendf(&value, "%lld", (long long)v->i);

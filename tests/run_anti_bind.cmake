@@ -293,6 +293,18 @@ elseif(CASE STREQUAL "words")
     expect_file("${WORK}/warnings" "${BIND}/words.warnings")
     compile_binding(words bindtest.words)
     compare_probes(words "${BIND}")
+elseif(CASE STREQUAL "unsigned_bitfield")
+    # A bitfield of one bit of size_t holds 1, so the two probes set it and
+    # agree, as for every unsigned type. M339 of docs/audit/summary.md.
+    run("${ANTI}" bind --clang "${BIND}/bits.h" --module bindtest.bits
+        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/probe_bits.c" probe)
+    string(FIND "${probe}" "dump(\"Bits.one\"" at)
+    if(at EQUAL -1)
+        message(FATAL_ERROR "the probe sets no Bits.one\n${probe}")
+    endif()
+    compile_binding(bits bindtest.bits)
+    compare_probes(bits "${BIND}")
 elseif(CASE STREQUAL "escaped_path")
     # A path given with a backslash, as every native path of Windows is.
     # clang escapes it in the line markers of `-E`, and the macros of the
