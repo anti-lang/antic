@@ -598,7 +598,7 @@ int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
     /* The first frame is the one of anti_rt_trace_walk, which the trace
        leaves out. */
     for (depth = 0; count < room; depth++) {
-#if defined(_M_ARM64)
+#if defined(ANTI_RT_ARM64)
         DWORD64 pc = context.Pc;
         DWORD64 sp = context.Sp;
 #else
@@ -622,7 +622,7 @@ int64_t anti_rt_trace_walk(uint64_t *into, int64_t room, int64_t skip)
         }
         RtlVirtualUnwind(UNW_FLAG_NHANDLER, base, pc, entry, &context, &data,
                          &establisher, NULL);
-#if defined(_M_ARM64)
+#if defined(ANTI_RT_ARM64)
         if (context.Sp <= sp) {
             break;
         }

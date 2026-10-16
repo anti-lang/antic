@@ -29,11 +29,10 @@ _Noreturn void anti_rt_windows_start(int (*program)(int, char **));
 #endif
 
 /* The architecture the runtime is compiled for, as a name of the layer.
-   clang names it the same on every system, and MSVC by names of its
-   own. */
-#if defined(__x86_64__) || defined(_M_X64)
+   clang names it the same on every system. */
+#if defined(__x86_64__)
 #define ANTI_RT_X86_64 1
-#elif defined(__aarch64__) || defined(_M_ARM64)
+#elif defined(__aarch64__)
 #define ANTI_RT_ARM64 1
 #endif
 
