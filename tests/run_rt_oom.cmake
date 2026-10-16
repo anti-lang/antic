@@ -7,6 +7,10 @@
 #   CASES    the cases, separated by commas
 #   WORK     a directory this run writes into
 # A case without a count below gives any count of bytes.
+#
+# DESIGN: abort() of the C runtime that the programs of the tests link on
+# Windows ends the process with the status 3, where the runtime of an Anti
+# program fails fast. A case there expects that status and the message.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -28,6 +32,10 @@ foreach(case IN LISTS cases)
     else()
         set(message ERR_MATCH "^anti: out of memory for [0-9]+ bytes\n$")
     endif()
-    program_expect("rt_oom_${case}" COMMAND "${PROGRAM}" ${case} ABORTS
+    set(ends ABORTS)
+    if(CMAKE_HOST_WIN32)
+        set(ends STATUS 3)
+    endif()
+    program_expect("rt_oom_${case}" COMMAND "${PROGRAM}" ${case} ${ends}
                    ${message})
 endforeach()
