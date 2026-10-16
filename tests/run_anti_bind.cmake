@@ -5,8 +5,8 @@
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
 #   CASE      header, clang, escaped_path, raymath, raylib, api, refusals,
-#             api_malformed, clang_malformed, ast_malformed or
-#             clang_of_the_tree
+#             api_malformed, clang_malformed, ast_malformed,
+#             api_typedef_chain, clang_typedef_chain or clang_of_the_tree
 #   SOURCES   tests/clib, for the case header
 #   DUMP      tests/dump, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -117,6 +117,50 @@ function(expect_calls name include program expected)
     if(NOT status EQUAL 0 OR NOT got STREQUAL wanted)
         file(READ "${WORK}/calls.out" text)
         message(FATAL_ERROR "the calls of ${name} printed\n${text}")
+    endif()
+endfunction()
+
+# A clang of the shell in WORK/fake that answers --version with the file
+# version, -E with the file pre and the read of the AST with the file ast,
+# and a copy of anti outside the checkout, which runs it. Sets h to the
+# empty header WORK/fake.h and fake to the command that binds it.
+function(fake_clang)
+    file(MAKE_DIRECTORY "${WORK}/bin" "${WORK}/fake")
+    file(COPY_FILE "${ANTI}" "${WORK}/bin/anti")
+    file(CHMOD "${WORK}/bin/anti" PERMISSIONS OWNER_READ OWNER_WRITE
+         OWNER_EXECUTE)
+    set(h "${WORK}/fake.h")
+    file(WRITE "${h}" "")
+    file(WRITE "${WORK}/fake/clang" "#!/bin/sh
+d=`dirname \"$0\"`
+for a in \"$@\"; do
+    case \"$a\" in
+    --version) cat \"$d/version\"; exit 0 ;;
+    -print-resource-dir) echo \"$d\"; exit 0 ;;
+    -E) cat \"$d/pre\"; exit 0 ;;
+    esac
+done
+cat \"$d/ast\"
+")
+    file(CHMOD "${WORK}/fake/clang" PERMISSIONS OWNER_READ OWNER_WRITE
+         OWNER_EXECUTE)
+    set(h "${h}" PARENT_SCOPE)
+    set(fake "${CMAKE_COMMAND}" -E env "PATH=${WORK}/fake:$ENV{PATH}"
+        "${WORK}/bin/anti" bind --clang "${h}" --module bindtest.fake
+        -o "${WORK}/out" --runtime "${RUNTIME}" PARENT_SCOPE)
+endfunction()
+
+# Fail unless the command ends with 0 inside 30 seconds and its standard
+# error holds warning.
+function(expect_bound_in_time warning)
+    execute_process(COMMAND ${ARGN} TIMEOUT 30
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    string(REGEX REPLACE "[ \n]+" " " said "${err}")
+    string(FIND "${said}" "${warning}" at)
+    if(NOT status EQUAL 0 OR at EQUAL -1)
+        message(FATAL_ERROR "${ARGN} did not end with `${warning}`: "
+                            "${status}\n${out}${err}")
     endif()
 endfunction()
 
@@ -498,28 +542,7 @@ elseif(CASE STREQUAL "ast_malformed")
     # nested deep, an AST whose values have the wrong kinds and a chain
     # of typedefs that the dump of a real clang nests. The copy of anti
     # stands outside the checkout, so it runs the clang of fake.
-    file(MAKE_DIRECTORY "${WORK}/bin" "${WORK}/fake")
-    file(COPY_FILE "${ANTI}" "${WORK}/bin/anti")
-    file(CHMOD "${WORK}/bin/anti" PERMISSIONS OWNER_READ OWNER_WRITE
-         OWNER_EXECUTE)
-    set(h "${WORK}/fake.h")
-    file(WRITE "${h}" "")
-    file(WRITE "${WORK}/fake/clang" "#!/bin/sh
-d=`dirname \"$0\"`
-for a in \"$@\"; do
-    case \"$a\" in
-    --version) cat \"$d/version\"; exit 0 ;;
-    -print-resource-dir) echo \"$d\"; exit 0 ;;
-    -E) cat \"$d/pre\"; exit 0 ;;
-    esac
-done
-cat \"$d/ast\"
-")
-    file(CHMOD "${WORK}/fake/clang" PERMISSIONS OWNER_READ OWNER_WRITE
-         OWNER_EXECUTE)
-    set(fake "${CMAKE_COMMAND}" -E env "PATH=${WORK}/fake:$ENV{PATH}"
-        "${WORK}/bin/anti" bind --clang "${h}" --module bindtest.fake
-        -o "${WORK}/out" --runtime "${RUNTIME}")
+    fake_clang()
     file(WRITE "${WORK}/fake/version"
          "clang version 99999999999999999999.1.0\nTarget: x\n")
     expect_refusal("is clang -1, and bind --clang ${clang_where}" ${fake})
@@ -563,6 +586,54 @@ cat \"$d/ast\"
                      \"type\": {\"qualType\": \"T0\"}}]}]}")
     file(WRITE "${WORK}/fake/ast" "${ast}")
     expect_refusal("`Packed` is packed to more than one byte" ${fake})
+elseif(CASE STREQUAL "api_typedef_chain")
+    # M312. Thirty aliases, each of which names the one before it three
+    # times. The reader resolves each alias once, where it took 3^30
+    # parses for the parameter of type F30 and did not end. The function
+    # is left out at its first parameter, before the writer spells the
+    # second.
+    set(aliases "{\"name\": \"F0\", \"type\": \"long double\"}")
+    foreach(i RANGE 1 30)
+        math(EXPR before "${i} - 1")
+        string(APPEND aliases ",\n{\"name\": \"F${i}\", \"type\": "
+               "\"F${before} (*)(F${before}, F${before})\"}")
+    endforeach()
+    file(WRITE "${WORK}/chain.json" "{\"functions\": [{\"name\": \"k\",
+        \"returnType\": \"void\", \"params\": [
+        {\"name\": \"x\", \"type\": \"long double\"},
+        {\"name\": \"t\", \"type\": \"F30\"}]}],
+        \"aliases\": [${aliases}]}")
+    expect_bound_in_time("`k` is left out: Anti has no form for the type of a parameter"
+        "${ANTI}" bind "${WORK}/chain.json" --module bindtest.chain
+        -o "${WORK}/out")
+elseif(CASE STREQUAL "clang_typedef_chain")
+    # M312. Forty typedefs, each of which names the one before it three
+    # times. A real clang nests the whole chain in the dump of every
+    # typedef, so a clang of the shell writes the AST. The reader resolves
+    # each typedef once, where it took 3^40 parses for the parameter of
+    # type F40 and did not end.
+    fake_clang()
+    file(WRITE "${WORK}/fake/version"
+         "clang version ${CLANG_VERSION}\nTarget: x\n")
+    file(WRITE "${WORK}/fake/pre" "# 1 \"${h}\"\n")
+    set(ast "{\"kind\": \"TranslationUnitDecl\", \"inner\": [
+        {\"kind\": \"TypedefDecl\", \"name\": \"F0\",
+         \"type\": {\"qualType\": \"long double\"}}")
+    foreach(i RANGE 1 40)
+        math(EXPR before "${i} - 1")
+        string(APPEND ast ",\n{\"kind\": \"TypedefDecl\", \"name\": \"F${i}\",
+            \"type\": {\"qualType\": \"F${before} (*)(F${before}, F${before})\"}}")
+    endforeach()
+    string(APPEND ast ",\n{\"kind\": \"FunctionDecl\", \"name\": \"k\",
+        \"loc\": {\"file\": \"${h}\", \"line\": 1},
+        \"type\": {\"qualType\": \"void (long double, F40)\"},
+        \"inner\": [{\"kind\": \"ParmVarDecl\", \"name\": \"x\",
+                     \"type\": {\"qualType\": \"long double\"}},
+                    {\"kind\": \"ParmVarDecl\", \"name\": \"t\",
+                     \"type\": {\"qualType\": \"F40\"}}]}]}")
+    file(WRITE "${WORK}/fake/ast" "${ast}")
+    expect_bound_in_time("`k` is left out: Anti has no form for the type of a parameter"
+        ${fake})
 elseif(CASE STREQUAL "clang_of_the_tree")
     # A copy of anti in host/ of a tree whose deps/clang is the pinned
     # clang takes that clang, with no clang on PATH. The tree stands in

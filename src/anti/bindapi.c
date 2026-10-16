@@ -15,6 +15,15 @@ struct api {
     int depth;                  /* of the aliases being resolved */
     const char *unparsed;       /* the first type of an entry that did not
                                    parse, or NULL */
+    struct bind_list resolved;  /* struct resolved * */
+};
+
+/* An alias or a callback once it is resolved, and the type inside it that
+   did not parse, or NULL. */
+struct resolved {
+    const char *name;
+    const struct bind_type *type;
+    const char *unparsed;
 };
 
 static const struct json_value *section(const struct api *a, const char *name)
@@ -90,25 +99,13 @@ static const struct bind_type *function_type(struct api *a,
     return t;
 }
 
-static const struct bind_type *typedef_named(void *context, const char *name)
+/* The type of the alias or the callback of the name, or NULL. */
+static const struct bind_type *alias_type(struct api *a, const char *name)
 {
-    struct api *a = context;
     const struct json_value *alias;
     const struct json_value *callback;
-    struct bind_record *r = record_of(a, name);
     size_t i;
 
-    if (r != NULL) {
-        struct bind_type *t = bind_type_new(a->b, BIND_RECORD);
-        t->name = r->name;
-        t->record = r;
-        return t;
-    }
-    if (entry_named(a, "enums", name) != NULL) {
-        struct bind_type *t = bind_type_new(a->b, BIND_ENUM);
-        t->name = bind_strdup(a->b, name);
-        return t;
-    }
     callback = entry_named(a, "callbacks", name);
     if (callback != NULL) {
         const struct bind_type *f = function_type(a, callback);
@@ -147,6 +144,61 @@ static const struct bind_type *typedef_named(void *context, const char *name)
         }
     }
     return NULL;
+}
+
+static const struct bind_type *typedef_named(void *context, const char *name)
+{
+    struct api *a = context;
+    struct bind_record *r = record_of(a, name);
+    struct resolved *k = NULL;
+    const struct bind_type *type;
+    const char *before = a->unparsed;
+    size_t i;
+
+    if (r != NULL) {
+        struct bind_type *t = bind_type_new(a->b, BIND_RECORD);
+        t->name = r->name;
+        t->record = r;
+        return t;
+    }
+    if (entry_named(a, "enums", name) != NULL) {
+        struct bind_type *t = bind_type_new(a->b, BIND_ENUM);
+        t->name = bind_strdup(a->b, name);
+        return t;
+    }
+    /* DESIGN: an alias or a callback is resolved once, and every use
+       takes the same type and the same type that did not parse, by M312.
+       An alias that names the one before it three times, thirty deep,
+       asked for 3^30 parses. The types are never changed once made, so
+       the uses share one. An alias that names itself is resolved again
+       at every level until the bound of parse, and the outermost
+       resolution is the one kept. */
+    for (i = 0; i < a->resolved.count; i++) {
+        struct resolved *done = a->resolved.items[i];
+        if (strcmp(done->name, name) == 0) {
+            if (a->unparsed == NULL) {
+                a->unparsed = done->unparsed;
+            }
+            return done->type;
+        }
+    }
+    a->unparsed = NULL;
+    type = alias_type(a, name);
+    for (i = 0; k == NULL && i < a->resolved.count; i++) {
+        struct resolved *done = a->resolved.items[i];
+        if (strcmp(done->name, name) == 0) {
+            k = done;
+        }
+    }
+    if (k == NULL) {
+        k = arena_alloc(&a->b->arena, sizeof *k);
+        k->name = bind_strdup(a->b, name);
+        bind_list_add(&a->resolved, k);
+    }
+    k->type = type;
+    k->unparsed = a->unparsed;
+    a->unparsed = before != NULL ? before : k->unparsed;
+    return type;
 }
 
 static struct bind_record *record_named(void *context, const char *tag,
@@ -601,6 +653,8 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
     a.b = b;
     a.root = tree.root;
     a.depth = 0;
+    a.unparsed = NULL;
+    memset(&a.resolved, 0, sizeof a.resolved);
     ok = tree.root->kind == JSON_OBJECT &&
          json_get(tree.root, "functions") != NULL;
     if (!ok) {
@@ -612,5 +666,6 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
     ok = ok && read_structs(&a) && read_enums(&a) && read_functions(&a) &&
          read_defines(&a);
     json_free(&tree);
+    free(a.resolved.items);
     return ok;
 }

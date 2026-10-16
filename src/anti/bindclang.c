@@ -238,6 +238,11 @@ struct typedef_entry {
     const char *c_type;         /* the qualType of the typedef */
     const char *owned_id;       /* the id of a record or enum it names */
     int depth;                  /* the resolution in progress */
+    /* The type the qualType names, kept while the generation of the
+       reader is the one it was resolved in. */
+    const struct bind_type *type;
+    bool resolved;
+    size_t resolved_in;
 };
 
 struct enum_entry {
@@ -291,6 +296,9 @@ struct reader {
     /* The target keeps an enum whose values pass INT64_MAX an int, with
        the bits of the values, as the ABI of Windows does. */
     bool int_enums;
+    /* The count of the changes to what a spelling names: a tag, a record
+       defined, an enum, the name of one and a typedef. */
+    size_t generation;
 };
 
 static void refuse(struct reader *r, const char *format, ...)
@@ -431,6 +439,14 @@ static const struct bind_type *typedef_named(void *context, const char *name)
             return bt;
         }
     }
+    /* DESIGN: a typedef is resolved once while nothing it may name
+       changes, and every use takes the same type, by M312. A typedef that
+       names the one before it three times, forty deep, asked for 3^40
+       parses. The types are never changed once made, so the uses share
+       one. */
+    if (t->resolved && t->resolved_in == r->generation) {
+        return t->type;
+    }
     /* A typedef that names itself through others would recurse without
        end. */
     if (t->depth > 0) {
@@ -439,6 +455,9 @@ static const struct bind_type *typedef_named(void *context, const char *name)
     t->depth++;
     type = parse(r, t->c_type);
     t->depth--;
+    t->type = type;
+    t->resolved = true;
+    t->resolved_in = r->generation;
     return type;
 }
 
@@ -744,6 +763,7 @@ static struct bind_record *declare_record(struct reader *r,
         t->record = rec;
         bind_list_add(&r->tags, t);
         bind_list_add(&r->b->records, rec);
+        r->generation++;
     }
     rec = t->record;
     if (id != NULL && (complete || t->id == NULL)) {
@@ -753,6 +773,7 @@ static struct bind_record *declare_record(struct reader *r,
         return rec;
     }
     rec->complete = true;
+    r->generation++;
     {
         struct text c_name = {0};
         if (json_get(node, "name") != NULL) {
@@ -853,6 +874,7 @@ static void declare_enum(struct reader *r, const struct json_value *node)
         e->base = low >= 0 && high <= 0xFFFFFFFFll ? "c_uint" : "c_longlong";
     }
     bind_list_add(&r->enums, entry);
+    r->generation++;
 }
 
 static void declare_typedef(struct reader *r, const struct json_value *node)
@@ -878,6 +900,7 @@ static void declare_typedef(struct reader *r, const struct json_value *node)
         }
     }
     bind_list_add(&r->typedefs, t);
+    r->generation++;
 }
 
 /* A typedef of the header names the anonymous record or enum it owns. */
@@ -906,6 +929,7 @@ static void name_owned(struct reader *r, const struct json_value *node)
     if (e != NULL && e->e->name == NULL) {
         e->e->name = bind_strdup(r->b, name);
         e->e->c_name = e->e->name;
+        r->generation++;
     }
 }
 
