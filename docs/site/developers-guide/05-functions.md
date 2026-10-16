@@ -1198,20 +1198,21 @@ fn caller()
 
 A snapshot is a record: its size in bytes first, then one field per captured variable. The function reads its captures from that record, which it receives as its context.
 
-For an `own fn` the record lives on the heap. Lowering computes the size of the record plus the length of every captured `str` and calls `anti_rt_snapshot_new` for the block. It copies each `str` behind the record with `anti_rt_snapshot_text`. The snapshot therefore owns the bytes of its texts and does not depend on the `str` it was made from.
+For an `own fn` the record lives on the heap. Lowering computes the size of the record plus the length of every captured `str` and one byte for its NUL, and calls `anti_rt_snapshot_new` for the block. It copies each `str` and a NUL behind the record with `anti_rt_snapshot_text`. The snapshot therefore owns the bytes of its texts and does not depend on the `str` it was made from, and the `ptr` of each text is a C string, as for every `str`.
 
 ```ir excerpt=snap target=linux-x86_64 mode=release
     %16 = add i64 size_of main.0.snapshot, %15
-    %17 = call ptr @anti_rt_snapshot_new(%16)
-    %18 = ptradd %17, offset_of main.0.snapshot.name
+    %17 = add i64 %16, 1
+    %18 = call ptr @anti_rt_snapshot_new(%17)
+    %19 = ptradd %18, offset_of main.0.snapshot.name
 ...
-    call void @anti_rt_snapshot_text(%17, size_of main.0.snapshot, %21, %20)
-    store i64 size_of main.0.snapshot, %18
+    call void @anti_rt_snapshot_text(%18, size_of main.0.snapshot, %22, %21)
+    store i64 size_of main.0.snapshot, %19
 ...
-    %24 = ptradd %17, offset_of main.0.snapshot.scale
+    %26 = ptradd %18, offset_of main.0.snapshot.scale
 ```
 
-`%15` is the length of `name`. `%16` is the size of the record plus that length, and `%17` the new block. `anti_rt_snapshot_text` copies the bytes of `name` to the offset where the record ends. The `store` writes that offset into the field of `name`, in place of a pointer, so the block can be copied byte by byte. `%24` is the field of `scale`, which takes the value 10.
+`%15` is the length of `name`. `%17` is the size of the record plus that length and its NUL, and `%18` the new block. `anti_rt_snapshot_text` copies the bytes of `name` and a NUL to the offset where the record ends. The `store` writes that offset into the field of `name`, in place of a pointer, so the block can be copied byte by byte. `%26` is the field of `scale`, which takes the value 10.
 
 `anti_rt_snapshot_new` is `malloc`, a write of the size and one atomic add to the count of live snapshots, which a leak check reads. `anti_rt_snapshot_free` is one atomic subtract and `free`. `anti_rt_snapshot_dup` reads the size, calls `anti_rt_snapshot_new` for a block of it and copies the block.
 
