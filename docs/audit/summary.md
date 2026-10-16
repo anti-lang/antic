@@ -205,7 +205,7 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 | S331 | `src/rt/object.c:13` | Two DESIGN comments describe what was replaced: default bodies that walk the field list, and an array field serialized as null. `object.c:710` is the second. | fixed `510d96a7` | rt |
 | S332 | `src/std/anti/log.anti:15` | The header describes a file of `level`, `format` and `[[sink]]` entries with a level each. `first_sink` reads `kind` and `path`, makes one sink and stops at the eighth entry. | fixed `fd716910` | std |
 | S333 | `src/anti/bindmodel.h:168` | `bind_is_keyword` is said to answer for a word the lexer reserves. It answers true for every text that is no identifier, and the reader of a header holds a name to no rule. | fixed `d62c120a` | anti-tool |
-| S334 | `tools/compile.sh:13` | The header says the first build installs the sysroots and raylib. The configure step installs clang and the LLVM tools alone, and a first `./c` stops at `src/native/raylib.cmake:10`. | new | build-and-tools |
+| S334 | `tools/compile.sh:13` | The header says the first build installs the sysroots and raylib. The configure step installs clang and the LLVM tools alone, and a first `./c` stops at `src/native/raylib.cmake:10`. | fixed `ae5f7fe9` | build-and-tools |
 | S335 | `tests/run_codeview_empty.cmake:24` | The test searches the assembly for `DEBUG_S_SYMBOLS` and `S_LPROC32`, spellings of the native back end that antic no longer writes. Both tests pass whatever antic writes. | fixed `06d0f6b6` | build-and-tools |
 
 ## Major
@@ -334,7 +334,7 @@ One-way dependencies, and a part doing the work of another:
   It is keyed on the path of llvm-mc. New. build-and-tools.
 - M327. `tests/CMakeLists.txt:1297`. The raylib source is named by the
   test directory and fetched by no one. The recipe works by the order of
-  two `add_subdirectory` lines. New. build-and-tools.
+  two `add_subdirectory` lines. New. build-and-tools. Fixed `ab89b335`.
 
 Each concern in one place:
 
@@ -351,7 +351,7 @@ Each concern in one place:
   the places of the runtime outside step 3.
 - M331. `tools/release.sh:666`. The release script spells `raylib-6.0`
   beside `tools/raylib-pin`, and no test holds the two together. New.
-  build-and-tools.
+  build-and-tools. Fixed `17e2d89d`.
 - M332. `src/rt/registry.h:12`. Layouts and numbers stand on both sides
   of the runtime contract with no test between them. Seven pairs stand
   outside `rt_abi.h`, and four enums of antic mirror the runtime. New.
@@ -390,7 +390,7 @@ Copies that drifted:
   belong to step 21.
 - M340. `src/native/get-pcre2.cmake:14`. Six fetch scripts are one
   script, and `tools/get-raylib.cmake` has diverged. Two more downloads
-  stand under other names. New. build-and-tools.
+  stand under other names. New. build-and-tools. Fixed `ab89b335`.
 - M341. `tools/check-llvm.cmake:16`. The LLVM tools are listed and
   checked in two places that disagree. A missing llvm-objdump leaves a
   `runtime/bin` without it and no error. New. build-and-tools.
