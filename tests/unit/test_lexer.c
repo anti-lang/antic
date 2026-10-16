@@ -256,8 +256,8 @@ static void format_depth(void)
 }
 
 /* A source of bad bytes gives LEX_ERRORS_MAX errors and one that says the
-   lexer stopped, not one per byte. Errors inside one literal count
-   toward the same cap. */
+   lexer stopped, not one per byte. Errors inside one literal, its
+   placeholders among them, count toward the same cap. */
 static void error_cap(void)
 {
     struct lexed l;
@@ -285,6 +285,35 @@ static void error_cap(void)
     lex_n(&l, source, length);
     CHECK(!l.ok);
     CHECK(l.diags.count == LEX_ERRORS_MAX + 1);
+    done(&l);
+    /* Errors in a run of placeholders count toward the cap as well, and
+       the one past it ends the run, by M306 of docs/audit/summary.md. */
+    memcpy(source, "f\"", 2);
+    for (i = 2; i + 3 < length; i += 3) {
+        memcpy(source + i, "{@}", 3);
+    }
+    source[i] = '"';
+    lex_n(&l, source, i + 1);
+    CHECK(!l.ok);
+    CHECK(l.diags.count == LEX_ERRORS_MAX + 1);
+    if (l.diags.count == LEX_ERRORS_MAX + 1) {
+        CHECK_STR(l.diags.items[LEX_ERRORS_MAX].message,
+                  "more than 100 errors, the lexer stops here");
+    }
+    CHECK(l.tokens.count == 2 && l.tokens.items[0].kind == TOKEN_ERROR);
+    done(&l);
+    /* One placeholder past the cap says once that the lexer stops, and
+       neither the placeholders after it nor the source after the literal
+       is read. */
+    memcpy(source, "f\"{", 3);
+    memset(source + 3, '@', 300);
+    memcpy(source + 303, "}{", 2);
+    memset(source + 305, '@', 300);
+    memcpy(source + 605, "}\" @@@", 6);
+    lex_n(&l, source, 611);
+    CHECK(!l.ok);
+    CHECK(l.diags.count == LEX_ERRORS_MAX + 1);
+    CHECK(l.tokens.count == 2 && l.tokens.items[0].kind == TOKEN_ERROR);
     done(&l);
     free(source);
 }

@@ -172,14 +172,16 @@ struct token_list {
    run with a diagnostic that says so, and the rest of the source is not
    read. A source of bad bytes would otherwise give a diagnostic and a
    token per byte, gigabytes at the cap of the source. Errors inside one
-   literal count toward the same cap and are dropped past it. */
+   literal, those of its `{expr}` placeholders among them, count toward
+   the same cap, and the run stops inside the literal as well. */
 #define LEX_ERRORS_MAX 100
 
-/* Split source into tokens, ending with TOKEN_EOF. Report every error to
-   diags and keep going, so that one run reports all of them. Returns true
-   when no error occurred. The array of out is allocated with realloc,
-   and lexer_token_list_free releases it. The texts of the tokens lie in the
-   memory pool the call names, which frees them. */
+/* Split source into tokens, ending with TOKEN_EOF. Report each error to
+   diags and keep going, up to LEX_ERRORS_MAX errors and the one that says
+   the run stops there. Returns true when no error occurred. The array of
+   out is allocated with realloc, and lexer_token_list_free releases it.
+   The texts of the tokens lie in the memory pool the call names, which
+   frees them. */
 bool lexer_lex(const char *source, size_t length, struct arena *arena,
                struct diagnostics *diags, struct token_list *out);
 

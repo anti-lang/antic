@@ -1260,6 +1260,10 @@ static void placeholder(struct lexer *lx, size_t end, bool raw,
     for (;;) {
         enum token_kind kind;
         size_t before;
+        if (inner.errors > LEX_ERRORS_MAX) {
+            c = -1; /* the run stops, so the placeholder is not read on */
+            break;
+        }
         skip_trivia(&inner);
         c = at(&inner, 0);
         if (c == -1 ||
@@ -1294,6 +1298,9 @@ static void placeholder(struct lexer *lx, size_t end, bool raw,
         piece->spec.bytes = lx->src + from;
         piece->spec.length = inner.pos - from;
     }
+    /* The errors inside count toward the cap of the run, as every other
+       error of the literal does. */
+    lx->errors = inner.errors;
     if (c == -1) {
         error_at(lx, piece->line, piece->column, "unterminated `{` in %s",
                  interpolated_name(raw));
@@ -1372,6 +1379,17 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
     lx->depth++;
     while (lx->pos < end) {
         int c = at(lx, 0);
+
+        /* Past the cap the run stops, so the rest of the literal is
+           skipped and reports nothing more, by M306 of
+           docs/audit/summary.md. */
+        if (lx->errors > LEX_ERRORS_MAX) {
+            valid = false;
+            while (lx->pos < end) {
+                advance(lx);
+            }
+            break;
+        }
 
         if ((c == '{' || c == '}') && at(lx, 1) == c && lx->pos + 1 < end) {
             append_byte(&bytes, (unsigned char)c);
