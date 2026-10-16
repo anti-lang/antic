@@ -115,9 +115,9 @@ struct node {
        `(?(...)yes|no)`. The number of a capturing group, or 0. */
     bool unknown;
     bool conditional;
-    long capture;
-    long min;                   /* NODE_REPEAT, and max -1 for no bound */
-    long max;
+    int64_t capture;
+    int64_t min;                /* NODE_REPEAT, and max -1 for no bound */
+    int64_t max;
     struct pattern_span span;
 };
 
@@ -128,7 +128,7 @@ struct reader {
     struct arena *arena;
     bool caseless;              /* `(?i)` */
     bool extended;              /* `(?x)` */
-    long groups;                /* the capturing groups opened so far */
+    int64_t groups;             /* the capturing groups opened so far */
     bool unsure;                /* `(?|`, `(?n)` or `\K`: no least length */
 };
 
@@ -324,9 +324,9 @@ static void skip_extended(struct reader *r)
 static struct node *parse_alt(struct reader *r);
 
 /* The value of up to nine digits at the position, or -1. */
-static long read_number(struct reader *r)
+static int64_t read_number(struct reader *r)
 {
-    long value = 0;
+    int64_t value = 0;
     int digits = 0;
 
     while (digits < 9 && peek(r, 0) >= 0 &&
@@ -853,8 +853,8 @@ static struct node *parse_atom(struct reader *r)
 static struct node *parse_repeat(struct reader *r, struct node *atom)
 {
     size_t at = r->pos;
-    long min;
-    long max;
+    int64_t min;
+    int64_t max;
     struct node *n;
 
     skip_extended(r);
@@ -1180,23 +1180,28 @@ bool pattern_exponential(const char *bytes, size_t length,
     return found;
 }
 
-/* The value of n times each, capped far below the range of a long. */
-static long times(long n, long each)
-{
-    const long cap = 1L << 30;
+/* DESIGN: a least count stops at LEAST_CAP, far below the range of
+   int64_t, so the product of a repeat and the sum of a sequence are
+   taken against the cap before they are formed. The reader counts in
+   int64_t on every target, so a count does not depend on the width of
+   a `long`, by S303 of docs/audit/summary.md. */
+#define LEAST_CAP (INT64_C(1) << 30)
 
+/* The value of n times each, capped at LEAST_CAP. */
+static int64_t times(int64_t n, int64_t each)
+{
     if (n == 0 || each == 0) {
         return 0;
     }
-    return n > cap / each ? cap : n * each;
+    return n > LEAST_CAP / each ? LEAST_CAP : n * each;
 }
 
 /* The fewest characters n can match. A character is one byte at least,
    so the count is a least count of bytes as well. */
-static long least(const struct node *n)
+static int64_t least(const struct node *n)
 {
-    long total;
-    long one;
+    int64_t total;
+    int64_t one;
     size_t i;
 
     switch (n->kind) {
@@ -1207,8 +1212,8 @@ static long least(const struct node *n)
     case NODE_CAT:
         total = 0;
         for (i = 0; i < n->count; i++) {
-            total += least(n->children[i]);
-            total = total > 1L << 30 ? 1L << 30 : total;
+            one = least(n->children[i]);
+            total = one > LEAST_CAP - total ? LEAST_CAP : total + one;
         }
         return total;
     case NODE_ALT:

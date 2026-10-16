@@ -48,6 +48,7 @@ void test_rt_bounds(void);
 void test_fs(void);
 void test_json(void);
 void test_regex(void);
+void test_pattern(void);
 void test_bind(void);
 void test_deps(void);
 void test_zip(void);
@@ -109,6 +110,7 @@ static const struct group groups[] = {
     {"fs", test_fs},
     {"json", test_json},
     {"regex", test_regex},
+    {"pattern", test_pattern},
     {"bind", test_bind},
     {"deps", test_deps},
     {"zip", test_zip},

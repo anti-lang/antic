@@ -62,6 +62,7 @@ add_executable(antic_unit_tests
     unit/test_fs.c
     unit/test_json.c
     unit/test_regex.c
+    unit/test_pattern.c
     unit/test_bind.c
     unit/test_deps.c
     unit/test_zip.c
