@@ -131,8 +131,11 @@ pub class CallbackSink inherits Sink
 /// collect them.
 ///
 /// A name, a level and a format stand here, because every logger carries them
-/// and `log.logger().level` reads and writes one. `SinkLogger` is the default,
-/// which writes through a `Sink`.
+/// and `log.logger().level` reads and writes one. Every thread that writes a
+/// line reads the three with no lock, so a program writes them before it starts
+/// the threads that log. A change while those threads run is a new logger given
+/// to `log.set`, and the old one is deleted once they stopped. `SinkLogger` is
+/// the default, which writes through a `Sink`.
 pub abstract class Logger
 {
 	/// The name that every line of this logger carries.
