@@ -101,8 +101,16 @@ static void add(struct anti_toml *doc, struct reader *r, const char *key,
     struct pair *pair;
 
     if (doc->count == doc->capacity) {
-        size_t capacity = doc->capacity == 0 ? 16 : doc->capacity * 2;
-        struct pair *grown = realloc(doc->pairs, capacity * sizeof *grown);
+        size_t capacity;
+        struct pair *grown;
+        /* A room whose double does not fit a size_t in bytes counts as
+           memory that ran out. */
+        if (doc->capacity > SIZE_MAX / 2 / sizeof *grown) {
+            r->failed = 1;
+            return;
+        }
+        capacity = doc->capacity == 0 ? 16 : doc->capacity * 2;
+        grown = realloc(doc->pairs, capacity * sizeof *grown);
         if (grown == NULL) {
             r->failed = 1;
             return;
