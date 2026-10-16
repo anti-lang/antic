@@ -336,7 +336,7 @@ Every hook site calls the installed handler and then the object's own hook. `lea
 | `ChangeJournal` | `changed` | the last 64 writes, as class and field |
 | `Composite` | all nine | up to 8 handlers, called in order |
 
-Each has `new()` and, apart from `Composite` and `CallLogger`, a `report()` that prints to standard error. `trace.install("leaks,profile")` builds the handlers a text names and installs them. The names are `leaks`, `profile`, `calls`, `errors`, `threads` and `writes`. A name past the eighth of a list writes a line to standard error and is left out, as an unknown name is. `trace.start()` does the same with the runtime key `trace`, so `--anti.trace=leaks` chooses the handler when the program starts. The program makes the call, and no handler is installed without it.
+Each has `new()` and, apart from `Composite` and `CallLogger`, a `report()` that prints to standard error. A handler runs on the thread of each hook site, so its counts are atomic and a `Mutex` guards each of its tables. `trace.install("leaks,profile")` builds the handlers a text names and installs them. The names are `leaks`, `profile`, `calls`, `errors`, `threads` and `writes`. A name past the eighth of a list writes a line to standard error and is left out, as an unknown name is. `trace.start()` does the same with the runtime key `trace`, so `--anti.trace=leaks` chooses the handler when the program starts. The program makes the call, and no handler is installed without it.
 
 ```anti
 //! name: traced
