@@ -14,7 +14,7 @@
 # session, which a user may take for part of the release, or a file the
 # manifest forgot, which no pin can reach. The check refuses both before
 # anything is uploaded.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 if(NOT DEFINED DIR)
     message(FATAL_ERROR "usage: cmake -DDIR=<directory> -DREMOTE=<dest> "

@@ -10,7 +10,7 @@
 # first export of the release script, which configures a build directory
 # that no earlier run filled. The order is what decides it, so the order
 # is what this reads.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 if(NOT DEFINED ROOT)
     message(FATAL_ERROR "usage: cmake -DROOT=<repository> "

@@ -7,6 +7,8 @@
 #   cmake -DROOT=<repository> -DRAYLIB=<raylib release>
 #         -DMINIAUDIO=<miniaudio release> -P tests/run_raylib_miniaudio_pin.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 function(read_pin out file key)
     file(STRINGS "${file}" line REGEX "^${key}=")
     string(REGEX REPLACE "^${key}=" "" value "${line}")

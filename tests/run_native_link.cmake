@@ -11,6 +11,8 @@
 #   TARGET    the target name
 #   OPTIONS   optional options of antic, separated by commas
 
+cmake_minimum_required(VERSION 3.21)
+
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(program "${SOURCE}" NAME_WE)
 set(exe "${WORK}/${program}-${TARGET}")

@@ -18,7 +18,7 @@
 # A static musl program names no version at all and passes with nothing to
 # report. LISTING reads a saved listing instead of running READOBJ, for the
 # test that shows a refusal, since no program of this tree needs a glibc.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 if(NOT DEFINED MAX_GLIBC)
     set(MAX_GLIBC "2.35")

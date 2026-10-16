@@ -20,7 +20,7 @@
 # carries it since the step glibc of docs/work-order-distribution.md. The
 # check reads that directory as it reads the target's own, so a package
 # without one glibc level is refused like one without a musl level.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 if(NOT DEFINED LEVELS OR (NOT DEFINED ARCHIVE AND NOT DEFINED TREE))
     message(FATAL_ERROR "usage: cmake -DARCHIVE=<file> -DLEVELS=<file> "

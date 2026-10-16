@@ -39,7 +39,7 @@
 # it and runs nothing of it but antic and anti, so no script and no pin
 # travels with it. Eddie decided this on 2026-10-08, in decision 7 of
 # docs/work-order-distribution.md.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 set(needed DEST SYSROOT RUNTIME HOSTS)
 if(NOT DEFINED ANTIC)

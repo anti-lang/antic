@@ -6,7 +6,7 @@
 # CMake downloads, checks the digest and unpacks the archive itself, so the
 # same script runs on macOS, Linux and Windows without a shell. An archive
 # already in <dir> with the pinned digest is not downloaded again.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 if(NOT DEFINED DEST)
     message(FATAL_ERROR "usage: cmake -DDEST=<dir> -P src/native/get-mimalloc.cmake")

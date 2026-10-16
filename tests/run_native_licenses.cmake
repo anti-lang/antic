@@ -7,6 +7,8 @@
 #   cmake -DROOT=<repository> -DRUNTIME=<runtime tree>
 #         -DNAMES=<name>[,<name>] -P tests/run_native_licenses.cmake
 
+cmake_minimum_required(VERSION 3.21)
+
 string(REPLACE "," ";" names "${NAMES}")
 if(names STREQUAL "")
     message(FATAL_ERROR "NAMES lists no native library")

@@ -10,7 +10,7 @@
 # machine that linked it. This reads both ends and refuses a pair that
 # does not match: the record names the PDB beside it, and the GUID of the
 # record is the GUID the PDB carries in its info stream.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 foreach(name BINARY PDB READOBJ)
     if(NOT DEFINED ${name})

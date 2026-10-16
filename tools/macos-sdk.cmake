@@ -16,7 +16,7 @@
 # not link". The digest of libSystem.tbd catches an SDK that changed
 # under the same name. The pin moves with the pinned LLVM and not before,
 # which docs/toolchain-later.md holds.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 # The default directory of the SDKs. The Command Line Tools keep every
 # SDK they have installed, while the SDKs directory of Xcode holds the

@@ -1048,6 +1048,11 @@ endif()
 add_test(NAME script_policies
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_script_policies.cmake")
+add_test(NAME script_policies_runner
+    COMMAND "${CMAKE_COMMAND}"
+            "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_script_policies.cmake"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/script-policies"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_script_policies_self.cmake")
 # Anti runs no CI, so no file stands under .github/workflows/.
 add_test(NAME no_workflows
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
