@@ -1237,8 +1237,7 @@ static void library_name(const struct options *o, const char *module,
         text_append(out, modpath_last(module));
         return;
     }
-    base = strrchr(o->output, '/');
-    base = base != NULL ? base + 1 : o->output;
+    base = platform_file_name(o->output);
     if (target_info(o->target)->format != FORMAT_COFF &&
         strncmp(base, "lib", 3) == 0) {
         base += 3;
@@ -1443,12 +1442,9 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     if (o->lib != LIB_NONE && !o->assembly_only) {
-        const char *slash = strrchr(o->output != NULL ? o->output : o->input,
-                                    '/');
         const char *from = o->output != NULL ? o->output : o->input;
-        if (slash != NULL) {
-            text_appendf(base, "%.*s/", (int)(slash - from), from);
-        }
+        text_append_bytes(base, from,
+                          (size_t)(platform_file_name(from) - from));
         text_append(base, text_cstr(&extras->name));
     } else if (o->output != NULL) {
         text_append(base, o->output);

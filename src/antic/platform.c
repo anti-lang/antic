@@ -991,6 +991,13 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
 
 #endif
 
+const char *platform_file_name(const char *path)
+{
+    const char *cut = platform_last_separator(path);
+
+    return cut != NULL ? cut + 1 : path;
+}
+
 bool self_directory(struct text *out)
 {
     struct text path = {0};

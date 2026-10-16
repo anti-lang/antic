@@ -383,8 +383,7 @@ static bool host_exports(const struct options *o, const char *object,
                          struct text *def, struct text *implib)
 {
     const char *suffix = target_info(o->target)->executable_suffix;
-    const char *slash = strrchr(executable, '/');
-    const char *file = slash != NULL ? slash + 1 : executable;
+    const char *file = platform_file_name(executable);
     size_t n = strlen(executable);
     struct text library = {0};
     struct text bytes = {0};

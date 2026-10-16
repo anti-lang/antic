@@ -53,6 +53,12 @@ bool path_relative(struct text *out, const char *path, const char *directory);
    none: `/` on every host, and `\` as well on Windows. */
 const char *platform_last_separator(const char *path);
 
+/* The file name of path, after its last separator by
+   platform_last_separator, or path itself when it has none. Every part of
+   antic and anti that splits a path takes this or that function, so a
+   Windows path splits at `\` everywhere, M335. */
+const char *platform_file_name(const char *path);
+
 /* The separator of the paths the host's own programs read: `\` on
    Windows and `/` elsewhere. */
 char platform_separator(void);

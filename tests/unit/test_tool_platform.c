@@ -154,7 +154,8 @@ static void write_all(const char *path, const char *bytes, size_t n)
 }
 
 /* Every case of path_rules.h, which the platform layer of the runtime
-   answers the same way. */
+   answers the same way. The file name of a path follows its last
+   separator. */
 static void path_rules_of_host(void)
 {
     size_t i;
@@ -166,6 +167,8 @@ static void path_rules_of_host(void)
         CHECK(path_is_absolute(r->path) == (r->absolute != 0));
         CHECK(r->separator < 0 ? last == NULL
                                : last == r->path + r->separator);
+        CHECK(platform_file_name(r->path) ==
+              (r->separator < 0 ? r->path : r->path + r->separator + 1));
     }
 }
 

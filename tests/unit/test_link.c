@@ -179,6 +179,64 @@ static void strips_debug(void)
     }
 }
 
+/* The separator of the paths the host's own programs read, `\` on
+   Windows and `/` elsewhere. */
+#if defined(_WIN32)
+#define HOST_SEP "\\"
+#else
+#define HOST_SEP "/"
+#endif
+
+/* An output path written with the separator of the host splits at it.
+   The PDB and the import library of a Windows link stand beside the
+   output, a dot in the name of a directory is no suffix, and the install
+   name of a macOS library and the soname of a Linux one are the file
+   name alone. A Windows path split at `/` alone gave the PDB
+   out\dir.pdb and the soname with its directories, M335. */
+static void host_separators(void)
+{
+    struct shared_options none = {NULL, NULL, NULL, NULL, false};
+    struct shared_options soname = {NULL, "2", "2.0.1", NULL, false};
+    struct link_inputs in;
+    struct link_command c;
+    struct text out = {0};
+
+    link_pdb_path(&out, "out" HOST_SEP "dir.v2" HOST_SEP "app");
+    CHECK_STR(text_cstr(&out), "out" HOST_SEP "dir.v2" HOST_SEP "app.pdb");
+    text_free(&out);
+    link_pdb_path(&out, "dir.v2" HOST_SEP "app.exe");
+    CHECK_STR(text_cstr(&out), "dir.v2" HOST_SEP "app.pdb");
+    text_free(&out);
+
+    in = lld_windows_inputs;
+    in.object = "geo.obj";
+    in.executable = "dir.v2" HOST_SEP "geo";
+    in.cpu = cpu_default(TARGET_WINDOWS_X86_64);
+    link_shared_command(&c, TARGET_WINDOWS_X86_64, &in, &none);
+    CHECK(holds(&c, "/PDB:dir.v2" HOST_SEP "geo.pdb"));
+    CHECK(holds(&c, "/IMPLIB:dir.v2" HOST_SEP "geo.lib"));
+    link_command_free(&c);
+
+    in = lld_inputs;
+    in.object = "geo.o";
+    in.executable = "out" HOST_SEP "libgeo.dylib";
+    in.extra_count = 0;
+    in.cpu = cpu_default(TARGET_MACOS_ARM64);
+    link_shared_command(&c, TARGET_MACOS_ARM64, &in, &none);
+    CHECK(holds(&c, "@rpath/libgeo.dylib"));
+    link_command_free(&c);
+
+    in = lld_inputs;
+    in.object = "geo.o";
+    in.executable = "out" HOST_SEP "libgeo.so.2";
+    in.extra_count = 0;
+    in.cpu = cpu_default(TARGET_LINUX_X86_64);
+    link_shared_command(&c, TARGET_LINUX_X86_64, &in, &soname);
+    CHECK(holds(&c, "-soname"));
+    CHECK(holds(&c, "libgeo.so.2"));
+    link_command_free(&c);
+}
+
 /* A Windows link runs in the directory of its output, and names each
    path relative to that directory. Two paths on different roots have no
    relative path. */
@@ -1020,6 +1078,7 @@ void test_link(void)
     strips_debug();
     relative_paths();
     pdb_names();
+    host_separators();
     runtime_entry();
     runtime_markers();
     runtime_licence(ANTIC_SOURCE_DIR "/src/rt/LICENSE");

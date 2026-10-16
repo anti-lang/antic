@@ -47,6 +47,14 @@
 #   output_dev_library    -o beside --dev with a library file as the input
 #   output_plugin         -o of a plugin without a directory: the index
 #                         stands beside the library and names it
+#   output_native_library -o with the separators of the host, `\` on
+#                         Windows: every file of a static library, of a
+#                         Linux library of --soname and of a Windows DLL
+#                         stands in the directory of the output
+#   output_native_plugin  -o of a plugin and, on Windows, of its host with
+#                         the separators of the host: the index names the
+#                         plugin by its file name, and the .def file of
+#                         the host names the program alone
 #   linker_lld            --linker lld beside the default
 #   windows_library_reproducible
 #                         two links of one Windows library write the same
@@ -642,6 +650,72 @@ if(CASE STREQUAL "output_dev_library")
     return()
 endif()
 
+# DESIGN: these two cases name the output as the host's own programs
+# write a path, which on Windows separates with `\`. The driver split a
+# path at `/` alone, so there the files of a library went to the working
+# directory and the index and the .def file named the directories, M335.
+if(CASE STREQUAL "output_native_library")
+    library_in(native)
+    file(MAKE_DIRECTORY "${WORK}/native/sub/dir.v2")
+    file(TO_NATIVE_PATH "sub/other.a" static)
+    antic_in(native --lib static --target linux-x86_64 -o "${static}"
+             named.anti)
+    wrote(native sub/other.a)
+    wrote(native sub/other.h)
+    if(EXISTS "${RUNTIME}/sysroot/linux-x86_64")
+        file(TO_NATIVE_PATH "sub/libother.so" shared)
+        antic_in(native --lib shared --soname --package-version 2.0.1
+                 --target linux-x86_64 -o "${shared}" named.anti)
+        wrote(native sub/libother.so.2)
+        if(NOT IS_SYMLINK "${WORK}/native/sub/libother.so")
+            message(FATAL_ERROR "sub/libother.so of --soname is no link")
+        endif()
+        file(READ_SYMLINK "${WORK}/native/sub/libother.so" target)
+        if(NOT target STREQUAL "libother.so.2")
+            message(FATAL_ERROR "sub/libother.so links to ${target}")
+        endif()
+    endif()
+    if(EXISTS "${RUNTIME}/sysroot/windows-x86_64")
+        file(TO_NATIVE_PATH "sub/dir.v2/other" dll)
+        antic_in(native --lib shared --target windows-x86_64 -o "${dll}"
+                 named.anti)
+        foreach(file other other.h other.lib other.pdb)
+            wrote(native sub/dir.v2/${file})
+        endforeach()
+    endif()
+    files_of("${WORK}/native" found)
+    if(NOT found STREQUAL "named.anti sub")
+        message(FATAL_ERROR "the libraries left files beside sub: ${found}")
+    endif()
+    return()
+endif()
+if(CASE STREQUAL "output_native_plugin")
+    set(plugins "${SOURCES}/plugin")
+    file(MAKE_DIRECTORY "${WORK}/plugin/sub" "${WORK}/net/example")
+    antic_in(plugin -c -I "${plugins}" -o "${WORK}/net/example/greet.antl"
+             "${plugins}/net/example/greet.anti")
+    set(host "")
+    if(CMAKE_HOST_WIN32)
+        file(MAKE_DIRECTORY "${WORK}/plugin/host")
+        file(TO_NATIVE_PATH "host/host.exe" program)
+        antic_in(plugin -I "${plugins}" -I "${WORK}" -o "${program}"
+                 "${plugins}/host.anti" "${WORK}/net/example/greet.antl")
+        file(STRINGS "${WORK}/plugin/host/host.def" def LIMIT_COUNT 1)
+        if(NOT def STREQUAL "NAME host.exe")
+            message(FATAL_ERROR "the .def file of the host starts with "
+                                "`${def}`")
+        endif()
+        set(host "${WORK}/plugin/host/host.lib")
+    endif()
+    file(TO_NATIVE_PATH "sub/bare.so" plugin)
+    antic_in(plugin --lib shared --no-runtime -I "${plugins}" -I "${WORK}"
+             -o "${plugin}" "${plugins}/net/example/fancy.anti" ${host})
+    wrote(plugin sub/bare.so)
+    wrote(plugin sub/anti-plugins.toml)
+    file(READ "${WORK}/plugin/sub/anti-plugins.toml" index)
+    holds("${index}" "path = 'bare.so'" "the index beside the plugin")
+    return()
+endif()
 if(CASE STREQUAL "output_plugin")
     set(plugins "${SOURCES}/plugin")
     file(MAKE_DIRECTORY "${WORK}/plugin" "${WORK}/net/example")

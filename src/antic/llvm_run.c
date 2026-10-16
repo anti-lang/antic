@@ -6,21 +6,6 @@
 #include "platform.h"
 #include "text.h"
 
-/* The file name of path, after its last separator. Windows takes `\` as
-   well as `/`. */
-static const char *file_name(const char *path)
-{
-    const char *name = path;
-    const char *p;
-
-    for (p = path; *p != '\0'; p++) {
-        if (*p == '/' || *p == '\\') {
-            name = p + 1;
-        }
-    }
-    return name;
-}
-
 /* The most options of llc before its input: the level, the file type,
    the relocation model, the two that split sections, the table of
    significant addresses and the alignment of functions. */
@@ -36,7 +21,7 @@ static const char *file_name(const char *path)
 static int run_llc(const char *llc, const char *const options[LLC_OPTIONS],
                    const char *input, const char *output)
 {
-    const char *name = file_name(output);
+    const char *name = platform_file_name(output);
     struct text directory = {0};
     struct text program = {0};
     struct text absolute = {0};
@@ -62,7 +47,7 @@ static int run_llc(const char *llc, const char *const options[LLC_OPTIONS],
         return process_run(argv);
     }
     text_appendf(&directory, "%.*s", (int)(name - output), output);
-    if (file_name(llc) != llc) {
+    if (platform_file_name(llc) != llc) {
         if (!absolute_path(llc, &program)) {
             goto done;
         }

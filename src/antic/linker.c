@@ -7,6 +7,7 @@
 
 #include "alloc.h"
 #include "ir.h"
+#include "platform.h"
 
 static bool ends_with(const char *s, const char *suffix)
 {
@@ -655,8 +656,7 @@ static void windows_debug(struct link_command *c, const struct link_inputs *in)
    linker names it by default, and stands beside it. */
 void link_pdb_path(struct text *out, const char *executable)
 {
-    const char *slash = strrchr(executable, '/');
-    const char *dot = strrchr(slash != NULL ? slash : executable, '.');
+    const char *dot = strrchr(platform_file_name(executable), '.');
 
     text_appendf(out, "%.*s.pdb",
                  (int)(dot != NULL ? (size_t)(dot - executable)
@@ -669,8 +669,7 @@ void link_pdb_path(struct text *out, const char *executable)
    stands beside it. */
 static void link_import_library_path(struct text *out, const char *library)
 {
-    const char *slash = strrchr(library, '/');
-    const char *dot = strrchr(slash != NULL ? slash : library, '.');
+    const char *dot = strrchr(platform_file_name(library), '.');
 
     text_appendf(out, "%.*s" LINK_COFF_ARCHIVE_SUFFIX,
                  (int)(dot != NULL ? (size_t)(dot - library)
@@ -952,10 +951,8 @@ static void macos_shared(struct link_command *c, enum target t,
 {
     struct text *install = next(c);
     struct text *compat = next(c);
-    const char *base = strrchr(in->executable, '/');
 
-    text_appendf(install, "@rpath/%s",
-                 base != NULL ? base + 1 : in->executable);
+    text_appendf(install, "@rpath/%s", platform_file_name(in->executable));
     text_appendf(compat, "%s.0.0", s->major != NULL ? s->major : "");
     macos_start(c, t, in, true);
     add(c, "-o");
@@ -1002,7 +999,6 @@ static void linux_shared(struct link_command *c, enum target t,
                          const struct text *library, bool glibc)
 {
     const char *linker = program(c, in, t);
-    const char *base = strrchr(in->executable, '/');
 
     add(c, linker);
     if (glibc) {
@@ -1025,7 +1021,7 @@ static void linux_shared(struct link_command *c, enum target t,
     add(c, in->executable);
     if (s->major != NULL) {
         add(c, "-soname");
-        add(c, base != NULL ? base + 1 : in->executable);
+        add(c, platform_file_name(in->executable));
     }
     add_inputs(c, in);
     if (!s->plugin) {

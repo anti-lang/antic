@@ -273,16 +273,13 @@ bool driver_build_c_library(const struct options *o, const char *object,
 {
     const struct target_info *info = target_info(o->target);
     const char *name = text_cstr(&extras->name);
-    const char *slash = strrchr(base, '/');
     struct text dir = {0};
     struct text path = {0};
     struct text header = {0};
     struct text major = {0};
     bool ok;
 
-    if (slash != NULL) {
-        text_appendf(&dir, "%.*s/", (int)(slash - base), base);
-    }
+    text_append_bytes(&dir, base, (size_t)(platform_file_name(base) - base));
     if (o->output != NULL) {
         text_append(&path, o->output);
     } else if (o->lib == LIB_STATIC) {
@@ -440,19 +437,16 @@ bool driver_build_c_library(const struct options *o, const char *object,
         /* DESIGN: with --soname a Linux library is lib<name>.so.<major>,
            and lib<name>.so links to it for the C compiler. */
         if (ok && versioned.length > 0) {
-            const char *link_name = strrchr(text_cstr(&versioned), '/');
-            const char *target =
-                link_name != NULL ? link_name + 1 : text_cstr(&versioned);
-            ok = platform_symlink(target, text_cstr(&path));
+            ok = platform_symlink(platform_file_name(text_cstr(&versioned)),
+                                  text_cstr(&path));
             if (!ok) {
                 fprintf(stderr, "antic: cannot write %s\n", text_cstr(&path));
             }
         }
         if (ok && s.plugin) {
-            const char *file = strrchr(text_cstr(&path), '/');
             ok = driver_write_plugin_index(text_cstr(&dir),
-                                           file != NULL ? file + 1
-                                                        : text_cstr(&path),
+                                           platform_file_name(
+                                               text_cstr(&path)),
                                            text_cstr(&path), &extras->provides);
         }
         driver_link_facts_free(&facts);
