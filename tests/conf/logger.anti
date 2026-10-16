@@ -1,7 +1,7 @@
-//! The logger that the file of `--anti.logger` asks for. The program writes
-//! one line at each of three levels and then `done`. With the argument
-//! `register` it first adds the kinds of sink `first` and `second`, which
-//! write each line to standard output after their name.
+//! The logger that the file of `--anti.logger` asks for. The program writes one
+//! line at each of three levels and then `done`. With the argument `register`
+//! it first adds the kinds of sink `first` and `second`, which write each line
+//! to standard output after their name.
 
 import anti.io;
 import anti.lang;

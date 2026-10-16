@@ -4,12 +4,12 @@
 //! each one by its long name. The help text comes from the same declarations,
 //! so it never falls behind them.
 //!
-//! An option has a long name and one letter. A flag stands for itself and
-//! takes no value, so `--name=value` of a flag fails. An option that takes a
-//! value reads `--name value`, `--name=value`, `-n value` or `-n=value`. A bare
-//! `--` ends the options, and every argument after it is a positional one, as
-//! is any argument that does not start with `-`, `-` alone, and `-` before a
-//! digit that is the letter of no option, such as `-5`. `--help` and `-h` are
+//! An option has a long name and one letter. A flag stands for itself and takes
+//! no value, so `--name=value` of a flag fails. An option that takes a value
+//! reads `--name value`, `--name=value`, `-n value` or `-n=value`. A bare `--`
+//! ends the options, and every argument after it is a positional one, as is any
+//! argument that does not start with `-`, `-` alone, and `-` before a digit
+//! that is the letter of no option, such as `-5`. `--help` and `-h` are
 //! declared for every parser.
 
 import anti.lang;

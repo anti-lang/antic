@@ -1,6 +1,6 @@
-//! `text_of` gives `none` for a name no declaration holds, and the value or
-//! the fallback of a declared option otherwise, an empty one among them. `at`
-//! gives `none` outside the arguments that are no option.
+//! `text_of` gives `none` for a name no declaration holds, and the value or the
+//! fallback of a declared option otherwise, an empty one among them. `at` gives
+//! `none` outside the arguments that are no option.
 import anti.args;
 import anti.io;
 import anti.lang;

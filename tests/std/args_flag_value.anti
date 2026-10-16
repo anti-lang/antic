@@ -1,5 +1,5 @@
-//! A flag given a value with `=` fails with the code `FLAG_WITH_VALUE`, and
-//! the message names the argument.
+//! A flag given a value with `=` fails with the code `FLAG_WITH_VALUE`, and the
+//! message names the argument.
 import anti.args;
 import anti.io;
 import anti.lang;
