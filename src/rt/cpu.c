@@ -1,6 +1,8 @@
-/* The processor check that runs once at start. antic writes the level a
-   program was built for into the object that defines main, and start.c
-   passes it here before it calls main.
+/* The processor check that runs once at start. The build compiles one
+   runtime per target and level, each with ANTI_CPU_LEVEL_ID set to its
+   own level, and antic links a program against the runtime of its level.
+   main of start.c calls the check before anything else runs, and the
+   check reads the level of the runtime it was compiled into.
 
    DESIGN: the check refuses only a machine that is known to be below the
    level. Where a platform has no query for a feature the level needs, the
