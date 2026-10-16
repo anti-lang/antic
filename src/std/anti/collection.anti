@@ -8,6 +8,11 @@
 //! collection fills five functions that reach its elements by place, and each
 //! collection module gives its class `==` through `equal`. `Indexed<T>` is the
 //! base of the collections that reach their elements by a position from 0.
+//!
+//! `NotOne` is the failure of a `_one` form, and `Changed` the failure of a
+//! versioned set. `Snapshot<T>` holds the copies that a walk of a collection
+//! threads share goes through. Both kinds of thread-safe collection import this
+//! module, so each of the three has one definition.
 
 import anti.lang;
 import anti.mem;
@@ -81,6 +86,117 @@ pub class NotOne inherits lang.Error
 	concrete fn destruct(self)
 	{
 		free(self.made);
+	}
+}
+
+/// The failure of `set_if_version`, which found the element changed or gone.
+///
+/// `expected` holds the version the caller read and `found` the version the
+/// element holds now, or -1 when the handle finds no element.
+pub class Changed inherits lang.Error
+{
+	/// The version the caller gave.
+	pub expected: int = 0,
+	/// The version of the element now, or -1 when it is gone.
+	pub found: int = 0,
+	/// The bytes of the message, which the error frees. A copy made with `dup`
+	/// shares them with the error it copies.
+	transient made: ?*byte = none,
+
+	/// The failure of a set that expected `expected` and found `found`.
+	pub fn found_version(expected: int, found: int) -> *Changed
+	{
+		let e = alloc Changed { expected: expected, found: found };
+		let message = "";
+		if found < 0 {
+			message = f"the element of version {expected} is gone";
+		} else {
+			message = f"the element changed from version {expected} to {found}";
+		}
+		e.message = message;
+		e.made = message.ptr;
+		return e;
+	}
+
+	concrete fn destruct(self)
+	{
+		free(self.made);
+	}
+}
+
+/// Copies of the elements of a collection that threads share, taken at one
+/// moment, which `for` walks.
+///
+/// The copies are the walk's own, from the allocator of the collection, and go
+/// back to it when the walk ends. A change of the collection meanwhile does not
+/// reach them.
+pub class Snapshot<T>
+{
+	from: *mem.Allocator,
+	items: ?*T = none,
+	capacity: int = 0,
+	/// The number of copies.
+	pub count: int = 0,
+	at: int = -1,
+
+	/// An empty snapshot whose room comes from `from`.
+	pub fn new(from: *mem.Allocator) -> Snapshot<T>
+	{
+		return Snapshot<T> { from: from };
+	}
+
+	/// Add `x` after the last copy.
+	pub fn add(self, own x: T)
+	{
+		if self.count == self.capacity {
+			self.grow();
+		}
+		let items = self.items catch fatal;
+		items[self.count] = x;
+		self.count += 1;
+	}
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.count;
+	}
+
+	operator fn value(self) -> T
+	{
+		let items = self.items catch fatal;
+		return dup(items[self.at]);
+	}
+
+	/// Twice the room, or 8 for the first, with the copies moved into it as
+	/// bytes.
+	fn grow(self)
+	{
+		let size = room_times(self.capacity, 2);
+		if size == 0 {
+			size = 8;
+		}
+		let room = room_from<T>(self.from, size) catch fatal;
+		if self.count > 0 {
+			memcpy(room as ?*byte, self.items as ?*byte,
+				(self.count * size_of(T)) as c_size_t);
+		}
+		self.from.free(self.items as ?*byte);
+		self.items = room;
+		self.capacity = size;
+	}
+
+	fn destruct(self)
+	{
+		let items = self.items else {
+			return;
+		};
+		let i = 0;
+		while i < self.count do {
+			destroy(&items[i]);
+			i += 1;
+		}
+		self.from.free(items as ?*byte);
 	}
 }
 

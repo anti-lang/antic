@@ -8,6 +8,7 @@
 //! fails once another thread changed the element, and a copy made with `dup`
 //! takes a lock of its own. The totals come out the same on every run.
 
+import anti.collection;
 import anti.collection.pool;
 import anti.collection.synchronized.{SyncPool};
 
@@ -149,7 +150,7 @@ fn main() -> int
 	let job = dispatch &counters -> bump(a);
 	let bumped = join(job);
 	counters.set_if_version(a, 0, version) catch e {
-		let c = e as *pool.Changed;
+		let c = e as *collection.Changed;
 		printf("stale after another thread: %d then %d, found version %d\n".ptr,
 			value as c_int, bumped as c_int, (c.found == version + 1) as c_int);
 	};

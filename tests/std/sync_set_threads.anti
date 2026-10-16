@@ -9,7 +9,7 @@
 //! copy made with `dup` takes a lock of its own. The totals come out the same
 //! on every run.
 
-import anti.collection.pool;
+import anti.collection;
 import anti.collection.synchronized.{SyncSet};
 
 extern fn printf(format: ?*byte, ...) -> c_int;
@@ -159,7 +159,7 @@ fn main() -> int
 	let job = dispatch &s -> swap(-2);
 	let theirs = join(job);
 	s.set_if_version(-2, version) catch e {
-		let c = e as *pool.Changed;
+		let c = e as *collection.Changed;
 		printf("stale after another thread: found theirs %d\n".ptr,
 			(c.found == theirs) as c_int);
 	};

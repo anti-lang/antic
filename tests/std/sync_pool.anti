@@ -146,7 +146,7 @@ fn versions() may fail
 	let (w, second) = p.get_versioned(h) ?? (-1, -1);
 	show(f"versioned: {v} then {w}, versions {first} {second}");
 	p.set_if_version(h, 99, first) catch e {
-		let c = e as *pool.Changed;
+		let c = e as *collection.Changed;
 		show(f"stale: {e.message}, found {c.found}");
 	};
 	let sum = 0;

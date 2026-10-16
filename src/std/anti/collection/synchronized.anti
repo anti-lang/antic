@@ -20,13 +20,12 @@
 //!
 //! Every element carries a version, so a thread can read, compute and write
 //! back only if nothing changed meanwhile. `set_if_version` fails with
-//! `anti.collection.pool.Changed` when the element changed or is gone.
+//! `anti.collection.Changed` when the element changed or is gone.
 //!
 //! `for x in c` walks copies of the elements taken under the lock, so an
 //! element that another thread adds or removes meanwhile is not in the walk.
 
 import anti.collection;
-import anti.collection.concurrent.{Snapshot};
 import anti.collection.list;
 import anti.collection.map as maps;
 import anti.collection.pool;
@@ -186,14 +185,14 @@ pub synchronized class SyncList<T>
 	/// version, so a thread can read, compute and write back only if nothing
 	/// changed meanwhile.
 	///
-	/// It fails with `anti.collection.pool.Changed`, which found version -1,
-	/// and tears `x` down, when no element holds `version`: the element changed
+	/// It fails with `anti.collection.Changed`, which found version -1, and
+	/// tears `x` down, when no element holds `version`: the element changed
 	/// since or is gone.
 	pub fn set_if_version(self, own x: T, version: int) may fail
 	{
 		let at = self.place_of(version);
 		if at < 0 {
-			fail pool.Changed.found_version(version, -1);
+			fail collection.Changed.found_version(version, -1);
 		}
 		self.clock += 1;
 		self.items[at] = (x, self.clock);
@@ -304,9 +303,9 @@ pub synchronized class SyncList<T>
 		});
 	}
 
-	operator fn iter(self) -> Snapshot<T>
+	operator fn iter(self) -> collection.Snapshot<T>
 	{
-		let taken = Snapshot<T>.new(self.from);
+		let taken = collection.Snapshot<T>.new(self.from);
 		for p in &self.items {
 			taken.add(dup(p.0));
 		}
@@ -680,15 +679,15 @@ pub synchronized class SyncMap<K: eq + hash, V>
 	/// `get_versioned` gave it, so a thread can read, compute and write back
 	/// only if nothing changed meanwhile.
 	///
-	/// It fails with `anti.collection.pool.Changed`, and tears `v` down, when
-	/// the entry changed since or is gone.
+	/// It fails with `anti.collection.Changed`, and tears `v` down, when the
+	/// entry changed since or is gone.
 	pub fn set_if_version(self, k: K, own v: V, version: int) may fail
 	{
 		let now = self.versions.get(k) else {
-			fail pool.Changed.found_version(version, -1);
+			fail collection.Changed.found_version(version, -1);
 		};
 		if now.version != version {
-			fail pool.Changed.found_version(version, now.version);
+			fail collection.Changed.found_version(version, now.version);
 		}
 		self.entries.set(k, v);
 		self.stamp(k);
@@ -791,9 +790,9 @@ pub synchronized class SyncMap<K: eq + hash, V>
 	}
 
 	/// Copies of the keys, in insertion order.
-	pub fn keys(self) -> Snapshot<K>
+	pub fn keys(self) -> collection.Snapshot<K>
 	{
-		let taken = Snapshot<K>.new(self.from);
+		let taken = collection.Snapshot<K>.new(self.from);
 		for k in self.entries.keys() {
 			taken.add(dup(k));
 		}
@@ -801,18 +800,18 @@ pub synchronized class SyncMap<K: eq + hash, V>
 	}
 
 	/// Copies of the values, in insertion order.
-	pub fn values(self) -> Snapshot<V>
+	pub fn values(self) -> collection.Snapshot<V>
 	{
-		let taken = Snapshot<V>.new(self.from);
+		let taken = collection.Snapshot<V>.new(self.from);
 		for v in self.entries.values() {
 			taken.add(dup(v));
 		}
 		return taken;
 	}
 
-	operator fn iter(self) -> Snapshot<(K, V)>
+	operator fn iter(self) -> collection.Snapshot<(K, V)>
 	{
-		let taken = Snapshot<(K, V)>.new(self.from);
+		let taken = collection.Snapshot<(K, V)>.new(self.from);
 		for (k, v) in self.entries {
 			taken.add((dup(k), dup(v)));
 		}
@@ -998,16 +997,16 @@ pub synchronized class SyncSet<T: eq + hash>
 	/// `version`, as `version_of` gave it. The element moves to the end of the
 	/// order and takes a new version.
 	///
-	/// It fails with `anti.collection.pool.Changed`, and tears `x` down, when
-	/// the element was replaced since or is gone.
+	/// It fails with `anti.collection.Changed`, and tears `x` down, when the
+	/// element was replaced since or is gone.
 	pub fn set_if_version(self, own x: T, version: int) may fail
 	{
 		if !self.items.contains(x) {
-			fail pool.Changed.found_version(version, -1);
+			fail collection.Changed.found_version(version, -1);
 		}
 		let now = self.version(x);
 		if now != version {
-			fail pool.Changed.found_version(version, now);
+			fail collection.Changed.found_version(version, now);
 		}
 		let gone = self.items.remove(x);
 		self.stamp(x);
@@ -1147,9 +1146,9 @@ pub synchronized class SyncSet<T: eq + hash>
 		self.versions.clear();
 	}
 
-	operator fn iter(self) -> Snapshot<T>
+	operator fn iter(self) -> collection.Snapshot<T>
 	{
-		let taken = Snapshot<T>.new(self.from);
+		let taken = collection.Snapshot<T>.new(self.from);
 		for x in self.items {
 			taken.add(dup(x));
 		}
@@ -1322,8 +1321,8 @@ pub synchronized class SyncPool<T>
 	/// Replace the element `h` finds with `x` when its version is still
 	/// `version`, as `get_versioned` gave it.
 	///
-	/// It fails with `anti.collection.pool.Changed`, and tears `x` down, when
-	/// the element changed since or is gone.
+	/// It fails with `anti.collection.Changed`, and tears `x` down, when the
+	/// element changed since or is gone.
 	pub fn set_if_version(self, h: pool.Handle<T>, own x: T, version: int)
 		may fail
 	{
@@ -1416,9 +1415,9 @@ pub synchronized class SyncPool<T>
 		self.items.clear();
 	}
 
-	operator fn iter(self) -> Snapshot<T>
+	operator fn iter(self) -> collection.Snapshot<T>
 	{
-		let taken = Snapshot<T>.new(self.from);
+		let taken = collection.Snapshot<T>.new(self.from);
 		let none_found = self.items.find_first(fn(x) {
 			taken.add(dup(x));
 			return false;

@@ -1934,28 +1934,25 @@ foreach(name IN ITEMS map map_tuple hash_map set hash_set)
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # The collections threads share, of anti.collection.concurrent, in dev
-# mode. The module stands on the maps and on the error of a versioned set
-# in anti.collection.pool, so the link names the objects of both.
+# mode. The module stands on the maps, so the link names their object.
 foreach(name IN ITEMS concurrent_map concurrent_map_threads
         concurrent_map_equal spsc_ring spsc_ring_threads)
     antic_program_test(std_${name}_dev
         "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
         OPTIONS "--dev"
-        DEV ${collection_dev} collection/map collection/pool
-            collection/concurrent
+        DEV ${collection_dev} collection/map collection/concurrent
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # The collections behind one lock each, of anti.collection.synchronized, in
-# dev mode. The module stands on the list, the maps, the sets, the pool and
-# the walk of anti.collection.concurrent, so the link names the object of
-# each.
+# dev mode. The module stands on the list, the maps, the sets and the pool,
+# so the link names the object of each.
 foreach(name IN ITEMS sync_list sync_list_threads sync_map sync_map_threads
         sync_set sync_set_threads sync_pool sync_pool_threads sync_equal)
     antic_program_test(std_${name}_dev
         "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
         OPTIONS "--dev"
         DEV ${collection_dev} collection/list collection/map collection/set
-            collection/pool collection/concurrent collection/synchronized
+            collection/pool collection/synchronized
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
 # `dup` and the hash of every collection in dev mode. Each program holds

@@ -60,41 +60,6 @@ pub struct Handle<T>
 	generation: int,
 }
 
-/// The failure of `set_if_version`, which found the element changed or gone.
-///
-/// `expected` holds the version the caller read and `found` the version the
-/// element holds now, or -1 when the handle finds no element.
-pub class Changed inherits lang.Error
-{
-	/// The version the caller gave.
-	pub expected: int = 0,
-	/// The version of the element now, or -1 when it is gone.
-	pub found: int = 0,
-	/// The bytes of the message, which the error frees. A copy made with `dup`
-	/// shares them with the error it copies.
-	transient made: ?*byte = none,
-
-	/// The failure of a set that expected `expected` and found `found`.
-	pub fn found_version(expected: int, found: int) -> *Changed
-	{
-		let e = alloc Changed { expected: expected, found: found };
-		let message = "";
-		if found < 0 {
-			message = f"the element of version {expected} is gone";
-		} else {
-			message = f"the element changed from version {expected} to {found}";
-		}
-		e.message = message;
-		e.made = message.ptr;
-		return e;
-	}
-
-	concrete fn destruct(self)
-	{
-		free(self.made);
-	}
-}
-
 /// The storage of `Pool<T>` and `Tree<T>`: slots in blocks that never move, a
 /// generation per slot and a list of the free slots.
 ///
@@ -183,17 +148,17 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 	/// Replace the element `h` finds with `x` when its version is still
 	/// `version`, as `get_versioned` gave it.
 	///
-	/// It fails with `Changed`, and tears `x` down, when the element changed
-	/// since or is gone.
+	/// It fails with `anti.collection.Changed`, and tears `x` down, when the
+	/// element changed since or is gone.
 	pub fn set_if_version(self, h: Handle<T>, own x: T, version: int) may fail
 	{
 		let i = self.slot_of(h);
 		if i < 0 {
-			fail Changed.found_version(version, -1);
+			fail collection.Changed.found_version(version, -1);
 		}
 		let now = self.word(i, VERSION);
 		if now != version {
-			fail Changed.found_version(version, now);
+			fail collection.Changed.found_version(version, now);
 		}
 		self.replace(i, x);
 	}

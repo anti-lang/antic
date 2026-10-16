@@ -1310,7 +1310,7 @@ Reading gives a copy. `get` gives a `?V`, and `pop` a `?T`. A pointer to an elem
 
 The functions a program passes to these operations run inside the lock. Such a function may read the collection again, since the hidden lock counts. It must not change the collection, which is walking its elements.
 
-Every element of the list, the maps, the set and the pool carries a version. It is a number that changes with each change of the element. `get_versioned(k)` of a map gives the value and its version. `set_if_version(k, v, version)` writes when the version still stands and fails with `anti.collection.pool.Changed` otherwise. The list gives a version with `find_first_versioned`, the set with `version_of` and the pool with `get_versioned` of a handle. A thread can therefore read, compute outside the lock and write back only if nothing changed.
+Every element of the list, the maps, the set and the pool carries a version. It is a number that changes with each change of the element. `get_versioned(k)` of a map gives the value and its version. `set_if_version(k, v, version)` writes when the version still stands and fails with `anti.collection.Changed` otherwise. The list gives a version with `find_first_versioned`, the set with `version_of` and the pool with `get_versioned` of a handle. A thread can therefore read, compute outside the lock and write back only if nothing changed.
 
 `==` and `x.hash()` of the four synchronized collections are operators of their module over pointers.
 

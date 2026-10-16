@@ -8,7 +8,7 @@
 //! changed the element, and a copy made with `dup` takes a lock of its own. The
 //! totals come out the same on every run.
 
-import anti.collection.pool;
+import anti.collection;
 import anti.collection.synchronized.{SyncList};
 
 extern fn printf(format: ?*byte, ...) -> c_int;
@@ -181,7 +181,7 @@ fn main() -> int
 	let job = dispatch &counters -> bump(0);
 	let held = join(job);
 	counters.set_if_version((0, 0), version) catch err {
-		let c = err as *pool.Changed;
+		let c = err as *collection.Changed;
 		printf("stale after another thread: %d counters, found %d\n".ptr,
 			held as c_int, c.found as c_int);
 	};

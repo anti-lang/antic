@@ -14,7 +14,6 @@
 
 import anti.collection;
 import anti.collection.map;
-import anti.collection.pool;
 import anti.lang;
 import anti.mem;
 import anti.text;
@@ -260,17 +259,17 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	/// `get_versioned` gave it, so a thread can read, compute and write back
 	/// only if nothing changed meanwhile.
 	///
-	/// It fails with `anti.collection.pool.Changed`, and tears `v` down, when
-	/// the entry changed since or is gone.
+	/// It fails with `anti.collection.Changed`, and tears `v` down, when the
+	/// entry changed since or is gone.
 	pub fn set_if_version(self, k: K, own v: V, version: int) may fail
 	{
 		let part = self.part_of(k);
 		sync part.lock {
 			let now = part.versions.get(k) else {
-				fail pool.Changed.found_version(version, -1);
+				fail collection.Changed.found_version(version, -1);
 			};
 			if now.version != version {
-				fail pool.Changed.found_version(version, now.version);
+				fail collection.Changed.found_version(version, now.version);
 			}
 			part.entries.set(k, v);
 			changed(part, k);
@@ -483,9 +482,9 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	}
 
 	/// Copies of the keys, taken part by part.
-	pub fn keys(self) -> Snapshot<K>
+	pub fn keys(self) -> collection.Snapshot<K>
 	{
-		let taken = Snapshot<K>.new(self.from);
+		let taken = collection.Snapshot<K>.new(self.from);
 		let i = 0;
 		while i < PARTS do {
 			let part = self.part(i);
@@ -500,9 +499,9 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	}
 
 	/// Copies of the values, taken part by part.
-	pub fn values(self) -> Snapshot<V>
+	pub fn values(self) -> collection.Snapshot<V>
 	{
-		let taken = Snapshot<V>.new(self.from);
+		let taken = collection.Snapshot<V>.new(self.from);
 		let i = 0;
 		while i < PARTS do {
 			let part = self.part(i);
@@ -516,9 +515,9 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 		return taken;
 	}
 
-	operator fn iter(self) -> Snapshot<(K, V)>
+	operator fn iter(self) -> collection.Snapshot<(K, V)>
 	{
-		let taken = Snapshot<(K, V)>.new(self.from);
+		let taken = collection.Snapshot<(K, V)>.new(self.from);
 		let i = 0;
 		while i < PARTS do {
 			let part = self.part(i);
@@ -869,82 +868,6 @@ fn copied<T>(p: *T) -> T
 	return dup(*p);
 }
 
-/// Copies of the elements of a collection that threads share, taken at one
-/// moment, which `for` walks.
-///
-/// The copies are the walk's own, from the allocator of the collection, and go
-/// back to it when the walk ends. A change of the collection meanwhile does not
-/// reach them.
-pub class Snapshot<T>
-{
-	from: *mem.Allocator,
-	items: ?*T = none,
-	capacity: int = 0,
-	/// The number of copies.
-	pub count: int = 0,
-	at: int = -1,
-
-	/// An empty snapshot whose room comes from `from`.
-	pub fn new(from: *mem.Allocator) -> Snapshot<T>
-	{
-		return Snapshot<T> { from: from };
-	}
-
-	/// Add `x` after the last copy.
-	pub fn add(self, own x: T)
-	{
-		if self.count == self.capacity {
-			self.grow();
-		}
-		let items = self.items catch fatal;
-		items[self.count] = x;
-		self.count += 1;
-	}
-
-	operator fn next(self) -> bool
-	{
-		self.at += 1;
-		return self.at < self.count;
-	}
-
-	operator fn value(self) -> T
-	{
-		let items = self.items catch fatal;
-		return dup(items[self.at]);
-	}
-
-	/// Twice the room, or 8 for the first, with the copies moved into it as
-	/// bytes.
-	fn grow(self)
-	{
-		let size = collection.room_times(self.capacity, 2);
-		if size == 0 {
-			size = 8;
-		}
-		let room = collection.room_from<T>(self.from, size) catch fatal;
-		if self.count > 0 {
-			memcpy(room as ?*byte, self.items as ?*byte,
-				(self.count * size_of(T)) as c_size_t);
-		}
-		self.from.free(self.items as ?*byte);
-		self.items = room;
-		self.capacity = size;
-	}
-
-	fn destruct(self)
-	{
-		let items = self.items else {
-			return;
-		};
-		let i = 0;
-		while i < self.count do {
-			destroy(&items[i]);
-			i += 1;
-		}
-		self.from.free(items as ?*byte);
-	}
-}
-
 /// A ring of fixed capacity `N` that passes elements from one producing thread
 /// to one consuming thread with no lock, such as samples between an audio
 /// thread and the rest of a program.
@@ -1155,11 +1078,11 @@ pub concurrent class SpscRing<T, N: int>
 		self.taken.store(held.head);
 	}
 
-	operator fn iter(self) -> Snapshot<T>
+	operator fn iter(self) -> collection.Snapshot<T>
 	{
 		let (head, tail) = self.held();
 		let items = self.items catch fatal;
-		let taken = Snapshot<T>.new(self.from);
+		let taken = collection.Snapshot<T>.new(self.from);
 		let p = head;
 		while p < tail do {
 			taken.add(dup(items[p % N]));

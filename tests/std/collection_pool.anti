@@ -6,7 +6,7 @@
 //! element. The versioned forms compare and set, and the shared parts of every
 //! collection work over the slots. `==` compares the elements in slot order.
 
-import anti.collection.{Copies};
+import anti.collection.{Changed, Copies};
 import anti.collection.pool.{Handle, Pool};
 import anti.lang;
 import anti.mem;
@@ -227,7 +227,7 @@ fn versions() may fail
 	let (next, later) = next_read;
 	show(f"set to {next}, version {later}");
 	p.set_if_version(h, 100, version) catch e {
-		let c = e as *pool.Changed;
+		let c = e as *Changed;
 		show(f"{e.message} ({c.expected} {c.found})");
 	};
 	p.modify(h, fn(x) {

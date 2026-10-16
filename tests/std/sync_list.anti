@@ -8,7 +8,6 @@
 
 import anti.collection;
 import anti.collection.list;
-import anti.collection.pool;
 import anti.collection.synchronized.{SyncList};
 import anti.lang;
 import anti.mem;
@@ -167,7 +166,7 @@ fn versions() may fail
 	});
 	show(f"versioned: {v} then {w}, new version {second != first}, {l}");
 	l.set_if_version(99, first) catch e {
-		let c = e as *pool.Changed;
+		let c = e as *collection.Changed;
 		show(f"stale: {e.message}, found {c.found}");
 	};
 	l.update_first(fn(x) {

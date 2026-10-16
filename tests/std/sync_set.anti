@@ -8,7 +8,6 @@
 //! once the element was replaced or left.
 
 import anti.collection;
-import anti.collection.pool;
 import anti.collection.set;
 import anti.collection.synchronized.{SyncSet};
 import anti.lang;
@@ -166,7 +165,7 @@ fn versions() may fail
 	let second = s.version_of(20) ?? -1;
 	show(f"versioned: new version {second != first}, the element moves {s}");
 	s.set_if_version(20, first) catch e {
-		let c = e as *pool.Changed;
+		let c = e as *collection.Changed;
 		show(f"stale: {e.message}, found is the new version {c.found == second}");
 	};
 	let gone = s.remove(20);

@@ -7,7 +7,6 @@
 
 import anti.collection;
 import anti.collection.synchronized.{SyncMap};
-import anti.collection.pool;
 import anti.lang;
 import anti.mem;
 import anti.text;
@@ -173,7 +172,7 @@ fn versions() may fail
 	let (w, second) = m.get_versioned(1) ?? (-1, -1);
 	show(f"versioned: {v} then {w}, new version {second != first}");
 	m.set_if_version(1, 99, first) catch e {
-		let c = e as *pool.Changed;
+		let c = e as *collection.Changed;
 		show(f"stale: {e.message}, found is the new version {c.found == second}");
 	};
 	m.modify(1, fn(p) {

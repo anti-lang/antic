@@ -1664,7 +1664,7 @@ let people = List<Person>.new(capacity: 1000);
 let ages = Map<str, int>.new(from: &arena);
 ```
 
-`Map` walks in insertion order, the same on every run. `SortedMap` is a B-tree and walks in key order. `HashMap` walks in an order that differs on every walk, so no program depends on it. A hashing collection mixes its hashes with a seed the runtime chooses at start from the random source of the system. `lang.hash_seed()` gives it, `lang.seeded(h, seed)` mixes it into a hash, and `--anti.hash_seed=<n>` or the key `hash_seed` fixes it for a test. `Ring<T, N>` allocates nothing after it is made, for real-time code. A `Pool` keeps its elements at fixed addresses and gives handles of a slot and a generation, so a stale handle finds nothing, and a `Tree` holds a hierarchy on the same handles. `get_versioned` gives an element with its version, and `set_if_version(h, x, version)` fails with `pool.Changed` when the element changed or is gone. `PriorityQueue<T>` gives its smallest element first, and `Grid<T>` is indexed by two positions. `sort`, `sort_by` and `map` are functions of `anti.collection.list` that a call on a list reaches as its own, and `map` names both its types, `scores.map<int, str>(f)`.
+`Map` walks in insertion order, the same on every run. `SortedMap` is a B-tree and walks in key order. `HashMap` walks in an order that differs on every walk, so no program depends on it. A hashing collection mixes its hashes with a seed the runtime chooses at start from the random source of the system. `lang.hash_seed()` gives it, `lang.seeded(h, seed)` mixes it into a hash, and `--anti.hash_seed=<n>` or the key `hash_seed` fixes it for a test. `Ring<T, N>` allocates nothing after it is made, for real-time code. A `Pool` keeps its elements at fixed addresses and gives handles of a slot and a generation, so a stale handle finds nothing, and a `Tree` holds a hierarchy on the same handles. `get_versioned` gives an element with its version, and `set_if_version(h, x, version)` fails with `collection.Changed` when the element changed or is gone. `PriorityQueue<T>` gives its smallest element first, and `Grid<T>` is indexed by two positions. `sort`, `sort_by` and `map` are functions of `anti.collection.list` that a call on a list reaches as its own, and `map` names both its types, `scores.map<int, str>(f)`.
 
 ```anti
 import anti.collection.grid.{Grid};
@@ -1746,7 +1746,7 @@ The 23 modules, with their public items and the functions among them that may fa
 | `anti.fs` | `Mode`, `File`, `open` with `Mode.Read` as its default, `read`, `write`, `flush`, `size`, `close`, `list`, `remove`, `rename`, `read_file`, `write_file`, `FileSystem`, `SystemFileSystem` | every function |
 | `anti.reflect` | `TypeId`, `Field`, `Function`, `describe`, `parent`, `name`, `field_count`, `field`, `function_count`, `function`, `get`, `set`, `new`, `call`, `ValueKind`, `Value`, `nothing`, `of_int`, `of_uint`, `of_float`, `of_bool`, `of_char`, `of_str`, `of_ptr`, `BAD_INDEX`, `NOT_CARRIED`, `WRONG_KIND`, `WRONG_COUNT` | `set`, `call` |
 | `anti.random` | `Source`, `Random`, `SharedRandom` | |
-| `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `find_one`, `update_one` and `remove_one` of every collection |
+| `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `Changed`, `Snapshot<T>`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `find_one`, `update_one` and `remove_one` of every collection |
 | `anti.toml` | `Document`, `int_value`, `bool_value` | `Document.read` |
 | `anti.config` | `Config`, `FileConfig`, `current`, `read` | `read` |
 | `anti.args` | `Parser` | `Parser.parse` |
@@ -1771,11 +1771,11 @@ The 12 modules under `anti.collection`, each with the `operator fn eq` and `oper
 | `anti.collection.map` | `Map<K, V>`, `HashMap<K, V>`, `EntryTable<E>`, `SlotTable<E>`, and the walks `MapWalk`, `MapKeys`, `MapValues`, `HashMapWalk`, `HashMapKeys` and `HashMapValues` |
 | `anti.collection.set` | `Set<T>`, `HashSet<T>`, `BitSet`, and the walks `SetWalk`, `HashSetWalk` and `BitWalk` |
 | `anti.collection.sorted` | `SortedMap<K, V>`, `SortedSet<T>`, `BTree<T>`, and the walks `SortedWalk`, `SortedEntries`, `SortedKeys` and `SortedValues` |
-| `anti.collection.pool` | `Pool<T>`, `Handle<T>`, `Slots<T>`, `Changed`, `SlotsWalk<T>` |
+| `anti.collection.pool` | `Pool<T>`, `Handle<T>`, `Slots<T>`, `SlotsWalk<T>` |
 | `anti.collection.tree` | `Tree<T>` |
 | `anti.collection.queue` | `PriorityQueue<T>`, `QueueWalk<T>` |
 | `anti.collection.synchronized` | `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>`, `SyncPool<T>`, `sort`, `sort_by`, `map` |
-| `anti.collection.concurrent` | `ConcurrentMap<K, V>`, `SpscRing<T, N>`, `Snapshot<T>` |
+| `anti.collection.concurrent` | `ConcurrentMap<K, V>`, `SpscRing<T, N>` |
 
 Not built yet: the modules over the other native libraries of the runtime archive, `anti.net`, `anti.raylib` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
 
