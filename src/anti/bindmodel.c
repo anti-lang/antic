@@ -83,6 +83,14 @@ bool bind_is_anti_word(const char *name)
     return is_c_identifier(name) && !antic_is_identifier(name);
 }
 
+void bind_anti_name(const char *name, struct text *out)
+{
+    text_append(out, name);
+    if (bind_is_anti_word(name)) {
+        text_append(out, "_");
+    }
+}
+
 /* DESIGN: the frameworks of Apple's SDK that each bundled library needs
    on macOS, which the binding names with `link framework`. raylib opens
    its window through GLFW over Cocoa and draws with OpenGL. miniaudio

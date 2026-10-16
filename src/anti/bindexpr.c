@@ -695,8 +695,10 @@ bool bind_eval_const(struct bind_module *b, const char *name,
     switch (v->kind) {
     case BIND_EVAL_INT:
         if (v->enum_type != NULL) {
-            c->type = v->enum_type;
-            text_appendf(&value, "%s.%s", v->enum_type, v->enum_value);
+            bind_anti_name(v->enum_type, &value);
+            c->type = bind_strdup(b, text_cstr(&value));
+            text_append(&value, ".");
+            bind_anti_name(v->enum_value, &value);
         } else {
             c->type = v->type;
             if (is_unsigned_type(v->type)) {

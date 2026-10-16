@@ -1,0 +1,28 @@
+//! The binding of words, which `anti bind` wrote from `words.h`. Nothing in it
+//! is written by hand. Run `anti bind` again to change it.
+
+pub const none_: c_int = 3;
+
+pub const PICK: self_ = self_.fn_;
+
+pub const ONE_DUP: dup_ = dup_ { x: 1, fn_: 2 };
+
+pub enum self_
+{
+	SELF_A = 0,
+	fn_ = 1,
+}
+
+pub struct type_
+{
+	a: c_int,
+	s: self_,
+}
+
+pub struct dup_
+{
+	x: c_int,
+	fn_: c_int,
+}
+
+pub extern fn take(t: ?*type_, s: self_, d: dup_);

@@ -179,6 +179,11 @@ bool bind_named(const struct bind_module *b, const char *kind,
    Anti reads as no identifier, as `fn`, `type` and `none`. */
 bool bind_is_anti_word(const char *name);
 
+/* Append the name of C as the binding writes it in Anti. A word of Anti
+   takes a trailing `_`, which changes no layout and no call. A record, an
+   enum, an enumerator, a constant, a field and a parameter take it. */
+void bind_anti_name(const char *name, struct text *out);
+
 /* The frameworks of Apple's SDK that a library links against on macOS,
    from the table of anti bind. Returns the number of names. */
 size_t bind_frameworks(const char *library, const char *const **names);

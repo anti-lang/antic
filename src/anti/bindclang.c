@@ -1400,7 +1400,8 @@ static bool compound_literal(struct reader *r, const struct macro *m)
     }
     rec = t->record;
     s++;
-    text_appendf(&literal, "%s { ", rec->name);
+    bind_anti_name(rec->name, &literal);
+    text_append(&literal, " { ");
     for (;;) {
         const char *end = s;
         char element[128];
@@ -1425,7 +1426,9 @@ static bool compound_literal(struct reader *r, const struct macro *m)
             text_free(&literal);
             return false;
         }
-        text_appendf(&literal, "%s%s: ", field > 0 ? ", " : "", f->name);
+        text_append(&literal, field > 0 ? ", " : "");
+        bind_anti_name(f->name, &literal);
+        text_append(&literal, ": ");
         if (strcmp(f->type->name, "c_float") == 0 ||
             strcmp(f->type->name, "c_double") == 0) {
             bind_float_text(v.kind == BIND_EVAL_FLOAT ? v.f : (double)v.i,
@@ -1452,7 +1455,8 @@ static bool compound_literal(struct reader *r, const struct macro *m)
     text_append(&literal, " }");
     c = arena_alloc(&r->b->arena, sizeof *c);
     c->name = m->name;
-    c->type = rec->name;
+    c->type = bind_strndup(r->b, text_cstr(&literal),
+                           strcspn(text_cstr(&literal), " "));
     c->value = bind_strdup(r->b, text_cstr(&literal));
     c->record = rec;
     bind_list_add(&r->b->consts, c);

@@ -281,6 +281,18 @@ elseif(CASE STREQUAL "nested_enum")
         message(FATAL_ERROR "the binding holds no constant TAGGED_Y\n"
                             "${module}")
     endif()
+elseif(CASE STREQUAL "words")
+    # Names of C that are words of Anti. A record, an enum, an enumerator
+    # and a constant take a trailing `_` as a field does, and a macro is
+    # skipped. The module and the warnings are fixed, the module compiles
+    # and the two probes agree.
+    run("${ANTI}" bind --clang "${BIND}/words.h" --module bindtest.words
+        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${run_err}")
+    expect_file("${WORK}/out/words.anti" "${BIND}/words.anti.expected")
+    expect_file("${WORK}/warnings" "${BIND}/words.warnings")
+    compile_binding(words bindtest.words)
+    compare_probes(words "${BIND}")
 elseif(CASE STREQUAL "escaped_path")
     # A path given with a backslash, as every native path of Windows is.
     # clang escapes it in the line markers of `-E`, and the macros of the
@@ -350,7 +362,7 @@ elseif(CASE STREQUAL "api")
     expect_refusal("raylib_api.json is not JSON: .* at line 4699, column 115"
         "${ANTI}" bind "${RAYLIB}/tools/rlparser/output/raylib_api.json"
         -o "${WORK}/pinned")
-elseif(CASE MATCHES "^api_(parts|callbacks|literals|types)$")
+elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words)$")
     # Four descriptions in the format of rlparser. api_parts holds
     # entries that lack a part: a function without its name, its result
     # or its parameters, a struct without its name or its list of fields,

@@ -12,6 +12,12 @@ enum place { AS_FIELD, AS_PARAM, AS_RESULT };
 static bool spell(const struct bind_type *t, enum place place,
                   struct text *out);
 
+/* A name as the module writes it. */
+static void name_of(const char *name, struct text *out)
+{
+    bind_anti_name(name, out);
+}
+
 /* DESIGN: a C function pointer is an Anti function type, `?fn(...)`,
    since C lets any of them be NULL. A variadic one has no Anti type, and
    neither has one whose parameters have none. Both become `?*byte`, which
@@ -85,8 +91,10 @@ static bool spell(const struct bind_type *t, enum place place,
 {
     switch (t->kind) {
     case BIND_SCALAR:
-    case BIND_ENUM:
         text_append(out, t->name);
+        return true;
+    case BIND_ENUM:
+        name_of(t->name, out);
         return true;
     case BIND_BOOL:
         text_append(out, "bool");
@@ -95,7 +103,7 @@ static bool spell(const struct bind_type *t, enum place place,
         if (!t->record->bound) {
             return false;
         }
-        text_append(out, t->record->name);
+        name_of(t->record->name, out);
         return true;
     case BIND_POINTER:
         spell_pointer(t->to, out);
@@ -228,16 +236,6 @@ void bind_settle(struct bind_module *b)
     text_free(&scratch);
 }
 
-/* A name as the module writes it. A C name that is a word of Anti takes
-   a trailing `_`, which changes no layout and no call. */
-static void name_of(const char *name, struct text *out)
-{
-    text_append(out, name);
-    if (bind_is_anti_word(name)) {
-        text_append(out, "_");
-    }
-}
-
 static void doc_of(const char *doc, const char *indent, struct text *out)
 {
     const char *line = doc;
@@ -265,7 +263,8 @@ static void write_record(const struct bind_record *r, struct text *out)
     if (r->packed) {
         text_append(out, "packed ");
     }
-    text_appendf(out, "%s %s", r->is_union ? "union" : "struct", r->name);
+    text_appendf(out, "%s ", r->is_union ? "union" : "struct");
+    name_of(r->name, out);
     if (r->align > 0) {
         text_appendf(out, " align(%lld)", (long long)r->align);
     }
@@ -296,7 +295,8 @@ static void write_enum(const struct bind_enum *e, struct text *out)
     size_t i;
 
     doc_of(e->doc, "", out);
-    text_appendf(out, "pub enum %s", e->name);
+    text_append(out, "pub enum ");
+    name_of(e->name, out);
     if (e->base != NULL) {
         text_appendf(out, ": %s", e->base);
     }
@@ -381,8 +381,9 @@ void bind_write_module(const struct bind_module *b, struct text *out)
         }
         text_append(out, "\n");
         doc_of(c->doc, "", out);
-        text_appendf(out, "pub const %s: %s = %s;\n", c->name, c->type,
-                     c->value);
+        text_append(out, "pub const ");
+        name_of(c->name, out);
+        text_appendf(out, ": %s = %s;\n", c->type, c->value);
     }
     for (i = 0; i < b->enums.count; i++) {
         text_append(out, "\n");
@@ -659,9 +660,10 @@ static bool settable(const struct bind_module *b, const struct bind_type *t,
         for (i = 0; e != NULL && i < e->value_count; i++) {
             if (e->values[i].value != 0) {
                 text_append(&s->c_value, e->values[i].name);
-                text_appendf(&s->anti_value, "%s.%s.", modpath_last(b->module),
-                             e->name);
-                text_append(&s->anti_value, e->values[i].name);
+                text_appendf(&s->anti_value, "%s.", modpath_last(b->module));
+                name_of(e->name, &s->anti_value);
+                text_append(&s->anti_value, ".");
+                name_of(e->values[i].name, &s->anti_value);
                 return true;
             }
         }
@@ -753,8 +755,10 @@ void bind_write_probe_anti(const struct bind_module *b, struct text *out)
     for (i = 0; i < b->records.count; i++) {
         const struct bind_record *r = b->records.items[i];
         if (probed(r)) {
-            text_appendf(out, "\nstruct Box%s\n{\n\tc: u8,\n\tt: %s.%s,\n}\n",
-                         r->name, m, r->name);
+            text_appendf(out, "\nstruct Box%s\n{\n\tc: u8,\n\tt: %s.", r->name,
+                         m);
+            name_of(r->name, out);
+            text_append(out, ",\n}\n");
         }
     }
     text_append(out,
@@ -768,31 +772,37 @@ void bind_write_probe_anti(const struct bind_module *b, struct text *out)
                 "\nfn main() -> int\n{\n");
     for (i = 0; i < b->records.count; i++) {
         const struct bind_record *r = b->records.items[i];
+        struct text anti_name = {0};
+        const char *t;
         if (!probed(r)) {
             continue;
         }
+        /* The labels hold the names of C, which the probe of C prints. */
+        name_of(r->name, &anti_name);
+        t = text_cstr(&anti_name);
         text_appendf(out, "\tprintf(\"%s size %%d align %%d\\n\".ptr, "
                      "size_of(%s.%s) as c_int,\n\t\t(size_of(Box%s) - "
-                     "size_of(%s.%s)) as c_int);\n", r->name, m, r->name,
-                     r->name, m, r->name);
+                     "size_of(%s.%s)) as c_int);\n", r->name, m, t,
+                     r->name, m, t);
         text_appendf(out, "\tlet v%zu = alloc(%s.%s, 1) else { return 1; };\n",
-                     i, m, r->name);
+                     i, m, t);
         for (j = 0; j < r->field_count; j++) {
             const struct bind_field *f = &r->fields[j];
             struct setting s;
             memset(&s, 0, sizeof s);
             if (f->name != NULL && settable(b, f->type, f->bits, &s)) {
                 text_appendf(out, "\tclear(v%zu as *byte, size_of(%s.%s));\n"
-                             "\tv%zu.", i, m, r->name, i);
+                             "\tv%zu.", i, m, t, i);
                 name_of(f->name, out);
                 text_appendf(out, "%s = %s;\n\tdump(\"%s.%s\", v%zu as *byte, "
                              "size_of(%s.%s));\n", text_cstr(&s.anti_path),
                              text_cstr(&s.anti_value), r->name, f->name, i, m,
-                             r->name);
+                             t);
             }
             setting_free(&s);
         }
         text_appendf(out, "\tfree(v%zu);\n", i);
+        text_free(&anti_name);
     }
     text_append(out, "\treturn 0;\n}\n");
 }

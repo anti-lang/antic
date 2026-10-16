@@ -503,7 +503,8 @@ static bool color(struct api *a, const char *name, const char *value,
     if (r == NULL) {
         return false;
     }
-    text_appendf(&literal, "%s { ", r->name);
+    bind_anti_name(r->name, &literal);
+    text_append(&literal, " { ");
     p = brace + 1;
     for (;;) {
         char *end;
@@ -520,8 +521,9 @@ static bool color(struct api *a, const char *name, const char *value,
             text_free(&literal);
             return false;
         }
-        text_appendf(&literal, "%s%s: %lld", field > 0 ? ", " : "",
-                     r->fields[field].name, n);
+        text_append(&literal, field > 0 ? ", " : "");
+        bind_anti_name(r->fields[field].name, &literal);
+        text_appendf(&literal, ": %lld", n);
         field++;
         p = end;
         while (*p == ' ') {
@@ -538,7 +540,8 @@ static bool color(struct api *a, const char *name, const char *value,
     text_append(&literal, " }");
     c = arena_alloc(&a->b->arena, sizeof *c);
     c->name = bind_strdup(a->b, name);
-    c->type = r->name;
+    c->type = bind_strndup(a->b, text_cstr(&literal),
+                           strcspn(text_cstr(&literal), " "));
     c->value = bind_strdup(a->b, text_cstr(&literal));
     c->record = r;
     c->doc = doc;
@@ -576,6 +579,12 @@ static bool read_defines(struct api *a)
         function_like = strchr(name, '(') != NULL;
         if (!function_like && !bind_named(a->b, "define", name)) {
             return false;
+        }
+        /* A define is skipped as a macro of a header is. */
+        if (!function_like && bind_is_anti_word(name)) {
+            bind_warn(a->b, "the define `%s` is a word of Anti and is skipped",
+                      name);
+            continue;
         }
         if (value->kind == JSON_STRING) {
             if (strcmp(kind, "STRING") == 0) {

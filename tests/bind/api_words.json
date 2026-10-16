@@ -1,0 +1,10 @@
+{"functions": [{"name": "take", "returnType": "void",
+                "params": [{"name": "t", "type": "type *"},
+                           {"name": "s", "type": "self"},
+                           {"name": "d", "type": "dup"}]}],
+ "structs": [{"name": "type", "fields": [{"name": "a", "type": "int"}, {"name": "s", "type": "self"}]},
+             {"name": "dup", "fields": [{"name": "x", "type": "int"}, {"name": "fn", "type": "int"}]}],
+ "enums": [{"name": "self", "values": [{"name": "SELF_A", "value": 0}, {"name": "fn", "value": 1}]}],
+ "defines": [{"name": "class", "type": "INT", "value": 4},
+             {"name": "PICK", "type": "UNKNOWN", "value": "fn"},
+             {"name": "ONE_DUP", "type": "COLOR", "value": "CLITERAL(dup){ 1, 2 }"}]}
