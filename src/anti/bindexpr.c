@@ -131,6 +131,17 @@ static void narrow(struct bind_eval *v)
     }
 }
 
+/* The double of v as a float of C. A value past the largest float has no
+   float value, C11 6.3.1.5, and the expression fails, by M311. */
+static void float_narrowed(struct eval *e, struct bind_eval *v)
+{
+    if (fabs(v->f) > FLT_MAX) {
+        fail(e);
+        v->f = 0.0;
+    }
+    v->f = (double)(float)v->f;
+}
+
 /* A numeric literal of C: a decimal, hexadecimal or octal integer with
    the suffixes u and l, or a decimal float with the suffix f. */
 static struct bind_eval number(struct eval *e)
@@ -159,12 +170,7 @@ static struct bind_eval number(struct eval *e)
         }
         if (e->s[e->pos] == 'f' || e->s[e->pos] == 'F') {
             v.type = "c_float";
-            /* A double past the largest float has no float value in C. */
-            if (v.f > FLT_MAX) {
-                fail(e);
-                v.f = 0.0;
-            }
-            v.f = (double)(float)v.f;
+            float_narrowed(e, &v);
             e->pos++;
         } else if (e->s[e->pos] == 'l' || e->s[e->pos] == 'L') {
             /* A long double has no Anti type. */
@@ -300,7 +306,8 @@ static const char *cast_type(const char *words)
 static struct bind_eval conditional(struct eval *e);
 
 /* v in the type, as a cast of C converts it. A float that no int64_t
-   holds has no value in C, and the expression fails. */
+   holds has no value in C, nor has a double past the largest float as a
+   float, and the expression fails. */
 static struct bind_eval converted(struct eval *e, struct bind_eval v,
                                   const char *type)
 {
@@ -312,6 +319,9 @@ static struct bind_eval converted(struct eval *e, struct bind_eval v,
             v.f = 0.0;
         }
         v.i = (int64_t)v.f;
+    }
+    if (strcmp(type, "c_float") == 0) {
+        float_narrowed(e, &v);
     }
     v.kind = is_float_type(type) ? BIND_EVAL_FLOAT : BIND_EVAL_INT;
     v.type = type;
@@ -504,7 +514,7 @@ static struct bind_eval apply(struct eval *e, struct bind_eval a,
             fail(e);
         }
         if (strcmp(type, "c_float") == 0) {
-            a.f = (double)(float)a.f;
+            float_narrowed(e, &a);
         }
         return a;
     }

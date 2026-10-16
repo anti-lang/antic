@@ -160,6 +160,14 @@ static void expressions(void)
     CHECK(!value_of(&b, "18446744073709551616", &v));
     CHECK(!value_of(&b, "0x10000000000000000", &v));
     CHECK(!value_of(&b, "1e999", &v));
+    /* M311. A float computed or converted past the largest float has no
+       float value in C, as a literal past it has none. */
+    CHECK(!value_of(&b, "3e38f * 10", &v));
+    CHECK(!value_of(&b, "-3e38f * 10", &v));
+    CHECK(!value_of(&b, "(float)1e300", &v));
+    CHECK(!value_of(&b, "(float)-1e300", &v));
+    CHECK(value_of(&b, "3e38f * 1", &v) && strcmp(v.type, "c_float") == 0);
+    CHECK(value_of(&b, "(float)3e38", &v) && strcmp(v.type, "c_float") == 0);
     CHECK(value_of(&b, "18446744073709551615u", &v) && v.i == -1 &&
           strcmp(v.type, "c_ulonglong") == 0);
     CHECK(value_of(&b, "1e-999", &v) && v.f == 0.0);
