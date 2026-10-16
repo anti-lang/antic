@@ -101,22 +101,30 @@ pub class Parser
 		return at >= 0 && self.options[at].given;
 	}
 
-	/// The value of the option called `name`, or its fallback.
-	pub fn text_of(self, name: str) -> str
+	/// The value of the option called `name`, or its fallback when the command
+	/// line left it out.
+	///
+	/// A name that no declaration holds gives `none`, so it differs from an
+	/// option whose value is empty.
+	pub fn text_of(self, name: str) -> ?str
 	{
 		let at = self.index_of(name);
 		if at < 0 {
-			return "";
+			return none;
 		}
 		return self.options[at].value;
 	}
 
 	/// The value of the option called `name` as an integer.
 	///
-	/// A value that spells no integer gives `fallback`.
+	/// A name that no declaration holds and a value that spells no integer give
+	/// `fallback`.
 	pub fn int_of(self, name: str, fallback: int) -> int
 	{
-		let n = text.parse_int(self.text_of(name)) catch e { yield fallback; };
+		let value = self.text_of(name) else {
+			return fallback;
+		};
+		let n = text.parse_int(value) catch e { yield fallback; };
 		return n;
 	}
 
@@ -126,11 +134,12 @@ pub class Parser
 		return self.rest_count;
 	}
 
-	/// The argument at `index` of those that are no option.
-	pub fn at(self, index: int) -> str
+	/// The argument at `index` of those that are no option, or `none` for an
+	/// index outside them.
+	pub fn at(self, index: int) -> ?str
 	{
 		if index < 0 || index >= self.rest_count {
-			return "";
+			return none;
 		}
 		return self.rest[index];
 	}

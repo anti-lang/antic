@@ -1,0 +1,36 @@
+//! `text_of` gives `none` for a name no declaration holds, and the value or
+//! the fallback of a declared option otherwise, an empty one among them. `at`
+//! gives `none` outside the arguments that are no option.
+import anti.args;
+import anti.io;
+import anti.lang;
+
+/// Print `value` in quotes, or `none`.
+fn shown(value: ?str)
+{
+	if let v = value {
+		io.print("\"");
+		io.print(v);
+		io.println("\"");
+	} else {
+		io.println("none");
+	}
+}
+
+fn main(argv: []str) -> int
+{
+	let p = args.Parser.new("pin", "");
+	p.value("output", 0x6F, "the file to write", "a.out");
+	p.value("tag", 0x74, "the tag of the version", "");
+	p.parse(argv) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	shown(p.text_of("output"));
+	shown(p.text_of("tag"));
+	shown(p.text_of("missing"));
+	shown(p.at(0));
+	shown(p.at(1));
+	shown(p.at(-1));
+	return 0;
+}

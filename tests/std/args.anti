@@ -40,12 +40,12 @@ fn main(argv: []str, env: []str) -> int
 	if p.given("help") {
 		return 3;
 	}
-	io.println(p.text_of("output"));
+	io.println(p.text_of("output") ?? "none");
 	if p.int_of("jobs", 0) != 8 || p.int_of("output", 3) != 3 {
 		return 4;
 	}
 	for i in 0..p.len() {
-		io.println(p.at(i));
+		io.println(p.at(i) ?? "none");
 	}
 
 	let out = text.Builder.new();
