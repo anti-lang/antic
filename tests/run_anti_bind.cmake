@@ -305,6 +305,22 @@ elseif(CASE STREQUAL "unsigned_bitfield")
     endif()
     compile_binding(bits bindtest.bits)
     compare_probes(bits "${BIND}")
+elseif(CASE STREQUAL "fixed_enum")
+    # An enum with a fixed base takes that base on every target, and the
+    # two probes agree on the structs that hold one. T137 of
+    # docs/audit/tests-findings.md.
+    run("${ANTI}" bind --clang "${BIND}/fixed.h" --module bindtest.fixed
+        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/fixed.anti" module)
+    foreach(line "pub enum Small: c_uchar" "pub enum Wide: c_ulonglong")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "fixed.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
+    compile_binding(fixed bindtest.fixed)
+    # A fixed base is C23, so the probe of C is compiled as C23.
+    compare_probes(fixed "${BIND}" -std=c23)
 elseif(CASE STREQUAL "escaped_path")
     # A path given with a backslash, as every native path of Windows is.
     # clang escapes it in the line markers of `-E`, and the macros of the

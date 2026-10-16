@@ -1857,6 +1857,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - [provisional] A message of the JSON reader of `anti bind` that the caller's buffer cannot hold is cut and ends in `...`.
 - [provisional] `anti bind --clang` counts every line in `int64_t` and refuses a line marker of `clang -E` that names a line above 4294967295, with a message that names the marker and says it is out of range. Reason: clang keeps a line in an unsigned of 32 bits and writes no higher marker, and the bound keeps the count of the lines after a marker far inside its type. `#line 2147483647`, the last line C allows, binds.
 - [provisional] An enumerator without a value after `INT64_MAX` takes the bits of 2^63, through the unsigned sum, as an enumerator written above `INT64_MAX` does.
+- [provisional] An enum with a fixed base of C23, as `enum Small : unsigned char`, takes that base on every target, and `int` stays the default. Reason: C lays the enum out as its fixed base, which the reader passed over. The enum then took `c_int` and 4 bytes where C gives 1, and on Windows `unsigned long long` gave an int, by T137.
 
 ## Regular expressions
 

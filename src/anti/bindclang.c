@@ -836,6 +836,8 @@ static void declare_enum(struct reader *r, const struct json_value *node)
     int64_t next = 0;
     bool is_unsigned = false;
     bool above_int64 = false;
+    const char *fixed;
+    const struct bind_type *fixed_type;
     size_t i;
 
     if (tag != NULL) {
@@ -888,8 +890,17 @@ static void declare_enum(struct reader *r, const struct json_value *node)
        C, unless a value leaves its range. clang then gives the enum
        unsigned int when no value is negative. An unsigned enum with a
        value above INT64_MAX, whose bits stand in the int64_t as a
-       negative one, is c_ulonglong, apart from Windows. */
-    if (is_unsigned && above_int64 && !r->int_enums) {
+       negative one, is c_ulonglong, apart from Windows. A fixed base, as
+       `enum E : unsigned char`, is the base on every target, since C lays
+       the enum out as that type, by T137. */
+    fixed = json_member_string(json_get(node, "fixedUnderlyingType"),
+                               "qualType");
+    fixed_type = fixed != NULL ? parse(r, fixed) : NULL;
+    if (fixed_type != NULL && fixed_type->kind == BIND_SCALAR) {
+        if (strcmp(fixed_type->name, "c_int") != 0) {
+            e->base = fixed_type->name;
+        }
+    } else if (is_unsigned && above_int64 && !r->int_enums) {
         e->base = "c_ulonglong";
     } else if (high > 0x7FFFFFFF || low < -0x7FFFFFFF - 1) {
         e->base = low >= 0 && high <= 0xFFFFFFFFll ? "c_uint" : "c_longlong";
