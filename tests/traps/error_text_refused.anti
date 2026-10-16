@@ -1,0 +1,16 @@
+//! `Error.text` stops the program with the failure routine when its text finds
+//! no memory. Before the fix it gave the message alone. The message claims more
+//! bytes than any host gives, so the text cannot be made.
+
+import anti.lang;
+
+extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
+
+fn main() -> int
+{
+	let bytes: [4]byte = [0x41; 4];
+	let huge = anti_rt_text_slice(&bytes[0], 1 << 50);
+	let e = lang.Error.new(3, huge);
+	let t = e.text();
+	return (t.len & 0x3F) as int;
+}

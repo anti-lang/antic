@@ -1,0 +1,21 @@
+//! `StackTrace.symbolize` stops the program with the failure routine when the
+//! names of its frames find no memory. Before the fix it gave no frames. The
+//! trace claims more frames than any host has room to name. The program ends
+//! before the trace is deleted, which would free frames it does not own.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let one: [1]lang.RawFrame = [lang.RawFrame {
+		address: 0,
+		module: "",
+		build_id: "",
+		base: 0,
+	}; 1];
+	let t = alloc lang.StackTrace {
+		frames: []lang.RawFrame { ptr: &one[0], len: 1 << 50 },
+	};
+	let names = t.symbolize();
+	return (names.len & 0x3F) as int;
+}

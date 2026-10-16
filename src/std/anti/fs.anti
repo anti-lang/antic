@@ -26,6 +26,7 @@ extern fn fwrite(bytes: ?*byte, size: c_size_t, count: c_size_t,
 extern fn ferror(file: ?*byte) -> c_int;
 extern fn fflush(file: ?*byte) -> c_int;
 extern fn fclose(file: ?*byte) -> c_int;
+extern fn anti_rt_out_of_memory(size: int) -> never;
 
 /// How `open` opens a file.
 ///
@@ -167,7 +168,7 @@ pub fn read_file(path: str) -> []byte may fail
 		return []byte { ptr: none, len: 0 };
 	}
 	let room = alloc(byte, n) else {
-		fail lang.Error.new(1, "out of memory");
+		anti_rt_out_of_memory(n);
 	};
 	let got = read(f, []byte { ptr: room, len: n }) catch e {
 		free(room);

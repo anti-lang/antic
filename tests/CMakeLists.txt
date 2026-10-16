@@ -1977,6 +1977,13 @@ add_test(NAME std_may_fail_only
         "-DROOT=${ANTIC_STD_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_may_fail_only.cmake")
 
+# M330. Every `alloc(T, n)` of src/std/ stops the program when the memory
+# runs out, and no module fails for it.
+add_test(NAME std_out_of_memory
+    COMMAND "${CMAKE_COMMAND}"
+        "-DROOT=${ANTIC_STD_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_std_out_of_memory.cmake")
+
 # So is every failing function of the test programs. The functions the
 # listing skips write the form on purpose: construct_forms refuses it on
 # a `construct`, failing and error_values check that a function written
@@ -5120,12 +5127,14 @@ add_test(NAME trap_table
 # group past those of its pattern, and stops with the count of the
 # pattern. chan_capacity: a channel made for no value stops the program.
 # send_closed and send_closed_waiting: a `send` on a closed channel stops
-# it, one that waits on a full channel included. take_in_refused: the
-# text that `take_in` makes stops the program when its allocator gives no
-# memory, by decision 4 of "Decisions of 2026-10-11".
+# it, one that waits on a full channel included. take_in_refused,
+# error_text_refused and trace_names_refused: the text that `take_in`
+# makes, the text of an error and the names of a trace stop the program
+# when they find no memory, by decision 4 of "Decisions of 2026-10-11".
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         singleton_memory pattern_limit pattern_group_count chan_capacity
-        send_closed send_closed_waiting take_in_refused)
+        send_closed send_closed_waiting take_in_refused error_text_refused
+        trace_names_refused)
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

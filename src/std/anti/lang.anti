@@ -25,6 +25,7 @@ extern fn anti_rt_trace_text(frames: ?*RawFrame, count: int) -> ?*byte;
 extern fn anti_rt_trace_symbolize(frame: ?*RawFrame, out: ?*Frame);
 extern fn anti_rt_trace_install(handler: ?*TraceHandler);
 extern fn anti_rt_hash_seed() -> u64;
+extern fn anti_rt_out_of_memory(size: int) -> never;
 
 /// The most frames a trace keeps, the innermost ones.
 const TRACE_DEPTH: int = 64;
@@ -132,7 +133,7 @@ pub class StackTrace
 			return t;
 		}
 		let list = alloc(RawFrame, count) else {
-			return t;
+			anti_rt_out_of_memory(count *| size_of(RawFrame));
 		};
 		let i = 0;
 		while i < count do {
@@ -178,7 +179,7 @@ pub class StackTrace
 			return none_named;
 		}
 		let list = alloc(Frame, self.frames.len) else {
-			return none_named;
+			anti_rt_out_of_memory(self.frames.len *| size_of(Frame));
 		};
 		let i = 0;
 		while i < self.frames.len do {
@@ -247,7 +248,7 @@ pub class Error
 	/// cause follows on a line of its own after ` caused by: `, and the trace
 	/// of this error follows the causes when it has one. The text is formed at
 	/// the first call, and the error keeps its bytes until it is deleted. When
-	/// the memory for them runs out, the text is the message alone.
+	/// the memory for them runs out, the program stops with a message.
 	pub fn text(self) -> str
 	{
 		let made = self.text_cache;
@@ -270,8 +271,8 @@ pub class Error
 		if trace.len > 0 {
 			length += 1 + trace.len;
 		}
-		let room = alloc(byte, length + 1) else {
-			return self.message;
+		let room = alloc(byte, length +| 1) else {
+			anti_rt_out_of_memory(length +| 1);
 		};
 		let at = put_line(room, 0, self.at, self.code, self.message);
 		below = self.cause;

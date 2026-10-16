@@ -14,6 +14,7 @@ import anti.lang;
 import anti.text;
 
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
+extern fn anti_rt_out_of_memory(size: int) -> never;
 
 /// One declared option, with what the command line gave it.
 struct Option
@@ -289,7 +290,9 @@ pub class Parser
 			while size < self.rest_count + 1 do {
 				size = size * 2;
 			}
-			let room = alloc(str, size) else { return; };
+			let room = alloc(str, size) else {
+				anti_rt_out_of_memory(size *| size_of(str));
+			};
 			if self.rest.ptr != none {
 				memcpy(room as ?*byte, self.rest.ptr as ?*byte,
 					(self.rest_count * size_of(str)) as c_size_t);
@@ -314,7 +317,9 @@ pub class Parser
 		while size < wanted do {
 			size = size * 2;
 		}
-		let room = alloc(Option, size) else { return; };
+		let room = alloc(Option, size) else {
+			anti_rt_out_of_memory(size *| size_of(Option));
+		};
 		if self.options.ptr != none {
 			memcpy(room as ?*byte, self.options.ptr as ?*byte,
 				(self.count * size_of(Option)) as c_size_t);
