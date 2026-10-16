@@ -3,8 +3,9 @@
 
    DESIGN: the state stands apart from the loader, because every hook
    site of every program reaches it. A program that loads nothing pays
-   one load and one compare per object. It links no loader, no digest
-   and no reader of an index. */
+   one load and one compare per object. The start of the injections
+   links the loader into every program all the same, since
+   --anti.inject may name a library for any injectable interface. */
 #include "plugin.h"
 
 #include "atomic.h"

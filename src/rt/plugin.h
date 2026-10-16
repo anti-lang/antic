@@ -46,9 +46,10 @@ struct anti_slots {
     const unsigned char *bits;
 };
 
-/* DESIGN: the pass over the whole program writes anti_rt_slots into a
-   program that loads a library or injects an interface. The table is
-   empty where its calls reach no slot at all. reflect says that the
+/* DESIGN: the pass over the whole program writes anti_rt_slots into
+   every program and into every library for C that bundles the runtime,
+   since the runtime archive puts the loader in each. The table is empty
+   where its calls reach no slot at all. reflect says that the
    program calls through `reflect.call`, which takes a slot at run time
    and may therefore reach any of them. */
 struct anti_slot_table {
@@ -79,8 +80,9 @@ enum { ANTI_PLUGIN_MAX = 16 };
 
 /* DESIGN: the slots of the open libraries, the count of them and the
    two hooks that count their objects stand in src/rt/loaded.c. The hook
-   sites of every program reach them. A program that loads nothing
-   links no loader, no digest and no reader of an index. */
+   sites of every program reach them. Every program links the loader as
+   well, since the start of the injections takes a provider from the
+   library that --anti.inject names. */
 
 /* One open library. `live` counts the objects of its classes that the
    program has not deleted, which `unload` refuses to leave behind. */

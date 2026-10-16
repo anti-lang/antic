@@ -1,1 +1,1 @@
-anti: --anti\.inject: service\.Logger comes from a library: .*
+anti: --anti\.inject: service\.Logger comes from a library: lib/x\.so: .*

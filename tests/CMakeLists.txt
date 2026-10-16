@@ -5603,7 +5603,10 @@ add_test(NAME conf_hash_seed_random
 # singleton that inherits the interface, whose `get` the provider is.
 # One field is called `alloc`, which the
 # example of the overview writes. `inject final` then refuses a
-# replacement at start, and --anti.inspect lists what it injects. The runner
+# replacement at start, and --anti.inspect lists what it injects. The
+# program imports nothing, and the case plugin shows that its start opens
+# the library that --anti.inject names through the loader of the runtime,
+# which every program links, S328 of docs/audit/summary.md. The runner
 # is the one of the configuration tests, because a pattern file holds the
 # output of each.
 set(INJECT "${CMAKE_CURRENT_SOURCE_DIR}/inject")
