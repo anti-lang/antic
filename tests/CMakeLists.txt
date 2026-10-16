@@ -302,6 +302,10 @@ function(antic_program_test name source)
             ${optional}
             "-DWORK=${arg_WORK}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_program.cmake")
+    if(arg_SKIP_RUN)
+        set_tests_properties(${name} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endif()
     if(dev_fixtures)
         set_property(TEST ${name} PROPERTY FIXTURES_REQUIRED ${dev_fixtures})
     endif()
@@ -774,6 +778,8 @@ foreach(target windows-x86_64 windows-arm64)
             "-DTARGET=${target}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/${target}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_coff_plugin.cmake")
+    set_tests_properties(llvm_coff_plugin_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 # A library that keeps an `f16` converts it through two functions of the
 # runtime below x86-64-v3, and takes them from its host as it takes every
@@ -789,6 +795,8 @@ add_test(NAME llvm_coff_plugin_f16
         "-DLIBRARY=halves"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/f16"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_coff_plugin.cmake")
+set_tests_properties(llvm_coff_plugin_f16 PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # The archive holds a runtime per level, so that a program built with --cpu
 # below its target's default links a runtime of that level.
@@ -1815,7 +1823,8 @@ if(ANTIC_EMULATED_TARGET)
             OPTIONS "${ANTIC_X86_64_OPTIONS},--memory-checks"
             WORK "${CMAKE_CURRENT_BINARY_DIR}/memory-checks-x86_64")
         set_tests_properties(memory_checks_list_${emulated}
-            std_builder_room_memory_checks_${emulated} PROPERTIES TIMEOUT 120)
+            std_builder_room_memory_checks_${emulated} PROPERTIES TIMEOUT 120
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
     endif()
 endif()
 
@@ -6129,6 +6138,8 @@ if(ANTIC_LLVM_AR)
                 "-DTARGET=${ANTIC_HOST_TARGET}"
                 "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/run_clib.cmake")
+        set_tests_properties(clib_${case} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
     endforeach()
 endif()
 # Two bundled libraries of each Windows target on every host. The pinned
@@ -7028,6 +7039,20 @@ add_test(NAME options_covered_runner
         "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_options_covered.cmake"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/options-covered"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_options_covered_self.cmake")
+
+# A runner that prints SKIP: and returns ends with status 0, which ctest
+# counts as a pass unless the test sets SKIP_REGULAR_EXPRESSION.
+# skips_registered reads every test of the tree and refuses one whose
+# runner prints the line without the property.
+add_test(NAME skips_registered
+    COMMAND "${CMAKE_COMMAND}"
+        "-DCTEST=${CMAKE_CTEST_COMMAND}" "-DTREE=${CMAKE_BINARY_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_skips_registered.cmake")
+add_test(NAME skips_registered_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_skips_registered.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/skips-registered"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_skips_registered_self.cmake")
 
 # The known failures, by decision 30 of "Decisions of 2026-10-11" in
 # docs/decisions.md. tests/known-failures.txt lists the tests that show a
