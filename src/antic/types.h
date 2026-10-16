@@ -218,8 +218,8 @@ struct type {
     bool item_exported;
 
     /* The object model. A struct or an enum owns the functions and
-       constants of its body. A struct that declares or inherits an
-       abstract function is reached through a pointer of two words. */
+       constants of its body. A pointer to an interface of a class is one
+       pointer, to the sub-object of that interface inside the object. */
     struct item **members;
     size_t member_count;
     /* The names of the private functions of a class of another module,
@@ -434,7 +434,9 @@ struct type *types_fn_never(struct types *types, struct type *fn);
    the method, whose first parameter is `self`, and keeps its `may fail`. */
 struct type *types_bound_of(struct types *types, const struct type *fn);
 
-/* A new struct type without fields. Each call returns a distinct type. */
+/* The root class `anti.lang.Object`, whose one field is the table
+   pointer. The first call makes it, and every later call returns the
+   same type. */
 struct type *types_object(struct types *types);
 
 /* DESIGN: `anti.lang` is the root of the standard library and imports
@@ -933,7 +935,8 @@ int types_bits(const struct type *t);
    between threads. */
 bool types_pointer_free(const struct type *t);
 
-/* Whether t declares fields, which a struct, a union and a class do. */
+/* Whether t has fields: a struct, a union, a class, a tuple, a variant
+   and a `?T`, whose parts the walks over fields reach as fields. */
 bool types_has_fields(const struct type *t);
 
 /* The type whose `operator fn hash` the checked call names, one of the

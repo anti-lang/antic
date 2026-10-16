@@ -13,9 +13,9 @@
    or a variant is a type the checker builds by putting the arguments in
    place of the parameters. A call of a generic function puts them into
    its signature, from the written arguments or from the types of the
-   values it is given. Compiling the copies is a later pass. The checker
-   records the first use that needs one, and the driver refuses a build
-   past the front end that has one. */
+   values it is given. `sema_compile_copies` of `sema_copies.c` compiles
+   every copy at the end of `sema_check`, and refuses a copy it cannot
+   make yet with the reason. */
 
 /* The hook table, in the order of the bits of a TYPE_PARAM. The first
    fourteen are the operators, then the five language hooks and `hash`. */

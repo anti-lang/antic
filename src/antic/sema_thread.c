@@ -1,6 +1,8 @@
 /* The checks of the calls that threads share data through: the atomic
-   operations, the Mutex, channels and `sync`, and the workers that
-   `parallel` and `dispatch` run and `join` waits for. */
+   operations, `Mutex.new()` and `destroy`, the operations of a channel,
+   and the workers that `parallel` and `dispatch` run and `join` waits
+   for, with the second `join` of one job. `check_sync` of `sema_stmt.c`
+   checks the `sync` block. */
 
 #include <stdint.h>
 #include <stdlib.h>
