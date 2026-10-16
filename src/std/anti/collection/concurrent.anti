@@ -347,8 +347,9 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 			let part = self.part(i);
 			sync part.lock {
 				n += part.entries.update_all(test, fn(e) {
+					let k = dup(e.0);
 					change(e);
-					changed(part, e.0);
+					changed(part, k);
 				});
 			}
 			i += 1;
@@ -833,6 +834,12 @@ fn made_parts<K: eq + hash, V>(from: *mem.Allocator, capacity: int)
 
 /// Give the entry of `k` in `part` a version the part never gave before, with
 /// the lock of `part` held.
+///
+/// DESIGN: a change that `update_*` lends may rewrite the key, which the table
+/// of the part puts back only after the change returns. The caller copies the
+/// key before the change and stamps the copy, as `SyncMap` does, so both maps
+/// follow one rule. By M338 of the third audit: the stamp went to the key the
+/// change wrote, and the entry kept its old version.
 fn changed<K: eq + hash, V>(part: *Part<K, V>, k: K)
 {
 	part.clock += 1;
@@ -845,8 +852,9 @@ fn update_in<K: eq + hash, V>(part: *Part<K, V>, test: fn((K, V)) -> bool,
 	change: fn(lent *(K, V))) -> bool
 {
 	return part.entries.update_first(test, fn(e) {
+		let k = dup(e.0);
 		change(e);
-		changed(part, e.0);
+		changed(part, k);
 	});
 }
 

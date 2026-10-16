@@ -1979,6 +1979,14 @@ foreach(name IN ITEMS sync_list sync_list_threads sync_map sync_map_threads
             collection/pool collection/synchronized
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 endforeach()
+# A change that rewrites the key of an entry, in both kinds of thread-safe
+# map, in dev mode.
+antic_program_test(std_map_key_rewrite_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/map_key_rewrite.anti"
+    OPTIONS "--dev"
+    DEV ${collection_dev} collection/list collection/map collection/set
+        collection/pool collection/concurrent collection/synchronized
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 # `dup` and the hash of every collection in dev mode. Each program holds
 # every collection, so the link names the object of every collection
 # module.

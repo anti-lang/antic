@@ -1,0 +1,5 @@
+exit 0
+ConcurrentMap.update_all: version moved 1, old version refused 1, value 11
+ConcurrentMap.update_first: version moved 1, old version refused 1, value 11
+SyncMap.update_all: version moved 1, old version refused 1, value 11
+SyncMap.update_first: version moved 1, old version refused 1, value 11

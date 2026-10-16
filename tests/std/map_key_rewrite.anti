@@ -1,0 +1,86 @@
+//! A change that rewrites the key of an entry of a `ConcurrentMap` or a
+//! `SyncMap`.
+//!
+//! The map puts the key back after the change, and the entry takes a new
+//! version all the same, so `set_if_version` with the version read before the
+//! change fails. Both maps follow one rule: the key is copied before the change
+//! and stamped after it.
+
+import anti.collection;
+import anti.collection.concurrent.{ConcurrentMap};
+import anti.collection.synchronized.{SyncMap};
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// One line that names the map and the form, and what the change left.
+fn report(name: str, moved: bool, refused: bool, value: int)
+{
+	printf("%.*s: version moved %d, old version refused %d, value %d\n".ptr,
+		name.len as c_int, name.ptr, moved as c_int, refused as c_int,
+		value as c_int);
+}
+
+/// The change of every form below: the key 5 and the value 11.
+fn rewrite(lent e: *(int, int))
+{
+	e.0 = 5;
+	e.1 = 11;
+}
+
+fn of_concurrent(first: bool)
+{
+	let m = ConcurrentMap<int, int>.new();
+	m.set(1, 10);
+	let (v, old) = m.get_versioned(1) ?? (-1, -1);
+	let name = "ConcurrentMap.update_all";
+	if first {
+		name = "ConcurrentMap.update_first";
+		m.update_first(fn(e) {
+			return e.0 == 1;
+		}, rewrite);
+	} else {
+		m.update_all(fn(e) {
+			return e.0 == 1;
+		}, rewrite);
+	}
+	let (w, now) = m.get_versioned(1) ?? (-1, -1);
+	let refused = false;
+	m.set_if_version(1, 99, old) catch e {
+		refused = true;
+	};
+	report(name, now != old, refused, m.get(1) ?? -1);
+}
+
+fn of_synchronized(first: bool)
+{
+	let m = SyncMap<int, int>.new();
+	m.set(1, 10);
+	let (v, old) = m.get_versioned(1) ?? (-1, -1);
+	let name = "SyncMap.update_all";
+	if first {
+		name = "SyncMap.update_first";
+		m.update_first(fn(e) {
+			return e.0 == 1;
+		}, rewrite);
+	} else {
+		m.update_all(fn(e) {
+			return e.0 == 1;
+		}, rewrite);
+	}
+	let (w, now) = m.get_versioned(1) ?? (-1, -1);
+	let refused = false;
+	m.set_if_version(1, 99, old) catch e {
+		refused = true;
+	};
+	report(name, now != old, refused, m.get(1) ?? -1);
+}
+
+fn main() -> int
+{
+	of_concurrent(false);
+	of_concurrent(true);
+	of_synchronized(false);
+	of_synchronized(true);
+	return 0;
+}
