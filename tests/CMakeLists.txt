@@ -2994,13 +2994,22 @@ add_test(NAME sysroot_links
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_sysroot_links.cmake")
 # The package of this host, packed from the antic of this build. It needs
 # the sysroots of every target, which every package carries.
-if(EXISTS "${ANTIC_SYSROOT_DIR}/linux-x86_64" AND
-   EXISTS "${ANTIC_SYSROOT_DIR}/linux-arm64" AND
-   EXISTS "${ANTIC_SYSROOT_DIR}/macos-arm64" AND
-   EXISTS "${ANTIC_SYSROOT_DIR}/macos-x86_64" AND
-   EXISTS "${ANTIC_SYSROOT_DIR}/windows-x86_64" AND
-   EXISTS "${ANTIC_SYSROOT_DIR}/windows-arm64" AND
-   EXISTS "${ANTIC_SYSROOT_DIR}/licenses")
+set(package_missing "")
+foreach(dir linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
+        windows-x86_64 windows-arm64 licenses)
+    if(NOT EXISTS "${ANTIC_SYSROOT_DIR}/${dir}")
+        list(APPEND package_missing "${dir}")
+    endif()
+endforeach()
+if(package_missing)
+    # Fail rather than skip, so a missing sysroot cannot pass unnoticed.
+    list(JOIN package_missing " " package_missing)
+    add_test(NAME package_keys
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "sysroots not found in ${ANTIC_SYSROOT_DIR}: ${package_missing}: run tools/get-sysroot.cmake")
+    set_tests_properties(package_keys PROPERTIES
+        FAIL_REGULAR_EXPRESSION "sysroots not found")
+else()
     add_test(NAME package_keys
         COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
                 "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
@@ -5195,10 +5204,17 @@ endif()
 # macOS and gdb on Linux. A breakpoint by file and line in an imported
 # module and a backtrace of Anti function names.
 # A Windows link writes CodeView, which neither reads, so a Windows host
-# runs no test of them even where a gdb stands on its path.
+# runs no test of them even where a gdb stands on its path. A host without
+# a debugger reports the test skipped and names the reason.
 find_program(ANTIC_LLDB NAMES lldb DOC "the debugger of macOS")
 find_program(ANTIC_GDB NAMES gdb DOC "the debugger of Linux")
-if(ANTIC_LLVM_MC AND (ANTIC_LLDB OR ANTIC_GDB) AND NOT WIN32)
+if(NOT WIN32 AND NOT ANTIC_LLDB AND NOT ANTIC_GDB)
+    add_test(NAME debug_info
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "SKIP: neither lldb nor gdb is on the path")
+    set_tests_properties(debug_info PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+elseif(ANTIC_LLVM_MC AND NOT WIN32)
     if(APPLE AND ANTIC_LLDB)
         set(debugger "${ANTIC_LLDB}")
         set(debugger_kind lldb)
