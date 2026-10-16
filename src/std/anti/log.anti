@@ -21,6 +21,7 @@ import anti.fs;
 import anti.lang;
 import anti.io;
 import anti.json;
+import anti.mem;
 import anti.runtime;
 import anti.text;
 import anti.time;
@@ -58,7 +59,11 @@ pub class StderrSink inherits Sink
 /// A sink that appends to a file.
 pub class FileSink inherits Sink
 {
-	file: ?*fs.File,
+	/* DESIGN: the sink shares its file with every copy `dup` makes of it,
+	   and the last of them closes it. By S318 of the third audit: a copy
+	   held the address of a file its original closed, and wrote to it and
+	   closed it again. */
+	file: mem.Shared<OpenFile>,
 
 	/// A sink that appends to the file at `path`, which may fail.
 	///
@@ -69,29 +74,32 @@ pub class FileSink inherits Sink
 		/* Binary, as every mode of anti.fs is, so a line ends with LF on
 		   Windows as well. */
 		let file = try fs.open(path, fs.Mode.Append);
-		return alloc FileSink { file: file };
+		return alloc FileSink {
+			file: mem.Shared<OpenFile>.new(OpenFile { file: file }),
+		};
 	}
 
 	concrete fn write(self, line: str)
 	{
-		let file = self.file else {
-			return;
-		};
-		/* A sink has no way to report, so a line the system will not
-		   store is lost, as one written to a closed standard error is. */
-		fs.write(file, []byte { ptr: line.ptr, len: line.len }) catch ignored {
-			return;
-		};
-		fs.flush(file) catch ignored { };
+		self.file.read(fn(open) {
+			/* A sink has no way to report, so a line the system will not
+			   store is lost, as one written to a closed standard error is. */
+			fs.write(open.file, []byte { ptr: line.ptr, len: line.len }) catch ignored {
+				return;
+			};
+			fs.flush(open.file) catch ignored { };
+		});
 	}
+}
+
+/// The file of a `FileSink` and of its copies, which the last of them closes.
+class OpenFile
+{
+	pub file: *fs.File,
 
 	fn destruct(self)
 	{
-		let file = self.file else {
-			return;
-		};
-		self.file = none;
-		fs.close(file) catch ignored { };
+		fs.close(self.file) catch ignored { };
 	}
 }
 

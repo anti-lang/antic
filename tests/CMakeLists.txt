@@ -1901,9 +1901,15 @@ antic_program_test(std_error_copies_memory_checks
     "${CMAKE_CURRENT_SOURCE_DIR}/std/error_copies.anti"
     OPTIONS --memory-checks
     WORK "${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks")
+# A copy of a file sink of anti.log under --memory-checks, which reports a
+# write to the file after the original closed it.
+antic_program_test(std_file_sink_dup_memory_checks
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/file_sink_dup.anti"
+    OPTIONS --memory-checks
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks")
 if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
-    set_tests_properties(std_error_copies_memory_checks PROPERTIES
-        DISABLED TRUE)
+    set_tests_properties(std_error_copies_memory_checks
+        std_file_sink_dup_memory_checks PROPERTIES DISABLED TRUE)
 endif()
 
 # The collections on handles and the heap and the sequences in dev mode,

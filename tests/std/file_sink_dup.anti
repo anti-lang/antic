@@ -1,0 +1,29 @@
+//! `dup` of a `FileSink` of `anti.log`.
+//!
+//! The copy appends to the same file as the sink it copies, and the file stays
+//! open until the last of the two is gone. A line the copy writes after the
+//! original is deleted reaches the file, and the run under `--memory-checks`
+//! reports a write to a closed file and a file closed twice.
+import anti.fs;
+import anti.lang;
+import anti.log;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const PATH: str = "file-sink-dup.out";
+
+fn main() -> int
+{
+	fs.remove(PATH) catch ignored { };
+	let sink = log.FileSink.new(PATH) catch fatal;
+	sink.write("from the original\n");
+	let copy = dup(sink);
+	delete(sink);
+	copy.write("from the copy\n");
+	delete(copy);
+	let bytes = fs.read_file(PATH) catch fatal;
+	printf("%.*s".ptr, bytes.len as c_int, bytes.ptr);
+	free(bytes.ptr);
+	fs.remove(PATH) catch fatal;
+	return 0;
+}
