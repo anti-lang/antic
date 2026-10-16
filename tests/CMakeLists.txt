@@ -6328,6 +6328,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "fn_may_fail|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/fn_may_fail.s,fn_may_fail.anti"
         "concrete_signature|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/concrete_signature.s,concrete_signature.anti"
         "final_replace|-S,-o,${LISTINGS}/final_replace.s,final_replace.anti"
+        "refused_base_uses|-S,-o,${LISTINGS}/refused_base_uses.s,refused_base_uses.anti"
         "worker_walk|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/worker_walk.s,worker_walk.anti"
         "assert_call|-S,-o,${LISTINGS}/assert_call.s,assert_call.anti"
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"

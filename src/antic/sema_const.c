@@ -104,8 +104,12 @@ static bool class_value(struct checker *c, const struct expr *lit,
         struct const_value *item = &out->as.aggregate.items[j];
         item->kind = CONST_DEFAULT;
         item->type = s->fields[j].type;
+        /* The base field of a class whose base was refused has no
+           type. The refusal is the message, and the field stays a
+           default. */
         if (s->fields[j].form == FIELD_BASE) {
-            if (!class_value(c, lit, s->fields[j].type, item)) {
+            if (s->fields[j].type != NULL &&
+                !class_value(c, lit, s->fields[j].type, item)) {
                 return false;
             }
             continue;

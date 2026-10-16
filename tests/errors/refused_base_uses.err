@@ -1,0 +1,2 @@
+refused_base_uses.anti:11:12: error: `Spot` cannot inherit `final` class `Dot`
+refused_base_uses.anti:16:12: error: `Missing` is not a class

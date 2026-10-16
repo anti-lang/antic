@@ -2132,7 +2132,10 @@ static bool pointer_free(const struct type *t, struct ptr_set *answered)
            through either. A class whose other fields are pointer-free is
            therefore pointer-free, and `[]Circle` chunks like any array. */
         for (i = 0; i < t->field_count; i++) {
-            if (t->fields[i].form == FIELD_TABLE || t->fields[i].owned) {
+            /* The base field of a class whose base was refused has no
+               type, and the refusal is the message of the mistake. */
+            if (t->fields[i].form == FIELD_TABLE || t->fields[i].owned ||
+                t->fields[i].type == NULL) {
                 continue;
             }
             if (!pointer_free(t->fields[i].type, answered)) {

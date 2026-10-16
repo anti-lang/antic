@@ -1,0 +1,46 @@
+//! A class whose base is refused is still named after the refusal: by a
+//! channel, by a `parallel` over an array of it, by an `own` parameter and by
+//! the default of a field. The refusal of each base is the one message of the
+//! program, and the checker reads no part of the class it lacks.
+
+final class Dot
+{
+	pub r: int = 0,
+}
+
+class Spot inherits Dot
+{
+	pub x: int = 0,
+}
+
+class Mark inherits Missing
+{
+	pub y: int = 0,
+}
+
+class Holder
+{
+	spot: Spot = Spot { x: 1 },
+	mark: Mark = Mark { y: 2 },
+}
+
+worker fn count(chunk: []Spot) -> int
+{
+	return chunk.len;
+}
+
+fn keep(own s: Spot) -> int
+{
+	return s.x;
+}
+
+fn main() -> int
+{
+	let spots = chan Spot(4);
+	let marks = chan Mark(4);
+	let items = [Spot { x: 1 }, Spot { x: 2 }];
+	let parts = parallel items[0..2] by 1 -> count();
+	free(parts.ptr);
+	let s = Spot { x: 3 };
+	return keep(s);
+}
