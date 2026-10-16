@@ -195,13 +195,13 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 | S321 | `sema_operator.c:470` | The DESIGN says two pointers compare whether or not either may hold `none`. `comparable_pointers` compares the addresses of two parameter arrays, so `fn(int) == ?fn(int)` is refused. | new | front-end |
 | S322 | `driver.h:26` | The comments of `opt`, `llc` and `llvm_ar` at line 114 promise a fallback to PATH. `driver_archive_tool` refuses a tool that `bin/` of the archive lacks. | new | back-end |
 | S323 | `docs/decisions.md:1227` | "Build ids" and "Debug information" describe `.file` and `.loc` directives, llvm-mc and `src/antic/debug.c`. The entry on C99 at line 1229 stands against `DW_LANG_C11` in `llvm_debug.c:115`. About twenty more entries from line 916 state the native back end as current. | new | back-end, structure, tool-pass |
-| S324 | `src/rt/json.h:66` | `anti_rt_json_value` and `anti_rt_json_member` are said to take one value of the grammar. `anti_rt_json_skip` takes `+-.e` as a number, and `member` of `anti.json` gives it out. | new | library-file |
+| S324 | `src/rt/json.h:66` | `anti_rt_json_value` and `anti_rt_json_member` are said to take one value of the grammar. `anti_rt_json_skip` takes `+-.e` as a number, and `member` of `anti.json` gives it out. | fixed `7c16ab47` | library-file |
 | S325 | `src/rt/trace.c:5` | The DESIGN says the capture reads nothing from a file. On Linux `elf_id` reads the whole file of every module but the runtime's own. | new | rt |
 | S326 | `src/rt/rt.h:6` | `anti_rt_init` is said to run on the first use of the runtime in a static library for C. No code runs it there. Line 21 names `start.c` as the writer of an option that `conf.c:274` writes. | new | rt |
 | S327 | `src/rt/cpu.c:1` | The header says antic writes the level into the object of `main` and `start.c` passes it. The level is a macro of the runtime's own compile. | new | rt |
 | S328 | `src/rt/plugin.h:80` | Three comments say a program that loads nothing links no loader. `conf.c:813` calls the loader in every program. `plugin.h:49` and `loaded.c:4` are the other two. | new | rt |
 | S329 | `src/rt/threads.h:34` | `join` of a null job is said to write nothing. `threads.c:350` writes `result_size` zero bytes. | new | rt |
-| S330 | `src/rt/patterns.c:695` | `patch` is said to find a misfit before any byte changes. The second pass searches the data it writes, so a lookahead group returns `MISFIT` with the data changed. Read, not run. | new | rt |
+| S330 | `src/rt/patterns.c:695` | `patch` is said to find a misfit before any byte changes. The second pass searches the data it writes, so a lookahead group returns `MISFIT` with the data changed. Read, not run. | fixed `e4688507` | rt |
 | S331 | `src/rt/object.c:13` | Two DESIGN comments describe what was replaced: default bodies that walk the field list, and an array field serialized as null. `object.c:710` is the second. | new | rt |
 | S332 | `src/std/anti/log.anti:15` | The header describes a file of `level`, `format` and `[[sink]]` entries with a level each. `first_sink` reads `kind` and `path`, makes one sink and stops at the eighth entry. | new | std |
 | S333 | `src/anti/bindmodel.h:168` | `bind_is_keyword` is said to answer for a word the lexer reserves. It answers true for every text that is no identifier, and the reader of a header holds a name to no rule. | new | anti-tool |
@@ -267,7 +267,8 @@ Rule 15, tests with malformed input:
 
 - M313. `src/rt/regex.c:436`. The rewriter of a byte pattern has no test
   of a pattern cut short. S304 and S305 lack a test as well. New.
-  library-file.
+  library-file. Fixed `3ed05df4` for the rewriter. S304 and S305 take
+  their tests in step 12.
 - M314. `tests/unit/test_symbols.c:392`. The ELF and DWARF readers have
   no test of a file cut short, and none of a line table of DWARF 2 or 3.
   Still open in part, M43. rt.
@@ -504,15 +505,15 @@ directory are in `src/antic/`.
 | 1 | 2 | The format attribute on six runtime functions, `src/rt/assert.c:10`, still open (tool-pass). A text kept in `char bytes[1]`, `src/rt/trace.c:50` (rt). |
 | 3 | 3 | Conversions the implementation defines, `types.c:373` (front-end). Lengths narrowed to `int`, with rule 16, `src/rt/assert.c:66`, and `serialize` called through another type, `src/rt/object.c:757` (rt). |
 | 4 | 1 | The walk order of a `HashMap` falls back to one order, `src/std/anti/collection/map.anti:475` (std). |
-| 5 | 3 | Products before an allocation, `sema.c:1292` (front-end), `lower_expr.c:1916` (middle) and `src/rt/toml.c:104` (library-file). |
+| 5 | 3 | Products before an allocation, `sema.c:1292` (front-end), `lower_expr.c:1916` (middle) and `src/rt/toml.c:104` (library-file), fixed `6ec49dc0`. |
 | 6 | 3 | A loop without its bound, `pattern.c:1019` (front-end). Arrays filled to a hand-counted bound, `llvm_run.c:224` (back-end). An index of the token lists, `tests/unit/test_modules.c:54` (tests). |
 | 8 | 1 | A field cleared through a pointer that may be unaligned, `src/rt/registry.c:237` (rt). |
 | 9 | 3 | `snprintf` results not read, `sema_const.c:191` (front-end), `whole_tables.c:1481`, still open from the first audit (middle), and `abi.c:12` (back-end). |
 | 10 | 2 | A signature without its length, `src/rt/call.c:37` (rt). A `str` read as a C string, `src/std/anti/os.anti:53` (std). |
 | 11 | 2 | Returned memory without its owner, `pattern.c:9` (front-end) and `src/rt/registry.h:47` (rt). |
-| 12 | 4 | Releases before each return, `parser_item.c:15` (front-end), `src/rt/regex.c:491` (library-file), `src/rt/platform_posix.c:92` (rt) and `src/anti/main.c:198` (anti-tool). |
+| 12 | 4 | Releases before each return, `parser_item.c:15` (front-end), `src/rt/regex.c:491` (library-file), fixed `0d2a7566`, `src/rt/platform_posix.c:92` (rt) and `src/anti/main.c:198` (anti-tool). |
 | 13 | 1 | The start of a Windows program aborts without a line, `src/rt/platform_windows.c:1363` (rt). |
-| 14 | 11 | Smaller gaps of the front-end readers, `modpath.c:93` (front-end). Names with a NUL, flag bytes above 1, a narrowed address and a field of type `none`, `antl_tree.c:1459`, `antl_read.c:515`, `antl_read_ir.c:417` and `antl_read.c:917`, and a quadratic scan, `src/rt/toml.c:139` (library-file). Two readers that take what they should refuse, `src/rt/registry.c:734` (rt). Two forms of `args`, `src/std/anti/args.anti:251` (std). Paths read without the test of a regular file, `src/anti/syms.c:343`, names not held against the words of Anti, `src/anti/bindwrite.c:263`, and zero added to NULL, `src/anti/zip.c:673` (anti-tool). |
+| 14 | 11 | Smaller gaps of the front-end readers, `modpath.c:93` (front-end). Names with a NUL, flag bytes above 1, a narrowed address and a field of type `none`, `antl_tree.c:1459`, `antl_read.c:515`, `antl_read_ir.c:417` and `antl_read.c:917`, and a quadratic scan, `src/rt/toml.c:139` (library-file). The NUL of a group name in `src/rt/regex.c:578` is fixed `9bc09550`, and the scan `b71e491e`. Two readers that take what they should refuse, `src/rt/registry.c:734` (rt). Two forms of `args`, `src/std/anti/args.anti:251` (std). Paths read without the test of a regular file, `src/anti/syms.c:343`, names not held against the words of Anti, `src/anti/bindwrite.c:263`, and zero added to NULL, `src/anti/zip.c:673` (anti-tool). |
 | 15 | 1 | Refusals and paths without a test, `sema_copies.c:90` (front-end). |
 | 16 | 1 | Counters of `int`, `parser.c:349` (front-end). |
 | 17 | 1 | The fields of the zip format in `unsigned long`, `src/anti/zip.c:43` (anti-tool). |
