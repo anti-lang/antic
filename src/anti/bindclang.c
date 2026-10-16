@@ -25,19 +25,21 @@
    the configure step installs into build/deps/clang of the checkout. anti
    lies in a tree of build/, such as build/host, so the pinned clang is
    deps/clang/bin/clang under the directory above the one that holds
-   anti. Elsewhere it is the first clang on PATH, which a bare name finds. */
+   anti. The directory of anti is cut at the separator of the host, which
+   is `\` as well on Windows, by T140. Elsewhere it is the first clang on
+   PATH, which a bare name finds. */
 static void find_clang(struct text *out)
 {
     struct text dir = {0};
     enum target host;
     const char *suffix = "";
-    char *slash;
+    const char *slash;
 
     if (target_host(&host)) {
         suffix = target_info(host)->executable_suffix;
     }
     if (self_directory(&dir)) {
-        slash = strrchr(dir.data, '/');
+        slash = platform_last_separator(dir.data);
         if (slash != NULL) {
             struct text pinned = {0};
             text_appendf(&pinned, "%.*s/deps/clang/bin/clang%s",
