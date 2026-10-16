@@ -602,6 +602,8 @@ A header maps as follows.
 
 A macro with parameters and a macro whose text is no constant expression are not bound. A macro without a value is passed over with a warning.
 
+A name that is a word of Anti takes a trailing `_` in the binding, so `struct type` becomes `pub struct type_`. A function of such a name is left out with a warning, since its name is its symbol, and so is a macro. A header that declares a name that is no C identifier, as `a$b`, is refused.
+
 The header below is the input of the example.
 
 ```c
