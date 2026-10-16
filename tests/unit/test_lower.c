@@ -1030,10 +1030,9 @@ struct rt_effects_row {
 static const struct rt_effects_row rt_effects_rows[] = {
     /* memcmp over the two runs the arguments point to. */
     {"anti_rt_compare_bytes", IR_EFFECTS_READS_ARGS, RT_SETTLED},
-    /* malloc and memcpy from the argument. malloc is not nosync, and it
-       sets errno when it fails. */
-    {"anti_rt_copy_buffer", IR_EFFECTS_WRITES_ARGS,
-     IR_WILLRETURN | IR_NOFREE},
+    /* malloc and memcpy from the argument. malloc is not nosync, and the
+       program ends when it fails. */
+    {"anti_rt_copy_buffer", IR_EFFECTS_WRITES_ARGS, IR_NOFREE},
     /* Arithmetic on the argument. */
     {"anti_rt_f16_to_f32", IR_EFFECTS_NONE, RT_SETTLED},
     {"anti_rt_f32_to_f16", IR_EFFECTS_NONE, RT_SETTLED},

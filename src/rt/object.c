@@ -1028,7 +1028,8 @@ void anti_lang_Object_copy(struct anti_object *self, struct anti_object *to)
    the compiler writes for every class. The destruct and copy entries of
    the table hold them. Ownership therefore never depends on the field
    list, which --no-reflect drops. A copy keeps the place a pointer to an
-   interface points at, in the new object. */
+   interface points at, in the new object. Memory that runs out for the
+   copy ends the program, by decision 4 of "Decisions of 2026-10-11". */
 void *anti_rt_dup(void *object, const struct anti_descriptor *type)
 {
     char *start = checked_object(object, type);
@@ -1043,7 +1044,7 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type)
     }
     made = malloc((size_t)d->size);
     if (made == NULL) {
-        return NULL;
+        anti_rt_out_of_memory(d->size);
     }
     copy((struct anti_object *)start, (struct anti_object *)made);
     anti_rt_plugin_created(((struct anti_object *)made)->table);
@@ -1150,8 +1151,9 @@ void *anti_rt_copy_buffer(const void *from, int64_t bytes)
         return NULL;
     }
     made = malloc((size_t)bytes);
-    if (made != NULL) {
-        memcpy(made, from, (size_t)bytes);
+    if (made == NULL) {
+        anti_rt_out_of_memory(bytes);
     }
+    memcpy(made, from, (size_t)bytes);
     return made;
 }

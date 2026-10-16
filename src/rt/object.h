@@ -288,8 +288,10 @@ const void *anti_rt_body_entry(anti_rt_body body);
    zero. A null object is left alone. */
 
 /* A copy of the object on the heap of the C library, of its concrete
-   size, or NULL. The copy entry of its table makes it. The caller frees
-   it with anti_rt_delete, which `delete` calls. */
+   size, or NULL for an object without a descriptor or a copy entry. The
+   copy entry of its table makes it. Memory that runs out ends the program
+   through anti_rt_out_of_memory. The caller frees it with
+   anti_rt_delete, which `delete` calls. */
 void *anti_rt_dup(void *object, const struct anti_descriptor *type);
 
 /* DESIGN: memory goes back to the allocator it came from. The teardown
@@ -372,7 +374,8 @@ int32_t anti_rt_json_unquote(struct anti_builder *b,
 void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg);
 
 /* A new buffer on the heap with the bytes at from, or NULL when there are
-   none. The caller frees it with free. */
+   none. Memory that runs out ends the program through
+   anti_rt_out_of_memory. The caller frees it with free. */
 void *anti_rt_copy_buffer(const void *from, int64_t bytes);
 
 /* A snapshot on the heap of size bytes, the size in its first eight.

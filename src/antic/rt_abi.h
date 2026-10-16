@@ -94,8 +94,8 @@
 /* Copies between the memory its arguments point to. */
 #define RT_WRITES (IR_EFFECTS_WRITES_ARGS, IR_GUARANTEES)
 /* Copies the memory of an argument into memory of malloc, which is not
-   nosync. */
-#define RT_ALLOCATES (IR_EFFECTS_WRITES_ARGS, IR_WILLRETURN | IR_NOFREE)
+   nosync, and ends the program when malloc fails, so it may not return. */
+#define RT_ALLOCATES (IR_EFFECTS_WRITES_ARGS, IR_NOFREE)
 /* Grows a buffer with realloc, which frees the old one, and ends the
    program when it fails. */
 #define RT_REALLOCATES (IR_EFFECTS_WRITES_ARGS, 0)

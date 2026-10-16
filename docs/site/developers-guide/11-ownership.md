@@ -839,7 +839,7 @@ b0:
 
 - The `memcpy` copies all 24 bytes, the table pointer and the address in `data` among them.
 - The two `getelementptr` lines give the address of `data` at offset 8 in the source and in the copy.
-- `anti_rt_copy_buffer(%v7, 8)` allocates 8 bytes with `malloc` and copies the `int` into them.
+- `anti_rt_copy_buffer(%v7, 8)` allocates 8 bytes with `malloc` and copies the `int` into them. When no memory is left, the program ends with a message, as `dup(p)` below does.
 - The `store` puts the new address into the copy, which now owns a cell of its own.
 - `anti_rt_hook_copied`, in the lines before, is the `copied` hook of [chapter 15]({{% relref "15-hooks" %}}).
 
