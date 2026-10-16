@@ -1,4 +1,5 @@
 #include "atomic.h"
+#include "hash.h"
 #include "rt.h"
 
 /* 1 once anti_rt_init began, and 1 once it ran. main, or the constructor

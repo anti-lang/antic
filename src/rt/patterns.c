@@ -2,10 +2,11 @@
    the messages of the errors of a pattern compiled at run time. */
 #include "atomic.h"
 #include "cpu_level.h"
+#include "fail.h"
 #include "grow.h"
+#include "platform.h"
 #include "regex.h"
-#include "rt.h"
-#include "std.h"
+#include "str.h"
 
 #include <stdbool.h>
 #include <stdlib.h>

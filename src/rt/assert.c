@@ -1,7 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "std.h"
+#include "fail.h"
 
 /* The one form of every line the runtime writes to standard error. */
 static void write_line(const char *format, va_list rest)

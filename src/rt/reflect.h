@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "object.h"
-#include "std.h"
+#include "str.h"
 
 /* The kinds of anti.reflect.ValueKind, in its order. */
 enum anti_value_kind {

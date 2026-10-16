@@ -10,12 +10,14 @@
 #include "lower.h"
 #include "object.h"
 #include "std.h"
+#include "fail.h"
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
 
 #include "atomic.h"
 #include "f16.h"
+#include "hash.h"
 #include "hooks.h"
 #include "inject.h"
 #include "layout.h"
@@ -419,7 +421,7 @@ static void checks_kind_of(const char *source, int kind)
 }
 
 /* DESIGN: a failed check names the values it prints by the kind of enum
-   anti_check in src/rt/std.h, which the runtime reads. Lowering writes that
+   anti_check in src/rt/fail.h, which the runtime reads. Lowering writes that
    number into the call, and this test pins the two together. */
 static void records_check_kinds(void)
 {

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "f16.h"
+#include "fail.h"
 #include "json.h"
 #include "object.h"
 #include "plugin.h"

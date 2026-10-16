@@ -26,9 +26,7 @@
 
 #include "cpu_level.h"
 #include "platform.h"
-#include "rt.h"
 #include "signals.h"
-#include "std.h"
 #include "utf.h"
 
 /* See the DESIGN comment of the same function in platform_posix.c. */
@@ -1110,7 +1108,7 @@ void *anti_rt_malloc_aligned(size_t size, size_t align)
     return malloc(size);
 }
 
-/* See rt.h. Windows has no leak check in its runtime of
+/* See platform.h. Windows has no leak check in its runtime of
    AddressSanitizer, so no program replaces this definition, and it is
    not weak. */
 void anti_rt_memory_kept(const void *p)

@@ -1,4 +1,4 @@
-#include "std.h"
+#include "fail.h"
 
 /* DESIGN: `p as *T` on a class pointer traps when the object is of no
    class below T. The compiler passes the name of T, which lives in the

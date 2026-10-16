@@ -11,11 +11,10 @@
 #include <string.h>
 
 #include "conf.h"
+#include "fail.h"
 #include "hooks.h"
 #include "object.h"
 #include "platform.h"
-#include "rt.h"
-#include "std.h"
 #include "threads.h"
 
 /* DESIGN: one dispatched object. The pool runs it and `join` waits for

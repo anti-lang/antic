@@ -8,9 +8,9 @@
 #include <string.h>
 #include "conf.h"
 #include "cpu_level.h"
+#include "fail.h"
 #include "platform.h"
 #include "rt.h"
-#include "std.h"
 
 /* The layouts of Anti's str and []str. */
 struct anti_str {

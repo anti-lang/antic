@@ -34,8 +34,6 @@
 
 #include "cpu_level.h"
 #include "platform.h"
-#include "rt.h"
-#include "std.h"
 #include "utf.h"
 
 /* DESIGN: anti.os builds the per-user directories, and the conventions
@@ -54,7 +52,7 @@ const unsigned char *anti_rt_errno_text(int32_t code)
     return (const unsigned char *)strerror((int)code);
 }
 
-/* See the DESIGN comment of the declaration in std.h. */
+/* See the DESIGN comment of the declaration in platform.h. */
 int32_t anti_rt_last_error(void)
 {
     return 0;
@@ -824,7 +822,7 @@ void *anti_rt_malloc_aligned(size_t size, size_t align)
 }
 
 /* DESIGN: the runtime marks what it keeps until exit through a function
-   that a program of --memory-checks replaces, see rt.h. The definition
+   that a program of --memory-checks replaces, see platform.h. The definition
    here is weak on ELF and Mach-O, so the one of the program wins and
    every other program pays one call that returns. */
 __attribute__((weak)) void anti_rt_memory_kept(const void *p)

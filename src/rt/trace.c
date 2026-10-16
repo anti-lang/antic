@@ -23,7 +23,7 @@
 #include "grow.h"
 #include "license.h"
 #include "platform.h"
-#include "rt.h"
+#include "std.h"
 #include "symbols.h"
 
 static struct anti_text text_of(const char *s)

@@ -9,8 +9,8 @@
 #include <string.h>
 
 #include "atomic.h"
+#include "fail.h"
 #include "platform.h"
-#include "std.h"
 #include "sync.h"
 
 /* The hidden lock of a synchronized object, which the compiler lays out

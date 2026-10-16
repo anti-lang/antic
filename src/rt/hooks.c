@@ -5,7 +5,7 @@
 #include "hooks.h"
 #include "object.h"
 #include "plugin.h"
-#include "std.h"
+#include "str.h"
 
 /* DESIGN: the one handler lives in an atomic word of the runtime and not
    in a static field of anti.lang.Trace. The hook sites of the runtime

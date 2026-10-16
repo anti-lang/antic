@@ -1,7 +1,7 @@
+/* The start of the runtime in src/rt/init.c, and the option of the
+   backtrace that the configuration sets. */
 #ifndef ANTI_RT_H
 #define ANTI_RT_H
-
-#include <stdint.h>
 
 /* The state of the runtime. An executable initialises it in main. A
    static or a shared library for C initialises it in a constructor that
@@ -12,24 +12,9 @@ void anti_rt_init(void);
 /* 1 after anti_rt_init, else 0. */
 int anti_rt_ready(void);
 
-/* Mark the heap block at p as kept from start to exit, so the leak check
-   of a program of --memory-checks leaves it out of its report. The
-   module that links such a program defines the function and calls the
-   leak checker's own `__lsan_ignore_object`. The runtime's definition in
-   the platform layer does nothing. */
-void anti_rt_memory_kept(const void *p);
-
 /* The key `backtrace` of the runtime configuration: 1 on, 0 off and -1
    when no layer named it. set_key of src/rt/conf.c writes it, from the
    command line, the file and rt.configure. */
 extern int anti_rt_option_backtrace;
-
-/* The hash of text and bytes, and the seed of the hashing collections, in
-   src/rt/hash.c. start chooses the seed from the random source of the
-   system, and set fixes it for the key `hash_seed`. */
-uint64_t anti_rt_hash_bytes(const unsigned char *bytes, int64_t count);
-uint64_t anti_rt_hash_seed(void);
-void anti_rt_hash_seed_set(uint64_t value);
-void anti_rt_hash_seed_start(void);
 
 #endif

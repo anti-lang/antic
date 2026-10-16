@@ -28,6 +28,42 @@ int64_t anti_rt_is_windows(void);
 _Noreturn void anti_rt_windows_start(int (*program)(int, char **));
 #endif
 
+/* The message of an errno value, as a NUL-terminated C string that the
+   caller does not free. It stays valid on its thread until the next
+   call. */
+const unsigned char *anti_rt_errno_text(int32_t code);
+
+/* DESIGN: Win32 keeps its own error apart from errno, and the message
+   for it comes from FormatMessageW. Every other system has no Win32 to
+   ask, so the code is 0 and the message is empty. That keeps
+   `SystemError.from_win32` one function with one meaning everywhere. */
+
+/* The code of the last failing Win32 call. */
+int32_t anti_rt_last_error(void);
+
+/* The message of a Win32 error code, as NUL-terminated UTF-8 that the
+   caller does not free. It stays valid on its thread until the next
+   call. */
+const unsigned char *anti_rt_last_error_text(int32_t code);
+
+/* Nanoseconds from a clock that never moves backwards, whose zero has no
+   meaning of its own. */
+int64_t anti_rt_monotonic(void);
+
+/* Nanoseconds since 1970-01-01T00:00:00Z. */
+int64_t anti_rt_wall(void);
+
+/* Wait for the given nanoseconds, or return at once for a count that is
+   not positive. */
+void anti_rt_sleep(int64_t nanoseconds);
+
+/* Mark the heap block at p as kept from start to exit, so the leak check
+   of a program of --memory-checks leaves it out of its report. The
+   module that links such a program defines the function and calls the
+   leak checker's own `__lsan_ignore_object`. The runtime's definition in
+   the platform layer does nothing. */
+void anti_rt_memory_kept(const void *p);
+
 /* The architecture the runtime is compiled for, as a name of the layer.
    clang names it the same on every system. */
 #if defined(__x86_64__)

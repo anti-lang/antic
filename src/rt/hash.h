@@ -30,4 +30,13 @@ static inline uint64_t anti_rt_hash_mix(uint64_t x)
     return x;
 }
 
+/* The hash of text and bytes, and the seed of the hashing collections,
+   which src/rt/hash.c defines for the runtime. start chooses the seed
+   from the random source of the system, and set fixes it for the key
+   `hash_seed`. */
+uint64_t anti_rt_hash_bytes(const unsigned char *bytes, int64_t count);
+uint64_t anti_rt_hash_seed(void);
+void anti_rt_hash_seed_set(uint64_t value);
+void anti_rt_hash_seed_start(void);
+
 #endif

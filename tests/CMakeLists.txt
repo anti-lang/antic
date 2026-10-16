@@ -148,6 +148,13 @@ add_test(NAME rt_extensions
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_extensions.cmake")
 
+# Each file of the runtime that M321 of docs/audit/summary.md named has
+# one header that declares what it defines, and str.h holds the layout of
+# a str.
+add_test(NAME rt_headers
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_rt_headers.cmake")
+
 # The runtime calls the UTF-16 entry points of Windows alone.
 add_test(NAME rt_wide_text
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"

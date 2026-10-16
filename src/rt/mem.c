@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fail.h"
 #include "platform.h"
 #include "std.h"
 

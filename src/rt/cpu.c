@@ -11,8 +11,8 @@
    query above them, so armv8.5 passes there. The platform layer reads
    the machine, and this file holds the levels. */
 #include "cpu_level.h"
+#include "fail.h"
 #include "platform.h"
-#include "std.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -17,6 +17,8 @@
 
 #include "conf.h"
 #include "conf_include.h"
+#include "fail.h"
+#include "hash.h"
 #include "inject.h"
 #include "platform.h"
 

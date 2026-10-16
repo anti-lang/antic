@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-#include "std.h"
+#include "str.h"
 
 /* Take one argument under --anti., its name without the prefix and the
    value after the `=`, which is NULL when the argument carried none.

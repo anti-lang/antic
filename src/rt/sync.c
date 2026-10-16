@@ -10,8 +10,8 @@
 #include <string.h>
 
 #include "atomic.h"
+#include "fail.h"
 #include "platform.h"
-#include "std.h"
 #include "sync.h"
 
 /* DESIGN: the language has no way to report these, and a program that

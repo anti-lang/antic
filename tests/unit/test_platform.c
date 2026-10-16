@@ -24,8 +24,6 @@
 #include "../binary_stdio.h"
 #include "../../src/rt/cpu_level.h"
 #include "../../src/rt/platform.h"
-#include "../../src/rt/rt.h"
-#include "../../src/rt/std.h"
 #include "check.h"
 #include "path_rules.h"
 

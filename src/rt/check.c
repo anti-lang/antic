@@ -1,4 +1,4 @@
-#include "std.h"
+#include "fail.h"
 
 /* DESIGN: the compiler builds the text that names the file, the line and
    the operation, and it lives in the read-only data of the module. The

@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "object.h"
-#include "std.h"
+#include "str.h"
 
 /* The flag of a class whose construct takes arguments. */
 #define ANTI_CLASS_ARGS 1

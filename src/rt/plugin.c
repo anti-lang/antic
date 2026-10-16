@@ -18,6 +18,7 @@
 
 #include "atomic.h"
 #include "digest.h"
+#include "fail.h"
 #include "platform.h"
 #include "plugin_index.h"
 #include "std.h"

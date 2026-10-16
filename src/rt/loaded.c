@@ -6,11 +6,11 @@
    one load and one compare per object. The start of the injections
    links the loader into every program all the same, since
    --anti.inject may name a library for any injectable interface. */
+#include "fail.h"
 #include "plugin.h"
 
 #include "atomic.h"
 #include "platform.h"
-#include "std.h"
 
 /* DESIGN: any thread may load and unload a library. Any thread makes
    objects, and the hooks of each look up its library. One lock guards

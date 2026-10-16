@@ -1,83 +1,18 @@
 /* The C functions behind the modules anti.io, anti.text, anti.license,
-   anti.time, anti.mem and anti.fs of the standard library, and the
-   failure routines of the runtime. */
+   anti.mem and anti.fs of the standard library. */
 #ifndef ANTI_STD_H
 #define ANTI_STD_H
 
 #include <stddef.h>
 #include <stdint.h>
 
-/* The layout of Anti's str, as a function returns it. */
-struct anti_text {
-    const unsigned char *ptr;
-    int64_t len;
-};
+#include "str.h"
 
 /* Write count bytes to standard output for stream 1, else standard error. */
 void anti_rt_write(int32_t stream, const unsigned char *bytes, size_t count);
 
 /* Flush both streams and end the process with status. */
 _Noreturn void anti_rt_exit(int32_t status);
-
-/* DESIGN: the failure routine of the runtime, in src/rt/assert.c. Every
-   failure the runtime reports goes through it, so each has one form. It
-   flushes standard output, writes the formatted text and a newline to
-   standard error, and ends the program. anti_rt_fail_exit ends it with
-   the status, as a refusal at start does with 70. anti_rt_fail_abort
-   aborts, for a state the program cannot go on from. */
-_Noreturn void anti_rt_fail_exit(int status, const char *format, ...);
-_Noreturn void anti_rt_fail_abort(const char *format, ...);
-
-/* The same form for a line that reports and goes on, as a library that
-   discovery passes over. */
-void anti_rt_note(const char *format, ...);
-
-/* Print the text of a failed assertion to standard error and abort. The
-   compiler built the text, so this adds only a newline. */
-_Noreturn void anti_rt_assert_failed(const unsigned char *text,
-                                     int64_t length);
-
-/* Name the test that is running, which a failed assertion reports before
-   its position. The runner of `anti test` is the one caller. */
-void anti_rt_test_running(const unsigned char *name, int64_t length);
-
-/* Which values a failed dev-mode check prints after its text. The
-   compiler names the file, the line and the operation. The kind names
-   the labels of the values. */
-enum anti_check {
-    ANTI_CHECK_BOUNDS,      /* An index and a length. */
-    ANTI_CHECK_OVERFLOW,    /* The two operands of + - or *. */
-    ANTI_CHECK_VALUE,       /* One signed value. */
-    ANTI_CHECK_VALUE_U,     /* One unsigned value. */
-    ANTI_CHECK_LEFT,        /* The signed left operand of / or %. */
-    ANTI_CHECK_LEFT_U,      /* The unsigned left operand of / or %. */
-    ANTI_CHECK_SHIFT,       /* A shift count and the width of its type. */
-    ANTI_CHECK_TEXT         /* No value: the text says it all. */
-};
-
-/* Print the text of a failed check, the values the kind names, and
-   abort. */
-_Noreturn void anti_rt_check_failed(const unsigned char *text,
-                                    int64_t length, int32_t kind, int64_t a,
-                                    int64_t b);
-
-/* Print the text of a walk whose collection changed, which names the
-   loop and the collection. Then print the file and the line of the last
-   change when the collection recorded one, and abort. */
-_Noreturn void anti_rt_walk_changed(const unsigned char *text,
-                                    int64_t length,
-                                    const unsigned char *file,
-                                    int64_t file_length, int64_t line);
-
-/* Print the name of the class a checked cast wanted and abort. The name
-   is not a C string, so its length comes with it. */
-_Noreturn void anti_rt_cast_failed(const unsigned char *name,
-                                   int64_t length);
-
-/* Print the name of the class an object with a zero table was taken for
-   and abort. */
-_Noreturn void anti_rt_table_unset(const unsigned char *name,
-                                   int64_t length);
 
 /* The str of a NUL-terminated C string, without the NUL. */
 struct anti_text anti_rt_text_from_c(const unsigned char *bytes);
@@ -157,35 +92,6 @@ struct anti_text anti_rt_runtime_version(void);
    extern. */
 int32_t anti_rt_errno(void);
 
-/* The message of an errno value, as a NUL-terminated C string that the
-   caller does not free. It stays valid on its thread until the next
-   call. */
-const unsigned char *anti_rt_errno_text(int32_t code);
-
-/* DESIGN: Win32 keeps its own error apart from errno, and the message
-   for it comes from FormatMessageW. Every other system has no Win32 to
-   ask, so the code is 0 and the message is empty. That keeps
-   `SystemError.from_win32` one function with one meaning everywhere. */
-
-/* The code of the last failing Win32 call. */
-int32_t anti_rt_last_error(void);
-
-/* The message of a Win32 error code, as NUL-terminated UTF-8 that the
-   caller does not free. It stays valid on its thread until the next
-   call. */
-const unsigned char *anti_rt_last_error_text(int32_t code);
-
-/* Nanoseconds from a clock that never moves backwards, whose zero has no
-   meaning of its own. */
-int64_t anti_rt_monotonic(void);
-
-/* Nanoseconds since 1970-01-01T00:00:00Z. */
-int64_t anti_rt_wall(void);
-
-/* Wait for the given nanoseconds, or return at once for a count that is
-   not positive. */
-void anti_rt_sleep(int64_t nanoseconds);
-
 /* size bytes of the C library at a multiple of align, a power of two, or
    NULL. A size below zero and an align that is no power of two give
    NULL. In src/rt/mem.c. */
@@ -227,7 +133,9 @@ int64_t anti_rt_fs_size(void *file);
 
 /* The bytes of the file at path, a NUL path, with a NUL after them and
    their count in length, or NULL. errno is ENOMEM when the memory ran
-   out. The caller frees the bytes with free. */
+   out. The caller frees the bytes with free. anti.fs does not call it:
+   the readers of the runtime do, for the configuration, the index of a
+   directory of plugins and the debug files of a trace. */
 unsigned char *anti_rt_fs_read(const char *path, int64_t *length);
 
 /* The names of the directory, without `.` and `..`, in one block that the

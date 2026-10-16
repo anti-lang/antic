@@ -5,9 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fail.h"
 #include "inject.h"
 #include "plugin.h"
-#include "std.h"
+#include "str.h"
 
 /* A startup error: the message through the failure routine and status
    70, the status of every refusal at start. The format is a literal. */

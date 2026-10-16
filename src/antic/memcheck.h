@@ -33,7 +33,7 @@
 #define MEMCHECK_OPTIONS \
     "detect_leaks=1:abort_on_error=0:fast_unwind_on_fatal=1:" \
     "allocator_may_return_null=1"
-/* The function of src/rt/rt.h that marks a block of the runtime as kept
+/* The function of src/rt/platform.h that marks a block of the runtime as kept
    until exit, and the call of the leak checker that it makes in a
    program of --memory-checks. */
 #define MEMCHECK_KEPT "anti_rt_memory_kept"

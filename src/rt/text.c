@@ -5,8 +5,9 @@
 #include <string.h>
 
 #include "atomic.h"
+#include "fail.h"
 #include "grow.h"
-#include "rt.h"
+#include "platform.h"
 #include "std.h"
 #include "utf.h"
 

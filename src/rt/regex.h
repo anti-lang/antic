@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "std.h"
+#include "str.h"
 
 /* DESIGN: the handle of a compiled pattern holds the code PCRE2 compiled,
    the pattern as it was written and whether it searches bytes. `==` of a

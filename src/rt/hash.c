@@ -13,8 +13,6 @@
 #include "atomic.h"
 #include "hash.h"
 #include "platform.h"
-#include "rt.h"
-#include "std.h"
 
 /* The seed of the program, written at start and by the configuration,
    and read by any thread. */

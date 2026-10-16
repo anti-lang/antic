@@ -247,7 +247,7 @@ struct place {
     uint32_t member;
 };
 
-/* The kinds of enum anti_check in src/rt/std.h, in its order. The unit test
+/* The kinds of enum anti_check in src/rt/fail.h, in its order. The unit test
    records_check_kinds pins the two together. */
 enum check_kind {
     CHECK_BOUNDS, CHECK_OVERFLOW, CHECK_VALUE, CHECK_VALUE_U, CHECK_LEFT,

@@ -7,7 +7,7 @@
 
 #include "object.h"
 #include "registry.h"
-#include "std.h"
+#include "str.h"
 
 /* DESIGN: one entry per `provides Interface as Class;` line of a
    library. The interface descriptor is the host's, because the library

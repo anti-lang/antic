@@ -31,7 +31,7 @@ The text of a check takes a number before it is removed.
 
 `anti_rt_check_failed(text, length, kind, a, b)` in `src/rt/check.c`. The compiler
 builds the text, which names the file, the line and the operation. The kind
-names the labels of the two values, and `src/rt/std.h` holds it as `enum
+names the labels of the two values, and `src/rt/fail.h` holds it as `enum
 anti_check`. `src/antic/lower_lowerer.h` mirrors it as `enum check_kind`, and the unit test
 `records_check_kinds` pins the numbers of the two together by reading the call
 that lowering writes.
