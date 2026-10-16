@@ -1403,7 +1403,7 @@ static struct symbol *read_extern(struct reader *r)
     struct name home;
     uint8_t marks;
     uint8_t lookup;
-    struct name runtime;
+    const char *runtime;
     const struct interface *lib;
     struct type *owner = NULL;
     size_t i;
@@ -1421,7 +1421,9 @@ static struct symbol *read_extern(struct reader *r)
     if (lookup == LOOK_MEMBER) {
         owner = antl_type_ref(r, r->table_count);
     }
-    runtime = antl_get_name(r);
+    /* The C symbol of a function of the root is a C string, so a NUL
+       inside it is refused. */
+    runtime = antl_get_cstr(r);
     sym->kind = (enum symbol_kind)kind;
     sym->type = r->table[type_index];
     sym->exported = (marks & 1) != 0;
@@ -1457,10 +1459,8 @@ static struct symbol *read_extern(struct reader *r)
         if ((flags & 3) > FN_CONCRETE || it->vis > VIS_PUB) {
             antl_damaged(r);
         }
-        if (runtime.length > 0) {
-            char *text = antl_allocate(r, runtime.length + 1, 1);
-            memcpy(text, runtime.text, runtime.length);
-            it->runtime = text;
+        if (runtime[0] != '\0') {
+            it->runtime = runtime;
         }
         it->symbol = sym;
         sym->item = it;

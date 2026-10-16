@@ -3675,6 +3675,48 @@ static void damaged_trees(void)
     }
 }
 
+/* A generic that calls a function of the root, whose C symbol the file
+   carries beside its name. */
+static const char root_source[] =
+    "pub class RC { }\n"
+    "pub fn rname<T>(x: T, c: *RC) -> str {\n"
+    "    return c.type_name();\n"
+    "}\n";
+
+/* Rule 14: the C symbol of a function of the root becomes a C string,
+   so one with a NUL inside is refused, where it would name a shorter
+   symbol. */
+static void runtime_names(void)
+{
+    static const char name[] = "type_name";
+    struct session s;
+    struct text bytes = {0};
+    size_t at;
+    size_t found = SIZE_MAX;
+
+    open_session(&s);
+    if (!build_library(&s, "rn", root_source, &bytes)) {
+        close_session(&s);
+        return;
+    }
+    CHECK(reads_file(&bytes));
+    /* The symbol stands before the mark of the item and its name. */
+    for (at = 4; at + 18 + 2 * strlen(name) <= bytes.length; at++) {
+        const uint8_t *p = (const uint8_t *)bytes.data + at;
+        if (u32_at(&bytes, at) == strlen(name) &&
+            memcmp(p + 4, name, strlen(name)) == 0 &&
+            p[4 + strlen(name)] == 1 &&
+            u32_at(&bytes, at + 5 + strlen(name)) == strlen(name)) {
+            found = at + 4 + 4;
+            break;
+        }
+    }
+    CHECK(found != SIZE_MAX);
+    refuses_poke(&bytes, found, "", 1);
+    text_free(&bytes);
+    close_session(&s);
+}
+
 /* A variadic C function that a generic calls. */
 static const char variadic_source[] =
     "extern fn printf(format: ?*c_char, ...) -> c_int;\n"
@@ -3686,6 +3728,7 @@ static void flag_bytes(void)
 {
     flags_refused("sweep", sweep_source);
     flags_refused("tt", tree_source);
+    flags_refused("rn", root_source);
     flags_refused("va", variadic_source);
 }
 
@@ -3695,6 +3738,7 @@ void test_modules(void)
     copy_depths();
     deep_values();
     field_kinds();
+    runtime_names();
     flag_bytes();
     damaged_trees();
     damaged_bytes();
