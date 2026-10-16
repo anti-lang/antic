@@ -61,10 +61,14 @@ function(skips_case name verdict)
         set(failures "${failures}${name}: accepted\n" PARENT_SCOPE)
         return()
     endif()
-    string(FIND "${out}${err}" "${verdict}" at)
+    # CMake wraps a long message, so the text is read with its spaces and
+    # its line ends made one space.
+    string(REGEX REPLACE "[ \t\r\n]+" " " flat "${out}${err}")
+    string(FIND "${flat}" "${verdict}" at)
     if(at EQUAL -1)
-        set(failures "${failures}${name}: refused without `${verdict}`\n"
-                     "${out}${err}\n" PARENT_SCOPE)
+        set(failures
+            "${failures}${name}: refused without `${verdict}`\n${out}${err}\n"
+            PARENT_SCOPE)
     endif()
 endfunction()
 

@@ -52,9 +52,12 @@ function(fixture_case name cc bin)
                             -P "${RUNNER}"
                     RESULT_VARIABLE status OUTPUT_VARIABLE out
                     ERROR_VARIABLE err ENCODING NONE)
+    # CMake wraps a long message, so the text is read with its spaces and
+    # its line ends made one space.
     set(said "${out}${err}")
-    if(status EQUAL 0 OR said MATCHES "SKIP: " OR
-       NOT said MATCHES "refused by the case")
+    string(REGEX REPLACE "[ \t\r\n]+" " " flat "${out}${err}")
+    if(status EQUAL 0 OR flat MATCHES "SKIP: " OR
+       NOT flat MATCHES "refused by the case")
         set(failures
             "${failures}${name}: did not fail with the output\n${said}\n"
             PARENT_SCOPE)

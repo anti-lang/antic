@@ -29,14 +29,17 @@ function(sdk_case name sdks verdict)
                             -P "${RUNNER}"
                     RESULT_VARIABLE status OUTPUT_VARIABLE out
                     ERROR_VARIABLE err ENCODING NONE)
+    # CMake wraps a long message, so the text is read with its spaces and
+    # its line ends made one space.
     set(said "${out}${err}")
+    string(REGEX REPLACE "[ \t\r\n]+" " " flat "${out}${err}")
     if(verdict STREQUAL "skip")
-        if(NOT status EQUAL 0 OR NOT said MATCHES "SKIP: ")
+        if(NOT status EQUAL 0 OR NOT flat MATCHES "SKIP: ")
             set(failures "${failures}${name}: not skipped\n${said}\n"
                 PARENT_SCOPE)
         endif()
-    elseif(status EQUAL 0 OR said MATCHES "SKIP: " OR
-           NOT said MATCHES "digest")
+    elseif(status EQUAL 0 OR flat MATCHES "SKIP: " OR
+           NOT flat MATCHES "digest")
         set(failures "${failures}${name}: not failed on the digest\n${said}\n"
             PARENT_SCOPE)
     endif()

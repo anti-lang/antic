@@ -22,8 +22,11 @@ function(verify_case name antic expected)
                             "-DWORK=${WORK}/run-${name}" -P "${RUNNER}"
                     RESULT_VARIABLE status OUTPUT_VARIABLE out
                     ERROR_VARIABLE err ENCODING NONE)
+    # CMake wraps a long message, so the text is read with its spaces and
+    # its line ends made one space.
     set(said "${out}${err}")
-    string(FIND "${said}" "${expected}" at)
+    string(REGEX REPLACE "[ \t\r\n]+" " " flat "${out}${err}")
+    string(FIND "${flat}" "${expected}" at)
     if(status EQUAL 0 OR at EQUAL -1)
         set(failures
             "${failures}${name}: no failure with `${expected}`\n${said}\n"

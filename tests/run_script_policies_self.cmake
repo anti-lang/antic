@@ -28,7 +28,10 @@ execute_process(COMMAND "${CMAKE_COMMAND}" "-DROOT=${WORK}" -DMIN=1
                         -P "${RUNNER}"
                 RESULT_VARIABLE status OUTPUT_VARIABLE out
                 ERROR_VARIABLE err ENCODING NONE)
+# CMake wraps a long message, so the text is read with its spaces and its
+# line ends made one space.
 set(said "${out}${err}")
+string(REGEX REPLACE "[ \t\r\n]+" " " flat "${out}${err}")
 if(status EQUAL 0)
     message(FATAL_ERROR "run_script_policies.cmake took scripts without the "
                         "line of the root\n${said}")
@@ -37,13 +40,13 @@ set(failures "")
 foreach(shown "tests/run_bare.cmake: no cmake_minimum_required"
         "tests/run_older.cmake: cmake_minimum_required(VERSION 3.20)"
         "tools/pack.cmake: no cmake_minimum_required")
-    string(FIND "${said}" "${shown}" at)
+    string(FIND "${flat}" "${shown}" at)
     if(at EQUAL -1)
         string(APPEND failures "names no `${shown}`\n")
     endif()
 endforeach()
 foreach(name run_right fetch helper)
-    string(FIND "${said}" "${name}.cmake" at)
+    string(FIND "${flat}" "${name}.cmake" at)
     if(NOT at EQUAL -1)
         string(APPEND failures "names ${name}.cmake\n")
     endif()

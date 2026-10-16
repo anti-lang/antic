@@ -22,7 +22,10 @@ if(status EQUAL 0)
     message(FATAL_ERROR "run_fmt_canonical.cmake passed an anti that a "
                         "signal ended")
 endif()
-if(NOT "${out}${err}" MATCHES "anti fmt --check ended with")
+# CMake wraps a long message, so the text is read with its spaces and its
+# line ends made one space.
+string(REGEX REPLACE "[ \t\r\n]+" " " flat "${out}${err}")
+if(NOT flat MATCHES "anti fmt --check ended with")
     message(FATAL_ERROR "run_fmt_canonical.cmake failed for another reason\n"
                         "${out}${err}")
 endif()

@@ -27,7 +27,10 @@ execute_process(COMMAND "${CMAKE_COMMAND}" "-DNAME=stops"
 if(status EQUAL 0)
     message(FATAL_ERROR "run_probe.cmake took two probes that end with 3")
 endif()
-if(NOT "${out}${err}" MATCHES "ended with 3 in C and 3 in Anti")
+# CMake wraps a long message, so the text is read with its spaces and its
+# line ends made one space.
+string(REGEX REPLACE "[ \t\r\n]+" " " flat "${out}${err}")
+if(NOT flat MATCHES "ended with 3 in C and 3 in Anti")
     message(FATAL_ERROR "run_probe.cmake failed for another reason\n"
                         "${out}${err}")
 endif()
