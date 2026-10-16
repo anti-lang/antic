@@ -1,0 +1,7 @@
+exit 0
+kept: `find_one` found 2 elements where it needs exactly one
+other: `find_one` found 3 elements where it needs exactly one
+kept count: 2
+kept: the element changed from version 0 to 1
+other: the element changed from version 0 to 2
+kept versions: 0 1

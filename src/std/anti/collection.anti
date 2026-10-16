@@ -56,6 +56,30 @@ pub abstract class Iterator<T>
 {
 }
 
+/// The bytes of the message of a `NotOne` or a `Changed`.
+///
+/// DESIGN: an error keeps its message in a `str`, which `dup` copies as a
+/// pointer, and the hook `copied` that could give the copy bytes of its own is
+/// dropped under `--no-hooks`. The error and its copies therefore share one
+/// `Message` through a count, and the last of them to go frees the bytes. By
+/// S318 of the third audit: the copy read the bytes after the error it copied
+/// freed them.
+class Message
+{
+	bytes: ?*byte = none,
+
+	/// The first handle of the bytes of `text`, which the message takes.
+	pub fn of(text: str) -> mem.Shared<Message>
+	{
+		return mem.Shared<Message>.new(Message { bytes: text.ptr });
+	}
+
+	fn destruct(self)
+	{
+		free(self.bytes);
+	}
+}
+
 /// The failure of a `_one` form, which found no element or more than one.
 ///
 /// `count` holds the number of elements that matched, and the message names the
@@ -64,9 +88,9 @@ pub class NotOne inherits lang.Error
 {
 	/// The number of elements that matched, 0 or more than 1.
 	pub count: int = 0,
-	/// The bytes of the message, which the error frees. A copy made with `dup`
-	/// shares them with the error it copies.
-	transient made: ?*byte = none,
+	/// The bytes of the message, which the error shares with every copy `dup`
+	/// makes of it.
+	made: ?mem.Shared<Message> = none,
 
 	/// The failure of the form named `form`, which found `count` elements.
 	pub fn found(form: str, count: int) -> *NotOne
@@ -79,13 +103,8 @@ pub class NotOne inherits lang.Error
 			message = f"`{form}` found {count} elements where it needs exactly one";
 		}
 		e.message = message;
-		e.made = message.ptr;
+		e.made = Message.of(message);
 		return e;
-	}
-
-	concrete fn destruct(self)
-	{
-		free(self.made);
 	}
 }
 
@@ -99,9 +118,9 @@ pub class Changed inherits lang.Error
 	pub expected: int = 0,
 	/// The version of the element now, or -1 when it is gone.
 	pub found: int = 0,
-	/// The bytes of the message, which the error frees. A copy made with `dup`
-	/// shares them with the error it copies.
-	transient made: ?*byte = none,
+	/// The bytes of the message, which the error shares with every copy `dup`
+	/// makes of it.
+	made: ?mem.Shared<Message> = none,
 
 	/// The failure of a set that expected `expected` and found `found`.
 	pub fn found_version(expected: int, found: int) -> *Changed
@@ -114,13 +133,8 @@ pub class Changed inherits lang.Error
 			message = f"the element changed from version {expected} to {found}";
 		}
 		e.message = message;
-		e.made = message.ptr;
+		e.made = Message.of(message);
 		return e;
-	}
-
-	concrete fn destruct(self)
-	{
-		free(self.made);
 	}
 }
 

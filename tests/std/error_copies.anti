@@ -1,0 +1,61 @@
+//! `dup` of the failures `NotOne` and `Changed` of `anti.collection`.
+//!
+//! Each error formats its message into bytes of its own. A copy that `dup`
+//! makes keeps its message after the error it copied is deleted, and each case
+//! makes another error of the same length meanwhile, whose bytes would take the
+//! place of the ones the copy only borrowed. The run under `--memory-checks`
+//! reports a read of freed bytes, a double free and a leak.
+
+import anti.collection;
+import anti.collection.pool.{Pool};
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The message of `e` on a line of its own after `name`.
+fn show(name: str, e: *lang.Error)
+{
+	printf("%.*s: %.*s\n".ptr, name.len as c_int, name.ptr, e.message.len as c_int,
+		e.message.ptr);
+}
+
+/// A copy of a `NotOne`, kept past the original.
+fn not_one()
+{
+	let e = collection.NotOne.found("find_one", 2);
+	let kept = dup(e);
+	delete(e);
+	let other = collection.NotOne.found("find_one", 3);
+	show("kept", kept);
+	show("other", other);
+	printf("kept count: %d\n".ptr, kept.count as c_int);
+	delete(other);
+	delete(kept);
+}
+
+/// A copy of the `Changed` a handler binds, kept past the handler.
+fn changed()
+{
+	let p = Pool<int>.new();
+	let h = p.add(5);
+	p.set(h, 6);
+	let kept: ?*lang.Error = none;
+	p.set_if_version(h, 7, 0) catch e {
+		kept = dup(e);
+	};
+	let other = collection.Changed.found_version(0, 2);
+	let copy = kept catch fatal;
+	show("kept", copy);
+	show("other", other);
+	let c = copy as *collection.Changed;
+	printf("kept versions: %d %d\n".ptr, c.expected as c_int, c.found as c_int);
+	delete(other);
+	delete(copy);
+}
+
+fn main() -> int
+{
+	not_one();
+	changed();
+	return 0;
+}

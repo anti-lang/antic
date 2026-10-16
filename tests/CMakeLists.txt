@@ -1889,6 +1889,23 @@ antic_program_test(std_collection_parts_dev
     DEV ${collection_dev}
     WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 
+# The copies of the failures of anti.collection in dev mode and under
+# --memory-checks, which reports a read of the bytes of a message after the
+# error that made them is gone.
+antic_program_test(std_error_copies_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/error_copies.anti"
+    OPTIONS "--dev"
+    DEV ${collection_dev} collection/pool
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
+antic_program_test(std_error_copies_memory_checks
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/error_copies.anti"
+    OPTIONS --memory-checks
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks")
+if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    set_tests_properties(std_error_copies_memory_checks PROPERTIES
+        DISABLED TRUE)
+endif()
+
 # The collections on handles and the heap and the sequences in dev mode,
 # and copies of collections that fields of the program reach.
 # Each module below anti.collection writes an object of its own, and a
