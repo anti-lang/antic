@@ -167,8 +167,8 @@ without a directory are in `src/antic/`.
 | S301 | `types.c:1987`, `sema_const.c:101` | 14 | A class whose base was refused keeps a NULL base field, set at `sema.c:2516`. `pointer_free` and `class_value` read through it after the error. | fixed `184e5a39` | front-end |
 | S302 | `sema_copies.c:197` | 3 | `xf` compares a field pointer with the bounds of arrays it does not lie in, which C11 6.5.8 leaves undefined. No target misreads it. | fixed `115e35d9` | front-end |
 | S303 | `pattern.c:1126` | 3, 16 | The least match length adds in `long` before its cap. On Windows the sum wraps, and a `with` that does not fit compiles there and is refused on the Mac. | fixed `ffeda0a3` | front-end |
-| S304 | `antl_verify.c:282` | 14 | The verifier holds no field name of a generic tree to its struct. `lower.c:902` then subtracts from NULL, and `layout.c:451` indexes outside the offsets. | new | library-file |
-| S305 | `antl_read.c:271` | 14 | Pointers, slices, arrays, function types and tuples of the type table nest without a limit. A file of 2 MB overflows the stack in `print_type` and `antl_visit_type`. | new | library-file |
+| S304 | `antl_verify.c:282` | 14 | The verifier holds no field name of a generic tree to its struct. `lower.c:902` then subtracts from NULL, and `layout.c:451` indexes outside the offsets. | fixed `9555cceb` | library-file |
+| S305 | `antl_read.c:271` | 14 | Pointers, slices, arrays, function types and tuples of the type table nest without a limit. A file of 2 MB overflows the stack in `print_type` and `antl_visit_type`. | fixed `04dbb192` | library-file |
 | S306 | `src/rt/trace.c:128` | 11 | A frame keeps the build id as a pointer into the image of its module. After `unload` of a plugin, `anti_rt_trace_text` reads memory that is gone. `trace.c:323` is the second place. | fixed `06e06339` | rt |
 | S307 | `src/rt/registry.c:94` | 23 | `reflect.new` and `Object.deserialize` give the lock back before `build` calls into the library, so `unload` on another thread closes it first. | fixed `b80a1e46` | rt |
 | S308 | `src/rt/hooks.c:81` | 23 | The `destroyed` hook counts an object out before its `destruct` and field teardown run. `unload` then closes the library under the thread still in it. | fixed `cfa95068` | rt |
@@ -269,7 +269,7 @@ Rule 15, tests with malformed input:
 - M313. `src/rt/regex.c:436`. The rewriter of a byte pattern has no test
   of a pattern cut short. S304 and S305 lack a test as well. New.
   library-file. Fixed `3ed05df4` for the rewriter. S304 and S305 take
-  their tests in step 12.
+  their tests in step 12, `9555cceb` and `04dbb192`.
 - M314. `tests/unit/test_symbols.c:392`. The ELF and DWARF readers have
   no test of a file cut short, and none of a line table of DWARF 2 or 3.
   Still open in part, M43. rt.
@@ -339,7 +339,7 @@ Each concern in one place:
   `0b794956`.
 - M329. `src/antic/antl_read.c:1060`. Four limits bound the nesting where
   `antl_io.h:59` names one. antic writes a constant 40 levels deep and
-  then calls its own file damaged. New. library-file.
+  then calls its own file damaged. New. library-file. Fixed `3b2be74e`.
 - M330. `src/std/anti/fs.anti:170`. Memory that runs out is answered five
   ways: stop, fail, drop the bytes, drop the option, or give a literal.
   New. std. Fixed `ba344114`, with the builder in `07caeed4`. T139 holds
@@ -370,6 +370,7 @@ Copies that drifted:
 - M336. `src/antic/antl_write.c:36`. The types the compiler declares are
   listed three times. The reader lacks `Job`, so a generic with a
   `dispatch` gives a file every importer refuses. New. library-file.
+  Fixed `d28e47d5`, the reader's `Job` in `ba14f572` as T061.
 - M337. `src/rt/platform_windows.c:455`. Windows lists a directory in two
   functions. They differ on `C:` and on a name that does not fit. Line
   1474 is the second. New. rt.
