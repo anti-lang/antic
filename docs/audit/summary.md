@@ -176,11 +176,11 @@ without a directory are in `src/antic/`.
 | S310 | `src/rt/plugin.c:589` | 14, 15 | `damage_of` tests the counts of a plugin table for a sign alone, and `fields_sound` accepts an offset without the width of the field. The test tries -1 and NULL alone. | fixed `32400589` | rt |
 | S311 | `src/rt/snapshot.c:30` | 6, 10 | A `str` inside a heap snapshot has no NUL after it, since `lower_function.c:499` sizes the block without one. `s.ptr` as a C string reads past the block. | fixed `95b0a747` | rt |
 | S312 | `src/rt/text.c:155`, `src/std/anti/text.anti:200` | 11, 4 | A builder that gets no memory gives the literal `""`, which the caller is told to free. `log.anti:197` puts it into an `own` field. | fixed `07caeed4` | rt, std |
-| S313 | `src/std/anti/log.anti:404` | 14 | A logger file that names an unknown kind of sink calls `Log.get()` inside `construct` of `Log` and recurses until the stack is gone. Read, not run. | new | std |
+| S313 | `src/std/anti/log.anti:404` | 14 | A logger file that names an unknown kind of sink calls `Log.get()` inside `construct` of `Log` and recurses until the stack is gone. Read, not run. | fixed `d385f56c` | std |
 | S314 | `src/std/anti/trace.anti:230` | 23, 6 | `Profiler`, `ErrorMonitor` and `ChangeJournal` write plain tables from every thread. Two threads take `count` past the array in a release build. | new | std |
 | S315 | `src/std/anti/collection.anti:761` | 6 | The five place functions of `Collection<T>` are public and index a raw pointer with the `at` they are given. `take_place` on a free slot of a `Pool` links it twice. | fixed `b81ca20c` | std |
 | S316 | `src/std/anti/collection.anti:714` | 5 | The size of a room is an unchecked product in `room_from`, `grid.anti:46`, `map.anti:297`, `sorted.anti:719`, `pool.anti:451` and `concurrent.anti:924`. A release build wraps. | fixed `f393ed52` | std |
-| S317 | `src/std/anti/args.anti:273` | 4 | `declare` writes an option after `reserve` at line 317 gave up without a word, past the slice or through `none`. | new | std |
+| S317 | `src/std/anti/args.anti:273` | 4 | `declare` writes an option after `reserve` at line 317 gave up without a word, past the slice or through `none`. | fixed `ba344114` | std |
 | S318 | `src/std/anti/collection/concurrent.anti:878` | 12 | `dup` of a `Snapshot` leaves two walks that free one room. `ArenaAllocator`, `FileSink`, `NotOne` and `Changed` have the same shape. Read, not run. | fixed `5518e342`, `0d126d62`, `f223467d`, `a0de8b0c` | std |
 | S319 | `src/anti/bindexpr.c:238` | 6, 14 | A string that ends in a backslash moves the evaluator of `anti bind` one byte past its text, and `space` reads on from there. | new | anti-tool |
 
@@ -203,7 +203,7 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 | S329 | `src/rt/threads.h:34` | `join` of a null job is said to write nothing. `threads.c:350` writes `result_size` zero bytes. | fixed `733f1014` | rt |
 | S330 | `src/rt/patterns.c:695` | `patch` is said to find a misfit before any byte changes. The second pass searches the data it writes, so a lookahead group returns `MISFIT` with the data changed. Read, not run. | fixed `e4688507` | rt |
 | S331 | `src/rt/object.c:13` | Two DESIGN comments describe what was replaced: default bodies that walk the field list, and an array field serialized as null. `object.c:710` is the second. | fixed `510d96a7` | rt |
-| S332 | `src/std/anti/log.anti:15` | The header describes a file of `level`, `format` and `[[sink]]` entries with a level each. `first_sink` reads `kind` and `path`, makes one sink and stops at the eighth entry. | new | std |
+| S332 | `src/std/anti/log.anti:15` | The header describes a file of `level`, `format` and `[[sink]]` entries with a level each. `first_sink` reads `kind` and `path`, makes one sink and stops at the eighth entry. | fixed `fd716910` | std |
 | S333 | `src/anti/bindmodel.h:168` | `bind_is_keyword` is said to answer for a word the lexer reserves. It answers true for every text that is no identifier, and the reader of a header holds a name to no rule. | new | anti-tool |
 | S334 | `tools/compile.sh:13` | The header says the first build installs the sysroots and raylib. The configure step installs clang and the LLVM tools alone, and a first `./c` stops at `src/native/raylib.cmake:10`. | new | build-and-tools |
 | S335 | `tests/run_codeview_empty.cmake:24` | The test searches the assembly for `DEBUG_S_SYMBOLS` and `S_LPROC32`, spellings of the native back end that antic no longer writes. Both tests pass whatever antic writes. | new | build-and-tools |
@@ -1049,9 +1049,9 @@ From `std`. The header of a module is its `//!` comment.
 | `src/std/anti/collection.anti` | The interfaces of walking, the bases `Collection<T>` and `Indexed<T>`, `Copies<T>`, the hashes, the writers of a map entry and the stable sort. | Names the first three alone. |
 | `src/std/anti/toml.anti` | Reading the TOML subset into a flat `Document`. | Says it. |
 | `src/std/anti/config.anti` | The settings of the program: the interface `Config` and `FileConfig`. | Says it. |
-| `src/std/anti/args.anti` | A command line declared once, parsed and read by name. | Says it. Lists three forms of an option, and the code takes two more. |
+| `src/std/anti/args.anti` | A command line declared once, parsed and read by name. | Says it. Lists three forms of an option, and the code takes two more. Fixed `fc960111`. |
 | `src/std/anti/json.anti` | Writing and reading the members of the JSON that `serialize` writes. | Says it. |
-| `src/std/anti/log.anti` | Levelled logging: sinks, the interface `Logger`, the logger of the program and the file that configures it. | Describes a file the code does not read, S332. |
+| `src/std/anti/log.anti` | Levelled logging: sinks, the interface `Logger`, the logger of the program and the file that configures it. | Describes a file the code does not read, S332, fixed `fd716910`. |
 | `src/std/anti/debug.anti` | `backtrace`, the short form of `StackTrace.capture`. | Says it. |
 | `src/std/anti/mem.anti` | The interface `Allocator`, its two implementations, and `Shared<T>`. | Says it. |
 | `src/std/anti/runtime.anti` | `configure` and `get` of the runtime configuration. | Says it. |
