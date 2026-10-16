@@ -178,8 +178,8 @@ without a directory are in `src/antic/`.
 | S312 | `src/rt/text.c:155`, `src/std/anti/text.anti:200` | 11, 4 | A builder that gets no memory gives the literal `""`, which the caller is told to free. `log.anti:197` puts it into an `own` field. | fixed `07caeed4` | rt, std |
 | S313 | `src/std/anti/log.anti:404` | 14 | A logger file that names an unknown kind of sink calls `Log.get()` inside `construct` of `Log` and recurses until the stack is gone. Read, not run. | new | std |
 | S314 | `src/std/anti/trace.anti:230` | 23, 6 | `Profiler`, `ErrorMonitor` and `ChangeJournal` write plain tables from every thread. Two threads take `count` past the array in a release build. | new | std |
-| S315 | `src/std/anti/collection.anti:761` | 6 | The five place functions of `Collection<T>` are public and index a raw pointer with the `at` they are given. `take_place` on a free slot of a `Pool` links it twice. | new | std |
-| S316 | `src/std/anti/collection.anti:714` | 5 | The size of a room is an unchecked product in `room_from`, `grid.anti:46`, `map.anti:297`, `sorted.anti:719`, `pool.anti:451` and `concurrent.anti:924`. A release build wraps. | new | std |
+| S315 | `src/std/anti/collection.anti:761` | 6 | The five place functions of `Collection<T>` are public and index a raw pointer with the `at` they are given. `take_place` on a free slot of a `Pool` links it twice. | fixed `b81ca20c` | std |
+| S316 | `src/std/anti/collection.anti:714` | 5 | The size of a room is an unchecked product in `room_from`, `grid.anti:46`, `map.anti:297`, `sorted.anti:719`, `pool.anti:451` and `concurrent.anti:924`. A release build wraps. | fixed `f393ed52` | std |
 | S317 | `src/std/anti/args.anti:273` | 4 | `declare` writes an option after `reserve` at line 317 gave up without a word, past the slice or through `none`. | new | std |
 | S318 | `src/std/anti/collection/concurrent.anti:878` | 12 | `dup` of a `Snapshot` leaves two walks that free one room. `ArenaAllocator`, `FileSink`, `NotOne` and `Changed` have the same shape. Read, not run. | new | std |
 | S319 | `src/anti/bindexpr.c:238` | 6, 14 | A string that ends in a backslash moves the evaluator of `anti bind` one byte past its text, and `space` reads on from there. | new | anti-tool |
@@ -232,7 +232,7 @@ Rule 11, who owns memory:
 - M304. `src/std/anti/collection/list.anti:189`. `reserve` and `shrink`
   move the room and count no change. A walk then reads freed room with no
   trap. Eleven more places in `list`, `deque`, `map`, `set` and `sorted`.
-  New. std.
+  New. std. Fixed `2004bca3`.
 
 Rule 12, release:
 
