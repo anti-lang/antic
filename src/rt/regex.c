@@ -483,21 +483,18 @@ void *anti_rt_regex_compile_bytes(const unsigned char *bytes, int64_t length,
 {
     struct wide w;
     pcre2_code *compiled = NULL;
+    void *kept = NULL;
     int error = 0;
     PCRE2_SIZE at = 0;
 
     memset(&w, 0, sizeof w);
     if (!widen(&w, bytes, length, code, offset)) {
-        free(w.out);
-        free(w.from);
-        return NULL;
+        goto done;
     }
     if (w.failed) {
-        free(w.out);
-        free(w.from);
         *code = PCRE2_ERROR_NOMEMORY;
         *offset = 0;
-        return NULL;
+        goto done;
     }
     compiled = pcre2_compile(w.n == 0 ? (PCRE2_SPTR) "" : w.out,
                              (PCRE2_SIZE)w.n, BYTE_OPTIONS, &error, &at,
@@ -506,9 +503,11 @@ void *anti_rt_regex_compile_bytes(const unsigned char *bytes, int64_t length,
         *code = (int32_t)error;
         *offset = (int64_t)at < w.n ? w.from[at] : length;
     }
+    kept = keep(compiled, bytes, length, 1, code, offset);
+done:
     free(w.out);
     free(w.from);
-    return keep(compiled, bytes, length, 1, code, offset);
+    return kept;
 }
 
 int anti_rt_regex_is_bytes(const void *compiled)
