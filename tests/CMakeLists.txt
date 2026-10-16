@@ -6118,6 +6118,12 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# read_build_id of tests/build_id.cmake refuses a file with no build line,
+# with two, or with an id that is not 64 digits.
+add_test(NAME build_id_reader
+    COMMAND "${CMAKE_COMMAND}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id-reader"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_build_id_reader.cmake")
 # The build id in the notice is the digest of the code. Two builds of one
 # program carry the same id, and another program carries another. An
 # object that opens and fails to read is refused.

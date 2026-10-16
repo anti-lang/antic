@@ -18,6 +18,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/build_id.cmake")
+
 string(REPLACE "|" ";" options "${OPTIONS}")
 
 function(build_id out dir source)
@@ -29,17 +31,11 @@ function(build_id out dir source)
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "antic failed for ${source}\n${err}")
     endif()
-    file(STRINGS "${WORK}/${dir}/program" lines REGEX "^build [0-9a-f]+$")
-    list(LENGTH lines count)
-    if(NOT count EQUAL 1)
-        message(FATAL_ERROR "${dir} holds ${count} build lines: ${lines}")
+    read_build_id(id error "${WORK}/${dir}/program")
+    if(NOT error STREQUAL "")
+        message(FATAL_ERROR "${error}")
     endif()
-    string(REGEX MATCH "^build ([0-9a-f]+)$" line "${lines}")
-    string(LENGTH "${CMAKE_MATCH_1}" length)
-    if(NOT length EQUAL 64)
-        message(FATAL_ERROR "the build id of ${dir} is not 64 digits: ${lines}")
-    endif()
-    set(${out} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    set(${out} "${id}" PARENT_SCOPE)
 endfunction()
 
 file(REMOVE_RECURSE "${WORK}")

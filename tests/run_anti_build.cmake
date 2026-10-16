@@ -20,6 +20,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/build_id.cmake")
 
 set(project "${WORK}/app")
 # A Windows host writes app.exe and its object app.exe.obj, and its
@@ -136,9 +137,10 @@ endforeach()
 # addresses, so the map answers for the binary beside it.
 program_expect("app.debug" COMMAND "${WORK}/symbols/app.debug" STATUS 9
                OUT "one\n")
-file(STRINGS "${release}" lines REGEX "^build [0-9a-f]+$")
-string(REGEX MATCH "^build ([0-9a-f]+)$" line "${lines}")
-set(id "${CMAKE_MATCH_1}")
+read_build_id(id error "${release}")
+if(NOT error STREQUAL "")
+    message(FATAL_ERROR "${error}")
+endif()
 file(READ "${WORK}/symbols/app.map" map)
 if(NOT map MATCHES "# build ${id}")
     message(FATAL_ERROR "the map names no build id of the program:\n${map}")
@@ -150,10 +152,12 @@ if(HOST MATCHES "^macos-" AND NOT map MATCHES "\n# text [0-9a-f][0-9a-f][0-9a-f]
 endif()
 # The debug link carries the id of the program, because the digest leaves
 # what -g added out. A trace of the program then finds this archive.
-file(STRINGS "${WORK}/symbols/app.debug" lines REGEX "^build [0-9a-f]+$")
-string(REGEX MATCH "^build ([0-9a-f]+)$" line "${lines}")
-if(NOT CMAKE_MATCH_1 STREQUAL id)
-    message(FATAL_ERROR "app.debug carries ${CMAKE_MATCH_1} and the program "
+read_build_id(debug_id error "${WORK}/symbols/app.debug")
+if(NOT error STREQUAL "")
+    message(FATAL_ERROR "${error}")
+endif()
+if(NOT debug_id STREQUAL id)
+    message(FATAL_ERROR "app.debug carries ${debug_id} and the program "
                         "carries ${id}")
 endif()
 if(HOST MATCHES "^windows-")
