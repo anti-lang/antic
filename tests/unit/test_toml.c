@@ -1,6 +1,9 @@
 /* The TOML subset of src/rt/toml.c, and the inline tables that `anti.toml`
    writes a dependency and a version of an index with. */
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "../binary_stdio.h"
 #include "check.h"
@@ -146,6 +149,63 @@ static void table_repeat_limit(void)
     anti_rt_toml_free(doc);
 }
 
+/* The text of count tables, `[[a]]` each or `[[aN]]` with N their
+   number when distinct, with one key each. The caller frees it. */
+static char *many_tables(int count, int distinct)
+{
+    char *text = malloc((size_t)count * 24 + 1);
+    size_t at = 0;
+    int i;
+
+    if (text == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < count; i++) {
+        int written;
+        if (distinct) {
+            written = snprintf(text + at, 25, "[[a%d]]\nk = 1\n", i);
+        } else {
+            written = snprintf(text + at, 25, "[[a]]\nk = 1\n");
+        }
+        at += (size_t)written;
+    }
+    text[at] = '\0';
+    return text;
+}
+
+/* Read text and check that the read took under two seconds of the
+   processor, and that the document holds key with the value 1. */
+static void reads_quickly(const char *text, const char *key)
+{
+    clock_t start = clock();
+    struct anti_toml *doc = read_toml(text);
+    double seconds = (double)(clock() - start) / CLOCKS_PER_SEC;
+
+    CHECK(seconds < 2.0);
+    CHECK(doc != NULL);
+    if (doc != NULL) {
+        CHECK_STR(value_of(doc, key), "1");
+    }
+    anti_rt_toml_free(doc);
+}
+
+/* A `[[name]]` header costs the same whatever was read before it. 100000
+   tables of one name, about 1.2 MB, asked for 5 * 10^9 comparisons of
+   keys, as did 100000 tables of distinct names. */
+static void table_repeat_cost(void)
+{
+    char *same = many_tables(100000, 0);
+    char *distinct = many_tables(100000, 1);
+
+    CHECK(same != NULL && distinct != NULL);
+    if (same != NULL && distinct != NULL) {
+        reads_quickly(same, "a.99999.k");
+        reads_quickly(distinct, "a99999.0.k");
+    }
+    free(same);
+    free(distinct);
+}
+
 /* A key is at most 319 bytes, the room of a path less its NUL. The
    bound holds bare or in quotes, and at the top level or inside an
    inline table. */
@@ -190,5 +250,6 @@ void test_toml(void)
     inline_table_nested();
     inline_table_unclosed();
     table_repeat_limit();
+    table_repeat_cost();
     key_length();
 }

@@ -24,10 +24,27 @@ struct pair {
     int64_t line;
 };
 
+/* A path that keys stand under, the first length bytes of the key of the
+   pair at pair, and the largest number that follows it and a dot in any
+   key, or -1. */
+struct under {
+    size_t pair;
+    size_t length;
+    uint64_t hash;
+    int64_t largest;
+};
+
+/* names is a table of open addressing of room slots, a power of two, and
+   holds the paths of the first indexed pairs. A slot of length 0 is
+   free. */
 struct anti_toml {
     struct pair *pairs;
     size_t count;
     size_t capacity;
+    struct under *names;
+    size_t room;
+    size_t names_count;
+    size_t indexed;
 };
 
 struct reader {
@@ -135,25 +152,127 @@ static void add(struct anti_toml *doc, struct reader *r, const char *key,
     doc->count++;
 }
 
-/* The count of `[[name]]` tables seen so far under that name. It is -1
-   when the largest number under the name is the limit of `int64_t`,
-   which leaves no next count. */
-static int64_t repeats(const struct anti_toml *doc, const char *name,
-                       size_t length)
+/* The hash of FNV-1a over length more bytes at bytes, from h. */
+static uint64_t hash_more(uint64_t h, const char *bytes, size_t length)
 {
-    int64_t seen = -1;
     size_t i;
 
-    for (i = 0; i < doc->count; i++) {
-        const char *key = doc->pairs[i].key;
-        if (strncmp(key, name, length) == 0 && key[length] == '.') {
-            int64_t number = strtoll(key + length + 1, NULL, 10);
-            if (number > seen) {
-                seen = number;
-            }
+    for (i = 0; i < length; i++) {
+        h ^= (unsigned char)bytes[i];
+        h *= 0x100000001b3u;
+    }
+    return h;
+}
+
+/* The slot of the path of length bytes at name with the hash h, the slot
+   that holds it or the free one where it goes. */
+static struct under *slot_of(const struct anti_toml *doc, const char *name,
+                             size_t length, uint64_t h)
+{
+    size_t mask = doc->room - 1;
+    size_t i = (size_t)h & mask;
+
+    while (doc->names[i].length != 0 &&
+           !(doc->names[i].hash == h && doc->names[i].length == length &&
+             memcmp(doc->pairs[doc->names[i].pair].key, name, length) == 0)) {
+        i = (i + 1) & mask;
+    }
+    return &doc->names[i];
+}
+
+/* Double the room of the paths, or give 0 when the memory runs out. */
+static int grow_names(struct anti_toml *doc)
+{
+    struct under *old = doc->names;
+    size_t old_room = doc->room;
+    size_t i;
+
+    if (doc->room > SIZE_MAX / 2 / sizeof *old) {
+        return 0;
+    }
+    doc->room = doc->room == 0 ? 64 : doc->room * 2;
+    doc->names = calloc(doc->room, sizeof *doc->names);
+    if (doc->names == NULL) {
+        doc->names = old;
+        doc->room = old_room;
+        return 0;
+    }
+    for (i = 0; i < old_room; i++) {
+        if (old[i].length != 0) {
+            const char *name = doc->pairs[old[i].pair].key;
+            *slot_of(doc, name, old[i].length, old[i].hash) = old[i];
         }
     }
-    return seen == INT64_MAX ? -1 : seen + 1;
+    free(old);
+    return 1;
+}
+
+/* Note the key of the pair at index under each of its paths that ends
+   before a dot, with the number that follows the dot. A `[[name]]` header
+   holds bare bytes and dots alone, so the paths stop at the first other
+   byte. Gives 0 when the memory runs out. */
+static int index_pair(struct anti_toml *doc, size_t index)
+{
+    const char *key = doc->pairs[index].key;
+    size_t length = (size_t)doc->pairs[index].key_length;
+    uint64_t h = 0xcbf29ce484222325u;
+    size_t from = 0;
+    size_t p;
+
+    for (p = 0; p < length && (is_bare(key[p]) || key[p] == '.'); p++) {
+        struct under *slot;
+        int64_t number;
+        if (key[p] != '.' || p == 0) {
+            continue;
+        }
+        h = hash_more(h, key + from, p - from);
+        from = p;
+        if (doc->names_count + 1 > doc->room / 2 && !grow_names(doc)) {
+            return 0;
+        }
+        slot = slot_of(doc, key, p, h);
+        if (slot->length == 0) {
+            slot->pair = index;
+            slot->length = p;
+            slot->hash = h;
+            slot->largest = -1;
+            doc->names_count++;
+        }
+        number = strtoll(key + p + 1, NULL, 10);
+        if (number > slot->largest) {
+            slot->largest = number;
+        }
+    }
+    return 1;
+}
+
+/* The count of `[[name]]` tables seen so far under that name: one past
+   the largest number that follows the name and a dot in any key read so
+   far. It is -1 when that number is the limit of `int64_t`, which leaves
+   no next count, and when the memory of the paths runs out.
+
+   DESIGN: the paths of the keys are indexed once each, at the first
+   header after them, so a header costs the same whatever was read before
+   it. A walk over every pair per header made N headers cost N^2 / 2
+   comparisons. */
+static int64_t repeats(struct anti_toml *doc, const char *name, size_t length)
+{
+    const struct under *slot;
+
+    for (; doc->indexed < doc->count; doc->indexed++) {
+        if (!index_pair(doc, doc->indexed)) {
+            return -1;
+        }
+    }
+    if (doc->room == 0) {
+        return 0;
+    }
+    slot = slot_of(doc, name, length, hash_more(0xcbf29ce484222325u, name,
+                                                length));
+    if (slot->length == 0) {
+        return 0;
+    }
+    return slot->largest == INT64_MAX ? -1 : slot->largest + 1;
 }
 
 static void read_header(struct reader *r, struct anti_toml *doc)
@@ -548,5 +667,6 @@ void anti_rt_toml_free(struct anti_toml *doc)
         free(doc->pairs[i].value);
     }
     free(doc->pairs);
+    free(doc->names);
     free(doc);
 }
