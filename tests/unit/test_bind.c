@@ -145,6 +145,16 @@ static void expressions(void)
     CHECK(!value_of(&b, "(1 + 2", &v));
     CHECK(!value_of(&b, "", &v));
     CHECK(!value_of(&b, "\"open", &v));
+    /* S319. A text that ends in the backslash of an escape fails at its
+       end. The copy holds the text and its terminator alone, so a read
+       past them is outside the allocation. */
+    {
+        static const char open_escape[] = "\"abc\\";
+        char *exact = alloc_zeroed(sizeof open_escape, 1);
+        memcpy(exact, open_escape, sizeof open_escape);
+        CHECK(!value_of(&b, exact, &v));
+        free(exact);
+    }
     /* A literal that no 64-bit integer or double holds is refused, not
        taken at the saturated value. */
     CHECK(!value_of(&b, "18446744073709551616", &v));

@@ -237,6 +237,13 @@ static struct bind_eval string(struct eval *e)
             }
             if (c == '\\') {
                 char d = e->s[e->pos + 1];
+                /* A backslash at the end of the text escapes nothing, and
+                   pos stays inside the text, by S319. */
+                if (d == '\0') {
+                    fail(e);
+                    text_free(&bytes);
+                    return v;
+                }
                 e->pos += 2;
                 switch (d) {
                 case 'n': c = '\n'; break;
