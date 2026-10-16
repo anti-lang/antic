@@ -1,0 +1,17 @@
+//! `take_place` of a `HashMap<K, V>` given the place of a removed entry stops
+//! the program, finding S315. Before the fix it counted the slot removed a
+//! second time and gave its zero bytes as an entry.
+
+import anti.collection.map.{HashMap};
+
+fn main() -> int
+{
+	let m = HashMap<int, int>.new();
+	m.set(1, 10);
+	m.set(2, 20);
+	let at = m.first_place();
+	let (k, v) = m.copy_place(at);
+	m.remove(k);
+	let (gone, after) = m.take_place(at);
+	return gone.0 + gone.1;
+}

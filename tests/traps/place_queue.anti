@@ -1,0 +1,14 @@
+//! `take_place` of a `PriorityQueue<T>` given a place past its elements
+//! stops the program, finding S315. Before the fix a release build moved the
+//! last element over room past it.
+
+import anti.collection.queue.{PriorityQueue};
+
+fn main() -> int
+{
+	let q = PriorityQueue<int>.new(8);
+	q.push(3);
+	q.push(1);
+	let (taken, after) = q.take_place(5);
+	return taken;
+}

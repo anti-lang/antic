@@ -1,0 +1,13 @@
+//! `copy_place` of a `SortedMap<K, V>` given a place past the slots of its
+//! nodes stops the program, finding S315. Before the fix a release build read
+//! the room past the last node.
+
+import anti.collection.sorted.{SortedMap};
+
+fn main() -> int
+{
+	let m = SortedMap<int, int>.new();
+	m.set(1, 10);
+	let (k, v) = m.copy_place(500);
+	return k + v;
+}

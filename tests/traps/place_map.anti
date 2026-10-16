@@ -1,0 +1,15 @@
+//! `copy_place` of a `Map<K, V>` given the place of a removed entry stops
+//! the program, finding S315. Before the fix it gave a copy of the zero bytes
+//! the entry left.
+
+import anti.collection.map.{Map};
+
+fn main() -> int
+{
+	let m = Map<int, int>.new();
+	m.set(1, 10);
+	m.set(2, 20);
+	m.remove(1);
+	let (k, v) = m.copy_place(0);
+	return k + v;
+}

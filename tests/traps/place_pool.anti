@@ -1,0 +1,18 @@
+//! `take_place` of a `Pool<T>` given a free slot stops the program,
+//! finding S315. Before the fix it linked the slot into the free list a
+//! second time, so the next two `add` calls shared one slot.
+
+import anti.collection.pool.{Pool};
+
+fn main() -> int
+{
+	let p = Pool<int>.new();
+	p.add(1);
+	let h = p.add(2);
+	p.add(3);
+	p.remove(h);
+	let (taken, after) = p.take_place(1);
+	let a = p.add(4);
+	let b = p.add(5);
+	return taken;
+}

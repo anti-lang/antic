@@ -199,6 +199,7 @@ pub class Tree<T> inherits pool.Slots<T>
 	/// its parent.
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
+		self.check_place("take_place", at);
 		let after = self.next_place(at);
 		let first = self.extra(at, FIRST);
 		if first == NO_NODE {

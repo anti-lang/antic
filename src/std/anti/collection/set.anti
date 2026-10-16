@@ -143,6 +143,7 @@ pub class Set<T: eq + hash> inherits map.EntryTable<T>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
+		self.check_place("lend_place", at);
 		let copy = self.copy_element(self.entry(at));
 		f(&copy);
 	}
@@ -338,6 +339,7 @@ pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
+		self.check_place("lend_place", at);
 		let copy = self.copy_element(self.entry(self.slot_at(at)));
 		f(&copy);
 	}
@@ -624,30 +626,34 @@ pub class BitSet inherits collection.Collection<int>
 	/// A place is the number itself.
 	concrete fn first_place(self) -> int
 	{
-		return self.next_place(-1);
+		return next_bit(self.words, self.word_count, -1);
 	}
 
 	concrete fn next_place(self, at: int) -> int
 	{
+		self.check_place("next_place", at);
 		return next_bit(self.words, self.word_count, at);
 	}
 
 	concrete fn lend_place(self, at: int, f: fn(lent *int))
 	{
+		self.check_place("lend_place", at);
 		let copy = at;
 		f(&copy);
 	}
 
 	concrete fn copy_place(self, at: int) -> int
 	{
+		self.check_place("copy_place", at);
 		return at;
 	}
 
 	concrete fn take_place(self, at: int) -> (int, int)
 	{
+		self.check_place("take_place", at);
 		let words = self.words catch fatal;
 		words[at / WORD_BITS] &= ~bit(at);
-		return (at, self.next_place(at));
+		return (at, next_bit(self.words, self.word_count, at));
 	}
 
 	/// A copy of the numbers in new room of the same allocator.
@@ -669,6 +675,15 @@ pub class BitSet inherits collection.Collection<int>
 	fn destruct(self)
 	{
 		self.from.free(self.words as ?*byte);
+	}
+
+	/// Stop the program unless the set holds the number `at`, which the place
+	/// function `form` was given.
+	fn check_place(self, form: str, at: int)
+	{
+		if !self.contains(at) {
+			self.no_element(form);
+		}
 	}
 
 	/// The word `i`, or 0 beyond the room.

@@ -1,0 +1,14 @@
+//! `take_place` of a `SortedSet<T>` given an empty slot of a node stops the
+//! program, finding S315. Before the fix it took the zero bytes of the slot
+//! out of the tree and closed a gap that was not there.
+
+import anti.collection.sorted.{SortedSet};
+
+fn main() -> int
+{
+	let s = SortedSet<int>.new();
+	s.add(1);
+	s.add(2);
+	let (x, after) = s.take_place(5);
+	return x;
+}

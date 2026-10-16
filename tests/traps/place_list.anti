@@ -1,0 +1,14 @@
+//! `copy_place` of a `List<T>` given a place past its elements stops the
+//! program, finding S315. The place functions are public, and before the fix
+//! a release build read the room past the last element.
+
+import anti.collection.list.{List};
+
+fn main() -> int
+{
+	let l = List<int>.new(8);
+	l.push(1);
+	l.push(2);
+	l.push(3);
+	return l.copy_place(5);
+}

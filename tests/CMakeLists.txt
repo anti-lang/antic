@@ -5164,6 +5164,22 @@ foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
 endforeach()
+# The place_ programs: a place function of a collection given a place
+# that holds no element stops the program with `Error.fatal`, finding
+# S315, one program for each class that fills the functions.
+foreach(name IN ITEMS place_list place_list_next place_grid place_queue
+        place_map place_map_next place_hash_map place_bitset place_pool
+        place_tree place_sorted place_sorted_set)
+    add_test(NAME trap_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
+            "-DSTATUS=1"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_trap.cmake")
+endforeach()
 # fatal_none: `catch fatal` on a `none` pointer runs the function of
 # `error.on_fatal`, prints the error and exits with 1, in release mode,
 # where the guard calls `Error.fatal` directly and ends with unreachable.

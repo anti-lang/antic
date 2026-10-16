@@ -1315,6 +1315,7 @@ class Held<T> inherits collection.Collection<T>
 
 	concrete fn next_place(self, at: int) -> int
 	{
+		self.check_place("next_place", at);
 		if at + 1 >= self.tail {
 			return -1;
 		}
@@ -1323,11 +1324,13 @@ class Held<T> inherits collection.Collection<T>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
+		self.check_place("lend_place", at);
 		f(&self.items[at % self.size]);
 	}
 
 	concrete fn copy_place(self, at: int) -> T
 	{
+		self.check_place("copy_place", at);
 		return self.copy_element(&self.items[at % self.size]);
 	}
 
@@ -1336,6 +1339,7 @@ class Held<T> inherits collection.Collection<T>
 	/// slot they leave, which stays zero.
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
+		self.check_place("take_place", at);
 		let slot = &self.items[at % self.size];
 		let got = (*slot, self.next_place(at));
 		let q = at - 1;
@@ -1349,6 +1353,15 @@ class Held<T> inherits collection.Collection<T>
 			size_of(T) as c_size_t);
 		self.head += 1;
 		return got;
+	}
+
+	/// Stop the program unless the position `at`, which the place function
+	/// `form` was given, lies between `head` and `tail`.
+	fn check_place(self, form: str, at: int)
+	{
+		if at < self.head || at >= self.tail {
+			self.no_element(form);
+		}
 	}
 
 	/// Remove every element that `test` accepts in one pass and give their

@@ -1,0 +1,12 @@
+//! `take_place` of a `Grid<T>` given a place past its cells stops the
+//! program, finding S315. Before the fix a release build wrote the fill value
+//! into the spare slot and past it.
+
+import anti.collection.grid.{Grid};
+
+fn main() -> int
+{
+	let g = Grid<int>.new(2, 3, 4);
+	let (taken, after) = g.take_place(9);
+	return taken;
+}

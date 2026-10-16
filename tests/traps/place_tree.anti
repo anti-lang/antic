@@ -1,0 +1,17 @@
+//! `take_place` of a `Tree<T>` given a free slot stops the program,
+//! finding S315. Before the fix it unlinked the slot from the tree a second
+//! time and linked it into the free list twice.
+
+import anti.collection.tree.{Tree};
+
+fn main() -> int
+{
+	let t = Tree<int>.new();
+	let root = t.add_root(1);
+	let leaf = t.add_child(root, 2) else {
+		return 2;
+	};
+	t.remove(leaf);
+	let (taken, after) = t.take_place(1);
+	return taken;
+}

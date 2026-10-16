@@ -283,16 +283,19 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 
 	concrete fn next_place(self, at: int) -> int
 	{
+		self.check_place("next_place", at);
 		return self.live_from(at + 1);
 	}
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
+		self.check_place("lend_place", at);
 		f(self.element(at));
 	}
 
 	concrete fn copy_place(self, at: int) -> T
 	{
+		self.check_place("copy_place", at);
 		return self.copy_element(self.element(at));
 	}
 
@@ -328,6 +331,15 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 				*p = self.copy_element(self.element(i));
 			}
 			i += 1;
+		}
+	}
+
+	/// Stop the program unless the slot `at`, which the place function `form`
+	/// was given, holds an element.
+	protected fn check_place(self, form: str, at: int)
+	{
+		if at < 0 || at >= self.used || self.word(at, LINK) != LIVE {
+			self.no_element(form);
 		}
 	}
 
@@ -530,6 +542,7 @@ pub class Pool<T> inherits Slots<T>
 
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
+		self.check_place("take_place", at);
 		let after = self.next_place(at);
 		let taken = self.release(at);
 		return (taken, after);

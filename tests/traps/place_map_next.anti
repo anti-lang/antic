@@ -1,0 +1,12 @@
+//! `next_place` of a `Map<K, V>` given a place below -1 stops the program,
+//! finding S315. Before the fix it read the marks of the entries before the
+//! first.
+
+import anti.collection.map.{Map};
+
+fn main() -> int
+{
+	let m = Map<int, int>.new();
+	m.set(1, 10);
+	return m.next_place(-1000000) + 10;
+}

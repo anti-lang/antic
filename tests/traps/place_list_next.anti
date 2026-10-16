@@ -1,0 +1,11 @@
+//! `next_place` of a `List<T>` given a place below -1 stops the program,
+//! finding S315. Before the fix it gave the place after it, 0 for -3.
+
+import anti.collection.list.{List};
+
+fn main() -> int
+{
+	let l = List<int>.new();
+	l.push(1);
+	return l.next_place(-3) + 10;
+}

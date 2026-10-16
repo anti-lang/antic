@@ -239,12 +239,14 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 
 	concrete fn next_place(self, at: int) -> int
 	{
+		self.check_place("next_place", at);
 		let links = self.links catch fatal;
 		return next_in(links, at);
 	}
 
 	concrete fn copy_place(self, at: int) -> T
 	{
+		self.check_place("copy_place", at);
 		return self.copy_element(self.slot(at));
 	}
 
@@ -304,6 +306,19 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 				i += 1;
 			}
 			n += 1;
+		}
+	}
+
+	/// Stop the program unless the place `at`, which the place function `form`
+	/// was given, is a slot that holds an element of a node of the tree.
+	protected fn check_place(self, form: str, at: int)
+	{
+		let links = self.links else {
+			self.no_element(form);
+		};
+		let n = at / NODE_MAX;
+		if at < 0 || n >= self.used || at % NODE_MAX >= links[n * LINKS + HELD] {
+			self.no_element(form);
 		}
 	}
 
@@ -1009,12 +1024,14 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))
 	{
+		self.check_place("lend_place", at);
 		f(self.slot(at));
 		self.check_order(at);
 	}
 
 	concrete fn take_place(self, at: int) -> ((K, V), int)
 	{
+		self.check_place("take_place", at);
 		let taken = (self.take_out(at), -1);
 		taken.1 = self.ceiling_place(&taken.0.0);
 		return taken;
@@ -1395,12 +1412,14 @@ pub class SortedSet<T: Ordered> inherits BTree<T>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
+		self.check_place("lend_place", at);
 		f(self.slot(at));
 		self.check_order(at);
 	}
 
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
+		self.check_place("take_place", at);
 		let taken = (self.take_out(at), -1);
 		taken.1 = self.ceiling_place(&taken.0);
 		return taken;

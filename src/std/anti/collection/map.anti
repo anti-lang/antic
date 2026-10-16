@@ -152,10 +152,56 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 
 	concrete fn first_place(self) -> int
 	{
-		return self.next_place(-1);
+		return self.live_after(-1);
 	}
 
 	concrete fn next_place(self, at: int) -> int
+	{
+		self.check_place("next_place", at);
+		return self.live_after(at);
+	}
+
+	concrete fn copy_place(self, at: int) -> E
+	{
+		self.check_place("copy_place", at);
+		return self.copy_element(self.entry(at));
+	}
+
+	concrete fn take_place(self, at: int) -> (E, int)
+	{
+		self.check_place("take_place", at);
+		let entries = self.entries catch fatal;
+		let hashes = self.hashes catch fatal;
+		self.forget(at);
+		hashes[at] = 0;
+		let after = self.live_after(at);
+		let taken = (entries[at], after);
+		memset(&entries[at] as ?*byte, 0, size_of(E) as c_size_t);
+		return taken;
+	}
+
+	/// Move the element at the place `at` out of the table. `count` still
+	/// counts it, and the caller takes it off.
+	protected fn take_entry(self, at: int) -> E
+	{
+		let (taken, after) = self.take_place(at);
+		return taken;
+	}
+
+	/// Stop the program unless the position `at`, which the place function
+	/// `form` was given, holds an entry that was not removed.
+	protected fn check_place(self, form: str, at: int)
+	{
+		let hashes = self.hashes else {
+			self.no_element(form);
+		};
+		if at < 0 || at >= self.used || hashes[at] == 0 {
+			self.no_element(form);
+		}
+	}
+
+	/// The position of the first entry after `at` that was not removed, or -1.
+	fn live_after(self, at: int) -> int
 	{
 		let hashes = self.hashes else {
 			return -1;
@@ -168,31 +214,6 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 			i += 1;
 		}
 		return -1;
-	}
-
-	concrete fn copy_place(self, at: int) -> E
-	{
-		return self.copy_element(self.entry(at));
-	}
-
-	concrete fn take_place(self, at: int) -> (E, int)
-	{
-		let entries = self.entries catch fatal;
-		let hashes = self.hashes catch fatal;
-		self.forget(at);
-		hashes[at] = 0;
-		let after = self.next_place(at);
-		let taken = (entries[at], after);
-		memset(&entries[at] as ?*byte, 0, size_of(E) as c_size_t);
-		return taken;
-	}
-
-	/// Move the element at the place `at` out of the table. `count` still
-	/// counts it, and the caller takes it off.
-	protected fn take_entry(self, at: int) -> E
-	{
-		let (taken, after) = self.take_place(at);
-		return taken;
 	}
 
 	/// A copy of every element in new room of the same allocator.
@@ -498,25 +519,43 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 
 	concrete fn next_place(self, at: int) -> int
 	{
+		self.check_place("next_place", at);
 		return self.live_from(at >> 32, (at & 0xFFFFFFFF) + 1);
 	}
 
 	concrete fn copy_place(self, at: int) -> E
 	{
+		self.check_place("copy_place", at);
 		return self.copy_element(self.entry(self.slot_at(at)));
 	}
 
 	concrete fn take_place(self, at: int) -> (E, int)
 	{
+		self.check_place("take_place", at);
 		let marks = self.marks catch fatal;
 		let slots = self.slots catch fatal;
 		let i = self.slot_at(at);
 		marks[i] = REMOVED;
 		self.removed += 1;
-		let after = self.next_place(at);
+		let after = self.live_from(at >> 32, (at & 0xFFFFFFFF) + 1);
 		let taken = (slots[i], after);
 		memset(&slots[i] as ?*byte, 0, size_of(E) as c_size_t);
 		return taken;
+	}
+
+	/// Stop the program unless the place `at`, which the place function `form`
+	/// was given, is one a walk gives and its slot holds an entry.
+	protected fn check_place(self, form: str, at: int)
+	{
+		let marks = self.marks else {
+			self.no_element(form);
+		};
+		if at < 0 || at >> 32 >= self.size || (at & 0xFFFFFFFF) >= self.size {
+			self.no_element(form);
+		}
+		if marks[self.slot_at(at)] <= REMOVED {
+			self.no_element(form);
+		}
 	}
 
 	/// The slot of the place `at`.
@@ -792,6 +831,7 @@ pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))
 	{
+		self.check_place("lend_place", at);
 		lend_entry(self.entry(at), f);
 	}
 
@@ -1136,6 +1176,7 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))
 	{
+		self.check_place("lend_place", at);
 		lend_entry(self.entry(self.slot_at(at)), f);
 	}
 

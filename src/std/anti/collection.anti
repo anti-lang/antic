@@ -110,7 +110,9 @@ pub fn allocator(from: ?*mem.Allocator) -> *mem.Allocator
 /// A collection fills five functions that reach an element by its place, an
 /// `int` of its own choosing that the order of the collection walks from
 /// `first_place` through `next_place` to `-1`. They serve the functions of this
-/// class, which a collection may replace with faster ones.
+/// class, which a collection may replace with faster ones. They are public, as
+/// every abstract function is, so each of the four that takes a place stops
+/// the program when that place holds no element.
 pub abstract class Collection<T>
 {
 	/// The number of elements.
@@ -133,6 +135,7 @@ pub abstract class Collection<T>
 	abstract fn first_place(self) -> int;
 
 	/// The place of the element after the one at `at`, or -1 after the last.
+	/// `at` holds an element.
 	abstract fn next_place(self, at: int) -> int;
 
 	/// Lend the element at the place `at` to `f`, which may change it.
@@ -366,6 +369,16 @@ pub abstract class Collection<T>
 	protected fn watch(self) -> lang.Watch
 	{
 		return lang.Watch { changes: &self.changes, count: self.changes.count };
+	}
+
+	/// Stop the program for a place that holds no element, which the place
+	/// function `form` was given.
+	protected fn no_element(self, form: str) -> never
+	{
+		let name = self.type_name();
+		let e = lang.Error.new(0,
+			f"`{form}` of `{name}` was given a place that holds no element");
+		e.fatal();
 	}
 
 	/// Room for `n` elements from the allocator, or `none` when it has run out.
@@ -782,6 +795,7 @@ pub abstract class Indexed<T> inherits Collection<T>
 
 	concrete fn next_place(self, at: int) -> int
 	{
+		self.check_place("next_place", at);
 		if at + 1 >= self.count {
 			return -1;
 		}
@@ -790,12 +804,14 @@ pub abstract class Indexed<T> inherits Collection<T>
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
+		self.check_place("lend_place", at);
 		let items = self.items catch fatal;
 		f(&items[self.slot(at)]);
 	}
 
 	concrete fn copy_place(self, at: int) -> T
 	{
+		self.check_place("copy_place", at);
 		let items = self.items catch fatal;
 		return self.copy_element(&items[self.slot(at)]);
 	}
@@ -805,6 +821,7 @@ pub abstract class Indexed<T> inherits Collection<T>
 	/// `head` on instead.
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
+		self.check_place("take_place", at);
 		let items = self.items catch fatal;
 		let after = -1;
 		if at + 1 < self.count {
@@ -829,6 +846,15 @@ pub abstract class Indexed<T> inherits Collection<T>
 		memset(&items[self.slot(self.count - 1)] as ?*byte, 0,
 			size_of(T) as c_size_t);
 		return taken;
+	}
+
+	/// Stop the program unless the position `at`, which the place function
+	/// `form` was given, holds an element.
+	protected fn check_place(self, form: str, at: int)
+	{
+		if at < 0 || at >= self.count {
+			self.no_element(form);
+		}
 	}
 
 	/// The slot that holds the element at position `i`, which lies between 0

@@ -164,6 +164,7 @@ pub class Grid<T> inherits collection.Indexed<T>
 	/// leaves its cell, which takes a copy of the fill value.
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
+		self.check_place("take_place", at);
 		let items = self.items catch fatal;
 		let taken = (items[at], self.next_place(at));
 		memset(&items[at] as ?*byte, 0, size_of(T) as c_size_t);

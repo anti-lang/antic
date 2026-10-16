@@ -79,6 +79,7 @@ pub class PriorityQueue<T: Ordered> inherits collection.Indexed<T>
 	/// belongs.
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
 	{
+		self.check_place("lend_place", at);
 		let items = self.items catch fatal;
 		f(&items[at]);
 		self.fix(at, self.count);
@@ -88,6 +89,7 @@ pub class PriorityQueue<T: Ordered> inherits collection.Indexed<T>
 	/// restore the order. The element after it in the array is then at `at`.
 	concrete fn take_place(self, at: int) -> (T, int)
 	{
+		self.check_place("take_place", at);
 		let items = self.items catch fatal;
 		let last = self.count - 1;
 		let after = -1;
