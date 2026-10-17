@@ -1,5 +1,7 @@
 # Compile one test program with antic, run it and compare the result with
-# the expected file beside the source. Run with cmake -P and these values:
+# the expected file beside the source. The LLVM text and the bitcode
+# beside the executable are gone after the build, unless OPTIONS holds
+# --keep-llvm. Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory, holding lib/<target>/<level>/
@@ -44,6 +46,7 @@ if(DEFINED EXPECTED)
 endif()
 set(exe "${WORK}/${name}")
 file(MAKE_DIRECTORY "${WORK}")
+file(REMOVE "${exe}.ll" "${exe}.bc")
 
 string(REPLACE "," ";" objects "${OBJECTS}")
 string(REPLACE "," ";" options "${OPTIONS}")
@@ -66,6 +69,13 @@ if(DEFINED WARNING AND NOT WARNING STREQUAL "")
     endif()
 else()
     antic_build(${limit} COMMAND ${build})
+endif()
+if(NOT "--keep-llvm" IN_LIST options)
+    foreach(intermediate "${exe}.ll" "${exe}.bc")
+        if(EXISTS "${intermediate}")
+            message(FATAL_ERROR "${intermediate} stays without --keep-llvm")
+        endif()
+    endforeach()
 endif()
 
 if(DEFINED SKIP_RUN AND NOT SKIP_RUN STREQUAL "")

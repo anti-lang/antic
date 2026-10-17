@@ -30,12 +30,18 @@ get_filename_component(file "${SOURCE}" NAME)
 # The host's program, and a Linux program, whose executable holds its
 # line table. A Mach-O executable leaves the table in the object, which
 # the LTO of a release build writes into the directory <program>.lto.
+# DESIGN: a Windows program keeps its lines in the PDB, which llvm-objdump
+# does not read, so on a Windows host the Linux program alone shows the
+# table. pdb_guid_<target> reads the PDB of a Windows program.
 set(targets ${HOST} linux-x86_64)
 list(REMOVE_DUPLICATES targets)
 foreach(target IN LISTS targets)
     set(program "${WORK}/${target}")
     antic_build(-g --target ${target} --runtime "${RUNTIME}" -o "${program}"
                 "${SOURCE}")
+    if(target MATCHES "^windows-")
+        continue()
+    endif()
     set(table "${program}")
     if(target MATCHES "^macos-")
         file(GLOB table "${program}.lto/*.o")

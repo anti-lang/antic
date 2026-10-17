@@ -226,8 +226,8 @@ endfunction()
 # DESIGN: ANTIC_TEST_LTO runs the suite behind --lto, as the step
 # runtime-lto of docs/work-order-llvm-optimization.md asks. Empty by
 # default, so the suite builds as a user does. Set to full or thin, it
-# gives each program test of antic_program_test, antic_modules_test and
-# antic_llvm_program_test that builds in release mode --lto in that mode.
+# gives each program test of antic_program_test and antic_modules_test
+# that builds in release mode --lto in that mode.
 # A test whose options hold one that --lto refuses keeps them alone.
 set(ANTIC_TEST_LTO "" CACHE STRING
     "full or thin: build the program tests of release mode with --lto")
@@ -657,123 +657,43 @@ add_test(NAME llvm_verify_runner
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify_runner"
         -P "${ANTIC_RUNNERS}/run_llvm_verify_self.cmake")
 
-# A program of tests/programs built with antic, which runs opt and llc of
-# the runtime archive and links, and run on a target the host runs. MODE is release or dev, and OPTIONS the options of antic
-# beside them. SOURCE names a program elsewhere than tests/programs,
-# OBJECTS the objects of C it links and EXPECTED its expected output. The
-# test is llvm_program_<name>_<target>_<mode>.
-function(antic_llvm_program_test name target mode)
-    cmake_parse_arguments(PARSE_ARGV 3 arg "" "SOURCE;OBJECTS;EXPECTED"
-                          "OPTIONS")
-    set(source "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti")
-    if(arg_SOURCE)
-        set(source "${arg_SOURCE}")
-    endif()
-    set(extra "")
-    if(arg_OBJECTS)
-        list(APPEND extra "-DOBJECTS=${arg_OBJECTS}")
-    endif()
-    if(arg_EXPECTED)
-        list(APPEND extra "-DEXPECTED=${arg_EXPECTED}")
-    endif()
-    set(options ${arg_OPTIONS})
-    if(target STREQUAL "macos-x86_64")
-        list(APPEND options --cpu v1)
-    endif()
-    if(mode STREQUAL "release")
-        antic_test_lto(options ${options})
-    endif()
-    list(JOIN options "," options)
-    add_test(NAME llvm_program_${name}_${target}_${mode}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${source}"
-            "-DTARGET_NAME=${target}"
-            "-DMODE=${mode}"
-            "-DOPTIONS=${options}"
-            ${extra}
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_programs"
-            -P "${ANTIC_RUNNERS}/run_llvm_program.cmake")
-endfunction()
-
-# The scalar programs of tests/programs, in release and dev mode, for
-# macos-arm64 and for macos-x86_64 under Rosetta, which take --cpu v1 as
-# every macos-x86_64 program of a macos-arm64 host does. scalar_ops and
-# llvm_division build in dev mode with --no-checks, so the defined result
-# stands behind each check. asserts calls
-# the runtime from its assertions in dev mode, and runs in release mode
-# alone. llvm_division is the test llvm_division of
-# docs/work-order-llvm-back-end.md. The six programs of the wide
-# operations run in both modes from the step emit-wide on, and llvm_flags,
-# the test llvm_flags, runs in release mode as the work order gives it.
-set(llvm_targets "")
-if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
-    set(llvm_targets macos-arm64 macos-x86_64)
-elseif(ANTIC_HOST_TARGET STREQUAL "macos-x86_64")
-    set(llvm_targets macos-x86_64)
-endif()
-foreach(target IN LISTS llvm_targets)
-    foreach(name IN ITEMS return42 return_pieces deep_nesting long_float
-            asserts scalar_ops llvm_division llvm_wrap)
-        antic_llvm_program_test(${name} ${target} release)
-    endforeach()
-    foreach(name IN ITEMS return42 return_pieces deep_nesting long_float)
-        antic_llvm_program_test(${name} ${target} dev)
-    endforeach()
-    foreach(name IN ITEMS scalar_ops llvm_division llvm_wrap)
-        antic_llvm_program_test(${name} ${target} dev OPTIONS --no-checks)
-    endforeach()
-    foreach(name IN ITEMS flags saturating mul_high carry_chain wrapping
-            simd)
-        antic_llvm_program_test(${name} ${target} release)
-        antic_llvm_program_test(${name} ${target} dev)
-    endforeach()
-    antic_llvm_program_test(llvm_flags ${target} release)
-endforeach()
-
 # The tool run of the LLVM back end: --keep-llvm, the bitcode of release
 # mode alone and -S. A failed opt or llc prints its own message and then
 # the line of antic. --opt and --llc name the tool, here one that refuses
 # the options antic passes: llc for opt, and llvm-mc for llc, since opt
-# takes the options of llc. The tests run on the hosts of llvm_targets,
-# and the step vm adds the others.
-if(llvm_targets)
-    add_test(NAME llvm_run
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_run"
-            -P "${ANTIC_RUNNERS}/run_llvm_run.cmake")
-    add_expect_test(llvm_opt_failed STATUS 1
-        PATTERN "llc: error: -passes is for .mir file only.*antic: opt failed"
-        COMMAND $<TARGET_FILE:antic>
-                --runtime "${ANTIC_RUNTIME_DIR}" --opt "${ANTIC_LLC}"
-                -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_opt_failed"
-                "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-    add_expect_test(llvm_llc_failed STATUS 1
-        PATTERN "llvm-mc: Unknown command line argument .*antic: llc failed"
-        COMMAND $<TARGET_FILE:antic> --dev
-                --runtime "${ANTIC_RUNTIME_DIR}" --llc "${ANTIC_LLVM_MC}"
-                -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_llc_failed"
-                "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-endif()
+# takes the options of llc. Every host runs them.
+add_test(NAME llvm_run
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_run"
+        -P "${ANTIC_RUNNERS}/run_llvm_run.cmake")
+add_expect_test(llvm_opt_failed STATUS 1
+    PATTERN "llc(\\.exe)?: error: -passes is for .mir file only.*antic: opt failed"
+    COMMAND $<TARGET_FILE:antic>
+            --runtime "${ANTIC_RUNTIME_DIR}" --opt "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_opt_failed"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+add_expect_test(llvm_llc_failed STATUS 1
+    PATTERN "llvm-mc(\\.exe)?: Unknown command line argument .*antic: llc failed"
+    COMMAND $<TARGET_FILE:antic> --dev
+            --runtime "${ANTIC_RUNTIME_DIR}" --llc "${ANTIC_LLVM_MC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_llc_failed"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
 # The test llvm_inline_lines: a release build with -g inlines a small
 # callee, and the line table names the line of the callee in the code of
 # its caller.
-if(llvm_targets)
-    add_test(NAME llvm_inline_lines
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/llvm_inline_lines.anti"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-inline-lines"
-            -P "${ANTIC_RUNNERS}/run_llvm_inline_lines.cmake")
-endif()
+add_test(NAME llvm_inline_lines
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/llvm_inline_lines.anti"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-inline-lines"
+        -P "${ANTIC_RUNNERS}/run_llvm_inline_lines.cmake")
 
 # The test of the step tables of docs/work-order-llvm-optimization.md: a
 # release build calls the function of an object of a known class
@@ -1510,16 +1430,29 @@ endif()
 
 file(GLOB program_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/programs/*.anti")
-# DESIGN: a program named llvm_* checks a result of release mode that
-# "Defined results in release mode" of docs/work-order-llvm-back-end.md
-# defines, such as a division by zero. It runs through
-# antic_llvm_program_test, in the modes and with the options it needs.
-list(FILTER program_sources EXCLUDE REGEX "/llvm_[a-z_]+\\.anti$")
 foreach(source IN LISTS program_sources)
     get_filename_component(name "${source}" NAME_WE)
     antic_program_test(program_${name}
         "${source}"
         WORK "${CMAKE_CURRENT_BINARY_DIR}/programs")
+endforeach()
+# The first programs of the LLVM back end in dev mode, which asserts
+# leaves out, since it calls the runtime from its assertions there. A
+# program named llvm_* checks a result of release mode that "Defined
+# results in release mode" of docs/work-order-llvm-back-end.md defines,
+# such as a division by zero. It and scalar_ops build in dev mode with
+# --no-checks, so the defined result stands behind each check.
+foreach(name IN ITEMS return42 return_pieces deep_nesting long_float simd)
+    antic_program_test(program_${name}_dev
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev")
+endforeach()
+foreach(name IN ITEMS scalar_ops llvm_division llvm_wrap)
+    antic_program_test(program_${name}_dev_no_checks
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+        OPTIONS "--dev" "--no-checks"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-dev-no-checks")
 endforeach()
 # The program whose calls release mode makes direct, in dev mode, which
 # keeps every call through a table.
@@ -1853,6 +1786,22 @@ if(ANTIC_EMULATED_TARGET)
             OPTIONS "${ANTIC_X86_64_OPTIONS}"
             ${emulator}
             WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64")
+    endforeach()
+    # The programs of dev mode above, and those of the wide operations.
+    foreach(name IN ITEMS return42 return_pieces deep_nesting long_float simd
+            flags saturating mul_high carry_chain wrapping)
+        antic_program_test(program_${name}_dev_${emulated}
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            OPTIONS "${ANTIC_X86_64_OPTIONS},--dev"
+            ${emulator}
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64-dev")
+    endforeach()
+    foreach(name IN ITEMS scalar_ops llvm_division llvm_wrap)
+        antic_program_test(program_${name}_dev_no_checks_${emulated}
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/${name}.anti"
+            OPTIONS "${ANTIC_X86_64_OPTIONS},--dev,--no-checks"
+            ${emulator}
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64-dev-no-checks")
     endforeach()
     set_tests_properties(program_args_${emulated} PROPERTIES
         ENVIRONMENT "ANTI_TEST_GREETING=héllo")
@@ -3275,36 +3224,6 @@ else()
     set_tests_properties(program_abi_raymath PROPERTIES
         FAIL_REGULAR_EXPRESSION "raylib not found")
 endif()
-
-# The programs of tests/abi under the LLVM back end, in release mode as the
-# program_abi_* tests run, for macos-arm64 and for macos-x86_64 under
-# Rosetta. Each links the objects of C of its native test and prints what
-# that test prints, so they check abi_classify of src/antic/abi.c against
-# clang. abi_simd holds the simd operations its structs need.
-foreach(target IN LISTS llvm_targets)
-    set(suffix "")
-    set(wchar_expected "${abi_wchar_expected}")
-    if(NOT target STREQUAL ANTIC_HOST_TARGET)
-        set(suffix _x86_64)
-        set(wchar_expected "${abi_wchar_x86_64_expected}")
-    endif()
-    foreach(case structs simd wchar raymath)
-        if(NOT TARGET abi_${case}${suffix})
-            continue()
-        endif()
-        set(expected "")
-        if(case STREQUAL "wchar")
-            set(expected EXPECTED "${wchar_expected}")
-        elseif(case STREQUAL "raymath")
-            set(expected EXPECTED
-                "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_raymath.expected")
-        endif()
-        antic_llvm_program_test(abi_${case} ${target} release
-            SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
-            OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}${suffix}>,,>"
-            ${expected})
-    endforeach()
-endforeach()
 
 # Diagnostics. A refusal of a program exits with 1, and its messages
 # equal the .err file beside it.
