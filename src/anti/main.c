@@ -496,8 +496,8 @@ static int license_command(int argc, char **argv)
               "so license needs --runtime\n", stderr);
     } else if (binary == NULL) {
         status = licensing_plain(text_cstr(&runtime));
-    } else if (symmap_license_of(binary, &notice) &&
-               symmap_license_sources(&notice, text_cstr(&runtime))) {
+    } else if (licensing_text_of(binary, &notice) &&
+               licensing_add_sources(&notice, text_cstr(&runtime))) {
         fputs(text_cstr(&notice), stdout);
         status = 0;
     }

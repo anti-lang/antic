@@ -334,7 +334,7 @@ static void runtime_markers(void)
 {
     static const char *const files[] = {
         "/src/antic/notice.h", "/src/rt/license.c", "/src/rt/trace.c",
-        "/src/anti/symmap.c", "/src/anti/syms.c",
+        "/src/anti/licensing.c", "/src/anti/syms.c",
     };
     size_t i;
 

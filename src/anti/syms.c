@@ -22,6 +22,7 @@
 #include "conf_include.h"
 #include "cursor.h"
 #include "license.h"
+#include "licensing.h"
 #include "plugin_index.h"
 #include "symbols.h"
 #include "symmap.h"
@@ -179,7 +180,7 @@ static void add_binary(struct binaries *list, const char *path)
     }
     b = &list->items[list->count];
     memset(b, 0, sizeof *b);
-    if (!symmap_notice(&bytes, &b->id, &b->version)) {
+    if (!licensing_notice(&bytes, &b->id, &b->version)) {
         printf("missing %s: it carries no build id of Anti\n", path);
         list->problems++;
         text_free(&b->id);
@@ -341,7 +342,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct text version = {0};
         const char *path = text_cstr(&files.items[i]);
         if (files_read(path, &bytes) && is_program(files_base_name(path), &bytes) &&
-            symmap_notice(&bytes, &id, &version)) {
+            licensing_notice(&bytes, &id, &version)) {
             add_binary(out, path);
         }
         text_free(&bytes);
@@ -618,7 +619,7 @@ static bool load_archive(const char *path, struct units *out)
     }
     twin = unit_entry(u, ".debug");
     map = unit_entry(u, ".map");
-    if (twin == NULL || !symmap_notice(twin, &u->id, &u->version)) {
+    if (twin == NULL || !licensing_notice(twin, &u->id, &u->version)) {
         u->id.length = 0;
         if (map == NULL || !map_id(map, &u->id)) {
             fprintf(stderr, "anti: %s holds no build id\n", path);

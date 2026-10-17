@@ -1,5 +1,7 @@
 /* `anti license` over the runtime archive, a project and a static
-   archive.
+   archive. It holds the readers of the licence notice of a binary, which
+   `anti build` and `anti symbols` take for the build id as well, and of
+   the record of upstream sources.
 
    DESIGN: every form writes the lines of the notice of a binary, through
    antic_notice_lines, so one reader reads them all and NOTICE.txt of a
@@ -16,7 +18,7 @@
 #include "deps.h"
 #include "driver.h"
 #include "files.h"
-#include "symmap.h"
+#include "license.h"
 
 /* The licence of antic and anti, which docs/distribution.md gives under
    "Licence choices for Anti itself", and their names in the plain
@@ -26,6 +28,235 @@
 #define OWN_TOOL "anti"
 /* The version of a component that no record gives one. */
 #define NO_VERSION "-"
+
+static const char notice_head[] = ANTI_NOTICE_BEGIN ANTI_NOTICE_BUILD;
+
+/* The begin marker of the notice in bytes, where the line of a build id
+   follows it, or NULL when the bytes hold none. */
+static const char *find_notice(const struct text *bytes)
+{
+    size_t marker = sizeof notice_head - 1;
+    size_t i;
+
+    for (i = 0; i + marker + ANTI_BUILD_ID_LENGTH < bytes->length; i++) {
+        const char *at = bytes->data + i;
+        size_t j;
+        if (memcmp(at, notice_head, marker) != 0) {
+            continue;
+        }
+        for (j = 0; j < ANTI_BUILD_ID_LENGTH; j++) {
+            char c = at[marker + j];
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+                break;
+            }
+        }
+        if (j == ANTI_BUILD_ID_LENGTH &&
+            at[marker + ANTI_BUILD_ID_LENGTH] == '\n') {
+            return at;
+        }
+    }
+    return NULL;
+}
+
+bool licensing_text(const struct text *bytes, struct text *out)
+{
+    static const char end_marker[] = ANTI_NOTICE_END;
+    const char *at = find_notice(bytes);
+    const char *from;
+    const char *end;
+    const char *to;
+
+    if (at == NULL) {
+        return false;
+    }
+    from = at + sizeof notice_head - 1 + ANTI_BUILD_ID_LENGTH + 1;
+    end = bytes->data + bytes->length;
+    for (to = from; to + sizeof end_marker - 1 <= end; to++) {
+        if (memcmp(to, end_marker, sizeof end_marker - 1) == 0) {
+            text_append_bytes(out, from, (size_t)(to - from));
+            return true;
+        }
+    }
+    return false;
+}
+
+bool licensing_notice(const struct text *bytes, struct text *id,
+                      struct text *version)
+{
+    size_t marker = sizeof notice_head - 1;
+    const char *at = find_notice(bytes);
+    const char *end = bytes->data + bytes->length;
+    const char *line;
+
+    if (at != NULL) {
+        text_append_bytes(id, at + marker, ANTI_BUILD_ID_LENGTH);
+        line = at + marker + ANTI_BUILD_ID_LENGTH + 1;
+        while (line < end && end - line > 8 &&
+               memcmp(line, "package ", 8) == 0) {
+            const char *stop = memchr(line, '\n', (size_t)(end - line));
+            const char *word;
+            const char *after;
+            if (stop == NULL) {
+                break;
+            }
+            word = memchr(line + 8, ' ', (size_t)(stop - line - 8));
+            after = word != NULL
+                        ? memchr(word + 1, ' ', (size_t)(stop - word - 1))
+                        : NULL;
+            if (word != NULL) {
+                version->length = 0;
+                text_append_bytes(version, word + 1,
+                                  (size_t)((after != NULL ? after : stop) -
+                                           word - 1));
+            }
+            line = stop + 1;
+            while (line < end && end - line > 12 &&
+                   memcmp(line, "attribution ", 12) == 0) {
+                stop = memchr(line, '\n', (size_t)(end - line));
+                line = stop != NULL ? stop + 1 : end;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+bool licensing_text_of(const char *binary, struct text *out)
+{
+    struct text bytes = {0};
+    bool found;
+
+    if (!files_read_reported(binary, &bytes)) {
+        return false;
+    }
+    found = licensing_text(&bytes, out);
+    text_free(&bytes);
+    if (!found) {
+        fprintf(stderr, "anti: %s carries no licence notice\n", binary);
+    }
+    return found;
+}
+
+/* The line of the record in sources that names the component of name,
+   without its newline, with its length in length, or NULL. A line of the
+   record is `<name> <version> <url>`, and one that starts with # is a
+   comment. */
+static const char *source_line(const struct text *sources, const char *name,
+                               size_t name_length, size_t *length)
+{
+    const char *at = sources->data;
+    const char *end = at + sources->length;
+
+    while (at < end) {
+        const char *stop = memchr(at, '\n', (size_t)(end - at));
+        size_t line_length = (size_t)((stop != NULL ? stop : end) - at);
+        if (line_length > name_length && at[0] != '#' &&
+            at[name_length] == ' ' && memcmp(at, name, name_length) == 0) {
+            *length = line_length;
+            return at;
+        }
+        at = stop != NULL ? stop + 1 : end;
+    }
+    return NULL;
+}
+
+bool licensing_source_version(const struct text *sources, const char *name,
+                              struct text *out)
+{
+    size_t name_length = strlen(name);
+    size_t length = 0;
+    const char *line = source_line(sources, name, name_length, &length);
+    const char *version;
+    const char *stop;
+
+    if (line == NULL) {
+        return false;
+    }
+    version = line + name_length + 1;
+    stop = memchr(version, ' ', length - name_length - 1);
+    text_append_bytes(out, version,
+                      stop != NULL ? (size_t)(stop - version)
+                                   : length - name_length - 1);
+    return true;
+}
+
+/* Append to out a `source` line for each of the names, the names of a
+   `text for` line separated by spaces, that the record in sources
+   names. */
+static void append_sources(struct text *out, const struct text *sources,
+                           const char *names, size_t names_length)
+{
+    const char *at = names;
+    const char *end;
+
+    if (names == NULL) {
+        return;
+    }
+    end = names + names_length;
+    while (at < end) {
+        const char *space = memchr(at, ' ', (size_t)(end - at));
+        const char *stop = space != NULL ? space : end;
+        size_t length = 0;
+        const char *line =
+            source_line(sources, at, (size_t)(stop - at), &length);
+        if (line != NULL) {
+            text_append(out, "source ");
+            text_append_bytes(out, line, length);
+            text_append(out, "\n");
+        }
+        if (space == NULL) {
+            break;
+        }
+        at = space + 1;
+    }
+}
+
+bool licensing_add_sources(struct text *notice, const char *runtime)
+{
+    static const char head[] = "text for ";
+    struct text path = {0};
+    struct text sources = {0};
+    struct text out = {0};
+    const char *names = NULL;
+    size_t names_length = 0;
+    bool ok;
+
+    text_appendf(&path, "%s/%s/%s", runtime, RUNTIME_LICENSES_DIR,
+                 RUNTIME_SOURCES_FILE);
+    ok = files_read_reported(text_cstr(&path), &sources);
+    if (ok) {
+        const char *at = notice->data;
+        const char *end = at + notice->length;
+        while (at < end) {
+            const char *stop = memchr(at, '\n', (size_t)(end - at));
+            const char *next = stop != NULL ? stop + 1 : end;
+            size_t line_length = (size_t)((stop != NULL ? stop : end) - at);
+            if (line_length > sizeof head - 1 &&
+                memcmp(at, head, sizeof head - 1) == 0) {
+                append_sources(&out, &sources, names, names_length);
+                names = at + sizeof head - 1;
+                names_length = line_length - (sizeof head - 1);
+            }
+            text_append_bytes(&out, at, (size_t)(next - at));
+            at = next;
+        }
+        /* R189 of "Rules of 2026-10-13": the last line of the notice
+           ends with its newline, so the line of a source starts a line
+           of its own. */
+        if (out.length > 0 && out.data[out.length - 1] != '\n') {
+            text_append(&out, "\n");
+        }
+        append_sources(&out, &sources, names, names_length);
+        notice->length = 0;
+        if (out.length > 0) {
+            text_append_bytes(notice, out.data, out.length);
+        }
+    }
+    text_free(&path);
+    text_free(&sources);
+    text_free(&out);
+    return ok;
+}
 
 /* A copy of the bytes of t in the memory pool, as a C string. */
 static const char *pooled(struct arena *arena, const struct text *t)
@@ -73,7 +304,7 @@ static bool component_package(const char *path, const char *component,
         text_append(&field, component);
         out->name = pooled(arena, &field);
         field.length = 0;
-        if (!symmap_source_version(sources, component, &field)) {
+        if (!licensing_source_version(sources, component, &field)) {
             text_append(&field, NO_VERSION);
         }
         out->version = pooled(arena, &field);
@@ -153,7 +384,7 @@ int licensing_plain(const char *runtime)
             list[i] = &packages[i];
         }
         antic_notice_lines(&notice, list, count);
-        ok = symmap_license_sources(&notice, runtime);
+        ok = licensing_add_sources(&notice, runtime);
     }
     if (ok) {
         fputs(text_cstr(&notice), stdout);
@@ -205,7 +436,7 @@ bool licensing_project(const struct licensing_project *p, struct text *out)
         struct text notice = {0};
         list[n++] = p->own;
         antic_notice_lines(&notice, list, n);
-        ok = symmap_license_sources(&notice, p->runtime);
+        ok = licensing_add_sources(&notice, p->runtime);
         if (ok) {
             text_append_bytes(out, notice.data, notice.length);
         }
