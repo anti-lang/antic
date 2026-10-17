@@ -416,7 +416,9 @@ Left of a replaced feature, with an effect:
 
 - M344. `tools/publish.cmake:91`. The upload half of the publish script
   is reached by no caller. It would send the signature beside the
-  binaries, against `tools/site-base`. New. build-and-tools.
+  binaries, against `tools/site-base`. New. build-and-tools. Fixed
+  `2473f1d3`, which makes it `tools/check-release.cmake` and drops the
+  upload.
 - M345. `tests/CMakeLists.txt:554`. The LLVM program tests are a second
   runner from the two-back-end period. `llvm_division`, `llvm_wrap` and
   `llvm_flags` run on a Mac and on neither VM. New. build-and-tools.
@@ -502,9 +504,10 @@ A header or a comment that differs from the code:
   `d4a0c9dc`.
 - M367. `CMakeLists.txt:303`. A DESIGN comment says the packer leaves the
   bitcode out of the package. `tools/pack-anti.cmake:388` copies it. New.
-  build-and-tools.
+  build-and-tools. Fixed `199c8885`.
 - M368. `tools/uninstall.sh:5`. The uninstallers name an address that no
-  release publishes. New. build-and-tools.
+  release publishes. New. build-and-tools. Fixed `cfec4ad3`, which has
+  step 9 publish them by decision 9.
 - M369. `tests/run_script_policies.cmake:11`. The policy test says
   "every script" and reads two list files. Four runners that `src/native/`
   registers carry no `cmake_minimum_required`. New. build-and-tools.
@@ -514,7 +517,8 @@ A header or a comment that differs from the code:
   `malloc` and is not listed. New. build-and-tools. Fixed `b0b90de3`.
 - M371. `tests/run_linux_libc.cmake:12`. The runner says it links with
   the recipe of the packer and holds a hand copy of it. New.
-  build-and-tools.
+  build-and-tools. Fixed `1dac8065`, one function of
+  `tools/host-compile.cmake` for both.
 
 ## Minor
 
@@ -561,7 +565,7 @@ directory are in `src/antic/`.
 | Dependencies and boundaries | 4 | The doc page of the front end builds an IR module, `docpage.c:13` (tool-pass). The inside header of the library file is included outside it, `antl_io.h:12` (structure). The records every part shares stand in the interface of the tool, `antic.h:4` and `antic.h:111` (structure, back-end). The status 3 of `driver_run` is a number at four places, `src/anti/build.c:333` (anti-tool). |
 | Each concern in one place | 20 | The prefix of a message at every site, `src/anti/bindclang.c:101` (structure). Tables and names defined twice, `sema_class.c:1020` (front-end). The checks of a dev build in four files, `lower_lowerer.h:9` (middle). Errors in three forms, `driver.c:597`, fixed `418a71e8`, and a platform layer that names antic, `platform.h:9`, fixed `482136fd` (back-end). No `ptr_set_free`, `ptrset.h:8` (library-file). A walk built three ways, `queue.anti:75`, a lent key handled three ways, `set.anti:144`, `destruct` declared two ways, `lang.anti:192`, functions without `-> never`, `io.anti:36`, and numbers spelled again, `lang.anti:126` (std). Names of files and directories, `src/anti/main.c:488`, and a JSON file read by `strstr`, `src/anti/sdk.c:41` (anti-tool). A dozen readers of a pin, `tools/upstream-sources.cmake:21`, the six targets in twenty places, `tools/pack-anti.cmake:56`, the host worked out in many ways, `tools/pinned-compiler.cmake:37`, versions outside their pins, `tools/sysroot-pins:4`, CMake 3.20 beside a 3.21 command, `tools/get-sysroot.cmake:30`, fixed `c3e7267b`, three ways to move the downloads, `CMakeLists.txt:42`, and the nm of the host, `tests/run_clib.cmake:391` (build-and-tools). |
 | Copies and small duplication | 4 | Two readings of one grammar that drifted, `parser_stmt.c:165` (front-end). Small copies inside the tools, `tools/release.sh:975` (build-and-tools). Registrations written out, `src/native/pcre2.cmake:97` and `tests/CMakeLists.txt:479`, still open (build-and-tools, tests). Two unit files that run the stages themselves, `tests/unit/test_whole.c:49` (tests). |
-| Left of a replaced feature | 4 | The option `--llvm-mc` through antic, anti, the build files and 57 runners, with `target_block_label` and the attributes column, `driver.h:23` (structure, back-end, build-and-tools, tests). The `Interlocked` branch for Microsoft's compiler, `src/rt/atomic.c:98` (rt), fixed `1a6f9729`. Checks and words of the Microsoft toolchain, `tools/release.sh:688` (build-and-tools). `src/std/.gitkeep` (std). |
+| Left of a replaced feature | 4 | The option `--llvm-mc` through antic, anti, the build files and 57 runners, with `target_block_label` and the attributes column, `driver.h:23` (structure, back-end, build-and-tools, tests). The `Interlocked` branch for Microsoft's compiler, `src/rt/atomic.c:98` (rt), fixed `1a6f9729`. Checks and words of the Microsoft toolchain, `tools/release.sh:688` (build-and-tools), whose call of `vcvarsall.bat` decision 16 took out, fixed `4d7515f7`. `src/std/.gitkeep` (std). |
 | Placement and names | 15 | A tracked `.pyc` under `tools/docs-style/__pycache__/` (structure). Functions outside the file their sentence names, `sema.c:1925`, and small things, `parser_stmt.c:12` (front-end). The channel design in the file of the workers, `lower_worker.c:349` (middle). Two headers that carry more than their sentence, `src/rt/regex.h:98` (library-file). Names that differ inside one module, `src/rt/object.h:211` (rt). Helpers that are `pub`, `collection.anti:575`, and three left by the closure: `Changed` and `Snapshot`, `synchronized.anti:29`, size and presence, `text.anti:174`, and `""` for what is not there, `args.anti:104`, all still open (std). Two records named `unit`, `src/anti/syms.c:409`, and three helpers in another file, `src/anti/repo.h:20` (anti-tool). Helpers in the file of another purpose, `tools/fetch-release.cmake:25` (build-and-tools). The runners flat in `tests/` and a build file in the order of its history, `tests/CMakeLists.txt:1`, still open (build-and-tools, tests). Test names that do not start with their kind, `tests/CMakeLists.txt:309` (tests). |
 | State without an owner | 2 | Two context fields saved by hand, `sema.c:973` (front-end). The writer changes the tree it writes, `antl_tree.c:845` (library-file). |
 | Tests | 2 | Expected texts that hold more than their subject, `tests/unit/test_lower.c:1277`, and 25 files of antic and anti no unit test reaches, `driver.c:1` (tests). |
@@ -1214,12 +1218,12 @@ From `build-and-tools`.
 | `tools/pack-anti.cmake` | Compiles antic and `anti` for each named host, and writes its package and the manifest. | Says it. Names `build/clang`, and does not list the bitcode. |
 | `tools/pinned-compiler.cmake` | Fetches the pinned tools and sets the compiler, the archiver and the linker of a build. | Says it. |
 | `tools/pinned-tools.cmake` | Holds the list of the LLVM tools and the checks that refuse a tool of the host. | Says it. |
-| `tools/publish.cmake` | Checks that a release directory holds what its signed manifest names and nothing else. | Says something else: an upload, M344. |
+| `tools/publish.cmake` | Checks that a release directory holds what its signed manifest names and nothing else. | Says something else: an upload, M344. Now `tools/check-release.cmake`, which says it, fixed `2473f1d3`. |
 | `tools/release.sh` | Makes a release in ten steps, from the preflight to the report. | Says it. |
 | `tools/sources.cmake` | Lists the C sources of antic and `anti` for the build and the packer. | Says it. |
 | `tools/std-modules.cmake` | Orders the collection modules of the standard library by their imports. | Says it. |
-| `tools/uninstall.sh` | Removes an install that carries the marker, with its executables and its profile line. | Names an address that is not published, M368. |
-| `tools/uninstall.ps1` | The same for Windows. | Names an address that is not published, M368. |
+| `tools/uninstall.sh` | Removes an install that carries the marker, with its executables and its profile line. | Names an address that is not published, M368. Published since `cfec4ad3`. |
+| `tools/uninstall.ps1` | The same for Windows. | Names an address that is not published, M368. Published since `cfec4ad3`. |
 | `tools/upstream-sources.cmake` | Reads pins, builds the URL of a pinned source and writes `licenses/sources.txt`. | Says it. Three jobs under one name. |
 | `tools/warnings.cmake` | Holds the warning set of our own C. | Says it. |
 | `tools/windows-compile.cmake` | Holds the triples, the compile options and the link options of a Windows target. | Says it. |
@@ -1276,7 +1280,8 @@ The reports leave these to Eddie. A step that needs one names it.
 - M363. Whether the site page of the build tool is the design to build
   towards or the description of `anti`.
 - M368. Whether step 9 of a release publishes the uninstallers, or their
-  headers name the copy a user has.
+  headers name the copy a user has. Decision 9 says step 9 does, fixed
+  `cfec4ad3`.
 - The four rows the closure of the second audit left: `Changed` and
   `Snapshot`, the names of size and presence, the `?str` of `args`, and a
   new directory under `tests/` for the runners.
@@ -1286,7 +1291,8 @@ The reports leave these to Eddie. A step that needs one names it.
   `anti-tool`. Whether it holds the digests of the imports. Decision 15
   says it does, fixed `1f7a28f3`.
 - The Build Tools on the Windows VM, which `tools/release.sh:688` loads
-  for Ninja alone.
+  for Ninja alone. Decision 16 gives the VM a pinned Ninja, fixed
+  `4d7515f7`.
 - Whether `A => free(p)` is a statement of a `switch` arm. `front-end` did
   not read the specifications for it.
 - The grade of zero added to a null pointer at `src/anti/zip.c:673`, which
