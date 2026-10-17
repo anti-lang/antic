@@ -8,6 +8,9 @@
 #include "object.h"
 #include "str.h"
 
+/* The flags of a class. The pass over the whole program writes them
+   from these two names, in src/antic/whole_tables.c. */
+
 /* The flag of a class whose construct takes arguments. */
 #define ANTI_CLASS_ARGS 1
 

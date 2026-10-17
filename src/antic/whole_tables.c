@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../rt/reflect.h"
+#include "../rt/registry.h"
 #include "alloc.h"
 #include "reach.h"
 #include "rt_abi.h"
@@ -114,8 +116,10 @@ static uint32_t write_class_list(struct ir_module *m, bool reflect,
                    module_text(m, c->module, seen, texts, &modules));
         const_int(&item->items[RT_CLASS_MODULE_LENGTH], IR_I64, strlen(c->module));
         const_int(&item->items[RT_CLASS_FLAGS], IR_I64,
-                  ((c->flags & IR_CLASS_ARGS) != 0 ? 1 : 0) |
-                      ((c->flags & IR_CLASS_REQUIRED) != 0 ? 2 : 0));
+                  ((c->flags & IR_CLASS_ARGS) != 0 ? ANTI_CLASS_ARGS : 0) |
+                      ((c->flags & IR_CLASS_REQUIRED) != 0
+                           ? ANTI_CLASS_REQUIRED
+                           : 0));
         items[n++] = *item;
     }
     if (n > 0) {
@@ -187,38 +191,34 @@ void whole_write_backtrace_default(struct ir_module *m, bool release)
     g->exported = true;
 }
 
-/* The kinds of anti.reflect.ValueKind, in its order. */
-enum value_kind {
-    VALUE_NONE, VALUE_INT, VALUE_UINT, VALUE_FLOAT, VALUE_BOOL, VALUE_CHAR,
-    VALUE_STR, VALUE_PTR
-};
-
 /* One name of a signature. The type passes the value, the kind of
-   reflect.Value carries it, and the Value holds it at the wide type. */
+   reflect.Value carries it, and the Value holds it at the wide type. The
+   kinds are enum anti_value_kind of src/rt/reflect.h, which the unit test
+   reflect_contract compares with anti.reflect.ValueKind. */
 struct value_type {
     const char *name;
     enum ir_type type;
     enum ir_ext ext;
-    enum value_kind kind;
+    enum anti_value_kind kind;
     enum ir_type wide;
 };
 
 static const struct value_type value_types[] = {
-    {"void", IR_VOID, IR_EXT_NONE, VALUE_NONE, IR_VOID},
-    {"bool", IR_I8, IR_EXT_ZERO, VALUE_BOOL, IR_I8},
-    {"char", IR_I32, IR_EXT_NONE, VALUE_CHAR, IR_I32},
-    {"i8", IR_I8, IR_EXT_SIGN, VALUE_INT, IR_I64},
-    {"i16", IR_I16, IR_EXT_SIGN, VALUE_INT, IR_I64},
-    {"i32", IR_I32, IR_EXT_NONE, VALUE_INT, IR_I64},
-    {"i64", IR_I64, IR_EXT_NONE, VALUE_INT, IR_I64},
-    {"u8", IR_I8, IR_EXT_ZERO, VALUE_UINT, IR_I64},
-    {"u16", IR_I16, IR_EXT_ZERO, VALUE_UINT, IR_I64},
-    {"u32", IR_I32, IR_EXT_NONE, VALUE_UINT, IR_I64},
-    {"u64", IR_I64, IR_EXT_NONE, VALUE_UINT, IR_I64},
-    {"f32", IR_F32, IR_EXT_NONE, VALUE_FLOAT, IR_F64},
-    {"f64", IR_F64, IR_EXT_NONE, VALUE_FLOAT, IR_F64},
-    {"str", IR_AGG, IR_EXT_NONE, VALUE_STR, IR_AGG},
-    {"ptr", IR_PTR, IR_EXT_NONE, VALUE_PTR, IR_PTR},
+    {"void", IR_VOID, IR_EXT_NONE, ANTI_VALUE_NONE, IR_VOID},
+    {"bool", IR_I8, IR_EXT_ZERO, ANTI_VALUE_BOOL, IR_I8},
+    {"char", IR_I32, IR_EXT_NONE, ANTI_VALUE_CHAR, IR_I32},
+    {"i8", IR_I8, IR_EXT_SIGN, ANTI_VALUE_INT, IR_I64},
+    {"i16", IR_I16, IR_EXT_SIGN, ANTI_VALUE_INT, IR_I64},
+    {"i32", IR_I32, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64},
+    {"i64", IR_I64, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64},
+    {"u8", IR_I8, IR_EXT_ZERO, ANTI_VALUE_UINT, IR_I64},
+    {"u16", IR_I16, IR_EXT_ZERO, ANTI_VALUE_UINT, IR_I64},
+    {"u32", IR_I32, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
+    {"u64", IR_I64, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
+    {"f32", IR_F32, IR_EXT_NONE, ANTI_VALUE_FLOAT, IR_F64},
+    {"f64", IR_F64, IR_EXT_NONE, ANTI_VALUE_FLOAT, IR_F64},
+    {"str", IR_AGG, IR_EXT_NONE, ANTI_VALUE_STR, IR_AGG},
+    {"ptr", IR_PTR, IR_EXT_NONE, ANTI_VALUE_PTR, IR_PTR},
 };
 
 /* The most names a signature holds: the result and the parameters. */
@@ -269,7 +269,7 @@ static struct ir_operand unpack(struct ir_function *f, struct ir_block *b,
     if (t->wide == t->type) {
         return ir_temp_op(f, wide);
     }
-    narrow = ir_unary(f, b, t->kind == VALUE_FLOAT ? IR_FTRUNC : IR_TRUNC,
+    narrow = ir_unary(f, b, t->kind == ANTI_VALUE_FLOAT ? IR_FTRUNC : IR_TRUNC,
                       t->type, ir_temp_op(f, wide));
     return ir_temp_op(f, narrow);
 }
@@ -280,8 +280,8 @@ static void pack(struct ir_function *f, struct ir_block *b,
                  const struct value_type *t, uint32_t str_agg,
                  struct ir_operand r, struct ir_operand at)
 {
-    enum ir_op op = t->kind == VALUE_FLOAT ? IR_FEXT
-                    : t->kind == VALUE_INT ? IR_SEXT
+    enum ir_op op = t->kind == ANTI_VALUE_FLOAT ? IR_FEXT
+                    : t->kind == ANTI_VALUE_INT ? IR_SEXT
                                            : IR_ZEXT;
     uint32_t wide;
 
