@@ -231,6 +231,13 @@ function(antic_build)
         list(APPEND options THROUGH ${arg_THROUGH})
     endif()
     antic_run(code stdout stderr ${options} COMMAND ${arguments})
+    # DESIGN: a sanitizer build of antic run without the programs of the
+    # system on PATH finds no symbolizer, and the runtime of the sanitizer
+    # starts with two lines of its own. They are no output of antic and
+    # leave, as in run_anti_messages.cmake. Every other line stays.
+    string(REGEX REPLACE
+           "==[0-9]+==WARN: No external symbolizers found[^\n]*\n==[0-9]+==HINT: Is PATH set[^\n]*\n"
+           "" stderr "${stderr}")
     set(printed "${stdout}")
     if(DEFINED arg_OUTPUT)
         set(${arg_OUTPUT} "${stdout}" PARENT_SCOPE)
