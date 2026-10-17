@@ -15,6 +15,9 @@
 #   path_target             a path dependency whose manifest names another
 #                           default target is built for the host, where
 #                           its consumer reads it (defect 2)
+#   path_target_cpu         and a build for a target of the other processor
+#                           with --cpu builds it at the level of the host
+#                           (T144)
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -107,6 +110,37 @@ if(CASE STREQUAL "path_target")
     endif()
     program_expect("the program" COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
                    STATUS 1 OUT "")
+    return()
+endif()
+
+# DESIGN: the consumer is a library project, which links nothing, so the
+# case needs no sysroot of the other target.
+if(CASE STREQUAL "path_target_cpu")
+    if(OTHER MATCHES "x86_64$")
+        set(level v1)
+    else()
+        set(level armv8.0)
+    endif()
+    string(CONCAT dep_source
+           "//! A library of a path.\n\n"
+           "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+    string(CONCAT app_source
+           "//! A library over the library of a path.\n\n"
+           "import com.example.dep;\n\n"
+           "/// Two.\npub fn two() -> int\n{\n\treturn dep.one() + 1;\n}\n")
+    write_project("${WORK}/dep" "com.example.dep" "" "com.example.dep"
+                  "${dep_source}")
+    write_project("${WORK}/app" "com.example.app"
+                  "\n[dependencies]\n\"com.example.dep\" = { path = \"../dep\" }\n"
+                  "com.example.app" "${app_source}")
+    anti_passes("the build of the consumer for ${OTHER} at ${level}"
+                "${WORK}/app" build --target ${OTHER} --cpu ${level} ${tools})
+    foreach(file "dep/dist/${HOST}/dev/com/example/dep.antl"
+                 "app/dist/${OTHER}/dev/com/example/app.antl")
+        if(NOT EXISTS "${WORK}/${file}")
+            message(FATAL_ERROR "the build wrote no ${file}")
+        endif()
+    endforeach()
     return()
 endif()
 

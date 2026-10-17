@@ -1092,6 +1092,10 @@ static bool path_dependency(void *context, const char *directory,
        own manifest, and a manifest that names another target wrote its
        library files where nothing reads them. */
     sub.target = target_name(host);
+    /* The level of the request is one of the targets of the request, and
+       the dependency takes the default level of the host. The level of
+       an x86_64 target refused the build of an ARM64 host, by T144. */
+    sub.cpu = NULL;
     sub.lib = BUILD_PROGRAM;
     sub.run = false;
     sub.notice = BUILD_NOTICE_BUILD;
