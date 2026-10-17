@@ -258,21 +258,20 @@ with the runtime of both Linux targets against glibc in `lib/linux-<cpu>-glibc/`
 program of `link linux`, a raylib program and a plugin host then link for Linux from any
 host. The two add about 120 MB to a package before compression and 17 MB after xz.
 
-### Publishing
+### The check of a release
 
-`tools/publish.cmake` uploads a version directory and checks it.
+`tools/check-release.cmake` checks the directory of a release before step 7 of `./r`
+uploads it.
 
 ```sh
-cmake -DDIR=<directory> -DREMOTE=<user@host:/path> -P tools/publish.cmake
+cmake -DDIR=<directory> -P tools/check-release.cmake
 ```
 
 It refuses a directory whose `SHA256SUMS` names a file that is missing, whose digests
 disagree, or that holds a file the manifest does not name. It refuses one without
 `SHA256SUMS.sig`, or whose signature is of another manifest, because an installer takes
-neither. It then sends the files, the signature and the manifest last, and reads the
-digests back over ssh. `CHECK_ONLY` runs the checks and sends nothing, which is what step
-6 of a release does before it tags. `KEY` names another public key than
-`tools/keys/release.pem`.
+neither. It sends nothing. Step 6 of a release runs it before it tags. `KEY` names
+another public key than `tools/keys/release.pem`.
 
 ### The release script
 

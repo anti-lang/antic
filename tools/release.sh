@@ -83,9 +83,9 @@ state=$dist/state
 logs=$dist/logs
 # DESIGN: the packages and the symbols archives of a release stand in one
 # directory under one SHA256SUMS. The packer writes that manifest, step 4
-# extends it and step 6 signs it in place. The directory is what
-# tools/publish.cmake uploads and what a user downloads from. A file
-# beside the twelve is a file a user takes for part of the release.
+# extends it and step 6 signs it in place. tools/check-release.cmake
+# reads the directory, step 7 uploads it and a user downloads from it. A
+# file beside the twelve is a file a user takes for part of the release.
 packages=$dist/packages
 work=$dist/work
 # DESIGN: the PDB of a Windows program stands outside the package, because
@@ -1012,15 +1012,14 @@ digests() {
     finished 06 digests
 }
 
-# The checks tools/publish.cmake makes before it uploads the directory of
-# a version, run here on the directory that goes up. A leftover file or a
-# digest that moved stops the release before the tag rather than after
-# the upload.
+# The checks of tools/check-release.cmake, run here on the directory that
+# goes up. A leftover file or a digest that moved stops the release
+# before the tag rather than after the upload.
 check_area() {
     mkdir -p "$logs"
-    cmake -DDIR="$packages" -DCHECK_ONLY=yes -P "$root/tools/publish.cmake" \
+    cmake -DDIR="$packages" -P "$root/tools/check-release.cmake" \
         > "$logs/area.log" 2>&1 ||
-        die "step 6: $packages is no download area, see $logs/area.log"
+        die "step 6: $packages is no release, see $logs/area.log"
     say "$(grep -o '[0-9]* files, each named and each digest right' "$logs/area.log")"
 }
 

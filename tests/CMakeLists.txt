@@ -3189,13 +3189,13 @@ add_test(NAME manifest_signature
 set_tests_properties(manifest_signature PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
-# The checks tools/publish.cmake makes before it uploads a version
-# directory of the download area.
-add_test(NAME publish_manifest
+# The checks of tools/check-release.cmake over the directory of a
+# release.
+add_test(NAME release_manifest
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/publish-manifest"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_publish_manifest.cmake")
-set_tests_properties(publish_manifest PROPERTIES
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-manifest"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_release_manifest.cmake")
+set_tests_properties(release_manifest PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # ./r on a copy of the tree, with the build, the packer and the two VMs

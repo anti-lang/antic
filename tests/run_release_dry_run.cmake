@@ -541,8 +541,8 @@ foreach(name state/02-suite state/03-packages state/04-symbols state/05-vms
     endif()
 endforeach()
 # DESIGN: the packages and the symbols archives stand in one directory
-# under one manifest, which is the directory tools/publish.cmake uploads
-# and step 6 signs. A file beside the twelve is a file a user downloads.
+# under one manifest, which is the directory tools/check-release.cmake
+# reads, step 6 signs and step 7 uploads. A file beside the twelve is a file a user downloads.
 file(READ "${dist}/packages/SHA256SUMS" manifest)
 foreach(host IN LISTS hosts)
     foreach(name "anti-${version}-${host}.tar.xz"
