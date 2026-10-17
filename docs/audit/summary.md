@@ -356,7 +356,8 @@ Each concern in one place:
 - M332. `src/rt/registry.h:12`. Layouts and numbers stand on both sides
   of the runtime contract with no test between them. Seven pairs stand
   outside `rt_abi.h`, and four enums of antic mirror the runtime. New.
-  rt, middle.
+  rt, middle. Fixed `e66be876`, `81d4b0b1`, `97ae741c`, `cc2a4857` and
+  `dec36ffd`.
 
 Tests, a golden written again without a reading:
 
