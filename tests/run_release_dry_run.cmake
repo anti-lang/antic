@@ -453,24 +453,6 @@ foreach(script vm-linux.sh vm-windows.cmd)
     endif()
 endforeach()
 
-# DESIGN: the Windows VM builds with the pinned Ninja that
-# tools/get-ninja.cmake installs under anti-vm, and loads no environment
-# of the Build Tools, by decision 16 of "Decisions of 2026-10-11". The
-# Build Tools put their own Ninja on the path. The script puts the pinned
-# one there, for the tests that configure a tree of their own, and names
-# it at every configure, since a tree configured before keeps the path of
-# the other one in its cache.
-file(READ "${copy}/build/dist/dry-run/work/vm-windows.cmd" script_text)
-if(script_text MATCHES "vcvars")
-    message(FATAL_ERROR "vm-windows.cmd of step 5 loads the environment of "
-                        "the Build Tools")
-endif()
-if(NOT script_text MATCHES "-DCMAKE_MAKE_PROGRAM=%A%/ninja/ninja\\.exe"
-   OR NOT script_text MATCHES "set PATH=%LOCALAPPDATA%\\\\anti-vm\\\\ninja;")
-    message(FATAL_ERROR "vm-windows.cmd of step 5 names no pinned Ninja of "
-                        "anti-vm")
-endif()
-
 # Run step 5 of the copy again with <variable> set to <value> for the
 # stand-in of ssh, and answer with the status, the output and the calls.
 function(vm_run variable value status_variable out_variable calls_variable)

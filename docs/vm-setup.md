@@ -132,24 +132,24 @@ Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
 Start-Service sshd; Set-Service -Name sshd -StartupType 'Automatic'
 winget install --id Git.Git -e
 winget install --id Kitware.CMake -e
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --includeRecommended"
 ```
 
-Three commands install the pinned clang, the LLVM tools and Ninja, which `tools/clang-pin`, `tools/llvm-pin` and `tools/ninja-pin` name for Windows on ARM64. The pinned clang needs the generator Ninja, because the Visual Studio generator takes the compiler of its own toolset. Decision 16 of "Decisions of 2026-10-11" pins a Ninja of the VM's own, so the VM needs no Build Tools of Visual Studio.
+Two commands install the pinned clang and LLVM tools, which `tools/clang-pin` and `tools/llvm-pin` name for Windows on ARM64.
 
 ```powershell
 cmake -DDEST=$env:LOCALAPPDATA\anti-vm\clang -P $env:USERPROFILE\antic-check\tools\get-clang.cmake
 cmake -DDEST=$env:LOCALAPPDATA\anti-vm\toolchain -P $env:USERPROFILE\antic-check\tools\get-llvm.cmake
-cmake -DDEST=$env:LOCALAPPDATA\anti-vm\ninja -P $env:USERPROFILE\antic-check\tools\get-ninja.cmake
 ```
 
 The configure step of the first test run installs the sysroots of all six targets into `%LOCALAPPDATA%\anti-vm\sysroot`. It installs the raylib source, which the test `program_abi_raymath` compiles against, into `%LOCALAPPDATA%\anti-vm\raylib`. The Windows sysroots come from the pinned source release of mingw-w64, as on every host, and the macOS ones from Zig. A program that names a framework takes Apple's SDK as on the Linux VM.
 
-Create `%USERPROFILE%\test.cmd` with these lines. The pinned Ninja goes on the path, where the tests `deps_dir` and `first_build` find it for the trees they configure. The configure names it as well, since a tree keeps the Ninja it was configured with. No environment of Visual Studio is loaded.
+Create `%USERPROFILE%\test.cmd` with these lines. `vcvarsall.bat arm64` sets the MSVC environment and puts the Ninja of Visual Studio on the path. antic runs lld-link with `/lldignoreenv`, so the variable `LIB` it sets reaches no link. The pinned clang needs Ninja, because the Visual Studio generator takes the compiler of its own toolset.
 
 ```bat
-set PATH=%LOCALAPPDATA%\anti-vm\ninja;%PATH%
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" arm64
 cd /d %USERPROFILE%\antic-check
-cmake -S . -B build\host -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=%LOCALAPPDATA%/anti-vm/ninja/ninja.exe -DANTIC_CLANG_DIR=%LOCALAPPDATA%/anti-vm/clang -DANTIC_LLVM_DIR=%LOCALAPPDATA%/anti-vm/toolchain -DANTIC_SYSROOT_DIR=%LOCALAPPDATA%/anti-vm/sysroot -DANTIC_RAYLIB_DIR=%LOCALAPPDATA%/anti-vm/raylib
+cmake -S . -B build\host -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANTIC_CLANG_DIR=%LOCALAPPDATA%/anti-vm/clang -DANTIC_LLVM_DIR=%LOCALAPPDATA%/anti-vm/toolchain -DANTIC_SYSROOT_DIR=%LOCALAPPDATA%/anti-vm/sysroot -DANTIC_RAYLIB_DIR=%LOCALAPPDATA%/anti-vm/raylib
 cmake --build build\host
 ctest --test-dir build\host --output-on-failure
 ```

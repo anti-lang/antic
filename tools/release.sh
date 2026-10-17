@@ -678,12 +678,14 @@ LINUX
     printf '%s\n' "$work/vm-linux.sh"
 }
 
-# The same for the Windows VM, as a cmd file with CRLF line endings, since
-# a command file is what ssh runs on that machine.
+# The same for the Windows VM, as a cmd file with CRLF line endings. The
+# build there needs the environment of vcvarsall.bat, and a command file
+# is what ssh runs on that machine.
 write_windows_script() {
     cat > "$work/vm-windows.cmd" <<WINDOWS
 @echo off
 setlocal
+set VC=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat
 cd /d %USERPROFILE%\antic-check
 rem DESIGN: the install the VM checks is the one a user gets, in the
 rem directories of Windows and not a tree under ANTI_HOME. DATA holds the
@@ -756,20 +758,13 @@ echo the install of windows-arm64 is checked and removed
 exit /b 0
 
 :suite
+call "%VC%" arm64 > nul
 rem The tools of the VM stand in its data directory, as on the Linux VM
-rem and as docs/vm-setup.md installs them. Without the four options that
-rem name them a fresh build\host downloads clang, the LLVM tools, the sysroots and
+rem and as docs/vm-setup.md installs them. Without these four options a
+rem fresh build\host downloads clang, the LLVM tools, the sysroots and
 rem raylib into the tree that each run replaces.
-rem
-rem DESIGN: the generator is the pinned Ninja of tools/get-ninja.cmake,
-rem by decision 16 of "Decisions of 2026-10-11", and no environment of
-rem the Build Tools is loaded. It goes on the PATH, where the tests that
-rem configure a tree of their own, deps_dir and first_build, find it. A
-rem tree configured before keeps the Ninja it was configured with in its
-rem cache, so every configure names it as well.
-set PATH=%LOCALAPPDATA%\anti-vm\ninja;%PATH%
 set A=%LOCALAPPDATA%/anti-vm
-set OPTS=-DCMAKE_MAKE_PROGRAM=%A%/ninja/ninja.exe -DANTIC_CLANG_DIR=%A%/clang -DANTIC_LLVM_DIR=%A%/toolchain -DANTIC_SYSROOT_DIR=%A%/sysroot -DANTIC_RAYLIB_DIR=%A%/raylib
+set OPTS=-DANTIC_CLANG_DIR=%A%/clang -DANTIC_LLVM_DIR=%A%/toolchain -DANTIC_SYSROOT_DIR=%A%/sysroot -DANTIC_RAYLIB_DIR=%A%/raylib
 if exist build\host (cmake -S . -B build\host %OPTS% > "%LOGS%\release-configure.log" 2>&1) else (cmake -S . -B build\host -G Ninja %OPTS% > "%LOGS%\release-configure.log" 2>&1)
 if errorlevel 1 (echo the configure failed & exit /b 1)
 cmake --build build\host > "%LOGS%\release-build.log" 2>&1

@@ -1,9 +1,0 @@
-# The pinned Ninja of the Windows VM, which tools/get-ninja.cmake
-# installs under anti-vm, by decision 16 of "Decisions of 2026-10-11" in
-# docs/decisions.md. The VM is windows-arm64, and @VERSION@ stands for
-# the version. GitHub publishes no digest for an asset of the release,
-# so the digest below is the one of the archive that the VM was first
-# tested with. No package carries Ninja.
-NINJA_VERSION=1.12.1
-NINJA_URL=https://github.com/ninja-build/ninja/releases/download/v@VERSION@/ninja-winarm64.zip
-NINJA_DIGEST=79c96a50e0deafec212cfa85aa57c6b74003f52d9d1673ddcd1eab1c958c5900
