@@ -1284,7 +1284,8 @@ The reports leave these to Eddie. A step that needs one names it.
   `cfec4ad3`.
 - The four rows the closure of the second audit left: `Changed` and
   `Snapshot`, the names of size and presence, the `?str` of `args`, and a
-  new directory under `tests/` for the runners.
+  new directory under `tests/` for the runners. Decision 13 moves them to
+  `tests/runners/`, fixed `b906e240`.
 - The `Interlocked` branch of `src/rt/atomic.c:98`, which no host
   compiles. Whether a reader's build with the system compiler keeps it.
 - The cache key of a library file in `anti build`, defect 10 of
