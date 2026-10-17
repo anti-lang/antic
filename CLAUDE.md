@@ -1211,7 +1211,8 @@ reports what it finished.
   `anti.lock`, fetches every library file from a `file://` or `https://`
   repository into the cache of the user and compiles the project. Dev mode
   writes one object per module, cached by the digest of its input, the compiler
-  version, the target and the level, with `-g` on. `--release` compiles the
+  version, the target and the level, the options of the manifest and the
+  digests of its imports, with `-g` on. `--release` compiles the
   whole program in one call and writes `<program>-symbols.zip` beside it.
   `--target`, `--cpu`, `--offline`, `--strip-docs`, `--lto` and
   `--lib static|shared` are built, and a project without `main` is a library project. `anti run`

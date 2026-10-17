@@ -9,6 +9,7 @@
    holds: `build/` is disposable and `dist/` is what a user runs. */
 #include "build.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -173,6 +174,53 @@ static bool write_key(const char *output, const struct text *key)
     return ok;
 }
 
+/* Append to out the options of o that decide an output beside its input
+   and the flags of the cache: the package with its version, its licence,
+   the text of its licence file, its dependencies and its attribution, the
+   injections and --strip-docs. The text of the licence file goes in by its
+   digest. Returns false when that file cannot be read.
+
+   DESIGN: defect 1 of docs/audit/anti-tool.md. The key held the input,
+   the compiler, the target, the level and three marks, so a build with
+   --strip-docs took the cached library file with its doc text, and a new
+   version in anti.toml left the library files and the objects as they
+   were. "Versions" in docs/decisions.md puts that version in every class
+   descriptor. Every option a compile takes from the manifest is in the
+   key, and the frameworks and the Linux libraries, which the link alone
+   reads, are not. */
+static bool options_key(const struct options *o, struct text *out)
+{
+    size_t i;
+
+    text_appendf(out, "package %s %s\n",
+                 o->package_name != NULL ? o->package_name : "",
+                 o->package_version != NULL ? o->package_version : "");
+    if (o->license != NULL) {
+        text_appendf(out, "license %s\n", o->license);
+    }
+    if (o->license_text != NULL) {
+        char hex[65];
+        if (!sha256_file(o->license_text, hex)) {
+            fprintf(stderr, "anti: cannot read %s\n", o->license_text);
+            return false;
+        }
+        text_appendf(out, "license-text %s\n", hex);
+    }
+    for (i = 0; i < o->dependency_count; i++) {
+        text_appendf(out, "dependency %s\n", o->dependencies[i]);
+    }
+    for (i = 0; i < o->attribution_count; i++) {
+        text_appendf(out, "attribution %s\n", o->attribution[i]);
+    }
+    for (i = 0; i < o->inject_count; i++) {
+        text_appendf(out, "inject %s\n", o->inject[i]);
+    }
+    if (o->strip_docs) {
+        text_append(out, "strip-docs\n");
+    }
+    return true;
+}
+
 /* Whether the objects carry the lines of -g. --memory-checks turns them
    on in release mode too, as it does for antic, since its reports name
    the lines. */
@@ -240,6 +288,77 @@ static void graph_libraries(const struct build *b, struct strings *out)
     }
 }
 
+/* Append to out the digest of every library file that the library file
+   library reaches through its imports, and of every library file of the
+   dependency graph, apart from library itself. Returns false when one
+   cannot be read.
+
+   DESIGN: decision 15 of "Decisions of 2026-10-11", by defect 10 of
+   docs/audit/anti-tool.md. The key of a library file was over its own
+   source, so a module whose import changed its interface was not checked
+   again, and its object kept the layout of a struct that had grown. The
+   search finds a module of the project under lib/ of the build and one
+   of the standard library in the runtime archive. A library file of the
+   graph stands under no root its module path names, so every one of them
+   is in the key. A new version of a dependency then builds every module
+   again, which the lock file makes rare. */
+static bool imports_key(const struct build *b, enum target t,
+                        enum cpu_level cpu, const char *library,
+                        struct text *out)
+{
+    struct arena arena = {0};
+    struct options search;
+    struct strings seed = {0};
+    const char *roots[1];
+    const char **closure = NULL;    /* the memory pool holds the list */
+    size_t count = 0;
+    size_t i;
+    bool ok;
+
+    strings_add(&seed, library);
+    graph_libraries(b, &seed);
+    roots[0] = text_cstr(&b->lib_dir);
+    unit_options(&search, text_cstr(&b->m.name), text_cstr(&b->runtime), roots,
+                 1, t, cpu);
+    search.libraries = seed.items;
+    search.library_count = seed.count;
+    ok = driver_libraries(&search, &arena, &closure, &count);
+    for (i = 0; ok && i < count; i++) {
+        char hex[65];
+        if (strcmp(closure[i], library) == 0) {
+            continue;
+        }
+        ok = sha256_file(closure[i], hex);
+        if (!ok) {
+            fprintf(stderr, "anti: cannot read %s\n", closure[i]);
+        } else {
+            text_appendf(out, "import %s %s\n", closure[i], hex);
+        }
+    }
+    strings_free(&seed);
+    arena_free(&arena);
+    return ok;
+}
+
+/* Whether the file at path is a library file of this compiler, asked
+   without a message. A library file of an older format is no cache. */
+static bool library_readable(const char *path)
+{
+    struct arena arena = {0};
+    struct text bytes = {0};
+    struct package package;
+    const char *module;
+    char error[200];
+    bool ok = files_read(path, &bytes) &&
+              antic_library_header((const uint8_t *)bytes.data, bytes.length,
+                                   &arena, &package, &module, error,
+                                   sizeof error);
+
+    text_free(&bytes);
+    arena_free(&arena);
+    return ok;
+}
+
 /* Write the library file of one module, unless the cache holds it. */
 static bool module_library(struct build *b, const struct unit *u,
                            enum target t, enum cpu_level cpu,
@@ -248,23 +367,12 @@ static bool module_library(struct build *b, const struct unit *u,
 {
     struct options o;
     struct cache_flags flags = {0};
+    struct text base = {0};
     struct text key = {0};
     bool ok = false;
 
     if (!unit_file(text_cstr(&b->lib_dir), text_cstr(&u->path), ANTL_SUFFIX,
                    output)) {
-        goto done;
-    }
-    /* DESIGN: a release build accepts no warning, so it checks every
-       module of the project with --warnings-as-errors. A library file
-       that a dev build wrote was checked without it, and the key keeps
-       the two apart. */
-    flags.target = t;
-    flags.cpu = cpu;
-    flags.strict = b->r->release;
-    cache_key(u->source, &flags, &key);
-    if (cached(text_cstr(output), &key)) {
-        ok = true;
         goto done;
     }
     base_options(b, &o, t, cpu);
@@ -276,9 +384,37 @@ static bool module_library(struct build *b, const struct unit *u,
     o.strip_docs = b->r->strip_docs;
     o.libraries = libraries->items;
     o.library_count = libraries->count;
+    /* DESIGN: a release build accepts no warning, so it checks every
+       module of the project with --warnings-as-errors. A library file
+       that a dev build wrote was checked without it, and the key keeps
+       the two apart. */
+    flags.target = t;
+    flags.cpu = cpu;
+    flags.strict = b->r->release;
+    cache_key(u->source, &flags, &base);
+    if (!options_key(&o, &base)) {
+        goto done;
+    }
+    /* The imports of the library file that stands are those of its
+       source, which the digest of the source holds. A new library file
+       takes its key from the imports it names after the compile. */
+    text_append(&key, text_cstr(&base));
+    if (library_readable(text_cstr(output)) &&
+        imports_key(b, t, cpu, text_cstr(output), &key) &&
+        cached(text_cstr(output), &key)) {
+        ok = true;
+        goto done;
+    }
     drop_key(text_cstr(output));
-    ok = driver_run(&o) == 0 && write_key(text_cstr(output), &key);
+    if (driver_run(&o) != 0) {
+        goto done;
+    }
+    key.length = 0;
+    text_append(&key, text_cstr(&base));
+    ok = imports_key(b, t, cpu, text_cstr(output), &key) &&
+         write_key(text_cstr(output), &key);
 done:
+    text_free(&base);
     text_free(&key);
     return ok;
 }
@@ -304,15 +440,6 @@ static bool module_object(struct build *b, const char *library,
         goto done;
     }
     text_appendf(out, "%s%s", text_cstr(&base), target_info(t)->object_suffix);
-    flags.target = t;
-    flags.cpu = cpu;
-    flags.debug = build_debug(b);
-    flags.checked = b->r->memory_checks;
-    cache_key(library, &flags, &key);
-    if (cached(text_cstr(out), &key)) {
-        ok = true;
-        goto done;
-    }
     /* The input is one of the library files of the build, and antic
        refuses a module that stands twice on its command line. */
     for (i = 0; i < libraries->count; i++) {
@@ -326,6 +453,19 @@ static bool module_object(struct build *b, const char *library,
     o.dev = true;
     o.libraries = rest.items;
     o.library_count = rest.count;
+    flags.target = t;
+    flags.cpu = cpu;
+    flags.debug = build_debug(b);
+    flags.checked = b->r->memory_checks;
+    cache_key(library, &flags, &key);
+    if (!options_key(&o, &key) ||
+        !imports_key(b, t, cpu, library, &key)) {
+        goto done;
+    }
+    if (cached(text_cstr(out), &key)) {
+        ok = true;
+        goto done;
+    }
     drop_key(text_cstr(out));
     status = driver_run(&o);
     ok = (status == 0 || status == 3) && write_key(text_cstr(out), &key);

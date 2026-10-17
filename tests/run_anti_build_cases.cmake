@@ -26,6 +26,19 @@
 #   lock_dropped            a package of the lock file that the manifest no
 #                           longer reaches leaves the graph, the lock file
 #                           and the notice, and is not fetched (defect 9)
+#   cache_strip_docs        the cached library file of a build without
+#                           --strip-docs is written again with it (defect 1)
+#   cache_version           a new version of the manifest reaches the
+#                           cached library file (defect 1)
+#   cache_license           and a new licence identifier (defect 1)
+#   cache_license_text      and a new text of the licence file (defect 1)
+#   cache_attribution       and a new attribution line (defect 1)
+#   cache_dependency        and a new dependency (defect 1)
+#   cache_import_checked    a module is checked again when a module it
+#                           imports changed its interface (defect 10,
+#                           decision 15 of "Decisions of 2026-10-11")
+#   cache_import_layout     and its object follows the new layout of a
+#                           struct of that module (defect 10)
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -386,6 +399,156 @@ if(CASE STREQUAL "lock_dropped")
         message(FATAL_ERROR "the build over the new lock file printed\n"
                             "${anti_text}")
     endif()
+    return()
+endif()
+
+# The printable strings of the library file that the library project at
+# directory delivered for the host.
+function(library_strings directory out)
+    set(library "${directory}/dist/${HOST}/dev/com/example/shapes.antl")
+    if(NOT EXISTS "${library}")
+        message(FATAL_ERROR "the build wrote no ${library}")
+    endif()
+    file(STRINGS "${library}" lines)
+    string(JOIN "\n" text ${lines})
+    set(${out} "${text}" PARENT_SCOPE)
+endfunction()
+
+function(holds text needle what)
+    string(FIND "${text}" "${needle}" at)
+    if(at LESS 0)
+        message(FATAL_ERROR "${what} holds no `${needle}`:\n${text}")
+    endif()
+endfunction()
+
+function(lacks text needle what)
+    string(FIND "${text}" "${needle}" at)
+    if(NOT at LESS 0)
+        message(FATAL_ERROR "${what} holds `${needle}`:\n${text}")
+    endif()
+endfunction()
+
+# The library project tests/anti-build/shapes, built once into the cache,
+# then changed by replacing from with to in the file named, and built
+# again. Each case reads the library file of the second build.
+function(cached_twice file from to)
+    file(COPY "${FIXTURES}/anti-build/shapes" DESTINATION "${WORK}")
+    set(project "${WORK}/shapes")
+    anti_passes("the first build" "${project}" build ${tools})
+    file(READ "${project}/${file}" text)
+    string(REPLACE "${from}" "${to}" text "${text}")
+    file(WRITE "${project}/${file}" "${text}")
+    anti_passes("the second build" "${project}" build ${ARGN} ${tools})
+    library_strings("${project}" second)
+    set(second "${second}" PARENT_SCOPE)
+endfunction()
+
+if(CASE STREQUAL "cache_strip_docs")
+    set(doc "The area of a rectangle of `w` by `h`.")
+    cached_twice(anti.toml "" "" --strip-docs)
+    lacks("${second}" "${doc}" "the library file of --strip-docs")
+    return()
+endif()
+
+if(CASE STREQUAL "cache_version")
+    cached_twice(anti.toml "version = \"2.0.1\"" "version = \"3.4.5\"")
+    holds("${second}" "3.4.5" "the library file of the new version")
+    lacks("${second}" "2.0.1" "the library file of the new version")
+    return()
+endif()
+
+if(CASE STREQUAL "cache_license")
+    cached_twice(anti.toml "BSD-3-Clause" "MIT")
+    lacks("${second}" "BSD-3-Clause" "the library file of the new licence")
+    return()
+endif()
+
+if(CASE STREQUAL "cache_license_text")
+    cached_twice(LICENSE "Redistribution and use" "Copying and use")
+    holds("${second}" "Copying and use" "the library file of the new text")
+    return()
+endif()
+
+if(CASE STREQUAL "cache_attribution")
+    cached_twice(anti.toml "The Shapes Authors" "The Area Authors")
+    holds("${second}" "Copyright 2026 The Area Authors"
+          "the library file of the new attribution")
+    return()
+endif()
+
+if(CASE STREQUAL "cache_dependency")
+    string(CONCAT dep_source
+           "//! A library of a path.\n\n"
+           "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+    write_project("${WORK}/dep" "com.example.dep" "" "com.example.dep"
+                  "${dep_source}")
+    cached_twice(anti.toml "attribution"
+                 "[dependencies]\n\"com.example.dep\" = { path = \"../dep\" }\n\n[package]\nattribution")
+    holds("${second}" "com.example.dep" "the library file of the new dependency")
+    return()
+endif()
+
+# A program over a module a, which imports a module b of the same
+# project. b is changed between two dev builds.
+function(import_project b_source a_source)
+    string(CONCAT app_source
+           "//! A program over a.\n\n"
+           "import com.example.a;\n\n"
+           "fn main() -> int\n{\n\treturn a.value();\n}\n")
+    write_project("${WORK}/app" "com.example.app" "" "com.example.app"
+                  "${app_source}")
+    file(WRITE "${WORK}/app/src/com/example/a.anti" "${a_source}")
+    file(WRITE "${WORK}/app/src/com/example/b.anti" "${b_source}")
+endfunction()
+
+if(CASE STREQUAL "cache_import_checked")
+    string(CONCAT a_source
+           "//! The module that imports b.\n\n"
+           "import com.example.b;\n\n"
+           "/// Twice the number of b.\n"
+           "pub fn value() -> int\n{\n\treturn b.number() * 2;\n}\n")
+    string(CONCAT b_source
+           "//! The module that a imports.\n\n"
+           "/// A number.\npub fn number() -> int\n{\n\treturn 3;\n}\n")
+    import_project("${b_source}" "${a_source}")
+    anti_passes("the first build" "${WORK}/app" build ${tools})
+    program_expect("the first program"
+                   COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 6 OUT "")
+    # number gives a bool now, which a may not multiply.
+    string(REPLACE "-> int\n{\n\treturn 3;" "-> bool\n{\n\treturn true;"
+           b_source "${b_source}")
+    file(WRITE "${WORK}/app/src/com/example/b.anti" "${b_source}")
+    anti("${WORK}/app" status text build ${tools})
+    if(status STREQUAL "0" OR NOT text MATCHES "a\\.anti:8:22: error: ")
+        message(FATAL_ERROR "the build after b changed its interface ended "
+                            "with ${status} and printed\n${text}\nThe case "
+                            "expects a.anti to be checked again and refused")
+    endif()
+    return()
+endif()
+
+if(CASE STREQUAL "cache_import_layout")
+    string(CONCAT a_source
+           "//! The module that imports b.\n\n"
+           "import com.example.b;\n\n"
+           "/// The size of the pair of b.\n"
+           "pub fn value() -> int\n{\n\treturn size_of(b.Pair) as int;\n}\n")
+    string(CONCAT b_source
+           "//! The module that a imports.\n\n"
+           "/// A pair.\npub struct Pair\n{\n\tleft: i64,\n\tright: i64,\n}\n")
+    import_project("${b_source}" "${a_source}")
+    anti_passes("the first build" "${WORK}/app" build ${tools})
+    program_expect("the first program"
+                   COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 16 OUT "")
+    string(REPLACE "\tright: i64,\n" "\tright: i64,\n\tthird: i64,\n"
+           b_source "${b_source}")
+    file(WRITE "${WORK}/app/src/com/example/b.anti" "${b_source}")
+    anti_passes("the build after b grew its pair" "${WORK}/app" build ${tools})
+    program_expect("the program after b grew its pair"
+                   COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 24 OUT "")
     return()
 endif()
 

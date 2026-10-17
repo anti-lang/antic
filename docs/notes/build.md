@@ -35,14 +35,21 @@ which is what a dependency of a path reads.
 ## The cache of a module
 
 The key of an output is the SHA-256 of its input, the version of antic, the
-target and the processor level, with a mark for `-g`. It stands in a file
+target and the processor level, with a mark for `-g`. `options_key` adds every
+option the compile takes from the manifest and the command. `imports_key` adds
+the digest of every library file the input reaches through its imports and of
+every library file of the graph. That is decision 15 of "Decisions of
+2026-10-11".
+It stands in a file
 beside the output, under the name of the output and `.key`. A compile drops the
 key first and writes it after, so a run that stops halfway leaves no key that
 the next build would trust.
 
 The key of a library file is over the source, and the key of an object is over
-the library file. A change that does not reach the interface or the IR of a
-module therefore leaves its object alone. A comment or a line break rewrites
+the library file. A change that reaches neither the interface nor the IR of a
+module or of its imports therefore leaves its object alone. The IR holds no
+sizes. A struct of an import that grows leaves the library file of a module the
+same bytes. The imports in the key of its object build it again. A comment or a line break rewrites
 the library file to the same bytes, and the object is not written again.
 
 ## The link of a dev build

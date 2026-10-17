@@ -275,7 +275,7 @@ dist/macos-arm64/dev/NOTICE.txt
 
 The build writes a library file per module of the project, and an object per module the program reaches. That covers the modules of the project, of the dependencies and of the standard library below them. The module with `main` is compiled from its source and linked in the same call.
 
-Every cached output has a key file beside it. The key is one line.
+Every cached output has a key file beside it. Its first line names the input and the flags.
 
 ```text
 4ab76bae31c4e96324107e36ab2ad4e7332f61d23d9a54fe7b0b8a1f4d752276 0.2.0 macos-arm64 armv8.5 g
@@ -288,6 +288,8 @@ Every cached output has a key file beside it. The key is one line.
 | `macos-arm64`, `armv8.5` | the target and the processor level |
 | `g` or `no-g` | whether the output carries the lines of `-g`. A dev object does, a library file does not |
 | `strict`, `memory-checks` | present when warnings are errors, and when the object carries the memory checks |
+
+The lines after it hold what else reaches the output. They name the package with its version and its licence, with the digest of the licence file. The dependencies, the attribution lines, the injections and `strip-docs` follow. The last lines hold the digest of every library file the input reaches through its imports, and of every library file of the dependencies. A module whose import changed its interface is checked again, and its object follows a struct of the import that grew.
 
 A build compiles an output again when it is missing or its key differs from the one the build would write. It removes the key before the compile and writes it after, so a build that stops halfway leaves no key to trust.
 
