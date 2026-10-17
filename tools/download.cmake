@@ -7,9 +7,9 @@
 # one, as for the signed list of a release, the file is downloaded every
 # time. A download says "download <url>" first.
 #
-# antic_get_source of src/native/get-source.cmake, tools/get-sysroot.cmake
-# and tools/fetch-release.cmake include this file. The test downloads_once
-# refuses a download anywhere else.
+# antic_get_source of src/native/get-source.cmake, tools/get-sysroot.cmake,
+# tools/fetch-release.cmake and tools/get-ninja.cmake include this file.
+# The test downloads_once refuses a download anywhere else.
 cmake_minimum_required(VERSION 3.21)
 
 function(antic_download url file)

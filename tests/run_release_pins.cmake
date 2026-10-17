@@ -107,3 +107,30 @@ foreach(pair "llvm=LLVM" "clang=CLANG")
                             "into `${written}`")
     endif()
 endforeach()
+
+# DESIGN: the Windows VM builds with the pinned Ninja of tools/ninja-pin,
+# by decision 16 of "Decisions of 2026-10-11", which tools/get-ninja.cmake
+# installs under anti-vm. The pin holds the version, the URL of the
+# archive with @VERSION@ in its place and the digest of the archive, and
+# the script spells none of them.
+row(ninja NINJA_VERSION ninja_version)
+if(NOT ninja_version MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "tools/ninja-pin names the version `${ninja_version}`")
+endif()
+row(ninja NINJA_URL ninja_url)
+if(NOT ninja_url MATCHES "^https://github\\.com/ninja-build/ninja/releases/download/v@VERSION@/[^/@]+\\.zip$")
+    message(FATAL_ERROR "tools/ninja-pin lies at `${ninja_url}`")
+endif()
+row(ninja NINJA_DIGEST ninja_digest)
+string(LENGTH "${ninja_digest}" length)
+if(NOT ninja_digest MATCHES "^[0-9a-f]+$" OR NOT length EQUAL 64)
+    message(FATAL_ERROR "tools/ninja-pin has the digest `${ninja_digest}`")
+endif()
+file(READ "${ROOT}/tools/get-ninja.cmake" text)
+string(FIND "${text}" "${ninja_version}" at_version)
+string(FIND "${text}" "${ninja_digest}" at_digest)
+if(NOT at_version EQUAL -1 OR NOT at_digest EQUAL -1 OR text MATCHES "ninja-build/")
+    message(FATAL_ERROR "tools/get-ninja.cmake spells the version, the "
+                        "digest or the release, which belong in "
+                        "tools/ninja-pin")
+endif()

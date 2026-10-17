@@ -26,7 +26,8 @@ file does.
   `tar -xmf`. Without `-m` the Mac's file times return, and Ninja keeps newer objects of an
   older source. That cost four false failures on 2026-09-19.
 - On Windows, write the commands into a `.cmd` file with CRLF endings, copy it over and run
-  `ssh -n ... "cmd /c %USERPROFILE%\x.cmd"`. The file calls `vcvarsall.bat arm64` first.
+  `ssh -n ... "cmd /c %USERPROFILE%\x.cmd"`. The file puts the pinned Ninja of
+  `%LOCALAPPDATA%\anti-vm\ninja` on the path first.
 - A program built by `run_program.cmake` has no `.exe` suffix. `cmd` runs a copy named
   `x.exe`.
 
@@ -220,9 +221,12 @@ asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
 - A build compiles antic and anti for its own host alone. `host_sources_<host>`
   compiles their sources for the Linux and Windows hosts with the options of a
   package. A warning of another host's headers then fails on the Mac.
-- Run the Windows suite under `vcvarsall.bat`, as `%USERPROFILE%\test.cmd`
-  does. Without it, CMake finds no Ninja and `deps_dir` fails. The full suite
-  with `-j4` took 8 min 36 s on 2026-10-02.
+- Run the Windows suite with the pinned Ninja of `tools/ninja-pin` on the
+  path, as `%USERPROFILE%\test.cmd` of `docs/vm-setup.md` does. Without it,
+  CMake finds no Ninja and `deps_dir` fails. A tree configured under
+  `vcvarsall.bat` keeps the Ninja of the Build Tools in its cache until a
+  configure names the pinned one with `-DCMAKE_MAKE_PROGRAM`. The full
+  suite with `-j4` took 8 min 36 s on 2026-10-02.
 
 ## For the next session
 
