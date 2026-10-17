@@ -104,8 +104,8 @@ endif()
 # installer downloads none and runs no script of the package, so the
 # package holds no tools/. VERSION in the root names the version of the
 # package.
-set(tools llvm-mc llvm-ar llvm-objdump llvm-readobj lld ld.lld ld64.lld
-          lld-link opt llc llvm-profdata)
+include("${ROOT}/tools/pinned-tools.cmake")
+antic_llvm_archive_tools(tools)
 set(expected anti/bin/antic${suffix}
              anti/bin/anti${suffix} anti/bin/llvm-version anti/VERSION
              anti/sysroot/macos-arm64/usr/lib/libSystem.tbd

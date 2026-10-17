@@ -172,9 +172,10 @@ every other file of every archive is that of anti.6.
 antic reach. The tools archive of macos-arm64 grows from 56,124,100 to 57,388,052 bytes,
 and it differs from that of anti.7 in `VERSION` and `bin/llvm-cov` alone. The build
 installs `llvm-cov` in `build/deps/llvm/bin`, and no package carries it:
-`tools/check-llvm.cmake` copies it into no runtime archive, and `tools/get-llvm.cmake
+`tools/check-llvm.cmake` copied it into no runtime archive, and `tools/get-llvm.cmake
 -DHOST=<host>` leaves it out of the directory the packer copies. The test
-`no_llvm_cov_packed` holds both.
+`no_llvm_cov_packed` holds both. `tools/copy-llvm.cmake` does that copy since step 23 of
+the fixes of `docs/audit/summary.md`.
 
 `tools/llvm-pin` names the tag, the address of the release, the name of an asset and
 the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives

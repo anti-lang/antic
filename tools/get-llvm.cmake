@@ -29,6 +29,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/deps-dir.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/pinned-tools.cmake")
 if(DEFINED HOST AND NOT DEFINED DEST)
     message(FATAL_ERROR "HOST names the tools of ${HOST}, and DEST says where "
                         "they go")
@@ -51,7 +52,7 @@ endif()
 if(fetched_host MATCHES "^windows-")
     set(exe ".exe")
 endif()
-foreach(name ld.lld ld64.lld lld-link)
+foreach(name IN LISTS ANTIC_LLD_NAMES)
     file(COPY_FILE "${DEST}/bin/lld${exe}" "${DEST}/bin/${name}${exe}"
          ONLY_IF_DIFFERENT)
 endforeach()

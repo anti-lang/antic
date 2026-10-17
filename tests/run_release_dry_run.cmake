@@ -140,6 +140,9 @@ endforeach()
 # What this test reads of step 4 is therefore the wiring: that the packer
 # leaves a PDB per Windows program, that the step finds it and that it
 # goes into the archive of its host.
+include("${ROOT}/tools/pinned-tools.cmake")
+antic_llvm_archive_tools(archive_tools)
+list(JOIN archive_tools " " archive_tools)
 file(WRITE "${WORK}/bin/cmake" "#!/bin/sh
 set -e
 dest=\"\"
@@ -242,11 +245,10 @@ if [ -n \"\$script\" ]; then
         ;;
     get-llvm.cmake)
         # The tools of another host, laid out as bin/ of the runtime
-        # archive: the eleven names and llvm-version.
+        # archive: the names of antic_llvm_archive_tools and llvm-version.
         [ -n \"\$dest\" ] && [ -n \"\$host\" ] || exit 1
         mkdir -p \"\$dest/bin\"
-        for tool in llvm-mc llvm-ar llvm-objdump llvm-readobj lld ld.lld \\
-                ld64.lld lld-link opt llc llvm-profdata; do
+        for tool in ${archive_tools}; do
             echo \"stand-in \$tool of \$host\" > \"\$dest/bin/\$tool\"
         done
         echo '${llvm_version}' > \"\$dest/bin/llvm-version\"

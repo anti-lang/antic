@@ -705,11 +705,14 @@ endif()
 # bin/ of the runtime archive: the LLVM tools of tools/llvm-version, which
 # antic runs and tools/pack-anti.cmake copies into the package of this
 # machine. tools/check-llvm.cmake checks the directory that
-# tools/get-llvm.cmake installed, and copies the tools with DEST.
+# tools/get-llvm.cmake installed, and tools/copy-llvm.cmake copies the
+# tools from it.
 add_custom_target(llvm_tools ALL
     COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+        -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake"
+    COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
         "-DDEST=${ANTIC_RUNTIME_DIR}/bin"
-        -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
+        -P "${PROJECT_SOURCE_DIR}/tools/copy-llvm.cmake")
 
 # The standard library in src/std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.

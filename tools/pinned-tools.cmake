@@ -41,33 +41,46 @@ function(antic_pinned_linker out llvm os)
 endfunction()
 
 # The nine LLVM tools of the pinned release, which tools/get-llvm.cmake
-# installs. tools/check-llvm.cmake copies every one but llvm-cov into the
-# runtime archive. lld runs under its names ld.lld, ld64.lld and lld-link.
+# installs. lld runs under the three names of ANTIC_LLD_NAMES, which
+# tools/get-llvm.cmake writes beside it. Every list of the tools is made
+# from these two, and the test llvm_tool_list refuses one spelled anywhere
+# else.
 #
 # DESIGN: llvm-cov measures what the tests of this tree reach, and no
 # package carries it, which Eddie decided on 2026-10-11 as decision 29 of
 # docs/decisions.md. A build needs it, so it stands in this list.
 set(ANTIC_LLVM_TOOLS llvm-mc lld llvm-ar llvm-objdump llvm-readobj opt llc
     llvm-profdata llvm-cov)
+set(ANTIC_LLD_NAMES ld.lld ld64.lld lld-link)
 
-# The list of problems of the nine LLVM tools in llvm/bin on a host of
-# the operating system os. It is empty when each is there and reports the
-# LLVM version. lld answers as ld.lld, because the generic name prints no
-# version.
-function(antic_llvm_tool_problems out llvm version os)
+# The names of the tools in bin/ of the runtime archive, which
+# tools/copy-llvm.cmake copies there and tools/pack-anti.cmake copies into
+# the package of the host: every tool of ANTIC_LLVM_TOOLS but llvm-cov, and
+# the names of lld.
+function(antic_llvm_archive_tools out)
+    set(names ${ANTIC_LLVM_TOOLS} ${ANTIC_LLD_NAMES})
+    list(REMOVE_ITEM names llvm-cov)
+    set(${out} "${names}" PARENT_SCOPE)
+endfunction()
+
+# The list of problems of the LLVM tools named after os, in the directory
+# bin on a host of the operating system os. It is empty when each is there
+# and reports the LLVM version. The generic name lld prints no version, so
+# it is checked for being there alone, and ld.lld answers for it.
+function(antic_llvm_tool_problems out bin version os)
     set(problems "")
     set(exe "")
     if(os STREQUAL "windows")
         set(exe ".exe")
     endif()
-    foreach(tool IN LISTS ANTIC_LLVM_TOOLS)
-        set(path "${llvm}/bin/${tool}${exe}")
+    foreach(tool IN LISTS ARGN)
+        set(path "${bin}/${tool}${exe}")
         if(NOT EXISTS "${path}")
             list(APPEND problems "${path} is missing")
             continue()
         endif()
         if(tool STREQUAL "lld")
-            set(path "${llvm}/bin/ld.lld${exe}")
+            continue()
         endif()
         execute_process(COMMAND "${path}" --version
                         OUTPUT_VARIABLE text ERROR_VARIABLE err)

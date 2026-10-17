@@ -1080,6 +1080,19 @@ add_test(NAME llvm_tools_root
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_tools_root.cmake")
 
+# The LLVM tools stand in one list, and tools/check-llvm.cmake checks
+# them through the one check.
+add_test(NAME llvm_tool_list
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_tool_list.cmake")
+
+# The copy into bin/ of the runtime archive takes every tool of the list
+# and refuses a directory that lacks one.
+add_test(NAME llvm_tools_copy
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-tools-copy"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_tools_copy.cmake")
+
 # A message at a position has one printer in antic, and the platform
 # layer names the tool that runs.
 add_test(NAME message_forms

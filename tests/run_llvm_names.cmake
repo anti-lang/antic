@@ -15,6 +15,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${ROOT}/tools/pinned-tools.cmake")
+
 if(CMAKE_HOST_WIN32)
     set(exe ".exe")
 endif()
@@ -23,7 +25,7 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${dest}/bin")
 file(COPY_FILE "${LLVM}/.installed" "${dest}/.installed")
 file(WRITE "${dest}/bin/lld${exe}" "lld\n")
-foreach(name ld.lld ld64.lld lld-link)
+foreach(name IN LISTS ANTIC_LLD_NAMES)
     file(WRITE "${dest}/bin/${name}${exe}" "lld\n")
 endforeach()
 # A name that holds something else is written as lld.
