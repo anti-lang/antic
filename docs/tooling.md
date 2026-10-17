@@ -236,7 +236,8 @@ ff = "https://anti.foundingfuture.com/repo"
 - `name` is a module path, the root of every module in the package. Each segment is a
   lowercase ASCII identifier.
 - `version` is a semantic version `major.minor.patch`.
-- `antic` is the minimum compiler version. `anti build` refuses an older compiler.
+- `antic` is the minimum compiler version, one to three parts of digits. `anti build`
+  refuses an older compiler and a version of another form, which satisfies nothing.
 - `license`, `license_text`, `attribution` and `publish` are described in
   `docs/distribution.md`.
 

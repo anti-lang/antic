@@ -24,6 +24,7 @@
 #include "memreport.h"
 #include "modpath.h"
 #include "platform.h"
+#include "repo.h"
 #include "syms.h"
 #include "sha256.h"
 #include "symmap.h"
@@ -1251,7 +1252,16 @@ static int build_project(const struct build_request *r,
     if (!manifest_read(text_cstr(&manifest_path), false, &b.m)) {
         goto done;
     }
-    /* `antic` of the manifest is the minimum compiler version. */
+    /* `antic` of the manifest is the minimum compiler version. A version
+       of another form satisfies nothing, as one of an index does, and
+       the comparison read `v0.3` as 0.0.0, which every compiler passed. */
+    if (b.m.antic.length > 0 && !repo_version_valid(text_cstr(&b.m.antic))) {
+        fprintf(stderr, "anti: %s: [package] antic `%s` is no version of one "
+                        "to three parts of digits, as `%s`\n",
+                text_cstr(&manifest_path), text_cstr(&b.m.antic),
+                ANTIC_VERSION);
+        goto done;
+    }
     if (b.m.antic.length > 0 &&
         deps_version_compare(ANTIC_VERSION, text_cstr(&b.m.antic)) < 0) {
         fprintf(stderr, "anti: %s asks for antic %s and this one is %s\n",

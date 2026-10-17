@@ -51,6 +51,13 @@ anti_message(antic_version
           ${app_source} "${app_text}"
     ARGS build ${tools}
     ERR "anti: ./anti.toml asks for antic 99.0.0 and this one is ${VERSION}")
+# A minimum version of antic that is no version satisfies nothing, as a
+# version of an index does, so the build refuses it.
+anti_message(antic_version_form
+    FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\nantic = \"v0.3\"\n"
+          ${app_source} "${app_text}"
+    ARGS build ${tools}
+    ERR "anti: ./anti.toml: [package] antic `v0.3` is no version of one to three parts of digits, as `${VERSION}`")
 anti_message(runtime_unknown
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     ENV "XDG_DATA_HOME=${WORK}/data"
