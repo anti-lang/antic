@@ -838,10 +838,6 @@ int doc_run(const struct doc_request *r)
     size_t j;
     int status = 0;
 
-    if (r->source_count == 0) {
-        fputs("anti: doc takes a source or a library file\n", stderr);
-        return 2;
-    }
     pages = files_array(r->source_count, sizeof *pages);
     units = files_array(r->source_count, sizeof *units);
     order = files_array(r->source_count, sizeof *order);

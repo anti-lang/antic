@@ -2,11 +2,12 @@
 # tests/run_anti_messages.cmake states the form of a case.
 
 # Without a file the command takes the source directory, which holds no
-# module here.
+# module here. The sources of a project come from the one function that
+# `anti check` and `anti fmt` take them from, M339 of the audit.
 anti_message(no_source STATUS 2
     FILES src/notes.txt "No module.\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}"
-    ERR "anti: doc takes a source or a library file")
+    ERR "anti: no .anti file under src")
 foreach(items dev private)
     anti_message(${items}_of_a_library
         FILES one.antl "A library file, which holds the public interface alone.\n"

@@ -611,17 +611,17 @@ static int doc_command(int argc, char **argv)
         runtime = text_cstr(&home);
     }
     /* DESIGN: without a file the command takes the source directory of
-       `[layout]`, as `anti check` and `anti fmt` do, so the three read the
-       same files. The test directory holds no module a reader of the
-       library documents. Every compile carries the package name, with a
-       file or without. */
+       `[layout]` from project_sources, as `anti check` and `anti fmt` do,
+       so the three read the same files. The test directory holds no
+       module a reader of the library documents. Every compile carries the
+       package name, with a file or without. */
     if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
         status = 1;
         goto done;
     }
     if (count == 0) {
-        if (!files_list_tree(text_cstr(&src), SOURCE_SUFFIX, &found)) {
-            status = 1;
+        if (!project_sources(text_cstr(&src), NULL, &found)) {
+            status = found.count == 0 ? 2 : 1;
             goto done;
         }
         listed = sources_of(&found);
@@ -680,13 +680,15 @@ static int fmt_command(int argc, char **argv)
         }
     }
     /* DESIGN: without a file the command takes the source and the test
-       directory of `[layout]`, as `anti check` does, so that the two read
-       the same files. */
+       directory of `[layout]` from project_sources, as `anti check` does,
+       so that the two read the same files. */
     if (count == 0) {
-        if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package) ||
-            !files_list_tree(text_cstr(&src), SOURCE_SUFFIX, &found) ||
-            !files_list_tree(text_cstr(&test), SOURCE_SUFFIX, &found)) {
+        if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
             status = 1;
+            goto done;
+        }
+        if (!project_sources(text_cstr(&src), text_cstr(&test), &found)) {
+            status = found.count == 0 ? 2 : 1;
             goto done;
         }
         listed = sources_of(&found);

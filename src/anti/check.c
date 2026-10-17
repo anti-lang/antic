@@ -22,6 +22,7 @@
 #include "fmt.h"
 #include "manifest.h"
 #include "modpath.h"
+#include "project.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -393,22 +394,6 @@ static size_t format_class(const struct unit *units, size_t count)
         text_free(&formed);
     }
     return findings;
-}
-
-/* The sources of the project: every `.anti` file under the source and the
-   test directory the manifest names. */
-static bool project_sources(const char *src, const char *test,
-                            struct files_list *out)
-{
-    bool ok = files_list_tree(src, SOURCE_SUFFIX, out) &&
-              files_list_tree(test, SOURCE_SUFFIX, out);
-
-    if (out->count == 0) {
-        fprintf(stderr, "anti: no %s file under %s or %s\n", SOURCE_SUFFIX,
-                src, test);
-        ok = false;
-    }
-    return ok;
 }
 
 int check_run(const struct check_request *r)

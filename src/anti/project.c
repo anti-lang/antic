@@ -1,4 +1,5 @@
-/* `anti new`, which writes a project of the default layout. */
+/* `anti new`, which writes a project of the default layout, and the
+   sources of a project that a command reads without a file. */
 #include "project.h"
 
 #include <stdio.h>
@@ -18,6 +19,27 @@ static void starter_module(const char *name, struct text *out)
     text_append(out, "fn main() -> int\n{\n");
     text_append(out, "\tio.println(\"hello\");\n");
     text_append(out, "\treturn 0;\n}\n");
+}
+
+bool project_sources(const char *src, const char *test,
+                     struct files_list *out)
+{
+    size_t before = out->count;
+
+    if (!files_list_tree(src, SOURCE_SUFFIX, out) ||
+        (test != NULL && !files_list_tree(test, SOURCE_SUFFIX, out))) {
+        return false;
+    }
+    if (out->count > before) {
+        return true;
+    }
+    if (test != NULL) {
+        fprintf(stderr, "anti: no %s file under %s or %s\n", SOURCE_SUFFIX,
+                src, test);
+    } else {
+        fprintf(stderr, "anti: no %s file under %s\n", SOURCE_SUFFIX, src);
+    }
+    return false;
 }
 
 int project_new(const char *name)

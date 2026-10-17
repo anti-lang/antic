@@ -31,7 +31,9 @@ struct doc_request {
 };
 
 /* `anti doc`: one page per module of r and an index of them, into its
-   out. Returns the exit status of the command. */
+   out. r holds at least one source: the command refuses a project
+   without one through project_sources. Returns the exit status of the
+   command. */
 int doc_run(const struct doc_request *r);
 
 #endif
