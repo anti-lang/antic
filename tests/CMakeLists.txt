@@ -3918,7 +3918,22 @@ add_test(NAME emit_identity
         "-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/emit-identity/programs.sha256"
         "-DVERSION=${PROJECT_VERSION}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity"
+        "-DPINNED=${CMAKE_CURRENT_BINARY_DIR}/emit-identity-pinned"
         -P "${ANTIC_RUNNERS}/run_emit_identity.cmake")
+
+# The runner keeps the texts of its manifest and names the first line that
+# moved in each text that differs. It writes a manifest on the Mac alone.
+if(CMAKE_HOST_APPLE)
+    add_test(NAME emit_identity_texts
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DVERSION=${PROJECT_VERSION}"
+            "-DRUNNER=${ANTIC_RUNNERS}/run_emit_identity.cmake"
+            "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity-texts"
+            -P "${ANTIC_RUNNERS}/run_emit_identity_self.cmake")
+endif()
 
 # One object links to the same bytes for macos-arm64 on every host.
 add_test(NAME link_identity_macos-arm64

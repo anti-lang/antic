@@ -22,9 +22,16 @@ should alter may move.
     -DPROGRAMS=$PWD/tests/programs \
     -DMANIFEST=$PWD/tests/emit-identity/programs.sha256 \
     -DVERSION=$(cat tools/version) \
-    -DWORK=$PWD/build/host/tests/emit-identity -DWRITE=yes \
+    -DWORK=$PWD/build/host/tests/emit-identity \
+    -DPINNED=$PWD/build/host/tests/emit-identity-pinned -DWRITE=yes \
     -P tests/runners/run_emit_identity.cmake
   ```
+
+  `PINNED` keeps the texts of the manifest that a run last wrote or passed.
+  A run that fails prints the first line that moved in each text that
+  differs from a kept one, for the first twenty of them. So does a run that
+  writes the manifest again. That output is the reading the manifest's own diff
+  cannot give.
 
 - `emit_identity` stops at the first program that does not compile. An
   untracked test that fails there hides the missing entries of every other

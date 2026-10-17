@@ -8,7 +8,7 @@
 # the object.
 #
 #   cmake -DANTIC=<antic> -DRUNTIME=<dir> -DPROGRAMS=<dir> -DMANIFEST=<file>
-#         -DVERSION=<version> -DWORK=<dir> [-DWRITE=yes]
+#         -DVERSION=<version> -DWORK=<dir> -DPINNED=<dir> [-DWRITE=yes]
 #         -P tests/runners/run_emit_identity.cmake
 #
 # The text names the version of antic in its ident line, which the digest
@@ -16,8 +16,17 @@
 # constant anti.lang.package.version too, which the digest keeps, so a new
 # version writes the manifest again. WRITE=yes writes the manifest, on the
 # Mac, after a change to antic that changes its output.
+#
+# DESIGN: PINNED, under the build tree, keeps the texts of the manifest
+# that a run last wrote or passed, with the digest of that manifest. A
+# run that differs, and a run that writes the manifest again, print the
+# first line that moved in each text that differs from a kept one. The
+# diff of the manifest names the programs that moved and nothing of how,
+# and "Pinned outputs" of docs/notes/value-rules.md asks for that reading.
 
 cmake_minimum_required(VERSION 3.21)
+
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
             windows-arm64)
@@ -49,18 +58,10 @@ foreach(source IN LISTS sources)
     endforeach()
 endforeach()
 
-if(WRITE STREQUAL "yes")
-    if(NOT CMAKE_HOST_APPLE)
-        message(FATAL_ERROR "the manifest holds the output of the Mac, so the Mac "
-                            "writes it")
-    endif()
-    file(WRITE "${MANIFEST}" "${lines}")
-    return()
-endif()
-file(READ "${MANIFEST}" expected)
-if(NOT lines STREQUAL expected)
+# The files of <manifest> whose line <lines> lacks, in <out>.
+function(moved out manifest)
     string(REPLACE "\n" ";" got "${lines}")
-    string(REPLACE "\n" ";" want "${expected}")
+    string(REPLACE "\n" ";" want "${manifest}")
     set(differ "")
     foreach(line IN LISTS got)
         if(line AND NOT line IN_LIST want)
@@ -68,10 +69,84 @@ if(NOT lines STREQUAL expected)
             list(APPEND differ "${file}")
         endif()
     endforeach()
-    list(LENGTH differ count)
-    list(JOIN differ ", " differ)
-    message(FATAL_ERROR "antic wrote other LLVM text than the Mac for ${count} "
-                        "files: ${differ}. A change to antic that alters its "
-                        "output writes the manifest on the Mac with -DWRITE=yes "
-                        "and the same values.")
+    set(${out} "${differ}" PARENT_SCOPE)
+endfunction()
+
+# Set <out> to the first line that moved in each file of <files>, against
+# the text PINNED keeps of <manifest>. The first twenty files are shown.
+function(show_moved out manifest files)
+    set(${out} "" PARENT_SCOPE)
+    string(SHA256 stamp "${manifest}")
+    if(NOT DEFINED PINNED OR NOT EXISTS "${PINNED}/manifest.sha256")
+        return()
+    endif()
+    file(STRINGS "${PINNED}/manifest.sha256" kept LIMIT_COUNT 1)
+    if(NOT kept STREQUAL stamp)
+        return()
+    endif()
+    set(text "")
+    set(shown 0)
+    foreach(file IN LISTS files)
+        if(shown EQUAL 20)
+            string(APPEND text "and more files\n")
+            break()
+        endif()
+        if(EXISTS "${PINNED}/${file}")
+            file(READ "${PINNED}/${file}" old HEX)
+            file(READ "${WORK}/${file}" new HEX)
+            bytes_difference(difference "${file}" "${old}" "${new}")
+            string(APPEND text "${difference}\n")
+            math(EXPR shown "${shown} + 1")
+        endif()
+    endforeach()
+    set(${out} "${text}" PARENT_SCOPE)
+endfunction()
+
+# Keep the texts of this run in PINNED as those of the manifest <lines>.
+function(keep_texts)
+    if(NOT DEFINED PINNED)
+        return()
+    endif()
+    file(REMOVE_RECURSE "${PINNED}")
+    file(COPY "${WORK}/" DESTINATION "${PINNED}")
+    string(SHA256 stamp "${lines}")
+    write_bytes("${PINNED}/manifest.sha256" "${stamp}\n")
+endfunction()
+
+if(WRITE STREQUAL "yes")
+    if(NOT CMAKE_HOST_APPLE)
+        message(FATAL_ERROR "the manifest holds the output of the Mac, so the Mac "
+                            "writes it")
+    endif()
+    if(EXISTS "${MANIFEST}")
+        file(READ "${MANIFEST}" old)
+        moved(differ "${old}")
+        show_moved(text "${old}" "${differ}")
+        if(NOT text STREQUAL "")
+            message("The texts that moved:\n${text}")
+        endif()
+    endif()
+    file(WRITE "${MANIFEST}" "${lines}")
+    keep_texts()
+    return()
 endif()
+file(READ "${MANIFEST}" expected)
+if(lines STREQUAL expected)
+    string(SHA256 stamp "${lines}")
+    set(kept "")
+    if(EXISTS "${PINNED}/manifest.sha256")
+        file(STRINGS "${PINNED}/manifest.sha256" kept LIMIT_COUNT 1)
+    endif()
+    if(NOT kept STREQUAL stamp)
+        keep_texts()
+    endif()
+    return()
+endif()
+moved(differ "${expected}")
+show_moved(text "${expected}" "${differ}")
+list(LENGTH differ count)
+list(JOIN differ ", " names)
+message(FATAL_ERROR "antic wrote other LLVM text than the Mac for ${count} "
+                    "files: ${names}. A change to antic that alters its "
+                    "output writes the manifest on the Mac with -DWRITE=yes "
+                    "and the same values.\n${text}")

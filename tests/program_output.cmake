@@ -59,14 +59,16 @@ function(readable_line out hex)
     set(${out} "${text}${end}" PARENT_SCOPE)
 endfunction()
 
-# Fail unless the hexadecimal <got> holds the bytes of <wanted>, both as
-# file(READ ... HEX) and string(HEX) write them. The message names <what>
-# and the first line that differs, as each side has it, with the line
-# before it and the line after it, once when the two sides agree on it.
+# Set <out> to the empty text when the hexadecimal <got> holds the bytes
+# of <wanted>, both as file(READ ... HEX) and string(HEX) write them, and
+# otherwise to a text that names <what> and the first line that differs,
+# as each side has it, with the line before it and the line after it,
+# once when the two sides agree on it.
 # DESIGN: one comparison for every runner. A runner that printed the whole
 # new text, or both sides in hexadecimal, left the reader to find the
 # line, and a golden was written again without that reading.
-function(expect_same_bytes what wanted got)
+function(bytes_difference out what wanted got)
+    set(${out} "" PARENT_SCOPE)
     if(got STREQUAL wanted)
         return()
     endif()
@@ -135,7 +137,16 @@ function(expect_same_bytes what wanted got)
             endif()
         endforeach()
     endif()
-    message(FATAL_ERROR "${text}")
+    set(${out} "${text}" PARENT_SCOPE)
+endfunction()
+
+# Fail unless the hexadecimal <got> holds the bytes of <wanted>, with the
+# text of bytes_difference.
+function(expect_same_bytes what wanted got)
+    bytes_difference(text "${what}" "${wanted}" "${got}")
+    if(NOT text STREQUAL "")
+        message(FATAL_ERROR "${text}")
+    endif()
 endfunction()
 
 # Fail unless the text <got> equals <wanted>, through expect_same_bytes.
