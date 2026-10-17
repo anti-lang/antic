@@ -552,28 +552,28 @@ Each was found by reading and none was run.
    `base_options` and `header_options` at 191 to 228: a new `version` in
    `anti.toml` leaves the library files and the objects of a dev build
    as they were. "Versions" in `docs/decisions.md` puts that version in
-   every class descriptor.
+   every class descriptor. Fixed `1f7a28f3`.
 2. `build.c:978`. `path_dependency` sets `sub.target = NULL`, and
    `build_targets` at 1021 then builds the list `default` of `[targets]`
    of the dependency. Line 983 reads `dist/<host>/<mode>` of it. A
    dependency whose manifest names another default target is built for
    that one and read where nothing was written. The comment at 946 and
-   the decision say "built for the host first".
+   the decision say "built for the host first". Fixed `c63535c8`.
 3. `build.c:905`. With `--lib shared --soname` antic writes
    `lib<name>.so.<major>` and a link `lib<name>.so` to it, at
    `src/antic/driver_library.c:373` and `440`. `copy_into` copies through
    the link, so `dist/` holds `lib<name>.so` alone, whose soname names a
    file that `dist/` lacks. No test passes `--soname` to `anti`, which
-   the tool pass reports.
+   the tool pass reports. Gone: fixed `bfe03ca0`, by T099.
 4. `build.c:905`. For a Windows target antic writes the import library
    `<name>.lib` beside the DLL, at `src/antic/linker.c:1073`. The build
    copies the DLL and the header into `dist/` and not the import library
-   a C program links against.
+   a C program links against. Fixed `f14c3f9a`.
 5. `deps.c:675`. An index that holds the package and no version that
    answers leaves `resolve_from_index` with false. `resolve_from_repo` at
    732 then prints that the repository "gave no index" of the package
    "that anti reads". The dependency names no repository, and no version
-   takes its constraint.
+   takes its constraint. Fixed `9bdd67cc`.
 6. `fmt.c:1738`. `e->anonymous` is set for a `fn` after `,`, `(`, `[`,
    `=`, `return`, `yield`, `=>` and `??`, and cleared at line 1458 alone,
    when a `{` arrives at the same depth of brackets. A function type at
@@ -588,19 +588,21 @@ Each was found by reading and none was run.
 8. `build.c:1156`. The `antic` of a manifest is compared without a test
    of its form. `antic = "v0.3"` reads as `0.0.0` in `version_part` at
    `deps.c:39` and every compiler passes, where the decision says a
-   version of another form satisfies nothing.
+   version of another form satisfies nothing. Fixed `ee515070`.
 9. `deps.c:1043`. `lock_answers` asks whether every dependency of the
    manifest stands in the lock file. A package of the lock file that the
    manifest no longer names stays in the graph and is fetched. It stands
-   in the header of every library file and in `NOTICE.txt`.
+   in the header of every library file and in `NOTICE.txt`. Fixed
+   `47f4593c`.
 10. `build.c:267`. The key of a library file is over its own source. A
     module whose import changed its interface is not checked again in a
     dev build, apart from the module that links. The specification gives
     the key so, and whether it should hold the digests of the imports is
-    Eddie's decision.
+    Eddie's decision. Decision 15 of "Decisions of 2026-10-11" says it
+    does. Fixed `1f7a28f3`.
 11. `repo.c:235`. curl runs with `-L`, so an `https://` repository may
     redirect to plain `http://` on any host, which `repo_url_allowed`
-    refuses in a URL of the manifest.
+    refuses in a URL of the manifest. Fixed `e0b707df`.
 
 ## What reaches past the interface
 

@@ -121,7 +121,8 @@ Three reports list defects that no rule names and count none of them.
 `anti-tool` lists eleven, among them the cache key of `anti build` at
 `src/anti/build.c:120`. `rt` lists four under "Outside the rules". `std`
 lists five under "Not confirmed". They stand in their reports, and fix steps
-21 and 22 take those of `anti`.
+21 and 22 take those of `anti`. Step 22 fixed defects 1, 2, 4, 5, 8, 9, 10
+and 11, and found defect 3 fixed by `bfe03ca0`.
 
 ### Merges and grades the reports disagree on
 
@@ -1279,7 +1280,8 @@ The reports leave these to Eddie. A step that needs one names it.
 - The `Interlocked` branch of `src/rt/atomic.c:98`, which no host
   compiles. Whether a reader's build with the system compiler keeps it.
 - The cache key of a library file in `anti build`, defect 10 of
-  `anti-tool`. Whether it holds the digests of the imports.
+  `anti-tool`. Whether it holds the digests of the imports. Decision 15
+  says it does, fixed `1f7a28f3`.
 - The Build Tools on the Windows VM, which `tools/release.sh:688` loads
   for Ninja alone.
 - Whether `A => free(p)` is a statement of a `switch` arm. `front-end` did
