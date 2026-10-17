@@ -18,6 +18,9 @@
 #   path_target_cpu         and a build for a target of the other processor
 #                           with --cpu builds it at the level of the host
 #                           (T144)
+#   redirect_to_http        a redirect of an https:// repository to plain
+#                           http:// of another host is refused (defect 11)
+#   redirect_followed       and one to https:// is followed
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -141,6 +144,129 @@ if(CASE STREQUAL "path_target_cpu")
             message(FATAL_ERROR "the build wrote no ${file}")
         endif()
     endforeach()
+    return()
+endif()
+
+# DESIGN: no test reaches a server, so the redirect cases put a curl of
+# their own first on the path. It answers as the servers of the case
+# would: https://repo.example redirects every file to the same path under
+# the URL of FAKE_REDIRECT, and mirror.example serves the files under
+# FAKE_SERVED, with no regard to the scheme. It follows a redirect when
+# it is given -L, as curl does, and it writes each URL it is asked for
+# into FAKE_LOG. A shell script stands for it, so Windows runs neither
+# case.
+set(fake_curl [=[#!/bin/sh
+out=
+format=
+follow=no
+url=
+while [ $# -gt 0 ]; do
+    case "$1" in
+    -o) out=$2; shift 2 ;;
+    -w) format=$2; shift 2 ;;
+    --etag-compare|--etag-save) shift 2 ;;
+    -*L*) follow=yes; shift ;;
+    -*) shift ;;
+    *) url=$1; shift ;;
+    esac
+done
+while :; do
+    echo "$url" >> "$FAKE_LOG"
+    location=
+    case "$url" in
+    https://repo.example/*)
+        code=302
+        location="$FAKE_REDIRECT/${url#https://repo.example/}" ;;
+    *://mirror.example/*)
+        file="$FAKE_SERVED/${url#*://mirror.example/}"
+        if [ -f "$file" ]; then
+            code=200
+            cp "$file" "$out"
+        else
+            code=404
+        fi ;;
+    *) code=404 ;;
+    esac
+    if [ "$code" = 302 ] && [ "$follow" = yes ]; then
+        url=$location
+        continue
+    fi
+    break
+done
+printf '%s' "$format" | sed -e "s|%{http_code}|$code|" -e "s|%{redirect_url}|$location|"
+[ "$code" -lt 400 ] || exit 22
+]=])
+
+# The library project units, served from WORK/served as version 1.0.0 of
+# its package, and a program over it whose repository is
+# https://repo.example. Each run of anti puts the fake curl first on the
+# path, with the target of its redirects.
+function(redirect_project redirect)
+    string(CONCAT units_source
+           "//! A library served over HTTP.\n\n"
+           "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+    string(CONCAT app_source
+           "//! A program over the library of a repository.\n\n"
+           "import com.example.units;\n\n"
+           "fn main() -> int\n{\n\treturn units.one();\n}\n")
+    write_project("${WORK}/units" "com.example.units" "" "com.example.units"
+                  "${units_source}")
+    anti_passes("the build of the library" "${WORK}/units" build ${tools})
+    set(served "${WORK}/served/com.example.units")
+    file(MAKE_DIRECTORY "${served}/1.0.0")
+    file(COPY_FILE "${WORK}/units/dist/${HOST}/dev/com/example/units.antl"
+         "${served}/1.0.0/com.example.units.antl")
+    file(SHA256 "${served}/1.0.0/com.example.units.antl" digest)
+    file(WRITE "${served}/index.toml"
+         "name = \"com.example.units\"\nrevision = 1\n\n[[version]]\n"
+         "version = \"1.0.0\"\n"
+         "modules = [{ path = \"com.example.units\", sha256 = \"${digest}\" }]\n")
+    write_project("${WORK}/app" "com.example.app"
+                  "\n[repositories]\nremote = \"https://repo.example\"\n\n[dependencies]\n\"com.example.units\" = { version = \"1.0.0\", repo = \"remote\" }\n"
+                  "com.example.app" "${app_source}")
+    file(WRITE "${WORK}/bin/curl" "${fake_curl}")
+    file(CHMOD "${WORK}/bin/curl" PERMISSIONS OWNER_READ OWNER_WRITE
+         OWNER_EXECUTE)
+    set(redirect_env "PATH=${WORK}/bin:$ENV{PATH}"
+        "FAKE_REDIRECT=${redirect}" "FAKE_SERVED=${WORK}/served"
+        "FAKE_LOG=${WORK}/curl.log" PARENT_SCOPE)
+endfunction()
+
+if(CASE STREQUAL "redirect_to_http")
+    redirect_project("http://mirror.example")
+    anti("${WORK}/app" status text build ${tools} ENV ${redirect_env})
+    # The resolver adds that the repository gave no version.
+    string(CONCAT expected
+           "anti: https://repo.example/com.example.units/index.toml: the server "
+           "redirects to http://mirror.example/com.example.units/index.toml, "
+           "which is no https:// URL and no http:// URL of 127.0.0.1 or "
+           "localhost\n"
+           "anti: https://repo.example has no version of com.example.units "
+           "that satisfies every constraint on it\n")
+    if(NOT status STREQUAL "1" OR NOT text STREQUAL expected)
+        message(FATAL_ERROR "the build over a redirect to http:// ended with "
+                            "${status} and printed\n${text}\nand the case "
+                            "expects 1 and\n${expected}")
+    endif()
+    file(READ "${WORK}/curl.log" asked)
+    if(asked MATCHES "mirror")
+        message(FATAL_ERROR "the build asked the target of the redirect:\n"
+                            "${asked}")
+    endif()
+    return()
+endif()
+
+if(CASE STREQUAL "redirect_followed")
+    redirect_project("https://mirror.example")
+    anti_passes("the build over a redirect to https://" "${WORK}/app" build
+                ${tools} ENV ${redirect_env})
+    program_expect("the program" COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 1 OUT "")
+    file(READ "${WORK}/curl.log" asked)
+    if(NOT asked MATCHES "https://mirror.example/com.example.units/1.0.0/")
+        message(FATAL_ERROR "the build fetched no library file from the "
+                            "target of the redirect:\n${asked}")
+    endif()
     return()
 endif()
 

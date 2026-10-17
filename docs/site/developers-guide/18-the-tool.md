@@ -215,7 +215,7 @@ index/<sha256 of the prefix>/com.example.units/index.toml.checked
 pkg/com.example.units/1.2.0/com.example.units.antl
 ```
 
-The file `index.toml.checked` is the stamp of the last check. The tool reads an index from its repository again at most once per hour. A library file in the cache is never fetched again. An `https://` fetch runs the `curl` of the system.
+The file `index.toml.checked` is the stamp of the last check. The tool reads an index from its repository again at most once per hour. A library file in the cache is never fetched again. An `https://` fetch runs the `curl` of the system. A redirect of the server is followed when it leads to `https://`, or to `http://` of the machine itself, and refused otherwise.
 
 `anti build --offline` contacts no repository and fails when a file it needs is not in the cache.
 

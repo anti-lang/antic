@@ -188,10 +188,122 @@ static bool file_url_path(const char *url, struct text *out)
    the file, it holds none, or it gives no answer. A file:// path that is
    not there and an HTTP status of 404 or 410 are the second. Anything else
    that fails is the third, since the file may be there all the same. */
-static bool http_absent(const struct text *status)
+static bool http_absent(const char *code)
 {
-    return strcmp(text_cstr(status), "404") == 0 ||
-           strcmp(text_cstr(status), "410") == 0;
+    return strcmp(code, "404") == 0 || strcmp(code, "410") == 0;
+}
+
+/* The most redirects one fetch follows. */
+enum { REPO_REDIRECTS = 10 };
+
+/* Whether a redirect of the server from the URL from may lead to to. The
+   target is held to the rule of a repository URL of the manifest, and a
+   file:// URL names no file of a server. */
+static bool redirect_allowed(const char *from, const char *to)
+{
+    static const char http[] = "http://";
+
+    if (strncmp(to, "https://", 8) == 0 ||
+        (strncmp(to, http, sizeof http - 1) == 0 &&
+         is_loopback(to + sizeof http - 1))) {
+        return true;
+    }
+    fprintf(stderr, "anti: %s: the server redirects to %s, which is no "
+                    "https:// URL and no http:// URL of 127.0.0.1 or "
+                    "localhost\n", from, to);
+    return false;
+}
+
+/* Fetch url over HTTP into the file at temporary, through every redirect
+   of the server. etag is as for fetch. Returns whether the last answer
+   was a file, and sets absent where it was a status of a file that is
+   not there.
+
+   DESIGN: curl is the one HTTP client every host of Anti has. The entity
+   tag of a cached index goes out with the request, so a warm cache costs
+   one round trip and no transfer. curl follows no redirect itself, since
+   `-L` took an https:// repository to plain http:// of any host. Each
+   target passes redirect_allowed first. */
+static bool fetch_http(const char *url, const char *temporary,
+                       const char *etag, bool *absent)
+{
+    struct text current = {0};
+    struct text compare = {0};
+    struct text save = {0};
+    struct text status = {0};
+    const char *code = "";
+    int hops;
+    bool ok = false;
+
+    *absent = false;
+    text_append(&current, url);
+    if (etag != NULL) {
+        text_append(&compare, etag);
+        text_append(&save, etag);
+    }
+    for (hops = 0;; hops++) {
+        const char *argv[12];
+        size_t argc = 0;
+        const char *location;
+        char *space;
+        argv[argc++] = "curl";
+        argv[argc++] = "-fsS";
+        if (etag != NULL) {
+            if (files_exists(etag)) {
+                argv[argc++] = "--etag-compare";
+                argv[argc++] = text_cstr(&compare);
+            }
+            argv[argc++] = "--etag-save";
+            argv[argc++] = text_cstr(&save);
+        }
+        argv[argc++] = "-o";
+        argv[argc++] = temporary;
+        argv[argc++] = "-w";
+        argv[argc++] = "%{http_code} %{redirect_url}";
+        argv[argc++] = text_cstr(&current);
+        argv[argc] = NULL;
+        status.length = 0;
+        ok = process_capture(argv, &status) == 0;
+        /* The status, then the target of a redirect or nothing. */
+        code = text_cstr(&status);
+        space = strchr(text_cstr(&status), ' ');
+        location = "";
+        if (space != NULL) {
+            *space = '\0';
+            location = space + 1;
+        }
+        if (!ok || code[0] != '3' || location[0] == '\0') {
+            break;
+        }
+        if (hops == REPO_REDIRECTS) {
+            fprintf(stderr, "anti: %s: the server redirects more than %d "
+                            "times\n", url, REPO_REDIRECTS);
+            ok = false;
+            goto done;
+        }
+        if (!redirect_allowed(text_cstr(&current), location)) {
+            ok = false;
+            goto done;
+        }
+        {
+            struct text next = {0};
+            text_append(&next, location);
+            text_free(&current);
+            current = next;
+        }
+    }
+    if (!ok && http_absent(code)) {
+        *absent = true;
+    } else if (!ok) {
+        fprintf(stderr, "anti: %s: curl fetched nothing\n",
+                text_cstr(&current));
+    }
+done:
+    text_free(&current);
+    text_free(&compare);
+    text_free(&save);
+    text_free(&status);
+    return ok;
 }
 
 /* Fetch url into the file at destination. etag names the file that holds
@@ -203,11 +315,6 @@ static enum repo_answer fetch(const char *url, const char *destination,
 {
     struct text temporary = {0};
     struct text source = {0};
-    struct text compare = {0};
-    struct text save = {0};
-    struct text status = {0};
-    const char *argv[12];
-    size_t argc = 0;
     enum repo_answer answer = REPO_FAILED;
     bool ok = false;
 
@@ -228,32 +335,10 @@ static enum repo_answer fetch(const char *url, const char *destination,
             }
         }
     } else {
-        /* DESIGN: curl is the one HTTP client every host of Anti has. The
-           entity tag of a cached index goes out with the request, so a
-           warm cache costs one round trip and no transfer. */
-        argv[argc++] = "curl";
-        argv[argc++] = "-fsSL";
-        if (etag != NULL) {
-            if (files_exists(etag)) {
-                text_appendf(&compare, "%s", etag);
-                argv[argc++] = "--etag-compare";
-                argv[argc++] = text_cstr(&compare);
-            }
-            text_appendf(&save, "%s", etag);
-            argv[argc++] = "--etag-save";
-            argv[argc++] = text_cstr(&save);
-        }
-        argv[argc++] = "-o";
-        argv[argc++] = text_cstr(&temporary);
-        argv[argc++] = "-w";
-        argv[argc++] = "%{http_code}";
-        argv[argc++] = url;
-        argv[argc] = NULL;
-        ok = process_capture(argv, &status) == 0;
-        if (!ok && http_absent(&status)) {
+        bool absent;
+        ok = fetch_http(url, text_cstr(&temporary), etag, &absent);
+        if (absent) {
             answer = REPO_ABSENT;
-        } else if (!ok) {
-            fprintf(stderr, "anti: %s: curl fetched nothing\n", url);
         }
     }
     if (ok) {
@@ -272,9 +357,6 @@ static enum repo_answer fetch(const char *url, const char *destination,
     platform_remove(text_cstr(&temporary));
     text_free(&temporary);
     text_free(&source);
-    text_free(&compare);
-    text_free(&save);
-    text_free(&status);
     return answer;
 }
 
