@@ -151,10 +151,37 @@ static void import_without_semicolon(void)
     }
 }
 
+/* Defect 6 of the anti-tool audit: a function type after `,` or `(`
+   marked an anonymous function whose body never came, and the next `{`
+   at that depth of brackets was laid out as its body. A literal after
+   such a type stands as it stands after any other type. */
+static void function_types(void)
+{
+    static const char *const cases[][2] = {
+        {"fn main()\n{\n\tlet m: Map<str, fn(int) -> int> =\n"
+         "\t\tmake(Point {\n\t\t\tx: 1,\n\t\t});\n}\n",
+         "fn main()\n{\n\tlet m: Map<str, fn(int) -> int> =\n"
+         "\t\tmake(Point {\n\t\tx: 1,\n\t});\n}\n"},
+        {"fn main()\n{\n\tlet t: (int, fn(int) -> int) =\n"
+         "\t\tmake(Point {\n\t\t\tx: 1,\n\t\t});\n}\n",
+         "fn main()\n{\n\tlet t: (int, fn(int) -> int) =\n"
+         "\t\tmake(Point {\n\t\tx: 1,\n\t});\n}\n"},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        struct text out = {0};
+        CHECK(fmt_source(cases[i][0], strlen(cases[i][0]), &out));
+        CHECK_STR(text_cstr(&out), cases[i][1]);
+        text_free(&out);
+    }
+}
+
 void test_fmt(void)
 {
     deep_angles();
     open_anonymous();
     odd_sources();
     import_without_semicolon();
+    function_types();
 }

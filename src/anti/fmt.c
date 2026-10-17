@@ -736,6 +736,19 @@ static void push_bracket(struct emitter *e, bool type)
     e->bracket_type[e->brackets++] = type;
 }
 
+/* Closes count brackets, or every open one when fewer stand. A `fn`
+   whose bracket closes before a `{` came was a function type, as in
+   `Map<str, fn(int) -> int>` or `(int, fn(int) -> int)`, and opens no
+   anonymous function. Defect 6 of the anti-tool audit: the mark stayed,
+   and the next `{` at that depth was laid out as the body. */
+static void close_brackets(struct emitter *e, size_t count)
+{
+    e->brackets -= count <= e->brackets ? count : e->brackets;
+    if (e->anonymous && e->brackets < e->anonymous_brackets) {
+        e->anonymous = false;
+    }
+}
+
 static void flush(struct emitter *e)
 {
     size_t tabs = e->depth + (e->cont ? 1 : 0);
@@ -1626,9 +1639,7 @@ static bool emit_import_brace(struct emitter *e, const struct piece *p)
     if (p->import_list && kind == TOKEN_RBRACE) {
         note_token(e, kind);
         append_piece(e, p, space_before(e, p));
-        if (e->brackets > 0) {
-            e->brackets--;
-        }
+        close_brackets(e, 1);
         return true;
     }
     return false;
@@ -1650,9 +1661,7 @@ static bool emit_angle(struct emitter *e, const struct piece *p)
     if (p->angle_close > 0) {
         note_token(e, kind);
         append_piece(e, p, space_before(e, p));
-        e->brackets -= (size_t)p->angle_close <= e->brackets
-                           ? (size_t)p->angle_close
-                           : e->brackets;
+        close_brackets(e, (size_t)p->angle_close);
         return true;
     }
     return false;
@@ -1706,7 +1715,7 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
         note_token(e, kind);
         append_piece(e, p, space_before(e, p));
         if (e->brackets > 0) {
-            e->brackets--;
+            close_brackets(e, 1);
             e->type_bracket = kind == TOKEN_RBRACKET &&
                               e->bracket_type[e->brackets];
         }
