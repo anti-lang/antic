@@ -336,7 +336,8 @@ One-way dependencies, and a part doing the work of another:
   rt. Fixed `66b3bd9f`, which moves the injections to `src/rt/inject.c`.
 - M326. `tests/CMakeLists.txt:1050`. The target `llvm_tools` of the test
   directory is the only producer of `runtime/bin`, a part of the product.
-  It is keyed on the path of llvm-mc. New. build-and-tools.
+  It is keyed on the path of llvm-mc. New. build-and-tools. Fixed
+  `c470bafc`, which moves the target to the root file.
 - M327. `tests/CMakeLists.txt:1297`. The raylib source is named by the
   test directory and fetched by no one. The recipe works by the order of
   two `add_subdirectory` lines. New. build-and-tools. Fixed `ab89b335`.
@@ -399,11 +400,13 @@ Copies that drifted:
   stand under other names. New. build-and-tools. Fixed `ab89b335`.
 - M341. `tools/check-llvm.cmake:16`. The LLVM tools are listed and
   checked in two places that disagree. A missing llvm-objdump leaves a
-  `runtime/bin` without it and no error. New. build-and-tools.
+  `runtime/bin` without it and no error. New. build-and-tools. Fixed
+  `29873529`, one list, one check and `tools/copy-llvm.cmake`.
 - M342. `src/native/CMakeLists.txt:31`. The triple and the flags of a
   target are written in eight places. The native libraries lack three
   flags the runtime takes, against their own comment. New.
-  build-and-tools.
+  build-and-tools. Fixed `22884b98`, the table of
+  `tools/target-compile.cmake` and a provisional entry on the flags.
 - M343. `tests/run_dev.cmake:26`. The helpers of the runners exist in
   many copies with different contracts. 49 builds in 31 runners accept
   whatever antic and the linker print. The pattern of M61. New.
