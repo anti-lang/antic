@@ -427,6 +427,18 @@ target_compile_definitions(rt_conf_tests PRIVATE
     ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME rt_conf_race COMMAND rt_conf_tests)
 
+# M315. Object.deserialize against malformed and cut-off text, in a
+# program of its own with stand-ins for the classes, the registry and the
+# loader. The runtime of an Anti program carries no sanitizer, and this
+# program does in the sanitizer builds.
+antic_rt_sources(deserialize_sources registry object json utf f16 text cast
+    mem assert atomic fs platform_posix platform_windows)
+add_executable(rt_deserialize_tests unit/test_deserialize.c
+    ${deserialize_sources})
+target_link_libraries(rt_deserialize_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
+add_test(NAME rt_deserialize COMMAND rt_deserialize_tests)
+
 # The loader of the runtime under threads that load at once, in a program
 # of its own with stand-ins for the rest of the runtime. It loads two
 # libraries that each carry an empty table of a plugin.

@@ -20,7 +20,7 @@
         {
             "name": "asan",
             "displayName": "AddressSanitizer",
-            "description": "Debug build of antic and its runtime under AddressSanitizer",
+            "description": "Debug build of antic, anti and the C test programs under AddressSanitizer",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
