@@ -752,18 +752,23 @@ static int64_t array_length(const struct anti_field *arg)
 /* DESIGN: a class value, in place or behind an `own` pointer, as an
    element or as a field, is written by the `serialize` of its table, so a
    class that replaces it, a collection among them, writes its own form.
-   One that does not reaches the default through the root's entry. */
+   One that does not reaches the default through the root's entry. The
+   entry is called as the type of anti_lang_Object_serialize, which every
+   serialize of a class has. A call through another function type is
+   undefined, and UndefinedBehaviorSanitizer stops it. The entry takes
+   self without const, as every entry does, and writes nothing to the
+   object. */
 static void serialize_object(struct anti_builder *b, const void *object)
 {
-    void (*write)(const void *, void *) =
-        (void (*)(const void *, void *))anti_rt_entry_body(
+    void (*write)(struct anti_object *, void *) =
+        (void (*)(struct anti_object *, void *))anti_rt_entry_body(
             object, ANTI_ENTRY_SERIALIZE);
 
     if (write == NULL) {
         put(b, "null");
         return;
     }
-    write(object, b);
+    write((struct anti_object *)object, b);
 }
 
 void anti_rt_element_serialize(void *out, void *bytes,
