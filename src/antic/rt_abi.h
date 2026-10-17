@@ -16,13 +16,13 @@
    so a change on one side that the other lacks fails the unit tests on
    the host.
 
-   The rest of the contract stands in three other places, each pinned by
-   a unit test. Three enums of antic mirror one of src/rt/object.h or
-   src/rt/fail.h: enum check_kind and enum hook_kind of lower_lowerer.h
-   and enum type_id of lower_desc.c, which records_check_kinds,
-   records_hook_entries and records_type_ids of test_lower.c hold.
-   whole_tables.c takes the flags of a class from src/rt/registry.h and
-   the kinds of a reflect.Value from src/rt/reflect.h themselves. antic
+   The rest of the contract stands in four other places. Three enums of
+   antic mirror one of src/rt/object.h or src/rt/fail.h: enum check_kind
+   and enum hook_kind of lower_lowerer.h and enum type_id of
+   lower_desc.c, which records_check_kinds, records_hook_entries and
+   records_type_ids of test_lower.c hold. whole_tables.c takes the flags
+   of a class from src/rt/registry.h and the kinds of a reflect.Value
+   from src/rt/reflect.h themselves, so those numbers stand once. antic
    declares anti.lang.Match and the hidden lock of a synchronized class,
    which match_layout and object_lock_layout compare with their structs.
    The modules of the standard library declare the frames of anti.lang,
