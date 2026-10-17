@@ -55,8 +55,8 @@ set -eu
 # DESIGN: the two halves of a release stand on two hosts, and a forged
 # release needs both of them. The GitHub release of the tag holds the
 # packages, the symbols archives and SHA256SUMS. anti-lang.com holds
-# SHA256SUMS.sig, the public key, the two installers and the downloads
-# page. Whoever takes GitHub changes binaries the signature no longer
+# SHA256SUMS.sig, the public key, the two installers, the two
+# uninstallers and the downloads page. Whoever takes GitHub changes binaries the signature no longer
 # covers. Whoever takes the site signs nothing, because the private key
 # is on neither host. A signature stored beside the binaries it covers
 # would leave the private key as the only thing between an attacker and a

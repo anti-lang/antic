@@ -70,13 +70,15 @@ holds its address, today `https://anti-lang.com`, and the two paths below it.
 ```text
 https://anti-lang.com/install.sh
 https://anti-lang.com/install.ps1
+https://anti-lang.com/uninstall.sh
+https://anti-lang.com/uninstall.ps1
 https://anti-lang.com/downloads/
 https://anti-lang.com/downloads/anti/<version>/SHA256SUMS.sig
 https://anti-lang.com/keys/release.pem
 ```
 
-Step 9 of a release rsyncs four files there over ssh: the two installers, the downloads
-page, `SHA256SUMS.sig` of the version and `tools/keys/release.pem`. It then reads the
+Step 9 of a release rsyncs six files there over ssh: the two installers, the two
+uninstallers, the downloads page, `SHA256SUMS.sig` of the version and `tools/keys/release.pem`. It then reads the
 signature and the key back over HTTPS, and checks that the signature covers the
 manifest of the GitHub release. The page names every asset of the release by URL and
 carries its digest. It shows the manual install as commands for both shells, with the
@@ -289,10 +291,10 @@ CI, so no runner checks a release. `./r --dry-run` performs the
 first five steps and prints what the rest would do. On a version that is a tag already
 it warns where a real run refuses.
 
-The site takes the two installers, the downloads page, the signature of the manifest
-and the public key. That page names the version and the six packages, with the digest
+The site takes the two installers, the two uninstallers, the downloads page, the
+signature of the manifest and the public key. That page names the version and the six packages, with the digest
 and the release URL of each. It carries the fingerprint of the public key. Step 9
-rsyncs the four files and reads the signature and the key back. Nothing binary reaches
+rsyncs the six files and reads the signature and the key back. Nothing binary reaches
 the site.
 
 `docs/work-order-release-script.md` holds the steps, and

@@ -92,6 +92,18 @@ Linux spells the digest check `sha256sum --ignore-missing -c SHA256SUMS`. The la
 
 The packages and `SHA256SUMS` stand on GitHub, and the signature and the key on anti-lang.com. A forged release therefore needs both hosts.
 
+### Uninstall
+
+The uninstaller removes the data directory and the two programs that the installer wrote. It refuses a directory that holds no marker of the installer.
+
+```sh
+curl -fsSL https://anti-lang.com/uninstall.sh | sh
+```
+
+```powershell
+irm https://anti-lang.com/uninstall.ps1 | iex
+```
+
 ## antic and anti
 
 `antic` is the compiler. It takes one source file and writes one executable, and it reads no project file.

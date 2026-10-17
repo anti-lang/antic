@@ -598,6 +598,8 @@ endforeach()
 foreach(line "would sign" "would tag v${version}" "would create the release"
         "would upload 13 files" "would upload no SHA256SUMS.sig"
         "would rsync tools/install.sh"
+        "would rsync [^\n]*tools/uninstall\\.sh"
+        "would rsync [^\n]*tools/uninstall\\.ps1"
         "would rsync the downloads page" "would rsync SHA256SUMS.sig"
         "tools/keys/release.pem" "would install")
     if(NOT out MATCHES "${line}")
@@ -611,15 +613,19 @@ endforeach()
 # decision 7 of docs/work-order-distribution.md: the download of the
 # package and the manifest from the release and of the signature and the
 # key from the site, the signature check of the installers, the digest,
-# the unpacking and the two programs on the path, for both shells. The
-# page of the dry run has every mark filled.
+# the unpacking and the two programs on the path, for both shells. It
+# names the uninstallers at the addresses of their headers, where step 9
+# puts them by decision 9 of "Decisions of 2026-10-11". The page of the
+# dry run has every mark filled.
 file(READ "${dist}/downloads-index.html" page)
 foreach(text "anti-${version}-macos-arm64.tar.xz"
         "downloads/anti/${version}/SHA256SUMS.sig" "keys/release.pem"
         "openssl dgst -sha256 -binary" "openssl pkeyutl -verify"
         "shasum -a 256" "sha256sum" "tar -xJf" ".local/share/anti"
         ".local/bin" "Get-FileHash" "tar.exe -xJf" "Programs\\anti\\bin"
-        "antic --version" "anti --version")
+        "antic --version" "anti --version"
+        "https://anti-lang.com/uninstall.sh | sh"
+        "https://anti-lang.com/uninstall.ps1 | iex")
     string(FIND "${page}" "${text}" found)
     if(found EQUAL -1)
         message(FATAL_ERROR "the downloads page shows no `${text}` in its "

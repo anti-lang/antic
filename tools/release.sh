@@ -1131,7 +1131,8 @@ write_page() {
 # DESIGN: nothing binary reaches the site, and the signature of the
 # manifest reaches nothing else. The GitHub release holds the packages,
 # the symbols archives and SHA256SUMS. This host holds SHA256SUMS.sig and
-# the public key beside the two installers and the downloads page. A
+# the public key beside the two installers, the two uninstallers and the
+# downloads page. A
 # forged release therefore needs both hosts. Whoever takes GitHub changes
 # binaries that the signature no longer covers. Whoever takes this host
 # signs nothing, because the private key is on neither. A signature stored
@@ -1147,7 +1148,7 @@ site() {
     if [ "$dry_run" = yes ]; then
         printf 'r: step 9, the site\n'
         write_page "$page"
-        say "would rsync tools/install.sh and tools/install.ps1 to ${ANTI_SITE:-\$ANTI_SITE}/"
+        say "would rsync tools/install.sh, tools/install.ps1, tools/uninstall.sh and tools/uninstall.ps1 to ${ANTI_SITE:-\$ANTI_SITE}/"
         say "would rsync the downloads page to ${ANTI_SITE:-\$ANTI_SITE}/downloads/index.html"
         say "would rsync SHA256SUMS.sig to ${ANTI_SITE:-\$ANTI_SITE}/$signature_path"
         say "would rsync tools/keys/release.pem to ${ANTI_SITE:-\$ANTI_SITE}/$site_key_path"
@@ -1163,10 +1164,14 @@ site() {
     [ -f "$signature" ] ||
         die "step 9: $signature is missing, and the site serves the signature of a release"
     write_page "$page"
+    # DESIGN: the uninstallers stand beside the installers, at the
+    # addresses their headers give, which decision 9 of "Decisions of
+    # 2026-10-11" in docs/decisions.md decided.
     rsync --chmod=u=rw,g=r,o= "$root/tools/install.sh" \
-        "$root/tools/install.ps1" "$destination/" ||
+        "$root/tools/install.ps1" "$root/tools/uninstall.sh" \
+        "$root/tools/uninstall.ps1" "$destination/" ||
         die "step 9: the installers did not reach $destination"
-    say "install.sh and install.ps1 stand in $destination"
+    say "install.sh, install.ps1, uninstall.sh and uninstall.ps1 stand in $destination"
     rsync --chmod=u=rw,g=r,o= "$page" "$destination/downloads/index.html" ||
         die "step 9: the downloads page did not reach $destination"
     say "the downloads page of $version stands in $destination/downloads"

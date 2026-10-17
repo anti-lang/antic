@@ -1161,9 +1161,9 @@ reports what it finished.
   See "Small things" in `docs/decisions.md`.
 - Anti 0.2.0 installs with one command. The six packages, the six symbols archives and
   `SHA256SUMS` are assets of the GitHub release of the tag, which `tools/release-base`
-  names. anti-lang.com serves text alone: the two installers, the downloads page,
-  `SHA256SUMS.sig` of every version and the public key, which is the single trust
-  anchor. `tools/site-base` names it. The two halves stand on two hosts on purpose, so
+  names. anti-lang.com serves text alone: the two installers, the two
+  uninstallers, the downloads page, `SHA256SUMS.sig` of every version and the
+  public key, which is the single trust anchor. `tools/site-base` names it. The two halves stand on two hosts on purpose, so
   a forged release needs both. See `docs/distribution.md`.
   An install follows the platform: `~/.local/bin` and `~/.local/share/anti`, or
   `%LOCALAPPDATA%\Programs\anti\bin` and `%LOCALAPPDATA%\anti`. Nothing outside

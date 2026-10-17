@@ -73,10 +73,11 @@ may be used, and it is yours to read.
 `./r` makes a release, and `docs/work-order-release-script.md` holds its eleven
 steps. `./r --dry-run` runs the first five and prints a plan for the rest. Step 7
 uploads the packages, the symbols archives and `SHA256SUMS` to the GitHub release
-of the tag. Step 9 rsyncs the two installers, the downloads page,
-`SHA256SUMS.sig` and the public key to the webroot of anti-lang.com, which
-`ANTI_SITE` names as `<host>:<path>`, and the run refuses without it. The
-signature and the binaries stand on two hosts, so a forged release needs both.
+of the tag. Step 9 rsyncs the two installers, the two uninstallers, the
+downloads page, `SHA256SUMS.sig` and the public key to the webroot of
+anti-lang.com, which `ANTI_SITE` names as `<host>:<path>`, and the run refuses
+without it. The signature and the binaries stand on two hosts, so a forged
+release needs both.
 The private key that signs `SHA256SUMS` stands at
 `tools/keys/private/release-key.pem`, which `.gitignore` excludes, and a run without it
 stops before the tag.

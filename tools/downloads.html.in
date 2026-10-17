@@ -137,6 +137,13 @@ Copy-Item "$env:LOCALAPPDATA\anti\bin\antic.exe", "$env:LOCALAPPDATA\anti\bin\an
 &amp; "$env:LOCALAPPDATA\Programs\anti\bin\antic.exe" --version
 &amp; "$env:LOCALAPPDATA\Programs\anti\bin\anti.exe" --version</pre>
 
+    <h2>Uninstall</h2>
+    <p>The uninstaller removes the data directory and the two programs
+      that the installer wrote. It refuses a directory that holds no marker
+      of the installer.</p>
+    <pre>curl -fsSL https://anti-lang.com/uninstall.sh | sh</pre>
+    <pre>irm https://anti-lang.com/uninstall.ps1 | iex</pre>
+
     <h2>The public key</h2>
     <p>The installers carry the public key of the release and check every
       manifest against it. The same key stands at
