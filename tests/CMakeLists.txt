@@ -2642,7 +2642,7 @@ add_test(NAME anti_build_inputs
 # tests/run_anti_build_cases.cmake, whose header names what each shows. A
 # Windows library links from every host whose runtime archive holds the
 # sysroot. The curl of the redirect cases is a shell script.
-set(anti_build_cases path_target path_target_cpu)
+set(anti_build_cases path_target path_target_cpu lock_dropped)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     list(APPEND anti_build_cases redirect_to_http redirect_followed
          redirect_loop)

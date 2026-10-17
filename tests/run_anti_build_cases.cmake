@@ -23,6 +23,9 @@
 #   redirect_followed       and one to https:// is followed
 #   redirect_loop           and a server that redirects to itself is left
 #                           after ten redirects
+#   lock_dropped            a package of the lock file that the manifest no
+#                           longer reaches leaves the graph, the lock file
+#                           and the notice, and is not fetched (defect 9)
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -288,6 +291,100 @@ if(CASE STREQUAL "redirect_followed")
     if(NOT asked MATCHES "https://mirror.example/com.example.units/1.0.0/")
         message(FATAL_ERROR "the build fetched no library file from the "
                             "target of the redirect:\n${asked}")
+    endif()
+    return()
+endif()
+
+# The file:// URL of a directory: file:///tmp/repo, and file:///C:/repo
+# for a Windows path, whose drive follows the third slash.
+function(file_url path out)
+    if(path MATCHES "^/")
+        set(${out} "file://${path}" PARENT_SCOPE)
+    else()
+        set(${out} "file:///${path}" PARENT_SCOPE)
+    endif()
+endfunction()
+
+if(CASE STREQUAL "lock_dropped")
+    # Three packages in a repository. The index of a says that a needs
+    # c, so the lock file holds c through a alone.
+    set(repo "${WORK}/repo")
+    foreach(package a b c)
+        string(CONCAT source
+               "//! A package of a repository.\n\n"
+               "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+        write_project("${WORK}/${package}" "com.example.${package}" ""
+                      "com.example.${package}" "${source}")
+        anti_passes("the build of ${package}" "${WORK}/${package}" build
+                    ${tools})
+        set(at "${repo}/com.example.${package}")
+        file(MAKE_DIRECTORY "${at}/1.0.0")
+        file(COPY_FILE
+             "${WORK}/${package}/dist/${HOST}/dev/com/example/${package}.antl"
+             "${at}/1.0.0/com.example.${package}.antl")
+        file(SHA256 "${at}/1.0.0/com.example.${package}.antl" digest)
+        set(needs "")
+        if(package STREQUAL "a")
+            set(needs "{ name = \"com.example.c\", version = \"1.0.0\" }")
+        endif()
+        file(WRITE "${at}/index.toml"
+             "name = \"com.example.${package}\"\nrevision = 1\n\n"
+             "[[version]]\nversion = \"1.0.0\"\n"
+             "modules = [{ path = \"com.example.${package}\", sha256 = \"${digest}\" }]\n"
+             "dependencies = [${needs}]\n")
+    endforeach()
+    file_url("${repo}" repo_url)
+    set(head "\n[repositories]\nlocal = \"${repo_url}\"\n\n[dependencies]\n")
+    set(on_a "\"com.example.a\" = { version = \"1.0.0\", repo = \"local\" }\n")
+    set(on_b "\"com.example.b\" = { version = \"1.0.0\", repo = \"local\" }\n")
+    string(CONCAT both
+           "//! A program over a and b.\n\n"
+           "import com.example.a;\nimport com.example.b;\n\n"
+           "fn main() -> int\n{\n\treturn a.one() + b.one();\n}\n")
+    write_project("${WORK}/app" "com.example.app" "${head}${on_a}${on_b}"
+                  "com.example.app" "${both}")
+    anti_passes("the build over a and b" "${WORK}/app" build ${tools})
+    file(READ "${WORK}/app/anti.lock" lock)
+    foreach(package a b c)
+        if(NOT lock MATCHES "name = \"com.example.${package}\"")
+            message(FATAL_ERROR "the first lock file names no "
+                                "com.example.${package}:\n${lock}")
+        endif()
+    endforeach()
+
+    # The manifest drops b, and b leaves the repository and the cache.
+    string(CONCAT one
+           "//! A program over a.\n\n"
+           "import com.example.a;\n\n"
+           "fn main() -> int\n{\n\treturn a.one();\n}\n")
+    write_project("${WORK}/app" "com.example.app" "${head}${on_a}"
+                  "com.example.app" "${one}")
+    file(REMOVE_RECURSE "${repo}/com.example.b" "${WORK}/cache")
+    anti_passes("the build over a alone" "${WORK}/app" build ${tools})
+    file(READ "${WORK}/app/anti.lock" lock)
+    if(lock MATCHES "com.example.b")
+        message(FATAL_ERROR "the lock file keeps com.example.b, which the "
+                            "manifest no longer names:\n${lock}")
+    endif()
+    foreach(package a c)
+        if(NOT lock MATCHES "name = \"com.example.${package}\"")
+            message(FATAL_ERROR "the lock file names no "
+                                "com.example.${package}:\n${lock}")
+        endif()
+    endforeach()
+    file(READ "${WORK}/app/dist/${HOST}/dev/NOTICE.txt" notice)
+    if(notice MATCHES "com.example.b")
+        message(FATAL_ERROR "the notice names com.example.b:\n${notice}")
+    endif()
+    program_expect("the program" COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 1 OUT "")
+
+    # The lock file of a and c answers the manifest, so the next build
+    # reads it and writes nothing about it.
+    anti_passes("the build after" "${WORK}/app" build ${tools})
+    if(NOT anti_text STREQUAL "")
+        message(FATAL_ERROR "the build over the new lock file printed\n"
+                            "${anti_text}")
     endif()
     return()
 endif()

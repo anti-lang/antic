@@ -144,7 +144,7 @@ modules = [
 ]
 ```
 
-The lock file names every package of the graph with its version, its source and the SHA-256 of each library file. A later build takes the locked versions and compares each digest before it compiles.
+The lock file names every package of the graph with its version, its source and the SHA-256 of each library file. A package whose version needs other packages names them in `needs`, as `needs = ["com.example.shapes"]`. A later build takes the locked versions and compares each digest before it compiles.
 
 ### Repositories
 
@@ -202,7 +202,7 @@ modules = [
 
 A build resolves in four steps.
 
-1. It reads the manifest. When a lock file stands and every locked entry meets the manifest, it takes the lock file as it is.
+1. It reads the manifest. When a lock file stands and every locked entry meets the manifest, it takes the lock file as it is. The dependencies of the manifest must also reach every locked package through `needs`.
 2. Otherwise it reads the index of each dependency and walks the dependencies of the versions until the graph is closed. It picks the highest version that is not yanked and meets every constraint on the package, and writes `anti.lock`.
 3. It fetches every library file that is not in the cache and compares its digest with the index.
 4. It hands the sources of the project and every library file of the graph to the compiler.

@@ -33,6 +33,11 @@ struct dep_package {
     struct text path;
     struct dep_module *modules;
     size_t module_count;
+    /* The packages this version needs, by name. The lock file records
+       them, so a lock tells which of its packages the manifest still
+       reaches. */
+    struct text *needs;
+    size_t need_count;
 };
 
 /* The closed dependency graph of a project. */

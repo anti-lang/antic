@@ -480,6 +480,13 @@ anti_message(lock_package_name
     ERR "anti: ./anti.lock names Com/Example, which is no package name, so ./anti.lock is not read"
         "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
+anti_message(lock_needs_name
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          anti.lock "${lock_head}${lock_units}needs = [\"Com/Example\"]\n"
+    ARGS build --offline ${tools}
+    ERR "anti: ./anti.lock names Com/Example, which is no package name, so ./anti.lock is not read"
+        "anti: --offline and no cached index of com.example.units from ${repo_url}"
+        "${no_version}")
 anti_message(lock_repository_with_a_quote
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.2.0\"\nrepo = 'file:///re\"po'\nmodules = [\n    ${units_module},\n]\n"

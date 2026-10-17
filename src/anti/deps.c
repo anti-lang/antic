@@ -157,6 +157,10 @@ static void package_free(struct dep_package *p)
         text_free(&p->modules[i].file);
     }
     free(p->modules);
+    for (i = 0; i < p->need_count; i++) {
+        text_free(&p->needs[i]);
+    }
+    free(p->needs);
     text_free(&p->name);
     text_free(&p->version);
     text_free(&p->repo);
@@ -855,6 +859,39 @@ static bool walk_round(struct resolver *r, bool *changed)
     return ok;
 }
 
+/* Add the name need to the packages p needs, once. */
+static void package_need(struct dep_package *p, const char *need)
+{
+    size_t i;
+
+    for (i = 0; i < p->need_count; i++) {
+        if (strcmp(text_cstr(&p->needs[i]), need) == 0) {
+            return;
+        }
+    }
+    p->needs = files_resize(p->needs, p->need_count + 1, sizeof *p->needs);
+    memset(&p->needs[p->need_count], 0, sizeof *p->needs);
+    text_append(&p->needs[p->need_count++], need);
+}
+
+/* Give every package of the graph of a settled walk the packages it
+   needs, which are the requirements its pick made. */
+static void record_needs(struct resolver *r)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < r->graph.count; i++) {
+        struct dep_package *p = &r->graph.packages[i];
+        for (j = 0; j < r->requirement_count; j++) {
+            if (strcmp(text_cstr(&r->requirements[j].from),
+                       text_cstr(&p->name)) == 0) {
+                package_need(p, text_cstr(&r->requirements[j].name));
+            }
+        }
+    }
+}
+
 /* Whether the strings of one package of the lock file follow the grammar
    of their kind, which the index they came from followed. A lock file is
    committed and cloned, so it is read as foreign input. */
@@ -961,6 +998,23 @@ static bool lock_read(const char *path, struct dep_graph *out)
             }
             text_append(&package_module(p, module)->digest, digest);
         }
+        for (j = 0; valid; j++) {
+            struct text head = {0};
+            const char *need;
+            text_appendf(&head, "package.%zu.needs", i);
+            need = value_at(doc, text_cstr(&head), j, "");
+            text_free(&head);
+            if (need == NULL) {
+                break;
+            }
+            if (!repo_name_valid(need)) {
+                fprintf(stderr, "anti: %s names %s, which is no package "
+                                "name, so %s is not read\n", path, need, path);
+                valid = false;
+                break;
+            }
+            package_need(p, need);
+        }
         if (!valid) {
             deps_free(out);
             break;
@@ -1029,6 +1083,16 @@ static bool lock_write(const char *path, const struct dep_graph *g)
             text_append(&out, " },\n");
         }
         text_append(&out, "]\n");
+        /* The lock reader takes no escape, and a name of the graph is a
+           package name, which holds neither a quote nor a control byte. */
+        if (p->need_count > 0) {
+            text_append(&out, "needs = [");
+            for (j = 0; j < p->need_count; j++) {
+                text_appendf(&out, "%s\"%s\"", j > 0 ? ", " : "",
+                             text_cstr(&p->needs[j]));
+            }
+            text_append(&out, "]\n");
+        }
     }
     if (!ok) {
         text_free(&out);
@@ -1037,6 +1101,49 @@ static bool lock_write(const char *path, const struct dep_graph *g)
     ok = files_write(path, &out);
     text_free(&out);
     return ok;
+}
+
+/* Whether the dependencies of the manifest reach every package of g
+   through the packages each one needs. A package that nothing reaches is
+   one the manifest no longer asks for. The lock kept it in the graph, so
+   it was fetched and named in every library file and in the notice, by
+   defect 9 of docs/audit/anti-tool.md. */
+static bool lock_reached(const struct manifest *m, const struct dep_graph *g)
+{
+    bool *reached = files_array(g->count + 1, sizeof *reached);
+    size_t i;
+    size_t j;
+    size_t k;
+    bool grew = true;
+    bool all = true;
+
+    for (i = 0; i < g->count; i++) {
+        for (j = 0; j < m->dependency_count && !reached[i]; j++) {
+            reached[i] = strcmp(text_cstr(&g->packages[i].name),
+                                text_cstr(&m->dependencies[j].name)) == 0;
+        }
+    }
+    while (grew) {
+        grew = false;
+        for (i = 0; i < g->count; i++) {
+            const struct dep_package *p = &g->packages[i];
+            for (j = 0; reached[i] && j < p->need_count; j++) {
+                for (k = 0; k < g->count; k++) {
+                    if (!reached[k] &&
+                        strcmp(text_cstr(&g->packages[k].name),
+                               text_cstr(&p->needs[j])) == 0) {
+                        reached[k] = true;
+                        grew = true;
+                    }
+                }
+            }
+        }
+    }
+    for (i = 0; i < g->count; i++) {
+        all = all && reached[i];
+    }
+    free(reached);
+    return all;
 }
 
 /* Whether the locked graph answers the manifest. Every dependency of a
@@ -1081,7 +1188,7 @@ static bool lock_answers(const struct manifest *m, const struct dep_graph *g,
             }
         }
     }
-    return true;
+    return lock_reached(m, g);
 }
 
 /* Put every library file of the graph on this machine and check its
@@ -1115,8 +1222,8 @@ static bool fetch_all(struct dep_graph *g, bool offline)
     return true;
 }
 
-/* Whether two graphs hold the same packages, versions and digests, which
-   decides whether the lock file is written again. */
+/* Whether two graphs hold the same packages, versions, digests and needs,
+   which decides whether the lock file is written again. */
 static bool graphs_equal(const struct dep_graph *a, const struct dep_graph *b)
 {
     size_t i;
@@ -1131,8 +1238,14 @@ static bool graphs_equal(const struct dep_graph *a, const struct dep_graph *b)
         if (strcmp(text_cstr(&x->name), text_cstr(&y->name)) != 0 ||
             strcmp(text_cstr(&x->version), text_cstr(&y->version)) != 0 ||
             strcmp(text_cstr(&x->repo), text_cstr(&y->repo)) != 0 ||
-            x->module_count != y->module_count) {
+            x->module_count != y->module_count ||
+            x->need_count != y->need_count) {
             return false;
+        }
+        for (j = 0; j < x->need_count; j++) {
+            if (strcmp(text_cstr(&x->needs[j]), text_cstr(&y->needs[j])) != 0) {
+                return false;
+            }
         }
         for (j = 0; j < x->module_count; j++) {
             if (strcmp(text_cstr(&x->modules[j].path),
@@ -1207,6 +1320,7 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
               "version each\n", stderr);
         goto done;
     }
+    record_needs(&r);
     if (!fetch_all(&r.graph, offline)) {
         goto done;
     }

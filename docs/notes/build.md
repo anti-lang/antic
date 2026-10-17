@@ -63,7 +63,9 @@ compiles again, and the link it carries is the relink of that build.
 
 The lock file answers the manifest when every dependency of a repository is in
 it. Each stands there with a version its constraint takes and the repository it
-names. A
+names. The dependencies of the manifest also reach every package of the lock
+through the `needs` of each, the packages its version needs. A package that
+nothing reaches is one the manifest dropped, and the lock no longer answers. A
 dependency of a path never answers, because the files under it are the
 developer's own and carry no version. A project with one therefore walks. That
 costs an index read per package of a repository, and an index is checked

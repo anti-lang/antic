@@ -280,8 +280,9 @@ Version constraints take three forms:
 ## Lock file
 
 `anti.lock` sits next to `anti.toml`. `anti build` and `anti add` write it. It records,
-per resolved package, the name, the version, the repository URL or path, and the
-`sha256` of each `.antl` of the package. A build with a lock file uses the locked
+per resolved package, the name, the version, the repository URL or path, the
+`sha256` of each `.antl` of the package and the names of the packages its version
+needs. A build with a lock file uses the locked
 versions and refuses a checksum mismatch. Commit `anti.lock` for applications. Libraries
 may omit it.
 
@@ -385,7 +386,8 @@ download time and again before every build.
 `anti build` resolves in this order:
 
 1. Read `anti.toml`. If `anti.lock` exists and every locked entry satisfies the manifest,
-   use the lock file and skip to step 5.
+   use the lock file and skip to step 5. The manifest must also reach every locked
+   package through the packages each one needs.
 2. For each dependency, fetch or refresh `<name>/index.toml` from its repository or
    from each repository in order. Path dependencies read the `.antl` headers instead.
 3. Walk the dependency lists in the index entries until the graph is closed. Pick the
