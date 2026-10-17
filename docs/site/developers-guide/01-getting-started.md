@@ -178,7 +178,7 @@ The first command writes two files beside the source: the executable `hello` and
 
 ### Hello as a project
 
-`anti new` takes a package name, which is a module path of at least two segments. The directory takes the last segment.
+`anti new` takes a package name, which is a module path of at least two segments of lowercase letters, digits and `_`. The directory takes the last segment.
 
 ```sh
 anti new com.example.hello

@@ -164,9 +164,9 @@ segment of the package name, with the suffix of an executable of the target. A p
 whose modules declare no `main` is a library project, and its build writes the library
 file of each module into `dist/` instead.
 
-`anti new <name>` takes a package name, a module path of at least two segments. The
-directory it writes is the last segment of that name, and the one module under `src/`
-takes the whole of it.
+`anti new <name>` takes a package name, a module path of at least two segments of
+lowercase letters, digits and `_`. The directory it writes is the last segment of that
+name, and the one module under `src/` takes the whole of it.
 
 `anti build --cpu <level>` forwards the level to `antic --cpu` for every module of the
 build. Without it each target takes its default level. The levels and the defaults are

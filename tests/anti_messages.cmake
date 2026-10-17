@@ -6,6 +6,15 @@
 anti_message(new_one_segment
     ARGS new app
     ERR "anti: `app` is one segment, and a package name is a module path of at least two, as com.example.app")
+# Defect 7 of the anti-tool audit: anti new counted the dots of its name
+# alone, so it wrote a project that no build takes, and a name that holds
+# a path wrote its project at that path.
+anti_message(new_not_a_package_name
+    ARGS new com.My-App
+    ERR "anti: `com.My-App` is no package name, which is lowercase segments of letters, digits and `_` joined by dots, as com.example.app")
+anti_message(new_name_with_a_path
+    ARGS new a.b/c
+    ERR "anti: `a.b/c` is no package name, which is lowercase segments of letters, digits and `_` joined by dots, as com.example.app")
 anti_message(new_there_already
     FILES app/notes.txt "The directory of an older project.\n"
     ARGS new com.example.app

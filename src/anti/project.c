@@ -6,6 +6,7 @@
 #include "files.h"
 #include "manifest.h"
 #include "modpath.h"
+#include "repo.h"
 #include "text.h"
 #include "units.h"
 
@@ -33,6 +34,16 @@ int project_new(const char *name)
         fprintf(stderr, "anti: `%s` is one segment, and a package name is a "
                         "module path of at least two, as com.example.%s\n",
                 name, name);
+        goto done;
+    }
+    /* The name is the module path of the starter and the directory of the
+       project, so it takes the form an index and the manifest take, and a
+       path inside it writes nowhere. Defect 7 of the anti-tool audit. */
+    if (!repo_name_valid(name)) {
+        fprintf(stderr, "anti: `%s` is no package name, which is lowercase "
+                        "segments of letters, digits and `_` joined by dots, "
+                        "as com.example.app\n",
+                name);
         goto done;
     }
     text_append(&directory, last);
