@@ -357,12 +357,12 @@ bool deps_library_header(const char *file, struct arena *arena,
     return ok;
 }
 
-/* The package header of a library file: its package name, its version
-   and, with r, the dependencies it carries as requirements of the
-   package from. */
+/* The package header of a library file: its package name, its version,
+   its module path and, with r, the dependencies it carries as
+   requirements of the package from. */
 static bool library_header(const char *file, struct text *name,
-                           struct text *version, struct resolver *r,
-                           const char *from)
+                           struct text *version, struct text *module_path,
+                           struct resolver *r, const char *from)
 {
     struct arena arena = {0};
     struct package package;
@@ -375,8 +375,10 @@ static bool library_header(const char *file, struct text *name,
     }
     name->length = 0;
     version->length = 0;
+    module_path->length = 0;
     text_append(name, package.name);
     text_append(version, package.version);
+    text_append(module_path, module);
     for (i = 0; r != NULL && i < package.dependency_count; i++) {
         const struct package_dependency *d = &package.dependencies[i];
         require(r, d->name, d->constraint == NULL ? "" : d->constraint,
@@ -388,31 +390,11 @@ done:
     return ok;
 }
 
-/* The module path of a library file under directory: its path below that
-   directory, without the suffix and with a dot for every separator. */
-static void module_of_file(const char *directory, const char *file,
-                           struct text *out)
-{
-    size_t skip = strlen(directory);
-    size_t i;
-
-    while (skip > 0 && directory[skip - 1] == '/') {
-        skip--;
-    }
-    if (strncmp(file, directory, skip) == 0 && file[skip] == '/') {
-        file += skip + 1;
-    }
-    text_append(out, file);
-    files_cut_suffix(out, ANTL_SUFFIX);
-    for (i = 0; i < out->length; i++) {
-        if (out->data[i] == '/') {
-            out->data[i] = '.';
-        }
-    }
-}
-
 /* Read a package from a directory of library files. Every `.antl` under
-   it whose header names this package belongs to it. */
+   it whose header names this package belongs to it, as the module its
+   header names. M339 of the audit: the module path came from the place
+   of the file, and a dev build reads it from the header, so a file under
+   another name gave two answers. */
 static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                               struct dep_package *out)
 {
@@ -439,9 +421,10 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
         struct text module = {0};
         const char *file = text_cstr(&files.items[i]);
         char hex[65];
-        if (!library_header(file, &name, &version, NULL, NULL)) {
+        if (!library_header(file, &name, &version, &module, NULL, NULL)) {
             text_free(&name);
             text_free(&version);
+            text_free(&module);
             goto done;
         }
         if (strcmp(text_cstr(&name), text_cstr(&req->name)) == 0) {
@@ -452,7 +435,7 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                 text_append(&out->version, text_cstr(&version));
                 out->path.length = 0;
                 text_append(&out->path, text_cstr(&directory));
-                if (!library_header(file, &name, &version, r,
+                if (!library_header(file, &name, &version, &module, r,
                                     text_cstr(&req->name))) {
                     text_free(&name);
                     text_free(&version);
@@ -460,7 +443,6 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                     goto done;
                 }
             }
-            module_of_file(text_cstr(&directory), file, &module);
             if (!sha256_file(file, hex)) {
                 fprintf(stderr, "anti: cannot read %s\n", file);
                 text_free(&name);
@@ -470,6 +452,18 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
             }
             {
                 struct dep_module *m = package_module(out, text_cstr(&module));
+                /* The package is new to this walk, so a module that holds
+                   a file already came from another file of the directory,
+                   and a build would take one of the two. */
+                if (m->file.length > 0) {
+                    fprintf(stderr, "anti: %s and %s both hold the module "
+                                    "%s\n", text_cstr(&m->file), file,
+                            text_cstr(&module));
+                    text_free(&name);
+                    text_free(&version);
+                    text_free(&module);
+                    goto done;
+                }
                 m->digest.length = 0;
                 text_append(&m->digest, hex);
                 m->file.length = 0;

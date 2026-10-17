@@ -73,6 +73,41 @@ if(NOT lock MATCHES "com.example.units")
     message(FATAL_ERROR "the lock file names no dependency:\n${lock}")
 endif()
 
+# A path may name a directory of library files, whose module path is the
+# one the header of each file names. M339 of the audit: the resolver took
+# it from the place of the file, so a file under another name gave the
+# lock file a module that a dev build, which reads the header, did not
+# name.
+file(MAKE_DIRECTORY "${WORK}/flat")
+file(COPY_FILE "${library}" "${WORK}/flat/units.antl")
+file(COPY "${WORK}/consumer/" DESTINATION "${WORK}/flat-consumer"
+     PATTERN "dist" EXCLUDE PATTERN "build" EXCLUDE
+     PATTERN "anti.lock" EXCLUDE)
+file(READ "${WORK}/flat-consumer/anti.toml" manifest)
+string(REPLACE "../units" "../flat" manifest "${manifest}")
+file(WRITE "${WORK}/flat-consumer/anti.toml" "${manifest}")
+build("the consumer of a directory of library files"
+      "${WORK}/flat-consumer" build)
+program_expect("the consumer of a directory of library files"
+               COMMAND "${WORK}/flat-consumer/dist/${HOST}/dev/consumer"
+               STATUS 8 OUT "consumer\n")
+file(READ "${WORK}/flat-consumer/anti.lock" lock)
+if(NOT lock MATCHES "{ path = \"com\\.example\\.units\", sha256")
+    message(FATAL_ERROR "the lock file names another module than the "
+                        "header of its file:\n${lock}")
+endif()
+# Two files of the directory whose headers name one module are refused,
+# since a build would take one of the two.
+file(COPY_FILE "${library}" "${WORK}/flat/twice.antl")
+file(REMOVE "${WORK}/flat-consumer/anti.lock")
+run_anti("${WORK}/flat-consumer" status text build --runtime "${RUNTIME}"
+         --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
+set(expected "anti: ./../flat/twice.antl and ./../flat/units.antl both hold the module com.example.units\n")
+if(status EQUAL 0 OR NOT text STREQUAL expected)
+    message(FATAL_ERROR "two files of one module gave ${status}:\n${text}")
+endif()
+file(REMOVE "${WORK}/flat/twice.antl")
+
 # The same package from a repository, which is a URL prefix over static
 # files. The index names every version with the digest of each module.
 set(repo "${WORK}/repo/com.example.units")
