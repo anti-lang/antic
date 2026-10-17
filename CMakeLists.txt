@@ -358,9 +358,10 @@ endif()
 # DESIGN: the runtime as bitcode that --lto links, one archive per mode in
 # lib/<target>/<level>/bitcode/<mode>/, as RUNTIME_BITCODE_DIR and
 # link_lto_name of src/antic/ name them. The mode is the word of -flto=
-# as well. tools/pack-anti.cmake leaves the directory out of the package
-# until Eddie's yes under condition C3 of
-# docs/work-order-llvm-optimization.md.
+# as well. tools/pack-anti.cmake copies bitcode/full/ into every package,
+# since a release build links through full LTO by default, which Eddie
+# decided on 2026-10-07, and leaves bitcode/thin/ out. The test
+# package_keys checks both.
 set(ANTIC_RUNTIME_BITCODE_DIR bitcode)
 set(ANTIC_LTO_MODES full thin)
 
