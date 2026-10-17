@@ -28,27 +28,27 @@ execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
     OUTPUT_VARIABLE antic_native_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 # The target triple and the flags of a compile for <target>, with the
-# headers of its sysroot in the runtime tree. They are the flags the cross
-# builds of anti_rt pass for the same target.
+# headers of its sysroot in the runtime tree: those of antic_target_triple
+# and antic_target_c_options of tools/target-compile.cmake, which the cross
+# builds of anti_rt take for the same target, and the -march of the
+# default level.
+#
+# [provisional] DESIGN: the native libraries take neither of the two code
+# options that the runtime of Linux adds in CMakeLists.txt. They need no
+# -mno-outline-atomics: the driver of clang adds the outline atomics where
+# it finds a GCC of the host, for a triple of glibc without a sysroot, and
+# a library compiles for musl, or for glibc with --sysroot. The libraries
+# of linux-arm64 built on anti-linux called no __aarch64_* helper on
+# 2026-10-17, and the test native_hosts reads them. They keep no frame
+# record where clang drops one: anti_rt_trace_walk follows the records
+# through the frames of the runtime, and no module of the standard library
+# hands a native library an Anti function to call back. A program that
+# does so through a binding of its own gets a trace that stops at the
+# frame of the library.
 function(antic_native_target out_triple out_flags target)
-    set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
-    string(REGEX REPLACE "-arm64$" "-aarch64" arch "${target}")
-    string(REGEX REPLACE "^[a-z]+-" "" arch "${arch}")
-    if(target MATCHES "^linux-")
-        set(triple "${arch}-linux-musl")
-        set(flags -fPIC -nostdinc -isystem "${sysroot}/usr/include"
-            -isystem "${antic_native_resource}/include")
-    elseif(target MATCHES "^macos-")
-        # The minimum macOS version of the triple is 11.0, the value of
-        # MACOS_MIN_MAJOR and MACOS_MIN_MINOR in src/antic/target.h.
-        string(REPLACE "aarch64" "arm64" arch "${arch}")
-        set(triple "${arch}-apple-macos11")
-        set(flags -isysroot "${sysroot}")
-    else()
-        antic_windows_triple(triple "${target}")
-        antic_windows_compile_options(flags "${sysroot}"
-            "${antic_native_resource}")
-    endif()
+    antic_target_triple(triple "${target}")
+    antic_target_c_options(flags "${target}"
+        "${ANTIC_RUNTIME_DIR}/sysroot/${target}" "${antic_native_resource}")
     antic_cpu_level(level "${target}")
     antic_cpu_march(march "${level}")
     list(APPEND flags "${march}")

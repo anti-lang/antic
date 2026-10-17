@@ -62,6 +62,9 @@ file(MAKE_DIRECTORY "${DEST}/licenses")
 # Each download is antic_download, which keeps a file on disk that has its
 # digest and checks every download against it.
 include("${tools_dir}/download.cmake")
+# The triples of the targets, which name the builtins of clang and the
+# import libraries of mingw-w64.
+include("${tools_dir}/target-compile.cmake")
 
 # The digest of the regular files under dir: their SHA-256 lines in the
 # order of their paths, hashed once more. Links stay out.
@@ -120,7 +123,7 @@ endfunction()
 # and of the kernel headers go to licenses/ as glibc.txt and
 # linux-headers.txt, and the one of each X11 and OpenGL package under the
 # name of its package.
-function(glibc_sysroot target arch triple)
+function(glibc_sysroot target arch)
     set(root "${DEST}/${target}")
     set(work "${DEST}/.download/${target}")
     file(REMOVE_RECURSE "${root}")
@@ -180,9 +183,11 @@ function(glibc_sysroot target arch triple)
             endif()
         endif()
     endforeach()
-    file(GLOB builtins "${CLANG_DIR}/lib/clang/*/lib/${triple}-unknown-linux-musl/libclang_rt.builtins.a")
+    string(REGEX REPLACE "-glibc$" "" musl "${target}")
+    antic_target_triple(musl_triple "${musl}")
+    file(GLOB builtins "${CLANG_DIR}/lib/clang/*/lib/${musl_triple}/libclang_rt.builtins.a")
     if(NOT builtins)
-        message(FATAL_ERROR "${CLANG_DIR} holds no builtins of ${triple}. "
+        message(FATAL_ERROR "${CLANG_DIR} holds no builtins of ${musl_triple}. "
                             "Run tools/get-clang.cmake first.")
     endif()
     file(COPY_FILE "${builtins}" "${root}/usr/lib/libclang_rt.builtins.a")
@@ -216,7 +221,8 @@ function(linux_sysroot target arch musl_digest)
     # DESIGN: the builtins come from the pinned clang, which builds them
     # from the LLVM source of the pin. A cross build of rt/ for musl then
     # takes nothing from a distribution but musl itself.
-    file(GLOB builtins "${CLANG_DIR}/lib/clang/*/lib/${arch}-unknown-linux-musl/libclang_rt.builtins.a")
+    antic_target_triple(musl_triple "${target}")
+    file(GLOB builtins "${CLANG_DIR}/lib/clang/*/lib/${musl_triple}/libclang_rt.builtins.a")
     if(NOT builtins)
         message(FATAL_ERROR "${CLANG_DIR} holds no builtins of ${arch} musl. "
                             "Run tools/get-clang.cmake first.")
@@ -433,19 +439,19 @@ foreach(target IN LISTS TARGETS)
     elseif(target STREQUAL "linux-arm64")
         linux_sysroot("${target}" aarch64 "${MUSL_DEV_AARCH64}")
     elseif(target STREQUAL "linux-x86_64-glibc")
-        glibc_sysroot("${target}" X86_64 x86_64)
+        glibc_sysroot("${target}" X86_64)
     elseif(target STREQUAL "linux-arm64-glibc")
-        glibc_sysroot("${target}" AARCH64 aarch64)
+        glibc_sysroot("${target}" AARCH64)
     elseif(target STREQUAL "macos-arm64")
         macos_sysroot("${target}" arm64)
     elseif(target STREQUAL "macos-x86_64")
         macos_sysroot("${target}" x86_64)
     elseif(target STREQUAL "windows-x86_64")
-        windows_sysroot("${target}" x86_64 x86_64-w64-windows-gnu
-                        i386:x86-64 lib64)
+        antic_target_triple(triple "${target}")
+        windows_sysroot("${target}" x86_64 "${triple}" i386:x86-64 lib64)
     elseif(target STREQUAL "windows-arm64")
-        windows_sysroot("${target}" aarch64 aarch64-w64-windows-gnu arm64
-                        libarm64)
+        antic_target_triple(triple "${target}")
+        windows_sysroot("${target}" aarch64 "${triple}" arm64 libarm64)
     else()
         message(FATAL_ERROR "unknown target ${target}")
     endif()

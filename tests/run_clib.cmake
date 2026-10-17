@@ -59,20 +59,20 @@ set(RUNTIME_LIBRARY "${PREFIX}anti_rt${STATIC_SUFFIX}")
 
 # DESIGN: on Windows the pinned clang compiles each C program against the
 # mingw-w64 sysroot of the runtime archive, with the triple and the flags
-# of tools/windows-compile.cmake, and lld-link links it against the
+# of tools/target-compile.cmake, and lld-link links it against the
 # sysroot as antic links an Anti program, never against the Build Tools
 # of the machine. The pinned archive ships no C++ library, so a C++17
 # check compiles the header with -x c++ and -fsyntax-only and links
 # nothing.
-include("${CMAKE_CURRENT_LIST_DIR}/../tools/windows-compile.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/target-compile.cmake")
 if("${TARGET}" MATCHES "^windows-")
     set(win "${RUNTIME}/sysroot/${TARGET}")
     list(GET CC 0 compiler)
     execute_process(COMMAND "${compiler}" -print-resource-dir
                     OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE
                     ENCODING NONE)
-    antic_windows_triple(triple "${TARGET}")
-    antic_windows_compile_options(windows_options "${win}" "${resource}")
+    antic_target_triple(triple "${TARGET}")
+    antic_target_c_options(windows_options "${TARGET}" "${win}" "${resource}")
     list(APPEND CC "--target=${triple}" ${windows_options})
     set(CXX ${CC} -x c++)
     set(LLD_LINK "${RUNTIME}/bin/lld-link${CMAKE_EXECUTABLE_SUFFIX}")
@@ -95,7 +95,8 @@ if(SYSROOT AND "${TARGET}" MATCHES "^macos-(.+)$")
     set(macos "${RUNTIME}/sysroot/${TARGET}")
     file(STRINGS "${macos}/sdk-version" sdk_version LIMIT_COUNT 1)
     list(GET CC 0 compiler)
-    set(CC "${compiler}" "--target=${arch}-apple-macos11" -isysroot "${macos}")
+    antic_target_triple(triple "${TARGET}")
+    set(CC "${compiler}" "--target=${triple}" -isysroot "${macos}")
     set(CXX ${CC} -x c++)
     set(LD64 "${RUNTIME}/bin/ld64.lld")
     if(CMAKE_HOST_WIN32)

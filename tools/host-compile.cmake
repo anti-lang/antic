@@ -4,29 +4,7 @@
 # them and the warning set, so a warning of another host's headers or
 # ABI fails the suite of any machine before it fails a release.
 
-include("${CMAKE_CURRENT_LIST_DIR}/windows-compile.cmake")
-
-# The triple of clang for host. A Windows host takes the gnu triple of
-# tools/windows-compile.cmake, as every C of a Windows target does.
-function(antic_host_triple host out)
-    if(host MATCHES "^windows-")
-        antic_windows_triple(triple "${host}")
-        set("${out}" "${triple}" PARENT_SCOPE)
-        return()
-    endif()
-    set(triples
-        "macos-arm64=arm64-apple-macos11"
-        "macos-x86_64=x86_64-apple-macos11"
-        "linux-x86_64=x86_64-unknown-linux-musl"
-        "linux-arm64=aarch64-unknown-linux-musl")
-    foreach(row IN LISTS triples)
-        if(row MATCHES "^${host}=(.*)$")
-            set("${out}" "${CMAKE_MATCH_1}" PARENT_SCOPE)
-            return()
-        endif()
-    endforeach()
-    message(FATAL_ERROR "unknown host ${host}")
-endfunction()
+include("${CMAKE_CURRENT_LIST_DIR}/target-compile.cmake")
 
 # The options of a compile for host into out: the target, the version
 # antic reports, the release of the pinned clang anti names, the versions
@@ -39,7 +17,7 @@ endfunction()
 # mingw-w64 sysroot.
 function(antic_host_compile_options out host root sysroot resource macos_sdk
                                     version)
-    antic_host_triple("${host}" triple)
+    antic_target_triple(triple "${host}")
     include("${root}/tools/clang-release.cmake")
     antic_clang_release(clang_version clang_tag clang_page)
     include("${root}/tools/libc-versions.cmake")

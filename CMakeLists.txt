@@ -68,7 +68,7 @@ endmacro()
 # calls the functions it does not deprecate, through src/antic/platform.c
 # in the tools and src/rt/platform_windows.c in the runtime.
 include(tools/warnings.cmake)
-include(tools/windows-compile.cmake)
+include(tools/target-compile.cmake)
 if(MSVC)
     add_compile_options(${ANTIC_MSVC_WARNINGS} /utf-8)
 else()
@@ -286,14 +286,15 @@ set(ANTIC_GLIBC_TARGETS linux-x86_64-glibc linux-arm64-glibc)
 # DESIGN: the configure step installs the sysroot of every target, as it
 # installs clang and the LLVM tools, so ./c builds a fresh checkout. That
 # is decision 3 of "Decisions of 2026-10-11". A sysroot is the work of
-# tools/get-sysroot.cmake on its two pins, so .installed/<target> holds
-# the digest of the three files, and a sysroot whose digest is there is
-# left as it is. The script needs the builtins of the pinned clang, so a
+# tools/get-sysroot.cmake on its two pins and the two files of the
+# triples it includes, so .installed/<target> holds the digest of the five
+# files, and a sysroot whose digest is there is left as it is. The script needs the builtins of the pinned clang, so a
 # reader's build with the compiler of the machine installs none, and its
 # runtime takes the sysroots it finds.
 if(NOT ANTIC_SYSTEM_COMPILER)
     set(antic_sysroot_inputs "")
-    foreach(file tools/get-sysroot.cmake tools/sysroot-pins
+    foreach(file tools/get-sysroot.cmake tools/target-compile.cmake
+                 tools/windows-compile.cmake tools/sysroot-pins
                  tools/zig-stubs-pin)
         file(SHA256 "${PROJECT_SOURCE_DIR}/${file}" antic_file_digest)
         string(APPEND antic_sysroot_inputs "${antic_file_digest}  ${file}\n")
@@ -367,7 +368,7 @@ set(ANTIC_LTO_MODES full thin)
 # sysroot, so that antic links a program for each of them from this host.
 # Linux takes the headers of musl, macOS the headers of the Zig release
 # that the sysroot holds and Windows the headers of mingw-w64, with the
-# triple and the flags of tools/windows-compile.cmake.
+# triple and the options of tools/target-compile.cmake.
 # DESIGN: the runtime and the glue of the runtime archive put every
 # function and every datum of an ELF or COFF object into a section of its
 # own, so that the link of a program drops the ones it never reaches, as
@@ -472,8 +473,7 @@ function(anti_cross_runtime_at target triple level root)
     # the triple of the first, the program's, and warned on each module
     # of the runtime whose triple differed. See the entry on the runtime
     # as bitcode under "Compiler behaviour" in docs/decisions.md.
-    string(REPLACE "-linux-musl" "-unknown-linux-gnu" bitcode_triple
-        "${triple}")
+    string(REGEX REPLACE "-musl$" "-gnu" bitcode_triple "${triple}")
     # [provisional] DESIGN: the bitcode of a Windows target carries the
     # msvc triple antic writes for the target, and its objects keep the
     # gnu triple the C compiles for, as the objects of a musl target keep
@@ -611,38 +611,10 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
             list(APPEND no_outline -fno-omit-frame-pointer
                  -momit-leaf-frame-pointer)
         endif()
-        if(target STREQUAL "linux-x86_64" OR target STREQUAL "linux-arm64")
-            string(REPLACE "linux-arm64" "aarch64" arch "${target}")
-            string(REPLACE "linux-x86_64" "x86_64" arch "${arch}")
-            anti_cross_runtime(${target} ${arch}-linux-musl -fPIC -nostdinc
-                ${no_outline}
-                -isystem "${sysroot}/usr/include"
-                -isystem "${clang_resource}/include")
-        elseif(target MATCHES "^linux-(x86_64|arm64)-glibc$")
-            # DESIGN: the runtime of the glibc mode compiles against the
-            # headers of glibc 2.35 on every host, the Linux one as well,
-            # so it names no symbol version above the sysroot's.
-            string(REPLACE "linux-arm64-glibc" "aarch64" arch "${target}")
-            string(REPLACE "linux-x86_64-glibc" "x86_64" arch "${arch}")
-            anti_cross_runtime(${target} ${arch}-linux-gnu -fPIC -nostdinc
-                ${no_outline}
-                -isystem "${sysroot}/usr/include/${arch}-linux-gnu"
-                -isystem "${sysroot}/usr/include"
-                -isystem "${clang_resource}/include")
-        elseif(target STREQUAL "macos-x86_64")
-            # The minimum macOS version of the triple is 11.0, the value of
-            # MACOS_MIN_MAJOR and MACOS_MIN_MINOR in src/antic/target.h.
-            anti_cross_runtime(${target} x86_64-apple-macos11
-                -isysroot "${sysroot}")
-        elseif(target STREQUAL "macos-arm64")
-            anti_cross_runtime(${target} arm64-apple-macos11
-                -isysroot "${sysroot}")
-        elseif(target MATCHES "^windows")
-            antic_windows_triple(triple "${target}")
-            antic_windows_compile_options(windows_options "${sysroot}"
-                "${clang_resource}")
-            anti_cross_runtime(${target} ${triple} ${windows_options})
-        endif()
+        antic_target_triple(triple "${target}")
+        antic_target_c_options(c_options "${target}" "${sysroot}"
+            "${clang_resource}")
+        anti_cross_runtime(${target} ${triple} ${c_options} ${no_outline})
     endforeach()
 endif()
 
@@ -659,10 +631,11 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(asan_macos-arm64 darwin libclang_rt.asan_osx_dynamic.dylib)
     set(asan_macos-x86_64 darwin libclang_rt.asan_osx_dynamic.dylib)
-    set(asan_linux-x86_64-glibc x86_64-unknown-linux-gnu libclang_rt.asan.a
-        libclang_rt.asan_static.a libclang_rt.asan.a.syms libunwind.a)
-    set(asan_linux-arm64-glibc aarch64-unknown-linux-gnu libclang_rt.asan.a
-        libclang_rt.asan_static.a libclang_rt.asan.a.syms libunwind.a)
+    foreach(target linux-x86_64-glibc linux-arm64-glibc)
+        antic_target_triple(triple "${target}")
+        set(asan_${target} "${triple}" libclang_rt.asan.a
+            libclang_rt.asan_static.a libclang_rt.asan.a.syms libunwind.a)
+    endforeach()
     set(asan_windows-x86_64 x86_64-pc-windows-msvc clang_rt.asan_dynamic.lib
         clang_rt.asan_dynamic.dll clang_rt.asan_dynamic_runtime_thunk.lib)
     foreach(target macos-arm64 macos-x86_64 linux-x86_64-glibc
@@ -684,12 +657,11 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     # names of src/antic/linker.h spell the same files.
     set(profile_macos-arm64 darwin libclang_rt.profile_osx.a)
     set(profile_macos-x86_64 darwin libclang_rt.profile_osx.a)
-    set(profile_linux-x86_64 x86_64-unknown-linux-musl libclang_rt.profile.a)
-    set(profile_linux-arm64 aarch64-unknown-linux-musl libclang_rt.profile.a)
-    set(profile_linux-x86_64-glibc x86_64-unknown-linux-gnu
-        libclang_rt.profile.a)
-    set(profile_linux-arm64-glibc aarch64-unknown-linux-gnu
-        libclang_rt.profile.a)
+    foreach(target linux-x86_64 linux-arm64 linux-x86_64-glibc
+            linux-arm64-glibc)
+        antic_target_triple(triple "${target}")
+        set(profile_${target} "${triple}" libclang_rt.profile.a)
+    endforeach()
     set(profile_windows-x86_64 x86_64-pc-windows-msvc clang_rt.profile.lib)
     set(profile_windows-arm64 aarch64-pc-windows-msvc clang_rt.profile.lib)
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)

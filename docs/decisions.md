@@ -400,6 +400,8 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
 - [provisional] `antl_write` and `antl_write_header` return false when a count or an index of the library file does not fit in its 32 bits. antic then reports `antic: <source> is too large for a library file` and writes no file. Reason: rule 17 wants a refusal rather than a damaged file, and the format keeps its fixed width.
 - [provisional] The reader uses some strings of a library file as C strings, such as a module path or a package name. Such a string with a NUL inside makes the file damaged. Reason: `strcmp` would compare the text before the NUL, so `foo\0x` would match `foo`.
 - [provisional] The start flag of `init.c` is atomic, since a static library for C sets it on first use from any thread of the host. Reason: rule 23. Decision 5 of "Decisions of 2026-10-11" replaces the first use: a constructor that runs at load starts the runtime.
+- The triple the C of a target is compiled for, and the headers of its sysroot, stand in `antic_target_triple` and `antic_target_c_options` of `tools/target-compile.cmake`, with the Windows half in `tools/windows-compile.cmake`. The cross builds of the runtime and of the native libraries, the packer, `tools/get-sysroot.cmake` and the C of the tests take them, and the test `target_triples` refuses a triple spelled anywhere else. A Linux triple names its vendor, `x86_64-unknown-linux-musl`, as clang normalises it, and the runtime archive came out the same bytes. Reason: M342 of the third audit, where eight places spelled the mapping in two forms and one put the headers of clang first.
+- [provisional] The native libraries and the glue of `anti.regex` take the triple, the headers and the `-march` of their target alone, and neither `-mno-outline-atomics` nor the frame records that the runtime of Linux takes. A library compiles for musl, or for glibc with `--sysroot`, and the driver of clang adds the outline atomics for neither: the libraries of linux-arm64 that anti-linux built call no `__aarch64_*` helper, which the test `native_hosts` holds. No module of the standard library hands a native library an Anti function to call back, so `anti_rt_trace_walk` reaches no frame of one. A program that does so through a binding of its own gets a trace that stops at the frame of the library. Reason: M342 of the third audit. The comment of `antic_native_target` said the libraries took the flags of the runtime, and they did not, with no reason recorded. Giving them the two options changes the code of every Linux library, which is Eddie's choice and not this step's.
 
 ### Warnings
 
@@ -473,7 +475,9 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
 - [provisional] The triple and the flags of each target stand in `antic_native_target`
   of `src/native/CMakeLists.txt`, a second copy of the arguments that the top-level file
   passes to `anti_cross_runtime`. Reason: the step could change no other line of the
-  top-level file. The fold makes both builds read one function.
+  top-level file. The fold makes both builds read one function. Since step 23 of "Fix
+  steps" in `docs/audit/summary.md` both read `antic_target_triple` and
+  `antic_target_c_options` of `tools/target-compile.cmake`.
 - [provisional] The download script of the native sources is
   `src/native/get-source.cmake`, beside the recipes, and not in `tools/`. Reason:
   `tools/` holds the pins, and the script belongs to the recipes that run it. It was

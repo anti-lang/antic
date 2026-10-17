@@ -90,10 +90,9 @@ if(NOT CLANG OR NOT EXISTS "${CLANG}")
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
 file(WRITE "${WORK}/probe.c" "int main(void) { return 0; }\n")
-foreach(pair "macos-arm64=arm64-apple-macos11" "macos-x86_64=x86_64-apple-macos11")
-    string(REPLACE "=" ";" parts "${pair}")
-    list(GET parts 0 host)
-    list(GET parts 1 triple)
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/target-compile.cmake")
+foreach(host macos-arm64 macos-x86_64)
+    antic_target_triple(triple "${host}")
     execute_process(
         COMMAND "${CLANG}" ${ANTIC_C_WARNINGS} "--target=${triple}"
                 -isysroot "${sdk}"

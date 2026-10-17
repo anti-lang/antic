@@ -28,7 +28,9 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E tar czf
                         "${WORK}/packages/musl.tar.gz" -- musl-1
                 WORKING_DIRECTORY "${stage}/source" COMMAND_ERROR_IS_FATAL ANY)
 set(clang "${WORK}/clang")
-file(WRITE "${clang}/lib/clang/23/lib/x86_64-unknown-linux-musl/libclang_rt.builtins.a"
+include("${ROOT}/tools/target-compile.cmake")
+antic_target_triple(musl_triple linux-x86_64)
+file(WRITE "${clang}/lib/clang/23/lib/${musl_triple}/libclang_rt.builtins.a"
      "builtins\n")
 file(WRITE "${clang}/licenses/llvm.txt" "llvm\n")
 
@@ -36,6 +38,9 @@ file(WRITE "${clang}/licenses/llvm.txt" "llvm\n")
 file(MAKE_DIRECTORY "${WORK}/tools")
 file(COPY_FILE "${ROOT}/tools/get-sysroot.cmake" "${WORK}/tools/get-sysroot.cmake")
 file(COPY_FILE "${ROOT}/tools/download.cmake" "${WORK}/tools/download.cmake")
+foreach(name target-compile.cmake windows-compile.cmake)
+    file(COPY_FILE "${ROOT}/tools/${name}" "${WORK}/tools/${name}")
+endforeach()
 file(COPY_FILE "${ROOT}/tools/zig-stubs-pin" "${WORK}/tools/zig-stubs-pin")
 file(SHA256 "${WORK}/packages/x86_64/musl-dev-1.apk" apk_digest)
 file(SHA256 "${WORK}/packages/musl.tar.gz" source_digest)

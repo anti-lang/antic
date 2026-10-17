@@ -903,6 +903,16 @@ add_test(NAME runtime_hosts
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_runtime_hosts.cmake")
 set_tests_properties(runtime_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# The native libraries of linux-arm64 call no outline atomics on any host,
+# without the option that keeps them out of the runtime.
+add_test(NAME native_hosts
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-hosts.txt"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_native_hosts.cmake")
+set_tests_properties(native_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # The atomic operations of a program are LLVM atomic instructions on every
 # target, and each target and level writes the instructions its runtime
 # holds: one instruction with LSE, a load-store exclusive loop on armv8.0,
@@ -1092,6 +1102,12 @@ add_test(NAME llvm_tools_copy
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-tools-copy"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_tools_copy.cmake")
+
+# The triple of the C of a target stands in tools/target-compile.cmake
+# alone.
+add_test(NAME target_triples
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_target_triples.cmake")
 
 # A message at a position has one printer in antic, and the platform
 # layer names the tool that runs.
@@ -1733,9 +1749,10 @@ elseif(ANTIC_HOST_TARGET STREQUAL "linux-arm64")
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
             OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
-        set(emulated_c_flags --target=x86_64-linux-musl -fPIC -nostdinc
-            "-isystem${resource}/include"
-            "-isystem${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64/usr/include")
+        antic_target_triple(triple linux-x86_64)
+        antic_target_c_options(emulated_c_flags linux-x86_64
+            "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64" "${resource}")
+        list(PREPEND emulated_c_flags "--target=${triple}")
     endif()
 elseif(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
     set(ANTIC_EMULATED_TARGET windows-x86_64)
@@ -1743,8 +1760,8 @@ elseif(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
             OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
-        antic_windows_triple(triple windows-x86_64)
-        antic_windows_compile_options(emulated_c_flags
+        antic_target_triple(triple windows-x86_64)
+        antic_target_c_options(emulated_c_flags windows-x86_64
             "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64" "${resource}")
         list(PREPEND emulated_c_flags "--target=${triple}")
     endif()

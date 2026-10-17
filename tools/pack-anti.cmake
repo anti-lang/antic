@@ -204,7 +204,7 @@ function(lowest_level out host)
 endfunction()
 
 function(build_program host output program)
-    antic_host_triple("${host}" triple)
+    antic_target_triple(triple "${host}")
     set(program_sources ${ANTIC_MAIN_SOURCES})
     set(program_dirs "")
     if(program STREQUAL "anti")
