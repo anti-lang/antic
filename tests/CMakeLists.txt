@@ -2642,7 +2642,7 @@ add_test(NAME anti_build_inputs
 # tests/run_anti_build_cases.cmake, whose header names what each shows. A
 # Windows library links from every host whose runtime archive holds the
 # sysroot.
-set(anti_build_cases)
+set(anti_build_cases path_target)
 if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
     list(APPEND anti_build_cases windows_import_library)
 endif()

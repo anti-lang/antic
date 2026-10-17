@@ -12,6 +12,9 @@
 # The cases, each a defect of docs/audit/anti-tool.md:
 #   windows_import_library  dist/ of a Windows DLL holds the import library
 #                           a C program links against (defect 4)
+#   path_target             a path dependency whose manifest names another
+#                           default target is built for the host, where
+#                           its consumer reads it (defect 2)
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -27,6 +30,19 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
 set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+set(exe "")
+if(HOST MATCHES "^windows-")
+    set(exe ".exe")
+endif()
+
+# A project at directory with the manifest text after its [package]
+# lines, and one module of path module whose text is source.
+function(write_project directory name manifest module source)
+    file(WRITE "${directory}/anti.toml"
+         "[package]\nname = \"${name}\"\nversion = \"1.0.0\"\n${manifest}")
+    string(REPLACE "." "/" file "${module}")
+    file(WRITE "${directory}/src/${file}.anti" "${source}")
+endfunction()
 
 # Run anti in a directory. The cache of the repositories is the user's,
 # so the run names its own. ENV names more of the environment.
@@ -68,6 +84,29 @@ if(CASE STREQUAL "windows_import_library")
                                 "holds: ${found}")
         endif()
     endforeach()
+    return()
+endif()
+
+if(CASE STREQUAL "path_target")
+    string(CONCAT dep_source
+           "//! A library whose project builds for another target.\n\n"
+           "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+    string(CONCAT app_source
+           "//! A program over the library of a path.\n\n"
+           "import com.example.dep;\n\n"
+           "fn main() -> int\n{\n\treturn dep.one();\n}\n")
+    write_project("${WORK}/dep" "com.example.dep"
+                  "\n[targets]\ndefault = [\"${OTHER}\"]\n"
+                  "com.example.dep" "${dep_source}")
+    write_project("${WORK}/app" "com.example.app"
+                  "\n[dependencies]\n\"com.example.dep\" = { path = \"../dep\" }\n"
+                  "com.example.app" "${app_source}")
+    anti_passes("the build of the consumer" "${WORK}/app" build ${tools})
+    if(NOT EXISTS "${WORK}/dep/dist/${HOST}/dev/com/example/dep.antl")
+        message(FATAL_ERROR "the dependency was not built for the host")
+    endif()
+    program_expect("the program" COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 1 OUT "")
     return()
 endif()
 

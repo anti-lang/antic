@@ -1087,7 +1087,11 @@ static bool path_dependency(void *context, const char *directory,
     }
     sub = *c->r;
     sub.root = directory;
-    sub.target = NULL;
+    /* The dependency is built for the host, whose dist directory is read
+       below. Without a target its build took the default targets of its
+       own manifest, and a manifest that names another target wrote its
+       library files where nothing reads them. */
+    sub.target = target_name(host);
     sub.lib = BUILD_PROGRAM;
     sub.run = false;
     sub.notice = BUILD_NOTICE_BUILD;
