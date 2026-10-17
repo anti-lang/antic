@@ -21,6 +21,8 @@
 #   redirect_to_http        a redirect of an https:// repository to plain
 #                           http:// of another host is refused (defect 11)
 #   redirect_followed       and one to https:// is followed
+#   redirect_loop           and a server that redirects to itself is left
+#                           after ten redirects
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -237,12 +239,10 @@ if(CASE STREQUAL "redirect_to_http")
     anti("${WORK}/app" status text build ${tools} ENV ${redirect_env})
     # The resolver adds that the repository gave no version.
     string(CONCAT expected
-           "anti: https://repo.example/com.example.units/index.toml: the server "
-           "redirects to http://mirror.example/com.example.units/index.toml, "
-           "which is no https:// URL and no http:// URL of 127.0.0.1 or "
-           "localhost\n"
-           "anti: https://repo.example has no version of com.example.units "
-           "that satisfies every constraint on it\n")
+           "anti: https://repo.example/com.example.units/index.toml: the server redirects to http://mirror.example/com.example.units/index.toml, which is no https:// URL and no http:// URL of 127.0.0.1 or localhost"
+           "\n"
+           "anti: https://repo.example has no version of com.example.units that satisfies every constraint on it"
+           "\n")
     if(NOT status STREQUAL "1" OR NOT text STREQUAL expected)
         message(FATAL_ERROR "the build over a redirect to http:// ended with "
                             "${status} and printed\n${text}\nand the case "
@@ -252,6 +252,28 @@ if(CASE STREQUAL "redirect_to_http")
     if(asked MATCHES "mirror")
         message(FATAL_ERROR "the build asked the target of the redirect:\n"
                             "${asked}")
+    endif()
+    return()
+endif()
+
+if(CASE STREQUAL "redirect_loop")
+    redirect_project("https://repo.example")
+    anti("${WORK}/app" status text build ${tools} ENV ${redirect_env})
+    string(CONCAT expected
+           "anti: https://repo.example/com.example.units/index.toml: the server redirects more than 10 times"
+           "\n"
+           "anti: https://repo.example has no version of com.example.units that satisfies every constraint on it"
+           "\n")
+    if(NOT status STREQUAL "1" OR NOT text STREQUAL expected)
+        message(FATAL_ERROR "the build over a loop of redirects ended with "
+                            "${status} and printed\n${text}\nand the case "
+                            "expects 1 and\n${expected}")
+    endif()
+    file(STRINGS "${WORK}/curl.log" asked)
+    list(LENGTH asked count)
+    if(NOT count EQUAL 11)
+        message(FATAL_ERROR "the build asked ${count} times, and the case "
+                            "expects the first request and ten redirects")
     endif()
     return()
 endif()

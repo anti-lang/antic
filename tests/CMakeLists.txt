@@ -2644,7 +2644,8 @@ add_test(NAME anti_build_inputs
 # sysroot. The curl of the redirect cases is a shell script.
 set(anti_build_cases path_target path_target_cpu)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    list(APPEND anti_build_cases redirect_to_http redirect_followed)
+    list(APPEND anti_build_cases redirect_to_http redirect_followed
+         redirect_loop)
 endif()
 if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
     list(APPEND anti_build_cases windows_import_library)
