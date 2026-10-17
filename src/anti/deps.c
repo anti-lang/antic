@@ -666,8 +666,14 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
                 text_cstr(&file));
         goto done;
     }
-    if (!best_version(r, req, doc, text_cstr(&file), &best, &have_best) ||
-        !have_best) {
+    if (!best_version(r, req, doc, text_cstr(&file), &best, &have_best)) {
+        goto done;
+    }
+    /* An index that holds no version that answers is an answer. The
+       repository has no version of the package, as one without the index
+       has none, and the search goes on to the next one. */
+    if (!have_best) {
+        ok = true;
         goto done;
     }
     *found = true;
