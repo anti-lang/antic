@@ -128,9 +128,33 @@ static void odd_sources(void)
     }
 }
 
+/* M310: an import whose `;` is missing took the brace of the next body
+   as the list of a direct import and sorted its names, so `let b = 1;`
+   became `let a = 1;`. A list stands after a module path and a `.`
+   alone, and a `;` follows its `}`. */
+static void import_without_semicolon(void)
+{
+    static const char *const sources[] = {
+        "import anti.text\nfn main() -> int\n{\n\tlet b = 1;\n"
+        "\tlet a = 2;\n\treturn b;\n}\n",
+        "import anti.text.\nfn main() -> int\n{\n\tlet b = 1;\n"
+        "\tlet a = 2;\n\treturn b;\n}\n",
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof sources / sizeof sources[0]; i++) {
+        struct text out = {0};
+        CHECK(fmt_source(sources[i], strlen(sources[i]), &out));
+        CHECK(strstr(text_cstr(&out), "let b = 1;") != NULL);
+        CHECK(strstr(text_cstr(&out), "let a = 2;") != NULL);
+        text_free(&out);
+    }
+}
+
 void test_fmt(void)
 {
     deep_angles();
     open_anonymous();
     odd_sources();
+    import_without_semicolon();
 }

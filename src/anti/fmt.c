@@ -230,6 +230,46 @@ static bool name_after(const char *src, const struct piece *a,
     return order > 0 || (order == 0 && a->length > b->length);
 }
 
+/* The first token piece at i or after it, past the comments. */
+static size_t token_from(const struct piece_list *l, size_t i)
+{
+    while (i < l->count && l->items[i].kind == PIECE_COMMENT) {
+        i++;
+    }
+    return i;
+}
+
+/* The `{` of the list of a direct import whose `import` stands at i, or
+   0 when there is none. The list follows a module path and its `.`, as
+   the parser reads it, and a `;` follows its `}`, or the `as` the parser
+   refuses there. M310: an import whose `;` is missing reached the brace
+   of the next body, and the pass sorted the names of that body. */
+static size_t import_list_at(const struct piece_list *l, size_t i)
+{
+    size_t open = token_from(l, i + 1);
+    enum token_kind after;
+
+    for (;;) {
+        size_t dot;
+        if (kind_at(l, open) != TOKEN_IDENT) {
+            return 0;
+        }
+        dot = token_from(l, open + 1);
+        if (kind_at(l, dot) != TOKEN_DOT) {
+            return 0;
+        }
+        open = token_from(l, dot + 1);
+        if (kind_at(l, open) == TOKEN_LBRACE) {
+            break;
+        }
+    }
+    if (l->items[open].match <= open) {
+        return 0;
+    }
+    after = kind_at(l, token_from(l, l->items[open].match + 1));
+    return after == TOKEN_SEMICOLON || after == TOKEN_AS ? open : 0;
+}
+
 /* DESIGN: the names of a direct import stand sorted in the order of
    their bytes, as in `{Builder, equal}`. The pass trades the text of
    the names between their places. A line break of the author then stays
@@ -241,20 +281,15 @@ static void sort_import_lists(struct piece_list *l, const char *src)
     size_t i;
 
     for (i = 0; i < l->count; i++) {
-        size_t open = i + 1;
+        size_t open;
         size_t close;
         size_t j;
         bool commented = false;
         if (kind_at(l, i) != TOKEN_IMPORT) {
             continue;
         }
-        while (open < l->count &&
-               (l->items[open].kind == PIECE_COMMENT ||
-                (kind_at(l, open) != TOKEN_LBRACE &&
-                 kind_at(l, open) != TOKEN_SEMICOLON))) {
-            open++;
-        }
-        if (kind_at(l, open) != TOKEN_LBRACE || l->items[open].match <= open) {
+        open = import_list_at(l, i);
+        if (open == 0) {
             continue;
         }
         close = l->items[open].match;
