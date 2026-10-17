@@ -580,11 +580,11 @@ Each was found by reading and none was run.
    such a place, the second type argument of `Map<str, fn(int) -> int>`
    or the tuple of `tests/clib/com/example/names.anti:520`, leaves it
    set. By this reading the next `{` at that depth is laid out as the
-   body of an anonymous function, at 1511 and 1775.
+   body of an anonymous function, at 1511 and 1775. Fixed `e3d6d304`.
 7. `project.c:32`. `anti new` counts the dots of its name and holds it to
    nothing else. `anti new com.My-App` writes a project that no build
    takes, and `anti new a./tmp/x` writes its project at `/tmp/x`.
-   `repo_name_valid` is the test.
+   `repo_name_valid` is the test. Fixed `6d360b0e`.
 8. `build.c:1156`. The `antic` of a manifest is compared without a test
    of its form. `antic = "v0.3"` reads as `0.0.0` in `version_part` at
    `deps.c:39` and every compiler passes, where the decision says a

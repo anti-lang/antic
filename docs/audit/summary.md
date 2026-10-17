@@ -257,7 +257,7 @@ Rule 14, untrusted input:
   another. New. rt. Fixed `06109ee3`.
 - M310. `src/anti/fmt.c:248`. `anti fmt` sorts the names of a body that
   follows an import without its semicolon. The file is written back
-  changed. New. anti-tool.
+  changed. New. anti-tool. Fixed `e42dda91`.
 - M311. `src/anti/bindexpr.c:497`. A float product past the largest
   float is written as `inf.0`, which no lexer of Anti reads. New.
   anti-tool. Fixed `2937296e`.
@@ -319,6 +319,7 @@ One purpose per module and file:
   `a8a16e64`.
 - M322. `src/anti/symmap.c:146`. The file of the symbols map also holds
   the readers of the licence notice and of `sources.txt`. New. anti-tool.
+  Fixed `5b14cfd6`, which moves them into `licensing.c`.
 - M323. `tests/run_release_dry_run.cmake:1`. The two largest runners
   hold many tests under one name. `run_package.cmake` runs thirteen
   checks as `package_keys`. New. build-and-tools.
@@ -391,7 +392,7 @@ Copies that drifted:
   They are the test for an unsigned type, a struct constant, the sources
   of a project and the module path of a library file. New. anti-tool.
   The first two pairs are fixed, `f5887976` and `7be83886`. The last two
-  belong to step 21.
+  are fixed in step 21, `5b136b75` and `9f70dc2d`.
 - M340. `src/native/get-pcre2.cmake:14`. Six fetch scripts are one
   script, and `tools/get-raylib.cmake` has diverged. Two more downloads
   stand under other names. New. build-and-tools. Fixed `ab89b335`.
