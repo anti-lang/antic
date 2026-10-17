@@ -368,10 +368,12 @@ Tests, a golden written again without a reading:
 
 - M333. `tests/runners/run_emit_identity.cmake:52`. The manifest of 1332 digests
   is written again with no way to read what changed. The old texts are
-  removed first. New. tests.
+  removed first. New. tests. Fixed `f287bf9b`, which keeps the texts of
+  the manifest and prints the first line that moved in each.
 - M334. `tests/runners/run_dump.cmake:32`. No runner shows where two texts
   differ, and eleven scripts each compare with an expected file
-  themselves. New. tests.
+  themselves. New. tests. Fixed `3dcbd6ae`, one comparison in
+  `tests/program_output.cmake` that names the first line that differs.
 
 Copies that drifted:
 
@@ -410,7 +412,8 @@ Copies that drifted:
 - M343. `tests/runners/run_dev.cmake:26`. The helpers of the runners exist in
   many copies with different contracts. 49 builds in 31 runners accept
   whatever antic and the linker print. The pattern of M61. New.
-  build-and-tools, tests.
+  build-and-tools, tests. Fixed `5e3dde37`, one helper of each kind in
+  `tests/program_output.cmake` and the test `antic_calls`.
 
 Left of a replaced feature, with an effect:
 
