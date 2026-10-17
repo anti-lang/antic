@@ -15,6 +15,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 foreach(installer install.sh install.ps1)
     file(READ "${ROOT}/tools/${installer}" text)
     string(TOLOWER "${text}" folded)
@@ -34,92 +36,27 @@ foreach(installer install.sh install.ps1)
     endif()
 endforeach()
 
-if(CMAKE_HOST_WIN32)
-    message("SKIP: install.sh needs a shell")
+fake_release_host()
+if(NOT skip STREQUAL "")
+    message("SKIP: ${skip}")
     return()
 endif()
-find_program(OPENSSL openssl)
-if(NOT OPENSSL)
-    message("SKIP: openssl is missing")
-    return()
-endif()
-find_program(CURL curl)
-if(NOT CURL)
-    message("SKIP: curl is missing")
-    return()
-endif()
-
-set(version "99.0.0")
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-    set(os macos)
-else()
-    set(os linux)
-endif()
-# A script of cmake -P carries no processor, so it comes from uname, as
-# it does in the installer.
-execute_process(COMMAND uname -m OUTPUT_VARIABLE arch
-                OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
-if(arch STREQUAL "aarch64")
-    set(arch arm64)
-endif()
-if(NOT arch MATCHES "^(arm64|x86_64)$")
-    message("SKIP: no package for the processor ${arch}")
-    return()
-endif()
-set(host "${os}-${arch}")
-set(asset "anti-${version}-${host}.tar.xz")
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
-
-# Run <command> and fail with <message> unless it succeeds.
-function(run message)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE failed
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT failed EQUAL 0)
-        message(FATAL_ERROR "${message}\n${out}${err}")
-    endif()
-endfunction()
 
 # Write the staging area of a package whose two programs print <printed>
 # as their version, in the layout the packer writes, with a signed
 # manifest.
 function(stage name printed)
-    set(tree "${WORK}/${name}/package")
-    file(MAKE_DIRECTORY "${tree}/anti/bin")
-    file(WRITE "${tree}/anti/bin/antic" "#!/bin/sh\necho \"antic ${printed}\"\n")
-    file(WRITE "${tree}/anti/bin/anti" "#!/bin/sh\necho \"anti ${printed}\"\n")
-    file(CHMOD "${tree}/anti/bin/antic" "${tree}/anti/bin/anti"
-         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
-                     GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
     set(area "${WORK}/${name}/base/anti/${version}")
-    file(MAKE_DIRECTORY "${area}")
-    run("the package did not pack" "${CMAKE_COMMAND}" -E chdir "${tree}"
-        "${CMAKE_COMMAND}" -E tar cJf "${area}/${asset}" anti)
-    file(SHA256 "${area}/${asset}" digest)
-    file(WRITE "${area}/SHA256SUMS" "${digest}  ${asset}\n")
-    run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
-        -out "${WORK}/${name}/SHA256SUMS.sha256" "${area}/SHA256SUMS")
-    run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
-        -inkey "${WORK}/private.pem" -in "${WORK}/${name}/SHA256SUMS.sha256"
-        -out "${area}/SHA256SUMS.sig")
+    fake_release_package("${area}" "${WORK}/${name}/package" "${printed}")
+    fake_release_sign("${area}/SHA256SUMS" "${area}/SHA256SUMS.sig")
 endfunction()
 
 # The key of this test, and the copy of the installer that carries its
 # public half in place of the key of the release.
-run("openssl wrote no private key" "${OPENSSL}" ecparam -name prime256v1
-    -genkey -noout -out "${WORK}/private.pem")
-run("openssl wrote no public key" "${OPENSSL}" ec -in "${WORK}/private.pem"
-    -pubout -out "${WORK}/public.pem")
-file(READ "${WORK}/public.pem" public)
-string(STRIP "${public}" public)
-file(READ "${ROOT}/tools/install.sh" installer)
-set(block "-----BEGIN PUBLIC KEY-----[A-Za-z0-9+/=\n]+-----END PUBLIC KEY-----")
-if(NOT installer MATCHES "${block}")
-    message(FATAL_ERROR "tools/install.sh holds no public key to replace")
-endif()
-string(REGEX REPLACE "${block}" "${public}" installer "${installer}")
-file(WRITE "${WORK}/install.sh" "${installer}")
+fake_release_key()
 
 # DESIGN: a cmake and an xcode-select stand first on the PATH. Each
 # leaves a file with its name and fails, so an installer that calls either

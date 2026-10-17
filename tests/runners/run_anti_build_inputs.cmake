@@ -17,6 +17,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 function(file_url path out)
     if(path MATCHES "^/")
         set(${out} "file://${path}" PARENT_SCOPE)
@@ -44,17 +46,8 @@ file(WRITE "${project}/anti.toml"
      "\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n")
 
 function(run_anti out_status out_text)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" ${ARGN} --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}"
-        WORKING_DIRECTORY "${project}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${project}" ${ARGN} --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}${err}" PARENT_SCOPE)
 endfunction()

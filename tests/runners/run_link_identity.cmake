@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(GLOB runtime_library "${RUNTIME}/lib/macos-arm64/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/macos-arm64/usr/lib/libSystem.tbd" OR
    runtime_library STREQUAL "")
@@ -23,13 +25,8 @@ file(MAKE_DIRECTORY "${WORK}")
 # The name of the output stands in the ad-hoc signature, so it is fixed.
 set(exe "${WORK}/identity")
 file(REMOVE "${exe}")
-execute_process(
-    COMMAND "${ANTIC}" --target macos-arm64
-            --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed for macos-arm64\n${err}")
-endif()
+antic_build(--target macos-arm64 --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            -o "${exe}" "${SOURCE}")
 file(SHA256 "${exe}" actual)
 file(STRINGS "${EXPECTED}" expected LIMIT_COUNT 1)
 if(NOT actual STREQUAL expected)

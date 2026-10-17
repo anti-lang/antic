@@ -12,18 +12,13 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.${LEVEL}.s")
 file(MAKE_DIRECTORY "${WORK}")
-execute_process(
-    COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S --target "${TARGET}"
-            --cpu "${LEVEL}"
-            -o "${assembly}" "${SOURCE}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
-endif()
+antic_build(--runtime "${RUNTIME}" -S --target "${TARGET}" --cpu "${LEVEL}" -o
+            "${assembly}" "${SOURCE}")
 
 file(READ "${assembly}" text)
 string(REGEX MATCHALL "\n\t${PATTERN}" found "${text}")

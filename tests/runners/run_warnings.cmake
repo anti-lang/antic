@@ -8,14 +8,10 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 string(REPLACE "," ";" arguments "${COMMAND}")
-execute_process(
-    COMMAND "${ANTIC}" ${arguments}
-    WORKING_DIRECTORY "${DIRECTORY}"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
+antic_run(status out err IN "${DIRECTORY}" COMMAND ${arguments})
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic refused the program with ${status}\n${err}")
 endif()

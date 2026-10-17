@@ -17,15 +17,6 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-# Run antic, which must succeed and print nothing.
-function(run)
-    execute_process(COMMAND "${ANTIC}" ${ARGV} RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic failed with ${status}: ${ARGV}\n${out}${err}")
-    endif()
-endfunction()
-
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/net/example")
 set(interface "net.example.greet.Greeter")
@@ -53,9 +44,9 @@ function(plugin program)
         set(host "${WORK}/${program}.lib")
     endif()
     file(MAKE_DIRECTORY "${dir}")
-    run(--lib shared --no-runtime --runtime "${RUNTIME}"
-        --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}" -o "${library}"
-        "${SOURCES}/net/example/fancy.anti" ${host})
+    antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
+                --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}" -o "${library}"
+                "${SOURCES}/net/example/fancy.anti" ${host})
     if(NOT EXISTS "${dir}/anti-plugins.toml")
         message(FATAL_ERROR "the plugin has no index beside it")
     endif()
@@ -70,12 +61,12 @@ function(plugin program)
 endfunction()
 
 # The interface is a library file that both sides import.
-run(-c -I "${SOURCES}" -o "${WORK}/net/example/greet.antl"
-    "${SOURCES}/net/example/greet.anti")
+antic_build(-c -I "${SOURCES}" -o "${WORK}/net/example/greet.antl"
+            "${SOURCES}/net/example/greet.anti")
 
 # The host loads the library, asks it for the interface and closes it.
-run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
-    -I "${WORK}" -o "${WORK}/host${EXE}" "${SOURCES}/host.anti")
+antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+            -I "${WORK}" -o "${WORK}/host${EXE}" "${SOURCES}/host.anti")
 plugin(host)
 library_dir(host dir)
 program_expect("the host" COMMAND "${WORK}/host${EXE}" "${dir}/libfancy${SUFFIX}"
@@ -86,19 +77,17 @@ program_expect("the host" COMMAND "${WORK}/host${EXE}" "${dir}/libfancy${SUFFIX}
 # directory of its own, where Windows finds no other program by the name
 # the imports of the library give.
 file(MAKE_DIRECTORY "${WORK}/closed")
-run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
-    -I "${WORK}" --closed -o "${WORK}/closed/closed${EXE}"
-    "${SOURCES}/host.anti")
+antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+            -I "${WORK}" --closed -o "${WORK}/closed/closed${EXE}"
+            "${SOURCES}/host.anti")
 program_expect("a closed program"
                COMMAND "${WORK}/closed/closed${EXE}" "${dir}/libfancy${SUFFIX}"
                STATUS 1 ERR_MATCH "libfancy")
 # It takes no provider from a library either, which the link says.
-execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}"
-                        --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}"
-                        --closed
-                        --inject "${interface}=plugin:${dir}/libfancy${SUFFIX}"
-                        -o "${WORK}/shut${EXE}" "${SOURCES}/user.anti"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND --runtime "${RUNTIME}" --llvm-mc
+          "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}" --closed --inject
+          "${interface}=plugin:${dir}/libfancy${SUFFIX}" -o
+          "${WORK}/shut${EXE}" "${SOURCES}/user.anti")
 if(status EQUAL 0 OR NOT err MATCHES "names a library, and `--closed` loads")
     message(FATAL_ERROR "a closed build took a library provider\n${err}")
 endif()
@@ -107,39 +96,35 @@ endif()
 # calls, so a library built with `--no-hooks` is refused, and so is a
 # program that loads libraries. A closed program loads none and may drop
 # them.
-execute_process(COMMAND "${ANTIC}" --no-hooks --lib shared --no-runtime
-                        --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-                        -I "${SOURCES}" -I "${WORK}"
-                        -o "${WORK}/closed/libfancy${SUFFIX}"
-                        "${SOURCES}/net/example/fancy.anti"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND --no-hooks --lib shared --no-runtime
+          --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I
+          "${WORK}" -o "${WORK}/closed/libfancy${SUFFIX}"
+          "${SOURCES}/net/example/fancy.anti")
 if(status EQUAL 0 OR NOT err MATCHES "`--no-hooks` drops the hooks that count the objects of a plugin")
     message(FATAL_ERROR "a plugin was built without its hooks\n${err}")
 endif()
-execute_process(COMMAND "${ANTIC}" --no-hooks --runtime "${RUNTIME}"
-                        --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}"
-                        -o "${WORK}/closed/hookless${EXE}"
-                        "${SOURCES}/host.anti"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND --no-hooks --runtime "${RUNTIME}"
+          --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}" -o
+          "${WORK}/closed/hookless${EXE}" "${SOURCES}/host.anti")
 if(status EQUAL 0 OR NOT err MATCHES "the program loads libraries, and `--no-hooks` drops")
     message(FATAL_ERROR "a host was built without its hooks\n${err}")
 endif()
-run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
-    -I "${WORK}" --closed --no-hooks -o "${WORK}/closed/hookless${EXE}"
-    "${SOURCES}/host.anti")
+antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+            -I "${WORK}" --closed --no-hooks -o "${WORK}/closed/hookless${EXE}"
+            "${SOURCES}/host.anti")
 
 # `plugin:<path>` of the manifest fills the slot of an injected field
 # from that library, and `discover` finds it through the index.
 library_dir(named dir)
-run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
-    -I "${WORK}" --inject "${interface}=plugin:${dir}/libfancy${SUFFIX}"
-    -o "${WORK}/named${EXE}" "${SOURCES}/user.anti")
+antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+            -I "${WORK}" --inject "${interface}=plugin:${dir}/libfancy${SUFFIX}"
+            -o "${WORK}/named${EXE}" "${SOURCES}/user.anti")
 plugin(named)
 program_expect("the program with a named library"
                COMMAND "${WORK}/named${EXE}" OUT_FILE "${PROVIDED}")
-run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
-    -I "${WORK}" --inject "${interface}=discover" -o "${WORK}/found${EXE}"
-    "${SOURCES}/user.anti")
+antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+            -I "${WORK}" --inject "${interface}=discover" -o "${WORK}/found${EXE}"
+            "${SOURCES}/user.anti")
 plugin(found)
 library_dir(found dir)
 program_expect("the program that discovers a library"
@@ -181,9 +166,9 @@ set(host "")
 if(SUFFIX STREQUAL ".dll")
     set(host "${WORK}/found.lib")
 endif()
-run(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-    -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
-    "${SOURCES}/net/example/fancy.anti" ${host})
+antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+            -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
+            "${SOURCES}/net/example/fancy.anti" ${host})
 file(READ "${kept}/anti-plugins.toml" index)
 file(SHA256 "${kept}/libfancy${SUFFIX}" digest)
 string(REGEX MATCHALL "libfancy" fancies "${index}")
@@ -203,9 +188,9 @@ program_expect("discovery through a rewritten index"
 # An index cut off inside an entry is no TOML, and antic replaces it with
 # the entry of its own library.
 file(WRITE "${kept}/anti-plugins.toml" "[[library]]\npath = 'libot")
-run(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-    -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
-    "${SOURCES}/net/example/fancy.anti" ${host})
+antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+            -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
+            "${SOURCES}/net/example/fancy.anti" ${host})
 file(READ "${kept}/anti-plugins.toml" index)
 if(index MATCHES "libot" OR NOT index MATCHES "path = 'libfancy${SUFFIX}'")
     message(FATAL_ERROR "a cut index stayed\n${index}")

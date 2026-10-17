@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
@@ -30,20 +32,8 @@ file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(program "${SOURCE}" NAME_WE)
 set(exe "${WORK}/${program}-${TARGET}")
 string(REPLACE "," ";" options "${OPTIONS}")
-execute_process(
-    COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" ${options} -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
-endif()
-# A link that succeeds prints nothing. A warning of the linker is a
-# defect of the inputs, as the triples of a program and a runtime that
-# differ were under --lto.
-if(NOT "${out}${err}" STREQUAL "")
-    message(FATAL_ERROR "antic printed output for ${TARGET}\n${out}${err}")
-endif()
+antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            ${options} -o "${exe}" "${SOURCE}")
 execute_process(COMMAND "${LLVM_OBJDUMP}" -h "${exe}"
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
 if(NOT status EQUAL 0 OR NOT out MATCHES "file format ${FORMAT}\n")

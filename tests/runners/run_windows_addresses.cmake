@@ -34,13 +34,8 @@ file(REMOVE "${exe}" "${object}" "${lto_exe}")
 foreach(build "${exe}|--lto|none" "${lto_exe}")
     string(REPLACE "|" ";" build "${build}")
     list(POP_FRONT build output)
-    execute_process(
-        COMMAND "${ANTIC}" --target ${target} --llvm-mc "${LLVM_MC}"
-                --runtime "${RUNTIME}" ${build} -o "${output}" "${SOURCE}"
-        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic ${build} failed for ${target}\n${err}")
-    endif()
+    antic_build(--target ${target} --llvm-mc "${LLVM_MC}" --runtime
+                "${RUNTIME}" ${build} -o "${output}" "${SOURCE}")
 endforeach()
 
 execute_process(COMMAND "${LLVM_OBJDUMP}" -r "${object}"

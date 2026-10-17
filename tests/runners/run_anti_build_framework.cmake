@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 set(project "${WORK}/clock")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
@@ -23,14 +25,8 @@ foreach(mode dev release)
     if(mode STREQUAL "release")
         set(flag --release)
     endif()
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" build ${flag} --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}"
-        WORKING_DIRECTORY "${project}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${project}" build ${flag} --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti build ${flag} failed with ${status}\n${out}${err}")
     endif()

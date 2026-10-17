@@ -27,12 +27,9 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-execute_process(COMMAND "${ANTIC}" --print-llvm-targets
-    RESULT_VARIABLE status OUTPUT_VARIABLE printed ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic --print-llvm-targets failed\n${err}")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
+antic_build(OUTPUT printed COMMAND --print-llvm-targets)
 file(MAKE_DIRECTORY "${WORK}")
 set(empty "${WORK}/empty.c")
 file(WRITE "${empty}" "void anti_probe(void) {}\n")

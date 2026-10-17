@@ -14,6 +14,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
@@ -27,12 +29,7 @@ function(spaces path n)
 endfunction()
 
 spaces("${WORK}/plain.anti" 8191)
-execute_process(
-    COMMAND "${ANTIC}" --front-end "${WORK}/plain.anti"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic refused a source of spaces\n${err}")
-endif()
+antic_build(--front-end "${WORK}/plain.anti")
 
 foreach(place "0|0" "0|10" "1|0" "100|100" "4094|0" "4094|5" "4095|0"
         "4095|3" "4096|0" "8189|1" "8190|0")
@@ -51,10 +48,7 @@ foreach(place "0|0" "0|10" "1|0" "100|100" "4094|0" "4094|5" "4095|0"
     if(NOT status EQUAL 0 OR NOT size EQUAL want)
         message(FATAL_ERROR "cannot write ${source}: ${size} bytes, not ${want}")
     endif()
-    execute_process(
-        COMMAND "${ANTIC}" --front-end "${source}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
+    antic_run(status out err COMMAND --front-end "${source}")
     if(status EQUAL 0)
         message(FATAL_ERROR "antic took a source with a NUL byte after "
                             "${before} bytes")
@@ -75,11 +69,5 @@ execute_process(
     COMMAND "${CMAKE_COMMAND}" -E cat "${WORK}/before.txt" "${NUL}"
             "${WORK}/after.txt"
     OUTPUT_FILE "${source}" RESULT_VARIABLE status)
-execute_process(
-    COMMAND "${ANTIC}" --front-end "${source}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic refused a NUL byte inside a bytes literal\n"
-                        "${err}")
-endif()
+antic_build(--front-end "${source}")
 file(REMOVE_RECURSE "${WORK}")

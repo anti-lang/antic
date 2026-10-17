@@ -190,6 +190,23 @@ asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
   `mkdir` and `cp`.
 - A tree configured before keeps the tools of its stored compiler information as plain
   variables over the cache. `antic_use_pinned_tools` sets them after `project()`.
+- A list of CMake reads a `[` as the start of a group, so a list of `[=[` holds one
+  element. A script loops over the brackets it names instead.
+
+## Helpers of the runners
+
+`tests/program_output.cmake` holds what more than one runner needs, one function
+each:
+
+- `antic_build` runs a build of antic that must end with 0 and print nothing, and
+  `antic_program` builds a program through it. `antic_run` hands back the status and
+  both outputs, for a refusal or a warning the runner reads. The test `antic_calls`
+  refuses an `execute_process` of antic in a runner.
+- `expect_same_bytes` and `expect_same_text` compare a whole output with what is
+  expected and name the first line that differs. `bytes_difference` gives the same text
+  without failing, which `run_emit_identity.cmake` prints for each text that moved.
+- `tool_run` runs a tool beside antic, `anti_run` runs anti with a cache of its own,
+  and the `fake_release_` functions write the release of the installer tests.
 
 ## Test hooks
 

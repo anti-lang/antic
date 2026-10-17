@@ -10,6 +10,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 find_program(OPENSSL openssl)
 if(NOT OPENSSL)
     message("SKIP: openssl is missing")
@@ -21,18 +23,10 @@ file(MAKE_DIRECTORY "${WORK}")
 set(area "${WORK}/area")
 file(MAKE_DIRECTORY "${area}")
 
-function(run message)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE failed
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT failed EQUAL 0)
-        message(FATAL_ERROR "${message}\n${out}${err}")
-    endif()
-endfunction()
-
-run("openssl wrote no private key" "${OPENSSL}" ecparam -name prime256v1
-    -genkey -noout -out "${WORK}/private.pem")
-run("openssl wrote no public key" "${OPENSSL}" ec -in "${WORK}/private.pem"
-    -pubout -out "${WORK}/public.pem")
+tool_run("openssl wrote no private key" "${OPENSSL}" ecparam -name prime256v1
+         -genkey -noout -out "${WORK}/private.pem")
+tool_run("openssl wrote no public key" "${OPENSSL}" ec -in "${WORK}/private.pem"
+         -pubout -out "${WORK}/public.pem")
 
 # Write the two files of the area, the manifest that names them and a
 # signature of that manifest.
@@ -45,11 +39,11 @@ function(write_area)
         string(APPEND lines "${digest}  ${name}\n")
     endforeach()
     file(WRITE "${area}/SHA256SUMS" "${lines}")
-    run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
-        -out "${WORK}/SHA256SUMS.sha256" "${area}/SHA256SUMS")
-    run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
-        -inkey "${WORK}/private.pem" -in "${WORK}/SHA256SUMS.sha256"
-        -out "${area}/SHA256SUMS.sig")
+    tool_run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
+             -out "${WORK}/SHA256SUMS.sha256" "${area}/SHA256SUMS")
+    tool_run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
+             -inkey "${WORK}/private.pem" -in "${WORK}/SHA256SUMS.sha256"
+             -out "${area}/SHA256SUMS.sig")
 endfunction()
 
 # Run the checks of tools/check-release.cmake over the area, and answer with the

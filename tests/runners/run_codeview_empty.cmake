@@ -19,6 +19,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 # Sets ${out} to the number of subsections of symbols in the dump and
 # ${out}_EMPTY to the number of them that hold no record. A record is a
 # line `Kind: S_...`. A type record is `TypeLeafKind:`, which the match
@@ -74,13 +76,8 @@ else()
     # antic adds .obj to the name -o gives.
     set(object "${WORK}/empty.${TARGET}.obj")
     file(REMOVE "${object}")
-    execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" --dev -g
-                            --target "${TARGET}" -I "${STD}"
-                            -o "${WORK}/empty.${TARGET}" "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed with ${status}\n${err}")
-    endif()
+    antic_build(--runtime "${RUNTIME}" --dev -g --target "${TARGET}" -I
+                "${STD}" -o "${WORK}/empty.${TARGET}" "${SOURCE}")
 endif()
 
 execute_process(COMMAND "${READOBJ}" --codeview "${object}"

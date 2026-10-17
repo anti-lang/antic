@@ -18,19 +18,16 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 include("${CMAKE_CURRENT_LIST_DIR}/../build_id.cmake")
 
 string(REPLACE "|" ";" options "${OPTIONS}")
 
 function(build_id out dir source)
     file(MAKE_DIRECTORY "${WORK}/${dir}")
-    execute_process(
-        COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-                ${options} ${ARGN} -o "${WORK}/${dir}/program" "${source}"
-        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${source}\n${err}")
-    endif()
+    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
+                ${ARGN} -o "${WORK}/${dir}/program" "${source}")
     read_build_id(id error "${WORK}/${dir}/program")
     if(NOT error STREQUAL "")
         message(FATAL_ERROR "${error}")
@@ -62,11 +59,9 @@ endif()
 # digest would give the program the id of other code. A directory opens
 # for reading on macOS and Linux, and its first read fails.
 file(MAKE_DIRECTORY "${WORK}/unreadable.o")
-execute_process(
-    COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-            ${options} -o "${WORK}/unreadable" "${SOURCE}"
-            "${WORK}/unreadable.o"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND --llvm-mc "${LLVM_MC}" --runtime
+          "${RUNTIME}" ${options} -o "${WORK}/unreadable" "${SOURCE}"
+          "${WORK}/unreadable.o")
 if(status EQUAL 0)
     message(FATAL_ERROR "antic linked an object it cannot read")
 endif()

@@ -36,25 +36,13 @@ if(MODE STREQUAL "dev")
 endif()
 foreach(library IN LISTS libraries)
     set(source "${ROOT}/com/example/${library}.anti")
-    execute_process(
-        COMMAND "${ANTIC}" -c -I "${ROOT}" -I "${WORK}"
-                --runtime "${RUNTIME}" ${lib_options}
-                -o "${WORK}/com/example/${library}.antl" "${source}"
-        RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR
-            "antic -c of ${library} failed with ${status}\n${err}")
-    endif()
+    antic_build(-c -I "${ROOT}" -I "${WORK}" --runtime "${RUNTIME}"
+                ${lib_options} -o "${WORK}/com/example/${library}.antl"
+                "${source}")
     if(MODE STREQUAL "dev")
-        execute_process(
-            COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${ROOT}"
-                    -I "${WORK}" --runtime "${RUNTIME}" ${lib_options}
-                    -o "${WORK}/${library}" "${source}"
-            RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-        if(NOT status EQUAL 0)
-            message(FATAL_ERROR
-                "antic --dev of ${library} failed with ${status}\n${err}")
-        endif()
+        antic_build(--dev --llvm-mc "${LLVM_MC}" -I "${ROOT}" -I "${WORK}"
+                    --runtime "${RUNTIME}" ${lib_options} -o
+                    "${WORK}/${library}" "${source}")
         list(APPEND program_inputs "${WORK}/${library}${OBJECT}")
     else()
         list(APPEND program_inputs "${WORK}/com/example/${library}.antl")
@@ -63,14 +51,8 @@ endforeach()
 if(MODE STREQUAL "dev")
     list(APPEND program_inputs ${std_objects})
 endif()
-execute_process(
-    COMMAND "${ANTIC}" -I "${WORK}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" ${options}
-            -o "${WORK}/${PROGRAM}" ${program_inputs}
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic of the program failed with ${status}\n${err}")
-endif()
+antic_build(-I "${WORK}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            ${options} -o "${WORK}/${PROGRAM}" ${program_inputs})
 program_output(out_hex status "${WORK}/${PROGRAM}.stdout"
                "${WORK}/${PROGRAM}")
 file(READ "${WORK}/${PROGRAM}.stdout" out)

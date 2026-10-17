@@ -168,18 +168,244 @@ function(exit_status out code)
     set(${out} "${code}" PARENT_SCOPE)
 endfunction()
 
-# Build <exe> from <source> with the ANTIC, LLVM_MC and RUNTIME of the
-# runner, passing the arguments after <source> to antic first. antic must
-# succeed and print nothing: warnings are errors, as run_program.cmake
-# says.
-function(antic_program exe source)
-    execute_process(COMMAND "${ANTIC}" ${ARGN} --llvm-mc "${LLVM_MC}"
-                            --runtime "${RUNTIME}" -o "${exe}" "${source}"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic gave ${status} for ${exe}\n${out}${err}")
+# Run antic and set <status>, <out> and <err> to its exit status, its
+# standard output and its standard error. The arguments of antic follow
+# COMMAND, and these keywords stand before it:
+#   IN <dir>             run it in dir
+#   TIMEOUT <s>          stop it after s seconds
+#   OUTPUT_FILE <file>   its standard output goes to file, and <out> is empty
+#   THROUGH <command>... run it as the last word of command, such as
+#                        `cmake -E env` with the settings of the case
+# DESIGN: the one way a runner runs antic. antic_build holds a build that
+# must succeed, and a call of antic_run reads what antic said. 49 builds
+# in 31 runners read the status alone and passed a warning of antic or
+# of the linker, which fails the same build of one module. The test
+# antic_calls refuses an execute_process of antic in a runner.
+function(antic_run status out err)
+    cmake_parse_arguments(PARSE_ARGV 3 arg "" "IN;TIMEOUT;OUTPUT_FILE"
+                          "THROUGH;COMMAND")
+    if(DEFINED arg_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR "antic_run takes the arguments of antic after "
+                            "COMMAND: ${arg_UNPARSED_ARGUMENTS}")
     endif()
+    set(options "")
+    if(DEFINED arg_IN)
+        list(APPEND options WORKING_DIRECTORY "${arg_IN}")
+    endif()
+    if(DEFINED arg_TIMEOUT)
+        list(APPEND options TIMEOUT "${arg_TIMEOUT}")
+    endif()
+    set(stdout "")
+    if(DEFINED arg_OUTPUT_FILE)
+        execute_process(COMMAND ${arg_THROUGH} "${ANTIC}" ${arg_COMMAND}
+                        ${options} RESULT_VARIABLE code
+                        OUTPUT_FILE "${arg_OUTPUT_FILE}"
+                        ERROR_VARIABLE stderr ENCODING NONE)
+    else()
+        execute_process(COMMAND ${arg_THROUGH} "${ANTIC}" ${arg_COMMAND}
+                        ${options} RESULT_VARIABLE code
+                        OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr
+                        ENCODING NONE)
+    endif()
+    set(${status} "${code}" PARENT_SCOPE)
+    set(${out} "${stdout}" PARENT_SCOPE)
+    set(${err} "${stderr}" PARENT_SCOPE)
+endfunction()
+
+# Run antic with the arguments, which must end with 0 and print nothing:
+# warnings are errors, as run_program.cmake says. The keywords of
+# antic_run stand before the arguments, which then follow COMMAND, and
+#   OUTPUT <var>         sets var to the standard output, which a dump
+#                        prints, and only the standard error must be empty
+function(antic_build)
+    cmake_parse_arguments(PARSE_ARGV 0 arg "" "IN;TIMEOUT;OUTPUT_FILE;OUTPUT"
+                          "THROUGH;COMMAND")
+    set(arguments ${arg_UNPARSED_ARGUMENTS} ${arg_COMMAND})
+    set(options "")
+    foreach(keyword IN ITEMS IN TIMEOUT OUTPUT_FILE)
+        if(DEFINED arg_${keyword})
+            list(APPEND options ${keyword} "${arg_${keyword}}")
+        endif()
+    endforeach()
+    if(DEFINED arg_THROUGH)
+        list(APPEND options THROUGH ${arg_THROUGH})
+    endif()
+    antic_run(code stdout stderr ${options} COMMAND ${arguments})
+    set(printed "${stdout}")
+    if(DEFINED arg_OUTPUT)
+        set(${arg_OUTPUT} "${stdout}" PARENT_SCOPE)
+        set(printed "")
+    endif()
+    if(NOT code EQUAL 0 OR NOT printed STREQUAL "" OR NOT stderr STREQUAL "")
+        list(JOIN arguments " " line)
+        message(FATAL_ERROR "antic ${line} gave ${code} and printed:\n"
+                            "${printed}${stderr}")
+    endif()
+endfunction()
+
+# Run the command after <what>, a tool of the harness, which must end with
+# 0. <what> names it in the message of a failure, and the empty text names
+# it by its command line. QUIET after <what> also refuses a tool that
+# writes on its standard error, and IN <dir> runs it in dir. The caller
+# gets the two outputs in tool_stdout and tool_stderr.
+# DESIGN: one helper for the tools a runner runs beside antic. Eight
+# runners each had a function run of their own, with four contracts.
+function(tool_run what)
+    set(command ${ARGN})
+    set(quiet FALSE)
+    set(where "")
+    if(command MATCHES "^QUIET(;|$)")
+        set(quiet TRUE)
+        list(REMOVE_AT command 0)
+    endif()
+    if(command MATCHES "^IN;")
+        list(GET command 1 directory)
+        set(where WORKING_DIRECTORY "${directory}")
+        list(REMOVE_AT command 0 1)
+    endif()
+    execute_process(COMMAND ${command} ${where} RESULT_VARIABLE status
+                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    if(what STREQUAL "")
+        list(JOIN command " " what)
+    endif()
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "${what} ended with ${status}\n${out}${err}")
+    endif()
+    if(quiet AND NOT err STREQUAL "")
+        message(FATAL_ERROR "${what} wrote on its standard error\n${err}")
+    endif()
+    set(tool_stdout "${out}" PARENT_SCOPE)
+    set(tool_stderr "${err}" PARENT_SCOPE)
+endfunction()
+
+# Run the ANTI of the runner in <dir> with the arguments after it, with a
+# cache of its own in <WORK>/cache, and set <status>, <out> and <err> to
+# its exit status, its standard output and its standard error. With ENV
+# <var=value>... first, those settings join the environment, and the
+# arguments follow COMMAND.
+# DESIGN: the one call of anti with a cache of its own. Ten places wrote
+# it out under four signatures, and one of them left out an option its
+# neighbour passed.
+function(anti_run status out err dir)
+    set(arguments ${ARGN})
+    set(settings "")
+    if(arguments MATCHES "^ENV;")
+        cmake_parse_arguments(PARSE_ARGV 4 arg "" "" "ENV;COMMAND")
+        set(settings ${arg_ENV})
+        set(arguments ${arg_COMMAND})
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+                            "XDG_CACHE_HOME=${WORK}/cache"
+                            "LOCALAPPDATA=${WORK}/cache" ${settings}
+                            "${ANTI}" ${arguments}
+                    WORKING_DIRECTORY "${dir}" RESULT_VARIABLE code
+                    OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr
+                    ENCODING NONE)
+    set(${status} "${code}" PARENT_SCOPE)
+    set(${out} "${stdout}" PARENT_SCOPE)
+    set(${err} "${stderr}" PARENT_SCOPE)
+endfunction()
+
+# The fake release of the installer tests, which install.sh takes from
+# file:// addresses. fake_release_host sets version, host and asset of
+# the caller to a package of version 99.0.0 for this machine, and skip to
+# the reason the test cannot run here, or to the empty text. A script of
+# cmake -P carries no processor, so it comes from uname, as it does in the
+# installer.
+# DESIGN: one fake release for the three tests of the installer, which
+# each wrote it out.
+function(fake_release_host)
+    set(skip "" PARENT_SCOPE)
+    if(CMAKE_HOST_WIN32)
+        set(skip "install.sh needs a shell" PARENT_SCOPE)
+        return()
+    endif()
+    find_program(OPENSSL openssl)
+    find_program(CURL curl)
+    foreach(tool OPENSSL CURL)
+        if(NOT ${tool})
+            string(TOLOWER "${tool}" name)
+            set(skip "${name} is missing" PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    set(version "99.0.0")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+        set(os macos)
+    else()
+        set(os linux)
+    endif()
+    execute_process(COMMAND uname -m OUTPUT_VARIABLE arch
+                    OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
+    if(arch STREQUAL "aarch64")
+        set(arch arm64)
+    endif()
+    if(NOT arch MATCHES "^(arm64|x86_64)$")
+        set(skip "no package for the processor ${arch}" PARENT_SCOPE)
+        return()
+    endif()
+    set(version "${version}" PARENT_SCOPE)
+    set(host "${os}-${arch}" PARENT_SCOPE)
+    set(asset "anti-${version}-${os}-${arch}.tar.xz" PARENT_SCOPE)
+endfunction()
+
+# Write <area>/<asset> and <area>/SHA256SUMS: a package of the two
+# programs the installer runs as the check of the install, as scripts in
+# <tree> that print <printed> as their version, and nothing else. The
+# installer reads no script and no pin of a package, so the test reaches
+# no server.
+function(fake_release_package area tree printed)
+    file(MAKE_DIRECTORY "${tree}/anti/bin" "${area}")
+    foreach(program antic anti)
+        file(WRITE "${tree}/anti/bin/${program}"
+             "#!/bin/sh\necho \"${program} ${printed}\"\n")
+    endforeach()
+    file(CHMOD "${tree}/anti/bin/antic" "${tree}/anti/bin/anti"
+         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
+                     GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+    tool_run("the package did not pack" "${CMAKE_COMMAND}" -E chdir "${tree}"
+             "${CMAKE_COMMAND}" -E tar cJf "${area}/${asset}" anti)
+    file(SHA256 "${area}/${asset}" digest)
+    file(WRITE "${area}/SHA256SUMS" "${digest}  ${asset}\n")
+endfunction()
+
+# Write the key of the test, <WORK>/private.pem and <WORK>/public.pem, and
+# <WORK>/install.sh, the installer with the public half in place of the
+# key of the release, whose text the caller gets in installer.
+function(fake_release_key)
+    tool_run("openssl wrote no private key" "${OPENSSL}" ecparam
+             -name prime256v1 -genkey -noout -out "${WORK}/private.pem")
+    tool_run("openssl wrote no public key" "${OPENSSL}" ec
+             -in "${WORK}/private.pem" -pubout -out "${WORK}/public.pem")
+    file(READ "${WORK}/public.pem" public)
+    string(STRIP "${public}" public)
+    file(READ "${ROOT}/tools/install.sh" text)
+    set(block
+        "-----BEGIN PUBLIC KEY-----[A-Za-z0-9+/=\n]+-----END PUBLIC KEY-----")
+    if(NOT text MATCHES "${block}")
+        message(FATAL_ERROR "tools/install.sh holds no public key to replace")
+    endif()
+    string(REGEX REPLACE "${block}" "${public}" text "${text}")
+    file(WRITE "${WORK}/install.sh" "${text}")
+    set(installer "${text}" PARENT_SCOPE)
+endfunction()
+
+# Sign <manifest> with the key of the test into <signature>, as step 6 of
+# ./r signs SHA256SUMS.
+function(fake_release_sign manifest signature)
+    tool_run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
+             -out "${WORK}/manifest.sha256" "${manifest}")
+    tool_run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
+             -inkey "${WORK}/private.pem" -in "${WORK}/manifest.sha256"
+             -out "${signature}")
+endfunction()
+
+# Build <exe> from <source> with the ANTIC, LLVM_MC and RUNTIME of the
+# runner, passing the arguments after <source> to antic first, through
+# antic_build.
+function(antic_program exe source)
+    antic_build(${ARGN} --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+                -o "${exe}" "${source}")
 endfunction()
 
 # Run a program and check what it did. Its standard output and standard

@@ -55,25 +55,14 @@ file(WRITE "${root}/app.anti"
      "\treturn v + v;\n"
      "}\n")
 
-execute_process(COMMAND "${ANTIC}" -c -I "${root}"
-                        -o "${WORK}/lib/com/example/step.antl"
-                        "${root}/com/example/step.anti"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -c failed\n${err}")
-endif()
+antic_build(-c -I "${root}" -o "${WORK}/lib/com/example/step.antl"
+            "${root}/com/example/step.anti")
 
 # Run antic in dev mode in the root, with the library file of the module
 # on the search path.
 function(dev_build name source)
-    execute_process(COMMAND "${ANTIC}" --dev ${ARGN} --llvm-mc "${LLVM_MC}"
-                            --runtime "${RUNTIME}" -I "${root}"
-                            -I "${WORK}/lib" -o "${WORK}/${name}"
-                            "${source}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${name}\n${err}")
-    endif()
+    antic_build(--dev ${ARGN} --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I
+                "${root}" -I "${WORK}/lib" -o "${WORK}/${name}" "${source}")
 endfunction()
 
 # The object and the assembly of each module, with the source positions

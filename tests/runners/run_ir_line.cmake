@@ -6,16 +6,10 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 string(REPLACE "," ";" arguments "${COMMAND}")
-execute_process(
-    COMMAND "${ANTIC}" --dump-ir ${arguments}
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic failed with ${status}\n${err}")
-endif()
+antic_build(OUTPUT out COMMAND --dump-ir ${arguments})
 string(REPLACE "\n" ";" lines "${out}")
 if(NOT LINE IN_LIST lines)
     message(FATAL_ERROR "the IR holds no line '${LINE}'")

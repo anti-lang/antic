@@ -9,28 +9,17 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
-execute_process(
-    COMMAND "${ANTIC}" -c -I "${ROOT}" --package-name com.example
-            -o "${WORK}/core.antl" "${ROOT}/com/example/core.anti"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -c failed with ${status}\n${err}")
-endif()
+antic_build(-c -I "${ROOT}" --package-name com.example -o "${WORK}/core.antl"
+            "${ROOT}/com/example/core.anti")
 # A module of the same package compiles against it.
-execute_process(
-    COMMAND "${ANTIC}" -c -I "${ROOT}" --package-name com.example
-            -o "${WORK}/near.antl" "${ROOT}/com/example/near.anti"
-            "${WORK}/core.antl"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "the package cannot see its own internal item\n${err}")
-endif()
+antic_build(-c -I "${ROOT}" --package-name com.example -o "${WORK}/near.antl"
+            "${ROOT}/com/example/near.anti" "${WORK}/core.antl")
 # A module of another package does not.
-execute_process(
-    COMMAND "${ANTIC}" -S -I "${ROOT}" -o "${WORK}/far.s"
-            "${ROOT}/far.anti" "${WORK}/core.antl"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND -S -I "${ROOT}" -o "${WORK}/far.s"
+          "${ROOT}/far.anti" "${WORK}/core.antl")
 if(status EQUAL 0)
     message(FATAL_ERROR "another package reached the internal item")
 endif()

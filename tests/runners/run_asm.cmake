@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${LLVM_MC}")
     message(FATAL_ERROR
         "llvm-mc not found at '${LLVM_MC}'. Configure with -DANTIC_LLVM_MC=<path>.")
@@ -22,16 +24,8 @@ get_filename_component(name "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${name}.${TARGET}.s")
 file(MAKE_DIRECTORY "${WORK}")
 string(REPLACE "|" ";" options "${OPTIONS}")
-execute_process(
-    COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S --target "${TARGET}" ${options}
-            -o "${assembly}" "${SOURCE}"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic -S failed with ${status}\n${out}${err}")
-endif()
+antic_build(--runtime "${RUNTIME}" -S --target "${TARGET}" ${options} -o
+            "${assembly}" "${SOURCE}")
 
 if(DEFINED HOLDS AND NOT HOLDS STREQUAL "")
     file(READ "${assembly}" text)

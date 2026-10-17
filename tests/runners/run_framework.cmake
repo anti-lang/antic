@@ -14,6 +14,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}" OR runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no sysroot or runtime for ${TARGET}")
@@ -23,11 +25,9 @@ string(REPLACE "," ";" options "${OPTIONS}")
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/core_foundation-${TARGET}")
 file(REMOVE "${exe}")
-execute_process(
-    COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" ${options} --framework CoreFoundation
-            -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND --target "${TARGET}" --llvm-mc
+          "${LLVM_MC}" --runtime "${RUNTIME}" ${options} --framework
+          CoreFoundation -o "${exe}" "${SOURCE}")
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}/sdk/sdk-version" AND
    NOT CMAKE_HOST_APPLE)
     string(REGEX REPLACE "[ \n]+" " " said "${err}")

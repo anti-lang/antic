@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(program "${SOURCE}" NAME_WE)
 set(exe "${WORK}/${program}-${TARGET}")
@@ -22,19 +24,8 @@ if(DEFINED OPTIONS)
     string(REPLACE "," ";" options "${OPTIONS}")
 endif()
 file(REMOVE "${exe}")
-execute_process(
-    COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" ${options} -o "${exe}" "${SOURCE}"
-            ${objects}
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed for ${TARGET}\n${out}${err}")
-endif()
-# Warnings are errors: antic, llvm-mc and the linker print nothing.
-if(NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic printed output for ${TARGET}\n${out}${err}")
-endif()
+antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            ${options} -o "${exe}" "${SOURCE}" ${objects})
 if(NOT EXISTS "${exe}")
     message(FATAL_ERROR "antic wrote no executable for ${TARGET}")
 endif()

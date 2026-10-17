@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 # A Windows program of `anti build --memory-checks` loads the DLL of
 # AddressSanitizer from its own directory, so the build puts the DLL into
 # dist/ beside the program, in dev and release mode. `anti run` started
@@ -25,16 +27,9 @@ foreach(mode dev release)
     if(mode STREQUAL "release")
         set(release --release)
     endif()
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" build ${release} --memory-checks --target ${target}
-                --runtime "${RUNTIME}"
-        WORKING_DIRECTORY "${WORK}/app"
-        RESULT_VARIABLE status OUTPUT_FILE "${WORK}/out-${mode}.txt"
-        ERROR_FILE "${WORK}/err-${mode}.txt")
+    anti_run(status out err "${WORK}/app" build ${release} --memory-checks
+             --target ${target} --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
-        file(READ "${WORK}/err-${mode}.txt" err)
         message(FATAL_ERROR "anti build of ${mode} failed with ${status}\n${err}")
     endif()
     set(dist "${WORK}/app/dist/${target}/${mode}")

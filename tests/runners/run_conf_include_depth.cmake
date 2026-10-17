@@ -26,14 +26,8 @@ set(failures "")
 
 # The program of SOURCE as dir/report.
 function(compile_report dir)
-    execute_process(
-        COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-                -o "${dir}/report${exe}" "${SOURCE}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
-    endif()
+    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o
+                "${dir}/report${exe}" "${SOURCE}")
 endfunction()
 
 # A chain of count files in dir, c0.toml at its head. Each includes the

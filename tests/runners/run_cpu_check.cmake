@@ -21,13 +21,8 @@ if(runtime_library STREQUAL "")
 endif()
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/cpu_check-${TARGET}")
-execute_process(
-    COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
-endif()
+antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            -o "${exe}" "${SOURCE}")
 # The runtime refuses at start with the status of a startup error.
 program_expect("cpu check ${TARGET}" COMMAND "${exe}" STATUS 70
                ERR_MATCH "this program needs a processor with ${NEEDS}")

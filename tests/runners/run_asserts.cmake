@@ -30,17 +30,15 @@ program_expect("forced" COMMAND "${WORK}/forced" ABORTS
                ERR_MATCH "^asserts\\.anti:[0-9]+: assertion failed: n > 0\n$")
 
 # Dev mode keeps them without a flag, and --no-asserts drops them.
-execute_process(COMMAND "${ANTIC}" --dev --runtime "${RUNTIME}" -S
-                        -o "${WORK}/dev.s" "${SOURCE}"
-                RESULT_VARIABLE status)
+antic_build(--dev --runtime "${RUNTIME}" -S -o "${WORK}/dev.s" "${SOURCE}")
 file(READ "${WORK}/dev.s" dev)
-if(NOT status EQUAL 0 OR NOT dev MATCHES "assert_failed")
+if(NOT dev MATCHES "assert_failed")
     message(FATAL_ERROR "dev mode dropped the assertion")
 endif()
-execute_process(COMMAND "${ANTIC}" --dev --no-asserts --runtime "${RUNTIME}" -S
-                        -o "${WORK}/off.s" "${SOURCE}" RESULT_VARIABLE status)
+antic_build(--dev --no-asserts --runtime "${RUNTIME}" -S -o "${WORK}/off.s"
+            "${SOURCE}")
 file(READ "${WORK}/off.s" off)
-if(NOT status EQUAL 0 OR off MATCHES "assert_failed")
+if(off MATCHES "assert_failed")
     message(FATAL_ERROR "--no-asserts kept the assertion")
 endif()
 
@@ -51,13 +49,8 @@ get_filename_component(here "${SOURCE}" DIRECTORY)
 file(MAKE_DIRECTORY "${WORK}/root/com/example" "${WORK}/lib/com/example")
 file(WRITE "${WORK}/root/com/example/checked.anti"
      "pub fn halve(n: int) -> int\n{\n\tassert(n > 0);\n\treturn n / 2;\n}\n")
-execute_process(COMMAND "${ANTIC}" -c -I "${WORK}/root"
-                        -o "${WORK}/lib/com/example/checked.antl"
-                        "${WORK}/root/com/example/checked.anti"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -c failed\n${err}")
-endif()
+antic_build(-c -I "${WORK}/root" -o "${WORK}/lib/com/example/checked.antl"
+            "${WORK}/root/com/example/checked.anti")
 file(WRITE "${WORK}/consumer.anti"
      "import com.example.checked;\n\nfn main() -> int\n{\n\treturn checked.halve(0);\n}\n")
 foreach(case "quiet;" "trap;--asserts")

@@ -9,6 +9,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 if(WIN32)
     set(data "${WORK}/home/anti")
@@ -22,12 +24,10 @@ endif()
 # first file it wants and names the directory it looked in.
 file(MAKE_DIRECTORY "${data}/lib")
 
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "${env}"
-            --unset=XDG_DATA_HOME --unset=ANTI_HOME
-            "${ANTIC}" -o "${WORK}/prog" "${SOURCE}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
+antic_run(status out err
+          THROUGH "${CMAKE_COMMAND}" -E env "${env}"
+                  --unset=XDG_DATA_HOME --unset=ANTI_HOME
+          COMMAND -o "${WORK}/prog" "${SOURCE}")
 # antic joins the data directory of Windows with backslashes and the
 # rest of a path with slashes, so both sides are read with one separator.
 string(REPLACE "\\" "/" printed "${out}${err}")
@@ -40,12 +40,10 @@ endif()
 # The directory above antic holds no lib/, so nothing else could have
 # answered. A run with neither an archive nor a data directory says what
 # it needs.
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "${env}-empty"
-            --unset=XDG_DATA_HOME --unset=ANTI_HOME
-            "${ANTIC}" -o "${WORK}/prog" "${SOURCE}"
-    RESULT_VARIABLE refused OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
+antic_run(refused out err
+          THROUGH "${CMAKE_COMMAND}" -E env "${env}-empty"
+                  --unset=XDG_DATA_HOME --unset=ANTI_HOME
+          COMMAND -o "${WORK}/prog" "${SOURCE}")
 if(refused EQUAL 0 OR NOT "${out}${err}" MATCHES "--runtime")
     message(FATAL_ERROR "antic without an archive does not ask for --runtime\n"
                         "${out}${err}")

@@ -32,13 +32,8 @@ foreach(build "release" "dev,--dev")
     string(REPLACE "," ";" options "${build}")
     list(POP_FRONT options name)
     set(program "${WORK}/${name}")
-    execute_process(COMMAND "${ANTIC}" --target "${TARGET}"
-                            --runtime "${RUNTIME}" ${options}
-                            -o "${program}" "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic ${options} failed\n${err}")
-    endif()
+    antic_build(--target "${TARGET}" --runtime "${RUNTIME}" ${options} -o
+                "${program}" "${SOURCE}")
     set(runner "${program}")
     if(NOT "${HOST}" STREQUAL "${TARGET}")
         set(runner "${EMULATOR}" "${program}")

@@ -14,6 +14,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 foreach(installer install.sh install.ps1)
     file(READ "${ROOT}/tools/${installer}" text)
     foreach(name SHA256SUMS.sig ANTI_STAGING "no SHA256SUMS.sig")
@@ -26,87 +28,23 @@ foreach(installer install.sh install.ps1)
     endforeach()
 endforeach()
 
-if(CMAKE_HOST_WIN32)
-    message("SKIP: install.sh needs a shell")
+fake_release_host()
+if(NOT skip STREQUAL "")
+    message("SKIP: ${skip}")
     return()
 endif()
-find_program(OPENSSL openssl)
-if(NOT OPENSSL)
-    message("SKIP: openssl is missing")
-    return()
-endif()
-find_program(CURL curl)
-if(NOT CURL)
-    message("SKIP: curl is missing")
-    return()
-endif()
-
-set(version "99.0.0")
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-    set(os macos)
-else()
-    set(os linux)
-endif()
-# A script of cmake -P carries no processor, so it comes from uname, as
-# it does in the installer.
-execute_process(COMMAND uname -m OUTPUT_VARIABLE arch
-                OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
-if(arch STREQUAL "aarch64")
-    set(arch arm64)
-endif()
-if(NOT arch MATCHES "^(arm64|x86_64)$")
-    message("SKIP: no package for the processor ${arch}")
-    return()
-endif()
-set(host "${os}-${arch}")
-set(asset "anti-${version}-${host}.tar.xz")
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(cmake_dir "${CMAKE_COMMAND}" DIRECTORY)
 
-# Run <command> and fail with <message> unless it succeeds.
-function(run message)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE failed
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT failed EQUAL 0)
-        message(FATAL_ERROR "${message}\n${out}${err}")
-    endif()
-endfunction()
-
-# The package the installer unpacks. It carries the two programs the
-# installer runs as the check of the install, as scripts that print the
-# version, and nothing else: the installer reads no script and no pin of
-# a package, so the test reaches no server.
-set(tree "${WORK}/package")
-file(MAKE_DIRECTORY "${tree}/anti/bin")
-file(WRITE "${tree}/anti/bin/antic" "#!/bin/sh\necho \"antic ${version}\"\n")
-file(WRITE "${tree}/anti/bin/anti" "#!/bin/sh\necho \"anti ${version}\"\n")
-file(CHMOD "${tree}/anti/bin/antic" "${tree}/anti/bin/anti"
-     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
-                 WORLD_READ WORLD_EXECUTE)
+# The package the installer unpacks.
 set(area "${WORK}/base/anti/${version}")
-file(MAKE_DIRECTORY "${area}")
-run("the package did not pack" "${CMAKE_COMMAND}" -E chdir "${tree}"
-    "${CMAKE_COMMAND}" -E tar cJf "${area}/${asset}" anti)
-file(SHA256 "${area}/${asset}" digest)
-file(WRITE "${area}/SHA256SUMS" "${digest}  ${asset}\n")
+fake_release_package("${area}" "${WORK}/package" "${version}")
 
 # The key of this test, and the copy of the installer that carries its
 # public half in place of the key of the release.
-run("openssl wrote no private key" "${OPENSSL}" ecparam -name prime256v1
-    -genkey -noout -out "${WORK}/private.pem")
-run("openssl wrote no public key" "${OPENSSL}" ec -in "${WORK}/private.pem"
-    -pubout -out "${WORK}/public.pem")
-file(READ "${WORK}/public.pem" public)
-string(STRIP "${public}" public)
-file(READ "${ROOT}/tools/install.sh" installer)
-set(block "-----BEGIN PUBLIC KEY-----[A-Za-z0-9+/=\n]+-----END PUBLIC KEY-----")
-if(NOT installer MATCHES "${block}")
-    message(FATAL_ERROR "tools/install.sh holds no public key to replace")
-endif()
-string(REGEX REPLACE "${block}" "${public}" installer "${installer}")
-file(WRITE "${WORK}/install.sh" "${installer}")
+fake_release_key()
 set(installer_script "${WORK}/install.sh")
 # The same copy without the check of the signature, which takes every
 # one. The case of a wrong signature must pass with it, so that case
@@ -120,11 +58,7 @@ string(REPLACE "${check}" "true || ${check}" unchecked "${installer}")
 file(WRITE "${WORK}/install-unchecked.sh" "${unchecked}")
 
 # Sign the manifest the way step 6 of ./r signs it.
-run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
-    -out "${WORK}/SHA256SUMS.sha256" "${area}/SHA256SUMS")
-run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
-    -inkey "${WORK}/private.pem" -in "${WORK}/SHA256SUMS.sha256"
-    -out "${area}/SHA256SUMS.sig")
+fake_release_sign("${area}/SHA256SUMS" "${area}/SHA256SUMS.sig")
 
 # Run the installer into a directory of its own and answer every question
 # with no, so that it downloads nothing and writes nothing outside WORK.
@@ -163,11 +97,7 @@ endif()
 # only the signature is wrong.
 file(RENAME "${area}/SHA256SUMS.sig" "${WORK}/SHA256SUMS.sig")
 file(WRITE "${WORK}/other/SHA256SUMS" "0000000000000000000000000000000000000000000000000000000000000000  ${asset}\n")
-run("openssl hashed nothing" "${OPENSSL}" dgst -sha256 -binary
-    -out "${WORK}/other/SHA256SUMS.sha256" "${WORK}/other/SHA256SUMS")
-run("openssl signed nothing" "${OPENSSL}" pkeyutl -sign
-    -inkey "${WORK}/private.pem" -in "${WORK}/other/SHA256SUMS.sha256"
-    -out "${area}/SHA256SUMS.sig")
+fake_release_sign("${WORK}/other/SHA256SUMS" "${area}/SHA256SUMS.sig")
 install_run(wrong no failed log)
 if(failed EQUAL 0 OR
    NOT "${log}" MATCHES "carries no signature of the key of Anti")

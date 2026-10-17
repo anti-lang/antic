@@ -14,20 +14,15 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
 # Run antic on source for target with the options, which must succeed.
 function(shared_library target source library)
-    execute_process(COMMAND "${ANTIC}" --target "${target}" --lib shared
-                            --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-                            ${ARGN} -o "${library}" "${source}"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic --lib shared for ${target} failed with "
-                            "${status}: ${ARGN}\n${out}${err}")
-    endif()
+    antic_build(--target "${target}" --lib shared --runtime "${RUNTIME}"
+                --llvm-mc "${LLVM_MC}" ${ARGN} -o "${library}" "${source}")
 endfunction()
 
 # Check that the text a tool printed for library names each pattern.

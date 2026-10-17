@@ -228,16 +228,7 @@ endfunction()
 # exits with 0. The program goes through program_expect, which reads what
 # it wrote as bytes.
 function(run_program module exe wanted)
-    execute_process(
-        COMMAND "${ANTIC}" --runtime "${RUNTIME}" -o "${exe}" "${module}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR
-            "the program ${module} of ${document} does not build:\n${out}${err}")
-    endif()
+    antic_build(--runtime "${RUNTIME}" -o "${exe}" "${module}")
     get_filename_component(label "${exe}" NAME)
     if(wanted STREQUAL "")
         program_expect("${label}" COMMAND "${exe}")
@@ -250,12 +241,7 @@ endfunction()
 function(target_triple out target)
     get_property(table GLOBAL PROPERTY llvm_targets)
     if("${table}" STREQUAL "")
-        execute_process(COMMAND "${ANTIC}" --print-llvm-targets
-                        OUTPUT_VARIABLE table RESULT_VARIABLE status
-                        ENCODING NONE)
-        if(NOT status EQUAL 0)
-            message(FATAL_ERROR "antic --print-llvm-targets failed")
-        endif()
+        antic_build(OUTPUT table COMMAND --print-llvm-targets)
         set_property(GLOBAL PROPERTY llvm_targets "${table}")
     endif()
     if(NOT table MATCHES "(^|\n)target ${target} [^ ]+ ([^ ]+) ")
@@ -294,34 +280,16 @@ function(excerpt_output out kind id module target mode option dir)
     endif()
     if(kind MATCHES "^(${dump_kinds})$")
         if(NOT EXISTS "${base}.${kind}")
-            execute_process(
-                COMMAND "${ANTIC}" ${dev} "--dump-${kind}" --target "${target}"
-                        --runtime "${RUNTIME}" "${module}"
-                RESULT_VARIABLE status
-                OUTPUT_FILE "${base}.${kind}"
-                ERROR_VARIABLE dump_err
-                ENCODING NONE)
-            if(NOT status EQUAL 0)
-                message(FATAL_ERROR
-                    "antic --dump-${kind} refuses the block `${id}` of ${document} for ${target} in ${mode} mode:\n${dump_err}")
-            endif()
+            antic_build(OUTPUT_FILE "${base}.${kind}"
+                        COMMAND ${dev} "--dump-${kind}" --target "${target}"
+                                --runtime "${RUNTIME}" "${module}")
         endif()
         set(${out} "${base}.${kind}" PARENT_SCOPE)
         return()
     endif()
     if(NOT EXISTS "${base}.s")
-        execute_process(
-            COMMAND "${ANTIC}" ${dev} ${extra} -S --keep-llvm
-                    --target "${target}" --runtime "${RUNTIME}"
-                    -o "${base}.s" "${module}"
-            RESULT_VARIABLE status
-            OUTPUT_VARIABLE build_out
-            ERROR_VARIABLE build_err
-            ENCODING NONE)
-        if(NOT status EQUAL 0)
-            message(FATAL_ERROR
-                "the block `${id}` of ${document} does not build for ${target} in ${mode} mode ${extra}:\n${build_out}${build_err}")
-        endif()
+        antic_build(${dev} ${extra} -S --keep-llvm --target "${target}"
+                    --runtime "${RUNTIME}" -o "${base}.s" "${module}")
     endif()
     if(kind STREQUAL "llvm" AND mode STREQUAL "dev")
         set(${out} "${base}.s.ll" PARENT_SCOPE)
@@ -648,13 +616,8 @@ foreach(document IN LISTS documents)
                 set(exe "${dir}/${name}")
             endif()
             write_module("${context};${source}" "${module}")
-            execute_process(
-                COMMAND "${ANTIC}" --front-end --tests
-                        --runtime "${RUNTIME}" "${module}"
-                RESULT_VARIABLE status
-                OUTPUT_VARIABLE out
-                ERROR_VARIABLE err
-                ENCODING NONE)
+            antic_run(status out err COMMAND --front-end --tests --runtime
+                      "${RUNTIME}" "${module}")
             if(refuse AND status EQUAL 0)
                 # The front end accepts the block, so a later pass of a
                 # release build is the one that refuses it.
@@ -662,13 +625,8 @@ foreach(document IN LISTS documents)
                 if("${source}" MATCHES "(^|;)fn main\\(")
                     set(later -o "${exe}")
                 endif()
-                execute_process(
-                    COMMAND "${ANTIC}" --runtime "${RUNTIME}" ${later}
-                            "${module}"
-                    RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err
-                    ENCODING NONE)
+                antic_run(status out err COMMAND --runtime "${RUNTIME}"
+                          ${later} "${module}")
             endif()
             if(refuse)
                 if(status EQUAL 0)

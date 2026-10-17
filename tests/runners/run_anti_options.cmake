@@ -68,13 +68,7 @@ file(MAKE_DIRECTORY "${WORK}")
 # Run anti in a directory. The cache of the repositories is the user's,
 # so the run names its own.
 function(anti directory out_status out_stdout out_stderr)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" ${ARGN}
-        WORKING_DIRECTORY "${directory}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${directory}" ${ARGN})
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_stdout} "${out}" PARENT_SCOPE)
     set(${out_stderr} "${err}" PARENT_SCOPE)
@@ -349,15 +343,9 @@ endfunction()
 if(CASE STREQUAL "check_root_library")
     shapes_and_program()
     file(MAKE_DIRECTORY "${project}/libs/com/example")
-    execute_process(
-        COMMAND "${ANTIC}" -c -I "${project}/roots" --runtime "${RUNTIME}"
-                -o "${project}/libs/com/example/shapes.antl"
-                "${project}/roots/com/example/shapes.anti"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
-    if(NOT status STREQUAL "0")
-        message(FATAL_ERROR "antic -c ended with ${status}\n${out}${err}")
-    endif()
+    antic_build(-c -I "${project}/roots" --runtime "${RUNTIME}" -o
+                "${project}/libs/com/example/shapes.antl"
+                "${project}/roots/com/example/shapes.anti")
     check_with_root(libs "front end: 1 file, 1 target, 0 warnings"
                     app/main.anti)
     return()

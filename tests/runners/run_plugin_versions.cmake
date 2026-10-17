@@ -21,15 +21,6 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-# Run antic, which must succeed and print nothing.
-function(run)
-    execute_process(COMMAND "${ANTIC}" ${ARGV} RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic failed with ${status}: ${ARGV}\n${out}${err}")
-    endif()
-endfunction()
-
 # The library of the version name for the host, built on its first use.
 function(library host name out)
     set(dir "${WORK}/${name}")
@@ -41,9 +32,9 @@ function(library host name out)
     set(path "${dir}/libfancy${SUFFIX}")
     if(NOT EXISTS "${path}")
         file(MAKE_DIRECTORY "${dir}")
-        run(--lib shared --no-runtime --runtime "${RUNTIME}"
-            --llvm-mc "${LLVM_MC}" -I "${root_${name}}" -I "${WORK}/${name}"
-            -o "${path}" "${root_${name}}/net/example/fancy.anti" ${imports})
+        antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
+                    --llvm-mc "${LLVM_MC}" -I "${root_${name}}" -I "${WORK}/${name}"
+                    -o "${path}" "${root_${name}}/net/example/fancy.anti" ${imports})
     endif()
     set(${out} "${path}" PARENT_SCOPE)
 endfunction()
@@ -78,9 +69,9 @@ foreach(part "base|${SOURCES}|0.0.0" "one|${versions}/one|0.0.0"
     list(GET one 1 root)
     list(GET one 2 version)
     file(MAKE_DIRECTORY "${WORK}/${name}/net/example")
-    run(-c --package-version "${version}" -I "${root}"
-        -o "${WORK}/${name}/net/example/greet.antl"
-        "${root}/net/example/greet.anti")
+    antic_build(-c --package-version "${version}" -I "${root}"
+                -o "${WORK}/${name}/net/example/greet.antl"
+                "${root}/net/example/greet.anti")
 endforeach()
 
 # One library per version, each bound to the interface of its own
@@ -105,9 +96,9 @@ foreach(part "reader|base" "caller|base" "reflector|base"
     else()
         set(source "${versions}/${name}.anti")
     endif()
-    run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-        -I "${versions}" -I "${SOURCES}" -I "${WORK}/${interface}"
-        -o "${WORK}/${name}${EXE}" "${source}")
+    antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+                -I "${versions}" -I "${SOURCES}" -I "${WORK}/${interface}"
+                -o "${WORK}/${name}${EXE}" "${source}")
 endforeach()
 
 # A library built against an earlier version loads while the program

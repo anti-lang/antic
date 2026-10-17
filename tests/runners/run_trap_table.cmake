@@ -36,9 +36,7 @@ foreach(case inline copy_inline)
     traps(dev ${case} Part)
 endforeach()
 
-execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}"
-                        -S -o "${WORK}/release.s" "${SOURCE}"
-                RESULT_VARIABLE status)
+antic_build(--runtime "${RUNTIME}" -S -o "${WORK}/release.s" "${SOURCE}")
 # The function run holds the dispatch, `is` and `as`, and release mode
 # inlines it into main. The teardown and the copy of Holder, which are
 # functions of their own, check in every mode. The body of main runs from
@@ -54,7 +52,7 @@ string(FIND "${main}" "-- End function" end)
 if(NOT end EQUAL -1)
     string(SUBSTRING "${main}" 0 ${end} main)
 endif()
-if(NOT status EQUAL 0 OR main STREQUAL "" OR end EQUAL -1 OR
+if(main STREQUAL "" OR end EQUAL -1 OR
    main MATCHES "anti_rt_table_unset")
     message(FATAL_ERROR "release mode checks a table in a dispatch")
 endif()

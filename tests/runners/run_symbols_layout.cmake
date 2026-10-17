@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
@@ -21,14 +23,8 @@ set(project "${WORK}/tracer")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(COPY "${FIXTURE}/tracer" DESTINATION "${WORK}")
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "XDG_CACHE_HOME=${WORK}/cache"
-            "LOCALAPPDATA=${WORK}/cache"
-            "${ANTI}" build --release --target "${TARGET}"
-            --runtime "${RUNTIME}"
-    WORKING_DIRECTORY "${project}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
+anti_run(status out err "${project}" build --release --target "${TARGET}"
+         --runtime "${RUNTIME}")
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "anti build --release failed with ${status}\n${out}${err}")
 endif()

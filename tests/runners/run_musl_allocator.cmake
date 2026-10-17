@@ -38,13 +38,8 @@ file(MAKE_DIRECTORY "${WORK}")
 # SOURCE with the options after <name>.
 function(link_program out name)
     set(program "${WORK}/${name}")
-    execute_process(COMMAND "${ANTIC}" --target "${TARGET}"
-                            --runtime "${RUNTIME}" ${ARGN}
-                            -o "${program}" "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic ${ARGN} failed\n${err}")
-    endif()
+    antic_build(--target "${TARGET}" --runtime "${RUNTIME}" ${ARGN} -o
+                "${program}" "${SOURCE}")
     execute_process(COMMAND "${LLVM_OBJDUMP}" -t "${program}"
                     RESULT_VARIABLE status OUTPUT_VARIABLE table
                     ERROR_VARIABLE err ENCODING NONE)

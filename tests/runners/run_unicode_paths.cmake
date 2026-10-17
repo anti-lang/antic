@@ -46,12 +46,11 @@ program_expect("prog" COMMAND "${WORK}/${name}/prog" STATUS 42)
 # to home, and set printed to what it wrote, with every backslash a
 # slash. It must fail, since no archive holds more than lib/.
 function(archive_run printed antic home)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env "${home_variable}=${home}"
-                --unset=XDG_DATA_HOME --unset=ANTI_HOME
-                "${antic}" -o "${WORK}/prog" "${SOURCE}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
+    set(ANTIC "${antic}")
+    antic_run(status out err
+              THROUGH "${CMAKE_COMMAND}" -E env "${home_variable}=${home}"
+                      --unset=XDG_DATA_HOME --unset=ANTI_HOME
+              COMMAND -o "${WORK}/prog" "${SOURCE}")
     if(status EQUAL 0)
         message(FATAL_ERROR "${antic} compiled with an archive of lib/ alone")
     endif()

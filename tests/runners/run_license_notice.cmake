@@ -21,6 +21,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 foreach(target linux-arm64 macos-arm64)
     if(NOT EXISTS "${RUNTIME}/sysroot/${target}")
         message("SKIP: the runtime archive has no sysroot for ${target}")
@@ -45,15 +47,8 @@ endforeach()
 # Build project for target and check its notice. carries is TRUE where
 # the program links musl and mimalloc.
 function(check_notice project target carries)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" build --target "${target}"
-                --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-        WORKING_DIRECTORY "${WORK}/${project}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${WORK}/${project}" build --target "${target}"
+             --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti build --target ${target} of ${project} "
                             "failed with ${status}\n${out}${err}")
@@ -139,14 +134,8 @@ check_notice(app macos-arm64 FALSE)
 # library files of the project do.
 file(COPY "${FIXTURE}/notices" "${FIXTURE}/shapes" "${FIXTURE}/tones"
      DESTINATION "${WORK}")
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env
-            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-            "${ANTI}" build --target macos-arm64
-            --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-    WORKING_DIRECTORY "${WORK}/notices"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
+anti_run(status out err "${WORK}/notices" build --target macos-arm64
+         --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "anti build of notices failed with ${status}\n"
                         "${out}${err}")

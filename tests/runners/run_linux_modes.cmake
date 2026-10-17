@@ -41,15 +41,9 @@ foreach(target linux-arm64 linux-x86_64)
             set(flag --release)
         endif()
         foreach(project app window)
-            execute_process(
-                COMMAND "${CMAKE_COMMAND}" -E env
-                        "XDG_CACHE_HOME=${WORK}/cache"
-                        "LOCALAPPDATA=${WORK}/cache"
-                        "${ANTI}" build ${flag} --target "${target}"
-                        --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-                WORKING_DIRECTORY "${WORK}/${project}"
-                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-                ENCODING NONE)
+            anti_run(status out err "${WORK}/${project}" build ${flag}
+                     --target "${target}" --runtime "${RUNTIME}"
+                     --llvm-mc "${LLVM_MC}")
             if(NOT status EQUAL 0)
                 message(FATAL_ERROR "anti build ${flag} --target ${target} of "
                                     "${project} failed with ${status}\n"

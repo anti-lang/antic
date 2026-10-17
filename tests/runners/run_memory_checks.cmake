@@ -23,29 +23,22 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
 
 set(checked "${HOST}")
 if(HOST STREQUAL "windows-arm64")
     set(checked windows-x86_64)
 endif()
-execute_process(COMMAND "${ANTIC}" --target ${checked} --runtime "${RUNTIME}"
-                        -S -o "${WORK}/memory_checks_off.s" "${SOURCE}"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed without --memory-checks\n${err}")
-endif()
+antic_build(--target ${checked} --runtime "${RUNTIME}" -S -o
+            "${WORK}/memory_checks_off.s" "${SOURCE}")
 file(READ "${WORK}/memory_checks_off.s" assembly)
 if(assembly MATCHES "__asan_")
     message(FATAL_ERROR "a build without --memory-checks carries a check")
 endif()
-execute_process(COMMAND "${ANTIC}" --memory-checks --target ${checked}
-                        --runtime "${RUNTIME}" -S
-                        -o "${WORK}/memory_checks_on.s" "${SOURCE}"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed with --memory-checks\n${err}")
-endif()
+antic_build(--memory-checks --target ${checked} --runtime "${RUNTIME}" -S -o
+            "${WORK}/memory_checks_on.s" "${SOURCE}")
 file(READ "${WORK}/memory_checks_on.s" assembly)
 if(NOT assembly MATCHES "__asan_loadN" OR
    NOT assembly MATCHES "__asan_storeN")
@@ -55,14 +48,8 @@ endif()
 # The hook of the options and the marking of the runtime's blocks, which
 # the linking module of each target carries or lacks.
 foreach(target linux-x86_64 macos-arm64 windows-x86_64)
-    execute_process(COMMAND "${ANTIC}" --memory-checks --target ${target}
-                            --runtime "${RUNTIME}" -S
-                            -o "${WORK}/memory_checks_${target}.s"
-                            "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${target}\n${err}")
-    endif()
+    antic_build(--memory-checks --target ${target} --runtime "${RUNTIME}" -S -o
+                "${WORK}/memory_checks_${target}.s" "${SOURCE}")
     file(READ "${WORK}/memory_checks_${target}.s" assembly)
     set(found OFF)
     if(assembly MATCHES "__asan_default_options" AND
@@ -95,10 +82,9 @@ foreach(target linux-x86_64 macos-arm64 windows-x86_64)
     endif()
 endforeach()
 
-execute_process(COMMAND "${ANTIC}" --memory-checks --target windows-arm64
-                        --runtime "${RUNTIME}" -S
-                        -o "${WORK}/memory_checks_arm.s" "${SOURCE}"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND --memory-checks --target windows-arm64
+          --runtime "${RUNTIME}" -S -o "${WORK}/memory_checks_arm.s"
+          "${SOURCE}")
 if(status EQUAL 0 OR NOT err STREQUAL
    "antic: `--memory-checks` is not available for windows-arm64\n")
     message(FATAL_ERROR "windows-arm64 exited with ${status} and printed "
@@ -110,15 +96,9 @@ if(HOST STREQUAL "windows-arm64")
     return()
 endif()
 
-include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
-
 set(program "${WORK}/memory_checks_run")
-execute_process(COMMAND "${ANTIC}" --memory-checks --llvm-mc "${LLVM_MC}"
-                        --runtime "${RUNTIME}" -o "${program}" "${SOURCE}"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed\n${err}")
-endif()
+antic_build(--memory-checks --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o
+            "${program}" "${SOURCE}")
 
 # The names of the frames come from the symbolizer of the runtime, which
 # has one on macOS alone. `anti run` puts the report through Anti's

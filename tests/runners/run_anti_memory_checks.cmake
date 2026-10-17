@@ -20,6 +20,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(HOST STREQUAL "windows-arm64")
     message("SKIP: windows-arm64 has no runtime of AddressSanitizer")
     return()
@@ -43,11 +45,8 @@ function(write_case case)
 endfunction()
 
 function(run_anti out_status out_err)
-    execute_process(COMMAND "${ANTI}" ${ARGN} --runtime "${RUNTIME}"
-                            --llvm-mc "${LLVM_MC}"
-                    WORKING_DIRECTORY "${WORK}/project"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err ENCODING NONE)
+    anti_run(status out err "${WORK}/project" ${ARGN} --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_err} "${err}" PARENT_SCOPE)
 endfunction()

@@ -23,12 +23,8 @@ if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
 endif()
-execute_process(COMMAND "${ANTIC}" --print-host-target
-    RESULT_VARIABLE status OUTPUT_VARIABLE host ENCODING NONE
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic --print-host-target failed")
-endif()
+antic_build(OUTPUT host COMMAND --print-host-target)
+string(STRIP "${host}" host)
 set(runner "")
 set(options "")
 set(runs FALSE)
@@ -50,14 +46,8 @@ if("${TARGET}" MATCHES "^windows-")
     string(APPEND exe ".exe")
 endif()
 file(REMOVE "${exe}")
-execute_process(
-    COMMAND "${ANTIC}" --target "${TARGET}" ${options} --lto "${LTO}"
-            --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
-endif()
+antic_build(--target "${TARGET}" ${options} --lto "${LTO}" --llvm-mc
+            "${LLVM_MC}" --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}")
 if(NOT runs)
     message(STATUS "linked for ${TARGET}, which does not run on ${host}")
     return()

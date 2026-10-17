@@ -16,15 +16,7 @@ cmake_minimum_required(VERSION 3.21)
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 string(REPLACE "," ";" arguments "${COMMAND}")
-execute_process(
-    COMMAND "${ANTIC}" ${arguments}
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic ${COMMAND} failed with ${status}\n${err}")
-endif()
+antic_build(OUTPUT out COMMAND ${arguments})
 file(READ "${EXPECTED}" expected)
 if(DEFINED VERSION)
     string(REPLACE "antic ${VERSION}" "antic VERSION" out "${out}")

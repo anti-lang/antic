@@ -9,12 +9,7 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-execute_process(COMMAND "${ANTIC}" --print-cpu-levels
-    RESULT_VARIABLE status OUTPUT_VARIABLE printed ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic --print-cpu-levels failed\n${err}")
-endif()
+antic_build(OUTPUT printed COMMAND --print-cpu-levels)
 file(STRINGS "${LEVELS}" lines REGEX "^(level|default) ")
 set(pinned "")
 foreach(line IN LISTS lines)

@@ -16,15 +16,12 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
-execute_process(
-    COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-            --package-name com.example.hello --package-version 2.0.0
-            --license MIT -o "${WORK}/licensed" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed\n${err}")
-endif()
+antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" --package-name
+            com.example.hello --package-version 2.0.0 --license MIT -o
+            "${WORK}/licensed" "${SOURCE}")
 file(STRINGS "${WORK}/licensed" lines REGEX "ANTI_LICENSES|^package |^build ")
 set(wanted "ANTI_LICENSES_BEGIN;build [0-9a-f]+;package anti.rt [0-9.]+ 0BSD;package com.example.hello 2.0.0 MIT")
 if(DEFINED WANTED)

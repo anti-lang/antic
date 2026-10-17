@@ -34,13 +34,8 @@ set(targets ${HOST} linux-x86_64)
 list(REMOVE_DUPLICATES targets)
 foreach(target IN LISTS targets)
     set(program "${WORK}/${target}")
-    execute_process(COMMAND "${ANTIC}" -g --target ${target}
-                            --runtime "${RUNTIME}" -o "${program}"
-                            "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${target}\n${err}")
-    endif()
+    antic_build(-g --target ${target} --runtime "${RUNTIME}" -o "${program}"
+                "${SOURCE}")
     set(table "${program}")
     if(target MATCHES "^macos-")
         file(GLOB table "${program}.lto/*.o")

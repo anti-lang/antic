@@ -14,23 +14,14 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-function(run)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
-        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-        message(FATAL_ERROR "${ARGN} failed with ${status}\n${out}${err}")
-    endif()
-    set(run_out "${out}" PARENT_SCOPE)
-endfunction()
-
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(base "${SOURCE}" NAME_WE)
 set(assembly "${WORK}/${base}.${TARGET}.s")
 set(object "${WORK}/${base}.${TARGET}.obj")
-run("${ANTIC}" --runtime "${RUNTIME}" -S --target "${TARGET}"
-    -o "${assembly}" "${SOURCE}")
-run("${LLVM_MC}" "-triple=${TRIPLE}" -filetype=obj -o "${object}" "${assembly}")
-run("${LLVM_READOBJ}" --unwind "${object}")
-string(REGEX REPLACE "^\nFile: [^\n]*\n" "" decoded "${run_out}")
+antic_build(--runtime "${RUNTIME}" -S --target "${TARGET}" -o "${assembly}"
+            "${SOURCE}")
+tool_run("" QUIET "${LLVM_MC}" "-triple=${TRIPLE}" -filetype=obj -o "${object}" "${assembly}")
+tool_run("" QUIET "${LLVM_READOBJ}" --unwind "${object}")
+string(REGEX REPLACE "^\nFile: [^\n]*\n" "" decoded "${tool_stdout}")
 file(READ "${EXPECTED}" expected)
 expect_same_text("the unwind data for ${EXPECTED}" "${expected}" "${decoded}")

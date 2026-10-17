@@ -29,16 +29,8 @@ set(state "${WORK}/state")
 
 # The cache of the repositories is the user's, so the run names its own.
 function(build what)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" build --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-        WORKING_DIRECTORY "${project}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${project}" build --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
     if(NOT status EQUAL 0)
         set(failure "${what} failed with ${status}\n${out}${err}" PARENT_SCOPE)
     endif()

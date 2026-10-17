@@ -17,18 +17,12 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
 endif()
-
-function(run)
-    execute_process(COMMAND "${ANTIC}" ${ARGV} RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic failed with ${status}: ${ARGV}\n${out}${err}")
-    endif()
-endfunction()
 
 set(dir "${WORK}")
 file(REMOVE_RECURSE "${dir}")
@@ -40,13 +34,13 @@ endif()
 if(NOT DEFINED LIBRARY)
     set(LIBRARY fancy)
 endif()
-run(${common} -c -I "${SOURCES}" -o "${dir}/net/example/greet.antl"
-    "${SOURCES}/net/example/greet.anti")
-run(${common} --runtime "${RUNTIME}" --keep-llvm -I "${SOURCES}"
-    -I "${dir}" -o "${dir}/host.exe" "${SOURCES}/host.anti")
-run(${common} --lib shared --no-runtime --runtime "${RUNTIME}"
-    --keep-llvm -I "${SOURCES}" -I "${dir}" -o "${dir}/lib/lib${LIBRARY}.dll"
-    "${SOURCES}/net/example/${LIBRARY}.anti" "${dir}/host.lib")
+antic_build(${common} -c -I "${SOURCES}" -o "${dir}/net/example/greet.antl"
+            "${SOURCES}/net/example/greet.anti")
+antic_build(${common} --runtime "${RUNTIME}" --keep-llvm -I "${SOURCES}"
+            -I "${dir}" -o "${dir}/host.exe" "${SOURCES}/host.anti")
+antic_build(${common} --lib shared --no-runtime --runtime "${RUNTIME}"
+            --keep-llvm -I "${SOURCES}" -I "${dir}" -o "${dir}/lib/lib${LIBRARY}.dll"
+            "${SOURCES}/net/example/${LIBRARY}.anti" "${dir}/host.lib")
 
 file(STRINGS "${dir}/host.def" def)
 file(READ "${dir}/lib/lib${LIBRARY}.ll" llvm)

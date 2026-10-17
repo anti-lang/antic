@@ -9,6 +9,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 set(limit 67108864)
 file(MAKE_DIRECTORY "${WORK}")
 string(REPEAT " " 1048576 mebibyte)
@@ -20,16 +22,9 @@ if(NOT size EQUAL limit)
     message(FATAL_ERROR "largest.anti holds ${size} bytes, not ${limit}")
 endif()
 
-execute_process(
-    COMMAND "${ANTIC}" --front-end "${WORK}/largest.anti"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic refused a source of ${limit} bytes\n${err}")
-endif()
+antic_build(--front-end "${WORK}/largest.anti")
 
-execute_process(
-    COMMAND "${ANTIC}" --front-end "${WORK}/larger.anti"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+antic_run(status ignored_out err COMMAND --front-end "${WORK}/larger.anti")
 if(status EQUAL 0)
     message(FATAL_ERROR "antic took a source of more than ${limit} bytes")
 endif()

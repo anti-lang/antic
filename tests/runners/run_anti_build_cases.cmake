@@ -72,13 +72,8 @@ endfunction()
 # so the run names its own. ENV names more of the environment.
 function(anti directory out_status out_text)
     cmake_parse_arguments(PARSE_ARGV 3 run "" "" "ENV")
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-                ${run_ENV} "${ANTI}" ${run_UNPARSED_ARGUMENTS}
-        WORKING_DIRECTORY "${directory}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${directory}" ENV ${run_ENV}
+             COMMAND ${run_UNPARSED_ARGUMENTS})
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}${err}" PARENT_SCOPE)
 endfunction()

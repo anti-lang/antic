@@ -51,26 +51,21 @@ set(limit "")
 if(DEFINED TIMEOUT AND NOT TIMEOUT STREQUAL "")
     set(limit TIMEOUT "${TIMEOUT}")
 endif()
-execute_process(
-    COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
-            -o "${exe}" "${SOURCE}" ${objects}
-    ${limit}
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
-endif()
+set(build --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
+          -o "${exe}" "${SOURCE}" ${objects})
 # Warnings are errors: antic, llvm-mc and the linker must print nothing
 # but the warning that the program is about.
 if(DEFINED WARNING AND NOT WARNING STREQUAL "")
+    antic_run(status out err ${limit} COMMAND ${build})
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
+    endif()
     string(FIND "${err}" "${WARNING}" at)
     if(NOT out STREQUAL "" OR at EQUAL -1)
         message(FATAL_ERROR "antic printed other output\n${out}${err}")
     endif()
-elseif(NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic printed output\n${out}${err}")
+else()
+    antic_build(${limit} COMMAND ${build})
 endif()
 
 if(DEFINED SKIP_RUN AND NOT SKIP_RUN STREQUAL "")

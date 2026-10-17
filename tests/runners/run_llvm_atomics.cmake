@@ -9,6 +9,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
 set(wanted
     "load atomic i8, ptr [^\n]* seq_cst, align 1"
@@ -23,14 +25,9 @@ set(wanted
     "inttoptr i64 ")
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
         windows-x86_64 windows-arm64)
-    execute_process(
-        COMMAND "${ANTIC}" --runtime "${RUNTIME}" --dev --dump-llvm
-                --target ${target} "${SOURCE}"
-        RESULT_VARIABLE status OUTPUT_FILE "${WORK}/atomics.${target}.ll"
-        ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${target}\n${err}")
-    endif()
+    antic_build(OUTPUT_FILE "${WORK}/atomics.${target}.ll"
+                COMMAND --runtime "${RUNTIME}" --dev --dump-llvm
+                        --target ${target} "${SOURCE}")
     file(READ "${WORK}/atomics.${target}.ll" text)
     foreach(pattern IN LISTS wanted)
         if(NOT text MATCHES "${pattern}")

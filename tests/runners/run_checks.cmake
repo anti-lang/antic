@@ -22,18 +22,15 @@ set(bounds "${SOURCES}/bounds_array.anti")
 antic_program("${WORK}/forced" "${bounds}" --checks)
 program_expect("forced" COMMAND "${WORK}/forced" ABORTS
                ERR_MATCH "index out of bounds: index 5, length 4")
-execute_process(COMMAND "${ANTIC}" --dev --no-checks --runtime "${RUNTIME}"
-                        -S -o "${WORK}/off.s"
-                        "${bounds}" RESULT_VARIABLE status)
+antic_build(--dev --no-checks --runtime "${RUNTIME}" -S -o "${WORK}/off.s"
+            "${bounds}")
 file(READ "${WORK}/off.s" off)
-if(NOT status EQUAL 0 OR off MATCHES "check_failed")
+if(off MATCHES "check_failed")
     message(FATAL_ERROR "--no-checks kept the checks of a dev build")
 endif()
-execute_process(COMMAND "${ANTIC}" --dev --runtime "${RUNTIME}" -S
-                        -o "${WORK}/on.s" "${bounds}"
-                RESULT_VARIABLE status)
+antic_build(--dev --runtime "${RUNTIME}" -S -o "${WORK}/on.s" "${bounds}")
 file(READ "${WORK}/on.s" on)
-if(NOT status EQUAL 0 OR NOT on MATCHES "check_failed")
+if(NOT on MATCHES "check_failed")
     message(FATAL_ERROR "dev mode dropped the checks")
 endif()
 
@@ -43,13 +40,8 @@ endif()
 file(MAKE_DIRECTORY "${WORK}/root/com/example" "${WORK}/lib/com/example")
 file(WRITE "${WORK}/root/com/example/nth.anti"
      "pub fn nth(a: []int, i: int) -> int\n{\n\treturn a[i];\n}\n")
-execute_process(COMMAND "${ANTIC}" -c -I "${WORK}/root"
-                        -o "${WORK}/lib/com/example/nth.antl"
-                        "${WORK}/root/com/example/nth.anti"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -c failed\n${err}")
-endif()
+antic_build(-c -I "${WORK}/root" -o "${WORK}/lib/com/example/nth.antl"
+            "${WORK}/root/com/example/nth.anti")
 file(WRITE "${WORK}/consumer.anti"
      "import com.example.nth;\n\nfn main() -> int\n{\n\tlet a = [1, 2];\n\treturn nth.nth(a[0..2], 5);\n}\n")
 # The release program reads past the slice, so it is not run: what it

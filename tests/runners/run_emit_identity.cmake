@@ -39,14 +39,8 @@ foreach(source IN LISTS sources)
     get_filename_component(name "${source}" NAME_WE)
     foreach(target IN LISTS targets)
         set(out "${WORK}/${name}.${target}.ll")
-        execute_process(COMMAND "${ANTIC}" --target ${target}
-                                --runtime "${RUNTIME}" --dump-llvm "${source}"
-                        RESULT_VARIABLE status OUTPUT_VARIABLE text
-                        ERROR_VARIABLE err ENCODING NONE)
-        if(NOT status EQUAL 0)
-            message(FATAL_ERROR "antic --dump-llvm failed for ${name} on "
-                                "${target}\n${err}")
-        endif()
+        antic_build(OUTPUT text COMMAND --target ${target} --runtime
+                    "${RUNTIME}" --dump-llvm "${source}")
         string(REPLACE "antic ${VERSION}" "antic VERSION" text "${text}")
         # DESIGN: the digest is the one of the text as antic means it. On
         # Windows the standard output of antic ends each line with CRLF,

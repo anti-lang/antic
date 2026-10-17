@@ -23,6 +23,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 set(NO_PROGRAM dump/format dump/generics_syntax dump/kinds dump/nodes)
 
 string(REPLACE "," ";" directories "${SOURCES}")
@@ -54,12 +56,8 @@ foreach(source IN LISTS sources)
                 list(APPEND options --dev)
             endif()
             set(case "${name} ${mode} ${target}")
-            execute_process(
-                COMMAND "${ANTIC}" ${options} --dump-llvm "${source}"
-                RESULT_VARIABLE status
-                OUTPUT_VARIABLE text
-                ERROR_VARIABLE err
-                ENCODING NONE)
+            antic_run(status text err COMMAND ${options} --dump-llvm
+                      "${source}")
             if(status EQUAL 0 AND err STREQUAL "" AND NOT text STREQUAL "")
                 set(file "${WORK}/${name}.${mode}.${target}.ll")
                 file(WRITE "${file}" "${text}")
@@ -80,11 +78,8 @@ foreach(source IN LISTS sources)
                 endif()
                 continue()
             endif()
-            execute_process(
-                COMMAND "${ANTIC}" ${options} --dump-opt "${source}"
-                RESULT_VARIABLE front
-                OUTPUT_QUIET
-                ERROR_QUIET)
+            antic_run(front ignored_out ignored_err
+                      COMMAND ${options} --dump-opt "${source}")
             if(status EQUAL 1 AND front EQUAL 1)
                 string(APPEND skipped "${case}\n")
                 list(APPEND skipped_files "${directory}/${name}")

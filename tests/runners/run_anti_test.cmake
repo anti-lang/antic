@@ -16,6 +16,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
@@ -102,25 +104,15 @@ refuse("${text}" "FAIL" "the release run")
 
 # A build that is not `anti test` drops both blocks. Neither the assembly
 # nor the library file holds a name of either.
-execute_process(
-    COMMAND "${ANTIC}" --runtime "${RUNTIME}" -S
-            -o "${WORK}/plain.s" "${MODULES}/com/example/stack.anti"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -S failed with ${status}\n${err}")
-endif()
+antic_build(--runtime "${RUNTIME}" -I "${MODULES}" -S -o "${WORK}/plain.s"
+            "${MODULES}/com/example/stack.anti")
 file(READ "${WORK}/plain.s" assembly)
 foreach(name push_grows top_is_last full_stack setup teardown)
     refuse("${assembly}" "${name}" "the assembly without --tests")
 endforeach()
 
-execute_process(
-    COMMAND "${ANTIC}" --runtime "${RUNTIME}" -c
-            -o "${WORK}/plain.antl" "${MODULES}/com/example/stack.anti"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -c failed with ${status}\n${err}")
-endif()
+antic_build(--runtime "${RUNTIME}" -I "${MODULES}" -c -o "${WORK}/plain.antl"
+            "${MODULES}/com/example/stack.anti")
 file(READ "${WORK}/plain.antl" library HEX)
 foreach(name push_grows top_is_last full_stack)
     string(HEX "${name}" needle)

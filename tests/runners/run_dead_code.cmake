@@ -26,6 +26,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
@@ -47,13 +49,8 @@ else()
     set(exe "${WORK}/${program}-${TARGET}")
 endif()
 file(REMOVE "${exe}")
-execute_process(
-    COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" --lto none -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed for ${TARGET}\n${err}")
-endif()
+antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            --lto none -o "${exe}" "${SOURCE}")
 
 # The names the image defines, one per line. Mach-O writes a C name with
 # a leading underscore, and the pattern below takes both spellings.

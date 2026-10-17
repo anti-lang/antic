@@ -35,16 +35,6 @@ string(REPLACE "." "\\." clang_asset "clang-${CLANG_TAG}-${HOST}.tar.xz")
 set(clang_where "needs clang ${clang_major}\\. Get ${clang_asset} from ${clang_page}, or another clang ${clang_major}, and put it first on PATH")
 include("${CMAKE_CURRENT_LIST_DIR}/../../tools/warnings.cmake")
 
-function(run)
-    execute_process(COMMAND ${ARGN}
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "${ARGN} failed with ${status}\n${out}${err}")
-    endif()
-    set(run_err "${err}" PARENT_SCOPE)
-endfunction()
-
 # Fail unless file holds the bytes of expected.
 function(expect_file file expected)
     file(READ "${file}" got)
@@ -71,8 +61,9 @@ function(compile_binding name module)
     get_filename_component(dir "${dir}" DIRECTORY)
     file(MAKE_DIRECTORY "${WORK}/src/${dir}" "${WORK}/lib/${dir}")
     file(COPY_FILE "${WORK}/out/${name}.anti" "${WORK}/src/${dir}/${name}.anti")
-    run("${ANTIC}" -c ${ARGN} -I "${WORK}/src" --runtime "${RUNTIME}"
-        -o "${WORK}/lib/${dir}/${name}.antl" "${WORK}/src/${dir}/${name}.anti")
+    antic_build(-c ${ARGN} -I "${WORK}/src" --runtime "${RUNTIME}" -o
+                "${WORK}/lib/${dir}/${name}.antl"
+                "${WORK}/src/${dir}/${name}.anti")
 endfunction()
 
 # Build the two probes that anti bind wrote, run both and compare their
@@ -81,11 +72,11 @@ endfunction()
 function(compare_probes name include)
     # The probe of C prints through the streams of C, which Windows opens
     # in text mode, so it takes binary_stdio.h as every C test file does.
-    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" ${ARGN}
-        ${HOST_LINK} -include "${CMAKE_CURRENT_LIST_DIR}/../binary_stdio.h"
-        -o "${WORK}/probe_c" "${WORK}/out/probe_${name}.c")
-    run("${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-        -I "${WORK}/lib" -o "${WORK}/probe_anti" "${WORK}/out/probe_${name}.anti")
+    tool_run("" ${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" ${ARGN}
+                ${HOST_LINK} -include "${CMAKE_CURRENT_LIST_DIR}/../binary_stdio.h"
+                -o "${WORK}/probe_c" "${WORK}/out/probe_${name}.c")
+    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I "${WORK}/lib"
+                -o "${WORK}/probe_anti" "${WORK}/out/probe_${name}.anti")
     program_output(c_hex c_status "${WORK}/probe_c.out" "${WORK}/probe_c")
     program_output(anti_hex anti_status "${WORK}/probe_anti.out"
                    "${WORK}/probe_anti")
@@ -104,12 +95,12 @@ endfunction()
 # Compile the shim, link a program that calls through the binding and
 # compare its output with the file expected.
 function(expect_calls name include program expected)
-    run(${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" -c
-        -o "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}"
-        "${WORK}/out/shim_${name}.c")
-    run("${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-        -I "${WORK}/lib" -o "${WORK}/calls" "${program}"
-        "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}")
+    tool_run("" ${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" -c
+                -o "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}"
+                "${WORK}/out/shim_${name}.c")
+    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I "${WORK}/lib"
+                -o "${WORK}/calls" "${program}"
+                "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}")
     program_output(got status "${WORK}/calls.out" "${WORK}/calls")
     file(READ "${expected}" wanted HEX)
     if(NOT status EQUAL 0)
@@ -174,10 +165,11 @@ if(CASE STREQUAL "header")
     # writes for the same module, which tests/dump holds.
     foreach(name geo shapes canvas failing tuples flags variants simdlib
             nested forms never)
-        run("${ANTIC}" -c --runtime "${RUNTIME}" -I "${SOURCES}"
-            -o "${WORK}/${name}.antl" "${SOURCES}/com/example/${name}.anti")
-        run("${ANTI}" bind --header "${WORK}/${name}.antl" -o "${WORK}/out"
-            --runtime "${RUNTIME}" -I "${SOURCES}")
+        antic_build(-c --runtime "${RUNTIME}" -I "${SOURCES}" -o
+                    "${WORK}/${name}.antl"
+                    "${SOURCES}/com/example/${name}.anti")
+        tool_run("" "${ANTI}" bind --header "${WORK}/${name}.antl" -o "${WORK}/out"
+                    --runtime "${RUNTIME}" -I "${SOURCES}")
         file(READ "${WORK}/out/${name}.h" got)
         file(READ "${DUMP}/${name}.h" wanted)
         expect_same_text("${name}.h, against ${DUMP}/${name}.h," "${wanted}"
@@ -195,8 +187,8 @@ if(CASE STREQUAL "header")
     endif()
     foreach(library IN LISTS spellings)
         file(REMOVE_RECURSE "${WORK}/renamed-out")
-        run("${ANTI}" bind --header "${library}" -o "${WORK}/renamed-out"
-            --runtime "${RUNTIME}" -I "${SOURCES}")
+        tool_run("" "${ANTI}" bind --header "${library}" -o "${WORK}/renamed-out"
+                    --runtime "${RUNTIME}" -I "${SOURCES}")
         file(GLOB written RELATIVE "${WORK}/renamed-out" "${WORK}/renamed-out/*")
         if(NOT written STREQUAL "geo.h")
             message(FATAL_ERROR "${library} gave ${written}, not geo.h")
@@ -210,9 +202,9 @@ elseif(CASE STREQUAL "clang")
     # tests/bind/layout.h holds one of each form. The module, the shim and
     # the warnings are fixed, the module compiles, the two probes agree and
     # the inline functions answer through the shim.
-    run("${ANTI}" bind --clang "${BIND}/layout.h" --module bindtest.layout
-        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
-    file(WRITE "${WORK}/warnings" "${run_err}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/layout.h" --module bindtest.layout
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/layout.anti" "${BIND}/layout.anti.expected")
     expect_file("${WORK}/out/shim_layout.c" "${BIND}/shim_layout.c.expected")
     expect_file("${WORK}/warnings" "${BIND}/layout.warnings")
@@ -225,10 +217,10 @@ elseif(CASE STREQUAL "forms")
     # header it includes stands in a directory that `-I` names. The module
     # and the warnings are fixed, the module compiles and the two probes
     # agree.
-    run("${ANTI}" bind --clang "${BIND}/forms.h" -I "${BIND}/include"
-        --module bindtest.forms --probe -o "${WORK}/out"
-        --runtime "${RUNTIME}")
-    file(WRITE "${WORK}/warnings" "${run_err}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/forms.h" -I "${BIND}/include"
+                --module bindtest.forms --probe -o "${WORK}/out"
+                --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/forms.anti" "${BIND}/forms.anti.expected")
     expect_file("${WORK}/warnings" "${BIND}/forms.warnings")
     compile_binding(forms bindtest.forms)
@@ -237,9 +229,9 @@ elseif(CASE STREQUAL "values")
     # tests/bind/values.h holds macros alone: the values that layout.h
     # leaves out, and the ones the evaluator skips. The module and the
     # warnings are fixed, and the module compiles.
-    run("${ANTI}" bind --clang "${BIND}/values.h" --module bindtest.values
-        -o "${WORK}/out" --runtime "${RUNTIME}")
-    file(WRITE "${WORK}/warnings" "${run_err}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/values.h" --module bindtest.values
+                -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/values.anti" "${BIND}/values.anti.expected")
     expect_file("${WORK}/warnings" "${BIND}/values.warnings")
     compile_binding(values bindtest.values)
@@ -247,10 +239,10 @@ elseif(CASE STREQUAL "functions")
     # tests/bind/functions.h holds the forms of a function that layout.h
     # leaves out. The module, the shim and the warnings are fixed, the
     # module compiles and the two probes agree.
-    run("${ANTI}" bind --clang "${BIND}/functions.h"
-        --module bindtest.functions --probe -o "${WORK}/out"
-        --runtime "${RUNTIME}")
-    file(WRITE "${WORK}/warnings" "${run_err}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/functions.h"
+                --module bindtest.functions --probe -o "${WORK}/out"
+                --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/functions.anti"
                 "${BIND}/functions.anti.expected")
     expect_file("${WORK}/out/shim_functions.c"
@@ -262,16 +254,16 @@ elseif(CASE STREQUAL "huge_enum")
     # An enum with a value above the range of a signed 64-bit integer, in
     # a struct. The two probes agree on the layout of the struct. T117 of
     # docs/audit/tests-findings.md.
-    run("${ANTI}" bind --clang "${BIND}/huge.h" --module bindtest.huge
-        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/huge.h" --module bindtest.huge
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
     compile_binding(huge bindtest.huge)
     compare_probes(huge "${BIND}")
 elseif(CASE STREQUAL "nested_enum")
     # An enum without a name as the type of a field. Each enumerator is a
     # constant of the module, as for such an enum outside a struct. T118
     # of docs/audit/tests-findings.md.
-    run("${ANTI}" bind --clang "${BIND}/tagged.h" --module bindtest.tagged
-        -o "${WORK}/out" --runtime "${RUNTIME}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/tagged.h" --module bindtest.tagged
+                -o "${WORK}/out" --runtime "${RUNTIME}")
     file(READ "${WORK}/out/tagged.anti" module)
     string(FIND "${module}" "pub const TAGGED_Y: c_int = 1;" at)
     if(at LESS 0)
@@ -283,9 +275,9 @@ elseif(CASE STREQUAL "words")
     # and a constant take a trailing `_` as a field does, and a macro is
     # skipped. The module and the warnings are fixed, the module compiles
     # and the two probes agree.
-    run("${ANTI}" bind --clang "${BIND}/words.h" --module bindtest.words
-        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
-    file(WRITE "${WORK}/warnings" "${run_err}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/words.h" --module bindtest.words
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/words.anti" "${BIND}/words.anti.expected")
     expect_file("${WORK}/warnings" "${BIND}/words.warnings")
     compile_binding(words bindtest.words)
@@ -293,8 +285,8 @@ elseif(CASE STREQUAL "words")
 elseif(CASE STREQUAL "unsigned_bitfield")
     # A bitfield of one bit of size_t holds 1, so the two probes set it and
     # agree, as for every unsigned type. M339 of docs/audit/summary.md.
-    run("${ANTI}" bind --clang "${BIND}/bits.h" --module bindtest.bits
-        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/bits.h" --module bindtest.bits
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
     file(READ "${WORK}/out/probe_bits.c" probe)
     string(FIND "${probe}" "dump(\"Bits.one\"" at)
     if(at EQUAL -1)
@@ -306,8 +298,8 @@ elseif(CASE STREQUAL "fixed_enum")
     # An enum with a fixed base takes that base on every target, and the
     # two probes agree on the structs that hold one. T137 of
     # docs/audit/tests-findings.md.
-    run("${ANTI}" bind --clang "${BIND}/fixed.h" --module bindtest.fixed
-        --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    tool_run("" "${ANTI}" bind --clang "${BIND}/fixed.h" --module bindtest.fixed
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
     file(READ "${WORK}/out/fixed.anti" module)
     foreach(line "pub enum Small: c_uchar" "pub enum Wide: c_ulonglong")
         string(FIND "${module}" "${line}" at)
@@ -333,12 +325,12 @@ elseif(CASE STREQUAL "escaped_path")
     else()
         set(dir "${WORK}/back\\slash")
         set(header "${dir}/layout.h")
-        run(mkdir -p "${dir}")
-        run(cp "${BIND}/layout.h" "${header}")
+        tool_run("" mkdir -p "${dir}")
+        tool_run("" cp "${BIND}/layout.h" "${header}")
     endif()
-    run("${ANTI}" bind --clang "${header}" --module bindtest.layout
-        -o "${WORK}/out" --runtime "${RUNTIME}")
-    file(WRITE "${WORK}/warnings" "${run_err}")
+    tool_run("" "${ANTI}" bind --clang "${header}" --module bindtest.layout
+                -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/layout.anti" "${BIND}/layout.anti.expected")
     expect_file("${WORK}/warnings" "${BIND}/layout.warnings")
 elseif(CASE STREQUAL "raymath")
@@ -346,9 +338,9 @@ elseif(CASE STREQUAL "raymath")
     # with C, and the functions of tests/abi/abi_raymath.anti called
     # through the generated binding and its shim print what the
     # hand-written binding prints.
-    run("${ANTI}" bind --clang "${RAYLIB}/src/raymath.h"
-        --module bindtest.raymath --probe -o "${WORK}/out"
-        --runtime "${RUNTIME}")
+    tool_run("" "${ANTI}" bind --clang "${RAYLIB}/src/raymath.h"
+                --module bindtest.raymath --probe -o "${WORK}/out"
+                --runtime "${RUNTIME}")
     compile_binding(raymath bindtest.raymath)
     compare_probes(raymath "${RAYLIB}/src")
     file(STRINGS "${ABI}/abi_raymath.expected" lines)
@@ -364,8 +356,8 @@ elseif(CASE STREQUAL "raylib")
     # raylib compiles. It compiles, names its frameworks and its Linux
     # libraries, turns the colour macros into constants of Color, and its
     # two probes agree.
-    run("${ANTI}" bind --clang "${RAYLIB}/src/raylib.h" --probe
-        -o "${WORK}/out" --runtime "${RUNTIME}")
+    tool_run("" "${ANTI}" bind --clang "${RAYLIB}/src/raylib.h" --probe
+                -o "${WORK}/out" --runtime "${RUNTIME}")
     file(READ "${WORK}/out/raylib.anti" module)
     foreach(line "link framework \"Cocoa\";" "link linux \"X11\";"
             "pub const RAYWHITE: Color = Color { r: 245, g: 245, b: 245, a: 255 };"
@@ -381,7 +373,7 @@ elseif(CASE STREQUAL "api")
     # A description in the format of rlparser, a part of raylib_api.json,
     # binds as anti.raylib with its frameworks and compiles. The file of
     # the pinned raylib is not JSON, and the refusal names the place.
-    run("${ANTI}" bind "${BIND}/raylib_api.json" -o "${WORK}/out")
+    tool_run("" "${ANTI}" bind "${BIND}/raylib_api.json" -o "${WORK}/out")
     expect_file("${WORK}/out/raylib.anti" "${BIND}/raylib.anti.expected")
     compile_binding(raylib anti.raylib --anti-internal)
     expect_refusal("raylib_api.json is not JSON: .* at line 4699, column 115"
@@ -402,9 +394,9 @@ elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words)$")
     # in the orders no other description has, a qualifier after a name, an
     # empty parameter list and nine spellings that do not parse. The
     # module and the warnings of each are fixed, and the module compiles.
-    run("${ANTI}" bind "${BIND}/${CASE}.json" --module bindtest.${CASE}
-        -o "${WORK}/out")
-    file(WRITE "${WORK}/warnings" "${run_err}")
+    tool_run("" "${ANTI}" bind "${BIND}/${CASE}.json" --module bindtest.${CASE}
+                -o "${WORK}/out")
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/${CASE}.anti" "${BIND}/${CASE}.anti.expected")
     expect_file("${WORK}/warnings" "${BIND}/${CASE}.warnings")
     compile_binding(${CASE} bindtest.${CASE})
@@ -507,19 +499,19 @@ elseif(CASE STREQUAL "api_malformed")
             {\"name\": \"SMALL\", \"type\": \"COLOR\",
              \"value\": \"CLITERAL(Pair){ 2, 1 }\"}],
         \"enums\": 5, \"callbacks\": {\"x\": 1}}")
-    run("${ANTI}" bind "${api}" --probe -o "${WORK}/out")
-    string(REGEX REPLACE "[ \n]+" " " said "${run_err}")
+    tool_run("" "${ANTI}" bind "${api}" --probe -o "${WORK}/out")
+    string(REGEX REPLACE "[ \n]+" " " said "${tool_stderr}")
     foreach(warning "the define `MINUS` is skipped" "the define `OPEN` is skipped"
             "the define `NEG` is skipped" "the define `HUGE` is skipped"
             "`g` is left out")
         string(FIND "${said}" "${warning}" at)
         if(at EQUAL -1)
-            message(FATAL_ERROR "no warning `${warning}`:\n${run_err}")
+            message(FATAL_ERROR "no warning `${warning}`:\n${tool_stderr}")
         endif()
     endforeach()
     string(FIND "${said}" "the define `SMALL` is skipped" at)
     if(NOT at EQUAL -1)
-        message(FATAL_ERROR "the define `SMALL` was skipped:\n${run_err}")
+        message(FATAL_ERROR "the define `SMALL` was skipped:\n${tool_stderr}")
     endif()
 elseif(CASE STREQUAL "clang_malformed")
     # Valid C that a reader of the AST mishandled, and macros nested deep
@@ -554,8 +546,8 @@ elseif(CASE STREQUAL "clang_malformed")
     string(APPEND text "#line 2147483647\n#define LATE 1\n"
            "struct Late { int a; };\nvoid late(struct Late *p);\n")
     file(WRITE "${h}" "${text}")
-    run("${ANTI}" bind --clang "${h}" --module bindtest.malformed
-        -o "${WORK}/out" --runtime "${RUNTIME}")
+    tool_run("" "${ANTI}" bind --clang "${h}" --module bindtest.malformed
+                -o "${WORK}/out" --runtime "${RUNTIME}")
     file(READ "${WORK}/out/malformed.anti" module)
     foreach(line "pub extern fn f(m: Mode);" "pub const F: c_int = 1;"
             "pub const CHAIN5000: c_int = 1;" "_f1\n{\n\ta: c_int," "_f2\n{\n\tb: c_float,"
@@ -566,12 +558,12 @@ elseif(CASE STREQUAL "clang_malformed")
             message(FATAL_ERROR "malformed.anti holds no line `${line}`\n${module}")
         endif()
     endforeach()
-    string(REGEX REPLACE "[ \n]+" " " said "${run_err}")
+    string(REGEX REPLACE "[ \n]+" " " said "${tool_stderr}")
     foreach(warning "the macro `MINUS` is no constant"
             "the macro `OPEN` is no constant" "the macro `CHAIN0` is no constant")
         string(FIND "${said}" "${warning}" at)
         if(at EQUAL -1)
-            message(FATAL_ERROR "no warning `${warning}`:\n${run_err}")
+            message(FATAL_ERROR "no warning `${warning}`:\n${tool_stderr}")
         endif()
     endforeach()
 elseif(CASE STREQUAL "ast_malformed")

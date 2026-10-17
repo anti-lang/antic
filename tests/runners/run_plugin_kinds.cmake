@@ -19,30 +19,21 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-# Run antic, which must succeed and print nothing.
-function(run)
-    execute_process(COMMAND "${ANTIC}" ${ARGV} RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic failed with ${status}: ${ARGV}\n${out}${err}")
-    endif()
-endfunction()
-
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/net/example" "${WORK}/lib")
 
 # The interface is a library file that both sides import.
-run(-c -I "${SOURCES}" --runtime "${RUNTIME}" -o "${WORK}/net/example/${INTERFACE}.antl"
-    "${SOURCES}/net/example/${INTERFACE}.anti")
-run(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
-    -I "${WORK}" -o "${WORK}/${HOST}${EXE}" "${SOURCES}/${HOST}.anti")
+antic_build(-c -I "${SOURCES}" --runtime "${RUNTIME}" -o "${WORK}/net/example/${INTERFACE}.antl"
+            "${SOURCES}/net/example/${INTERFACE}.anti")
+antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+            -I "${WORK}" -o "${WORK}/${HOST}${EXE}" "${SOURCES}/${HOST}.anti")
 set(import_library "")
 if(SUFFIX STREQUAL ".dll")
     set(import_library "${WORK}/${HOST}.lib")
 endif()
 set(library "${WORK}/lib/lib${LIBRARY}${SUFFIX}")
-run(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-    -I "${SOURCES}" -I "${WORK}" -o "${library}"
-    "${SOURCES}/net/example/${LIBRARY}.anti" ${import_library})
+antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+            -I "${SOURCES}" -I "${WORK}" -o "${library}"
+            "${SOURCES}/net/example/${LIBRARY}.anti" ${import_library})
 program_expect("the host" COMMAND "${WORK}/${HOST}${EXE}" "${library}"
                OUT_FILE "${EXPECTED}")

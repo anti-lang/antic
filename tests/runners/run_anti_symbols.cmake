@@ -27,15 +27,6 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${deploy}/plugins" "${WORK}/net/example")
 file(COPY "${FIXTURE}/tracer" DESTINATION "${WORK}")
 
-function(run what)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-        message(FATAL_ERROR "${what} failed with ${status}\n${out}${err}")
-    endif()
-    set(output "${out}" PARENT_SCOPE)
-endfunction()
-
 # Run `anti symbols` in the deployment, and give its status and output.
 function(symbols out_status out_text)
     execute_process(COMMAND "${ANTI}" symbols ${ARGN}
@@ -55,14 +46,8 @@ function(build_id file out)
 endfunction()
 
 function(release)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" build --release --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}"
-        WORKING_DIRECTORY "${project}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${project}" build --release --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "the release build failed with ${status}\n"
                             "${out}${err}")
@@ -84,18 +69,17 @@ else()
     # The plugin and its debug twin, which carry one build id. Its archive
     # is packed by another tool, which compresses what it holds.
     set(library "libfancy${SUFFIX}")
-    run("the interface" "${ANTIC}" -c -I "${PLUGIN}"
-        -o "${WORK}/net/example/greet.antl"
-        "${PLUGIN}/net/example/greet.anti")
-    run("the plugin" "${ANTIC}" --lib shared --no-runtime
-        --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${PLUGIN}"
-        -I "${WORK}" -o "${deploy}/plugins/${library}"
-        "${PLUGIN}/net/example/fancy.anti")
+    antic_build(-c -I "${PLUGIN}" -o "${WORK}/net/example/greet.antl"
+                "${PLUGIN}/net/example/greet.anti")
+    antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc
+                "${LLVM_MC}" -I "${PLUGIN}" -I "${WORK}" -o
+                "${deploy}/plugins/${library}"
+                "${PLUGIN}/net/example/fancy.anti")
     file(MAKE_DIRECTORY "${WORK}/twin")
-    run("the twin of the plugin" "${ANTIC}" -g --lib shared --no-runtime
-        --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${PLUGIN}"
-        -I "${WORK}" -o "${WORK}/twin/libfancy.debug"
-        "${PLUGIN}/net/example/fancy.anti")
+    antic_build(-g --lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc
+                "${LLVM_MC}" -I "${PLUGIN}" -I "${WORK}" -o
+                "${WORK}/twin/libfancy.debug"
+                "${PLUGIN}/net/example/fancy.anti")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf
                             "${deploy}/plugins/libfancy-symbols.zip"
                             --format=zip libfancy.debug

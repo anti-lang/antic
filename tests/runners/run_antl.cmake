@@ -12,15 +12,7 @@ cmake_minimum_required(VERSION 3.21)
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 string(REPLACE "|" ";" options "${OPTIONS}")
-execute_process(
-    COMMAND "${ANTIC}" -c -I "${ROOT}" ${options} -o "${OUTPUT}" "${SOURCE}"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic -c failed with ${status}\n${out}${err}")
-endif()
+antic_build(-c -I "${ROOT}" ${options} -o "${OUTPUT}" "${SOURCE}")
 file(READ "${OUTPUT}" hex HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "\\1 " hex "${hex}")
 string(REGEX REPLACE "(([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] ))" "\\1\n" hex "${hex}")

@@ -33,14 +33,8 @@ set(exe "${WORK}/${name}")
 string(REPLACE "," ";" options "${OPTIONS}")
 string(REPLACE "," ";" arguments "${ARGS}")
 string(REPLACE "," ";" objects "${STD_OBJECTS}")
-execute_process(
-    COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
-            -o "${exe}" "${SOURCE}" ${objects}
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
-endif()
+antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options} -o
+            "${exe}" "${SOURCE}" ${objects})
 file(STRINGS "${exe}" ids REGEX "^build [0-9a-f]+$")
 list(GET ids 0 id)
 string(REPLACE "build " "" id "${id}")

@@ -33,16 +33,7 @@ file(MAKE_DIRECTORY "${WORK}")
 file(COPY "${FIXTURE}/units" "${FIXTURE}/consumer" DESTINATION "${WORK}")
 
 function(run_anti where out_status out_text)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" ${ARGN}
-        WORKING_DIRECTORY "${where}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${where}" ${ARGN})
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}${err}" PARENT_SCOPE)
 endfunction()
@@ -186,7 +177,7 @@ string(REPLACE "version = \"1.2.0\", repo" "version = \"=1.1.0\", repo"
        manifest "${manifest}")
 file(WRITE "${WORK}/fetched/consumer/anti.toml" "${manifest}")
 run_anti("${WORK}/fetched/consumer" status text build --runtime "${RUNTIME}"
-         --llvm-mc "${LLVM_MC}")
+         --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
 if(status EQUAL 0 OR NOT text MATCHES "satisfies every constraint")
     message(FATAL_ERROR "the yanked version answered the constraint: ${text}")
 endif()

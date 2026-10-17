@@ -36,16 +36,7 @@ file(COPY "${FIXTURE}/app" DESTINATION "${WORK}")
 # The cache of the repositories is the user's, so the run names its own
 # and leaves the one of this machine alone.
 function(run_anti out_status out_text)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" ${ARGN}
-        WORKING_DIRECTORY "${project}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${project}" ${ARGN})
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}${err}" PARENT_SCOPE)
 endfunction()
@@ -329,13 +320,8 @@ foreach(file anti.toml src/com/example/demo.anti)
         message(FATAL_ERROR "anti new wrote no ${file}")
     endif()
 endforeach()
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "XDG_CACHE_HOME=${WORK}/cache"
-            "LOCALAPPDATA=${WORK}/cache"
-            "${ANTI}" run --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
-    WORKING_DIRECTORY "${WORK}/new/demo"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
+anti_run(status out err "${WORK}/new/demo" run --runtime "${RUNTIME}"
+         --llvm-mc "${LLVM_MC}")
 if(NOT status EQUAL 0 OR NOT out MATCHES "hello")
     message(FATAL_ERROR "the project of anti new wrote ${out}${err}")
 endif()

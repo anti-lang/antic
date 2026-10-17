@@ -18,6 +18,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}" OR runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no sysroot or runtime for ${TARGET}")
@@ -25,13 +27,8 @@ if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}" OR runtime_library STREQUAL "")
 endif()
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/symbols")
-execute_process(
-    COMMAND "${ANTIC}" -g --target ${TARGET} --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -g failed for ${TARGET}\n${err}")
-endif()
+antic_build(-g --target ${TARGET} --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+            -o "${exe}" "${SOURCE}")
 
 function(probe form file symbol offset wanted)
     execute_process(COMMAND "${PROBE}" ${form} "${file}" ${symbol} ${offset}
@@ -48,13 +45,8 @@ endfunction()
 # as the entry on inlined frames in docs/decisions.md says. The release
 # build gives main, and a dev build gives inner, at the line of its
 # declaration.
-execute_process(
-    COMMAND "${ANTIC}" --dev -g --target ${TARGET} --llvm-mc "${LLVM_MC}"
-            --runtime "${RUNTIME}" -o "${exe}_dev" "${SOURCE}"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic --dev -g failed for ${TARGET}\n${err}")
-endif()
+antic_build(--dev -g --target ${TARGET} --llvm-mc "${LLVM_MC}" --runtime
+            "${RUNTIME}" -o "${exe}_dev" "${SOURCE}")
 if("${TARGET}" MATCHES "^linux-")
     probe(elf "${exe}" symbols.main 0 "symbols.main symbols.anti:12")
     probe(elf "${exe}_dev" symbols.inner 0 "symbols.inner symbols.anti:6")

@@ -10,18 +10,14 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
 # Run antic with ARGN, which must succeed and print nothing.
 function(antic)
-    execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}"
-                            ${ARGN}
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic ${ARGN} gave ${status}\n${out}${err}")
-    endif()
+    antic_build(--runtime "${RUNTIME}" ${ARGN})
 endfunction()
 
 # Fail unless path exists, or with ABSENT unless it does not.

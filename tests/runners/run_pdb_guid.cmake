@@ -11,6 +11,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
@@ -30,18 +32,8 @@ foreach(mode release debug)
         set(flags -g)
     endif()
     file(REMOVE "${exe}" "${pdb}")
-    execute_process(
-        COMMAND "${ANTIC}" --target "${TARGET}" --llvm-mc "${LLVM_MC}"
-                --runtime "${RUNTIME}" ${flags} -o "${exe}" "${SOURCE}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-        ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "antic failed for ${TARGET} ${mode}\n${out}${err}")
-    endif()
-    # A link of a program of Anti says nothing.
-    if(NOT "${out}${err}" STREQUAL "")
-        message(FATAL_ERROR "the ${mode} link for ${TARGET} printed\n${out}${err}")
-    endif()
+    antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime
+                "${RUNTIME}" ${flags} -o "${exe}" "${SOURCE}")
     if(NOT EXISTS "${pdb}")
         message(FATAL_ERROR "the ${mode} link for ${TARGET} wrote no ${pdb}")
     endif()

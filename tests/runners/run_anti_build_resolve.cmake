@@ -30,33 +30,15 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
 function(run_anti_status where out_status out_text)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" ${ARGN} --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}"
-        WORKING_DIRECTORY "${where}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${where}" ${ARGN} --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}${err}" PARENT_SCOPE)
 endfunction()
 
 function(run_anti where)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" ${ARGN} --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}"
-        WORKING_DIRECTORY "${where}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${where}" ${ARGN} --runtime "${RUNTIME}"
+             --llvm-mc "${LLVM_MC}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti ${ARGN} in ${where} failed with "
                             "${status}\n${out}${err}")

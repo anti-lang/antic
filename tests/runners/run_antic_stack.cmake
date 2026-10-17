@@ -15,6 +15,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
@@ -28,19 +30,10 @@ endforeach()
 file(WRITE "${WORK}/deep.anti"
     "fn main() -> int\n{\n\tlet x = 1;\n\treturn ${expr} - x - ${depth};\n}\n")
 
-execute_process(
-    COMMAND sh -c
-            "ulimit -s 256 && exec \"$0\" -S \"$1\" -o \"$2\" --opt \"$3\" --llc \"$4\""
-            "${ANTIC}" "${WORK}/deep.anti" "${WORK}/deep.s" "${OPT}" "${LLC}"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR
-        "antic failed on the deepest source with a main stack of 256 KB, "
-        "status ${status}:\n${out}${err}")
-endif()
+# antic runs on the deepest source with a main stack of 256 KB.
+antic_build(THROUGH sh -c "ulimit -s 256 && exec \"$0\" \"$@\""
+            COMMAND -S "${WORK}/deep.anti" -o "${WORK}/deep.s" --opt "${OPT}"
+                    --llc "${LLC}")
 if(NOT EXISTS "${WORK}/deep.s")
-    message(FATAL_ERROR "antic wrote no assembly:\n${out}${err}")
+    message(FATAL_ERROR "antic wrote no assembly")
 endif()

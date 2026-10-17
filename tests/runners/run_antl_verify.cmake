@@ -10,6 +10,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(scale "${LIBS}/com/example/scale.antl")
@@ -26,13 +28,8 @@ execute_process(
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "poke_byte failed with ${status}")
 endif()
-execute_process(
-    COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" -I "${LIBS}"
-            -o "${WORK}/scale_antl" "${WORK}/scale.antl"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
+antic_run(status out err COMMAND --dev --llvm-mc "${LLVM_MC}" -I "${LIBS}" -o
+          "${WORK}/scale_antl" "${WORK}/scale.antl")
 if(status EQUAL 0)
     message(FATAL_ERROR "antic --dev compiled a library file that fails "
                         "verification\n${out}${err}")

@@ -59,9 +59,8 @@ file(MAKE_DIRECTORY "${WORK}")
 # antic with the options, which must fail with status 2 and a message
 # that matches the pattern.
 function(refused pattern)
-    execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" ${ARGN}
-                            -o "${WORK}/refused" "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
+    antic_run(status ignored_out err COMMAND --runtime "${RUNTIME}" ${ARGN} -o
+              "${WORK}/refused" "${SOURCE}")
     if(NOT status EQUAL 2 OR NOT err MATCHES "${pattern}")
         message(FATAL_ERROR "antic ${ARGN} gave ${status}, not 2 with "
                             "'${pattern}':\n${err}")
@@ -70,13 +69,8 @@ endfunction()
 
 # antic with the options, which must succeed and print nothing.
 function(built output)
-    execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" ${options}
-                            ${ARGN} -o "${output}" "${SOURCE}"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic ${ARGN} gave ${status}\n${out}${err}")
-    endif()
+    antic_build(--runtime "${RUNTIME}" ${options} ${ARGN} -o "${output}"
+                "${SOURCE}")
 endfunction()
 
 file(WRITE "${WORK}/empty.profdata" "")

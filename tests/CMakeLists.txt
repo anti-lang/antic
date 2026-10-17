@@ -592,6 +592,11 @@ add_test(NAME compare_runner
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/compare-runner"
         -P "${ANTIC_RUNNERS}/run_compare_self.cmake")
 
+# A runner runs antic through antic_run or antic_build alone.
+add_test(NAME antic_calls
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_antic_calls.cmake")
+
 # The runtime archive holds the licence text of every component.
 add_expect_test(runtime_licenses STATUS 0
     PATTERN "^BSD Zero Clause License"

@@ -11,6 +11,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
 foreach(case linux-x86_64=4000 linux-arm64=4000 macos-arm64=4000
         macos-x86_64=4000 windows-x86_64=8000 windows-arm64=8000)
@@ -18,12 +20,8 @@ foreach(case linux-x86_64=4000 linux-arm64=4000 macos-arm64=4000
     list(GET parts 0 target)
     list(GET parts 1 wanted)
     set(listing "${WORK}/mutex_size.${target}.s")
-    execute_process(COMMAND "${ANTIC}" -S --target "${target}" -o "${listing}"
-                            --opt "${OPT}" --llc "${LLC}" "${SOURCE}"
-                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT err STREQUAL "")
-        message(FATAL_ERROR "antic -S failed for ${target}\n${err}")
-    endif()
+    antic_build(-S --target "${target}" -o "${listing}" --opt "${OPT}" --llc
+                "${LLC}" "${SOURCE}")
     file(READ "${listing}" text)
     # llc writes a comment after the constant, `// =0xfa0`.
     if(NOT text MATCHES "[#$]${wanted}[,\n ]")

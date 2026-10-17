@@ -24,8 +24,10 @@
 # A test passes a unit of antic when
 #   - the command line of a registered test holds the path of antic and
 #     the option as an argument, or
-#   - a runner under tests/ holds `${ANTIC}` and the option as a word.
-# A test passes a unit of anti when
+#   - a runner under tests/ holds `${ANTIC}`, or a call of antic_build,
+#     antic_run or antic_program, and the option as a word.
+# A test passes a unit of anti when, with a call of anti_run read as the
+# call of anti it makes,
 #   - the command line of a registered test holds the path of anti, then
 #     the command and then the option, each as an argument, or
 #   - one command of a runner that holds `${ANTI}` holds the command and
@@ -182,7 +184,12 @@ set(count 0)
 foreach(file IN LISTS scripts)
     read_text(text "${file}")
     string(REGEX REPLACE "(^|\n)[ \t]*#[^\n]*" "\\1" text "${text}")
-    if(text MATCHES "[$]{ANTIC}")
+    # A call of anti_run of tests/program_output.cmake reads as the call
+    # of anti it makes.
+    string(REGEX REPLACE
+           "anti_run\\([ \t\n]*[A-Za-z_0-9]+[ \t\n]+[A-Za-z_0-9]+[ \t\n]+[A-Za-z_0-9]+[ \t\n]+(\"[^\"\n]*\"|[^ \t\n\"]+)[ \t\n]+(ENV[^)]*[ \t\n]COMMAND[ \t\n]+)?"
+           "\"\${ANTI}\" " text "${text}")
+    if(text MATCHES "[$]{ANTIC}|(^|[^a-z_])antic_(build|run|program)[(]")
         string(APPEND antic_runners "${text}\n")
     endif()
     if(text MATCHES "[$]{ANTI}")

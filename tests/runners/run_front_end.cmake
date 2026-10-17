@@ -9,18 +9,11 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
-execute_process(
-    COMMAND "${ANTIC}" --front-end --runtime "${RUNTIME}"
-            -o "${WORK}/good" "${GOOD}"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "the front end refused ${GOOD} with ${status}\n${err}")
-endif()
+antic_build(--front-end --runtime "${RUNTIME}" -o "${WORK}/good" "${GOOD}")
 file(GLOB written "${WORK}/*")
 if(written)
     message(FATAL_ERROR "the front end wrote ${written}")
@@ -28,12 +21,7 @@ endif()
 
 # The same run without --runtime needs no linker and no runtime archive,
 # because nothing below the checker runs.
-execute_process(
-    COMMAND "${ANTIC}" --front-end "${GOOD}"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
+antic_run(status out err COMMAND --front-end "${GOOD}")
 if(status EQUAL 0)
     message(FATAL_ERROR "a program that imports anti.lang needs the archive")
 endif()
@@ -43,12 +31,7 @@ if(NOT at LESS 0)
 endif()
 
 # A program the checker refuses still exits non-zero.
-execute_process(
-    COMMAND "${ANTIC}" --front-end --runtime "${RUNTIME}" "${BAD}"
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
+antic_run(status out err COMMAND --front-end --runtime "${RUNTIME}" "${BAD}")
 if(status EQUAL 0)
     message(FATAL_ERROR "the front end accepted ${BAD}")
 endif()

@@ -16,6 +16,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(source "${ROOT}/tests/programs/return42.anti")
@@ -37,11 +39,9 @@ endfunction()
 # fallback on it would succeed, and with the given variables set.
 function(run_antic what expected_status pattern)
     cmake_parse_arguments(PARSE_ARGV 3 arg "" "" "ENV;COMMAND")
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env "PATH=${RUNTIME}/bin" ${arg_ENV}
-                "${ANTIC}" ${arg_COMMAND}
-        WORKING_DIRECTORY "${WORK}" RESULT_VARIABLE status
-        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    antic_run(status out err IN "${WORK}"
+              THROUGH "${CMAKE_COMMAND}" -E env "PATH=${RUNTIME}/bin" ${arg_ENV}
+              COMMAND ${arg_COMMAND})
     if(NOT status EQUAL expected_status)
         message(FATAL_ERROR "${what}: antic ended with ${status}, not "
                             "${expected_status}\n${out}${err}")

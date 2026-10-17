@@ -37,17 +37,8 @@ set(mode_options "")
 if(MODE STREQUAL "dev")
     set(mode_options --dev)
 endif()
-execute_process(
-    COMMAND "${ANTIC}" --runtime "${RUNTIME}"
-            --target "${TARGET_NAME}" ${mode_options} ${options}
-            -o "${base}" "${SOURCE}" ${objects}
-    RESULT_VARIABLE status
-    OUTPUT_VARIABLE out
-    ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0 OR NOT out STREQUAL "" OR NOT err STREQUAL "")
-    message(FATAL_ERROR "antic gave ${status} for ${base}\n${out}${err}")
-endif()
+antic_build(--runtime "${RUNTIME}" --target "${TARGET_NAME}" ${mode_options}
+            ${options} -o "${base}" "${SOURCE}" ${objects})
 foreach(intermediate "${base}.ll" "${base}.bc")
     if(EXISTS "${intermediate}")
         message(FATAL_ERROR "${intermediate} stays without --keep-llvm")

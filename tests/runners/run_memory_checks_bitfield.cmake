@@ -24,12 +24,7 @@ file(MAKE_DIRECTORY "${WORK}")
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 set(program "${WORK}/memory_checks_bitfield")
-execute_process(COMMAND "${ANTIC}" --memory-checks --runtime "${RUNTIME}"
-                        -o "${program}" "${SOURCE}"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed\n${err}")
-endif()
+antic_build(--memory-checks --runtime "${RUNTIME}" -o "${program}" "${SOURCE}")
 
 program_expect("memory checks bitfield" COMMAND "${program}" STATUS 1
                ANY_ERR)

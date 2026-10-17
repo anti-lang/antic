@@ -151,17 +151,8 @@ function(anti_message name)
         file(COPY_FILE "${ANTI}" "${anti}")
         file(CHMOD "${anti}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
     endif()
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                ${arg_ENV}
-                "${anti}" ${arg_ARGS}
-        WORKING_DIRECTORY "${PROJECT}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    set(ANTI "${anti}")
+    anti_run(status out err "${PROJECT}" ENV ${arg_ENV} COMMAND ${arg_ARGS})
     # What anti wrote stays beside the project, for the reader of a failure.
     file(WRITE "${WORK}/stdout" "${out}")
     file(WRITE "${WORK}/stderr" "${err}")

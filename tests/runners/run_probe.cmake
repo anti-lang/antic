@@ -25,13 +25,8 @@ execute_process(COMMAND ${CC} ${ANTIC_C_WARNINGS} -std=c11 ${HOST_LINK}
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "${CC} ${NAME}.c failed\n${err}")
 endif()
-execute_process(
-    COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
-            -o "${WORK}/${NAME}_anti" "${SOURCES}/${NAME}.anti"
-    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic ${NAME}.anti failed\n${err}")
-endif()
+antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o
+            "${WORK}/${NAME}_anti" "${SOURCES}/${NAME}.anti")
 program_output(c_hex c_status "${WORK}/${NAME}_c.stdout" "${WORK}/${NAME}_c")
 program_output(anti_hex anti_status "${WORK}/${NAME}_anti.stdout" "${WORK}/${NAME}_anti")
 # Each probe ends with 0, so two that stop on the same output fail too.

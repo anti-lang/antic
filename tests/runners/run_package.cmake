@@ -28,6 +28,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(READ "${ROOT}/tools/pack-anti.cmake" packer_text)
 if(packer_text MATCHES "xcrun[^\n]*--show-sdk-path" AND
    NOT packer_text MATCHES "xcrun --sdk")
@@ -221,12 +223,8 @@ endif()
 # symbols of a binary, whose readers stand in src/rt. On a Linux host the
 # packer compiled that anti itself, which once left the three readers out.
 function(run_packed what)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-                "${WORK}/unpacked/anti/bin/anti${suffix}" ${ARGN}
-        WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE status
-        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
+    set(ANTI "${WORK}/unpacked/anti/bin/anti${suffix}")
+    anti_run(status out err "${WORK}/run" ${ARGN})
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "the packed anti: ${what} failed with ${status}\n"
                             "${out}${err}")
@@ -323,21 +321,15 @@ else()
 endif()
 set(saved_path "$ENV{PATH}")
 set(ENV{PATH} "${bind_path}")
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env
-            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-            "${WORK}/unpacked/anti/bin/anti${suffix}" bind --clang
-            "${WORK}/unpacked/anti/include/raylib/raylib.h"
-            -o "${WORK}/run/bound-clang"
-    WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE packed_status
-    OUTPUT_VARIABLE packed_out ERROR_VARIABLE packed_err ENCODING NONE)
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env
-            "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-            "${ANTI}" bind --clang "${RAYLIB}/src/raylib.h"
-            -o "${WORK}/run/bound-tree" --runtime "${RUNTIME}"
-    WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE tree_status
-    OUTPUT_VARIABLE tree_out ERROR_VARIABLE tree_err ENCODING NONE)
+set(tree_anti "${ANTI}")
+set(ANTI "${WORK}/unpacked/anti/bin/anti${suffix}")
+anti_run(packed_status packed_out packed_err "${WORK}/run" bind --clang
+         "${WORK}/unpacked/anti/include/raylib/raylib.h"
+         -o "${WORK}/run/bound-clang")
+set(ANTI "${tree_anti}")
+anti_run(tree_status tree_out tree_err "${WORK}/run" bind --clang
+         "${RAYLIB}/src/raylib.h" -o "${WORK}/run/bound-tree"
+         --runtime "${RUNTIME}")
 set(ENV{PATH} "${saved_path}")
 if(NOT packed_status EQUAL 0)
     message(FATAL_ERROR "the packed anti bind --clang of include/raylib/raylib.h "
@@ -379,17 +371,18 @@ foreach(target IN LISTS targets)
     if(target MATCHES "^windows-")
         string(APPEND exe ".exe")
     endif()
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env "PATH=" --unset=LIB
-                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
-                "${bin}/antic${suffix}" --target "${target}" -o "${exe}"
-                "${ROOT}/tests/programs/return42.anti"
-        WORKING_DIRECTORY "${WORK}/run" RESULT_VARIABLE status
-        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0 OR NOT EXISTS "${exe}")
-        message(FATAL_ERROR "the package alone, with an empty PATH and no LIB, "
-                            "links no program for ${target}: antic ended with "
-                            "${status}\n${out}${err}")
+    # The antic of the package, with an empty PATH and no LIB.
+    set(tree_antic "${ANTIC}")
+    set(ANTIC "${bin}/antic${suffix}")
+    antic_build(IN "${WORK}/run"
+                THROUGH "${CMAKE_COMMAND}" -E env "PATH=" --unset=LIB
+                        "XDG_CACHE_HOME=${WORK}/cache"
+                        "LOCALAPPDATA=${WORK}/cache"
+                COMMAND --target "${target}" -o "${exe}"
+                        "${ROOT}/tests/programs/return42.anti")
+    set(ANTIC "${tree_antic}")
+    if(NOT EXISTS "${exe}")
+        message(FATAL_ERROR "the package alone links no program for ${target}")
     endif()
 endforeach()
 # The notice of a program of musl, printed by the packed anti from the

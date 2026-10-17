@@ -114,15 +114,6 @@ list(APPEND CC ${ANTIC_C_WARNINGS})
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-function(run)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
-        OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "${ARGN} failed with ${status}\n${out}${err}")
-    endif()
-    set(run_out "${out}" PARENT_SCOPE)
-endfunction()
-
 # Compile the C sources of SOURCES with the options of OPTIONS, and link
 # them with the inputs of INPUTS into output. On Windows the pinned clang
 # compiles each source for the target and lld-link links the objects
@@ -149,7 +140,7 @@ function(program output)
         foreach(source IN LISTS arg_SOURCES)
             get_filename_component(name "${source}" NAME_WE)
             set(object "${output}-${name}.o")
-            run(${CC} ${arg_OPTIONS} -c "${source}" -o "${object}")
+            tool_run("" ${CC} ${arg_OPTIONS} -c "${source}" -o "${object}")
             list(APPEND objects "${object}")
         endforeach()
     endif()
@@ -161,14 +152,14 @@ function(program output)
             list(GET runtimes 0 lowest)
             list(APPEND inputs "${lowest}")
         endif()
-        run("${LLD_LINK}" ${WINDOWS_LINK} "/OUT:${output}" ${objects}
-            ${inputs} ${ANTIC_WINDOWS_LIBRARIES})
+        tool_run("" "${LLD_LINK}" ${WINDOWS_LINK} "/OUT:${output}" ${objects}
+                    ${inputs} ${ANTIC_WINDOWS_LIBRARIES})
     elseif(MACOS_LINK)
-        run("${LD64}" ${MACOS_LINK} ${objects} ${arg_INPUTS} ${rpaths}
-            -o "${output}")
+        tool_run("" "${LD64}" ${MACOS_LINK} ${objects} ${arg_INPUTS} ${rpaths}
+                    -o "${output}")
     else()
-        run(${CC} ${arg_OPTIONS} ${arg_SOURCES} ${arg_INPUTS} ${cc_rpaths}
-            ${LINK} -o "${output}")
+        tool_run("" ${CC} ${arg_OPTIONS} ${arg_SOURCES} ${arg_INPUTS} ${cc_rpaths}
+                    ${LINK} -o "${output}")
     endif()
 endfunction()
 
@@ -186,10 +177,11 @@ function(library name kind dir)
     if(kind STREQUAL "shared" AND CMAKE_HOST_WIN32)
         set(link "${dir}/${name}.lib")
     endif()
-    run("${ANTIC}" --lib ${kind} ${ARGN} ${TARGET_OPTION} --llvm-mc "${LLVM_MC}"
-        --llvm-ar "${LLVM_AR}" --runtime "${RUNTIME}" -I "${SOURCES}"
-        -o "${file}" "${SOURCES}/com/example/${name}.anti")
-    set(run_out "${run_out}" PARENT_SCOPE)
+    antic_build(OUTPUT tool_stdout COMMAND --lib ${kind} ${ARGN} ${TARGET_OPTION}
+                --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}" --runtime
+                "${RUNTIME}" -I "${SOURCES}" -o "${file}"
+                "${SOURCES}/com/example/${name}.anti")
+    set(tool_stdout "${tool_stdout}" PARENT_SCOPE)
     set(library_file "${file}" PARENT_SCOPE)
     set(library_link "${link}" PARENT_SCOPE)
 endfunction()
@@ -225,14 +217,14 @@ file(REMOVE_RECURSE "${dir}")
 if(CASE STREQUAL "static")
     library(geo static "${dir}")
     # The printed line links main.c with the archive and the runtime.
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     if(NOT line MATCHES "^${DRIVER} main.c ${library_file} ${RUNTIME}/lib/[a-z0-9_-]+/[a-z0-9.]+/${RUNTIME_LIBRARY}")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
     # The archive keeps the copy of the package header in an object.
-    run("${LLVM_AR}" t "${library_file}")
-    if(NOT run_out MATCHES "geo.package.o")
-        message(FATAL_ERROR "the archive holds no package header\n${run_out}")
+    tool_run("" "${LLVM_AR}" t "${library_file}")
+    if(NOT tool_stdout MATCHES "geo.package.o")
+        message(FATAL_ERROR "the archive holds no package header\n${tool_stdout}")
     endif()
     string(REPLACE "${DRIVER} main.c " "" inputs "${line}")
     separate_arguments(inputs UNIX_COMMAND "${inputs}")
@@ -244,7 +236,7 @@ elseif(CASE STREQUAL "classes")
     # it. The header compiles as C11 and as C++17.
     library(canvas static "${dir}")
     expect_header("${dir}/canvas.h" canvas.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/canvas${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/canvas.c"
@@ -253,11 +245,11 @@ elseif(CASE STREQUAL "classes")
     # The copy finds ../binary_stdio.h through the directory of canvas.c.
     configure_file("${SOURCES}/canvas.c" "${dir}/canvas.cpp" COPYONLY)
     if(CMAKE_HOST_WIN32)
-        run(${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
-            "${dir}/canvas.cpp")
+        tool_run("" ${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
+                    "${dir}/canvas.cpp")
     else()
-        run(${CXX} -std=c++17 -I "${dir}" -I "${SOURCES}" "${dir}/canvas.cpp"
-            "${library_file}" "${runtime_library}" ${LINK} -o "${dir}/canvaspp")
+        tool_run("" ${CXX} -std=c++17 -I "${dir}" -I "${SOURCES}" "${dir}/canvas.cpp"
+                    "${library_file}" "${runtime_library}" ${LINK} -o "${dir}/canvaspp")
         expect_output("${dir}/canvaspp" "${SOURCES}/canvas.expected")
     endif()
 elseif(CASE STREQUAL "failing")
@@ -265,7 +257,7 @@ elseif(CASE STREQUAL "failing")
     # the header says in a comment that each may fail.
     library(failing static "${dir}")
     expect_header("${dir}/failing.h" failing.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/failing${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/failing.c"
@@ -277,21 +269,21 @@ elseif(CASE STREQUAL "generics")
     # per public function. The header compiles as C11 and as C++17.
     library(stacks static "${dir}")
     expect_header("${dir}/stacks.h" stacks.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/stacks${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/stacks.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/stacks${EXE}" "${SOURCES}/stacks.expected")
     configure_file("${SOURCES}/stacks.c" "${dir}/stacks.cpp" COPYONLY)
-    run(${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
-        "${dir}/stacks.cpp")
+    tool_run("" ${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
+                "${dir}/stacks.cpp")
 elseif(CASE STREQUAL "tuples")
     # A tuple of an exported signature crosses as the struct the header
     # writes for it, one per distinct tuple, and C builds one of its own.
     library(tuples static "${dir}")
     expect_header("${dir}/tuples.h" tuples.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/tuples${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/tuples.c"
@@ -302,7 +294,7 @@ elseif(CASE STREQUAL "optional")
     # and a bool that the header writes for it, one per T.
     library(optional static "${dir}")
     expect_header("${dir}/optional.h" optional.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/optional${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/optional.c"
@@ -314,7 +306,7 @@ elseif(CASE STREQUAL "simd")
     # struct of its lanes.
     library(simdlib static "${dir}")
     expect_header("${dir}/simdlib.h" simdlib.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/simd${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/simd.c"
@@ -328,13 +320,13 @@ elseif(CASE STREQUAL "forms")
     # as well.
     library(forms static "${dir}")
     expect_header("${dir}/forms.h" forms.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/forms${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/forms.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/forms${EXE}" "${SOURCES}/forms.expected")
-    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only "${SOURCES}/forms.cpp")
+    tool_run("" ${CXX} -std=c++17 -I "${dir}" -fsyntax-only "${SOURCES}/forms.cpp")
 elseif(CASE STREQUAL "views")
     # More forms of a header that no other library holds: an enum, an
     # optional result, types that name themselves, a field named as a
@@ -344,13 +336,13 @@ elseif(CASE STREQUAL "views")
     # header compiles as C++17 as well.
     library(views static "${dir}")
     expect_header("${dir}/views.h" views.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/views${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/views.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/views${EXE}" "${SOURCES}/views.expected")
-    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only "${SOURCES}/views.cpp")
+    tool_run("" ${CXX} -std=c++17 -I "${dir}" -fsyntax-only "${SOURCES}/views.cpp")
 elseif(CASE STREQUAL "never" OR CASE STREQUAL "never_cpp")
     # An export function that never returns. The header declares it so,
     # and a C program ends inside the call. never_cpp compiles the header
@@ -358,7 +350,7 @@ elseif(CASE STREQUAL "never" OR CASE STREQUAL "never_cpp")
     library(never static "${dir}")
     expect_header("${dir}/never.h" never.h)
     if(CASE STREQUAL "never")
-        string(STRIP "${run_out}" line)
+        string(STRIP "${tool_stdout}" line)
         string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library
                "${line}")
         program("${dir}/never${EXE}" OPTIONS -std=c11 -I "${dir}"
@@ -366,15 +358,15 @@ elseif(CASE STREQUAL "never" OR CASE STREQUAL "never_cpp")
                 INPUTS "${library_file}" "${runtime_library}")
         expect_output("${dir}/never${EXE}" "${SOURCES}/never.expected")
     else()
-        run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
-            "${SOURCES}/never.cpp")
+        tool_run("" ${CXX} -std=c++17 -I "${dir}" -fsyntax-only
+                    "${SOURCES}/never.cpp")
     endif()
 elseif(CASE STREQUAL "flags")
     # Flags crosses as the struct of four bools the header writes for it,
     # passed and returned by value and held as a field.
     library(flags static "${dir}")
     expect_header("${dir}/flags.h" flags.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/flags${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/flags.c"
@@ -384,7 +376,7 @@ elseif(CASE STREQUAL "tight")
     # The struct the header writes for a packed class has the size Anti
     # gives the class.
     library(tight static "${dir}")
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/tight${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/tight.c"
@@ -394,7 +386,7 @@ elseif(CASE STREQUAL "tight_aligned")
     # The struct the header writes for a packed struct with align(16) has
     # the size and the alignment Anti gives the struct.
     library(tight static "${dir}")
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/tight_aligned${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/tight_aligned.c"
@@ -406,7 +398,7 @@ elseif(CASE STREQUAL "ledger")
     # two threads of C call it without losing an addition.
     library(ledger static "${dir}")
     expect_header("${dir}/ledger.h" ledger.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/ledger${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/ledger.c"
@@ -418,7 +410,7 @@ elseif(CASE STREQUAL "handlers")
     # object frees the snapshot.
     library(handlers static "${dir}")
     expect_header("${dir}/handlers.h" handlers.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/handlers${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/handlers.c"
@@ -429,7 +421,7 @@ elseif(CASE STREQUAL "names")
     # name each, writes a whole float constant as a float of its type, and
     # declares every entry of a table of more than 64 public functions.
     library(names static "${dir}")
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/names${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/names.c"
@@ -442,14 +434,14 @@ elseif(CASE STREQUAL "variants")
     # as well.
     library(variants static "${dir}")
     expect_header("${dir}/variants.h" variants.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/variants${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/variants.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/variants${EXE}" "${SOURCES}/variants.expected")
-    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
-        "${SOURCES}/variants.cpp")
+    tool_run("" ${CXX} -std=c++17 -I "${dir}" -fsyntax-only
+                "${SOURCES}/variants.cpp")
 elseif(CASE STREQUAL "nested")
     # An export class whose layout holds types nested in it. The header
     # writes each one the layout reaches before the class, under the name
@@ -457,14 +449,14 @@ elseif(CASE STREQUAL "nested")
     # compiles as C++17 as well.
     library(nested static "${dir}")
     expect_header("${dir}/nested.h" nested.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/nested${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/nested.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/nested${EXE}" "${SOURCES}/nested.expected")
-    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
-        "${SOURCES}/nested.cpp")
+    tool_run("" ${CXX} -std=c++17 -I "${dir}" -fsyntax-only
+                "${SOURCES}/nested.cpp")
 elseif(CASE MATCHES "^ctypes")
     # Every C type Anti names, in a library built three ways: as an
     # archive beside the runtime, as a shared library and as an archive
@@ -478,7 +470,7 @@ elseif(CASE MATCHES "^ctypes")
         set(inputs "${library_file}")
     else()
         library(ctypes static "${dir}")
-        string(STRIP "${run_out}" line)
+        string(STRIP "${tool_stdout}" line)
         string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
         set(inputs "${library_file}" "${runtime_library}")
     endif()
@@ -493,17 +485,17 @@ elseif(CASE STREQUAL "shared")
 elseif(CASE STREQUAL "exports")
     library(geo shared "${dir}")
     if(APPLE)
-        run(nm -gU "${library_file}")
+        tool_run("" nm -gU "${library_file}")
     elseif(CMAKE_HOST_WIN32)
-        run("${RUNTIME}/bin/llvm-readobj" --coff-exports "${library_file}")
+        tool_run("" "${RUNTIME}/bin/llvm-readobj" --coff-exports "${library_file}")
         string(REGEX MATCHALL "Name: [A-Za-z_][A-Za-z0-9_.]*" names
-               "${run_out}")
-        string(REPLACE "Name: " "" run_out "${names}")
-        string(REPLACE ";" "\n" run_out "${run_out}\n")
+               "${tool_stdout}")
+        string(REPLACE "Name: " "" tool_stdout "${names}")
+        string(REPLACE ";" "\n" tool_stdout "${tool_stdout}\n")
     else()
-        run(nm -D --defined-only "${library_file}")
+        tool_run("" nm -D --defined-only "${library_file}")
     endif()
-    string(REGEX MATCHALL "[A-Za-z_][A-Za-z0-9_.]*\n" symbols "${run_out}")
+    string(REGEX MATCHALL "[A-Za-z_][A-Za-z0-9_.]*\n" symbols "${tool_stdout}")
     set(names "")
     foreach(symbol IN LISTS symbols)
         string(STRIP "${symbol}" symbol)
@@ -532,7 +524,7 @@ elseif(CASE STREQUAL "two")
     set(geo "${library_file}")
     library(other static "${dir}/static")
     # The printed link line names the runtime library of the host.
-    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${run_out}")
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${tool_stdout}")
     program("${dir}/two_static${EXE}" OPTIONS -I "${dir}/static"
             SOURCES "${SOURCES}/twolibs.c"
             INPUTS "${geo}" "${library_file}" ${runtime_library})
@@ -546,19 +538,19 @@ elseif(CASE STREQUAL "header")
     expect_header("${dir}/geo.h" geo.h)
     library(shapes static "${dir}")
     expect_header("${dir}/shapes.h" shapes.h)
-    run(${CC} -std=c11 -I "${dir}" -fsyntax-only
-        "${SOURCES}/header.c")
-    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
-        "${SOURCES}/header.cpp")
-    run(${CC} -std=c11 -I "${dir}" -fsyntax-only
-        "${SOURCES}/shapes.c")
-    run(${CXX} -std=c++17 -I "${dir}" -fsyntax-only
-        "${SOURCES}/shapes.cpp")
+    tool_run("" ${CC} -std=c11 -I "${dir}" -fsyntax-only
+                "${SOURCES}/header.c")
+    tool_run("" ${CXX} -std=c++17 -I "${dir}" -fsyntax-only
+                "${SOURCES}/header.cpp")
+    tool_run("" ${CC} -std=c11 -I "${dir}" -fsyntax-only
+                "${SOURCES}/shapes.c")
+    tool_run("" ${CXX} -std=c++17 -I "${dir}" -fsyntax-only
+                "${SOURCES}/shapes.cpp")
 elseif(CASE STREQUAL "bundle")
     library(geo static "${dir}" --bundle-runtime)
     set(geo "${library_file}")
     expect_header("${dir}/geo.h" geo.bundle.h)
-    string(STRIP "${run_out}" line)
+    string(STRIP "${tool_stdout}" line)
     # The driver puts the system libraries of the target on the line, and
     # a Linux program links pthread and the maths library.
     set(system "")
@@ -581,8 +573,8 @@ elseif(CASE STREQUAL "bundle")
     if(NOT "${TARGET}" MATCHES "^macos-")
         library(other static "${dir}" --bundle-runtime)
         if("${TARGET}" MATCHES "^windows-")
-            run(${CC} -I "${dir}" -c "${SOURCES}/twolibs.c"
-                -o "${dir}/two_bundled.o")
+            tool_run("" ${CC} -I "${dir}" -c "${SOURCES}/twolibs.c"
+                        -o "${dir}/two_bundled.o")
             execute_process(
                 COMMAND "${LLD_LINK}" ${WINDOWS_LINK}
                         "/OUT:${dir}/two_bundled${EXE}" "${dir}/two_bundled.o"
@@ -607,8 +599,8 @@ elseif(CASE STREQUAL "bundle")
         file(GLOB runtime_libraries "${RUNTIME}/lib/${TARGET}/*/${RUNTIME_LIBRARY}")
         list(GET runtime_libraries 0 runtime_library)
         set(linked "${out}${err}")
-        run("${LLVM_OBJDUMP}" --syms "${runtime_library}")
-        set(defined "${run_out}")
+        tool_run("" "${LLVM_OBJDUMP}" --syms "${runtime_library}")
+        set(defined "${tool_stdout}")
         set(spelled "(duplicate symbol:? '?|multiple definition of `)")
         string(REGEX MATCHALL "${spelled}[^' \n]+" reported "${linked}")
         set(runtime_duplicate "")
@@ -645,8 +637,8 @@ elseif(CASE STREQUAL "twice")
     library(geo static "${dir}" --bundle-runtime)
     set(geo "${library_file}")
     library(other static "${dir}" --bundle-runtime)
-    run("${LLVM_AR}" t "${geo}")
-    string(REPLACE "\r" "" listed "\n${run_out}")
+    tool_run("" "${LLVM_AR}" t "${geo}")
+    string(REPLACE "\r" "" listed "\n${tool_stdout}")
     foreach(member geo.o geo.bundle.o geo.package.o anti_rt_license_stub.o
             init.o text.o)
         if(NOT listed MATCHES "\n${member}\n")
@@ -660,8 +652,8 @@ elseif(CASE STREQUAL "twice")
     endforeach()
     # The marker member defines both names, and the library object leaves
     # the one of its package undefined.
-    run("${LLVM_OBJDUMP}" --syms "${geo}")
-    string(REPLACE "\r" "" symbols "${run_out}")
+    tool_run("" "${LLVM_OBJDUMP}" --syms "${geo}")
+    string(REPLACE "\r" "" symbols "${tool_stdout}")
     foreach(defined _anti_rt_bundle _anti_rt_bundle_com_example_geo)
         if(NOT symbols MATCHES "\n[0-9a-f]+ g [^\n]*[ \t]${defined}\n")
             message(FATAL_ERROR "${geo} defines no ${defined}\n${symbols}")
@@ -671,7 +663,7 @@ elseif(CASE STREQUAL "twice")
         message(FATAL_ERROR "the library object of ${geo} names no marker\n"
                             "${symbols}")
     endif()
-    run(${CC} -I "${dir}" -c "${SOURCES}/twolibs.c" -o "${dir}/twolibs.o")
+    tool_run("" ${CC} -I "${dir}" -c "${SOURCES}/twolibs.c" -o "${dir}/twolibs.o")
     execute_process(
         COMMAND "${LD64}" ${MACOS_LINK} "${dir}/twolibs.o" "${geo}"
                 "${library_file}" -o "${dir}/two_bundled"

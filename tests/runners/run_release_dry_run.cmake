@@ -18,6 +18,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 # DESIGN: the commands that take a VM off the network, put it back and ask
 # whether it reaches the network stand in tools/release.sh, one variable
 # each, and docs/vm-setup.md shows the same six as commands of the Mac.
@@ -68,15 +70,6 @@ include("${CMAKE_CURRENT_LIST_DIR}/../../tools/warnings.cmake")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/bin" "${WORK}/fixture")
 
-# Run <command> and fail with <message> unless it succeeds.
-function(run message)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE failed
-                    OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
-    if(NOT failed EQUAL 0)
-        message(FATAL_ERROR "${message}\n${out}${err}")
-    endif()
-endfunction()
-
 # The two programs a package carries. The one of macos-x86_64 is compiled
 # for that processor, because the packer checks it under Rosetta, and the
 # others are compiled for this machine. Each prints the version, which is
@@ -90,15 +83,15 @@ foreach(program antic anti)
     file(WRITE "${WORK}/fixture/${program}.c"
          "#include <stdio.h>\n"
          "int main(void) { printf(\"${program} ${version}\\n\"); return 0; }\n")
-    run("the fixture ${program} did not compile"
-        "${CC}" ${ANTIC_C_WARNINGS} -O0 -isysroot "${sdk}" ${HOST_LINK}
-        -o "${WORK}/fixture/${program}"
-        "${WORK}/fixture/${program}.c")
-    run("the fixture ${program} did not compile for x86_64"
-        "${CC}" ${ANTIC_C_WARNINGS} -arch x86_64 -O0
-        -isysroot "${sdk}" ${HOST_LINK}
-        -o "${WORK}/fixture/${program}-x86_64"
-        "${WORK}/fixture/${program}.c")
+    tool_run("the fixture ${program} did not compile"
+             "${CC}" ${ANTIC_C_WARNINGS} -O0 -isysroot "${sdk}" ${HOST_LINK}
+             -o "${WORK}/fixture/${program}"
+             "${WORK}/fixture/${program}.c")
+    tool_run("the fixture ${program} did not compile for x86_64"
+             "${CC}" ${ANTIC_C_WARNINGS} -arch x86_64 -O0
+             -isysroot "${sdk}" ${HOST_LINK}
+             -o "${WORK}/fixture/${program}-x86_64"
+             "${WORK}/fixture/${program}.c")
 endforeach()
 
 # The two programs of a Windows host are real COFF executables with a PDB
@@ -116,19 +109,19 @@ foreach(pair "windows-x86_64=x86_64-pc-windows-msvc=X64"
     list(GET parts 1 triple)
     list(GET parts 2 machine)
     file(MAKE_DIRECTORY "${WORK}/fixture/${host}")
-    run("the fixture of ${host} did not compile for ${triple}"
-        "${CC}" ${ANTIC_C_WARNINGS} "--target=${triple}" -c
-        -o "${WORK}/fixture/${host}/windows.obj"
-        "${WORK}/fixture/windows.c")
+    tool_run("the fixture of ${host} did not compile for ${triple}"
+             "${CC}" ${ANTIC_C_WARNINGS} "--target=${triple}" -c
+             -o "${WORK}/fixture/${host}/windows.obj"
+             "${WORK}/fixture/windows.c")
     foreach(program antic anti)
-        run("lld-link did not link the fixture ${program} of ${host}"
-            "${LLVM_BIN}/lld-link" /NOLOGO /DEBUG "/PDBALTPATH:%_PDB%"
-            /pdbsourcepath:.
-            /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE /NODEFAULTLIB
-            "/MACHINE:${machine}"
-            "/OUT:${WORK}/fixture/${host}/${program}.exe"
-            "/PDB:${WORK}/fixture/${host}/${program}.pdb"
-            "${WORK}/fixture/${host}/windows.obj")
+        tool_run("lld-link did not link the fixture ${program} of ${host}"
+                 "${LLVM_BIN}/lld-link" /NOLOGO /DEBUG "/PDBALTPATH:%_PDB%"
+                 /pdbsourcepath:.
+                 /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE /NODEFAULTLIB
+                 "/MACHINE:${machine}"
+                 "/OUT:${WORK}/fixture/${host}/${program}.exe"
+                 "/PDB:${WORK}/fixture/${host}/${program}.pdb"
+                 "${WORK}/fixture/${host}/windows.obj")
     endforeach()
 endforeach()
 
@@ -354,23 +347,23 @@ endforeach()
 # so that the preflight sees a main that is committed and pushed.
 set(copy "${WORK}/antic")
 file(MAKE_DIRECTORY "${copy}")
-run("the export of the tree failed" "${GIT}" -C "${ROOT}" checkout-index -a
-    --prefix=${copy}/)
-run("the bare origin failed" "${GIT}" init --quiet --bare -b main
-    "${WORK}/origin.git")
-run("git init failed" "${GIT}" init --quiet -b main "${copy}")
-run("git config failed" "${GIT}" -C "${copy}" config user.email "r@example.com")
-run("git config failed" "${GIT}" -C "${copy}" config user.name "Release Test")
-run("git remote failed" "${GIT}" -C "${copy}" remote add origin
-    "${WORK}/origin.git")
+tool_run("the export of the tree failed" "${GIT}" -C "${ROOT}" checkout-index -a
+         --prefix=${copy}/)
+tool_run("the bare origin failed" "${GIT}" init --quiet --bare -b main
+         "${WORK}/origin.git")
+tool_run("git init failed" "${GIT}" init --quiet -b main "${copy}")
+tool_run("git config failed" "${GIT}" -C "${copy}" config user.email "r@example.com")
+tool_run("git config failed" "${GIT}" -C "${copy}" config user.name "Release Test")
+tool_run("git remote failed" "${GIT}" -C "${copy}" remote add origin
+         "${WORK}/origin.git")
 file(WRITE "${copy}/tools/version" "${version}\n")
 file(READ "${copy}/CHANGELOG.md" changelog)
 string(REPLACE "\n## " "\n## ${version} - 2026-09-20\n\nThe version of the test of the release script.\n\n## " changelog "${changelog}")
 file(WRITE "${copy}/CHANGELOG.md" "${changelog}")
-run("git add failed" "${GIT}" -C "${copy}" add -A)
-run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
-    -m "Release ${version}")
-run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
+tool_run("git add failed" "${GIT}" -C "${copy}" add -A)
+tool_run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
+         -m "Release ${version}")
+tool_run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
 
 # DESIGN: the cache of the stand-in names a deps directory of this test,
 # with the real LLVM tools of this machine behind a link, so that what the
@@ -687,8 +680,8 @@ if(OPENSSL)
     # A plaintext key that .gitignore excludes and git does not track.
     # The directory is ignored, so a checkout of the tree holds none.
     file(MAKE_DIRECTORY "${copy}/tools/keys/private")
-    run("openssl wrote no plaintext key" "${OPENSSL}" ecparam -name prime256v1
-        -genkey -noout -out "${copy}/${key_path}")
+    tool_run("openssl wrote no plaintext key" "${OPENSSL}" ecparam -name prime256v1
+             -genkey -noout -out "${copy}/${key_path}")
     key_run(failed log)
     if(NOT failed EQUAL 0)
         message(FATAL_ERROR "./r refused a key that git cannot see\n${log}")
@@ -700,9 +693,9 @@ if(OPENSSL)
 
     # An encrypted key at the same path is taken as readily.
     file(RENAME "${copy}/${key_path}" "${WORK}/plaintext.pem")
-    run("openssl wrote no encrypted key" "${OPENSSL}" pkcs8 -topk8
-        -in "${WORK}/plaintext.pem" -out "${copy}/${key_path}"
-        -passout pass:secret)
+    tool_run("openssl wrote no encrypted key" "${OPENSSL}" pkcs8 -topk8
+             -in "${WORK}/plaintext.pem" -out "${copy}/${key_path}"
+             -passout pass:secret)
     key_run(failed log)
     if(NOT failed EQUAL 0 OR NOT "${log}" MATCHES "encrypted key")
         message(FATAL_ERROR "./r refused an encrypted key\n${log}")
@@ -714,10 +707,10 @@ if(OPENSSL)
     # A key git tracks is refused, and the refusal names the file. The
     # add needs -f, which is the whole point: one of those publishes it.
     # It is committed, because the preflight refuses a dirty index first.
-    run("git add failed" "${GIT}" -C "${copy}" add -f "${key_path}")
-    run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
-        -m "The key, by accident")
-    run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
+    tool_run("git add failed" "${GIT}" -C "${copy}" add -f "${key_path}")
+    tool_run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
+             -m "The key, by accident")
+    tool_run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
     key_run(refused log)
     if(refused EQUAL 0)
         message(FATAL_ERROR "./r signed with a key that git tracks\n${log}")
@@ -726,10 +719,10 @@ if(OPENSSL)
         message(FATAL_ERROR "the refusal of a tracked key names no "
                             "file\n${log}")
     endif()
-    run("git rm failed" "${GIT}" -C "${copy}" rm --quiet --cached "${key_path}")
-    run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
-        -m "The key, out of the index again")
-    run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
+    tool_run("git rm failed" "${GIT}" -C "${copy}" rm --quiet --cached "${key_path}")
+    tool_run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
+             -m "The key, out of the index again")
+    tool_run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
 
     # A key that no rule of .gitignore excludes is refused as well, even
     # though it is untracked, because nothing keeps it untracked.
@@ -739,20 +732,20 @@ if(OPENSSL)
         message(FATAL_ERROR ".gitignore of the tree excludes no tools/keys/private")
     endif()
     file(WRITE "${copy}/.gitignore" "${without}")
-    run("git add failed" "${GIT}" -C "${copy}" add .gitignore)
-    run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
-        -m "No rule for the key")
-    run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
+    tool_run("git add failed" "${GIT}" -C "${copy}" add .gitignore)
+    tool_run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
+             -m "No rule for the key")
+    tool_run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
     key_run(refused log)
     if(refused EQUAL 0 OR NOT "${log}" MATCHES "${key_path}")
         message(FATAL_ERROR "./r signed with a key that .gitignore does not "
                             "exclude\n${log}")
     endif()
     file(WRITE "${copy}/.gitignore" "${ignores}")
-    run("git add failed" "${GIT}" -C "${copy}" add .gitignore)
-    run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
-        -m "The rule again")
-    run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
+    tool_run("git add failed" "${GIT}" -C "${copy}" add .gitignore)
+    tool_run("the commit failed" "${GIT}" -C "${copy}" commit --quiet
+             -m "The rule again")
+    tool_run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
 
     # A file at that path that holds no private key stops the run.
     file(WRITE "${copy}/${key_path}" "-----BEGIN PUBLIC KEY-----\n")
@@ -807,19 +800,19 @@ function(tagged_runs where)
                             "${where} in step 1\n${out}${err}")
     endif()
 endfunction()
-run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")
+tool_run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")
 tagged_runs("of the checkout")
-run("the push of the tag failed" "${GIT}" -C "${copy}" push --quiet origin
-    "v${version}")
-run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
+tool_run("the push of the tag failed" "${GIT}" -C "${copy}" push --quiet origin
+         "v${version}")
+tool_run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
 tagged_runs("of origin")
-run("the tag did not leave origin" "${GIT}" -C "${copy}" push --quiet origin
-    ":refs/tags/v${version}")
+tool_run("the tag did not leave origin" "${GIT}" -C "${copy}" push --quiet origin
+         ":refs/tags/v${version}")
 
 # A release that stopped after step 7 holds a tag of its own, and its
 # rerun goes on rather than refusing it. The stamp of step 7 in the state
 # of this commit is what tells that tag from a published version.
-run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")
+tool_run("the tag failed" "${GIT}" -C "${copy}" tag "v${version}")
 execute_process(COMMAND "${GIT}" -C "${copy}" rev-parse HEAD
                 OUTPUT_VARIABLE resumed_head
                 OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
@@ -835,7 +828,7 @@ if(NOT resumed EQUAL 0 OR NOT "${out}" MATCHES "step 7 of this run made")
                         "${out}${err}")
 endif()
 file(REMOVE "${dist}/state/07-release")
-run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
+tool_run("the tag did not go" "${GIT}" -C "${copy}" tag -d "v${version}")
 
 # An uncommitted change is refused, since a release names a commit that
 # origin holds.
@@ -855,8 +848,8 @@ file(READ "${copy}/CHANGELOG.md" changelog)
 string(REPLACE "## ${version} - 2026-09-20" "## 98.0.0 - 2026-09-20"
        changelog "${changelog}")
 file(WRITE "${copy}/CHANGELOG.md" "${changelog}")
-run("the commit failed" "${GIT}" -C "${copy}" commit --quiet -a -m "No entry")
-run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
+tool_run("the commit failed" "${GIT}" -C "${copy}" commit --quiet -a -m "No entry")
+tool_run("the push failed" "${GIT}" -C "${copy}" push --quiet origin main)
 set(ENV{PATH} "${WORK}/bin:${saved_path}")
 execute_process(COMMAND "${copy}/r" --dry-run WORKING_DIRECTORY "${copy}"
                 RESULT_VARIABLE refused OUTPUT_VARIABLE out

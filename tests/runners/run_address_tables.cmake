@@ -18,6 +18,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
@@ -26,12 +28,8 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
 set(program "${WORK}/program")
-execute_process(COMMAND "${ANTIC}" --target "${TARGET}" --runtime "${RUNTIME}"
-                        --lto none -o "${program}" "${SOURCE}"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic --lto none failed\n${err}")
-endif()
+antic_build(--target "${TARGET}" --runtime "${RUNTIME}" --lto none -o
+            "${program}" "${SOURCE}")
 if("${TARGET}" MATCHES "^windows-")
     set(objects "${program}.obj")
     set(library anti_rt.lib)
@@ -48,8 +46,11 @@ file(GLOB runtimes "${RUNTIME}/lib/${TARGET}/*/${library}"
      "${RUNTIME}/lib/${TARGET}/*/${stub}"
      "${RUNTIME}/lib/${TARGET}-glibc/*/${library}"
      "${RUNTIME}/lib/${TARGET}/${regex}")
+# A reader's build with the compiler of the machine lays out the runtime
+# of the targets it can, as for the sysroot above.
 if(runtimes STREQUAL "")
-    message(FATAL_ERROR "the runtime archive has no ${library} for ${TARGET}")
+    message("SKIP: the runtime archive has no runtime library for ${TARGET}")
+    return()
 endif()
 list(APPEND objects ${runtimes})
 

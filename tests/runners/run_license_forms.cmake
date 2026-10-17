@@ -45,16 +45,7 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
 function(run_anti where out_status out_text out_err)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E env
-                "XDG_CACHE_HOME=${WORK}/cache"
-                "LOCALAPPDATA=${WORK}/cache"
-                "${ANTI}" ${ARGN}
-        WORKING_DIRECTORY "${where}"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE out
-        ERROR_VARIABLE err
-        ENCODING NONE)
+    anti_run(status out err "${where}" ${ARGN})
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}" PARENT_SCOPE)
     set(${out_err} "${err}" PARENT_SCOPE)

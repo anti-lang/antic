@@ -53,22 +53,10 @@ same_file("${WORK}/user/index.html" "${FIXTURE}/index.expected.html"
 
 # The same two modules as library files. `anti doc` on one equals
 # `anti doc` on the source for the public interface.
-execute_process(
-    COMMAND "${ANTIC}" -c --runtime "${RUNTIME}" -I "${SRC}"
-            -o "${WORK}/lib/com/example/shapes.antl" "${SHAPES}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -c on shapes failed\n${out}${err}")
-endif()
-execute_process(
-    COMMAND "${ANTIC}" -c --runtime "${RUNTIME}" -I "${SRC}" -I "${WORK}/lib"
-            -o "${WORK}/lib/com/example/app.antl" "${APP}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-    ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic -c on app failed\n${out}${err}")
-endif()
+antic_build(-c --runtime "${RUNTIME}" -I "${SRC}" -o
+            "${WORK}/lib/com/example/shapes.antl" "${SHAPES}")
+antic_build(-c --runtime "${RUNTIME}" -I "${SRC}" -I "${WORK}/lib" -o
+            "${WORK}/lib/com/example/app.antl" "${APP}")
 run_doc("-I;${WORK}/lib;--work;${WORK}/w2;-o;${WORK}/library;${WORK}/lib/com/example/shapes.antl;${WORK}/lib/com/example/app.antl"
         status text)
 if(NOT status EQUAL 0)

@@ -67,6 +67,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 foreach(value ANTIC CASE RUNTIME SOURCES WORK)
     if(NOT DEFINED ${value})
         message(FATAL_ERROR "${value} is not set")
@@ -78,10 +80,7 @@ file(MAKE_DIRECTORY "${WORK}")
 
 # Run antic in WORK and give its status and its two outputs.
 function(antic out_status out_stdout out_stderr)
-    execute_process(COMMAND "${ANTIC}" ${ARGN}
-                    WORKING_DIRECTORY "${WORK}"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err ENCODING NONE)
+    antic_run(status out err IN "${WORK}" COMMAND ${ARGN})
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_stdout} "${out}" PARENT_SCOPE)
     set(${out_stderr} "${err}" PARENT_SCOPE)
@@ -435,26 +434,29 @@ endif()
 # A build of return42.anti twice, each in a directory of its own that
 # holds the source: without -o in `plain` and with -o <file> in `option`.
 # The two directories then hold what each build wrote beside the source.
-function(output_beside_source named)
+# Each build ends with 0, prints nothing on its standard output and the
+# text of said on its standard error.
+function(output_beside_source named said)
     foreach(copy plain option)
         file(MAKE_DIRECTORY "${WORK}/${copy}" "${WORK}/out")
         file(COPY "${SOURCES}/programs/return42.anti"
              DESTINATION "${WORK}/${copy}")
     endforeach()
-    execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" ${ARGN}
-                            return42.anti
-                    WORKING_DIRECTORY "${WORK}/plain"
-                    RESULT_VARIABLE status)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "the build without -o ended with ${status}")
-    endif()
-    execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" ${ARGN}
-                            -o "${WORK}/out/${named}" return42.anti
-                    WORKING_DIRECTORY "${WORK}/option"
-                    RESULT_VARIABLE status)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "the build with -o ended with ${status}")
-    endif()
+    foreach(copy plain option)
+        set(output "")
+        if(copy STREQUAL "option")
+            set(output -o "${WORK}/out/${named}")
+        endif()
+        antic_run(status out err IN "${WORK}/${copy}"
+                  COMMAND --runtime "${RUNTIME}" ${ARGN} ${output}
+                          return42.anti)
+        if(NOT status EQUAL 0 OR NOT out STREQUAL "")
+            message(FATAL_ERROR "the build in ${copy} ended with ${status}\n"
+                                "${out}${err}")
+        endif()
+        expect_same_text("the standard error of the build in ${copy}"
+                         "${said}" "${err}")
+    endforeach()
     files_of("${WORK}/plain" plain)
     files_of("${WORK}/option" option)
     files_of("${WORK}/out" out)
@@ -471,7 +473,7 @@ function(expect_files what found expected)
 endfunction()
 
 if(CASE STREQUAL "output_assembly")
-    output_beside_source(named.s -S)
+    output_beside_source(named.s "" -S)
     expect_files("the directory of the build without -o" "${plain}"
                  "return42.anti return42.s")
     expect_files("the directory of the build with -o" "${option}"
@@ -481,7 +483,12 @@ if(CASE STREQUAL "output_assembly")
 endif()
 
 if(CASE STREQUAL "output_library")
-    output_beside_source(named.antl -c)
+    # A library file of a module whose path has one segment gets the
+    # warning that such a path is for a program's own files.
+    string(CONCAT said "return42.anti:1:1: warning: the module path "
+                       "`return42` has one segment, which is for a program's "
+                       "own files [single-segment-path]\n")
+    output_beside_source(named.antl "${said}" -c)
     expect_files("the directory of the build without -o" "${plain}"
                  "return42.anti return42.antl")
     expect_files("the directory of the build with -o" "${option}"
@@ -491,7 +498,7 @@ if(CASE STREQUAL "output_library")
 endif()
 
 if(CASE STREQUAL "output_program")
-    output_beside_source(named${EXE} --lto none --llvm-mc "${LLVM_MC}")
+    output_beside_source(named${EXE} "" --lto none --llvm-mc "${LLVM_MC}")
     foreach(name plain option out)
         # The object of the program stays beside it, under a name of the
         # host.
@@ -540,16 +547,11 @@ function(library_in directory)
     file(COPY_FILE "${library_source}" "${WORK}/${directory}/named.anti")
 endfunction()
 
-# Run antic in a directory under WORK. It must end with 0.
+# Run antic in a directory under WORK. It must end with 0 and write no
+# message. A library prints how to link it on the standard output.
 function(antic_in directory)
-    execute_process(COMMAND "${ANTIC}" ${tools} ${ARGN}
-                    WORKING_DIRECTORY "${WORK}/${directory}"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE out
-                    ERROR_VARIABLE err ENCODING NONE)
-    if(NOT status EQUAL 0)
-        string(REPLACE ";" " " line "${ARGN}")
-        message(FATAL_ERROR "antic ${line} ended with ${status}\n${out}${err}")
-    endif()
+    antic_build(IN "${WORK}/${directory}" OUTPUT printed
+                COMMAND ${tools} ${ARGN})
 endfunction()
 
 # Stop unless the directory under WORK holds the file.
@@ -634,7 +636,17 @@ endif()
 if(CASE STREQUAL "output_dev_library")
     foreach(copy plain option)
         library_in(${copy})
-        antic_in(${copy} -c named.anti)
+        # The module path of named.anti has one segment, which a library
+        # file warns of.
+        antic_run(status out err IN "${WORK}/${copy}"
+                  COMMAND ${tools} -c named.anti)
+        string(CONCAT said "named.anti:1:1: warning: the module path `named` "
+                           "has one segment, which is for a program's own "
+                           "files [single-segment-path]\n")
+        if(NOT status EQUAL 0 OR NOT out STREQUAL "")
+            message(FATAL_ERROR "antic -c ended with ${status}\n${out}${err}")
+        endif()
+        expect_same_text("the standard error of antic -c" "${said}" "${err}")
         file(REMOVE "${WORK}/${copy}/named.anti")
     endforeach()
     antic_in(plain --dev named.antl)

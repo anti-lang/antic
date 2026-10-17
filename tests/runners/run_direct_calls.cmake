@@ -17,6 +17,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}")
     message("SKIP: the runtime archive has no sysroot for ${TARGET}")
     return()
@@ -31,12 +33,8 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(name "${SOURCE}" NAME_WE)
 set(program "${WORK}/${name}")
-execute_process(COMMAND "${ANTIC}" --target "${TARGET}" --runtime "${RUNTIME}"
-                        --lto none --keep-llvm -o "${program}" "${SOURCE}"
-                RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
-if(NOT status EQUAL 0)
-    message(FATAL_ERROR "antic failed\n${err}")
-endif()
+antic_build(--target "${TARGET}" --runtime "${RUNTIME}" --lto none --keep-llvm
+            -o "${program}" "${SOURCE}")
 execute_process(COMMAND "${OPT}" -S -o "${program}.opt.ll" "${program}.bc"
                 RESULT_VARIABLE status)
 if(NOT status EQUAL 0)

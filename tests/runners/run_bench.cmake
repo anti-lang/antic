@@ -31,6 +31,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 set(programs scalar_loop objects builder simd_loop map_work)
 set(dev_modules lang mem text collection collection/map)
 
@@ -57,6 +59,16 @@ if(CMAKE_HOST_WIN32)
 endif()
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/release" "${WORK}/dev" "${WORK}/std")
+
+# Run antic through antic_build with the arguments after `into`, and set
+# the variable `into` to the time it took in microseconds.
+function(timed_antic into)
+    string(TIMESTAMP start "%s%f" UTC)
+    antic_build(${ARGN})
+    string(TIMESTAMP stop "%s%f" UTC)
+    math(EXPR took "${stop} - ${start}")
+    set(${into} "${took}" PARENT_SCOPE)
+endfunction()
 
 # Run a command, stop with its output when it fails, and set the variable
 # after `into` to the time it took in microseconds.
@@ -90,7 +102,7 @@ endfunction()
 set(dev_objects "")
 foreach(module IN LISTS dev_modules)
     string(REPLACE "/" "_" name "${module}")
-    timed(unused "${ANTIC}" --dev ${options} ${tools} --runtime "${RUNTIME}"
+    timed_antic(unused --dev ${options} ${tools} --runtime "${RUNTIME}"
         -I "${RUNTIME}/std" -o "${WORK}/std/anti_${name}"
         "${RUNTIME}/std/anti/${module}.antl")
     list(APPEND dev_objects "${WORK}/std/anti_${name}${object_suffix}")
@@ -103,10 +115,10 @@ foreach(name IN LISTS programs)
     set(release_times "")
     set(dev_times "")
     foreach(build RANGE 1 ${BUILDS})
-        timed(took "${ANTIC}" ${options} ${release_options} ${tools}
+        timed_antic(took ${options} ${release_options} ${tools}
             --runtime "${RUNTIME}" -o "${WORK}/release/${name}" "${source}")
         list(APPEND release_times ${took})
-        timed(took "${ANTIC}" --dev ${options} ${tools} --runtime "${RUNTIME}"
+        timed_antic(took --dev ${options} ${tools} --runtime "${RUNTIME}"
             -I "${RUNTIME}/std" -o "${WORK}/dev/${name}" "${source}"
             ${dev_objects})
         list(APPEND dev_times ${took})

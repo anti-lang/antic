@@ -21,6 +21,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 set(root "${WORK}/root")
 set(profiles "${WORK}/profiles")
 set(out "${WORK}/out")
@@ -42,15 +44,6 @@ file(WRITE "${root}/tests/unit/main.c"
      "    return whole(argc > 1 ? second(-2) : first(-1));\n"
      "}\n")
 
-function(run what)
-    execute_process(COMMAND ${ARGN} WORKING_DIRECTORY "${WORK}"
-                    RESULT_VARIABLE status OUTPUT_VARIABLE text
-                    ERROR_VARIABLE text ENCODING NONE)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "${what} gave ${status}\n${text}")
-    endif()
-endfunction()
-
 # The report of the profiles on disk, with its status and its output.
 function(report status_out text_out)
     execute_process(
@@ -64,11 +57,11 @@ function(report status_out text_out)
     set(${text_out} "${text}" PARENT_SCOPE)
 endfunction()
 
-run("the compile of the program"
-    "${CC}" -isysroot "${SDK}" ${HOST_LINK} ${COMPILE_FLAGS} ${LINK_FLAGS}
-    -o "${WORK}/probe"
-    "${root}/src/antic/half.c" "${root}/src/rt/whole.c"
-    "${root}/tests/unit/main.c")
+tool_run("the compile of the program" IN "${WORK}"
+         "${CC}" -isysroot "${SDK}" ${HOST_LINK} ${COMPILE_FLAGS} ${LINK_FLAGS}
+         -o "${WORK}/probe"
+         "${root}/src/antic/half.c" "${root}/src/rt/whole.c"
+         "${root}/tests/unit/main.c")
 
 # No profile yet: the script names the directory and writes no report.
 report(status text)
@@ -79,12 +72,12 @@ if(EXISTS "${out}/summary.txt")
     message(FATAL_ERROR "the report without a profile wrote ${out}/summary.txt")
 endif()
 
-run("the first run"
-    "${CMAKE_COMMAND}" -E env "LLVM_PROFILE_FILE=${profiles}/%9m.profraw"
-    "${WORK}/probe")
-run("the second run"
-    "${CMAKE_COMMAND}" -E env "LLVM_PROFILE_FILE=${profiles}/second.profraw"
-    "${WORK}/probe" again)
+tool_run("the first run" IN "${WORK}"
+         "${CMAKE_COMMAND}" -E env "LLVM_PROFILE_FILE=${profiles}/%9m.profraw"
+         "${WORK}/probe")
+tool_run("the second run" IN "${WORK}"
+         "${CMAKE_COMMAND}" -E env "LLVM_PROFILE_FILE=${profiles}/second.profraw"
+         "${WORK}/probe" again)
 file(GLOB raw "${profiles}/*.profraw")
 list(LENGTH raw count)
 if(NOT count EQUAL 2)
