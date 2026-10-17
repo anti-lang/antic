@@ -95,7 +95,11 @@ user of the tools can observe, under "Regular expressions".
   in `_bytes` stand under names of their own because `anti.regex` declares each external
   function with one signature. `anti_rt_regex_patch` and `anti_rt_bytes_patch` of
   `src/rt/patterns.c` give the count of places, or -1, -2 and -3 for the match limit, a
-  span that does not fit and a missing group.
+  span that does not fit and a missing group. `src/rt/regex.h` names the three
+  `ANTI_RT_REGEX_EXPENSIVE`, `ANTI_RT_REGEX_MISFIT` and `ANTI_RT_REGEX_MISSING`, and
+  `anti.regex` names them `EXPENSIVE`, `MISFIT` and `MISSING`. `regex.h` holds
+  `struct anti_cursor` and `struct anti_growing`, the layouts of `Cursor` and
+  `Growing`, and `unit_contract` compares both sides.
 - The tests are `programs/regex_compile.anti`, `programs/pattern_literals.anti` in both
   modes, `programs/pattern_match.anti`, `programs/pattern_walk.anti`,
   `programs/pattern_replace.anti` in both modes, `programs/failing_nested.anti`,

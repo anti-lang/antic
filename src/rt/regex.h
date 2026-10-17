@@ -128,4 +128,34 @@ struct anti_maybe_match {
     uint8_t has;
 };
 
+/* The layout of anti.regex.Cursor, which src/rt/patterns.c reads and
+   writes. It holds where the next search starts and with which options,
+   and the end of the last match given. skip and left count the matches
+   to pass over and to give, and left is -1 without a limit. The unit
+   test regex_contract compares the two. */
+struct anti_cursor {
+    const void *pattern;
+    struct anti_text subject;
+    int64_t at;
+    int64_t options;
+    int64_t last;
+    int64_t skip;
+    int64_t left;
+};
+
+/* Bytes that grow as they are appended to, in memory of the C library,
+   in the layout of anti.regex.Growing. */
+struct anti_growing {
+    unsigned char *bytes;
+    int64_t length;
+    int64_t capacity;
+};
+
+/* What a search gives at the match limit, and what `patch` gives for
+   what does not fit and for a group the pattern lacks. anti.regex names
+   the same three numbers. */
+#define ANTI_RT_REGEX_EXPENSIVE (-1)
+#define ANTI_RT_REGEX_MISFIT (-2)
+#define ANTI_RT_REGEX_MISSING (-3)
+
 #endif

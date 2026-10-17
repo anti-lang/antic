@@ -57,6 +57,7 @@ void test_fmt(void);
 void test_files(void);
 void test_tool_platform(void);
 void test_interface(void);
+void test_contract(void);
 
 /* Each group of checks under the name of its file, tests/unit/test_<name>.c.
    ctest runs one file per test, unit_<name>, so a failure names its file. */
@@ -119,6 +120,7 @@ static const struct group groups[] = {
     {"files", test_files},
     {"tool_platform", test_tool_platform},
     {"interface", test_interface},
+    {"contract", test_contract},
 };
 
 /* The name of the file whose groups run, or NULL for every group, and

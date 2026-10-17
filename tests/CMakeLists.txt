@@ -71,6 +71,7 @@ add_executable(antic_unit_tests
     unit/test_files.c
     unit/test_tool_platform.c
     unit/test_interface.c
+    unit/test_contract.c
     ${unit_rt_sources})
 target_link_libraries(antic_unit_tests PRIVATE anti_core ${CMAKE_DL_LIBS})
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the

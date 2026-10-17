@@ -123,30 +123,17 @@ struct anti_text anti_rt_regex_message(int32_t code)
 #define PCRE2_STATIC
 #include <pcre2.h>
 
-/* The layout of anti.regex.Cursor. It holds where the next search starts
-   and with which options, and the end of the last match given. skip and
-   left count the matches to pass over and to give, and left is -1
-   without a limit. */
-struct anti_cursor {
-    const void *pattern;
-    struct anti_text subject;
-    int64_t at;
-    int64_t options;
-    int64_t last;
-    int64_t skip;
-    int64_t left;
-};
-
 /* A walk and the match it stands at, as anti.regex.Matches holds them. */
 struct anti_matches {
     struct anti_match current;
     struct anti_cursor cursor;
 };
 
-/* What a search gives, and what anti.regex reads from each function. */
+/* What a search gives, and what anti.regex reads from each function by
+   its sign. A search at the match limit gives ANTI_RT_REGEX_EXPENSIVE of
+   regex.h. */
 #define FOUND 1
 #define DONE 0
-#define EXPENSIVE (-1)
 #define NO_GROUP (-1)
 
 /* The options of the search after an empty match: a match at the same
@@ -170,7 +157,7 @@ static int64_t failure(int rc)
 
     if (rc == PCRE2_ERROR_MATCHLIMIT || rc == PCRE2_ERROR_DEPTHLIMIT ||
         rc == PCRE2_ERROR_HEAPLIMIT || rc == PCRE2_ERROR_NOMEMORY) {
-        return EXPENSIVE;
+        return ANTI_RT_REGEX_EXPENSIVE;
     }
     anti_rt_regex_message_into(rc, message, sizeof message);
     anti_rt_fail_abort("anti: a search of a pattern failed: %s",
@@ -585,15 +572,7 @@ int64_t anti_rt_regex_template_fits(const void *pattern,
     return 1;
 }
 
-/* Bytes that grow as they are appended to, in memory of the C library,
-   in the layout of anti.regex.Growing. */
-struct growing {
-    unsigned char *bytes;
-    int64_t length;
-    int64_t capacity;
-};
-
-static void grow_append(struct growing *g, const unsigned char *bytes,
+static void grow_append(struct anti_growing *g, const unsigned char *bytes,
                         int64_t length)
 {
     unsigned char *grown;
@@ -612,7 +591,7 @@ static void grow_append(struct growing *g, const unsigned char *bytes,
 
 /* Append the template with the groups of the match m, whose ovector ov
    holds every group. */
-static void expand(struct growing *g, const struct anti_match *m,
+static void expand(struct anti_growing *g, const struct anti_match *m,
                    const PCRE2_SIZE *ov, const unsigned char *bytes,
                    int64_t length)
 {
@@ -652,7 +631,7 @@ int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
                               struct anti_text *out)
 {
     struct anti_matches it;
-    struct growing g = {NULL, 0, 0};
+    struct anti_growing g = {NULL, 0, 0};
     pcre2_match_data *md;
     int64_t rest = 0;
     int64_t status = walk_begin(&it, pattern, s, length, limit);
@@ -680,10 +659,6 @@ int64_t anti_rt_regex_replace(const void *pattern, const unsigned char *s,
     out->len = g.length;
     return DONE;
 }
-
-/* What `patch` gives beside the count of the places it patched. */
-#define MISFIT (-2)
-#define MISSING (-3)
 
 /* Whether length bytes written at offset at stay inside a span of span
    bytes. at comes from the program unchanged, so the test takes no sum
@@ -715,25 +690,25 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
     int64_t places = 0;
     int64_t status;
     int64_t i;
-    struct growing offsets = {NULL, 0, 0};
+    struct anti_growing offsets = {NULL, 0, 0};
     struct anti_matches it;
     pcre2_match_data *md;
 
     if (name_length > 0) {
         group = anti_rt_regex_group_number(pattern, name, name_length);
         if (group < 0) {
-            return MISSING;
+            return ANTI_RT_REGEX_MISSING;
         }
     } else if (into == 0) {
         if (count > 1) {
-            return MISSING;
+            return ANTI_RT_REGEX_MISSING;
         }
         group = count;
     } else if (!has_group(pattern, into)) {
-        return MISSING;
+        return ANTI_RT_REGEX_MISSING;
     }
     if (at < 0) {
-        return MISFIT;
+        return ANTI_RT_REGEX_MISFIT;
     }
     md = match_data(pattern, 1);
     status = walk_begin(&it, pattern, data, length, limit);
@@ -747,7 +722,7 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
             continue;
         }
         if (!fits_span(at, with_length, end - start)) {
-            status = MISFIT;
+            status = ANTI_RT_REGEX_MISFIT;
             break;
         }
         offset = start + at;
@@ -802,7 +777,7 @@ int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
     int64_t i;
 
     if (!fits_span(at, with_length, find_length)) {
-        return MISFIT;
+        return ANTI_RT_REGEX_MISFIT;
     }
     if (find_length == 0) {
         return 0;
@@ -832,14 +807,14 @@ int64_t anti_rt_bytes_patch(unsigned char *data, int64_t length,
 /* DESIGN: a text that grows, as anti.regex.Growing holds it. `replace`
    with a function writes its result into one without anti.text, so a
    program of patterns links nothing it does not name. */
-void anti_rt_regex_append(struct growing *g, const unsigned char *bytes,
+void anti_rt_regex_append(struct anti_growing *g, const unsigned char *bytes,
                           int64_t length)
 {
     grow_append(g, bytes, length);
 }
 
 /* The bytes of g, which the caller frees, and g empty. */
-struct anti_text anti_rt_regex_take(struct growing *g)
+struct anti_text anti_rt_regex_take(struct anti_growing *g)
 {
     struct anti_text t;
 
@@ -965,7 +940,7 @@ int64_t anti_rt_regex_replace_bytes(const void *pattern,
                                  limit, out);
 }
 
-struct anti_text anti_rt_regex_take_bytes(struct growing *g)
+struct anti_text anti_rt_regex_take_bytes(struct anti_growing *g)
 {
     return anti_rt_regex_take(g);
 }

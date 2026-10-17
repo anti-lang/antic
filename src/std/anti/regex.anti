@@ -76,6 +76,15 @@ extern fn anti_rt_regex_stop_template(file: ?*byte, length: int, line: int,
 	bytes: ?*byte, template_length: int, pattern: ?*byte,
 	pattern_length: int);
 
+/// What a search gives at the match limit, as `ANTI_RT_REGEX_EXPENSIVE` of
+/// `src/rt/regex.h`.
+const EXPENSIVE: int = -1;
+/// What `patch` gives when `with` does not fit a span, as
+/// `ANTI_RT_REGEX_MISFIT`.
+const MISFIT: int = -2;
+/// What `patch` gives when `into` names no group, as `ANTI_RT_REGEX_MISSING`.
+const MISSING: int = -3;
+
 /// The failure of a pattern, the base of every error of this module.
 pub class Error inherits lang.Error
 {
@@ -908,13 +917,13 @@ pub fn patch(data: []byte, r: ByteRegex, with: []byte, into: int, name: str,
 {
 	let n = anti_rt_regex_patch(r.handle, data.ptr, data.len, with.ptr, with.len,
 		into, name.ptr, name.len, offset, limit);
-	if n == -1 {
+	if n == EXPENSIVE {
 		fail too_expensive();
 	}
-	if n == -2 {
+	if n == MISFIT {
 		fail length_mismatch();
 	}
-	if n == -3 {
+	if n == MISSING {
 		fail missing_into();
 	}
 	return n;
@@ -932,13 +941,13 @@ pub fn patch_literal(data: []byte, r: ByteRegex, pattern: str, with: []byte,
 {
 	let n = anti_rt_regex_patch(r.handle, data.ptr, data.len, with.ptr, with.len,
 		into, name.ptr, name.len, offset, limit);
-	if n == -1 {
+	if n == EXPENSIVE {
 		stop_expensive(pattern, at);
 	}
-	if n == -2 {
+	if n == MISFIT {
 		fail length_mismatch();
 	}
-	if n == -3 {
+	if n == MISSING {
 		stop_into(pattern, into, name, at);
 	}
 	return n;
@@ -952,7 +961,7 @@ pub fn patch_fixed(data: []byte, r: ByteRegex, pattern: str, with: []byte,
 {
 	let n = anti_rt_regex_patch(r.handle, data.ptr, data.len, with.ptr, with.len,
 		into, name.ptr, name.len, offset, limit);
-	if n == -1 {
+	if n == EXPENSIVE {
 		stop_expensive(pattern, at);
 	}
 	if n < 0 {
