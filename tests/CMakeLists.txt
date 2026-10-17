@@ -2638,6 +2638,27 @@ add_test(NAME anti_build_inputs
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-inputs"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_inputs.cmake")
+# What `anti build` delivers and caches, one test per case of
+# tests/run_anti_build_cases.cmake, whose header names what each shows. A
+# Windows library links from every host whose runtime archive holds the
+# sysroot.
+set(anti_build_cases)
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    list(APPEND anti_build_cases windows_import_library)
+endif()
+foreach(case IN LISTS anti_build_cases)
+    add_test(NAME anti_build_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            -DCASE=${case}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DOTHER=${anti_build_other}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-cases/${case}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_anti_build_cases.cmake")
+endforeach()
 
 # The messages of anti, one test per message. A table of the directory of
 # its command holds the cases of each, and anti_messages.cmake those of

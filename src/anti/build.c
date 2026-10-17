@@ -810,6 +810,20 @@ static bool build_c_library(struct build *b, enum target t, enum cpu_level cpu,
         text_free(&file);
         text_free(&name);
     }
+    /* A C program links against a DLL through its import library, which
+       the link writes beside the DLL under the name a static library of
+       Windows takes, so dist/ holds it beside the DLL and the header. */
+    if (ok && o.lib == LIB_SHARED && target_info(t)->os == OS_WINDOWS) {
+        struct text file = {0};
+        struct text name = {0};
+        library_name(t, false, base, &name);
+        text_appendf(&file, "%s/%s", text_cstr(&b->build_dir),
+                     text_cstr(&name));
+        ok = copy_into(text_cstr(&file), text_cstr(&b->dist_dir),
+                       text_cstr(&name));
+        text_free(&file);
+        text_free(&name);
+    }
     return ok;
 }
 

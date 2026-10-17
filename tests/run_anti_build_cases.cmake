@@ -1,0 +1,74 @@
+# Drive `anti build` over one case of what it delivers and caches. Run with
+# cmake -P and these values:
+#   ANTI     the anti executable
+#   CASE     the case
+#   RUNTIME  the runtime archive
+#   LLVM_MC  the assembler
+#   FIXTURES the directory tests/
+#   HOST     the target name of this host
+#   OTHER    a target name that is not this host's
+#   WORK     a directory this run writes into
+#
+# The cases, each a defect of docs/audit/anti-tool.md:
+#   windows_import_library  dist/ of a Windows DLL holds the import library
+#                           a C program links against (defect 4)
+
+cmake_minimum_required(VERSION 3.21)
+
+include("${CMAKE_CURRENT_LIST_DIR}/program_output.cmake")
+
+foreach(value ANTI CASE RUNTIME LLVM_MC FIXTURES HOST WORK)
+    if(NOT DEFINED ${value})
+        message(FATAL_ERROR "${value} is not set")
+    endif()
+endforeach()
+
+file(REMOVE_RECURSE "${WORK}")
+file(MAKE_DIRECTORY "${WORK}")
+
+set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+
+# Run anti in a directory. The cache of the repositories is the user's,
+# so the run names its own. ENV names more of the environment.
+function(anti directory out_status out_text)
+    cmake_parse_arguments(PARSE_ARGV 3 run "" "" "ENV")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env
+                "XDG_CACHE_HOME=${WORK}/cache" "LOCALAPPDATA=${WORK}/cache"
+                ${run_ENV} "${ANTI}" ${run_UNPARSED_ARGUMENTS}
+        WORKING_DIRECTORY "${directory}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    set(${out_status} "${status}" PARENT_SCOPE)
+    set(${out_text} "${out}${err}" PARENT_SCOPE)
+endfunction()
+
+# Run anti in a directory, and stop unless it ends with 0.
+function(anti_passes what directory)
+    anti("${directory}" status text ${ARGN})
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "${what} ended with ${status}\n${text}")
+    endif()
+    set(anti_text "${text}" PARENT_SCOPE)
+endfunction()
+
+if(CASE STREQUAL "windows_import_library")
+    file(COPY "${FIXTURES}/anti-build/shapes" DESTINATION "${WORK}")
+    set(project "${WORK}/shapes")
+    anti_passes("anti build --lib shared" "${project}" build --lib shared
+                --target windows-x86_64 ${tools})
+    set(dist "${project}/dist/windows-x86_64/dev")
+    if(NOT EXISTS "${project}/build/windows-x86_64/dev/shapes.lib")
+        message(FATAL_ERROR "the link wrote no import library shapes.lib")
+    endif()
+    file(GLOB found RELATIVE "${dist}" "${dist}/*")
+    foreach(file shapes.dll shapes.h shapes.lib)
+        if(NOT EXISTS "${dist}/${file}")
+            message(FATAL_ERROR "dist/ of a Windows DLL holds no ${file}. It "
+                                "holds: ${found}")
+        endif()
+    endforeach()
+    return()
+endif()
+
+message(FATAL_ERROR "no case ${CASE}")
