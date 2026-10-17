@@ -1074,6 +1074,12 @@ add_test(NAME downloads_once
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_downloads_once.cmake")
 
+# bin/ of the runtime archive is built by the root CMakeLists.txt from
+# the directory of the pinned LLVM tools, and by no file of tests/.
+add_test(NAME llvm_tools_root
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_llvm_tools_root.cmake")
+
 # A message at a position has one printer in antic, and the platform
 # layer names the tool that runs.
 add_test(NAME message_forms
@@ -1393,21 +1399,14 @@ else()
     set(ANTIC_TEST_CXX ${ANTIC_TEST_CC} --driver-mode=g++)
 endif()
 
-# The runtime archive carries llvm-mc, lld and llvm-ar of LLVM
-# tools/llvm-version, which the build copies to runtime/bin from the
-# directory that tools/get-llvm.cmake installs. It carries no llvm-cov,
-# which toolchain_pin refuses there.
-if(ANTIC_LLVM_MC)
-    get_filename_component(ANTIC_LLVM_BIN "${ANTIC_LLVM_MC}" DIRECTORY)
-    add_custom_target(llvm_tools ALL
-        COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_LLVM_BIN}"
-            "-DDEST=${ANTIC_RUNTIME_DIR}/bin"
-            -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
-    add_test(NAME toolchain_pin
-        COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_RUNTIME_DIR}/bin"
-            -DRUNTIME_ARCHIVE=ON
-            -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
-endif()
+# The LLVM tools in bin/ of the runtime archive, which the target
+# llvm_tools of the root CMakeLists.txt copies there, are those of LLVM
+# tools/llvm-version. The directory holds no llvm-cov, which toolchain_pin
+# refuses there.
+add_test(NAME toolchain_pin
+    COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_RUNTIME_DIR}/bin"
+        -DRUNTIME_ARCHIVE=ON
+        -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
 
 # A module that writes no function writes no empty CodeView subsection of
 # symbols, which lld-link warns of. codeview_empty_refuses_<target> feeds
