@@ -13,14 +13,6 @@
 #include "platform.h"
 #include "sync.h"
 
-/* The hidden lock of a synchronized object, which the compiler lays out
-   as a Mutex and two `int` fields. */
-struct object_lock {
-    struct anti_rt_word word;
-    int64_t owner;
-    int64_t depth;
-};
-
 /* A value that differs per thread and is never zero: the address of a
    variable each thread has its own copy of. */
 static int64_t thread_tag(void)
@@ -272,7 +264,7 @@ void anti_rt_mutex_destroy(void *word)
    calls another on the same object, a closure it runs and `sync obj`
    around calls of the object all take it that way. The owner is read
    by other threads, so it is read and written atomically. */
-static int object_enter(struct object_lock *l, int64_t me)
+static int object_enter(struct anti_object_lock *l, int64_t me)
 {
     if (anti_rt_atomic_load(&l->owner, (int64_t)sizeof l->owner) == me) {
         l->depth++;
@@ -281,14 +273,14 @@ static int object_enter(struct object_lock *l, int64_t me)
     return 0;
 }
 
-static void object_hold(struct object_lock *l, int64_t me)
+static void object_hold(struct anti_object_lock *l, int64_t me)
 {
     anti_rt_word_lock(&l->word);
     anti_rt_atomic_store(&l->owner, (int64_t)sizeof l->owner, me);
     l->depth = 1;
 }
 
-static int object_leave(struct object_lock *l)
+static int object_leave(struct anti_object_lock *l)
 {
     if (--l->depth > 0) {
         return 0;

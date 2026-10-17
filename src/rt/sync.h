@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+#include "platform.h"
+
 /* A new channel of capacity values of size bytes each, on the heap.
    anti_rt_chan_delete frees it, which `delete(c)` calls. */
 void *anti_rt_chan_new(int64_t size, int64_t capacity);
@@ -49,6 +51,15 @@ void anti_rt_mutex_unlock_at(void *word);
 /* `m.destroy()`. The word holds nothing of the system, so only the
    orders of a dev build are forgotten. */
 void anti_rt_mutex_destroy(void *word);
+
+/* The hidden lock of a synchronized object, which the compiler lays out
+   as a Mutex and two `int` fields, the thread that holds it and how
+   often. The unit test object_lock_layout compares the two. */
+struct anti_object_lock {
+    struct anti_rt_word word;
+    int64_t owner;
+    int64_t depth;
+};
 
 /* Take and give back the hidden lock of a synchronized class at lock,
    which the thread that holds it takes again without waiting. The `_at`

@@ -1026,10 +1026,10 @@ struct type *types_mutex(struct types *types)
 
 /* DESIGN: the hidden lock of a synchronized class is a struct of
    `anti.lang` that the compiler declares. It holds a Mutex, the thread
-   that holds it and how often, in the order of `struct object_lock` of
-   `src/rt/lock.c`. A thread that holds it takes it again without
-   waiting, so a function of the object that calls another does not wait
-   for itself. */
+   that holds it and how often, in the order of `struct anti_object_lock`
+   of `src/rt/sync.h`, which the unit test object_lock_layout pins. A
+   thread that holds it takes it again without waiting, so a function of
+   the object that calls another does not wait for itself. */
 struct type *types_object_lock(struct types *types)
 {
     static const char module_text[] = LANG_MODULE;

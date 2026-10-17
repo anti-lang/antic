@@ -1227,6 +1227,56 @@ static void match_layout(void)
     lowered_release(&l);
 }
 
+/* DESIGN: antic declares the hidden lock of a synchronized class in
+   src/antic/types.c, and the runtime takes it as struct anti_object_lock
+   of src/rt/sync.h. This test lays out the lock a class holds for the
+   host and compares it with the struct, member by member, the Mutex
+   word among them. */
+static void object_lock_layout(void)
+{
+    static const size_t offsets[] = {
+        offsetof(struct anti_object_lock, word),
+        offsetof(struct anti_object_lock, owner),
+        offsetof(struct anti_object_lock, depth)
+    };
+    static const size_t sizes[] = {
+        sizeof(((struct anti_object_lock *)0)->word),
+        sizeof(((struct anti_object_lock *)0)->owner),
+        sizeof(((struct anti_object_lock *)0)->depth)
+    };
+    struct lowered l;
+    struct layouts layouts;
+    const struct layout *ir;
+    char error[256];
+    enum target host;
+    uint32_t agg;
+    size_t k;
+
+    lowered_run(&l, "synchronized class Counter\n{\n    n: int = 0,\n\n"
+                    "    pub fn add(self) { self.n = self.n + 1; }\n}\n"
+                    "fn main() -> int { return 0; }\n");
+    CHECK(l.ok);
+    agg = ir_agg_find(&l.ir, LANG_MODULE "." LANG_OBJECT_LOCK);
+    CHECK(agg != IR_NO_AGG);
+    if (!l.ok || agg == IR_NO_AGG || !target_host(&host)) {
+        lowered_release(&l);
+        return;
+    }
+    CHECK(l.ir.aggs[agg]->field_count == sizeof offsets / sizeof offsets[0]);
+    CHECK(layout_init(&layouts, host, &l.ir, error, sizeof error));
+    ir = layout_agg(&layouts, agg);
+    CHECK(ir->size == sizeof(struct anti_object_lock));
+    for (k = 0; k < sizeof offsets / sizeof offsets[0] &&
+                k < l.ir.aggs[agg]->field_count;
+         k++) {
+        CHECK(ir->offsets[k] == offsets[k]);
+        CHECK(layout_size(&layouts, l.ir.aggs[agg]->fields[k].type) ==
+              sizes[k]);
+    }
+    layout_free(&layouts);
+    lowered_release(&l);
+}
+
 /* The records the runtime declares, in the layout of src/rt/object.h.
    Every other expected text leaves these lines out through ir_print_own,
    so a change of a record rewrites this test alone. */
@@ -2565,4 +2615,5 @@ void test_lower(void)
     runtime_effects();
     runtime_records();
     match_layout();
+    object_lock_layout();
 }
