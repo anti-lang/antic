@@ -5,15 +5,15 @@
 #   SYSROOT   the directory of tools/get-sysroot.cmake
 #   CHECK     tools/check-libc.cmake
 #   WORK      a directory for the files
-#   PACKAGE   optional, a packed tree whose bin/antic is read as well
 #
-# tools/pack-anti.cmake links a Linux program against the pinned sysroot,
-# static and against musl, and reads its dynamic section before it writes
-# the package. This links a stand-in with that same recipe for both Linux
-# hosts and reads it the same way, so a change to the recipe that reaches
-# the builder's libc fails here rather than in a published tarball. The
-# packed antic itself is read when PACKAGE names a tree, which a release
-# run has and the suite has not.
+# tools/pack-anti.cmake compiles and links antic and anti for a Linux host
+# with antic_host_compile_options and antic_host_linux_link of
+# tools/host-compile.cmake, static against the musl of the pinned
+# sysroot, and reads the dynamic section of each before it writes the
+# package. This compiles and links a stand-in with the same two functions
+# for both Linux hosts and reads it the same way, so a change of the
+# recipe that reaches the builder's libc fails here rather than in a
+# published tarball.
 #
 # It also shows the refusal, on a listing of a program that needs a glibc
 # of its own machine. No program of this tree needs one, so the listing is
@@ -28,29 +28,30 @@ endif()
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
-include("${CMAKE_CURRENT_LIST_DIR}/../tools/warnings.cmake")
+get_filename_component(root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+include("${root}/tools/warnings.cmake")
+include("${root}/tools/host-compile.cmake")
+file(READ "${root}/tools/version" version)
+string(STRIP "${version}" version)
 file(WRITE "${WORK}/tiny.c" "int main(void) { return 0; }\n")
 
-include("${CMAKE_CURRENT_LIST_DIR}/../tools/target-compile.cmake")
-
-# The link line of tools/pack-anti.cmake, on one small source.
+# The compile and the link of tools/pack-anti.cmake, on one small source.
+# A Linux host reads neither the resource directory of the clang nor the
+# Apple SDK, so both stay empty.
 function(link_stand_in host out)
-    antic_target_triple(triple "${host}")
-    set(lib "${SYSROOT}/${host}/usr/lib")
+    antic_host_compile_options(options "${host}" "${root}" "${SYSROOT}" ""
+                               "" "${version}")
     set(object "${WORK}/tiny.${host}.o")
     set(program "${WORK}/tiny.${host}")
-    execute_process(COMMAND "${CLANG}" ${ANTIC_C_WARNINGS} --target=${triple}
-                            --sysroot "${SYSROOT}/${host}" -O2
+    execute_process(COMMAND "${CLANG}" ${options} ${ANTIC_C_WARNINGS}
                             -c -o "${object}" "${WORK}/tiny.c"
                     RESULT_VARIABLE failed ERROR_VARIABLE err ENCODING NONE)
     if(failed)
         message(FATAL_ERROR "${host}: the stand-in did not compile\n${err}")
     endif()
-    execute_process(COMMAND "${LLVM_BIN}/ld.lld" -static -pie
-                            --no-dynamic-linker -o "${program}"
-                            "${lib}/rcrt1.o" "${lib}/crti.o" "${object}"
-                            "${lib}/libc.a" "${lib}/libclang_rt.builtins.a"
-                            "${lib}/crtn.o"
+    antic_host_linux_link(command "${host}" "${SYSROOT}" "${LLVM_BIN}"
+                          "${program}" "${object}")
+    execute_process(COMMAND ${command}
                     RESULT_VARIABLE failed ERROR_VARIABLE err ENCODING NONE)
     if(failed)
         message(FATAL_ERROR "${host}: the stand-in did not link\n${err}")
@@ -73,11 +74,6 @@ foreach(host linux-x86_64 linux-arm64)
     link_stand_in("${host}" program)
     reads_clean("${program}" "the ${host} stand-in")
 endforeach()
-
-if(DEFINED PACKAGE AND EXISTS "${PACKAGE}/bin/antic")
-    reads_clean("${PACKAGE}/bin/antic" "the packed antic")
-    reads_clean("${PACKAGE}/bin/anti" "the packed anti")
-endif()
 
 # A program of a machine whose glibc is newer than the pinned one. The
 # listing is the shape llvm-readobj -V writes for the versioned symbols.

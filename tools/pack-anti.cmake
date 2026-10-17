@@ -245,9 +245,9 @@ function(build_program host output program)
              /OPT:REF)
     endif()
     # Every program links from objects, which stand outside the tree of the
-    # package, work/<host>/anti. The clang driver looks for the start files
-    # of gcc on Linux, so the objects go to ld.lld with the musl ones
-    # instead. A Windows link names them by relative paths.
+    # package, work/<host>/anti. A Linux link is antic_host_linux_link of
+    # tools/host-compile.cmake, and a Windows link names them by relative
+    # paths.
     set(objects "")
     file(MAKE_DIRECTORY "${DEST}/work/${host}/objects/${program}")
     # An object is named after the path of its source, since two
@@ -286,13 +286,9 @@ function(build_program host output program)
         list(APPEND objects "${object}")
     endforeach()
     if(host MATCHES "^linux-")
-        set(lib "${SYSROOT}/${host}/usr/lib")
-        execute_process(
-            COMMAND "${LLVM_BIN}/ld.lld" -static -pie --no-dynamic-linker
-                    -o "${output}" "${lib}/rcrt1.o" "${lib}/crti.o" ${objects}
-                    "${lib}/libc.a" "${lib}/libclang_rt.builtins.a"
-                    "${lib}/crtn.o"
-            RESULT_VARIABLE failed)
+        antic_host_linux_link(command "${host}" "${SYSROOT}" "${LLVM_BIN}"
+                              "${output}" ${objects})
+        execute_process(COMMAND ${command} RESULT_VARIABLE failed)
     elseif(host MATCHES "^windows-")
         # DESIGN: the link runs in the directory of the output and names
         # the objects, the PDB and the output relative to it, as antic

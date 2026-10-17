@@ -1109,6 +1109,12 @@ add_test(NAME target_triples
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/run_target_triples.cmake")
 
+# The link of a Linux program of a release stands in
+# tools/host-compile.cmake alone.
+add_test(NAME linux_link_recipe
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/run_linux_link_recipe.cmake")
+
 # A message at a position has one printer in antic, and the platform
 # layer names the tool that runs.
 add_test(NAME message_forms

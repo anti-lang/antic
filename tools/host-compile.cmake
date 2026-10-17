@@ -1,8 +1,11 @@
 # The options of the pinned clang that compile a source of antic or anti
-# for one host. tools/pack-anti.cmake compiles the programs of a package
-# with them, and the tests host_sources_<host> compile every source with
-# them and the warning set, so a warning of another host's headers or
-# ABI fails the suite of any machine before it fails a release.
+# for one host, and the link of a Linux host. tools/pack-anti.cmake
+# compiles and links the programs of a package with them. The tests
+# host_sources_<host> compile every source with the options and the
+# warning set, so a warning of another host's headers or ABI fails the
+# suite of any machine before it fails a release. The test linux_libc
+# compiles and links a stand-in with both, so a change of either that
+# reaches the libc of the machine fails it as well.
 
 include("${CMAKE_CURRENT_LIST_DIR}/target-compile.cmake")
 
@@ -41,4 +44,18 @@ function(antic_host_compile_options out host root sysroot resource macos_sdk
         list(APPEND options ${windows_options})
     endif()
     set("${out}" "${options}" PARENT_SCOPE)
+endfunction()
+
+# The command that links a Linux program of a release into out: ld.lld
+# of llvm_bin, static and position independent against the musl of the
+# pinned sysroot of host, with the objects that follow output between the
+# start files. The clang driver looks for the start files of gcc on
+# Linux, so the objects go to ld.lld with the musl ones instead. The test
+# linux_link_recipe refuses this link spelled anywhere else.
+function(antic_host_linux_link out host sysroot llvm_bin output)
+    set(lib "${sysroot}/${host}/usr/lib")
+    set("${out}" "${llvm_bin}/ld.lld" -static -pie --no-dynamic-linker
+                 -o "${output}" "${lib}/rcrt1.o" "${lib}/crti.o" ${ARGN}
+                 "${lib}/libc.a" "${lib}/libclang_rt.builtins.a"
+                 "${lib}/crtn.o" PARENT_SCOPE)
 endfunction()
