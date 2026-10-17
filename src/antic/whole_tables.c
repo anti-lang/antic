@@ -16,7 +16,7 @@
    them. It adds the classes of a library to the registry, so a program
    that loads one carries the table those classes join. */
 static const char *const registry_readers[] = {
-    "anti_rt_reflect_new", RUNTIME_ROOT "deserialize", PLUGIN_LOAD
+    REFLECT_NEW, RUNTIME_ROOT "deserialize", PLUGIN_LOAD
 };
 
 bool whole_reads_registry(const struct ir_module *m, const struct ir_reach *r)
@@ -406,7 +406,7 @@ bool whole_calls_through_reflection(const struct ir_module *m,
 
     for (i = 0; i < m->function_count; i++) {
         if (r->functions[i] && m->functions[i]->module == NULL &&
-            strcmp(m->functions[i]->name, "anti_rt_reflect_call") == 0) {
+            strcmp(m->functions[i]->name, REFLECT_CALL) == 0) {
             return true;
         }
     }

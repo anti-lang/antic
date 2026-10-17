@@ -45,9 +45,19 @@
    library takes such a name. */
 #define INJECT_SLOT_PREFIX "inject."
 
-/* The runtime function that `anti.plugin.load` calls. A program that
-   holds it can host a plugin, so the link exports its symbols. */
+/* The runtime functions that a module of the standard library declares
+   with `extern fn` and that antic finds by name. RT_FUNCTIONS leaves them
+   out, since the Anti declaration is the one antic reads, and the unit
+   test library_names of tests/unit/test_contract.c finds each in its
+   module. PLUGIN_LOAD is the function that `anti.plugin.load` calls. A
+   program that holds it can host a plugin, so the link exports its
+   symbols. REFLECT_NEW builds a class by its name and reads the registry,
+   REFLECT_CALL is the call of `reflect.call`, and MEM_ALLOC gives fresh
+   memory to `LibcAllocator`. */
 #define PLUGIN_LOAD "anti_rt_plugin_load"
+#define REFLECT_NEW "anti_rt_reflect_new"
+#define REFLECT_CALL "anti_rt_reflect_call"
+#define MEM_ALLOC "anti_rt_mem_alloc"
 
 /* The two providers of the manifest that name a library rather than a
    function of the program. `plugin:` carries the path after it, and

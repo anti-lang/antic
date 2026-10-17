@@ -21,6 +21,7 @@
 #include "lexer.h"
 #include "lower.h"
 #include "parser.h"
+#include "rt_abi.h"
 #include "sema.h"
 #include "target.h"
 #include "types.h"
@@ -412,9 +413,56 @@ static void reflect_contract(void)
     library_close(&lib);
 }
 
+/* The lowered module calls the C function name, the form in which antic
+   finds it in the IR of a program. */
+static void declares_extern(const struct library *lib, const char *module,
+                            const char *name)
+{
+    size_t i;
+    size_t k;
+
+    for (i = 0; i < lib->count; i++) {
+        const struct ir_module *ir = &lib->irs[i];
+        if (strcmp(lib->names[i], module) != 0) {
+            continue;
+        }
+        for (k = 0; k < ir->function_count; k++) {
+            if (ir->functions[k]->module == NULL &&
+                strcmp(ir->functions[k]->name, name) == 0) {
+                return;
+            }
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "%s declares no extern fn %s\n", module, name);
+}
+
+/* DESIGN: antic finds four runtime functions by name that a module of
+   the standard library declares with `extern fn`, which RT_FUNCTIONS
+   leaves out. src/antic/rt_abi.h names each once, and each module
+   declares the name antic looks for. */
+static void library_names(void)
+{
+    struct library lib;
+
+    library_open(&lib);
+    if (library_load(&lib, "anti.lang", NULL) &&
+        library_load(&lib, "anti.mem", NULL) &&
+        library_load(&lib, "anti.text", NULL) &&
+        library_load(&lib, "anti.reflect", NULL) &&
+        library_load(&lib, "anti.plugin", NULL)) {
+        declares_extern(&lib, "anti.mem", MEM_ALLOC);
+        declares_extern(&lib, "anti.reflect", REFLECT_NEW);
+        declares_extern(&lib, "anti.reflect", REFLECT_CALL);
+        declares_extern(&lib, "anti.plugin", PLUGIN_LOAD);
+    }
+    library_close(&lib);
+}
+
 void test_contract(void)
 {
     lang_frames();
     regex_contract();
     reflect_contract();
+    library_names();
 }

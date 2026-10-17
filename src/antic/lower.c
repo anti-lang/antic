@@ -426,21 +426,20 @@ void lower_add_params(struct lowerer *l, struct ir_function *f,
    docs/work-order-llvm-optimization.md names. The LLVM text marks their
    result noalias. anti_rt_dup fills the new object through the copy entry
    of its class, which fills the fields of the object alone, and the
-   `copied` hook runs after the call. */
-static const char *const allocating_functions[] = {
-    "anti_rt_copy_buffer", "anti_rt_dup", "anti_rt_mem_alloc"};
+   `copied` hook runs after the call. The first two are rows of
+   RT_FUNCTIONS, and anti.mem declares the third. */
+static bool allocating_function(const char *name)
+{
+    return strcmp(name, rt_name(RT_FN_COPY_BUFFER)) == 0 ||
+           strcmp(name, rt_name(RT_FN_DUP)) == 0 ||
+           strcmp(name, MEM_ALLOC) == 0;
+}
 
 /* Mark the C function f allocates when it is one of them. */
 void lower_mark_allocates(struct ir_function *f)
 {
-    size_t i;
-
-    for (i = 0; i < sizeof allocating_functions / sizeof *allocating_functions;
-         i++) {
-        if (strcmp(f->name, allocating_functions[i]) == 0 &&
-            f->result == IR_PTR) {
-            f->allocates = true;
-        }
+    if (allocating_function(f->name) && f->result == IR_PTR) {
+        f->allocates = true;
     }
 }
 
