@@ -1,5 +1,5 @@
 # The messages of `anti symbols`, one case each.
-# tests/run_anti_messages.cmake states the form of a case.
+# tests/runners/run_anti_messages.cmake states the form of a case.
 
 anti_message(configuration_no_toml
     FILES conf.toml "[runtime\n"

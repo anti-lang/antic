@@ -65,7 +65,7 @@ Rule 10 ends: "A test fails the suite when a banned function appears in
 `src/rt/`, `src/antic/` or `src/anti/`." No file of `tests/` or `tools/`
 holds `strcpy`, `strcat`, `strncpy` or `vsprintf` apart from
 `tests/abi/c_allocator.anti`, which binds `strcpy` as an `extern fn` of its
-own, and `tests/run_rt_names.cmake`, which lists the names the Windows
+own, and `tests/runners/run_rt_names.cmake`, which lists the names the Windows
 runtime defines. `run_float_digits.cmake:38` refuses `scanf` in one
 generated object alone. `data/banned-calls.txt` shows the grep the test
 would run: twelve lines, all in `src/rt/platform_stdio.c`, which defines
@@ -202,7 +202,7 @@ name a file of the repository that is gone or renamed:
 - `docs/decisions.md:1220` says `src/antic/debug.c` records the byte range
   of everything `-g` appends. The file is `llvm_debug.c`, and the entry
   speaks in the present tense of a back end that is gone.
-- `docs/decisions.md:500` names `tests/run_pcre2_pin.cmake`, which is
+- `docs/decisions.md:500` names `tests/runners/run_pcre2_pin.cmake`, which is
   `run_native_pin.cmake`. Line 539 names
   `src/native/get-media-sysroot.cmake`, which does not exist.
 - `docs/decisions.md:2126` and `2292` cite `docs/audit/rt.md` and
@@ -239,12 +239,12 @@ the code does, minor, new.
 The DESIGN comment of `antic.h` lists the shared helpers `anti` may
 include: `text.h`, `arena.h`, `target.h`, `cpu.h`, `modpath.h`,
 `platform.h`, `userdirs.h`, `sha256.h` and `applesdk.h`.
-`tests/run_anti_interface.cmake:15` allows `attributes.h` as well, and
+`tests/runners/run_anti_interface.cmake:15` allows `attributes.h` as well, and
 `src/anti/bindmodel.h:9` includes it. One of the two lists is wrong.
 
 ### A comment names an option that is gone
 
-`tests/run_bench.cmake:14`, documentation, a comment that describes what is
+`tests/runners/run_bench.cmake:14`, documentation, a comment that describes what is
 gone, minor, new.
 
 The comment gives, as the example of `OPTIONS`,

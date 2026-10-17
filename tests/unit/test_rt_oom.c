@@ -7,7 +7,7 @@
    The files of the runtime this program links are compiled with malloc
    and realloc named refused_malloc and refused_realloc, which give NULL
    once refusing is set and call the C library before. The argument names
-   one case, and tests/run_rt_oom.cmake checks the stop. A case that comes
+   one case, and tests/runners/run_rt_oom.cmake checks the stop. A case that comes
    back prints what it got and ends with status 0. */
 #include <stdint.h>
 #include <stdio.h>

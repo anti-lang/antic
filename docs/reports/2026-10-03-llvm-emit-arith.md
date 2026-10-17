@@ -19,7 +19,7 @@ back end is unchanged and stays the default.
   `anti.rt.main`, so no program links without them. The text now writes each global
   without an address as a packed struct of its bytes, and the entry as an alias of
   `main`. A global that holds an address is refused until `emit-memory`.
-- `tests/run_llvm_program.cmake` runs the route by hand: `--dump-llvm`, opt at
+- `tests/runners/run_llvm_program.cmake` runs the route by hand: `--dump-llvm`, opt at
   `default<O2>` and llc at `-O2` in release mode, llc at `-O1` in dev mode, then
   ld64.lld of the runtime archive. It links an empty `anti_licenses`, since the
   notice carries a build id that digests the runtime library and stays out of the

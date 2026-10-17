@@ -40,17 +40,17 @@ pages. Each resolves, by the heading ids Goldmark writes by default.
 
 ## Changes under tests/
 
-- `tests/run_document_examples.cmake` takes three more options of an
+- `tests/runners/run_document_examples.cmake` takes three more options of an
   excerpt: `option=tests` is `--tests`, `option=debug` is `-g` and
   `option=cpu-<level>` is `--cpu <level>`. Six copies of the two pages,
   each with a wrong line or without its option, fail the runner.
-- `tests/run_bench.cmake` takes `RELEASE_OPTIONS`, options for the release
+- `tests/runners/run_bench.cmake` takes `RELEASE_OPTIONS`, options for the release
   build alone. Dev mode refuses `--profile-use`, so a build with a profile
   could not go through the runner before.
 
 ## The measured table
 
-`tests/run_bench.cmake` ran seven times at commit `a9e8ffd0` on the
+`tests/runners/run_bench.cmake` ran seven times at commit `a9e8ffd0` on the
 development Mac, an Apple M4 Pro. The Anti times in milliseconds:
 
 | Program | Plain | `--lto none` | `--checks --asserts` | `--no-hooks` | `--trace objects` | `--profile-use` |

@@ -3,7 +3,7 @@
 The step `guide-types` of the documentation driver, on 2026-10-11, on the
 branch `docs`. It writes chapters 8 to 10 of `docs/site/developers-guide/`
 in full. It changes no code under `src/`. Under `tests/` it changes one
-line of `tests/run_document_examples.cmake`.
+line of `tests/runners/run_document_examples.cmake`.
 
 ## What the step wrote
 

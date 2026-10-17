@@ -20,7 +20,7 @@ the branch `docs`. It writes chapters 1 to 3 of
 - `03-values.md`: seven feature sections, each with its five parts. They are
   types and literals, variables and constants, integers, floats and `f16`,
   text and bytes, tuples and type inference.
-- `tests/run_document_examples.cmake` takes five more kinds of excerpt,
+- `tests/runners/run_document_examples.cmake` takes five more kinds of excerpt,
   `tokens`, `ast`, `types`, `ir` and `opt`, each read from `antic
   --dump-<kind>`. Chapter 2 shows a dump of each, and without the marks the
   suite would not check them. A `const` that starts a line is now an item

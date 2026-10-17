@@ -1,6 +1,6 @@
 # The list of the known failures, tests/known-failures.txt, read by
 # tests/CMakeLists.txt, which expects each listed test to fail, and by
-# tests/run_known_failures.cmake, which checks the list.
+# tests/runners/run_known_failures.cmake, which checks the list.
 #
 # DESIGN: decision 30 of "Decisions of 2026-10-11" in docs/decisions.md. A
 # test that shows a defect stays in the suite, written as the rule says

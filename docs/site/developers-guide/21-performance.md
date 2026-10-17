@@ -10,7 +10,7 @@ tags: [compilers, programming-languages]
 keywords: [performance, benchmarks, profile-guided optimization, tracing, checks, release build]
 ---
 
-The cost of a feature is a set of counts. They are the bytes of a value, the heap allocations and the calls into the runtime. The atomic operations, the locks and the checks a build inserts complete them. The first table of this page holds those counts for every feature section of the guide. Each row links to the section that shows them. A time stands on this page only where `tests/run_bench.cmake` measured it beside a C twin. Its table names the machine, the commit and the command.
+The cost of a feature is a set of counts. They are the bytes of a value, the heap allocations and the calls into the runtime. The atomic operations, the locks and the checks a build inserts complete them. The first table of this page holds those counts for every feature section of the guide. Each row links to the section that shows them. A time stands on this page only where `tests/runners/run_bench.cmake` measured it beside a C twin. Its table names the machine, the commit and the command.
 
 ## The cost of every feature
 
@@ -126,7 +126,7 @@ The C twin of a program copies the data structures of the Anti program. `objects
 cmake --build build/host --target bench
 ```
 
-The target builds the twins and runs `tests/run_bench.cmake`. The runner compiles each Anti program three times in release mode and three times in dev mode. It then runs the release program and its twin five times each. It prints the median of each step and writes the table to `build/host/tests/bench.md`. A program whose line differs from the line of its twin stops the run.
+The target builds the twins and runs `tests/runners/run_bench.cmake`. The runner compiles each Anti program three times in release mode and three times in dev mode. It then runs the release program and its twin five times each. It prints the median of each step and writes the table to `build/host/tests/bench.md`. A program whose line differs from the line of its twin stops the run.
 
 | Program | C run | Anti run | Anti / C | Release compile | Dev compile |
 |---|---:|---:|---:|---:|---:|
@@ -164,8 +164,8 @@ The release compile is the whole build of a program: the passes of antic, `opt`,
 |---|---|
 | Machine, target, commit, runs | those of the table above |
 | Command of the first column | `cmake --build build/host --target bench` |
-| Command of columns two to five | `cmake -DOPTIONS=<options> -P tests/run_bench.cmake`, with the other values of the `bench` target and the options joined by commas |
-| Command of the last column | `cmake -DRELEASE_OPTIONS=--profile-use,<file> -P tests/run_bench.cmake`, with the other values of the `bench` target |
+| Command of columns two to five | `cmake -DOPTIONS=<options> -P tests/runners/run_bench.cmake`, with the other values of the `bench` target and the options joined by commas |
+| Command of the last column | `cmake -DRELEASE_OPTIONS=--profile-use,<file> -P tests/runners/run_bench.cmake`, with the other values of the `bench` target |
 | C twins | the six runs measured the twins between 283.1 and 288.0 ms, 101.2 and 104.1 ms, 42.9 and 44.7 ms, 111.1 and 113.7 ms, and 125.4 and 128.3 ms |
 | Load | another job ran on the machine during the runs |
 
@@ -175,9 +175,9 @@ The release compile under `--lto none` took 35.7, 45.2, 65.3, 35.5 and 294.1 ms 
 
 ### A new program
 
-A measurement of a feature the five programs do not reach needs a program of its own. The program is `tests/bench/<name>.anti`, and its twin `tests/bench/<name>.c` does the same work with the same data layout. Both print one line, which the runner compares. The name goes into the list `programs` of `tests/run_bench.cmake` and into `bench_programs` of `tests/CMakeLists.txt`, which builds the twin.
+A measurement of a feature the five programs do not reach needs a program of its own. The program is `tests/bench/<name>.anti`, and its twin `tests/bench/<name>.c` does the same work with the same data layout. Both print one line, which the runner compares. The name goes into the list `programs` of `tests/runners/run_bench.cmake` and into `bench_programs` of `tests/CMakeLists.txt`, which builds the twin.
 
-Where it lives: `tests/run_bench.cmake`, the target `bench` in `tests/CMakeLists.txt`, and the programs in `tests/bench/`. `tests/bench/ablate/run.py` measures one change of the compiler against another with more runs.
+Where it lives: `tests/runners/run_bench.cmake`, the target `bench` in `tests/CMakeLists.txt`, and the programs in `tests/bench/`. `tests/bench/ablate/run.py` measures one change of the compiler against another with more runs.
 
 ## --profile-generate and --profile-use
 
@@ -250,7 +250,7 @@ The column was therefore measured two more times. `map_work` repeats its gain, a
 |---|---|
 | Machine, target, mode, runs | those of the first table of this section |
 | Commit | `2d850efa`, whose compiler, runtime and bench programs equal those of `a9e8ffd0` |
-| Command | `cmake -DOPTIONS=--no-hooks -P tests/run_bench.cmake`, with the other values of the `bench` target |
+| Command | `cmake -DOPTIONS=--no-hooks -P tests/runners/run_bench.cmake`, with the other values of the `bench` target |
 | Plain build of the same hour | `builder` 57.4 ms at 1.29 times its twin, `map_work` 137.3 ms at 1.09 |
 | Load | another job ran on the machine, at a load average of 17 on 14 cores |
 

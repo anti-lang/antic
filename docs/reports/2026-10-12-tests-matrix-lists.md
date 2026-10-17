@@ -9,12 +9,12 @@ takes `matrix-lists`. No file under `src/` changed.
 - `docs/notes/test-matrix.md` holds the constructs, the contexts, the kinds
   of value and the matrix in eight areas. Each list names the file it was
   read from.
-- `tests/run_diagnostics_covered.cmake` is the test `diagnostics_covered`,
-  and `tests/run_options_covered.cmake` the test `options_covered`.
+- `tests/runners/run_diagnostics_covered.cmake` is the test `diagnostics_covered`,
+  and `tests/runners/run_options_covered.cmake` the test `options_covered`.
 - `tests/diagnostics-open.txt` and `tests/options-open.txt` hold what has no
   test today.
-- `tests/run_diagnostics_covered_self.cmake` and
-  `tests/run_options_covered_self.cmake` are the tests
+- `tests/runners/run_diagnostics_covered_self.cmake` and
+  `tests/runners/run_options_covered_self.cmake` are the tests
   `diagnostics_covered_runner` and `options_covered_runner`. Nine and nine
   cases build a small tree each, one the runner accepts and eight it
   refuses, each with the text of its message.

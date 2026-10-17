@@ -50,7 +50,7 @@ Test first. `own_tools` was red on the old code, `build/drive/logs/own-tools-red
 and the lld, llvm-ar and the two `LIB` cases linked by hand through the fallbacks
 before the change.
 
-- `own_tools`, `tests/run_own_tools.cmake`: stand-in archives of links into the real
+- `own_tools`, `tests/runners/run_own_tools.cmake`: stand-in archives of links into the real
   one. With `PATH` holding the real tools, an empty `bin/` is refused for opt, for
   ld.lld, for lld-link and for llvm-ar, and nothing is written. With `LIB` naming the
   real Windows sysroot, an archive without one is refused and names the package. With

@@ -1,0 +1,137 @@
+# The runtime and `anti symbols` read the includes of a runtime
+# configuration with walks of their own, and both stop at one depth with
+# one message. A file may stand below 32 others, and a file below 33
+# others ends both. Both also stop at one count of files read for one
+# configuration, so includes that fan out end: 256 files may be read,
+# and the 257th ends both. Run with cmake -P and these values:
+#   ANTIC    the antic executable
+#   ANTI     the anti executable
+#   LLVM_MC  the llvm-mc executable
+#   RUNTIME  the runtime archive
+#   SOURCE   a program that ends with status 0
+#   HOST     the target name of this host
+#   WORK     a directory this run writes into
+
+cmake_minimum_required(VERSION 3.21)
+
+set(exe "")
+if(HOST MATCHES "^windows-")
+    set(exe ".exe")
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
+file(REMOVE_RECURSE "${WORK}")
+file(MAKE_DIRECTORY "${WORK}")
+set(failures "")
+
+# The program of SOURCE as dir/report.
+function(compile_report dir)
+    execute_process(
+        COMMAND "${ANTIC}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+                -o "${dir}/report${exe}" "${SOURCE}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "antic failed with ${status}\n${out}${err}")
+    endif()
+endfunction()
+
+# A chain of count files in dir, c0.toml at its head. Each includes the
+# next, and the last one sets a key.
+function(write_chain dir count)
+    file(MAKE_DIRECTORY "${dir}")
+    math(EXPR last "${count} - 1")
+    foreach(i RANGE 0 ${last})
+        math(EXPR next "${i} + 1")
+        if(i LESS last)
+            file(WRITE "${dir}/c${i}.toml" "include = \"c${next}.toml\"\n")
+        else()
+            file(WRITE "${dir}/c${i}.toml" "[runtime]\nthreads = 2\n")
+        endif()
+    endforeach()
+    compile_report("${dir}")
+endfunction()
+
+# A file c0.toml in dir that includes leaf.toml count times. leaf.toml
+# sets a key.
+function(write_wide dir count)
+    file(MAKE_DIRECTORY "${dir}")
+    file(WRITE "${dir}/leaf.toml" "[runtime]\nthreads = 2\n")
+    set(names "")
+    foreach(i RANGE 1 ${count})
+        list(APPEND names "\"leaf.toml\"")
+    endforeach()
+    list(JOIN names ", " text)
+    file(WRITE "${dir}/c0.toml" "include = [${text}]\n")
+    compile_report("${dir}")
+endfunction()
+
+# A chain of count files in dir, c0.toml at its head. Each includes the
+# next twice, so the last one is read 2^(count - 1) times.
+function(write_doubling dir count)
+    file(MAKE_DIRECTORY "${dir}")
+    math(EXPR last "${count} - 1")
+    foreach(i RANGE 0 ${last})
+        math(EXPR next "${i} + 1")
+        if(i LESS last)
+            file(WRITE "${dir}/c${i}.toml"
+                 "include = [\"c${next}.toml\", \"c${next}.toml\"]\n")
+        else()
+            file(WRITE "${dir}/c${i}.toml" "[runtime]\nthreads = 2\n")
+        endif()
+    endforeach()
+    compile_report("${dir}")
+endfunction()
+
+# Run the program and the inventory over the chain in dir. status is
+# the status the program ends with, and message the one both print, or
+# empty for none.
+function(expect_chain dir status message)
+    get_filename_component(label "${dir}" NAME)
+    if(message STREQUAL "")
+        program_expect("${label}" COMMAND "${dir}/report${exe}"
+                       "--anti.conf=${dir}/c0.toml" STATUS ${status} ANY_OUT)
+    else()
+        program_expect("${label}" COMMAND "${dir}/report${exe}"
+                       "--anti.conf=${dir}/c0.toml" STATUS ${status}
+                       ERR_MATCH "${message}")
+    endif()
+    execute_process(
+        COMMAND "${ANTI}" symbols inventory --conf "${dir}/c0.toml"
+                --out "${dir}/all.zip"
+        RESULT_VARIABLE got OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    if(message STREQUAL "" AND NOT got EQUAL 0)
+        string(APPEND failures
+               "the inventory over ${dir} ended with ${got}\n${out}${err}\n")
+    endif()
+    if(NOT message STREQUAL "" AND
+       (got EQUAL 0 OR NOT err MATCHES "${message}"))
+        string(APPEND failures
+               "the inventory over ${dir} ended with ${got}\n${err}\n")
+    endif()
+    set(failures "${failures}" PARENT_SCOPE)
+endfunction()
+
+# 33 files: the last one stands below 32 others.
+write_chain("${WORK}/deep" 33)
+expect_chain("${WORK}/deep" 0 "")
+# 34 files: the last one stands below 33 others.
+write_chain("${WORK}/deeper" 34)
+expect_chain("${WORK}/deeper" 70
+             "anti: the configuration files include one another at [^\n]*c33\\.toml")
+# c0.toml and 255 includes of one leaf: 256 files read.
+write_wide("${WORK}/wide" 255)
+expect_chain("${WORK}/wide" 0 "")
+# c0.toml and 256 includes: the 257th file read ends both.
+write_wide("${WORK}/wider" 256)
+expect_chain("${WORK}/wider" 70
+             "anti: the configuration reads more than 256 files, the last at [^\n]*leaf\\.toml")
+# 32 files that each include the next twice ask for 2^32 reads, and the
+# bound ends them as well.
+write_doubling("${WORK}/doubling" 32)
+expect_chain("${WORK}/doubling" 70
+             "anti: the configuration reads more than 256 files")
+if(NOT failures STREQUAL "")
+    message(FATAL_ERROR "${failures}")
+endif()

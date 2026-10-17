@@ -399,7 +399,7 @@ The notice names the licence of the runtime and of each library the program link
 
 ## Reading the excerpts
 
-Every example of this guide is checked by the test `guide_examples`, which runs `tests/run_document_examples.cmake` over each page. The marks below tell the test what to check.
+Every example of this guide is checked by the test `guide_examples`, which runs `tests/runners/run_document_examples.cmake` over each page. The marks below tell the test what to check.
 
 A block with a `main` is a program. The test builds it in release mode and runs it, and the `text output` block after it holds everything it prints. A second block, `text output windows`, follows it where the output on Windows differs, and a Windows host compares that one. A `//! name:` line on top names the block for the excerpts below it.
 

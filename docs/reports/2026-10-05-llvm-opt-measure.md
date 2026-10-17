@@ -12,7 +12,7 @@ Both machines measured `0e483a44`, the commit before this report. Nothing
 under `src/` or `tests/` changed.
 
 - The five programs: the target `bench` of `build/host`, which runs
-  `tests/run_bench.cmake`. Three release and three dev compiles of each
+  `tests/runners/run_bench.cmake`. Three release and three dev compiles of each
   program, five runs of the release executable and of its C twin, medians.
 - `mixed_work`: `tests/bench/ablate/run.py mixed_work`, the baseline alone,
   15 runs and three release compiles, medians. It has no C twin. Its dev

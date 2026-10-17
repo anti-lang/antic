@@ -571,9 +571,9 @@ constant: 9 6 3 0
 forward: 0 3 6 9
 ```
 
-`tests/run_program.cmake` builds the program in release mode, runs it and compares both. It reads the output as the bytes of a file, so a CR and a NUL count. The compiler must print nothing during the build. A warning fails the test unless the test names it. An optional `<name>.args` holds one command-line argument per line.
+`tests/runners/run_program.cmake` builds the program in release mode, runs it and compares both. It reads the output as the bytes of a file, so a CR and a NUL count. The compiler must print nothing during the build. A warning fails the test unless the test names it. An optional `<name>.args` holds one command-line argument per line.
 
-The pages of this guide use a third form. A block that declares `main` is built and run, and the `text output` block after it holds its whole output. The test `guide_examples` compares the two through `tests/run_document_examples.cmake`.
+The pages of this guide use a third form. A block that declares `main` is built and run, and the `text output` block after it holds its whole output. The test `guide_examples` compares the two through `tests/runners/run_document_examples.cmake`.
 
 ## Memory checks in tests
 

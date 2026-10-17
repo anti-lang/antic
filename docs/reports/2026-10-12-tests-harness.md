@@ -18,14 +18,14 @@ registers a file of `tests/matrix/` by its name and expects the tests of
 - `antic_dev_imports` reads the modules of the standard library a program
   imports, and those import. `antic_dev_object` registers the test that
   compiles the dev object of one on first use.
-- `tests/run_matrix_files.cmake` is the test `matrix_files`. It refuses a
+- `tests/runners/run_matrix_files.cmake` is the test `matrix_files`. It refuses a
   file of the directory that registers nothing.
 - `tests/known-failures.txt` holds its header and no line.
   `docs/audit/tests-findings.md` holds its header and the empty table.
   `tests/known_failures.cmake` reads the list for the configure step, which
-  sets `WILL_FAIL`, and for `tests/run_known_failures.cmake`, the test
+  sets `WILL_FAIL`, and for `tests/runners/run_known_failures.cmake`, the test
   `known_failures`.
-- `tests/run_known_failures_self.cmake` is the test
+- `tests/runners/run_known_failures_self.cmake` is the test
   `known_failures_runner`: 17 cases, five lists the runner accepts and
   twelve it refuses, each with the text of its message.
 - `run_program.cmake`, `program_expect` and `run_expect.cmake` take a time

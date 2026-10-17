@@ -9,7 +9,7 @@ llvm-tools report of the same date covers the archives.
 - `tools/llvm-pin` names `@VERSION@-anti.2` and the tools of all six hosts, macos-x86_64
   among them.
 - `tools/clang-pin` is new. It names the same release and the clang archive of each
-  host. `tests/run_release_pins.cmake` holds both pins to one tag.
+  host. `tests/runners/run_release_pins.cmake` holds both pins to one tag.
 - `tools/sysroot-pins` loses the Alpine `compiler-rt` package. The Linux sysroots take
   `libclang_rt.builtins.a` from the pinned clang.
 

@@ -102,7 +102,7 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
                 "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/abi/pcre2_match.anti"
                 "-DOBJECTS=${probe},${library}"
                 "-DWORK=${ANTIC_PCRE2_WORK}/run"
-                -P "${PROJECT_SOURCE_DIR}/tests/run_program.cmake")
+                -P "${ANTIC_RUNNERS}/run_program.cmake")
     endif()
     add_test(NAME pcre2_link_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -113,7 +113,7 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
             "-DOBJECTS=${probe},${library}"
             "-DWORK=${ANTIC_PCRE2_WORK}/link"
             "-DTARGET=${target}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_link.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
 endforeach()
 
 # JIT stays off: the definitions of the build never name SUPPORT_JIT.
@@ -126,4 +126,4 @@ add_test(NAME pcre2_pin
             -DHASH=SHA256 -DPARTS=2
             "-DABSENT=-DSUPPORT_JIT"
             -DABSENT_IN=src/native/pcre2-files.cmake
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_pin.cmake")

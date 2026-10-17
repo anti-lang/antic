@@ -428,7 +428,7 @@ overflow is in reach, but the rule asks for the check.
 No test feeds `zip_read` or `inflate` a truncated archive, an offset past
 the end or a broken deflate stream. None feeds `anti symbols resolve` a
 malformed trace or map, or the resolver a malformed `index.toml` or
-`anti.lock`, and the one refusal `tests/run_anti_bind.cmake` checks for
+`anti.lock`, and the one refusal `tests/runners/run_anti_bind.cmake` checks for
 `raylib_api.json` is a syntax error. A test with a repeated struct name
 would have found the first severe finding.
 

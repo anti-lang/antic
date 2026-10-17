@@ -184,7 +184,7 @@ symbol name, written twice.
 - `PLUGIN_INDEX` is defined at `src/antic/target.h:43` and again at
   `src/anti/syms.c:32`, and `src/rt/plugin.c:763` spells
   `"anti-plugins.toml"` a third time. The runtime cannot include the
-  header of `antic`, so its copy is a seam. `tests/run_plugin.cmake`
+  header of `antic`, so its copy is a seam. `tests/runners/run_plugin.cmake`
   covers that seam, and nothing covers the copy in `syms.c`.
 - `-symbols.zip` is written by `src/anti/build.c:549` and read through
   `ARCHIVE_SUFFIX` at `syms.c:30`, two spellings in one program.

@@ -378,13 +378,13 @@ its reports.
   tests.
 - M58. `src/rt/plugin.c:559`. Two refusals of the plugin loader are
   never triggered. New. tests.
-- M59. `tests/run_modules.cmake:71`. Scripts spell the object suffix
+- M59. `tests/runners/run_modules.cmake:71`. Scripts spell the object suffix
   `.o`, and 16 cross-module dev tests skip Windows. New. tests.
-- M60. `tests/run_pcre2_pin.cmake:46`. Three of the five pin checks
+- M60. `tests/runners/run_pcre2_pin.cmake:46`. Three of the five pin checks
   match the version as a pattern. New. tests.
-- M61. `tests/run_table.cmake:19`. Five runners of stopping programs
+- M61. `tests/runners/run_table.cmake:19`. Five runners of stopping programs
   disagree on the output of antic and on exit codes. New. tests.
-- M62. `tests/run_plugin.cmake:25`. Scripts compare program output
+- M62. `tests/runners/run_plugin.cmake:25`. Scripts compare program output
   without the raw-bytes rule. New. tests.
 
 ## Minor
@@ -422,7 +422,7 @@ finding at. Paths without a directory are in `src/antic/`.
 | 27 | 3 | `sema_expr.c:1095` (front-end), `lower_lowerer.h:4` (back-end), `src/anti/doc.c:780` (anti-tool). |
 | Warnings | 1 | `(void)` on 26 parameters without a reason, `arm64.c:406` (back-end). |
 | None | 1 | The CodeView name of a function unescaped, `debug.c:440` (back-end). |
-| Tests | 10 | Tests that drop out on some hosts, `tests/CMakeLists.txt:1313`. Dev objects compiled in four places, `tests/run_checks.cmake:96`. Registrations without a helper, `tests/CMakeLists.txt:479`. Copied unit test helpers, `tests/unit/test_sema.c:28`. The descriptor pinned in 28 texts, `tests/unit/test_lower.c:547`. Directories that hold more than one kind, `tests/CMakeLists.txt:320`. Test names, `tests/CMakeLists.txt:3678`. Smaller uncovered features, `main.c:265`. Dead runner code, `tests/run_start.cmake:1`. A comment above the wrong test, `tests/CMakeLists.txt:1305` (tests). |
+| Tests | 10 | Tests that drop out on some hosts, `tests/CMakeLists.txt:1313`. Dev objects compiled in four places, `tests/runners/run_checks.cmake:96`. Registrations without a helper, `tests/CMakeLists.txt:479`. Copied unit test helpers, `tests/unit/test_sema.c:28`. The descriptor pinned in 28 texts, `tests/unit/test_lower.c:547`. Directories that hold more than one kind, `tests/CMakeLists.txt:320`. Test names, `tests/CMakeLists.txt:3678`. Smaller uncovered features, `main.c:265`. Dead runner code, `tests/runners/run_start.cmake:1`. A comment above the wrong test, `tests/CMakeLists.txt:1305` (tests). |
 
 `front-end` also lists six defects no rule names, `rt` one, `anti-tool`
 four and `back-end` none. They are not counted. Two needed a decision,
@@ -612,7 +612,7 @@ that reader. Steps 1 to 13 close every severe finding.
 12. runtime plugin loader. S28 with the object counted under the lock,
     S33 in `class_sound`, M47, and M58 with a library for another
     runtime and one with a foreign interface. Files: `plugin.c`,
-    `loaded.c`, `hooks.c`, `tests/run_plugin_versions.cmake`.
+    `loaded.c`, `hooks.c`, `tests/runners/run_plugin_versions.cmake`.
 13. anti allocation and integers. S30, S31, S32 and S34. Files:
     `files.c`, `bindclang.c`, `repo.c`, tests.
 14. antic checker split, value rules. M10 for the value rules,

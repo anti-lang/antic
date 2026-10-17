@@ -90,7 +90,7 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
                 "-DSOURCE=${source}"
                 "-DOBJECTS=${probe},${library}"
                 "-DWORK=${ANTIC_MINIAUDIO_WORK}/run"
-                -P "${PROJECT_SOURCE_DIR}/tests/run_program.cmake")
+                -P "${ANTIC_RUNNERS}/run_program.cmake")
     endif()
     add_test(NAME miniaudio_link_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -101,7 +101,7 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
             "-DOBJECTS=${probe},${library}"
             "-DWORK=${ANTIC_MINIAUDIO_WORK}/link"
             "-DTARGET=${target}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_link.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
 endforeach()
 
 add_test(NAME miniaudio_pin
@@ -110,4 +110,4 @@ add_test(NAME miniaudio_pin
             -DSCRIPT=src/native/get-source.cmake
             -DCALLER=src/native/miniaudio.cmake
             -DHASH=SHA256 -DPARTS=3
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_pin.cmake")

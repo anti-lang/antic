@@ -1,5 +1,5 @@
 # The messages of `anti check`, one case each.
-# tests/run_anti_messages.cmake states the form of a case.
+# tests/runners/run_anti_messages.cmake states the form of a case.
 
 set(check_manifest "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n")
 

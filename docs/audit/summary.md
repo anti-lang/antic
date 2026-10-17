@@ -18,7 +18,7 @@ and C by `docs/c-guidelines.md`, structure, and documentation. The first
 audit wrote its ids with one digit and the second with two. The ids here
 have three digits, S301 to S335 and M301 to M371, so no number names two
 findings. `docs/decisions.md:2126` and `2292` and
-`tests/run_anti_build_inputs.cmake:12` cite `docs/audit/summary.md` and
+`tests/runners/run_anti_build_inputs.cmake:12` cite `docs/audit/summary.md` and
 mean the summaries of the earlier audits, which stand under their dates.
 
 ## Counts
@@ -151,7 +151,7 @@ and 11, and found defect 3 fixed by `bfe03ca0`.
   the comments that name llvm-mc, the records in `antic.h`, rule 18 and
   rule 19. They are also the moved function names of the notes, the
   chapters of the book, the flat runners, the registrations and the header
-  of `tests/run_anti_build.cmake`.
+  of `tests/runners/run_anti_build.cmake`.
 - `tool-pass` counts its rule 26 findings under structure. They stand under
   safety and C here, as every numbered rule does. Its finding on two
   options without a test stands under the bar of tests.
@@ -207,7 +207,7 @@ code. Three of them are defects of the code as well: S321, S324 and S330.
 | S332 | `src/std/anti/log.anti:15` | The header describes a file of `level`, `format` and `[[sink]]` entries with a level each. `first_sink` reads `kind` and `path`, makes one sink and stops at the eighth entry. | fixed `fd716910` | std |
 | S333 | `src/anti/bindmodel.h:168` | `bind_is_keyword` is said to answer for a word the lexer reserves. It answers true for every text that is no identifier, and the reader of a header holds a name to no rule. | fixed `d62c120a` | anti-tool |
 | S334 | `tools/compile.sh:13` | The header says the first build installs the sysroots and raylib. The configure step installs clang and the LLVM tools alone, and a first `./c` stops at `src/native/raylib.cmake:10`. | fixed `ae5f7fe9` | build-and-tools |
-| S335 | `tests/run_codeview_empty.cmake:24` | The test searches the assembly for `DEBUG_S_SYMBOLS` and `S_LPROC32`, spellings of the native back end that antic no longer writes. Both tests pass whatever antic writes. | fixed `06d0f6b6` | build-and-tools |
+| S335 | `tests/runners/run_codeview_empty.cmake:24` | The test searches the assembly for `DEBUG_S_SYMBOLS` and `S_LPROC32`, spellings of the native back end that antic no longer writes. Both tests pass whatever antic writes. | fixed `06d0f6b6` | build-and-tools |
 
 ## Major
 
@@ -305,7 +305,7 @@ The bar of tests:
   build-and-tools. Fixed `718b75d2`, `8ddb9cda`, `d5cb6dce` and
   `e3e89ef2`. The test `skips_registered` refuses a runner that prints
   `SKIP:` without the property.
-- M320. `tests/run_manifest_signature.cmake:155`. Five checks cannot
+- M320. `tests/runners/run_manifest_signature.cmake:155`. Five checks cannot
   tell a failure from a pass. The wrong-signature case passes for an
   installer that accepts every signature. New. build-and-tools. Fixed
   `2936609e`, `3362bafc`, `00fc93e9`, `54ab226f` and `a99dedcc`.
@@ -321,7 +321,7 @@ One purpose per module and file:
 - M322. `src/anti/symmap.c:146`. The file of the symbols map also holds
   the readers of the licence notice and of `sources.txt`. New. anti-tool.
   Fixed `5b14cfd6`, which moves them into `licensing.c`.
-- M323. `tests/run_release_dry_run.cmake:1`. The two largest runners
+- M323. `tests/runners/run_release_dry_run.cmake:1`. The two largest runners
   hold many tests under one name. `run_package.cmake` runs thirteen
   checks as `package_keys`. New. build-and-tools.
 
@@ -366,10 +366,10 @@ Each concern in one place:
 
 Tests, a golden written again without a reading:
 
-- M333. `tests/run_emit_identity.cmake:52`. The manifest of 1332 digests
+- M333. `tests/runners/run_emit_identity.cmake:52`. The manifest of 1332 digests
   is written again with no way to read what changed. The old texts are
   removed first. New. tests.
-- M334. `tests/run_dump.cmake:32`. No runner shows where two texts
+- M334. `tests/runners/run_dump.cmake:32`. No runner shows where two texts
   differ, and eleven scripts each compare with an expected file
   themselves. New. tests.
 
@@ -407,7 +407,7 @@ Copies that drifted:
   flags the runtime takes, against their own comment. New.
   build-and-tools. Fixed `22884b98`, the table of
   `tools/target-compile.cmake` and a provisional entry on the flags.
-- M343. `tests/run_dev.cmake:26`. The helpers of the runners exist in
+- M343. `tests/runners/run_dev.cmake:26`. The helpers of the runners exist in
   many copies with different contracts. 49 builds in 31 runners accept
   whatever antic and the linker print. The pattern of M61. New.
   build-and-tools, tests.
@@ -508,14 +508,14 @@ A header or a comment that differs from the code:
 - M368. `tools/uninstall.sh:5`. The uninstallers name an address that no
   release publishes. New. build-and-tools. Fixed `cfec4ad3`, which has
   step 9 publish them by decision 9.
-- M369. `tests/run_script_policies.cmake:11`. The policy test says
+- M369. `tests/runners/run_script_policies.cmake:11`. The policy test says
   "every script" and reads two list files. Four runners that `src/native/`
   registers carry no `cmake_minimum_required`. New. build-and-tools.
   Fixed `c3e7267b`, with the minor finding on CMake 3.20.
 - M370. `tests/CMakeLists.txt:126`. The allocator test is said to cover
   the programs that link `antic_core`. `tests/doc/antl_rename.c:29` calls
   `malloc` and is not listed. New. build-and-tools. Fixed `b0b90de3`.
-- M371. `tests/run_linux_libc.cmake:12`. The runner says it links with
+- M371. `tests/runners/run_linux_libc.cmake:12`. The runner says it links with
   the recipe of the packer and holds a hand copy of it. New.
   build-and-tools. Fixed `1dac8065`, one function of
   `tools/host-compile.cmake` for both.
@@ -555,7 +555,7 @@ directory are in `src/antic/`.
 | 25 | 1 | Names outside the prefix of their file, `platform.c:216` (back-end). |
 | 26 | 15 | A type walk and an operand comparison twice, `sema_value.c:310`, and eleven lines of `list.anti:189` and `deque.anti:95`, still open (tool-pass). Three tests of the program's main, `reach.c:154`, a file's existence, `driver_search.c:50`, and two functions nothing calls, `target.c:151` (structure). Repeated blocks, `sema_generic.c:1838`, and dead code, `sema_copies.c:450` (front-end). Helpers written twice, `optimize.c:24` (middle). Blocks of the back end, `llvm_emit.c:242` (back-end). The comparison of two names, `antl_tree.c:1377` (library-file). Unused functions, `src/rt/object.c:1109`, and blocks twice, `src/rt/patterns.c:35` (rt). Dead code, `src/std/anti/collection/map.anti:71`, and duplicated code, `src/std/anti/args.anti:284` (std). Two copies that allocate on their own, `src/anti/syms.c:837` (anti-tool). |
 | Warnings | 1 | `(void)is_union;` without a reason, `src/anti/bindapi.c:153` (anti-tool). |
-| Bar of tests | 2 | `--soname` and `--strip-docs` have no test, `main.c:295` (tool-pass). Three guards have holes, `tests/run_warning_set.cmake:14` (build-and-tools). |
+| Bar of tests | 2 | `--soname` and `--strip-docs` have no test, `main.c:295` (tool-pass). Three guards have holes, `tests/runners/run_warning_set.cmake:14` (build-and-tools). |
 
 ### Structure
 
@@ -563,7 +563,7 @@ directory are in `src/antic/`.
 |---|---|---|
 | One purpose | 1 | `anti.regex` holds two functions that use no pattern, `src/std/anti/regex.anti:982` (std). |
 | Dependencies and boundaries | 4 | The doc page of the front end builds an IR module, `docpage.c:13` (tool-pass). The inside header of the library file is included outside it, `antl_io.h:12` (structure). The records every part shares stand in the interface of the tool, `antic.h:4` and `antic.h:111` (structure, back-end). The status 3 of `driver_run` is a number at four places, `src/anti/build.c:333` (anti-tool). |
-| Each concern in one place | 20 | The prefix of a message at every site, `src/anti/bindclang.c:101` (structure). Tables and names defined twice, `sema_class.c:1020` (front-end). The checks of a dev build in four files, `lower_lowerer.h:9` (middle). Errors in three forms, `driver.c:597`, fixed `418a71e8`, and a platform layer that names antic, `platform.h:9`, fixed `482136fd` (back-end). No `ptr_set_free`, `ptrset.h:8` (library-file). A walk built three ways, `queue.anti:75`, a lent key handled three ways, `set.anti:144`, `destruct` declared two ways, `lang.anti:192`, functions without `-> never`, `io.anti:36`, and numbers spelled again, `lang.anti:126` (std). Names of files and directories, `src/anti/main.c:488`, and a JSON file read by `strstr`, `src/anti/sdk.c:41` (anti-tool). A dozen readers of a pin, `tools/upstream-sources.cmake:21`, the six targets in twenty places, `tools/pack-anti.cmake:56`, the host worked out in many ways, `tools/pinned-compiler.cmake:37`, versions outside their pins, `tools/sysroot-pins:4`, CMake 3.20 beside a 3.21 command, `tools/get-sysroot.cmake:30`, fixed `c3e7267b`, three ways to move the downloads, `CMakeLists.txt:42`, and the nm of the host, `tests/run_clib.cmake:391` (build-and-tools). |
+| Each concern in one place | 20 | The prefix of a message at every site, `src/anti/bindclang.c:101` (structure). Tables and names defined twice, `sema_class.c:1020` (front-end). The checks of a dev build in four files, `lower_lowerer.h:9` (middle). Errors in three forms, `driver.c:597`, fixed `418a71e8`, and a platform layer that names antic, `platform.h:9`, fixed `482136fd` (back-end). No `ptr_set_free`, `ptrset.h:8` (library-file). A walk built three ways, `queue.anti:75`, a lent key handled three ways, `set.anti:144`, `destruct` declared two ways, `lang.anti:192`, functions without `-> never`, `io.anti:36`, and numbers spelled again, `lang.anti:126` (std). Names of files and directories, `src/anti/main.c:488`, and a JSON file read by `strstr`, `src/anti/sdk.c:41` (anti-tool). A dozen readers of a pin, `tools/upstream-sources.cmake:21`, the six targets in twenty places, `tools/pack-anti.cmake:56`, the host worked out in many ways, `tools/pinned-compiler.cmake:37`, versions outside their pins, `tools/sysroot-pins:4`, CMake 3.20 beside a 3.21 command, `tools/get-sysroot.cmake:30`, fixed `c3e7267b`, three ways to move the downloads, `CMakeLists.txt:42`, and the nm of the host, `tests/runners/run_clib.cmake:391` (build-and-tools). |
 | Copies and small duplication | 4 | Two readings of one grammar that drifted, `parser_stmt.c:165` (front-end). Small copies inside the tools, `tools/release.sh:975` (build-and-tools). Registrations written out, `src/native/pcre2.cmake:97` and `tests/CMakeLists.txt:479`, still open (build-and-tools, tests). Two unit files that run the stages themselves, `tests/unit/test_whole.c:49` (tests). |
 | Left of a replaced feature | 4 | The option `--llvm-mc` through antic, anti, the build files and 57 runners, with `target_block_label` and the attributes column, `driver.h:23` (structure, back-end, build-and-tools, tests). The `Interlocked` branch for Microsoft's compiler, `src/rt/atomic.c:98` (rt), fixed `1a6f9729`. Checks and words of the Microsoft toolchain, `tools/release.sh:688` (build-and-tools). Its call of `vcvarsall.bat` waits for decision 16, since the call also gives the configure the `rc.exe` that CMake asks for, `docs/reports/2026-10-17-solid-step24.md`. `src/std/.gitkeep` (std). |
 | Placement and names | 15 | A tracked `.pyc` under `tools/docs-style/__pycache__/` (structure). Functions outside the file their sentence names, `sema.c:1925`, and small things, `parser_stmt.c:12` (front-end). The channel design in the file of the workers, `lower_worker.c:349` (middle). Two headers that carry more than their sentence, `src/rt/regex.h:98` (library-file). Names that differ inside one module, `src/rt/object.h:211` (rt). Helpers that are `pub`, `collection.anti:575`, and three left by the closure: `Changed` and `Snapshot`, `synchronized.anti:29`, size and presence, `text.anti:174`, and `""` for what is not there, `args.anti:104`, all still open (std). Two records named `unit`, `src/anti/syms.c:409`, and three helpers in another file, `src/anti/repo.h:20` (anti-tool). Helpers in the file of another purpose, `tools/fetch-release.cmake:25` (build-and-tools). The runners flat in `tests/` and a build file in the order of its history, `tests/CMakeLists.txt:1`, still open (build-and-tools, tests). Test names that do not start with their kind, `tests/CMakeLists.txt:309` (tests). |
@@ -575,10 +575,10 @@ directory are in `src/antic/`.
 | Question | Count | Findings and reports |
 |---|---|---|
 | A comment that differs from the code | 12 | `antic.h:11` against the test `anti_interface` (tool-pass). Stale sentences, `parser_item.c:345` (front-end). Two comments of the IR, `ir_verify.c:679` (middle). `antl_verify.c:13` and `src/rt/toml.c:1` (library-file). `src/rt/symbols.h:65` and comments that name what moved, `src/rt/platform.h:4` (rt). `src/std/anti/random.anti:5` (std). Nine comments, `src/anti/build.c:487` (anti-tool). `CMakeLists.txt:136`, the recipes that name modules, `src/native/sqlite.cmake:1`, and two presets, `CMakePresets.json:23` (build-and-tools). |
-| A header that says less | 3 | `src/rt/platform_windows.c:1` (structure). Eight headers, `src/anti/zip.c:1` (anti-tool). Headers of runners, `tests/program_output.cmake:1` and `tests/run_anti_build.cmake:4` (build-and-tools, tests). |
+| A header that says less | 3 | `src/rt/platform_windows.c:1` (structure). Eight headers, `src/anti/zip.c:1` (anti-tool). Headers of runners, `tests/program_output.cmake:1` and `tests/runners/run_anti_build.cmake:4` (build-and-tools, tests). |
 | Stale names in notes and documents | 10 | File names in the decisions and `CLAUDE.md`, `docs/decisions.md:1220` (tool-pass), fixed `e5efa818`. Function names that moved, `docs/notes/hashing.md:8`, `check.md:76` and `versions.md:41` (structure, front-end, library-file). `ir.md:7`, `optimizer.md:7`, `hashing.md:11` and `dev-checks.md:44` (middle). `llvm.md:17` (back-end). `threads.md:31` (rt). The site page of the library, `docs/site/standard-library/index.md:27` (std). `doc.md:53` (anti-tool). |
-| Comments that name what is gone | 4 | llvm-mc as the assembler, `cpu.c:7`, `target.c:16` and `tests/run_bench.cmake:14` (structure, back-end, tool-pass). Chapters of the book, `layout.h:12` and `sema.h:196` (middle, front-end). The steps of the work order, `llvm_emit.c:24` (back-end). Finding numbers that two audits use, `tests/run_antl_verify.cmake:1` (tests). |
-| DESIGN without a reason | 4 | `sema_expr.c:1984` (front-end). A reason that is gone, `driver_index.c:14` (back-end). Two bounds of 32, `src/rt/trace.c:142` (rt). `tests/run_asserts.cmake:47` (build-and-tools). |
+| Comments that name what is gone | 4 | llvm-mc as the assembler, `cpu.c:7`, `target.c:16` and `tests/runners/run_bench.cmake:14` (structure, back-end, tool-pass). Chapters of the book, `layout.h:12` and `sema.h:196` (middle, front-end). The steps of the work order, `llvm_emit.c:24` (back-end). Finding numbers that two audits use, `tests/runners/run_antl_verify.cmake:1` (tests). |
+| DESIGN without a reason | 4 | `sema_expr.c:1984` (front-end). A reason that is gone, `driver_index.c:14` (back-end). Two bounds of 32, `src/rt/trace.c:142` (rt). `tests/runners/run_asserts.cmake:47` (build-and-tools). |
 | Rule 27 | 3 | Comments above the wrong item, `parser.c:177` (front-end) and `driver.c:135` (back-end). Two banned phrases, `src/std/anti/collection/queue.anti:17` (std). |
 | The path from `CLAUDE.md` | 1 | The docs-style rules for a comment stand in no file of the repository, `tools/docs-style/banned-terms.md:6` (build-and-tools). |
 
@@ -1373,7 +1373,7 @@ file after step 28 changes `docs/notes/source-tree.md` in the same commit.
     `bindwrite.c` and `tests/unit/test_bind.c`.
 15. Tests that cannot fail. S335, M319, M320, M369 and M370. Each check is
     first shown to pass on a broken input. Files:
-    `tests/run_codeview_empty.cmake`, `tests/CMakeLists.txt` and the
+    `tests/runners/run_codeview_empty.cmake`, `tests/CMakeLists.txt` and the
     runners those findings name.
 16. The first build and the fetch scripts. S334, M327, M331 and M340,
     after the decision on the configure step. One function fetches a
@@ -1412,16 +1412,16 @@ file after step 28 changes `docs/notes/source-tree.md` in the same commit.
     `src/native/CMakeLists.txt`.
 24. Release scripts. M344, M367, M368 and M371. Files:
     `tools/publish.cmake`, `tools/release.sh`, the two uninstallers,
-    `CMakeLists.txt` and `tests/run_linux_libc.cmake`.
+    `CMakeLists.txt` and `tests/runners/run_linux_libc.cmake`.
 25. Runners, one way to build and one way to compare. M343, M333 and M334.
     `antic_program` for every build, and one function that prints the
     first line that differs. `emit_identity` keeps the texts of the last
     manifest. Files: `tests/program_output.cmake` and the runners.
 26. Runners, the LLVM program tests and the two largest. M345 and M323.
     The `llvm_*.anti` programs join the glob of every host. Files:
-    `tests/CMakeLists.txt`, `tests/run_llvm_program.cmake`,
-    `tests/run_program.cmake`, `tests/run_release_dry_run.cmake` and
-    `tests/run_package.cmake`.
+    `tests/CMakeLists.txt`, `tests/runners/run_llvm_program.cmake`,
+    `tests/runners/run_program.cmake`, `tests/runners/run_release_dry_run.cmake` and
+    `tests/runners/run_package.cmake`.
 27. The option `--llvm-mc` and what the assembler left, after its
     decision and after step 23. The merged minor finding and the comments
     that name llvm-mc. The step crosses antic, `anti`, the build files and

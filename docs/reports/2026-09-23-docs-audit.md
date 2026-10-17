@@ -9,7 +9,7 @@ Commit `05ded9f` changes three files and nothing else.
 
 | File | Change |
 |---|---|
-| `tests/run_repo_layout.cmake` | `docs_directories` lists `audit` |
+| `tests/runners/run_repo_layout.cmake` | `docs_directories` lists `audit` |
 | `CLAUDE.md` | "Repository layout" lists the directories of `docs/` and names `docs/audit/` as the place of an audit report and its data |
 | `docs/decisions.md` | The first entry of "Repository layout" lists the directories of `docs/` and records the decision |
 

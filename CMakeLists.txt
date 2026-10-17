@@ -727,6 +727,10 @@ add_custom_target(anti_std ALL DEPENDS ${std_files})
 include(tools/git-hooks.cmake)
 
 enable_testing()
+# The directory of the test runners, run_*.cmake, by decision 13 of
+# "Decisions of 2026-10-11". tests/ and src/native/ name a runner through
+# it alone.
+set(ANTIC_RUNNERS "${PROJECT_SOURCE_DIR}/tests/runners")
 add_subdirectory(tests)
 # The native libraries of the runtime archive and their tests.
 add_subdirectory(src/native)

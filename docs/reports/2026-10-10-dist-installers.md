@@ -25,7 +25,7 @@ and run nothing of the package but its two programs. The commit is
   `package-api`, were 34,781 bytes before compression.
 - `tools/package-api`, `tools/cmake-pin` and `tools/cmake-version` left the
   tree with the tests `package_api` and `cmake_pin` and the script
-  `tests/run_pin.cmake`. `install.sh` alone read them.
+  `tests/runners/run_pin.cmake`. `install.sh` alone read them.
 - `tools/downloads.html.in` shows the manual install for both shells, with
   the checks of the installers as commands: the two `openssl` lines over
   `SHA256SUMS.sig` and the key, `shasum` or `Get-FileHash` over the
@@ -51,7 +51,7 @@ page. Step 5 of the script was right as it stood.
 
 ## What it tested
 
-- `installer_alone`, `tests/run_installer_alone.cmake`, is new. It reads
+- `installer_alone`, `tests/runners/run_installer_alone.cmake`, is new. It reads
   both installers for `cmake`, `get-sysroot`, `package-api`,
   `xcode-select`, `CommandLineTools` and `ANTI_MICROSOFT` in either case,
   and for `--version`. It then runs `install.sh` against a package of the

@@ -88,7 +88,7 @@ endfunction()
 
 # The link test of a media library on Linux: the object of the probe,
 # compiled with its own main, linked by the pinned clang and lld against
-# the glibc sysroot, as tests/run_glibc_link.cmake describes. <libs> are
+# the glibc sysroot, as tests/runners/run_glibc_link.cmake describes. <libs> are
 # the system libraries of the link, separated by commas.
 function(antic_media_glibc_test name target object library libs expected)
     antic_media_glibc(sysroot libdir "${target}")
@@ -107,5 +107,5 @@ function(antic_media_glibc_test name target object library libs expected)
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DTARGET=${target}"
             "-DWORK=${CMAKE_BINARY_DIR}/native/link/${name}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_glibc_link.cmake")
+            -P "${ANTIC_RUNNERS}/run_glibc_link.cmake")
 endfunction()

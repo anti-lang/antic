@@ -111,4 +111,4 @@ add_test(NAME mimalloc_pin
             -DSCRIPT=src/native/get-source.cmake
             -DCALLER=src/native/mimalloc.cmake
             -DHASH=SHA256 -DPARTS=3
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_pin.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_pin.cmake")

@@ -93,7 +93,7 @@ The tools that pass it are anti and the suite:
   `docs/audit/data/options-unexercised.txt` counts the option in 46 test
   files. `tests/CMakeLists.txt:1048` derives the directory of the LLVM
   tools from the path of llvm-mc, and each recipe of `src/native/` hands
-  `-DLLVM_MC` to `tests/run_program.cmake`, as `pcre2.cmake:100` does.
+  `-DLLVM_MC` to `tests/runners/run_program.cmake`, as `pcre2.cmake:100` does.
 - `docs/decisions.md:929` lists it among the driver options.
 
 `docs/distribution.md:131` records that no build runs llvm-mc and that the
@@ -284,7 +284,7 @@ major, and this finding covers what it left out.
 
 `CLAUDE.md` gives `tests/` and `tools/` one sentence each. Below that, the
 first comment of `tests/CMakeLists.txt` describes `tests/programs` and
-`tests/unit` alone, and `tests/run_repo_layout.cmake:24` lists the other
+`tests/unit` alone, and `tests/runners/run_repo_layout.cmake:24` lists the other
 twenty-four directories by name without a purpose. Six of them appear in
 no document at all: `anti-build`, `anti-test`, `check`, `framework`,
 `opt` and `raw`. Of `tools/`, five files are named by no document:
@@ -421,7 +421,7 @@ the dispatch switches of `antl_read.c:876` and `lower_expr.c:2078`, of
 The option `--llvm-mc` and its plumbing through anti and the suite, the
 second finding. `target_block_label`, the seventh. The comments that name
 llvm-mc as the assembler, the eleventh. The entries of `docs/decisions.md`,
-the major finding. `tests/run_bench.cmake:14`, which the tool pass reports.
+the major finding. `tests/runners/run_bench.cmake:14`, which the tool pass reports.
 No dead branch of code was found: `data/back-end-mentions.txt` finds no
 `regalloc`, `select.c`, `emit.c` or `--backend` under `src/`, and the two
 exported functions nothing calls are the whole of the dead code the

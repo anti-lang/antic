@@ -7,17 +7,17 @@ changed.
 
 ## What the step added
 
-- `tests/run_usage.cmake` holds the usage. `antic --help`, `anti --help`
+- `tests/runners/run_usage.cmake` holds the usage. `antic --help`, `anti --help`
   and `anti -h` print it on the standard output and end with 0, and the
   tool without an argument prints the same bytes on the standard error
   and ends with 2. The runner also holds 74 command lines that a tool
   refuses with its usage, `antic_usage_<case>` and `anti_usage_<case>`.
-- `tests/run_anti_options.cmake` holds 13 cases, `anti_option_<case>`:
+- `tests/runners/run_anti_options.cmake` holds 13 cases, `anti_option_<case>`:
   `build --strip-docs`, `build --soname` for macOS, Linux and Windows,
   `build --target all` alone and with `--cpu`, `check -I` with a library
   file and with a source, `bind -D` with a name, a value and the shim,
   and `symbols inventory --from`.
-- `tests/run_antic_options.cmake` holds 20 cases, `antic_option_<case>`:
+- `tests/runners/run_antic_options.cmake` holds 20 cases, `antic_option_<case>`:
   `--cpu` beside `--target` for each of the six targets, `--checks` and
   `--asserts` with their `--no-` forms beside `--dev` and without it,
   `--warn-undocumented` beside `--doc-warnings`, `--warnings-as-errors`

@@ -1,5 +1,5 @@
 # The messages of `anti build` and of `anti run`, one case each.
-# tests/run_anti_messages.cmake states the form of a case.
+# tests/runners/run_anti_messages.cmake states the form of a case.
 
 set(manifest_package "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\n")
 

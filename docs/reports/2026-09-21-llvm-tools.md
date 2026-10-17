@@ -8,7 +8,7 @@ archive per host and no longer holds a recipe, an upstream pin or a packer for L
 ## Changes
 
 - `tools/llvm-pin` names the tag, the release, the asset name and the digests of the
-  five hosts. `tests/run_llvm_pin.cmake` checks it, that it names no macos-x86_64, and
+  five hosts. `tests/runners/run_llvm_pin.cmake` checks it, that it names no macos-x86_64, and
   that no script spells the version or the release.
 - `tools/get-llvm.cmake` downloads the asset of the host into `build/llvm`. It checks
   the pinned digest, the line of `SHA256SUMS` and `SHA256SUMS.sig` with

@@ -1,5 +1,5 @@
 # The messages of `anti fmt`, one case each.
-# tests/run_anti_messages.cmake states the form of a case.
+# tests/runners/run_anti_messages.cmake states the form of a case.
 
 # Without a file the command takes the source and the test directory,
 # which hold no module here. M339 of the audit: the command formatted

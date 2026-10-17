@@ -23,7 +23,7 @@ commands of `anti` and the options of `antic` the page names, which the gaps
 report left to Eddie. The plan put the section in, so it is there, and taking
 it out is one deletion.
 
-`tests/run_overview_examples.cmake` builds and runs every block that declares
+`tests/runners/run_overview_examples.cmake` builds and runs every block that declares
 `main`, and compares what it prints with the `text` block after the example
 through `program_expect` of `tests/program_output.cmake`, so the raw-bytes
 rule holds. Its last line now reads `55 blocks compiled, 1 programs run, 9

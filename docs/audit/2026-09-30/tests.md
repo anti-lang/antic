@@ -162,7 +162,7 @@ interface of the same name.
 
 ### The object suffix is spelled in five places, and the dev tests across modules skip Windows
 
-`tests/run_modules.cmake:71`, duplicated runner code, major, new.
+`tests/runners/run_modules.cmake:71`, duplicated runner code, major, new.
 
 `list(APPEND program_inputs "${WORK}/std_${module}.o")` names the object
 of a dev build with `.o`, as does line 53 and `run_dev.cmake:29` and
@@ -180,7 +180,7 @@ value.
 
 ### The five pin checks of the native libraries have drifted apart
 
-`tests/run_pcre2_pin.cmake:46`, duplicated runner code, major, new.
+`tests/runners/run_pcre2_pin.cmake:46`, duplicated runner code, major, new.
 
 `run_pcre2_pin`, `run_sqlite_pin`, `run_mbedtls_pin`, `run_miniaudio_pin`
 and `run_raylib_pin` repeat one check with the names changed. The check
@@ -194,7 +194,7 @@ the library as a value would hold the check once.
 
 ### Five runners run a program that must stop, and they disagree
 
-`tests/run_table.cmake:19`, duplicated runner code, major, new.
+`tests/runners/run_table.cmake:19`, duplicated runner code, major, new.
 
 `check` of `run_checks.cmake:30`, `run_table.cmake`, `run_lock_order.cmake`,
 `run_parallel_size.cmake` and `run_pattern_limit.cmake` each build a
@@ -211,7 +211,7 @@ refuses 0 alone.
 
 ### Scripts compare the output of a program without the raw-bytes rule
 
-`tests/run_plugin.cmake:25`, duplicated runner code, major, new.
+`tests/runners/run_plugin.cmake:25`, duplicated runner code, major, new.
 
 The `DESIGN` comment of `tests/program_output.cmake:1` says an
 `OUTPUT_VARIABLE` "loses the CR of each CRLF and every NUL", so the
@@ -241,7 +241,7 @@ and sets `SKIP_REGULAR_EXPRESSION`, which shows the test as skipped.
 
 ### The dev objects of the standard library are compiled in four places
 
-`tests/run_checks.cmake:96`, duplicated runner code, minor, new.
+`tests/runners/run_checks.cmake:96`, duplicated runner code, minor, new.
 
 The fixtures `dev_object_*` of `tests/CMakeLists.txt:605` to `1135` compile
 the modules of the standard library in dev mode once per suite.
@@ -344,14 +344,14 @@ is a suffix, an arch or a middle word: `dump_alloc_args.linux-arm64`,
 
 ### Dead runner code
 
-`tests/run_start.cmake:1`, dead runner code, minor, new.
+`tests/runners/run_start.cmake:1`, dead runner code, minor, new.
 
 No registration runs `run_start.cmake`, which links with the `CC` of the
 host and names a `start.c` of chapter 1.
 `docs/reports/2026-09-26-warnings.md:51` recorded that, and the file
 stayed. `run_pin.cmake:41` returns when `tools/get-cmake.cmake` is
 missing, and it is, so the last check of `cmake_pin` never runs. Line 4 of
-the same script points at `tests/run_llvm_pin.cmake`, which does not
+the same script points at `tests/runners/run_llvm_pin.cmake`, which does not
 exist. `tests/programs/.gitkeep` is tracked in a directory of 363 files.
 
 ### A comment stands above the wrong test

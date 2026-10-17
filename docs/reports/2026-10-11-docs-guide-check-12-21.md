@@ -42,7 +42,7 @@ pages. Of 402 files and names, five did not stand where the page put them.
 | 20 | `llvm-objdump -d` prints 9,996 lines, not 9912 | the two programs of the session |
 | 21 | Ten rows of the cost table take the atomic loads of the hook calls their sections count | `src/rt/hooks.c:68` and `:92`, `src/rt/loaded.c:46` |
 | 21 | Six more rows follow the corrections of chapters 12, 13 and 16 | the rows above |
-| 21 | The column `--no-hooks` is measured two more times | `tests/run_bench.cmake` with `OPTIONS=--no-hooks` |
+| 21 | The column `--no-hooks` is measured two more times | `tests/runners/run_bench.cmake` with `OPTIONS=--no-hooks` |
 
 ## Examples, excerpts and measurements added
 
@@ -94,7 +94,7 @@ columns of the options table in chapter 21 were not measured again.
   page shows it. The file in the work directory of the runner gives another.
 - A dev build compiles the standard library in dev mode, one object per
   module. The cost of a library function in dev mode holds its checks.
-- No file under `src/`, `tests/bench` or `tests/run_bench.cmake` changed
+- No file under `src/`, `tests/bench` or `tests/runners/run_bench.cmake` changed
   since `a9e8ffd0`, so the times of chapter 21 stand for this commit.
 
 ## Gates

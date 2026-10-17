@@ -24,7 +24,7 @@ tests of the area threads of `docs/notes/test-matrix.md`. No file under
   value and at a `send` on a closed channel. `lock_orders` and
   `lock_order_once` hold the lock orders of one thread, and
   `check_join_twice` the trap of decision 23.
-  `tests/run_dev_report.cmake` runs the last three and stops a program
+  `tests/runners/run_dev_report.cmake` runs the last three and stops a program
   that hangs.
 - The note marks 331 open cells and 137 open kinds. Four cells and seven
   kinds stay open, each with the reason it cannot exist.

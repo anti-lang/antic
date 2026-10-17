@@ -4,7 +4,7 @@ The step `guide-ownership` of the documentation driver, on 2026-10-11, on
 the branch `docs`. It writes chapters 11 and 12 of
 `docs/site/developers-guide/` in full. It changes no code under `src/`.
 Under `tests/` it adds one field to the excerpt header of
-`tests/run_document_examples.cmake`.
+`tests/runners/run_document_examples.cmake`.
 
 ## What the step wrote
 
@@ -31,7 +31,7 @@ error each names, and the pages hold 39 excerpts.
 
 Chapter 12 holds the one time table of the two chapters. It gives the five
 programs of `tests/bench` with and without `--memory-checks`, from
-`tests/run_bench.cmake`, with the machine, the commit, the mode and both
+`tests/runners/run_bench.cmake`, with the machine, the commit, the mode and both
 commands. `tests/bench` gained no program.
 
 ## The runner

@@ -255,7 +255,7 @@ asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
   reported that release mode checks a table in a dispatch.
 - Windows has no debugger test. The CodeView line table of a `-g` build was read instead,
   with `build\runtime\bin\llvm-readobj.exe --codeview` on the object of the two sources
-  that `tests/run_debug.cmake` writes. It names `com/example/step.anti` and `app.anti` in
+  that `tests/runners/run_debug.cmake` writes. It names `com/example/step.anti` and `app.anti` in
   its `FileChecksums`, and one `FunctionLineTable` per function with the statement lines:
   1, 3 and 4 for `step`, 3 and 5 for `helper`, 8, 10 and 11 for `main`. A debugger check
   on Windows, with lldb of the tools or WinDbg, is the one debug test not run on any host.

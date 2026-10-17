@@ -32,7 +32,7 @@ has a test or a reason below.
   itself, so `antl_lang_code_alone` reaches the lookup of `StackTrace` among
   the items of the module. `passed` of `generic_limits` hands a nested type
   on to a generic function.
-- `variant_wide_tag` runs `tests/run_variant_wide_tag.cmake`, which writes a
+- `variant_wide_tag` runs `tests/runners/run_variant_wide_tag.cmake`, which writes a
   variant of 65536 cases, compiles it and runs it. The tag is a `u32`.
 
 ## The coverage of each file

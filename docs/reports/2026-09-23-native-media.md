@@ -21,7 +21,7 @@ against glibc stays for another step.
   `libraylib.a`, or `miniaudio.lib` and `raylib.lib`, in `lib/<target>/` for all six
   targets on this Mac.
 - The tests `raylib_link_<target>` and `miniaudio_link_<target>` link a C probe for every
-  target. On Linux the link runs through `tests/run_glibc_link.cmake`, and elsewhere
+  target. On Linux the link runs through `tests/runners/run_glibc_link.cmake`, and elsewhere
   through antic. `raylib_run` and `miniaudio_run` run on the host. `media_sysroot` and
   `miniaudio_pin` check the pins and the script. The system libraries of each library on
   each target are in `docs/decisions-native.md`.
@@ -35,7 +35,7 @@ against glibc stays for another step.
   by an absolute link, which leaves the sysroot. The script makes such links relative.
 - raylib on Linux needs `libX11`, since `rcore.c` calls it for the clipboard.
 - The macOS link lacked every framework. antic takes them from `--framework` and not from
-  `link framework` in the source, so `tests/run_native_link.cmake` now takes options.
+  `link framework` in the source, so `tests/runners/run_native_link.cmake` now takes options.
 - ld64.lld 23.1.1 writes no `objc_msgSendClass$` stub, so `rglfw.c` compiles with
   `-fno-objc-msgsend-class-selector-stubs`.
 - `stb_vorbis.c` raised `-Wtautological-compare` on an overflow check. It compiles with

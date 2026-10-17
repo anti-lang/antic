@@ -1,6 +1,6 @@
 # The build id of a program or of its debug link: the one line
 # "build <64 hexadecimal digits>" of its licence notice. See
-# tests/run_build_id.cmake for why the search takes that whole form.
+# tests/runners/run_build_id.cmake for why the search takes that whole form.
 
 # Set <out> to the id that <file> holds and <error> to the empty text, or
 # <out> to the empty text and <error> to what is wrong: no such line, more

@@ -1,7 +1,7 @@
 # The tools a build of this tree runs, all from the pinned release of
 # anti-lang/llvm-tools. tools/pinned-compiler.cmake includes this file,
 # sets the tools with antic_pinned_link_options, and CMakeLists.txt calls
-# antic_refuse_host_tools after project(). tests/run_pinned_tools.cmake
+# antic_refuse_host_tools after project(). tests/runners/run_pinned_tools.cmake
 # reads a tree's cache through antic_pinned_tool_problems.
 #
 # DESIGN: every host builds with the pinned clang, lld, llvm-mc and llvm-ar

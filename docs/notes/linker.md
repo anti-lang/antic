@@ -89,7 +89,7 @@ tools can observe.
   `anti_rt_registry` and the other tables of the pass over the whole program too,
   which each library object of a bundle defines. No function of the runtime is a
   duplicate, since the link takes each runtime member from the first archive. The
-  case `twice` of `tests/run_clib.cmake` reads the report of the marker.
+  case `twice` of `tests/runners/run_clib.cmake` reads the report of the marker.
 - A C program links the runtime members it reaches and not the whole runtime. The
   program of `tests/clib/roundtrip.c` for macos-arm64 is 58,048 bytes against the
   archive. Against the one object of Apple's `ld -r` it was 174,416 bytes.

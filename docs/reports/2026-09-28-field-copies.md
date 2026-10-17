@@ -72,6 +72,6 @@ their leak counts measure the change alone.
 
 - Should a collection hash its elements, as its `==` compares them? The
   question went out in this session and has no answer yet.
-- `tests/run_std_collection_modules.cmake` builds a synthetic tree with a
+- `tests/runners/run_std_collection_modules.cmake` builds a synthetic tree with a
   `sync/list` module to test the order. It passes, and renaming it to
   `synchronized/list` is a change of a test only. Should it follow the name?

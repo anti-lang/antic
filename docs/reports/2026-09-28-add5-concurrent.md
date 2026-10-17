@@ -25,7 +25,7 @@ session stand under `build/drive/logs/` of the worktree `add5-concurrent`.
   `std_spsc_ring_threads` passes two million values through a ring of 64 in
   each direction at full speed, then tuples through a ring of 7 and objects
   that own memory. Nothing is lost, reordered or torn.
-- `tests/run_anti_check.cmake` counts 34 modules of the standard library.
+- `tests/runners/run_anti_check.cmake` counts 34 modules of the standard library.
 
 A ring that published its counter before it wrote the slot put 12546 values
 out of order in `std_spsc_ring_threads`. The test catches the fault it exists

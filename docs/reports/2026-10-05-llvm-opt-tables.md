@@ -72,7 +72,7 @@ provisional entry below.
 - `unit_modules`: bit 32 of the flags of a function reads and bit 64 is
   refused.
 - `dump_llvm_tables_macos-arm64`, golden `tests/dump/tables.macos-arm64.ll`.
-- `direct_calls`, `tests/run_direct_calls.cmake`: builds
+- `direct_calls`, `tests/runners/run_direct_calls.cmake`: builds
   `programs/table_hook.anti` with `--keep-llvm`, writes the bitcode of opt as
   text and refuses a call through a pointer in `table_hook.main`. It failed
   before the change and passes after it: the done condition of the step.

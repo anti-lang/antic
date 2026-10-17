@@ -27,7 +27,7 @@ Markdown documents, `.md` files, and nothing else.
 ## What happened on the way
 
 - Another session worked in the same checkout. Its uncommitted changes to
-  `tests/run_clib.cmake` and five other files stood in the tree while the
+  `tests/runners/run_clib.cmake` and five other files stood in the tree while the
   sanitizer suites ran, and `clib_bundle` failed in both. The session left
   those files alone and did not push.
 - That session then committed on top of the two commits of this step and

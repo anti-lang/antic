@@ -1,6 +1,6 @@
 # The messages of antic and of anti that no test expects yet. The test
 # diagnostics_covered reads this list beside the sources and the expected
-# outputs under tests/. tests/run_diagnostics_covered.cmake states how it
+# outputs under tests/. tests/runners/run_diagnostics_covered.cmake states how it
 # reads each.
 #
 # One line per message: its format as the C source writes it, with the

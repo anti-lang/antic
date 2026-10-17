@@ -1,5 +1,5 @@
 # The messages of `anti doc`, one case each.
-# tests/run_anti_messages.cmake states the form of a case.
+# tests/runners/run_anti_messages.cmake states the form of a case.
 
 # Without a file the command takes the source directory, which holds no
 # module here. The sources of a project come from the one function that

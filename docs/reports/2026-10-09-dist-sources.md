@@ -32,7 +32,7 @@ Test first, `build/drive/logs/sources-red.log` and `sources-red-detail.log`: `ru
 failed on the missing file, the six `<name>_pin` tests on the pins without a URL, and
 `license_notice` on a notice without the lines.
 
-- `runtime_sources`, `tests/run_sources.cmake`, reads the record of the build tree. Every
+- `runtime_sources`, `tests/runners/run_sources.cmake`, reads the record of the build tree. Every
   line has three fields and an HTTPS URL. Every name has a licence text beside the file
   and appears once. No byte is a carriage return. The URLs of glibc, the kernel
   headers and musl name the versions of `tools/sysroot-pins`. Zig and the six libraries

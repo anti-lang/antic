@@ -65,7 +65,7 @@ the headers stay in the source trees now name `include/`.
 | anti-linux | 1624 of 1624 in two parts of `ctest -I`, six skipped | 142 s and 189 s, `headers-vm-linux-suite-1.log` and `-2.log` |
 | anti-windows | 1612 of 1612 in five parts, fourteen skipped | 252 s, 143 s, 374 s, 324 s and 154 s, `headers-vm-windows-suite-1.log` to `-3.log`, `-4b.log`, `-5.log` |
 
-The move of the bind changed `tests/run_package.cmake` after the first Mac suites and the
+The move of the bind changed `tests/runners/run_package.cmake` after the first Mac suites and the
 two Linux parts. The three Mac suites ran again on the final commit, and `package_keys`
 and `raw_output` ran again on anti-linux, `headers-vm-linux-suite-3.log`. The VMs took
 the changed files with `tar -xmf` after a digest of every tracked file outside `docs/`

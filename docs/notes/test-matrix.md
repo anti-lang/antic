@@ -1776,7 +1776,7 @@ step `ownership` wrote the refusal that expects it.
 
 Two tests hold what the matrix cannot: the messages and the options.
 
-`diagnostics_covered` runs `tests/run_diagnostics_covered.cmake`:
+`diagnostics_covered` runs `tests/runners/run_diagnostics_covered.cmake`:
 
 - It reads every message that `src/antic/` gives through `diagnostics_add`,
   `diagnostics_warn`, `diagnostics_check` and `diagnostics_doc`. Seven
@@ -1797,7 +1797,7 @@ Two tests hold what the matrix cannot: the messages and the options.
 - A format of anti with fewer than two words beside `anti:` hands a text on
   and is no message.
 
-`options_covered` runs `tests/run_options_covered.cmake`:
+`options_covered` runs `tests/runners/run_options_covered.cmake`:
 
 - It reads every `strcmp(arg, "-...")` of `src/antic/main.c` as an option.
 - It reads `src/anti/main.c` function by function. `strcmp(argv[1], ...)`

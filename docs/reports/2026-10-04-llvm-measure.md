@@ -18,7 +18,7 @@ Each Anti program prints one line and its twin prints the same line. A twin foll
 the algorithm of the library code it stands for: the growth of the builder's buffer,
 the digits of `append_int` and the table of `SlotTable<E>`.
 
-`tests/run_bench.cmake` compiles every program three times in release mode and three
+`tests/runners/run_bench.cmake` compiles every program three times in release mode and three
 times in dev mode, runs the release executable and its twin five times each, and
 prints the medians. The target `bench` of `tests/CMakeLists.txt` builds the twins
 with the pinned clang at `-O2` and runs the script. It stands outside the suite and

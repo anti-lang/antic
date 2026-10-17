@@ -73,7 +73,7 @@ joined object. Log: `build/drive/logs/bm-red2.log`.
   expects the duplicate `anti_rt_bundle` with both marker members named.
 - `own_tools` builds a bundled macOS library with a search path that holds
   no `ld`.
-- The case `bundle` of `tests/run_clib.cmake` now builds and runs
+- The case `bundle` of `tests/runners/run_clib.cmake` now builds and runs
   `roundtrip.c` against the bundled library on every target. Before, it ran
   `notice.c` alone.
 

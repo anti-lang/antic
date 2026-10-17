@@ -292,7 +292,7 @@ of `object.c` calls it, and no generated code names it.
 `anti_lang_Object_type_name` and the other functions of the root, and
 `anti_lang_Object_deserialize` at `registry.c:883`, are exported under
 `anti_lang_`. They are the mangling of `anti.lang.Object`, and
-`tests/run_rt_names.cmake:10` allows the prefix. Rule 25 says no other
+`tests/runners/run_rt_names.cmake:10` allows the prefix. Rule 25 says no other
 prefix. The exception belongs in the rule, which is Eddie's decision.
 
 ### Growing buffers written five times

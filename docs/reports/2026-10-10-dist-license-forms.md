@@ -35,7 +35,7 @@ commits are `dfa2a909`, `2b65557f`, `d10ed993` and `ec470c18`.
 ## What it tested
 
 `license_plain`, `license_project`, `license_project_notice` and
-`license_from_archive` check one form each, from `tests/run_license_forms.cmake`.
+`license_from_archive` check one form each, from `tests/runners/run_license_forms.cmake`.
 The project is `tests/anti-build/notices`, which links `shapes` and `tones`,
 two packages with a licence, a text and attributions. `shapes` is the static
 archive of `--lib static`, built for one target of each archive form and once

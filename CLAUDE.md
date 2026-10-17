@@ -358,6 +358,7 @@ for a reader's build and never for a release.
 | `src/native/` | The recipes that build the third-party C libraries of the runtime archive |
 | `tests/` | Test programs, expected outputs, the runner |
 | `tests/matrix/` | The matrix of constructs and contexts, by decision 28 of "Decisions of 2026-10-11" |
+| `tests/runners/` | The runners `run_*.cmake` of the tests, by decision 13 of "Decisions of 2026-10-11" |
 | `tools/` | Helper scripts, the pins, the installers and the docs-style checker |
 | `tools/keys/` | `release.pem`, the public key that checks the LLVM tools, and the ignored `private/` |
 | `docs/` | The specifications, the decisions and the reports |
@@ -379,8 +380,9 @@ for a reader's build and never for a release.
 - Every new file goes into the directory its kind already has: compiler code
   in `src/antic/`, tool code in `src/anti/`, runtime C in `src/rt/`, Anti
   library code in `src/std/`, native library recipes in `src/native/`, a test
-  in the `tests/` subdirectory of its kind, a report in `docs/reports/`, a
-  note in `docs/notes/`, an audit report or its data in `docs/audit/`.
+  in the `tests/` subdirectory of its kind, a runner `run_*.cmake` in
+  `tests/runners/`, a report in `docs/reports/`, a note in `docs/notes/`,
+  an audit report or its data in `docs/audit/`.
 - No new directory at the top level, or directly under `src/`, `tests/` or
   `docs/`, without Eddie's decision. A session that needs one stops and
   reports BLOCKED with the reason.
@@ -435,19 +437,19 @@ Where a test goes:
   no directory. `tests/antic_messages.cmake` holds the messages of the
   driver of antic that stand at no position of a source, as
   `antic_message_<case>`, through the same runner. The name of a case registers its test, and the header of
-  `tests/run_anti_messages.cmake` states the form.
+  `tests/runners/run_anti_messages.cmake` states the form.
 - `tests/unit/`: the C unit tests, `unit_<file>` for `test_<file>.c`.
   `unit_<file>_messages` compares the standard error of a group with
   `tests/unit/<file>.err`, for `zip` and `syms`.
 - `tests/opt/`, `tests/emit-identity/`, `tests/link-identity/`, `tests/raw/`
   and `tests/framework/`: the IR around the optimizer, the pinned bytes of
   the output, the raw-bytes rule and a framework of Apple.
-- `tests/run_antic_options.cmake` and `tests/run_anti_options.cmake`: an
+- `tests/runners/run_antic_options.cmake` and `tests/runners/run_anti_options.cmake`: an
   option beside the run without it, `antic_option_<case>` and
   `anti_option_<case>`. A case runs the tool twice and names what differs,
   so it fails for an option the tool takes and ignores. The header of
   each runner lists its cases.
-- `tests/run_usage.cmake`: the usage, and a command line a tool refuses
+- `tests/runners/run_usage.cmake`: the usage, and a command line a tool refuses
   with it, `antic_usage_<case>` and `anti_usage_<case>`.
 - `tests/bench/`: the benchmarks, outside the suite.
 
@@ -480,7 +482,7 @@ The matrix, by decision 28 of "Decisions of 2026-10-11":
   names that cell alone.
 - No build of the matrix keeps a `tests` or a `fixtures` block, and none
   reads a library file. `anti_test_flow` runs a module of
-  `tests/anti-test/` through `tests/run_anti_test_module.cmake` for the
+  `tests/anti-test/` through `tests/runners/run_anti_test_module.cmake` for the
   first, and `flow_modules` holds a library of `tests/modules/` for the
   second.
 
@@ -529,7 +531,7 @@ The two guards and the lists of the matrix:
   a line that names nothing of the sources.
 - The diagnostics guard reads the functions its runner names. A new function
   that hands a format on to `diagnostics_add` goes into `TEXTS_ANTIC` of
-  `tests/run_diagnostics_covered.cmake`.
+  `tests/runners/run_diagnostics_covered.cmake`.
 - `docs/notes/test-matrix.md` holds the constructs, the contexts, the kinds
   of value and the matrix, with each cell open or held by a source.
 

@@ -32,7 +32,7 @@ change. The test programs now write their failing functions with
   `may fail` function builds the value there with `build_into` and
   destroys nothing. That leaves `program_out_slot`, which the decision
   names as the pin, as the one test of the rule.
-- `tests/run_std_may_fail.cmake` is now `tests/run_may_fail_only.cmake`.
+- `tests/runners/run_std_may_fail.cmake` is now `tests/runners/run_may_fail_only.cmake`.
   It reads `ROOT` at every depth and skips the declarations in `SKIP`.
   `std_may_fail_only` runs it over `std/anti`, and the new
   `tests_may_fail_only` runs it over `tests/` with two skips.

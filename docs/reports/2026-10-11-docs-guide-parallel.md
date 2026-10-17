@@ -3,7 +3,7 @@
 The step `guide-parallel` of the documentation driver, on 2026-10-11, on
 the branch `docs`. It writes chapters 13, 14 and 15 of
 `docs/site/developers-guide/` in full. It changes no code under `src/`.
-Under `tests/` it changes `tests/run_document_examples.cmake` twice.
+Under `tests/` it changes `tests/runners/run_document_examples.cmake` twice.
 
 ## What the step wrote
 

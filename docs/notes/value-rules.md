@@ -23,7 +23,7 @@ should alter may move.
     -DMANIFEST=$PWD/tests/emit-identity/programs.sha256 \
     -DVERSION=$(cat tools/version) \
     -DWORK=$PWD/build/host/tests/emit-identity -DWRITE=yes \
-    -P tests/run_emit_identity.cmake
+    -P tests/runners/run_emit_identity.cmake
   ```
 
 - `emit_identity` stops at the first program that does not compile. An
@@ -41,7 +41,7 @@ should alter may move.
     Run `antl_scale` and `antl_generic`, then write the hex of
     `build/host/tests/modules/com/example/scale.antl` and
     `build/host/tests/modules/pick.antl` in the layout of
-    `tests/run_antl.cmake`, 16 bytes per line;
+    `tests/runners/run_antl.cmake`, 16 bytes per line;
   - the format version that `CLAUDE.md` names.
 - A version bump alone changes one byte of each hex file. A new field of every
   symbol of a tree adds bytes to `pick.antl.hex`.

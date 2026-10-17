@@ -18,7 +18,7 @@ two glibc sysroots and the glibc runtime of both Linux targets.
 Test first. `package_keys` failed on the old packer, since the archive lacked
 `linux-x86_64-glibc/lib/x86_64-linux-gnu/libc.so.6`, `build/drive/logs/glibc-red.log`.
 
-`package_keys`, `tests/run_package.cmake`, now requires the libc, `Scrt1.o`, `libX11.so`,
+`package_keys`, `tests/runners/run_package.cmake`, now requires the libc, `Scrt1.o`, `libX11.so`,
 `libGL.so`, `Xlib.h` and `gl.h` of both glibc sysroots and the glibc runtimes. From the
 unpacked package, with its `bin/` alone on the `PATH`, it does this for both Linux targets:
 

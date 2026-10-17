@@ -105,7 +105,7 @@ No warning of our own code on any host. Two defects of the new tests came to lig
 the VMs and were fixed in the unpushed commit, which became `3c047bd4` and then
 `1400572b`. anti-linux ran the host program under qemu, since the list of targets of
 `tests/CMakeLists.txt` gave the host an empty second element. anti-windows named the
-object `generated.exe.exe.obj` in `tests/run_profile.cmake`, and its seven profile
+object `generated.exe.exe.obj` in `tests/runners/run_profile.cmake`, and its seven profile
 tests passed once that suffix was fixed. Neither change touches the Mac, which ran its
 host suite again at `1400572b` and the seven profile tests in both sanitizer trees.
 

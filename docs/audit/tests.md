@@ -41,9 +41,9 @@ The second audit reported 20 findings on the tests in
 `docs/audit/2026-09-30/tests.md`, and `closure.md` marks 19 fixed and one
 left. The first audit did not audit `tests/`. Four items of
 `docs/audit/tool-pass.md` lie in this area and are not counted again:
-`tests/run_bench.cmake:14` names `--backend,native`, `--soname` and
+`tests/runners/run_bench.cmake:14` names `--backend,native`, `--soname` and
 `--strip-docs` have no test, `docs/decisions.md:500` names
-`tests/run_pcre2_pin.cmake`, which is `run_native_pin.cmake` now, and rule
+`tests/runners/run_pcre2_pin.cmake`, which is `run_native_pin.cmake` now, and rule
 10 names a test of the banned calls that no file of `tests/` holds.
 
 ## Counts
@@ -78,7 +78,7 @@ tests in `CLAUDE.md` is the count of the host tree, and every test
 
 ### The digest manifest is written again without a way to read what changed
 
-`tests/run_emit_identity.cmake:52`, structure, whether a golden can be
+`tests/runners/run_emit_identity.cmake:52`, structure, whether a golden can be
 re-pinned without reading what changed, major, new.
 
 `tests/emit-identity/programs.sha256` holds 1332 digests, one per program of
@@ -102,7 +102,7 @@ happen.
 
 ### No runner shows a difference, and each compares with its expected file itself
 
-`tests/run_dump.cmake:32`, structure, whether a golden can be re-pinned
+`tests/runners/run_dump.cmake:32`, structure, whether a golden can be re-pinned
 without reading what changed and one concern in one place, major, new.
 
 A comparison with an expected file is written out in `run_dump.cmake:32`,
@@ -166,7 +166,7 @@ show the way: a program of its own with stand-ins for the rest.
 
 ### 49 builds in 31 runners accept whatever antic and the linker print
 
-`tests/run_modules.cmake:38`, structure, one way to run a tool, duplicated
+`tests/runners/run_modules.cmake:38`, structure, one way to run a tool, duplicated
 logic that has diverged, major, new.
 
 `run_program.cmake:56` gives the rule: "Warnings are errors: antic, llvm-mc
@@ -229,7 +229,7 @@ The row of `CLAUDE.md` reads "Test programs, expected outputs, the runner".
 names two kinds: "Unit tests link the compiler's code directly. Program
 tests in tests/programs compile .anti files with antic and run the
 result." `CLAUDE.md:222` sends a new test to "the `tests/` subdirectory of
-its kind" and names no kind. `tests/run_repo_layout.cmake:5` says of its
+its kind" and names no kind. `tests/runners/run_repo_layout.cmake:5` says of its
 lists "the rule in CLAUDE.md names the same entries", and `CLAUDE.md`
 names the directories of `src/` and `docs/` and none of `tests/`. The one
 list of the 26 names is line 23 of that script, without a purpose beside
@@ -268,7 +268,7 @@ New in the same place: `plugin_table.c` is the library of
 
 ### Helpers of the runners are copied, and the copies differ
 
-`tests/run_anti_build.cmake:37`, structure, one way to run a tool, minor,
+`tests/runners/run_anti_build.cmake:37`, structure, one way to run a tool, minor,
 new.
 
 - `run_anti` stands in seven runners with eight bodies:
@@ -341,7 +341,7 @@ six.
 
 ### The tests still pass and document an assembler that nothing runs
 
-`tests/run_program.cmake:30`, structure and documentation, what is left of
+`tests/runners/run_program.cmake:30`, structure and documentation, what is left of
 the native back end, minor, new.
 
 `docs/decisions.md:19` says "antic accepts `--llvm-mc` and runs nothing
@@ -424,7 +424,7 @@ on names, fixed in `eaaa26f9`, was about `listing_` and the targets.
 
 ### Comments cite a finding by a number that two audits both use
 
-`tests/run_antl_verify.cmake:1`, documentation, a stale name in a comment,
+`tests/runners/run_antl_verify.cmake:1`, documentation, a stale name in a comment,
 minor, new.
 
 "M7: the IR of a library file that antic --dev compiles passes ir_verify"
@@ -441,7 +441,7 @@ the form that still reads right: "M32 of the second audit".
 
 ### A header documents a value the runner does not take
 
-`tests/run_anti_build.cmake:4`, documentation, a comment that differs from
+`tests/runners/run_anti_build.cmake:4`, documentation, a comment that differs from
 the code, minor, new.
 
 The header lists "OBJDUMP  llvm-objdump of the pinned release". The

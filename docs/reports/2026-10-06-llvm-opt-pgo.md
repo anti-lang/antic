@@ -38,7 +38,7 @@ runtime, as `docs/reports/2026-10-05-llvm-opt-pgo.md` says. `23.1.1-anti.6` hold
 - `unit_link`, `profile_links`: the link line of macos-arm64, linux-arm64 of musl,
   linux-x86_64 of glibc and windows-arm64. It failed to build before the field existed
   (`pgo-unit-red.log`).
-- `profile_guided`, `tests/run_profile.cmake`: the refusals, then `mixed_work` built
+- `profile_guided`, `tests/runners/run_profile.cmake`: the refusals, then `mixed_work` built
   with `--profile-generate`, run under `LLVM_PROFILE_FILE` and without it, merged by
   `llvm-profdata` and built with `--profile-use`. That build prints nothing, so opt
   matched every function, and `mixed_work.main` carries `function_entry_count` 1. Both

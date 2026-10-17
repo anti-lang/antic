@@ -24,7 +24,7 @@ off, and sets the version to 0.2.0. The commits are `f30c59f4` and
   are written again from the Mac at 0.2.0. Nothing but the version moved
   in them: the tree differs from `c804e289`, whose suite passed at 0.1.0
   with the old files, in the version and in the files that spell it.
-- The header of `tests/run_emit_identity.cmake` said that a new version
+- The header of `tests/runners/run_emit_identity.cmake` said that a new version
   leaves the manifest as it is. The constant makes that untrue, and the
   header says now why the manifest moves. The gate that the two identity
   tests are unchanged holds for every step that leaves the version alone.

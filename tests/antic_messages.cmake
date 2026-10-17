@@ -1,6 +1,6 @@
 # The messages of the driver of antic that name a file, a tool or an option
 # and stand at no position of a source. One case each.
-# tests/run_anti_messages.cmake states the form of a case. It runs the
+# tests/runners/run_anti_messages.cmake states the form of a case. It runs the
 # program that ANTI names, which is antic for this table, in the directory
 # of the case.
 

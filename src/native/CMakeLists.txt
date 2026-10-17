@@ -113,4 +113,4 @@ add_test(NAME native_licenses
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DNAMES=${antic_native_licenses}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_licenses.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_licenses.cmake")

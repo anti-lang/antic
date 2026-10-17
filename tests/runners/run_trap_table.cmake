@@ -1,0 +1,60 @@
+# An object whose table is zero traps with the name of its class. Run with
+# cmake -P and these values:
+#   ANTIC     the antic executable
+#   LLVM_MC   the llvm-mc executable
+#   RUNTIME   the runtime archive
+#   SOURCE    tests/traps/table.anti
+#   WORK      a directory for the files
+#
+# delete, destroy and dup are calls into the runtime, which checks in
+# every mode, and so do the teardown and the copy of a class value held
+# inline. A dispatch, `is` and `as` check in dev mode, and release mode
+# keeps the raw load.
+
+cmake_minimum_required(VERSION 3.21)
+
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
+function(traps build case class)
+    program_expect("table ${build} ${case}"
+                   COMMAND "${WORK}/table_${build}" ${case} ABORTS
+                   ERR "table not set: the object is no ${class}\n")
+endfunction()
+
+file(MAKE_DIRECTORY "${WORK}")
+antic_program("${WORK}/table_release" "${SOURCE}")
+antic_program("${WORK}/table_dev" "${SOURCE}" --dev)
+foreach(case delete destroy dup)
+    traps(release ${case} Square)
+    traps(dev ${case} Square)
+endforeach()
+foreach(case call is as)
+    traps(dev ${case} Shape)
+endforeach()
+foreach(case inline copy_inline)
+    traps(release ${case} Part)
+    traps(dev ${case} Part)
+endforeach()
+
+execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}"
+                        -S -o "${WORK}/release.s" "${SOURCE}"
+                RESULT_VARIABLE status)
+# The function run holds the dispatch, `is` and `as`, and release mode
+# inlines it into main. The teardown and the copy of Holder, which are
+# functions of their own, check in every mode. The body of main runs from
+# its label to the comment llc writes after every function.
+#
+# Each host spells the label its own way: `table.main:` on ELF,
+# `_table.main:` on Mach-O and `_A5table_main:` on COFF, which writes the
+# last segment of a dotted name after an `_`. The character class takes
+# the dot and the underscore, so one pattern reads every host.
+file(READ "${WORK}/release.s" release)
+string(REGEX MATCH "table[._]main:.*" main "${release}")
+string(FIND "${main}" "-- End function" end)
+if(NOT end EQUAL -1)
+    string(SUBSTRING "${main}" 0 ${end} main)
+endif()
+if(NOT status EQUAL 0 OR main STREQUAL "" OR end EQUAL -1 OR
+   main MATCHES "anti_rt_table_unset")
+    message(FATAL_ERROR "release mode checks a table in a dispatch")
+endif()

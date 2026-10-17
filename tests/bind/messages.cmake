@@ -1,5 +1,5 @@
 # The messages of `anti bind`, one case each.
-# tests/run_anti_messages.cmake states the form of a case.
+# tests/runners/run_anti_messages.cmake states the form of a case.
 
 # An API description that is no JSON. Each case is the text of the file
 # and what the reader says of it.

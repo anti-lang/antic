@@ -209,14 +209,14 @@ a directory are in `src/antic/`.
 | Warnings | `arm64.c:406` | Fixed | `0356cefa`. |
 | None | `debug.c:440` | Fixed | `f3a1413d`. |
 | Tests | `tests/CMakeLists.txt:1313` | Fixed | `07249add`. |
-| Tests | `tests/run_checks.cmake:96` | Fixed | `ca3bf832`. |
+| Tests | `tests/runners/run_checks.cmake:96` | Fixed | `ca3bf832`. |
 | Tests | `tests/CMakeLists.txt:479` | Fixed | `ca3bf832` and `eaaa26f9`. |
 | Tests | `tests/unit/test_sema.c:28` | Fixed | `fbc477e4`, `704a7bb9` and `c8845ef6`. |
 | Tests | `tests/unit/test_lower.c:547` | Fixed | `c8845ef6`. |
 | Tests | `tests/CMakeLists.txt:320` | Left | `2dcb38e6` fixed what needs no new directory. The projects of the `anti` commands and the scripts flat in `tests/` need a new directory under `tests/`, which is Eddie's decision. |
 | Tests | `tests/CMakeLists.txt:3678` | Fixed | `eaaa26f9` and `2dcb38e6`. |
 | Tests | `main.c:265` | Fixed | `dfe5d620`. The stub of a slot that `reflect.call` alone reaches has no test: nothing in Anti reaches it, a question for Eddie. |
-| Tests | `tests/run_start.cmake:1` | Fixed | `8de724a1`. |
+| Tests | `tests/runners/run_start.cmake:1` | Fixed | `8de724a1`. |
 | Tests | `tests/CMakeLists.txt:1305` | Fixed | `07249add`. |
 
 ## Defects no rule names

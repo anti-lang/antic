@@ -2,7 +2,7 @@
    calloc and realloc, and files_grow wrote through it. Each helper now
    exits through files_out_of_memory, as files.h says. The program asks
    one helper, named by its argument, for more memory than any host
-   gives, and tests/run_files_oom.cmake checks the exit. A helper that
+   gives, and tests/runners/run_files_oom.cmake checks the exit. A helper that
    comes back prints what it returned and ends with status 0. */
 #include <stdint.h>
 #include <stdio.h>

@@ -22,7 +22,7 @@ of the suite at `d6c44aa1`.
   report` writes the report again.
 - The test `coverage_report` runs the report script on a program of three
   files, with two profiles that reach one function each.
-- `tests/run_profile.cmake` and `tests/run_anti_build.cmake` set
+- `tests/runners/run_profile.cmake` and `tests/runners/run_anti_build.cmake` set
   `LLVM_PROFILE_FILE` for the one program that reads it.
 - `CLAUDE.md` describes the mode under "Building", and
   `docs/decisions.md` records it under "Repository layout" with one

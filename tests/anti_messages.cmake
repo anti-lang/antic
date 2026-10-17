@@ -1,6 +1,6 @@
 # The messages of the commands of `anti` that have no directory under
 # tests/: `anti new`, `anti license` and `anti sdk`. One case each.
-# tests/run_anti_messages.cmake states the form of a case.
+# tests/runners/run_anti_messages.cmake states the form of a case.
 
 # anti new.
 anti_message(new_one_segment

@@ -76,7 +76,7 @@ sysroots and raylib as it fetches the five other sources.
 
 ### The test of the empty CodeView subsection cannot fail
 
-`tests/run_codeview_empty.cmake:24`, documentation, a file whose documented
+`tests/runners/run_codeview_empty.cmake:24`, documentation, a file whose documented
 behaviour differs from what the code does, and the bar of `tests/`, severe,
 new.
 
@@ -154,7 +154,7 @@ unpacked tree, and stands in another directory.
 `tools/get-sysroot.cmake:63` holds a seventh download with a digest check
 under the name `fetch`, and `tools/fetch-release.cmake:82` an eighth under
 `download`. The second audit found the same shape in the five pin checks
-of the tests, which `tests/run_native_pin.cmake` now holds once. One
+of the tests, which `tests/runners/run_native_pin.cmake` now holds once. One
 function that takes the pin, the archive name and the marker file would
 hold the fetch once as well.
 
@@ -172,7 +172,7 @@ at line 16 and copies eleven at line 32. `antic_llvm_tool_problems` at
 llvm-objdump for its version, and it copies a tool only `if(EXISTS ...)`,
 so a missing llvm-objdump leaves a `runtime/bin` without it and no error.
 The other check reports a missing tool. The eleven names are spelled again
-at `tests/run_package.cmake:107` and `tests/run_release_dry_run.cmake:261`,
+at `tests/runners/run_package.cmake:107` and `tests/runners/run_release_dry_run.cmake:261`,
 and the header of `tools/get-llvm.cmake` lists the eight in prose.
 `check-llvm.cmake` is also two things, a check and the copy that makes
 `runtime/bin`. One list and one check, with the copy as a step of its own,
@@ -199,8 +199,8 @@ The same mapping from a target to a triple and its headers stands in:
 - `tools/host-compile.cmake:17`, the one table a script can include.
 - `tests/CMakeLists.txt:1359`, which puts the headers of clang before those
   of the sysroot, the reverse of the root file.
-- `tests/run_linux_libc.cmake:34`, a second `triple_of`.
-- `tests/run_macos_sdk.cmake:80` and `tests/run_clib.cmake:96`.
+- `tests/runners/run_linux_libc.cmake:34`, a second `triple_of`.
+- `tests/runners/run_macos_sdk.cmake:80` and `tests/runners/run_clib.cmake:96`.
 - `tools/get-sysroot.cmake:455`, which spells the two gnu triples that
   `tools/windows-compile.cmake` calls its "One definition".
 
@@ -234,7 +234,7 @@ between them, major, new.
 The scripts of both VMs configure with
 `-DANTIC_RAYLIB_DIR=.../raylib/raylib-6.0`, at lines 666 and 767.
 `tools/raylib-pin` holds `RAYLIB_VERSION=6.0`. The test `raylib_pin` hands
-`tests/run_native_pin.cmake` `src/native/raylib.cmake` alone, and no runner
+`tests/runners/run_native_pin.cmake` `src/native/raylib.cmake` alone, and no runner
 holds the text `raylib-6`. A move of the pin leaves step 5 of a release
 pointing at a directory that no longer exists, and the first run to find
 out is a release. The script already reads `tools/site-base` and
@@ -257,16 +257,16 @@ user has.
 
 ### The policy test reads two list files, and four runners are outside it
 
-`tests/run_script_policies.cmake:11`, documentation, a header that claims
+`tests/runners/run_script_policies.cmake:11`, documentation, a header that claims
 more than the code checks, major, new.
 
 The header says "Every script that runs as `cmake -P` names the minimum
 version of CMake." The loop reads the `-P` calls of `CMakeLists.txt` and
 `tests/CMakeLists.txt`. The files of `src/native/` register tests with
 `-P` too, and four runners they name carry no `cmake_minimum_required`:
-`tests/run_native_link.cmake`, `tests/run_glibc_link.cmake`,
-`tests/run_native_licenses.cmake` and
-`tests/run_raylib_miniaudio_pin.cmake`. The header gives the cost of that,
+`tests/runners/run_native_link.cmake`, `tests/runners/run_glibc_link.cmake`,
+`tests/runners/run_native_licenses.cmake` and
+`tests/runners/run_raylib_miniaudio_pin.cmake`. The header gives the cost of that,
 24 tests failed under CMake 3.31. Line 28 also accepts any line that
 starts with the command, with any version. The minor finding on the two
 versions below belongs to the same rule.
@@ -282,7 +282,7 @@ named. The pattern is back in a runner added after that fix, and it stands
 in others the finding did not name.
 
 - `llvm_coff_plugin_<target>` at line 691 sets no
-  `SKIP_REGULAR_EXPRESSION`. `tests/run_llvm_coff_plugin.cmake:17` prints
+  `SKIP_REGULAR_EXPRESSION`. `tests/runners/run_llvm_coff_plugin.cmake:17` prints
   `SKIP:` and returns when the sysroot is missing, and the test reports a
   pass. The loop above it, at line 684, sets the property.
 - `package_keys` exists only when all six sysroots are on disk, at line
@@ -291,10 +291,10 @@ in others the finding did not name.
   the opposite.
 - `debug_info`, the one test of `-g` under a debugger, exists only when
   `find_program` finds lldb or gdb, at line 3644.
-- `tests/run_macos_sdk.cmake:27` turns every failure of
+- `tests/runners/run_macos_sdk.cmake:27` turns every failure of
   `tools/macos-sdk.cmake` into `SKIP:`, the refusal of a changed SDK among
   them, which the header lists as a thing the test shows.
-- `tests/run_release_dry_run.cmake:97` to `144` turns a fixture that does
+- `tests/runners/run_release_dry_run.cmake:97` to `144` turns a fixture that does
   not compile into `SKIP:` with its output discarded. A warning of the
   pinned clang under `-Werror` then skips the whole test of `./r`.
 
@@ -303,7 +303,7 @@ name it, as a skip with its reason or as a failure.
 
 ### Five checks cannot tell a failure from a pass
 
-`tests/run_manifest_signature.cmake:155`, Safety and C, the bar of
+`tests/runners/run_manifest_signature.cmake:155`, Safety and C, the bar of
 `tests/`, major, new.
 
 - The case of a wrong signature writes a manifest whose digest is all
@@ -311,22 +311,22 @@ name it, as a skip with its reason or as a failure.
   "signature". An installer that accepts every signature prints
   "SHA256SUMS carries the signature" at `tools/install.sh:153` and then
   fails on the digest at line 261. The case passes for it as well.
-  `tests/run_installer_github.cmake:243` has the same form. The case
+  `tests/runners/run_installer_github.cmake:243` has the same form. The case
   should keep the digest right and change the signature, or match the
   message of the refusal.
-- `tests/run_probe.cmake:31` and `32` read the exit status of both probes
+- `tests/runners/run_probe.cmake:31` and `32` read the exit status of both probes
   into variables that nothing reads. Two programs that die with the same
   output pass.
-- `tests/run_fmt_canonical.cmake:38` adds the output of a failed
+- `tests/runners/run_fmt_canonical.cmake:38` adds the output of a failed
   `anti fmt --check` to the report, and line 59 fails on a report that is
   not empty. A run that ends by a signal prints nothing and passes.
-- `tests/run_llvm_verify.cmake:74` counts a program whose `--dump-llvm`
+- `tests/runners/run_llvm_verify.cmake:74` counts a program whose `--dump-llvm`
   fails as skipped whenever `--dump-opt` fails too, a crash included. The
   list of the skipped is compared with nothing.
-- `tests/run_anti_build.cmake:139` reads the build id with no check that
+- `tests/runners/run_anti_build.cmake:139` reads the build id with no check that
   a line was found. With no line, the id is empty, `# build ` matches the
   head of any map at line 143, and line 150 compares two empty texts.
-  `tests/run_build_id.cmake:32` reads the same line and demands 64 digits.
+  `tests/runners/run_build_id.cmake:32` reads the same line and demands 64 digits.
 
 ### The allocator test passes over a program that calls malloc
 
@@ -345,9 +345,9 @@ link the library, not from memory.
 `tests/CMakeLists.txt:554`, structure, left of the two-back-end period,
 major, new.
 
-`antic_llvm_program_test` and `tests/run_llvm_program.cmake` date from the
+`antic_llvm_program_test` and `tests/runners/run_llvm_program.cmake` date from the
 time LLVM was the second back end. The runner repeats
-`tests/run_program.cmake`: the expected file beside the source, the
+`tests/runners/run_program.cmake`: the expected file beside the source, the
 `.args` file and `program_expect`. It adds `--target`, `--dev` and a check
 that no `.ll` or `.bc` stays. `llvm_targets` at line 599 is set for a Mac
 host alone, and the comment at line 629 says "the step vm adds the
@@ -362,7 +362,7 @@ host.
 
 ### The helpers of the runners exist in many copies with different contracts
 
-`tests/run_dev.cmake:26`, structure, duplicated logic that has diverged,
+`tests/runners/run_dev.cmake:26`, structure, duplicated logic that has diverged,
 major, new.
 
 The second audit reported two such families, M61 and M62, and the scripts
@@ -397,7 +397,7 @@ it named hold their fix. The same shape stands in others.
 
 ### The two largest runners hold many tests under one name
 
-`tests/run_release_dry_run.cmake:1`, structure, a file whose purpose is not
+`tests/runners/run_release_dry_run.cmake:1`, structure, a file whose purpose is not
 one sentence, major, new.
 
 `run_release_dry_run.cmake` has 915 lines and eight parts. Lines 21 to 43
@@ -410,9 +410,9 @@ stand-in, and it is the only test of the script: `check-cpu` occurs in no
 other file of `tests/`. It stands behind five returns that skip the file
 on a host that is no Mac. The comment at line 151 says the test
 `cpu_archive_levels` covers `check-cpu.cmake`, and that test runs
-`tests/run_cpu_archive.cmake` over the runtime.
+`tests/runners/run_cpu_archive.cmake` over the runtime.
 
-`tests/run_package.cmake` has 663 lines under the test name
+`tests/runners/run_package.cmake` has 663 lines under the test name
 `package_keys`, and its first sentence is about the key. It also checks
 the listing, `sources.txt`, `anti bind`, the link for six targets, two
 licence forms, the glibc and raylib programs, `anti build --release`,
@@ -422,7 +422,7 @@ unpack are the shared part, and the rest are tests of their own.
 
 ### A runner says it links with the recipe of the packer and holds a copy
 
-`tests/run_linux_libc.cmake:12`, documentation, a header that differs from
+`tests/runners/run_linux_libc.cmake:12`, documentation, a header that differs from
 the code, major, new.
 
 The header says the test "links a stand-in with that same recipe" as
@@ -466,9 +466,9 @@ reads it. It spells the six targets at lines 536, 672, 2239, 2662, 2711,
 2733, 2759 and 4727, and a pair of them in thirteen more loops. The
 scripts spell the list again: `tools/pack-anti.cmake:56`,
 `tools/check-offline.cmake:44`, `tools/release.sh:38`,
-`tests/run_emit_identity.cmake:22`, `tests/run_llvm_atomics.cmake:24`,
-`tests/run_package.cmake:47` and `306`,
-`tests/run_release_dry_run.cmake:60` and `tests/run_release_pins.cmake:11`.
+`tests/runners/run_emit_identity.cmake:22`, `tests/runners/run_llvm_atomics.cmake:24`,
+`tests/runners/run_package.cmake:47` and `306`,
+`tests/runners/run_release_dry_run.cmake:60` and `tests/runners/run_release_pins.cmake:11`.
 The contents agree and the orders differ. `tools/check-cpu.cmake:38` shows
 the other way: it takes the targets from the `default` lines of
 `tools/cpu-levels`, "rather than against a list written here a second
@@ -502,7 +502,7 @@ new.
 
 - musl stands three times in one pin: `MUSL_VERSION=1.2.6`,
   `MUSL_APK=1.2.6-r2` and the URL of `MUSL_SOURCE_URL`, which takes no
-  `@VERSION@` as `MINGW_URL` does. `tests/run_sources.cmake:99` ties the
+  `@VERSION@` as `MINGW_URL` does. `tests/runners/run_sources.cmake:99` ties the
   first to the third through the record. Nothing compares `MUSL_APK`.
 - glibc 2.35 is the default of `MAX_GLIBC` at `tools/check-libc.cmake:24`,
   beside the file names of `tools/sysroot-pins`.
@@ -510,7 +510,7 @@ new.
   13, 17, 21, 24, 28 and 39. No pin test lists the file, so a move of a
   pin leaves them.
 - `tools/clang-pin:6` and `tools/llvm-pin:7` both hold the tag. The test
-  `release_pins` compares them at `tests/run_release_pins.cmake:63`, which
+  `release_pins` compares them at `tests/runners/run_release_pins.cmake:63`, which
   is the seam held as it should be.
 
 ### Fourteen scripts name CMake 3.20, and two of them call a 3.21 command
@@ -520,7 +520,7 @@ than one place, minor, new.
 
 The root file and most scripts name 3.21. Fourteen name 3.20: eight of
 `tools/`, the five fetch scripts of `src/native/` and
-`tests/run_find_order.cmake`. `tools/get-sysroot.cmake` calls
+`tests/runners/run_find_order.cmake`. `tools/get-sysroot.cmake` calls
 `file(COPY_FILE ...)` eighteen times and `tools/pack-anti.cmake` twice,
 and CMake has the command from 3.21 on. The test `script_policies` asks
 for the line and compares no version.
@@ -540,7 +540,7 @@ places of the area add to it.
   of the recipes.
 - `tools/cpu-levels:5` keeps the column "llvm-mc -mattr= value", which
   `--print-cpu-levels` alone reads.
-- `tests/run_program.cmake:30` stops every program test when the file of
+- `tests/runners/run_program.cmake:30` stops every program test when the file of
   llvm-mc is missing, a tool antic ignores.
 - `tests/CMakeLists.txt` holds nine guards that cannot be false, since
   `pinned-compiler.cmake:47` sets both variables with `FORCE`:
@@ -550,9 +550,9 @@ places of the area add to it.
   antic runs them itself". antic runs them. `tests/CMakeLists.txt` still
   passes `--opt` and `--llc` at lines 184, 2533, 2537, 2545, 2549 and
   2558, where the sibling tests pass `--runtime`.
-- `tests/run_unicode_paths.cmake:7` says antic "runs llvm-mc".
+- `tests/runners/run_unicode_paths.cmake:7` says antic "runs llvm-mc".
 
-`tests/run_asm.cmake` and `tests/run_unwind.cmake` do assemble with
+`tests/runners/run_asm.cmake` and `tests/runners/run_unwind.cmake` do assemble with
 llvm-mc, so the tool has two users left.
 
 ### Checks and words of the Microsoft toolchain remain
@@ -566,16 +566,16 @@ llvm-mc, so the tool has two users left.
   Ninja of Visual Studio on the path. The whole MSVC environment is loaded
   for one build tool, and a Ninja installed alone would end the last use
   of the Build Tools.
-- `tests/run_windows_sysroot.cmake:182` refuses the directories `crt` and
+- `tests/runners/run_windows_sysroot.cmake:182` refuses the directories `crt` and
   `sdk` in a sysroot, the layout of Microsoft's CRT and SDK, which
   `tools/get-sysroot.cmake` can no longer write. No comment says why.
-- `tests/run_release_pins.cmake:83` refuses the name `llvm-sums`, a file
+- `tests/runners/run_release_pins.cmake:83` refuses the name `llvm-sums`, a file
   that exists nowhere.
-- `tests/run_clib.cmake:43` sets `DRIVER` to `cl`, since
+- `tests/runners/run_clib.cmake:43` sets `DRIVER` to `cl`, since
   `src/antic/linker.c:1169` prints `cl main.c` in the link line of a
   Windows library. The DESIGN comment at line 58 of the runner says such a
   program is built with the pinned clang.
-- `tests/run_package.cmake:32` refuses a bare `xcrun` in the packer.
+- `tests/runners/run_package.cmake:32` refuses a bare `xcrun` in the packer.
   `tools/pack-anti.cmake` holds no `xcrun` at all, since the call moved to
   `tools/macos-sdk.cmake:53`. The check cannot fire, and the DESIGN
   comment above it describes a rule the file no longer checks.
@@ -609,15 +609,15 @@ llvm-mc, so the tool has two users left.
 - `tests/CMakeLists.txt:1045`: the archive "carries llvm-mc, lld and
   llvm-ar". It carries eleven files.
 - `tests/CMakeLists.txt` names chapters of the book in fourteen comments,
-  line 4462 among them, and `tests/run_clib.cmake:9` and `181` name
+  line 4462 among them, and `tests/runners/run_clib.cmake:9` and `181` name
   chapter 25.
-- `tests/run_release_key.cmake:1`: the key checks the signature "of the
+- `tests/runners/run_release_key.cmake:1`: the key checks the signature "of the
   LLVM tools". The installers check the release of Anti.
-- `tests/run_script_policies.cmake:6` gives its reason through "A GitHub
-  runner", and `tests/run_float_digits.cmake:26` describes a host runtime
+- `tests/runners/run_script_policies.cmake:6` gives its reason through "A GitHub
+  runner", and `tests/runners/run_float_digits.cmake:26` describes a host runtime
   "built by CMake" with members named `text.c.o`. Neither exists.
-- `tests/run_find_order.cmake:20` calls `add_subdirectory(tests)` the last
-  line of the root file, and `tests/run_front_end.cmake:29` says a run
+- `tests/runners/run_find_order.cmake:20` calls `add_subdirectory(tests)` the last
+  line of the root file, and `tests/runners/run_front_end.cmake:29` says a run
   needs "no runtime archive", above a check that it fails without one.
 
 ### The native recipes name modules that do not exist
@@ -657,17 +657,17 @@ minor, new.
   assembly" and compares LLVM text. `run_cross_link.cmake:1` names one
   source where `SOURCE` is an argument.
 - Thirteen comments cite a finding as `M03` or `S45` with no audit named.
-  `tests/run_anti_build_inputs.cmake:12` cites `docs/audit/summary.md`,
+  `tests/runners/run_anti_build_inputs.cmake:12` cites `docs/audit/summary.md`,
   which does not exist.
 
 ### DESIGN comments that give no reason
 
-`tests/run_asserts.cmake:47`, documentation, a DESIGN comment that gives
+`tests/runners/run_asserts.cmake:47`, documentation, a DESIGN comment that gives
 no reason, minor, new.
 
 "DESIGN: the decision belongs to the build that compiles the program"
 states the rule the block tests. The same sentence opens
-`tests/run_checks.cmake:40`. `tests/CMakeLists.txt:1683` says what
+`tests/runners/run_checks.cmake:40`. `tests/CMakeLists.txt:1683` says what
 `anti.os` does and what the test does. Each is a plain comment under the
 wrong word. The other DESIGN comments of the area give a reason, and the
 ones whose statement no longer holds stand in the findings above.
@@ -697,7 +697,7 @@ new.
 - `antic_read_pins` and `antic_pin_url` serve every fetch script and stand
   in `tools/upstream-sources.cmake`, the file of the sources record.
 - `tools/sources.cmake` lists the C sources, `tools/upstream-sources.cmake`
-  writes `sources.txt`, and `tests/run_sources.cmake` tests the second.
+  writes `sources.txt`, and `tests/runners/run_sources.cmake` tests the second.
   Three names stand for two things.
 - `no_outline` at `CMakeLists.txt:541` also holds the two frame pointer
   flags from line 554 on.
@@ -721,7 +721,7 @@ new.
   `--ld-path=` at line 226 beside `antic_pinned_link_options`.
 - `tools/cpu-levels` has four readers: `CMakeLists.txt:184`,
   `tools/pack-anti.cmake:194`, `tools/check-cpu.cmake:31` and
-  `tests/run_cpu_archive.cmake`.
+  `tests/runners/run_cpu_archive.cmake`.
 - The resource directory of clang is asked for at `CMakeLists.txt:526`
   and `601`, at `src/native/CMakeLists.txt:27` and at
   `tests/CMakeLists.txt:1357` and `1366`.
@@ -792,18 +792,18 @@ not refuse the file.
 
 ### Three guards have holes
 
-`tests/run_warning_set.cmake:14`, Safety and C, the bar of `tests/`, minor,
+`tests/runners/run_warning_set.cmake:14`, Safety and C, the bar of `tests/`, minor,
 new.
 
 - `warning_set` globs `src/native/*.cmake` and not
   `src/native/CMakeLists.txt`, so a warning flag written there passes.
   `docs/c-guidelines.md` says the test "refuses a warning flag spelled
   anywhere else".
-- `repo_layout` at `tests/run_repo_layout.cmake:80` checks a directory
+- `repo_layout` at `tests/runners/run_repo_layout.cmake:80` checks a directory
   under `src/`, `tests/` and `docs/` and needs two slashes. A file placed
   directly in `src/` passes, and so does anything under `tools/` and
   `LICENSES/`.
-- `rt_names` at `tests/run_rt_names.cmake:70` reads a line that holds
+- `rt_names` at `tests/runners/run_rt_names.cmake:70` reads a line that holds
   ` g `. A weak definition on ELF or Mach-O prints ` w ` and is not read,
   while the COFF branch above it handles weak names.
 
@@ -811,7 +811,7 @@ No tracked file slips through any of the three today.
 
 ### A test runs the nm of the host
 
-`tests/run_clib.cmake:391`, structure, one way to run a tool, minor, new.
+`tests/runners/run_clib.cmake:391`, structure, one way to run a tool, minor, new.
 
 The case `exports` runs `nm -gU` on a Mac and `nm -D --defined-only` on
 Linux, at lines 391 and 399. The pinned release carries no nm.
@@ -968,174 +968,174 @@ sentence is what the pin holds.
 
 | File | Purpose | Header |
 |---|---|---|
-| `tests/run_address_tables.cmake` | Checks that an object and the runtime archives of a target carry the address-significance table. | Says it. |
-| `tests/run_alloc_oom.cmake` | Runs the allocation helpers out of memory and expects status 70. | Says it. |
-| `tests/run_anti_bind.cmake` | Runs one of ten cases of `anti bind`. | Says it. |
-| `tests/run_anti_build.cmake` | Drives `anti build`, `anti run` and `anti new` over a project of two modules. | Says less, and lists `OBJDUMP`, which is not read. |
-| `tests/run_anti_build_deps.cmake` | Drives `anti build` over a path dependency and a `file://` repository. | Says it. |
-| `tests/run_anti_build_framework.cmake` | Builds a project that names a framework and checks the program loads it. | Says it. |
-| `tests/run_anti_build_inputs.cmake` | Feeds `anti build` a malformed index and lock file. | Says it. Cites a summary that does not exist. |
-| `tests/run_anti_build_rerun.cmake` | Runs and rebuilds a program in turns on a Windows host. | Says it. |
-| `tests/run_anti_build_resolve.cmake` | Checks the resolver and the search over more than one repository. | Says less: the first part alone. |
-| `tests/run_anti_build_running.cmake` | Builds a changed program while the old one runs. | Says it. |
-| `tests/run_anti_check.cmake` | Drives `anti check` over fixture projects and the standard library. | Says it. |
-| `tests/run_anti_doc.cmake` | Drives `anti doc` over a fixture in its forms. | Says it. |
-| `tests/run_anti_fmt.cmake` | Checks the canonical form of one file and `--check`. | Says it. |
-| `tests/run_anti_fmt_write.cmake` | Checks that `anti fmt` leaves a source whole when a write fails. | Says it. |
-| `tests/run_anti_interface.cmake` | Checks by its includes that anti reaches antic through the interface alone. | Says it. |
-| `tests/run_anti_internal.cmake` | Runs check, build, test and doc over a project with an internal item. | Says it. |
-| `tests/run_anti_memory_checks.cmake` | Drives `anti run` and `anti test` with `--memory-checks`. | Says it. |
-| `tests/run_anti_memory_dll.cmake` | Cross builds for windows-x86_64 with memory checks and looks for the DLL. | Says it. |
-| `tests/run_anti_sdk.cmake` | Checks `anti sdk export` and `anti sdk import`. | Says it. |
-| `tests/run_anti_symbols.cmake` | Drives `anti symbols inventory`, `check` and `resolve`. | Says it. |
-| `tests/run_anti_symbols_input.cmake` | Checks that `anti symbols resolve` refuses numbers beyond 64 bits. | Says it. |
-| `tests/run_anti_test.cmake` | Drives `anti test` over fixture modules. | Says it. |
-| `tests/run_antic_stack.cmake` | Compiles the deepest accepted expression on a small stack. | Says it. |
-| `tests/run_antl.cmake` | Compares the bytes of a library file with a hex listing. | Says it. |
-| `tests/run_antl_verify.cmake` | Changes one byte of a library file and expects the refusal of the verifier. | Says it. |
-| `tests/run_asm.cmake` | Writes assembly with `-S` and assembles it with llvm-mc. | Says it. |
-| `tests/run_asserts.cmake` | Checks `assert` in each build mode and through a library file. | Says it. |
-| `tests/run_atomic_load.cmake` | Checks the instruction of the atomic load in an ARM64 runtime. | Says it. |
-| `tests/run_bench.cmake` | Builds and times the benchmark programs and their C twins. | Says it. Names `--backend,native`. |
-| `tests/run_build_id.cmake` | Checks that links of one program share a build id. | Says less. |
-| `tests/run_check.cmake` | Builds a check program in both modes and expects the dev build to stop. | Says it. |
-| `tests/run_checks.cmake` | Checks `--checks`, `--no-checks` and a library whose checks follow the build. | Says it. |
-| `tests/run_classlib.cmake` | Compiles a library with a class and a client of it. | Says it. |
-| `tests/run_clib.cmake` | Runs one of twenty cases of libraries for C. | Says `CROSS` is for Windows, and macOS passes it too. |
-| `tests/run_codeview_empty.cmake` | Meant to check for an empty CodeView subsection. | Says what the code cannot check. |
-| `tests/run_conf_include_depth.cmake` | Checks that the runtime and `anti symbols` stop at the same include depth. | Says it. |
-| `tests/run_cpu_archive.cmake` | Checks that each target of the archive has a runtime per level. | Says it. |
-| `tests/run_cpu_check.cmake` | Runs a program above the level of the machine and expects the refusal. | Says it. |
-| `tests/run_cpu_level.cmake` | Checks the dev assembly of one level for patterns. | Says it. |
-| `tests/run_cpu_pin.cmake` | Compares `antic --print-cpu-levels` with `tools/cpu-levels`. | Says it. |
-| `tests/run_cpu_runtime.cmake` | Checks the instructions of one runtime library. | Says it. |
-| `tests/run_cross_link.cmake` | Links a program for a target and checks the format of the file. | Names one source, and takes any. |
-| `tests/run_dead_code.cmake` | Checks which functions a link keeps and drops. | Says it. |
-| `tests/run_debug.cmake` | Checks the line table of `-g` and three debugger sessions. | Says it. |
-| `tests/run_deps_dir.cmake` | Configures a copy of the tree with `ANTI_DEPS_DIR` and checks nothing is downloaded. | Says it. |
+| `tests/runners/run_address_tables.cmake` | Checks that an object and the runtime archives of a target carry the address-significance table. | Says it. |
+| `tests/runners/run_alloc_oom.cmake` | Runs the allocation helpers out of memory and expects status 70. | Says it. |
+| `tests/runners/run_anti_bind.cmake` | Runs one of ten cases of `anti bind`. | Says it. |
+| `tests/runners/run_anti_build.cmake` | Drives `anti build`, `anti run` and `anti new` over a project of two modules. | Says less, and lists `OBJDUMP`, which is not read. |
+| `tests/runners/run_anti_build_deps.cmake` | Drives `anti build` over a path dependency and a `file://` repository. | Says it. |
+| `tests/runners/run_anti_build_framework.cmake` | Builds a project that names a framework and checks the program loads it. | Says it. |
+| `tests/runners/run_anti_build_inputs.cmake` | Feeds `anti build` a malformed index and lock file. | Says it. Cites a summary that does not exist. |
+| `tests/runners/run_anti_build_rerun.cmake` | Runs and rebuilds a program in turns on a Windows host. | Says it. |
+| `tests/runners/run_anti_build_resolve.cmake` | Checks the resolver and the search over more than one repository. | Says less: the first part alone. |
+| `tests/runners/run_anti_build_running.cmake` | Builds a changed program while the old one runs. | Says it. |
+| `tests/runners/run_anti_check.cmake` | Drives `anti check` over fixture projects and the standard library. | Says it. |
+| `tests/runners/run_anti_doc.cmake` | Drives `anti doc` over a fixture in its forms. | Says it. |
+| `tests/runners/run_anti_fmt.cmake` | Checks the canonical form of one file and `--check`. | Says it. |
+| `tests/runners/run_anti_fmt_write.cmake` | Checks that `anti fmt` leaves a source whole when a write fails. | Says it. |
+| `tests/runners/run_anti_interface.cmake` | Checks by its includes that anti reaches antic through the interface alone. | Says it. |
+| `tests/runners/run_anti_internal.cmake` | Runs check, build, test and doc over a project with an internal item. | Says it. |
+| `tests/runners/run_anti_memory_checks.cmake` | Drives `anti run` and `anti test` with `--memory-checks`. | Says it. |
+| `tests/runners/run_anti_memory_dll.cmake` | Cross builds for windows-x86_64 with memory checks and looks for the DLL. | Says it. |
+| `tests/runners/run_anti_sdk.cmake` | Checks `anti sdk export` and `anti sdk import`. | Says it. |
+| `tests/runners/run_anti_symbols.cmake` | Drives `anti symbols inventory`, `check` and `resolve`. | Says it. |
+| `tests/runners/run_anti_symbols_input.cmake` | Checks that `anti symbols resolve` refuses numbers beyond 64 bits. | Says it. |
+| `tests/runners/run_anti_test.cmake` | Drives `anti test` over fixture modules. | Says it. |
+| `tests/runners/run_antic_stack.cmake` | Compiles the deepest accepted expression on a small stack. | Says it. |
+| `tests/runners/run_antl.cmake` | Compares the bytes of a library file with a hex listing. | Says it. |
+| `tests/runners/run_antl_verify.cmake` | Changes one byte of a library file and expects the refusal of the verifier. | Says it. |
+| `tests/runners/run_asm.cmake` | Writes assembly with `-S` and assembles it with llvm-mc. | Says it. |
+| `tests/runners/run_asserts.cmake` | Checks `assert` in each build mode and through a library file. | Says it. |
+| `tests/runners/run_atomic_load.cmake` | Checks the instruction of the atomic load in an ARM64 runtime. | Says it. |
+| `tests/runners/run_bench.cmake` | Builds and times the benchmark programs and their C twins. | Says it. Names `--backend,native`. |
+| `tests/runners/run_build_id.cmake` | Checks that links of one program share a build id. | Says less. |
+| `tests/runners/run_check.cmake` | Builds a check program in both modes and expects the dev build to stop. | Says it. |
+| `tests/runners/run_checks.cmake` | Checks `--checks`, `--no-checks` and a library whose checks follow the build. | Says it. |
+| `tests/runners/run_classlib.cmake` | Compiles a library with a class and a client of it. | Says it. |
+| `tests/runners/run_clib.cmake` | Runs one of twenty cases of libraries for C. | Says `CROSS` is for Windows, and macOS passes it too. |
+| `tests/runners/run_codeview_empty.cmake` | Meant to check for an empty CodeView subsection. | Says what the code cannot check. |
+| `tests/runners/run_conf_include_depth.cmake` | Checks that the runtime and `anti symbols` stop at the same include depth. | Says it. |
+| `tests/runners/run_cpu_archive.cmake` | Checks that each target of the archive has a runtime per level. | Says it. |
+| `tests/runners/run_cpu_check.cmake` | Runs a program above the level of the machine and expects the refusal. | Says it. |
+| `tests/runners/run_cpu_level.cmake` | Checks the dev assembly of one level for patterns. | Says it. |
+| `tests/runners/run_cpu_pin.cmake` | Compares `antic --print-cpu-levels` with `tools/cpu-levels`. | Says it. |
+| `tests/runners/run_cpu_runtime.cmake` | Checks the instructions of one runtime library. | Says it. |
+| `tests/runners/run_cross_link.cmake` | Links a program for a target and checks the format of the file. | Names one source, and takes any. |
+| `tests/runners/run_dead_code.cmake` | Checks which functions a link keeps and drops. | Says it. |
+| `tests/runners/run_debug.cmake` | Checks the line table of `-g` and three debugger sessions. | Says it. |
+| `tests/runners/run_deps_dir.cmake` | Configures a copy of the tree with `ANTI_DEPS_DIR` and checks nothing is downloaded. | Says it. |
 
 ### The runners from dev to manifest_signature
 
 | File | Purpose | Header |
 |---|---|---|
-| `tests/run_dev.cmake` | Builds a program in dev mode from sources and from library files and compares both. | Says "assembly", and compares LLVM text. |
-| `tests/run_direct_calls.cmake` | Refuses an indirect call in one function of a release build. | Says it. |
-| `tests/run_distinct_addresses.cmake` | Checks that distinct functions keep distinct addresses under a link mode. | Says it. |
-| `tests/run_dump.cmake` | Compares the output of antic with an expected file. | Says it. |
-| `tests/run_emit_identity.cmake` | Compares the digests of the LLVM text of every program with those of the Mac. | Says it. |
-| `tests/run_errors_registered.cmake` | Checks that every error program is named by a test. | Says it. |
-| `tests/run_expect.cmake` | Runs a command and checks its status and output. | Says it. |
-| `tests/run_expect_self.cmake` | Tests `run_expect.cmake` and refuses `PASS_REGULAR_EXPRESSION`. | Says it. |
-| `tests/run_files_oom.cmake` | Runs the file helpers out of memory and expects status 70. | Says it. |
-| `tests/run_find_order.cmake` | Refuses a variable read above the `find_program` that sets it. | Says it. One comment is stale. |
-| `tests/run_float_digits.cmake` | Checks that three runtime members name no printf or scanf function. | Says it. One comment is stale. |
-| `tests/run_fmt_canonical.cmake` | Runs `anti fmt --check` over the sources of the tree. | Says it. |
-| `tests/run_framework.cmake` | Links a program with a framework, or expects the refusal without an SDK. | Says it. |
-| `tests/run_front_end.cmake` | Runs `antic --front-end` on a good and a bad program. | Says it. One comment contradicts a check. |
-| `tests/run_function_alignment.cmake` | Checks the 16-byte alignment of ARM64 functions. | Says it. |
-| `tests/run_glibc_link.cmake` | Links a C probe of a native library against the glibc sysroot. | Says it. No `cmake_minimum_required`. |
-| `tests/run_glibc_sysroot.cmake` | Checks the glibc pins and runs the sysroot script on stand-in packages. | Says it. |
-| `tests/run_hash_seed.cmake` | Runs a program twice and expects two seeds. | Says it. |
-| `tests/run_header_names.cmake` | Refuses one of our headers included with angle brackets. | Says it. |
-| `tests/run_header_sections.cmake` | Checks that each function under a section of a shared header is defined in that file. | Says it. |
-| `tests/run_host_sources.cmake` | Compiles every source of antic and anti for one host under the warning set. | Says it. |
-| `tests/run_installer_alone.cmake` | Runs the installer with a failing cmake on the path and refuses words of removed steps. | Says it. |
-| `tests/run_installer_github.cmake` | Pins the addresses in both installers and runs one against a fake release. | Says it. |
-| `tests/run_installer_options.cmake` | Pins the options, the install roots and the marker across the four install scripts. | Says less: the options alone. |
-| `tests/run_internal.cmake` | Checks that an internal item is refused from another package. | Lists two variables it does not read. |
-| `tests/run_ir_line.cmake` | Requires one line in the IR dump. | Says it. |
-| `tests/run_license_forms.cmake` | Checks one form of `anti license`. | Says it. |
-| `tests/run_license_notice.cmake` | Checks the notice of three programs against `NOTICE.txt`. | Claims a static library it does not build. |
-| `tests/run_licenses.cmake` | Finds the licence notice in the bytes of a program. | Says it. |
-| `tests/run_line_endings.cmake` | Requires LF in the programs and expected files. | Says it. |
-| `tests/run_link_identity.cmake` | Compares the digest of a linked program with a stored one. | Says it. |
-| `tests/run_linux_libc.cmake` | Links a static stand-in for both Linux hosts and runs `check-libc.cmake` on it. | Says something else: the recipe of the packer. |
-| `tests/run_linux_modes.cmake` | Builds a static and a dynamic Linux program and reads their ELF headers. | Says it. |
-| `tests/run_llvm_atomics.cmake` | Requires atomic instructions in the dev LLVM text of six targets. | Says it. |
-| `tests/run_llvm_coff_plugin.cmake` | Checks the imports and exports of a Windows plugin and its host. | Says it. |
-| `tests/run_llvm_datalayout_pin.cmake` | Compares the data layout and the features antic prints with the pinned clang. | Says it. |
-| `tests/run_llvm_inline_lines.cmake` | Checks that an inlined callee keeps its line under `-g`. | Says it. |
-| `tests/run_llvm_names.cmake` | Checks that `get-llvm.cmake` does not rewrite an lld name in place. | Says it. |
-| `tests/run_llvm_program.cmake` | Builds and runs one program for a macOS target, a second form of `run_program.cmake`. | Says it. |
-| `tests/run_llvm_run.cmake` | Checks `--keep-llvm`, the kept files of each mode and `-S`. | Says it. |
-| `tests/run_llvm_verify.cmake` | Runs the verifier of opt over the LLVM text of every program. | Says it. |
-| `tests/run_lock_order.cmake` | Requires the lock-order reports of a dev build. | Says it. |
-| `tests/run_lto_default.cmake` | Checks which link takes bitcode and which objects. | Says it. |
-| `tests/run_macos_sdk.cmake` | Checks that the SDK script finds the pinned SDK and refuses a changed one. | Says it, and not that it skips on any failure. |
-| `tests/run_macos_sysroot.cmake` | Checks the Zig pin and runs the sysroot script on stand-ins. | Says less: not the Apple SDK half. |
-| `tests/run_manifest_signature.cmake` | Runs the installer against a signed, a wrong, an unsigned and a staging manifest. | Says it. |
+| `tests/runners/run_dev.cmake` | Builds a program in dev mode from sources and from library files and compares both. | Says "assembly", and compares LLVM text. |
+| `tests/runners/run_direct_calls.cmake` | Refuses an indirect call in one function of a release build. | Says it. |
+| `tests/runners/run_distinct_addresses.cmake` | Checks that distinct functions keep distinct addresses under a link mode. | Says it. |
+| `tests/runners/run_dump.cmake` | Compares the output of antic with an expected file. | Says it. |
+| `tests/runners/run_emit_identity.cmake` | Compares the digests of the LLVM text of every program with those of the Mac. | Says it. |
+| `tests/runners/run_errors_registered.cmake` | Checks that every error program is named by a test. | Says it. |
+| `tests/runners/run_expect.cmake` | Runs a command and checks its status and output. | Says it. |
+| `tests/runners/run_expect_self.cmake` | Tests `run_expect.cmake` and refuses `PASS_REGULAR_EXPRESSION`. | Says it. |
+| `tests/runners/run_files_oom.cmake` | Runs the file helpers out of memory and expects status 70. | Says it. |
+| `tests/runners/run_find_order.cmake` | Refuses a variable read above the `find_program` that sets it. | Says it. One comment is stale. |
+| `tests/runners/run_float_digits.cmake` | Checks that three runtime members name no printf or scanf function. | Says it. One comment is stale. |
+| `tests/runners/run_fmt_canonical.cmake` | Runs `anti fmt --check` over the sources of the tree. | Says it. |
+| `tests/runners/run_framework.cmake` | Links a program with a framework, or expects the refusal without an SDK. | Says it. |
+| `tests/runners/run_front_end.cmake` | Runs `antic --front-end` on a good and a bad program. | Says it. One comment contradicts a check. |
+| `tests/runners/run_function_alignment.cmake` | Checks the 16-byte alignment of ARM64 functions. | Says it. |
+| `tests/runners/run_glibc_link.cmake` | Links a C probe of a native library against the glibc sysroot. | Says it. No `cmake_minimum_required`. |
+| `tests/runners/run_glibc_sysroot.cmake` | Checks the glibc pins and runs the sysroot script on stand-in packages. | Says it. |
+| `tests/runners/run_hash_seed.cmake` | Runs a program twice and expects two seeds. | Says it. |
+| `tests/runners/run_header_names.cmake` | Refuses one of our headers included with angle brackets. | Says it. |
+| `tests/runners/run_header_sections.cmake` | Checks that each function under a section of a shared header is defined in that file. | Says it. |
+| `tests/runners/run_host_sources.cmake` | Compiles every source of antic and anti for one host under the warning set. | Says it. |
+| `tests/runners/run_installer_alone.cmake` | Runs the installer with a failing cmake on the path and refuses words of removed steps. | Says it. |
+| `tests/runners/run_installer_github.cmake` | Pins the addresses in both installers and runs one against a fake release. | Says it. |
+| `tests/runners/run_installer_options.cmake` | Pins the options, the install roots and the marker across the four install scripts. | Says less: the options alone. |
+| `tests/runners/run_internal.cmake` | Checks that an internal item is refused from another package. | Lists two variables it does not read. |
+| `tests/runners/run_ir_line.cmake` | Requires one line in the IR dump. | Says it. |
+| `tests/runners/run_license_forms.cmake` | Checks one form of `anti license`. | Says it. |
+| `tests/runners/run_license_notice.cmake` | Checks the notice of three programs against `NOTICE.txt`. | Claims a static library it does not build. |
+| `tests/runners/run_licenses.cmake` | Finds the licence notice in the bytes of a program. | Says it. |
+| `tests/runners/run_line_endings.cmake` | Requires LF in the programs and expected files. | Says it. |
+| `tests/runners/run_link_identity.cmake` | Compares the digest of a linked program with a stored one. | Says it. |
+| `tests/runners/run_linux_libc.cmake` | Links a static stand-in for both Linux hosts and runs `check-libc.cmake` on it. | Says something else: the recipe of the packer. |
+| `tests/runners/run_linux_modes.cmake` | Builds a static and a dynamic Linux program and reads their ELF headers. | Says it. |
+| `tests/runners/run_llvm_atomics.cmake` | Requires atomic instructions in the dev LLVM text of six targets. | Says it. |
+| `tests/runners/run_llvm_coff_plugin.cmake` | Checks the imports and exports of a Windows plugin and its host. | Says it. |
+| `tests/runners/run_llvm_datalayout_pin.cmake` | Compares the data layout and the features antic prints with the pinned clang. | Says it. |
+| `tests/runners/run_llvm_inline_lines.cmake` | Checks that an inlined callee keeps its line under `-g`. | Says it. |
+| `tests/runners/run_llvm_names.cmake` | Checks that `get-llvm.cmake` does not rewrite an lld name in place. | Says it. |
+| `tests/runners/run_llvm_program.cmake` | Builds and runs one program for a macOS target, a second form of `run_program.cmake`. | Says it. |
+| `tests/runners/run_llvm_run.cmake` | Checks `--keep-llvm`, the kept files of each mode and `-S`. | Says it. |
+| `tests/runners/run_llvm_verify.cmake` | Runs the verifier of opt over the LLVM text of every program. | Says it. |
+| `tests/runners/run_lock_order.cmake` | Requires the lock-order reports of a dev build. | Says it. |
+| `tests/runners/run_lto_default.cmake` | Checks which link takes bitcode and which objects. | Says it. |
+| `tests/runners/run_macos_sdk.cmake` | Checks that the SDK script finds the pinned SDK and refuses a changed one. | Says it, and not that it skips on any failure. |
+| `tests/runners/run_macos_sysroot.cmake` | Checks the Zig pin and runs the sysroot script on stand-ins. | Says less: not the Apple SDK half. |
+| `tests/runners/run_manifest_signature.cmake` | Runs the installer against a signed, a wrong, an unsigned and a staging manifest. | Says it. |
 
 ### The runners from may_fail_only to release_dry_run
 
 | File | Purpose | Header |
 |---|---|---|
-| `tests/run_may_fail_only.cmake` | Refuses a function written by hand with an error result. | Says it. |
-| `tests/run_memory_checks.cmake` | Checks what `--memory-checks` adds and reports per target. | Says each report names a function, and the code expects one name. |
-| `tests/run_memory_checks_list.cmake` | Checks the report of a pointer kept across a push. | The same. |
-| `tests/run_mimalloc_environment.cmake` | Runs a musl program with two variables of mimalloc. | Says it. |
-| `tests/run_modules.cmake` | Builds library modules and a program in one mode and compares the output. | `LIB_OPTIONS` does not reach the dev object. |
-| `tests/run_musl_allocator.cmake` | Reads the symbols of a musl program for the allocator. | Says it. |
-| `tests/run_mutex_size.cmake` | Reads the size of a Mutex for six targets. | Says it. |
-| `tests/run_names_once.cmake` | Refuses four shared names outside their header. | Says "every other file of src/", and skips `src/native/`. |
-| `tests/run_native_licenses.cmake` | Compares the licence texts of the repository with those of the runtime tree. | Says it. No `cmake_minimum_required`. |
-| `tests/run_native_link.cmake` | Links a test program against a native library for one target. | Says it. No `cmake_minimum_required`. |
-| `tests/run_native_pin.cmake` | Checks the form of a pin and that its version and digest stand nowhere else. | Says the URL too, which is not checked. |
-| `tests/run_native_pin_self.cmake` | Tests `run_native_pin.cmake` on a made-up tree. | Says it. |
-| `tests/run_no_paths.cmake` | Refuses the path of the checkout in the runtime libraries and in antic. | Says it. |
-| `tests/run_no_sdk_fetcher.cmake` | Refuses the name of the removed SDK fetcher. | Says it. |
-| `tests/run_no_workflows.cmake` | Refuses a file under `.github/workflows/`. | Says it. |
-| `tests/run_one_allocator.cmake` | Refuses an allocation outside `src/antic/alloc.c`. | Opens with the bare label `M03`. |
-| `tests/run_overview_examples.cmake` | Puts every `anti` block of the overview through the front end. | Says it. |
-| `tests/run_own_tools.cmake` | Shows that antic takes no tool or sysroot from the machine. | Says it. |
-| `tests/run_package.cmake` | Packs the host package and runs thirteen checks on it. | Says less: the key. |
-| `tests/run_pdb_guid.cmake` | Runs `check-pdb.cmake` on a linked Windows program. | Says it. |
-| `tests/run_pdb_names.cmake` | Checks the names in a PDB and that it holds no build path. | Says it. |
-| `tests/run_pinned_compiler.cmake` | Checks that the cache names the pinned clang and no runner a host compiler. | Says it. |
-| `tests/run_pinned_tools.cmake` | Runs the tool check of the configure step on the cache and on changed copies. | Says it. |
-| `tests/run_platform_layer.cmake` | Refuses a host `#if` outside the platform files. | Says it. |
-| `tests/run_plugin.cmake` | Builds a plugin and its hosts and checks loading and injection. | Says less. |
-| `tests/run_plugin_versions.cmake` | Loads six versions of a library to check the version rules. | Says "one host", and builds three. |
-| `tests/run_pre_commit.cmake` | Drives the pre-commit hook in a scratch repository. | Lists `PYTHON`, which only decides a skip. |
-| `tests/run_probe.cmake` | Compares the ABI probe in C with the one in Anti. | Says it. |
-| `tests/run_profile.cmake` | Builds with a profile, merges it and builds again. | Says it. |
-| `tests/run_program.cmake` | Compiles one program, runs it and compares with the expected file. | Says it. |
-| `tests/run_publish_manifest.cmake` | Runs `publish.cmake` in its check mode over a whole area and five broken ones. | Says it. |
-| `tests/run_raw_output.cmake` | Checks the raw bytes rule and scans every runner for it. | Says less: three parts are missing. |
-| `tests/run_raylib_miniaudio_pin.cmake` | Checks that the miniaudio raylib bundles is the pinned one. | Says it. No `cmake_minimum_required`. |
-| `tests/run_release_dry_run.cmake` | Runs `./r --dry-run` on a clone with stand-in tools, in eight parts. | Says less: two parts are missing. |
+| `tests/runners/run_may_fail_only.cmake` | Refuses a function written by hand with an error result. | Says it. |
+| `tests/runners/run_memory_checks.cmake` | Checks what `--memory-checks` adds and reports per target. | Says each report names a function, and the code expects one name. |
+| `tests/runners/run_memory_checks_list.cmake` | Checks the report of a pointer kept across a push. | The same. |
+| `tests/runners/run_mimalloc_environment.cmake` | Runs a musl program with two variables of mimalloc. | Says it. |
+| `tests/runners/run_modules.cmake` | Builds library modules and a program in one mode and compares the output. | `LIB_OPTIONS` does not reach the dev object. |
+| `tests/runners/run_musl_allocator.cmake` | Reads the symbols of a musl program for the allocator. | Says it. |
+| `tests/runners/run_mutex_size.cmake` | Reads the size of a Mutex for six targets. | Says it. |
+| `tests/runners/run_names_once.cmake` | Refuses four shared names outside their header. | Says "every other file of src/", and skips `src/native/`. |
+| `tests/runners/run_native_licenses.cmake` | Compares the licence texts of the repository with those of the runtime tree. | Says it. No `cmake_minimum_required`. |
+| `tests/runners/run_native_link.cmake` | Links a test program against a native library for one target. | Says it. No `cmake_minimum_required`. |
+| `tests/runners/run_native_pin.cmake` | Checks the form of a pin and that its version and digest stand nowhere else. | Says the URL too, which is not checked. |
+| `tests/runners/run_native_pin_self.cmake` | Tests `run_native_pin.cmake` on a made-up tree. | Says it. |
+| `tests/runners/run_no_paths.cmake` | Refuses the path of the checkout in the runtime libraries and in antic. | Says it. |
+| `tests/runners/run_no_sdk_fetcher.cmake` | Refuses the name of the removed SDK fetcher. | Says it. |
+| `tests/runners/run_no_workflows.cmake` | Refuses a file under `.github/workflows/`. | Says it. |
+| `tests/runners/run_one_allocator.cmake` | Refuses an allocation outside `src/antic/alloc.c`. | Opens with the bare label `M03`. |
+| `tests/runners/run_overview_examples.cmake` | Puts every `anti` block of the overview through the front end. | Says it. |
+| `tests/runners/run_own_tools.cmake` | Shows that antic takes no tool or sysroot from the machine. | Says it. |
+| `tests/runners/run_package.cmake` | Packs the host package and runs thirteen checks on it. | Says less: the key. |
+| `tests/runners/run_pdb_guid.cmake` | Runs `check-pdb.cmake` on a linked Windows program. | Says it. |
+| `tests/runners/run_pdb_names.cmake` | Checks the names in a PDB and that it holds no build path. | Says it. |
+| `tests/runners/run_pinned_compiler.cmake` | Checks that the cache names the pinned clang and no runner a host compiler. | Says it. |
+| `tests/runners/run_pinned_tools.cmake` | Runs the tool check of the configure step on the cache and on changed copies. | Says it. |
+| `tests/runners/run_platform_layer.cmake` | Refuses a host `#if` outside the platform files. | Says it. |
+| `tests/runners/run_plugin.cmake` | Builds a plugin and its hosts and checks loading and injection. | Says less. |
+| `tests/runners/run_plugin_versions.cmake` | Loads six versions of a library to check the version rules. | Says "one host", and builds three. |
+| `tests/runners/run_pre_commit.cmake` | Drives the pre-commit hook in a scratch repository. | Lists `PYTHON`, which only decides a skip. |
+| `tests/runners/run_probe.cmake` | Compares the ABI probe in C with the one in Anti. | Says it. |
+| `tests/runners/run_profile.cmake` | Builds with a profile, merges it and builds again. | Says it. |
+| `tests/runners/run_program.cmake` | Compiles one program, runs it and compares with the expected file. | Says it. |
+| `tests/runners/run_publish_manifest.cmake` | Runs `publish.cmake` in its check mode over a whole area and five broken ones. | Says it. |
+| `tests/runners/run_raw_output.cmake` | Checks the raw bytes rule and scans every runner for it. | Says less: three parts are missing. |
+| `tests/runners/run_raylib_miniaudio_pin.cmake` | Checks that the miniaudio raylib bundles is the pinned one. | Says it. No `cmake_minimum_required`. |
+| `tests/runners/run_release_dry_run.cmake` | Runs `./r --dry-run` on a clone with stand-in tools, in eight parts. | Says less: two parts are missing. |
 
 ### The runners from release_key to windows_sysroot
 
 | File | Purpose | Header |
 |---|---|---|
-| `tests/run_release_key.cmake` | Checks that both installers hold the public key and that a package carries none. | Names the LLVM tools, and omits the tag check. |
-| `tests/run_release_pins.cmake` | Checks the form of the two LLVM pins and that no script spells them. | Says less: not the directory check. |
-| `tests/run_release_site.cmake` | Checks the order of the setgid step and the mode of every rsync of step 9. | Says it. |
-| `tests/run_repo_layout.cmake` | Checks every tracked path against the allowed entries. | Says it. |
-| `tests/run_rt_extensions.cmake` | Refuses a compiler extension in the runtime outside five files. | Says it. |
-| `tests/run_rt_names.cmake` | Refuses an exported name of the runtime outside its prefixes. | Says "every symbol", and weak ones are not read. |
-| `tests/run_rt_wide_text.cmake` | Refuses a call of an ANSI entry point of Windows in the runtime. | Says it. |
-| `tests/run_runtime_frames.cmake` | Requires the frame record in `main` of every Linux and macOS runtime. | Says it. |
-| `tests/run_runtime_from_data_dir.cmake` | Checks that antic finds the archive of the data directory. | Says it. |
-| `tests/run_runtime_hosts.cmake` | Refuses outline atomics in the linux-arm64 runtime. | Says it. |
-| `tests/run_script_policies.cmake` | Requires `cmake_minimum_required` in the scripts two list files name. | Says "every script". |
-| `tests/run_shared_inputs.cmake` | Builds shared libraries with three options and reads their dependencies. | Says it, and not the silent skip. |
-| `tests/run_simd_width.cmake` | Counts the lines of one instruction in the assembly of a program. | Says it. |
-| `tests/run_source_cap.cmake` | Checks the size limit of a source. | Says it. |
-| `tests/run_source_nul.cmake` | Checks the refusal of a NUL byte at eleven positions. | Says it. |
-| `tests/run_sources.cmake` | Checks `licenses/sources.txt` against the pins and the licence texts. | Says less: not the Zig line. |
-| `tests/run_std_collection_modules.cmake` | Tests the ordering function of `tools/std-modules.cmake`. | Says it. |
-| `tests/run_std_tests.cmake` | Runs `anti test` on one module in both modes. | Says it. |
-| `tests/run_symbols.cmake` | Looks up two functions in a program built with `-g`. | Says it. |
-| `tests/run_symbols_layout.cmake` | Compares the sections of a shipped program with those of its debug link. | Says it. |
-| `tests/run_sysroot_links.cmake` | Checks that the sysroot script turns an absolute link relative. | Says it. |
-| `tests/run_trace.cmake` | Runs a program and matches its output against pattern files. | Says it. |
-| `tests/run_trap.cmake` | Builds a program that must stop and compares its message. | Says it. |
-| `tests/run_trap_table.cmake` | Checks the trap of an unset table entry per build mode. | Says it. |
-| `tests/run_unicode_paths.cmake` | Runs antic and anti with names outside ASCII. | Says antic runs llvm-mc. |
-| `tests/run_unwind.cmake` | Compares the Windows unwind data of a program with an expected file. | Says it. |
-| `tests/run_warning_names.cmake` | Holds the warning table of antic equal to the note. | Says it. |
-| `tests/run_warning_set.cmake` | Refuses a warning flag outside the two warning files. | Says "any other build file", and one is not read. |
-| `tests/run_warnings.cmake` | Runs antic and requires or forbids texts in its messages. | Says it. |
-| `tests/run_windows_addresses.cmake` | Refuses 32-bit address relocations in a windows-x86_64 object. | Says it. |
-| `tests/run_windows_sysroot.cmake` | Checks the mingw-w64 pins and runs the sysroot script on a stand-in release. | Says less: not the pin checks. |
+| `tests/runners/run_release_key.cmake` | Checks that both installers hold the public key and that a package carries none. | Names the LLVM tools, and omits the tag check. |
+| `tests/runners/run_release_pins.cmake` | Checks the form of the two LLVM pins and that no script spells them. | Says less: not the directory check. |
+| `tests/runners/run_release_site.cmake` | Checks the order of the setgid step and the mode of every rsync of step 9. | Says it. |
+| `tests/runners/run_repo_layout.cmake` | Checks every tracked path against the allowed entries. | Says it. |
+| `tests/runners/run_rt_extensions.cmake` | Refuses a compiler extension in the runtime outside five files. | Says it. |
+| `tests/runners/run_rt_names.cmake` | Refuses an exported name of the runtime outside its prefixes. | Says "every symbol", and weak ones are not read. |
+| `tests/runners/run_rt_wide_text.cmake` | Refuses a call of an ANSI entry point of Windows in the runtime. | Says it. |
+| `tests/runners/run_runtime_frames.cmake` | Requires the frame record in `main` of every Linux and macOS runtime. | Says it. |
+| `tests/runners/run_runtime_from_data_dir.cmake` | Checks that antic finds the archive of the data directory. | Says it. |
+| `tests/runners/run_runtime_hosts.cmake` | Refuses outline atomics in the linux-arm64 runtime. | Says it. |
+| `tests/runners/run_script_policies.cmake` | Requires `cmake_minimum_required` in the scripts two list files name. | Says "every script". |
+| `tests/runners/run_shared_inputs.cmake` | Builds shared libraries with three options and reads their dependencies. | Says it, and not the silent skip. |
+| `tests/runners/run_simd_width.cmake` | Counts the lines of one instruction in the assembly of a program. | Says it. |
+| `tests/runners/run_source_cap.cmake` | Checks the size limit of a source. | Says it. |
+| `tests/runners/run_source_nul.cmake` | Checks the refusal of a NUL byte at eleven positions. | Says it. |
+| `tests/runners/run_sources.cmake` | Checks `licenses/sources.txt` against the pins and the licence texts. | Says less: not the Zig line. |
+| `tests/runners/run_std_collection_modules.cmake` | Tests the ordering function of `tools/std-modules.cmake`. | Says it. |
+| `tests/runners/run_std_tests.cmake` | Runs `anti test` on one module in both modes. | Says it. |
+| `tests/runners/run_symbols.cmake` | Looks up two functions in a program built with `-g`. | Says it. |
+| `tests/runners/run_symbols_layout.cmake` | Compares the sections of a shipped program with those of its debug link. | Says it. |
+| `tests/runners/run_sysroot_links.cmake` | Checks that the sysroot script turns an absolute link relative. | Says it. |
+| `tests/runners/run_trace.cmake` | Runs a program and matches its output against pattern files. | Says it. |
+| `tests/runners/run_trap.cmake` | Builds a program that must stop and compares its message. | Says it. |
+| `tests/runners/run_trap_table.cmake` | Checks the trap of an unset table entry per build mode. | Says it. |
+| `tests/runners/run_unicode_paths.cmake` | Runs antic and anti with names outside ASCII. | Says antic runs llvm-mc. |
+| `tests/runners/run_unwind.cmake` | Compares the Windows unwind data of a program with an expected file. | Says it. |
+| `tests/runners/run_warning_names.cmake` | Holds the warning table of antic equal to the note. | Says it. |
+| `tests/runners/run_warning_set.cmake` | Refuses a warning flag outside the two warning files. | Says "any other build file", and one is not read. |
+| `tests/runners/run_warnings.cmake` | Runs antic and requires or forbids texts in its messages. | Says it. |
+| `tests/runners/run_windows_addresses.cmake` | Refuses 32-bit address relocations in a windows-x86_64 object. | Says it. |
+| `tests/runners/run_windows_sysroot.cmake` | Checks the mingw-w64 pins and runs the sysroot script on a stand-in release. | Says less: not the pin checks. |

@@ -44,7 +44,7 @@ rest.
 - The other nine hold a build without the runtime archive and a tool
   that does not start. They also hold a library file as the input of
   `--dev`, a source name and a plugin name the index cannot hold.
-- Five cases of `tests/run_antic_options.cmake`: `output_static`,
+- Five cases of `tests/runners/run_antic_options.cmake`: `output_static`,
   `output_shared`, `output_dev_library`, `output_plugin` and `linker_lld`.
 - `bitfield_defaults_modules` and `function_default_modules` in
   `tests/modules/`, and the matrix program
@@ -53,7 +53,7 @@ rest.
   `forms` and `never` of `tests/clib/` and their headers in `tests/dump/`.
   `anti_bind_header` writes both headers from the library files.
 - `anti_doc_forms_html` and `anti_doc_forms_private` over the module
-  `forms` of `tests/doc/`, through `tests/run_anti_doc_page.cmake`.
+  `forms` of `tests/doc/`, through `tests/runners/run_anti_doc_page.cmake`.
 - Four cases of `tests/check/messages.cmake`, two usage cases of
   `anti new` and three lines of `tests/unit/test_userdirs.c`.
 
@@ -98,7 +98,7 @@ rest.
   `values_c_wchar_operators` takes each operator of a `c_wchar` at run
   time.
 - `llvm_coff_plugin_f16` with the library `halves` of `tests/plugin/`,
-  which shows T121. `tests/run_llvm_coff_plugin.cmake` takes the library
+  which shows T121. `tests/runners/run_llvm_coff_plugin.cmake` takes the library
   and the level of the processor as values.
 - `dump_llvm_wchar_constant_macos-arm64`, which shows T122, and
   `dump_llvm_wchar_constant_linux-arm64`, which passes.
@@ -114,7 +114,7 @@ rest.
 
 ## What the fifth session added
 
-- Five cases of `tests/run_anti_options.cmake`. `targets_default` builds
+- Five cases of `tests/runners/run_anti_options.cmake`. `targets_default` builds
   for the targets that `default` of `[targets]` names. `release_path`
   builds a path dependency under `--release`. `library_root` builds a
   library project without the module of the package name.
@@ -175,7 +175,7 @@ rest.
   line and an `inject final` field.
 - `trace_package_modules`, two tests: the pattern of `--trace` names a
   package above the module of a class that asks for no call hooks.
-  `tests/run_modules.cmake` now passes the options of a library to its
+  `tests/runners/run_modules.cmake` now passes the options of a library to its
   dev object as well as to its library file.
 - Two programs in `tests/matrix/`, six tests, each with a case under
   `--trace writes`. `classes_changed_hook_of_a_transient_field` writes a
@@ -693,7 +693,7 @@ Of the sixth session:
 - `error_layout_sum` and `error_layout_span` hold a message of the layout
   without a position, as `error_layout_divide` does, for the reason the
   entry above on the fourth session gives.
-- `tests/run_modules.cmake` built the dev object of a library without the
+- `tests/runners/run_modules.cmake` built the dev object of a library without the
   options of `LIB_OPTIONS`. The pattern of `--trace` decides in the build
   that holds the body, so the dev object now takes them. The three tests
   that pass such options give the same output as before.

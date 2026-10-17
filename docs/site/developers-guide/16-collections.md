@@ -934,7 +934,7 @@ The counts are the same in dev and in release, apart from the checks of dev mode
 | Target | macos-arm64 |
 | Commit | `1fb19e61` |
 | Mode | release, linked with full LTO. The C twin is built by the pinned clang at `-O2` |
-| Command | `cmake --build build/host --target bench`, which runs `tests/run_bench.cmake` |
+| Command | `cmake --build build/host --target bench`, which runs `tests/runners/run_bench.cmake` |
 | Runs | the median of 5 runs of each program |
 | Load | another job ran on the machine during the run |
 

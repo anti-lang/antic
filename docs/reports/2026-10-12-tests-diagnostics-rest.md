@@ -8,7 +8,7 @@ reach: the lexer, the parser and `anti`. No file under `src/` changed.
 
 - `tests/errors/` holds five new programs for the lexer and the parser,
   each registered as `error_<name>`.
-- `tests/run_anti_messages.cmake` runs one case of a table. It writes the
+- `tests/runners/run_anti_messages.cmake` runs one case of a table. It writes the
   files of the case, runs anti in their directory and compares the whole
   standard error, the exit status and the standard output.
 - Seven tables `tests/<directory>/messages.cmake` hold the cases of `build`

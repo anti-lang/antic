@@ -21,7 +21,7 @@ This step has no audit ID. `docs/audit/` names no finding of the packer.
 
 ## Test
 
-`package_keys` (`tests/run_package.cmake`) unpacks the package of the host
+`package_keys` (`tests/runners/run_package.cmake`) unpacks the package of the host
 and runs its anti. It runs `anti bind` on `tests/bind/raylib_api.json`,
 `anti build --release` of `tests/anti-build/app` with its `anti.toml`, and
 `anti symbols inventory` on the release program, off Windows as

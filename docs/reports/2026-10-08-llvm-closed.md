@@ -27,7 +27,7 @@ of LLVM are marked complete, and each item has a report of its own.
 
 ## `tests/bench`
 
-`tests/run_bench.cmake` through `cmake --build build/host --target bench`, 5 runs each,
+`tests/runners/run_bench.cmake` through `cmake --build build/host --target bench`, 5 runs each,
 after item 4. A release build links through full LTO. Each cell is Anti over its C twin,
 then over the same cell of `2026-10-05-llvm-opt-measure.md`:
 

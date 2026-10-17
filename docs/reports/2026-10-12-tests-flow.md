@@ -16,7 +16,7 @@ changed.
   meet. "Flow" in the note lists them with the triples.
 - `anti_test_flow` runs `tests/anti-test/com/example/flow` under
   `anti test`: 49 tests, each construct in a `tests` block and in a
-  `fixtures` block. `tests/run_anti_test_module.cmake` is its runner.
+  `fixtures` block. `tests/runners/run_anti_test_module.cmake` is its runner.
 - `flow_modules` holds each construct in a plain and in a generic function
   of a library file, `tests/modules/flow/com/example/flow`.
 - The note marks 317 cells and 44 kinds. One cell cannot exist: a function

@@ -1,7 +1,7 @@
 # The options of antic and the commands and options of anti that no test
 # passes yet. The test options_covered reads this list beside
 # src/antic/main.c, src/anti/main.c, the command lines of the registered
-# tests and the runners under tests/. tests/run_options_covered.cmake
+# tests and the runners under tests/. tests/runners/run_options_covered.cmake
 # states how it reads each.
 #
 # One line per unit: `antic <option>`, `anti <command>`,

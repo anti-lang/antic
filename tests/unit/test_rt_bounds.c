@@ -35,7 +35,7 @@ static void block_growth(void)
 }
 
 /* A count that the size of the builder cannot hold ends the program as
-   memory that runs out does, which tests/run_rt_oom.cmake checks. A pad
+   memory that runs out does, which tests/runners/run_rt_oom.cmake checks. A pad
    before the bytes moves them and keeps their NUL. */
 static void builder_bounds(void)
 {

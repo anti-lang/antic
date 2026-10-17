@@ -157,7 +157,7 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
                 "-DOBJECTS=${probe},${library},${miniaudio}"
                 "-DWORK=${ANTIC_RAYLIB_WORK}/run"
                 "-DOPTIONS=${options}"
-                -P "${PROJECT_SOURCE_DIR}/tests/run_program.cmake")
+                -P "${ANTIC_RUNNERS}/run_program.cmake")
     endif()
     add_test(NAME raylib_link_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -169,7 +169,7 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
             "-DWORK=${ANTIC_RAYLIB_WORK}/link"
             "-DTARGET=${target}"
             "-DOPTIONS=${options}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_link.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
 endforeach()
 
 # A program that calls raylib's audio and miniaudio of its own links both
@@ -230,7 +230,7 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
                 "-DOBJECTS=${probe},${libraries}"
                 "-DWORK=${ANTIC_RAYLIB_WORK}/media_audio_run"
                 "-DOPTIONS=${options}"
-                -P "${PROJECT_SOURCE_DIR}/tests/run_program.cmake")
+                -P "${ANTIC_RUNNERS}/run_program.cmake")
     endif()
     add_test(NAME media_audio_link_${target}
         COMMAND "${CMAKE_COMMAND}"
@@ -242,11 +242,11 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
             "-DWORK=${ANTIC_RAYLIB_WORK}/media_audio_link"
             "-DTARGET=${target}"
             "-DOPTIONS=${options}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_native_link.cmake")
+            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
 endforeach()
 
 add_test(NAME raylib_miniaudio_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
             "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
             "-DMINIAUDIO=${ANTIC_MINIAUDIO_SOURCE}"
-            -P "${PROJECT_SOURCE_DIR}/tests/run_raylib_miniaudio_pin.cmake")
+            -P "${ANTIC_RUNNERS}/run_raylib_miniaudio_pin.cmake")

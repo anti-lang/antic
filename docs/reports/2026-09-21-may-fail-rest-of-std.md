@@ -31,7 +31,7 @@ the next step.
   `text.parse_int` does. `json.member` keeps `-> bool` and its `out`.
 - The comment of `FileSink.new` said code 1. The error was always the
   `SystemError` of errno, and the comment says so now.
-- `tests/run_std_may_fail.cmake`, the test `std_may_fail_only`, refuses
+- `tests/runners/run_std_may_fail.cmake`, the test `std_may_fail_only`, refuses
   a function of `std/anti` written by hand as `-> ?*Error`, apart from
   an `extern fn` and a `construct`. The build names the directory once,
   as `ANTIC_STD_SOURCE_DIR`.

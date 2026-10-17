@@ -1348,7 +1348,7 @@ Where it lives: `memcheck_declare` and the pass over each function in `src/antic
 
 The check is a call and never an inline test. A loop over a slice therefore makes one call per element.
 
-The table below holds the five programs of `tests/bench`, each run by `tests/run_bench.cmake` beside its C twin. Every time is the median of 5 runs of a release build.
+The table below holds the five programs of `tests/bench`, each run by `tests/runners/run_bench.cmake` beside its C twin. Every time is the median of 5 runs of a release build.
 
 | Program | C twin | Anti | Anti with `--memory-checks` | With the option, against without |
 |---|---:|---:|---:|---:|
@@ -1365,7 +1365,7 @@ The table below holds the five programs of `tests/bench`, each run by `tests/run
 | Commit | `82157882` |
 | Mode | release. The plain build links with full LTO, and the checked build without LTO |
 | Command, columns two and three | `cmake --build build/host --target bench` |
-| Command, column four | `cmake -DOPTIONS=--memory-checks -P tests/run_bench.cmake`, with the other values of the `bench` target |
+| Command, column four | `cmake -DOPTIONS=--memory-checks -P tests/runners/run_bench.cmake`, with the other values of the `bench` target |
 | Load | another job ran on the machine during both runs. The C twins took 287.6, 104.0, 42.8, 114.8 and 129.1 ms in the second run |
 
 The option is off in every build unless it is given. It is a tool for a test run and not for a program that ships.

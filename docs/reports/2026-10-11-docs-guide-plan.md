@@ -9,7 +9,7 @@ gates again.
 
 ## What the step wrote
 
-- `tests/run_document_examples.cmake`, the runner of the syntax overview
+- `tests/runners/run_document_examples.cmake`, the runner of the syntax overview
   under a new name. It reads a list of documents and directories, so one
   runner serves `docs/anti-syntax-overview.md` and the guide. The overview
   keeps its test name and its counts.
@@ -84,7 +84,7 @@ before opt and not in the module after it.
 - `llvm-objdump -d` prints no relocations, so a call in an `asm` excerpt
   shows no name of its callee. The `llvm` excerpt names it.
 - The test `raw_output` refuses a captured output of a tool outside its
-  list. The runner calls opt as `tests/run_direct_calls.cmake` does.
+  list. The runner calls opt as `tests/runners/run_direct_calls.cmake` does.
 - Chapters 1, 2, 18, 20 and 21 describe tools and not features, so their
   sections carry one sentence and no five parts. Chapter 19 has one
   feature section, on the two blocks.

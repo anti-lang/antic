@@ -9,7 +9,7 @@ lane stay. Status: DONE.
 ## What was done
 
 - `cfbf011..0bb15bd`, the seven commits of `add5/sorted`. There were conflicts
-  in `tests/run_anti_check.cmake` and `tests/run_checks.cmake`. The dev checks
+  in `tests/runners/run_anti_check.cmake` and `tests/runners/run_checks.cmake`. The dev checks
   of `List<T>` and `Grid<T>` from the seq lane stand beside the check of
   `sorted_changed`. The front end and the formatting of `src/std/` count 31
   files: the 30 of `main` and `sorted.anti`.

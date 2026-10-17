@@ -6,7 +6,7 @@ of antic.
 
 ## What changed
 
-1. `tests/run_overview_examples.cmake` and the test `overview_examples`. A
+1. `tests/runners/run_overview_examples.cmake` and the test `overview_examples`. A
    block splits into items, which stand at module level, and statements,
    which go into the body of one function. A hidden block in an HTML comment
    before an example declares the names it uses. A block that opens with

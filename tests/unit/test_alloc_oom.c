@@ -3,7 +3,7 @@
    library refuses the memory or a size overflows, with status 70 and the
    message, and never comes back with NULL. The program asks one helper,
    named by its argument, for more memory than any host gives, and
-   tests/run_alloc_oom.cmake checks the exit. A helper that comes back
+   tests/runners/run_alloc_oom.cmake checks the exit. A helper that comes back
    prints what it returned and ends with status 0. */
 #include <stdint.h>
 #include <stdio.h>

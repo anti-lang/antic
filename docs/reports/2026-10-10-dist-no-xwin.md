@@ -19,7 +19,7 @@ and already took xwin out of `tools/get-sysroot.cmake`, both installers and
   runtime of Microsoft". Step 10 of `docs/work-order-release-script.md`
   asks for a link for the other five targets, so the script now does what
   that document says.
-- The test `no_sdk_fetcher`, `tests/run_no_sdk_fetcher.cmake`, holds the
+- The test `no_sdk_fetcher`, `tests/runners/run_no_sdk_fetcher.cmake`, holds the
   search of the step. It refuses the name xwin, in either case, in `src/`,
   `tests/`, `tools/`, `docs/notes/`, `docs/site/`, the documents directly
   under `docs/` apart from `docs/decisions.md`, and `CLAUDE.md`. It refuses

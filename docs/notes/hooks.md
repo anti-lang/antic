@@ -97,7 +97,7 @@ since a value of a class without a teardown ends with no hook.
 `driver_run` of `src/antic/driver.c` therefore refuses `--no-hooks` with
 `--no-runtime`, and `compile` refuses it for a program that loads
 libraries, the one `whole_hosts_plugins` finds and `--closed` does not
-shut. `tests/errors/no_hooks_plugins.anti` and `tests/run_plugin.cmake`
+shut. `tests/errors/no_hooks_plugins.anti` and `tests/runners/run_plugin.cmake`
 check both, and that a closed host builds without hooks.
 
 `--trace` and `--no-trace` decide for marked code instead of the mode,

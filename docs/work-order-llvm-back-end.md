@@ -773,7 +773,7 @@ In antic, step `pins` of the work order makes these changes:
   and the copy loop that fills the runtime archive's `bin/`. The header
   comment names seven tools.
 - `tools/get-llvm.cmake`: the header comment names seven tools.
-- `tests/run_pinned_tools.cmake` checks `opt` and `llc` as it checks the
+- `tests/runners/run_pinned_tools.cmake` checks `opt` and `llc` as it checks the
   others.
 - `libunwind.a` goes from the anti.5 archive into the runtime archive
   beside the `libclang_rt` libraries, for the targets it exists for. The
@@ -1059,7 +1059,7 @@ The twelve steps, by id:
 `pins`, the toolchain. The release `23.1.1-anti.5` of
 `anti-lang/llvm-tools` exists. Make the changes listed under "Toolchain
 and packaging": both pin files, `tools/check-llvm.cmake`,
-`tools/get-llvm.cmake`, `tests/run_pinned_tools.cmake`, `libunwind` in the
+`tools/get-llvm.cmake`, `tests/runners/run_pinned_tools.cmake`, `libunwind` in the
 runtime archive and the Linux `--memory-checks` link, the documentation
 lines. Configure a fresh build so the archives download and verify. Done
 when the three suites pass on the Mac, `pinned_tools` passes with seven
