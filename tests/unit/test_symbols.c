@@ -149,9 +149,10 @@ static void add_sleb(struct blob *b, int64_t v)
     }
 }
 
-/* The part of a DWARF 4 or 5 line unit after its header length, up to
-   the program: one file, `a.anti`, and no directory. A DWARF 5 table
-   takes the counts and the formats given. */
+/* The part of a DWARF line unit after its header length, up to the
+   program: one file, `a.anti`, and no directory. DWARF 2 and 3 have no
+   field of the operations per instruction. A DWARF 5 table takes the
+   counts and the formats given. */
 static void line_header(struct blob *h, int version, uint8_t dir_formats,
                         uint64_t dir_count, uint8_t file_formats,
                         uint64_t file_count)
@@ -161,7 +162,9 @@ static void line_header(struct blob *h, int version, uint8_t dir_formats,
     uint64_t i;
 
     add_int(h, 1, 1);           /* minimum instruction length */
-    add_int(h, 1, 1);           /* operations per instruction */
+    if (version >= 4) {
+        add_int(h, 1, 1);       /* operations per instruction */
+    }
     add_int(h, 1, 1);           /* default is_stmt */
     add_int(h, (uint8_t)-5, 1); /* line base */
     add_int(h, 14, 1);          /* line range */
@@ -387,6 +390,17 @@ static bool line_of(const struct blob *line, uint64_t vaddr,
     return anti_rt_elf_line(image, size, vaddr, found);
 }
 
+/* A copy of the first size bytes of image in memory of its own. */
+static uint8_t *exactly(const uint8_t *image, size_t size)
+{
+    uint8_t *copy = alloc_zeroed(size, 1);
+
+    if (size > 0) {
+        memcpy(copy, image, size);
+    }
+    return copy;
+}
+
 /* S28: a section of type NOBITS holds no bytes of the file. A reader of
    names, strings or lines refuses it whatever its size says. */
 static void nobits_sections(void)
@@ -571,6 +585,141 @@ static void loaded_room(void)
     CHECK(anti_rt_elf_loaded_room(headers, 3, 0x5) == 0);
 }
 
+/* M314: an ELF file cut short at every byte, each copy in memory of its
+   own, so AddressSanitizer reports a read past its end. The line table
+   stands last, so every cut loses part of it. The symbol stays readable
+   once the cut keeps every section before the line table. */
+static void elf_cut_short(void)
+{
+    struct blob line = {{0}, 0};
+    uint8_t image[2048];
+    size_t size;
+    size_t cut;
+
+    simple_lines(&line, 6);
+    size = elf_image(image, sizeof image, ELF_NULL, &line);
+    for (cut = 0; cut <= size; cut++) {
+        uint8_t *copy = exactly(image, cut);
+        bool whole = cut == size;
+        bool symbols = cut >= size - line.size;
+        struct anti_found found;
+        uint64_t vaddr = 0;
+        int count = 0;
+        memset(&found, 0, sizeof found);
+        CHECK(anti_rt_elf_symbol(copy, cut, "anti_licenses", &vaddr) ==
+              symbols);
+        CHECK(!symbols || vaddr == 0x1000);
+        anti_rt_elf_functions(copy, cut, count_function, &count);
+        CHECK(count == (symbols ? 1 : 0));
+        memset(&found, 0, sizeof found);
+        CHECK(anti_rt_elf_function(copy, cut, 0x1004, &found) == symbols);
+        memset(&found, 0, sizeof found);
+        CHECK(anti_rt_elf_line(copy, cut, 0x1004, &found) == whole);
+        CHECK(!whole || found.line == 7);
+        free(copy);
+    }
+}
+
+/* Whether the symbol of an exact copy of the image is found, and whether
+   the line of 0x1004 is. */
+static void elf_reads(const uint8_t *image, size_t size, bool symbol,
+                      bool line)
+{
+    uint8_t *copy = exactly(image, size);
+    struct anti_found found;
+    uint64_t vaddr = 0;
+
+    memset(&found, 0, sizeof found);
+    CHECK(anti_rt_elf_symbol(copy, size, "anti_licenses", &vaddr) == symbol);
+    CHECK(anti_rt_elf_line(copy, size, 0x1004, &found) == line);
+    free(copy);
+}
+
+/* M314: the section headers or the section of the names outside the
+   file, and a symbol table whose size is no multiple of a symbol. */
+static void elf_headers_outside(void)
+{
+    struct blob line = {{0}, 0};
+    uint8_t image[2048];
+    uint8_t *symtab = image + 64 + 64 * ELF_SYMTAB;
+    size_t size;
+
+    simple_lines(&line, 6);
+    size = elf_image(image, sizeof image, ELF_NULL, &line);
+    elf_reads(image, size, true, true);
+
+    /* e_shoff at the end of the file, one byte short of the headers, and
+       an offset that wraps the address space. */
+    put(image + 40, size, 8);
+    elf_reads(image, size, false, false);
+    put(image + 40, size - 64 * ELF_SECTIONS + 1, 8);
+    elf_reads(image, size, false, false);
+    put(image + 40, UINT64_MAX - 63, 8);
+    elf_reads(image, size, false, false);
+    put(image + 40, 64, 8);
+    /* More headers than the file holds. */
+    put(image + 60, 0xffff, 2);
+    elf_reads(image, size, false, false);
+    put(image + 60, ELF_SECTIONS, 2);
+
+    /* e_shstrndx past the last header, and at the end of the range. */
+    put(image + 62, ELF_SECTIONS, 2);
+    elf_reads(image, size, false, false);
+    put(image + 62, 0xffff, 2);
+    elf_reads(image, size, false, false);
+    put(image + 62, ELF_SHSTRTAB, 2);
+    elf_reads(image, size, true, true);
+
+    /* A symbol table one byte short of its second symbol, one byte past
+       it, and one that runs past the end of the file. */
+    put(symtab + 32, 47, 8);
+    elf_reads(image, size, false, true);
+    put(symtab + 32, 49, 8);
+    elf_reads(image, size, true, true);
+    put(symtab + 32, size, 8);
+    elf_reads(image, size, false, true);
+    put(symtab + 32, UINT64_MAX - 7, 8);
+    elf_reads(image, size, false, true);
+    put(symtab + 32, 48, 8);
+    /* A string table the symbol table links to that is no section. */
+    put(symtab + 40, ELF_SECTIONS, 4);
+    elf_reads(image, size, false, true);
+    put(symtab + 40, ELF_STRTAB, 4);
+    elf_reads(image, size, true, true);
+}
+
+/* M314: a line table of DWARF 2 and of DWARF 3, whose header has no
+   field of the operations per instruction. Each is read whole, and
+   refused when its section is cut short at any byte. */
+static void old_dwarf_lines(void)
+{
+    int version;
+
+    for (version = 2; version <= 3; version++) {
+        struct blob h = {{0}, 0};
+        struct blob p = {{0}, 0};
+        struct blob line = {{0}, 0};
+        struct anti_found found;
+        size_t cut;
+
+        line_header(&h, version, 0, 0, 0, 0);
+        two_rows(&p, 6);
+        line_unit(&line, version, &h, &p);
+        CHECK(line_of(&line, 0x1004, &found));
+        CHECK(found.line == 7);
+        CHECK(found.file != NULL && strcmp(found.file, "a.anti") == 0);
+        CHECK(!line_of(&line, 0x1010, &found));
+        for (cut = 0; cut < line.size; cut++) {
+            struct blob part = {{0}, 0};
+            uint8_t image[2048];
+            size_t size;
+            add(&part, line.bytes, cut);
+            size = elf_image(image, sizeof image, ELF_NULL, &part);
+            elf_reads(image, size, true, false);
+        }
+    }
+}
+
 /* The address of __TEXT of a Mach-O header, which a trace and `anti
    symbols` both read. The header holds a __PAGEZERO segment and a
    __TEXT segment, each of 72 bytes. Every read stays inside the size
@@ -686,17 +835,6 @@ static size_t macho_image(uint8_t *out, size_t room, const struct t_nlist *n,
     }
     memcpy(out + strings, macho_names, sizeof macho_names);
     return strings + sizeof macho_names;
-}
-
-/* A copy of the first size bytes of image in memory of its own. */
-static uint8_t *exactly(const uint8_t *image, size_t size)
-{
-    uint8_t *copy = alloc_zeroed(size, 1);
-
-    if (size > 0) {
-        memcpy(copy, image, size);
-    }
-    return copy;
 }
 
 static bool count_any(void *context, const char *name, uint64_t vaddr,
@@ -1041,6 +1179,9 @@ void test_symbols(void)
     empty_entry_formats();
     long_leb();
     loaded_room();
+    elf_cut_short();
+    elf_headers_outside();
+    old_dwarf_lines();
     macho_text();
     macho_symbols();
     macho_debug_map();
