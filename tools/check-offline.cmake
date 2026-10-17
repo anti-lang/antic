@@ -15,7 +15,7 @@
 # distribution" in docs/decisions.md, and decision 8 of
 # docs/work-order-distribution.md makes it step 5 of ./r, which turns the
 # network of each VM off before it runs this. The script reaches no
-# network itself and asks for none, so the test package_keys runs it on
+# network itself and asks for none, so the test package_offline runs it on
 # the package of the host as well. Whether the network is off is the
 # question of the release script, which holds the commands.
 #

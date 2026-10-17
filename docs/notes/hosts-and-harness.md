@@ -39,7 +39,7 @@ file does.
 | Windows VM | 1583 | none | windows-arm64 programs, windows-x86_64 under the x64 emulation, the Win32 expected files |
 
 The counts are of 2026-10-08. A host runs fewer tests than the Mac because a test that
-needs something it lacks is not registered or skips. Linux skips `release_dry_run` and
+needs something it lacks is not registered or skips. Linux skips the five tests of `./r` and
 `macos_sdk`. Windows also skips `sysroot_digest`, `installer_github` and
 `manifest_signature`.
 
@@ -207,6 +207,12 @@ each:
   without failing, which `run_emit_identity.cmake` prints for each text that moved.
 - `tool_run` runs a tool beside antic, `anti_run` runs anti with a cache of its own,
   and the `fake_release_` functions write the release of the installer tests.
+
+Two more files of `tests/` hold the shared part of one family of tests each.
+`tests/package_tree.cmake` reads the package that `package_pack` packed and unpacked,
+for the tests `package_<part>`, each in a directory of its own. `tests/release_copy.cmake`
+makes the copy of the tree with its stand-ins and runs `./r --dry-run` on it once, for
+each of the five tests of `./r`, which then run the script again as each needs.
 
 ## Test hooks
 

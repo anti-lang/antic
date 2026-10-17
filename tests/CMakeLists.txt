@@ -3058,6 +3058,8 @@ add_test(NAME sysroot_links
             -P "${ANTIC_RUNNERS}/run_sysroot_links.cmake")
 # The package of this host, packed from the antic of this build. It needs
 # the sysroots of every target, which every package carries.
+# package_pack packs and unpacks it in package/, the tests package_* read
+# it there, each in a directory of its own, and package_clean removes it.
 set(package_missing "")
 foreach(dir linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
         windows-x86_64 windows-arm64 licenses)
@@ -3065,32 +3067,108 @@ foreach(dir linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
         list(APPEND package_missing "${dir}")
     endif()
 endforeach()
+set(package_dir "${CMAKE_CURRENT_BINARY_DIR}/package")
 if(package_missing)
     # Fail rather than skip, so a missing sysroot cannot pass unnoticed.
     list(JOIN package_missing " " package_missing)
-    add_test(NAME package_keys
+    add_test(NAME package_pack
         COMMAND "${CMAKE_COMMAND}" -E echo
             "sysroots not found in ${ANTIC_SYSROOT_DIR}: ${package_missing}: run tools/get-sysroot.cmake")
-    set_tests_properties(package_keys PROPERTIES
+    set_tests_properties(package_pack PROPERTIES
         FAIL_REGULAR_EXPRESSION "sysroots not found")
 else()
-    add_test(NAME package_keys
+    add_test(NAME package_pack
         COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
                 "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
                 "-DHOST=${ANTIC_HOST_TARGET}"
                 "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DCLANG=${CMAKE_C_COMPILER}"
                 "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package"
+                "-DWORK=${package_dir}"
                 -P "${ANTIC_RUNNERS}/run_package.cmake")
     # PERF DECISION: the package carries the LLVM tools, and xz compresses
     # its 530 MB of them in about three minutes. ctest runs the tests of
     # a fresh tree in the order of their declaration, which put this one
     # last and alone at the end of the suite. The cost puts it first, so
     # the rest of the suite runs beside it.
-    set_tests_properties(package_keys PROPERTIES COST 300)
+    set_tests_properties(package_pack PROPERTIES COST 300
+        FIXTURES_SETUP package)
+    add_test(NAME package_clean
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${package_dir}")
+    set_tests_properties(package_clean PROPERTIES FIXTURES_CLEANUP package)
+    # package_<part> runs run_package_<part>.cmake over the package, with
+    # the values of the cache that the part names after its name.
+    function(antic_package_test part)
+        set(values "")
+        foreach(value IN LISTS ARGN)
+            if(value STREQUAL "ANTIC")
+                list(APPEND values "-DANTIC=$<TARGET_FILE:antic>")
+            elseif(value STREQUAL "ANTI")
+                list(APPEND values "-DANTI=$<TARGET_FILE:anti>")
+            elseif(value STREQUAL "RUNTIME")
+                list(APPEND values "-DRUNTIME=${ANTIC_RUNTIME_DIR}")
+            elseif(value STREQUAL "CLANG")
+                list(APPEND values "-DCLANG=${CMAKE_C_COMPILER}")
+            elseif(value STREQUAL "LLVM_BIN")
+                list(APPEND values "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin")
+            elseif(value STREQUAL "RAYLIB")
+                list(APPEND values "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}")
+            else()
+                message(FATAL_ERROR "antic_package_test names no value ${value}")
+            endif()
+        endforeach()
+        add_test(NAME package_${part}
+            COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                    "-DHOST=${ANTIC_HOST_TARGET}" ${values}
+                    "-DPACKAGE=${package_dir}"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-${part}"
+                    -P "${ANTIC_RUNNERS}/run_package_${part}.cmake")
+        set_tests_properties(package_${part} PROPERTIES
+            FIXTURES_REQUIRED package)
+    endfunction()
+    antic_package_test(keys)
+    antic_package_test(contents RUNTIME)
+    antic_package_test(version)
+    antic_package_test(bind ANTI RUNTIME CLANG RAYLIB)
+    antic_package_test(targets)
+    antic_package_test(license)
+    antic_package_test(glibc)
+    antic_package_test(build)
+    antic_package_test(offline)
+    # The record of the upstream sources travels beside the licence texts,
+    # with a line for glibc and one for the kernel headers whose URL names
+    # the version of tools/sysroot-pins.
+    add_test(NAME package_sources
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DSOURCES=${package_dir}/unpacked/anti/licenses/sources.txt"
+                -P "${ANTIC_RUNNERS}/run_sources.cmake")
+    set_tests_properties(package_sources PROPERTIES FIXTURES_REQUIRED package)
+    # A host that is not Linux packs linux-arm64 as well. It packs a
+    # package of its own beside package_pack, which xz takes two minutes
+    # for, so its cost starts it early too.
+    if(NOT ANTIC_HOST_TARGET MATCHES "^linux-")
+        add_test(NAME package_cross
+            COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                    "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                    "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+                    "-DCLANG=${CMAKE_C_COMPILER}"
+                    "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-cross"
+                    -P "${ANTIC_RUNNERS}/run_package_cross.cmake")
+        set_tests_properties(package_cross PROPERTIES COST 120)
+    endif()
+    # The packer refuses a build with the compiler of the machine, before
+    # it packs anything.
+    add_test(NAME package_system_compiler
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DANTIC=$<TARGET_FILE:antic>" "-DHOST=${ANTIC_HOST_TARGET}"
+                "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-system-compiler"
+                -P "${ANTIC_RUNNERS}/run_package_system_compiler.cmake")
 endif()
+add_test(NAME package_sdk_pin
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_package_sdk_pin.cmake")
 # The release script names the directory of the raylib download, never the
 # version of the pin.
 add_test(NAME raylib_pin
@@ -3167,18 +3245,33 @@ set_tests_properties(release_manifest PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # ./r on a copy of the tree, with the build, the packer and the two VMs
-# stood in for on the PATH. It checks the order of the steps, the output
-# of each and the refusals of the preflight.
-add_test(NAME release_dry_run
+# stood in for on the PATH. tests/release_copy.cmake makes the copy and
+# runs ./r --dry-run on it once for each test. release_dry_run checks
+# the order of the steps and the output of each, and the other four what
+# a rerun of the script does: on a failure of step 5, with each form of
+# the signing key, on a version that is a tag and in the preflight. A
+# release is made on the development Mac, so they skip elsewhere.
+foreach(name dry_run vm_failures signing_key tags preflight)
+    add_test(NAME release_${name}
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DCC=${CMAKE_C_COMPILER}"
+                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+                "-DSDK=${ANTIC_MACOS_SDK}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-${name}"
+                -P "${ANTIC_RUNNERS}/run_release_${name}.cmake")
+    set_tests_properties(release_${name} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+# The network commands of tools/release.sh against docs/vm-setup.md, and
+# tools/check-cpu.cmake over a tree of empty runtimes, on every host.
+add_test(NAME release_vm_commands
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DCC=${CMAKE_C_COMPILER}"
-            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-            "-DSDK=${ANTIC_MACOS_SDK}"
-            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release"
-            -P "${ANTIC_RUNNERS}/run_release_dry_run.cmake")
-set_tests_properties(release_dry_run PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
+            -P "${ANTIC_RUNNERS}/run_release_vm_commands.cmake")
+add_test(NAME check_cpu
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/check-cpu"
+            -P "${ANTIC_RUNNERS}/run_check_cpu.cmake")
 # run_release_dry_run.cmake fails with the output of a fixture that does
 # not compile or link, where it reported the whole test skipped.
 add_test(NAME release_dry_run_runner

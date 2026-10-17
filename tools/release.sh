@@ -525,7 +525,7 @@ build_symbols() {
 # docs/work-order-distribution.md places in this step. These are the
 # commands that take a VM off the network, put it back and ask whether it
 # reaches the network. Each runs on the VM over ssh from this Mac, and
-# docs/vm-setup.md shows the same six, which the test release_dry_run
+# docs/vm-setup.md shows the same six, which the test release_vm_commands
 # holds.
 #
 # DESIGN: off is one rule of the firewall of the VM, which refuses every

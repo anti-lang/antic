@@ -361,7 +361,7 @@ endif()
 # as well. tools/pack-anti.cmake copies bitcode/full/ into every package,
 # since a release build links through full LTO by default, which Eddie
 # decided on 2026-10-07, and leaves bitcode/thin/ out. The test
-# package_keys checks both.
+# package_contents checks both.
 set(ANTIC_RUNTIME_BITCODE_DIR bitcode)
 set(ANTIC_LTO_MODES full thin)
 

@@ -192,7 +192,7 @@ other host, `tools/get-llvm.cmake -DHOST=<host>` lays the archive of that host o
 same way under `build/deps/llvm-tools/<host>`, checked against the pin, the manifest
 and the signature as the host's own. Step 1 of `./r` fills those five directories and
 step 3 hands the directory to the packer as `TOOLS`. The macos-arm64 package that the
-test `package_keys` builds from the tree grew from 20,533,160 bytes to 125,271,420
+test `package_pack` builds from the tree grew from 20,533,160 bytes to 125,271,420
 with the tools on 2026-10-09, since the four names of lld are four copies of 73 MB
 that xz compresses one by one.
 
@@ -233,7 +233,7 @@ that packed it: musl for the static form, glibc 2.35 and the kernel headers of U
 22.04 for the dynamic one. The shipped antic then runs on any Linux from Ubuntu 22.04 on.
 `tools/pack-anti.cmake` reads the versioned symbols of each Linux program it packs with
 `tools/check-libc.cmake` and refuses one that names a glibc above 2.35. The test
-`linux_libc` reads a program linked by that same recipe, and `package_keys` packs a real
+`linux_libc` reads a program linked by that same recipe, and `package_pack` packs a real
 one on a Linux host.
 
 A file we build carries the prefix `anti-`, as in `anti-raylib-6.0-linux-x86_64.tar.xz`.

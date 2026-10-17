@@ -77,7 +77,8 @@ endforeach()
 # DESIGN: the LLVM tools travel in bin/ of every package, which Eddie
 # decided on 2026-10-08 in docs/work-order-distribution.md, so no
 # installer reads the pin or the version to download them. A package
-# carries neither file in tools/, and the test package_keys checks that.
+# carries neither file in tools/, and the test package_contents checks
+# that.
 foreach(script install.sh install.ps1)
     file(READ "${ROOT}/tools/${script}" text)
     foreach(name llvm-pin llvm-version llvm-sums)
