@@ -273,10 +273,12 @@ Rule 15, tests with malformed input:
   their tests in step 12, `9555cceb` and `04dbb192`.
 - M314. `tests/unit/test_symbols.c:392`. The ELF and DWARF readers have
   no test of a file cut short, and none of a line table of DWARF 2 or 3.
-  Still open in part, M43. rt.
+  Still open in part, M43. rt. Fixed `b1a3820e`.
 - M315. `tests/std/deserialize_input.anti:1`. The malformed input of
   `Object.deserialize` runs in a program that links no sanitizer. 23 of
-  the 42 files of `src/rt/` run under none. New. tests.
+  the 42 files of `src/rt/` run under none. New. tests. Fixed `f6e270fc`
+  for `registry.c` and `object.c`, the two files step 20 names. The test
+  showed T143, fixed `ca450252`.
 
 Rule 22, one platform layer and one result on every target:
 
