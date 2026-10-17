@@ -21,6 +21,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 if(NOT STATUS MATCHES "^[0-9]+$")
     message(FATAL_ERROR "STATUS is `${STATUS}`, and it must be a number")
 endif()
@@ -55,10 +57,7 @@ if(NOT status STREQUAL STATUS)
 endif()
 if(DEFINED EXPECTED)
     file(READ "${EXPECTED}" expected)
-    if(NOT output STREQUAL expected)
-        message(FATAL_ERROR "the output differs from ${EXPECTED}\n"
-                            "got:\n${output}")
-    endif()
+    expect_same_text("the output for ${EXPECTED}" "${expected}" "${output}")
 elseif(NOT output MATCHES "${PATTERN}")
     message(FATAL_ERROR "the output does not match `${PATTERN}`\n"
                         "got:\n${output}")

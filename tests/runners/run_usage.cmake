@@ -20,6 +20,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 foreach(value COMMAND NAME)
     if(NOT DEFINED ${value})
         message(FATAL_ERROR "${value} is not set")
@@ -57,10 +59,8 @@ if(REFUSED)
         message(FATAL_ERROR "the command wrote on the standard output:\n"
                             "${out}")
     endif()
-    if(NOT err STREQUAL expected)
-        message(FATAL_ERROR "the standard error of the command is not the "
-                            "usage:\n${err}")
-    endif()
+    expect_same_text("the standard error of the command, against the usage,"
+                     "${expected}" "${err}")
     return()
 endif()
 

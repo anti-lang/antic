@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 string(REPLACE "," ";" arguments "${COMMAND}")
 execute_process(
     COMMAND "${ANTIC}" ${arguments}
@@ -29,6 +31,4 @@ if(DEFINED VERSION)
 endif()
 string(REGEX REPLACE "\ntype anti\\.rt\\.[^\n]*" "" out "\n${out}")
 string(SUBSTRING "${out}" 1 -1 out)
-if(NOT out STREQUAL expected)
-    message(FATAL_ERROR "output differs from ${EXPECTED}\ngot:\n${out}")
-endif()
+expect_same_text("the output for ${EXPECTED}" "${expected}" "${out}")

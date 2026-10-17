@@ -11,6 +11,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 configure_file("${FIXTURE}/loose.anti" "${WORK}/loose.anti" COPYONLY)
@@ -49,9 +51,8 @@ if(NOT status EQUAL 0)
 endif()
 file(READ "${WORK}/loose.anti" formed)
 file(READ "${FIXTURE}/loose.expected" expected)
-if(NOT formed STREQUAL expected)
-    message(FATAL_ERROR "the canonical form is not the expected one:\n${formed}")
-endif()
+expect_same_text("the canonical form of ${FIXTURE}/loose.anti" "${expected}"
+                 "${formed}")
 
 # Format stability: `anti fmt` on its own output changes nothing, and
 # --check says so.
@@ -60,9 +61,7 @@ if(NOT status EQUAL 0 OR NOT text STREQUAL "")
     message(FATAL_ERROR "the second run changed the file\n${text}")
 endif()
 file(READ "${WORK}/loose.anti" again)
-if(NOT again STREQUAL expected)
-    message(FATAL_ERROR "the second run wrote another form")
-endif()
+expect_same_text("the form of the second run" "${expected}" "${again}")
 run_fmt("--check;${WORK}/loose.anti" status text)
 if(NOT status EQUAL 0 OR NOT text STREQUAL "")
     message(FATAL_ERROR "--check reported a formatted file\n${text}")

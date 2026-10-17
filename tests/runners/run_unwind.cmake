@@ -12,6 +12,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 function(run)
     execute_process(COMMAND ${ARGN} RESULT_VARIABLE status
         OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)
@@ -31,6 +33,4 @@ run("${LLVM_MC}" "-triple=${TRIPLE}" -filetype=obj -o "${object}" "${assembly}")
 run("${LLVM_READOBJ}" --unwind "${object}")
 string(REGEX REPLACE "^\nFile: [^\n]*\n" "" decoded "${run_out}")
 file(READ "${EXPECTED}" expected)
-if(NOT decoded STREQUAL expected)
-    message(FATAL_ERROR "the unwind data differs from ${EXPECTED}\n${decoded}")
-endif()
+expect_same_text("the unwind data for ${EXPECTED}" "${expected}" "${decoded}")

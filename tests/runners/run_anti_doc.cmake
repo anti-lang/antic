@@ -14,6 +14,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 set(SRC "${FIXTURE}/src")
 set(SHAPES "${SRC}/com/example/shapes.anti")
 set(APP "${SRC}/com/example/app.anti")
@@ -35,9 +37,7 @@ endfunction()
 function(same_file got expected what)
     file(READ "${got}" a)
     file(READ "${expected}" b)
-    if(NOT a STREQUAL b)
-        message(FATAL_ERROR "${what} differs from ${expected}:\n${a}")
-    endif()
+    expect_same_text("${what}, against ${expected}," "${b}" "${a}")
 endfunction()
 
 # User docs from the two sources.

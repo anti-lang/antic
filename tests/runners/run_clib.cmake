@@ -198,9 +198,8 @@ endfunction()
 function(expect_header header expected)
     file(READ "${header}" got)
     file(READ "${DUMP}/${expected}" wanted)
-    if(NOT got STREQUAL wanted)
-        message(FATAL_ERROR "${header} differs from ${DUMP}/${expected}\n${got}")
-    endif()
+    expect_same_text("${header}, against ${DUMP}/${expected}," "${wanted}"
+                     "${got}")
 endfunction()
 
 # Fail unless the program of ARGN exits with 0 and prints <wanted>, byte

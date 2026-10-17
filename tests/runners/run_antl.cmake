@@ -9,6 +9,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 string(REPLACE "|" ";" options "${OPTIONS}")
 execute_process(
     COMMAND "${ANTIC}" -c -I "${ROOT}" ${options} -o "${OUTPUT}" "${SOURCE}"
@@ -25,6 +27,5 @@ string(REGEX REPLACE "(([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )([0-9a-f][0-9a-f] )
 string(REGEX REPLACE " \n" "\n" hex "${hex}")
 string(REGEX REPLACE " $" "\n" hex "${hex}")
 file(READ "${EXPECTED}" expected)
-if(NOT hex STREQUAL expected)
-    message(FATAL_ERROR "${OUTPUT} differs from ${EXPECTED}\ngot:\n${hex}")
-endif()
+expect_same_text("the bytes of ${OUTPUT} for ${EXPECTED}" "${expected}"
+                 "${hex}")

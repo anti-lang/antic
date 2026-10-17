@@ -39,6 +39,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
@@ -414,10 +416,8 @@ if(FORM STREQUAL "archive")
         endif()
         anti_output("anti license --from-archive ${archive}" "${WORK}" out
                     license --from-archive "${archive}")
-        if(NOT out STREQUAL expected)
-            message(FATAL_ERROR "anti license --from-archive ${archive} "
-                                "prints\n${out}\nand not\n${expected}")
-        endif()
+        expect_same_text("anti license --from-archive ${archive}"
+                         "${expected}" "${out}")
     endforeach()
     # An archive that bundles the runtime keeps the header as a member.
     anti_output("anti build --lib static --bundle-runtime" "${WORK}/shapes"
@@ -426,10 +426,8 @@ if(FORM STREQUAL "archive")
     anti_output("anti license --from-archive of a bundle" "${WORK}" out
                 license --from-archive
                 "${WORK}/shapes/dist/macos-arm64/dev/libshapes.a")
-    if(NOT out STREQUAL expected)
-        message(FATAL_ERROR "anti license --from-archive of a bundle prints\n"
-                            "${out}")
-    endif()
+    expect_same_text("anti license --from-archive of a bundle" "${expected}"
+                     "${out}")
     # A file that is no archive, and an archive without a package header.
     run_anti("${WORK}" status out err license --from-archive
              "${FIXTURE}/shapes/LICENSE")

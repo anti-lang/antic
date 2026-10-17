@@ -185,13 +185,13 @@ function(anti_message name)
                                 "and the case expects a match of\n"
                                 "${arg_ERR_MATCH}")
         endif()
-    elseif(NOT err STREQUAL expected_err)
-        message(FATAL_ERROR "${name}: the standard error is\n${err}"
-                            "and the case expects\n${expected_err}")
+    else()
+        expect_same_text("${name}: the standard error" "${expected_err}"
+                         "${err}")
     endif()
-    if(NOT arg_ANY_OUT AND NOT out STREQUAL expected_out)
-        message(FATAL_ERROR "${name}: the standard output is\n${out}"
-                            "and the case expects\n${expected_out}")
+    if(NOT arg_ANY_OUT)
+        expect_same_text("${name}: the standard output" "${expected_out}"
+                         "${out}")
     endif()
     set_property(GLOBAL PROPERTY anti_message_ran ON)
 endfunction()

@@ -7,6 +7,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 execute_process(COMMAND "${ANTIC}" --print-cpu-levels
     RESULT_VARIABLE status OUTPUT_VARIABLE printed ERROR_VARIABLE err
     ENCODING NONE)
@@ -18,8 +20,5 @@ set(pinned "")
 foreach(line IN LISTS lines)
     string(APPEND pinned "${line}\n")
 endforeach()
-if(NOT printed STREQUAL pinned)
-    message(FATAL_ERROR
-        "antic --print-cpu-levels differs from ${LEVELS}\nantic:\n${printed}"
-        "file:\n${pinned}")
-endif()
+expect_same_text("antic --print-cpu-levels, against ${LEVELS},"
+                 "${pinned}" "${printed}")

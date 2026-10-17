@@ -10,6 +10,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/archive")
 
@@ -61,6 +63,4 @@ execute_process(COMMAND "${ANTI}" symbols resolve "${WORK}/trace.txt"
 if(NOT status EQUAL 0 OR NOT err STREQUAL "")
     message(FATAL_ERROR "resolve failed with ${status}\n${out}${err}")
 endif()
-if(NOT out STREQUAL expected)
-    message(FATAL_ERROR "resolve gave\n${out}\nexpected\n${expected}")
-endif()
+expect_same_text("the output of resolve" "${expected}" "${out}")

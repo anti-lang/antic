@@ -49,9 +49,7 @@ endfunction()
 function(expect_file file expected)
     file(READ "${file}" got)
     file(READ "${expected}" wanted)
-    if(NOT got STREQUAL wanted)
-        message(FATAL_ERROR "${file} differs from ${expected}\n${got}")
-    endif()
+    expect_same_text("${file}, against ${expected}," "${wanted}" "${got}")
 endfunction()
 
 # Fail unless the command fails and its standard error matches pattern.
@@ -114,10 +112,11 @@ function(expect_calls name include program expected)
         "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}")
     program_output(got status "${WORK}/calls.out" "${WORK}/calls")
     file(READ "${expected}" wanted HEX)
-    if(NOT status EQUAL 0 OR NOT got STREQUAL wanted)
+    if(NOT status EQUAL 0)
         file(READ "${WORK}/calls.out" text)
-        message(FATAL_ERROR "the calls of ${name} printed\n${text}")
+        message(FATAL_ERROR "the calls of ${name} ended with ${status}\n${text}")
     endif()
+    expect_same_bytes("the output of the calls of ${name}" "${wanted}" "${got}")
 endfunction()
 
 # A clang of the shell in WORK/fake that answers --version with the file
@@ -181,9 +180,8 @@ if(CASE STREQUAL "header")
             --runtime "${RUNTIME}" -I "${SOURCES}")
         file(READ "${WORK}/out/${name}.h" got)
         file(READ "${DUMP}/${name}.h" wanted)
-        if(NOT got STREQUAL wanted)
-            message(FATAL_ERROR "${name}.h differs from ${DUMP}/${name}.h\n${got}")
-        endif()
+        expect_same_text("${name}.h, against ${DUMP}/${name}.h," "${wanted}"
+                         "${got}")
     endforeach()
     # M26: the header takes the last segment of the module path, whatever
     # the library file is called and however its path is written. A
@@ -205,9 +203,8 @@ if(CASE STREQUAL "header")
         endif()
         file(READ "${WORK}/renamed-out/geo.h" got)
         file(READ "${DUMP}/geo.h" wanted)
-        if(NOT got STREQUAL wanted)
-            message(FATAL_ERROR "the header of ${library} differs from geo.h")
-        endif()
+        expect_same_text("the header of ${library}, against geo.h,"
+                         "${wanted}" "${got}")
     endforeach()
 elseif(CASE STREQUAL "clang")
     # tests/bind/layout.h holds one of each form. The module, the shim and

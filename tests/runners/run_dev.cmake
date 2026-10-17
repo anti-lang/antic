@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 file(MAKE_DIRECTORY "${WORK}")
 foreach(module scale twice)
     execute_process(
@@ -57,10 +59,8 @@ foreach(module scale twice)
     set(text .ll)
     file(READ "${WORK}/${module}${text}" from_source)
     file(READ "${WORK}/${module}_antl${text}" from_library)
-    if(NOT from_source STREQUAL from_library)
-        message(FATAL_ERROR
-            "${module}_antl${text} differs from ${module}${text}")
-    endif()
+    expect_same_text("${module}_antl${text}, against ${module}${text},"
+                     "${from_source}" "${from_library}")
 endforeach()
 execute_process(
     COMMAND "${ANTIC}" --dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"

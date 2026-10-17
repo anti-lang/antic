@@ -19,6 +19,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 foreach(value ANTI RUNTIME ROOT SOURCES PAGE EXPECTED WORK)
     if(NOT DEFINED ${value})
         message(FATAL_ERROR "${value} is not set")
@@ -43,6 +45,4 @@ if(NOT status EQUAL 0 OR NOT err STREQUAL wanted_err)
 endif()
 file(READ "${WORK}/out/${PAGE}" got)
 file(READ "${EXPECTED}" wanted)
-if(NOT got STREQUAL wanted)
-    message(FATAL_ERROR "${PAGE} differs from ${EXPECTED}:\n${got}")
-endif()
+expect_same_text("${PAGE}, against ${EXPECTED}," "${wanted}" "${got}")

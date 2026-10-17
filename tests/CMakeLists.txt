@@ -584,6 +584,14 @@ add_test(NAME expect_runner
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/expect-runner"
         -P "${ANTIC_RUNNERS}/run_expect_self.cmake")
 
+# expect_same_bytes names the first line where two texts differ, and the
+# runners that compare with an expected file fail through it.
+add_test(NAME compare_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DROOT=${CMAKE_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/compare-runner"
+        -P "${ANTIC_RUNNERS}/run_compare_self.cmake")
+
 # The runtime archive holds the licence text of every component.
 add_expect_test(runtime_licenses STATUS 0
     PATTERN "^BSD Zero Clause License"
