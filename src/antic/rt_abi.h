@@ -5,15 +5,30 @@
    the runtime functions that generated code calls and the records that
    antic writes for the runtime to read.
 
-   DESIGN: the contract stands here once. A row of RT_FUNCTIONS names a
-   function, its result and its parameters, each type as a pair of its
-   IR type and its C type. A row of a record names a field the same way,
-   by the member of the C struct. antic declares every call and lays out
-   every record from the IR column alone. The tests runtime_functions and
-   runtime_records of tests/unit/test_lower.c read the C column against
-   the declarations of src/rt/, the prototype of each function and the
-   offset of each member, so a change on one side that the other lacks
-   fails the unit tests on the host. */
+   DESIGN: the functions and the records of the contract stand here once.
+   A row of RT_FUNCTIONS names a function, its result and its parameters,
+   each type as a pair of its IR type and its C type. A row of a record
+   names a field the same way, by the member of the C struct. antic
+   declares every call and lays out every record from the IR column
+   alone. The tests runtime_functions and runtime_records of
+   tests/unit/test_lower.c read the C column against the declarations of
+   src/rt/, the prototype of each function and the offset of each member,
+   so a change on one side that the other lacks fails the unit tests on
+   the host.
+
+   The rest of the contract stands in three other places, each pinned by
+   a unit test. Three enums of antic mirror one of src/rt/object.h or
+   src/rt/fail.h: enum check_kind and enum hook_kind of lower_lowerer.h
+   and enum type_id of lower_desc.c, which records_check_kinds,
+   records_hook_entries and records_type_ids of test_lower.c hold.
+   whole_tables.c takes the flags of a class from src/rt/registry.h and
+   the kinds of a reflect.Value from src/rt/reflect.h themselves. antic
+   declares anti.lang.Match and the hidden lock of a synchronized class,
+   which match_layout and object_lock_layout compare with their structs.
+   The modules of the standard library declare the frames of anti.lang,
+   the walk, the growing bytes and the codes of anti.regex, and the
+   Value, its kinds, the type ids and the codes of anti.reflect, and
+   tests/unit/test_contract.c compares each with src/rt/. */
 
 #include <stdbool.h>
 #include <stddef.h>
