@@ -1,5 +1,7 @@
-/* The one walk of a function body that every analysis of the checked
-   tree visits through. */
+/* The one walk of a function body that every analysis searching a whole
+   body or expression for a kind of node visits through. An analysis that
+   follows one path of the tree, the last statement of a block or the
+   operands of a condition, recurses on its own. */
 
 #include "ast.h"
 

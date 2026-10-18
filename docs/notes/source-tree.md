@@ -44,7 +44,7 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 |---|---|
 | `src/antic/ast.h` | The syntax tree of one module, the fields the checker adds to it, and the entry points of the dump and the walk. |
 | `src/antic/ast_dump.c` | Writes the tree, untyped or with the checked types, one node per line for `--dump-ast` and `--dump-types`. |
-| `src/antic/ast_walk.c` | The one walk over a body that every analysis of the checked tree uses. |
+| `src/antic/ast_walk.c` | The one walk over a body that every analysis searching a whole body or expression for a kind of node uses. |
 | `src/antic/diagnostic.c` | Appends a formatted error, warning, safety check or doc warning to a growable list. |
 | `src/antic/diagnostic.h` | The record of one diagnostic with its stable name, and the list of one compilation. |
 | `src/antic/lexer.c` | Splits a validated UTF-8 source into tokens under caps on size, nesting and errors, decodes literals and doc comments, and lexes each `{expr}` with a nested lexer. |
