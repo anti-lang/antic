@@ -83,7 +83,8 @@ A doc token carries the text the lexer read, with the whitespace every line
 shares removed. The formatter removes a ` * ` gutter from it when every line of
 a block carries one. It then fills the text to 80 columns and writes it back at
 the indent of the item. A tab counts four columns, which is what `anti html` and
-`anti tex` render it as.
+`anti tex` of `docs/tooling-addendum.md` render it as. Neither command is
+built.
 
 The fill walks the lines of the text. A line whose text opens with three
 backticks toggles a fence, and a line inside one is written as it stands. An

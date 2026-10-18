@@ -29,7 +29,8 @@ tools can observe.
 - The runtime decides the chunk count when the program writes no `by`, so it also
   allocates the array of results. `anti_rt_parallel` therefore writes back both the
   pointer and the count, and the caller builds the slice from them. The results are
-  `malloc` memory that nothing frees, as the argument slices of `src/rt/start.c` are.
+  `malloc` memory that the program frees with one `free` of the slice's pointer, as it
+  frees a listing of `anti.fs`.
 - The split gives the first `count % chunks` chunks one element more than the rest.
   Every element then belongs to exactly one chunk, and the chunks stay contiguous. A
   count of chunks above the element count is lowered to the element count. An empty
@@ -40,3 +41,9 @@ tools can observe.
 - A `parallel` that meets a busy pool runs its chunks in the thread that asked for
   them. That covers a worker that itself dispatches, which would otherwise wait for a
   pool that only it could free.
+- `anti_rt_dispatch` of `src/rt/threads.c` gives one object to the pool and gives back
+  a job on the heap. It copies the arguments of the call into the job, since the slot
+  of the caller's frame that held them may be written again before the job starts. A
+  second dispatch of an object in flight gives a null job, so two workers never hold
+  one object. `anti_rt_join` waits for the job, writes its result and frees it, and
+  `join` of a null job writes zero bytes of the size of the result.

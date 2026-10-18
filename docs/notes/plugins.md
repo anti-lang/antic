@@ -46,7 +46,7 @@ every undefined name to the loader. The `provides` lines reach the index
 through `struct extras`, because the optimizer drops the class records
 that carry them.
 
-`write_plugin_index` writes `anti-plugins.toml` beside the library. It
+`driver_write_plugin_index` of `driver_index.c` writes `anti-plugins.toml` beside the library. It
 reads the old index with `src/rt/toml.c`, the reader of the runtime,
 keeps the `[[library]]` entries of the other libraries of the directory
 and replaces the one of the library it wrote. `index_string` writes each
@@ -87,7 +87,7 @@ function and every datum global and marks none hidden. The link passes
 `--closed` turns all of it off.
 
 A Windows host writes `<program>.def` and the link writes the import
-library `<program>.lib` beside it. `emit_names` lists the names of the
+library `<program>.lib` beside it. `llvm_emit_names` lists the names of the
 object, a datum with `DATA`. `coff_archive_exports` of
 `src/antic/coff.c` adds the names of the runtime members the link takes.
 It reads the symbol index of the archive and follows the undefined names
@@ -115,8 +115,10 @@ source text writes one.
 
 `src/rt/plugin.c` opens the library, reads `anti_rt_provides` and checks it.
 The runtime version must match the host's exactly. Every interface
-descriptor must lie in the host's image. That proves the library was
-bound against the host rather than carrying an interface of its own.
+descriptor must lie outside the library's own image, which
+`matches_host` checks. That proves the library was bound against the
+host, or against a library the host loaded, rather than carrying an
+interface of its own.
 The version checks of each interface follow, in `docs/notes/versions.md`.
 The classes of the library then join the host's registry, so
 `reflect.new` finds one by name.
@@ -170,4 +172,5 @@ directory, as in `PATH`, and `discover` writes it `.`. A library there is
 then a path, never a bare name that `dlopen` would look for on the path
 of the system. It opens no library to find out what is inside one. A library built for another runtime is logged and passed over. One
 whose bytes do not match the digest of the index is refused. Two
-libraries that provide one interface are an error naming both.
+libraries of one index that provide one interface are an error naming
+both. Across the directories the first that provides it wins.
