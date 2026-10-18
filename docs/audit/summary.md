@@ -482,31 +482,37 @@ A note or a document that describes a design the code no longer has:
 
 - M353. `docs/notes/generics.md:31`. A call of a function with type
   parameters of its own is said to be refused. `own_params_copy` makes
-  the copy. New. front-end.
+  the copy. New. front-end. Fixed `f081d37d`.
 - M354. `docs/notes/lowering.md:7`. Lowering is said to stop at scalars.
-  The note names a test that does not exist. New. middle.
+  The note names a test that does not exist. New. middle. Fixed
+  `6df38359`. The test `dump_ir_main` exists, registered by
+  `antic_dump_test`, and the note now says what it pins.
 - M355. `docs/notes/whole-program.md:26`. Stale in five places. They are
   the flags of a class record, the readers of the registry and the slot
   table. Two sections cover devirtualisation, and five passes have none.
-  New. middle.
+  New. middle. Fixed `e1a68ab9`.
 - M356. `docs/notes/aggregates.md:16`. The note describes the emitter of
   the native back end and a binding that "stays planned". New. middle.
+  Fixed `cfcd61c9`.
 - M357. `docs/notes/linker.md:22`. The note gives `/vctoolsdir` and
   `/winsdkdir` for a Windows link that writes neither. It says a check
-  runs before the compile. New. back-end.
+  runs before the compile. New. back-end. Fixed `689f9f70`: the note
+  and the comment of `link_facts` say the check runs at the link.
 - M358. `docs/notes/modules.md:7`. The instruction record is said to be
   49 bytes. Three messages of the reader are missing, and no note
-  describes the verifier. New. library-file.
+  describes the verifier. New. library-file. Fixed `05e59893`.
 - M359. `docs/notes/runtime-conf.md:30`. Two notes describe plugins as
   not built. `docs/notes/injection.md:104` is the second. New. rt.
+  Fixed `66b3bd9f` for the two lines and `25a1d31f` for the keys, the
+  start, the read of the file and the line of `--anti.inspect`.
 - M360. `docs/notes/setup.md:7`. The note places the runtime where the
   build no longer puts it, and says it is compiled with hidden
-  visibility. New. rt.
+  visibility. New. rt. Fixed `977b7665`.
 - M361. `docs/notes/trace-handlers.md:22`. Two notes describe a handler
   design the code does not have. A third gives format version 57 for 81.
   New. std. Fixed `5f15d339`.
 - M362. `docs/notes/warnings.md:40`. The note says the two safety checks
-  are not built. Both are. New. anti-tool.
+  are not built. Both are. New. anti-tool. Fixed `3c44b558`.
 - M363. `docs/site/build-tool/index.md:30`. The site page of the build
   tool describes assembly files, llvm-mc, eight commands that do not
   exist and none of `anti symbols`. New. anti-tool.
@@ -597,7 +603,7 @@ directory are in `src/antic/`.
 |---|---|---|
 | A comment that differs from the code | 12 | `antic.h:11` against the test `anti_interface` (tool-pass). Stale sentences, `parser_item.c:345` (front-end). Two comments of the IR, `ir_verify.c:679` (middle). `antl_verify.c:13` and `src/rt/toml.c:1` (library-file). `src/rt/symbols.h:65` and comments that name what moved, `src/rt/platform.h:4` (rt). `src/std/anti/random.anti:5` (std). Nine comments, `src/anti/build.c:487` (anti-tool). `CMakeLists.txt:136`, the recipes that name modules, `src/native/sqlite.cmake:1`, and two presets, `CMakePresets.json:23` (build-and-tools). |
 | A header that says less | 3 | `src/rt/platform_windows.c:1` (structure), fixed `48d4a31a`. Eight headers, `src/anti/zip.c:1` (anti-tool), fixed `342ab0f3`. Headers of runners, `tests/program_output.cmake:1` and `tests/runners/run_anti_build.cmake:4` (build-and-tools, tests), fixed `d1ae01a1`, and `run_modules.cmake:20` by `0f0c5f9e` before. |
-| Stale names in notes and documents | 10 | File names in the decisions and `CLAUDE.md`, `docs/decisions.md:1220` (tool-pass), fixed `e5efa818`. Function names that moved, `docs/notes/hashing.md:8`, `check.md:76` and `versions.md:41` (structure, front-end, library-file). `ir.md:7`, `optimizer.md:7`, `hashing.md:11` and `dev-checks.md:44` (middle). `llvm.md:17` (back-end). `threads.md:31` (rt). The site page of the library, `docs/site/standard-library/index.md:27` (std). `doc.md:53` (anti-tool). |
+| Stale names in notes and documents | 10 | File names in the decisions and `CLAUDE.md`, `docs/decisions.md:1220` (tool-pass), fixed `e5efa818`. Function names that moved, `docs/notes/hashing.md:8`, `check.md:76` and `versions.md:41` (structure, front-end, library-file), fixed `6166b2e6`, which runs the script of structure as the test `note_claims`, and the rest of `check.md:76` by `1dfa55b9`. `ir.md:7`, `optimizer.md:7`, `hashing.md:11` and `dev-checks.md:44` (middle), fixed `db37fed3`, `f9ae0e87`, `05e6eae0` and `c7054b27`. `llvm.md:17` (back-end), fixed `5d8b1853`. `threads.md:31` (rt), fixed `a98ef749`. The site page of the library, `docs/site/standard-library/index.md:27` (std), fixed `c5ca7d47`. `doc.md:53` (anti-tool), fixed `1d078cf6`. |
 | Comments that name what is gone | 4 | llvm-mc as the assembler, `cpu.c:7`, `target.c:16` and `tests/runners/run_bench.cmake:14` (structure, back-end, tool-pass), fixed `c0f1e8e1` and `452739de`. Chapters of the book, `layout.h:12` and `sema.h:196` (middle, front-end). The steps of the work order, `llvm_emit.c:24` (back-end). Finding numbers that two audits use, `tests/runners/run_antl_verify.cmake:1` (tests). |
 | DESIGN without a reason | 4 | `sema_expr.c:1984` (front-end). A reason that is gone, `driver_index.c:14` (back-end). Two bounds of 32, `src/rt/trace.c:142` (rt). `tests/runners/run_asserts.cmake:47` (build-and-tools). |
 | Rule 27 | 3 | Comments above the wrong item, `parser.c:177` (front-end) and `driver.c:135` (back-end). Two banned phrases, `src/std/anti/collection/queue.anti:17` (std). |
