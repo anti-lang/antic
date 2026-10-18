@@ -185,6 +185,10 @@ static bool float_fits(double x, const struct type *t)
    have no literal and print as nan and inf. */
 static void float_as_literal(struct text *out, double x, bool single)
 {
+    /* The longest text of "%.*e" below, at 16 digits after the point, is
+       a sign, a digit, the point, the 16 digits and `e-308`: 24 bytes and
+       the NUL. So neither snprintf cuts its text, and digits takes the 17
+       digits of it. */
     char buffer[40];
     char digits[24];
     const char *p;
