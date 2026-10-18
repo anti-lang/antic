@@ -436,7 +436,8 @@ A file without a header comment that says its one purpose:
 - M346. `src/antic/alloc.c:1`. 64 files of `src/` open with no sentence
   of their purpose: 44 of `src/antic/`, 15 of `src/rt/` and 5 of
   `src/anti/`. Six more headers say less than their file. New. tool-pass,
-  middle, front-end, back-end, library-file, rt, anti-tool.
+  middle, front-end, back-end, library-file, rt, anti-tool. The front
+  end fixed `5ee03303`, which the test `file_headers` holds.
 - M347. `tests/unit/test_target.c:1`. 24 of the 56 unit files open
   without a header comment. Three test more than one part and no line
   says so. New. tests.
@@ -446,7 +447,9 @@ A public function or item without a comment:
 - M348. `src/antic/optimize.h:6`. 586 of 1346 declared functions share a
   comment or have none. 198 of them stand in public headers. The reports
   list the worst: `types.h`, `reflect.h`, `utf.h` and fifteen of
-  `src/anti/`. New. tool-pass, front-end, rt, anti-tool.
+  `src/anti/`. New. tool-pass, front-end, rt, anti-tool. The public
+  headers of the front end fixed `5ee03303`, which the test
+  `file_headers` holds.
 - M349. `src/std/anti/log.anti:40`. Public items of the library stand
   without a `///` comment. The public fields of `SlotsWalk` let a program
   read outside the blocks. New. std.
