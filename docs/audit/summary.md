@@ -456,10 +456,15 @@ A public function or item without a comment:
   holds.
 - M349. `src/std/anti/log.anti:40`. Public items of the library stand
   without a `///` comment. The public fields of `SlotsWalk` let a program
-  read outside the blocks. New. std.
+  read outside the blocks. New. std. Fixed `50ce44fe` for the walk, which
+  the matrix refusal `modules_walk_of_a_pool_moved_outside` holds, and
+  `291ad13b` for the comments, which the test `file_headers` holds.
 - M350. `src/std/anti/os.anti:138`. Comments of the library leave out the
   owner, the failure or the lifetime of what a function gives. Nine
-  groups of places. New. std.
+  groups of places. New. std. Fixed `291ad13b`, and `file_headers` holds
+  the comments of the functions that may fail. The message of a
+  `SystemError` was fixed by `b06fe3ad` and the failure of code 1 of
+  `json.unquote` was gone by `07caeed4`.
 
 The path from `CLAUDE.md` to a file, and the "Files of" sections:
 
@@ -1078,17 +1083,17 @@ From `std`. The header of a module is its `//!` comment.
 |---|---|---|
 | `src/std/LICENSE` | The 0BSD text of the library. | A licence text. |
 | `src/std/.gitkeep` | Nothing. A leftover of the step before the directory held a module. | An empty file. |
-| `src/std/anti/lang.anti` | The root that imports nothing: the types the compiler knows by name, `Error` with its text, the trace of a stack, the hook handler and the hash seed. | Names `Object` and `Job` alone. |
+| `src/std/anti/lang.anti` | The root that imports nothing: the types the compiler knows by name, `Error` with its text, the trace of a stack, the hook handler and the hash seed. | Names `Object` and `Job` alone. Fixed `291ad13b`. |
 | `src/std/anti/io.anti` | Console output and the exit of a program. | Says it. |
 | `src/std/anti/text.anti` | Functions on `str`, and `Builder`, which collects bytes and formats values. | Says it. |
 | `src/std/anti/license.anti` | The licence notice of the program. | Says it. |
 | `src/std/anti/error.anti` | `SystemError`, `on_fatal` and `check`, beside the `Error` of `anti.lang`. | Says it. |
 | `src/std/anti/time.anti` | `Duration`, the two clocks, and the interface `Clock` with its default. | Says it. |
 | `src/std/anti/os.anti` | Signals, and the three per-user directories of the platform. | Says it. Two subjects under one title. |
-| `src/std/anti/fs.anti` | Files by handle and by whole file, and the interface `FileSystem` with its default. | Lists no `read_file` and no `write_file`. |
+| `src/std/anti/fs.anti` | Files by handle and by whole file, and the interface `FileSystem` with its default. | Lists no `read_file` and no `write_file`. Fixed `291ad13b`. |
 | `src/std/anti/reflect.anti` | Reading the descriptor of a class: fields, functions, `get`, `set`, `new`, `call` and `Value`. | Says it. |
 | `src/std/anti/random.anti` | The generator `Random`, the interface `Source` and the shared default. | Gives eight words of state for four. |
-| `src/std/anti/collection.anti` | The interfaces of walking, the bases `Collection<T>` and `Indexed<T>`, `Copies<T>`, the hashes, the writers of a map entry and the stable sort. | Names the first three alone. |
+| `src/std/anti/collection.anti` | The interfaces of walking, the bases `Collection<T>` and `Indexed<T>`, `Copies<T>`, the hashes, the writers of a map entry and the stable sort. | Names the first three alone. Fixed `291ad13b`. |
 | `src/std/anti/toml.anti` | Reading the TOML subset into a flat `Document`. | Says it. |
 | `src/std/anti/config.anti` | The settings of the program: the interface `Config` and `FileConfig`. | Says it. |
 | `src/std/anti/args.anti` | A command line declared once, parsed and read by name. | Says it. Lists three forms of an option, and the code takes two more. Fixed `fc960111`. |
@@ -1100,19 +1105,19 @@ From `std`. The header of a module is its `//!` comment.
 | `src/std/anti/simd.anti` | A header alone: the three mask functions the compiler knows by name. | Says it. |
 | `src/std/anti/trace.anti` | The seven stock handlers of the hooks, `install`, `start` and their tests. | Claims atomic counts for all seven and names no `install`. Fixed `bd5e69c6`. |
 | `src/std/anti/plugin.anti` | Loading a shared library and asking it for the class it provides. | Says it. |
-| `src/std/anti/regex.anti` | The run-time half of patterns: the errors, `compile`, the iterators, every function the pattern methods call, and `patch`. | The first line names the first two alone. |
+| `src/std/anti/regex.anti` | The run-time half of patterns: the errors, `compile`, the iterators, every function the pattern methods call, and `patch`. | The first line names the first two alone. Fixed `291ad13b`. |
 | `src/std/anti/collection/list.anti` | `List<T>`, with `sort`, `sort_by` and `map`. | Says it. |
 | `src/std/anti/collection/deque.anti` | `Deque<T>`, a ring that grows at both ends. | Says it. |
 | `src/std/anti/collection/ring.anti` | `Ring<T, N>`, a ring of fixed room. | Says it. |
 | `src/std/anti/collection/grid.anti` | `Grid<T>`, a rectangle of cells that never changes its size. | Says it. |
-| `src/std/anti/collection/queue.anti` | `PriorityQueue<T>`, a binary heap, and its walk. | Opens with "Ordered retrieval" and no class. |
-| `src/std/anti/collection/map.anti` | `Map` and `HashMap`, their two tables for any element, their walks and the sort of serialized texts. | Names no sort. |
+| `src/std/anti/collection/queue.anti` | `PriorityQueue<T>`, a binary heap, and its walk. | Opens with "Ordered retrieval" and no class. Fixed `291ad13b`. |
+| `src/std/anti/collection/map.anti` | `Map` and `HashMap`, their two tables for any element, their walks and the sort of serialized texts. | Names no sort. Fixed `291ad13b`. |
 | `src/std/anti/collection/set.anti` | `Set` and `HashSet` on the tables of the maps, and `BitSet`. | Says it. |
 | `src/std/anti/collection/sorted.anti` | `SortedMap` and `SortedSet` over one B-tree in one block. | Says it. |
-| `src/std/anti/collection/pool.anti` | `Slots<T>`, `Handle<T>`, `Pool<T>`, the failure `Changed` and the walk. | Names no `Changed`. |
+| `src/std/anti/collection/pool.anti` | `Slots<T>`, `Handle<T>`, `Pool<T>`, the failure `Changed` and the walk. | Names no `Changed`, which `93ced37c` moved to `anti.collection`. Its walk is named since `291ad13b`. |
 | `src/std/anti/collection/tree.anti` | `Tree<T>`, a hierarchy on the slots of the pool. | Says it. |
-| `src/std/anti/collection/synchronized.anti` | Four synchronized classes around a plain collection each, with a version per element. | Names no `sort`, `sort_by` and `map`. |
-| `src/std/anti/collection/concurrent.anti` | `ConcurrentMap`, `SpscRing` and the walk `Snapshot<T>`. | Names no `Snapshot`. |
+| `src/std/anti/collection/synchronized.anti` | Four synchronized classes around a plain collection each, with a version per element. | Names no `sort`, `sort_by` and `map`. Fixed `291ad13b`. |
+| `src/std/anti/collection/concurrent.anti` | `ConcurrentMap`, `SpscRing` and the walk `Snapshot<T>`. | Names no `Snapshot`, which `93ced37c` moved to `anti.collection`. Gone. |
 
 ### The recipes of the native libraries
 
