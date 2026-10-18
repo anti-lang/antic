@@ -460,6 +460,15 @@ bool sema_simd_method_declared(struct checker *c, const struct type *s,
                                const struct name *name);
 
 /* sema_call.c */
+/* The refusal of the member name, private or protected by vis, that the
+   class owner declares, where the code that names it may not see it. */
+void sema_refuse_hidden(struct checker *c, struct pos pos,
+                        const struct name *name, enum visibility vis,
+                        const struct type *owner);
+/* The refusal of the atomic field or local name where it is named
+   outside its own calls. */
+void sema_refuse_atomic(struct checker *c, struct pos pos,
+                        const struct name *name);
 /* The defaults of the parameters of sym. sema_required_params gives the
    fewest parameters a call of it writes, of count in all.
    sema_filled_by_defaults gives how many parameters after the first

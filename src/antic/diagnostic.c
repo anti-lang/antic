@@ -43,6 +43,18 @@ void diagnostics_add(struct diagnostics *d, int line, int column,
     va_end(args);
 }
 
+void diagnostics_vadd(struct diagnostics *d, int line, int column,
+                      const char *format, va_list args)
+{
+    add(d, NAME_NONE, line, column, false, false, format, args);
+}
+
+void diagnostics_vcheck(struct diagnostics *d, enum diag_name name, int line,
+                        int column, const char *format, va_list args)
+{
+    add(d, name, line, column, false, false, format, args);
+}
+
 void diagnostics_warn(struct diagnostics *d, enum diag_name name, int line,
                       int column, const char *format, ...)
 {

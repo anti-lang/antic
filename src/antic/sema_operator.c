@@ -327,14 +327,9 @@ static struct expr *operator_receiver(struct checker *c, struct expr *a,
     if (first->kind != TYPE_POINTER || a->type == first) {
         return a;
     }
-    if (!sema_is_place(a)) {
-        struct expr *slot = sema_new_node(c, EXPR_UNARY, a->pos);
-        slot->as.unary.op = TOKEN_AMP;
-        slot->as.unary.operand = a;
-        slot->type = first;
-        return slot;
+    if (sema_is_place(a)) {
+        sema_mark_address_taken(c, a);
     }
-    sema_mark_address_taken(c, a);
     address = sema_new_node(c, EXPR_UNARY, a->pos);
     address->as.unary.op = TOKEN_AMP;
     address->as.unary.operand = a;

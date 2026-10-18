@@ -31,104 +31,6 @@ static bool replaces_destroyed(const struct item *m)
     return m->has_self && params == 1;
 }
 
-/* DESIGN: a struct or a tuple is owning when any of its parts owns
-   something, transitively. Such a part is a class value that needs a
-   teardown, and a collection is one. So is an `own fn`, a `?T` or an
-   array of an owning type, and an owning struct or tuple. An owning one
-   follows the value rules of a class value, and one that owns nothing
-   stays plain data. A union owns nothing, since no teardown knows which
-   of its fields it holds. A variant is owning when the struct of any of
-   its cases is, since its tag names the case it holds, and its teardown
-   tears down the fields of that case. answered holds the structs, the
-   tuples, the variants and the classes met in this walk. None of them
-   needs a teardown, since the walk ends at the first that does, and a
-   type that holds another twice is walked once. */
-static bool needs_teardown(const struct type *t, struct ptr_set *answered)
-{
-    static const struct name destruct_name = {"destruct", 8};
-    size_t i;
-
-    if (t == NULL) {
-        return false;
-    }
-    switch (t->kind) {
-    case TYPE_OPTIONAL:
-    case TYPE_ARRAY:
-        return needs_teardown(t->element, answered);
-    case TYPE_FN:
-        return t->owned;
-    case TYPE_STRUCT:
-    case TYPE_TUPLE:
-        if (t->is_union || !ptr_set_add(answered, t)) {
-            return false;
-        }
-        for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                needs_teardown(f->type, answered)) {
-                return true;
-            }
-        }
-        return false;
-    case TYPE_VARIANT:
-        if (!ptr_set_add(answered, t)) {
-            return false;
-        }
-        for (i = 0; i < t->param_count; i++) {
-            if (needs_teardown(t->params[i], answered)) {
-                return true;
-            }
-        }
-        return false;
-    case TYPE_CLASS:
-        if (!ptr_set_add(answered, t)) {
-            return false;
-        }
-        break;
-    default:
-        return false;
-    }
-    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
-        for (i = 0; i < t->member_count; i++) {
-            const struct item *m = t->members[i];
-            /* The root's `destruct` is empty and never asks for one. */
-            if (m->kind == ITEM_FN && m->name.length == destruct_name.length &&
-                memcmp(m->name.text, destruct_name.text,
-                       destruct_name.length) == 0 &&
-                m->runtime == NULL && sema_has_body(m)) {
-                return true;
-            }
-            if (replaces_destroyed(m)) {
-                return true;
-            }
-        }
-        for (i = 0; i < t->field_count; i++) {
-            const struct struct_field *f = &t->fields[i];
-            if (f->owned) {
-                return true;
-            }
-            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
-                needs_teardown(f->type, answered)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool sema_needs_teardown(const struct type *t)
-{
-    struct ptr_set answered;
-    bool needs;
-
-    memset(&answered, 0, sizeof answered);
-    needs = needs_teardown(t, &answered);
-    free(answered.slots);
-    return needs;
-}
-
-static const char own_fields_phrase[] = "has `own` fields";
-
 /* Whether a class of the chain of t declares a field `own`. */
 static bool own_field_in_chain(const struct type *t)
 {
@@ -161,6 +63,105 @@ static bool destruct_in_chain(const struct type *t)
     }
     return false;
 }
+
+/* Whether a class of the chain of t replaces the `destroyed` hook. */
+static bool destroyed_in_chain(const struct type *t)
+{
+    size_t i;
+
+    for (; t != NULL && t->kind == TYPE_CLASS; t = t->base) {
+        for (i = 0; i < t->member_count; i++) {
+            if (replaces_destroyed(t->members[i])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static bool needs_teardown(const struct type *t, struct ptr_set *answered);
+
+/* Whether a plain or `use` field of t, or of a class of its chain, needs
+   a teardown. */
+static bool field_needs_teardown(const struct type *t,
+                                 struct ptr_set *answered)
+{
+    size_t i;
+
+    for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
+        for (i = 0; i < t->field_count; i++) {
+            const struct struct_field *f = &t->fields[i];
+            if ((f->form == FIELD_PLAIN || f->form == FIELD_USE) &&
+                needs_teardown(f->type, answered)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* DESIGN: a struct or a tuple is owning when any of its parts owns
+   something, transitively. Such a part is a class value that needs a
+   teardown, and a collection is one. So is an `own fn`, a `?T` or an
+   array of an owning type, and an owning struct or tuple. An owning one
+   follows the value rules of a class value, and one that owns nothing
+   stays plain data. A union owns nothing, since no teardown knows which
+   of its fields it holds. A variant is owning when the struct of any of
+   its cases is, since its tag names the case it holds, and its teardown
+   tears down the fields of that case. answered holds the structs, the
+   tuples, the variants and the classes met in this walk. None of them
+   needs a teardown, since the walk ends at the first that does, and a
+   type that holds another twice is walked once. */
+static bool needs_teardown(const struct type *t, struct ptr_set *answered)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    switch (t->kind) {
+    case TYPE_OPTIONAL:
+    case TYPE_ARRAY:
+        return needs_teardown(t->element, answered);
+    case TYPE_FN:
+        return t->owned;
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+        return !t->is_union && ptr_set_add(answered, t) &&
+               field_needs_teardown(t, answered);
+    case TYPE_VARIANT:
+        if (!ptr_set_add(answered, t)) {
+            return false;
+        }
+        for (i = 0; i < t->param_count; i++) {
+            if (needs_teardown(t->params[i], answered)) {
+                return true;
+            }
+        }
+        return false;
+    case TYPE_CLASS:
+        /* The root's `destruct` is empty and never asks for one, which
+           destruct_in_chain keeps out. */
+        return ptr_set_add(answered, t) &&
+               (destruct_in_chain(t) || destroyed_in_chain(t) ||
+                own_field_in_chain(t) || field_needs_teardown(t, answered));
+    default:
+        return false;
+    }
+}
+
+bool sema_needs_teardown(const struct type *t)
+{
+    struct ptr_set answered;
+    bool needs;
+
+    memset(&answered, 0, sizeof answered);
+    needs = needs_teardown(t, &answered);
+    free(answered.slots);
+    return needs;
+}
+
+static const char own_fields_phrase[] = "has `own` fields";
 
 /* The first field of the class, struct or tuple t whose type owns
    something, through the chain of a class, or NULL. */

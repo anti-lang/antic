@@ -33,32 +33,28 @@ int64_t sema_signed_bits(uint64_t v)
 void sema_error_at(struct checker *c, struct pos pos, const char *format,
                    ...)
 {
-    char message[160];
     va_list args;
 
     if (c->ctx.quiet > 0) {
         return;
     }
     va_start(args, format);
-    text_vformat(message, sizeof message, format, args);
+    diagnostics_vadd(c->diags, pos.line, pos.column, format, args);
     va_end(args);
-    diagnostics_add(c->diags, pos.line, pos.column, "%s", message);
     c->ok = false;
 }
 
 void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
                    const char *format, ...)
 {
-    char message[160];
     va_list args;
 
     if (c->ctx.quiet > 0) {
         return;
     }
     va_start(args, format);
-    text_vformat(message, sizeof message, format, args);
+    diagnostics_vcheck(c->diags, name, pos.line, pos.column, format, args);
     va_end(args);
-    diagnostics_check(c->diags, name, pos.line, pos.column, "%s", message);
 }
 
 /* A type name for a message, kept in one of four rotating buffers so

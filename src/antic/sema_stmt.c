@@ -451,6 +451,18 @@ static void check_flags_assign(struct checker *c, struct stmt *s);
    A type with `index` alone is read-only through `e[i]`. A compound
    assignment would compute e and i once for the read and once for the
    write, so it is refused, and `e[i] = e[i] + v` says what runs. */
+/* The refusal of a compound assignment, the statement s, to `e[i]`
+   through the hooks. Every compound spelling is its binary operator and
+   `=`. */
+static void refuse_compound_index(struct checker *c, const struct stmt *s)
+{
+    char spelling[OP_TEXT];
+    const char *o = sema_op_text(s->as.assign.op, spelling);
+
+    sema_error_at(c, s->pos, "`%s` takes no `operator fn set_index`, and "
+                  "`e[i] = e[i] %.*s v` writes it", o, (int)strlen(o) - 1, o);
+}
+
 bool sema_set_index(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
@@ -459,15 +471,11 @@ bool sema_set_index(struct checker *c, struct stmt *s)
     struct expr **args;
     size_t count = target->as.index.several ? index->as.tuple.count : 1;
     struct type *t = sema_check_expr(c, base, NULL);
-    char spelling[OP_TEXT];
 
     if (!sema_is_error(t) && t->kind == TYPE_PARAM) {
         if (!sema_is_error(sema_param_index(c, target, t, true)) &&
             s->as.assign.op != TOKEN_ASSIGN) {
-            const char *o = sema_op_text(s->as.assign.op, spelling);
-            sema_error_at(c, s->pos, "`%s` takes no `operator fn set_index`, "
-                          "and `e[i] = e[i] %.*s v` writes it", o,
-                          (int)strlen(o) - 1, o);
+            refuse_compound_index(c, s);
         }
         sema_check_expr(c, s->as.assign.value, NULL);
         return true;
@@ -483,11 +491,7 @@ bool sema_set_index(struct checker *c, struct stmt *s)
         return true;
     }
     if (s->as.assign.op != TOKEN_ASSIGN) {
-        /* Every compound spelling is its binary operator and `=`. */
-        const char *o = sema_op_text(s->as.assign.op, spelling);
-        sema_error_at(c, s->pos, "`%s` takes no `operator fn set_index`, "
-                      "and `e[i] = e[i] %.*s v` writes it", o,
-                      (int)strlen(o) - 1, o);
+        refuse_compound_index(c, s);
         sema_check_expr(c, s->as.assign.value, NULL);
         return true;
     }

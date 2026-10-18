@@ -84,7 +84,6 @@ struct pos parser_pos_of(const struct token *t)
 void parser_error_here(struct parser *p, const char *format, ...)
 {
     va_list args;
-    char message[sizeof p->diags->items->message];
 
     p->ok = false;
     if (p->panic) {
@@ -92,10 +91,9 @@ void parser_error_here(struct parser *p, const char *format, ...)
     }
     p->panic = true;
     va_start(args, format);
-    text_vformat(message, sizeof message, format, args);
+    diagnostics_vadd(p->diags, parser_peek(p)->line, parser_peek(p)->column,
+                     format, args);
     va_end(args);
-    diagnostics_add(p->diags, parser_peek(p)->line, parser_peek(p)->column,
-                    "%s", message);
 }
 
 static void too_deep(struct parser *p)
@@ -435,6 +433,17 @@ static void sync_item(struct parser *p)
     }
 }
 
+/* Recover from a line at module level that failed after it started at
+   the token before: step over one token when the line took none, so the
+   loop moves on, and skip to the next item. */
+static void recover_item(struct parser *p, size_t before)
+{
+    if (p->pos == before) {
+        parser_next(p);
+    }
+    sync_item(p);
+}
+
 /* Whether token t is the identifier word. */
 bool parser_is_word(const struct parser *p, const struct token *t,
                     const char *word)
@@ -755,10 +764,7 @@ bool parser_parse(const char *source, const struct token_list *tokens,
             *seen = true;
             if (!test_block(&p, &items,
                             is_tests ? BLOCK_TESTS : BLOCK_FIXTURES)) {
-                if (p.pos == before) {
-                    parser_next(&p);
-                }
-                sync_item(&p);
+                recover_item(&p, before);
             }
             continue;
         }
@@ -772,30 +778,21 @@ bool parser_parse(const char *source, const struct token_list *tokens,
         }
         if (parser_check(&p, TOKEN_PROVIDES)) {
             if (!provides_line(&p, &provides)) {
-                if (p.pos == before) {
-                    parser_next(&p);
-                }
-                sync_item(&p);
+                recover_item(&p, before);
             }
             continue;
         }
         if (parser_is_word(&p, parser_peek(&p), "link") &&
             parser_is_word(&p, parser_peek_at(&p, 1), "framework")) {
             if (!link_line(&p, &frameworks, "framework")) {
-                if (p.pos == before) {
-                    parser_next(&p);
-                }
-                sync_item(&p);
+                recover_item(&p, before);
             }
             continue;
         }
         if (parser_is_word(&p, parser_peek(&p), "link") &&
             parser_is_word(&p, parser_peek_at(&p, 1), "linux")) {
             if (!link_line(&p, &linux_libraries, "linux")) {
-                if (p.pos == before) {
-                    parser_next(&p);
-                }
-                sync_item(&p);
+                recover_item(&p, before);
             }
             continue;
         }
@@ -806,10 +803,10 @@ bool parser_parse(const char *source, const struct token_list *tokens,
             /* An `import` is no item, so an item that stopped at one,
                as `pub import` does, had its message there. The recovery
                passes it, so the `import` gets no second message. */
-            if (p.pos == before || parser_check(&p, TOKEN_IMPORT)) {
+            if (p.pos != before && parser_check(&p, TOKEN_IMPORT)) {
                 parser_next(&p);
             }
-            sync_item(&p);
+            recover_item(&p, before);
         }
     }
     m->imports = parser_list_finish(&p, &imports, &m->import_count);

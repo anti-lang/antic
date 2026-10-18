@@ -2081,9 +2081,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         /* An atomic local is read and written by its own calls alone,
            as an atomic field is. */
         if (sym->atomic && !c->atomic_place) {
-            sema_error_at(c, e->pos, "`%.*s` is atomic, so it is read with "
-                          "`load()` and written with `store(v)`",
-                          (int)e->as.name.length, e->as.name.text);
+            sema_refuse_atomic(c, e->pos, &e->as.name);
             return sema_builtin(c, TYPE_ERROR);
         }
         sema_check_guarded_pointer(c, e, sym);

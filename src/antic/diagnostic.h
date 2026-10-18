@@ -4,6 +4,7 @@
 /* The record of one diagnostic with its stable name, and the list of the
    diagnostics of one compilation. */
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -69,6 +70,14 @@ struct diagnostics {
 void diagnostics_add(struct diagnostics *d, int line, int column,
                      const char *format, ...)
     ATTRIBUTE_PRINTF(4, 5);
+/* diagnostics_add and diagnostics_check with the arguments as a va_list,
+   for a function that takes a format of its own and hands it on. */
+void diagnostics_vadd(struct diagnostics *d, int line, int column,
+                      const char *format, va_list args)
+    ATTRIBUTE_PRINTF(4, 0);
+void diagnostics_vcheck(struct diagnostics *d, enum diag_name name, int line,
+                        int column, const char *format, va_list args)
+    ATTRIBUTE_PRINTF(5, 0);
 /* Append a warning with its stable name, which `allow` silences and
    --warnings-as-errors turns into an error. The message and the memory
    follow diagnostics_add. */

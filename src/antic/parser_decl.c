@@ -10,6 +10,16 @@
 #include "parser_parser.h"
 #include "warnings.h"
 
+/* Whether the token at is the word `own` of a parameter mark, before a
+   name, `fn` or `?fn`. */
+static bool own_mark(const struct parser *p, size_t at)
+{
+    enum token_kind next = parser_peek_at(p, at + 1)->kind;
+
+    return parser_is_word(p, parser_peek_at(p, at), "own") &&
+           (next == TOKEN_IDENT || next == TOKEN_FN || next == TOKEN_QUESTION);
+}
+
 /* DESIGN: `keep` and `concurrent` are contextual words before a
    parameter of function type, in a parameter list and in the list of a
    function type. A mark stands before a name followed by a colon, or
@@ -30,11 +40,7 @@ bool parser_is_fn_mark(const struct parser *p, size_t at)
            (after->kind == TOKEN_IDENT &&
             parser_peek_at(p, at + 2)->kind == TOKEN_COLON) ||
            parser_is_word(p, after, "keep") ||
-           parser_is_word(p, after, "concurrent") ||
-           (parser_is_word(p, after, "own") &&
-            (parser_peek_at(p, at + 2)->kind == TOKEN_IDENT ||
-             parser_peek_at(p, at + 2)->kind == TOKEN_FN ||
-             parser_peek_at(p, at + 2)->kind == TOKEN_QUESTION));
+           parser_is_word(p, after, "concurrent") || own_mark(p, at + 1);
 }
 
 /* Read the marks before a parameter. Both may stand, and the checker
@@ -49,10 +55,7 @@ void parser_fn_param_marks(struct parser *p, bool *keep, bool *concurrent,
             *concurrent = true;
         }
         parser_next(p);
-        if (parser_is_word(p, parser_peek(p), "own") &&
-            (parser_peek_at(p, 1)->kind == TOKEN_IDENT ||
-             parser_peek_at(p, 1)->kind == TOKEN_FN ||
-             parser_peek_at(p, 1)->kind == TOKEN_QUESTION)) {
+        if (own_mark(p, 0)) {
             parser_next(p);
             *owned = true;
         }

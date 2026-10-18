@@ -409,6 +409,22 @@ static bool level_allows(const struct checker *c, enum visibility vis,
     return from == declared_in;
 }
 
+void sema_refuse_hidden(struct checker *c, struct pos pos,
+                        const struct name *name, enum visibility vis,
+                        const struct type *owner)
+{
+    sema_error_at(c, pos, "`%.*s` is %s `%s`", (int)name->length, name->text,
+                  vis == VIS_PROTECTED ? "protected in" : "private to",
+                  sema_tn(owner));
+}
+
+void sema_refuse_atomic(struct checker *c, struct pos pos,
+                        const struct name *name)
+{
+    sema_error_at(c, pos, "`%.*s` is atomic, so it is read with `load()` and "
+                  "written with `store(v)`", (int)name->length, name->text);
+}
+
 /* DESIGN: the class below calls a `construct` with arguments as
    `self.super.construct(x)`, whatever level it was declared at. The
    object model document declares `construct` without a level, which
@@ -765,12 +781,8 @@ static bool no_method_call(struct checker *c, struct expr *call,
     }
     if (hidden != NULL && !member_visible(c, s, hidden)) {
         const struct type *owner = sema_declaring_class(hidden);
-        sema_error_at(c, field->pos, "`%.*s` is %s `%s`",
-                      (int)field->as.field.name.length,
-                      field->as.field.name.text,
-                      hidden->vis == VIS_PROTECTED ? "protected in"
-                                                   : "private to",
-                      sema_tn(owner != NULL ? owner : s));
+        sema_refuse_hidden(c, field->pos, &field->as.field.name, hidden->vis,
+                           owner != NULL ? owner : s);
         return false;
     }
     if (private_of_library(c, field->pos, s, &field->as.field.name)) {
@@ -2455,10 +2467,8 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
           c->ctx.within->symbol != NULL &&
           c->ctx.within->symbol->type == sema_declaring_class(m))) {
         const struct type *owner = sema_declaring_class(m);
-        sema_error_at(c, e->pos, "`%.*s` is %s `%s`", (int)name->length,
-                      name->text,
-                      m->vis == VIS_PROTECTED ? "protected in" : "private to",
-                      sema_tn(owner != NULL ? owner : t));
+        sema_refuse_hidden(c, e->pos, name, m->vis,
+                           owner != NULL ? owner : t);
         return sema_builtin(c, TYPE_ERROR);
     }
     /* DESIGN: a static field is a global of the class and not a
@@ -2469,10 +2479,7 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (m->is_static && m->atomic && !c->atomic_place) {
-        sema_error_at(c, e->pos,
-                      "`%.*s` is atomic, so it is read with `load()` "
-                      "and written with `store(v)`", (int)name->length,
-                      name->text);
+        sema_refuse_atomic(c, e->pos, name);
         return sema_builtin(c, TYPE_ERROR);
     }
     /* DESIGN: `T.f` names the body of T. A body qualified by an
@@ -2652,20 +2659,14 @@ static struct type *check_struct_field(struct checker *c, struct expr *e,
     /* A field the checker wrote to reach a base or a promoted name
        carries no level of its own. */
     if (!e->as.field.promoted && !field_visible(c, s, f)) {
-        sema_error_at(c, e->pos, "`%.*s` is %s `%s`", (int)name->length,
-                      name->text,
-                      f->vis == VIS_PROTECTED ? "protected in"
-                                              : "private to",
-                      sema_tn(s));
+        sema_refuse_hidden(c, e->pos, name, f->vis, s);
         return sema_builtin(c, TYPE_ERROR);
     }
     /* DESIGN: an atomic field is read and written by its own calls
        alone, so that every access is one operation of the memory
        model. A mention of it anywhere else is refused. */
     if (f->atomic && !c->atomic_place) {
-        sema_error_at(c, e->pos, "`%.*s` is atomic, so it is read with "
-                      "`load()` and written with `store(v)`",
-                      (int)name->length, name->text);
+        sema_refuse_atomic(c, e->pos, name);
         return sema_builtin(c, TYPE_ERROR);
     }
     if (!sema_check_reach(c, e, f)) {
@@ -2817,11 +2818,8 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
         }
         if (f->home != NULL && f->home->kind == TYPE_CLASS &&
             !field_visible(c, f->home, f)) {
-            sema_error_at(c, inits[i].pos, "`%.*s` is %s `%s`",
-                          (int)inits[i].name.length, inits[i].name.text,
-                          f->vis == VIS_PROTECTED ? "protected in"
-                                                  : "private to",
-                          sema_tn(f->home));
+            sema_refuse_hidden(c, inits[i].pos, &inits[i].name, f->vis,
+                               f->home);
             ok = false;
         }
         /* DESIGN: the provider of an interface fills an `inject` field,

@@ -274,7 +274,6 @@ static void error_at(struct lexer *lx, int line, int column,
                      const char *format, ...)
 {
     va_list args;
-    char message[sizeof lx->diags->items->message];
 
     lx->ok = false;
     if (lx->errors > LEX_ERRORS_MAX) {
@@ -288,9 +287,8 @@ static void error_at(struct lexer *lx, int line, int column,
         return;
     }
     va_start(args, format);
-    text_vformat(message, sizeof message, format, args);
+    diagnostics_vadd(lx->diags, line, column, format, args);
     va_end(args);
-    diagnostics_add(lx->diags, line, column, "%s", message);
 }
 
 static struct token *push(struct lexer *lx, enum token_kind kind,

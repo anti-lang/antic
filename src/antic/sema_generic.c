@@ -1969,6 +1969,46 @@ static bool refuse_shape(struct checker *c, struct expr *e,
     return false;
 }
 
+/* The refusal of a call that leaves the parameter p of the generic named
+   of without an argument. */
+static void refuse_unbound(struct checker *c, struct pos pos,
+                           const struct type *p, const struct name *of)
+{
+    sema_error_at(c, pos, "nothing in the arguments gives `%.*s` of `%.*s`, "
+                  "so the call writes it out after the name",
+                  (int)p->name.length, p->name.text, (int)of->length,
+                  of->text);
+}
+
+/* Check each argument of map against the constraints of its parameter.
+   The first outer_count are those of the class named outer, and the rest
+   those of the function named name. */
+static void meets_all(struct checker *c, const struct generic_map *map,
+                      size_t outer_count, const struct name *outer,
+                      const struct name *name, struct pos pos)
+{
+    size_t i;
+
+    for (i = 0; i < map->count; i++) {
+        if (map->args[i] != NULL) {
+            check_meets(c, map->args[i], map->params[i],
+                        i < outer_count ? outer : name, pos);
+        }
+    }
+}
+
+/* Record the arguments of map on the call for its copy, which the copy of
+   the function that holds the call puts its own arguments into, and give
+   the signature fn of the copy. */
+static struct type *record_copy(struct checker *c, struct expr *call,
+                                struct type *fn, struct generic_map *map)
+{
+    call->as.call.copy_args = map->args;
+    call->as.call.copy_values = map->values;
+    call->as.call.copy_count = map->count;
+    return subst(c, fn, map);
+}
+
 struct type *sema_generic_call(struct checker *c, struct expr *e,
                                struct type *fn, const struct symbol *sym,
                                size_t fixed, const struct generic_call *g)
@@ -2087,24 +2127,15 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
             if (refuse_shape(c, e, fn, it, fixed, &map, i, g)) {
                 return sema_builtin(c, TYPE_ERROR);
             }
-            if (operator_leaves_open(it, fn, p)) {
-                return sema_builtin(c, TYPE_ERROR);
+            if (!operator_leaves_open(it, fn, p)) {
+                refuse_unbound(c, e->pos, p,
+                               i < outer_count ? &outer->name : name);
             }
-            sema_error_at(c, e->pos, "nothing in the arguments gives `%.*s` "
-                          "of `%.*s`, so the call writes it out after the "
-                          "name", (int)p->name.length, p->name.text,
-                          (int)(i < outer_count ? outer->name.length
-                                                : name->length),
-                          i < outer_count ? outer->name.text : name->text);
             return sema_builtin(c, TYPE_ERROR);
         }
     }
-    for (i = 0; i < map.count; i++) {
-        if (map.args[i] != NULL) {
-            check_meets(c, map.args[i], params[i],
-                        i < outer_count ? &outer->name : name, e->pos);
-        }
-    }
+    meets_all(c, &map, outer_count, outer != NULL ? &outer->name : NULL, name,
+              e->pos);
     /* A copy of the class that inference completed replaces the class in
        the signature, `List.new()` of `*List<T>` among them. */
     if (outer != NULL && map.to == NULL && copy != outer) {
@@ -2119,12 +2150,7 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
         map.from = outer;
         map.to = make_copy(c, outer, args, values, e->pos);
     }
-    /* The call keeps the arguments of the copy it calls, which the copy
-       of the function that holds it puts its own arguments into. */
-    e->as.call.copy_args = map.args;
-    e->as.call.copy_values = map.values;
-    e->as.call.copy_count = map.count;
-    return subst(c, fn, &map);
+    return record_copy(c, e, fn, &map);
 }
 
 /* Check the arguments that map gives the generic function it against its
@@ -2138,25 +2164,15 @@ static struct type *finish_copy(struct checker *c, struct expr *call,
 
     for (i = 0; i < map->count; i++) {
         const struct type *p = map->params[i];
-        if (map->args[i] == NULL && map->values[i] == NULL &&
-            operator_leaves_open(it, fn, p)) {
-            return NULL;
-        }
         if (map->args[i] == NULL && map->values[i] == NULL) {
-            sema_error_at(c, call->pos, "nothing in the arguments gives `%.*s` "
-                          "of `%.*s`, so the call writes it out after the "
-                          "name", (int)p->name.length, p->name.text,
-                          (int)it->name.length, it->name.text);
+            if (!operator_leaves_open(it, fn, p)) {
+                refuse_unbound(c, call->pos, p, &it->name);
+            }
             return NULL;
-        }
-        if (map->args[i] != NULL) {
-            check_meets(c, map->args[i], p, &it->name, call->pos);
         }
     }
-    call->as.call.copy_args = map->args;
-    call->as.call.copy_values = map->values;
-    call->as.call.copy_count = map->count;
-    return subst(c, fn, map);
+    meets_all(c, map, 0, NULL, &it->name, call->pos);
+    return record_copy(c, call, fn, map);
 }
 
 /* DESIGN: a generic `worker fn` named by `parallel` or `dispatch` takes
