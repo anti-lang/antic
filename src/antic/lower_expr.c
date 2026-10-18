@@ -1999,7 +1999,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     }
     to.target = lower_none();
     lower_callee(l, callee, fn, &to);
-    args = alloc_zeroed(2 * n + 3, sizeof *args);
+    args = alloc_zeroed(alloc_sum(alloc_product(n, 2), 3), sizeof *args);
     values = alloc_zeroed(n + 1, sizeof *values);
     given = 0;
     if (to.bound.kind != IR_NONE) {

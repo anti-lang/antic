@@ -769,7 +769,8 @@ static bool merge_blocks(struct ir_function *f)
             next->count == 0) {
             continue;
         }
-        insts = alloc_resize(block->insts, block->count - 1 + next->count,
+        insts = alloc_resize(block->insts,
+                             alloc_sum(block->count - 1, next->count),
                              sizeof *insts);
         memcpy(insts + block->count - 1, next->insts,
                next->count * sizeof *insts);

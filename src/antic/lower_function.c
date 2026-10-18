@@ -85,7 +85,7 @@ static const char *home_file_of(struct lowerer *l, const struct item *it)
         return NULL;
     }
     n = strlen(it->home_module);
-    file = arena_alloc(l->m->arena, n + sizeof SOURCE_SUFFIX);
+    file = arena_alloc(l->m->arena, alloc_sum(n, sizeof SOURCE_SUFFIX));
     for (i = 0; i < n; i++) {
         file[i] = it->home_module[i] == '.' ? '/' : it->home_module[i];
     }

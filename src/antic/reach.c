@@ -174,7 +174,8 @@ void ir_reach(const struct ir_module *m, const char *entry, bool all,
     w.m = m;
     w.out = out;
     w.defined = defined;
-    w.work = alloc_zeroed(m->function_count + m->global_count, sizeof *w.work);
+    w.work = alloc_zeroed(alloc_sum(m->function_count, m->global_count),
+                          sizeof *w.work);
     w.work_count = 0;
     for (i = 0; entry != NULL && !all && i < m->function_count; i++) {
         has_main = has_main || is_main_of(m->functions[i], entry);

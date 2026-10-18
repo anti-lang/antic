@@ -130,7 +130,8 @@ static void call_worker(struct lowerer *l, const struct expr *call,
     const struct type *result = callee->symbol->type->result;
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_function *f = l->f;
-    struct ir_operand *args = alloc_zeroed(2 * extra + 1, sizeof *args);
+    struct ir_operand *args =
+        alloc_zeroed(alloc_sum(alloc_product(extra, 2), 1), sizeof *args);
     struct ir_operand *values = alloc_zeroed(extra + 1, sizeof *values);
     struct ir_operand at_out;
     uint32_t value;

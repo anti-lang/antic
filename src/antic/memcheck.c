@@ -236,7 +236,7 @@ void memcheck_function(const struct ir_module *m, struct ir_function *f,
     for (b = 0; b < f->block_count; b++) {
         struct ir_block *block = f->blocks[b];
         /* An instruction takes four checks at most, a vselect. */
-        size_t capacity = alloc_product(block->count, 5) + 1;
+        size_t capacity = alloc_sum(alloc_product(block->count, 5), 1);
         c.out = alloc_zeroed(capacity, sizeof *c.out);
         c.count = 0;
         for (i = 0; i < block->count; i++) {
