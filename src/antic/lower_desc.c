@@ -1023,16 +1023,6 @@ static const struct ir_global *version_global(struct lowerer *l)
    the shorter. An entry whose signature no reflect.Value carries hashes
    its count of parameters instead. That still tells two entries of one
    name apart. */
-static uint64_t hash_bytes(uint64_t h, const char *bytes, size_t length)
-{
-    size_t i;
-
-    for (i = 0; i < length; i++) {
-        h = (h ^ (uint8_t)bytes[i]) * 0x100000001b3ULL;
-    }
-    return h;
-}
-
 /* The chain of an abstract class: one hash per prefix of its table, the
    empty prefix first. Entry k is the hash of a table of k entries. */
 static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
@@ -1043,7 +1033,7 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
     struct ir_global *g;
     char *module;
     char *name;
-    uint64_t h = 0xcbf29ce484222325ULL;
+    uint64_t h = IR_HASH_START;
     size_t i;
 
     table_of(t, &table);
@@ -1065,18 +1055,18 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
         const struct item *fn = table.entries[i].fn;
         struct text code = {0};
         char params[24];
-        h = hash_bytes(h, table.entries[i].name.text,
+        h = ir_hash_bytes(h, table.entries[i].name.text,
                        table.entries[i].name.length);
-        h = hash_bytes(h, ":", 1);
+        h = ir_hash_bytes(h, ":", 1);
         if (fn != NULL && fn->symbol != NULL &&
             signature_code(fn->symbol->type, &code)) {
-            h = hash_bytes(h, text_cstr(&code), code.length);
+            h = ir_hash_bytes(h, text_cstr(&code), code.length);
         } else {
             snprintf(params, sizeof params, "%zu", table.entries[i].params);
-            h = hash_bytes(h, params, strlen(params));
+            h = ir_hash_bytes(h, params, strlen(params));
         }
         text_free(&code);
-        h = hash_bytes(h, ";", 1);
+        h = ir_hash_bytes(h, ";", 1);
         value->items[i + 1].kind = IR_CONST_INT;
         value->items[i + 1].scalar = IR_I64;
         value->items[i + 1].integer = h;

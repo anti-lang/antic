@@ -24,27 +24,6 @@
 
 /* Helpers */
 
-static int bits(enum ir_type type)
-{
-    switch (type) {
-    case IR_I8: return 8;
-    case IR_I16: return 16;
-    case IR_I32: return 32;
-    default: return 64;
-    }
-}
-
-static uint64_t trim(enum ir_type type, uint64_t v)
-{
-    int n = bits(type);
-    return n == 64 ? v : v & (((uint64_t)1 << n) - 1);
-}
-
-static int64_t signed_value(enum ir_type type, uint64_t v)
-{
-    return arith_signed(v, bits(type));
-}
-
 static struct ir_operand none(void)
 {
     struct ir_operand o = {IR_NONE, IR_VOID, {0}};
@@ -58,7 +37,7 @@ static bool is_constant(const struct ir_operand *o)
 
 static bool is_int(const struct ir_operand *o, uint64_t v)
 {
-    return o->kind == IR_INT && o->as.integer == trim(o->type, v);
+    return o->kind == IR_INT && o->as.integer == ir_fold_trim(o->type, v);
 }
 
 static bool is_temp(const struct ir_operand *o, uint32_t temp)
@@ -200,7 +179,7 @@ static bool fold_conversion(const struct ir_inst *inst, struct ir_operand *out)
 {
     enum ir_type from = inst->a.type;
     enum ir_type to = inst->type;
-    int n = bits(to);
+    int n = ir_fold_bits(to);
     uint64_t v = inst->a.as.integer;
     double d = inst->a.as.floating;
     double limit = n == 64 ? 18446744073709551616.0
@@ -212,7 +191,7 @@ static bool fold_conversion(const struct ir_inst *inst, struct ir_operand *out)
         *out = ir_int_op(to, v);
         return true;
     case IR_SEXT:
-        *out = ir_int_op(to, (uint64_t)signed_value(from, v));
+        *out = ir_int_op(to, (uint64_t)ir_fold_signed(from, v));
         return true;
     case IR_SITOF:
     case IR_UITOF:
@@ -220,8 +199,8 @@ static bool fold_conversion(const struct ir_inst *inst, struct ir_operand *out)
            rounds twice and can land on the other f32 neighbour. */
         if (inst->op == IR_SITOF) {
             *out = ir_float_op(to, to == IR_F32
-                                       ? (double)(float)signed_value(from, v)
-                                       : (double)signed_value(from, v));
+                                       ? (double)(float)ir_fold_signed(from, v)
+                                       : (double)ir_fold_signed(from, v));
         } else {
             *out = ir_float_op(to, to == IR_F32 ? (double)(float)v
                                                 : (double)v);
@@ -1046,6 +1025,10 @@ static bool forward_stores(struct ir_function *f)
    since a use of that temporary may then reach another object. `self`
    is a parameter and escapes by nature. */
 
+/* The most fields of a slot the pass splits. A slot with more stays in
+   memory. */
+#define SPLIT_FIELDS 32
+
 /* One field of a split slot, named by the offset that reaches it. */
 struct slot_field {
     struct ir_operand offset;
@@ -1067,7 +1050,7 @@ static struct slot_field *field_at(struct ir_function *f,
             return fields[i].type == type ? &fields[i] : NULL;
         }
     }
-    if (*count >= 32) {
+    if (*count >= SPLIT_FIELDS) {
         return NULL;
     }
     fields[*count].offset = offset;
@@ -1294,7 +1277,7 @@ static void drop_slot_addresses(struct ir_function *f, uint32_t base)
 
 static bool split_slots(struct ir_function *f)
 {
-    struct slot_field fields[32];
+    struct slot_field fields[SPLIT_FIELDS];
     bool changed = false;
     size_t b;
     size_t i;

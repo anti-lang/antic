@@ -36,54 +36,42 @@ static struct exit_action *grow_defers(struct defers *scope)
     return scope->items;
 }
 
-/* Record one exit action of the innermost block. Every field is written
-   here, because `realloc` leaves the new elements with the bytes of
-   whatever stood there. */
-static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
-                             const struct symbol *local, bool undo)
-{
-    struct exit_action *action;
-
-    l->defers->items = grow_defers(l->defers);
-    action = &l->defers->items[l->defers->count++];
-    action->stmt = stmt;
-    action->local = local;
-    action->undo = undo;
-    action->error = false;
-    action->error_temp = 0;
-    action->error_type = NULL;
-    action->unlock = false;
-    action->mutex = 0;
-    action->pair = false;
-    action->second = 0;
-    action->unlock_fn = RT_FUNCTION_COUNT;
-    action->leave = false;
-    action->life_end = false;
-    action->slot = 0;
-    action->unbuild = false;
-}
-
-/* Record the `leave` hook of the function around the scope. */
-void lower_push_leave_action(struct lowerer *l)
+/* A new exit action of the innermost block that does nothing yet. Every
+   field is cleared here, because `realloc` leaves the new elements with
+   the bytes of whatever stood there. */
+static struct exit_action *new_exit_action(struct lowerer *l)
 {
     struct exit_action *action;
 
     l->defers->items = grow_defers(l->defers);
     action = &l->defers->items[l->defers->count++];
     memset(action, 0, sizeof *action);
-    action->leave = true;
+    action->unlock_fn = RT_FUNCTION_COUNT;
+    return action;
+}
+
+/* Record one exit action of the innermost block. */
+static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
+                             const struct symbol *local, bool undo)
+{
+    struct exit_action *action = new_exit_action(l);
+
+    action->stmt = stmt;
+    action->local = local;
+    action->undo = undo;
+}
+
+/* Record the `leave` hook of the function around the scope. */
+void lower_push_leave_action(struct lowerer *l)
+{
+    new_exit_action(l)->leave = true;
 }
 
 /* Record the teardown of what a `construct` that may fail built, which
    the exits that give an error run. */
 void lower_push_unbuild_action(struct lowerer *l)
 {
-    struct exit_action *action;
-
-    l->defers->items = grow_defers(l->defers);
-    action = &l->defers->items[l->defers->count++];
-    memset(action, 0, sizeof *action);
-    action->unbuild = true;
+    new_exit_action(l)->unbuild = true;
 }
 
 /* Record the delete of the error a handler binds, whose name is sym or
@@ -91,25 +79,12 @@ void lower_push_unbuild_action(struct lowerer *l)
 void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
                              uint32_t error, const struct type *error_type)
 {
-    struct exit_action *action;
+    struct exit_action *action = new_exit_action(l);
 
-    l->defers->items = grow_defers(l->defers);
-    action = &l->defers->items[l->defers->count++];
-    action->stmt = NULL;
     action->local = sym;
-    action->undo = false;
     action->error = true;
     action->error_temp = error;
     action->error_type = error_type;
-    action->unlock = false;
-    action->mutex = 0;
-    action->pair = false;
-    action->second = 0;
-    action->unlock_fn = RT_FUNCTION_COUNT;
-    action->leave = false;
-    action->life_end = false;
-    action->slot = 0;
-    action->unbuild = false;
 }
 
 /* Record the unlock of the lock whose address is in mutex, which a
@@ -118,25 +93,11 @@ void lower_push_error_action(struct lowerer *l, const struct symbol *sym,
 void lower_push_unlock_action(struct lowerer *l, uint32_t mutex,
                               enum rt_function unlock_fn)
 {
-    struct exit_action *action;
+    struct exit_action *action = new_exit_action(l);
 
-    l->defers->items = grow_defers(l->defers);
-    action = &l->defers->items[l->defers->count++];
-    action->stmt = NULL;
-    action->local = NULL;
-    action->undo = false;
-    action->error = false;
-    action->error_temp = 0;
-    action->error_type = NULL;
     action->unlock = true;
     action->mutex = mutex;
-    action->pair = false;
-    action->second = 0;
     action->unlock_fn = unlock_fn;
-    action->leave = false;
-    action->life_end = false;
-    action->slot = 0;
-    action->unbuild = false;
 }
 
 void lower_jump_to_join(struct lowerer *l, struct ir_block **join)
@@ -1250,8 +1211,7 @@ static void start_lifetime(struct lowerer *l, const struct symbol *sym)
         return;
     }
     ir_lifetime(l->f, l->b, IR_LIFE_START, lower_temp(l, sym->ir));
-    push_exit_action(l, NULL, NULL, false);
-    action = &l->defers->items[l->defers->count - 1];
+    action = new_exit_action(l);
     action->life_end = true;
     action->slot = sym->ir;
 }

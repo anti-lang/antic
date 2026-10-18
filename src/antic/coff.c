@@ -151,17 +151,6 @@ static void put(unsigned char *p, uint32_t v, int n)
     }
 }
 
-static uint64_t hash(const char *name, size_t length)
-{
-    uint64_t h = 1469598103934665603u;
-    size_t i;
-
-    for (i = 0; i < length; i++) {
-        h = (h ^ (unsigned char)name[i]) * 1099511628211u;
-    }
-    return h;
-}
-
 /* The entry of name, or with insert a new empty one, which has no name. */
 static struct entry *find(struct table *t, const char *name, size_t length,
                           bool insert)
@@ -185,7 +174,8 @@ static struct entry *find(struct table *t, const char *name, size_t length,
     if (t->capacity == 0) {
         return NULL;
     }
-    for (i = hash(name, length) & (t->capacity - 1);; i = (i + 1) & (t->capacity - 1)) {
+    i = ir_hash_bytes(IR_HASH_START, name, length) & (t->capacity - 1);
+    for (;; i = (i + 1) & (t->capacity - 1)) {
         struct entry *e = &t->items[i];
         if (e->name == NULL) {
             return insert ? e : NULL;

@@ -138,19 +138,26 @@ bool ir_is_copy_name(const char *name)
     return strchr(name, '<') != NULL;
 }
 
-uint64_t ir_hash_name(const char *module, const char *name)
+uint64_t ir_hash_bytes(uint64_t h, const char *bytes, size_t length)
 {
-    uint64_t h = 1469598103934665603u;
-    const char *p;
+    size_t i;
 
-    for (p = module; p != NULL && *p != '\0'; p++) {
-        h = (h ^ (unsigned char)*p) * 1099511628211u;
-    }
-    h = (h ^ 0xff) * 1099511628211u;
-    for (p = name; *p != '\0'; p++) {
-        h = (h ^ (unsigned char)*p) * 1099511628211u;
+    for (i = 0; i < length; i++) {
+        h = (h ^ (unsigned char)bytes[i]) * 0x100000001b3u;
     }
     return h;
+}
+
+uint64_t ir_hash_name(const char *module, const char *name)
+{
+    static const char separator[1] = {'\xff'};
+    uint64_t h = IR_HASH_START;
+
+    if (module != NULL) {
+        h = ir_hash_bytes(h, module, strlen(module));
+    }
+    h = ir_hash_bytes(h, separator, sizeof separator);
+    return ir_hash_bytes(h, name, strlen(name));
 }
 
 uint32_t ir_agg_find(const struct ir_module *m, const char *name)
@@ -829,10 +836,11 @@ void ir_assign(struct ir_function *f, struct ir_block *b, uint32_t dst,
     append(f, b, IR_COPY, f->temps[dst], dst)->a = src;
 }
 
-uint32_t ir_entry_slot(struct ir_function *f, struct ir_vtype of)
+/* A cleared instruction inserted in the entry block after the slots
+   already there. */
+static struct ir_inst *after_entry_slots(struct ir_function *f)
 {
     struct ir_block *b = f->blocks[0];
-    uint32_t result = ir_temp(f, IR_PTR);
     size_t at = 0;
     struct ir_inst *inst;
 
@@ -845,6 +853,14 @@ uint32_t ir_entry_slot(struct ir_function *f, struct ir_vtype of)
     b->count++;
     inst = &b->insts[at];
     memset(inst, 0, sizeof *inst);
+    return inst;
+}
+
+uint32_t ir_entry_slot(struct ir_function *f, struct ir_vtype of)
+{
+    uint32_t result = ir_temp(f, IR_PTR);
+    struct ir_inst *inst = after_entry_slots(f);
+
     inst->op = IR_SLOT;
     inst->type = IR_PTR;
     inst->result = result;
@@ -872,19 +888,8 @@ uint32_t ir_load(struct ir_function *f, struct ir_block *b, enum ir_type type,
 uint32_t ir_entry_zero_slot(struct ir_function *f)
 {
     uint32_t slot = ir_entry_slot(f, ir_scalar(IR_PTR));
-    struct ir_block *b = f->blocks[0];
-    size_t at = 0;
-    struct ir_inst *inst;
+    struct ir_inst *inst = after_entry_slots(f);
 
-    while (at < b->count && b->insts[at].op == IR_SLOT) {
-        at++;
-    }
-    b->insts = alloc_grow(b->insts, &b->capacity, b->count, sizeof *b->insts);
-    memmove(&b->insts[at + 1], &b->insts[at],
-            (b->count - at) * sizeof *b->insts);
-    b->count++;
-    inst = &b->insts[at];
-    memset(inst, 0, sizeof *inst);
     inst->of = ir_scalar(IR_VOID);
     inst->op = IR_STORE;
     inst->type = IR_PTR;

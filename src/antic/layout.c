@@ -213,8 +213,6 @@ static bool bit_unit(struct layouts *l, const struct ir_aggtype *t,
     return true;
 }
 
-static int64_t signed_value(enum ir_type type, uint64_t v);
-
 /* The C rules of chapter 18. A struct places each field at the next
    multiple of its alignment, and a union places every field at 0. packed
    aligns every field to 1, and align(N) raises the aggregate's alignment.
@@ -384,22 +382,6 @@ static void compute(struct layouts *l, uint32_t agg)
     }
 }
 
-static int bits(enum ir_type type)
-{
-    return type == IR_I8 ? 8 : type == IR_I16 ? 16 : type == IR_I32 ? 32 : 64;
-}
-
-static uint64_t trim(enum ir_type type, uint64_t v)
-{
-    int n = bits(type);
-    return n == 64 ? v : v & (((uint64_t)1 << n) - 1);
-}
-
-static int64_t signed_value(enum ir_type type, uint64_t v)
-{
-    return arith_signed(v, bits(type));
-}
-
 /* Apply op to the folded operands a and b of type type. The result has
    the type of the symbolic value. */
 static bool wchar_signed(const struct layouts *l);
@@ -428,8 +410,8 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
     case IR_NEG: *out = 0 - a; break;
     case IR_NOT: *out = ~a; break;
     case IR_TRUNC:
-    case IR_ZEXT: *out = trim(type, a); break;
-    case IR_SEXT: *out = (uint64_t)signed_value(type, a); break;
+    case IR_ZEXT: *out = ir_fold_trim(type, a); break;
+    case IR_SEXT: *out = (uint64_t)ir_fold_signed(type, a); break;
     default:
         switch (ir_fold_int(op, type, a, b, out)) {
         case IR_FOLDED:
@@ -448,7 +430,7 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
                names the width alone. */
             fail(l, "a size expression shifts a %d-bit value out of range "
                     "on %s",
-                 bits(type), target_name(l->target));
+                 ir_fold_bits(type), target_name(l->target));
             return false;
         case IR_FOLD_NOT_BINARY:
             fail(l, "a size expression uses `%s`, which does not fold",
@@ -457,7 +439,7 @@ static bool fold_op(struct layouts *l, const struct ir_sym *s,
         }
         break;
     }
-    *out = trim(result, *out);
+    *out = ir_fold_trim(result, *out);
     return true;
 }
 

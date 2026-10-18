@@ -1,18 +1,24 @@
-/* The one rule that folds an integer operation on constants, and the three
-   cases that have no value. */
+/* The one rule that folds an integer operation on constants, the three
+   cases that have no value, and the widths of the integer types. */
 
 #include "ir_fold.h"
 
 #include "arith.h"
 
-static int bits(enum ir_type type)
+int ir_fold_bits(enum ir_type type)
 {
     return type == IR_I8 ? 8 : type == IR_I16 ? 16 : type == IR_I32 ? 32 : 64;
 }
 
-static uint64_t trim(int n, uint64_t v)
+uint64_t ir_fold_trim(enum ir_type type, uint64_t v)
 {
+    int n = ir_fold_bits(type);
     return n == 64 ? v : v & (((uint64_t)1 << n) - 1);
+}
+
+int64_t ir_fold_signed(enum ir_type type, uint64_t v)
+{
+    return arith_signed(v, ir_fold_bits(type));
 }
 
 static bool is_shift(enum ir_op op)
@@ -21,8 +27,11 @@ static bool is_shift(enum ir_op op)
 }
 
 /* The checks of the operations that have no value for some operands. */
-static enum ir_fold defined(enum ir_op op, int n, uint64_t a, uint64_t b)
+static enum ir_fold defined(enum ir_op op, enum ir_type type, uint64_t a,
+                            uint64_t b)
 {
+    int n = ir_fold_bits(type);
+
     bool divides = op == IR_SDIV || op == IR_UDIV || op == IR_SREM ||
                    op == IR_UREM;
 
@@ -30,7 +39,7 @@ static enum ir_fold defined(enum ir_op op, int n, uint64_t a, uint64_t b)
         return IR_FOLD_BY_ZERO;
     }
     if ((op == IR_SDIV || op == IR_SREM) && a == (uint64_t)1 << (n - 1) &&
-        b == trim(n, UINT64_MAX)) {
+        b == ir_fold_trim(type, UINT64_MAX)) {
         return IR_FOLD_LEAST_BY_MINUS_ONE;
     }
     return IR_FOLDED;
@@ -39,20 +48,20 @@ static enum ir_fold defined(enum ir_op op, int n, uint64_t a, uint64_t b)
 enum ir_fold ir_fold_int(enum ir_op op, enum ir_type type, uint64_t a,
                          uint64_t b, uint64_t *out)
 {
-    int n = bits(type);
+    int n = ir_fold_bits(type);
     uint64_t count = b;
     int64_t x;
     int64_t y;
     enum ir_fold status;
 
-    a = trim(n, a);
-    b = trim(n, b);
-    x = arith_signed(a, n);
-    y = arith_signed(b, n);
+    a = ir_fold_trim(type, a);
+    b = ir_fold_trim(type, b);
+    x = ir_fold_signed(type, a);
+    y = ir_fold_signed(type, b);
     if (is_shift(op) && count >= (uint64_t)n) {
         return IR_FOLD_SHIFT_RANGE;
     }
-    status = defined(op, n, a, b);
+    status = defined(op, type, a, b);
     if (status != IR_FOLDED) {
         return status;
     }
@@ -98,6 +107,6 @@ enum ir_fold ir_fold_int(enum ir_op op, enum ir_type type, uint64_t a,
     default:
         return IR_FOLD_NOT_BINARY;
     }
-    *out = trim(n, *out);
+    *out = ir_fold_trim(type, *out);
     return IR_FOLDED;
 }

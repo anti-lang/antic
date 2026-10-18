@@ -665,6 +665,11 @@ uint32_t ir_array_of(struct ir_module *m, const char *element_name,
    An index stops below UINT32_MAX, which IR_NO_AGG and IR_NO_INDEX take,
    and a count past it ends the run as a failed allocation does. */
 uint32_t ir_index(size_t count);
+/* The offset basis of FNV-1a, the hash of no bytes. */
+#define IR_HASH_START 0xcbf29ce484222325u
+/* The FNV-1a hash of length bytes of bytes, continued from the hash h of
+   the bytes before them. */
+uint64_t ir_hash_bytes(uint64_t h, const char *bytes, size_t length);
 /* The FNV-1a hash of module, a NULL one as empty, then a byte 0xff and
    name, for the tables that find a function or a global by its two
    names. */

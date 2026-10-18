@@ -2,7 +2,8 @@
 #define ANTIC_IR_FOLD_H
 
 /* The interface of ir_fold.c: the folding of an integer operation on
-   constants, which the optimizer and the layout share. */
+   constants, and the widths it reads, which the optimizer and the layout
+   share. */
 
 #include <stdint.h>
 
@@ -29,6 +30,17 @@ enum ir_fold {
    count b is read whole, so a count of any width compares with the width
    of type, and a negative one compares as a large one. out receives the
    bits of type, or 0 or 1 for a comparison. */
+/* The width of the fixed-width integer type type: 8, 16, 32, or 64 for
+   every other type. */
+int ir_fold_bits(enum ir_type type);
+
+/* The low bits of v that the integer type type holds. */
+uint64_t ir_fold_trim(enum ir_type type, uint64_t v);
+
+/* The low bits of v that the integer type type holds, as a signed value
+   sign-extended to 64. */
+int64_t ir_fold_signed(enum ir_type type, uint64_t v);
+
 enum ir_fold ir_fold_int(enum ir_op op, enum ir_type type, uint64_t a,
                          uint64_t b, uint64_t *out);
 
