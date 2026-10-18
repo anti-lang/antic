@@ -3536,6 +3536,13 @@ add_expect_test(warning_dropped_module_note STATUS 0
     EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped_module_note.err"
     COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
             dropped_module_note.anti)
+# The note of a variant case and the comments of the fields of a case are
+# checked as every other comment is.
+add_expect_test(warning_variant_case_comments STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/variant_case_comments.err"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            variant_case_comments.anti)
 add_test(NAME silent_dropped
     COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/dropped_silent.s"

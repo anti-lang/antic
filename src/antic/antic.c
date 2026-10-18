@@ -135,8 +135,15 @@ static void item_comments(struct comment_list *list, const struct item *it,
         add_comment(list, &it->params[i].note, true, param);
     }
     for (i = 0; i < it->case_count; i++) {
-        add_comment(list, &it->cases[i].doc, false,
-                    pool_name(arena, &it->cases[i].name));
+        const struct variant_case *one = &it->cases[i];
+        size_t j;
+        add_comment(list, &one->doc, false, pool_name(arena, &one->name));
+        add_comment(list, &one->note, true, pool_name(arena, &one->name));
+        for (j = 0; j < one->field_count; j++) {
+            const char *field = pool_name(arena, &one->fields[j].name);
+            add_comment(list, &one->fields[j].doc, false, field);
+            add_comment(list, &one->fields[j].note, true, field);
+        }
     }
     for (i = 0; i < it->member_count; i++) {
         item_comments(list, it->members[i], arena);

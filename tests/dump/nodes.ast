@@ -1,4 +1,4 @@
-module_doc "The nodes of the parsed tree that no other dump of it holds: `provides`, the\nmarks of a parameter and of a function type, the handlers of a failing call,\n`yield`, `try`, `assert`, `defer`, `undo`, `fail`, `dispatch`, `parallel`,\n`sync` on two objects, `select`, a walk by pointer, `here`, an anonymous\nfunction with a result, a pattern and `delete` and `destroy` with an\nallocator. The parser takes the file and the checker would refuse it, so\n`--dump-ast` is its one use."
+module_doc "The nodes of the parsed tree that no other dump of it holds: `provides`, the\nmarks of a parameter and of a function type, the handlers of a failing call,\n`yield`, `try`, `assert`, `defer`, `undo`, `fail`, `dispatch`, `parallel`,\n`sync` on two objects, `select`, a walk by pointer, `here`, an anonymous\nfunction with a result, a pattern and `delete` and `destroy` with an\nallocator. Then the marks the parser reads that a later stage decides on:\nan `own` parameter, `lent` before a tuple element, `?fn`, `may fail` and\n`keep own` of a function type, the note of a variant case, the case after\n`is`, `as?` against `as` and the pattern of a `for`. The parser takes the\nfile and the checker would refuse it, so `--dump-ast` is its one use."
 import anti.lang
 provides Named as Tagged
 provides lang.Named as Tagged
@@ -271,6 +271,7 @@ function values
   param p
     type *
       type Tagged
+    own
   param from
     type *
       type Allocator
@@ -331,5 +332,79 @@ function values
     simple_stmt
       delete
         ident p
+    return_stmt
+      int_lit 0
+type_decl Pair
+  type tuple
+    type int
+    lent
+    type *
+      type int
+type_decl Maybefn
+  type ?fn
+    type int
+    result
+      type int
+type_decl Failing
+  type fn
+    type int
+    result
+      type int
+    may_fail
+type_decl Owner
+  type fn
+    type keep own fn
+      type int
+      result
+        type int
+variant_decl Shape
+  case Circle
+    note "The note of a case."
+    field r
+      type int
+  case Empty
+function casts
+  param s
+    type Shape
+  param t
+    type *
+      type Named
+  param pairs
+    type []
+      type tuple
+        type int
+        type int
+  result
+    type int
+  block
+    let_stmt a
+      is_test
+        ident s
+        type Shape.Circle
+    let_stmt b
+      is_test
+        ident s
+        type lang.Shape.Circle
+    let_stmt c
+      checked_cast
+        ident t
+        type *
+          type Tagged
+    let_stmt d
+      cast
+        ident t
+        type *
+          type Tagged
+    for_stmt y
+      pattern
+      name x
+      over
+        ident pairs
+      block
+        simple_stmt =
+          ident a
+          equality ==
+            ident x
+            ident y
     return_stmt
       int_lit 0

@@ -70,18 +70,25 @@ enum token_kind {
     TOKEN_AMP, TOKEN_PIPE, TOKEN_CARET, TOKEN_TILDE, TOKEN_BANG,
     TOKEN_SHL, TOKEN_SHR, TOKEN_AND_AND, TOKEN_OR_OR,
     TOKEN_EQ, TOKEN_NE, TOKEN_LT, TOKEN_LE, TOKEN_GT, TOKEN_GE,
+    /* The assignments, from TOKEN_ASSIGN to TOKEN_SHR_ASSIGN, which
+       parser_is_assign_op reads as one range. */
     TOKEN_ASSIGN, TOKEN_PLUS_ASSIGN, TOKEN_MINUS_ASSIGN, TOKEN_STAR_ASSIGN,
     TOKEN_SLASH_ASSIGN, TOKEN_PERCENT_ASSIGN, TOKEN_AMP_ASSIGN,
     TOKEN_PIPE_ASSIGN, TOKEN_CARET_ASSIGN, TOKEN_SHL_ASSIGN,
-    TOKEN_SHR_ASSIGN, TOKEN_QUESTION, TOKEN_QUESTION_STAR, TOKEN_ATOMIC,
-    TOKEN_DISPATCH,
-    TOKEN_JOIN, TOKEN_JOIN_ALL,
+    TOKEN_SHR_ASSIGN,
+    TOKEN_QUESTION, TOKEN_QUESTION_STAR,
+    /* The keywords `atomic`, `dispatch`, `join` and `join_all`. They stand
+       among the operators because they were added here, and a library
+       file stores the kind of an operator, so no kind moves. */
+    TOKEN_ATOMIC, TOKEN_DISPATCH, TOKEN_JOIN, TOKEN_JOIN_ALL,
     TOKEN_QUESTION_QUESTION, TOKEN_QUESTION_DOT,
     /* The wrapping operators `+% -% *% <<%` and the saturating ones
        `+| -| *|`. */
     TOKEN_PLUS_WRAP, TOKEN_MINUS_WRAP, TOKEN_STAR_WRAP, TOKEN_SHL_WRAP,
     TOKEN_PLUS_SAT, TOKEN_MINUS_SAT, TOKEN_STAR_SAT,
-    /* Their compound assignments, `+%= -%= *%= <<%=` and `+|= -|= *|=`. */
+    /* Their compound assignments, `+%= -%= *%= <<%=` and `+|= -|= *|=`,
+       from TOKEN_PLUS_WRAP_ASSIGN to TOKEN_STAR_SAT_ASSIGN, the second
+       range of parser_is_assign_op. */
     TOKEN_PLUS_WRAP_ASSIGN, TOKEN_MINUS_WRAP_ASSIGN, TOKEN_STAR_WRAP_ASSIGN,
     TOKEN_SHL_WRAP_ASSIGN, TOKEN_PLUS_SAT_ASSIGN, TOKEN_MINUS_SAT_ASSIGN,
     TOKEN_STAR_SAT_ASSIGN,

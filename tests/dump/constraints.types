@@ -244,8 +244,10 @@ function max               fn(T, T) -> T
     constraint lt
   param a                  T
     type T
+    own
   param b                  T
     type T
+    own
   result
     type T
   block
@@ -302,6 +304,7 @@ function both              fn(T, T) -> T
     type T
   param b                  T
     type T
+    own
   result
     type T
   block
@@ -482,6 +485,7 @@ function pass              fn(T) -> T
   type_param T
   param a                  T
     type T
+    own
   result
     type T
   block

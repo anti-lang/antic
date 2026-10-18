@@ -138,8 +138,8 @@ void parser_fn_param_marks(struct parser *p, bool *keep, bool *concurrent,
                            bool *owned);
 bool parser_result_type(struct parser *p, struct item *it);
 bool parser_lent_mark(struct parser *p);
-struct param *parser_params(struct parser *p, bool allow_variadic,
-                            bool *variadic, bool *has_self, size_t *count);
+bool parser_params(struct parser *p, bool allow_variadic, bool *variadic,
+                   bool *has_self, struct param **out, size_t *count);
 void parser_may_fail_after(struct parser *p, struct item *it);
 bool parser_never_result(struct parser *p);
 bool parser_starts_member(const struct parser *p);

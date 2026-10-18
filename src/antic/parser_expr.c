@@ -52,17 +52,21 @@ static struct field_init *field_inits(struct parser *p, size_t *count)
     return parser_list_finish(p, &fields, count);
 }
 
-/* A comma-separated list of expressions up to the closing token. */
-static struct expr **expressions(struct parser *p, enum token_kind close,
-                                 size_t *count)
+/* A comma-separated list of expressions up to the closing token, into
+   *out and *count. Returns false on a syntax error, so an empty list,
+   whose *out is NULL, is no failure. */
+static bool expressions(struct parser *p, enum token_kind close,
+                        struct expr ***out, size_t *count)
 {
     struct list items = {NULL, 0, 0, sizeof(struct expr *)};
 
+    *out = NULL;
+    *count = 0;
     while (!parser_check(p, close)) {
         struct expr *e = parser_expression(p);
         if (e == NULL) {
             free(items.data);
-            return NULL;
+            return false;
         }
         parser_list_push(&items, &e);
         if (!parser_accept(p, TOKEN_COMMA)) {
@@ -71,9 +75,10 @@ static struct expr **expressions(struct parser *p, enum token_kind close,
     }
     if (!parser_expect(p, close)) {
         free(items.data);
-        return NULL;
+        return false;
     }
-    return parser_list_finish(p, &items, count);
+    *out = parser_list_finish(p, &items, count);
+    return true;
 }
 
 /* Read the format specification of an `{expr}` into out: an alignment
@@ -684,14 +689,15 @@ static struct expr *postfix_links(struct parser *p)
 
         if (parser_accept(p, TOKEN_LPAREN)) {
             bool saved = p->no_struct_literal;
+            bool ok;
             outer = parser_new_expr(p, EXPR_CALL, t);
             outer->pos = e->pos;
             outer->as.call.callee = e;
             p->no_struct_literal = false;
-            outer->as.call.args =
-                expressions(p, TOKEN_RPAREN, &outer->as.call.arg_count);
+            ok = expressions(p, TOKEN_RPAREN, &outer->as.call.args,
+                             &outer->as.call.arg_count);
             p->no_struct_literal = saved;
-            if (p->panic) {
+            if (!ok) {
                 return NULL;
             }
         } else if (parser_accept(p, TOKEN_LBRACKET)) {

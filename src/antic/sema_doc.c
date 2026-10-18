@@ -439,8 +439,8 @@ static void doc_check_text(const struct doc_scope *s,
 }
 
 /* Every doc comment of an item. They are its own two, those of its
-   fields, those of the cases of a variant and those of every member of
-   its body. */
+   fields, those of the cases of a variant and of their fields, and those
+   of every member of its body. */
 static void doc_check_item(struct doc_scope *s, const struct item *it)
 {
     const struct item *outer = s->item;
@@ -454,7 +454,14 @@ static void doc_check_item(struct doc_scope *s, const struct item *it)
         doc_check_text(s, &it->params[i].note, &it->params[i].name);
     }
     for (i = 0; i < it->case_count; i++) {
-        doc_check_text(s, &it->cases[i].doc, &it->cases[i].name);
+        const struct variant_case *one = &it->cases[i];
+        size_t j;
+        doc_check_text(s, &one->doc, &one->name);
+        doc_check_text(s, &one->note, &one->name);
+        for (j = 0; j < one->field_count; j++) {
+            doc_check_text(s, &one->fields[j].doc, &one->fields[j].name);
+            doc_check_text(s, &one->fields[j].note, &one->fields[j].name);
+        }
     }
     for (i = 0; i < it->member_count; i++) {
         doc_check_item(s, it->members[i]);

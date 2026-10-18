@@ -268,7 +268,7 @@ static struct item *variant_item(struct parser *p, struct item *it)
         struct variant_case one;
         memset(&one, 0, sizeof one);
         one.doc = parser_doc_before(p, TOKEN_DOC);
-        parser_doc_before(p, TOKEN_NOTE);
+        one.note = parser_doc_before(p, TOKEN_NOTE);
         one.pos = parser_pos_of(parser_peek(p));
         if (!parser_expect_name(p, &one.name)) {
             free(cases.data);
@@ -440,9 +440,8 @@ static struct item *item_level(struct parser *p)
         if (!parser_expect_name(p, &it->name) || !parser_type_params(p, it)) {
             return NULL;
         }
-        it->params = parser_params(p, false, &it->variadic, NULL,
-                                   &it->param_count);
-        if (p->panic ||
+        if (!parser_params(p, false, &it->variadic, NULL, &it->params,
+                           &it->param_count) ||
             !parser_result_type(p, it)) {
             return NULL;
         }
@@ -458,9 +457,8 @@ static struct item *item_level(struct parser *p)
         if (!parser_expect(p, TOKEN_FN) || !parser_expect_name(p, &it->name)) {
             return NULL;
         }
-        it->params = parser_params(p, true, &it->variadic, NULL,
-                                   &it->param_count);
-        if (p->panic ||
+        if (!parser_params(p, true, &it->variadic, NULL, &it->params,
+                           &it->param_count) ||
             !parser_result_type(p, it)) {
             return NULL;
         }

@@ -152,6 +152,10 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
         break;
     case TYPEX_NAMED:
         label_name(d, "type", &t->module, &t->name);
+        if (t->member.length > 0) {
+            text_appendf(d->out, ".%.*s", (int)t->member.length,
+                         t->member.text);
+        }
         end(d, start, NULL);
         dump_type_args(d, depth + 1, t->args, t->arg_count);
         break;
@@ -177,9 +181,11 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
         dump_type(d, depth + 1, t->element);
         break;
     case TYPEX_FN:
-        text_append(d->out, t->keep ? "type keep fn"
-                            : t->concurrent ? "type concurrent fn"
-                                            : "type fn");
+        text_append(d->out, t->keep && t->owned ? "type keep own "
+                            : t->keep           ? "type keep "
+                            : t->concurrent     ? "type concurrent "
+                                                : "type ");
+        text_append(d->out, t->nullable ? "?fn" : "fn");
         end(d, start, NULL);
         for (i = 0; i < t->param_count; i++) {
             if (t->params[i]->lent) {
@@ -194,11 +200,17 @@ static void dump_type(struct dumper *d, int depth, const struct type_expr *t)
             simple(d, depth + 1, "result", NULL);
             dump_type(d, depth + 2, t->result);
         }
+        if (t->may_fail) {
+            simple(d, depth + 1, "may_fail", NULL);
+        }
         break;
     case TYPEX_TUPLE:
         text_append(d->out, "type tuple");
         end(d, start, NULL);
         for (i = 0; i < t->param_count; i++) {
+            if (t->params[i]->lent) {
+                simple(d, depth + 1, "lent", NULL);
+            }
             dump_type(d, depth + 1, t->params[i]);
         }
         break;
@@ -365,7 +377,9 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         dump_expr(d, depth + 1, e->as.in.high);
         break;
     case EXPR_CAST:
-        text_append(d->out, "cast");
+        text_append(d->out, e->as.cast.test      ? "is_test"
+                            : e->as.cast.checked ? "checked_cast"
+                                                 : "cast");
         end(d, start, type);
         dump_expr(d, depth + 1, e->as.cast.operand);
         dump_type(d, depth + 1, e->as.cast.type);
@@ -681,6 +695,9 @@ static void dump_stmt(struct dumper *d, int depth, const struct stmt *s)
         element = loop_name(s);
         label_name(d, "for_stmt", NULL, &element);
         end(d, start, loop_element(s));
+        if (s->as.for_loop.pattern) {
+            simple(d, depth + 1, "pattern", NULL);
+        }
         dump_bindings(d, depth + 1, s->as.for_loop.names,
                       s->as.for_loop.name_count - (element.length > 0 ? 1 : 0));
         if (s->as.for_loop.over != NULL) {
@@ -859,6 +876,9 @@ static void dump_params(struct dumper *d, int depth, const char *label,
         }
         if (params[i].writable) {
             simple(d, depth + 1, "mutable", NULL);
+        }
+        if (params[i].owned) {
+            simple(d, depth + 1, "own", NULL);
         }
         if (params[i].keep) {
             simple(d, depth + 1, "keep", NULL);
@@ -1090,6 +1110,7 @@ static void dump_module(struct dumper *d, const struct module *module)
                 label_name(d, "case", NULL, &one->name);
                 end(d, at, NULL);
                 dump_doc(d, 2, "doc", &one->doc);
+                dump_doc(d, 2, "note", &one->note);
                 dump_params(d, 2, "field", one->fields, one->field_count,
                             payload);
             }

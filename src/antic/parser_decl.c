@@ -122,26 +122,27 @@ bool parser_lent_mark(struct parser *p)
 }
 
 /* A parenthesised list of name: type pairs, each with an optional
-   `= value`. When allow_variadic is set, an ellipsis token may end the
-   list. */
+   `= value`, into *out and *count. When allow_variadic is set, an
+   ellipsis token may end the list. Returns false on a syntax error, so an
+   empty list, whose *out is NULL, is no failure. */
 /* DESIGN: `self` is written as the first parameter and carries no type,
    because its type is always a pointer to the struct that declares the
    function. It reaches the parameter list as has_self, not as a param. */
-struct param *parser_params(struct parser *p, bool allow_variadic,
-                            bool *variadic, bool *has_self, size_t *count)
+bool parser_params(struct parser *p, bool allow_variadic, bool *variadic,
+                   bool *has_self, struct param **out, size_t *count)
 {
     struct list list = {NULL, 0, 0, sizeof(struct param)};
 
+    *out = NULL;
+    *count = 0;
     if (!parser_expect(p, TOKEN_LPAREN)) {
-        return NULL;
+        return false;
     }
     if (has_self != NULL && parser_check(p, TOKEN_SELF)) {
         parser_next(p);
         *has_self = true;
         if (!parser_accept(p, TOKEN_COMMA)) {
-            return parser_expect(p, TOKEN_RPAREN)
-                       ? parser_list_finish(p, &list, count)
-                       : NULL;
+            return parser_expect(p, TOKEN_RPAREN);
         }
     }
     while (!parser_check(p, TOKEN_RPAREN)) {
@@ -167,14 +168,14 @@ struct param *parser_params(struct parser *p, bool allow_variadic,
             !parser_expect(p, TOKEN_COLON) ||
             (param.type = parser_type(p)) == NULL) {
             free(list.data);
-            return NULL;
+            return false;
         }
         /* `name: T = value`: the default that a call which leaves the
            parameter out passes. */
         if (parser_accept(p, TOKEN_ASSIGN) &&
             (param.value = parser_expression(p)) == NULL) {
             free(list.data);
-            return NULL;
+            return false;
         }
         parser_list_push(&list, &param);
         if (!parser_accept(p, TOKEN_COMMA)) {
@@ -183,9 +184,10 @@ struct param *parser_params(struct parser *p, bool allow_variadic,
     }
     if (!parser_expect(p, TOKEN_RPAREN)) {
         free(list.data);
-        return NULL;
+        return false;
     }
-    return parser_list_finish(p, &list, count);
+    *out = parser_list_finish(p, &list, count);
+    return true;
 }
 
 /* DESIGN: `never` after `->` is a contextual word, so it stays a name
@@ -454,9 +456,8 @@ static struct item *member_level(struct parser *p, const struct item *owner)
     if (!parser_type_params(p, m)) {
         return NULL;
     }
-    m->params = parser_params(p, false, &m->variadic, &m->has_self,
-                              &m->param_count);
-    if (p->panic ||
+    if (!parser_params(p, false, &m->variadic, &m->has_self, &m->params,
+                       &m->param_count) ||
         !parser_result_type(p, m)) {
         return NULL;
     }

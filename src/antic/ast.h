@@ -873,6 +873,7 @@ struct variant_case {
     struct name name;
     struct pos pos;
     struct doc_text doc;            /* the /// text */
+    struct doc_text note;           /* the //# text */
     struct param *fields;
     size_t field_count;
 };
