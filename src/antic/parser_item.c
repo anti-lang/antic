@@ -348,7 +348,8 @@ static struct item *item_level(struct parser *p)
     it->vis = it->pub ? VIS_PUB : VIS_PRIVATE;
     /* DESIGN: `internal` reaches every module under the same package
        root. It is a level of a module item, and never of a class
-       member. */
+       member, since a member is reached through its class, whose own
+       level says who may name it. */
     if (!it->pub && parser_accept(p, TOKEN_INTERNAL)) {
         it->vis = VIS_INTERNAL;
     } else if (parser_check(p, TOKEN_PROTECTED)) {
@@ -357,17 +358,11 @@ static struct item *item_level(struct parser *p)
         return NULL;
     }
     /* DESIGN: export marks items that Anti defines for C. An extern fn is
-       defined in C already. */
+       defined in C already, so exporting one would define it twice. */
     if (it->exported && parser_peek(p)->kind == TOKEN_EXTERN) {
         parser_error_here(p, "an `extern fn` cannot be exported");
         return NULL;
     }
-    /* DESIGN: worker marks a function that a `parallel` may run on
-       another thread. It stands before fn, after pub, and no other item
-       takes it. */
-    /* DESIGN: `abstract` marks a class with an open function, and the
-       contextual `final` forbids inheritance. Both stand before `class`,
-       after `pub`. */
     /* DESIGN: `trace` marks a class whose `pub` functions call the enter
        and leave hooks. It is a contextual word before `class`, and
        before `fn` in a class body, where it marks one function. A module
@@ -381,6 +376,10 @@ static struct item *item_level(struct parser *p)
         }
         it->trace = true;
     }
+    /* DESIGN: `abstract` marks a class with an open function, and the
+       contextual `final` forbids inheritance. Both stand before `class`,
+       after `pub`, so the header of a class says all it is before its
+       name, as `pub` does for its reach. */
     if (parser_peek(p)->kind == TOKEN_ABSTRACT && class_ahead(p, 1)) {
         parser_next(p);
         it->is_abstract = true;
@@ -411,6 +410,10 @@ static struct item *item_level(struct parser *p)
         parser_next(p);
         it->is_operator = true;
     }
+    /* DESIGN: worker marks a function that a `parallel` may run on
+       another thread. It stands before fn, after pub, and no other item
+       takes it, since the checker holds a worker to rules of its own
+       that only a function can meet. */
     it->worker = parser_accept(p, TOKEN_WORKER);
     if (it->worker && parser_peek(p)->kind != TOKEN_FN) {
         parser_error_here(p, "`worker` stands before `fn`");

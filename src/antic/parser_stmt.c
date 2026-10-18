@@ -659,7 +659,8 @@ static struct stmt *statement_level(struct parser *p)
         return parser_expect(p, TOKEN_RBRACE) ? s : NULL;
     }
     /* DESIGN: `defer stmt;` records a statement that runs at every exit
-       of the enclosing block, in reverse order of declaration. */
+       of the enclosing block, in reverse order of declaration, so a
+       release stands beside what it releases and runs on every path. */
     case TOKEN_DEFER:
         parser_next(p);
         s = new_stmt(p, STMT_DEFER, t);

@@ -173,11 +173,6 @@ bool parser_expect_name(struct parser *p, struct name *name)
     return true;
 }
 
-/* DESIGN: `alloc` and `free` name a function of a struct or class and
-   follow `.`, so that `anti.mem.Allocator` has the two functions its
-   work order names. They stay keywords everywhere else. A built-in
-   `alloc` or `free` never stands after `fn` or `.`, so each position
-   has one reading. */
 /* Whether the token may be the name of an `inject` field: an ordinary
    name, or `alloc` or `free`. A name must stand after `inject`, so a
    built-in of either name never does. */
@@ -187,6 +182,11 @@ bool parser_is_field_name(const struct token *t)
            t->kind == TOKEN_FREE;
 }
 
+/* DESIGN: `alloc` and `free` name a function of a struct or class and
+   follow `.`, so that `anti.mem.Allocator` has the two functions its
+   work order names. They stay keywords everywhere else. A built-in
+   `alloc` or `free` never stands after `fn` or `.`, so each position
+   has one reading. */
 bool parser_expect_member_name(struct parser *p, struct name *name)
 {
     const struct token *t = parser_peek(p);

@@ -2304,9 +2304,6 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         c->loop_depth--;
         return;
-    /* DESIGN: `for i in lo..hi` counts over an integer range, and
-       `for x in slice` walks a slice or an array. The variable is
-       read-only in the body, so the loop cannot lose its step. */
     /* `yield v` gives the value that takes the place of the result the
        failing call would have written. */
     case STMT_YIELD:
@@ -2351,6 +2348,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
     case STMT_TRY:
         check_try(c, s);
         return;
+    /* DESIGN: `for i in lo..hi` counts over an integer range, and
+       `for x in slice` walks a slice or an array. The variable is
+       read-only in the body, so the loop cannot lose its step. */
     case STMT_FOR:
         check_for(c, s);
         return;

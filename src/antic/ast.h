@@ -236,7 +236,9 @@ struct iteration {
        iterator holds an `anti.lang.Watch`. changed compares the count of
        the collection with the count the watch remembers. The three
        others give the file and the line of the last change. All four
-       are NULL for an iterator without a watch. */
+       are NULL for an iterator without a watch. The checker builds them
+       on the loop, because it knows the type of the iterator, and
+       lowering writes them into the turn of a dev build alone. */
     struct expr *changed;
     struct expr *change_file;
     struct expr *change_file_length;

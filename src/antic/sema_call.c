@@ -1323,14 +1323,6 @@ static struct type *check_handled(struct checker *c, struct expr *e,
     return result;
 }
 
-/* DESIGN: `Circle(2.0)` builds a value and runs the `construct` of the
-   class with those arguments. The defaults are written first, so the
-   body sees a complete object. A `construct` that can fail makes the
-   whole expression a failing call, which needs a handler like any
-   other. The `construct` is the one the class declares. It runs one
-   body per level, so a class that declares none has no `construct`
-   with arguments, whatever its base declares, and a literal builds
-   it. */
 /* The fewest parameters of the type that a call of sym gives, which is
    every parameter before the first with a default. */
 size_t sema_required_params(const struct symbol *sym, size_t count)
@@ -1410,6 +1402,14 @@ void sema_append_defaults(struct checker *c, struct expr *e,
     e->as.call.arg_count = have + filled;
 }
 
+/* DESIGN: `Circle(2.0)` builds a value and runs the `construct` of the
+   class with those arguments. The defaults are written first, so the
+   body sees a complete object. A `construct` that can fail makes the
+   whole expression a failing call, which needs a handler like any
+   other. The `construct` is the one the class declares. It runs one
+   body per level, so a class that declares none has no `construct`
+   with arguments, whatever its base declares, and a literal builds
+   it. */
 static struct type *check_construct(struct checker *c, struct expr *e,
                                     struct type *t, struct type *expected)
 {
@@ -1664,11 +1664,6 @@ static struct type *plugin_call(struct checker *c, struct expr *e, bool *ok)
 static struct type *check_call(struct checker *c, struct expr *e,
                               struct type *expected, struct generic_call *g);
 
-/* DESIGN: a call carries what a generic needs from it past the rewrites
-   of the checker. That is the type arguments written after the callee's
-   name, and the class or the receiver the callee is reached through. The
-   callee is the name checked now, so a generic function named there is
-   a call and not a value. */
 /* Refuse the field name of a value of type t that e reads. The callee of
    a bare call of a shared `operator fn` names the type none of them
    takes. */
@@ -2203,6 +2198,11 @@ static struct type *unfailing_result(struct checker *c, struct expr *e,
     return fn->result;
 }
 
+/* DESIGN: a call carries what a generic needs from it past the rewrites
+   of the checker. That is the type arguments written after the callee's
+   name, and the class or the receiver the callee is reached through. The
+   callee is the name checked now, so a generic function named there is
+   a call and not a value. */
 static struct type *check_call(struct checker *c, struct expr *e,
                                struct type *expected, struct generic_call *g)
 {

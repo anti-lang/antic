@@ -2153,7 +2153,9 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         t = sema_check_expr(c, e->as.index.base, NULL);
         /* DESIGN: `e[i]` on a type with the `index` hook is the call
            `e.index(i)`, and the index takes the type the hook names.
-           `e[x, y]` is `e.index(x, y)`. */
+           `e[x, y]` is `e.index(x, y)`. The checker writes the call, so
+           lowering and the later passes see an ordinary call and no
+           second form of an index. */
         if (!sema_is_error(t) && sema_hook(c, t, LANG_HOOK_INDEX) != NULL) {
             struct expr *index = e->as.index.index;
             *e = e->as.index.several
@@ -2516,11 +2518,6 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
         return sema_is_error(t) ? t : sema_builtin(c, TYPE_VOID);
-    /* DESIGN: `dup` copies an object of its concrete class and gives a
-       pointer of the static type back. `delete` runs the destruct chain and
-       frees the object. `destroy` runs the chain without the free, for
-       an object that is not on a heap of its own. All three need a class
-       pointer, because all three read the table of the object. */
     /* A node the checker makes, already typed. */
     case EXPR_ATOMIC:
         return e->type;
@@ -2528,6 +2525,14 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return sema_check_sync_op(c, e);
     case EXPR_SIMD:
         return e->type;
+    /* DESIGN: `dup` of a class pointer copies an object of its concrete
+       class and gives a pointer of the static type back, since it reads
+       the table of the object. `delete` runs the destruct chain and frees
+       the object. `destroy` runs the chain without the free, for an
+       object that is not on a heap of its own. The other operands each
+       of them takes have a DESIGN of their own below: a value of a type
+       parameter, a class value, a struct, a tuple and a variant for
+       `dup`, and a pointer to any type for `destroy`. */
     case EXPR_OBJECT: {
         const char *what = e->as.object.op == TOKEN_DUP      ? "dup"
                            : e->as.object.op == TOKEN_DELETE ? "delete"
@@ -2674,10 +2679,6 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     return sema_builtin(c, TYPE_ERROR);
 }
 
-/* DESIGN: a read of an f16 gives an f32. The checker writes it as an
-   `as f32` of the f16, marked promoted, so that lowering converts it
-   where it converts every other `as`. An `as f16` stays f16, because it
-   is the value that a write takes. */
 /* DESIGN: a literal where a `?T` is expected is a T, which then passes
    as the `?T` that holds it. It takes its type from the T, so `0` where a
    `?u8` stands is a `u8`. Every other expression keeps the `?T`, which
@@ -2728,6 +2729,10 @@ static struct type *refuse_tried(struct checker *c, struct expr *e,
     return sema_builtin(c, TYPE_ERROR);
 }
 
+/* DESIGN: a read of an f16 gives an f32. The checker writes it as an
+   `as f32` of the f16, marked promoted, so that lowering converts it
+   where it converts every other `as`. An `as f16` stays f16, because it
+   is the value that a write takes. */
 struct type *sema_check_expr(struct checker *c, struct expr *e,
                              struct type *expected)
 {
