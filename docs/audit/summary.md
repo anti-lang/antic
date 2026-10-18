@@ -476,7 +476,9 @@ The path from `CLAUDE.md` to a file, and the "Files of" sections:
   `6a513f47`: `docs/notes/source-tree.md` and the test `source_tree`.
 - M352. `docs/decisions.md:2176`. The sections "Files of the parser" and
   "Files of the checker" hold seven sentences that no longer describe the
-  files. New. front-end.
+  files. New. front-end. Fixed `6d0fc3f6`: the entry of the checker
+  names eighteen files and points at `sema_checker.h` and
+  `docs/notes/source-tree.md`.
 
 A note or a document that describes a design the code no longer has:
 
@@ -521,6 +523,8 @@ A header or a comment that differs from the code:
 
 - M364. `docs/c-guidelines.md:46`. Rule 10 names a test that fails the
   suite on a banned function. No such test exists. New. tool-pass.
+  Fixed `93df3995`: the test `banned_calls`, which leaves out
+  `src/rt/platform_stdio.c`, as rule 10 now says.
 - M365. `src/antic/memcheck.h:15`. The DESIGN gives a reason of the
   register allocator. `loop_depth` of `ir.h:312` is written and never
   read. New. middle. Fixed `a89c1d19`, which the test
