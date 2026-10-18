@@ -3677,6 +3677,15 @@ add_test(NAME guide_examples
         "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
 
+# The site page of the build tool names the commands of anti and the
+# options of anti and antic as their usage gives them (M363).
+add_test(NAME build_tool_page
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DPAGE=${PROJECT_SOURCE_DIR}/docs/site/build-tool/index.md"
+        -P "${ANTIC_RUNNERS}/run_build_tool_page.cmake")
+
 add_expect_test(warning_one_segment STATUS 0
     PATTERN "geometry.anti:1:1: warning: the module path `geometry` has one segment, which is for a program's own files \\[single-segment-path\\]"
     COMMAND "$<TARGET_FILE:antic>" -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"

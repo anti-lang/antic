@@ -148,7 +148,7 @@ The lock file names every package of the graph with its version, its source and 
 
 ### Repositories
 
-A repository is a URL prefix over static files, and no server code stands behind it. The URL starts with `https://` or `file://`. `http://` is taken for `127.0.0.1` and `localhost` alone.
+A repository is a URL prefix over static files, and no server code stands behind it. The URL starts with `https://` or `file://`. `http://` is taken for `127.0.0.1`, `localhost` and `[::1]` alone.
 
 ```text
 <prefix>/<name>/index.toml

@@ -606,6 +606,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_bench.cmake` | Builds and times the benchmark programs and their C twins. |
 | `tests/runners/run_build_id.cmake` | Checks that links of one program share a build id. |
 | `tests/runners/run_build_id_reader.cmake` | Tests `read_build_id` of `tests/build_id.cmake` on a file with one build line and on files without one. |
+| `tests/runners/run_build_tool_page.cmake` | Compares the commands and options that the site page of the build tool names with the usage of anti and of antic. |
 | `tests/runners/run_check.cmake` | Builds a check program in both modes and expects the dev build to stop. |
 | `tests/runners/run_check_cpu.cmake` | Tests that `tools/check-cpu.cmake` refuses a package that lacks a level of `tools/cpu-levels`. |
 | `tests/runners/run_checks.cmake` | Checks `--checks`, `--no-checks` and a library whose checks follow the build. |
