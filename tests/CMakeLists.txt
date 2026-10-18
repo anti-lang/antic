@@ -4878,6 +4878,16 @@ add_expect_test(error_modules_library_exports_nothing STATUS 1
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_exports_nothing.a"
             modules_library_exports_nothing.anti)
+# The line a static library for C prints names what a C program links
+# beside the archive. A module that imports `anti.regex` needs its glue
+# and PCRE2 after it, as the link of a program of Anti takes them, by
+# "Static library" of docs/libraries-for-c.md (T146).
+add_expect_test(clib_regex_link_line STATUS 0
+    PATTERN "^c[cl] main\\.c .*libmatcher\\.a .*anti_rt_regex\\.(a|lib) .*pcre2-8\\.(a|lib)"
+    COMMAND "$<TARGET_FILE:antic>" --lib static
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/libmatcher.a"
+            "${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/matcher.anti")
 add_expect_test(error_modules_library_kind STATUS 2
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
     PATTERN "--lib takes static or shared[^a-z]+not bundled"
