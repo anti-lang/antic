@@ -5,15 +5,28 @@
    an escape and checks a source with the functions below, and antic
    compiles src/rt/utf.c for it. They use no platform functions, so the
    unit tests check them on any host. */
+
 #ifndef ANTI_UTF_H
 #define ANTI_UTF_H
 
 #include <stddef.h>
 #include <stdint.h>
 
+/* The n bytes at in as UTF-8 into out, without a NUL. Each maximal
+   subpart of an ill-formed sequence becomes one U+FFFD. out holds
+   3 * n bytes. Gives the count of bytes written. */
 size_t anti_rt_utf8_repair(const unsigned char *in, size_t n,
                            unsigned char *out);
+
+/* The n UTF-16 units at in as UTF-8 into out, without a NUL. A surrogate
+   pair gives one scalar value, and any other surrogate U+FFFD. out holds
+   3 * n bytes. Gives the count of bytes written. */
 size_t anti_rt_utf16_to_utf8(const uint16_t *in, size_t n, unsigned char *out);
+
+/* Split the Windows command line at line, ended by a 0 unit, by the
+   rules of the Microsoft C startup code. out takes each argument followed
+   by a 0 unit, and holds 2 * n + 2 units for a line of n units. Gives
+   the count of arguments, the name of the program included. */
 size_t anti_rt_split_command_line(const uint16_t *line, uint16_t *out);
 
 /* DESIGN: decision 7 of "Decisions of 2026-10-11". A file name keeps

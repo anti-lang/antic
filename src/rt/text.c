@@ -1,3 +1,6 @@
+/* The C behind anti.text: helpers of text, the buffer of a Builder,
+   floats to text and text to floats. */
+
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>

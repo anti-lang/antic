@@ -7,6 +7,7 @@
    test then sees the same buckets on every run. A collection reads the seed once, when
    it is made, and mixes it into the hash of every key. A later change
    of the key therefore reaches the collections made after it. */
+
 #include <stdint.h>
 #include <string.h>
 

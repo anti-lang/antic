@@ -1,10 +1,6 @@
 #ifndef ANTI_RT_TOML_H
 #define ANTI_RT_TOML_H
 
-#include <stdint.h>
-
-#include "str.h"
-
 /* A read of the TOML subset that anti.toml, the logger and the runtime
    configuration need. It holds bare keys and quoted keys, `[table]`
    headers, `[[table]]` arrays, inline tables, basic strings, integers,
@@ -17,6 +13,11 @@
    same way. An inline table writes one key per pair under the path of the
    table, so `a = { b = 1 }` holds `a.b`, and an array of inline tables
    holds `a.0.b`. */
+
+#include <stdint.h>
+
+#include "str.h"
+
 struct anti_toml;
 
 /* Read the document. Returns NULL when the text is not the subset. The
@@ -41,6 +42,8 @@ int64_t anti_rt_toml_find(const struct anti_toml *doc,
 /* The line the value of the key at index came from, counting from 1. */
 int64_t anti_rt_toml_line(const struct anti_toml *doc, int64_t index);
 
+/* Free the document and every key and value it holds. A NULL doc does
+   nothing. */
 void anti_rt_toml_free(struct anti_toml *doc);
 
 #endif

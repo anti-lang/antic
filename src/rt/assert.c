@@ -1,3 +1,6 @@
+/* The failure routines of the runtime: one line to standard error, then
+   exit, abort or return. Also the failed assertion of a test. */
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

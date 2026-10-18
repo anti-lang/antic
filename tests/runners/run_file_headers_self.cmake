@@ -5,9 +5,10 @@
 #   RUNNER  tests/runners/run_file_headers.cmake
 #   WORK    a directory for the trees
 #
-# Each case writes a tree of two files, runs the check on it and states
-# whether it must accept the tree. A case that must be refused names a
-# text of the message, so a refusal for another reason fails the case.
+# Each case writes a tree of two files of antic and one of the runtime,
+# runs the check on it and states whether it must accept the tree. A
+# case that must be refused names a text of the message, so a refusal
+# for another reason fails the case.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -15,13 +16,21 @@ file(REMOVE_RECURSE "${WORK}")
 
 set(good_c "/* Reads a thing. */\n\n#include \"lexer.h\"\n")
 set(good_h "#ifndef ANTIC_LEXER_H\n#define ANTIC_LEXER_H\n\n/* The thing. */\n\n#include <stddef.h>\n\n/* Gives one. */\nint lexer_one(void);\n\n/* Gives two from a\n   and b. */\nint lexer_two(int a,\n              int b);\n\n#endif\n")
+# A header of the runtime, whose comment stands before its guard.
+set(good_rt "/* The calls of hash.c. */\n\n#ifndef ANTI_HASH_H\n#define ANTI_HASH_H\n\n/* Gives a hash. */\nint anti_rt_hash(void);\n\n#endif\n")
 
 set(failures "")
-# tree_case(<name> accept|<text of the refusal> <text of lexer.c> <text of lexer.h>)
+# tree_case(<name> accept|<text of the refusal> <text of lexer.c> <text of lexer.h>
+#           [<text of src/rt/hash.h>])
 function(tree_case name verdict c_text h_text)
     set(tree "${WORK}/${name}")
+    set(rt_text "${good_rt}")
+    if(ARGC GREATER 4)
+        set(rt_text "${ARGV4}")
+    endif()
     file(WRITE "${tree}/src/antic/lexer.c" "${c_text}")
     file(WRITE "${tree}/src/antic/lexer.h" "${h_text}")
+    file(WRITE "${tree}/src/rt/hash.h" "${rt_text}")
     # A shared header needs no comment per function.
     file(WRITE "${tree}/src/antic/parser_parser.h"
         "/* The shared state. */\n\nint parser_one(void);\nint parser_two(void);\n")
@@ -82,6 +91,16 @@ tree_case(comment_apart
           "src/antic/lexer.h:5: lexer_one has no comment of its own"
           "${good_c}"
           "/* The thing. */\n\n/* Gives one. */\n\nint lexer_one(void);\n")
+
+tree_case(runtime_header_fastened
+          "src/rt/hash.h: the first comment describes the item below it"
+          "${good_c}" "${good_h}"
+          "/* The calls of hash.c. */\n#ifndef ANTI_HASH_H\n#define ANTI_HASH_H\n\n/* Gives a hash. */\nint anti_rt_hash(void);\n\n#endif\n")
+
+tree_case(runtime_function_without_comment
+          "src/rt/hash.h:6: anti_rt_hash has no comment of its own"
+          "${good_c}" "${good_h}"
+          "/* The calls of hash.c. */\n\n#ifndef ANTI_HASH_H\n#define ANTI_HASH_H\n\nint anti_rt_hash(void);\n\n#endif\n")
 
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "run_file_headers.cmake:\n${failures}")

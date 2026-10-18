@@ -6,6 +6,7 @@
    anti compile src/rt/digest.c into their own programs. It calls nothing
    of the platform, so each side opens its files its own way and hands
    the stream to anti_rt_sha256_stream. */
+
 #ifndef ANTI_RT_DIGEST_H
 #define ANTI_RT_DIGEST_H
 
@@ -21,9 +22,14 @@ struct anti_sha256 {
     uint64_t length;                /* the bytes fed so far */
 };
 
+/* Set s to the state of an empty input. */
 void anti_rt_sha256_init(struct anti_sha256 *s);
+
+/* Feed count bytes to s. The pieces of one input may come in any sizes,
+   and an empty one changes nothing. */
 void anti_rt_sha256_update(struct anti_sha256 *s, const void *bytes,
                            size_t count);
+
 /* Write the digest as 64 lowercase hexadecimal digits and a NUL. The
    state is spent afterwards. */
 void anti_rt_sha256_hex(struct anti_sha256 *s, char hex[65]);

@@ -1,3 +1,6 @@
+/* The atomic operations of the language at a width that comes with the
+   address, by the builtins of the compiler. */
+
 #include "atomic.h"
 
 /* DESIGN: every operation is sequentially consistent, which is the one

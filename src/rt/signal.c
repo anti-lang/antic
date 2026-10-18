@@ -2,6 +2,7 @@
    signal to deliver below on an ordinary thread, which calls the
    function the program registered. See the DESIGN comment of
    anti_rt_signal_route in platform.h. */
+
 #include <stdint.h>
 
 #include "atomic.h"

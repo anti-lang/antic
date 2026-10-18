@@ -1,5 +1,6 @@
 /* The start of the runtime in src/rt/init.c, and the option of the
    backtrace that the configuration sets. */
+
 #ifndef ANTI_RT_H
 #define ANTI_RT_H
 

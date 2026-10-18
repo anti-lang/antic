@@ -6,6 +6,7 @@
    one load and one compare per object. The start of the injections
    links the loader into every program all the same, since
    --anti.inject may name a library for any injectable interface. */
+
 #include "fail.h"
 #include "plugin.h"
 

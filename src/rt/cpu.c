@@ -1,8 +1,9 @@
-/* The processor check that runs once at start. The build compiles one
-   runtime per target and level, each with ANTI_CPU_LEVEL_ID set to its
-   own level, and antic links a program against the runtime of its level.
-   main of start.c calls the check before anything else runs, and the
-   check reads the level of the runtime it was compiled into.
+/* The table of processor levels, and the check of the machine against
+   the level of the runtime, which runs once at start. The build compiles
+   one runtime per target and level, each with ANTI_CPU_LEVEL_ID set to
+   its own level, and antic links a program against the runtime of its
+   level. main of start.c calls the check before anything else runs, and
+   the check reads the level of the runtime it was compiled into.
 
    DESIGN: the check refuses only a machine that is known to be below the
    level. Where a platform has no query for a feature the level needs, the
@@ -10,6 +11,7 @@
    Windows on ARM64 answers up to the ARMv8.2 dot products and has no
    query above them, so armv8.5 passes there. The platform layer reads
    the machine, and this file holds the levels. */
+
 #include "cpu_level.h"
 #include "fail.h"
 #include "platform.h"

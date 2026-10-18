@@ -2,6 +2,7 @@
    makes, in src/rt/threads.c. RT_FUNCTIONS of src/antic/rt_abi.h lists
    the same functions, and the unit test runtime_functions compares the
    two. */
+
 #ifndef ANTI_RT_THREADS_H
 #define ANTI_RT_THREADS_H
 
@@ -40,9 +41,13 @@ void anti_rt_join(void *handle, int64_t result_size, void *out);
 /* Wait for every job of the array, in the order it holds them. */
 void anti_rt_join_all(void *const *handles, int64_t count);
 
-/* anti_rt_join and anti_rt_join_all with the `joined` hook of the object
-   the pool ran, which the compiler calls where hooks are compiled. */
+/* anti_rt_join with the `joined` hook of the object the pool ran, after
+   the join, which the compiler calls where hooks are compiled. A job
+   without an object fires no hook. */
 void anti_rt_join_hooked(void *handle, int64_t result_size, void *out);
+
+/* anti_rt_join_all with the `joined` hook of the object of each job, as
+   anti_rt_join_hooked fires it. */
 void anti_rt_join_all_hooked(void *const *handles, int64_t count);
 
 #endif

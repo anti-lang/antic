@@ -1,5 +1,6 @@
 /* The runtime configuration: the keys of [runtime], the layer each value
    came from and the options under --anti. that name them. */
+
 #ifndef ANTI_RT_CONF_H
 #define ANTI_RT_CONF_H
 
@@ -14,8 +15,11 @@
 void anti_rt_conf_option(const char *name, int64_t length, const char *value);
 
 /* After the option pass: answer --anti.help, read the file that
-   --anti.conf or ANTI_CONF names, and answer --anti.inspect. Each of
-   the two options ends the program with status 0. */
+   --anti.conf or ANTI_CONF names, fill every injection whose provider
+   comes from a library through anti_rt_inject_start, and answer
+   --anti.inspect. Each of the two options ends the program with status
+   0. A file that cannot be read, a key it does not know and a library
+   that cannot give its provider end it with status 70. */
 void anti_rt_conf_start(void);
 
 /* Read the file the program names, with its includes, unless the
@@ -27,9 +31,12 @@ void anti_rt_conf_configure(const unsigned char *path, int64_t length);
    one and the program runs as it was built. */
 struct anti_text anti_rt_conf_get(const unsigned char *key, int64_t length);
 
-/* The count the text of the `threads` key names, from 1 to
-   ANTI_RT_THREADS_MAX, or 0 for a text that is no such count. */
+/* The largest count of workers the `threads` key takes. */
 #define ANTI_RT_THREADS_MAX INT32_MAX
+
+/* The count the text of the `threads` key names, from 1 to
+   ANTI_RT_THREADS_MAX, or 0 for a text that is no such count: an empty
+   text, a byte that is no digit, a sign or a count past the maximum. */
 int32_t anti_rt_conf_threads(struct anti_text text);
 
 #endif

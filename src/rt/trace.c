@@ -13,6 +13,7 @@
    file of each other module. The walk and the module of an address are
    calls of the platform layer, and the format of the module chooses the
    reader of its tables here. */
+
 #include "trace.h"
 
 #include <inttypes.h>

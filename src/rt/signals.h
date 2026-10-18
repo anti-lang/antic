@@ -1,6 +1,8 @@
 #ifndef ANTI_RT_SIGNALS_H
 #define ANTI_RT_SIGNALS_H
 
+/* The two console signals and the two calls of src/rt/signal.c. */
+
 #include <stdint.h>
 
 /* The two signals a console sends, under the numbers C gives them. A

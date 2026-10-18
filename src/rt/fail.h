@@ -1,6 +1,7 @@
 /* The failure routines of the runtime: the one form of every failure it
    reports in src/rt/assert.c, and the failed assertions, checks and
    casts of a program in assert.c, check.c and cast.c. */
+
 #ifndef ANTI_RT_FAIL_H
 #define ANTI_RT_FAIL_H
 

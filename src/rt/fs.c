@@ -6,6 +6,7 @@
    else, so the module builds each error with SystemError.from_errno on
    every system. The calls of the system stand in the platform layer,
    which takes a path in UTF-8 on every system. */
+
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>

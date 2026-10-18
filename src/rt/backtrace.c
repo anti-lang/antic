@@ -7,6 +7,7 @@
    every `fail` asks the function below. It stands in a file of its own,
    so a program that captures a trace and never fails links no reference
    to the default. */
+
 #include "trace.h"
 
 #include "atomic.h"

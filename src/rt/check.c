@@ -1,3 +1,6 @@
+/* The traps of a failed dev-mode check and of a collection changed
+   while a loop walks it. */
+
 #include "fail.h"
 
 /* DESIGN: the compiler builds the text that names the file, the line and

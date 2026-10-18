@@ -1,3 +1,6 @@
+/* The two f16 conversions a program calls where the processor has no
+   instruction. */
+
 #include "f16.h"
 
 /* DESIGN: x86-64-v1 and v2 have no F16C. A program built for them

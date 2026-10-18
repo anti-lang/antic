@@ -1,4 +1,5 @@
 /* The SHA-256 of FIPS 180-4, for the runtime, antic and anti. */
+
 #include "digest.h"
 
 #include <string.h>

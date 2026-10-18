@@ -1,3 +1,5 @@
+/* The empty licence text and version of a bundled static library. */
+
 #include "std.h"
 
 /* The licence text in a static library for C. A bundled runtime carries

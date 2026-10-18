@@ -6,6 +6,7 @@
    value. A scalar is its 64 bits through the finalizer of MurmurHash3. A
    value of parts starts at the offset basis of FNV-1a. It takes each part
    as the mix of the hash so far xor the hash of the part. */
+
 #ifndef ANTI_HASH_H
 #define ANTI_HASH_H
 
@@ -30,13 +31,21 @@ static inline uint64_t anti_rt_hash_mix(uint64_t x)
     return x;
 }
 
-/* The hash of text and bytes, and the seed of the hashing collections,
-   which src/rt/hash.c defines for the runtime. start chooses the seed
-   from the random source of the system, and set fixes it for the key
-   `hash_seed`. */
+/* src/rt/hash.c defines the functions below. */
+
+/* The hash of count bytes, the parts of eight bytes each and the length
+   last. A text hashes as its bytes. */
 uint64_t anti_rt_hash_bytes(const unsigned char *bytes, int64_t count);
+
+/* The seed of the hashing collections, which any thread may read. */
 uint64_t anti_rt_hash_seed(void);
+
+/* Fixes the seed to value, for the key `hash_seed`. A collection made
+   before keeps the seed it read. */
 void anti_rt_hash_seed_set(uint64_t value);
+
+/* Chooses the seed from the random source of the system at start, or
+   from the two clocks when the system gives no random bytes. */
 void anti_rt_hash_seed_start(void);
 
 #endif

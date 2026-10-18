@@ -7,6 +7,7 @@
    one, and `anti symbols` reads it to find the libraries of a
    deployment. src/antic/target.h includes this header rather than
    repeating the name. */
+
 #ifndef ANTI_RT_PLUGIN_INDEX_H
 #define ANTI_RT_PLUGIN_INDEX_H
 

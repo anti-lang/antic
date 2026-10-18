@@ -4,6 +4,7 @@
    DESIGN: a Mutex is one word of the program's own memory, the word of
    the platform layer, and `Mutex.new()` gives zero, its unlocked state.
    See struct anti_rt_word in platform.h. */
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

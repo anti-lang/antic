@@ -1,5 +1,6 @@
 /* Loading a shared library that `provides` interfaces: the table the
    library carries and what a host does with it. */
+
 #ifndef ANTI_RT_PLUGIN_H
 #define ANTI_RT_PLUGIN_H
 
@@ -102,10 +103,12 @@ struct anti_plugin {
     int64_t loads;
 };
 
-/* Take and give back the lock of the slots. A caller of
-   anti_rt_plugin_at or anti_rt_plugin_registry holds it for as long as it
-   reads what they give. */
+/* Take the lock of the slots. A caller of anti_rt_plugin_at or
+   anti_rt_plugin_registry holds it for as long as it reads what they
+   give, and calls no anti_rt_plugin_image while it holds it. */
 void anti_rt_plugin_hold(void);
+
+/* Give back the lock of the slots, which the thread holds. */
 void anti_rt_plugin_release(void);
 
 /* The count of open libraries, which is 0 while no library is open. */
@@ -120,8 +123,10 @@ struct anti_plugin *anti_rt_plugin_at(int64_t index);
    the program. */
 const void *anti_rt_plugin_image(const void *address);
 
-/* Count a library that was opened, or one that was closed. */
+/* Count a library that was opened. */
 void anti_rt_plugin_opened(void);
+
+/* Count a library that was closed. */
 void anti_rt_plugin_closed(void);
 
 /* The classes of the open library in slot index, or NULL for a slot
@@ -169,14 +174,21 @@ int8_t anti_rt_plugin_unload(void *handle);
    the object returned, see ANTI_HOOK_ON_HEAP. The check
    costs one load and one compare while no library is open, because the
    count of them is the first thing it reads. */
+
+/* Count one more live object of the library that holds table, the table
+   of its class. A NULL table and a table of the program count nowhere. */
 void anti_rt_plugin_created(const void *table);
+
+/* Count one live object fewer of the library that holds table, as
+   anti_rt_plugin_created counts. */
 void anti_rt_plugin_destroyed(const void *table);
 
 /* The provider of the interface named by path. It comes from the
    library at library, or from the first library of the search
    directories that provides it when library is empty. NULL when there
    is none, with the reason in anti_rt_plugin_message. dirs is the
-   `plugins` key, one directory per `:` separated part. */
+   `plugins` key, one directory per part between the separators of
+   anti_rt_path_list_separator. */
 void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,
                               const unsigned char *library,
                               int64_t library_length, const char *dirs);

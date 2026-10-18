@@ -1,6 +1,10 @@
 #ifndef ANTI_RT_REFLECT_H
 #define ANTI_RT_REFLECT_H
 
+/* What anti.reflect reads through the runtime: the layout of its Value,
+   the reasons of set and call, the walks of a descriptor in
+   src/rt/reflect.c and the table of the trampolines of a program. */
+
 #include <stdint.h>
 
 #include "object.h"
@@ -43,25 +47,58 @@ enum anti_reflect_reason {
     ANTI_REFLECT_WRONG_COUNT
 };
 
+/* The walks below read the descriptor d of a class. A NULL d gives what
+   a class without fields and functions gives, and an index below zero or
+   past the last record gives what the comment of the walk names. A text
+   they give is read-only data of the program. */
+
+/* The name of the class of d, empty for a NULL d. */
 struct anti_text anti_rt_reflect_class_name(const struct anti_descriptor *d);
+
+/* The descriptor of the base class of d, or NULL for a class without
+   one and for a NULL d. */
 const struct anti_descriptor *anti_rt_reflect_parent(
     const struct anti_descriptor *d);
+
+/* The count of the field records of d, 0 for a NULL d. */
 int64_t anti_rt_reflect_field_count(const struct anti_descriptor *d);
+
+/* The name of the field at index, empty out of range. */
 struct anti_text anti_rt_reflect_field_name(const struct anti_descriptor *d,
                                             int64_t index);
+
+/* The offset of the field at index from the start of the object, -1 out
+   of range. */
 int64_t anti_rt_reflect_field_offset(const struct anti_descriptor *d,
                                      int64_t index);
+
+/* The type id of enum anti_type of the field at index, ANTI_TYPE_NONE
+   out of range. */
 int64_t anti_rt_reflect_field_type(const struct anti_descriptor *d,
                                    int64_t index);
+
+/* 1 when the field at index owns what it holds, and 0 when it does not
+   or the index is out of range. */
 int64_t anti_rt_reflect_field_owned(const struct anti_descriptor *d,
                                     int64_t index);
+
+/* The count of the public functions of the chain of d, 0 for a NULL d. */
 int64_t anti_rt_reflect_function_count(const struct anti_descriptor *d);
+
+/* The name of the function at index, empty out of range. */
 struct anti_text anti_rt_reflect_function_name(const struct anti_descriptor *d,
                                                int64_t index);
+
+/* The entry of the table that holds the function at index, -1 out of
+   range. */
 int64_t anti_rt_reflect_function_slot(const struct anti_descriptor *d,
                                       int64_t index);
+
+/* The count of the parameters of the function at index, self included,
+   0 out of range. */
 int64_t anti_rt_reflect_function_params(const struct anti_descriptor *d,
                                         int64_t index);
+
 /* The field at index of the object as a Value in out. A field of a type
    that no Value carries, and an index out of range, leave out alone. */
 void anti_rt_reflect_get(void *object, const struct anti_descriptor *d,

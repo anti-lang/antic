@@ -1,3 +1,6 @@
+/* Bounds-checked readers of the symbol tables of ELF and Mach-O, the
+   names of COFF, the debug map and the line tables of DWARF. */
+
 #include "symbols.h"
 
 #include <string.h>

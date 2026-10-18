@@ -13,6 +13,7 @@
    holds any bytes. Windows holds UTF-16, and a surrogate of a name that
    pairs with no other stands as the three bytes of its value. macOS
    holds UTF-8 alone. */
+
 #ifndef ANTI_RT_PLATFORM_H
 #define ANTI_RT_PLATFORM_H
 
@@ -123,8 +124,11 @@ void anti_rt_streams_binary(void);
 
 /* Memory of size bytes, at least 1, at align, a power of two, or NULL.
    anti_rt_aligned_free gives it back, and nothing else may: Windows keeps
-   it apart from the memory of malloc. NULL is no memory and is left. */
+   it apart from the memory of malloc. */
 void *anti_rt_aligned_alloc(size_t size, size_t align);
+
+/* Give back memory of anti_rt_aligned_alloc. NULL is no memory and is
+   left. */
 void anti_rt_aligned_free(void *p);
 
 /* Memory of size bytes, at least 1, that `free` of C releases, or NULL.
@@ -173,27 +177,41 @@ enum anti_rt_lock {
     ANTI_RT_LOCK_COUNT
 };
 
+/* The monitor of the lock which, never NULL. */
 struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which);
 
 /* A monitor on the heap, or NULL when the system or the memory gives
-   none. anti_rt_monitor_free ends it, and no thread may hold it then. */
+   none. anti_rt_monitor_free ends it. */
 struct anti_rt_monitor *anti_rt_monitor_new(void);
+
+/* End a monitor of anti_rt_monitor_new and free it. No thread may hold
+   it or wait on it then. */
 void anti_rt_monitor_free(struct anti_rt_monitor *m);
 
+/* Take the lock of m, and wait while another thread holds it. A thread
+   that holds it already must not take it again. */
 void anti_rt_monitor_hold(struct anti_rt_monitor *m);
+
+/* Give back the lock of m, which the thread holds. */
 void anti_rt_monitor_release(struct anti_rt_monitor *m);
 
 /* Wait on condition, 0 or 1, while the thread holds m. A wait may end
    without a wake, so the caller checks its own state in a loop. */
 void anti_rt_monitor_wait(struct anti_rt_monitor *m, int condition);
+
+/* Wake one thread that waits on condition of m, if one does. */
 void anti_rt_monitor_wake_one(struct anti_rt_monitor *m, int condition);
+
+/* Wake every thread that waits on condition of m. */
 void anti_rt_monitor_wake_all(struct anti_rt_monitor *m, int condition);
 
+/* Take the lock which, as anti_rt_monitor_hold takes its monitor. */
 static inline void anti_rt_lock_hold(enum anti_rt_lock which)
 {
     anti_rt_monitor_hold(anti_rt_monitor_of(which));
 }
 
+/* Give back the lock which, which the thread holds. */
 static inline void anti_rt_lock_release(enum anti_rt_lock which)
 {
     anti_rt_monitor_release(anti_rt_monitor_of(which));
@@ -218,7 +236,11 @@ struct anti_rt_word {
 };
 #endif
 
+/* Take the word w, and wait while another thread holds it. The word
+   is no recursive lock: a thread that holds it must not take it again. */
 void anti_rt_word_lock(struct anti_rt_word *w);
+
+/* Give back the word w, which the thread holds. */
 void anti_rt_word_unlock(struct anti_rt_word *w);
 
 /* Start a thread that runs body and ends with it. Nothing joins the
@@ -286,8 +308,10 @@ int anti_rt_file_seek(FILE *file, int64_t offset, int whence);
    open a directory as a stream, and Windows opens none. */
 int anti_rt_file_is_directory(FILE *file);
 
-/* Remove the file, or rename it. Each returns 0, or -1 with errno set. */
+/* Remove the file at path. Returns 0, or -1 with errno set. */
 int anti_rt_file_remove(const char *path);
+
+/* Give the file at from the path to. Returns 0, or -1 with errno set. */
 int anti_rt_file_rename(const char *from, const char *to);
 
 /* Call each with the name of every entry of the directory at path, as
@@ -304,14 +328,24 @@ int anti_rt_directory_list(const char *path,
                                        size_t length),
                            void *context);
 
-/* The system's loader of shared libraries. open takes a path in UTF-8
-   and gives NULL when it fails, and error then gives the reason. A reason
-   the system writes itself goes to text, of size bytes. The reason
-   dlerror gives is kept per thread by the C library. The handle open
-   gives belongs to the caller, and close gives it back. */
+/* The system's loader of shared libraries. Open the library at path, in
+   UTF-8, or give NULL when it fails, and anti_rt_library_error then
+   gives the reason. The handle belongs to the caller, and
+   anti_rt_library_close gives it back. */
 void *anti_rt_library_open(const char *path);
+
+/* Give back the handle of anti_rt_library_open. The code and the data
+   of the library may be gone after it. */
 void anti_rt_library_close(void *handle);
+
+/* The address of the symbol name of the library of handle, or NULL when
+   it holds none. */
 void *anti_rt_library_symbol(void *handle, const char *name);
+
+/* The reason the last call of the loader on the thread failed. macOS
+   and Linux give the text that dlerror keeps per thread, or "cannot open
+   the file" when it keeps none. Windows writes the number of the error
+   into text, of size bytes, and gives text. */
 const char *anti_rt_library_error(char *text, size_t size);
 
 /* The base of the image of the program or of a library that address

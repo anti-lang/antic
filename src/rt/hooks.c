@@ -1,3 +1,6 @@
+/* What a hook site does: it calls the installed handler, then the
+   object's own hook. Also the store of Trace.install. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

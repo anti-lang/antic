@@ -9,6 +9,7 @@
    links the runtime, would get a second main. This file holds the one
    #if on a system outside the files named platform_<system>.c, as rule 22
    of docs/c-guidelines.md says. */
+
 #if defined(_WIN32)
 
 #include "platform.h"

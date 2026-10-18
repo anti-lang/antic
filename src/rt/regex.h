@@ -1,9 +1,12 @@
-/* The compile of a pattern with PCRE2, which antic and the runtime share.
+/* What src/rt/regex.c and src/rt/patterns.c share with antic: the
+   compile of a pattern with PCRE2, the groups, the pieces of a template
+   and the layout of Match.
 
    DESIGN: one definition read from both sides. antic checks every pattern
    literal with it, and the program compiles the same literal with it at
    start. The two read a pattern with the same options and the same
    library. antic compiles src/rt/regex.c into its own program. */
+
 #ifndef ANTI_RT_REGEX_H
 #define ANTI_RT_REGEX_H
 

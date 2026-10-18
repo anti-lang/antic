@@ -1,6 +1,7 @@
 /* The root class of the object model and the data behind reflection. The
    compiler builds a descriptor and a table for every class. It lays both
    out with the C rules, so these declarations mirror what it writes. */
+
 #ifndef ANTI_OBJECT_H
 #define ANTI_OBJECT_H
 
@@ -105,8 +106,12 @@ struct anti_descriptor;
 
 /* Whether the two compiled patterns a and b have the same text and the
    same mode. The hash of p takes its text and its mode, so it agrees. The
-   default `==` and hash of a Regex call the two. */
+   default `==` and hash of a Regex call the two. Two NULL patterns are
+   the same, and one NULL pattern differs from any other. */
 int8_t anti_rt_pattern_same(const void *a, const void *b);
+
+/* The hash of the text and the mode of the compiled pattern p, and the
+   offset basis of FNV-1a for a NULL p. */
 uint64_t anti_rt_pattern_hash(const void *p);
 
 /* The bytes of one element that a pointer or a slice of the type id
@@ -315,9 +320,13 @@ void anti_rt_delete(void *object, const struct anti_descriptor *type);
    heap of its own. */
 void anti_rt_destroy(void *object, const struct anti_descriptor *type);
 
-/* delete and destroy that give every piece of memory back to from. */
+/* anti_rt_delete that gives every piece of memory back to from, the
+   object included. A NULL object does nothing. */
 void anti_rt_delete_from(void *object, const struct anti_descriptor *type,
                          struct anti_object *from);
+
+/* anti_rt_destroy that gives every piece of memory the object owns back
+   to from, and keeps the object. A NULL object does nothing. */
 void anti_rt_destroy_from(void *object, const struct anti_descriptor *type,
                           struct anti_object *from);
 

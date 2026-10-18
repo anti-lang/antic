@@ -1,5 +1,7 @@
 /* The C functions behind the modules anti.io, anti.text, anti.license,
-   anti.mem and anti.fs of the standard library. */
+   anti.mem and anti.fs of the standard library, with the layout of a
+   Builder and the value of errno for an `extern fn`. */
+
 #ifndef ANTI_STD_H
 #define ANTI_STD_H
 
@@ -21,6 +23,9 @@ struct anti_text anti_rt_text_from_c(const unsigned char *bytes);
    until the program ends, one copy per distinct text. A SystemError keeps
    its message in one. In src/rt/text.c. */
 struct anti_text anti_rt_text_kept(const unsigned char *bytes);
+
+/* The str of the len bytes at bytes, which it neither copies nor checks.
+   The str lives as long as the bytes do. */
 struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len);
 
 /* The offset of the first byte of the len bytes at bytes that starts no
@@ -50,9 +55,16 @@ struct anti_builder {
     int64_t capacity;
 };
 
+/* Append the len bytes at bytes, and keep a NUL after the last byte. A
+   len of 0 or below appends nothing. */
 void anti_rt_builder_append(struct anti_builder *b,
                             const unsigned char *bytes, int64_t len);
+
+/* The bytes of b as a str, which b keeps. It is empty for a builder
+   that holds no room yet, and stands until the next change of b. */
 struct anti_text anti_rt_builder_text(const struct anti_builder *b);
+
+/* Empty b and keep its room for the next appends. */
 void anti_rt_builder_clear(struct anti_builder *b);
 
 /* Put count copies of byte at position at, and move what stood there

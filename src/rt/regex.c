@@ -1,3 +1,7 @@
+/* The compile of a text pattern and a byte pattern with PCRE2, the
+   rewrite of a byte pattern, and the groups and the pieces of a
+   template. */
+
 #include "regex.h"
 #include "grow.h"
 

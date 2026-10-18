@@ -8,6 +8,7 @@
    table and opens nothing else. It checks every count, length, pointer
    and offset of the table before it uses one. A damaged or mismatched
    library would otherwise send it outside the table. */
+
 #include "plugin.h"
 
 #include <limits.h>

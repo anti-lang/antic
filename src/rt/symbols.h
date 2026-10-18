@@ -3,6 +3,7 @@
    holds, an image in memory or a file read whole. They call nothing of
    the system, so one test reads the tables of every target on one
    host. */
+
 #ifndef ANTI_SYMBOLS_H
 #define ANTI_SYMBOLS_H
 

@@ -12,6 +12,7 @@
    archives as it is. This file holds a #if on the system outside the
    files named platform_<system>.c, as rule 22 of docs/c-guidelines.md
    says. */
+
 #if defined(_WIN32)
 
 #include <corecrt_startup.h>

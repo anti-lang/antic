@@ -1,3 +1,7 @@
+/* The start of the runtime: the flags that say it began and ran, the
+   seed of the hashing collections, and the option of the backtrace that
+   the configuration sets. */
+
 #include "atomic.h"
 #include "hash.h"
 #include "rt.h"

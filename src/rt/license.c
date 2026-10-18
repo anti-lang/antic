@@ -1,3 +1,6 @@
+/* The licence text and the runtime version, read from the notice that
+   antic links into the program. */
+
 #include <string.h>
 #include "license.h"
 #include "std.h"

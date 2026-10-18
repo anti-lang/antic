@@ -3,6 +3,7 @@
    and `select`. src/rt/lock.c holds the locks and src/rt/sync.c the
    channels. RT_FUNCTIONS of src/antic/rt_abi.h lists the same functions,
    and the unit test runtime_functions compares the two. */
+
 #ifndef ANTI_RT_SYNC_H
 #define ANTI_RT_SYNC_H
 
@@ -40,12 +41,24 @@ void anti_rt_chan_delete(void *handle);
 int64_t anti_rt_select(void *const *chans, void *const *slots,
                        int64_t count, void **got);
 
-/* Take and give back the Mutex whose word is at word. The forms with
-   `_at` are the ones of a dev build, which records the order the locks
-   of a thread are taken in at the site, a text that names the place. */
+/* The forms with `_at` below are the ones of a dev build. Each records
+   the order in which the locks of a thread are taken at the site, a
+   text that names the place, and writes one note to standard error when
+   two locks are taken in opposite orders. */
+
+/* Take the Mutex whose word is at word, and wait while another thread
+   holds it. A thread that holds it already waits for itself. */
 void anti_rt_mutex_lock(void *word);
+
+/* Give back the Mutex whose word is at word, which the thread holds. */
 void anti_rt_mutex_unlock(void *word);
+
+/* anti_rt_mutex_lock of a dev build, which ends the program with the
+   two sites when the thread holds the Mutex already. */
 void anti_rt_mutex_lock_at(void *word, const char *site);
+
+/* anti_rt_mutex_unlock of a dev build, which takes the Mutex off the
+   record of the thread. */
 void anti_rt_mutex_unlock_at(void *word);
 
 /* `m.destroy()`. The word holds nothing of the system, so only the
@@ -61,20 +74,38 @@ struct anti_object_lock {
     int64_t depth;
 };
 
-/* Take and give back the hidden lock of a synchronized class at lock,
-   which the thread that holds it takes again without waiting. The `_at`
-   forms are those of a dev build, as for a Mutex. */
+/* Take the hidden lock of a synchronized class at lock, and wait while
+   another thread holds it. The thread that holds it takes it again
+   without waiting and counts how deep. */
 void anti_rt_object_lock(void *lock);
+
+/* Give back one take of the hidden lock at lock, and free it for other
+   threads after the last. */
 void anti_rt_object_unlock(void *lock);
+
+/* anti_rt_object_lock of a dev build, which records the order at the
+   first take of the thread alone. */
 void anti_rt_object_lock_at(void *lock, const char *site);
+
+/* anti_rt_object_unlock of a dev build, which takes the lock off the
+   record of the thread at the last give. */
 void anti_rt_object_unlock_at(void *lock);
 
-/* `sync a, b { }`: take the hidden locks of two objects in the order of
-   their addresses, and give both back. The same object twice is one
-   lock. */
+/* `sync a, b { }`: take the hidden locks of the objects a and b in the
+   order of their addresses. The same object twice is one lock, taken
+   once. */
 void anti_rt_object_lock_pair(void *a, void *b);
+
+/* Give back the two hidden locks that anti_rt_object_lock_pair took
+   for a and b, or the one for the same object twice. */
 void anti_rt_object_unlock_pair(void *a, void *b);
+
+/* anti_rt_object_lock_pair of a dev build, through
+   anti_rt_object_lock_at. */
 void anti_rt_object_lock_pair_at(void *a, void *b, const char *site);
+
+/* anti_rt_object_unlock_pair of a dev build, through
+   anti_rt_object_unlock_at. */
 void anti_rt_object_unlock_pair_at(void *a, void *b);
 
 /* Whether a lies below b in memory. The standard library takes locks of

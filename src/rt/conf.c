@@ -1,4 +1,5 @@
-/* The runtime configuration.
+/* The keys, the layers, the options and the file of the runtime
+   configuration, which hands each line of [injections] to inject.c.
 
    DESIGN: a program reads a configuration file only when --anti.conf or
    ANTI_CONF names one, or when main calls rt.configure. The runtime
@@ -8,6 +9,7 @@
    that named it. A line of [injections] or of --anti.inject goes to
    src/rt/inject.c, which takes the providers from libraries after the
    configuration has been read. */
+
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>

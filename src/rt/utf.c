@@ -1,3 +1,6 @@
+/* UTF-8 and UTF-16 conversion, the bytes of a Windows file name and the
+   split of a Windows command line. */
+
 #include "utf.h"
 
 static size_t put_scalar(uint32_t c, unsigned char *out)

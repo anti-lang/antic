@@ -5,6 +5,7 @@
    DESIGN: a channel and a select stand on the monitors of the platform
    layer, a lock and condition variables of the system, as the pool of
    src/rt/threads.c does. */
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,4 +1,6 @@
-/* The platform layer on Windows. See platform.h. */
+/* The platform layer on Windows, and the static part of the C runtime
+   that ucrtbase.dll does not export. See platform.h. */
+
 #if defined(_WIN32)
 
 /* rand_s stands behind this macro, which comes before the first header

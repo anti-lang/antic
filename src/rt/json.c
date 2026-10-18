@@ -5,6 +5,7 @@
    one scanner reads the JSON of both. It reads text from outside the
    program in both uses. Every read checks at against end first. Malformed
    input is refused with false, never with an abort. */
+
 #include <string.h>
 
 #include "json.h"

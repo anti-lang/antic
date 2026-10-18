@@ -12,6 +12,7 @@
    architecture rise with the level, so a comparison decides whether a
    machine is high enough. Ids of different architectures never meet,
    because a program built for one never starts on the other. */
+
 #ifndef ANTI_CPU_LEVEL_H
 #define ANTI_CPU_LEVEL_H
 

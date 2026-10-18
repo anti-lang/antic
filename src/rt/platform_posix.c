@@ -1,4 +1,5 @@
 /* The platform layer on macOS and Linux. See platform.h. */
+
 #if !defined(_WIN32)
 
 /* clock_gettime, nanosleep, dladdr, sysconf, syscall, fseeko,

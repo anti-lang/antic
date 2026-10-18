@@ -1,5 +1,6 @@
 /* The registry of the classes of a program, which the link step writes,
    and the two functions that read it. */
+
 #ifndef ANTI_RT_REGISTRY_H
 #define ANTI_RT_REGISTRY_H
 

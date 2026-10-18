@@ -1,3 +1,6 @@
+/* The traps of a failed checked cast and of an object whose table is
+   not set. */
+
 #include "fail.h"
 
 /* DESIGN: `p as *T` on a class pointer traps when the object is of no

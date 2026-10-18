@@ -637,7 +637,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_errors_registered.cmake` | Checks that every error program is named by a test. |
 | `tests/runners/run_expect.cmake` | Runs a command and checks its status and output. |
 | `tests/runners/run_expect_self.cmake` | Tests `run_expect.cmake` and refuses `PASS_REGULAR_EXPRESSION`. |
-| `tests/runners/run_file_headers.cmake` | Refuses a file of antic that opens without the comment of its purpose, and a function of a public header without a comment of its own. |
+| `tests/runners/run_file_headers.cmake` | Refuses a file of antic or of the runtime that opens without the comment of its purpose, and a function of a public header without a comment of its own. |
 | `tests/runners/run_file_headers_self.cmake` | Tests `run_file_headers.cmake` on made-up trees. |
 | `tests/runners/run_files_oom.cmake` | Runs the file helpers out of memory and expects status 70. |
 | `tests/runners/run_find_order.cmake` | Refuses a variable read above the `find_program` that sets it. |

@@ -1,7 +1,10 @@
-/* The C entry point of every Anti program. It converts the command-line
-   arguments and the environment to []str. It calls the program's main
-   through anti.rt.main, the runtime entry symbol that antic defines, and
-   returns the result as the process exit code. */
+/* The C entry point of every Anti program. It checks the processor and
+   starts the runtime. It converts the command-line arguments and the
+   environment to []str, and takes the options of the runtime off the
+   arguments. It calls the program's main through anti.rt.main, the
+   runtime entry symbol that antic defines, and returns the result as the
+   process exit code. */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

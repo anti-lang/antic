@@ -7,6 +7,7 @@
    half with ties to even, which is what fcvt and vcvtps2ph do in the
    default mode. A NaN keeps its sign and the top of its payload and
    becomes quiet, as it does in both instructions. */
+
 #ifndef ANTI_F16_H
 #define ANTI_F16_H
 
@@ -88,7 +89,13 @@ static inline uint16_t anti_rt_f16_narrow(float f)
 /* The routines a program calls at x86-64-v1 and v2. A half travels in
    the low sixteen bits of a 32-bit integer register. The routines ignore
    the high bits they take and clear the ones they give. */
+
+/* The f32 of the half in the low sixteen bits of h, which it holds
+   exactly. */
 float anti_rt_f16_to_f32(uint32_t h);
+
+/* The half nearest f in the low sixteen bits, rounded as the header
+   says, with the high bits clear. */
 uint32_t anti_rt_f32_to_f16(float f);
 
 #endif

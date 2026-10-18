@@ -3,28 +3,37 @@
 # declares has a comment of its own. Run with cmake -P and ROOT, the root
 # of the repository.
 #
-# The header of a file is its first line after the include guard. It is a
-# comment, it is no DESIGN, PERF DECISION or [AI AGENT] comment, and a
-# blank line follows it, so it describes the file and not the item below
-# it. A declaration of a public header has a comment that ends on the
-# line above its first line, so two declarations never share one. The
-# shared headers of a family of files are no public headers, and
-# header_sections checks them.
+# The header of a file is its first line, or its first after the include
+# guard where the guard comes first. It is a comment, it is no DESIGN,
+# PERF DECISION or [AI AGENT] comment, and a blank line follows it, so it
+# describes the file and not the item below it. A declaration of a
+# public header has a comment that ends on the line above its first
+# line, so two declarations never share one. The shared headers of a
+# family of files are no public headers, and header_sections checks
+# them.
 #
 # Step 29 of "Fix steps" in docs/audit/summary.md reaches one part of the
 # tree per session, and each part joins the files read here.
 
 cmake_minimum_required(VERSION 3.21)
 
-# Every file of antic. The shared headers are those header_sections checks.
+# Every file of antic and of the runtime. The shared headers of antic are
+# those header_sections checks. Every header of the runtime is public:
+# generated code, antic, anti or another file of the runtime calls what
+# it declares.
+set(parts antic rt)
 set(shared antl_io.h driver_parts.h lower_lowerer.h parser_parser.h
     sema_checker.h whole_parts.h)
 
-file(GLOB files RELATIVE "${ROOT}" "${ROOT}/src/antic/*.[ch]")
+set(files "")
+foreach(part IN LISTS parts)
+    file(GLOB part_files RELATIVE "${ROOT}" "${ROOT}/src/${part}/*.[ch]")
+    if(part_files STREQUAL "")
+        message(FATAL_ERROR "no file of ${part} under ${ROOT}/src/${part}")
+    endif()
+    list(APPEND files ${part_files})
+endforeach()
 list(SORT files)
-if(files STREQUAL "")
-    message(FATAL_ERROR "no file of antic under ${ROOT}/src/antic")
-endif()
 
 set(failures "")
 
@@ -36,7 +45,7 @@ foreach(path IN LISTS files)
     set(at 0)
     while(at LESS count)
         list(GET lines ${at} line)
-        if(line STREQUAL "" OR line MATCHES "^#(ifndef|define) ANTIC_[A-Z0-9_]+_H$")
+        if(line STREQUAL "" OR line MATCHES "^#(ifndef|define) ANTIC?_[A-Z0-9_]+_H$")
             math(EXPR at "${at} + 1")
         else()
             break()

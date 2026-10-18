@@ -1,10 +1,13 @@
-/* The worker pool behind `parallel`. antic lowers the construct to one
-   call of anti_rt_parallel with a thunk that runs a worker over one
-   chunk. The pool is built at the first call and lives for the program.
+/* The worker pool behind `parallel`, `dispatch` and `join`. antic
+   lowers `parallel` to one call of anti_rt_parallel with a thunk that
+   runs a worker over one chunk, and `dispatch` to a job of the pool that
+   `join` waits for. The pool is built at the first call and lives for
+   the program.
 
    DESIGN: the caller blocks until every chunk is done, so the array it
    splits cannot change while the workers read it. The runtime does the
    splitting, which is what makes the construct free of data races. */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

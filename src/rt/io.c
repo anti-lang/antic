@@ -1,3 +1,5 @@
+/* The write and the exit of anti.io through the C streams. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "std.h"

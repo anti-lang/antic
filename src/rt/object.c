@@ -1,3 +1,6 @@
+/* The C behind anti.lang.Object: the functions of the root, the walk
+   that writes JSON and text, and delete, destroy, dup and give. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>

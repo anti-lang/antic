@@ -1,15 +1,16 @@
 #ifndef ANTI_RT_JSON_H
 #define ANTI_RT_JSON_H
 
+/* A scanner of JSON text, at the level of tokens and positions. It knows
+   no descriptor and builds no tree. Object.deserialize reads into objects
+   on top of it. anti bind builds a tree of the output of clang with it. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-/* A scanner of JSON text, at the level of tokens and positions. It knows
-   no descriptor and builds no tree. Object.deserialize reads into objects
-   on top of it. anti bind builds a tree of the output of clang with it.
-
-   Every function reads only between at and end, and a function that
+/* The scanner: the next byte to read and the end of the text. Every
+   function reads only between at and end, and a function that
    fails leaves at somewhere inside that range. A caller that wants to
    look ahead copies the scanner, which is two pointers. */
 struct anti_json {

@@ -1,5 +1,6 @@
 /* The runtime of anti.lang.StackTrace and of the frames that `fail`
    captures. */
+
 #ifndef ANTI_TRACE_H
 #define ANTI_TRACE_H
 

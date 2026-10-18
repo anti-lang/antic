@@ -1,5 +1,8 @@
-/* The patterns of a program: the literals it compiles before main, and
-   the messages of the errors of a pattern compiled at run time. */
+/* The run-time side of anti.regex: the literals a program compiles
+   before main, the messages of a pattern compiled at run time, the
+   searches, the groups, replace and patch of text and of bytes, and the
+   stop of a search that reaches a limit. */
+
 #include "atomic.h"
 #include "cpu_level.h"
 #include "fail.h"

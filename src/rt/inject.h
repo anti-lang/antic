@@ -2,6 +2,7 @@
    lines of [injections] and of --anti.inject that name a library for
    one, and the providers the loader takes from those libraries before
    main. src/rt/conf.c reads the lines and hands each to this file. */
+
 #ifndef ANTI_RT_INJECT_H
 #define ANTI_RT_INJECT_H
 

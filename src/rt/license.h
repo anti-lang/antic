@@ -8,6 +8,7 @@
    find the id of a binary at the begin marker, and nowhere else, since
    the data of a program may hold a line of the same form. src/antic/
    notice.h includes this header rather than repeating the markers. */
+
 #ifndef ANTI_RT_LICENSE_H
 #define ANTI_RT_LICENSE_H
 

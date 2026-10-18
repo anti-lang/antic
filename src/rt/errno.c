@@ -1,3 +1,5 @@
+/* The value of errno for an `extern fn`. */
+
 #include <errno.h>
 
 #include "std.h"

@@ -9,6 +9,7 @@
    of anti.fs fails with ENOMEM, the compile of a byte pattern fails, and
    the text of a trace is NULL, since the failure routine may be the one
    that builds it. */
+
 #ifndef ANTI_RT_GROW_H
 #define ANTI_RT_GROW_H
 
