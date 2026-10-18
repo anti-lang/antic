@@ -4,7 +4,7 @@ Choices made for floating point. They describe the inside of the compiler.
 `docs/decisions.md` holds what a reader of the language or a user of the
 tools can observe.
 
-- Chapter 17 float comparisons follow IEEE 754: `fne` holds for NaN, and `feq`, `flt`, `fle`, `fgt` and `fge` fail. The LLVM text writes `fne` as `fcmp une`. The others take the ordered predicates, `fcmp oeq`, `olt`, `ole`, `ogt` and `oge`.
+- Float comparisons follow IEEE 754: `fne` holds for NaN, and `feq`, `flt`, `fle`, `fgt` and `fge` fail. The LLVM text writes `fne` as `fcmp une`. The others take the ordered predicates, `fcmp oeq`, `olt`, `ole`, `ogt` and `oge`.
 - An integer constant of a float type is the bits of the float in the LLVM text. The text writes it as the hexadecimal form of a `double`, which LLVM reads for both float types. The optimizer leaves such a zero in a copy of `f64`.
 - The text carries no fast-math flag, so llc contracts no `a * b + c` into an FMA.
 - A float out of the range of an integer type converts with `llvm.fptosi.sat` or `llvm.fptoui.sat`, which saturate and give 0 for NaN on every target.

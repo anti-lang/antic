@@ -14,10 +14,11 @@ design the back end was built from.
 
 - `back_end` of `src/antic/driver.c` lowers the program and runs the passes
   over the whole program. It drops the failures the mode leaves out, runs the
-  optimizer and puts in the checks of `--memory-checks`. `llvm_back_end` then
-  folds every symbolic size with `layout_init`, `layout_data` and
-  `layout_resolve`, runs the optimizer again on each function that had a
-  symbolic value, and translates the module. The translation never sees a
+  optimizer and declares the checks of `--memory-checks` with
+  `memcheck_declare`. `llvm_back_end` then folds every symbolic size with
+  `layout_init`, `layout_data` and `layout_resolve`, and runs the optimizer
+  again on each function that had a symbolic value. It puts the checks in
+  with `memcheck_function` and translates the module. The translation never sees a
   symbolic size.
 - Release mode translates the whole program into one text, dev mode one
   module, and a plugin its own module alone. `--dump-llvm` prints the text
@@ -60,8 +61,10 @@ design the back end was built from.
   `llvm.compiler.used`, so under LTO it keeps its frame and its own name in a
   trace, a map and a PDB. The function of each module that compiles its pattern
   literals and, in a library for C, the constructor of the runtime stand in
-  `llvm.global_ctors`. The copy of the package header and the notice are
-  constants in sections of their own, which `llvm.used` keeps.
+  `llvm.global_ctors`. The copy of the package header is a constant in
+  a section of its own, `.anti_package` or `__DATA,__anti_package`. The notice is a constant in the
+  read-only section of each format, `.rodata`, `__TEXT,__const` or `.rdata`.
+  `llvm.used` keeps both.
 - A call names the function type that `abi_classify` gives for its callee.
   An argument past the parameters of a variadic C function passes in its
   promoted type outside that type. The result of a call takes the type of its
