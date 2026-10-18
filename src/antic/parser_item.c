@@ -11,13 +11,16 @@
 static size_t closing_brace(const struct parser *p)
 {
     size_t i;
-    int depth = 1;
+    size_t depth = 1;
 
     for (i = p->pos; i < p->last; i++) {
         if (p->tokens[i].kind == TOKEN_LBRACE) {
             depth++;
-        } else if (p->tokens[i].kind == TOKEN_RBRACE && --depth == 0) {
-            return i;
+        } else if (p->tokens[i].kind == TOKEN_RBRACE) {
+            depth--;
+            if (depth == 0) {
+                return i;
+            }
         }
     }
     return p->last;

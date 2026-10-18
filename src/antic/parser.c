@@ -331,7 +331,7 @@ struct doc_text parser_doc_before(struct parser *p, enum token_kind kind)
    docs/audit/tests-findings.md. */
 void parser_sync_statement(struct parser *p, size_t from)
 {
-    int open = 0;
+    size_t open = 0;
     size_t i;
 
     p->half = false;
@@ -348,7 +348,9 @@ void parser_sync_statement(struct parser *p, size_t from)
        reads it moves on, by T103. */
     if (p->pos == from && parser_peek(p)->kind != TOKEN_EOF &&
         parser_peek(p)->kind != TOKEN_RBRACE) {
-        open += parser_peek(p)->kind == TOKEN_LBRACE;
+        if (parser_peek(p)->kind == TOKEN_LBRACE) {
+            open++;
+        }
         parser_next(p);
     }
     for (;;) {
@@ -393,7 +395,7 @@ void parser_sync_statement(struct parser *p, size_t from)
 /* Skip to the next item at the outermost brace level. */
 static void sync_item(struct parser *p)
 {
-    int depth = 0;
+    size_t depth = 0;
 
     p->half = false;
     p->angles = 0;

@@ -838,7 +838,7 @@ static struct stmt *statement(struct parser *p)
    `while`, where the recovery of a statement stops. */
 static void skip_block(struct parser *p)
 {
-    int open = 0;
+    size_t open = 0;
 
     while (!parser_check(p, TOKEN_EOF) &&
            (open > 0 || !parser_check(p, TOKEN_RBRACE))) {

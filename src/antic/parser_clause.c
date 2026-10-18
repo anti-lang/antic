@@ -50,17 +50,22 @@ bool parser_clause_ahead(const struct parser *p, size_t ahead)
 bool parser_statement_clause(const struct parser *p)
 {
     size_t i = p->pos + 1;
-    int depth = 0;
+    size_t depth = 0;
     enum token_kind after;
 
     if (!parser_clause_ahead(p, 0)) {
         return false;
     }
+    /* The token at i is the `(` that parser_clause_ahead found, so depth
+       is 1 before the first `)` and the loop stops when it reaches 0. */
     for (; p->tokens[i].kind != TOKEN_EOF; i++) {
         if (p->tokens[i].kind == TOKEN_LPAREN) {
             depth++;
-        } else if (p->tokens[i].kind == TOKEN_RPAREN && --depth == 0) {
-            break;
+        } else if (p->tokens[i].kind == TOKEN_RPAREN) {
+            depth--;
+            if (depth == 0) {
+                break;
+            }
         }
     }
     if (p->tokens[i].kind == TOKEN_EOF) {
