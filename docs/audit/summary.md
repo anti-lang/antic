@@ -459,7 +459,8 @@ The path from `CLAUDE.md` to a file, and the "Files of" sections:
 - M351. `docs/decisions.md:2161`. No document lists the files of a
   directory with their purposes. 41 of the 96 `.c` files of `src/antic/`
   stand in no "Files of" section. `src/anti/`, `src/rt/`, `tests/` and
-  `tools/` have no list at all. New. tool-pass, tests, structure.
+  `tools/` have no list at all. New. tool-pass, tests, structure. Fixed
+  `6a513f47`: `docs/notes/source-tree.md` and the test `source_tree`.
 - M352. `docs/decisions.md:2176`. The sections "Files of the parser" and
   "Files of the checker" hold seven sentences that no longer describe the
   files. New. front-end.
