@@ -1,6 +1,10 @@
 # The raw-bytes rule: an Anti program writes the bytes it was given, and
 # the harness reads them as bytes on every host. The test runs a child that
-# writes a CR, an LF and a NUL, then a program that writes them.
+# writes a CR, an LF and a NUL, then an Anti program and a C program that
+# write them. program_expect then refuses four children that differ from
+# what is expected. Last it reads every runner: each call that captures
+# output names ENCODING NONE, and none reads a program it built into a
+# variable.
 #
 #   cmake -DROOT=<repository> -DANTIC=<antic>
 #         -DRUNTIME=<runtime directory> -DC_PROGRAM=<raw_bytes_c>

@@ -1,6 +1,7 @@
-# Link tests/programs/return42.anti for TARGET on this host with lld and
-# check the object file format of the executable with llvm-objdump. The
-# format names the architecture, and the link prints nothing. Run with cmake -P and these values:
+# Link SOURCE for TARGET on this host with lld and check the object file
+# format of the executable with llvm-objdump. The format names the
+# architecture, and the link prints nothing. Run with cmake -P and these
+# values:
 #   ANTIC         the antic executable
 #   LLVM_OBJDUMP  the llvm-objdump executable
 #   RUNTIME       the runtime directory

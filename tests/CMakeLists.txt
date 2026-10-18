@@ -4907,7 +4907,6 @@ set_tests_properties(error_modules_import_cycle PROPERTIES
 add_test(NAME internal_package
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/internal"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/internal"
         -P "${ANTIC_RUNNERS}/run_internal.cmake")

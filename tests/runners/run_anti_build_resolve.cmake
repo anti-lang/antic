@@ -1,5 +1,7 @@
-# Drive the resolution of `anti build` over a `file://` repository whose
-# picks change while the walk runs. Run with cmake -P and these values:
+# Drive the resolution of `anti build` in two parts: over a `file://`
+# repository whose picks change while the walk runs, and over a manifest
+# of more than one repository that a dependency is searched in. Run with
+# cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
 #   HOST     the target name of this host

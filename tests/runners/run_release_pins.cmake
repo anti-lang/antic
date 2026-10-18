@@ -2,7 +2,10 @@
 # that the LLVM tools and the pinned clang come from: its tag, where it
 # lies, the name of an asset and the digest of the asset of each of the six
 # hosts. Both pins name one release. The version stands in
-# tools/llvm-version alone and the rest in the pins alone.
+# tools/llvm-version alone and the rest in the pins alone, and no
+# installer names a pin or the version. tools/get-llvm.cmake and
+# tools/get-clang.cmake install into the directories that
+# tools/pinned-compiler.cmake reads, each spelled once.
 #
 #   cmake -DROOT=<repository> -P tests/runners/run_release_pins.cmake
 

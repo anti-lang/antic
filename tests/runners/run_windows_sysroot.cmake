@@ -1,5 +1,6 @@
-# tools/get-sysroot.cmake lays out the Windows sysroot of a target from the
-# source release of mingw-w64 that tools/sysroot-pins names: the headers of
+# The pin of mingw-w64 in tools/sysroot-pins names a version, an https URL
+# and a digest. tools/get-sysroot.cmake lays out the Windows sysroot of a
+# target from the source release that the pin names: the headers of
 # mingw-w64-headers into include/, with _mingw.h written from _mingw.h.in,
 # and the import libraries that llvm-dlltool writes from the .def files of
 # mingw-w64-crt into lib/, each .def.in preprocessed for the processor of
@@ -7,6 +8,8 @@
 # source release served from a file:// URL takes the place of the real one
 # in a copy of the script. The pinned clang preprocesses the .def files
 # and llvm-ar, as llvm-dlltool, writes the libraries, as in a real run.
+# The licences follow, and a second run lays the sysroot out again from
+# the download it kept.
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -DCLANG_DIR=<dir>
 #         -DLLVM_BIN=<dir> -DOBJDUMP=<llvm-objdump>

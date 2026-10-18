@@ -1,3 +1,8 @@
+# The functions every runner includes. They run a program, antic and anti
+# with the output in files, write bytes and compare bytes and texts, build
+# a program and check its output and status, and fake a release for the
+# tests of the installer.
+
 # DESIGN: the raw-bytes rule. The harness reads the standard output and
 # the standard error of a program as the bytes of a file, on every host.
 # An OUTPUT_VARIABLE or an ERROR_VARIABLE loses the CR of each CRLF and

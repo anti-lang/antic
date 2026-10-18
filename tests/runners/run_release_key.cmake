@@ -1,7 +1,9 @@
-# The public key that checks SHA256SUMS.sig of the LLVM tools lives in the
-# installers, which anti-lang.com serves, and in tools/keys/release.pem of the
-# repository. A package carries none, since whoever could replace a package
-# could replace a key inside it. Each installer holds the key of the file.
+# The public key that checks SHA256SUMS.sig, of a release of Anti and of
+# the LLVM tools alike, lives in the installers, which anti-lang.com
+# serves, and in tools/keys/release.pem of the repository. A package
+# carries none, since whoever could replace a package could replace a key
+# inside it. Each installer holds the key of the file. The tag of a
+# release is annotated and unsigned, so a release asks gpg for no key.
 #
 #   cmake -DROOT=<repository> -P tests/runners/run_release_key.cmake
 

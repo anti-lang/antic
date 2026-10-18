@@ -1,5 +1,7 @@
 # Link one program twice and another once, and read the build id of each
-# from its licence notice. Run with cmake -P and these values:
+# from its licence notice. Then refuse a link with an object that cannot
+# be read, which would give the program a digest of less than its code.
+# Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file linked twice

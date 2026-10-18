@@ -2,7 +2,11 @@
 # with --lib shared --no-runtime, so it carries no runtime and is bound
 # against the host that loads it. A Windows library links against the
 # import library of its host, so each program there takes a library of
-# its own. Run with cmake -P and these values:
+# its own. Then a `--closed` program that cannot load it, the refusal of
+# `--no-hooks`, a provider of the manifest taken from the library by
+# `plugin:<path>` and by `discover`, and the index of plugins that antic
+# writes beside a library and rewrites. Run with cmake -P and these
+# values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/plugin

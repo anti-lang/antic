@@ -1,8 +1,9 @@
 # Build a program of three modules in dev mode: each library module into
 # its own object, then the main module, linked with those objects. Run the
 # result and check its exit status. Then build the library modules again
-# from their library files, which gives the same assembly, and link and
-# run that program too. Run with cmake -P and these values:
+# from their library files, compare the LLVM text of each with the one
+# from its source, and link and run that program too. Run with cmake -P
+# and these values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory
 #   MODULES   the search root of the sources

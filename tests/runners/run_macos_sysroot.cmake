@@ -4,7 +4,11 @@
 # library from its source archive into sysroot/macos-<cpu>, with the SDK
 # version of the stubs, Zig's MIT licence and the text of the APSL. A
 # stand-in archive served from a file:// URL takes the place of the real
-# one in a copy of the script, and the test runs on every host.
+# one in a copy of the script, and the test runs on every host. An
+# archive of another digest is refused. The second half is the Apple SDK:
+# the .tbd stubs of a MacOSX.sdk that APPLE_SDK names go to sdk/ of each
+# macOS sysroot, a run that names none keeps them, and a directory that is
+# no SDK is refused.
 #
 #   cmake -DROOT=<repository> -DWORK=<dir> -P tests/runners/run_macos_sysroot.cmake
 

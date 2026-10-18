@@ -1,8 +1,7 @@
 # Drive `anti build`, `anti run` and `anti new` over the two-module
 # project of tests/anti-build/app. Run with cmake -P and these values:
 #   ANTI     the anti executable
-#   OBJDUMP  llvm-objdump of the pinned release
-#   RUNTIME  the runtime archive
+#   RUNTIME  the runtime archive, whose bin/ holds llvm-profdata
 #   FIXTURE  the directory that holds app/ and units/
 #   HOST     the target name of this host
 #   OTHER    a target name that is not this host's
@@ -12,9 +11,12 @@
 #   WORK     a directory this run writes into
 #   OBJECT   the suffix of an object of the host, .o or .obj
 #
-# It covers the dev mode of docs/tooling-addendum.md with its cache,
-# release mode, the `-g` rule of docs/tooling.md, --target, --cpu, the
-# lock file, `anti run` and the project `anti new` writes.
+# It covers the dev mode of docs/tooling-addendum.md with its cache and
+# the line tables of its objects, release mode with the symbols archive
+# beside the binary, the `-g` rule of docs/tooling.md, --target, --cpu,
+# the lock file, `anti run` and the project `anti new` writes. Then
+# --profile-generate and --profile-use, and the bitcode of a release
+# build beside the objects of --lto none.
 
 cmake_minimum_required(VERSION 3.21)
 

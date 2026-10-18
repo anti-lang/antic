@@ -1,6 +1,8 @@
 # The installers and the uninstallers of the two shells take the same
 # options, because a reader of one page uses either. A spelling that only
-# one of them knows fails the other with no message worth reading.
+# one of them knows fails the other with no message worth reading. The
+# four scripts also agree on the roots of an install, with antic, anti.os
+# and docs/decisions.md, and on the file name of the installer's marker.
 #
 #   cmake -DROOT=<repository> -P tests/runners/run_installer_options.cmake
 
