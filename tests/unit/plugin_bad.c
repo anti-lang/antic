@@ -1,6 +1,7 @@
 /* A shared library that rt_plugin_table_tests loads: the table of a
    plugin with one entry, one class and one struct. The table is
    writable, so the test damages one value of it before each load. */
+
 #include "../binary_stdio.h"
 #include "../../src/rt/plugin.h"
 #include "../../src/rt/registry.h"

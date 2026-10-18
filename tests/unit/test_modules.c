@@ -1,3 +1,6 @@
+/* The library file written, read back and damaged, the imports across
+   modules and the module paths. */
+
 #include "../binary_stdio.h"
 #include <stdlib.h>
 #include "check.h"

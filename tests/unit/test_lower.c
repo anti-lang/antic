@@ -1,3 +1,6 @@
+/* The IR that lowering writes for a source, and the table of the runtime
+   functions that lowering calls against the prototypes of src/rt/. */
+
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"

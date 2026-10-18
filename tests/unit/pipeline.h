@@ -1,6 +1,7 @@
 /* The compiler stages the unit tests run a source through: the front end
    alone, or the front end and lowering. One copy, so a change of a stage
    reaches every test that runs it. */
+
 #ifndef ANTIC_TEST_PIPELINE_H
 #define ANTIC_TEST_PIPELINE_H
 
@@ -18,7 +19,7 @@
 #include "types.h"
 
 /* A source lexed and parsed. ok is false when the parser refused it, with
-   its messages in diags. parsed_release frees p whatever the result. */
+   its messages in diags. */
 struct parsed {
     struct arena arena;
     struct diagnostics diags;
@@ -27,7 +28,12 @@ struct parsed {
     bool ok;
 };
 
+/* Lex and parse source into p, which needs no setup. A source the lexer
+   refuses counts a failure. */
 void parsed_run(struct parsed *p, const char *source);
+
+/* Free the tokens, the messages and the memory pool of p, whatever
+   parsed_run gave. */
 void parsed_release(struct parsed *p);
 
 /* Check that source parses without a message and that its tree, as
@@ -46,12 +52,17 @@ struct checked {
     bool ok;
 };
 
-/* Check source into c as the module main, or as the module name. A source
-   that does not parse counts a failure and prints its first message,
-   since every test source is meant to parse. checked_release frees c
-   whatever the result. */
+/* Check source into c as the module main, as checked_run_as does. */
 void checked_run(struct checked *c, const char *source);
+
+/* Check source into c, which needs no setup, as the module name. A source
+   that does not lex or parse counts a failure and prints its first
+   message, since every test source is meant to parse, and leaves ok
+   false. */
 void checked_run_as(struct checked *c, const char *name, const char *source);
+
+/* Free the tokens, the messages and the memory pool of c, which holds
+   its tree and its types, whatever checked_run gave. */
 void checked_release(struct checked *c);
 
 /* Print every message of d and the source they came from. */
@@ -79,17 +90,23 @@ void rejects_with(const char *source, const char *message);
 
 /* A source checked and lowered into ir. ok is false when it does not
    check, which counts a failure. The caller optimises ir as its test
-   needs. lowered_release frees l whatever the result. */
+   needs. */
 struct lowered {
     struct checked front;
     struct ir_module ir;
     bool ok;
 };
 
+/* Check source as the module main and lower it into l with no options
+   of lower_module, as lowered_run_with does. */
 void lowered_run(struct lowered *l, const char *source);
-/* lowered_run with the options of lower_module, LOWER_DEV among them. */
+
+/* lowered_run with the options of lower_module, LOWER_DEV among them. A
+   source that does not check is not lowered, and its ir stays empty. */
 void lowered_run_with(struct lowered *l, const char *source,
                       unsigned options);
+
+/* Free the IR and the checked source of l, whatever lowered_run gave. */
 void lowered_release(struct lowered *l);
 
 /* Append the IR of m to out as ir_print does, without the lines of the

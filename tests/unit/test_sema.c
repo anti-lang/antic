@@ -1,3 +1,9 @@
+/* What the checker accepts, refuses and warns of: the rules of each
+   construct, a type that contains itself, the chains of constants, calls
+   and types it walks without a recursion per link, the copies of
+   generics and their bounds, the walks over the parts of a type and the
+   members reached through a type. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"

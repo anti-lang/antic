@@ -9,6 +9,7 @@
    the debugger library of the system. Then the memory at an alignment,
    the arguments and the environment of the process and what the
    processor reports. */
+
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)

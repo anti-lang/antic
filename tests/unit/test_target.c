@@ -1,3 +1,6 @@
+/* The mangled names, the C names and the block labels of
+   src/antic/target.c, and the target of the host. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "target.h"

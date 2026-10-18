@@ -1,3 +1,6 @@
+/* Two parts. The text buffer of src/antic/text.c, and the cut of a long
+   line of a message of src/antic/diagnostic.c. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "diagnostic.h"

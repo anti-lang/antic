@@ -1,3 +1,7 @@
+/* The UTF-8 of src/rt/utf.c: the repair of bytes, the conversion from
+   UTF-16, a Windows file name as bytes and back, the split of a command
+   line, and a scalar value encoded and decoded. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "alloc.h"

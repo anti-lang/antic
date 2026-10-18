@@ -22,20 +22,21 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-# Every file of antic, of the runtime and of anti. The shared headers of
-# antic are those header_sections checks. Every header of the runtime is
-# public: generated code, antic, anti or another file of the runtime
-# calls what it declares. Every header of anti is public as well, since
-# main.c or another file of anti calls what each declares.
-set(parts antic rt anti)
+# Every file of antic, of the runtime, of anti and of the unit tests. The
+# shared headers of antic are those header_sections checks. Every header
+# of the runtime is public: generated code, antic, anti or another file
+# of the runtime calls what it declares. Every header of anti is public
+# as well, since main.c or another file of anti calls what each declares,
+# and so is every header of the unit tests, whose files call it.
+set(parts src/antic src/rt src/anti tests/unit)
 set(shared antl_io.h driver_parts.h lower_lowerer.h parser_parser.h
     sema_checker.h whole_parts.h)
 
 set(files "")
 foreach(part IN LISTS parts)
-    file(GLOB part_files RELATIVE "${ROOT}" "${ROOT}/src/${part}/*.[ch]")
+    file(GLOB part_files RELATIVE "${ROOT}" "${ROOT}/${part}/*.[ch]")
     if(part_files STREQUAL "")
-        message(FATAL_ERROR "no file of ${part} under ${ROOT}/src/${part}")
+        message(FATAL_ERROR "no file of ${part} under ${ROOT}/${part}")
     endif()
     list(APPEND files ${part_files})
 endforeach()

@@ -1,3 +1,8 @@
+/* The arithmetic of src/antic/arith.c that the checker and the back end
+   fold constants with: the decimal reader, the quotient of IEEE 754, the
+   upper half of a product, the saturating operations and the shifts at
+   every width, and the conversion to f32. */
+
 #include <float.h>
 #include <math.h>
 #include <stdint.h>

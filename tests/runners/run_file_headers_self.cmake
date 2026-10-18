@@ -6,9 +6,10 @@
 #   WORK    a directory for the trees
 #
 # Each case writes a tree of two files of antic, one of the runtime, one
-# of anti and a module of the standard library, runs the check on it and states whether it must accept the tree. A
-# case that must be refused names a text of the message, so a refusal
-# for another reason fails the case.
+# of anti, a module of the standard library and two files of the unit
+# tests. It runs the check on the tree and states whether it must accept
+# it. A case that must be refused names a text of the message, so a
+# refusal for another reason fails the case.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -26,10 +27,15 @@ set(good_anti "#ifndef ANTI_ZIP_H\n#define ANTI_ZIP_H\n\n/* The zip archive. */\
 # no function that may fail.
 set(good_std "//! Things.\n\n/// A thing.\npub class Thing\n{\n\t/// Its size.\n\tpub size: int,\n\n\t/// Writes it.\n\tabstract fn write(self);\n}\n\n/// Reads a thing, and fails when it is gone.\npub fn read(path: str)\n\t-> int may fail\n{\n\treturn 0;\n}\n\n/// Calls `f`.\npub fn call(f: fn() may fail)\n{\n}\n")
 
+# A unit test and a header the unit tests share.
+set(good_unit_c "/* The things of lexer.c. */\n\n#include \"check.h\"\n")
+set(good_unit_h "/* The stages. */\n\n#ifndef ANTIC_TEST_PIPELINE_H\n#define ANTIC_TEST_PIPELINE_H\n\n/* Runs a source. */\nvoid parsed_run(const char *source);\n\n#endif\n")
+
 set(failures "")
 # tree_case(<name> accept|<text of the refusal> <text of lexer.c> <text of lexer.h>
 #           [<text of src/rt/hash.h> [<text of src/anti/zip.h>
-#           [<text of src/std/anti/thing.anti>]]])
+#           [<text of src/std/anti/thing.anti> [<text of tests/unit/test_thing.c>
+#           [<text of tests/unit/pipeline.h>]]]]])
 function(tree_case name verdict c_text h_text)
     set(tree "${WORK}/${name}")
     set(rt_text "${good_rt}")
@@ -44,11 +50,21 @@ function(tree_case name verdict c_text h_text)
     if(ARGC GREATER 6)
         set(std_text "${ARGV6}")
     endif()
+    set(unit_c_text "${good_unit_c}")
+    if(ARGC GREATER 7)
+        set(unit_c_text "${ARGV7}")
+    endif()
+    set(unit_h_text "${good_unit_h}")
+    if(ARGC GREATER 8)
+        set(unit_h_text "${ARGV8}")
+    endif()
     file(WRITE "${tree}/src/antic/lexer.c" "${c_text}")
     file(WRITE "${tree}/src/antic/lexer.h" "${h_text}")
     file(WRITE "${tree}/src/rt/hash.h" "${rt_text}")
     file(WRITE "${tree}/src/anti/zip.h" "${anti_text}")
     file(WRITE "${tree}/src/std/anti/thing.anti" "${std_text}")
+    file(WRITE "${tree}/tests/unit/test_thing.c" "${unit_c_text}")
+    file(WRITE "${tree}/tests/unit/pipeline.h" "${unit_h_text}")
     # A shared header needs no comment per function.
     file(WRITE "${tree}/src/antic/parser_parser.h"
         "/* The shared state. */\n\nint parser_one(void);\nint parser_two(void);\n")
@@ -163,6 +179,28 @@ tree_case(abstract_failure_not_named
           "src/std/anti/thing.anti:7: the comment of a function that may fail does not say how it fails"
           "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
           "//! Things.\n\n/// A thing.\npub abstract class Thing\n{\n\t/// Reads it.\n\tabstract fn read(self) -> int may fail;\n}\n")
+
+tree_case(unit_without_header
+          "tests/unit/test_thing.c: opens with no comment"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}" "${good_std}"
+          "#include \"check.h\"\n\n/* Counts one case. */\nstatic int cases;\n")
+
+tree_case(unit_header_after_includes
+          "tests/unit/test_thing.c: opens with no comment"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}" "${good_std}"
+          "#include \"check.h\"\n\n/* The things of lexer.c. */\n")
+
+tree_case(unit_header_fastened
+          "tests/unit/pipeline.h: the first comment describes the item below it"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}" "${good_std}"
+          "${good_unit_c}"
+          "/* The stages. */\n#ifndef ANTIC_TEST_PIPELINE_H\n#define ANTIC_TEST_PIPELINE_H\n\n/* Runs a source. */\nvoid parsed_run(const char *source);\n\n#endif\n")
+
+tree_case(unit_function_shares_a_comment
+          "tests/unit/pipeline.h:8: parsed_release has no comment of its own"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}" "${good_std}"
+          "${good_unit_c}"
+          "/* The stages. */\n\n#ifndef ANTIC_TEST_PIPELINE_H\n#define ANTIC_TEST_PIPELINE_H\n\n/* Runs a source and frees it. */\nvoid parsed_run(const char *source);\nvoid parsed_release(void);\n\n#endif\n")
 
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "run_file_headers.cmake:\n${failures}")

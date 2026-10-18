@@ -1,3 +1,6 @@
+/* The sizes, the alignments, the bitfields and the refusals of
+   src/antic/layout.c, and the constants it folds per target. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "arena.h"

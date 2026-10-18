@@ -1,3 +1,6 @@
+/* The three user directories of src/antic/userdirs.c on each system,
+   under an environment the test gives. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include <string.h>

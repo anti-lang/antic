@@ -1,6 +1,7 @@
 /* The join of COFF objects that a bundled runtime of a Windows library
    takes. Each test builds small objects by hand, joins them and reads the
    result back. */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

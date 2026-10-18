@@ -554,7 +554,7 @@ Each holds one case per message of a command, which
 | `tests/unit/test_tool_platform.c` | The platform layer of antic and `anti` on the host. |
 | `tests/unit/test_types.c` | The type table and the pointer sets of `ptrset.c`. |
 | `tests/unit/test_userdirs.c` | The three user directories under an environment the test gives. |
-| `tests/unit/test_utf.c` | The repair, the conversion and the split of UTF-8 in `src/rt/utf.c`. |
+| `tests/unit/test_utf.c` | The UTF-8 of `src/rt/utf.c`: the repair of bytes, the conversion from UTF-16, a Windows file name, the split of a command line and a scalar value encoded and decoded. |
 | `tests/unit/test_variant.c` | The rules of sum types in the checker. |
 | `tests/unit/test_whole.c` | The pass over the whole program. |
 | `tests/unit/test_zip.c` | The zip reader of `anti symbols` on damaged archives. |

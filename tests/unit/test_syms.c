@@ -2,6 +2,7 @@
    deployment index with no id, and a program with no function. Each
    used to hand a null pointer to memcmp or qsort with a count of zero,
    which the sanitizer builds catch. */
+
 #if !defined(_WIN32)
 /* mkfifo is POSIX, outside the C11 library. */
 #define _POSIX_C_SOURCE 200809L

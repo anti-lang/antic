@@ -1,5 +1,6 @@
 /* Integer bounds of the runtime: the growth of a block, the places of a
    text builder and atomic subtraction at the minimum of each width. */
+
 #include <stdint.h>
 #include <stdlib.h>
 

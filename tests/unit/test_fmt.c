@@ -3,6 +3,7 @@
    past what the stack holds, and the body of an anonymous function that
    the file ends inside. The last group holds single rules, on sources
    the parser takes and on ones it refuses. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>

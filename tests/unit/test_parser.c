@@ -1,3 +1,5 @@
+/* The tree the parser builds, its errors and its depth limit. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"

@@ -5,6 +5,7 @@
    and an unset one as NULL. Paths follow the rules of the host that
    path_rules.h holds, and on Windows a path and a value outside ASCII
    reach the system as UTF-16. */
+
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)

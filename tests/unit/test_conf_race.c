@@ -4,6 +4,7 @@
    time. The sanitizer builds report a value freed under that reader. The
    runtime of an Anti program carries no sanitizer, so the check stands
    here, with the loader replaced by stand-ins. */
+
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)

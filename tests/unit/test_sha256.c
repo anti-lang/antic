@@ -1,3 +1,6 @@
+/* The SHA-256 of src/rt/digest.c over the vectors of FIPS 180-4, whole
+   and in pieces that cross its blocks. */
+
 #include <string.h>
 
 #include "../binary_stdio.h"

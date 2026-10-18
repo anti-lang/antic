@@ -1,3 +1,8 @@
+/* The pass over the whole program of src/antic/whole.c: what it reaches,
+   the entries and the joined modules, devirtualisation and the facts of
+   a table, the class registry, the singleton check, the used slots, the
+   trampolines of reflection and the interfaces a library provides. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "antl.h"

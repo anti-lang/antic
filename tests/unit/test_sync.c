@@ -1,3 +1,8 @@
+/* The rules of "Locking and channels" in
+   docs/anti-language-additions.md. `anti.lang.Mutex` and `sync m { }`,
+   `chan T` with `send`, `recv` and `close`, and `select` over the
+   channels. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"
@@ -8,11 +13,6 @@
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
-
-/* The rules of "Locking and channels" in
-   docs/anti-language-additions.md. `anti.lang.Mutex` and `sync m { }`,
-   `chan T` with `send`, `recv` and `close`, and `select` over the
-   channels. */
 
 /* A source the parser refuses, with its first message. */
 static void syntax_error(const char *source, int line, int column,

@@ -2,6 +2,7 @@
    src/rt/platform.h, and the one of the tools, src/antic/platform.h, both
    follow. The test of each layer runs its own two functions over these
    cases, so the two layers cannot answer a path differently. */
+
 #ifndef ANTIC_TEST_PATH_RULES_H
 #define ANTIC_TEST_PATH_RULES_H
 

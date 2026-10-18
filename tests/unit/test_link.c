@@ -1,3 +1,7 @@
+/* Three parts. The command lines of the linker per target and mode, of
+   src/antic/linker.c. The names of an Apple SDK, of src/antic/applesdk.c.
+   The markers of the notice, which src/rt/license.h alone holds. */
+
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"

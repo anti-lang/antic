@@ -4,6 +4,7 @@
    modules of src/std/ as antic compiles them and compare each layout and
    each number with the declaration of src/rt/, so a change on one side
    that the other lacks fails here on the host. */
+
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include <stddef.h>

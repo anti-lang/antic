@@ -1,3 +1,6 @@
+/* The rules of "Nullable pointers" in docs/anti-language-additions.md.
+   `*T` never holds `none`, `?*T` may, and narrowing is per block. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"
@@ -8,9 +11,6 @@
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
-
-/* The rules of "Nullable pointers" in docs/anti-language-additions.md.
-   `*T` never holds `none`, `?*T` may, and narrowing is per block. */
 
 /* A function body around a fragment, so each case is one line of source. */
 static void body_accepts(const char *fragment)

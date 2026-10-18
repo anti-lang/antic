@@ -1,6 +1,7 @@
 /* The zip reader of anti symbols. The archives are cut short or point
    outside the file, and the deflate streams are broken or unpack past
    the size their entry declares. */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

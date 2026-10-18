@@ -1,3 +1,8 @@
+/* The stages that pipeline.h declares: a source lexed and parsed,
+   checked, or checked and lowered for the unit tests, the checks of what
+   the checker accepts and refuses, and the IR print without the types of
+   the runtime. */
+
 #include "../binary_stdio.h"
 #include "pipeline.h"
 

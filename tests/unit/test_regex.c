@@ -2,6 +2,7 @@
    pattern, and the lookup of a group by a name that holds a NUL. Each
    prefix is a heap copy without a NUL, so AddressSanitizer reports a read
    past its end. */
+
 #include <stdlib.h>
 #include <string.h>
 

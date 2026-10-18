@@ -5,6 +5,7 @@
    named by its argument, for more memory than any host gives, and
    tests/runners/run_alloc_oom.cmake checks the exit. A helper that comes back
    prints what it returned and ends with status 0. */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

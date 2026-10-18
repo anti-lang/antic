@@ -1,3 +1,8 @@
+/* The rules of "Sum types" in docs/anti-language-additions.md. A variant
+   is a tag and a union of its cases, a literal names its case, `switch`
+   binds the fields of a case and covers every case, and `is`, `if let`
+   and `tag` read the tag. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"
@@ -8,11 +13,6 @@
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
-
-/* The rules of "Sum types" in docs/anti-language-additions.md. A variant
-   is a tag and a union of its cases, a literal names its case, `switch`
-   binds the fields of a case and covers every case, and `is`, `if let`
-   and `tag` read the tag. */
 
 /* The kind of the integer under the tag of a variant of count cases
    without fields. */

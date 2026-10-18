@@ -1,6 +1,7 @@
 /* The signal table of the runtime under threads that register at once.
    Windows starts no reader thread and opens no pipe, so the checks are of
    the other two systems. */
+
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)

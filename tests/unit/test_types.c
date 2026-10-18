@@ -1,3 +1,6 @@
+/* Two parts. The type table of src/antic/types.c, and the pointer sets
+   of src/antic/ptrset.c. */
+
 #include <stdint.h>
 #include <stdlib.h>
 

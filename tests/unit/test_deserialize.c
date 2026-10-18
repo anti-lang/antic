@@ -8,6 +8,7 @@
    one fails, and each class counts the objects prepared and torn down.
    The classes, the registry and the loader are stand-ins for what antic
    writes into a program. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

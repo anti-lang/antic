@@ -1,3 +1,6 @@
+/* The table of the entry functions of the unit tests by file, and the
+   main that runs the files one argument names. */
+
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"

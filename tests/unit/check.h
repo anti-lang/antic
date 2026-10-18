@@ -1,5 +1,6 @@
 /* Minimal assertion macros for the unit tests. A failed check prints its
    location and the test run continues, so one run reports every failure. */
+
 #ifndef ANTIC_CHECK_H
 #define ANTIC_CHECK_H
 

@@ -1,3 +1,6 @@
+/* The passes of src/antic/optimize.c over the IR of a source, with the
+   verifier run before and after them. */
+
 #include <stdlib.h>
 
 #include "../binary_stdio.h"

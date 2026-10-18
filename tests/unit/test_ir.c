@@ -1,3 +1,6 @@
+/* The IR built by hand: its printed form, the checks of its verifier and
+   the facts a function and an instruction carry. */
+
 #include <string.h>
 
 #include "../binary_stdio.h"

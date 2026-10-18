@@ -1,5 +1,6 @@
 /* The reader of a pattern literal of src/antic/pattern.c: the fewest bytes
    a match or a group can take, which the fit rule of `patch` reads. */
+
 #include <stdint.h>
 #include <string.h>
 

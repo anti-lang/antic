@@ -7,6 +7,7 @@
    executable names it. It prints the file and the line. The two forms are
    `symbols_probe elf <file> <symbol> <offset>` and
    `symbols_probe macho <object> <symbol> <offset>`. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

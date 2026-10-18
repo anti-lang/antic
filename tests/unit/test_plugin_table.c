@@ -3,6 +3,7 @@
    of it, loads the library and expects a refusal that names the damage,
    and then puts the value back. The sanitizer builds check that no load
    reads or writes outside what the table describes. */
+
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)

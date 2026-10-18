@@ -1,3 +1,7 @@
+/* The readers of src/rt/symbols.c: the names of COFF, the sections and
+   line tables of ELF, and the symbols, the debug map and the lines of an
+   object of Mach-O. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "alloc.h"

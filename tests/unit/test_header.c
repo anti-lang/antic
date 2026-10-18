@@ -1,3 +1,8 @@
+/* The C header antic writes for a library: the structs, unions,
+   constants and functions it exports, the tuples, Flags and f16 fields
+   of an exported signature, a bundled archive, owning structs and the
+   lanes of a simd struct of bools. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"

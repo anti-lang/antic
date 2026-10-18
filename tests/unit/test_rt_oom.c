@@ -9,6 +9,7 @@
    once refusing is set and call the C library before. The argument names
    one case, and tests/runners/run_rt_oom.cmake checks the stop. A case that comes
    back prints what it got and ends with status 0. */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

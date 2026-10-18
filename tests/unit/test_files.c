@@ -2,6 +2,7 @@
    a directory tree. A read that fails part of the way now fails. So do a
    write the disk refuses and a directory that cannot be read. A link
    back up the tree now ends the walk. */
+
 #if !defined(_WIN32)
 /* chmod, symlink, mkfifo and geteuid are POSIX, outside the C11
    library. */

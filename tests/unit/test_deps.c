@@ -1,5 +1,6 @@
 /* The manifest of a project, the version constraints of its dependencies
    and the repository URLs the rules allow. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

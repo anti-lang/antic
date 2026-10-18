@@ -3,6 +3,7 @@
    second load of a library that is open. The
    loader of the runtime runs here with stand-ins for the rest of the
    runtime, so the sanitizer builds check it. */
+
 #if defined(__APPLE__)
 #define _DARWIN_C_SOURCE
 #elif !defined(_WIN32)

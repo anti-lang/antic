@@ -1,3 +1,7 @@
+/* The tokens, the literals, the doc comments and the errors of the
+   lexer, and the bounds on the nesting of a format and on the count of
+   its messages. */
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "alloc.h"
