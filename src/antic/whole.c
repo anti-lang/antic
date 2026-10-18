@@ -400,15 +400,6 @@ static bool same_operand(const struct ir_module *m, const uint32_t *rep,
         return false;
     }
     switch (a->kind) {
-    case IR_NONE:
-        return true;
-    case IR_TEMP:
-        return a->as.temp == b->as.temp;
-    case IR_INT:
-        return a->as.integer == b->as.integer;
-    case IR_FLOAT:
-        return memcmp(&a->as.floating, &b->as.floating,
-                      sizeof a->as.floating) == 0;
     case IR_GLOBAL:
         return same_global(m, a->as.index, b->as.index);
     case IR_FUNC:
@@ -417,8 +408,9 @@ static bool same_operand(const struct ir_module *m, const uint32_t *rep,
         return a->as.index == b->as.index;
     case IR_SYM:
         return same_sym(m, a->as.index, b->as.index);
+    default:
+        return ir_same_scalar(a, b);
     }
-    return false;
 }
 
 static bool same_function(const struct ir_module *m, const uint32_t *rep,

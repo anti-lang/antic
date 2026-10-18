@@ -903,9 +903,8 @@ static bool names_temp(struct ir_operand o, uint32_t t)
     return o.kind == IR_TEMP && o.as.temp == t;
 }
 
-/* Whether two operands name the same value. Each kind compares the member
-   of the union it writes, since the bytes of a wider member that no store
-   wrote are unspecified in C11 6.2.6.1. */
+/* Whether two operands name the same value. A reference names the same
+   one by the same index. */
 static bool same_operand(const struct ir_operand *a,
                          const struct ir_operand *b)
 {
@@ -913,22 +912,14 @@ static bool same_operand(const struct ir_operand *a,
         return false;
     }
     switch (a->kind) {
-    case IR_NONE:
-        return true;
-    case IR_TEMP:
-        return a->as.temp == b->as.temp;
-    case IR_INT:
-        return a->as.integer == b->as.integer;
-    case IR_FLOAT:
-        return memcmp(&a->as.floating, &b->as.floating,
-                      sizeof a->as.floating) == 0;
     case IR_GLOBAL:
     case IR_FUNC:
     case IR_BLOCK:
     case IR_SYM:
         return a->as.index == b->as.index;
+    default:
+        return ir_same_scalar(a, b);
     }
-    return false;
 }
 
 /* DESIGN: the IR is not in SSA form, and `ir_assign` writes a temporary

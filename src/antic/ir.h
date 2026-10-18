@@ -800,6 +800,13 @@ struct ir_const *ir_const_int(struct ir_module *m, enum ir_type type,
 /* Whether the two constants hold the same value. */
 bool ir_const_equal(const struct ir_const *a, const struct ir_const *b);
 
+/* Whether the operands a and b, of one kind among IR_NONE, IR_TEMP,
+   IR_INT and IR_FLOAT, name the same value. Each kind compares the member
+   of the union it writes, since the bytes of a wider member that no store
+   wrote are unspecified in C11 6.2.6.1. The reference kinds are left to
+   the caller, which knows what makes two of them the same. */
+bool ir_same_scalar(const struct ir_operand *a, const struct ir_operand *b);
+
 /* The operand of temporary temp of f, with its type. */
 struct ir_operand ir_temp_op(const struct ir_function *f, uint32_t temp);
 

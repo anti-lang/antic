@@ -409,39 +409,6 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
     sema_refuse_lock_copy(c, value, t);
 }
 
-/* Whether a value of t holds a Mutex. It does when it is one, or a
-   struct, a class, a tuple, a variant or an array with one inside it. A
-   pointer holds none. answered holds the types with fields met in this
-   walk, none of which holds a Mutex, since the walk ends at the first
-   that does. */
-static bool holds_mutex(const struct type *t, struct ptr_set *answered)
-{
-    size_t i;
-
-    if (t == NULL) {
-        return false;
-    }
-    if (types_is_mutex(t)) {
-        return true;
-    }
-    if (t->kind == TYPE_ARRAY || t->kind == TYPE_OPTIONAL) {
-        return holds_mutex(t->element, answered);
-    }
-    if (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS &&
-        t->kind != TYPE_TUPLE && t->kind != TYPE_VARIANT) {
-        return false;
-    }
-    if (!ptr_set_add(answered, t)) {
-        return false;
-    }
-    for (i = 0; i < t->field_count; i++) {
-        if (holds_mutex(t->fields[i].type, answered)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* The largest `align(N)` of t and of the parts it holds in place, or 0.
    A packed type puts its fields at any offset, so it has its own N
    alone. answered holds the types with fields met in this walk. */
@@ -485,15 +452,11 @@ uint64_t sema_declared_align(const struct type *t)
     return align;
 }
 
+/* A value holds a Mutex when it is one, or a struct, a class, a tuple, a
+   variant, a `?T` or an array with one inside it. A pointer holds none. */
 bool sema_holds_mutex(const struct type *t)
 {
-    struct ptr_set answered;
-    bool holds;
-
-    memset(&answered, 0, sizeof answered);
-    holds = holds_mutex(t, &answered);
-    free(answered.slots);
-    return holds;
+    return types_holds(t, types_is_mutex);
 }
 
 /* DESIGN: a Mutex is the lock word itself, so a copy would be a second

@@ -632,6 +632,23 @@ bool ir_const_equal(const struct ir_const *a, const struct ir_const *b)
     }
 }
 
+bool ir_same_scalar(const struct ir_operand *a, const struct ir_operand *b)
+{
+    switch (a->kind) {
+    case IR_NONE:
+        return true;
+    case IR_TEMP:
+        return a->as.temp == b->as.temp;
+    case IR_INT:
+        return a->as.integer == b->as.integer;
+    case IR_FLOAT:
+        return memcmp(&a->as.floating, &b->as.floating,
+                      sizeof a->as.floating) == 0;
+    default:
+        return false;
+    }
+}
+
 static void add_reloc(struct ir_module *m, struct ir_global *g,
                       uint64_t offset, uint32_t target, bool fn)
 {

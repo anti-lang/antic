@@ -991,6 +991,10 @@ bool types_pointer_free(const struct type *t);
 /* Whether t has fields: a struct, a union, a class, a tuple, a variant
    and a `?T`, whose parts the walks over fields reach as fields. */
 bool types_has_fields(const struct type *t);
+/* Whether a value of t holds a type that leaf accepts: t itself, the
+   element of an array or a field, at any depth, of a type with fields. A
+   pointer holds nothing. Each type with fields is walked once. */
+bool types_holds(const struct type *t, bool (*leaf)(const struct type *));
 
 /* The type whose `operator fn hash` the checked call names, one of the
    calls of a default hash: the first parameter of the function, through

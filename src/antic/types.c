@@ -2117,6 +2117,46 @@ bool types_has_fields(const struct type *t)
                          t->kind == TYPE_OPTIONAL);
 }
 
+/* The walk of types_holds. answered holds the types with fields met in
+   it, none of which holds a type leaf accepts, since the walk ends at the
+   first that does. */
+static bool holds_walk(const struct type *t,
+                       bool (*leaf)(const struct type *),
+                       struct ptr_set *answered)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return false;
+    }
+    if (leaf(t)) {
+        return true;
+    }
+    if (t->kind == TYPE_ARRAY) {
+        return holds_walk(t->element, leaf, answered);
+    }
+    if (!types_has_fields(t) || !ptr_set_add(answered, t)) {
+        return false;
+    }
+    for (i = 0; i < t->field_count; i++) {
+        if (holds_walk(t->fields[i].type, leaf, answered)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool types_holds(const struct type *t, bool (*leaf)(const struct type *))
+{
+    struct ptr_set answered;
+    bool holds;
+
+    memset(&answered, 0, sizeof answered);
+    holds = holds_walk(t, leaf, &answered);
+    free(answered.slots);
+    return holds;
+}
+
 const struct type *types_hash_call_type(const struct expr *call)
 {
     const struct expr *callee = call->as.call.callee;

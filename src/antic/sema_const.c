@@ -1556,45 +1556,14 @@ static void const_deps_of_symbol(struct chain_deps *d, struct symbol *sym)
     sema_leave(d->c, &saved);
 }
 
-/* Whether a value of type t holds a class, itself or in a field or an
-   element. answered holds the types with fields met in this walk, none
-   of which holds a class. */
-static bool class_in(const struct type *t, struct ptr_set *answered)
+static bool is_class(const struct type *t)
 {
-    size_t i;
-
-    if (t == NULL) {
-        return false;
-    }
-    if (t->kind == TYPE_CLASS) {
-        return true;
-    }
-    if (t->kind == TYPE_ARRAY) {
-        return class_in(t->element, answered);
-    }
-    if (!types_has_fields(t)) {
-        return false;
-    }
-    if (!ptr_set_add(answered, t)) {
-        return false;
-    }
-    for (i = 0; i < t->field_count; i++) {
-        if (class_in(t->fields[i].type, answered)) {
-            return true;
-        }
-    }
-    return false;
+    return t->kind == TYPE_CLASS;
 }
 
 bool sema_holds_class(const struct type *t)
 {
-    struct ptr_set answered;
-    bool holds;
-
-    memset(&answered, 0, sizeof answered);
-    holds = class_in(t, &answered);
-    free(answered.slots);
-    return holds;
+    return types_holds(t, is_class);
 }
 
 /* Evaluate a constant that a chain names. */
