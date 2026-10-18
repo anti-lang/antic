@@ -517,7 +517,8 @@ A note or a document that describes a design the code no longer has:
   are not built. Both are. New. anti-tool. Fixed `3c44b558`.
 - M363. `docs/site/build-tool/index.md:30`. The site page of the build
   tool describes assembly files, llvm-mc, eight commands that do not
-  exist and none of `anti symbols`. New. anti-tool.
+  exist and none of `anti symbols`. New. anti-tool. Fixed `10eb85ab`,
+  by decision 8, with the test `build_tool_page`.
 
 A header or a comment that differs from the code:
 
