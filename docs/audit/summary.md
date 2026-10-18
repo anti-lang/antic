@@ -442,7 +442,8 @@ A file without a header comment that says its one purpose:
   test `file_headers` holds.
 - M347. `tests/unit/test_target.c:1`. 24 of the 56 unit files open
   without a header comment. Three test more than one part and no line
-  says so. New. tests.
+  says so. New. tests. Fixed `d1052d33`, which the test `file_headers`
+  holds.
 
 A public function or item without a comment:
 
@@ -595,7 +596,7 @@ directory are in `src/antic/`.
 | Question | Count | Findings and reports |
 |---|---|---|
 | A comment that differs from the code | 12 | `antic.h:11` against the test `anti_interface` (tool-pass). Stale sentences, `parser_item.c:345` (front-end). Two comments of the IR, `ir_verify.c:679` (middle). `antl_verify.c:13` and `src/rt/toml.c:1` (library-file). `src/rt/symbols.h:65` and comments that name what moved, `src/rt/platform.h:4` (rt). `src/std/anti/random.anti:5` (std). Nine comments, `src/anti/build.c:487` (anti-tool). `CMakeLists.txt:136`, the recipes that name modules, `src/native/sqlite.cmake:1`, and two presets, `CMakePresets.json:23` (build-and-tools). |
-| A header that says less | 3 | `src/rt/platform_windows.c:1` (structure), fixed `48d4a31a`. Eight headers, `src/anti/zip.c:1` (anti-tool), fixed `342ab0f3`. Headers of runners, `tests/program_output.cmake:1` and `tests/runners/run_anti_build.cmake:4` (build-and-tools, tests). |
+| A header that says less | 3 | `src/rt/platform_windows.c:1` (structure), fixed `48d4a31a`. Eight headers, `src/anti/zip.c:1` (anti-tool), fixed `342ab0f3`. Headers of runners, `tests/program_output.cmake:1` and `tests/runners/run_anti_build.cmake:4` (build-and-tools, tests), fixed `d1ae01a1`, and `run_modules.cmake:20` by `0f0c5f9e` before. |
 | Stale names in notes and documents | 10 | File names in the decisions and `CLAUDE.md`, `docs/decisions.md:1220` (tool-pass), fixed `e5efa818`. Function names that moved, `docs/notes/hashing.md:8`, `check.md:76` and `versions.md:41` (structure, front-end, library-file). `ir.md:7`, `optimizer.md:7`, `hashing.md:11` and `dev-checks.md:44` (middle). `llvm.md:17` (back-end). `threads.md:31` (rt). The site page of the library, `docs/site/standard-library/index.md:27` (std). `doc.md:53` (anti-tool). |
 | Comments that name what is gone | 4 | llvm-mc as the assembler, `cpu.c:7`, `target.c:16` and `tests/runners/run_bench.cmake:14` (structure, back-end, tool-pass), fixed `c0f1e8e1` and `452739de`. Chapters of the book, `layout.h:12` and `sema.h:196` (middle, front-end). The steps of the work order, `llvm_emit.c:24` (back-end). Finding numbers that two audits use, `tests/runners/run_antl_verify.cmake:1` (tests). |
 | DESIGN without a reason | 4 | `sema_expr.c:1984` (front-end). A reason that is gone, `driver_index.c:14` (back-end). Two bounds of 32, `src/rt/trace.c:142` (rt). `tests/runners/run_asserts.cmake:47` (build-and-tools). |
