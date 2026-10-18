@@ -523,13 +523,14 @@ static bool skip_block(struct lexer *lx, size_t skip)
    the closer, the form C programmers write for a short comment. Over more
    lines than one the text starts on the line after the opener and ends on
    the line before the closer. A line then holds text or a delimiter, and
-   the block form gives the text of the line form. */
-static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
+   the block form gives the text of the line form.
+   This reads the text of the comment that opens at start, at line and
+   column, after its marker of marker bytes, into raw. It returns false
+   after the error of a comment that never ends, or of text beside the
+   opener or the closer of a comment of more than one line. */
+static bool block_doc_text(struct lexer *lx, size_t start, int line,
+                           int column, size_t marker, struct text *raw)
 {
-    size_t start = lx->pos;
-    int line = lx->line;
-    int column = lx->column;
-    struct text raw = {0};
     size_t i;
 
     for (i = 0; i < marker; i++) {
@@ -549,11 +550,9 @@ static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
         while (lx->pos < from + i) {
             advance(lx);
         }
-        text_append_bytes(&raw, lx->src + from, i);
+        text_append_bytes(raw, lx->src + from, i);
         skip_block(lx, 0);
-        push_doc(lx, kind, start, line, column, &raw);
-        text_free(&raw);
-        return;
+        return true;
     }
     if (at(lx, 0) != '\n') {
         /* One message for one comment: a missing end outranks the text. */
@@ -564,7 +563,7 @@ static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
         } else {
             error_at(lx, line, column, "unterminated block comment");
         }
-        return;
+        return false;
     }
     advance(lx);
     for (i = 0;; i++) {
@@ -578,8 +577,7 @@ static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
         }
         if (at(lx, 0) == -1) {
             error_at(lx, line, column, "unterminated block comment");
-            text_free(&raw);
-            return;
+            return false;
         }
         if (at(lx, 0) == '*') {
             advance(lx);
@@ -587,18 +585,29 @@ static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
             if (!blank) {
                 error_at(lx, text_line, 1,
                          "doc comment text ends on the line before `*/`");
-                text_free(&raw);
-                return;
+                return false;
             }
             break;
         }
         if (i > 0) {
-            text_append(&raw, "\n");
+            text_append(raw, "\n");
         }
-        take_line(lx, from, &raw);
+        take_line(lx, from, raw);
         advance(lx);
     }
-    push_doc(lx, kind, start, line, column, &raw);
+    return true;
+}
+
+static void block_doc(struct lexer *lx, enum token_kind kind, size_t marker)
+{
+    size_t start = lx->pos;
+    int line = lx->line;
+    int column = lx->column;
+    struct text raw = {0};
+
+    if (block_doc_text(lx, start, line, column, marker, &raw)) {
+        push_doc(lx, kind, start, line, column, &raw);
+    }
     text_free(&raw);
 }
 

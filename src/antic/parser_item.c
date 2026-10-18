@@ -26,6 +26,19 @@ static size_t closing_brace(const struct parser *p)
     return p->last;
 }
 
+/* `align(N)` after the name of a struct, a union, a class or a variant,
+   when it stands there. Returns false after an error. */
+static bool align_clause(struct parser *p, struct item *it)
+{
+    if (!parser_is_word(p, parser_peek(p), "align")) {
+        return true;
+    }
+    parser_next(p);
+    return parser_expect(p, TOKEN_LPAREN) &&
+           (it->align = parser_expression(p)) != NULL &&
+           parser_expect(p, TOKEN_RPAREN);
+}
+
 /* The lines of a class body and its `}`: the fields, the functions and
    constants and the nested types. Returns false after an error. */
 static bool class_body(struct parser *p, struct item *it, struct list *fields,
@@ -191,13 +204,8 @@ static struct item *class_item(struct parser *p, struct item *it)
     }
     /* DESIGN: `align(N)` stays directly after the name, as on a struct,
        and the base follows it. */
-    if (parser_is_word(p, parser_peek(p), "align")) {
-        parser_next(p);
-        if (!parser_expect(p, TOKEN_LPAREN) ||
-            (it->align = parser_expression(p)) == NULL ||
-            !parser_expect(p, TOKEN_RPAREN)) {
-            return NULL;
-        }
+    if (!align_clause(p, it)) {
+        return NULL;
     }
     /* The base is one name, qualified by its module or not, and no field
        of its own. The checker builds the `super` field from it. */
@@ -243,6 +251,44 @@ static struct item *class_item(struct parser *p, struct item *it)
     return it;
 }
 
+/* One case of a variant into one: its comments, its name and, in
+   braces, its fields. Returns false after an error, and keeps no memory
+   then. */
+static bool variant_case(struct parser *p, struct variant_case *one)
+{
+    struct list fields = {NULL, 0, 0, sizeof(struct param)};
+
+    memset(one, 0, sizeof *one);
+    one->doc = parser_doc_before(p, TOKEN_DOC);
+    one->note = parser_doc_before(p, TOKEN_NOTE);
+    one->pos = parser_pos_of(parser_peek(p));
+    if (!parser_expect_name(p, &one->name)) {
+        return false;
+    }
+    if (!parser_accept(p, TOKEN_LBRACE)) {
+        return true;
+    }
+    while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
+        struct param field;
+        memset(&field, 0, sizeof field);
+        field.doc = parser_doc_before(p, TOKEN_DOC);
+        field.note = parser_doc_before(p, TOKEN_NOTE);
+        field.pos = parser_pos_of(parser_peek(p));
+        if (!parser_expect_name(p, &field.name) ||
+            !parser_expect(p, TOKEN_COLON) ||
+            (field.type = parser_type(p)) == NULL) {
+            free(fields.data);
+            return false;
+        }
+        parser_list_push(&fields, &field);
+        if (!parser_accept(p, TOKEN_COMMA)) {
+            break;
+        }
+    }
+    one->fields = parser_list_finish(p, &fields, &one->field_count);
+    return parser_expect(p, TOKEN_RBRACE);
+}
+
 /* DESIGN: a variant body holds its cases and nothing else. A case is a
    name and, in braces, the fields it carries, each a name and a type. A
    variant is a struct, so no function, constant, default or bitfield
@@ -256,53 +302,17 @@ static struct item *variant_item(struct parser *p, struct item *it)
     if (!parser_expect_name(p, &it->name) || !parser_type_params(p, it)) {
         return NULL;
     }
-    if (parser_is_word(p, parser_peek(p), "align")) {
-        parser_next(p);
-        if (!parser_expect(p, TOKEN_LPAREN) ||
-            (it->align = parser_expression(p)) == NULL ||
-            !parser_expect(p, TOKEN_RPAREN)) {
-            return NULL;
-        }
+    if (!align_clause(p, it)) {
+        return NULL;
     }
     if (!parser_expect(p, TOKEN_LBRACE)) {
         return NULL;
     }
     while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
         struct variant_case one;
-        memset(&one, 0, sizeof one);
-        one.doc = parser_doc_before(p, TOKEN_DOC);
-        one.note = parser_doc_before(p, TOKEN_NOTE);
-        one.pos = parser_pos_of(parser_peek(p));
-        if (!parser_expect_name(p, &one.name)) {
+        if (!variant_case(p, &one)) {
             free(cases.data);
             return NULL;
-        }
-        if (parser_accept(p, TOKEN_LBRACE)) {
-            struct list fields = {NULL, 0, 0, sizeof(struct param)};
-            while (!parser_check(p, TOKEN_RBRACE) &&
-                   !parser_check(p, TOKEN_EOF)) {
-                struct param field;
-                memset(&field, 0, sizeof field);
-                field.doc = parser_doc_before(p, TOKEN_DOC);
-                field.note = parser_doc_before(p, TOKEN_NOTE);
-                field.pos = parser_pos_of(parser_peek(p));
-                if (!parser_expect_name(p, &field.name) ||
-                    !parser_expect(p, TOKEN_COLON) ||
-                    (field.type = parser_type(p)) == NULL) {
-                    free(fields.data);
-                    free(cases.data);
-                    return NULL;
-                }
-                parser_list_push(&fields, &field);
-                if (!parser_accept(p, TOKEN_COMMA)) {
-                    break;
-                }
-            }
-            one.fields = parser_list_finish(p, &fields, &one.field_count);
-            if (!parser_expect(p, TOKEN_RBRACE)) {
-                free(cases.data);
-                return NULL;
-            }
         }
         parser_list_push(&cases, &one);
         if (!parser_accept(p, TOKEN_COMMA)) {
@@ -494,13 +504,8 @@ static struct item *item_level(struct parser *p)
             parser_error_here(p, "a union takes no type parameters");
             return NULL;
         }
-        if (parser_is_word(p, parser_peek(p), "align")) {
-            parser_next(p);
-            if (!parser_expect(p, TOKEN_LPAREN) ||
-                (it->align = parser_expression(p)) == NULL ||
-                !parser_expect(p, TOKEN_RPAREN)) {
-                return NULL;
-            }
+        if (!align_clause(p, it)) {
+            return NULL;
         }
         if (!parser_header_clauses(p) || !parser_expect(p, TOKEN_LBRACE)) {
             return NULL;

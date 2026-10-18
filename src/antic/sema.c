@@ -3153,6 +3153,9 @@ bool sema_check(struct module *module, const char *module_name,
         sema_compile_copies(&c);
     }
     sema_leave(&c, &outside);
+    /* The module scope never narrows, and its list is freed beside the
+       entries all the same, as sema_leave_scope frees every other one. */
     free(c.module_scope.entries);
+    free(c.module_scope.narrowed);
     return c.ok;
 }
