@@ -1027,6 +1027,19 @@ static bool exports_of(const struct text *archive, size_t size,
     return ok;
 }
 
+/* A join of no object is refused, since the header of the join takes the
+   machine of the first. */
+static void test_no_input(void)
+{
+    struct text out = {0};
+    struct text error = {0};
+
+    CHECK(!coff_join(NULL, 0, &out, &error));
+    CHECK(strstr(text_cstr(&error), "no object") != NULL);
+    text_free(&out);
+    text_free(&error);
+}
+
 /* The archive index of coff_archive_exports: the closure from the object
    through the index, then every damage of the index and of a member
    header. */
@@ -1138,4 +1151,5 @@ void test_coff(void)
     test_damaged_bytes();
     test_associative_parent();
     test_archive_index();
+    test_no_input();
 }

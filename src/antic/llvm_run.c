@@ -3,15 +3,36 @@
 #include "llvm_run.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "llvm_target.h"
 #include "platform.h"
 #include "text.h"
 
-/* The most options of llc before its input: the level, the file type,
-   the relocation model, the two that split sections, the table of
-   significant addresses and the alignment of functions. */
-#define LLC_OPTIONS 7
+/* The most arguments of a run of opt or llc. The longest is llc with
+   seven options, the level, the file type, the relocation model, the two
+   that split sections, the table of significant addresses and the
+   alignment of functions, then the input, -o and the output. opt takes
+   nine at most under --lto. */
+#define RUN_ARGS 11
+
+/* The arguments of one run, with a NULL after the last. */
+struct args {
+    const char *v[RUN_ARGS + 1];
+    size_t n;
+};
+
+static void push(struct args *a, const char *arg)
+{
+    if (a->n >= RUN_ARGS) {
+        /* Unreachable while RUN_ARGS covers every command. */
+        fputs("antic: a run of opt or llc needs more than RUN_ARGS "
+              "arguments\n", stderr);
+        abort();
+    }
+    a->v[a->n++] = arg;
+    a->v[a->n] = NULL;
+}
 
 /* DESIGN: llc runs in the directory of its output and writes the output
    by its file name alone. llc records the name of its output as the
@@ -20,47 +41,45 @@
    build. The input and llc itself then go by absolute paths. It is the
    rule that nothing shipped holds a build path, which windows_debug in
    linker.c gives the link. */
-static int run_llc(const char *llc, const char *const options[LLC_OPTIONS],
+static int run_llc(const char *llc, const struct args *options,
                    const char *input, const char *output)
 {
     const char *name = platform_file_name(output);
     struct text directory = {0};
     struct text program = {0};
     struct text absolute = {0};
-    const char *argv[LLC_OPTIONS + 5];
-    size_t n = 0;
+    struct args argv = {0};
     size_t i;
     size_t at_input;
     size_t at_output;
     int run = -1;
 
-    argv[n++] = llc;
-    for (i = 0; i < LLC_OPTIONS && options[i] != NULL; i++) {
-        argv[n++] = options[i];
+    push(&argv, llc);
+    for (i = 0; i < options->n; i++) {
+        push(&argv, options->v[i]);
     }
-    at_input = n;
-    argv[n++] = input;
-    argv[n++] = "-o";
-    at_output = n;
-    argv[n++] = output;
-    argv[n] = NULL;
+    at_input = argv.n;
+    push(&argv, input);
+    push(&argv, "-o");
+    at_output = argv.n;
+    push(&argv, output);
 
     if (name == output) {
-        return process_run(argv);
+        return process_run(argv.v);
     }
     text_appendf(&directory, "%.*s", (int)(name - output), output);
     if (platform_file_name(llc) != llc) {
         if (!absolute_path(llc, &program)) {
             goto done;
         }
-        argv[0] = text_cstr(&program);
+        argv.v[0] = text_cstr(&program);
     }
     if (!absolute_path(input, &absolute)) {
         goto done;
     }
-    argv[at_input] = text_cstr(&absolute);
-    argv[at_output] = name;
-    run = process_run_in(text_cstr(&directory), argv);
+    argv.v[at_input] = text_cstr(&absolute);
+    argv.v[at_output] = name;
+    run = process_run_in(text_cstr(&directory), argv.v);
 done:
     text_free(&absolute);
     text_free(&program);
@@ -104,15 +123,15 @@ done:
    lld-link of the pinned release read a context-sensitive profile and a
    sample profile alone. */
 static void profile_options(const struct llvm_run *r, struct text *profile,
-                            const char **opt, size_t *n)
+                            struct args *opt)
 {
     if (r->profile_generate) {
-        opt[(*n)++] = "-pgo-kind=pgo-instr-gen-pipeline";
-        opt[(*n)++] = "-profile-file=" LLVM_PROFILE_DEFAULT;
+        push(opt, "-pgo-kind=pgo-instr-gen-pipeline");
+        push(opt, "-profile-file=" LLVM_PROFILE_DEFAULT);
     } else if (r->profile_use != NULL) {
         text_appendf(profile, "-profile-file=%s", r->profile_use);
-        opt[(*n)++] = "-pgo-kind=pgo-instr-use-pipeline";
-        opt[(*n)++] = text_cstr(profile);
+        push(opt, "-pgo-kind=pgo-instr-use-pipeline");
+        push(opt, text_cstr(profile));
     }
 }
 
@@ -120,24 +139,22 @@ static bool run_lto(const struct llvm_run *r, const char *text_path,
                     const char *output)
 {
     struct text profile = {0};
-    const char *opt[10];
-    size_t n = 0;
+    struct args opt = {0};
     bool ok;
 
-    opt[n++] = r->opt;
+    push(&opt, r->opt);
     if (r->lto == LTO_THIN) {
-        opt[n++] = "--thinlto-bc";
-        opt[n++] = "-passes=thinlto-pre-link<O3>";
+        push(&opt, "--thinlto-bc");
+        push(&opt, "-passes=thinlto-pre-link<O3>");
     } else {
-        opt[n++] = "-passes=lto-pre-link<O3>";
+        push(&opt, "-passes=lto-pre-link<O3>");
     }
-    opt[n++] = LLVM_INLINE_THRESHOLD;
-    profile_options(r, &profile, opt, &n);
-    opt[n++] = "-o";
-    opt[n++] = output;
-    opt[n++] = text_path;
-    opt[n] = NULL;
-    ok = process_run(opt) == 0;
+    push(&opt, LLVM_INLINE_THRESHOLD);
+    profile_options(r, &profile, &opt);
+    push(&opt, "-o");
+    push(&opt, output);
+    push(&opt, text_path);
+    ok = process_run(opt.v) == 0;
     text_free(&profile);
     if (!ok) {
         fprintf(stderr, "antic: opt failed\n");
@@ -184,19 +201,17 @@ static bool run_opt(const struct llvm_run *r, const char *text_path,
                     const char *bitcode_path)
 {
     struct text profile = {0};
-    const char *opt[9];
-    size_t n = 0;
+    struct args opt = {0};
     bool ok;
 
-    opt[n++] = r->opt;
-    opt[n++] = llvm_opt_options[0];
-    opt[n++] = llvm_opt_options[1];
-    profile_options(r, &profile, opt, &n);
-    opt[n++] = "-o";
-    opt[n++] = bitcode_path;
-    opt[n++] = text_path;
-    opt[n] = NULL;
-    ok = process_run(opt) == 0;
+    push(&opt, r->opt);
+    push(&opt, llvm_opt_options[0]);
+    push(&opt, llvm_opt_options[1]);
+    profile_options(r, &profile, &opt);
+    push(&opt, "-o");
+    push(&opt, bitcode_path);
+    push(&opt, text_path);
+    ok = process_run(opt.v) == 0;
     text_free(&profile);
     if (!ok) {
         fprintf(stderr, "antic: opt failed\n");
@@ -208,8 +223,7 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
               const char *bitcode_path, const char *output)
 {
     struct text model = {0};
-    const char *options[LLC_OPTIONS] = {NULL};
-    size_t n = 0;
+    struct args options = {0};
     int run;
 
     if (r->lto != LTO_NONE) {
@@ -220,9 +234,9 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
     }
     text_appendf(&model, "-relocation-model=%s",
                  llvm_relocation_model(r->target));
-    options[n++] = r->optimize ? "-O2" : "-O1";
-    options[n++] = r->assembly ? "-filetype=asm" : "-filetype=obj";
-    options[n++] = text_cstr(&model);
+    push(&options, r->optimize ? "-O2" : "-O1");
+    push(&options, r->assembly ? "-filetype=asm" : "-filetype=obj");
+    push(&options, text_cstr(&model));
     /* DESIGN: an ELF or COFF object puts every function and every datum
        into a section of its own, in release and dev mode, so that the
        link drops the ones the program never reaches. Eddie decided on
@@ -233,13 +247,13 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
        and toolchain" in docs/decisions.md, and drop_unused in
        linker.c. */
     if (target_info(r->target)->format != FORMAT_MACHO) {
-        options[n++] = "-function-sections";
-        options[n++] = "-data-sections";
+        push(&options, "-function-sections");
+        push(&options, "-data-sections");
     }
     /* The address-significance table names every symbol whose address
        the program uses, so the safe folding of lld leaves those apart.
        Every target writes it. See drop_unused in linker.c. */
-    options[n++] = "-addrsig";
+    push(&options, "-addrsig");
     /* DESIGN: every function of an ARM64 object starts on a 16-byte
        boundary, and the object runtime of each ARM64 target is compiled
        with -falign-functions=16 to match, see CMakeLists.txt. Eddie
@@ -260,9 +274,9 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
        docs/reports/2026-10-08-allocator-and-alignment.md holds the
        tables. */
     if (target_info(r->target)->arch == ARCH_ARM64) {
-        options[n++] = "-align-all-functions=4";
+        push(&options, "-align-all-functions=4");
     }
-    run = run_llc(r->llc, options, r->optimize ? bitcode_path : text_path,
+    run = run_llc(r->llc, &options, r->optimize ? bitcode_path : text_path,
                   output);
     text_free(&model);
     if (run != 0) {

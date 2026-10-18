@@ -902,6 +902,11 @@ bool coff_join(const struct coff_input *inputs, size_t count,
     bool ok = true;
     size_t k;
 
+    /* The header of the join takes the machine of the first object. */
+    if (count == 0) {
+        text_append(error, "no object to join");
+        return false;
+    }
     memset(&j, 0, sizeof j);
     j.objects = alloc_zeroed(count, sizeof *j.objects);
     j.count = count;
