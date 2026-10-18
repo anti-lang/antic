@@ -505,22 +505,3 @@ struct ir_operand lower_parallel(struct lowerer *l,
     ir_store(l->f, l->b, IR_I64, length, length_at);
     return lower_temp(l, out);
 }
-
-/* Locking and channels */
-
-/* DESIGN: a channel is a struct of one handle, which names the object
-   the runtime made. Each operation passes the handle to a function of
-   the runtime, which holds the queue. A Mutex is the lock word itself,
-   and each operation passes its address. A value that `send` puts and `recv` takes goes through a slot
-   of the frame. The IR then names no size but the one of the element
-   type. */
-
-/* The handle that the channel e holds. A pointer to a channel points at
-   its handle. */
-struct ir_operand lower_load_handle(struct lowerer *l, const struct expr *e)
-{
-    struct ir_operand at = e->type->kind == TYPE_POINTER ? lower_expr(l, e)
-                                                          : lower_address(l, e);
-
-    return lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
-}

@@ -619,7 +619,6 @@ void lower_fail(struct lowerer *l, const struct stmt *s);
 
 /* lower_worker.c */
 
-struct ir_operand lower_load_handle(struct lowerer *l, const struct expr *e);
 struct ir_operand lower_dispatch(struct lowerer *l,
                                  const struct expr *e);
 struct ir_operand lower_join(struct lowerer *l, const struct expr *e);

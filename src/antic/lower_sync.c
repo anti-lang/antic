@@ -78,6 +78,23 @@ static void destroy_held(struct lowerer *l, const struct type *element,
     l->b = done;
 }
 
+/* DESIGN: a channel is a struct of one handle, which names the object
+   the runtime made. Each operation passes the handle to a function of
+   the runtime, which holds the queue. A Mutex is the lock word itself,
+   and each operation passes its address. A value that `send` puts and
+   `recv` takes goes through a slot of the frame. The IR then names no
+   size but the one of the element type. */
+
+/* The handle that the channel e holds. A pointer to a channel points at
+   its handle. */
+static struct ir_operand load_handle(struct lowerer *l, const struct expr *e)
+{
+    struct ir_operand at = e->type->kind == TYPE_POINTER ? lower_expr(l, e)
+                                                          : lower_address(l, e);
+
+    return lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+}
+
 struct ir_operand lower_sync_op(struct lowerer *l,
                                 const struct expr *e)
 {
@@ -110,7 +127,7 @@ struct ir_operand lower_sync_op(struct lowerer *l,
         return lower_none();
     case SYNC_SEND:
         element = target->type->element;
-        args[0] = lower_load_handle(l, target);
+        args[0] = load_handle(l, target);
         slot = ir_entry_slot(l->f, lower_vtype_of(l, element));
         lower_store_value(l, element, e->as.sync_op.value, lower_temp(l, slot));
         args[1] = lower_temp(l, slot);
@@ -120,13 +137,13 @@ struct ir_operand lower_sync_op(struct lowerer *l,
        the channel is closed and empty. */
     case SYNC_RECV:
         element = target->type->element;
-        args[0] = lower_load_handle(l, target);
+        args[0] = load_handle(l, target);
         slot = ir_entry_slot(l->f, lower_vtype_of(l, element));
         args[1] = lower_temp(l, slot);
         return lower_rt_call(l, RT_FN_CHAN_RECV, args);
     case SYNC_CLOSE:
     case SYNC_CHAN_DELETE:
-        args[0] = lower_load_handle(l, target);
+        args[0] = load_handle(l, target);
         if (e->as.sync_op.op == SYNC_CHAN_DELETE
             && sema_needs_teardown(target->type->element)) {
             destroy_held(l, target->type->element, args[0]);
@@ -344,7 +361,7 @@ void lower_select(struct lowerer *l, const struct stmt *s)
 
     for (i = 0; i < count; i++) {
         const struct switch_arm *arm = &s->as.select.arms[i];
-        struct ir_operand handle = lower_load_handle(l, arm->value);
+        struct ir_operand handle = load_handle(l, arm->value);
         struct ir_operand offset;
         uint32_t slot;
         offset = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
