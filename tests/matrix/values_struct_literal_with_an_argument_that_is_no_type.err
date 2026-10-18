@@ -1,1 +1,1 @@
-values_struct_literal_with_an_argument_that_is_no_type.anti:10:21: error: a tuple has two or more elements
+values_struct_literal_with_an_argument_that_is_no_type.anti:10:19: error: a tuple has two or more elements

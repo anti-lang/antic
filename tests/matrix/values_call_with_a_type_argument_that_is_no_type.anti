@@ -7,6 +7,6 @@ fn pick<T>(a: T) -> T
 
 fn main() -> int
 {
-	let n = pick < (own int) > (1);
+	let n = pick<(own int)>(1);
 	return 0;
 }
