@@ -22,6 +22,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
+
 foreach(value ANTI ANTIC PAGE)
     if(NOT DEFINED ${value})
         message(FATAL_ERROR "${value} is not set")
@@ -41,17 +43,16 @@ function(escape out text)
     set(${out} "${text}" PARENT_SCOPE)
 endfunction()
 
-# What `--help` of each tool prints, which ends with 0. The usage is
-# text, so it is read into a variable as it stands.
+# What `--help` of each tool prints, which ends with 0. antic runs
+# through antic_run of tests/program_output.cmake, as every runner's
+# call of antic does.
 execute_process(COMMAND "${ANTI}" --help
     RESULT_VARIABLE status OUTPUT_VARIABLE anti_usage ERROR_VARIABLE anti_usage
     ENCODING NONE)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "anti --help ends with ${status}")
 endif()
-execute_process(COMMAND "${ANTIC}" --help
-    RESULT_VARIABLE status OUTPUT_VARIABLE antic_usage
-    ERROR_VARIABLE antic_usage ENCODING NONE)
+antic_run(status antic_usage antic_error COMMAND --help)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "antic --help ends with ${status}")
 endif()
