@@ -25,3 +25,4 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 rt_oom_fs T139 The listing of anti.fs fails with ENOMEM where memory that runs out stops the program.
 memory_checks_bitfield T141 --memory-checks puts no check on a load or a store of a bitfield.
 error_frame_limit T142 A frame of 2^31 bytes or more compiles, since the step switch removed the check of the native back end.
+std_plugin_messages T145 The message of an error of plugin.load is the buffer the next load writes over.

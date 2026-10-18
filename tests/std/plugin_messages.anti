@@ -1,0 +1,23 @@
+//! T145: the message of an error of `plugin.load` keeps its text after the next
+//! load. The first load fails on a path that holds a NUL byte, the second on a
+//! library that does not exist, and the first error prints its own message
+//! after the second failed.
+
+import anti.io;
+import anti.plugin;
+import anti.text;
+
+fn main() -> int
+{
+	let lib = plugin.load(text.from_bytes(b"a\0b")) catch first {
+		let other = plugin.load("no-such-library") catch second {
+			io.print(first.message);
+			io.print("\n");
+			return 0;
+		};
+		delete(other);
+		return 1;
+	};
+	delete(lib);
+	return 2;
+}
