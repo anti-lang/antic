@@ -310,7 +310,6 @@ struct ir_block {
     size_t count;
     size_t capacity;
     enum ir_fail fail;
-    uint32_t loop_depth;        /* the loops this block sits inside */
 };
 
 /* A parameter. An aggregate parameter's temporary holds a pointer to the
@@ -590,9 +589,9 @@ struct ir_module {
        imports. The driver sets it before the passes over the whole
        program. */
     bool hosts;
-    /* --memory-checks: selection puts a check before every load and
-       store, a call of one of these two functions. memcheck_declare of
-       src/antic/memcheck.c sets all three. */
+    /* --memory-checks: memcheck_function puts a check before every load
+       and store, a call of one of these two functions. memcheck_declare
+       of src/antic/memcheck.c sets all three. */
     bool memory_checks;
     uint32_t memcheck_load;
     uint32_t memcheck_store;

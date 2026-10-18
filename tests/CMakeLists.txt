@@ -1092,6 +1092,12 @@ add_test(NAME file_headers_runner
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/file-headers"
         -P "${ANTIC_RUNNERS}/run_file_headers_self.cmake")
 
+# No comment of antic gives a reason of the native back end, and the IR
+# keeps no field that only its register allocator read (M365).
+add_test(NAME native_back_end_gone
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_native_back_end_gone.cmake")
+
 # docs/notes/source-tree.md holds one row per file of the root, src/,
 # tests/unit/, tools/ and tests/runners/, per file and script of tests/
 # and per directory of tests/, and no row of anything else.

@@ -200,7 +200,6 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
     loop.outer = l->loop;
     loop.defers_at = l->defers;
     loop.temps_at = l->temp_count;
-    l->loop_depth++;
     ir_jump(l->f, l->b, first);
     if (is_while) {
         l->b = test;
@@ -213,7 +212,6 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
         ir_jump(l->f, l->b, test);
     }
     l->loop = loop.outer;
-    l->loop_depth--;
     if (!is_while) {
         l->b = test;
         lower_branch(l, s->as.loop.cond, body, exit);
@@ -337,7 +335,6 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     loop.outer = l->loop;
     loop.defers_at = l->defers;
     loop.temps_at = l->temp_count;
-    l->loop_depth++;
     ir_jump(l->f, l->b, test);
     l->b = test;
     if (it->changed != NULL) {
@@ -386,7 +383,6 @@ static void lower_for_hooks(struct lowerer *l, const struct stmt *s)
     l->defers = pass.outer;
     free(pass.items);
     l->loop = loop.outer;
-    l->loop_depth--;
     l->b = exit;
     lower_run_defers(l, &around, false);
     l->defers = around.outer;
@@ -660,7 +656,6 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
     loop.outer = l->loop;
     loop.defers_at = l->defers;
     loop.temps_at = l->temp_count;
-    l->loop_depth++;
     l->loop = &loop;
     l->b = w.body;
     /* The variable of the body: the counter of a range, or the element
@@ -678,7 +673,6 @@ static void lower_for(struct lowerer *l, const struct stmt *s)
         ir_jump(l->f, l->b, w.step);
     }
     l->loop = loop.outer;
-    l->loop_depth--;
     l->b = w.step;
     if (over == NULL) {
         range_step(l, &w);

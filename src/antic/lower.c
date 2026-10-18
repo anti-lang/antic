@@ -285,14 +285,10 @@ bool lower_narrows(enum ir_type from, enum ir_type to)
     return max_bits(to) <= min_bits(from);
 }
 
-/* Every block records the loops it sits inside. The allocator weighs a
-   spill by it, because a value in a loop is read again on every pass. */
+/* A new block of the function being lowered. */
 struct ir_block *lower_new_block(struct lowerer *l)
 {
-    struct ir_block *b = ir_block_add(l->f);
-
-    b->loop_depth = l->loop_depth;
-    return b;
+    return ir_block_add(l->f);
 }
 
 /* Names in the tree point into the source and carry a length. Return a

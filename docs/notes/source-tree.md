@@ -697,6 +697,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_musl_allocator.cmake` | Reads the symbols of a musl program for the allocator. |
 | `tests/runners/run_mutex_size.cmake` | Reads the size of a Mutex for six targets. |
 | `tests/runners/run_names_once.cmake` | Refuses four shared names outside their header. |
+| `tests/runners/run_native_back_end_gone.cmake` | Refuses a comment of antic that gives a reason of the native back end, and the loop depth of a block of the IR. |
 | `tests/runners/run_native_hosts.cmake` | Refuses a call of a helper of the outline atomics in the native libraries of linux-arm64. |
 | `tests/runners/run_native_licenses.cmake` | Compares the licence texts of the repository with those of the runtime tree. |
 | `tests/runners/run_native_link.cmake` | Links a test program against a native library for one target. |

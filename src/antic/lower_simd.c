@@ -80,12 +80,9 @@ static void lanes_begin(struct lowerer *l, struct lanes *c, size_t count,
     }
     c->index = ir_temp(l->f, IR_I64);
     ir_assign(l->f, l->b, c->index, lower_zero());
-    l->loop_depth++;
     c->head = lower_new_block(l);
     body = lower_new_block(l);
-    l->loop_depth--;
     c->exit = lower_new_block(l);
-    l->loop_depth++;
     ir_jump(l->f, l->b, c->head);
     l->b = c->head;
     more = lower_temp(l, ir_binary(l->f, l->b, IR_ULT, IR_I8,
@@ -107,7 +104,6 @@ static void lanes_end(struct lowerer *l, struct lanes *c)
                                    ir_int_op(IR_I64, 1)));
     ir_assign(l->f, l->b, c->index, next);
     ir_jump(l->f, l->b, c->head);
-    l->loop_depth--;
     l->b = c->exit;
 }
 

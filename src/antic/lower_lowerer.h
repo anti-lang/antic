@@ -160,7 +160,6 @@ struct lowerer {
     /* The exit actions run for an exit of the function, which ends the
        lifetime of every slot itself. */
     bool leaving;
-    uint32_t loop_depth;        /* the loops the next block sits inside */
     struct handling *handling;  /* the handler being lowered */
     struct try_scope *try_scope;
     struct ir_operand out_address;  /* the out parameter of a failing call */

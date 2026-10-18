@@ -15,12 +15,12 @@
    __asan_storeN with the address and the number of bytes. The runtime of
    AddressSanitizer then reports a use after free, a double free and an
    access outside a heap block. Its leak check reports the blocks still
-   allocated at exit. A call keeps the check out of the two targets,
-   since the register allocator already treats one. An inline test of the
-   shadow memory would need both. The checks go in after the back end
-   lays the types out, so the IR above it keeps no size. By then the
-   back end has made plain loads and stores of the bitfields and of the
-   lanes of simd structs. */
+   allocated at exit. A call is the same on every target, where an inline
+   test of the shadow memory needs code for each, as the entry on the
+   checks of AddressSanitizer in docs/decisions.md says. memcheck_function
+   puts the checks in after layout_resolve lays the types out, so the IR
+   above it keeps no size. A load, a store, a copy and each simd operation
+   on memory take a check of the bytes they reach. */
 #define MEMCHECK_LOAD "__asan_loadN"
 #define MEMCHECK_STORE "__asan_storeN"
 /* The hook that AddressSanitizer reads its default options from, and the
@@ -49,8 +49,9 @@ bool memcheck_available(enum target t);
 /* Declare the two check functions in m and mark m for the checks. Where
    the runtime of t checks for leaks, the module that links, the one that
    defines main, also gets the options hook, which turns the leak check
-   on, and the function that marks a block of the runtime as kept. Runs
-   before selection, which gives each function of m its entry. */
+   on, and the function that marks a block of the runtime as kept. The
+   driver calls it after the optimizer, whose removal of unused code would
+   drop the two declarations that no call names yet. */
 void memcheck_declare(struct ir_module *m, const char *module, bool links,
                       enum target t);
 
