@@ -708,10 +708,10 @@ static const struct ir_global *array_descriptor(struct lowerer *l,
                             count);
         for (level = t; level->kind == TYPE_ARRAY; level = level->element) {
             bool last = level->element->kind != TYPE_ARRAY;
-            char part[24];
+            char part[TEXT_NAME_SIZE];
             struct name label;
             struct ir_const *item;
-            snprintf(part, sizeof part, "_%zu", i);
+            text_format_name(part, sizeof part, "_%zu", i);
             label.text = part;
             label.length = strlen(part);
             item = field_record(l, &label, IR_NO_AGG, 0,
@@ -1054,7 +1054,7 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
     for (i = 0; i < table.count; i++) {
         const struct item *fn = table.entries[i].fn;
         struct text code = {0};
-        char params[24];
+        char params[TEXT_NAME_SIZE];
         h = ir_hash_bytes(h, table.entries[i].name.text,
                        table.entries[i].name.length);
         h = ir_hash_bytes(h, ":", 1);
@@ -1062,7 +1062,8 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
             signature_code(fn->symbol->type, &code)) {
             h = ir_hash_bytes(h, text_cstr(&code), code.length);
         } else {
-            snprintf(params, sizeof params, "%zu", table.entries[i].params);
+            text_format_name(params, sizeof params, "%zu",
+                             table.entries[i].params);
             h = ir_hash_bytes(h, params, strlen(params));
         }
         text_free(&code);

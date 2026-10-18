@@ -948,7 +948,7 @@ const struct ir_global *lower_literal_global(struct lowerer *l,
 {
     struct ir_module *m = l->m;
     uint8_t *bytes;
-    char name[24];
+    char name[TEXT_NAME_SIZE];
     size_t i;
 
     for (i = 0; i < m->global_count; i++) {
@@ -965,7 +965,7 @@ const struct ir_global *lower_literal_global(struct lowerer *l,
     bytes = arena_alloc(m->arena, text->length + 1);
     memcpy(bytes, text->bytes, text->length);
     bytes[text->length] = 0;
-    snprintf(name, sizeof name, "%zu", lower_globals_of_module(l));
+    text_format_name(name, sizeof name, "%zu", lower_globals_of_module(l));
     return ir_global_add(m, l->module_name, name, bytes, text->length + 1, 1);
 }
 

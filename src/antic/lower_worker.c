@@ -260,9 +260,10 @@ struct ir_operand lower_dispatch(struct lowerer *l,
     uint32_t agg;
     struct ir_operand handle;
     uint32_t out;
-    char name[32];
+    char name[TEXT_NAME_SIZE];
 
-    snprintf(name, sizeof name, "dispatch.%zu", next_thunk(l, "dispatch."));
+    text_format_name(name, sizeof name, "dispatch.%zu",
+                     next_thunk(l, "dispatch."));
     args[0] = lower_expr(l, e->as.dispatch.object);
     context = pack_context(l, call, extra, name, &agg);
     args[1] = result->kind == TYPE_VOID ? ir_int_op(IR_I64, 0)
@@ -468,9 +469,10 @@ struct ir_operand lower_parallel(struct lowerer *l,
     uint32_t results;
     uint32_t count;
     uint32_t out;
-    char name[32];
+    char name[TEXT_NAME_SIZE];
 
-    snprintf(name, sizeof name, "parallel.%zu", next_thunk(l, "parallel."));
+    text_format_name(name, sizeof name, "parallel.%zu",
+                     next_thunk(l, "parallel."));
     array = lower_address(l, e->as.parallel.array);
     context = pack_context(l, call, extra, name, &agg);
     results = ir_slot(l->f, l->b, ir_scalar(IR_PTR));

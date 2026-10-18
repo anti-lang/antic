@@ -15,6 +15,7 @@ void test_llvm_emit(void);
 void test_f16(void);
 void test_text(void);
 void test_diagnostic_cut(void);
+void test_name_size(void);
 void test_host_target(void);
 void test_lexer(void);
 void test_parser(void);
@@ -78,6 +79,7 @@ static const struct group groups[] = {
     {"f16", test_f16},
     {"text", test_text},
     {"text", test_diagnostic_cut},
+    {"text", test_name_size},
     {"target", test_host_target},
     {"lexer", test_lexer},
     {"parser", test_parser},

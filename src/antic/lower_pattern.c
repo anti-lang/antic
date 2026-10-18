@@ -19,7 +19,7 @@ struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e)
 {
     const struct ir_global *text = lower_literal_global(l, &e->as.text);
     struct ir_global *slot;
-    char name[32];
+    char name[TEXT_NAME_SIZE];
     size_t i;
 
     bool bytes = types_is_byte_regex(e->type);
@@ -31,7 +31,7 @@ struct ir_operand lower_pattern(struct lowerer *l, const struct expr *e)
             return lower_temp(l, ir_addr(l->f, l->b, ir_global_op(slot)));
         }
     }
-    snprintf(name, sizeof name, "pattern.%zu", l->regex_count);
+    text_format_name(name, sizeof name, "pattern.%zu", l->regex_count);
     /* The one field of a Regex is a pointer, none until the start. */
     slot = ir_global_add_value(l->m, l->module_name, name,
                                ir_const_int(l->m, IR_PTR, 0));

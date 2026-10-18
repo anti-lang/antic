@@ -1,5 +1,8 @@
-/* Two parts. The text buffer of src/antic/text.c, and the cut of a long
-   line of a message of src/antic/diagnostic.c. */
+/* Three parts. The text buffer of src/antic/text.c, the cut of a long
+   line of a message of src/antic/diagnostic.c, and the room of a
+   generated name. */
+
+#include <stdint.h>
 
 #include "../binary_stdio.h"
 #include "check.h"
@@ -53,4 +56,23 @@ void test_diagnostic_cut(void)
     CHECK(n >= 3 && memcmp(d.items[0].message + n - 3, "...", 3) == 0);
     CHECK_STR(d.items[1].message, "unknown name `y`");
     diagnostics_free(&d);
+}
+
+/* The longest name lowering and the whole-program pass format, with the
+   largest count, fits a buffer of TEXT_NAME_SIZE whole. text_format_name
+   stops the test where it does not. */
+void test_name_size(void)
+{
+    char name[TEXT_NAME_SIZE];
+    char expected[TEXT_NAME_SIZE];
+    int n;
+
+    n = snprintf(expected, sizeof expected, "injectable.%zu.library",
+                 (size_t)SIZE_MAX);
+    CHECK(n > 0 && (size_t)n < sizeof expected);
+    text_format_name(name, sizeof name, "injectable.%zu.library",
+                     (size_t)SIZE_MAX);
+    CHECK_STR(name, expected);
+    text_format_name(name, sizeof name, "trampolines.%zu", (size_t)SIZE_MAX);
+    CHECK(strlen(name) == 12 + 20);
 }

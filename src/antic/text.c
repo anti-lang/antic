@@ -1,5 +1,5 @@
 /* A byte buffer that grows and stays NUL-terminated, and the formatting of
-   a message into a fixed buffer. */
+   a message or a generated name into a fixed buffer. */
 
 #include "text.h"
 
@@ -101,4 +101,18 @@ void text_format(char *buffer, size_t size, const char *format, ...)
     va_start(args, format);
     text_vformat(buffer, size, format, args);
     va_end(args);
+}
+
+void text_format_name(char *buffer, size_t size, const char *format, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, format);
+    n = vsnprintf(buffer, size, format, args);
+    va_end(args);
+    if (n < 0 || (size_t)n >= size) {
+        fputs("antic: a generated name does not fit its buffer\n", stderr);
+        exit(70);
+    }
 }

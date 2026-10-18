@@ -1143,8 +1143,8 @@ static struct ir_operand lower_carry(struct lowerer *l, const struct expr *e)
     /* The operation stands before its one read. */
     a = l->b->insts[l->b->count - 2].a;
     b = l->b->insts[l->b->count - 2].b;
-    snprintf(operation, sizeof operation, "overflow in %s",
-             e->as.binary.op == TOKEN_PLUS ? "+" : "-");
+    text_format(operation, sizeof operation, "overflow in %s",
+                e->as.binary.op == TOKEN_PLUS ? "+" : "-");
     text = lower_check_text(l, e->pos.line, operation);
     lower_check_branch(l, flags[IR_FLAG_OVERFLOW], true, text, CHECK_OVERFLOW,
                        a, b,

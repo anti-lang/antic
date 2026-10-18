@@ -420,7 +420,7 @@ struct ir_operand lower_const_address(struct lowerer *l,
 {
     struct ir_module *m = l->m;
     struct ir_const *value = arena_alloc(m->arena, sizeof *value);
-    char name[24];
+    char name[TEXT_NAME_SIZE];
     size_t i;
 
     const_tree(l, v, t, value);
@@ -431,7 +431,7 @@ struct ir_operand lower_const_address(struct lowerer *l,
             return lower_temp(l, ir_addr(l->f, l->b, ir_global_op(g)));
         }
     }
-    snprintf(name, sizeof name, "%zu", lower_globals_of_module(l));
+    text_format_name(name, sizeof name, "%zu", lower_globals_of_module(l));
     return lower_temp(
         l, ir_addr(l->f, l->b,
                    ir_global_op(ir_global_add_value(m, l->module_name, name,

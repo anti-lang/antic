@@ -135,8 +135,8 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
         if (!types_is_signed(t)) {
             return lower_none();
         }
-        snprintf(operation, sizeof operation, "overflow in %s",
-                 op == TOKEN_PLUS ? "+" : op == TOKEN_MINUS ? "-" : "*");
+        text_format(operation, sizeof operation, "overflow in %s",
+                    op == TOKEN_PLUS ? "+" : op == TOKEN_MINUS ? "-" : "*");
         text = lower_check_text(l, line, operation);
         /* The failure block prints left and right alone, so the path
            that reads the result is the one without overflow. */
@@ -154,8 +154,8 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
     case TOKEN_PERCENT:
         ok = lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, right,
                                      ir_int_op(lower_ir_type_of(t), 0)));
-        snprintf(operation, sizeof operation, "division by zero in %s",
-                 op == TOKEN_SLASH ? "/" : "%");
+        text_format(operation, sizeof operation, "division by zero in %s",
+                    op == TOKEN_SLASH ? "/" : "%");
         lower_check_branch(l, ok, false, lower_check_text(l, line, operation),
                            types_is_signed(t) ? CHECK_LEFT : CHECK_LEFT_U, left,
                            lower_none(), t);
@@ -173,8 +173,8 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
             struct ir_operand bad =
                 lower_temp(l, ir_binary(l->f, l->b, IR_AND, IR_I8,
                                         by_minus_one, least));
-            snprintf(operation, sizeof operation, "overflow in %s",
-                     op == TOKEN_SLASH ? "/" : "%");
+            text_format(operation, sizeof operation, "overflow in %s",
+                        op == TOKEN_SLASH ? "/" : "%");
             lower_check_branch(l, bad, true,
                                lower_check_text(l, line, operation),
                                CHECK_OVERFLOW, left, right, t);
@@ -203,9 +203,9 @@ struct ir_operand lower_binary_checks(struct lowerer *l, enum token_kind op,
                                         lower_size_operand(l, t),
                                         ir_int_op(IR_I64, 8)));
         ok = lower_temp(l, ir_binary(l->f, l->b, IR_ULT, IR_I8, count, width));
-        snprintf(operation, sizeof operation,
-                 "shift count out of range for %s",
-                 op == TOKEN_SHL ? "<<" : ">>");
+        text_format(operation, sizeof operation,
+                    "shift count out of range for %s",
+                    op == TOKEN_SHL ? "<<" : ">>");
         lower_check_branch(l, ok, false, lower_check_text(l, line, operation),
                            CHECK_SHIFT, count, width, NULL);
         return lower_none();
