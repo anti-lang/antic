@@ -323,7 +323,9 @@ One purpose per module and file:
   Fixed `5b14cfd6`, which moves them into `licensing.c`.
 - M323. `tests/runners/run_release_dry_run.cmake:1`. The two largest runners
   hold many tests under one name. `run_package.cmake` runs thirteen
-  checks as `package_keys`. New. build-and-tools.
+  checks as `package_keys`. New. build-and-tools. Fixed `1ba2cce5`, which
+  makes each check a test of its own over the fixture `package_pack` and
+  the copy of `tests/release_copy.cmake`.
 
 One-way dependencies, and a part doing the work of another:
 
@@ -425,6 +427,7 @@ Left of a replaced feature, with an effect:
 - M345. `tests/CMakeLists.txt:554`. The LLVM program tests are a second
   runner from the two-back-end period. `llvm_division`, `llvm_wrap` and
   `llvm_flags` run on a Mac and on neither VM. New. build-and-tools.
+  Fixed `044687b5`, which puts them in the glob of every host.
 
 ### Documentation
 
