@@ -1092,6 +1092,12 @@ add_test(NAME file_headers_runner
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/file-headers"
         -P "${ANTIC_RUNNERS}/run_file_headers_self.cmake")
 
+# No file of antic, of the runtime or of anti calls a function that rule 9
+# of docs/c-guidelines.md bans. Rule 10 names the test.
+add_test(NAME banned_calls
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_banned_calls.cmake")
+
 # No comment of antic gives a reason of the native back end, and the IR
 # keeps no field that only its register allocator read (M365).
 add_test(NAME native_back_end_gone

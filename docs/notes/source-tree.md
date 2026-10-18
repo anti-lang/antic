@@ -602,6 +602,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_asm.cmake` | Writes assembly with `-S` and assembles it with llvm-mc. |
 | `tests/runners/run_asserts.cmake` | Checks `assert` in each build mode and through a library file. |
 | `tests/runners/run_atomic_load.cmake` | Checks the instruction of the atomic load in an ARM64 runtime. |
+| `tests/runners/run_banned_calls.cmake` | Refuses a call of a function that rule 9 of `docs/c-guidelines.md` bans in a file of antic, of the runtime or of anti. |
 | `tests/runners/run_bench.cmake` | Builds and times the benchmark programs and their C twins. |
 | `tests/runners/run_build_id.cmake` | Checks that links of one program share a build id. |
 | `tests/runners/run_build_id_reader.cmake` | Tests `read_build_id` of `tests/build_id.cmake` on a file with one build line and on files without one. |

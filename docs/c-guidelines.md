@@ -43,7 +43,7 @@ The bar differs by where the code runs.
 ### Strings and copies
 
 9. No function that finds a length by scanning for a NUL writes into a buffer. `strcpy`, `strcat`, `sprintf`, `vsprintf`, `gets` and `strncpy` are banned, as is `scanf` with a bare `%s`. A copy is `memcpy` with a length the code knows, followed by an explicit NUL where one is needed. Text is formatted with `snprintf`, and its result is checked for truncation.
-10. Text inside the code carries its length, as a `str` of Anti does. A NUL-terminated string stands only at the boundary with C, where a C function expects one. A test fails the suite when a banned function appears in `src/rt/`, `src/antic/` or `src/anti/`.
+10. Text inside the code carries its length, as a `str` of Anti does. A NUL-terminated string stands only at the boundary with C, where a C function expects one. The test `banned_calls` fails the suite when a file of `src/rt/`, `src/antic/` or `src/anti/` calls a function that rule 9 bans. It leaves out `src/rt/platform_stdio.c`, which defines `sprintf`, `vsprintf` and the scanf family for a Windows target, since the headers of the UCRT declare them and `ucrtbase.dll` does not export them, and whose `sprintf` calls `vsprintf`.
 
 ### Ownership and errors
 
