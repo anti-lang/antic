@@ -1044,7 +1044,8 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 	}
 
 	/// The entries as text, `{1: 10, 2: 20}`, each key and value as `to_text`
-	/// of a collection writes an element.
+	/// of a collection writes an element. The text is memory of its own from
+	/// the C library, which `free(s.ptr)` returns.
 	concrete fn to_text(self) -> str
 	{
 		let out = text.Builder.new();

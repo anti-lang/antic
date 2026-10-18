@@ -134,7 +134,8 @@ fn windows_dir(app: str, tail: str) -> str may fail
 /// `$XDG_CONFIG_HOME/<app>` on Linux and macOS, which falls back to
 /// `~/.config/<app>`, and `config\` of `%LOCALAPPDATA%\<app>` on Windows. It
 /// fails when the environment names no home, and the message names the variable
-/// that is absent.
+/// that is absent. The text holds memory of its own from the C library, which
+/// the caller frees with `free(dir.ptr)`.
 pub fn user_config_dir(app: str) -> str may fail
 {
 	if windows() {
@@ -147,7 +148,7 @@ pub fn user_config_dir(app: str) -> str may fail
 ///
 /// `$XDG_DATA_HOME/<app>` on Linux and macOS, which falls back to
 /// `~/.local/share/<app>`, and `%LOCALAPPDATA%\<app>` on Windows. It fails as
-/// `user_config_dir` does.
+/// `user_config_dir` does, and the caller frees the text as it frees that one.
 pub fn user_data_dir(app: str) -> str may fail
 {
 	if windows() {
@@ -160,7 +161,8 @@ pub fn user_data_dir(app: str) -> str may fail
 ///
 /// `$XDG_CACHE_HOME/<app>` on Linux and macOS, which falls back to
 /// `~/.cache/<app>`, and `cache\` of `%LOCALAPPDATA%\<app>` on Windows. It
-/// fails as `user_config_dir` does.
+/// fails as `user_config_dir` does, and the caller frees the text as it frees
+/// that one.
 pub fn user_cache_dir(app: str) -> str may fail
 {
 	if windows() {

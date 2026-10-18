@@ -1,8 +1,12 @@
 //! The root of the standard library, which imports nothing.
 //!
 //! It holds the types the compiler knows by name, so every other module can
-//! name them without an import cycle. `Object` and `Job` belong to it as well,
-//! and the compiler declares both itself.
+//! name them without an import cycle: `Error` with its text, `NoneDereference`,
+//! `SourceLocation`, the trace of a stack in `StackTrace`, the hook handler
+//! `TraceHandler` with `Trace`, the walk guards `Changes` and `Watch`, the
+//! constraint `Ordered` and the hash seed. `Object`, `Job`, `Flags`, `Mutex`,
+//! `Regex`, `ByteRegex`, `Match`, `ByteMatch` and `FieldDescriptor` belong to
+//! it as well, and the compiler declares them itself.
 //!
 //! `Error` is the error convention of the language. A function that can fail is
 //! declared `-> R may fail`, or `may fail` when it has no result. It returns
@@ -121,7 +125,7 @@ pub class StackTrace
 	transient text_cache: ?*byte = none,
 
 	/// The trace of the caller and the calls above it, without the `skip`
-	/// innermost frames.
+	/// innermost frames, in a new object the caller deletes.
 	pub fn capture(skip: int = 0) -> *StackTrace
 	{
 		let addresses: [64]u64 = [0; 64];
@@ -229,13 +233,17 @@ pub class Error
 	transient text_cache: ?*byte = none,
 
 	/// An error with a code and a message and no cause.
+	///
+	/// The error keeps `message` itself and no copy, so its bytes must stay
+	/// until the error is deleted, as those of a literal do.
 	pub fn new(code: int, message: str) -> *Error
 	{
 		return alloc Error { code: code, message: message, cause: none };
 	}
 
 	/// An error that wraps the one below it and takes it over. The error a
-	/// handler binds moves here, and the handler deletes it no longer.
+	/// handler binds moves here, and the handler deletes it no longer. It keeps
+	/// `message` as `new` does.
 	pub fn wrap(code: int, message: str, own cause: ?*Error) -> *Error
 	{
 		return alloc Error { code: code, message: message, cause: cause };
@@ -429,6 +437,7 @@ pub class Trace
 /// replaces it without a data race.
 internal singleton class Fatal
 {
+	/// The function that runs before `fatal` ends the program, or `none`.
 	pub atomic hook: ?fn() = none,
 }
 

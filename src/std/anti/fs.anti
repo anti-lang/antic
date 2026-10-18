@@ -1,11 +1,11 @@
 //! Files and directories.
 //!
 //! `open` gives a `File`, which `read`, `write`, `flush` and `size` take and
-//! `close` ends. `list` gives the names of a directory, and `remove` and
-//! `rename` change what a directory holds. Every function of the module may
-//! fail, and the error is a `SystemError` with the number the system gave. A
-//! path goes to the system as the program wrote it, and Windows takes `/` as
-//! well as `\`.
+//! `close` ends. `read_file` and `write_file` take a whole file in one call.
+//! `list` gives the names of a directory, and `remove` and `rename` change what
+//! a directory holds. Every function of the module may fail, and the error is a
+//! `SystemError` with the number the system gave. A path goes to the system as
+//! the program wrote it, and Windows takes `/` as well as `\`.
 //!
 //! `FileSystem` is the standard interface. It works in whole files, so a fake
 //! of it holds the bytes of each path, and `SystemFileSystem` is its default.
@@ -48,6 +48,9 @@ pub struct File
 }
 
 /// Open the file at `path` in `mode`, which reads when the call leaves it out.
+///
+/// The caller ends the file with `close`. A file that will not open fails with
+/// the `SystemError` of the number the system gave.
 pub fn open(path: str, mode: Mode = Mode.Read) -> *File may fail
 {
 	let handle = anti_rt_fs_open(path.ptr, path.len, mode as c_int);
@@ -60,7 +63,8 @@ pub fn open(path: str, mode: Mode = Mode.Read) -> *File may fail
 /// Read up to `into.len` bytes of `f` into `into`, and give their count.
 ///
 /// The count is below `into.len` only at the end of the file, and it is 0 once
-/// nothing is left.
+/// nothing is left. A read that the system refuses fails with the `SystemError`
+/// of the number it gave.
 pub fn read(f: *File, into: []byte) -> int may fail
 {
 	let count = fread(into.ptr, 1 as c_size_t, into.len as c_size_t,
@@ -126,7 +130,8 @@ pub fn close(f: *File) may fail
 /// The names leave out `.` and `..` and come in the order the system gives. The
 /// slice and its names are one block, which the caller frees with
 /// `free(names.ptr)`. A name keeps the bytes the system holds, so it opens its
-/// entry, also where it is no UTF-8.
+/// entry, also where it is no UTF-8. A directory that will not open fails with
+/// the `SystemError` of the number the system gave.
 pub fn list(path: str) -> []str may fail
 {
 	let count = 0;
@@ -138,6 +143,9 @@ pub fn list(path: str) -> []str may fail
 }
 
 /// Remove the file at `path`.
+///
+/// A file the system does not remove fails with the `SystemError` of the number
+/// it gave.
 pub fn remove(path: str) may fail
 {
 	if anti_rt_fs_remove(path.ptr, path.len) != 0 {
@@ -148,7 +156,8 @@ pub fn remove(path: str) may fail
 /// Give the file at `from` the path `to`.
 ///
 /// This is `rename` of the C library. A file already at `to` is replaced on
-/// Linux and macOS, and Windows refuses the call.
+/// Linux and macOS, and Windows refuses the call. A refused call fails with the
+/// `SystemError` of the number the system gave.
 pub fn rename(from: str, to: str) may fail
 {
 	if anti_rt_fs_rename(from.ptr, from.len, to.ptr, to.len) != 0 {
@@ -159,7 +168,9 @@ pub fn rename(from: str, to: str) may fail
 /// The bytes of the whole file at `path`.
 ///
 /// The caller frees them with `free(bytes.ptr)`. An empty file gives a slice of
-/// no bytes, whose `ptr` is `none`.
+/// no bytes, whose `ptr` is `none`. A file that will not open or read fails
+/// with the `SystemError` of the number the system gave, and a stream without
+/// an end, such as a pipe, fails as `size` does.
 pub fn read_file(path: str) -> []byte may fail
 {
 	let f = try open(path, Mode.Read);
@@ -180,6 +191,9 @@ pub fn read_file(path: str) -> []byte may fail
 
 /// Write `bytes` as the whole file at `path`, which it creates or empties
 /// first.
+///
+/// A file that will not open, or whose bytes could not all be stored, fails
+/// with the `SystemError` of the number the system gave.
 pub fn write_file(path: str, bytes: []byte) may fail
 {
 	let f = try open(path, Mode.Write);
@@ -195,24 +209,26 @@ pub fn write_file(path: str, bytes: []byte) may fail
 ///
 /// The interface works in whole files, since a fake of it holds the bytes of
 /// each path. A program that reads a file in pieces calls `open` and `read` of
-/// the module instead.
+/// the module instead. A function of it fails with the error its implementation
+/// gives, which is a `SystemError` for `SystemFileSystem`.
 pub abstract class FileSystem
 {
 	/// The bytes of the whole file at `path`, which the caller frees with
-	/// `free(bytes.ptr)`.
+	/// `free(bytes.ptr)`, and fails when the file cannot be read.
 	abstract fn read_file(self, path: str) -> []byte may fail;
 
-	/// Write `bytes` as the whole file at `path`.
+	/// Write `bytes` as the whole file at `path`, and fail when the file cannot
+	/// be written.
 	abstract fn write_file(self, path: str, bytes: []byte) may fail;
 
 	/// The names of the entries of the directory `path`, which the caller frees
-	/// with `free(names.ptr)`.
+	/// with `free(names.ptr)`, and fails when the directory cannot be read.
 	abstract fn list(self, path: str) -> []str may fail;
 
-	/// Remove the file at `path`.
+	/// Remove the file at `path`, and fail when it cannot be removed.
 	abstract fn remove(self, path: str) may fail;
 
-	/// Give the file at `from` the path `to`.
+	/// Give the file at `from` the path `to`, and fail when the system refuses.
 	abstract fn rename(self, from: str, to: str) may fail;
 
 	/// The provider the link takes where the build names none, which is the

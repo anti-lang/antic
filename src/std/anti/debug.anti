@@ -6,7 +6,7 @@
 import anti.lang;
 
 /// The trace of the caller and the calls above it, without the `skip` innermost
-/// frames.
+/// frames, in a new object the caller deletes.
 pub fn backtrace(skip: int = 0) -> *lang.StackTrace
 {
 	let t = lang.StackTrace.capture(skip + 1);

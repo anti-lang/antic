@@ -216,7 +216,9 @@ fn padding(n: int, align: int) -> int
 /// The object of a `Shared<T>` and the number of its handles.
 class Cell<T>
 {
+	/// The number of handles of the object, and the last to go tears it down.
 	pub atomic count: int,
+	/// The object the handles share.
 	pub value: T,
 }
 

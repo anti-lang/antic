@@ -8,7 +8,10 @@
 //! `lang.hash_seed()` gives when the map is made.
 //!
 //! `EntryTable<E>` and `SlotTable<E>` hold the two layouts for any element, and
-//! the sets of `anti.collection.set` build on them as well.
+//! the sets of `anti.collection.set` build on them as well. `MapWalk`,
+//! `MapKeys` and `MapValues` walk a `Map`, and `HashMapWalk`, `HashMapKeys` and
+//! `HashMapValues` a `HashMap`. The serialized form of a `HashMap` sorts its
+//! entries by their texts, so it never depends on the slots.
 
 import anti.collection;
 import anti.lang;
@@ -847,7 +850,8 @@ pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
 	}
 
 	/// The entries as text, `{"Ann": 41, "Bob": 30}`, each key and value as
-	/// `to_text` of a collection writes an element.
+	/// `to_text` of a collection writes an element. The text is memory of its
+	/// own from the C library, which `free(s.ptr)` returns.
 	concrete fn to_text(self) -> str
 	{
 		let out = text.Builder.new();
@@ -1192,6 +1196,8 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 	}
 
 	/// The entries as text, `{"Ann": 41, "Bob": 30}`, in the order of a walk.
+	/// The text is memory of its own from the C library, which `free(s.ptr)`
+	/// returns.
 	concrete fn to_text(self) -> str
 	{
 		let out = text.Builder.new();

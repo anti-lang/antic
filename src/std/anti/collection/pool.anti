@@ -8,7 +8,7 @@
 //! slot holds another element.
 //!
 //! `Slots<T>` holds the storage and the reading and lending forms that a pool
-//! and `anti.collection.tree.Tree<T>` share.
+//! and `anti.collection.tree.Tree<T>` share, and `SlotsWalk<T>` walks both.
 
 import anti.collection;
 import anti.lang;

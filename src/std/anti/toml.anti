@@ -110,7 +110,7 @@ pub class Document
 	/// Read `source` as a document the caller owns and deletes.
 	///
 	/// It is `read` for a program that holds the document in a field, where a
-	/// value would end with the block that made it.
+	/// value would end with the block that made it, and fails as `read` does.
 	pub fn open(source: str) -> *Document may fail
 	{
 		let handle = anti_rt_toml_read(source.ptr, source.len);

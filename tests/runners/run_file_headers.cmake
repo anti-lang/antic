@@ -12,6 +12,11 @@
 # family of files are no public headers, and header_sections checks
 # them.
 #
+# A module of the standard library opens with its `//!` comment. Every
+# `pub` item and field and every `abstract fn` has a `///` comment that
+# ends on the line above it, and the comment of such a function that may
+# fail says how it fails.
+#
 # Step 29 of "Fix steps" in docs/audit/summary.md reaches one part of the
 # tree per session, and each part joins the files read here.
 
@@ -107,6 +112,63 @@ foreach(path IN LISTS files)
             endif()
         endif()
         set(previous "${line}")
+    endforeach()
+endforeach()
+
+# Every module of the standard library.
+file(GLOB_RECURSE modules RELATIVE "${ROOT}" "${ROOT}/src/std/*.anti")
+if(modules STREQUAL "")
+    message(FATAL_ERROR "no module under ${ROOT}/src/std")
+endif()
+list(SORT modules)
+
+foreach(path IN LISTS modules)
+    file(STRINGS "${ROOT}/${path}" lines)
+    set(first "")
+    list(LENGTH lines count)
+    if(count GREATER 0)
+        list(GET lines 0 first)
+    endif()
+    if(NOT first MATCHES "^//! ")
+        string(APPEND failures "\n${path}: opens with no `//!` comment")
+    endif()
+
+    # The `///` comment above each line, and the signature of a function
+    # up to its body or its `;`.
+    set(doc "")
+    set(previous "")
+    set(number 0)
+    set(signature "")
+    foreach(line IN LISTS lines)
+        math(EXPR number "${number} + 1")
+        string(STRIP "${line}" text)
+        if(NOT signature STREQUAL "")
+            string(APPEND signature " ${text}")
+        elseif(text MATCHES "^(pub|abstract fn)[ \t]")
+            if(NOT previous MATCHES "^///")
+                string(APPEND failures
+                    "\n${path}:${number}: `${text}` has no `///` comment")
+            elseif(text MATCHES "^(pub[ \t]+)?([a-z]+[ \t]+)*fn[ \t]")
+                set(signature "${text}")
+                set(signature_doc "${doc}")
+                set(signature_line ${number})
+            endif()
+        endif()
+        if(NOT signature STREQUAL "" AND text MATCHES "[{;]$")
+            # A `may fail` after the parameters, not inside a parameter type.
+            string(REGEX REPLACE "[ \t]*[{;]$" "" signature "${signature}")
+            if(signature MATCHES "may fail$" AND NOT signature_doc MATCHES "fail")
+                string(APPEND failures
+                    "\n${path}:${signature_line}: the comment of a function that may fail does not say how it fails")
+            endif()
+            set(signature "")
+        endif()
+        if(text MATCHES "^///")
+            string(APPEND doc " ${text}")
+        else()
+            set(doc "")
+        endif()
+        set(previous "${text}")
     endforeach()
 endforeach()
 

@@ -361,13 +361,13 @@ The modules of the standard library, in Anti. The header of a module is its
 | `src/std/.gitkeep` | An empty file, left from before the directory held a module. |
 | `src/std/LICENSE` | The 0BSD text of the library. |
 | `src/std/anti/args.anti` | A command line declared once, parsed and read by name. |
-| `src/std/anti/collection.anti` | The interfaces of walking, the bases `Collection<T>` and `Indexed<T>`, `Copies<T>`, the hashes, the writers of a map entry and the stable sort. |
-| `src/std/anti/collection/concurrent.anti` | `ConcurrentMap`, `SpscRing` and the walk `Snapshot<T>`. |
+| `src/std/anti/collection.anti` | The interfaces of walking, the bases `Collection<T>` and `Indexed<T>`, the failures `NotOne` and `Changed`, `Snapshot<T>`, `Copies<T>`, the hashes, the writers of a map entry and the stable sort. |
+| `src/std/anti/collection/concurrent.anti` | `ConcurrentMap` and `SpscRing`. |
 | `src/std/anti/collection/deque.anti` | `Deque<T>`, a ring that grows at both ends. |
 | `src/std/anti/collection/grid.anti` | `Grid<T>`, a rectangle of cells that never changes its size. |
 | `src/std/anti/collection/list.anti` | `List<T>`, with `sort`, `sort_by` and `map`. |
 | `src/std/anti/collection/map.anti` | `Map` and `HashMap`, their two tables for any element, their walks and the sort of serialized texts. |
-| `src/std/anti/collection/pool.anti` | `Slots<T>`, `Handle<T>`, `Pool<T>`, the failure `Changed` and the walk. |
+| `src/std/anti/collection/pool.anti` | `Slots<T>`, `Handle<T>`, `Pool<T>` and the walk `SlotsWalk<T>`. |
 | `src/std/anti/collection/queue.anti` | `PriorityQueue<T>`, a binary heap, and its walk. |
 | `src/std/anti/collection/ring.anti` | `Ring<T, N>`, a ring of fixed room. |
 | `src/std/anti/collection/set.anti` | `Set` and `HashSet` on the tables of the maps, and `BitSet`. |

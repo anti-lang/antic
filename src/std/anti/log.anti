@@ -45,6 +45,7 @@ pub enum Format: u8 { Text, Json }
 /// A sink writes one whole line per call, with the newline at its end.
 pub abstract class Sink
 {
+	/// Writes `line`, which ends with its newline, as one whole line.
 	abstract fn write(self, line: str);
 }
 
@@ -102,6 +103,7 @@ pub class FileSink inherits Sink
 /// The file of a `FileSink` and of its copies, which the last of them closes.
 class OpenFile
 {
+	/// The open file, which `destruct` closes.
 	pub file: *fs.File,
 
 	fn destruct(self)
@@ -282,6 +284,7 @@ class FileLogger inherits Logger
 {
 	/// The entries in the order of the file, each with a sink it owns.
 	pub own legs: []Leg,
+	/// The number of entries of `legs` that hold a sink.
 	pub count: int = 0,
 	/// The copy of the name of the file, which `name` holds.
 	pub own held: ?*byte = none,
@@ -440,8 +443,11 @@ pub fn level_of(name: str, fallback: Level) -> Level
 /// One kind of sink a configuration file may name.
 class Kind
 {
+	/// The name of the kind, which the `kind` of an entry gives.
 	pub name: str = "",
+	/// The function that takes the `path` of an entry and gives its sink.
 	pub make: fn(str) -> *Sink,
+	/// The kind registered before this one, or `none`.
 	pub next: ?*Kind,
 }
 

@@ -5,8 +5,8 @@
 #   RUNNER  tests/runners/run_file_headers.cmake
 #   WORK    a directory for the trees
 #
-# Each case writes a tree of two files of antic, one of the runtime and
-# one of anti, runs the check on it and states whether it must accept the tree. A
+# Each case writes a tree of two files of antic, one of the runtime, one
+# of anti and a module of the standard library, runs the check on it and states whether it must accept the tree. A
 # case that must be refused names a text of the message, so a refusal
 # for another reason fails the case.
 
@@ -22,9 +22,14 @@ set(good_rt "/* The calls of hash.c. */\n\n#ifndef ANTI_HASH_H\n#define ANTI_HAS
 # A header of anti.
 set(good_anti "#ifndef ANTI_ZIP_H\n#define ANTI_ZIP_H\n\n/* The zip archive. */\n\n/* Frees an archive. */\nvoid zip_free(void *z);\n\n#endif\n")
 
+# A module of the standard library. The parameter that may fail makes
+# no function that may fail.
+set(good_std "//! Things.\n\n/// A thing.\npub class Thing\n{\n\t/// Its size.\n\tpub size: int,\n\n\t/// Writes it.\n\tabstract fn write(self);\n}\n\n/// Reads a thing, and fails when it is gone.\npub fn read(path: str)\n\t-> int may fail\n{\n\treturn 0;\n}\n\n/// Calls `f`.\npub fn call(f: fn() may fail)\n{\n}\n")
+
 set(failures "")
 # tree_case(<name> accept|<text of the refusal> <text of lexer.c> <text of lexer.h>
-#           [<text of src/rt/hash.h> [<text of src/anti/zip.h>]])
+#           [<text of src/rt/hash.h> [<text of src/anti/zip.h>
+#           [<text of src/std/anti/thing.anti>]]])
 function(tree_case name verdict c_text h_text)
     set(tree "${WORK}/${name}")
     set(rt_text "${good_rt}")
@@ -35,10 +40,15 @@ function(tree_case name verdict c_text h_text)
     if(ARGC GREATER 5)
         set(anti_text "${ARGV5}")
     endif()
+    set(std_text "${good_std}")
+    if(ARGC GREATER 6)
+        set(std_text "${ARGV6}")
+    endif()
     file(WRITE "${tree}/src/antic/lexer.c" "${c_text}")
     file(WRITE "${tree}/src/antic/lexer.h" "${h_text}")
     file(WRITE "${tree}/src/rt/hash.h" "${rt_text}")
     file(WRITE "${tree}/src/anti/zip.h" "${anti_text}")
+    file(WRITE "${tree}/src/std/anti/thing.anti" "${std_text}")
     # A shared header needs no comment per function.
     file(WRITE "${tree}/src/antic/parser_parser.h"
         "/* The shared state. */\n\nint parser_one(void);\nint parser_two(void);\n")
@@ -118,6 +128,41 @@ tree_case(anti_function_without_comment
           "src/anti/zip.h:8: zip_close has no comment of its own"
           "${good_c}" "${good_h}" "${good_rt}"
           "#ifndef ANTI_ZIP_H\n#define ANTI_ZIP_H\n\n/* The zip archive. */\n\n/* Frees an archive. */\nvoid zip_free(void *z);\nvoid zip_close(void *z);\n\n#endif\n")
+
+tree_case(module_without_header
+          "src/std/anti/thing.anti: opens with no `//!` comment"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
+          "/// A thing.\npub fn thing()\n{\n}\n")
+
+tree_case(module_header_as_doc
+          "src/std/anti/thing.anti: opens with no `//!` comment"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
+          "/// Things.\n\n/// A thing.\npub fn thing()\n{\n}\n")
+
+tree_case(pub_field_without_comment
+          "src/std/anti/thing.anti:6: `pub size: int,` has no `///` comment"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
+          "//! Things.\n\n/// A thing.\npub class Thing\n{\n\tpub size: int,\n}\n")
+
+tree_case(abstract_without_comment
+          "src/std/anti/thing.anti:6: `abstract fn write(self)"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
+          "//! Things.\n\n/// A thing.\npub abstract class Thing\n{\n\tabstract fn write(self);\n}\n")
+
+tree_case(comment_apart_from_item
+          "src/std/anti/thing.anti:5: `pub fn thing()` has no `///` comment"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
+          "//! Things.\n\n/// A thing.\n\npub fn thing()\n{\n}\n")
+
+tree_case(failure_not_named
+          "src/std/anti/thing.anti:4: the comment of a function that may fail does not say how it fails"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
+          "//! Things.\n\n/// Reads a thing.\npub fn read(path: str)\n\t-> int may fail\n{\n\treturn 0;\n}\n")
+
+tree_case(abstract_failure_not_named
+          "src/std/anti/thing.anti:7: the comment of a function that may fail does not say how it fails"
+          "${good_c}" "${good_h}" "${good_rt}" "${good_anti}"
+          "//! Things.\n\n/// A thing.\npub abstract class Thing\n{\n\t/// Reads it.\n\tabstract fn read(self) -> int may fail;\n}\n")
 
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "run_file_headers.cmake:\n${failures}")

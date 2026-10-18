@@ -127,6 +127,10 @@ pub fn current() -> *Config
 }
 
 /// Read the TOML file at `path` as the configuration of the program.
+///
+/// It is `FileConfig.read` and fails as it does: with the `SystemError` of a
+/// file that cannot be read, or an error of code 1 for a text outside the TOML
+/// subset.
 pub fn read(path: str) may fail
 {
 	try FileConfig.get().read(path);

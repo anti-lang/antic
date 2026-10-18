@@ -13,6 +13,13 @@
 //! versioned set. `Snapshot<T>` holds the copies that a walk of a collection
 //! threads share goes through. Both kinds of thread-safe collection import this
 //! module, so each of the three has one definition.
+//!
+//! `IndexedWalk<T>` lends the elements of an `Indexed<T>` to a loop, and
+//! `Copies<T>` holds the copies that `find_all` gives. `allocator` gives the
+//! allocator of a collection, the `hash_` functions give the hashes of a
+//! collection in order and in any order, and `text_keys` with the `_entries`
+//! and `write_entry` functions write the entries of a map for `serialize`.
+//! `sort_stable` is the stable sort of the lists and the maps.
 
 import anti.lang;
 import anti.mem;

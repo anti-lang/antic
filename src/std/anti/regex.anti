@@ -1,4 +1,5 @@
-//! The failures of a pattern, and the compile of a pattern at run time.
+//! The run-time half of patterns: the failures, `compile`, the iterators, every
+//! function the pattern methods call, and `patch`.
 //!
 //! A pattern literal, `re"..."`, is checked by the compiler and compiled before
 //! `main`, and a module that writes one imports this module.
@@ -119,7 +120,8 @@ pub class LengthMismatch inherits Error
 ///
 /// The pattern is text, so `\d`, `\w` and `\s` mean their ASCII sets unless it
 /// starts with `(*UCP)`. It fails with `BadPattern` when the pattern does not
-/// compile.
+/// compile. The compiled form is never given back and stays until the program
+/// ends, so each call takes memory of its own for good.
 pub fn compile(text: str) -> Regex may fail
 {
 	let code: i32 = 0;
@@ -138,7 +140,8 @@ pub fn compile(text: str) -> Regex may fail
 ///
 /// `.` matches any byte, and a character outside ASCII stands for its UTF-8
 /// bytes. It fails with `BadPattern` when the pattern does not compile, and for
-/// a negated class or a range that holds a character outside ASCII.
+/// a negated class or a range that holds a character outside ASCII. The
+/// compiled form stays until the program ends, as that of `compile` does.
 pub fn compile_bytes(text: str) -> ByteRegex may fail
 {
 	let code: i32 = 0;
@@ -660,6 +663,8 @@ pub class BytePieces
 }
 
 /// The first match of `r` in `data`, or `none`. `data.matches(r)` calls it.
+///
+/// It fails with `TooExpensive` at the match limit.
 pub fn bytes_matches(data: []byte, r: ByteRegex) -> ?ByteMatch may fail
 {
 	let found: ?ByteMatch = none;
@@ -682,6 +687,8 @@ pub fn bytes_matches_literal(data: []byte, r: ByteRegex, pattern: str,
 }
 
 /// Whether `r` matches in `data`. `if data.matches(r) { }` calls it.
+///
+/// It fails with `TooExpensive` at the match limit.
 pub fn bytes_matched(data: []byte, r: ByteRegex) -> bool may fail
 {
 	let status = anti_rt_regex_test(r.handle, data.ptr, data.len);
@@ -705,7 +712,8 @@ pub fn bytes_matched_literal(data: []byte, r: ByteRegex, pattern: str,
 
 /// The matches of `r` in `data`, left to right, for a `for` loop.
 /// `data.find_all(r)` calls it, and a `limit` takes matches as `find_all` of
-/// `str` does.
+/// `str` does. It searches the whole of `data` once before the walk, so it
+/// fails with `TooExpensive` there and the walk never does.
 pub fn bytes_find_all(data: []byte, r: ByteRegex, limit: int = 0,
 	at: lang.SourceLocation = here) -> ByteMatches may fail
 {
@@ -767,8 +775,11 @@ pub fn bytes_replace_literal(data: []byte, r: ByteRegex, pattern: str,
 	return out;
 }
 
-/// `data` with each match of `r` replaced by what `with` returns for it.
+/// `data` with each match of `r` replaced by what `with` returns for it, in new
+/// bytes of the C library, which the program frees with `free(result.ptr)`.
 /// `data.replace(r, fn(m) { })` calls it.
+///
+/// It fails with `TooExpensive` at the match limit.
 pub fn bytes_replace_fn(data: []byte, r: ByteRegex,
 	with: fn(ByteMatch) -> []byte, limit: int = 0,
 	at: lang.SourceLocation = here) -> []byte may fail
@@ -812,6 +823,9 @@ fn bytes_replaced(it: *ByteMatches, data: []byte,
 
 /// The pieces of `data` between the matches of `r`, left to right, for a `for`
 /// loop or `to_slice()`. `data.split(r)` calls it.
+///
+/// It searches the whole of `data` once before the walk, so it fails with
+/// `TooExpensive` there and the walk never does.
 pub fn bytes_split(data: []byte, r: ByteRegex, limit: int = 0,
 	at: lang.SourceLocation = here) -> BytePieces may fail
 {
@@ -836,6 +850,11 @@ pub fn bytes_split_literal(data: []byte, r: ByteRegex, pattern: str,
 
 /// Group `n` of the byte match `m`, 0 for the whole match. `m.group(n)` and
 /// `m.1` call it.
+///
+/// The group is found by the search of `m` run again over the bytes it
+/// searched, which are the caller's. A change of those bytes since the match,
+/// such as `patch` makes, stops the program when the search finds the match no
+/// longer, and may give the group of another match where it finds one.
 pub fn bytes_group(m: ByteMatch, n: int, at: lang.SourceLocation = here) -> []byte
 {
 	let out = m.all[0..0];

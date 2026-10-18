@@ -82,7 +82,9 @@ pub class Parser
 	///
 	/// An unknown option fails with an error of the code `UNKNOWN_OPTION`, an
 	/// option that takes a value and has none with `MISSING_VALUE`, and a flag
-	/// given a value with `FLAG_WITH_VALUE`.
+	/// given a value with `FLAG_WITH_VALUE`. The message of the error points
+	/// into the parser, so the parser lives as long as the program reads it,
+	/// and the next failed `parse` writes over it.
 	pub fn parse(self, argv: []str) may fail
 	{
 		let only_rest = false;

@@ -9,7 +9,7 @@ import anti.lang;
 import anti.os;
 import anti.text;
 
-/// Print `dir`, or nothing when the call that gave it failed.
+/// Print `dir` and free it, or do nothing when the call that gave it failed.
 fn show(dir: str)
 {
 	if text.byte_count(dir) == 0 {
@@ -17,6 +17,7 @@ fn show(dir: str)
 	}
 	io.print(dir);
 	io.print("\n");
+	free(dir.ptr);
 }
 
 /// Print the message of `e` and give the empty text.

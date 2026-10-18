@@ -6,10 +6,11 @@
 //! at a `concurrent` parameter or a worker may change one.
 //!
 //! They have the operations of the plain collections, less every operation by
-//! position and the lending of the whole buffer. Between threads a position can
-//! go stale at any moment, so an element is addressed by criteria, key or
-//! handle, and a slice of the whole buffer would be reached without the lock.
-//! Reading gives a copy, and no pointer to an element leaves them except
+//! position and the lending of the whole buffer. `sort`, `sort_by` and `map` of
+//! the module take a `SyncList<T>` as those of `List<T>` do. Between threads a
+//! position can go stale at any moment, so an element is addressed by criteria,
+//! key or handle, and a slice of the whole buffer would be reached without the
+//! lock. Reading gives a copy, and no pointer to an element leaves them except
 //! through a parameter that lends it.
 //!
 //! `read`, `modify` and the functions given to the find, update and remove

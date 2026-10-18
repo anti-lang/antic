@@ -1,4 +1,4 @@
-//! Ordered retrieval.
+//! `PriorityQueue<T>`, a binary heap, and its walk `QueueWalk<T>`.
 //!
 //! `PriorityQueue<T>` is a binary heap in one array. `pop` and `peek` give the
 //! smallest element first, for schedulers, event queues, timers and path
@@ -256,8 +256,11 @@ pub operator fn hash<T: Ordered + hash>(a: PriorityQueue<T>) -> u64
 /// the order of the array. The loop tears each copy down.
 pub class QueueWalk<T: Ordered>
 {
+	/// The watch that traps a change of the queue while the loop walks it.
 	pub watch: lang.Watch,
+	/// The queue the loop walks.
 	pub queue: *PriorityQueue<T>,
+	/// The position of the element of this turn, -1 before the first.
 	pub at: int = -1,
 
 	operator fn next(self) -> bool

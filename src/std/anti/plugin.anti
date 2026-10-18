@@ -87,7 +87,8 @@ pub class Library
 	///
 	/// A library that `load` opened more than once closes at the last `unload`.
 	/// It fails with `IN_USE` while an object of one of its classes is alive,
-	/// and the library stays open.
+	/// and the library stays open. The message of the error is the runtime's,
+	/// as the message of a failed `load` is.
 	pub fn unload(self) may fail
 	{
 		if !anti_rt_plugin_unload(self.handle) {
@@ -101,8 +102,8 @@ pub class Library
 ///
 /// It fails with `NOT_LOADED` when the file is no library of this runtime, or
 /// provides nothing, or carries an interface of its own where the host's is the
-/// one it must provide. The message of the error belongs to the runtime and
-/// stands until the next failure, as the message of a `SystemError` does.
+/// one it must provide. The message of the error belongs to the runtime, and
+/// the next `load`, `instance` or `unload` of the same thread writes over it.
 pub fn load(path: str) -> *Library may fail
 {
 	let opened = anti_rt_plugin_load(path.ptr, path.len);

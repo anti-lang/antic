@@ -67,18 +67,29 @@ pub const WRONG_COUNT: int = 4;
 /// One field of a class, as its descriptor lists it.
 pub class Field
 {
+	/// The name of the field, a text of the descriptor that the caller does not
+	/// free.
 	pub name: str = "",
+	/// The offset of the field from the start of the object, in bytes.
 	pub offset: int = 0,
+	/// The type of the field.
 	pub type_id: TypeId = TypeId.None,
+	/// The type that a pointer, a slice, an array or an enum is built on, and
+	/// `None` for any other type.
 	pub element: TypeId = TypeId.None,
+	/// Whether the field owns what it holds, as an `own` field does.
 	pub owned: bool = false,
 }
 
 /// One public function of a class, with the entry of its table.
 pub class Function
 {
+	/// The name of the function, a text of the descriptor that the caller does
+	/// not free.
 	pub name: str = "",
+	/// The entry of the table that holds the function.
 	pub slot: int = 0,
+	/// The number of parameters of the function, `self` among them.
 	pub param_count: int = 0,
 }
 
@@ -133,7 +144,9 @@ pub fn function(d: *byte, index: int) -> Function
 ///
 /// An integer comes at 64 bits and a float as an `f64`. A field of a type that
 /// no `Value` carries, such as a slice or an inline struct, and an index out of
-/// range give a value of kind `None`.
+/// range give a value of kind `None`. `d` describes the class of `object` or a
+/// base of it, as `describe` and `parent` give one. Another descriptor reads
+/// the object at the offsets of another class, and nothing checks it.
 pub fn get(object: *byte, d: *byte, index: int) -> Value
 {
 	let v = nothing();
@@ -147,7 +160,8 @@ pub fn get(object: *byte, d: *byte, index: int) -> Value
 /// float narrows to the field's type. A float narrows to an `f16` field through
 /// `f32`, as `as f16` takes one. An index out of range, a field that no `Value`
 /// carries and a value of another kind each fail with the code that names the
-/// reason, and write nothing.
+/// reason, and write nothing. `d` describes the class of `object` or a base of
+/// it, as for `get`.
 pub fn set(object: *byte, d: *byte, index: int, value: Value) may fail
 {
 	let v = value;
