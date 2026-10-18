@@ -10,8 +10,8 @@
 #   WORK      a directory for the objects and the executables
 #   OPT       optional opt executable
 #   LLC       optional llc executable
-#   OPTIONS   optional options of antic, separated by commas, such as
-#             --backend,native for an antic that still has that option
+#   OPTIONS   optional options of antic for both builds, separated by
+#             commas, such as -g
 #   RELEASE_OPTIONS  optional options of antic for the release build
 #             alone, separated by commas, such as --profile-use,<file>,
 #             which dev mode refuses
