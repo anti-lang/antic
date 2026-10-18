@@ -530,8 +530,7 @@ static bool settle_diagnostics(const struct options *o,
 }
 
 /* Print one token per line: its position, its group and its source text.
-   A doc comment spans lines, so it prints its first line. Chapter 1 shows
-   this output for the function scale. */
+   A doc comment spans lines, so it prints its first line. */
 static void dump_tokens(const char *source, const struct token_list *tokens)
 {
     size_t i;

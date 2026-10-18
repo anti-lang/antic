@@ -1423,8 +1423,8 @@ static bool converts_as_integer(const struct type *t)
            t->kind == TYPE_ENUM;
 }
 
-/* The conversions of chapter 2. Two types with one IR type, such as u32
-   and char, convert without an instruction. */
+/* The conversions of `as`. Two types with one IR type, such as u32 and
+   char, convert without an instruction. */
 /* What the pointer or the slice t reaches, or NULL for another type. */
 static const struct type *viewed(const struct type *t)
 {

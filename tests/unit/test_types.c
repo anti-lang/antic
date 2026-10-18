@@ -105,7 +105,7 @@ void test_types(void)
         CHECK(!types_pointer_free(types_tuple(&types, elements, 2)));
     }
 
-    /* struct Pixel { tag: u8, value: i32, flag: u8 } from chapter 2 */
+    /* struct Pixel { tag: u8, value: i32, flag: u8 } */
     pixel = types_struct(&types, name_of("main"), name_of("Pixel"));
     named(pixel, "Pixel");
     CHECK(pixel != types_struct(&types, name_of("main"), name_of("Pixel")));

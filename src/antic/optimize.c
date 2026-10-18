@@ -16,9 +16,12 @@
 /* DESIGN: the passes rely on three properties and nothing else.
    1. The IR passes ir_verify, including its check that every path to a
       use of a temporary passes a definition of it.
-   2. Integer operations wrap, and chapter 2 leaves division by zero,
-      MIN / -1, a shift by the width or more and an out-of-range float
-      conversion undefined. Folding skips exactly those cases.
+   2. Integer operations wrap. Division by zero, MIN / -1, a shift by
+      the width or more and an out-of-range float conversion have no
+      value of the IR: C leaves each undefined, a dev build stops it and
+      a release build gives the result of ARM64, as "Checks and
+      debugging" in docs/anti-syntax-overview.md says. Folding skips
+      exactly those cases.
    3. Memory may change at every store and every call. No pass reasons
       about the contents of memory. */
 

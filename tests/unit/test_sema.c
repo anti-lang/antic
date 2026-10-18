@@ -748,7 +748,7 @@ void test_sema(void)
 
     /* main */
     accepts("fn main(args: []str, env: []str) -> int { return args.len; }");
-    /* Threads, chapter 22. */
+    /* Threads. */
     accepts("worker fn sum(chunk: []int) -> int { return chunk.len; }\n"
             "fn f(a: []int) -> int { let r = parallel a -> sum; "
             "return r.len; }\n");

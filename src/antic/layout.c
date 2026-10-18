@@ -213,7 +213,7 @@ static bool bit_unit(struct layouts *l, const struct ir_aggtype *t,
     return true;
 }
 
-/* The C rules of chapter 18. A struct places each field at the next
+/* The rules of C. A struct places each field at the next
    multiple of its alignment, and a union places every field at 0. packed
    aligns every field to 1, and align(N) raises the aggregate's alignment.
    The size rounds up to the alignment.

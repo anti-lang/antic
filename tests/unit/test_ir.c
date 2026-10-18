@@ -25,7 +25,7 @@ static void verified(const struct ir_module *m, const char *expected_errors)
     text_free(&errors);
 }
 
-/* The function scale of chapter 1 after constant folding. */
+/* The function scale after its constant factor is folded to 6. */
 static void scale(void)
 {
     struct arena arena = {0};

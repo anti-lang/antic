@@ -2,7 +2,8 @@
 #define ANTIC_LAYOUT_H
 
 /* The back end lays out the aggregates of the IR for one target and folds
-   its symbolic values. Chapter 18 gives the rules. */
+   its symbolic values. The rules of C on the target give each layout, and
+   layout.c states them. */
 
 #include <stdbool.h>
 #include <stddef.h>

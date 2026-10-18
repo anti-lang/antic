@@ -385,7 +385,7 @@ void test_optimize(void)
               "b0:\n"
               "    ret i64 0\n"
               "}\n");
-    /* The function scale of chapter 1. */
+    /* The function scale, whose constant k folds to 6. */
     optimizes("fn scale(x: int) -> int {\n"
               "    let k = 2 + 4;\n"
               "    return x * k;\n"
