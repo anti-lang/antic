@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "../rt/regex.h"
 #include "arith.h"
 #include "pattern.h"
 #include "sema_checker.h"
@@ -159,29 +158,29 @@ static bool group_known(struct checker *c, const struct expr *pattern,
 static bool template_fits(struct checker *c, const struct expr *pattern,
                           const struct expr *t)
 {
-    const unsigned char *bytes = (const unsigned char *)t->as.text.bytes;
-    int64_t length = (int64_t)t->as.text.length;
+    const char *bytes = t->as.text.bytes;
     bool mode = types_is_byte_regex(pattern->type);
     int64_t count = pattern_group_count(pattern->as.text.bytes,
                                         pattern->as.text.length, mode);
-    struct anti_rt_piece piece;
-    int64_t offset = 0;
+    struct pattern_piece piece;
+    size_t offset = 0;
     bool ok = true;
 
-    while (anti_rt_regex_piece(bytes, length, &offset, &piece)) {
-        if (piece.kind == ANTI_RT_PIECE_NUMBER && piece.number > count) {
+    while (pattern_template_piece(bytes, t->as.text.length, &offset,
+                                  &piece)) {
+        if (piece.kind == PATTERN_PIECE_NUMBER && piece.number > count) {
             sema_error_at(c, t->pos, "the template names group %lld, and the "
                           "pattern has %lld group%s", (long long)piece.number,
                           (long long)count, count == 1 ? "" : "s");
             ok = false;
-        } else if (piece.kind == ANTI_RT_PIECE_NAME &&
+        } else if (piece.kind == PATTERN_PIECE_NAME &&
                    pattern_group_number(pattern->as.text.bytes,
                                         pattern->as.text.length, mode,
-                                        (const char *)bytes + piece.start,
-                                        (size_t)piece.length) < 0) {
+                                        bytes + piece.start,
+                                        piece.length) < 0) {
             sema_error_at(c, t->pos, "the template names the group `%.*s`, "
                           "which the pattern lacks", (int)piece.length,
-                          (const char *)bytes + piece.start);
+                          bytes + piece.start);
             ok = false;
         }
     }

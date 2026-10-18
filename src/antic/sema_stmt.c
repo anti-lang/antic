@@ -3494,3 +3494,16 @@ void sema_check_test_block(struct checker *c, struct item *it)
                       "`fixtures`, which runs them around every test");
     }
 }
+
+struct stmt *sema_arm_fallthrough(const struct stmt *body)
+{
+    const struct block *b;
+
+    if (body->kind != STMT_BLOCK) {
+        return NULL;
+    }
+    b = body->as.block;
+    return b->count > 0 && b->stmts[b->count - 1]->kind == STMT_FALLTHROUGH
+               ? b->stmts[b->count - 1]
+               : NULL;
+}

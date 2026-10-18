@@ -504,19 +504,6 @@ static bool literal_complete(const struct type *t, struct ptr_set *answered)
     return true;
 }
 
-struct stmt *sema_arm_fallthrough(const struct stmt *body)
-{
-    const struct block *b;
-
-    if (body->kind != STMT_BLOCK) {
-        return NULL;
-    }
-    b = body->as.block;
-    return b->count > 0 && b->stmts[b->count - 1]->kind == STMT_FALLTHROUGH
-               ? b->stmts[b->count - 1]
-               : NULL;
-}
-
 /* DESIGN: a Mutex field without a default starts free, as `Mutex.new()`
    gives it, so a literal and `construct` may leave it out. So does the
    hidden lock of a synchronized class. */

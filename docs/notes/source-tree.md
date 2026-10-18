@@ -60,9 +60,9 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/parser_parser.h` | The state of the parser and the functions its files share, each under the file that defines it. |
 | `src/antic/parser_stmt.c` | Statements and blocks, the handlers of `catch` included. |
 | `src/antic/parser_type.c` | Types, and the scan that tells type arguments after `<` from a comparison. |
-| `src/antic/pattern.c` | Checks a pattern literal: compiles it through the PCRE2 wrapper of the runtime, numbers its groups, and reads it into a tree for `exponential-pattern` and the least match length. |
+| `src/antic/pattern.c` | Checks a pattern literal: compiles it through the PCRE2 wrapper of the runtime, numbers its groups, and reads it into a tree for `exponential-pattern` and the least match length. Reads the pieces of a replacement template for the checker. |
 | `src/antic/pattern.h` | The interface of `pattern.c`. |
-| `src/antic/sema.c` | The shared helpers of the checker, every declaration pass over the items of a module, and `sema_check`, which runs the passes in order. |
+| `src/antic/sema.c` | The shared helpers of the checker, every declaration pass over the items of a module with the checks of `provides`, `link` and a simd struct, and `sema_check`, which runs the passes in order. |
 | `src/antic/sema.h` | The interface of the checker to the driver, lowering and the header: symbols, constants, the interface of a module, `sema_check` and the queries of the later passes. |
 | `src/antic/sema_call.c` | Checks calls and members: fields and their visibility, the functions of a class, `construct`, errors and their handlers, `mul_high` and the calls of a plugin library. |
 | `src/antic/sema_chain.c` | Takes a chain of declarations that name each other apart and resolves them leaves first. |

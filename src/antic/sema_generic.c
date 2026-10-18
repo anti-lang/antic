@@ -2521,3 +2521,13 @@ void sema_strip_generics(struct module *module, struct arena *arena)
     }
     module->item_count = kept;
 }
+
+const char *sema_no_order(const struct type *t, const char *hook)
+{
+    if (strcmp(hook, LANG_HOOK_LT) != 0 ||
+        (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS)) {
+        return "";
+    }
+    return ". A struct or a class has no default order and declares "
+           "`operator fn lt`";
+}

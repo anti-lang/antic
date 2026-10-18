@@ -394,7 +394,6 @@ struct expr *sema_hook_call(struct checker *c, struct expr *base,
                             size_t count);
 bool sema_iterate(struct checker *c, struct expr *e, struct type *t,
                   struct iteration *it, struct type **element);
-bool sema_descends_from(const struct type *a, const struct type *b);
 extern const struct name sema_hidden_value;
 const char *sema_format_name(const struct expr *e);
 struct type *sema_check_expr(struct checker *c, struct expr *e,
@@ -562,6 +561,9 @@ void sema_join_flow_stmt(struct checker *c, struct join_flow *flow,
 void sema_join_flow_free(struct join_flow *flow);
 
 /* sema_class.c */
+/* Whether a is b or a class below b, so a pointer to a converts to a
+   pointer to b without a check. */
+bool sema_descends_from(const struct type *a, const struct type *b);
 /* The type of one parameter of a function of anti.lang.Object, after
    `self`. */
 enum root_param { ROOT_P_OBJECT, ROOT_P_STR, ROOT_P_ERROR, ROOT_P_FIELD };
@@ -743,6 +745,9 @@ bool sema_thread_safe(const struct type *t);
 bool sema_thread_safe_symbol(const struct symbol *sym);
 
 /* sema_generic.c */
+/* The end of a refusal of the hook named hook on type t: what a struct
+   or a class without `lt` declares, and "" for any other. */
+const char *sema_no_order(const struct type *t, const char *hook);
 /* Whether name is one of the twenty of the hook table: the fourteen
    operators, the five language hooks and `hash`. */
 bool sema_operator_named(const struct name *name);
@@ -869,9 +874,6 @@ bool sema_concurrent_lacks(struct checker *c, struct type *t,
    `equals` and `hash` the compiler writes for it, where its chain declares
    neither. */
 void sema_class_defaults(struct checker *c, struct item *it);
-/* The end of a refusal of the hook named hook on type t: what a struct
-   or a class without `lt` declares, and "" for any other. */
-const char *sema_no_order(const struct type *t, const char *hook);
 
 /* sema_pattern.c */
 

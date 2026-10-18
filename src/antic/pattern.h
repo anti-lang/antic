@@ -3,7 +3,8 @@
 
 /* The interface of pattern.c, the checks of a pattern literal: the
    compile with PCRE2, the count and the numbers of its groups, the least
-   length of a match and the safety check `exponential-pattern`. */
+   length of a match and the safety check `exponential-pattern`, and the
+   pieces of a replacement template. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -38,6 +39,29 @@ int64_t pattern_group_number(const char *bytes, size_t length,
    0 for the whole match. It may be below the true least, never above. */
 int64_t pattern_least_bytes(const char *bytes, size_t length,
                             int64_t group);
+
+/* The kinds of piece a replacement template is made of: text, a group by
+   its number, `$1` and `${1}`, and a group by its name, `${name}`. */
+enum pattern_piece_kind {
+    PATTERN_PIECE_TEXT,
+    PATTERN_PIECE_NUMBER,
+    PATTERN_PIECE_NAME
+};
+
+/* One piece of a template. start and length give its bytes in the
+   template, and the name of a named group. */
+struct pattern_piece {
+    enum pattern_piece_kind kind;
+    size_t start;
+    size_t length;
+    int64_t number;
+};
+
+/* Read the piece of the template of length bytes at bytes that starts at
+   *offset into *piece, as the runtime reads it, and move *offset past it.
+   Returns false at the end of the template. */
+bool pattern_template_piece(const char *bytes, size_t length, size_t *offset,
+                            struct pattern_piece *piece);
 
 /* Whether the pattern, which compiles, nests a repeat inside another over
    text that overlaps, which can take exponential time. Then *inner is the

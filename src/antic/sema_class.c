@@ -1516,3 +1516,15 @@ bool sema_root_hook(const struct name *name)
     }
     return false;
 }
+
+/* Whether a is b or a class below b, so a pointer to a converts to a
+   pointer to b without a check. */
+bool sema_descends_from(const struct type *a, const struct type *b)
+{
+    for (; a != NULL; a = a->kind == TYPE_CLASS ? a->base : NULL) {
+        if (a == b) {
+            return true;
+        }
+    }
+    return false;
+}

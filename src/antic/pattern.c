@@ -1,7 +1,9 @@
 /* Checks a pattern literal. It compiles the pattern through the PCRE2
    wrapper of the runtime, numbers its groups, and reads it into a tree
    for the safety check `exponential-pattern` and the least length of a
-   match. */
+   match. It also reads the pieces of a replacement template as the
+   runtime does, so the checker reaches the runtime through this file
+   alone. */
 
 #include "pattern.h"
 
@@ -1317,4 +1319,24 @@ int64_t pattern_least_bytes(const char *bytes, size_t length,
     }
     arena_free(&arena);
     return count;
+}
+
+bool pattern_template_piece(const char *bytes, size_t length, size_t *offset,
+                            struct pattern_piece *piece)
+{
+    struct anti_rt_piece one;
+    int64_t at = (int64_t)*offset;
+
+    if (!anti_rt_regex_piece((const unsigned char *)bytes, (int64_t)length,
+                             &at, &one)) {
+        return false;
+    }
+    *offset = (size_t)at;
+    piece->kind = one.kind == ANTI_RT_PIECE_NUMBER ? PATTERN_PIECE_NUMBER
+                  : one.kind == ANTI_RT_PIECE_NAME ? PATTERN_PIECE_NAME
+                                                   : PATTERN_PIECE_TEXT;
+    piece->start = (size_t)one.start;
+    piece->length = (size_t)one.length;
+    piece->number = one.number;
+    return true;
 }

@@ -1309,18 +1309,6 @@ static bool can_convert(const struct type *from, const struct type *to)
     return from->kind == TYPE_POINTER && to->kind == TYPE_POINTER;
 }
 
-/* Whether a is b or a class below b, so a pointer to a converts to a
-   pointer to b without a check. */
-bool sema_descends_from(const struct type *a, const struct type *b)
-{
-    for (; a != NULL; a = a->kind == TYPE_CLASS ? a->base : NULL) {
-        if (a == b) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* DESIGN: `p is *T` and `p as *T` on a class pointer compare the
    ancestor of the object at T's depth with T's descriptor. `is` gives a
    bool, `as` traps on a mismatch and `as?` gives `none`. Both need a class
