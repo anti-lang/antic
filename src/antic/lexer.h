@@ -203,7 +203,8 @@ bool lexer_token_is_builtin_type(enum token_kind kind);
 const char *lexer_token_kind_name(enum token_kind kind);
 
 /* The group of a kind in a token dump: keyword, ident, int_lit,
-   float_lit, char_lit, string_lit, doc or symbol. */
+   float_lit, char_lit, string_lit, doc, symbol, eof or error. Every
+   literal of text, a pattern literal among them, is string_lit. */
 const char *lexer_token_category(enum token_kind kind);
 
 #endif

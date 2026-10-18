@@ -145,7 +145,9 @@ bool modpath_of_source(const char *source, const char *const *roots,
     dot = strrchr(rest, '.');
     end = dot != NULL && strcmp(dot, SOURCE_SUFFIX) == 0 ? dot
                                                          : rest + strlen(rest);
-    while (ok && rest < end) {
+    /* The loop reads one name at least, so a file named `.anti` gives an
+       empty name, which is refused, and never an empty module path. */
+    do {
         const char *slash = first_separator(rest, (size_t)(end - rest));
         size_t n = slash != NULL ? (size_t)(slash - rest)
                                  : (size_t)(end - rest);
@@ -163,7 +165,7 @@ bool modpath_of_source(const char *source, const char *const *roots,
                          rest);
         }
         rest += n + 1;
-    }
+    } while (ok && rest < end);
     text_free(&part);
     return ok;
 }

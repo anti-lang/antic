@@ -4072,7 +4072,8 @@ antic_dump_test(tokens docs
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.tokens"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.anti")
 
-# The groups of a float literal, a character literal and a reserved word.
+# The groups of a float literal, a character literal, a pattern literal and
+# a reserved word.
 antic_dump_test(tokens kinds
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/kinds.tokens"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/kinds.anti")

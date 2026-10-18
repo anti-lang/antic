@@ -679,6 +679,11 @@ static void module_paths(void)
             "`Com` in src/Com/geo.anti is not a lowercase identifier");
     path_of("src/com/fn/geo.anti", roots, 2,
             "`fn` in src/com/fn/geo.anti is a keyword");
+    /* A file named for the suffix alone names no module, so its empty
+       name is refused as every other name that is no identifier. */
+    path_of(".anti", NULL, 0, "`` in .anti is not a lowercase identifier");
+    path_of("src/.anti", roots, 2,
+            "`` in src/.anti is not a lowercase identifier");
     /* A Windows host separates the parts of a path with `\` as well, as
        its programs and a script that joins a path there write it. */
     if (platform_separator() == '\\') {

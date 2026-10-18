@@ -1594,7 +1594,8 @@ const char *lexer_token_category(enum token_kind kind)
     case TOKEN_CHAR: return "char_lit";
     case TOKEN_STRING:
     case TOKEN_BYTES:
-    case TOKEN_FORMAT: return "string_lit";
+    case TOKEN_FORMAT:
+    case TOKEN_PATTERN: return "string_lit";
     case TOKEN_RESERVED: return "keyword";
     case TOKEN_DOC:
     case TOKEN_MODULE_DOC:

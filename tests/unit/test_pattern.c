@@ -41,8 +41,39 @@ static void least_counts(void)
     CHECK(least_of("(?:ab){65535}", 0) == 131070);
 }
 
+static bool nested(const char *pattern)
+{
+    struct pattern_span inner;
+    struct pattern_span outer;
+
+    return pattern_exponential(pattern, strlen(pattern), &inner, &outer);
+}
+
+/* PCRE2 reads two octal digits after `\0`, so `\0777` is `?` and then
+   `7`, inside a class and outside one. The reader took a third digit and
+   read one character outside ASCII, a gap of the readers under rule 14
+   in docs/audit/front-end.md. */
+static void octal_escapes(void)
+{
+    CHECK(least_of("\\0777", 0) == 2);
+    CHECK(nested("(?:7+[\\0777])+"));
+}
+
+/* `[:` opens a POSIX class only where `:]` follows before any `]`, as
+   PCRE2 reads it. Otherwise `[` and `:` are characters of the class, so
+   the class of `[[:a]b(c+)+` ends at its first `]` and the nested repeat
+   after it is seen. */
+static void posix_class_ends(void)
+{
+    CHECK(nested("[[:a]b(c+)+"));
+    CHECK(least_of("[[:a]b", 0) == 2);
+    CHECK(!nested("[[:alpha:]]+"));
+}
+
 void test_pattern(void)
 {
     least_cap();
     least_counts();
+    octal_escapes();
+    posix_class_ends();
 }

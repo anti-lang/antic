@@ -344,12 +344,14 @@ static int64_t read_number(struct reader *r)
 }
 
 /* The value of the hex or octal digits of an escape, `\x{...}`, `\xhh`,
-   `\o{...}` and `\0oo`, as one character. */
+   `\o{...}` and `\0oo`, as one character. As PCRE2 reads them, two
+   digits at most follow `\x` and `\0` without braces, so `\0777` is
+   `\077` and then `7`. `\o` takes its braces always. */
 static uint32_t coded_char(struct reader *r, unsigned kind)
 {
     uint32_t value = 0;
     int base = kind == 'x' ? 16 : 8;
-    int limit = kind == 'x' ? 2 : 3;
+    const int limit = 2;
     bool braced = kind != '0' && peek(r, 0) == '{';
     int digits = 0;
 
@@ -479,11 +481,35 @@ static void posix_class(const unsigned char *name, size_t length,
 }
 
 /* `[...]`, from the byte after the `[`. */
+/* Whether a POSIX class name starts at name, the byte after its `[:`.
+   Then *end is the position of its `:]`. As PCRE2 reads it, a `]` or a
+   second `[:` before the `:]` means the `[` is a character of the class,
+   and `\]` and `\\` are skipped as one. */
+static bool posix_end(const struct reader *r, size_t name, size_t *end)
+{
+    size_t i;
+
+    for (i = name; i < r->n; i++) {
+        unsigned char c = r->s[i];
+        unsigned char next = i + 1 < r->n ? r->s[i + 1] : 0;
+        if (c == '\\' && (next == ']' || next == '\\')) {
+            i++;
+        } else if ((c == '[' && next == ':') || c == ']') {
+            return false;
+        } else if (c == ':' && next == ']') {
+            *end = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 static struct node *parse_class(struct reader *r, size_t start)
 {
     struct node *n = new_node(r, NODE_SET, start);
     bool negate = false;
     bool first = true;
+    size_t end;
 
     if (peek(r, 0) == '^') {
         negate = true;
@@ -497,15 +523,10 @@ static struct node *parse_class(struct reader *r, size_t start)
             break;
         }
         first = false;
-        if (peek(r, 0) == '[' && peek(r, 1) == ':') {
-            size_t name = r->pos + 2;
-            size_t end = name;
-            while (end + 1 < r->n &&
-                   !(r->s[end] == ':' && r->s[end + 1] == ']')) {
-                end++;
-            }
-            posix_class(r->s + name, end - name, &n->set);
-            r->pos = end + 2 < r->n ? end + 2 : r->n;
+        if (peek(r, 0) == '[' && peek(r, 1) == ':' &&
+            posix_end(r, r->pos + 2, &end)) {
+            posix_class(r->s + r->pos + 2, end - (r->pos + 2), &n->set);
+            r->pos = end + 2;
             continue;
         }
         if (peek(r, 0) == '\\' && peek(r, 1) == 'Q') {
