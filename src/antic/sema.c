@@ -22,6 +22,10 @@
 
 /* Helpers */
 
+/* The path of the root module, which the checker looks up its standard
+   items in. */
+static const struct name lang_module = {LANG_MODULE, sizeof LANG_MODULE - 1};
+
 /* The bits of v read as a two's complement int64_t. C leaves the
    conversion of a uint64_t above INT64_MAX to the implementation, so a
    negative value is computed from its complement. */
@@ -90,11 +94,6 @@ bool sema_is_error(const struct type *t)
     return t == NULL || t->kind == TYPE_ERROR;
 }
 
-bool sema_same_name(const struct name *a, const struct name *b)
-{
-    return a->length == b->length && memcmp(a->text, b->text, a->length) == 0;
-}
-
 bool sema_name_is(const struct name *a, const char *text)
 {
     return a->length == strlen(text) && memcmp(a->text, text, a->length) == 0;
@@ -117,7 +116,7 @@ bool sema_same_place(const struct expr *a, const struct expr *b)
         return a->symbol != NULL && a->symbol == b->symbol;
     }
     if (a->kind == EXPR_FIELD && b->kind == EXPR_FIELD) {
-        return sema_same_name(&a->as.field.name, &b->as.field.name) &&
+        return types_same_name(&a->as.field.name, &b->as.field.name) &&
                sema_same_place(a->as.field.base, b->as.field.base);
     }
     return false;
@@ -147,7 +146,7 @@ struct symbol *sema_scope_find_local(const struct scope *s,
     size_t i;
 
     for (i = 0; i < s->count; i++) {
-        if (sema_same_name(&s->entries[i].name, name)) {
+        if (types_same_name(&s->entries[i].name, name)) {
             return s->entries[i].symbol;
         }
     }
@@ -176,7 +175,7 @@ static struct symbol *nested_find(const struct checker *c,
         for (i = 0; i < it->nested_count; i++) {
             const struct item *inner = it->nested[i];
             if (inner->symbol != NULL &&
-                sema_same_name(&inner->local_name, name)) {
+                types_same_name(&inner->local_name, name)) {
                 return inner->symbol;
             }
         }
@@ -249,7 +248,7 @@ static bool imports_module(const struct checker *c,
         const struct interface *next;
         imported.text = lib->imports[i];
         imported.length = strlen(lib->imports[i]);
-        if (sema_same_name(&imported, module)) {
+        if (types_same_name(&imported, module)) {
             return true;
         }
         next = sema_find_library(c, &imported);
@@ -291,7 +290,7 @@ struct symbol *sema_library_item(const struct checker *c,
     size_t i;
 
     for (i = 0; i < lib->item_count; i++) {
-        if (!sema_same_name(&lib->items[i]->name, name)) {
+        if (!types_same_name(&lib->items[i]->name, name)) {
             continue;
         }
         if (lib->items[i]->internal && !package_shared(c, lib)) {
@@ -1138,7 +1137,7 @@ struct symbol *sema_std_item(struct checker *c, const struct name *module,
     const struct interface *lib = sema_find_library(c, module);
     struct symbol *sym = lib != NULL ? sema_library_item(c, lib, name) : NULL;
 
-    if (sym == NULL && own && sema_same_name(&c->module_name, module)) {
+    if (sym == NULL && own && types_same_name(&c->module_name, module)) {
         sym = sema_lookup(c, name);
     }
     return sym != NULL && sym->kind == SYMBOL_STRUCT && sym->type != NULL
@@ -1195,9 +1194,8 @@ struct symbol *sema_std_function(struct checker *c, struct pos pos,
    names. */
 struct type *sema_error_class(struct checker *c, struct pos pos)
 {
-    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
     static const struct name class_name = {LANG_ERROR, sizeof LANG_ERROR - 1};
-    struct symbol *sym = sema_std_item(c, &module, &class_name, true);
+    struct symbol *sym = sema_std_item(c, &lang_module, &class_name, true);
 
     if (sym == NULL || sym->type->kind != TYPE_CLASS) {
         sema_error_at(c, pos, "`may fail` gives `?*" LANG_MODULE "." LANG_ERROR
@@ -1211,10 +1209,9 @@ struct type *sema_error_class(struct checker *c, struct pos pos)
    after an error at pos. */
 struct type *sema_location_type(struct checker *c, struct pos pos)
 {
-    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
     static const struct name type_name = {
         LANG_SOURCE_LOCATION, sizeof LANG_SOURCE_LOCATION - 1};
-    struct symbol *sym = sema_std_item(c, &module, &type_name, true);
+    struct symbol *sym = sema_std_item(c, &lang_module, &type_name, true);
 
     if (sym == NULL || sym->type->kind != TYPE_STRUCT) {
         sema_error_at(c, pos, "`here` gives an `" LANG_MODULE "."
@@ -1444,7 +1441,7 @@ static void declare_get(struct checker *c, struct item *it)
        so the class declares none. A `get` its base declares would stand
        in place of the one written, and is refused at the class. */
     for (i = 0; i < it->member_count; i++) {
-        if (sema_same_name(&it->members[i]->name, &name)) {
+        if (types_same_name(&it->members[i]->name, &name)) {
             sema_error_at(c, it->members[i]->name_pos,
                           "`%.*s` is a singleton, and the compiler writes "
                           "its `get`", (int)it->name.length, it->name.text);
@@ -1531,9 +1528,8 @@ static void declare_deserialize(struct checker *c, struct type *object)
    program without that module cannot name it either. */
 static struct type *lang_error_or_null(struct checker *c)
 {
-    static const struct name module = {LANG_MODULE, sizeof LANG_MODULE - 1};
     static const struct name class_name = {LANG_ERROR, sizeof LANG_ERROR - 1};
-    struct symbol *sym = sema_std_item(c, &module, &class_name, false);
+    struct symbol *sym = sema_std_item(c, &lang_module, &class_name, false);
 
     if (sym == NULL || sym->type->kind != TYPE_CLASS) {
         return NULL;
@@ -1545,35 +1541,11 @@ static struct type *lang_error_or_null(struct checker *c)
    live in the runtime, and nine hooks with empty bodies after them. The
    checker builds one item per function, so `v.type_name()` resolves like
    any inherited call and lowering finds the runtime symbol behind it.
-   The list is built once per session. */
-/* The type of one parameter of a hook, after `self`. */
-enum root_param { ROOT_P_OBJECT, ROOT_P_STR, ROOT_P_ERROR, ROOT_P_FIELD };
-
+   The list is built once per session, from sema_root_fns, which the
+   tables of sema_class.c read as well. */
 static void declare_root(struct checker *c)
 {
-    static const struct {
-        const char *name;
-        int params;             /* besides self */
-        enum type_kind result;
-        enum root_param kinds[2];
-    } root[] = {
-        {"type_name", 0, TYPE_STR, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {ROOT_TO_TEXT, 0, TYPE_STR, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {"equals", 1, TYPE_BOOL, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {"hash", 0, TYPE_U64, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {"serialize", 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {"destruct", 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {"copy", 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {ROOT_CREATED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {ROOT_DESTROYED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {ROOT_COPIED, 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {ROOT_DISPATCHED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {ROOT_JOINED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
-        {ROOT_ENTER, 1, TYPE_VOID, {ROOT_P_STR, ROOT_P_OBJECT}},
-        {ROOT_LEAVE, 1, TYPE_VOID, {ROOT_P_STR, ROOT_P_OBJECT}},
-        {ROOT_FAILED, 2, TYPE_VOID, {ROOT_P_STR, ROOT_P_ERROR}},
-        {ROOT_CHANGED, 1, TYPE_VOID, {ROOT_P_FIELD, ROOT_P_OBJECT}}
-    };
+    const struct root_fn *root = sema_root_fns;
     struct type *object = types_object(c->types);
     struct type *error = lang_error_or_null(c);
     struct item **members;
@@ -1583,9 +1555,8 @@ static void declare_root(struct checker *c)
     if (object->member_count > 0) {
         return;
     }
-    members = arena_alloc(c->arena, sizeof root / sizeof root[0] *
-                                        sizeof *members);
-    for (i = 0; i < sizeof root / sizeof root[0]; i++) {
+    members = types_alloc_array(c->arena, SEMA_ROOT_COUNT, sizeof *members);
+    for (i = 0; i < SEMA_ROOT_COUNT; i++) {
         struct item *it = arena_alloc(c->arena, sizeof *it);
         struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
         struct type **params = arena_alloc(c->arena, 3 * sizeof *params);
@@ -1622,12 +1593,12 @@ static void declare_root(struct checker *c)
         sym->kind = SYMBOL_FN;
         sym->name = it->name;
         sym->item = it;
-        sym->type = types_fn(c->types, params, (size_t)root[i].params + 1,
+        sym->type = types_fn(c->types, params, root[i].params + 1,
                              sema_builtin(c, root[i].result));
         members[i] = it;
     }
     object->members = members;
-    object->member_count = sizeof root / sizeof root[0];
+    object->member_count = SEMA_ROOT_COUNT;
     declare_deserialize(c, object);
 }
 
@@ -1670,7 +1641,7 @@ static void declare_cases(struct checker *c, struct item *it)
         values[i].type = tag;
         values[i].number = i;
         for (k = 0; k < i; k++) {
-            if (sema_same_name(&values[k].name, &one->name)) {
+            if (types_same_name(&values[k].name, &one->name)) {
                 sema_error_at(c, one->pos, "variant `%.*s` has two cases named "
                               "`%.*s`", (int)it->name.length, it->name.text,
                               (int)one->name.length, one->name.text);
@@ -1701,7 +1672,7 @@ static void declare_cases(struct checker *c, struct item *it)
             fields[j].type = sema_resolve_type(c, one->fields[j].type);
             sema_leave(c, &sized);
             for (k = 0; k < j; k++) {
-                if (sema_same_name(&fields[k].name, &fields[j].name)) {
+                if (types_same_name(&fields[k].name, &fields[j].name)) {
                     sema_error_at(c, fields[j].pos,
                                   "case `%.*s` of `%.*s` has two "
                                   "fields named `%.*s`", (int)one->name.length,
@@ -1852,7 +1823,7 @@ static void declare_import(struct checker *c, const struct import *imp)
             local.length = module->length - i - 1;
         }
     }
-    if (sema_same_name(module, &c->module_name)) {
+    if (types_same_name(module, &c->module_name)) {
         sema_error_at(c, imp->module_pos, "`%.*s` cannot import itself",
                       (int)module->length, module->text);
         return;
@@ -1943,14 +1914,15 @@ static bool same_qualifier(const struct item *it, const struct item *a,
                            const struct item *b)
 {
     bool a_plain = a->qualifier.length == 0 ||
-                   sema_same_name(&a->qualifier, &it->name);
+                   types_same_name(&a->qualifier, &it->name);
     bool b_plain = b->qualifier.length == 0 ||
-                   sema_same_name(&b->qualifier, &it->name);
+                   types_same_name(&b->qualifier, &it->name);
 
     if (a->kind != ITEM_FN || b->kind != ITEM_FN || (a_plain && b_plain)) {
         return true;
     }
-    return !a_plain && !b_plain && sema_same_name(&a->qualifier, &b->qualifier);
+    return !a_plain && !b_plain &&
+           types_same_name(&a->qualifier, &b->qualifier);
 }
 
 /* A framework is named once, and its name is one name of Apple's SDK:
@@ -2103,7 +2075,7 @@ static bool shares_name(const struct module *module, const struct item *it)
     for (i = 0; i < module->item_count; i++) {
         const struct item *other = module->items[i];
         if (other != it && module_operator(other) &&
-            sema_same_name(&other->name, &it->name)) {
+            types_same_name(&other->name, &it->name)) {
             return true;
         }
     }
@@ -2387,7 +2359,7 @@ static void declare_enum_values(struct checker *c, struct item *it)
             }
         }
         for (k = 0; k < j; k++) {
-            if (sema_same_name(&values[k].name, &values[j].name)) {
+            if (types_same_name(&values[k].name, &values[j].name)) {
                 sema_error_at(c, values[j].pos, "enum `%.*s` has two values "
                               "named `%.*s`", (int)it->name.length,
                               it->name.text, (int)values[j].name.length,
@@ -2544,7 +2516,7 @@ static void resolve_fields(struct checker *c, struct item *it,
                           "bitfield");
         }
         for (k = 0; k < j && !types_field_is_unit_break(&fields[j]); k++) {
-            if (sema_same_name(&fields[k].name, &fields[j].name)) {
+            if (types_same_name(&fields[k].name, &fields[j].name)) {
                 sema_error_at(c, fields[j].pos, "%s `%.*s` has two fields "
                               "named `%.*s`",
                               it->kind == ITEM_UNION ? "union" : "struct",
@@ -2743,7 +2715,7 @@ static void declare_members(struct checker *c, struct item *it)
         named = sema_module_find(c, &m->qualifier);
         if (named != NULL && named->kind == SYMBOL_STRUCT &&
             named->type != NULL && named->type->kind == TYPE_CLASS &&
-            !sema_same_name(&named->type->name, &m->qualifier)) {
+            !types_same_name(&named->type->name, &m->qualifier)) {
             m->qualifier = named->type->name;
         }
     }
@@ -2758,7 +2730,7 @@ static void declare_members(struct checker *c, struct item *it)
            which names the static function that stands for another
            maker. */
         for (k = 0; k < j && !sema_name_is(&m->name, "construct"); k++) {
-            if (sema_same_name(&it->members[k]->name, &m->name) &&
+            if (types_same_name(&it->members[k]->name, &m->name) &&
                 same_qualifier(it, it->members[k], m)) {
                 sema_error_at(c, m->name_pos, "`%.*s` declares `%.*s` twice",
                               (int)it->name.length, it->name.text,
@@ -3009,7 +2981,7 @@ static bool named_by_refused_base(const struct module *module,
         if (below->kind == ITEM_CLASS && below->base_name.length > 0 &&
             below->base_module.length == 0 && below->symbol != NULL &&
             below->symbol->type != NULL && below->symbol->type->base == NULL &&
-            sema_same_name(&below->base_name, &it->name)) {
+            types_same_name(&below->base_name, &it->name)) {
             return true;
         }
     }

@@ -647,6 +647,15 @@ struct type *types_object(struct types *types);
    and the registry that `--no-reflect` drops. */
 #define REFLECT_MODULE "anti.reflect"
 
+/* The seven functions of `anti.lang.Object` whose bodies live in the
+   runtime, in the order of its table. ROOT_TO_TEXT is the second. */
+#define ROOT_TYPE_NAME "type_name"
+#define ROOT_EQUALS "equals"
+#define ROOT_HASH "hash"
+#define ROOT_SERIALIZE "serialize"
+#define ROOT_DESTRUCT "destruct"
+#define ROOT_COPY "copy"
+
 /* DESIGN: `anti.lang.Object` declares nine hooks with empty bodies after
    its seven functions. They take the entries after those in the table of
    every class, in this order, which `enum anti_hook` of `src/rt/object.h`
@@ -988,6 +997,13 @@ int types_bits(const struct type *t);
    between threads. */
 bool types_pointer_free(const struct type *t);
 
+/* The level of the chain of t, t itself first, whose name is q, or NULL.
+   The chain of a class goes up through its bases, and any other type is
+   a chain of one. */
+const struct type *types_level_named(const struct type *t,
+                                     const struct name *q);
+/* Whether the names a and b spell the same bytes. */
+bool types_same_name(const struct name *a, const struct name *b);
 /* Whether t has fields: a struct, a union, a class, a tuple, a variant
    and a `?T`, whose parts the walks over fields reach as fields. */
 bool types_has_fields(const struct type *t);

@@ -783,7 +783,7 @@ struct name_writes {
 static bool names_it(const struct name_writes *w, const struct expr *e)
 {
     return e != NULL && e->kind == EXPR_NAME &&
-           sema_same_name(&e->as.name, w->name);
+           types_same_name(&e->as.name, w->name);
 }
 
 static bool visit_write_expr(void *data, const struct expr *e);
@@ -953,15 +953,13 @@ static void pattern_piece(char *out, size_t size, const struct expr *e,
 struct type *sema_check_pattern(struct checker *c, struct expr *e,
                                 struct type *expected)
 {
-    static const struct name module = {REGEX_MODULE,
-                                       sizeof REGEX_MODULE - 1};
     bool bytes = expected != NULL && types_is_byte_regex(expected);
     struct pattern_span inner;
     struct pattern_span outer;
     char message[ANTI_PATTERN_MESSAGE];
     size_t offset = 0;
 
-    if (sema_find_library(c, &module) == NULL) {
+    if (sema_find_library(c, &regex_module) == NULL) {
         sema_error_at(c, e->pos, "a pattern literal is compiled by `"
                       REGEX_MODULE "`, so the module imports `" REGEX_MODULE
                       "`");
@@ -999,8 +997,6 @@ static const struct name hidden_regex = {"<regex>", 7};
 struct type *sema_check_regex_compile(struct checker *c, struct expr *e,
                                       struct type *expected)
 {
-    static const struct name module = {REGEX_MODULE,
-                                       sizeof REGEX_MODULE - 1};
     struct expr *callee = e->as.call.callee;
     const struct name *name = &callee->as.field.name;
     bool bytes = sema_name_is(&callee->as.field.base->as.name,
@@ -1019,10 +1015,11 @@ struct type *sema_check_regex_compile(struct checker *c, struct expr *e,
                       (int)name->length, name->text);
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (sema_std_function(c, e->pos, what, &module, function, 1) == NULL) {
+    if (sema_std_function(c, e->pos, what, &regex_module, function, 1) ==
+        NULL) {
         return sema_builtin(c, TYPE_ERROR);
     }
-    lib = sema_find_library(c, &module);
+    lib = sema_find_library(c, &regex_module);
     sema_enter_scope(c, &scope);
     home = sema_declare(c, SYMBOL_MODULE, &hidden_regex, e->pos,
                         "`%.*s` is already declared");

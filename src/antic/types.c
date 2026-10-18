@@ -541,7 +541,7 @@ bool types_is_lang_error(const struct type *t)
     return lang_item(t, TYPE_CLASS, LANG_ERROR);
 }
 
-static bool same_text(const struct name *a, const struct name *b)
+bool types_same_name(const struct name *a, const struct name *b)
 {
     return a->length == b->length &&
            memcmp(a->text, b->text, a->length) == 0;
@@ -554,19 +554,25 @@ static const struct type *level_above(const struct type *t)
     return t->kind == TYPE_CLASS ? t->base : NULL;
 }
 
-enum body_table types_body_table(const struct type *t, const struct item *m)
+const struct type *types_level_named(const struct type *t,
+                                     const struct name *q)
 {
-    const struct type *up;
-
-    if (m->qualifier.length == 0 || same_text(&m->qualifier, &t->name)) {
-        return BODY_PLAIN;
-    }
-    for (up = level_above(t); up != NULL; up = level_above(up)) {
-        if (same_text(&m->qualifier, &up->name)) {
-            return BODY_BASE;
+    for (; t != NULL; t = level_above(t)) {
+        if (types_same_name(q, &t->name)) {
+            return t;
         }
     }
-    return BODY_INTERFACE;
+    return NULL;
+}
+
+enum body_table types_body_table(const struct type *t, const struct item *m)
+{
+    if (m->qualifier.length == 0 || types_same_name(&m->qualifier, &t->name)) {
+        return BODY_PLAIN;
+    }
+    return types_level_named(level_above(t), &m->qualifier) != NULL
+               ? BODY_BASE
+               : BODY_INTERFACE;
 }
 
 const struct item *types_primary_member(const struct type *t,
@@ -578,7 +584,7 @@ const struct item *types_primary_member(const struct type *t,
         const struct item *plain = NULL;
         for (i = 0; i < t->member_count; i++) {
             const struct item *m = t->members[i];
-            if (m->kind != ITEM_FN || !same_text(&m->name, name)) {
+            if (m->kind != ITEM_FN || !types_same_name(&m->name, name)) {
                 continue;
             }
             switch (types_body_table(t, m)) {
@@ -632,14 +638,14 @@ const struct item *types_interface_member(const struct type *t,
                                           const struct type *iface,
                                           const struct name *name)
 {
-    const struct type *chain;
     size_t i;
 
     for (; t != NULL; t = level_above(t)) {
         const struct item *plain = NULL;
         for (i = 0; i < t->member_count; i++) {
             const struct item *m = t->members[i];
-            if (m->kind != ITEM_FN || !m->pub || !same_text(&m->name, name)) {
+            if (m->kind != ITEM_FN || !m->pub ||
+                !types_same_name(&m->name, name)) {
                 continue;
             }
             switch (types_body_table(t, m)) {
@@ -647,11 +653,8 @@ const struct item *types_interface_member(const struct type *t,
                 plain = plain != NULL ? plain : m;
                 break;
             case BODY_INTERFACE:
-                for (chain = iface; chain != NULL;
-                     chain = level_above(chain)) {
-                    if (same_text(&m->qualifier, &chain->name)) {
-                        return m;
-                    }
+                if (types_level_named(iface, &m->qualifier) != NULL) {
+                    return m;
                 }
                 break;
             case BODY_BASE:
@@ -669,7 +672,7 @@ struct name types_member_symbol(struct arena *arena, const struct name *owner,
                                 const struct item *m)
 {
     bool qualified = m->qualifier.length > 0 &&
-                     !same_text(&m->qualifier, owner);
+                     !types_same_name(&m->qualifier, owner);
     size_t length = owner->length + 1 + m->name.length +
                     (qualified ? m->qualifier.length + 1 : 0);
     char *text = arena_alloc(arena, length + 1);
@@ -1601,7 +1604,7 @@ bool types_cases_from_fields(struct types *types, struct type *v)
             return false;
         }
         for (j = 0; u != NULL && j < u->field_count; j++) {
-            if (same_text(&u->fields[j].name, &tag->fields[i].name)) {
+            if (types_same_name(&u->fields[j].name, &tag->fields[i].name)) {
                 v->params[i] = u->fields[j].type;
             }
         }
@@ -1615,7 +1618,7 @@ bool types_case_index(const struct type *v, const struct name *name,
     size_t i;
 
     for (i = 0; v->base != NULL && i < v->base->field_count; i++) {
-        if (same_text(&v->base->fields[i].name, name)) {
+        if (types_same_name(&v->base->fields[i].name, name)) {
             *index = i;
             return true;
         }
@@ -2181,7 +2184,7 @@ const struct struct_field *types_find_field(const struct type *s,
     size_t i;
 
     for (i = 0; i < s->field_count; i++) {
-        if (same_text(&s->fields[i].name, name) &&
+        if (types_same_name(&s->fields[i].name, name) &&
             !types_field_is_unit_break(&s->fields[i])) {
             return &s->fields[i];
         }

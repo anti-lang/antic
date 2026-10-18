@@ -158,26 +158,6 @@ static const char *operator_name(enum token_kind op)
     }
 }
 
-/* Whether name is one of the nineteen the operator table holds: the
-   fourteen operators and the five language hooks. */
-bool sema_operator_named(const struct name *name)
-{
-    static const char *const names[] = {
-        "add", "sub", "mul", "div", "rem", "neg", "eq",
-        "lt", "and", "or", "xor", "shl", "shr", "not",
-        LANG_HOOK_ITER, LANG_HOOK_NEXT, LANG_HOOK_VALUE, LANG_HOOK_INDEX,
-        LANG_HOOK_SET_INDEX, LANG_HOOK_HASH
-    };
-    size_t i;
-
-    for (i = 0; i < sizeof names / sizeof names[0]; i++) {
-        if (sema_name_is(name, names[i])) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* Whether sym is a function written `operator fn`, of the module being
    checked or of a library file. */
 static bool symbol_is_operator(const struct symbol *sym)

@@ -50,7 +50,7 @@ static struct item *reached_member(const struct type *t,
         struct item *base_body = NULL;
         for (i = 0; i < level->member_count; i++) {
             struct item *m = level->members[i];
-            if (!sema_same_name(&m->name, name)) {
+            if (!types_same_name(&m->name, name)) {
                 continue;
             }
             if (m->kind != ITEM_FN) {
@@ -65,7 +65,7 @@ static struct item *reached_member(const struct type *t,
             case BODY_INTERFACE:
                 if (lone == NULL) {
                     lone = m;
-                } else if (!sema_same_name(&lone->qualifier, &m->qualifier)) {
+                } else if (!types_same_name(&lone->qualifier, &m->qualifier)) {
                     two = true;
                 }
                 break;
@@ -100,12 +100,12 @@ static bool ambiguous_member(struct checker *c, struct pos pos,
     for (up = t; up != NULL; up = up->base) {
         for (i = 0; i < up->member_count; i++) {
             const struct item *m = up->members[i];
-            if (m->kind != ITEM_FN || !sema_same_name(&m->name, name) ||
+            if (m->kind != ITEM_FN || !types_same_name(&m->name, name) ||
                 types_body_table(up, m) != BODY_INTERFACE) {
                 continue;
             }
             for (k = 0; k < count; k++) {
-                if (sema_same_name(seen[k], &m->qualifier)) {
+                if (types_same_name(seen[k], &m->qualifier)) {
                     break;
                 }
             }
@@ -349,7 +349,7 @@ static bool from_test_block(const struct checker *c, const struct type *t)
     const struct item *named = sema_named_function(c);
 
     return named != NULL && named->block != BLOCK_NONE && t != NULL &&
-           sema_same_name(&t->module, &c->module_name);
+           types_same_name(&t->module, &c->module_name);
 }
 
 static bool descends_or_copies(const struct type *a, const struct type *b);
@@ -375,7 +375,7 @@ static bool from_module_operator(const struct checker *c,
                memcmp(named->home_module, t->module.text,
                       t->module.length) == 0;
     }
-    return sema_same_name(&t->module, &c->module_name);
+    return types_same_name(&t->module, &c->module_name);
 }
 
 /* DESIGN: the four levels of the object model document. A public member
@@ -579,7 +579,7 @@ static struct symbol *shared_operator(const struct checker *c,
         return NULL;
     }
     shared = sema_shared_name(c->arena, name, &g->name);
-    if (sema_same_name(&s->module, &c->module_name)) {
+    if (types_same_name(&s->module, &c->module_name)) {
         return sema_scope_find_local(&c->module_scope, &shared);
     }
     lib = sema_find_library(c, &s->module);
@@ -615,7 +615,7 @@ struct symbol *sema_module_function(const struct checker *c,
     }
     /* An item of another library that a direct import names is no
        function of the module that declares the type. */
-    if (sema_same_name(&s->module, &c->module_name)) {
+    if (types_same_name(&s->module, &c->module_name)) {
         struct symbol *sym = sema_scope_find_local(&c->module_scope, name);
         return sema_direct_item(sym) ? NULL : sym;
     }
@@ -734,7 +734,7 @@ static const struct type *private_owner(const struct type *t,
     for (level = t; level != NULL;
          level = level->kind == TYPE_CLASS ? level->base : NULL) {
         for (i = 0; i < level->private_fn_count; i++) {
-            if (sema_same_name(&level->private_fns[i], name)) {
+            if (types_same_name(&level->private_fns[i], name)) {
                 return level;
             }
         }
@@ -1435,7 +1435,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     bool ok = true;
 
     for (i = 0; i < t->member_count; i++) {
-        if (sema_same_name(&t->members[i]->name, &construct_name)) {
+        if (types_same_name(&t->members[i]->name, &construct_name)) {
             m = t->members[i];
         }
     }
@@ -2330,7 +2330,7 @@ struct item *sema_find_member(const struct type *t, const struct name *name)
 
     for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
         for (i = 0; i < t->member_count; i++) {
-            if (sema_same_name(&t->members[i]->name, name)) {
+            if (types_same_name(&t->members[i]->name, name)) {
                 return t->members[i];
             }
         }
@@ -2797,7 +2797,7 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
     for (i = 0; i < count; i++) {
         const struct struct_field *f = NULL;
         for (j = 0; j < field_count; j++) {
-            if (sema_same_name(&fields[j].name, &inits[i].name) &&
+            if (types_same_name(&fields[j].name, &inits[i].name) &&
                 !types_field_is_unit_break(&fields[j])) {
                 f = &fields[j];
             }
@@ -2810,7 +2810,7 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
             continue;
         }
         for (j = 0; j < i; j++) {
-            if (sema_same_name(&inits[j].name, &inits[i].name)) {
+            if (types_same_name(&inits[j].name, &inits[i].name)) {
                 sema_error_at(c, inits[i].pos, "the field `%.*s` appears twice",
                               (int)inits[i].name.length, inits[i].name.text);
                 ok = false;
@@ -2860,7 +2860,7 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
             continue;
         }
         for (i = 0; i < count; i++) {
-            if (sema_same_name(&fields[j].name, &inits[i].name)) {
+            if (types_same_name(&fields[j].name, &inits[i].name)) {
                 break;
             }
         }

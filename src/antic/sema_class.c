@@ -22,19 +22,16 @@ static const struct type *qualified_table(const struct type *t,
     size_t k;
 
     for (up = t; up != NULL; up = sema_inherited(up)) {
-        if (sema_same_name(q, &up->name)) {
+        if (types_same_name(q, &up->name)) {
             return up;
         }
         for (k = 0; k < up->field_count; k++) {
-            const struct type *iface;
-            if (up->fields[k].form != FIELD_IMPL) {
-                continue;
-            }
-            for (iface = up->fields[k].type; iface != NULL;
-                 iface = sema_inherited(iface)) {
-                if (sema_same_name(q, &iface->name)) {
-                    return iface;
-                }
+            const struct type *iface =
+                up->fields[k].form == FIELD_IMPL
+                    ? types_level_named(up->fields[k].type, q)
+                    : NULL;
+            if (iface != NULL) {
+                return iface;
             }
         }
     }
@@ -48,17 +45,14 @@ static const struct item *chain_entry(const struct type *t,
                                       const struct type **owner)
 {
     const struct item *found = types_primary_member(t, name);
-    size_t i;
+    const struct type *level =
+        found != NULL ? types_member_level(t, found) : NULL;
 
-    for (; found != NULL && t != NULL; t = sema_inherited(t)) {
-        for (i = 0; i < t->member_count; i++) {
-            if (t->members[i] == found) {
-                *owner = t;
-                return found;
-            }
-        }
+    if (level == NULL) {
+        return NULL;
     }
-    return NULL;
+    *owner = level;
+    return found;
 }
 
 /* Whether the level t itself fills the table of iface with a body
@@ -74,11 +68,11 @@ static bool qualified_body(const struct type *t, const struct type *iface,
     for (i = 0; i < t->member_count; i++) {
         const struct item *m = t->members[i];
         if (m->kind != ITEM_FN || m->qualifier.length == 0 ||
-            !sema_same_name(&m->name, name)) {
+            !types_same_name(&m->name, name)) {
             continue;
         }
         for (chain = iface; chain != NULL; chain = sema_inherited(chain)) {
-            if (sema_same_name(&m->qualifier, &chain->name)) {
+            if (types_same_name(&m->qualifier, &chain->name)) {
                 return true;
             }
         }
@@ -257,7 +251,6 @@ static bool one_table(const struct type *t, const struct item *a,
 {
     enum body_table a_table = types_body_table(t, a);
     const struct type *up;
-    const struct type *chain;
     size_t k;
 
     if (a_table != types_body_table(t, b) || a_table == BODY_PLAIN) {
@@ -268,17 +261,10 @@ static bool one_table(const struct type *t, const struct item *a,
     }
     for (up = t; up != NULL; up = sema_inherited(up)) {
         for (k = 0; k < up->field_count; k++) {
-            bool has_a = false;
-            bool has_b = false;
-            if (up->fields[k].form != FIELD_IMPL) {
-                continue;
-            }
-            for (chain = up->fields[k].type; chain != NULL;
-                 chain = sema_inherited(chain)) {
-                has_a = has_a || sema_same_name(&a->qualifier, &chain->name);
-                has_b = has_b || sema_same_name(&b->qualifier, &chain->name);
-            }
-            if (has_a && has_b) {
+            const struct type *iface = up->fields[k].type;
+            if (up->fields[k].form == FIELD_IMPL &&
+                types_level_named(iface, &a->qualifier) != NULL &&
+                types_level_named(iface, &b->qualifier) != NULL) {
                 return true;
             }
         }
@@ -341,7 +327,7 @@ static void check_replacement(struct checker *c, const struct item *it,
     bool filled = false;
     size_t k;
 
-    if (m->qualifier.length > 0 && !sema_same_name(&m->qualifier, &t->name)) {
+    if (m->qualifier.length > 0 && !types_same_name(&m->qualifier, &t->name)) {
         const struct type *table = qualified_table(t, &m->qualifier);
         if (table == NULL) {
             return;
@@ -506,7 +492,7 @@ static bool declared_twice(const struct item *it, const struct item *m)
 
     for (k = 0; k < it->member_count; k++) {
         if (it->members[k] != m && it->members[k]->kind == ITEM_FN &&
-            sema_same_name(&it->members[k]->name, &m->name)) {
+            types_same_name(&it->members[k]->name, &m->name)) {
             return true;
         }
     }
@@ -545,7 +531,7 @@ static void check_contracts(struct checker *c, const struct item *it,
            message, by T071 of docs/audit/tests-findings.md. */
         if (m->contract == FN_CONCRETE && m->qualifier.length > 0 &&
             (qualified_table(t, &m->qualifier) == NULL ||
-             (sema_same_name(&m->qualifier, &t->name) &&
+             (types_same_name(&m->qualifier, &t->name) &&
               declared_twice(it, m)))) {
             continue;
         }
@@ -1090,9 +1076,9 @@ static void check_qualifiers(struct checker *c, const struct item *it,
         for (k = 0; k < j; k++) {
             const struct item *other = it->members[k];
             if (other->kind == ITEM_FN &&
-                sema_same_name(&other->name, &m->name) &&
+                types_same_name(&other->name, &m->name) &&
                 other->qualifier.length > 0 &&
-                !sema_same_name(&other->qualifier, &m->qualifier) &&
+                !types_same_name(&other->qualifier, &m->qualifier) &&
                 one_table(t, other, m)) {
                 sema_error_at(c, m->name_pos, "`%.*s` declares `%.*s` twice",
                               (int)it->name.length, it->name.text,
@@ -1417,20 +1403,24 @@ void sema_check_classes(struct checker *c)
    every table. A class replaces one with a concrete function of the same
    name. The order of the nine is `enum anti_hook` of src/rt/object.h, and
    the unit test records_hook_entries pins the two together. */
-static const char *const root_names[] = {
-    "type_name", ROOT_TO_TEXT, "equals", "hash", "serialize", "destruct",
-    "copy", ROOT_CREATED, ROOT_DESTROYED, ROOT_COPIED, ROOT_DISPATCHED,
-    ROOT_JOINED, ROOT_ENTER, ROOT_LEAVE, ROOT_FAILED, ROOT_CHANGED
+const struct root_fn sema_root_fns[SEMA_ROOT_COUNT] = {
+    {ROOT_TYPE_NAME, 0, TYPE_STR, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_TO_TEXT, 0, TYPE_STR, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_EQUALS, 1, TYPE_BOOL, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_HASH, 0, TYPE_U64, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_SERIALIZE, 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_DESTRUCT, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_COPY, 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_CREATED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_DESTROYED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_COPIED, 1, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_DISPATCHED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_JOINED, 0, TYPE_VOID, {ROOT_P_OBJECT, ROOT_P_OBJECT}},
+    {ROOT_ENTER, 1, TYPE_VOID, {ROOT_P_STR, ROOT_P_OBJECT}},
+    {ROOT_LEAVE, 1, TYPE_VOID, {ROOT_P_STR, ROOT_P_OBJECT}},
+    {ROOT_FAILED, 2, TYPE_VOID, {ROOT_P_STR, ROOT_P_ERROR}},
+    {ROOT_CHANGED, 1, TYPE_VOID, {ROOT_P_FIELD, ROOT_P_OBJECT}}
 };
-
-/* The parameters of each, `self` among them. */
-static const unsigned char root_params[] = {
-    1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 2, 3, 2
-};
-
-#define ROOT_COUNT (sizeof root_names / sizeof root_names[0])
-/* The seven functions come first, and the nine hooks after them. */
-#define ROOT_FIRST_HOOK 7
 
 /* The parameters of the member m, `self` among them. The out pointer of
    a `may fail` function is no parameter of the declaration. */
@@ -1450,7 +1440,7 @@ static size_t table_add(struct table_entry *out, size_t count,
     size_t i;
 
     for (i = 0; i < count; i++) {
-        if (sema_same_name(&out[i].name, &name) && out[i].params == params) {
+        if (types_same_name(&out[i].name, &name) && out[i].params == params) {
             out[i].fn = m;
             return count;
         }
@@ -1464,7 +1454,7 @@ static size_t table_add(struct table_entry *out, size_t count,
 
 size_t sema_table_bound(const struct type *t)
 {
-    size_t bound = ROOT_COUNT;
+    size_t bound = SEMA_ROOT_COUNT;
 
     for (; t != NULL; t = t->kind == TYPE_CLASS ? t->base : NULL) {
         bound += t->member_count;
@@ -1484,12 +1474,12 @@ size_t sema_table_of(const struct type *t, struct table_entry *out)
         count = sema_table_of(t->base, out);
     }
     if (t->kind == TYPE_CLASS && t->base == NULL) {
-        for (i = 0; i < ROOT_COUNT; i++) {
+        for (i = 0; i < SEMA_ROOT_COUNT; i++) {
             struct name name;
-            name.text = root_names[i];
-            name.length = strlen(root_names[i]);
-            count = table_add(out, count, name, root_params[i], NULL,
-                              root_names[i]);
+            name.text = sema_root_fns[i].name;
+            name.length = strlen(sema_root_fns[i].name);
+            count = table_add(out, count, name, sema_root_fns[i].params + 1,
+                              NULL, sema_root_fns[i].name);
         }
     }
     /* DESIGN: `concrete fn I::f` fills the table of I alone, and the
@@ -1519,9 +1509,8 @@ bool sema_root_hook(const struct name *name)
 {
     size_t i;
 
-    for (i = ROOT_FIRST_HOOK; i < ROOT_COUNT; i++) {
-        if (name->length == strlen(root_names[i]) &&
-            memcmp(name->text, root_names[i], name->length) == 0) {
+    for (i = SEMA_ROOT_FIRST_HOOK; i < SEMA_ROOT_COUNT; i++) {
+        if (sema_name_is(name, sema_root_fns[i].name)) {
             return true;
         }
     }

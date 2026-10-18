@@ -132,7 +132,7 @@ static const struct item *enclosing_named(const struct item *it,
     for (; it != NULL; it = it->outer) {
         const struct name *own = it->local_name.length > 0 ? &it->local_name
                                                            : &it->name;
-        if (it->kind == ITEM_CLASS && sema_same_name(own, name)) {
+        if (it->kind == ITEM_CLASS && types_same_name(own, name)) {
             return it;
         }
     }
@@ -241,7 +241,7 @@ static const struct held_mutex *guard_holder(const struct checker *c,
     for (h = c->held; h != c->held_outside; h = h->outer) {
         const struct expr *m = sema_bare_place(h->mutex);
         const struct type *owner;
-        if (m->kind != EXPR_FIELD || !sema_same_name(&m->as.field.name,
+        if (m->kind != EXPR_FIELD || !types_same_name(&m->as.field.name,
                                                      &f->guard)) {
             continue;
         }
@@ -542,7 +542,7 @@ void sema_note_field_write(struct checker *c, const struct expr *e)
     if (f == NULL || is_free_field(f) || in_lifecycle_of(c, f->home)) {
         return;
     }
-    if (!sema_same_name(&f->home->module, &c->module_name)) {
+    if (!types_same_name(&f->home->module, &c->module_name)) {
         if (f->unchecked || f->home->unchecked_fields) {
             return;
         }

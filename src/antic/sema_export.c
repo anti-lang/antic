@@ -470,7 +470,7 @@ void sema_check_export(struct checker *c, struct item *it)
             for (j = 0; j < lib->item_count; j++) {
                 const struct symbol *other = lib->items[j];
                 if (other->exported && other->kind == SYMBOL_FN &&
-                    sema_same_name(&other->name, &it->name)) {
+                    types_same_name(&other->name, &it->name)) {
                     sema_error_at(c, it->name_pos,
                                   "export fn `%.*s` has the symbol "
                                   "of export fn `%.*s` in module `%s`",

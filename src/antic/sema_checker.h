@@ -293,7 +293,6 @@ const char *sema_tn(const struct type *t);
 void sema_check_nesting(struct checker *c, struct type *t, struct pos pos);
 struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);
-bool sema_same_name(const struct name *a, const struct name *b);
 bool sema_name_is(const struct name *a, const char *text);
 /* The place e names with its `&` and `*` taken off, so `m`, `&m` and
    `*&m` name one place. */
@@ -408,7 +407,6 @@ void sema_error_may_be_none(struct checker *c, const struct expr *e,
 /* sema_operator.c */
 
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT]);
-bool sema_operator_named(const struct name *name);
 /* The operator function `name` that the type t declares, or that the
    module of t declares for a struct. */
 struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
@@ -564,6 +562,24 @@ void sema_join_flow_stmt(struct checker *c, struct join_flow *flow,
 void sema_join_flow_free(struct join_flow *flow);
 
 /* sema_class.c */
+/* The type of one parameter of a function of anti.lang.Object, after
+   `self`. */
+enum root_param { ROOT_P_OBJECT, ROOT_P_STR, ROOT_P_ERROR, ROOT_P_FIELD };
+/* One function of anti.lang.Object: its name, its parameters besides
+   `self`, its result and the types of those parameters. */
+struct root_fn {
+    const char *name;
+    size_t params;
+    enum type_kind result;
+    enum root_param kinds[2];
+};
+/* The sixteen functions of anti.lang.Object in the order of every table:
+   the seven of the runtime, then the nine hooks from
+   SEMA_ROOT_FIRST_HOOK. declare_root of sema.c builds their items from
+   it, and the tables of sema_class.c take their first entries from it. */
+#define SEMA_ROOT_COUNT 16
+#define SEMA_ROOT_FIRST_HOOK 7
+extern const struct root_fn sema_root_fns[SEMA_ROOT_COUNT];
 
 /* Check the class model of every type with fields of the module. */
 void sema_check_classes(struct checker *c);
@@ -727,6 +743,9 @@ bool sema_thread_safe(const struct type *t);
 bool sema_thread_safe_symbol(const struct symbol *sym);
 
 /* sema_generic.c */
+/* Whether name is one of the twenty of the hook table: the fourteen
+   operators, the five language hooks and `hash`. */
+bool sema_operator_named(const struct name *name);
 
 struct symbol *sema_type_param_find(const struct checker *c,
                                     const struct name *name);

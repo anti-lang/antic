@@ -52,6 +52,11 @@ static int hook_index(const struct name *name)
     return -1;
 }
 
+bool sema_operator_named(const struct name *name)
+{
+    return hook_index(name) >= 0;
+}
+
 static int hook_of(const char *text)
 {
     struct name name;
@@ -77,7 +82,7 @@ struct symbol *sema_type_param_find(const struct checker *c,
          f = f->enclosing) {
         for (i = 0; i < f->type_param_count; i++) {
             if (f->type_params[i].symbol != NULL &&
-                sema_same_name(&f->type_params[i].name, name)) {
+                types_same_name(&f->type_params[i].name, name)) {
                 return f->type_params[i].symbol;
             }
         }
@@ -85,7 +90,7 @@ struct symbol *sema_type_param_find(const struct checker *c,
     for (w = c->ctx.within; w != NULL; w = w->outer) {
         for (i = 0; i < w->type_param_count; i++) {
             if (w->type_params[i].symbol != NULL &&
-                sema_same_name(&w->type_params[i].name, name)) {
+                types_same_name(&w->type_params[i].name, name)) {
                 return w->type_params[i].symbol;
             }
         }
@@ -125,7 +130,7 @@ static void declare_params(struct checker *c, struct item *it)
         struct type_param *tp = &it->type_params[i];
         struct symbol *sym = arena_alloc(c->arena, sizeof *sym);
         for (j = 0; j < i; j++) {
-            if (sema_same_name(&it->type_params[j].name, &tp->name)) {
+            if (types_same_name(&it->type_params[j].name, &tp->name)) {
                 sema_error_at(c, tp->pos, "`%.*s` names two type parameters "
                               "`%.*s`", (int)it->name.length, it->name.text,
                               (int)tp->name.length, tp->name.text);
@@ -1303,7 +1308,7 @@ static struct pos chan_field_pos(const struct type *copy, size_t i)
 
     for (j = 0; it != NULL && j < it->param_count; j++) {
         const struct type_expr *t = it->params[j].type;
-        if (sema_same_name(&it->params[j].name, &f->name) && t != NULL &&
+        if (types_same_name(&it->params[j].name, &f->name) && t != NULL &&
             t->kind == TYPEX_CHAN && t->element != NULL) {
             return t->element->pos;
         }

@@ -2595,7 +2595,7 @@ static void set_target(const struct required *r, const struct expr *target,
         return;
     }
     for (i = 0; i < r->count; i++) {
-        if (sema_same_name(&r->fields[i]->name, &target->as.field.name)) {
+        if (types_same_name(&r->fields[i]->name, &target->as.field.name)) {
             set[i] = true;
         }
     }
@@ -3308,7 +3308,7 @@ bool sema_refuse_count_write(struct checker *c, const struct expr *target,
         return false;
     }
     for (t = sema_struct_of(receiver->type); t != NULL; t = t->base) {
-        if (sema_same_name(&t->module, &c->module_name)) {
+        if (types_same_name(&t->module, &c->module_name)) {
             return false;
         }
         if (t == f->home) {

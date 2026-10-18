@@ -116,7 +116,7 @@ static bool class_value(struct checker *c, const struct expr *lit,
             continue;
         }
         for (i = 0; i < lit->as.struct_lit.field_count; i++) {
-            if (sema_same_name(&s->fields[j].name,
+            if (types_same_name(&s->fields[j].name,
                                &lit->as.struct_lit.fields[i].name) &&
                 !sema_eval_const(c, lit->as.struct_lit.fields[i].value,
                                  item)) {
@@ -1090,7 +1090,7 @@ static bool const_struct(struct checker *c, struct expr *e,
     }
     for (i = 0; i < e->as.struct_lit.field_count; i++) {
         for (j = 0; j < s->field_count; j++) {
-            if (sema_same_name(&s->fields[j].name,
+            if (types_same_name(&s->fields[j].name,
                                &e->as.struct_lit.fields[i].name) &&
                 !sema_eval_const(c, e->as.struct_lit.fields[i].value,
                                  &out->as.aggregate.items[j])) {
