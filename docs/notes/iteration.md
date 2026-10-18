@@ -6,7 +6,7 @@ and iteration" in `docs/decisions.md`.
 
 ## Checker
 
-- `sema_operator_named` holds the nineteen names. `check_hook` of `sema.c`
+- `sema_operator_named` holds the nineteen names. `check_hook` of `sema_class.c`
   checks the signature of each hook, for a function of a class body and for a
   free `operator fn` of a module alike.
 - `sema_hook` finds a hook on a type or on the type a `*T` points to. A

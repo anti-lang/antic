@@ -706,6 +706,8 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_no_paths.cmake` | Refuses the path of the checkout in the runtime libraries and in antic. |
 | `tests/runners/run_no_sdk_fetcher.cmake` | Refuses the name of the removed SDK fetcher. |
 | `tests/runners/run_no_tool_packed.cmake` | Refuses a tool of the build that no package carries in a directory the packer copies. |
+| `tests/runners/run_note_claims.cmake` | Refuses a claim of `docs/notes/` or `docs/decisions.md` that names a C file as the place of a function the file does not hold. |
+| `tests/runners/run_note_claims_self.cmake` | Tests `run_note_claims.cmake` on made-up trees. |
 | `tests/runners/run_no_workflows.cmake` | Refuses a file under `.github/workflows/`. |
 | `tests/runners/run_one_allocator.cmake` | Refuses an allocation outside `src/antic/alloc.c`. |
 | `tests/runners/run_options_covered.cmake` | Refuses an option of antic or a command or option of `anti` that no test passes and `tests/options-open.txt` does not list. |

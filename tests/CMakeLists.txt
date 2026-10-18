@@ -1110,6 +1110,18 @@ add_test(NAME source_tree_runner
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-tree"
         -P "${ANTIC_RUNNERS}/run_source_tree_self.cmake")
 
+# Every claim of docs/notes/ and docs/decisions.md that a function stands
+# in a C file holds, the script of docs/audit/structure.md that found ten
+# that moved with the splits.
+add_test(NAME note_claims
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_note_claims.cmake")
+add_test(NAME note_claims_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_note_claims.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/note-claims"
+        -P "${ANTIC_RUNNERS}/run_note_claims_self.cmake")
+
 # A name that the tools and the runtime both spell, the markers of the
 # notice, the index of plugins, the suffix of a symbols archive and the
 # sysroot directory, stands in one header.

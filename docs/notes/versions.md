@@ -38,7 +38,7 @@ hash per prefix and holds the empty prefix first. It is an array of
 
 ## `compatible`
 
-`compatible_line` of `src/antic/parser_decl.c` reads the contextual word where a
+`parser_compatible_line` of `src/antic/parser_decl.c` reads the contextual word where a
 field of a class body stands. The version is the source span of the
 number the lexer read, with any further `.<integer>` parts after it,
 because `1.1.0` is no number of Anti. The checker refuses the line on a
@@ -59,7 +59,7 @@ target.
 
 ## The bitmaps
 
-`write_slots` keeps the slots the program's calls reach and adds the flag
+`whole_write_slots` of `whole_tables.c` keeps the slots the program's calls reach and adds the flag
 `reflect` to `anti_rt_slots` for a program that calls `reflect.call`. The
 two kinds of reach are apart because a reached slot the library lacks is
 a refusal and a slot only reflection may reach is a stub. Every program
