@@ -9,19 +9,17 @@ tools can observe.
 ## The tools and the sysroots of a link
 
 - Every linker is the flavour of lld in `bin/` of the runtime archive, which is
-  `bin/` of the package beside antic. `link_facts` asks `driver_archive_tool`
-  for it before the compile and refuses a missing one by its path. `--linker
-  platform` is the one link that runs a program of the host.
+  `bin/` of the package beside antic. `link_facts` of `driver_link.c` asks
+  `driver_archive_tool` for it and refuses a missing one by its path. It runs
+  when the link starts, after the compile and after opt and llc wrote the
+  object. `--linker platform` is the one link that runs a program of the host.
 - Every target links against `sysroot/<target>` of the archive, the Windows
   targets included, and a missing sysroot is refused with the line that it is
   the package's. Every lld-link command carries `/lldignoreenv`, so the library
-  directories of `LIB`, which an MSVC environment sets, reach no link. On a
-  Windows host lld-link also finds the installed Visual Studio and Windows SDK
-  through the setup configuration and the registry, under `/lldignoreenv` too,
-  and the Windows VM read `ucrt.lib` from Windows Kits with `LIB` unset. So
-  every lld-link command names `crt` and `sdk` of the sysroot as `/vctoolsdir`
-  and `/winsdkdir`, which ends the detection, and a library the sysroot lacks
-  stays missing. `own_tools` checks both with stand-in archives of links.
+  directories of `LIB`, which an MSVC environment sets, reach no link. The mingw
+  mode of the next section ends the search for an installed Visual Studio and
+  Windows SDK, so a library the sysroot lacks stays missing. `own_tools` checks
+  both with stand-in archives of links.
 
 ## The Windows link against mingw-w64
 

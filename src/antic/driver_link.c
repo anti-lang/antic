@@ -177,7 +177,8 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
         return true;
     }
     /* The flavour of lld stands in bin/ of the archive, and a link without
-       it is refused there rather than after the compile. */
+       it is refused by its path before the linker runs. The compile has
+       run by then. */
     if (driver_archive_tool(o, link_lld_flavour(t), &marker) == NULL) {
         text_free(&marker);
         return false;
