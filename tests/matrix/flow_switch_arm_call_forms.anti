@@ -1,7 +1,7 @@
 //! An arm of a `switch` or a `select` that is one call takes every call a
-//! statement takes: `free`, `delete`, `join` and a call with its handler.
-//! Each form is a function of its own, and the program prints one line per
-//! form and input.
+//! statement takes: `free`, `delete`, `join` and a call with its handler. Each
+//! form is a function of its own, and the program prints one line per form and
+//! input.
 
 import anti.lang;
 

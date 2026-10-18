@@ -3,11 +3,11 @@
 //! `yield`, `try`, `assert`, `defer`, `undo`, `fail`, `dispatch`, `parallel`,
 //! `sync` on two objects, `select`, a walk by pointer, `here`, an anonymous
 //! function with a result, a pattern and `delete` and `destroy` with an
-//! allocator. Then the marks the parser reads that a later stage decides on:
-//! an `own` parameter, `lent` before a tuple element, `?fn`, `may fail` and
-//! `keep own` of a function type, the note of a variant case, the case after
-//! `is`, `as?` against `as` and the pattern of a `for`. The parser takes the
-//! file and the checker would refuse it, so `--dump-ast` is its one use.
+//! allocator. Then the marks the parser reads that a later stage decides on: an
+//! `own` parameter, `lent` before a tuple element, `?fn`, `may fail` and `keep
+//! own` of a function type, the note of a variant case, the case after `is`,
+//! `as?` against `as` and the pattern of a `for`. The parser takes the file and
+//! the checker would refuse it, so `--dump-ast` is its one use.
 
 import anti.lang;
 
@@ -133,7 +133,8 @@ type Maybefn = ?fn(int) -> int;
 type Failing = fn(int) -> int may fail;
 type Owner = fn(keep own fn(int) -> int);
 
-variant Shape {
+variant Shape
+{
 	//# The note of a case.
 	Circle { r: int },
 	Empty,

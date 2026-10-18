@@ -1,7 +1,8 @@
 //! The comments of a variant case and of its fields take the doc checks, the
 //! `//#` note of a case as well.
 
-variant Shape {
+variant Shape
+{
 	/// A circle.
 	//# # A heading in the note of a case
 	Circle {

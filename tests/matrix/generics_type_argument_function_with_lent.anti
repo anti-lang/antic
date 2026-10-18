@@ -1,5 +1,5 @@
-//! A type argument that is a function type with a `lent` parameter reads as
-//! a type argument after `<`, as one with `keep` or `own` does, and not as a
+//! A type argument that is a function type with a `lent` parameter reads as a
+//! type argument after `<`, as one with `keep` or `own` does, and not as a
 //! comparison.
 
 import anti.lang;

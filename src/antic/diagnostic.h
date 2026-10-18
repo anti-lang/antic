@@ -70,11 +70,13 @@ struct diagnostics {
 void diagnostics_add(struct diagnostics *d, int line, int column,
                      const char *format, ...)
     ATTRIBUTE_PRINTF(4, 5);
-/* diagnostics_add and diagnostics_check with the arguments as a va_list,
-   for a function that takes a format of its own and hands it on. */
+/* diagnostics_add with the arguments as a va_list, for a function that
+   takes a format of its own and hands it on. */
 void diagnostics_vadd(struct diagnostics *d, int line, int column,
                       const char *format, va_list args)
     ATTRIBUTE_PRINTF(4, 0);
+/* diagnostics_check with the arguments as a va_list, as
+   diagnostics_vadd. */
 void diagnostics_vcheck(struct diagnostics *d, enum diag_name name, int line,
                         int column, const char *format, va_list args)
     ATTRIBUTE_PRINTF(5, 0);
