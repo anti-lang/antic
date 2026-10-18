@@ -7,6 +7,8 @@
 
 #include "sema_checker.h"
 
+static bool holds_param(const struct type *t);
+
 /* DESIGN: R115 of "Rules of 2026-10-13". The `destroyed` hook of a class
    that replaces it runs at the end of the life of every value, as
    `created` runs at its start. The teardown calls the hook, so a level
@@ -233,6 +235,12 @@ static void owns_reason(char *out, size_t size, const struct type *t)
 
 const char *sema_owns_phrase(const struct type *t)
 {
+    /* DESIGN: the phrase stands in one of two buffers that take turns,
+       so the phrases of two calls stay apart while one message holds
+       both, and the next call but one writes a buffer again. The phrase
+       is read before then, since each caller formats its message at
+       once. The checker runs on one thread, the work thread of
+       platform_run_on_stack, so no two calls race on a buffer. */
     static char buffers[2][160];
     static size_t next;
     char *buffer = buffers[next++ % 2];
@@ -303,7 +311,7 @@ static bool moves_own_param(struct checker *c, struct expr *value,
     struct symbol *sym = value->kind == EXPR_NAME ? value->symbol : NULL;
     bool generic_local = sym != NULL && sym->kind == SYMBOL_LOCAL &&
                          !sym->caught && value->type != NULL &&
-                         sema_holds_param(value->type);
+                         holds_param(value->type);
 
     if (sym == NULL || !(sym->own_param || generic_local) ||
         value->type == NULL || sema_is_error(value->type) ||
@@ -533,7 +541,10 @@ void sema_refuse_moved(struct checker *c, const struct expr *e,
     }
 }
 
-bool sema_holds_param(const struct type *t)
+/* Whether a value of t may own something in a copy of a generic: a type
+   parameter, or a value that holds one in place. A pointer or a slice
+   to one owns nothing. */
+static bool holds_param(const struct type *t)
 {
     size_t i;
 
@@ -542,10 +553,10 @@ bool sema_holds_param(const struct type *t)
         return true;
     case TYPE_ARRAY:
     case TYPE_OPTIONAL:
-        return sema_holds_param(t->element);
+        return holds_param(t->element);
     case TYPE_TUPLE:
         for (i = 0; i < t->param_count; i++) {
-            if (sema_holds_param(t->params[i])) {
+            if (holds_param(t->params[i])) {
                 return true;
             }
         }
@@ -576,7 +587,7 @@ bool sema_refuse_caller_value(struct checker *c, const struct expr *value)
 
     if (sym == NULL || sym->kind != SYMBOL_PARAM || sym->own_param ||
         sym->caught || t == NULL || sema_is_error(t) || t->kind == TYPE_FN ||
-        !(sema_type_owns(t) || sema_holds_param(t))) {
+        !(sema_type_owns(t) || holds_param(t))) {
         return false;
     }
     sema_error_at(c, value->pos, "`%.*s` belongs to the caller and does not "
@@ -608,7 +619,7 @@ bool sema_literal_moves(const struct expr *value)
     if (sema_type_owns(t) || sema_needs_teardown(t)) {
         return true;
     }
-    return sema_holds_param(t) && (sym->kind == SYMBOL_LOCAL || sym->own_param);
+    return holds_param(t) && (sym->kind == SYMBOL_LOCAL || sym->own_param);
 }
 
 /* DESIGN: the parts move once the literal has read every part, so a part
@@ -746,7 +757,7 @@ bool sema_move_local(struct checker *c, struct expr *e,
 static bool moves_at_call(const struct type *t)
 {
     return sema_type_owns(t) || sema_needs_teardown(t) ||
-           sema_holds_param(t) || !types_pointer_free(t) || types_is_chan(t) ||
+           holds_param(t) || !types_pointer_free(t) || types_is_chan(t) ||
            types_is_mutex(t);
 }
 

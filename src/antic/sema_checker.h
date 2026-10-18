@@ -439,7 +439,6 @@ struct type *sema_check_in(struct checker *c, struct expr *e);
 
 /* sema_simd.c */
 
-bool sema_simd_numeric(const struct type *lane);
 bool sema_simd_lane_refused(const struct type *lane);
 struct type *sema_check_simd_unary(struct checker *c, struct expr *e,
                                    struct type *t);
@@ -661,10 +660,6 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
 bool sema_literal_moves(const struct expr *value);
 void sema_move_into_literal(struct checker *c, struct expr *value,
                             const char *literal);
-/* Whether a value of t may own something in a copy of a generic: a type
-   parameter, or a value that holds one in place. A pointer or a slice
-   to one owns nothing. */
-bool sema_holds_param(const struct type *t);
 /* Refuse value when it names a parameter that is not `own` and whose
    value owns something or whose type holds a type parameter, and give
    whether it did. */

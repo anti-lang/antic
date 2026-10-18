@@ -11,7 +11,7 @@
 
 /* Whether the lanes of type lane are numbers, which `+ - * /` take. An
    f16 lane is one, since each operation reads it as an f32. */
-bool sema_simd_numeric(const struct type *lane)
+static bool simd_numeric(const struct type *lane)
 {
     return types_is_numeric(lane) || lane->kind == TYPE_F16;
 }
@@ -77,7 +77,7 @@ struct type *sema_check_simd_binary(struct checker *c, struct expr *e,
     case TOKEN_MINUS:
     case TOKEN_STAR:
     case TOKEN_SLASH:
-        if (!sema_simd_numeric(lane)) {
+        if (!simd_numeric(lane)) {
             sema_error_at(c, e->pos,
                           "`%s` needs lanes of numbers, and `%s` has "
                           "`%s`", o, sema_tn(left), sema_tn(lane));
@@ -98,7 +98,7 @@ struct type *sema_check_simd_binary(struct checker *c, struct expr *e,
         return left;
     case TOKEN_EQ:
     case TOKEN_NE:
-        if (!sema_simd_numeric(lane) && lane->kind != TYPE_CHAR &&
+        if (!simd_numeric(lane) && lane->kind != TYPE_CHAR &&
             lane->kind != TYPE_BOOL) {
             sema_error_at(c, e->pos, "`%s` is not defined on the lanes of `%s`",
                           o,
@@ -110,7 +110,7 @@ struct type *sema_check_simd_binary(struct checker *c, struct expr *e,
     case TOKEN_LE:
     case TOKEN_GT:
     case TOKEN_GE:
-        if (!sema_simd_numeric(lane) && lane->kind != TYPE_CHAR) {
+        if (!simd_numeric(lane) && lane->kind != TYPE_CHAR) {
             sema_error_at(c, e->pos,
                           "`%s` needs lanes of numbers or `char`, and "
                           "`%s` has `%s`", o, sema_tn(left), sema_tn(lane));
@@ -491,7 +491,7 @@ struct type *sema_check_simd_value(struct checker *c, struct expr *e,
         return sema_builtin(c, TYPE_ERROR);
     }
     if (op != SIMD_OP_STORE && op != SIMD_OP_SHUFFLE &&
-        !sema_simd_numeric(lane)) {
+        !simd_numeric(lane)) {
         sema_error_at(c, e->pos, "`%.*s` needs lanes of numbers, and `%s` has "
                       "`%s`", (int)name->length, name->text, sema_tn(s),
                       sema_tn(lane));
