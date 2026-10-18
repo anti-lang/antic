@@ -3130,8 +3130,8 @@ static struct type *anonymous_type(struct checker *c, struct item *it,
     size_t shown = target != NULL
                        ? target->param_count - (target->has_out ? 1 : 0)
                        : 0;
-    struct type **params = arena_alloc(
-        c->arena, (it->param_count + 2) * sizeof *params);
+    struct type **params = types_alloc_array(
+        c->arena, it->param_count + 2, sizeof *params);
     struct type *result = sema_builtin(c, TYPE_VOID);
     size_t i;
 

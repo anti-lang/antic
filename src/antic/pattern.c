@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "../rt/regex.h"
+#include "alloc.h"
 #include "arena.h"
 
 static void *compile(const char *bytes, size_t length, bool bytes_mode,
@@ -299,7 +300,8 @@ static void add_child(struct reader *r, struct node *parent,
 {
     if (parent->count == parent->room) {
         size_t room = parent->room == 0 ? 4 : 2 * parent->room;
-        struct node **grown = arena_alloc(r->arena, room * sizeof *grown);
+        struct node **grown =
+            arena_alloc(r->arena, alloc_product(room, sizeof *grown));
         if (parent->count > 0) {
             memcpy(grown, parent->children,
                    parent->count * sizeof *grown);

@@ -1314,8 +1314,8 @@ static struct type *function_type_of(struct checker *c, struct item *it)
 {
     size_t extra = it->has_self ? 1 : 0;
     size_t out = it->may_fail && it->result != NULL ? 1 : 0;
-    struct type **params = arena_alloc(
-        c->arena, (it->param_count + extra + out + 1) * sizeof *params);
+    struct type **params = types_alloc_array(
+        c->arena, it->param_count + extra + out + 1, sizeof *params);
     struct type *result = sema_builtin(c, TYPE_VOID);
     size_t i;
 

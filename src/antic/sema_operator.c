@@ -461,7 +461,7 @@ static struct expr *class_operator(struct checker *c, struct type *t,
     it = fn->item;
     call = sema_new_node(c, EXPR_CALL, pos);
     callee = sema_new_node(c, EXPR_NAME, pos);
-    args = arena_alloc(c->arena, count * sizeof *args);
+    args = types_alloc_array(c->arena, count, sizeof *args);
     sema_enter_quiet(c, &quiet);
     sig = sema_operator_copy(c, call, fn->type, fn, t, count > 1 ? t : NULL);
     sema_leave(c, &quiet);

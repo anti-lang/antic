@@ -1008,7 +1008,7 @@ static bool const_items(struct checker *c, struct expr *const *values,
     out->kind = kind;
     out->as.aggregate.count = count;
     out->as.aggregate.items =
-        arena_alloc(c->arena, count * sizeof *out->as.aggregate.items);
+        types_alloc_array(c->arena, count, sizeof *out->as.aggregate.items);
     for (i = 0; i < count; i++) {
         if (!sema_eval_const(c, values[i], &out->as.aggregate.items[i])) {
             return false;
@@ -1048,8 +1048,8 @@ static bool const_repeat(struct checker *c, struct expr *e,
     }
     out->kind = CONST_ARRAY;
     out->as.aggregate.count = e->type->length;
-    out->as.aggregate.items = arena_alloc(
-        c->arena, e->type->length * sizeof *out->as.aggregate.items);
+    out->as.aggregate.items = types_alloc_array(
+        c->arena, e->type->length, sizeof *out->as.aggregate.items);
     for (i = 0; i < e->type->length; i++) {
         out->as.aggregate.items[i] = a;
     }

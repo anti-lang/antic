@@ -181,7 +181,8 @@ static struct expr *format_literal(struct parser *p, const struct token *t)
 {
     struct expr *e = parser_new_expr(p, EXPR_FORMAT, t);
     size_t n = t->value.format.count;
-    struct format_part *parts = parser_node(p, n * sizeof *parts);
+    struct format_part *parts =
+        parser_node(p, alloc_product(n, sizeof *parts));
     size_t i;
 
     parser_next(p);

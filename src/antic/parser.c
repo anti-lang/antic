@@ -30,7 +30,7 @@ void *parser_list_finish(struct parser *p, struct list *l, size_t *count)
 
     *count = l->count;
     if (l->count > 0) {
-        copy = arena_alloc(p->arena, l->count * l->size);
+        copy = arena_alloc(p->arena, alloc_product(l->count, l->size));
         memcpy(copy, l->data, l->count * l->size);
     }
     free(l->data);

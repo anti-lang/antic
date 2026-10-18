@@ -1336,7 +1336,7 @@ static void placeholder(struct lexer *lx, size_t end, bool raw,
     }
     if (tokens.count > 0) {
         struct token *copy =
-            arena_alloc(lx->arena, tokens.count * sizeof *copy);
+            arena_alloc(lx->arena, alloc_product(tokens.count, sizeof *copy));
         memcpy(copy, tokens.items, tokens.count * sizeof *copy);
         piece->tokens = copy;
         piece->token_count = tokens.count;
@@ -1433,7 +1433,8 @@ static void interpolated(struct lexer *lx, const struct string_prefix *prefix,
     text_free(&bytes);
     if (valid) {
         struct token *t = push(lx, TOKEN_FORMAT, start, line, column);
-        kept = arena_alloc(lx->arena, pieces.count * sizeof *kept);
+        kept = arena_alloc(lx->arena,
+                           alloc_product(pieces.count, sizeof *kept));
         memcpy(kept, pieces.items, pieces.count * sizeof *kept);
         t->value.format.pieces = kept;
         t->value.format.count = pieces.count;
