@@ -250,7 +250,7 @@ static bool arm_returns(const struct stmt *body)
                                     : stmt_returns(body);
 }
 
-/* The missing-return rule of chapter 2 decides from the form alone. */
+/* The missing-return rule decides from the form alone. */
 static bool stmt_returns(const struct stmt *s)
 {
     size_t i;
@@ -3209,6 +3209,8 @@ static bool snapshot_copies(const struct type *t, bool top)
 {
     size_t i;
 
+    /* The kinds from TYPE_BOOL to TYPE_F64 are the scalars, bool, char,
+       the integers and the floats, in one range of enum type_kind. */
     if (t->kind >= TYPE_BOOL && t->kind <= TYPE_F64) {
         return true;
     }
@@ -3453,7 +3455,7 @@ struct type *sema_check_anonymous(struct checker *c, struct expr *e,
     return types_fn_form(c->types, fn, true, safe);
 }
 
-/* main takes one of the three forms of chapter 2. */
+/* main takes one of the three forms of the language. */
 void sema_check_main(struct checker *c, struct item *it)
 {
     struct type *t = it->symbol->type;

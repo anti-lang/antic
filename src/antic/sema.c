@@ -548,8 +548,8 @@ static bool params_alone(const struct symbolic *s)
 
 /* A constant expression of type int with a value of at least 1, or a
    symbolic value. DESIGN: a length computed from size_of stays symbolic,
-   and the back end checks that it is at least 1 on its target. Chapter 2
-   allows it in struct fields and local variables. A length computed from
+   and the back end checks that it is at least 1 on its target. It
+   stands in a struct field and a local variable alone. A length computed from
    constant parameters alone is an integer in every copy, so it stands
    wherever a length does. */
 struct type *sema_array_of(struct checker *c, struct expr *e,
@@ -2544,8 +2544,8 @@ static void declare_fields(struct checker *c, struct item *it)
     /* DESIGN: a class carries its base as field 0, named `super`.
        The name is a keyword, so no declared field collides with it,
        and `self.super` is then ordinary field access. The base is
-       nested whole, so the C rules of chapter 18 place it at offset
-       0 and the class's own fields after it. */
+       nested whole, so the C rules of struct layout place it at
+       offset 0 and the class's own fields after it. */
     base_fields = it->kind == ITEM_CLASS ? 1 : 0;
     hidden = it->kind == ITEM_CLASS && sema_needs_hidden_lock(it) ? 1 : 0;
     fields = types_alloc_array(c->arena,

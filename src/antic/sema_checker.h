@@ -319,6 +319,9 @@ struct symbol *sema_library_item(const struct checker *c,
                                  const struct interface *lib,
                                  const struct name *name);
 bool sema_direct_item(const struct symbol *sym);
+/* Declare name of kind at pos in the current scope. A name the scope
+   holds already is refused with duplicate_message, a format that holds
+   exactly one `%.*s`, which takes the name. */
 struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
                             const struct name *name, struct pos pos,
                             const char *duplicate_message);

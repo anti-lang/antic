@@ -891,7 +891,7 @@ enum item_kind {
     ITEM_TYPE                       /* `type People = List<Person>;` */
 };
 
-/* A function of a struct body against the contracts of its chain. */
+/* A function of a class body against the contracts of its chain. */
 enum fn_contract { FN_PLAIN, FN_ABSTRACT, FN_CONCRETE };
 
 /* The module-level block an ITEM_FN was written in. `anti test`
@@ -932,7 +932,7 @@ struct item {
     struct constraint_ref *constraints;
     size_t constraint_count;
     struct expr *value;             /* ITEM_CONST */
-    bool packed;                    /* ITEM_STRUCT, ITEM_UNION, ITEM_VARIANT */
+    bool packed;        /* ITEM_STRUCT, ITEM_UNION, ITEM_CLASS, ITEM_VARIANT */
     bool simd;                      /* ITEM_STRUCT: a `simd struct` */
     struct expr *align;             /* the same three, or NULL */
     struct variant_case *cases;     /* ITEM_VARIANT */
@@ -1150,7 +1150,8 @@ struct module {
 };
 
 /* Append the tree of module to out, one node per line, indented by two
-   spaces per level. Chapter 1 shows this output for the function scale. */
+   spaces per level. The test dump_ast_scale pins this output for the
+   function scale. */
 void ast_dump(struct text *out, const struct module *module);
 /* The syntax tree as ast_dump prints it, with the type of every
    expression, parameter, variable and function on the right, once the

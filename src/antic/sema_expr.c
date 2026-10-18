@@ -13,7 +13,9 @@
 
 /* Places and literals */
 
-/* An expression that denotes a location in memory, as chapter 2 lists. */
+/* An expression that denotes a location in memory: a local or a
+   parameter, a dereference, an element and a field, as the cases below
+   list them. */
 bool sema_is_place(const struct expr *e)
 {
     const struct type *base;
@@ -171,8 +173,11 @@ static struct type *float_literal(struct checker *c, struct expr *e,
 }
 
 /* DESIGN: a pointer to a struct converts to a pointer to any type of its
-   `inherits` chain. That is the one implicit conversion of the language.
-   The base lies at offset 0, so the address is the same. */
+   `inherits` chain. It is the one implicit conversion of one pointer to
+   another of a different class. sema_require holds the others a value
+   makes where it stands: to an interface, a T to a `?T` and the forms of
+   a function type. The base lies at offset 0, so the address is the
+   same. */
 static bool converts_to_base(const struct type *got,
                              const struct type *expected)
 {
@@ -816,8 +821,8 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
             return false;
         }
     }
-    /* The one implicit conversion of a pointer and the widening to
-       `?*T` compose: a `*Circle` reaches a `?*Shape` parameter. */
+    /* The conversion of a pointer to its base and the widening to `?*T`
+       compose: a `*Circle` reaches a `?*Shape` parameter. */
     if (widens_to_nullable(got, expected)) {
         struct type *bare = types_without_none(c->types, expected);
         if (got == bare || converts_to_base(got, bare)) {
@@ -1277,7 +1282,7 @@ static bool check_collect(struct checker *c, struct expr *e)
     return true;
 }
 
-/* The conversion table of chapter 2. */
+/* The table of the conversions `as` takes between built-in types. */
 static bool can_convert(const struct type *from, const struct type *to)
 {
     /* An f16 is made from an f32 and read as one, and it converts to

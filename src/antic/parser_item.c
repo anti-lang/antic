@@ -417,8 +417,8 @@ static struct item *item_level(struct parser *p)
         return NULL;
     }
     /* DESIGN: packed and align are contextual words. packed is one only
-       directly before struct, union or variant, and align only between
-       the name of one of them and its opening brace. */
+       directly before struct, union, class or variant, and align only
+       between the name of one of them and its opening brace. */
     if (parser_is_word(p, parser_peek(p), "packed") &&
         (parser_peek_at(p, 1)->kind == TOKEN_STRUCT ||
          parser_peek_at(p, 1)->kind == TOKEN_UNION ||

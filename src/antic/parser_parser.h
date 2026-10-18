@@ -20,10 +20,12 @@
 #include "diagnostic.h"
 #include "lexer.h"
 
-/* DESIGN: recursive descent, one function per grammar rule of chapter 2,
-   with precedence climbing for the binary operators. After an error the
-   parser is in panic mode and reports nothing more. It skips to the start
-   of a statement or an item, so one mistake produces one message. */
+/* DESIGN: recursive descent, one function per grammar rule, with
+   precedence climbing for the binary operators. After an error the parser
+   is in panic mode and reports nothing more. It skips to the start of a
+   statement or an item, and past the closing brace of a class body that
+   failed, so one mistake produces one message, by T101 of
+   docs/audit/tests-findings.md. */
 
 struct parser {
     const char *source;

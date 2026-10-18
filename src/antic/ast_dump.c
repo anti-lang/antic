@@ -9,8 +9,8 @@
 #include "sema.h"
 #include "types.h"
 
-/* Node names follow the rules of the chapter 2 grammar, so a dump reads
-   like the grammar that produced it. A typed dump adds the checked type
+/* Node names follow the rules of the grammar, so a dump reads like the
+   grammar that produced it. A typed dump adds the checked type
    of a node at column 28. */
 
 enum { TYPE_COLUMN = 27 };
@@ -920,7 +920,8 @@ static void dump_type_params(struct dumper *d, int depth,
     }
 }
 
-/* The functions and constants declared in the body of a struct or enum. */
+/* The functions and constants declared in the body of a class or an
+   enum. */
 static void dump_members(struct dumper *d, const struct item *it)
 {
     size_t i;

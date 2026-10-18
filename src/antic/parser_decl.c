@@ -337,8 +337,8 @@ bool parser_type_params(struct parser *p, struct item *it)
     return ok;
 }
 
-/* One function or constant declared between the braces of a struct, a
-   union or an enum. An abstract function has no body and ends with `;`. */
+/* One function or constant declared between the braces of a class or an
+   enum. An abstract function has no body and ends with `;`. */
 static struct item *member_level(struct parser *p, const struct item *owner)
 {
     struct item *m = parser_node(p, sizeof *m);
@@ -386,7 +386,7 @@ static struct item *member_level(struct parser *p, const struct item *owner)
     } else if (parser_accept(p, TOKEN_CONCRETE)) {
         m->contract = FN_CONCRETE;
     }
-    /* A function of a contract is public wherever its struct is, and so
+    /* A function of a contract is public wherever its class is, and so
        is one an operator calls. */
     if (m->contract != FN_PLAIN || m->is_operator) {
         m->pub = true;
@@ -475,7 +475,7 @@ static struct item *member_level(struct parser *p, const struct item *owner)
 }
 
 /* A member with the clauses of its header closed over it. */
-static struct item *member(struct parser *p, const struct item *owner)
+struct item *parser_member(struct parser *p, const struct item *owner)
 {
     size_t mark = p->clauses->count;
     struct pos from = parser_pos_of(parser_peek(p));
@@ -643,11 +643,6 @@ bool parser_nested_type(struct parser *p, struct list *nested)
     return true;
 }
 
-struct item *parser_member(struct parser *p, const struct item *owner)
-{
-    return member(p, owner);
-}
-
 /* Read the functions and constants of a body into it->members, and the
    types of a class body into nested, which is NULL for an enum. */
 bool parser_members_of(struct parser *p, struct item *it,
@@ -668,7 +663,7 @@ bool parser_members_of(struct parser *p, struct item *it,
             }
             continue;
         }
-        m = member(p, it);
+        m = parser_member(p, it);
         if (m == NULL) {
             free(list.data);
             return false;

@@ -4,8 +4,8 @@
 /* The interface of types.c: the checked types of a compilation, their
    constructors and predicates, and the names of the library modules the
    compiler knows. Every type exists once, so two types are the same type
-   exactly when their pointers are equal. Structs are the exception
-   chapter 2 makes: each declaration is a new type. */
+   exactly when their pointers are equal. Structs are the exception the
+   language makes: each declaration is a new type. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -17,6 +17,8 @@
 
 enum type_kind {
     TYPE_VOID,      /* the result of a function without -> R */
+    /* The scalars, from TYPE_BOOL to TYPE_F64, which snapshot_copies of
+       sema_stmt.c reads as one range. */
     TYPE_BOOL,
     TYPE_CHAR,
     TYPE_I8,
@@ -461,10 +463,13 @@ struct type *types_object(struct types *types);
    compiler knows these of them by name: `Error`, which a failing function
    returns, `NoneDereference`, the error of a `catch` on a `?*T`,
    `SourceLocation`, the value of `here`, and `StackTrace`, whose
-   `capture` a `fail` calls. It declares two more of the module itself:
-   `Object`, the root of every class chain, and `Job`, which `dispatch`
-   gives. The names are defined here and nowhere else, and so are the
-   fields of them that the compiler writes. */
+   `capture` a `fail` calls. It declares the others of the module itself,
+   as the list lang_declared of types.c names them: `Object`, the root of
+   every class chain, `Job`, which `dispatch` gives, the channel, `Flags`,
+   `Mutex`, `Regex` and `ByteRegex`, `Match` and `ByteMatch`, the hidden
+   lock of a synchronized class and `FieldDescriptor`. The names are
+   defined here and nowhere else, and so are the fields of them that the
+   compiler writes. */
 #define LANG_MODULE "anti.lang"
 #define LANG_OBJECT "Object"
 #define LANG_JOB "Job"
@@ -991,8 +996,8 @@ bool types_is_numeric(const struct type *t);
    the range a value must fit on every target. */
 int types_bits(const struct type *t);
 
-/* A type with no pointer inside it, the property the threading chapter
-   needs. str counts as pointer-free, because its bytes never change. A
+/* A type with no pointer inside it, the property a value passed to a
+   worker needs. str counts as pointer-free, because its bytes never change. A
    Mutex and a channel count as well, because each is made to be shared
    between threads. */
 bool types_pointer_free(const struct type *t);

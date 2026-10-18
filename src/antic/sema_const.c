@@ -428,7 +428,7 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
 /* DESIGN: C leaves these operations undefined, so no value exists that
    the constant folder could produce. With constant operands they are
    compile errors wherever they appear. A variable operand leaves them to
-   run time, as chapter 2 states. The operands are already checked, so a
+   run time, where a dev build checks them. The operands are already checked, so a
    constant name among them has its value, and the quiet evaluation adds
    no message of its own. */
 bool sema_undefined_on_constants(struct checker *c, struct expr *e,
@@ -1257,8 +1257,9 @@ static bool const_in(struct checker *c, struct expr *e,
     return sema_eval_const(c, sides[2], out);
 }
 
-/* Evaluate a checked expression. The expression must use only what
-   chapter 2 allows in a constant. */
+/* Evaluate a checked expression into *out. Returns false where the
+   expression holds a form no constant may, such as a call or `?.`, and
+   reports most of them as `... is not a constant expression`. */
 bool sema_eval_const(struct checker *c, struct expr *e,
                      struct const_value *out)
 {

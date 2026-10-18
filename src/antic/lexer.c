@@ -198,11 +198,10 @@ static const struct kind_info kinds[TOKEN_KIND_COUNT] = {
     [TOKEN_TYPE] = {"type", CAT_KEYWORD},
 };
 
-/* The words chapter 2 reserves for threads and does not use yet. They lex
-   as TOKEN_RESERVED, which no grammar rule accepts. Chapter 22 took
-   `worker` and `parallel` out of the list and gave them a token, and
-   locking and channels took `chan`, `recv`, `select`, `send` and
-   `sync`. */
+/* The words the language reserves for threads and does not use yet.
+   They lex as TOKEN_RESERVED, which no grammar rule accepts. `worker`
+   and `parallel` left the list when they got a token, and locking and
+   channels took `chan`, `recv`, `select`, `send` and `sync`. */
 static const char *const reserved[] = {
     "thread",
 };

@@ -220,7 +220,7 @@ struct interface {
     size_t linux_library_count;
 };
 
-/* Check one module against the rules of chapter 2: resolve every name,
+/* Check one module against the rules of the language: resolve every name,
    give every expression its type and compute every constant. The method
    syntax v.f(args) and qualified names are rewritten into plain names.
    libraries holds the interface of every loaded library. program says
