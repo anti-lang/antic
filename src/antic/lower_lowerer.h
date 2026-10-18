@@ -6,7 +6,9 @@
    - lower.c the helpers every part uses, the declarations of runtime
      functions, and the items of a module, which lower_module lowers.
    - lower_place.c places, addresses and constant data.
-   - lower_check.c the checks of a dev build.
+   - lower_check.c the checks of a dev build. Two build part of what they
+     guard and stand with it: the check of a walk in lower_stmt.c and
+     the bounds of the lanes of `load` and `store` in lower_simd.c.
    - lower_hook.c the sites of the hooks and which classes are traced.
    - lower_function.c function bodies, anonymous functions and closures.
    - lower_pattern.c pattern literals and the constructor that compiles
@@ -440,6 +442,16 @@ void lower_bitfield_check(struct lowerer *l, const struct struct_field *field,
 struct ir_operand lower_bitfield_saturate(struct lowerer *l,
                                           const struct struct_field *field,
                                           struct ir_operand v);
+void lower_slice_bounds_check(struct lowerer *l, const struct expr *e,
+                              struct ir_operand low, struct ir_operand high,
+                              struct ir_operand whole);
+void lower_check_table(struct lowerer *l, struct ir_operand table,
+                       const struct type *t);
+/* The check of a dev build that the integer, char or enum v of type from
+   is a value of type to, for `v as to`. */
+void lower_narrow_check(struct lowerer *l, const struct expr *e,
+                        const struct type *from, const struct type *to,
+                        struct ir_operand v);
 
 /* lower_hook.c */
 
@@ -568,8 +580,7 @@ struct ir_operand lower_flag_operation(struct lowerer *l,
                                        struct ir_operand flags[4]);
 struct ir_operand lower_load_table(struct lowerer *l, struct ir_operand p,
                                    const struct type *t);
-void lower_check_table(struct lowerer *l, struct ir_operand table,
-                       const struct type *t);
+const struct type *lower_integer_form(const struct type *t);
 uint32_t lower_sym_of(struct lowerer *l, const struct symbolic *s);
 struct ir_operand lower_argument(struct lowerer *l,
                                  const struct expr *arg);

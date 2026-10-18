@@ -775,7 +775,7 @@ retq
 
 `addq (%rsi), %rax` adds the low words and sets the carry flag. The two `movq` lines after it leave the flag alone. `adcq 0x8(%rdi), %rax` adds the high words and that carry in one instruction. arm64 writes the pair as `adds` and `adc`. A flag that a function never reads costs nothing.
 
-Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the checks of an operator and `narrow_check` of `src/antic/lower_expr.c` the one of `as`. `optimize_drop_failures` of `src/antic/optimize.c` drops them. `src/antic/arith.c` computes the wrapping and saturating results of constants, and `src/antic/llvm_emit.c` writes the intrinsics. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
+Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the checks of an operator and `lower_narrow_check` of the same file the one of `as`. `optimize_drop_failures` of `src/antic/optimize.c` drops them. `src/antic/arith.c` computes the wrapping and saturating results of constants, and `src/antic/llvm_emit.c` writes the intrinsics. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
 
 ### What it costs
 

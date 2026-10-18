@@ -60,7 +60,7 @@ Dropping the checks turns every overflow operation back into its plain
 arithmetic, so a build without them emits what it emitted before the checks
 existed.
 
-Narrowing. `narrow_check` in `src/antic/lower_expr.c`. The value goes to the target type
+Narrowing. `lower_narrow_check` in `src/antic/lower_check.c`. The value goes to the target type
 and back to the source with the target's signedness. A value the target cannot
 hold comes back changed. The round trip is blind to a change of sign alone,
 because a target of the same width keeps every bit. That case is a signed
@@ -85,7 +85,7 @@ Conversions to `char` and to an enum replace the two tests with one of their
 own, in `scalar_check` and `enum_check`. A `char` must be at most `0x10FFFF`
 and outside the surrogates, which is one unsigned comparison and one more on
 the value less `0xD800`. An enum value must be one the enum declares, which is
-one comparison per name joined by `or`. `integer_form` gives the type a value
+one comparison per name joined by `or`. `lower_integer_form` gives the type a value
 converts as, since an enum converts as its base type, and `enum_value` extends
 the sign of a declared value whose base type is signed.
 

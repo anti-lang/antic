@@ -101,29 +101,6 @@ static void fill_array(struct lowerer *l, const struct expr *e,
     l->b = done;
 }
 
-/* DESIGN: by decision 24 of "Decisions of 2026-10-11" a dev build checks
-   the bounds of a[lo..hi] as it checks an index. hi lies in 0..=length
-   and lo in 0..=hi, and each is one unsigned comparison, since a value
-   below zero is a large unsigned one. The first names the length of a,
-   the second hi as the length that lo indexes. A raw pointer has no
-   length and no check. */
-static void slice_bounds_check(struct lowerer *l, const struct expr *e,
-                               struct ir_operand low, struct ir_operand high,
-                               struct ir_operand whole)
-{
-    int line = e->pos.line;
-    struct ir_operand ok =
-        lower_temp(l, ir_binary(l->f, l->b, IR_ULE, IR_I8, high, whole));
-
-    lower_check_branch(l, ok, false,
-                       lower_check_text(l, line, "slice end out of bounds"),
-                       CHECK_BOUNDS, high, whole, NULL);
-    ok = lower_temp(l, ir_binary(l->f, l->b, IR_ULE, IR_I8, low, high));
-    lower_check_branch(l, ok, false,
-                       lower_check_text(l, line, "slice start out of bounds"),
-                       CHECK_BOUNDS, low, high, NULL);
-}
-
 /* a[lo..hi] points lo elements after element 0 of a and holds hi - lo
    elements. */
 static void build_slice(struct lowerer *l, const struct expr *e,
@@ -138,7 +115,7 @@ static void build_slice(struct lowerer *l, const struct expr *e,
     uint32_t offset;
 
     if (whole.kind != IR_NONE) {
-        slice_bounds_check(l, e, low, high, whole);
+        lower_slice_bounds_check(l, e, low, high, whole);
     }
     offset = ir_binary(l->f, l->b, IR_MUL, IR_I64, low,
                        lower_size_operand(l, e->type->element));
@@ -1290,32 +1267,6 @@ struct ir_operand lower_load_table(struct lowerer *l, struct ir_operand p,
     return table;
 }
 
-/* Trap with the name of t when table is zero. */
-void lower_check_table(struct lowerer *l, struct ir_operand table,
-                       const struct type *t)
-{
-    struct ir_block *bad;
-    struct ir_block *join;
-    struct token_text text;
-    struct ir_operand args[2];
-
-    bad = lower_new_block(l);
-    join = lower_new_block(l);
-    ir_branch(l->f, l->b,
-              lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, table,
-                                      ir_int_op(IR_PTR, 0))),
-              bad, join);
-    l->b = bad;
-    text.bytes = t->name.text;
-    text.length = t->name.length;
-    args[0] = lower_temp(l, ir_addr(l->f, l->b,
-                                    ir_global_op(lower_literal_global(l,
-                                                                      &text))));
-    args[1] = ir_int_op(IR_I64, t->name.length);
-    lower_rt_call(l, RT_FN_TABLE_UNSET, args);
-    l->b = join;
-}
-
 /* DESIGN: `p is *T` holds when the object is T or a class below it. The
    ancestors of a class are its descriptors from the root down. The entry
    at T's depth is therefore T's descriptor for every class below T. An
@@ -1459,7 +1410,7 @@ static struct ir_operand narrow_from_i64(struct lowerer *l,
 
 /* The integer type that t converts as. An enum converts as its base
    type, and char as the unsigned 32-bit value it already is. */
-static const struct type *integer_form(const struct type *t)
+const struct type *lower_integer_form(const struct type *t)
 {
     return t->kind == TYPE_ENUM ? t->base : t;
 }
@@ -1470,138 +1421,6 @@ static bool converts_as_integer(const struct type *t)
 {
     return types_is_integer(t) || t->kind == TYPE_CHAR ||
            t->kind == TYPE_ENUM;
-}
-
-/* The value an enum declares for its name at index i, as an i64. A
-   signed base type extends its sign, so the constant compares against
-   the widened value the check builds. */
-static uint64_t enum_value(const struct type *t, size_t i)
-{
-    uint64_t n = t->fields[i].number;
-    int width = types_bits(t->base);
-
-    if (types_is_signed(t->base) && width > 0 && width < 64 &&
-        ((n >> (width - 1)) & 1) != 0) {
-        n |= ~(uint64_t)0 << width;
-    }
-    return n;
-}
-
-/* DESIGN: a value that becomes a char must be a Unicode scalar value:
-   at most 0x10FFFF and never one of the surrogates. The comparison is
-   unsigned on the widened value, so a negative source fails the first
-   test and needs no test of its own. The surrogates are one range, so
-   subtracting its start turns the pair of bounds into one comparison. */
-static void scalar_check(struct lowerer *l, const struct expr *e,
-                         const struct type *from, struct ir_operand wide,
-                         const char *operation, enum check_kind kind,
-                         struct ir_operand v)
-{
-    struct ir_operand low =
-        lower_temp(l, ir_binary(l->f, l->b, IR_ULE, IR_I8, wide,
-                                ir_int_op(IR_I64, 0x10FFFF)));
-    struct ir_operand off =
-        lower_temp(l, ir_binary(l->f, l->b, IR_SUB, IR_I64, wide,
-                                ir_int_op(IR_I64, 0xD800)));
-    struct ir_operand off_ok =
-        lower_temp(l, ir_binary(l->f, l->b, IR_UGE, IR_I8, off,
-                                ir_int_op(IR_I64, 0x800)));
-    struct ir_operand ok =
-        lower_temp(l, ir_binary(l->f, l->b, IR_AND, IR_I8, low, off_ok));
-
-    lower_check_branch(l, ok, false,
-                       lower_check_text(l, e->pos.line, operation), kind, v,
-                       lower_none(), from);
-}
-
-/* DESIGN: a value that becomes an enum must be one of the values the
-   enum declares. The test compares the widened value against each of
-   them and takes the union. That is one comparison per name and no
-   block of its own. */
-static void enum_check(struct lowerer *l, const struct expr *e,
-                       const struct type *from, const struct type *to,
-                       struct ir_operand wide, const char *operation,
-                       enum check_kind kind, struct ir_operand v)
-{
-    struct ir_operand ok = lower_none();
-    size_t i;
-
-    for (i = 0; i < to->field_count; i++) {
-        struct ir_operand is =
-            lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, wide,
-                                    ir_int_op(IR_I64, enum_value(to, i))));
-        ok = ok.kind == IR_NONE
-                 ? is
-                 : lower_temp(l, ir_binary(l->f, l->b, IR_OR, IR_I8, ok, is));
-    }
-    lower_check_branch(l, ok, false,
-                       lower_check_text(l, e->pos.line, operation), kind, v,
-                       lower_none(), from);
-}
-
-/* DESIGN: a narrowing `as` is checked by the round trip. The value goes
-   to the target type and back to the source with the target's
-   signedness. A value the target cannot hold comes back changed.
-   The round trip is blind to a change of sign alone, because a target of
-   the same width keeps every bit. That case is a comparison against
-   zero. A target-sized type leaves both to the back end, because a
-   conversion that is a copy on one target passes the round trip.
-
-   char and an enum have a set of values rather than a width, so each
-   replaces the two tests with one of its own. */
-static void narrow_check(struct lowerer *l, const struct expr *e,
-                         const struct type *from, const struct type *to,
-                         struct ir_operand v)
-{
-    const struct type *source_form = integer_form(from);
-    enum ir_type source = lower_ir_type_of(from);
-    enum ir_type target = lower_ir_type_of(to);
-    enum check_kind kind =
-        types_is_signed(source_form) ? CHECK_VALUE : CHECK_VALUE_U;
-    bool sign_changes =
-        types_is_signed(source_form) != types_is_signed(integer_form(to));
-    struct text operation = {0};
-    struct ir_operand ok;
-    struct ir_operand round;
-
-    if (from == to) {
-        return;
-    }
-    text_append(&operation, to->kind == TYPE_ENUM ? "value not declared by "
-                                                  : "value out of range for ");
-    types_name(&operation, to);
-    if (to->kind == TYPE_CHAR || to->kind == TYPE_ENUM) {
-        struct ir_operand wide = lower_widen_operand(l, v, source_form);
-        if (to->kind == TYPE_CHAR) {
-            scalar_check(l, e, from, wide, text_cstr(&operation), kind, v);
-        } else if (to->field_count > 0) {
-            enum_check(l, e, from, to, wide, text_cstr(&operation), kind, v);
-        }
-        goto done;
-    }
-    if (sign_changes &&
-        (types_is_signed(source_form) || lower_narrows(source, target))) {
-        ok = lower_temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, v,
-                                     ir_int_op(source, 0)));
-        lower_check_branch(l, ok, false,
-                           lower_check_text(l, e->pos.line,
-                                            text_cstr(&operation)), kind,
-                           v, lower_none(), from);
-    }
-    if (source != target && lower_narrows(source, target)) {
-        round = lower_temp(l, ir_unary(l->f, l->b, IR_TRUNC, target, v));
-        round = lower_temp(
-            l, ir_unary(l->f, l->b,
-                        types_is_signed(integer_form(to)) ? IR_SEXT : IR_ZEXT,
-                        source, round));
-        ok = lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, round, v));
-        lower_check_branch(l, ok, false,
-                           lower_check_text(l, e->pos.line,
-                                            text_cstr(&operation)), kind,
-                           v, lower_none(), from);
-    }
-done:
-    text_free(&operation);
 }
 
 /* The conversions of chapter 2. Two types with one IR type, such as u32
@@ -1694,7 +1513,7 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
                             e->as.cast.from_sub);
     }
     if (converts_as_integer(from) && converts_as_integer(to)) {
-        narrow_check(l, e, from, to, v);
+        lower_narrow_check(l, e, from, to, v);
     }
     if (types_is_float(from) && types_is_float(to)) {
         if (source == target) {
@@ -1702,15 +1521,15 @@ static struct ir_operand lower_cast(struct lowerer *l, const struct expr *e)
         }
         op = target == IR_F64 ? IR_FEXT : IR_FTRUNC;
     } else if (types_is_float(from)) {
-        op = types_is_signed(integer_form(to)) ? IR_FTOSI : IR_FTOUI;
+        op = types_is_signed(lower_integer_form(to)) ? IR_FTOSI : IR_FTOUI;
     } else if (types_is_float(to)) {
-        op = types_is_signed(integer_form(from)) ? IR_SITOF : IR_UITOF;
+        op = types_is_signed(lower_integer_form(from)) ? IR_SITOF : IR_UITOF;
     } else if (source == target) {
         return v;
     } else if (lower_narrows(source, target)) {
         op = IR_TRUNC;
     } else {
-        op = types_is_signed(integer_form(from)) ? IR_SEXT : IR_ZEXT;
+        op = types_is_signed(lower_integer_form(from)) ? IR_SEXT : IR_ZEXT;
     }
     return lower_temp(l, ir_unary(l->f, l->b, op, target, v));
 }

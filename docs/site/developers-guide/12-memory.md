@@ -788,7 +788,7 @@ b0:
 
 In that build of the example, the loop of `total` holds no index check. `i` runs from 0 to below `xs.len`, and the optimizer proves the comparison true. The one call of `anti_rt_check_failed` left in `total` is the overflow check of `sum +=`.
 
-Where it lives: `lower_bounds_check` of `src/antic/lower_check.c` writes the check of an index, and `slice_bounds_check` of `src/antic/lower_expr.c` that of a part. `optimize_drop_failures` of `src/antic/optimize.c` removes it, and `back_end` of `src/antic/driver.c` decides by the mode and the four options. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
+Where it lives: `lower_bounds_check` of `src/antic/lower_check.c` writes the check of an index, and `lower_slice_bounds_check` of the same file that of a part. `optimize_drop_failures` of `src/antic/optimize.c` removes it, and `back_end` of `src/antic/driver.c` decides by the mode and the four options. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
 
 ### What it costs
 

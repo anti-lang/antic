@@ -1205,7 +1205,7 @@ retq
 
 The C header of a library writes an exported enum as an `enum` of C.
 
-Where it lives: `declare_enums_and_variants` of `src/antic/sema.c` gives each value its number. `enum_check` of `src/antic/lower_expr.c` writes the dev check, and `lower_switch` of `src/antic/lower_stmt.c` the chain of compares.
+Where it lives: `declare_enums_and_variants` of `src/antic/sema.c` gives each value its number. `enum_check` of `src/antic/lower_check.c` writes the dev check, and `lower_switch` of `src/antic/lower_stmt.c` the chain of compares.
 
 ### What it costs
 
