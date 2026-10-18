@@ -194,7 +194,7 @@ bool parser_params(struct parser *p, bool allow_variadic, bool *variadic,
    everywhere else. A type named `never` is still written after the arrow
    with its module, `m.never`, or with its type arguments. Whether the
    next token is that word. */
-bool parser_never_result(struct parser *p)
+bool parser_never_result(const struct parser *p)
 {
     enum token_kind after = parser_peek_at(p, 1)->kind;
 

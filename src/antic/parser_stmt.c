@@ -366,7 +366,7 @@ static bool read_handler(struct parser *p, struct handler *out, bool required)
    v) in e`. The pattern is a parenthesis, two names or more apart by
    commas, the closing parenthesis and `in`. A range that begins with a
    parenthesis names no variable. */
-static bool tuple_pattern(struct parser *p)
+static bool tuple_pattern(const struct parser *p)
 {
     size_t at = 2;
 

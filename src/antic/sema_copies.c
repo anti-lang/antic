@@ -166,6 +166,9 @@ static void map_add(struct clone *cl, struct type *p, struct type *arg)
         cl->map.values = values;
         cl->map_capacity = capacity;
     }
+    /* The map shows its parameters as const to a substitution, and this
+       clone owns the array, which the growth above allocated, so the
+       write goes through a view without the const. */
     params = (struct type **)cl->map.params;
     params[cl->map.count] = p;
     cl->map.args[cl->map.count] = arg;

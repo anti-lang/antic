@@ -646,7 +646,7 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
    operation a loop, which a warning names. The alignment follows from
    the size, so the declaration has no `align(N)`, and a lane is a whole
    value, so no field is a bitfield. */
-static void check_simd_struct(struct checker *c, struct item *it)
+static void check_simd_struct(struct checker *c, const struct item *it)
 {
     struct type *t = it->symbol->type;
     const struct type *lane;

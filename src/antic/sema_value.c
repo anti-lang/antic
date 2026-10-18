@@ -383,7 +383,7 @@ void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
 }
 
 void sema_bind_value(struct checker *c, struct expr *value, struct name into,
-                     struct type *t)
+                     const struct type *t)
 {
     if (!moves_own_param(c, value, into)) {
         sema_refuse_owned_copy(c, value, t);
@@ -396,7 +396,7 @@ void sema_bind_value(struct checker *c, struct expr *value, struct name into,
    other owner, so `=` moves it. The bytes it replaces are not destroyed:
    the element of an `alloc(T, n)` it fills has no value yet. */
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
-                            struct type *t)
+                            const struct type *t)
 {
     if (sema_refuse_caller_value(c, value)) {
         return;
