@@ -25,8 +25,9 @@ under "Generics and collections" in `docs/decisions.md` hold the decisions.
 
 - `lent` is a contextual word before the name of a parameter of a named or
   an anonymous function. It stands as well before the type of a parameter
-  of a function type. Followed by `,` or `)` in a type list it is a type
-  name.
+  of a function type, before the type of a result, `-> lent *T`, and before
+  an element of a tuple type, `(K, lent *V)`. Followed by `,` or `)` in a
+  type list it is a type name.
 
 ## Checker
 
@@ -40,7 +41,7 @@ under "Generics and collections" in `docs/decisions.md` hold the decisions.
 - `as` of a lent pointer gives the lent form, `dup` the plain one, and
   `delete` and `destroy` refuse it. `unify` takes the plain form, so a type
   argument is never lent.
-- `note_move` reads the `own` list of the function. The error a handler binds
+- `sema_note_move` of `sema_value.c` reads the `own` list of the function. The error a handler binds
   moves as before. Any other local or parameter moves through
   `sema_move_local`, which refuses the four moves the text order cannot
   follow and records `moved`, `moved_to` and `moved_by` on the symbol. A name
@@ -69,5 +70,6 @@ under "Generics and collections" in `docs/decisions.md` hold the decisions.
 - The byte after the element of a pointer type holds `?` in bit 0 and `lent`
   in bit 1. The tree of a generic carries `lent` on a parameter and a type
   expression, and the moves, the loops, the captures and `own` of a symbol.
-  The format is version 64. The byte after the element of a slice type is 1
-  for `lent []T`, from version 67.
+  Both came in with format version 64. The byte after the element of a slice
+  type is 1 for `lent []T`, which came in with version 67. `ANTL_VERSION` of
+  `src/antic/antl.h` gives the version of today.

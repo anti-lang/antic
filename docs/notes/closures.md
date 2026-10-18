@@ -85,7 +85,7 @@ choices of `snapshot fn` and `own fn`.
   form handles it. `types_fn_form` drops the flag, so the conversions
   compare the signature alone.
 - The parser reads `snapshot fn` as an anonymous function with the flag
-  `snapshot`. `parser_fn_param_marks` reads `own` after `keep`, in a
+  `snapshot`. `parser_fn_param_marks` reads `own` after `keep` or `concurrent`, in a
   parameter list and in the list of a function type. `resolve_fields` gives
   an `own` field of function type the owned form.
 - `check_snapshot` runs after the body of a snapshot. It refuses a capture

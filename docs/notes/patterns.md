@@ -4,7 +4,7 @@ Choices made for the pattern literal, `Regex` and `anti.regex` in each pass. The
 the inside of the compiler. `docs/decisions.md` holds what a reader of the language or a
 user of the tools can observe, under "Regular expressions".
 
-- The lexer reads `re` from the table of string prefixes as a raw form and writes
+- The lexer reads `re` from the table of string prefixes as `FORM_PATTERN`, a form of its own, and writes
   `TOKEN_PATTERN` with the bytes between the quotes. The token stands after every earlier
   kind. The parser writes `EXPR_PATTERN`, whose `spelling` keeps the source text for the
   positions of the checker.
@@ -41,8 +41,8 @@ user of the tools can observe, under "Regular expressions".
 - `anti_rt_regex_message` keeps the message of each error number in a table of 768
   pointers, filled by compare and swap, so a `BadPattern` holds a `str` that outlives it.
 - `sema_pattern_call` of `src/antic/sema_pattern.c` takes a call whose callee names
-  `matches`, `find_all`, `replace` or `split` on a `str`, or `group` or `took_part` on a
-  match. It checks the receiver once and marks the callee `checked`, so the path of an
+  `matches`, `find_all`, `replace` or `split` on a `str`, `group` or `took_part` on a
+  match, or `patch`, `to_bytes` or `to_text`, which `is_method` lists. It checks the receiver once and marks the callee `checked`, so the path of an
   ordinary member call reads the type it found. It checks every argument itself, writes
   the callee as a name bound to the function of `anti.regex` and puts the text first. For
   a literal it puts the text of the literal third. `sema_check_call` then appends the
