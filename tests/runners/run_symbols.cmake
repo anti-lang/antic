@@ -2,7 +2,6 @@
 # functions up with the probe, which reads the file with the readers the
 # runtime of that target uses. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   PROBE     the symbols_probe executable
 #   SOURCE    tests/trace/symbols.anti
@@ -27,7 +26,7 @@ if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}" OR runtime_library STREQUAL "")
 endif()
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/symbols")
-antic_build(-g --target ${TARGET} --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+antic_build(-g --target ${TARGET} --runtime "${RUNTIME}"
             -o "${exe}" "${SOURCE}")
 
 function(probe form file symbol offset wanted)
@@ -45,7 +44,7 @@ endfunction()
 # as the entry on inlined frames in docs/decisions.md says. The release
 # build gives main, and a dev build gives inner, at the line of its
 # declaration.
-antic_build(--dev -g --target ${TARGET} --llvm-mc "${LLVM_MC}" --runtime
+antic_build(--dev -g --target ${TARGET} --runtime
             "${RUNTIME}" -o "${exe}_dev" "${SOURCE}")
 if("${TARGET}" MATCHES "^linux-")
     probe(elf "${exe}" symbols.main 0 "symbols.main symbols.anti:12")

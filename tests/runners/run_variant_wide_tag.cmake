@@ -4,7 +4,6 @@
 # since a checkout holds no file of 65536 cases. Run with cmake -P and
 # these values:
 #   ANTIC    the antic executable
-#   LLVM_MC  the llvm-mc executable
 #   RUNTIME  the runtime directory, holding lib/<target>/<level>/
 #   WORK     a directory this run writes into
 

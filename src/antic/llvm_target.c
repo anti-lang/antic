@@ -33,9 +33,9 @@ static const char *const layouts[TARGET_COUNT] = {
    features the lower levels lack, and -mno-fmv gives the three ARM64
    triples one string, so a row holds for every target of its architecture.
    extensions are the clang names of what the level adds to the
-   architecture, the +fullfp16 and +dotprod of the llvm-mc attributes. The
-   test llvm_datalayout_pin compares each row with clang for every target,
-   and cpu_levels_pin compares target-cpu and features with
+   architecture, +fp16 and +dotprod, which features names +fullfp16 and
+   +dotprod. The test llvm_datalayout_pin compares each row with clang for
+   every target, and cpu_levels_pin compares target-cpu and features with
    tools/cpu-levels. */
 static const struct {
     const char *target_cpu;

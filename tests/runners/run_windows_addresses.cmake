@@ -9,7 +9,6 @@
 # on x86_64, under the x64 emulation on arm64. Run with cmake -P and these
 # values:
 #   ANTIC         the antic executable
-#   LLVM_MC       the llvm-mc executable
 #   LLVM_OBJDUMP  the llvm-objdump executable
 #   RUNTIME       the runtime directory
 #   SOURCE        the .anti file, which prints `hello`
@@ -34,7 +33,7 @@ file(REMOVE "${exe}" "${object}" "${lto_exe}")
 foreach(build "${exe}|--lto|none" "${lto_exe}")
     string(REPLACE "|" ";" build "${build}")
     list(POP_FRONT build output)
-    antic_build(--target ${target} --llvm-mc "${LLVM_MC}" --runtime
+    antic_build(--target ${target} --runtime
                 "${RUNTIME}" ${build} -o "${output}" "${SOURCE}")
 endforeach()
 

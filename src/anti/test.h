@@ -8,13 +8,13 @@
    are the -I search roots, which also give each module its path. work
    holds the library files, the objects and the runner. package is the
    package name of the manifest, which every compile carries, or NULL
-   outside a project. runtime names the runtime archive, and llvm_mc the
-   assembler, either of them NULL for the default. release builds and
-   runs the whole program instead of one object per module, with the
-   checks and the assertions off. memory_checks passes --memory-checks to
-   every compile and runs each runner through Anti's symbolizer. inject
-   holds the `Interface=Provider` entries of the manifest, which every
-   compile of the run passes to antic. */
+   outside a project. runtime names the runtime archive, NULL for the
+   default. release builds and runs the whole program instead of one
+   object per module, with the checks and the assertions off.
+   memory_checks passes --memory-checks to every compile and runs each
+   runner through Anti's symbolizer. inject holds the `Interface=Provider`
+   entries of the manifest, which every compile of the run passes to
+   antic. */
 struct test_request {
     const char *const *sources;
     size_t source_count;
@@ -23,7 +23,6 @@ struct test_request {
     const char *work;
     const char *package;
     const char *runtime;
-    const char *llvm_mc;
     bool release;
     bool memory_checks;
     const char *const *inject;

@@ -13,7 +13,6 @@
 # Run with cmake -P and these values:
 #   ANTI              the anti executable
 #   RUNTIME           the runtime archive
-#   LLVM_MC           the assembler
 #   FIXTURE           tests/anti-build
 #   MUSL_VERSION      the version of musl of the pinned sysroot
 #   MIMALLOC_VERSION  the version of the pinned mimalloc
@@ -48,7 +47,7 @@ endforeach()
 # the program links musl and mimalloc.
 function(check_notice project target carries)
     anti_run(status out err "${WORK}/${project}" build --target "${target}"
-             --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+             --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti build --target ${target} of ${project} "
                             "failed with ${status}\n${out}${err}")
@@ -135,7 +134,7 @@ check_notice(app macos-arm64 FALSE)
 file(COPY "${FIXTURE}/notices" "${FIXTURE}/shapes" "${FIXTURE}/tones"
      DESTINATION "${WORK}")
 anti_run(status out err "${WORK}/notices" build --target macos-arm64
-         --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+         --runtime "${RUNTIME}")
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "anti build of notices failed with ${status}\n"
                         "${out}${err}")

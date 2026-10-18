@@ -1,7 +1,6 @@
 # --memory-checks finds memory errors while the program runs. Run with
 # cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    tests/traps/memory_checks.anti
 #   WORK      a directory for the files
@@ -97,7 +96,7 @@ if(HOST STREQUAL "windows-arm64")
 endif()
 
 set(program "${WORK}/memory_checks_run")
-antic_build(--memory-checks --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o
+antic_build(--memory-checks --runtime "${RUNTIME}" -o
             "${program}" "${SOURCE}")
 
 # The names of the frames come from the symbolizer of the runtime, which

@@ -1,7 +1,6 @@
 # An object whose table is zero traps with the name of its class. Run with
 # cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    tests/traps/table.anti
 #   WORK      a directory for the files

@@ -97,7 +97,6 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         add_test(NAME pcre2_match
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/abi/pcre2_match.anti"
                 "-DOBJECTS=${probe},${library}"
@@ -107,7 +106,6 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     add_test(NAME pcre2_link_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/abi/pcre2_match.anti"
             "-DOBJECTS=${probe},${library}"

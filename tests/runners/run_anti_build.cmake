@@ -3,7 +3,6 @@
 #   ANTI     the anti executable
 #   OBJDUMP  llvm-objdump of the pinned release
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  the directory that holds app/ and units/
 #   HOST     the target name of this host
 #   OTHER    a target name that is not this host's
@@ -42,7 +41,7 @@ function(run_anti out_status out_text)
 endfunction()
 
 function(build what)
-    run_anti(status text ${ARGN} --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+    run_anti(status text ${ARGN} --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "${what} failed with ${status}\n${text}")
     endif()
@@ -92,7 +91,7 @@ program_expect("the changed program" COMMAND "${program}" STATUS 9
                OUT "one\n")
 
 # `anti run` builds for the host and runs what it wrote.
-run_anti(status text run --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+run_anti(status text run --runtime "${RUNTIME}")
 if(NOT status EQUAL 9 OR NOT text MATCHES "one")
     message(FATAL_ERROR "anti run ended with ${status} and wrote ${text}")
 endif()
@@ -299,8 +298,7 @@ endif()
 build("the build at ${CPU}" build --cpu "${CPU}")
 
 # A level of the other architecture is refused.
-run_anti(status text build --cpu nonesuch --runtime "${RUNTIME}"
-         --llvm-mc "${LLVM_MC}")
+run_anti(status text build --cpu nonesuch --runtime "${RUNTIME}")
 if(status EQUAL 0 OR NOT text MATCHES "no processor level")
     message(FATAL_ERROR "--cpu nonesuch was taken: ${text}")
 endif()
@@ -320,8 +318,7 @@ foreach(file anti.toml src/com/example/demo.anti)
         message(FATAL_ERROR "anti new wrote no ${file}")
     endif()
 endforeach()
-anti_run(status out err "${WORK}/new/demo" run --runtime "${RUNTIME}"
-         --llvm-mc "${LLVM_MC}")
+anti_run(status out err "${WORK}/new/demo" run --runtime "${RUNTIME}")
 if(NOT status EQUAL 0 OR NOT out MATCHES "hello")
     message(FATAL_ERROR "the project of anti new wrote ${out}${err}")
 endif()
@@ -343,8 +340,7 @@ endif()
 set(LLVM_BIN "${RUNTIME}/bin")
 foreach(refused "--profile-generate" "--release;--profile-generate;--lib;static"
         "--profile-use;${WORK}/app.profdata")
-    run_anti(status text build ${refused} --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    run_anti(status text build ${refused} --runtime "${RUNTIME}")
     if(NOT status EQUAL 2 OR NOT text MATCHES
        "--profile-generate and --profile-use build a program with --release")
         message(FATAL_ERROR "anti build ${refused} gave ${status}: ${text}")
@@ -364,7 +360,7 @@ if(NOT status EQUAL 0)
     message(FATAL_ERROR "llvm-profdata merge gave ${status}\n${err}")
 endif()
 run_anti(status text build --release --profile-use "${WORK}/app.profdata"
-         --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+         --runtime "${RUNTIME}")
 if(NOT status EQUAL 0 OR text MATCHES "warning")
     message(FATAL_ERROR "the build with the profile gave ${status}: ${text}")
 endif()

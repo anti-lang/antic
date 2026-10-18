@@ -7,7 +7,6 @@
 # inherits the interface.
 # Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/plugin
 #   SUFFIX    the suffix of a shared library on this host
@@ -33,7 +32,7 @@ function(library host name out)
     if(NOT EXISTS "${path}")
         file(MAKE_DIRECTORY "${dir}")
         antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
-                    --llvm-mc "${LLVM_MC}" -I "${root_${name}}" -I "${WORK}/${name}"
+                    -I "${root_${name}}" -I "${WORK}/${name}"
                     -o "${path}" "${root_${name}}/net/example/fancy.anti" ${imports})
     endif()
     set(${out} "${path}" PARENT_SCOPE)
@@ -96,7 +95,7 @@ foreach(part "reader|base" "caller|base" "reflector|base"
     else()
         set(source "${versions}/${name}.anti")
     endif()
-    antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+    antic_build(--runtime "${RUNTIME}"
                 -I "${versions}" -I "${SOURCES}" -I "${WORK}/${interface}"
                 -o "${WORK}/${name}${EXE}" "${source}")
 endforeach()

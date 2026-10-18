@@ -3,7 +3,6 @@
 #   ANTI     the anti executable
 #   CASE     the case
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURES the directory tests/
 #   HOST     the target name of this host
 #   OTHER    a target name that is not this host's
@@ -44,7 +43,7 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-foreach(value ANTI CASE RUNTIME LLVM_MC FIXTURES HOST WORK)
+foreach(value ANTI CASE RUNTIME FIXTURES HOST WORK)
     if(NOT DEFINED ${value})
         message(FATAL_ERROR "${value} is not set")
     endif()
@@ -53,7 +52,7 @@ endforeach()
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
-set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+set(tools --runtime "${RUNTIME}")
 set(exe "")
 if(HOST MATCHES "^windows-")
     set(exe ".exe")

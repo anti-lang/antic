@@ -3,7 +3,6 @@
 # STATUS where it is given, and writes nothing to its standard output. Run
 # with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    the program, tests/traps/<name>.anti
 #   OPTIONS   optional options of antic, separated by commas

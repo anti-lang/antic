@@ -322,5 +322,5 @@ Both x86_64 packages run under emulation as well, and both passed on 2026-09-16.
 machine compiled and ran a linux-x86_64 program with `qemu-x86_64`. Windows 11 on ARM
 emulates x64, and the installer takes that package with `ANTI_ARCH` or `--intel` into
 `%USERPROFILE%\.anti-x86_64`. Its `antic.exe` reports `windows-x86_64`, compiles a program
-through the emulated llvm-mc and lld-link, and `llvm-objdump -h` calls the result
+through the emulated opt, llc and lld-link, and `llvm-objdump -h` calls the result
 `coff-x86-64`.

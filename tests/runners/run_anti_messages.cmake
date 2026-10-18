@@ -5,7 +5,6 @@
 #   CASE     the name of the case to run
 #   WORK     a directory this run writes into
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   CLANG_VERSION, CLANG_TAG and CLANG_PAGE
 #            the version of the pinned clang, the tag of its release and
 #            the page of that release, which a refusal of `anti bind` names

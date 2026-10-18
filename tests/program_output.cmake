@@ -407,11 +407,11 @@ function(fake_release_sign manifest signature)
              -out "${signature}")
 endfunction()
 
-# Build <exe> from <source> with the ANTIC, LLVM_MC and RUNTIME of the
-# runner, passing the arguments after <source> to antic first, through
+# Build <exe> from <source> with the ANTIC and RUNTIME of the runner,
+# passing the arguments after <source> to antic first, through
 # antic_build.
 function(antic_program exe source)
-    antic_build(${ARGN} --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+    antic_build(${ARGN} --runtime "${RUNTIME}"
                 -o "${exe}" "${source}")
 endfunction()
 

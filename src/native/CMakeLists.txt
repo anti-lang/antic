@@ -2,7 +2,7 @@
 # libraries, one per target, from the pinned sources with the pinned clang.
 # CMakeLists.txt at the top adds this directory after the cross builds of
 # anti_rt and the tests. The targets, the sysroots of the runtime tree, the
-# processor levels, llvm-ar and llvm-mc come from there.
+# processor levels and llvm-ar come from there.
 # Libraries are added in the order of docs/decisions.md: PCRE2, then Mbed
 # TLS, miniaudio and raylib, with SQLite between PCRE2 and Mbed TLS as
 # docs/anti-language-additions.md places it. media.cmake holds what the

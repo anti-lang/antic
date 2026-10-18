@@ -7,7 +7,6 @@
 # -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  the directory that holds app/
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
@@ -24,8 +23,7 @@ file(COPY "${FIXTURE}/app" DESTINATION "${WORK}")
 
 # The cache of the repositories is the user's, so the run names its own.
 function(build what)
-    anti_run(status out err "${project}" build --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${project}" build --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "${what} failed with ${status}\n${out}${err}")
     endif()

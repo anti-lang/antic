@@ -4,7 +4,6 @@
 # Without either the link fails with a message that names the framework
 # and where a Mac keeps the SDK. Run with cmake -P and these values:
 #   ANTIC         the antic executable
-#   LLVM_MC       the llvm-mc executable
 #   LLVM_OBJDUMP  the llvm-objdump executable
 #   RUNTIME       the runtime directory
 #   SOURCE        the .anti file
@@ -25,8 +24,8 @@ string(REPLACE "," ";" options "${OPTIONS}")
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/core_foundation-${TARGET}")
 file(REMOVE "${exe}")
-antic_run(status ignored_out err COMMAND --target "${TARGET}" --llvm-mc
-          "${LLVM_MC}" --runtime "${RUNTIME}" ${options} --framework
+antic_run(status ignored_out err COMMAND --target "${TARGET}"
+          --runtime "${RUNTIME}" ${options} --framework
           CoreFoundation -o "${exe}" "${SOURCE}")
 if(NOT EXISTS "${RUNTIME}/sysroot/${TARGET}/sdk/sdk-version" AND
    NOT CMAKE_HOST_APPLE)

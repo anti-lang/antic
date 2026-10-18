@@ -6,7 +6,7 @@
 
 set(program "fn main() -> int\n{\n\treturn 42;\n}\n")
 set(library "//! A library.\n\npub fn twice(x: int) -> int\n{\n\treturn x * 2;\n}\n")
-set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+set(tools --runtime "${RUNTIME}")
 # A library for C, which exports a function.
 set(exporting "//! A library for C.\n\nexport fn twice(x: c_int) -> c_int\n{\n\treturn x * 2;\n}\n")
 

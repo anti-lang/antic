@@ -3,7 +3,6 @@
 #   ANTIC     the antic executable
 #   CASE      the case to run, one of the list below
 #   RUNTIME   the runtime archive
-#   LLVM_MC   the assembler
 #   LLVM_AR   the archiver
 #   READOBJ   llvm-readobj of the pinned release
 #   OBJDUMP   llvm-objdump of the pinned release
@@ -347,7 +346,7 @@ if(CASE STREQUAL "strict_dev")
 endif()
 
 set(library_source "${SOURCES}/errors/modules_library_options.anti")
-set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
+set(tools --runtime "${RUNTIME}" --llvm-ar "${LLVM_AR}")
 
 if(CASE STREQUAL "bundle_static")
     antic_output(plain_said --lib static ${tools} -o "${WORK}/plain.a"
@@ -498,7 +497,7 @@ if(CASE STREQUAL "output_library")
 endif()
 
 if(CASE STREQUAL "output_program")
-    output_beside_source(named${EXE} "" --lto none --llvm-mc "${LLVM_MC}")
+    output_beside_source(named${EXE} "" --lto none)
     foreach(name plain option out)
         # The object of the program stays beside it, under a name of the
         # host.

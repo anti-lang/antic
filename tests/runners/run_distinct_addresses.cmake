@@ -7,7 +7,6 @@
 # address there, and the test fails. See the entry on folding under "Scope
 # and toolchain" in docs/decisions.md. Run with cmake -P and these values:
 #   ANTIC         the antic executable
-#   LLVM_MC       the llvm-mc executable
 #   RUNTIME       the runtime directory
 #   SOURCE        the .anti file
 #   WORK          a directory for the executable
@@ -46,8 +45,8 @@ if("${TARGET}" MATCHES "^windows-")
     string(APPEND exe ".exe")
 endif()
 file(REMOVE "${exe}")
-antic_build(--target "${TARGET}" ${options} --lto "${LTO}" --llvm-mc
-            "${LLVM_MC}" --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}")
+antic_build(--target "${TARGET}" ${options} --lto "${LTO}"
+            --runtime "${RUNTIME}" -o "${exe}" "${SOURCE}")
 if(NOT runs)
     message(STATUS "linked for ${TARGET}, which does not run on ${host}")
     return()

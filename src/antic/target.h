@@ -44,7 +44,7 @@ struct target_info {
     enum target_arch arch;
     enum object_format format;
     enum convention convention;
-    const char *triple;             /* the -triple option of llvm-mc */
+    const char *triple;             /* completed by llvm_triple */
     const char *object_suffix;
     const char *executable_suffix;
 };
@@ -68,10 +68,5 @@ void target_mangle(struct text *out, enum target t, const char *module,
 /* Append the symbol of the C function name as a C compiler for target t
    writes it. Mach-O adds a leading _, and ELF and COFF keep the name. */
 void target_c_symbol(struct text *out, enum target t, const char *name);
-
-/* Append the label of block number block in the function with symbol
-   function. The prefix keeps the label out of the symbol table. */
-void target_block_label(struct text *out, enum target t, const char *function,
-                        size_t block);
 
 #endif

@@ -10,7 +10,6 @@ struct build_request {
     const char *target;         /* a target name, `all`, or NULL */
     const char *cpu;            /* a processor level, or NULL */
     const char *runtime;        /* the runtime archive, or NULL */
-    const char *llvm_mc;
     const char *llvm_ar;
     bool release;
     bool offline;

@@ -2,7 +2,6 @@
 # breakpoint set by file and line in each, and a backtrace that names the
 # Anti functions. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   WORK      a directory for the sources and the binaries
 #   DEBUGGER  lldb or gdb, the debugger of the host
@@ -61,7 +60,7 @@ antic_build(-c -I "${root}" -o "${WORK}/lib/com/example/step.antl"
 # Run antic in dev mode in the root, with the library file of the module
 # on the search path.
 function(dev_build name source)
-    antic_build(--dev ${ARGN} --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I
+    antic_build(--dev ${ARGN} --runtime "${RUNTIME}" -I
                 "${root}" -I "${WORK}/lib" -o "${WORK}/${name}" "${source}")
 endfunction()
 

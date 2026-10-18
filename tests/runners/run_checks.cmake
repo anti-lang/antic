@@ -2,7 +2,6 @@
 # library whose checks follow the build that links it. tests/runners/run_check.cmake
 # runs each check. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCES   the directory of the check programs
 #   WORK      a directory for the files

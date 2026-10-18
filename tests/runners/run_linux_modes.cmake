@@ -9,7 +9,6 @@
 #   ANTI     the anti executable
 #   READOBJ  llvm-readobj of the pinned release
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  tests/anti-build
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
@@ -42,8 +41,7 @@ foreach(target linux-arm64 linux-x86_64)
         endif()
         foreach(project app window)
             anti_run(status out err "${WORK}/${project}" build ${flag}
-                     --target "${target}" --runtime "${RUNTIME}"
-                     --llvm-mc "${LLVM_MC}")
+                     --target "${target}" --runtime "${RUNTIME}")
             if(NOT status EQUAL 0)
                 message(FATAL_ERROR "anti build ${flag} --target ${target} of "
                                     "${project} failed with ${status}\n"

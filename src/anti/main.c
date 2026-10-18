@@ -31,18 +31,17 @@ static int usage(FILE *out)
           "       anti build [--release] [--target <t>|all] [--offline]\n"
           "                  [--strip-docs] [--cpu <level>] [--memory-checks]\n"
           "                  [--lib static|shared] [--bundle-runtime]\n"
-          "                  [--soname] [--runtime <dir>] [--llvm-mc <path>]\n"
-          "                  [--llvm-ar <path>] [--profile-generate]\n"
+          "                  [--soname] [--runtime <dir>] [--llvm-ar <path>]\n"
+          "                  [--profile-generate]\n"
           "                  [--profile-use <file>] [--lto full|thin|none]\n"
           "       anti run [--release] [--cpu <level>] [--offline]\n"
           "                [--memory-checks] [--profile-generate]\n"
           "                [--profile-use <file>] [--lto full|thin|none]\n"
-          "                [--runtime <dir>] [--llvm-mc <path>]\n"
+          "                [--runtime <dir>]\n"
           "       anti sdk export [--sdk <MacOSX.sdk>] [-o <dir>]\n"
           "       anti sdk import <bundle> [--sysroot <dir>]\n"
           "       anti test [--release] [--memory-checks] [--work <dir>]\n"
-          "                 [-I <dir>]\n"
-          "                 [--runtime <dir>] [--llvm-mc <path>]\n"
+          "                 [-I <dir>] [--runtime <dir>]\n"
           "                 <file.anti>...\n"
           "       anti check [--warn-undocumented] [--targets all]\n"
           "                  [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
@@ -289,8 +288,6 @@ static int build_options(int argc, char **argv, int from,
             request.cpu = argv[++i];
         } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
             request.runtime = argv[++i];
-        } else if (strcmp(argv[i], "--llvm-mc") == 0 && i + 1 < argc) {
-            request.llvm_mc = argv[++i];
         } else if (strcmp(argv[i], "--llvm-ar") == 0 && i + 1 < argc) {
             request.llvm_ar = argv[++i];
         } else if (strcmp(argv[i], "--lib") == 0 && i + 1 < argc) {
@@ -714,7 +711,6 @@ static int test_command(int argc, char **argv)
     const char **roots = files_array((size_t)argc, sizeof *roots);
     const char *work = "build/tests";
     const char *runtime = NULL;
-    const char *llvm_mc = NULL;
     struct manifest_inject inject = {0};
     struct text src = {0};
     struct text test = {0};
@@ -736,8 +732,6 @@ static int test_command(int argc, char **argv)
             work = argv[++i];
         } else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) {
             runtime = argv[++i];
-        } else if (strcmp(argv[i], "--llvm-mc") == 0 && i + 1 < argc) {
-            llvm_mc = argv[++i];
         } else if (strcmp(argv[i], "-I") == 0 && i + 1 < argc) {
             roots[root_count++] = argv[++i];
         } else if (argv[i][0] == '-') {
@@ -766,7 +760,6 @@ static int test_command(int argc, char **argv)
     request.work = work;
     request.package = package.length > 0 ? text_cstr(&package) : NULL;
     request.runtime = runtime;
-    request.llvm_mc = llvm_mc;
     request.release = release;
     request.memory_checks = memory_checks;
     request.inject = inject.entries;
@@ -901,19 +894,18 @@ done:
    after --project. */
 static const char *const value_options[] = {
     "build", "--target", "--cpu", "--lto", "--lib", "--profile-use",
-    "--runtime", "--llvm-mc", "--llvm-ar", NULL,
+    "--runtime", "--llvm-ar", NULL,
     "run", "--target", "--cpu", "--lto", "--lib", "--profile-use",
-    "--runtime", "--llvm-mc", "--llvm-ar", NULL,
+    "--runtime", "--llvm-ar", NULL,
     "check", "--targets", "--work", "--runtime", "-I", NULL,
     "doc", "-o", "--work", "--runtime", "-I", NULL,
-    "test", "--work", "--runtime", "--llvm-mc", "-I", NULL,
+    "test", "--work", "--runtime", "-I", NULL,
     "bind", "--header", "--clang", "-o", "--runtime", "--module",
     "--target", "-I", "-D", NULL,
     "symbols", "--conf", "--from", "--out", "--symbols", NULL,
     "sdk", "--sdk", "-o", "--sysroot", NULL,
     "license", "--from", "--from-archive", "--runtime", "--target",
-    "--cpu", "--lto", "--lib", "--profile-use", "--llvm-mc", "--llvm-ar",
-    NULL,
+    "--cpu", "--lto", "--lib", "--profile-use", "--llvm-ar", NULL,
     NULL};
 
 /* Whether option takes a value in the command of the list at list. */

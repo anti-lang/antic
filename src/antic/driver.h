@@ -20,9 +20,6 @@ struct diagnostic_counts {
 struct options {
     const char *input;          /* The .anti source file. */
     const char *output;         /* NULL: input without .anti. */
-    /* --llvm-mc, which antic accepts for the tools that pass it and no
-       longer runs: llc writes every object. */
-    const char *llvm_mc;
     /* --opt and --llc. NULL: the tool of bin/ of the runtime archive,
        and antic refuses the build when the archive lacks it, as
        driver_archive_tool says. No tool comes from the search path. */

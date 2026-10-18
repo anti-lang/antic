@@ -208,7 +208,7 @@ rules, and the tests named there pin each fact.
   `--opt` and `--llc` name others. A failed tool prints its own message,
   then `antic: opt failed` or `antic: llc failed`.
 - `<output>.ll` and `<output>.bc` are deleted as soon as llc ends, unless
-  `--keep-llvm` keeps them. `--llvm-mc` is accepted and runs nothing.
+  `--keep-llvm` keeps them.
 
 ## Tests
 

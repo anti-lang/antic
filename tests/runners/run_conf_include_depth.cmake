@@ -6,7 +6,6 @@
 # and the 257th ends both. Run with cmake -P and these values:
 #   ANTIC    the antic executable
 #   ANTI     the anti executable
-#   LLVM_MC  the llvm-mc executable
 #   RUNTIME  the runtime archive
 #   SOURCE   a program that ends with status 0
 #   HOST     the target name of this host
@@ -26,7 +25,7 @@ set(failures "")
 
 # The program of SOURCE as dir/report.
 function(compile_report dir)
-    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o
+    antic_build(--runtime "${RUNTIME}" -o
                 "${dir}/report${exe}" "${SOURCE}")
 endfunction()
 

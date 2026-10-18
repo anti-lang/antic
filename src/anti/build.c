@@ -236,7 +236,6 @@ static void base_options(struct build *b, struct options *o,
 {
     unit_options(o, text_cstr(&b->m.name), text_cstr(&b->runtime), b->roots,
                  1, t, cpu);
-    o->llvm_mc = b->r->llvm_mc;
     o->llvm_ar = b->r->llvm_ar;
     o->inject = b->m.inject.entries;
     o->inject_count = b->m.inject.count;

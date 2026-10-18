@@ -13,9 +13,10 @@ static const char *const names[TARGET_COUNT] = {
     [TARGET_WINDOWS_ARM64] = "windows-arm64",
 };
 
-/* DESIGN: one row per target, in the order of enum target. The triples
-   select the object format in llvm-mc, and the minimum macOS version comes
-   from the .build_version directive in the assembly. */
+/* DESIGN: one row per target, in the order of enum target. The triple of
+   a row selects the object format, and llvm_triple of llvm_target.c
+   writes it into the LLVM text. On macOS it appends the minimum version,
+   which the linker passes as the platform version too. */
 static const struct target_info infos[TARGET_COUNT] = {
     [TARGET_LINUX_X86_64] = {OS_LINUX, ARCH_X86_64, FORMAT_ELF,
                              CONVENTION_SYSV, "x86_64-unknown-linux-gnu",
@@ -144,13 +145,4 @@ void target_c_symbol(struct text *out, enum target t, const char *name)
     for (i = 0; name[i] != '\0'; i++) {
         text_appendf(out, "%c", name[i] == '.' ? '_' : name[i]);
     }
-}
-
-/* DESIGN: llvm-mc leaves a label that starts with L out of a Mach-O symbol
-   table. It leaves one that starts with .L out of ELF and COFF tables. */
-void target_block_label(struct text *out, enum target t, const char *function,
-                        size_t block)
-{
-    text_appendf(out, "%s%s.b%zu",
-                 infos[t].format == FORMAT_MACHO ? "L" : ".L", function, block);
 }

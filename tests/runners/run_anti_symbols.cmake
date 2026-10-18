@@ -4,7 +4,6 @@
 #   ANTI     the anti executable
 #   ANTIC    the antic executable
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  tests/anti-symbols
 #   PLUGIN   tests/plugin
 #   SUFFIX   the suffix of a plugin on this host, empty where a program
@@ -46,8 +45,7 @@ function(build_id file out)
 endfunction()
 
 function(release)
-    anti_run(status out err "${project}" build --release --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${project}" build --release --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "the release build failed with ${status}\n"
                             "${out}${err}")
@@ -71,13 +69,13 @@ else()
     set(library "libfancy${SUFFIX}")
     antic_build(-c -I "${PLUGIN}" -o "${WORK}/net/example/greet.antl"
                 "${PLUGIN}/net/example/greet.anti")
-    antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc
-                "${LLVM_MC}" -I "${PLUGIN}" -I "${WORK}" -o
+    antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
+                -I "${PLUGIN}" -I "${WORK}" -o
                 "${deploy}/plugins/${library}"
                 "${PLUGIN}/net/example/fancy.anti")
     file(MAKE_DIRECTORY "${WORK}/twin")
-    antic_build(-g --lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc
-                "${LLVM_MC}" -I "${PLUGIN}" -I "${WORK}" -o
+    antic_build(-g --lib shared --no-runtime --runtime "${RUNTIME}"
+                -I "${PLUGIN}" -I "${WORK}" -o
                 "${WORK}/twin/libfancy.debug"
                 "${PLUGIN}/net/example/fancy.anti")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf

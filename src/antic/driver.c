@@ -1,6 +1,6 @@
 /* The driver of antic: it reads the files of a compilation and runs it,
-   the front end, lowering, the passes over the IR, the back end and the
-   assembler, and writes the library file, the C header and the assembly.
+   the front end, lowering, the passes over the IR, the back end, opt and
+   llc, and writes the library file, the C header and the assembly.
    driver_parts.h names the files that hold the rest. */
 
 #include "driver.h"
@@ -743,7 +743,7 @@ static bool digest_file(struct anti_sha256 *s, const char *path)
    too, so a `-g` link and a plain link of one program carry one id.
    `anti symbols` then matches a trace of the one to the archive of the
    other. */
-static bool build_id(const struct options *o, const struct text *assembly,
+static bool build_id(const struct options *o, const struct text *llvm_text,
                      const struct debug_spans *spans, char hex[65],
                      char *error, size_t size)
 {
@@ -756,13 +756,14 @@ static bool build_id(const struct options *o, const struct text *assembly,
     anti_rt_sha256_init(&s);
     for (i = 0; spans != NULL && i < spans->count; i++) {
         if (spans->items[i].start > at) {
-            anti_rt_sha256_update(&s, assembly->data + at,
+            anti_rt_sha256_update(&s, llvm_text->data + at,
                                   spans->items[i].start - at);
         }
         at = spans->items[i].end > at ? spans->items[i].end : at;
     }
-    if (at < assembly->length) {
-        anti_rt_sha256_update(&s, assembly->data + at, assembly->length - at);
+    if (at < llvm_text->length) {
+        anti_rt_sha256_update(&s, llvm_text->data + at,
+                              llvm_text->length - at);
     }
     for (i = 0; ok && i < o->object_count; i++) {
         if (!digest_file(&s, o->objects[i])) {
@@ -803,12 +804,12 @@ static void identified_notice(struct text *out, const struct text *notice,
 /* The back end of docs/work-order-llvm-back-end.md. It folds the symbolic
    values of the target and puts in the checks of --memory-checks, then
    translates the module into LLVM IR text. --dump-llvm prints the text.
-   Otherwise the text goes to assembly with the notice after the build id,
-   and driver_run hands it to opt and llc. Returns 0 with the text, 2
+   Otherwise the text goes to llvm_text with the notice after the build
+   id, and driver_run hands it to opt and llc. Returns 0 with the text, 2
    after the dump, 3 for a dev object of a module without main and 1
    after an error. */
 static int llvm_back_end(const struct options *o, struct ir_module *program,
-                         const char *module, struct text *assembly,
+                         const char *module, struct text *llvm_text,
                          struct extras *extras)
 {
     struct layouts layouts;
@@ -897,7 +898,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
             }
         }
         if (ok) {
-            text_append_bytes(assembly, out.data, out.length);
+            text_append_bytes(llvm_text, out.data, out.length);
         } else {
             status = 1;
         }
@@ -1018,7 +1019,7 @@ static void build_notice(const struct options *o,
    of a module without main and 1 after an error. */
 static int back_end(const struct options *o, struct module *tree,
                     const char *module, struct ir_module *program,
-                    struct text *assembly, struct extras *extras)
+                    struct text *llvm_text, struct extras *extras)
 {
     size_t i;
 
@@ -1100,7 +1101,7 @@ static int back_end(const struct options *o, struct module *tree,
                          o->lib == LIB_NONE && has_main(program, module),
                          o->target);
     }
-    return llvm_back_end(o, program, module, assembly, extras);
+    return llvm_back_end(o, program, module, llvm_text, extras);
 }
 
 /* The package header from the options. A field without an option stays
@@ -1263,7 +1264,7 @@ static bool own_interface(const struct options *o, struct module *tree,
 }
 
 static int compile(const struct options *o, struct text *source,
-                   struct text *module, struct text *assembly,
+                   struct text *module, struct text *llvm_text,
                    struct text *base, struct extras *extras)
 {
     struct arena arena = {0};
@@ -1418,7 +1419,7 @@ static int compile(const struct options *o, struct text *source,
         }
         free((void *)all);
     }
-    status = back_end(o, tree, text_cstr(module), &program, assembly, extras);
+    status = back_end(o, tree, text_cstr(module), &program, llvm_text, extras);
     /* Both lie in this frame and in the list freed below. */
     extras->own = NULL;
     extras->libraries = NULL;
@@ -1658,7 +1659,7 @@ done:
    library files declare what it calls. A main module comes from source,
    so this object never links. */
 static int compile_library_file(const struct options *o,
-                                struct text *assembly, struct text *base,
+                                struct text *llvm_text, struct text *base,
                                 struct extras *extras)
 {
     struct arena arena = {0};
@@ -1706,7 +1707,7 @@ static int compile_library_file(const struct options *o,
                         "verification\n%s", text_cstr(&verify_errors));
         goto done;
     }
-    status = back_end(o, NULL, header.module, &program, assembly, extras);
+    status = back_end(o, NULL, header.module, &program, llvm_text, extras);
     if (status == 0 || status == 3) {
         status = 3;
         if (o->output != NULL) {
@@ -1817,7 +1818,7 @@ int driver_run(const struct options *given)
     const struct options *o = &resolved;
     struct text source = {0};
     struct text module = {0};
-    struct text assembly = {0};
+    struct text llvm_text = {0};
     struct text base = {0};
     struct text asm_path = {0};
     struct text obj_path = {0};
@@ -1891,8 +1892,8 @@ int driver_run(const struct options *given)
         return 2;
     }
     switch (ends_with(o->input, ANTL_SUFFIX)
-                ? compile_library_file(o, &assembly, &base, &extras)
-                : compile(o, &source, &module, &assembly, &base, &extras)) {
+                ? compile_library_file(o, &llvm_text, &base, &extras)
+                : compile(o, &source, &module, &llvm_text, &base, &extras)) {
     case 0:
         break;
     case 2: /* a dump or a library file finished the command */
@@ -1924,7 +1925,7 @@ int driver_run(const struct options *given)
         if (o->output == NULL) {
             text_append(&asm_path, ASSEMBLY_SUFFIX);
         }
-        status = driver_compile_llvm(o, &assembly, text_cstr(&base),
+        status = driver_compile_llvm(o, &llvm_text, text_cstr(&base),
                                      text_cstr(&asm_path))
                      ? 0
                      : 1;
@@ -1935,7 +1936,7 @@ int driver_run(const struct options *given)
        can open it. The text stays only under --keep-llvm. */
     text_appendf(&obj_path, "%s%s", text_cstr(&base),
                  target_info(o->target)->object_suffix);
-    if (!driver_compile_llvm(o, &assembly, text_cstr(&base),
+    if (!driver_compile_llvm(o, &llvm_text, text_cstr(&base),
                              text_cstr(&obj_path))) {
         goto done;
     }
@@ -1962,7 +1963,7 @@ done:
     extras_free(&extras);
     text_free(&source);
     text_free(&module);
-    text_free(&assembly);
+    text_free(&llvm_text);
     text_free(&base);
     text_free(&asm_path);
     text_free(&obj_path);

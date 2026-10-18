@@ -3,7 +3,6 @@
 # the library lacks, or one it cannot resolve in the sysroot of the
 # target, fails the link. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file
 #   OBJECTS   the objects and libraries to link, separated by commas
@@ -24,7 +23,7 @@ if(DEFINED OPTIONS)
     string(REPLACE "," ";" options "${OPTIONS}")
 endif()
 file(REMOVE "${exe}")
-antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+antic_build(--target "${TARGET}" --runtime "${RUNTIME}"
             ${options} -o "${exe}" "${SOURCE}" ${objects})
 if(NOT EXISTS "${exe}")
     message(FATAL_ERROR "antic wrote no executable for ${TARGET}")

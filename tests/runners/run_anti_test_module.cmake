@@ -3,7 +3,7 @@
 # runner and runs it. It passes when every test passed and the output is
 # the bytes of <module>.expected: one `ok` line per test and the count.
 #
-#   cmake -DANTI=<anti> -DRUNTIME=<runtime directory> -DLLVM_MC=<llvm-mc>
+#   cmake -DANTI=<anti> -DRUNTIME=<runtime directory>
 #         -DMODULES=<tests/anti-test> -DMODULE=<com/example/name>
 #         -DWORK=<dir> -P tests/runners/run_anti_test_module.cmake
 
@@ -15,7 +15,7 @@ file(MAKE_DIRECTORY "${WORK}")
 
 program_output(got status "${WORK}/anti-test.out"
                "${ANTI}" test --work "${WORK}" -I "${MODULES}"
-               --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+               --runtime "${RUNTIME}"
                "${MODULES}/${MODULE}.anti")
 file(READ "${WORK}/anti-test.out" text)
 if(NOT status EQUAL 0)

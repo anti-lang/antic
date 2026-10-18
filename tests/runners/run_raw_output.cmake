@@ -2,7 +2,7 @@
 # the harness reads them as bytes on every host. The test runs a child that
 # writes a CR, an LF and a NUL, then a program that writes them.
 #
-#   cmake -DROOT=<repository> -DANTIC=<antic> -DLLVM_MC=<llvm-mc>
+#   cmake -DROOT=<repository> -DANTIC=<antic>
 #         -DRUNTIME=<runtime directory> -DC_PROGRAM=<raw_bytes_c>
 #         -DWORK=<dir> -P tests/runners/run_raw_output.cmake
 
@@ -23,7 +23,7 @@ endif()
 # A program writes the same bytes through the runtime, and the harness
 # compares them with its expected file.
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DANTIC=${ANTIC}"
-                        "-DLLVM_MC=${LLVM_MC}" "-DRUNTIME=${RUNTIME}"
+                        "-DRUNTIME=${RUNTIME}"
                         "-DSOURCE=${ROOT}/tests/raw/raw_bytes.anti"
                         "-DWORK=${WORK}" -P "${CMAKE_CURRENT_LIST_DIR}/run_program.cmake"
                 RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err

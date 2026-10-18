@@ -3,7 +3,6 @@
 # message of the section and the exit code of a refusal. Run with cmake -P
 # and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   TARGET    the antic target name
 #   SOURCE    the .anti file
@@ -21,7 +20,7 @@ if(runtime_library STREQUAL "")
 endif()
 file(MAKE_DIRECTORY "${WORK}")
 set(exe "${WORK}/cpu_check-${TARGET}")
-antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+antic_build(--target "${TARGET}" --runtime "${RUNTIME}"
             -o "${exe}" "${SOURCE}")
 # The runtime refuses at start with the status of a startup error.
 program_expect("cpu check ${TARGET}" COMMAND "${exe}" STATUS 70

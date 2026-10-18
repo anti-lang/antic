@@ -94,8 +94,6 @@ static int usage(FILE *out)
           "                       x86_64, armv8.0, armv8.2 or armv8.5 on\n"
           "                       ARM64. The target's default stands\n"
           "                       otherwise\n"
-          "  --llvm-mc <path>     accepted for the tools that pass it, and\n"
-          "                       unused: llc writes every object\n"
           "  --runtime <dir>      the directory holding lib/<target>/\n"
           "  --dump-tokens        print the tokens of <file.anti> and stop\n"
           "  --dump-ast           print the syntax tree and stop\n"
@@ -144,11 +142,9 @@ static int print_cpu_levels(void)
 
     for (i = 0; i < CPU_LEVEL_COUNT; i++) {
         enum cpu_level level = (enum cpu_level)i;
-        const char *attributes = cpu_attributes(level);
-        printf("level %s %s %d %s %s %s %s\n", cpu_name(level),
+        printf("level %s %s %d %s %s %s\n", cpu_name(level),
                cpu_arch(level) == ARCH_ARM64 ? "arm64" : "x86_64",
                (int)cpu_id(level), cpu_clang_arch(level),
-               attributes[0] == '\0' ? "-" : attributes,
                llvm_target_cpu(level), llvm_target_features(level));
     }
     for (i = 0; i < TARGET_COUNT; i++) {
@@ -477,8 +473,6 @@ static int run(int argc, char **argv, const struct lists *l)
             slot = &target;
         } else if (strcmp(arg, "--cpu") == 0) {
             slot = &cpu;
-        } else if (strcmp(arg, "--llvm-mc") == 0) {
-            slot = &options.llvm_mc;
         } else if (strcmp(arg, "--opt") == 0) {
             slot = &options.opt;
         } else if (strcmp(arg, "--llc") == 0) {

@@ -5,7 +5,6 @@
 # and the runtime library comes from one cross build. Run with cmake -P
 # and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file
 #   EXPECTED  the file of the digest
@@ -25,7 +24,7 @@ file(MAKE_DIRECTORY "${WORK}")
 # The name of the output stands in the ad-hoc signature, so it is fixed.
 set(exe "${WORK}/identity")
 file(REMOVE "${exe}")
-antic_build(--target macos-arm64 --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+antic_build(--target macos-arm64 --runtime "${RUNTIME}"
             -o "${exe}" "${SOURCE}")
 file(SHA256 "${exe}" actual)
 file(STRINGS "${EXPECTED}" expected LIMIT_COUNT 1)

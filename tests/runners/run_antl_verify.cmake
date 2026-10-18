@@ -3,7 +3,6 @@
 # which the reader accepts and the verifier refuses. Run with cmake -P and
 # these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   POKE      the poke_byte executable
 #   LIBS      the directory of the library files
 #   WORK      a scratch directory
@@ -28,7 +27,7 @@ execute_process(
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "poke_byte failed with ${status}")
 endif()
-antic_run(status out err COMMAND --dev --llvm-mc "${LLVM_MC}" -I "${LIBS}" -o
+antic_run(status out err COMMAND --dev -I "${LIBS}" -o
           "${WORK}/scale_antl" "${WORK}/scale.antl")
 if(status EQUAL 0)
     message(FATAL_ERROR "antic --dev compiled a library file that fails "

@@ -6,7 +6,6 @@
 # names nothing, when the library takes the inputs of a plain program.
 # Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   READOBJ   llvm-readobj of the pinned release
 #   OBJDUMP   llvm-objdump of the pinned release
 #   RUNTIME   the runtime archive
@@ -22,7 +21,7 @@ file(MAKE_DIRECTORY "${WORK}")
 # Run antic on source for target with the options, which must succeed.
 function(shared_library target source library)
     antic_build(--target "${target}" --lib shared --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}" ${ARGN} -o "${library}" "${source}")
+                ${ARGN} -o "${library}" "${source}")
 endfunction()
 
 # Check that the text a tool printed for library names each pattern.

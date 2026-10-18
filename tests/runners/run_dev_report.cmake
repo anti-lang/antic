@@ -1,7 +1,6 @@
 # What a dev build reports on standard error while a program runs, and that
 # a release build reports nothing. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    the program
 #   WORK      a directory for the files

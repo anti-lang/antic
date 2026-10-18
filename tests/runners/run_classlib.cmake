@@ -2,7 +2,6 @@
 # program that uses it, and run the program. Run with cmake -P and these
 # values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   ROOT      the search root that holds the sources
 #   WORK      a directory for the outputs
@@ -14,7 +13,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 file(MAKE_DIRECTORY "${WORK}")
 antic_build(-c -I "${ROOT}" -o "${WORK}/shapes.antl"
             "${ROOT}/com/example/shapes.anti")
-antic_build(-I "${ROOT}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o
+antic_build(-I "${ROOT}" --runtime "${RUNTIME}" -o
             "${WORK}/client" "${ROOT}/client.anti" "${WORK}/shapes.antl")
 program_output(out_hex status "${WORK}/client.stdout" "${WORK}/client")
 file(READ "${WORK}/client.stdout" out)

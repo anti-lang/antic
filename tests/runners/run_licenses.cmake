@@ -1,7 +1,6 @@
 # Link a program and find the licence notice anti_licenses in it by its
 # markers. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file
 #   WORK      a directory for the executable
@@ -19,7 +18,7 @@ cmake_minimum_required(VERSION 3.21)
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 file(MAKE_DIRECTORY "${WORK}")
-antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" --package-name
+antic_build(--runtime "${RUNTIME}" --package-name
             com.example.hello --package-version 2.0.0 --license MIT -o
             "${WORK}/licensed" "${SOURCE}")
 file(STRINGS "${WORK}/licensed" lines REGEX "ANTI_LICENSES|^package |^build ")

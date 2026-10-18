@@ -4,7 +4,6 @@
 # import library of its host, so each program there takes a library of
 # its own. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/plugin
 #   SUFFIX    the suffix of a shared library on this host
@@ -45,7 +44,7 @@ function(plugin program)
     endif()
     file(MAKE_DIRECTORY "${dir}")
     antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}" -o "${library}"
+                -I "${SOURCES}" -I "${WORK}" -o "${library}"
                 "${SOURCES}/net/example/fancy.anti" ${host})
     if(NOT EXISTS "${dir}/anti-plugins.toml")
         message(FATAL_ERROR "the plugin has no index beside it")
@@ -65,7 +64,7 @@ antic_build(-c -I "${SOURCES}" -o "${WORK}/net/example/greet.antl"
             "${SOURCES}/net/example/greet.anti")
 
 # The host loads the library, asks it for the interface and closes it.
-antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" -o "${WORK}/host${EXE}" "${SOURCES}/host.anti")
 plugin(host)
 library_dir(host dir)
@@ -77,15 +76,15 @@ program_expect("the host" COMMAND "${WORK}/host${EXE}" "${dir}/libfancy${SUFFIX}
 # directory of its own, where Windows finds no other program by the name
 # the imports of the library give.
 file(MAKE_DIRECTORY "${WORK}/closed")
-antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" --closed -o "${WORK}/closed/closed${EXE}"
             "${SOURCES}/host.anti")
 program_expect("a closed program"
                COMMAND "${WORK}/closed/closed${EXE}" "${dir}/libfancy${SUFFIX}"
                STATUS 1 ERR_MATCH "libfancy")
 # It takes no provider from a library either, which the link says.
-antic_run(status ignored_out err COMMAND --runtime "${RUNTIME}" --llvm-mc
-          "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}" --closed --inject
+antic_run(status ignored_out err COMMAND --runtime "${RUNTIME}"
+          -I "${SOURCES}" -I "${WORK}" --closed --inject
           "${interface}=plugin:${dir}/libfancy${SUFFIX}" -o
           "${WORK}/shut${EXE}" "${SOURCES}/user.anti")
 if(status EQUAL 0 OR NOT err MATCHES "names a library, and `--closed` loads")
@@ -97,32 +96,32 @@ endif()
 # program that loads libraries. A closed program loads none and may drop
 # them.
 antic_run(status ignored_out err COMMAND --no-hooks --lib shared --no-runtime
-          --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I
+          --runtime "${RUNTIME}" -I "${SOURCES}" -I
           "${WORK}" -o "${WORK}/closed/libfancy${SUFFIX}"
           "${SOURCES}/net/example/fancy.anti")
 if(status EQUAL 0 OR NOT err MATCHES "`--no-hooks` drops the hooks that count the objects of a plugin")
     message(FATAL_ERROR "a plugin was built without its hooks\n${err}")
 endif()
 antic_run(status ignored_out err COMMAND --no-hooks --runtime "${RUNTIME}"
-          --llvm-mc "${LLVM_MC}" -I "${SOURCES}" -I "${WORK}" -o
+          -I "${SOURCES}" -I "${WORK}" -o
           "${WORK}/closed/hookless${EXE}" "${SOURCES}/host.anti")
 if(status EQUAL 0 OR NOT err MATCHES "the program loads libraries, and `--no-hooks` drops")
     message(FATAL_ERROR "a host was built without its hooks\n${err}")
 endif()
-antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" --closed --no-hooks -o "${WORK}/closed/hookless${EXE}"
             "${SOURCES}/host.anti")
 
 # `plugin:<path>` of the manifest fills the slot of an injected field
 # from that library, and `discover` finds it through the index.
 library_dir(named dir)
-antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" --inject "${interface}=plugin:${dir}/libfancy${SUFFIX}"
             -o "${WORK}/named${EXE}" "${SOURCES}/user.anti")
 plugin(named)
 program_expect("the program with a named library"
                COMMAND "${WORK}/named${EXE}" OUT_FILE "${PROVIDED}")
-antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" --inject "${interface}=discover" -o "${WORK}/found${EXE}"
             "${SOURCES}/user.anti")
 plugin(found)
@@ -166,7 +165,7 @@ set(host "")
 if(SUFFIX STREQUAL ".dll")
     set(host "${WORK}/found.lib")
 endif()
-antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
             -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
             "${SOURCES}/net/example/fancy.anti" ${host})
 file(READ "${kept}/anti-plugins.toml" index)
@@ -188,7 +187,7 @@ program_expect("discovery through a rewritten index"
 # An index cut off inside an entry is no TOML, and antic replaces it with
 # the entry of its own library.
 file(WRITE "${kept}/anti-plugins.toml" "[[library]]\npath = 'libot")
-antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
             -I "${SOURCES}" -I "${WORK}" -o "${kept}/libfancy${SUFFIX}"
             "${SOURCES}/net/example/fancy.anti" ${host})
 file(READ "${kept}/anti-plugins.toml" index)

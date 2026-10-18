@@ -3,8 +3,10 @@
 # llvm-version. A tool missing from the directory of the LLVM tools is an
 # error that names it. The copy of check-llvm.cmake took a tool only if it
 # was there, so a missing llvm-objdump left a runtime archive without it
-# and no error. The tools here are stand-ins of a few bytes, since the
-# copy reads no version. Run with cmake -P and these values:
+# and no error. The tools of ANTIC_LLVM_UNPACKED stay out of the copy,
+# and the copy removes one that an older build left there. The tools here
+# are stand-ins of a few bytes, since the copy reads no version. Run with
+# cmake -P and these values:
 #   ROOT  the root of the repository
 #   WORK  a directory this run writes into
 
@@ -24,7 +26,11 @@ foreach(name IN LISTS names)
         file(WRITE "${source}/${name}${exe}" "stand-in ${name}\n")
     endif()
 endforeach()
-file(WRITE "${source}/llvm-cov${exe}" "stand-in llvm-cov\n")
+file(MAKE_DIRECTORY "${dest}")
+foreach(name IN LISTS ANTIC_LLVM_UNPACKED)
+    file(WRITE "${source}/${name}${exe}" "stand-in ${name}\n")
+    file(WRITE "${dest}/${name}${exe}" "stand-in ${name} of an older build\n")
+endforeach()
 
 function(copy out_status out_text)
     execute_process(COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${source}"
@@ -65,8 +71,11 @@ if(NOT written STREQUAL "${pin}\n")
     message(FATAL_ERROR "llvm-version of the copy holds `${written}`, the "
                         "pin is `${pin}`")
 endif()
-if(EXISTS "${dest}/llvm-cov${exe}")
-    message(FATAL_ERROR "tools/copy-llvm.cmake copied llvm-cov${exe}, which "
-                        "no package carries")
-endif()
+foreach(name IN LISTS ANTIC_LLVM_UNPACKED)
+    if(EXISTS "${dest}/${name}${exe}")
+        message(FATAL_ERROR "tools/copy-llvm.cmake left ${name}${exe} in "
+                            "bin/ of the runtime archive, and no package "
+                            "carries it")
+    endif()
+endforeach()
 file(REMOVE_RECURSE "${WORK}")

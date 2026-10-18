@@ -1,6 +1,5 @@
 # The five behaviours of `assert`. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    a program whose assertion fails
 #   WORK      a directory for the files

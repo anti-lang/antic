@@ -4,7 +4,6 @@
 # compile of every command carries it. Run with cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  the directory that holds internal/
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
@@ -34,11 +33,10 @@ function(run_anti what)
 endfunction()
 
 run_anti("anti check" check --runtime "${RUNTIME}")
-run_anti("the dev build" build --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
-run_anti("the release build" build --release --runtime "${RUNTIME}"
-         --llvm-mc "${LLVM_MC}")
+run_anti("the dev build" build --runtime "${RUNTIME}")
+run_anti("the release build" build --release --runtime "${RUNTIME}")
 run_anti("anti test" test --work "${WORK}/tests" -I src
-         --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+         --runtime "${RUNTIME}"
          src/com/example/core.anti src/com/example/near.anti)
 run_anti("anti doc" doc -o "${WORK}/doc" --work "${WORK}/doc-work"
          --runtime "${RUNTIME}")

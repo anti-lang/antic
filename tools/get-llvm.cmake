@@ -1,10 +1,10 @@
 # Install the nine LLVM tools llvm-mc, lld, llvm-ar, llvm-objdump,
 # llvm-readobj, opt, llc, llvm-profdata and llvm-cov for this host into
 # <dir>/bin.
-# llvm-mc assembles, lld links under the names ld.lld, ld64.lld and
-# lld-link, and llvm-ar writes static libraries. llvm-objdump reads the
-# format and architecture of an output, and llvm-readobj decodes the
-# Windows unwind data for the tests. opt optimizes LLVM IR and llc compiles
+# llvm-mc assembles the output of `antic -S` for the tests, lld links
+# under the names ld.lld, ld64.lld and lld-link, and llvm-ar writes static
+# libraries. llvm-objdump reads the format and architecture of an output,
+# and llvm-readobj decodes the Windows unwind data for the tests. opt optimizes LLVM IR and llc compiles
 # it to an object, for the LLVM back end. llvm-profdata merges the raw
 # profiles of a --profile-generate run into the file --profile-use reads.
 # llvm-cov reads such a profile against a program built for coverage, which
@@ -24,8 +24,8 @@
 # runtime archive holds the tools of this machine alone, and a package
 # carries the tools of its own host. The archive is checked the same way,
 # and <dir>/bin is laid out as bin/ of the runtime archive, with the four
-# names of lld and llvm-version, and without llvm-cov. Nothing of it runs
-# here.
+# names of lld and llvm-version, and without llvm-mc and llvm-cov. Nothing
+# of it runs here.
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/deps-dir.cmake")
@@ -61,12 +61,15 @@ endforeach()
 # has checked them. tools/check-llvm.cmake writes llvm-version beside the
 # tools of this machine, and the same line stands here for the packer.
 #
-# DESIGN: llvm-cov leaves the directory of another host. No package
-# carries it, which Eddie decided on 2026-10-11 as decision 29 of
-# docs/decisions.md, and tools/pack-anti.cmake copies this bin/ whole into
-# the package of the host. The test no_llvm_cov_packed holds it.
+# DESIGN: llvm-mc and llvm-cov, ANTIC_LLVM_UNPACKED, leave the directory
+# of another host. No package carries either, which Eddie decided on
+# 2026-10-11 as decisions 2 and 29 of docs/decisions.md, and
+# tools/pack-anti.cmake copies this bin/ whole into the package of the
+# host. The tests no_llvm_mc_packed and no_llvm_cov_packed hold it.
 if(DEFINED HOST)
-    file(REMOVE "${DEST}/bin/llvm-cov${exe}")
+    foreach(tool IN LISTS ANTIC_LLVM_UNPACKED)
+        file(REMOVE "${DEST}/bin/${tool}${exe}")
+    endforeach()
     file(WRITE "${DEST}/bin/llvm-version" "${fetched_version}\n")
     message(STATUS "the LLVM tools of ${HOST} in ${DEST}/bin")
     return()

@@ -1,7 +1,6 @@
 # The tests of anti bind. Run with cmake -P and these values:
 #   ANTI      the anti executable
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
 #   CASE      header, clang, escaped_path, raymath, raylib, api, refusals,
@@ -75,7 +74,7 @@ function(compare_probes name include)
     tool_run("" ${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" ${ARGN}
                 ${HOST_LINK} -include "${CMAKE_CURRENT_LIST_DIR}/../binary_stdio.h"
                 -o "${WORK}/probe_c" "${WORK}/out/probe_${name}.c")
-    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I "${WORK}/lib"
+    antic_build(--runtime "${RUNTIME}" -I "${WORK}/lib"
                 -o "${WORK}/probe_anti" "${WORK}/out/probe_${name}.anti")
     program_output(c_hex c_status "${WORK}/probe_c.out" "${WORK}/probe_c")
     program_output(anti_hex anti_status "${WORK}/probe_anti.out"
@@ -98,7 +97,7 @@ function(expect_calls name include program expected)
     tool_run("" ${CC} ${ANTIC_C_WARNINGS} -std=c11 -I "${include}" -c
                 -o "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}"
                 "${WORK}/out/shim_${name}.c")
-    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I "${WORK}/lib"
+    antic_build(--runtime "${RUNTIME}" -I "${WORK}/lib"
                 -o "${WORK}/calls" "${program}"
                 "${WORK}/shim${CMAKE_C_OUTPUT_EXTENSION}")
     program_output(got status "${WORK}/calls.out" "${WORK}/calls")

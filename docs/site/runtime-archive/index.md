@@ -26,7 +26,6 @@ Chapter 3 installs Anti with one command. That package is this archive with anti
 |---|---|---|
 | `bin/antic` | The compiler | The program the user runs |
 | `bin/opt`, `bin/llc` | The optimizer and the code generator of LLVM | antic writes LLVM IR text and stops, so something must optimise it and write the object |
-| `bin/llvm-mc` | The assembler | antic accepts `--llvm-mc` and runs nothing with it, until a separate decision takes it out |
 | `bin/lld` and its three names | The linker | One program links ELF, Mach-O and COFF, under `ld.lld`, `ld64.lld` and `lld-link` |
 | `bin/llvm-ar` | The archiver | Static libraries for C, which `antic --lib static` writes |
 | `bin/llvm-objdump`, `bin/llvm-readobj` | Readers of object files | The tests of chapters 16 and 21 check what the emitter produced |

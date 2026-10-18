@@ -3,7 +3,6 @@
 # Run with cmake -P and these values:
 #   NAME      the name of the pair, probe when it is not given
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/abi
 #   WORK      a directory for the executables
@@ -25,7 +24,7 @@ execute_process(COMMAND ${CC} ${ANTIC_C_WARNINGS} -std=c11 ${HOST_LINK}
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "${CC} ${NAME}.c failed\n${err}")
 endif()
-antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -o
+antic_build(--runtime "${RUNTIME}" -o
             "${WORK}/${NAME}_anti" "${SOURCES}/${NAME}.anti")
 program_output(c_hex c_status "${WORK}/${NAME}_c.stdout" "${WORK}/${NAME}_c")
 program_output(anti_hex anti_status "${WORK}/${NAME}_anti.stdout" "${WORK}/${NAME}_anti")

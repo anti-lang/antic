@@ -11,7 +11,7 @@
 # one. The runtime stays as given, so the second link holds no path of
 # the checkout at all.
 #
-#   cmake -DANTIC=<antic> -DLLVM_MC=<llvm-mc> -DRUNTIME=<runtime archive>
+#   cmake -DANTIC=<antic> -DRUNTIME=<runtime archive>
 #         -DSOURCE=<file.anti> -DNAMES=<symbol;...> -DWORK=<dir>
 #         -DTARGET=<target> -DROOT=<checkout> -P tests/runners/run_pdb_names.cmake
 
@@ -47,7 +47,7 @@ foreach(run release release-relative debug debug-relative)
     endif()
     file(REMOVE "${exe}" "${pdb}")
     antic_build(IN "${WORK}"
-                COMMAND --target "${TARGET}" --llvm-mc "${LLVM_MC}"
+                COMMAND --target "${TARGET}"
                         --runtime "${runtime}" ${flags} -o "${exe}" "${SOURCE}")
     if(NOT EXISTS "${pdb}")
         message(FATAL_ERROR "the ${run} link for ${TARGET} wrote no ${pdb}")

@@ -3,7 +3,8 @@
 
 # ANTIC_LLVM_MC and ANTIC_LLVM_AR, the llvm-mc and the llvm-ar of the
 # pinned release, stand in tools/pinned-compiler.cmake, which runs before
-# the first test reads either.
+# the first test reads either. llvm-mc assembles the output of `antic -S`
+# for the tests of the assembly, and no package carries it.
 
 # The files of src/rt/ a test program compiles, by the names
 # ANTIC_RUNTIME_SOURCES of CMakeLists.txt gives them. A name the runtime does
@@ -189,7 +190,7 @@ function(antic_dev_object module)
         return()
     endif()
     add_test(NAME dev_object_${name}
-        COMMAND antic --dev --llvm-mc "${ANTIC_LLVM_MC}"
+        COMMAND antic --dev
                 --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
                 -I "${ANTIC_RUNTIME_DIR}/std"
                 -o "${CMAKE_CURRENT_BINARY_DIR}/anti_${name}_dev"
@@ -245,9 +246,9 @@ function(antic_test_lto out)
     set(${out} ${options} PARENT_SCOPE)
 endfunction()
 
-# A program test of run_program.cmake, which builds source with antic,
-# llvm-mc and the runtime archive of this tree, runs it and compares the
-# result with the expected file beside it.
+# A program test of run_program.cmake, which builds source with antic and
+# the runtime archive of this tree, runs it and compares the result with
+# the expected file beside it.
 #   antic_program_test(<name> <source> WORK <dir> [EXPECTED <file>]
 #                      [OPTIONS <option>...] [DEV <module>...]
 #                      [OBJECTS <object>...] [UNSET <variable>...]
@@ -288,7 +289,6 @@ function(antic_program_test name source)
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${source}"
             "-DOPTIONS=${options}"
@@ -334,7 +334,6 @@ function(antic_modules_test name)
         add_test(NAME ${name}_${mode}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DROOT=${arg_ROOT}"
                 "-DLIBRARIES=${libraries}"
@@ -394,16 +393,15 @@ function(antic_dump_test stage subject expected)
             -P "${ANTIC_RUNNERS}/run_dump.cmake")
 endfunction()
 
-# llvm-objdump, llvm-readobj and llvm-mc of the runtime archive, with the
-# suffix of an executable of the host, .exe on Windows. Every test names
-# them by these three. Spelled without the suffix, the file was missing on
-# Windows, and each test that reads a library there skipped.
+# llvm-objdump and llvm-readobj of the runtime archive, with the suffix of
+# an executable of the host, .exe on Windows. Every test names them by
+# these two. Spelled without the suffix, the file was missing on Windows,
+# and each test that reads a library there skipped. llvm-mc is no tool of
+# the runtime archive, and the tests take ANTIC_LLVM_MC.
 set(ANTIC_RUNTIME_OBJDUMP
     "${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}")
 set(ANTIC_RUNTIME_READOBJ
     "${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}")
-set(ANTIC_RUNTIME_MC
-    "${ANTIC_RUNTIME_DIR}/bin/llvm-mc${CMAKE_EXECUTABLE_SUFFIX}")
 
 # The signal table of the runtime, in a program of its own. The test
 # starts threads, and so does the reader of the platform layer.
@@ -981,7 +979,6 @@ if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     add_test(NAME cpu_check_refuses
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DTARGET=macos-x86_64"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
@@ -1029,8 +1026,9 @@ add_test(NAME llvm_tool_list
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_llvm_tool_list.cmake")
 
-# The copy into bin/ of the runtime archive takes every tool of the list
-# and refuses a directory that lacks one.
+# The copy into bin/ of the runtime archive takes every tool of the list,
+# refuses a directory that lacks one and leaves out the tools no package
+# carries.
 add_test(NAME llvm_tools_copy
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-tools-copy"
@@ -1156,6 +1154,10 @@ add_usage_test(antic option_unknown FIRST "antic: unknown option --bogus"
 add_usage_test(antic second_input FIRST "antic: one input file only"
     ARGS "${usage_source}" "${usage_source}")
 add_usage_test(antic options_without_an_input ARGS -S --dev)
+# Decision 2 of "Decisions of 2026-10-11" in docs/decisions.md: the option
+# --llvm-mc is gone, so antic refuses it as an option it does not know.
+add_usage_test(antic llvm_mc_gone FIRST "antic: unknown option --llvm-mc"
+    ARGS --llvm-mc llvm-mc "${usage_source}")
 # R141 of "Rules of 2026-10-13" in docs/decisions.md: the usage of antic
 # lists the options of the modes, the checks and the hooks.
 add_test(NAME antic_usage_lists_options
@@ -1179,6 +1181,9 @@ foreach(case
         "build_option_unknown|build|--bogus"
         "build_word|build|extra"
         "build_lib_kind|build|--lib|bundled"
+        "build_llvm_mc_gone|build|--llvm-mc|llvm-mc"
+        "run_llvm_mc_gone|run|--llvm-mc|llvm-mc"
+        "test_llvm_mc_gone|test|--llvm-mc|llvm-mc"
         "check_option_unknown|check|--bogus"
         "check_targets_value|check|--targets|some"
         "doc_option_unknown|doc|--bogus"
@@ -1213,11 +1218,10 @@ endforeach()
 # names the option and ends with 2, as antic does.
 foreach(case
         "build|--target" "build|--cpu" "build|--lto" "build|--lib"
-        "build|--profile-use" "build|--runtime" "build|--llvm-mc"
-        "build|--llvm-ar"
+        "build|--profile-use" "build|--runtime" "build|--llvm-ar"
         "check|--targets" "check|--work" "check|--runtime" "check|-I"
         "doc|-o" "doc|--work" "doc|--runtime" "doc|-I"
-        "test|--work" "test|--runtime" "test|--llvm-mc" "test|-I"
+        "test|--work" "test|--runtime" "test|-I"
         "bind|--header" "bind|--clang" "bind|-o" "bind|--runtime"
         "bind|--module" "bind|--target" "bind|-I" "bind|-D"
         "symbols|--conf" "symbols|--from" "symbols|--out" "symbols|--symbols"
@@ -1279,7 +1283,7 @@ add_antic_refusal(lto_memory_checks_macos
 foreach(option --lib --linker --lto --framework --linux-lib --inject
         --dependency --attribution -I --llvm-ar --profile-use
         --package-name --package-version --license --license-text -o
-        --target --cpu --llvm-mc --opt --llc --runtime)
+        --target --cpu --opt --llc --runtime)
     string(REGEX REPLACE "^-+" "" word "${option}")
     string(REPLACE "-" "_" word "${word}")
     if(option STREQUAL "-o")
@@ -1312,7 +1316,6 @@ foreach(case IN LISTS antic_option_cases)
             "-DANTIC=$<TARGET_FILE:antic>"
             -DCASE=${case}
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_AR=${ANTIC_LLVM_AR}"
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
@@ -1825,7 +1828,6 @@ if(ANTIC_EMULATED_TARGET)
         add_test(NAME memory_checks_list_${emulated}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
                 "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
@@ -2270,11 +2272,16 @@ add_test(NAME llvm_names
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-names"
             -P "${ANTIC_RUNNERS}/run_llvm_names.cmake")
 
-# llvm-cov stays out of every directory the packer copies into a package.
-add_test(NAME no_llvm_cov_packed
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/no-llvm-cov-packed"
-            -P "${ANTIC_RUNNERS}/run_no_llvm_cov_packed.cmake")
+# llvm-cov and llvm-mc stay out of every directory the packer copies into
+# a package, no_llvm_cov_packed and no_llvm_mc_packed.
+foreach(tool llvm-cov llvm-mc)
+    string(REPLACE "-" "_" word "${tool}")
+    add_test(NAME no_${word}_packed
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DTOOL=${tool}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/no-${tool}-packed"
+                -P "${ANTIC_RUNNERS}/run_no_tool_packed.cmake")
+endforeach()
 
 # The report of the coverage measurement: tools/coverage-report.cmake
 # merges the profiles of two runs of a small program and writes the
@@ -2315,7 +2322,6 @@ add_executable(raw_bytes_c raw/raw_bytes.c)
 add_test(NAME raw_output
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DC_PROGRAM=$<TARGET_FILE:raw_bytes_c>"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/raw"
@@ -2327,7 +2333,6 @@ add_test(NAME anti_test
         "-DANTI=$<TARGET_FILE:anti>"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${ANTIC_RUNNERS}/run_anti_test.cmake")
@@ -2339,7 +2344,6 @@ add_test(NAME anti_test_flow
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DMODULE=com/example/flow"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-flow"
@@ -2351,7 +2355,6 @@ add_test(NAME anti_test_values
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DMODULE=com/example/values"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-values"
@@ -2363,7 +2366,6 @@ add_test(NAME anti_test_ownership
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DMODULE=com/example/ownership"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-ownership"
@@ -2376,7 +2378,6 @@ add_test(NAME anti_test_errors
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DMODULE=com/example/errors"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-errors"
@@ -2389,7 +2390,6 @@ add_test(NAME anti_test_threads
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DMODULE=com/example/threads"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-threads"
@@ -2402,7 +2402,6 @@ add_test(NAME anti_test_classes
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DMODULE=com/example/classes"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-classes"
@@ -2415,7 +2414,6 @@ add_test(NAME anti_memory_checks
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
         "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_tests.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-checks"
@@ -2451,7 +2449,6 @@ add_test(NAME anti_build
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DOTHER=${anti_build_other}"
@@ -2469,7 +2466,6 @@ add_test(NAME anti_internal
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-internal"
@@ -2491,7 +2487,6 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "-DANTI=$<TARGET_FILE:anti>"
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
             "-DPLUGIN=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "${anti_symbols_plugin}"
@@ -2534,7 +2529,6 @@ if(APPLE)
             "-DANTI=$<TARGET_FILE:anti>"
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-framework"
@@ -2549,7 +2543,6 @@ add_test(NAME linux_modes
         "-DANTI=$<TARGET_FILE:anti>"
         "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-modes"
@@ -2562,7 +2555,6 @@ add_test(NAME license_notice
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
         "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
@@ -2588,7 +2580,6 @@ foreach(form plain project notice archive)
             "-DFORM=${form}"
             "-DANTI=$<TARGET_FILE:anti>"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_AR=${ANTIC_LLVM_AR}"
             "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
@@ -2608,7 +2599,6 @@ add_test(NAME anti_build_deps
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DLLVM_AR=${ANTIC_LLVM_AR}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DHOST=${ANTIC_HOST_TARGET}"
@@ -2620,7 +2610,6 @@ add_test(NAME anti_build_resolve
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-resolve"
         -P "${ANTIC_RUNNERS}/run_anti_build_resolve.cmake")
@@ -2631,7 +2620,6 @@ add_test(NAME anti_build_inputs
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-inputs"
         -P "${ANTIC_RUNNERS}/run_anti_build_inputs.cmake")
@@ -2656,7 +2644,6 @@ foreach(case IN LISTS anti_build_cases)
             "-DANTI=$<TARGET_FILE:anti>"
             -DCASE=${case}
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DOTHER=${anti_build_other}"
@@ -2722,7 +2709,6 @@ foreach(pair "anti_build|anti-build/messages.cmake"
                 "-DCASE=${name}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/messages/${command}-${name}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DHOST=${ANTIC_HOST_TARGET}"
                 "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
                 "-DVERSION=${PROJECT_VERSION}"
@@ -2775,7 +2761,6 @@ foreach(case IN LISTS anti_option_cases)
             "-DANTIC=$<TARGET_FILE:antic>"
             -DCASE=${case}
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_AR=${ANTIC_LLVM_AR}"
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
@@ -2794,7 +2779,6 @@ if(ANTIC_HOST_TARGET MATCHES "^windows-")
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-rerun"
@@ -2809,7 +2793,6 @@ add_test(NAME anti_build_running
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-running"
@@ -2850,7 +2833,6 @@ endif()
 add_test(NAME variant_wide_tag
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variant-wide-tag"
         -P "${ANTIC_RUNNERS}/run_variant_wide_tag.cmake")
@@ -3008,7 +2990,6 @@ foreach(case IN LISTS anti_bind_cases)
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
             "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
@@ -3033,7 +3014,6 @@ add_test(NAME std_tests_trace
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
         "-DSOURCE=${ANTIC_STD_SOURCE_DIR}/trace.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-tests-trace"
@@ -3644,7 +3624,7 @@ add_test(NAME guide_examples
         "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/site/developers-guide"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/guide"
         "-DLLVM_OPT=${ANTIC_OPT}"
-        "-DLLVM_MC=${ANTIC_RUNTIME_MC}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
 
@@ -3677,7 +3657,6 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
         add_test(NAME cross_link_${target}${suffix}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${program}.anti"
@@ -3695,7 +3674,6 @@ foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
         add_test(NAME cross_link_lto_${mode}_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
@@ -3717,7 +3695,6 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
     add_test(NAME dead_code_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
@@ -3745,7 +3722,6 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
         add_test(NAME ${name}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${distinct_source}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/distinct-addresses/${lto}"
@@ -3780,7 +3756,6 @@ endforeach()
 add_test(NAME windows_addresses
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
@@ -3879,7 +3854,6 @@ add_test(NAME unicode_paths
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DANTI=$<TARGET_FILE:anti>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unicode-paths"
@@ -3892,7 +3866,6 @@ foreach(target windows-x86_64 windows-arm64)
     add_test(NAME pdb_guid_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-pdb.cmake"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
@@ -3914,7 +3887,6 @@ foreach(target windows-x86_64 windows-arm64)
     add_test(NAME pdb_names_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
             "-DNAMES=${pdb_names}"
@@ -3956,7 +3928,6 @@ endif()
 add_test(NAME link_identity_macos-arm64
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/return42.macos-arm64.sha256"
@@ -3976,7 +3947,6 @@ foreach(target macos-arm64 macos-x86_64)
     add_test(NAME framework_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DOPTIONS=${framework_options}"
@@ -3993,7 +3963,6 @@ endforeach()
 add_test(NAME shared_inputs
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
@@ -4017,7 +3986,7 @@ endif()
 add_expect_test(error_foreign_link STATUS 2
     PATTERN "^antic: linking for ${foreign_target} with the platform linker needs a host with the same operating system"
     COMMAND "$<TARGET_FILE:antic>" --target ${foreign_target} --linker platform
-            --runtime "${ANTIC_RUNTIME_DIR}" --llvm-mc "${ANTIC_LLVM_MC}"
+            --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
             "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
@@ -4200,7 +4169,6 @@ set_tests_properties(antl_twice PROPERTIES
 add_test(NAME classlib
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/classlib"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/classlib"
@@ -4908,7 +4876,6 @@ set_tests_properties(error_modules_import_cycle PROPERTIES
 add_test(NAME internal_package
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/internal"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/internal"
@@ -4923,7 +4890,6 @@ set_tests_properties(dump_ir_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 add_test(NAME dev_modules
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DMODULES=${MODULES}"
         "-DLIBS=${LIBS}"
@@ -4937,7 +4903,6 @@ target_link_libraries(poke_byte PRIVATE antic_core)
 add_test(NAME dev_library_verify
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DPOKE=$<TARGET_FILE:poke_byte>"
         "-DLIBS=${LIBS}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dev-verify"
@@ -5092,16 +5057,13 @@ set_tests_properties(error_duplicate_library PROPERTIES
 
 # The five behaviours of `assert`: a release build without it, a forced
 # build with it, dev mode keeping it and --no-asserts dropping it.
-if(ANTIC_LLVM_MC)
-    add_test(NAME asserts
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/asserts.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asserts"
-            -P "${ANTIC_RUNNERS}/run_asserts.cmake")
-endif()
+add_test(NAME asserts
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/asserts.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asserts"
+        -P "${ANTIC_RUNNERS}/run_asserts.cmake")
 
 # Every dev-mode check: bounds, overflow, a narrowing `as`, division,
 # shifts and a walk of a collection that changes, one test per program in
@@ -5117,7 +5079,6 @@ function(antic_check_test name phrase pattern runs)
     add_test(NAME check_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DPHRASE=${phrase}"
@@ -5130,242 +5091,239 @@ function(antic_check_test name phrase pattern runs)
         set_property(TEST check_${name} PROPERTY FIXTURES_REQUIRED ${fixtures})
     endif()
 endfunction()
-if(ANTIC_LLVM_MC)
-    antic_check_test(bounds_array "index out of bounds"
-        "bounds_array\\.anti:[0-9]+: index out of bounds: index 5, length 4"
-        ON)
-    antic_check_test(bounds_slice "index out of bounds"
-        "bounds_slice\\.anti:[0-9]+: index out of bounds: index 4, length 2"
-        ON)
-    antic_check_test(bounds_simd "index out of bounds"
-        "bounds_simd\\.anti:[0-9]+: index out of bounds: index 7, length 6"
-        ON)
-    antic_check_test(bounds_str "index out of bounds"
-        "bounds_str\\.anti:[0-9]+: index out of bounds: index 7, length 3"
-        ON)
-    antic_check_test(overflow_add "overflow in"
-        "overflow_add\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
-        ON)
-    antic_check_test(overflow_sub "overflow in"
-        "overflow_sub\\.anti:[0-9]+: overflow in -: left -9223372036854775807, right 2"
-        ON)
-    antic_check_test(overflow_mul "overflow in"
-        "overflow_mul\\.anti:[0-9]+: overflow in \\*: left 4000000000, right 4000000000"
-        ON)
-    antic_check_test(overflow_mul32 "overflow in"
-        "overflow_mul32\\.anti:[0-9]+: overflow in \\*: left 100000, right 100000"
-        ON)
-    antic_check_test(overflow_carry "overflow in"
-        "overflow_carry\\.anti:[0-9]+: overflow in \\+: left 9223372036854775806, right 1"
-        ON)
-    antic_check_test(narrow "out of range"
-        "narrow\\.anti:[0-9]+: value out of range for i8: value 300"
-        ON)
-    antic_check_test(narrow_sign "out of range"
-        "narrow_sign\\.anti:[0-9]+: value out of range for u64: value -1"
-        ON)
-    antic_check_test(narrow_char "out of range"
-        "narrow_char\\.anti:[0-9]+: value out of range for char: value 1114112"
-        ON)
-    antic_check_test(narrow_surrogate "out of range"
-        "narrow_surrogate\\.anti:[0-9]+: value out of range for char: value 55296"
-        ON)
-    antic_check_test(narrow_enum "not declared by"
-        "narrow_enum\\.anti:[0-9]+: value not declared by Kind: value 7"
-        ON)
-    antic_check_test(divide "division by zero"
-        "divide\\.anti:[0-9]+: division by zero in /: left 10"
-        OFF)
-    antic_check_test(remainder "division by zero"
-        "remainder\\.anti:[0-9]+: division by zero in %: left 10"
-        OFF)
-    antic_check_test(shift_wide "shift count out of range"
-        "shift_wide\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
-        ON)
-    antic_check_test(shift_negative "shift count out of range"
-        "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64"
-        ON)
-    # R087 of "Rules of 2026-10-13": a count of chunks below zero.
-    antic_check_test(parallel_count_below_zero "count of chunks below zero"
-        "parallel_count_below_zero\\.anti:[0-9]+: count of chunks below zero: value -3"
-        ON)
-    # The checks on the narrow types, in a compound assignment and in a copy
-    # of a generic function. docs/notes/test-matrix.md names them under
-    # "Values".
-    antic_check_test(overflow_add_i8 "overflow in"
-        "overflow_add_i8\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
-        ON)
-    antic_check_test(overflow_sub_i16 "overflow in"
-        "overflow_sub_i16\\.anti:[0-9]+: overflow in -: left -32768, right 1"
-        ON)
-    antic_check_test(overflow_mul_i8 "overflow in"
-        "overflow_mul_i8\\.anti:[0-9]+: overflow in \\*: left 100, right 2"
-        ON)
-    antic_check_test(overflow_compound "overflow in"
-        "overflow_compound\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
-        ON)
-    antic_check_test(overflow_generic "overflow in"
-        "overflow_generic\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
-        ON)
-    antic_check_test(narrow_unsigned "out of range"
-        "narrow_unsigned\\.anti:[0-9]+: value out of range for i8: value 200"
-        ON)
-    antic_check_test(narrow_u64 "out of range"
-        "narrow_u64\\.anti:[0-9]+: value out of range for int: value 9223372036854775808"
-        ON)
-    antic_check_test(narrow_to_byte "out of range"
-        "narrow_to_byte\\.anti:[0-9]+: value out of range for byte: value -1"
-        ON)
-    antic_check_test(divide_byte "division by zero"
-        "divide_byte\\.anti:[0-9]+: division by zero in /: left 200"
-        ON)
-    antic_check_test(remainder_i8 "division by zero"
-        "remainder_i8\\.anti:[0-9]+: division by zero in %: left -7"
-        ON)
-    antic_check_test(divide_compound "division by zero"
-        "divide_compound\\.anti:[0-9]+: division by zero in /: left 10"
-        ON)
-    antic_check_test(shift_wide_byte "shift count out of range"
-        "shift_wide_byte\\.anti:[0-9]+: shift count out of range for <<: count 8, width 8"
-        ON)
-    antic_check_test(shift_right_wide_i16 "shift count out of range"
-        "shift_right_wide_i16\\.anti:[0-9]+: shift count out of range for >>: count 16, width 16"
-        ON)
-    antic_check_test(shift_compound "shift count out of range"
-        "shift_compound\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
-        ON)
-    # R031 of "Rules of 2026-10-13": the least value divided by -1, its
-    # remainder by -1 and unary `-` of it stop a dev build with the
-    # overflow check.
-    antic_check_test(overflow_divide_least "overflow in"
-        "overflow_divide_least\\.anti:[0-9]+: overflow in /: left -9223372036854775808, right -1"
-        ON)
-    antic_check_test(overflow_remainder_least_i8 "overflow in"
-        "overflow_remainder_least_i8\\.anti:[0-9]+: overflow in %: left -128, right -1"
-        ON)
-    antic_check_test(overflow_divide_least_compound "overflow in"
-        "overflow_divide_least_compound\\.anti:[0-9]+: overflow in /: left -32768, right -1"
-        ON)
-    antic_check_test(overflow_negate_least "overflow in"
-        "overflow_negate_least\\.anti:[0-9]+: overflow in -: value -9223372036854775808"
-        ON)
-    antic_check_test(overflow_negate_least_i8 "overflow in"
-        "overflow_negate_least_i8\\.anti:[0-9]+: overflow in -: value -128"
-        ON)
-    # R032: `<<%` by a count below zero stops a dev build. A count at or
-    # above the width gives 0 and is no failure.
-    antic_check_test(shift_wrap_negative "shift count out of range"
-        "shift_wrap_negative\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 64"
-        ON)
-    antic_check_test(shift_wrap_negative_compound "shift count out of range"
-        "shift_wrap_negative_compound\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 8"
-        ON)
-    # R048: a value that does not fit the width of a bitfield stops a dev
-    # build where it is stored, in a write, a compound assignment and a
-    # literal.
-    antic_check_test(bitfield_write "out of range"
-        "bitfield_write\\.anti:[0-9]+: value out of range for the 3 bits of a: value 13"
-        ON)
-    antic_check_test(bitfield_write_signed "out of range"
-        "bitfield_write_signed\\.anti:[0-9]+: value out of range for the 3 bits of b: value -5"
-        ON)
-    antic_check_test(bitfield_compound "out of range"
-        "bitfield_compound\\.anti:[0-9]+: value out of range for the 3 bits of a: value 8"
-        ON)
-    antic_check_test(bitfield_literal "out of range"
-        "bitfield_literal\\.anti:[0-9]+: value out of range for the 20 bits of b: value 524288"
-        ON)
-    antic_check_test(bitfield_class "out of range"
-        "bitfield_class\\.anti:[0-9]+: value out of range for the 9 bits of kind: value 512"
-        ON)
-    # Decision 24 of "Decisions of 2026-10-11": a dev build checks the
-    # bounds of `xs[lo..hi]` as it checks an index.
-    antic_check_test(slice_range "out of bounds"
-        "slice_range\\.anti:[0-9]+: .*out of bounds.*length 3"
-        ON)
-    # The same check on a slice of a slice, against the length of the
-    # slice, and on bounds that give no slice: the low one above the high
-    # one, and the low one below zero.
-    antic_check_test(slice_of_slice_range "out of bounds"
-        "slice_of_slice_range\\.anti:[0-9]+: .*out of bounds.*length 2"
-        ON)
-    antic_check_test(slice_range_reversed "out of bounds"
-        "slice_range_reversed\\.anti:[0-9]+: .*out of bounds"
-        ON)
-    antic_check_test(slice_range_negative "out of bounds"
-        "slice_range_negative\\.anti:[0-9]+: .*out of bounds"
-        ON)
-    antic_check_test(walk_changed "was changed while"
-        "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
-        ON DEV lang)
-    antic_check_test(collection_changed "was changed while"
-        "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
-        ON DEV lang mem text collection)
-    antic_check_test(list_changed "was changed while"
-        "list_changed\\.anti:12: `people` was changed while `for` walked it: changed at list_changed\\.anti:14"
-        ON DEV lang mem text collection collection/list)
-    antic_check_test(list_bounds "index out of bounds"
-        "\\.anti:[0-9]+: index out of bounds: index 5, length 4"
-        ON DEV lang mem text collection collection/list)
-    antic_check_test(grid_bounds "index out of bounds"
-        "\\.anti:[0-9]+: index out of bounds: index 3, length 3"
-        ON DEV lang mem text collection collection/grid)
-    antic_check_test(sorted_changed "was changed while"
-        "sorted_changed\\.anti:13: `ages` was changed while `for` walked it: changed at sorted_changed\\.anti:15"
-        ON DEV lang mem text collection reflect collection/sorted)
-    antic_check_test(map_changed "was changed while"
-        "map_changed\\.anti:12: `ages` was changed while `for` walked it: changed at map_changed\\.anti:14"
-        ON DEV lang mem text collection collection/map)
-    antic_check_test(set_changed "was changed while"
-        "set_changed\\.anti:12: `seen` was changed while `for` walked it: changed at set_changed\\.anti:13"
-        ON DEV lang mem text collection collection/map collection/set)
-    # M304: `reserve` and `shrink` move the room a walk holds, and each
-    # counts the move as a change of the collection.
-    antic_check_test(list_reserve_changed "was changed while"
-        "list_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_reserve_changed\\.anti:16"
-        ON DEV lang mem text collection collection/list)
-    antic_check_test(list_shrink_changed "was changed while"
-        "list_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_shrink_changed\\.anti:16"
-        ON DEV lang mem text collection collection/list)
-    antic_check_test(deque_reserve_changed "was changed while"
-        "deque_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_reserve_changed\\.anti:16"
-        ON DEV lang mem text collection collection/deque)
-    antic_check_test(deque_shrink_changed "was changed while"
-        "deque_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_shrink_changed\\.anti:16"
-        ON DEV lang mem text collection collection/deque)
-    antic_check_test(map_reserve_changed "was changed while"
-        "map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_reserve_changed\\.anti:16"
-        ON DEV lang mem text collection collection/map)
-    antic_check_test(map_shrink_changed "was changed while"
-        "map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_shrink_changed\\.anti:16"
-        ON DEV lang mem text collection collection/map)
-    antic_check_test(hash_map_reserve_changed "was changed while"
-        "hash_map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_reserve_changed\\.anti:16"
-        ON DEV lang mem text collection collection/map)
-    antic_check_test(hash_map_shrink_changed "was changed while"
-        "hash_map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_shrink_changed\\.anti:16"
-        ON DEV lang mem text collection collection/map)
-    antic_check_test(bitset_reserve_changed "was changed while"
-        "bitset_reserve_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_reserve_changed\\.anti:16"
-        ON DEV lang mem text collection collection/map collection/set)
-    antic_check_test(bitset_shrink_changed "was changed while"
-        "bitset_shrink_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_shrink_changed\\.anti:16"
-        ON DEV lang mem text collection collection/map collection/set)
-    antic_check_test(sorted_reserve_changed "was changed while"
-        "sorted_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_reserve_changed\\.anti:16"
-        ON DEV lang mem text collection reflect collection/sorted)
-    antic_check_test(sorted_shrink_changed "was changed while"
-        "sorted_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_shrink_changed\\.anti:16"
-        ON DEV lang mem text collection reflect collection/sorted)
-    add_test(NAME checks_override
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/traps"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks-override"
-            -P "${ANTIC_RUNNERS}/run_checks.cmake")
-endif()
+antic_check_test(bounds_array "index out of bounds"
+    "bounds_array\\.anti:[0-9]+: index out of bounds: index 5, length 4"
+    ON)
+antic_check_test(bounds_slice "index out of bounds"
+    "bounds_slice\\.anti:[0-9]+: index out of bounds: index 4, length 2"
+    ON)
+antic_check_test(bounds_simd "index out of bounds"
+    "bounds_simd\\.anti:[0-9]+: index out of bounds: index 7, length 6"
+    ON)
+antic_check_test(bounds_str "index out of bounds"
+    "bounds_str\\.anti:[0-9]+: index out of bounds: index 7, length 3"
+    ON)
+antic_check_test(overflow_add "overflow in"
+    "overflow_add\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
+    ON)
+antic_check_test(overflow_sub "overflow in"
+    "overflow_sub\\.anti:[0-9]+: overflow in -: left -9223372036854775807, right 2"
+    ON)
+antic_check_test(overflow_mul "overflow in"
+    "overflow_mul\\.anti:[0-9]+: overflow in \\*: left 4000000000, right 4000000000"
+    ON)
+antic_check_test(overflow_mul32 "overflow in"
+    "overflow_mul32\\.anti:[0-9]+: overflow in \\*: left 100000, right 100000"
+    ON)
+antic_check_test(overflow_carry "overflow in"
+    "overflow_carry\\.anti:[0-9]+: overflow in \\+: left 9223372036854775806, right 1"
+    ON)
+antic_check_test(narrow "out of range"
+    "narrow\\.anti:[0-9]+: value out of range for i8: value 300"
+    ON)
+antic_check_test(narrow_sign "out of range"
+    "narrow_sign\\.anti:[0-9]+: value out of range for u64: value -1"
+    ON)
+antic_check_test(narrow_char "out of range"
+    "narrow_char\\.anti:[0-9]+: value out of range for char: value 1114112"
+    ON)
+antic_check_test(narrow_surrogate "out of range"
+    "narrow_surrogate\\.anti:[0-9]+: value out of range for char: value 55296"
+    ON)
+antic_check_test(narrow_enum "not declared by"
+    "narrow_enum\\.anti:[0-9]+: value not declared by Kind: value 7"
+    ON)
+antic_check_test(divide "division by zero"
+    "divide\\.anti:[0-9]+: division by zero in /: left 10"
+    OFF)
+antic_check_test(remainder "division by zero"
+    "remainder\\.anti:[0-9]+: division by zero in %: left 10"
+    OFF)
+antic_check_test(shift_wide "shift count out of range"
+    "shift_wide\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
+    ON)
+antic_check_test(shift_negative "shift count out of range"
+    "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64"
+    ON)
+# R087 of "Rules of 2026-10-13": a count of chunks below zero.
+antic_check_test(parallel_count_below_zero "count of chunks below zero"
+    "parallel_count_below_zero\\.anti:[0-9]+: count of chunks below zero: value -3"
+    ON)
+# The checks on the narrow types, in a compound assignment and in a copy
+# of a generic function. docs/notes/test-matrix.md names them under
+# "Values".
+antic_check_test(overflow_add_i8 "overflow in"
+    "overflow_add_i8\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
+    ON)
+antic_check_test(overflow_sub_i16 "overflow in"
+    "overflow_sub_i16\\.anti:[0-9]+: overflow in -: left -32768, right 1"
+    ON)
+antic_check_test(overflow_mul_i8 "overflow in"
+    "overflow_mul_i8\\.anti:[0-9]+: overflow in \\*: left 100, right 2"
+    ON)
+antic_check_test(overflow_compound "overflow in"
+    "overflow_compound\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
+    ON)
+antic_check_test(overflow_generic "overflow in"
+    "overflow_generic\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
+    ON)
+antic_check_test(narrow_unsigned "out of range"
+    "narrow_unsigned\\.anti:[0-9]+: value out of range for i8: value 200"
+    ON)
+antic_check_test(narrow_u64 "out of range"
+    "narrow_u64\\.anti:[0-9]+: value out of range for int: value 9223372036854775808"
+    ON)
+antic_check_test(narrow_to_byte "out of range"
+    "narrow_to_byte\\.anti:[0-9]+: value out of range for byte: value -1"
+    ON)
+antic_check_test(divide_byte "division by zero"
+    "divide_byte\\.anti:[0-9]+: division by zero in /: left 200"
+    ON)
+antic_check_test(remainder_i8 "division by zero"
+    "remainder_i8\\.anti:[0-9]+: division by zero in %: left -7"
+    ON)
+antic_check_test(divide_compound "division by zero"
+    "divide_compound\\.anti:[0-9]+: division by zero in /: left 10"
+    ON)
+antic_check_test(shift_wide_byte "shift count out of range"
+    "shift_wide_byte\\.anti:[0-9]+: shift count out of range for <<: count 8, width 8"
+    ON)
+antic_check_test(shift_right_wide_i16 "shift count out of range"
+    "shift_right_wide_i16\\.anti:[0-9]+: shift count out of range for >>: count 16, width 16"
+    ON)
+antic_check_test(shift_compound "shift count out of range"
+    "shift_compound\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
+    ON)
+# R031 of "Rules of 2026-10-13": the least value divided by -1, its
+# remainder by -1 and unary `-` of it stop a dev build with the
+# overflow check.
+antic_check_test(overflow_divide_least "overflow in"
+    "overflow_divide_least\\.anti:[0-9]+: overflow in /: left -9223372036854775808, right -1"
+    ON)
+antic_check_test(overflow_remainder_least_i8 "overflow in"
+    "overflow_remainder_least_i8\\.anti:[0-9]+: overflow in %: left -128, right -1"
+    ON)
+antic_check_test(overflow_divide_least_compound "overflow in"
+    "overflow_divide_least_compound\\.anti:[0-9]+: overflow in /: left -32768, right -1"
+    ON)
+antic_check_test(overflow_negate_least "overflow in"
+    "overflow_negate_least\\.anti:[0-9]+: overflow in -: value -9223372036854775808"
+    ON)
+antic_check_test(overflow_negate_least_i8 "overflow in"
+    "overflow_negate_least_i8\\.anti:[0-9]+: overflow in -: value -128"
+    ON)
+# R032: `<<%` by a count below zero stops a dev build. A count at or
+# above the width gives 0 and is no failure.
+antic_check_test(shift_wrap_negative "shift count out of range"
+    "shift_wrap_negative\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 64"
+    ON)
+antic_check_test(shift_wrap_negative_compound "shift count out of range"
+    "shift_wrap_negative_compound\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 8"
+    ON)
+# R048: a value that does not fit the width of a bitfield stops a dev
+# build where it is stored, in a write, a compound assignment and a
+# literal.
+antic_check_test(bitfield_write "out of range"
+    "bitfield_write\\.anti:[0-9]+: value out of range for the 3 bits of a: value 13"
+    ON)
+antic_check_test(bitfield_write_signed "out of range"
+    "bitfield_write_signed\\.anti:[0-9]+: value out of range for the 3 bits of b: value -5"
+    ON)
+antic_check_test(bitfield_compound "out of range"
+    "bitfield_compound\\.anti:[0-9]+: value out of range for the 3 bits of a: value 8"
+    ON)
+antic_check_test(bitfield_literal "out of range"
+    "bitfield_literal\\.anti:[0-9]+: value out of range for the 20 bits of b: value 524288"
+    ON)
+antic_check_test(bitfield_class "out of range"
+    "bitfield_class\\.anti:[0-9]+: value out of range for the 9 bits of kind: value 512"
+    ON)
+# Decision 24 of "Decisions of 2026-10-11": a dev build checks the
+# bounds of `xs[lo..hi]` as it checks an index.
+antic_check_test(slice_range "out of bounds"
+    "slice_range\\.anti:[0-9]+: .*out of bounds.*length 3"
+    ON)
+# The same check on a slice of a slice, against the length of the
+# slice, and on bounds that give no slice: the low one above the high
+# one, and the low one below zero.
+antic_check_test(slice_of_slice_range "out of bounds"
+    "slice_of_slice_range\\.anti:[0-9]+: .*out of bounds.*length 2"
+    ON)
+antic_check_test(slice_range_reversed "out of bounds"
+    "slice_range_reversed\\.anti:[0-9]+: .*out of bounds"
+    ON)
+antic_check_test(slice_range_negative "out of bounds"
+    "slice_range_negative\\.anti:[0-9]+: .*out of bounds"
+    ON)
+antic_check_test(walk_changed "was changed while"
+    "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
+    ON DEV lang)
+antic_check_test(collection_changed "was changed while"
+    "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
+    ON DEV lang mem text collection)
+antic_check_test(list_changed "was changed while"
+    "list_changed\\.anti:12: `people` was changed while `for` walked it: changed at list_changed\\.anti:14"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(list_bounds "index out of bounds"
+    "\\.anti:[0-9]+: index out of bounds: index 5, length 4"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(grid_bounds "index out of bounds"
+    "\\.anti:[0-9]+: index out of bounds: index 3, length 3"
+    ON DEV lang mem text collection collection/grid)
+antic_check_test(sorted_changed "was changed while"
+    "sorted_changed\\.anti:13: `ages` was changed while `for` walked it: changed at sorted_changed\\.anti:15"
+    ON DEV lang mem text collection reflect collection/sorted)
+antic_check_test(map_changed "was changed while"
+    "map_changed\\.anti:12: `ages` was changed while `for` walked it: changed at map_changed\\.anti:14"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(set_changed "was changed while"
+    "set_changed\\.anti:12: `seen` was changed while `for` walked it: changed at set_changed\\.anti:13"
+    ON DEV lang mem text collection collection/map collection/set)
+# M304: `reserve` and `shrink` move the room a walk holds, and each
+# counts the move as a change of the collection.
+antic_check_test(list_reserve_changed "was changed while"
+    "list_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(list_shrink_changed "was changed while"
+    "list_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(deque_reserve_changed "was changed while"
+    "deque_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/deque)
+antic_check_test(deque_shrink_changed "was changed while"
+    "deque_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/deque)
+antic_check_test(map_reserve_changed "was changed while"
+    "map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(map_shrink_changed "was changed while"
+    "map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(hash_map_reserve_changed "was changed while"
+    "hash_map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(hash_map_shrink_changed "was changed while"
+    "hash_map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(bitset_reserve_changed "was changed while"
+    "bitset_reserve_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map collection/set)
+antic_check_test(bitset_shrink_changed "was changed while"
+    "bitset_shrink_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map collection/set)
+antic_check_test(sorted_reserve_changed "was changed while"
+    "sorted_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection reflect collection/sorted)
+antic_check_test(sorted_shrink_changed "was changed while"
+    "sorted_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection reflect collection/sorted)
+add_test(NAME checks_override
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/traps"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks-override"
+        -P "${ANTIC_RUNNERS}/run_checks.cmake")
 
 # The debug information of -g, read by the debugger of the host: lldb on
 # macOS and gdb on Linux. A breakpoint by file and line in an imported
@@ -5381,7 +5339,7 @@ if(NOT WIN32 AND NOT ANTIC_LLDB AND NOT ANTIC_GDB)
             "SKIP: neither lldb nor gdb is on the path")
     set_tests_properties(debug_info PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")
-elseif(ANTIC_LLVM_MC AND NOT WIN32)
+elseif(NOT WIN32)
     if(APPLE AND ANTIC_LLDB)
         set(debugger "${ANTIC_LLDB}")
         set(debugger_kind lldb)
@@ -5395,7 +5353,6 @@ elseif(ANTIC_LLVM_MC AND NOT WIN32)
     add_test(NAME debug_info
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/debug"
             "-DDEBUGGER=${debugger}"
@@ -5408,7 +5365,6 @@ endif()
 add_test(NAME trap_table
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/table.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5442,7 +5398,6 @@ foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5457,7 +5412,6 @@ foreach(name IN ITEMS place_list place_list_next place_grid place_queue
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DSTATUS=1"
@@ -5470,7 +5424,6 @@ endforeach()
 add_test(NAME trap_fatal_none
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/fatal_none.anti"
         "-DSTATUS=1"
@@ -5493,7 +5446,6 @@ add_test(NAME mutex_size
 add_test(NAME lock_order
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/lock_order.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5514,7 +5466,6 @@ foreach(name IN ITEMS lock_orders lock_order_once)
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5525,7 +5476,6 @@ endforeach()
 add_test(NAME check_join_twice
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/join_twice.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5539,7 +5489,6 @@ set_tests_properties(check_join_twice PROPERTIES TIMEOUT 120)
 add_test(NAME check_sync_held
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/sync_held.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5555,7 +5504,6 @@ set_tests_properties(check_sync_held PROPERTIES TIMEOUT 120)
 add_test(NAME memory_checks
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5568,7 +5516,6 @@ set_tests_properties(memory_checks PROPERTIES TIMEOUT 120
 add_test(NAME memory_checks_list
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5595,7 +5542,6 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
     add_test(NAME std_builder_room_memory_checks
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/builder_room.anti"
             "-DOPTIONS=--memory-checks"
@@ -5691,7 +5637,6 @@ if(NOT WIN32)
     add_test(NAME abi_probe
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe"
@@ -5708,7 +5653,6 @@ if(NOT WIN32)
     add_test(NAME abi_probe_types
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DNAME=probe_types"
@@ -5721,7 +5665,6 @@ if(NOT WIN32)
         COMMAND "${CMAKE_COMMAND}"
             "-DRUNNER=${ANTIC_RUNNERS}/run_probe.cmake"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-runner"
             "-DCC=${ANTIC_TEST_CC}"
@@ -5734,7 +5677,6 @@ if(NOT WIN32)
     add_test(NAME program_licenses
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses"
@@ -5794,7 +5736,6 @@ foreach(case
     add_test(NAME trace_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${TRACE}/${source}.anti"
             "-DOPTIONS=${options}"
@@ -5895,7 +5836,6 @@ foreach(case
     add_test(NAME conf_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CONF}/${source}.anti"
             "-DOPTIONS=${options}"
@@ -5918,7 +5858,6 @@ add_test(NAME conf_include_depth
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DANTI=$<TARGET_FILE:anti>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CONF}/report.anti"
         "-DHOST=${ANTIC_HOST_TARGET}"
@@ -5930,7 +5869,6 @@ add_test(NAME conf_include_depth
 add_test(NAME conf_hash_seed_random
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${CONF}/seed.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-hash_seed_random"
@@ -5970,7 +5908,6 @@ foreach(case
     add_test(NAME inject_${name}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${INJECT}/service.anti"
             "-DOPTIONS=${options}"
@@ -5999,7 +5936,7 @@ foreach(mode dev release)
         COMMAND "$<TARGET_FILE:anti>" test ${extra}
                 --work "${CMAKE_CURRENT_BINARY_DIR}/inject-manifest-${mode}"
                 -I src --runtime "${ANTIC_RUNTIME_DIR}"
-                --llvm-mc "${ANTIC_LLVM_MC}" src/com/example/app.anti)
+ src/com/example/app.anti)
 endforeach()
 
 # The six standard interfaces under `anti test`. The project names no
@@ -6017,7 +5954,7 @@ foreach(mode dev release)
         COMMAND "$<TARGET_FILE:anti>" test ${extra}
                 --work "${CMAKE_CURRENT_BINARY_DIR}/inject-standard-${mode}"
                 -I src --runtime "${ANTIC_RUNTIME_DIR}"
-                --llvm-mc "${ANTIC_LLVM_MC}" src/com/example/standard.anti)
+ src/com/example/standard.anti)
 endforeach()
 
 # Plugins. The library of tests/plugin is built with --lib shared
@@ -6040,7 +5977,6 @@ endif()
 add_test(NAME plugin_host
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
@@ -6057,7 +5993,6 @@ add_test(NAME plugin_host
 add_test(NAME plugin_kinds
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
@@ -6076,7 +6011,6 @@ add_test(NAME plugin_kinds
 add_test(NAME plugin_locals
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
@@ -6095,7 +6029,6 @@ add_test(NAME plugin_locals
 add_test(NAME plugin_stages
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
@@ -6113,7 +6046,6 @@ add_test(NAME plugin_stages
 add_test(NAME plugin_trace
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
@@ -6131,7 +6063,6 @@ add_test(NAME plugin_trace
 add_test(NAME plugin_unused
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
@@ -6151,7 +6082,6 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME plugin_module_not_imported
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "-DSUFFIX=${plugin_suffix}"
@@ -6170,7 +6100,6 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME plugin_module_named
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "-DSUFFIX=${plugin_suffix}"
@@ -6190,7 +6119,6 @@ foreach(library needy holder)
     add_test(NAME plugin_refused_${library}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "-DSUFFIX=${plugin_suffix}"
@@ -6207,7 +6135,6 @@ endforeach()
 add_test(NAME plugin_versions
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
@@ -6248,7 +6175,6 @@ foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
     add_test(NAME trace_symbols_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DPROBE=$<TARGET_FILE:symbols_probe>"
             "-DSOURCE=${TRACE}/symbols.anti"
@@ -6272,7 +6198,6 @@ if(NOT WIN32)
     add_test(NAME program_build_id
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
             "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/args.anti"
@@ -6290,7 +6215,6 @@ if(NOT WIN32)
         add_test(NAME llvm_build_id_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
                 "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
@@ -6306,7 +6230,6 @@ if(NOT WIN32)
     add_test(NAME program_licenses_std
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/io.anti"
             "-DWANTED=ANTI_LICENSES_BEGIN|build [0-9a-f]+|package anti.rt [0-9.]+ 0BSD|package anti [0-9.]+ 0BSD|package com.example.hello 2.0.0 MIT"
@@ -6343,7 +6266,6 @@ if(ANTIC_LLVM_AR)
         add_test(NAME clib_${case}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DLLVM_AR=${ANTIC_LLVM_AR}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
@@ -6371,7 +6293,6 @@ if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
         add_test(NAME clib_bundle_${target}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DLLVM_AR=${ANTIC_LLVM_AR}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
@@ -6413,7 +6334,6 @@ if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
             add_test(NAME ${name}
                 COMMAND "${CMAKE_COMMAND}"
                     "-DANTIC=$<TARGET_FILE:antic>"
-                    "-DLLVM_MC=${ANTIC_LLVM_MC}"
                     "-DLLVM_AR=${ANTIC_LLVM_AR}"
                     "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                     "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
@@ -6446,26 +6366,24 @@ add_test(NAME ir_tuple_out
 
 # The Windows unwind data of chapter 16, decoded by llvm-readobj from the
 # object that llvm-mc writes.
-if(ANTIC_LLVM_MC)
-    foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
-            "windows-arm64,aarch64-pc-windows-msvc")
-        string(REPLACE "," ";" parts "${target_triple}")
-        list(GET parts 0 target)
-        list(GET parts 1 triple)
-        add_test(NAME unwind_${target}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
-                "-DTARGET=${target}"
-                "-DTRIPLE=${triple}"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.anti"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unwind"
-                "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.${target}.unwind"
-                -P "${ANTIC_RUNNERS}/run_unwind.cmake")
-    endforeach()
-endif()
+foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
+        "windows-arm64,aarch64-pc-windows-msvc")
+    string(REPLACE "," ";" parts "${target_triple}")
+    list(GET parts 0 target)
+    list(GET parts 1 triple)
+    add_test(NAME unwind_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DTARGET=${target}"
+            "-DTRIPLE=${triple}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unwind"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.${target}.unwind"
+            -P "${ANTIC_RUNNERS}/run_unwind.cmake")
+endforeach()
 
 # targets.txt is the target matrix that chapter 11 prints.
 add_test(NAME print_targets

@@ -2,7 +2,6 @@
 # and a malformed anti.lock. Run with cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  the directory that holds consumer/
 #   WORK     a directory this run writes into
 #
@@ -46,8 +45,7 @@ file(WRITE "${project}/anti.toml"
      "\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n")
 
 function(run_anti out_status out_text)
-    anti_run(status out err "${project}" ${ARGN} --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${project}" ${ARGN} --runtime "${RUNTIME}")
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}${err}" PARENT_SCOPE)
 endfunction()

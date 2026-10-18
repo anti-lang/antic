@@ -1,7 +1,6 @@
 # Link one program twice and another once, and read the build id of each
 # from its licence notice. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file linked twice
 #   OTHER     another .anti file
@@ -26,7 +25,7 @@ string(REPLACE "|" ";" options "${OPTIONS}")
 
 function(build_id out dir source)
     file(MAKE_DIRECTORY "${WORK}/${dir}")
-    antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
+    antic_build(--runtime "${RUNTIME}" ${options}
                 ${ARGN} -o "${WORK}/${dir}/program" "${source}")
     read_build_id(id error "${WORK}/${dir}/program")
     if(NOT error STREQUAL "")
@@ -59,7 +58,7 @@ endif()
 # digest would give the program the id of other code. A directory opens
 # for reading on macOS and Linux, and its first read fails.
 file(MAKE_DIRECTORY "${WORK}/unreadable.o")
-antic_run(status ignored_out err COMMAND --llvm-mc "${LLVM_MC}" --runtime
+antic_run(status ignored_out err COMMAND --runtime
           "${RUNTIME}" ${options} -o "${WORK}/unreadable" "${SOURCE}"
           "${WORK}/unreadable.o")
 if(status EQUAL 0)

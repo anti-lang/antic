@@ -33,11 +33,11 @@ Dev mode is the default for `anti build`, `anti run` and `anti test`:
 
 - `antic` compiles one module per call: every file in `src/` and every `.antl` in the
   dependency graph. The other modules are passed for type checking only.
-- Each module produces `build/<os>-<cpu>/dev/<module>.s` and `<module>.o`.
+- Each module produces `build/<os>-<cpu>/dev/<module>.o`.
 - The cache key of a module is the SHA-256 of its input bytes, the `antic` version and
   the target name. The options of the manifest and the digests of the library files it
-  imports join them. `anti build` recompiles a module when its key changes and runs llvm-mc
-  only on new assembly. Every build relinks.
+  imports join them. `anti build` recompiles a module when its key changes. Every build
+  relinks.
 - Cross-module calls are symbol references through the mangled names. No cross-module
   inlining.
 

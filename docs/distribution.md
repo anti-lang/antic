@@ -113,7 +113,7 @@ move a signature onto the host that serves the binaries.
 ### The LLVM tools
 
 Every package carries the LLVM tools of its host in `bin/` beside antic and anti:
-llvm-mc, lld under its four names, llvm-ar, llvm-objdump, llvm-readobj, opt, llc and
+lld under its four names, llvm-ar, llvm-objdump, llvm-readobj, opt, llc and
 llvm-profdata, with `llvm-version`. They are not served from the download area on their
 own. The repository `anti-lang/llvm-tools` builds them
 from the pinned LLVM source and publishes one archive per host as an asset of a GitHub
@@ -130,7 +130,10 @@ copies into `lib/<target>/` and a program of `--profile-generate` links.
 
 antic writes LLVM IR text, and opt and llc turn it into the object that lld links. Since
 the step `switch` of `docs/work-order-llvm-back-end.md` they are the one back end, and no
-build runs llvm-mc. llvm-mc leaves the set when a separate decision says so.
+build of a program runs llvm-mc. Decision 2 of "Decisions of 2026-10-11" took llvm-mc out
+of the set and `--llvm-mc` out of antic and anti. The build installs llvm-mc in
+`build/deps/llvm/bin` for the tests that assemble the output of `antic -S`, and no
+package carries it, as no package carries llvm-cov. The test `no_llvm_mc_packed` holds it.
 
 `23.1.1-anti.4` added opt and llc, for the LLVM back end. Each tools archive about
 doubled, 177,317,004 bytes over the six hosts:

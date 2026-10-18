@@ -42,15 +42,16 @@ if(CMAKE_HOST_WIN32)
 elseif(CMAKE_HOST_APPLE)
     set(antic_host_os macos)
 endif()
-# The assembler and the archiver of the pinned release, which the runtime,
-# the native libraries and the tests run. Each has this one definition.
+# The archiver of the pinned release, which the runtime and the native
+# libraries run, and its assembler, which the tests of `antic -S` run.
+# Each has this one definition.
 set(ANTIC_LLVM_MC "${ANTIC_LLVM_DIR}/bin/llvm-mc${antic_exe}" CACHE FILEPATH
     "llvm-mc of the pinned release" FORCE)
 set(ANTIC_LLVM_AR "${ANTIC_LLVM_DIR}/bin/llvm-ar${antic_exe}" CACHE FILEPATH
     "llvm-ar of the pinned release" FORCE)
 # opt and llc of the pinned release. The tests of the LLVM back end run the
-# verifier of opt over the text antic writes, and both programs on it until
-# antic runs them itself.
+# verifier of opt over the text antic writes, and some pass both to antic
+# with --opt and --llc.
 set(ANTIC_OPT "${ANTIC_LLVM_DIR}/bin/opt${antic_exe}" CACHE FILEPATH
     "opt of the pinned release" FORCE)
 set(ANTIC_LLC "${ANTIC_LLVM_DIR}/bin/llc${antic_exe}" CACHE FILEPATH

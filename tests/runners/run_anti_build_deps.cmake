@@ -3,7 +3,6 @@
 # cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   LLVM_AR  the archiver of a static library
 #   FIXTURE  the directory that holds units/ and consumer/
 #   HOST     the target name of this host
@@ -40,7 +39,7 @@ endfunction()
 
 function(build what where)
     run_anti("${where}" status text ${ARGN} --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
+             --llvm-ar "${LLVM_AR}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "${what} failed with ${status}\n${text}")
     endif()
@@ -92,7 +91,7 @@ endif()
 file(COPY_FILE "${library}" "${WORK}/flat/twice.antl")
 file(REMOVE "${WORK}/flat-consumer/anti.lock")
 run_anti("${WORK}/flat-consumer" status text build --runtime "${RUNTIME}"
-         --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
+         --llvm-ar "${LLVM_AR}")
 set(expected "anti: ./../flat/twice.antl and ./../flat/units.antl both hold the module com.example.units\n")
 if(status EQUAL 0 OR NOT text STREQUAL expected)
     message(FATAL_ERROR "two files of one module gave ${status}:\n${text}")
@@ -177,7 +176,7 @@ string(REPLACE "version = \"1.2.0\", repo" "version = \"=1.1.0\", repo"
        manifest "${manifest}")
 file(WRITE "${WORK}/fetched/consumer/anti.toml" "${manifest}")
 run_anti("${WORK}/fetched/consumer" status text build --runtime "${RUNTIME}"
-         --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
+         --llvm-ar "${LLVM_AR}")
 if(status EQUAL 0 OR NOT text MATCHES "satisfies every constraint")
     message(FATAL_ERROR "the yanked version answered the constraint: ${text}")
 endif()

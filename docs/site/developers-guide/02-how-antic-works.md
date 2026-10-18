@@ -345,7 +345,7 @@ antic reads one directory beside its own executable. That directory is the runti
 
 | Path | Contents |
 |---|---|
-| `bin/` | `opt`, `llc`, `lld`, `ld.lld`, `ld64.lld`, `lld-link`, `llvm-ar`, `llvm-mc`, `llvm-objdump`, `llvm-profdata`, `llvm-readobj` and `llvm-version` |
+| `bin/` | `opt`, `llc`, `lld`, `ld.lld`, `ld64.lld`, `lld-link`, `llvm-ar`, `llvm-objdump`, `llvm-profdata`, `llvm-readobj` and `llvm-version` |
 | `std/` | the standard library, one `.antl` per module |
 | `lib/<target>/<level>/` | `libanti_rt.a`, the runtime as objects, and `bitcode/full/` and `bitcode/thin/` with the runtime as bitcode |
 | `lib/<target>/` | the native libraries PCRE2, SQLite, Mbed TLS, miniaudio and raylib, the glue of `anti.regex` and the profile runtime of compiler-rt |

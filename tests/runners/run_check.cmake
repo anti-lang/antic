@@ -1,7 +1,6 @@
 # One dev-mode check, in a build that has it and a build that does not.
 # Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    the check program
 #   PHRASE    the text of the check, which the release build does not carry

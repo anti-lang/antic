@@ -4,7 +4,6 @@
 # module to its own object and links the objects. Run with cmake -P and
 # these values:
 #   ANTIC      the antic executable
-#   LLVM_MC    the llvm-mc executable
 #   RUNTIME    the runtime directory
 #   ROOT       the search root that holds the sources
 #   LIBRARIES  the library modules under com/example, separated by commas,
@@ -40,7 +39,7 @@ foreach(library IN LISTS libraries)
                 ${lib_options} -o "${WORK}/com/example/${library}.antl"
                 "${source}")
     if(MODE STREQUAL "dev")
-        antic_build(--dev --llvm-mc "${LLVM_MC}" -I "${ROOT}" -I "${WORK}"
+        antic_build(--dev -I "${ROOT}" -I "${WORK}"
                     --runtime "${RUNTIME}" ${lib_options} -o
                     "${WORK}/${library}" "${source}")
         list(APPEND program_inputs "${WORK}/${library}${OBJECT}")
@@ -51,7 +50,7 @@ endforeach()
 if(MODE STREQUAL "dev")
     list(APPEND program_inputs ${std_objects})
 endif()
-antic_build(-I "${WORK}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+antic_build(-I "${WORK}" --runtime "${RUNTIME}"
             ${options} -o "${WORK}/${PROGRAM}" ${program_inputs})
 program_output(out_hex status "${WORK}/${PROGRAM}.stdout"
                "${WORK}/${PROGRAM}")

@@ -4,7 +4,6 @@
 # library links against the import library of its host. Run with cmake -P
 # and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/plugin
 #   SUFFIX    the suffix of a shared library on this host
@@ -25,14 +24,14 @@ file(MAKE_DIRECTORY "${WORK}/net/example" "${WORK}/lib")
 # The interface is a library file that both sides import.
 antic_build(-c -I "${SOURCES}" --runtime "${RUNTIME}" -o "${WORK}/net/example/${INTERFACE}.antl"
             "${SOURCES}/net/example/${INTERFACE}.anti")
-antic_build(--runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" -I "${SOURCES}"
+antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" -o "${WORK}/${HOST}${EXE}" "${SOURCES}/${HOST}.anti")
 set(import_library "")
 if(SUFFIX STREQUAL ".dll")
     set(import_library "${WORK}/${HOST}.lib")
 endif()
 set(library "${WORK}/lib/lib${LIBRARY}${SUFFIX}")
-antic_build(--lib shared --no-runtime --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
             -I "${SOURCES}" -I "${WORK}" -o "${library}"
             "${SOURCES}/net/example/${LIBRARY}.anti" ${import_library})
 program_expect("the host" COMMAND "${WORK}/${HOST}${EXE}" "${library}"

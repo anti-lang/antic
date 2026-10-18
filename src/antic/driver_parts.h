@@ -3,7 +3,7 @@
 
 /* The inside of the driver, which its files share. driver.c reads and
    writes the files of a compilation and runs it: the front end, lowering,
-   the passes, the back end and the assembler, and the library file, the
+   the passes, the back end, opt and llc, and the library file, the
    header and the interface it writes. driver_link.c plans and runs the
    link of a program: the facts of the target, Apple's SDK, the Windows
    paths, the exports of a host and the native libraries. driver_search.c

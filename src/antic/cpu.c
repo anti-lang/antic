@@ -3,11 +3,9 @@
 #include <string.h>
 
 /* DESIGN: one row per level, in the order of enum cpu_level. clang_arch
-   builds the runtime archive's native libraries for the level.
-   attributes let llvm-mc assemble the instructions the level adds. The
-   x86_64 assembler of LLVM takes every instruction of every level, so
-   those rows carry no attributes. The names come from src/rt/cpu_level.h,
-   which the runtime reads too.
+   builds the runtime archive's native libraries for the level. The
+   function attributes of the LLVM text stand in llvm_target.c. The names
+   come from src/rt/cpu_level.h, which the runtime reads too.
 
    tools/cpu-levels holds the same table for the build, and the test
    cpu_levels_pin compares the two. */
@@ -16,19 +14,16 @@ static const struct {
     int32_t id;
     unsigned features;
     const char *clang_arch;
-    const char *attributes;
 } levels[CPU_LEVEL_COUNT] = {
-    [CPU_V1] = {ARCH_X86_64, ANTI_CPU_X86_64_V1, 0, "x86-64", ""},
-    [CPU_V2] = {ARCH_X86_64, ANTI_CPU_X86_64_V2, CPU_SSE4, "x86-64-v2", ""},
+    [CPU_V1] = {ARCH_X86_64, ANTI_CPU_X86_64_V1, 0, "x86-64"},
+    [CPU_V2] = {ARCH_X86_64, ANTI_CPU_X86_64_V2, CPU_SSE4, "x86-64-v2"},
     [CPU_V3] = {ARCH_X86_64, ANTI_CPU_X86_64_V3,
-                CPU_SSE4 | CPU_AVX | CPU_F16C, "x86-64-v3", ""},
-    [CPU_ARMV8_0] = {ARCH_ARM64, ANTI_CPU_ARMV8_0, 0, "armv8-a", ""},
+                CPU_SSE4 | CPU_AVX | CPU_F16C, "x86-64-v3"},
+    [CPU_ARMV8_0] = {ARCH_ARM64, ANTI_CPU_ARMV8_0, 0, "armv8-a"},
     [CPU_ARMV8_2] = {ARCH_ARM64, ANTI_CPU_ARMV8_2,
-                     CPU_LSE | CPU_FP16 | CPU_DOTPROD, "armv8.2-a",
-                     "+lse,+fullfp16,+dotprod"},
+                     CPU_LSE | CPU_FP16 | CPU_DOTPROD, "armv8.2-a"},
     [CPU_ARMV8_5] = {ARCH_ARM64, ANTI_CPU_ARMV8_5,
-                     CPU_LSE | CPU_FP16 | CPU_DOTPROD, "armv8.5-a",
-                     "+lse,+fullfp16,+dotprod"},
+                     CPU_LSE | CPU_FP16 | CPU_DOTPROD, "armv8.5-a"},
 };
 
 /* DESIGN: the x86_64 baseline of a release build is x86-64-v3, and the
@@ -67,11 +62,6 @@ bool cpu_has(enum cpu_level level, unsigned feature)
 const char *cpu_clang_arch(enum cpu_level level)
 {
     return levels[level].clang_arch;
-}
-
-const char *cpu_attributes(enum cpu_level level)
-{
-    return levels[level].attributes;
 }
 
 enum cpu_level cpu_default(enum target t)

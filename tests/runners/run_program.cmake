@@ -3,7 +3,6 @@
 # beside the executable are gone after the build, unless OPTIONS holds
 # --keep-llvm. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory, holding lib/<target>/<level>/
 #   SOURCE    the .anti file
 #   WORK      a directory for the executable and intermediate files
@@ -33,11 +32,6 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-if(NOT EXISTS "${LLVM_MC}")
-    message(FATAL_ERROR
-        "llvm-mc not found at '${LLVM_MC}'. Configure with -DANTIC_LLVM_MC=<path>.")
-endif()
-
 get_filename_component(name "${SOURCE}" NAME_WE)
 get_filename_component(dir "${SOURCE}" DIRECTORY)
 set(expected_file "${dir}/${name}.expected")
@@ -54,9 +48,9 @@ set(limit "")
 if(DEFINED TIMEOUT AND NOT TIMEOUT STREQUAL "")
     set(limit TIMEOUT "${TIMEOUT}")
 endif()
-set(build --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options}
+set(build --runtime "${RUNTIME}" ${options}
           -o "${exe}" "${SOURCE}" ${objects})
-# Warnings are errors: antic, llvm-mc and the linker must print nothing
+# Warnings are errors: antic, opt, llc and the linker must print nothing
 # but the warning that the program is about.
 if(DEFINED WARNING AND NOT WARNING STREQUAL "")
     antic_run(status out err ${limit} COMMAND ${build})

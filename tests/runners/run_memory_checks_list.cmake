@@ -1,7 +1,6 @@
 # --memory-checks finds a pointer into a List kept across a push that grows
 # it. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    tests/traps/memory_checks_list.anti
 #   WORK      a directory for the files
@@ -28,7 +27,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 string(REPLACE "," ";" options "${OPTIONS}")
 set(program "${WORK}/memory_checks_list")
-antic_build(--memory-checks ${options} --llvm-mc "${LLVM_MC}" --runtime
+antic_build(--memory-checks ${options} --runtime
             "${RUNTIME}" -o "${program}" "${SOURCE}")
 
 program_expect("memory checks list" COMMAND "${program}" STATUS 1 ANY_ERR)

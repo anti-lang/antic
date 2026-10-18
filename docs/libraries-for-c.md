@@ -128,7 +128,7 @@ The header is regenerated on every `anti build --lib`. Do not edit it.
 Both forms write `<name>.h` next to the library.
 
 The static archive is created with `llvm-ar`, taken from the same pinned LLVM release
-as `llvm-mc` and added to the runtime archive. `llvm-ar` writes ELF, Mach-O and COFF
+as `llc` and added to the runtime archive. `llvm-ar` writes ELF, Mach-O and COFF
 archives. The shared library and the Windows import library are created by the platform
 linker with `-shared`, `-dynamiclib` or `/DLL`.
 

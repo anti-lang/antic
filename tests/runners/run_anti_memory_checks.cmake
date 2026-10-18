@@ -2,7 +2,6 @@
 # the reports. Run with cmake -P and these values:
 #   ANTI      the anti executable
 #   RUNTIME   the runtime archive
-#   LLVM_MC   the llvm-mc executable
 #   SOURCE    tests/traps/memory_checks.anti
 #   TESTS     tests/traps/memory_checks_tests.anti
 #   WORK      a directory this run writes into
@@ -45,8 +44,7 @@ function(write_case case)
 endfunction()
 
 function(run_anti out_status out_err)
-    anti_run(status out err "${WORK}/project" ${ARGN} --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${WORK}/project" ${ARGN} --runtime "${RUNTIME}")
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_err} "${err}" PARENT_SCOPE)
 endfunction()
@@ -130,7 +128,7 @@ endif()
 # `anti test` reports the second free of a test with its frames.
 get_filename_component(tests_root "${TESTS}" DIRECTORY)
 execute_process(COMMAND "${ANTI}" test --memory-checks --work "${WORK}/tests"
-                        --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+                        --runtime "${RUNTIME}"
                         -I "${tests_root}" "${TESTS}"
                 RESULT_VARIABLE status OUTPUT_VARIABLE out
                 ERROR_VARIABLE err ENCODING NONE)

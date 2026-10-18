@@ -1,6 +1,5 @@
 # The lock-order check of a dev build. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime archive
 #   SOURCE    tests/traps/lock_order.anti
 #   WORK      a directory for the files

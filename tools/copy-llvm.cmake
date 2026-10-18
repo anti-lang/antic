@@ -1,8 +1,9 @@
 # Lay out bin/ of the runtime archive: copy every tool that
 # antic_llvm_archive_tools of tools/pinned-tools.cmake names from LLVM_BIN
 # to DEST, and write llvm-version beside them. A tool missing from LLVM_BIN
-# is an error that names it, and nothing is written then. llvm-cov stays
-# out, as tools/check-llvm.cmake states. The target llvm_tools of
+# is an error that names it, and nothing is written then. The tools of
+# ANTIC_LLVM_UNPACKED stay out, as tools/check-llvm.cmake states, and the
+# copy removes one that an older build left in DEST. The target llvm_tools of
 # CMakeLists.txt runs this after that check. Run with cmake -P and these
 # values:
 #   LLVM_BIN  the directory of the installed tools
@@ -29,6 +30,9 @@ if(missing)
     message(FATAL_ERROR "${text}")
 endif()
 file(MAKE_DIRECTORY "${DEST}")
+foreach(tool IN LISTS ANTIC_LLVM_UNPACKED)
+    file(REMOVE "${DEST}/${tool}${exe}")
+endforeach()
 foreach(tool IN LISTS names)
     file(COPY "${LLVM_BIN}/${tool}${exe}" DESTINATION "${DEST}")
 endforeach()

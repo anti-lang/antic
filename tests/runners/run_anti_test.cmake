@@ -3,7 +3,6 @@
 #   ANTI      the anti executable
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime archive
-#   LLVM_MC   the llvm-mc executable
 #   MODULES   the directory that holds com/example/*.anti
 #   WORK      a directory for the library files, the objects and the runner
 #
@@ -28,7 +27,7 @@ function(run_tests source release out_status out_text)
     endif()
     execute_process(
         COMMAND "${ANTI}" test ${extra} --work "${WORK}" -I "${MODULES}"
-                --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+                --runtime "${RUNTIME}"
                 "${MODULES}/${source}"
         RESULT_VARIABLE status
         OUTPUT_VARIABLE out

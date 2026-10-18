@@ -2,7 +2,6 @@
 # picks change while the walk runs. Run with cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
 #
@@ -30,15 +29,13 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 
 function(run_anti_status where out_status out_text)
-    anti_run(status out err "${where}" ${ARGN} --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${where}" ${ARGN} --runtime "${RUNTIME}")
     set(${out_status} "${status}" PARENT_SCOPE)
     set(${out_text} "${out}${err}" PARENT_SCOPE)
 endfunction()
 
 function(run_anti where)
-    anti_run(status out err "${where}" ${ARGN} --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${where}" ${ARGN} --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti ${ARGN} in ${where} failed with "
                             "${status}\n${out}${err}")

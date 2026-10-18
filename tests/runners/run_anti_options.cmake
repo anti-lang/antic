@@ -4,7 +4,6 @@
 #   ANTIC     the antic executable
 #   CASE      the case to run, one of the list below
 #   RUNTIME   the runtime archive
-#   LLVM_MC   the assembler
 #   LLVM_AR   the archiver
 #   OBJDUMP   llvm-objdump of the pinned release
 #   READOBJ   llvm-readobj of the pinned release
@@ -108,7 +107,7 @@ function(lacks text needle what)
     endif()
 endfunction()
 
-set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
+set(tools --runtime "${RUNTIME}" --llvm-ar "${LLVM_AR}")
 
 # The library project of tests/anti-build/shapes twice: `plain` for the
 # run without the option and `option` for the run with it.
@@ -274,10 +273,9 @@ if(CASE STREQUAL "target_all")
     foreach(copy plain option)
         file(COPY "${FIXTURES}/anti-build/app" DESTINATION "${WORK}/${copy}")
     endforeach()
-    anti_passes("anti build" "${WORK}/plain/app" build --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}")
+    anti_passes("anti build" "${WORK}/plain/app" build --runtime "${RUNTIME}")
     anti_passes("anti build --target all" "${WORK}/option/app" build
-                --target all --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+                --target all --runtime "${RUNTIME}")
     dist_of("${WORK}/plain/app" plain)
     dist_of("${WORK}/option/app" option)
     if(NOT plain STREQUAL HOST)
@@ -297,7 +295,7 @@ if(CASE STREQUAL "target_all_cpu")
     # `antic --print-targets`, whose second is the first of ARM64.
     file(COPY "${FIXTURES}/anti-build/app" DESTINATION "${WORK}")
     anti("${WORK}/app" status out err build --target all --cpu v1
-         --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+         --runtime "${RUNTIME}")
     if(NOT status STREQUAL "1" OR NOT out STREQUAL "" OR NOT err STREQUAL
        "anti: v1 is no processor level of linux-arm64\n")
         message(FATAL_ERROR "anti build --target all --cpu v1 ended with "
@@ -427,7 +425,7 @@ endif()
 if(CASE STREQUAL "symbols_from")
     file(COPY "${FIXTURES}/anti-symbols/tracer" DESTINATION "${WORK}")
     anti_passes("anti build --release" "${WORK}/tracer" build --release
-                --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+                --runtime "${RUNTIME}")
     set(dist "${WORK}/tracer/dist/${HOST}/release")
     set(deploy "${WORK}/deploy")
     file(GLOB program "${dist}/tracer" "${dist}/tracer.exe")
@@ -460,7 +458,7 @@ if(CASE STREQUAL "symbols_target")
     foreach(target linux-arm64 windows-x86_64)
         anti_passes("anti build --release --target ${target}"
                     "${WORK}/tracer" build --release --target ${target}
-                    --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+                    --runtime "${RUNTIME}")
         set(dist "${WORK}/tracer/dist/${target}/release")
         set(deploy "${WORK}/deploy-${target}")
         file(GLOB built "${dist}/tracer" "${dist}/tracer.exe"
@@ -499,7 +497,7 @@ if(CASE STREQUAL "targets_default")
          "\n[targets]\ndefault = [\"linux-arm64\", \"windows-x86_64\"]\n")
     foreach(copy plain option)
         anti_passes("anti build of ${copy}" "${WORK}/${copy}/app" build
-                    --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+                    --runtime "${RUNTIME}")
         dist_of("${WORK}/${copy}/app" ${copy})
     endforeach()
     if(NOT plain STREQUAL HOST)
@@ -528,10 +526,9 @@ if(CASE STREQUAL "release_path")
              "import com.example.shapes;\n\n"
              "fn main() -> int\n{\n\treturn 0;\n}\n")
     endforeach()
-    anti_passes("anti build" "${WORK}/plain/app" build --runtime "${RUNTIME}"
-                --llvm-mc "${LLVM_MC}")
+    anti_passes("anti build" "${WORK}/plain/app" build --runtime "${RUNTIME}")
     anti_passes("anti build --release" "${WORK}/option/app" build --release
-                --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+                --runtime "${RUNTIME}")
     foreach(copy plain option)
         directories_of("${WORK}/${copy}/shapes/dist/${HOST}" ${copy})
     endforeach()

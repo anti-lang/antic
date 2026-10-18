@@ -2,7 +2,6 @@
 # an internal function, a generic one included, and a module of another
 # package does not. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   ROOT      the search root that holds the sources
 #   WORK      a directory for the outputs

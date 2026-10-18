@@ -2,7 +2,6 @@
 # check the object file format of the executable with llvm-objdump. The
 # format names the architecture, and the link prints nothing. Run with cmake -P and these values:
 #   ANTIC         the antic executable
-#   LLVM_MC       the llvm-mc executable
 #   LLVM_OBJDUMP  the llvm-objdump executable
 #   RUNTIME       the runtime directory
 #   SOURCE        the .anti file
@@ -32,7 +31,7 @@ file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(program "${SOURCE}" NAME_WE)
 set(exe "${WORK}/${program}-${TARGET}")
 string(REPLACE "," ";" options "${OPTIONS}")
-antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+antic_build(--target "${TARGET}" --runtime "${RUNTIME}"
             ${options} -o "${exe}" "${SOURCE}")
 execute_process(COMMAND "${LLVM_OBJDUMP}" -h "${exe}"
     RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING NONE)

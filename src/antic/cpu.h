@@ -46,9 +46,6 @@ bool cpu_has(enum cpu_level level, unsigned feature);
    runtime archive for a level. */
 const char *cpu_clang_arch(enum cpu_level level);
 
-/* The -mattr= value of llvm-mc, empty where the assembler needs none. */
-const char *cpu_attributes(enum cpu_level level);
-
 /* The default level of a target: x86-64-v3 on both x86_64 targets, and
    per operating system on ARM64. */
 enum cpu_level cpu_default(enum target t);

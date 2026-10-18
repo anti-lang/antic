@@ -4,8 +4,9 @@
 # antic_refuse_host_tools after project(). tests/runners/run_pinned_tools.cmake
 # reads a tree's cache through antic_pinned_tool_problems.
 #
-# DESIGN: every host builds with the pinned clang, lld, llvm-mc and llvm-ar
-# alone. Eddie decided this. No compiler, linker, assembler or archiver of
+# DESIGN: every host builds with the pinned clang, lld and llvm-ar alone,
+# and the tests assemble with the pinned llvm-mc. Eddie decided this. No
+# compiler, linker, assembler or archiver of
 # the host takes part: no system gcc or clang, no Apple ld or ar, no GNU ld
 # or ar, no MSVC. A host tool differs per machine, so the same tree built
 # on two hosts gave two programs, and the Linux runtime built by the host
@@ -46,20 +47,23 @@ endfunction()
 # from these two, and the test llvm_tool_list refuses one spelled anywhere
 # else.
 #
-# DESIGN: llvm-cov measures what the tests of this tree reach, and no
-# package carries it, which Eddie decided on 2026-10-11 as decision 29 of
-# docs/decisions.md. A build needs it, so it stands in this list.
+# DESIGN: llvm-cov measures what the tests of this tree reach, and
+# llvm-mc assembles the output of `antic -S` for the tests. No package
+# carries either, which Eddie decided on 2026-10-11 as decisions 29 and 2
+# of docs/decisions.md. A build needs both, so both stand in this list,
+# and ANTIC_LLVM_UNPACKED names them.
 set(ANTIC_LLVM_TOOLS llvm-mc lld llvm-ar llvm-objdump llvm-readobj opt llc
     llvm-profdata llvm-cov)
 set(ANTIC_LLD_NAMES ld.lld ld64.lld lld-link)
+set(ANTIC_LLVM_UNPACKED llvm-mc llvm-cov)
 
 # The names of the tools in bin/ of the runtime archive, which
 # tools/copy-llvm.cmake copies there and tools/pack-anti.cmake copies into
-# the package of the host: every tool of ANTIC_LLVM_TOOLS but llvm-cov, and
-# the names of lld.
+# the package of the host: every tool of ANTIC_LLVM_TOOLS but those of
+# ANTIC_LLVM_UNPACKED, and the names of lld.
 function(antic_llvm_archive_tools out)
     set(names ${ANTIC_LLVM_TOOLS} ${ANTIC_LLD_NAMES})
-    list(REMOVE_ITEM names llvm-cov)
+    list(REMOVE_ITEM names ${ANTIC_LLVM_UNPACKED})
     set(${out} "${names}" PARENT_SCOPE)
 endfunction()
 

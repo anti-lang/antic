@@ -44,7 +44,7 @@ anti_message(dependency_repository_unknown
 set(app_source "src/com/example/app.anti")
 set(app_text "//! The smallest program.\n\nfn main() -> int\n{\n\treturn 0;\n}\n")
 set(library_text "//! The smallest library.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
-set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}")
+set(tools --runtime "${RUNTIME}")
 
 anti_message(antic_version
     FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\nantic = \"99.0.0\"\n"

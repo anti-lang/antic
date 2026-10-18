@@ -18,7 +18,7 @@ file(WRITE "${WORK}/sources/stops.anti"
      "\treturn 3;\n"
      "}\n")
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DNAME=stops"
-                        "-DANTIC=${ANTIC}" "-DLLVM_MC=${LLVM_MC}"
+                        "-DANTIC=${ANTIC}"
                         "-DRUNTIME=${RUNTIME}" "-DSOURCES=${WORK}/sources"
                         "-DWORK=${WORK}/run" "-DCC=${CC}"
                         "-DHOST_LINK=${HOST_LINK}" -P "${RUNNER}"

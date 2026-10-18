@@ -151,7 +151,6 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         add_test(NAME raylib_run
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${source}"
                 "-DOBJECTS=${probe},${library},${miniaudio}"
@@ -162,7 +161,6 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     add_test(NAME raylib_link_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${source}"
             "-DOBJECTS=${probe},${library},${miniaudio}"
@@ -224,7 +222,6 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         add_test(NAME media_audio_run
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${source}"
                 "-DOBJECTS=${probe},${libraries}"
@@ -235,7 +232,6 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     add_test(NAME media_audio_link_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${source}"
             "-DOBJECTS=${probe},${libraries}"

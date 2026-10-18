@@ -6,7 +6,6 @@
 #   ANTI     the anti executable
 #   OBJDUMP  llvm-objdump of the pinned release
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  tests/anti-build
 #   HOST     the target name of this host, a macOS target
 #   WORK     a directory this run writes into
@@ -25,8 +24,7 @@ foreach(mode dev release)
     if(mode STREQUAL "release")
         set(flag --release)
     endif()
-    anti_run(status out err "${project}" build ${flag} --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${project}" build ${flag} --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti build ${flag} failed with ${status}\n${out}${err}")
     endif()

@@ -2,7 +2,6 @@
 # antic --lib, then compile and run C programs against them. Run with
 # cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   LLVM_AR   the llvm-ar executable
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/clib
@@ -178,7 +177,7 @@ function(library name kind dir)
         set(link "${dir}/${name}.lib")
     endif()
     antic_build(OUTPUT tool_stdout COMMAND --lib ${kind} ${ARGN} ${TARGET_OPTION}
-                --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}" --runtime
+                --llvm-ar "${LLVM_AR}" --runtime
                 "${RUNTIME}" -I "${SOURCES}" -o "${file}"
                 "${SOURCES}/com/example/${name}.anti")
     set(tool_stdout "${tool_stdout}" PARENT_SCOPE)

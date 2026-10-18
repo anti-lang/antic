@@ -1,7 +1,6 @@
 # Compile a program, run it and match its output against a pattern file,
 # one regular expression per line. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   SOURCE    the .anti file
 #   OPTIONS   optional options of antic, separated by commas
@@ -33,7 +32,7 @@ set(exe "${WORK}/${name}")
 string(REPLACE "," ";" options "${OPTIONS}")
 string(REPLACE "," ";" arguments "${ARGS}")
 string(REPLACE "," ";" objects "${STD_OBJECTS}")
-antic_build(--llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" ${options} -o
+antic_build(--runtime "${RUNTIME}" ${options} -o
             "${exe}" "${SOURCE}" ${objects})
 file(STRINGS "${exe}" ids REGEX "^build [0-9a-f]+$")
 list(GET ids 0 id)

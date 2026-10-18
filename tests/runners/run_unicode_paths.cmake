@@ -4,7 +4,7 @@
 # ANSI entry point of Windows cannot name.
 #
 #   1. A source, an output and a work directory of such a name, given on
-#      the command line. antic reads the source, runs llvm-mc and the
+#      the command line. antic reads the source, runs opt, llc and the
 #      linker on the paths, and the program exits with 42.
 #   2. An antic copied into the bin/ of such a directory, beside a lib/,
 #      takes the directory as its runtime archive.
@@ -13,7 +13,7 @@
 #   4. anti reads a source of such a name given on its command line, and
 #      finds one of such a name in the src/ of a project it made.
 #
-#   cmake -DANTIC=<antic> -DANTI=<anti> -DLLVM_MC=<llvm-mc> -DRUNTIME=<dir>
+#   cmake -DANTIC=<antic> -DANTI=<anti> -DRUNTIME=<dir>
 #         -DSOURCE=<return42.anti> -DWORK=<dir>
 #         -P tests/runners/run_unicode_paths.cmake
 

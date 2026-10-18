@@ -3,7 +3,6 @@
 #   FORM              plain, project, notice or archive
 #   ANTI              the anti executable
 #   RUNTIME           the runtime archive
-#   LLVM_MC           the assembler
 #   LLVM_AR           the archiver of a static library
 #   ROOT              the repository, whose LICENSE is the one of antic
 #                     and anti
@@ -61,7 +60,7 @@ function(anti_output what where out_text)
 endfunction()
 
 # The options that name the runtime archive and its tools to a build.
-set(tools --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}" --llvm-ar "${LLVM_AR}")
+set(tools --runtime "${RUNTIME}" --llvm-ar "${LLVM_AR}")
 
 # Fail unless text holds part.
 function(expect_part what text part)

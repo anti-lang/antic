@@ -4,7 +4,7 @@
 # the two together is the CodeView record of the debug directory. The link
 # passes /DEBUG with or without -g, so both builds are read here.
 #
-#   cmake -DANTIC=<antic> -DLLVM_MC=<llvm-mc> -DREADOBJ=<llvm-readobj>
+#   cmake -DANTIC=<antic> -DREADOBJ=<llvm-readobj>
 #         -DCHECK=<tools/check-pdb.cmake> -DRUNTIME=<runtime archive>
 #         -DSOURCE=<file.anti> -DWORK=<dir> -DTARGET=<target>
 #         -P tests/runners/run_pdb_guid.cmake
@@ -32,7 +32,7 @@ foreach(mode release debug)
         set(flags -g)
     endif()
     file(REMOVE "${exe}" "${pdb}")
-    antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime
+    antic_build(--target "${TARGET}" --runtime
                 "${RUNTIME}" ${flags} -o "${exe}" "${SOURCE}")
     if(NOT EXISTS "${pdb}")
         message(FATAL_ERROR "the ${mode} link for ${TARGET} wrote no ${pdb}")

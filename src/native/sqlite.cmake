@@ -87,7 +87,6 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         add_test(NAME sqlite_run
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCE=${source}"
                 "-DOBJECTS=${probe},${library}"
@@ -97,7 +96,6 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     add_test(NAME sqlite_link_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCE=${source}"
             "-DOBJECTS=${probe},${library}"

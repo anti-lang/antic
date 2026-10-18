@@ -4,7 +4,6 @@
 # from their library files, which gives the same assembly, and link and
 # run that program too. Run with cmake -P and these values:
 #   ANTIC     the antic executable
-#   LLVM_MC   the llvm-mc executable
 #   RUNTIME   the runtime directory
 #   MODULES   the search root of the sources
 #   LIBS      the search root of the library files
@@ -17,11 +16,11 @@ include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 file(MAKE_DIRECTORY "${WORK}")
 foreach(module scale twice)
-    antic_build(--dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" --keep-llvm
+    antic_build(--dev --runtime "${RUNTIME}" --keep-llvm
                 -I "${MODULES}" -I "${LIBS}" -o "${WORK}/${module}"
                 "${MODULES}/com/example/${module}.anti")
 endforeach()
-antic_build(--dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I "${LIBS}" -o
+antic_build(--dev --runtime "${RUNTIME}" -I "${LIBS}" -o
             "${WORK}/main" "${MODULES}/main.anti" "${WORK}/scale${OBJECT}"
             "${WORK}/twice${OBJECT}")
 execute_process(COMMAND "${WORK}/main" RESULT_VARIABLE status)
@@ -30,7 +29,7 @@ if(NOT status EQUAL 42)
 endif()
 
 foreach(module scale twice)
-    antic_build(--dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" --keep-llvm
+    antic_build(--dev --runtime "${RUNTIME}" --keep-llvm
                 -I "${LIBS}" -o "${WORK}/${module}_antl"
                 "${LIBS}/com/example/${module}.antl")
     # The text of --keep-llvm stands beside the object.
@@ -40,7 +39,7 @@ foreach(module scale twice)
     expect_same_text("${module}_antl${text}, against ${module}${text},"
                      "${from_source}" "${from_library}")
 endforeach()
-antic_build(--dev --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}" -I "${LIBS}" -o
+antic_build(--dev --runtime "${RUNTIME}" -I "${LIBS}" -o
             "${WORK}/main_antl" "${MODULES}/main.anti"
             "${WORK}/scale_antl${OBJECT}" "${WORK}/twice_antl${OBJECT}")
 execute_process(COMMAND "${WORK}/main_antl" RESULT_VARIABLE status)

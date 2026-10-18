@@ -7,7 +7,6 @@
 # with cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
-#   LLVM_MC  the assembler
 #   FIXTURE  the directory that holds running/
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
@@ -29,8 +28,7 @@ set(state "${WORK}/state")
 
 # The cache of the repositories is the user's, so the run names its own.
 function(build what)
-    anti_run(status out err "${project}" build --runtime "${RUNTIME}"
-             --llvm-mc "${LLVM_MC}")
+    anti_run(status out err "${project}" build --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         set(failure "${what} failed with ${status}\n${out}${err}" PARENT_SCOPE)
     endif()
@@ -71,7 +69,7 @@ endif()
 execute_process(
     COMMAND "${program}"
     COMMAND "${CMAKE_COMMAND}" -DREBUILD=ON
-            "-DANTI=${ANTI}" "-DRUNTIME=${RUNTIME}" "-DLLVM_MC=${LLVM_MC}"
+            "-DANTI=${ANTI}" "-DRUNTIME=${RUNTIME}"
             "-DHOST=${HOST}" "-DWORK=${WORK}"
             -P "${CMAKE_CURRENT_LIST_FILE}"
     WORKING_DIRECTORY "${state}"

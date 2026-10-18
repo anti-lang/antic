@@ -15,7 +15,6 @@
 # function the image holds, so the test reads the names there, as
 # run_pdb_names.cmake does. Run with cmake -P and these values:
 #   ANTIC         the antic executable
-#   LLVM_MC       the llvm-mc executable
 #   LLVM_OBJDUMP  the llvm-objdump executable
 #   RUNTIME       the runtime directory
 #   SOURCE        the .anti file
@@ -49,7 +48,7 @@ else()
     set(exe "${WORK}/${program}-${TARGET}")
 endif()
 file(REMOVE "${exe}")
-antic_build(--target "${TARGET}" --llvm-mc "${LLVM_MC}" --runtime "${RUNTIME}"
+antic_build(--target "${TARGET}" --runtime "${RUNTIME}"
             --lto none -o "${exe}" "${SOURCE}")
 
 # The names the image defines, one per line. Mach-O writes a C name with

@@ -20,15 +20,6 @@ static void names_c(enum target t, const char *name, const char *expected)
     text_free(&out);
 }
 
-static void labels(enum target t, const char *function, size_t block,
-                   const char *expected)
-{
-    struct text out = {0};
-    target_block_label(&out, t, function, block);
-    CHECK_STR(text_cstr(&out), expected);
-    text_free(&out);
-}
-
 void test_target(void)
 {
     enum target t = TARGET_COUNT;
@@ -37,10 +28,6 @@ void test_target(void)
     names_c(TARGET_MACOS_ARM64, "puts", "_puts");
     names_c(TARGET_LINUX_X86_64, "puts", "puts");
     names_c(TARGET_WINDOWS_ARM64, "__chkstk", "__chkstk");
-    /* Block labels stay out of the symbol table. */
-    labels(TARGET_MACOS_X86_64, "_main.scale", 2, "L_main.scale.b2");
-    labels(TARGET_LINUX_ARM64, "main.scale", 0, ".Lmain.scale.b0");
-    labels(TARGET_WINDOWS_X86_64, "_A4main_scale", 11, ".L_A4main_scale.b11");
 
     CHECK_STR(target_name(TARGET_MACOS_ARM64), "macos-arm64");
     CHECK_STR(target_name(TARGET_LINUX_X86_64), "linux-x86_64");

@@ -3,7 +3,6 @@
 # module. Run with cmake -P and these values:
 #   ANTI      the anti executable
 #   RUNTIME   the runtime archive
-#   LLVM_MC   the llvm-mc executable
 #   STD       the source root of the standard library
 #   SOURCE    the module under test
 #   WORK      a directory for the library files, the objects and the runner
@@ -24,7 +23,7 @@ function(run_tests release out_text)
     endif()
     execute_process(
         COMMAND "${ANTI}" test ${extra} --work "${WORK}/${release}"
-                -I "${STD}" --runtime "${RUNTIME}" --llvm-mc "${LLVM_MC}"
+                -I "${STD}" --runtime "${RUNTIME}"
                 "${SOURCE}"
         RESULT_VARIABLE status
         OUTPUT_VARIABLE out

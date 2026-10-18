@@ -8,13 +8,15 @@
 #   LLVM_BIN         the directory of the installed tools
 #   RUNTIME_ARCHIVE  set when LLVM_BIN is bin/ of the runtime archive
 #
-# DESIGN: llvm-cov is a tool of the build alone. It measures what the tests
-# of this tree reach, and no package carries it, which Eddie decided on
-# 2026-10-11 as decision 29 of docs/decisions.md. tools/pack-anti.cmake
-# copies bin/ of the runtime archive whole into the package of this
-# machine. So the copy leaves llvm-cov out, and RUNTIME_ARCHIVE refuses one
-# that stands there. The tests toolchain_pin and no_llvm_cov_packed hold
-# it.
+# DESIGN: llvm-cov and llvm-mc, ANTIC_LLVM_UNPACKED, are tools of the
+# build alone. llvm-cov measures what the tests of this tree reach, and
+# llvm-mc assembles the output of `antic -S` for the tests. No package
+# carries either, which Eddie decided on 2026-10-11 as decisions 29 and 2
+# of docs/decisions.md.
+# tools/pack-anti.cmake copies bin/ of the runtime archive whole into the
+# package of this machine. So the copy leaves both out, and RUNTIME_ARCHIVE
+# refuses one that stands there. The tests toolchain_pin,
+# no_llvm_cov_packed and no_llvm_mc_packed hold it.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -28,10 +30,12 @@ if(CMAKE_HOST_WIN32)
     set(exe ".exe")
 endif()
 if(RUNTIME_ARCHIVE)
-    if(EXISTS "${LLVM_BIN}/llvm-cov${exe}")
-        message(FATAL_ERROR "${LLVM_BIN} holds llvm-cov${exe}, and no package "
-                            "carries llvm-cov")
-    endif()
+    foreach(tool IN LISTS ANTIC_LLVM_UNPACKED)
+        if(EXISTS "${LLVM_BIN}/${tool}${exe}")
+            message(FATAL_ERROR "${LLVM_BIN} holds ${tool}${exe}, and no "
+                                "package carries ${tool}")
+        endif()
+    endforeach()
     antic_llvm_archive_tools(names)
 else()
     set(names ${ANTIC_LLVM_TOOLS} ${ANTIC_LLD_NAMES})

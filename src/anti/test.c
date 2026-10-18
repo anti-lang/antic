@@ -41,9 +41,8 @@ static bool read_unit(const char *source, const char *const *roots,
 /* The options every call of this run shares, over the options of a
    project compile that unit_options gives. */
 static bool base_options(struct options *o, const char *package,
-                         const char *runtime, const char *llvm_mc,
-                         const char *const *roots, size_t root_count,
-                         bool memory_checks)
+                         const char *runtime, const char *const *roots,
+                         size_t root_count, bool memory_checks)
 {
     enum target target;
     enum cpu_level cpu;
@@ -54,7 +53,6 @@ static bool base_options(struct options *o, const char *package,
         return false;
     }
     unit_options(o, package, runtime, roots, root_count, target, cpu);
-    o->llvm_mc = llvm_mc;
     o->tests = true;
     /* DESIGN: a test names the insides of its own module. `anti test`
        runs the standard library's tests too, so the run allows the
@@ -347,7 +345,7 @@ int test_run(const struct test_request *r)
     for (i = 0; i < r->root_count; i++) {
         search[i + 1] = r->roots[i];
     }
-    if (!base_options(&base, r->package, r->runtime, r->llvm_mc, search,
+    if (!base_options(&base, r->package, r->runtime, search,
                       r->root_count + 1, r->memory_checks)) {
         free(units);
         free(search);
