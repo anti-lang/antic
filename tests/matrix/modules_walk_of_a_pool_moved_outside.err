@@ -1,0 +1,1 @@
+modules_walk_of_a_pool_moved_outside.anti:10:2: error: `used` is private to `SlotsWalk<int>`

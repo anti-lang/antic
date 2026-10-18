@@ -1,0 +1,12 @@
+//! M349 of the third audit: the fields of the walk of a pool are private to
+//! `SlotsWalk<T>`. A program that wrote `used` would walk past the blocks.
+
+import anti.collection.pool.{Pool};
+
+fn main() -> int
+{
+	let xs = Pool<int>.new();
+	let w = xs.iter();
+	w.used = 1000;
+	return 0;
+}

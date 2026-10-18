@@ -232,13 +232,8 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 
 	operator fn iter(self) -> SlotsWalk<T>
 	{
-		return SlotsWalk<T> {
-			watch: self.watch(),
-			blocks: &self.blocks[0],
-			shift: self.shift,
-			words: SLOT_WORDS + self.extra_words,
-			used: self.used,
-		};
+		return SlotsWalk<T>.over(&self.blocks[0], self.shift,
+			SLOT_WORDS + self.extra_words, self.used, self.watch());
 	}
 
 	concrete fn first_place(self) -> int
@@ -531,12 +526,30 @@ pub operator fn hash<T: hash>(a: Pool<T>) -> u64
 /// order of the slots.
 pub class SlotsWalk<T>
 {
-	pub watch: lang.Watch,
-	pub blocks: *?*byte,
-	pub shift: int,
-	pub words: int,
-	pub used: int,
-	pub at: int = -1,
+	/* DESIGN: the fields are private, and `over` alone sets them, as for
+	   `IndexedWalk`. By M349 of the third audit: a program that wrote
+	   `used` or `at` of a public field walked past the blocks. */
+	watch: lang.Watch,
+	blocks: *?*byte,
+	shift: int,
+	words: int,
+	used: int,
+	at: int = -1,
+
+	/// A walk of the first `used` slots of the blocks at `blocks`, the first of
+	/// which holds `2^shift` slots, each with `words` words after the elements
+	/// of its block, which `watch` guards.
+	pub fn over(blocks: *?*byte, shift: int, words: int, used: int,
+		watch: lang.Watch) -> SlotsWalk<T>
+	{
+		return SlotsWalk<T> {
+			watch: watch,
+			blocks: blocks,
+			shift: shift,
+			words: words,
+			used: used,
+		};
+	}
 
 	operator fn next(self) -> bool
 	{
