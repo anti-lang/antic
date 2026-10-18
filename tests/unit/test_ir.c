@@ -966,6 +966,114 @@ static void refused_forms(void)
     arena_free(&arena);
 }
 
+/* A class record names a global, a function, an aggregate or a field of
+   the module in every part: the descriptors, the tables and the init,
+   its aggregate, the aggregate and field of each subtable, and the
+   descriptor of each `inject` and `provides` entry. One class gets each
+   wrong part and the others are whole. */
+static void class_records(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_class *c;
+    struct ir_field fields[1];
+    uint32_t agg;
+    uint32_t g;
+    static const uint8_t zero[8] = {0};
+
+    ir_module_init(&m, &arena, "main");
+    memset(fields, 0, sizeof fields);
+    fields[0].name = "x";
+    fields[0].type = ir_scalar(IR_I64);
+    agg = ir_struct_add(&m, IR_AGG_STRUCT, "main.Shape", fields, 1, false, 0);
+    g = ir_global_add(&m, "main", "descriptor", zero, sizeof zero, 8)->index;
+
+    c = ir_class_add(&m, "main", "Whole");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_subtable(c, g, g, agg, 0);
+    ir_class_inject(&m, c, "main.Log", "log", g, false);
+    ir_class_provides(&m, c, "main.Log", g);
+
+    c = ir_class_add(&m, "main", "Shapeless");
+    c->descriptor = g;
+    c->base = g;
+
+    c = ir_class_add(&m, "main", "SubAggregate");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_subtable(c, g, g, agg + 1, 0);
+
+    c = ir_class_add(&m, "main", "SubField");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_subtable(c, g, g, agg, 1);
+
+    c = ir_class_add(&m, "main", "Injected");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_inject(&m, c, "main.Log", "log", g + 1, false);
+
+    c = ir_class_add(&m, "main", "Provided");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_provides(&m, c, "main.Log", g + 1);
+
+    verified(&m,
+             "class main.Shapeless names what the module does not hold\n"
+             "class main.SubAggregate names what the module does not "
+             "hold\n"
+             "class main.SubField names what the module does not hold\n"
+             "class main.Injected names what the module does not hold\n"
+             "class main.Provided names what the module does not hold\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
+/* A class record prints every flag and every list it holds: here the
+   flag `required`, a subtable, an `inject final` field and a `provides`
+   entry. */
+static void class_printed(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_class *c;
+    struct ir_field fields[1];
+    uint32_t agg;
+    uint32_t g;
+    static const uint8_t zero[8] = {0};
+
+    ir_module_init(&m, &arena, "main");
+    memset(fields, 0, sizeof fields);
+    fields[0].name = "x";
+    fields[0].type = ir_scalar(IR_I64);
+    agg = ir_struct_add(&m, IR_AGG_STRUCT, "main.Shape", fields, 1, false, 0);
+    g = ir_global_add(&m, "main", "descriptor", zero, sizeof zero, 8)->index;
+    c = ir_class_add(&m, "main", "Whole");
+    c->flags = IR_CLASS_REQUIRED;
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_subtable(c, g, g, agg, 0);
+    ir_class_inject(&m, c, "main.Log", "log", g, true);
+    ir_class_provides(&m, c, "main.Log", g);
+    printed(&m, "type main.Shape = struct { x: i64 }\n"
+                "global main.descriptor size 8 align 8 bytes 00 00 00 00 00 "
+                "00 00 00\n"
+                "class main.Whole required descriptor @main.descriptor base "
+                "@main.descriptor implements @main.descriptor in "
+                "@main.descriptor inject final log main.Log by "
+                "@main.descriptor provides main.Log by @main.descriptor\n");
+    verified(&m, "");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* A global of the runtime and a function of a library have no module.
    The printer and the verifier write the name alone, where they once
    passed the NULL module to %s. */
@@ -1003,6 +1111,8 @@ void test_ir(void)
     positions();
     symbolic();
     verifier();
+    class_records();
+    class_printed();
     never_returns();
     table_accesses();
     param_facts();

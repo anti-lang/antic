@@ -680,22 +680,32 @@ static bool global_ok(const struct ir_module *m, uint32_t g, bool optional)
 }
 
 /* Every global, function, aggregate and field a class record names
-   exists. */
+   exists: its descriptors, tables and init, its aggregate and the fields
+   of it that are `mutable`, the aggregate and field of each subtable and
+   the descriptor of each `inject` and `provides` entry. */
 static bool check_class(const struct ir_module *m, const struct ir_class *c,
                         struct text *errors)
 {
     bool ok = global_ok(m, c->descriptor, false) &&
               global_ok(m, c->base, false) && global_ok(m, c->table, true) &&
               (c->init == IR_NO_INDEX || c->init < m->function_count) &&
-              (c->mutable_count == 0 || c->agg < m->agg_count);
+              c->agg < m->agg_count;
     size_t i;
 
     for (i = 0; ok && i < c->subtable_count; i++) {
-        ok = global_ok(m, c->subtables[i].interface, false) &&
-             global_ok(m, c->subtables[i].table, false);
+        const struct ir_subtable *sub = &c->subtables[i];
+        ok = global_ok(m, sub->interface, false) &&
+             global_ok(m, sub->table, false) && sub->agg < m->agg_count &&
+             sub->field < m->aggs[sub->agg]->field_count;
     }
     for (i = 0; ok && i < c->mutable_count; i++) {
         ok = c->mutable_fields[i] < m->aggs[c->agg]->field_count;
+    }
+    for (i = 0; ok && i < c->inject_count; i++) {
+        ok = global_ok(m, c->injects[i].descriptor, false);
+    }
+    for (i = 0; ok && i < c->provides_count; i++) {
+        ok = global_ok(m, c->provides[i].descriptor, false);
     }
     if (!ok) {
         text_append(errors, "class ");

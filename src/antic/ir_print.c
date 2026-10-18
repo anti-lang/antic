@@ -520,7 +520,8 @@ static void global_ref(struct text *out, const struct ir_module *m,
 }
 
 /* A class record prints as class, its flags, then each global it names,
-   its interface tables and its `mutable` fields. */
+   its interface tables, its `mutable` fields, its `inject` fields and
+   the interfaces it is provided for. */
 static void class_record(struct text *out, const struct ir_module *m,
                          const struct ir_class *c)
 {
@@ -533,6 +534,8 @@ static void class_record(struct text *out, const struct ir_module *m,
     text_append(out,
                 (c->flags & IR_CLASS_SINGLETON) != 0 ? " singleton" : "");
     text_append(out, (c->flags & IR_CLASS_ARGS) != 0 ? " args" : "");
+    text_append(out,
+                (c->flags & IR_CLASS_REQUIRED) != 0 ? " required" : "");
     global_ref(out, m, "descriptor", c->descriptor);
     global_ref(out, m, "base", c->base);
     global_ref(out, m, "table", c->table);
@@ -548,6 +551,16 @@ static void class_record(struct text *out, const struct ir_module *m,
     for (i = 0; i < c->mutable_count; i++) {
         text_appendf(out, " mutable %s.%s", m->aggs[c->agg]->name,
                      m->aggs[c->agg]->fields[c->mutable_fields[i]].name);
+    }
+    for (i = 0; i < c->inject_count; i++) {
+        text_appendf(out, " inject%s %s %s",
+                     c->injects[i].final ? " final" : "",
+                     c->injects[i].field, c->injects[i].interface);
+        global_ref(out, m, "by", c->injects[i].descriptor);
+    }
+    for (i = 0; i < c->provides_count; i++) {
+        text_appendf(out, " provides %s", c->provides[i].interface);
+        global_ref(out, m, "by", c->provides[i].descriptor);
     }
     text_append(out, "\n");
 }
