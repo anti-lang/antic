@@ -2,7 +2,6 @@
    fields its own functions alone reach, and a concurrent class, whose
    every field is guarded, atomic or fixed. */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

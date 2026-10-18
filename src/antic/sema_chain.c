@@ -2,7 +2,6 @@
    constants, `type` lines and `constraint` sets, and resolves it from its
    leaves. */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

@@ -1757,16 +1757,13 @@ static void unify(struct type *param, struct type *arg,
        words, that gives it is held to the rules of `keep`, as at a
        field. */
     if (param->kind == TYPE_PARAM) {
-        if (arg->kind == TYPE_FN && arg->context && map->types != NULL) {
+        if (arg->kind == TYPE_FN && arg->context) {
             arg = types_fn_form(map->types, arg, false, false);
         }
         /* A type argument is never `lent`, so a lent pointer at a
            parameter of a type parameter meets the rule of `lent` there.
            So does a tuple that holds one. */
-        if (map->types != NULL) {
-            arg = types_unlent_parts(map->types,
-                                     types_unlent(map->types, arg));
-        }
+        arg = types_unlent_parts(map->types, types_unlent(map->types, arg));
         for (i = 0; i < map->count; i++) {
             if (map->params[i] == param && map->args[i] == NULL &&
                 !param->param->constant) {
@@ -1780,7 +1777,7 @@ static void unify(struct type *param, struct type *arg,
     if (param->kind == TYPE_OPTIONAL) {
         if (arg->kind == TYPE_OPTIONAL) {
             unify(param->element, arg->element, map);
-        } else if (map->types != NULL) {
+        } else {
             unify(param->element, types_without_none(map->types, arg), map);
         }
         return;

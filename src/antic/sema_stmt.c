@@ -451,7 +451,7 @@ static void check_flags_assign(struct checker *c, struct stmt *s);
    A type with `index` alone is read-only through `e[i]`. A compound
    assignment would compute e and i once for the read and once for the
    write, so it is refused, and `e[i] = e[i] + v` says what runs. */
-static bool check_set_index(struct checker *c, struct stmt *s)
+bool sema_set_index(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
     struct expr *base = target->as.index.base;
@@ -506,7 +506,7 @@ static bool check_set_index(struct checker *c, struct stmt *s)
     return true;
 }
 
-/* The target `e[i]` of an assignment that check_set_index gave back,
+/* The target `e[i]` of an assignment that sema_set_index gave back,
    which checked e. The reading of the target takes the type of e as it
    stands, so an error in e is reported once and an `own` argument of a
    call in e moves once. The mark lasts for this reading alone and the
@@ -522,11 +522,6 @@ static struct type *check_index_target(struct checker *c,
     t = sema_check_storage(c, target);
     base->prechecked = marked;
     return t;
-}
-
-bool sema_set_index(struct checker *c, struct stmt *s)
-{
-    return check_set_index(c, s);
 }
 
 /* The captured variable declared deepest of the closure that the value e
@@ -745,7 +740,7 @@ static void check_assign(struct checker *c, struct stmt *s)
         check_flags_assign(c, s);
         return;
     }
-    if (target->kind == EXPR_INDEX && check_set_index(c, s)) {
+    if (target->kind == EXPR_INDEX && sema_set_index(c, s)) {
         return;
     }
     /* A `=` to a name gives it a new value and reads none, so it is no

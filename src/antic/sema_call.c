@@ -759,8 +759,7 @@ static bool no_method_call(struct checker *c, struct expr *call,
     }
     if (through != NULL) {
         promote_base(c, field, through);
-        field->as.field.base->type =
-            sema_check_expr(c, field->as.field.base, NULL);
+        sema_check_expr(c, field->as.field.base, NULL);
         return !sema_is_error(field->as.field.base->type) &&
                method_call(c, call);
     }
@@ -948,8 +947,7 @@ static bool method_call(struct checker *c, struct expr *call)
         const struct struct_field *sub = table_sub_object(s, member);
         if (sub != NULL) {
             promote_base(c, field, sub);
-            field->as.field.base->type =
-                sema_check_expr(c, field->as.field.base, NULL);
+            sema_check_expr(c, field->as.field.base, NULL);
             return !sema_is_error(field->as.field.base->type) &&
                    method_call(c, call);
         }

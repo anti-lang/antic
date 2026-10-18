@@ -409,6 +409,8 @@ void sema_error_may_be_none(struct checker *c, const struct expr *e,
 
 const char *sema_op_text(enum token_kind op, char buffer[OP_TEXT]);
 bool sema_operator_named(const struct name *name);
+/* The operator function `name` that the type t declares, or that the
+   module of t declares for a struct. */
 struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
                                     const char *text);
 /* Whether the module of t, or t itself, gives it `operator fn text`, a

@@ -1563,8 +1563,9 @@ void lexer_token_list_free(struct token_list *list)
 const char *lexer_token_kind_name(enum token_kind kind)
 {
     /* DESIGN: the spelling of a symbol in backticks, written on its first
-       use and read after. antic runs on one thread and starts none, so no
-       two calls race on an entry. */
+       use and read after. antic and anti each run the compiler on one work
+       thread, from platform_run_on_stack, while the main thread waits, so
+       no two calls race on an entry. */
     static char names[TOKEN_KIND_COUNT][16];
     int n;
 

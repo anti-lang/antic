@@ -15,8 +15,6 @@ static bool names_carry(const struct expr *e)
 }
 
 static const char *operator_name(enum token_kind op);
-static struct symbol *operator_symbol(struct checker *c, struct type *t,
-                                      const char *text);
 
 /* The type a literal on the right of op takes beside a left operand of
    type left. An `operator fn` of left gives the type of its second
@@ -34,7 +32,7 @@ static struct type *right_literal_type(struct checker *c, enum token_kind op,
     if (called == NULL || !types_has_fields(left) || types_is_simd(left)) {
         return left;
     }
-    fn = operator_symbol(c, left, called);
+    fn = sema_operator_symbol(c, left, called);
     if (fn == NULL || fn->type == NULL || fn->type->kind != TYPE_FN ||
         fn->type->param_count < 2) {
         return left;
@@ -180,17 +178,6 @@ bool sema_operator_named(const struct name *name)
     return false;
 }
 
-/* The operator function `name` that the type t declares, or that the
-   module of t declares for a struct. */
-static struct symbol *operator_symbol(struct checker *c, struct type *t,
-                                      const char *text);
-
-struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
-                                    const char *text)
-{
-    return operator_symbol(c, t, text);
-}
-
 /* Whether sym is a function written `operator fn`, of the module being
    checked or of a library file. */
 static bool symbol_is_operator(const struct symbol *sym)
@@ -222,8 +209,8 @@ static bool takes_first(const struct symbol *sym, const struct type *t)
    one module declares one function of a name. The `operator fn eq` of
    one struct is therefore no operator of another struct of the module,
    which keeps its default `==`. */
-static struct symbol *operator_symbol(struct checker *c, struct type *t,
-                                      const char *text)
+struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
+                                    const char *text)
 {
     struct name name;
     struct item *m;
@@ -252,7 +239,7 @@ bool sema_module_operator(struct checker *c, struct type *t,
     struct name name;
     struct symbol *fn;
 
-    if (operator_symbol(c, t, text) != NULL) {
+    if (sema_operator_symbol(c, t, text) != NULL) {
         return true;
     }
     name.text = text;
@@ -682,7 +669,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             return sema_check_simd_binary(c, e, left, right);
         }
         if (called != NULL) {
-            struct symbol *fn = operator_symbol(c, left, called);
+            struct symbol *fn = sema_operator_symbol(c, left, called);
             if (fn != NULL) {
                 return check_operator(c, e, right, fn);
             }
@@ -757,7 +744,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             return sema_check_simd_binary(c, e, left, right);
         }
         if (called != NULL) {
-            struct symbol *fn = operator_symbol(c, left, called);
+            struct symbol *fn = sema_operator_symbol(c, left, called);
             if (fn != NULL) {
                 return check_operator(c, e, right, fn);
             }
@@ -778,9 +765,7 @@ struct type *sema_check_binary(struct checker *c, struct expr *e,
             e->as.binary.carry = true;
             return left;
         }
-        if (left != right &&
-            !((op == TOKEN_EQ || op == TOKEN_NE) &&
-              comparable_pointers(left, right))) {
+        if (left != right) {
             sema_error_at(c, e->pos,
                           "the operands of `%s` have the types `%s` and "
                           "`%s`", o, sema_tn(left), sema_tn(right));
@@ -854,7 +839,7 @@ struct type *sema_check_in(struct checker *c, struct expr *e)
     if (sema_is_error(types[first]) || !ok) {
         return sema_builtin(c, TYPE_ERROR);
     }
-    lt = operator_symbol(c, types[first], "lt");
+    lt = sema_operator_symbol(c, types[first], "lt");
     if (lt == NULL && !types_is_numeric(types[first]) &&
         types[first]->kind != TYPE_CHAR) {
         sema_error_at(c, e->pos, "`in` needs numeric or `char` operands, found "

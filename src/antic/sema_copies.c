@@ -2,7 +2,6 @@
    per use, checks again the nodes it left open, and rewrites the calls
    that name the copies. */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -498,13 +497,6 @@ static struct item *type_item(struct copies *k, struct type *copy)
         fns[made->member_count++] = members[i];
     }
     copy->members = members;
-    /* A field of the copy is declared by the copy, whose symbols then
-       name its own reach and thunks. */
-    for (i = 0; i < copy->field_count; i++) {
-        if (copy->fields[i].home == copy->generic) {
-            copy->fields[i].home = copy;
-        }
-    }
     k->added = alloc_grow(k->added, &k->added_capacity, k->added_count,
                           sizeof *k->added);
     k->added[k->added_count++] = made;
