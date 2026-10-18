@@ -464,10 +464,28 @@ static bool angle_list(struct angles *a, size_t *at, bool declaration)
     }
 }
 
+/* Whether the token at is a mark the parser reads before a type of a
+   list: `keep`, `concurrent`, `own` or `lent`. Each is a contextual word,
+   so one before `,` or `)` is a type of that name. */
+static bool angle_mark_word(const struct angles *a, size_t at)
+{
+    enum token_kind next = angle_kind(a, at + 1);
+
+    return (angle_word(a, at, "keep") || angle_word(a, at, "concurrent") ||
+            angle_word(a, at, "own") || angle_word(a, at, "lent")) &&
+           next != TOKEN_COMMA && next != TOKEN_RPAREN;
+}
+
+/* The types of a list that `(` opened, up to its `)`, each after the
+   marks the parser reads before it, as the scan of parser_type.c reads
+   them. */
 static bool angle_types(struct angles *a, size_t *at)
 {
     (*at)++;
     while (angle_kind(a, *at) != TOKEN_RPAREN) {
+        while (angle_mark_word(a, *at)) {
+            (*at)++;
+        }
         if (!angle_type(a, at) || a->half) {
             return false;
         }

@@ -93,3 +93,11 @@ fn narrowed(p: *collection.Iterable<int>) -> bool
 	let n = 5 as? int;
 	return q != none;
 }
+
+/// Type arguments that are function types with the marks of a parameter.
+fn marked() -> int
+{
+	let a = size<fn(keep fn(int) -> int) -> int>();
+	let b = size<fn(lent *int) -> int>();
+	return a + b;
+}
