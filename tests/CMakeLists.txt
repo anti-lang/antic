@@ -1079,6 +1079,18 @@ add_test(NAME header_sections
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_header_sections.cmake")
 
+# docs/notes/source-tree.md holds one row per file of the root, src/,
+# tests/unit/, tools/ and tests/runners/, per file and script of tests/
+# and per directory of tests/, and no row of anything else.
+add_test(NAME source_tree
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_source_tree.cmake")
+add_test(NAME source_tree_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_source_tree.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-tree"
+        -P "${ANTIC_RUNNERS}/run_source_tree_self.cmake")
+
 # A name that the tools and the runtime both spell, the markers of the
 # notice, the index of plugins, the suffix of a symbols archive and the
 # sysroot directory, stands in one header.

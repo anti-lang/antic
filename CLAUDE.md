@@ -365,6 +365,11 @@ for a reader's build and never for a release.
 | `LICENSES/` | Licence texts of bundled components |
 | `build/` | Every build tree, the downloads in `deps/` and the driver state in `drive/`. Never committed |
 
+`docs/notes/source-tree.md` gives the purpose of every file of the root,
+`src/`, `tests/unit/`, `tools/` and `tests/runners/`, and of every script
+and directory of `tests/`. A commit that adds, moves or removes such a file
+changes its row, and the test `source_tree` refuses a file without one.
+
 ## Repository layout
 
 - The top level holds exactly `build/`, `docs/`, `LICENSES/`, `src/`, `tests/`
