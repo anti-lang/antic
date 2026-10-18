@@ -12,6 +12,10 @@
 #include "alloc.h"
 #include "arena.h"
 
+/* The pattern of length bytes compiled by PCRE2, as a byte pattern when
+   bytes_mode holds. The caller owns the handle and gives it to
+   anti_rt_regex_free. NULL when it does not compile, with *code the error
+   of PCRE2 and *at the byte it names. */
 static void *compile(const char *bytes, size_t length, bool bytes_mode,
                      int32_t *code, int64_t *at)
 {
@@ -284,6 +288,8 @@ static void skip_past(struct reader *r, int close)
     }
 }
 
+/* A node of the kind that starts at start, with no children. The arena
+   of the reader owns it, and the reader frees every node at once. */
 static struct node *new_node(struct reader *r, enum node_kind kind,
                              size_t start)
 {
@@ -569,7 +575,8 @@ static struct node *parse_class(struct reader *r, size_t start)
 }
 
 /* A node for text this reader does not follow, such as a backreference
-   or a call of a group. It takes every byte and is never empty. */
+   or a call of a group. It takes every byte and is never empty. The arena
+   of the reader owns it, as it owns every node. */
 static struct node *opaque(struct reader *r, size_t start)
 {
     struct node *n = new_node(r, NODE_SET, start);
