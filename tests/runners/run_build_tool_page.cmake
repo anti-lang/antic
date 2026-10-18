@@ -41,15 +41,20 @@ function(escape out text)
     set(${out} "${text}" PARENT_SCOPE)
 endfunction()
 
-# usage_of(<out> <tool>): what `<tool> --help` prints, which ends with 0.
-function(usage_of out tool)
-    execute_process(COMMAND "${tool}" --help
-        RESULT_VARIABLE status OUTPUT_VARIABLE text ERROR_VARIABLE text)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "${tool} --help ends with ${status}")
-    endif()
-    set(${out} "${text}" PARENT_SCOPE)
-endfunction()
+# What `--help` of each tool prints, which ends with 0. The usage is
+# text, so it is read into a variable as it stands.
+execute_process(COMMAND "${ANTI}" --help
+    RESULT_VARIABLE status OUTPUT_VARIABLE anti_usage ERROR_VARIABLE anti_usage
+    ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "anti --help ends with ${status}")
+endif()
+execute_process(COMMAND "${ANTIC}" --help
+    RESULT_VARIABLE status OUTPUT_VARIABLE antic_usage
+    ERROR_VARIABLE antic_usage ENCODING NONE)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "antic --help ends with ${status}")
+endif()
 
 # options_of(<out> <text>): every `--option` the text names, sorted.
 function(options_of out text)
@@ -59,8 +64,6 @@ function(options_of out text)
     set(${out} "${found}" PARENT_SCOPE)
 endfunction()
 
-usage_of(anti_usage "${ANTI}")
-usage_of(antic_usage "${ANTIC}")
 options_of(anti_options "${anti_usage}")
 options_of(antic_options "${antic_usage}")
 # The usage of anti lists the options of its commands. The tool itself
