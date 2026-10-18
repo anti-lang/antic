@@ -1,6 +1,7 @@
 /* The side of antic behind antic.h: the walks over a source and a library
    file that the commands of anti ask for. The page of `anti doc` is
    docpage.c. */
+
 #include "antic.h"
 
 #include <stdio.h>

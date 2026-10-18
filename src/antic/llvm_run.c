@@ -1,3 +1,5 @@
+/* The runs of opt and llc on the LLVM text, with the options of each mode. */
+
 #include "llvm_run.h"
 
 #include <stdio.h>

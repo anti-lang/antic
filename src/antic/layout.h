@@ -1,15 +1,15 @@
 #ifndef ANTIC_LAYOUT_H
 #define ANTIC_LAYOUT_H
 
+/* The back end lays out the aggregates of the IR for one target and folds
+   its symbolic values. Chapter 18 gives the rules. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "ir.h"
 #include "target.h"
-
-/* The back end lays out the aggregates of the IR for one target and folds
-   its symbolic values. Chapter 18 gives the rules. */
 
 /* One scalar inside an aggregate, for the classification of its ABI. */
 struct layout_member {
@@ -65,10 +65,17 @@ struct layouts {
    cover the aggregates and symbolic values that m holds at this call. */
 bool layout_init(struct layouts *l, enum target t, const struct ir_module *m,
                  char *error, size_t error_size);
+
+/* Release the tables of l. */
 void layout_free(struct layouts *l);
 
+/* The layout of aggregate agg, computed on its first use. */
 const struct layout *layout_agg(struct layouts *l, uint32_t agg);
+
+/* The size in bytes of a value of type v on the target. */
 uint64_t layout_size(struct layouts *l, struct ir_vtype v);
+
+/* The alignment in bytes of a value of type v on the target. */
 uint64_t layout_align(struct layouts *l, struct ir_vtype v);
 
 /* Fold symbolic value sym to its bits on the target. Returns false after

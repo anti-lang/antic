@@ -1,3 +1,6 @@
+/* The passes over one function, and the removal of what the entry cannot
+   reach. */
+
 #include "optimize.h"
 
 #include <stdlib.h>

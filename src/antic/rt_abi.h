@@ -317,7 +317,10 @@ struct rt_signature {
     enum ir_type types[1 + RT_PARAMS_MAX];
 };
 
+/* The IR form of the row of function f. */
 const struct rt_signature *rt_signature(enum rt_function f);
+
+/* The C name of function f, which the IR and the runtime share. */
 const char *rt_name(enum rt_function f);
 
 /* The records, each a list of rows F(id, member, IR type), in the order
@@ -505,8 +508,10 @@ RT_RECORDS(RT_RECORD_ITEM_ENUM)
 enum rt_record { RT_RECORDS(RT_RECORD_ENUM) RT_RECORD_COUNT };
 #undef RT_RECORD_ENUM
 
-/* The name of record r in the IR, and its count of items. */
+/* The name of record r in the IR. */
 const char *rt_record_name(enum rt_record r);
+
+/* The count of items of record r. */
 size_t rt_record_items(enum rt_record r);
 
 /* The aggregate of record r in m, added on its first use. */

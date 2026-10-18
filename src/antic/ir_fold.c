@@ -1,3 +1,6 @@
+/* The one rule that folds an integer operation on constants, and the three
+   cases that have no value. */
+
 #include "ir_fold.h"
 
 #include "arith.h"

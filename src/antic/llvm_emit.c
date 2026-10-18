@@ -1,3 +1,7 @@
+/* The translation of a laid-out module of the IR into LLVM IR text, with
+   the small texts of a package header, a bundle marker, a notice and the
+   names of a .def file. */
+
 #include "llvm_emit.h"
 
 #include <inttypes.h>

@@ -1,6 +1,8 @@
 #ifndef ANTIC_HEADER_H
 #define ANTIC_HEADER_H
 
+/* The interface of header.c: the C header of a library for C. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

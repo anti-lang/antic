@@ -1,6 +1,9 @@
 #ifndef ANTIC_ATTRIBUTES_H
 #define ANTIC_ATTRIBUTES_H
 
+/* The format attribute of antic, so that clang checks the arguments of
+   every function that formats like printf. */
+
 /* DESIGN: rule 1 of docs/c-guidelines.md keeps a compiler extension to a
    file that exists to hold one, and this header is that file for antic.
    ATTRIBUTE_PRINTF(f, a) marks a function that formats like printf. Its

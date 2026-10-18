@@ -1,3 +1,6 @@
+/* The section of the generics of the library file, written, collected and
+   read by one walker per kind of record. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

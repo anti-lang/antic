@@ -1,6 +1,11 @@
 #ifndef ANTIC_LLVM_EMIT_H
 #define ANTIC_LLVM_EMIT_H
 
+/* The translation of the IR into LLVM IR text, the back end of
+   docs/work-order-llvm-back-end.md. It runs after layout_data and
+   layout_resolve, so it never sees a symbolic size. opt and llc of the
+   pinned release read the text it writes. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -10,11 +15,6 @@
 #include "layout.h"
 #include "target.h"
 #include "text.h"
-
-/* The translation of the IR into LLVM IR text, the back end of
-   docs/work-order-llvm-back-end.md. It runs after layout_data and
-   layout_resolve, so it never sees a symbolic size. opt and llc of the
-   pinned release read the text it writes. */
 
 struct llvm_emit_options {
     enum target target;

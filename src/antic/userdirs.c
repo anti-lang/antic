@@ -1,3 +1,6 @@
+/* The directories of a user-local install on each platform, and the
+   runtime archive of the machine. */
+
 #include "userdirs.h"
 
 #include <stdlib.h>

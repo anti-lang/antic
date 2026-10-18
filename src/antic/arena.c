@@ -1,3 +1,5 @@
+/* Memory handed out from blocks and freed all at once. */
+
 #include "arena.h"
 
 #include <stdlib.h>

@@ -12,23 +12,18 @@
 # header_sections checks them.
 #
 # Step 29 of "Fix steps" in docs/audit/summary.md reaches one part of the
-# tree per session, and each part joins the lists here.
+# tree per session, and each part joins the files read here.
 
 cmake_minimum_required(VERSION 3.21)
 
-# The files of the front end of antic, by the prefixes of their names.
-set(prefixes ast diagnostic lexer modpath parser pattern sema types warnings)
-set(shared parser_parser.h sema_checker.h)
+# Every file of antic. The shared headers are those header_sections checks.
+set(shared antl_io.h driver_parts.h lower_lowerer.h parser_parser.h
+    sema_checker.h whole_parts.h)
 
-set(files "")
-foreach(prefix IN LISTS prefixes)
-    file(GLOB found RELATIVE "${ROOT}"
-        "${ROOT}/src/antic/${prefix}.[ch]" "${ROOT}/src/antic/${prefix}_*.[ch]")
-    list(APPEND files ${found})
-endforeach()
+file(GLOB files RELATIVE "${ROOT}" "${ROOT}/src/antic/*.[ch]")
 list(SORT files)
 if(files STREQUAL "")
-    message(FATAL_ERROR "no file of the front end under ${ROOT}/src/antic")
+    message(FATAL_ERROR "no file of antic under ${ROOT}/src/antic")
 endif()
 
 set(failures "")

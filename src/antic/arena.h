@@ -1,6 +1,9 @@
 #ifndef ANTIC_ARENA_H
 #define ANTIC_ARENA_H
 
+/* The interface of arena.c: memory handed out from blocks and freed all at
+   once. */
+
 #include <stddef.h>
 
 /* Memory for data that lives until the whole compilation ends, such as
@@ -14,6 +17,9 @@ struct arena {
 
 /* Return size bytes of zeroed memory, aligned for any object type. */
 void *arena_alloc(struct arena *a, size_t size);
+
+/* Release every block of a at once, which ends each pointer arena_alloc
+   gave, and leave a empty and valid. */
 void arena_free(struct arena *a);
 
 #endif

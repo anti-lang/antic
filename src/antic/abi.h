@@ -1,6 +1,12 @@
 #ifndef ANTIC_ABI_H
 #define ANTIC_ABI_H
 
+/* The classification of every parameter and result for the C convention
+   of a target, in the terms of an LLVM signature. The section "Calling
+   convention" of docs/work-order-llvm-back-end.md gives the rules. LLVM
+   places what the classification leaves to it: the registers, the stack
+   slots and the variadic rules of the triple. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -8,12 +14,6 @@
 #include "ir.h"
 #include "layout.h"
 #include "target.h"
-
-/* The classification of every parameter and result for the C convention
-   of a target, in the terms of an LLVM signature. The section "Calling
-   convention" of docs/work-order-llvm-back-end.md gives the rules. LLVM
-   places what the classification leaves to it: the
-   registers, the stack slots and the variadic rules of the triple. */
 
 enum abi_kind {
     ABI_DIRECT,      /* a scalar in its own type */

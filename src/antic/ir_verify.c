@@ -1,3 +1,6 @@
+/* The check of the structural and type rules of a module of the IR, with
+   definite assignment, the facts and the class records. */
+
 #include "ir.h"
 
 #include <inttypes.h>

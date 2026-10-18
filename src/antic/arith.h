@@ -1,15 +1,15 @@
 #ifndef ANTIC_ARITH_H
 #define ANTIC_ARITH_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 /* Integer arithmetic of n bits, n being 8, 16, 32 or 64, which the
    checker, the optimizer and the back end compute on constants. Each
    function reads the low n bits of its operands. It returns the n bits of
    the result, sign-extended to 64 when is_signed is set and zero-extended
    otherwise. */
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /* The low n bits of v as a signed value of n bits, sign-extended to 64.
    C11 6.3.1.3 leaves the conversion of an unsigned value above the

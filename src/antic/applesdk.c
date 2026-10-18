@@ -1,3 +1,5 @@
+/* The newest SDK of the Command Line Tools that ld64.lld reads. */
+
 #include "applesdk.h"
 
 #include <limits.h>

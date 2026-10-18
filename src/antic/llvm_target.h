@@ -1,13 +1,13 @@
 #ifndef ANTIC_LLVM_TARGET_H
 #define ANTIC_LLVM_TARGET_H
 
-#include "cpu.h"
-#include "target.h"
-#include "text.h"
-
 /* What the LLVM back end writes for a target and a processor level. The
    section "Targets, CPU levels and object formats" of
    docs/work-order-llvm-back-end.md settles each value. */
+
+#include "cpu.h"
+#include "target.h"
+#include "text.h"
 
 /* Append the triple of the text: the one of target_info, with the minimum
    macOS version appended on macOS. */
@@ -20,9 +20,11 @@ const char *llvm_data_layout(enum target t);
    the triple: pic on every target. */
 const char *llvm_relocation_model(enum target t);
 
-/* The "target-cpu" and "target-features" function attributes of a level.
-   The feature string is the one the pinned clang writes for the level. */
+/* The "target-cpu" function attribute of a level. */
 const char *llvm_target_cpu(enum cpu_level level);
+
+/* The "target-features" function attribute of a level, the string the
+   pinned clang writes for it. */
 const char *llvm_target_features(enum cpu_level level);
 
 /* The "tune-cpu" function attribute of a target, or NULL where the

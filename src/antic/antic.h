@@ -1,6 +1,9 @@
 #ifndef ANTIC_ANTIC_H
 #define ANTIC_ANTIC_H
 
+/* What the anti tool may use of antic, with the records that more than one
+   part shares. */
+
 /* DESIGN: what the anti tool may use of antic. anti compiles through
    driver.h, and everything else it needs of the compiler stands here:
    the names of the files antic writes and of the runtime archive, the
@@ -273,6 +276,8 @@ struct options;
 bool antic_doc_page(const struct options *options, enum doc_items items,
                     struct doc_page *out);
 
+/* Release every record of page that antic_doc_page wrote and leave page
+   empty, so a page the call left half built is freed as well. */
 void doc_page_free(struct doc_page *page);
 
 #endif

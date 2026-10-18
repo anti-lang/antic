@@ -1,3 +1,6 @@
+/* The lowering of expressions: a literal built in place, the operators,
+   the conversions with their checks, and calls with their targets. */
+
 #include <stdio.h>
 #include <stdlib.h>
 

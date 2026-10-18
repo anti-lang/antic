@@ -1,3 +1,6 @@
+/* The class model, devirtualisation, the merge of copies, the singleton
+   check, the table facts and whole_program, which runs the passes. */
+
 #include "whole.h"
 
 #include <stdio.h>

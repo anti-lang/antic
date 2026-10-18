@@ -1,3 +1,6 @@
+/* The helpers every file of lowering uses, the declarations of C and
+   runtime functions, and lower_module. */
+
 #include "lower.h"
 
 #include <stdio.h>

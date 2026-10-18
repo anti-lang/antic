@@ -1,3 +1,6 @@
+/* The checks of AddressSanitizer that --memory-checks puts before every
+   load and store, their declarations and their insertion. */
+
 #include "memcheck.h"
 
 #include <stdint.h>

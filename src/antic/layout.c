@@ -1,3 +1,7 @@
+/* The layout of the aggregates of the IR for one target and the folding of
+   its symbolic values, with the units of bitfields, the resolution of a
+   function and the bytes of a constant global. */
+
 #include "layout.h"
 
 #include <inttypes.h>

@@ -1,3 +1,6 @@
+/* The C header of a library for C, written from the interfaces of the
+   module and its libraries. */
+
 #include "header.h"
 
 #include <inttypes.h>

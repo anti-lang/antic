@@ -1,3 +1,7 @@
+/* The command lines of lld, the platform linkers and llvm-ar for a
+   program, a shared library, an archive and a relocatable object of each
+   target. */
+
 #include "linker.h"
 #include "llvm_run.h"
 

@@ -1,3 +1,6 @@
+/* The rules of a tree the reader of a library file built, with the shape
+   of a simd struct and the type of an IR constant. */
+
 #include <stdint.h>
 #include <string.h>
 

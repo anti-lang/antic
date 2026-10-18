@@ -1,6 +1,9 @@
 #ifndef ANTIC_CPU_H
 #define ANTIC_CPU_H
 
+/* The interface of cpu.c: the processor levels of the targets, their
+   names, their features and the default of each target. */
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -37,9 +40,17 @@ enum cpu_feature {
    in the level table. The checker and the lowering read it. */
 enum { CPU_VECTOR_BYTE_CAP = 256 };
 
+/* The name of level as --cpu takes it, from the table of the runtime: v1,
+   armv8.2 and the others. */
 const char *cpu_name(enum cpu_level level);
+
+/* The architecture whose level this is. */
 enum target_arch cpu_arch(enum cpu_level level);
+
+/* The id of level that the runtime reads, from src/rt/cpu_level.h. */
 int32_t cpu_id(enum cpu_level level);
+
+/* Whether level has feature, a flag of enum cpu_feature. */
 bool cpu_has(enum cpu_level level, unsigned feature);
 
 /* The -march= value of clang, which builds the native libraries of the

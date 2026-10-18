@@ -1,3 +1,6 @@
+/* The debug metadata of the LLVM text: the compile unit, the files, the
+   subprograms and the locations, and the spans the build id leaves out. */
+
 #include "llvm_debug.h"
 
 #include <inttypes.h>

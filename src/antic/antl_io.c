@@ -1,3 +1,6 @@
+/* The primitives that write and read an integer, a count, a name and a C
+   string of the library file, each with its check. */
+
 #include "antl_io.h"
 
 #include <limits.h>

@@ -1,6 +1,9 @@
 #ifndef ANTIC_COFF_H
 #define ANTIC_COFF_H
 
+/* The interface of coff.c: the join of COFF objects into one relocatable
+   object, and the names the linked members of a COFF archive define. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

@@ -1,6 +1,10 @@
 #ifndef ANTIC_WHOLE_H
 #define ANTIC_WHOLE_H
 
+/* The passes over the IR of the whole program. They run after the last
+   module compiles and before the link, in every build mode, and read the
+   class records that lowering writes. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -8,11 +12,7 @@
 #include "ir.h"
 #include "text.h"
 
-/* The passes over the IR of the whole program. They run after the last
-   module compiles and before the link, in every build mode, and read the
-   class records that lowering writes.
-
-   DESIGN: the program holds the IR of every module. A library file
+/* DESIGN: the program holds the IR of every module. A library file
    carries the IR of its module, and antic loads every library file the
    program imports. The compilation of the main module therefore sees the
    whole program in dev mode as well as in release mode. */
@@ -22,7 +22,11 @@
    whole_free. */
 struct whole;
 
+/* Build the classes of program and the tables each class pointer may point
+   at, from the class records of program. */
 struct whole *whole_build(const struct ir_module *program);
+
+/* Release w. NULL is allowed. */
 void whole_free(struct whole *w);
 
 /* The distinct functions that a call through the table of a class may

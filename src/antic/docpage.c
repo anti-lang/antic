@@ -1,6 +1,7 @@
 /* The page of `anti doc`, built from the public interface of a module or
    from its syntax tree. antic.h holds the records and the DESIGN of the
    split: anti renders them and reads nothing of the checker. */
+
 #include "antic.h"
 
 #include <inttypes.h>

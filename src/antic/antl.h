@@ -1,6 +1,9 @@
 #ifndef ANTIC_ANTL_H
 #define ANTIC_ANTL_H
 
+/* The public face of the library file: its version, the depth limit of a
+   tree and the four entry points. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

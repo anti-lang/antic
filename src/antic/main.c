@@ -1,3 +1,6 @@
+/* The command line of antic and the run it asks the driver for, on a
+   thread with a stack of its own. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

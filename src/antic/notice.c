@@ -1,3 +1,6 @@
+/* The licence notice of a set of packages, and the identifier of a
+   component of the runtime archive. */
+
 #include "notice.h"
 
 #include <string.h>

@@ -1,6 +1,9 @@
 #ifndef ANTIC_ALLOC_H
 #define ANTIC_ALLOC_H
 
+/* The interface of alloc.c: the checked allocation of antic, which ends
+   the run on a failure or an overflow. */
+
 #include <stddef.h>
 
 /* DESIGN: the one owner of the heap memory of antic. Every part of the

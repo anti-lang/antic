@@ -1,14 +1,14 @@
 #ifndef ANTIC_LLVM_RUN_H
 #define ANTIC_LLVM_RUN_H
 
+/* The run of opt and llc of the pinned release on the text that
+   llvm_emit_module writes, "Integration route" of
+   docs/work-order-llvm-back-end.md. */
+
 #include <stdbool.h>
 
 #include "antic.h"
 #include "target.h"
-
-/* The run of opt and llc of the pinned release on the text that
-   llvm_emit_module writes, "Integration route" of
-   docs/work-order-llvm-back-end.md. */
 
 /* The suffixes of the intermediate files beside the output: the text and
    the bitcode opt writes from it. */

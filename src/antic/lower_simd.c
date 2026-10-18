@@ -1,3 +1,6 @@
+/* The operations of simd structs, as one instruction, as one operation per
+   lane or as a loop over the lanes. */
+
 #include <stdio.h>
 #include <string.h>
 

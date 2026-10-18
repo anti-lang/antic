@@ -1,3 +1,6 @@
+/* The triple, the data layout, the relocation model and the processor
+   attributes the LLVM text carries per target and level. */
+
 #include "llvm_target.h"
 
 /* DESIGN: every data layout string is the `target datalayout` line the

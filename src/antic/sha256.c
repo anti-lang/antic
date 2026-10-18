@@ -1,3 +1,5 @@
+/* The SHA-256 digest of a file, by the hash of the runtime. */
+
 #include "sha256.h"
 
 #include <stdio.h>

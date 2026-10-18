@@ -1,3 +1,6 @@
+/* The text form of a module of the IR, which --dump-ir, --dump-opt and the
+   tests read. */
+
 #include "ir.h"
 
 #include <inttypes.h>

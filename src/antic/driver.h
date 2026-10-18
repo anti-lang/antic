@@ -1,6 +1,9 @@
 #ifndef ANTIC_DRIVER_H
 #define ANTIC_DRIVER_H
 
+/* The options and the entry points of the driver, which main.c and the
+   anti tool compile through. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

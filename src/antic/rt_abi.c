@@ -1,3 +1,6 @@
+/* The tables behind rt_abi.h: the functions of the runtime that generated
+   code calls and the records it writes. */
+
 #include "rt_abi.h"
 
 #include <stdlib.h>

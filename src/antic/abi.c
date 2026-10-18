@@ -1,3 +1,6 @@
+/* The classification of the parameters and the result of a function for
+   the C convention of a target, as abi.h describes it. */
+
 #include "abi.h"
 
 #include <stdio.h>

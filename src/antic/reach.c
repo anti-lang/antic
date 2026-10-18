@@ -1,3 +1,6 @@
+/* What the entries of a program reach, by one rule, and the walk that
+   computes it. */
+
 #include "reach.h"
 
 #include <stdint.h>

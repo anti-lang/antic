@@ -1,3 +1,6 @@
+/* The join of COFF objects into one relocatable object, and the names the
+   linked members of a COFF archive define. */
+
 #include "coff.h"
 
 #include <inttypes.h>

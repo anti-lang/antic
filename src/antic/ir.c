@@ -1,3 +1,6 @@
+/* The construction of a module of the IR, its tables, and the appenders of
+   instructions. */
+
 #include "ir.h"
 
 #include <stdarg.h>

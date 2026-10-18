@@ -1,3 +1,6 @@
+/* The lowering of statements, loops, `switch`, the exit actions of a block
+   and the slots of a function. */
+
 #include <stdlib.h>
 #include <string.h>
 

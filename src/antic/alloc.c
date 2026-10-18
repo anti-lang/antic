@@ -1,3 +1,6 @@
+/* The checked allocation of antic, which ends the run on a failure or an
+   overflow. */
+
 #include "alloc.h"
 
 #include <stdint.h>

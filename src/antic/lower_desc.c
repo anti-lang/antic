@@ -1,3 +1,6 @@
+/* The descriptors, field and function records, tables and class records of
+   classes, structs, variants, tuples, arrays and `?T`. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

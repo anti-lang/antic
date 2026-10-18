@@ -1,6 +1,8 @@
 #ifndef ANTIC_REACH_H
 #define ANTIC_REACH_H
 
+/* The interface of reach.c: what the entries of a program reach. */
+
 #include <stdbool.h>
 
 #include "ir.h"
@@ -33,6 +35,7 @@ struct ir_reach {
 void ir_reach(const struct ir_module *m, const char *entry, bool all,
               struct ir_reach *out);
 
+/* Release the two lists of r. */
 void ir_reach_free(struct ir_reach *r);
 
 #endif

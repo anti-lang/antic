@@ -1,3 +1,6 @@
+/* The table of the processor levels, their features, their clang arch and
+   the default of each target. */
+
 #include "cpu.h"
 
 #include <string.h>

@@ -1,6 +1,9 @@
 #ifndef ANTIC_MEMCHECK_H
 #define ANTIC_MEMCHECK_H
 
+/* The interface of memcheck.c: the checks of AddressSanitizer that
+   --memory-checks puts before every load and store. */
+
 #include <stdbool.h>
 
 #include "ir.h"

@@ -1,6 +1,9 @@
 #ifndef ANTIC_IR_FOLD_H
 #define ANTIC_IR_FOLD_H
 
+/* The interface of ir_fold.c: the folding of an integer operation on
+   constants, which the optimizer and the layout share. */
+
 #include <stdint.h>
 
 #include "ir.h"

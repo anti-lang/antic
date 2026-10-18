@@ -1,6 +1,9 @@
 #ifndef ANTIC_SHA256_H
 #define ANTIC_SHA256_H
 
+/* The interface of sha256.c: the SHA-256 digest of a file, by the hash of
+   the runtime. */
+
 #include <stdbool.h>
 
 /* The hash is the one of the runtime, which antic and anti compile in. */

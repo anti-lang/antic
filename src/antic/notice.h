@@ -1,6 +1,9 @@
 #ifndef ANTIC_NOTICE_H
 #define ANTIC_NOTICE_H
 
+/* The interface of notice.c: the licence notice of a set of packages, and
+   the identifier of a component of the runtime archive. */
+
 #include <stddef.h>
 
 /* The begin and end markers of the licence notice, by which a tool finds

@@ -1,3 +1,6 @@
+/* The arithmetic on constants of n bits that the checker, the optimizer
+   and the layout share. */
+
 #include "arith.h"
 
 #include "text.h"

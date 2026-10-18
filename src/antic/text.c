@@ -1,3 +1,6 @@
+/* A byte buffer that grows and stays NUL-terminated, and the formatting of
+   a message into a fixed buffer. */
+
 #include "text.h"
 
 #include <stdarg.h>

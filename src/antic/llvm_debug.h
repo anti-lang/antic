@@ -1,6 +1,12 @@
 #ifndef ANTIC_LLVM_DEBUG_H
 #define ANTIC_LLVM_DEBUG_H
 
+/* The debug information of `-g` in the LLVM text, as the section "Debug
+   information" of docs/work-order-llvm-back-end.md gives it: one
+   !DICompileUnit, one !DIFile per source file, one !DISubprogram per
+   function and a !DILocation on every instruction with a line. Lines
+   only, so no variable, type or parameter is described. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -9,13 +15,7 @@
 #include "target.h"
 #include "text.h"
 
-/* The debug information of `-g` in the LLVM text, as the section "Debug
-   information" of docs/work-order-llvm-back-end.md gives it: one
-   !DICompileUnit, one !DIFile per source file, one !DISubprogram per
-   function and a !DILocation on every instruction with a line. Lines
-   only, so no variable, type or parameter is described.
-
-   DESIGN: COFF writes the compile unit and a subprogram per function in
+/* DESIGN: COFF writes the compile unit and a subprogram per function in
    every build, with -g and without it. CodeView then writes the symbol
    record of each function, which names a static function in the PDB.
    Without -g no instruction carries a line, the subprogram names line 0,
@@ -45,6 +45,7 @@ struct debug_spans {
     size_t capacity;
 };
 
+/* Release the spans of s and leave it empty. */
 void debug_spans_free(struct debug_spans *s);
 
 struct llvm_debug {
@@ -82,6 +83,7 @@ void llvm_debug_init(struct llvm_debug *d, enum target t,
                      bool lines, bool optimized, uint32_t first,
                      struct debug_spans *spans);
 
+/* Release the metadata nodes of d. */
 void llvm_debug_free(struct llvm_debug *d);
 
 /* Append s as a metadata string in quotes. A quote, a backslash and a

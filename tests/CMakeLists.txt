@@ -1079,10 +1079,10 @@ add_test(NAME header_sections
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_header_sections.cmake")
 
-# Each file of the front end of antic opens with the comment of its
-# purpose, and each function a public header of it declares has a comment
-# of its own. Step 29 of the fix steps of docs/audit/summary.md adds the
-# other parts of the tree.
+# Each file of antic opens with the comment of its purpose, and each
+# function a public header of it declares has a comment of its own. Step
+# 29 of the fix steps of docs/audit/summary.md adds the other parts of the
+# tree.
 add_test(NAME file_headers
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_file_headers.cmake")

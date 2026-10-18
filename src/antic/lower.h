@@ -1,6 +1,9 @@
 #ifndef ANTIC_LOWER_H
 #define ANTIC_LOWER_H
 
+/* The entry of lowering, a checked module into a module of the IR, and its
+   options. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

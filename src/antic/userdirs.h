@@ -1,6 +1,9 @@
 #ifndef ANTIC_USERDIRS_H
 #define ANTIC_USERDIRS_H
 
+/* The interface of userdirs.c: the directories of a user-local install on
+   each platform, and the runtime archive of the machine. */
+
 #include <stdbool.h>
 
 #include "text.h"

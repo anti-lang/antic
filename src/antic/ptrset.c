@@ -1,3 +1,6 @@
+/* A set of pointers, a map from a pointer to a pointer and one to an
+   index, over one table. */
+
 #include "ptrset.h"
 
 #include <stdio.h>

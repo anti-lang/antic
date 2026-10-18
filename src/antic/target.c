@@ -1,3 +1,6 @@
+/* The table of the six targets, their names and the symbols of functions
+   and of C names per object format. */
+
 #include "target.h"
 
 #include <string.h>

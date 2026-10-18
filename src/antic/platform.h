@@ -1,16 +1,16 @@
 #ifndef ANTIC_PLATFORM_H
 #define ANTIC_PLATFORM_H
 
+/* The platform layer of antic and anti, which docs/c-guidelines.md names
+   under rule 22. Every call that differs between the systems goes through
+   it. A path, an argument and the value of a variable are UTF-8 on every
+   host, and Windows sees UTF-16 at each of its calls. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 
 #include "text.h"
-
-/* The platform layer of antic and anti, which docs/c-guidelines.md names
-   under rule 22. Every call that differs between the systems goes through
-   it. A path, an argument and the value of a variable are UTF-8 on every
-   host, and Windows sees UTF-16 at each of its calls. */
 
 /* Open the file at path in binary mode, for reading, or for writing when
    writing is true. Writing creates the file or empties the one that is

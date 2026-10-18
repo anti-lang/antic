@@ -1,6 +1,9 @@
 #ifndef ANTIC_LINKER_H
 #define ANTIC_LINKER_H
 
+/* The interface of linker.c: the command lines of the links of each target
+   and the facts about the host they need. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -89,6 +92,8 @@ struct link_command {
    with NULL. */
 void link_command(struct link_command *c, enum target t,
                   const struct link_inputs *in);
+
+/* Release the strings and the argument list of c. */
 void link_command_free(struct link_command *c);
 
 /* The version facts of a shared library, NULL when absent. The .def file

@@ -1,6 +1,9 @@
 #ifndef ANTIC_TARGET_H
 #define ANTIC_TARGET_H
 
+/* The interface of target.c: the six targets, their object formats and
+   calling conventions, and the symbols of functions and of C names. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -49,15 +52,25 @@ struct target_info {
     const char *executable_suffix;
 };
 
+/* The name of t, which is also the directory of t in the runtime archive. */
 const char *target_name(enum target t);
+
+/* What the rest of antic needs to know about t. */
 const struct target_info *target_info(enum target t);
+
+/* The name of an object format for a message: ELF, Mach-O or COFF. */
 const char *target_format_name(enum object_format format);
+
+/* The name of a calling convention for a message. */
 const char *target_convention_name(enum convention convention);
 
 /* Store the target antic runs on. Returns false on a host that is not
    one of the six targets, and stores TARGET_COUNT. The platform layer,
    platform.c, defines it, since the answer is the host's. */
 bool target_host(enum target *t);
+
+/* Store the target named name. Returns false for a name that is none of
+   the six targets, and leaves *t alone. */
 bool target_from_name(const char *name, enum target *t);
 
 /* Append the symbol of function name in module to out. t is one of the

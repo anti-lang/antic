@@ -1,6 +1,9 @@
 #ifndef ANTIC_APPLESDK_H
 #define ANTIC_APPLESDK_H
 
+/* The interface of applesdk.c: the newest SDK of the Command Line Tools
+   that ld64.lld reads. */
+
 #include <stdbool.h>
 
 #include "text.h"

@@ -1,6 +1,11 @@
 #ifndef ANTIC_IR_H
 #define ANTIC_IR_H
 
+/* The intermediate representation of antic: typed three-address code in
+   functions of basic blocks. It is the same for all six targets. It holds
+   no register, no calling convention and no symbol mangling, because the
+   back end decides those per target. */
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,12 +15,7 @@
 #include "attributes.h"
 #include "text.h"
 
-/* The intermediate representation of antic: typed three-address code in
-   functions of basic blocks. It is the same for all six targets. It holds
-   no register, no calling convention and no symbol mangling, because the
-   back end decides those per target.
-
-   DESIGN: the IR records types, never sizes, offsets or register classes.
+/* DESIGN: the IR records types, never sizes, offsets or register classes.
    A size, an offset or an array stride is a symbolic value that names the
    type. The back end folds it after it lays out the types for its target,
    so a library file holds the same bytes on every host. */
@@ -607,22 +607,33 @@ struct ir_module {
     const char *extern_clash;
 };
 
+/* Make m an empty module named name, whose names, globals and constants
+   live in arena. */
 void ir_module_init(struct ir_module *m, struct arena *arena,
                     const char *name);
+
+/* Release the heap memory of m, its functions and class records among it,
+   and leave m zeroed. arena keeps the rest. */
 void ir_module_free(struct ir_module *m);
 
-/* Release the heap memory of a block, of the blocks and temporaries of a
-   function, or of both and the parameters. The two for a function leave
-   its counts and capacities at 0, so it takes new blocks and temporaries
-   afterwards. The optimizer uses them for blocks and functions it
-   removes. */
+/* Release b with its instructions and their argument lists. The
+   optimizer uses it for blocks it removes. */
 void ir_block_free(struct ir_block *b);
+
+/* Release the blocks and the temporaries of f and leave their counts and
+   capacities at 0, so f takes new ones afterwards. */
 void ir_function_free_body(struct ir_function *f);
 /* Release the lists of a class record and leave them empty. */
 void ir_class_free(struct ir_class *c);
+
+/* Release the body and the parameters of f, as ir_function_free_body does
+   for the body. The optimizer uses both for functions it removes. */
 void ir_function_free(struct ir_function *f);
 
+/* The value type of the scalar type, with no aggregate. */
 struct ir_vtype ir_scalar(enum ir_type type);
+
+/* The value type of aggregate agg of the type table. */
 struct ir_vtype ir_aggregate(uint32_t agg);
 
 /* Add a source file to the module's table, or find the one of that path.
@@ -662,10 +673,20 @@ uint64_t ir_hash_name(const char *module, const char *name);
 /* The index of the aggregate named name, or IR_NO_AGG. */
 uint32_t ir_agg_find(const struct ir_module *m, const char *name);
 
-/* Add a symbolic value, or find an equal one. Returns its index. */
+/* Add the symbolic value of the integer value of type, or find an equal
+   one. Returns its index. */
 uint32_t ir_sym_int(struct ir_module *m, enum ir_type type, uint64_t value);
+
+/* The symbolic size of a value of type of, an i64, added or found as
+   ir_sym_int is. */
 uint32_t ir_sym_size_of(struct ir_module *m, struct ir_vtype of);
+
+/* The symbolic offset of field field of aggregate agg, an i64, added or
+   found as ir_sym_int is. */
 uint32_t ir_sym_offset_of(struct ir_module *m, uint32_t agg, uint32_t field);
+
+/* The symbolic value of op of type on the symbolic values a and b, added
+   or found as ir_sym_int is. b is unused for an operation of one operand. */
 uint32_t ir_sym_op(struct ir_module *m, enum ir_op op, enum ir_type type,
                    uint32_t a, uint32_t b);
 /* The operand of symbolic value sym: an integer constant for a number,
@@ -691,24 +712,46 @@ bool ir_in_unit(const char *module, const char *unit, const char *entry);
    build and the library reader all ask here. */
 bool ir_is_copy_name(const char *name);
 
+/* Add a function that module defines, named name, with an empty body.
+   result is its result type, and result_agg the aggregate of an IR_AGG
+   result or IR_NO_AGG. */
 struct ir_function *ir_function_add(struct ir_module *m, const char *module,
                                     const char *name, enum ir_type result,
                                     uint32_t result_agg);
+
+/* Add the declaration of a C function, which has no module and no body.
+   variadic marks one that takes more arguments than its parameters. */
 struct ir_function *ir_extern_add(struct ir_module *m, const char *name,
                                   enum ir_type result, bool variadic);
 /* A function of another Anti module, which that module's IR defines. */
 struct ir_function *ir_declare_add(struct ir_module *m, const char *module,
                                    const char *name, enum ir_type result,
                                    uint32_t result_agg);
+
+/* Add a parameter of type to f, with agg the aggregate of an IR_AGG one.
+   Returns the temporary that holds it in the body, a pointer for an
+   aggregate, or IR_NO_RESULT for a function without a body. */
 uint32_t ir_param_add(struct ir_function *f, enum ir_type type, uint32_t agg);
+
+/* Add an empty block to f. Returns it, numbered by its place in f. */
 struct ir_block *ir_block_add(struct ir_function *f);
+
+/* Add a temporary of type to f. Returns its index. A function past the
+   last index ends the run as a failed allocation does. */
 uint32_t ir_temp(struct ir_function *f, enum ir_type type);
 
+/* Add a global that module defines, named name, with a copy of the size
+   bytes at bytes and the alignment align. Its relocations are added after
+   it. */
 struct ir_global *ir_global_add(struct ir_module *m, const char *module,
                                 const char *name, const uint8_t *bytes,
                                 uint64_t size, uint64_t align);
+
+/* Put the address of global target into g at offset. */
 void ir_global_reloc(struct ir_module *m, struct ir_global *g,
                      uint64_t offset, uint32_t target);
+
+/* Put the address of the function of index function into g at offset. */
 void ir_global_reloc_fn(struct ir_module *m, struct ir_global *g,
                         uint64_t offset, uint32_t function);
 
@@ -721,11 +764,26 @@ struct ir_global *ir_global_add_value(struct ir_module *m, const char *module,
 /* Add the record of a class with no tables, no base and no fields. */
 struct ir_class *ir_class_add(struct ir_module *m, const char *module,
                               const char *name);
+
+/* Add to c the table of an interface sub-object: the global of the
+   interface's descriptor, the global of the table, and the aggregate and
+   the field of the sub-object. */
 void ir_class_subtable(struct ir_class *c, uint32_t interface,
                        uint32_t table, uint32_t agg, uint32_t field);
+
+/* Add field of the aggregate of c to the fields a singleton declares
+   `mutable`, which the singleton check of the pass over the whole program
+   reads. */
 void ir_class_mutable(struct ir_class *c, uint32_t field);
+
+/* Add to c an interface its module provides it for, by the path of the
+   interface and the global of its descriptor. */
 void ir_class_provides(struct ir_module *m, struct ir_class *c,
                        const char *interface, uint32_t descriptor);
+
+/* Add to c an `inject` field it declares: the path of the interface, the
+   name of the field, the global of the interface's descriptor and whether
+   the field is `inject final`. */
 void ir_class_inject(struct ir_module *m, struct ir_class *c,
                      const char *interface, const char *field,
                      uint32_t descriptor, bool final);
@@ -743,22 +801,37 @@ struct ir_const *ir_const_int(struct ir_module *m, enum ir_type type,
 /* Whether the two constants hold the same value. */
 bool ir_const_equal(const struct ir_const *a, const struct ir_const *b);
 
+/* The operand of temporary temp of f, with its type. */
 struct ir_operand ir_temp_op(const struct ir_function *f, uint32_t temp);
+
+/* An integer constant of the scalar type, cut to the width of i8, i16 or
+   i32. */
 struct ir_operand ir_int_op(enum ir_type type, uint64_t value);
+
+/* A floating constant of type f32 or f64. */
 struct ir_operand ir_float_op(enum ir_type type, double value);
+
+/* The address of function f, a pointer. */
 struct ir_operand ir_func_op(const struct ir_function *f);
+
+/* The address of global g, a pointer. */
 struct ir_operand ir_global_op(const struct ir_global *g);
 
 /* Append a copy of inst, with a copy of its argument list. The library
    file reader uses it for instructions whose operands it has checked. */
 void ir_inst_add(struct ir_block *b, const struct ir_inst *inst);
 
-/* Append an instruction. The emitters with a result create a new
-   temporary and return it. ir_assign writes to an existing temporary,
-   because the IR is not in static single assignment form. */
+/* The appenders below add one instruction to the end of b. The ones with
+   a result create a new temporary and return it. ir_assign writes to an
+   existing temporary, because the IR is not in static single assignment
+   form. */
+
+/* Append op of type on x and y. Returns the temporary of the result. */
 uint32_t ir_binary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                    enum ir_type type, struct ir_operand x,
                    struct ir_operand y);
+
+/* Append op of type on x. Returns the temporary of the result. */
 uint32_t ir_unary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                   enum ir_type type, struct ir_operand x);
 /* A flag operation of x and y, with the carry or borrow c of an add or a
@@ -769,8 +842,13 @@ uint32_t ir_flag_op(struct ir_function *f, struct ir_block *b, enum ir_op op,
 /* Read flag of the flag operation whose result is of, right after it. */
 uint32_t ir_flag(struct ir_function *f, struct ir_block *b, enum ir_flag flag,
                  struct ir_operand of);
+
+/* Append a copy of src into the temporary dst, of the type of dst. */
 void ir_assign(struct ir_function *f, struct ir_block *b, uint32_t dst,
                struct ir_operand src);
+
+/* Append a stack slot for a value of type of. Returns the temporary of its
+   address. */
 uint32_t ir_slot(struct ir_function *f, struct ir_block *b,
                  struct ir_vtype of);
 /* Add a slot to the entry block, after the slots already there. Lowering
@@ -779,25 +857,38 @@ uint32_t ir_entry_slot(struct ir_function *f, struct ir_vtype of);
 /* Add a slot of one pointer to the entry block, which holds zero from the
    start of the function. */
 uint32_t ir_entry_zero_slot(struct ir_function *f);
+
+/* Append a load of a value of type from pointer. Returns the temporary of
+   the value. */
 uint32_t ir_load(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand pointer);
+
+/* Append a store of value, of type, at pointer. */
 void ir_store(struct ir_function *f, struct ir_block *b, enum ir_type type,
               struct ir_operand value, struct ir_operand pointer);
-/* A load or a store of a pointer that reaches what access names. */
+/* Append a load of a pointer from pointer, which reaches what access
+   names. Returns the temporary of the pointer. */
 uint32_t ir_load_access(struct ir_function *f, struct ir_block *b,
                         struct ir_operand pointer, enum ir_access access);
+
+/* Append a store of the pointer value at pointer, which reaches what
+   access names. */
 void ir_store_access(struct ir_function *f, struct ir_block *b,
                      struct ir_operand value, struct ir_operand pointer,
                      enum ir_access access);
+
+/* Append the address pointer plus the byte offset. Returns the temporary
+   of the address. */
 uint32_t ir_ptradd(struct ir_function *f, struct ir_block *b,
                    struct ir_operand pointer, struct ir_operand offset);
-/* The facts of "Arithmetic, addresses and ranges": an operation with the
-   wrap facts wrap, an address inside the object pointer points at, a load
-   of a value from low up to high, and the start or the end of the
-   lifetime of a slot. */
+/* ir_binary with the wrap facts wrap of "Arithmetic, addresses and
+   ranges": IR_NSW, IR_NUW, both or none. */
 uint32_t ir_binary_wrap(struct ir_function *f, struct ir_block *b,
                         enum ir_op op, enum ir_type type, struct ir_operand x,
                         struct ir_operand y, unsigned wrap);
+
+/* ir_ptradd of an address that stays inside the object pointer points at,
+   IR_INBOUNDS. */
 uint32_t ir_ptradd_inbounds(struct ir_function *f, struct ir_block *b,
                             struct ir_operand pointer,
                             struct ir_operand offset);
@@ -816,14 +907,24 @@ uint32_t ir_ptradd_inbounds(struct ir_function *f, struct ir_block *b,
    ir_type_access gives the last instruction of b, a load or a store, of
    and member. */
 void ir_type_access(struct ir_block *b, struct ir_vtype of, uint32_t member);
+
+/* ir_load of a value that lies from low up to high, without high. */
 uint32_t ir_load_range(struct ir_function *f, struct ir_block *b,
                        enum ir_type type, struct ir_operand pointer,
                        uint64_t low, uint64_t high);
+
+/* Append the start or the end of the lifetime of slot, with op
+   IR_LIFE_START or IR_LIFE_END. */
 void ir_lifetime(struct ir_function *f, struct ir_block *b, enum ir_op op,
                  struct ir_operand slot);
+
+/* Append a copy of a value of type of from src to dst. */
 void ir_memcopy(struct ir_function *f, struct ir_block *b,
                 struct ir_operand dst, struct ir_operand src,
                 struct ir_vtype of);
+
+/* Append the address of target, a function or a global. Returns the
+   temporary of the address. */
 uint32_t ir_addr(struct ir_function *f, struct ir_block *b,
                  struct ir_operand target);
 /* Read or write bitfield field of aggregate agg in the aggregate at
@@ -831,27 +932,47 @@ uint32_t ir_addr(struct ir_function *f, struct ir_block *b,
 uint32_t ir_bitload(struct ir_function *f, struct ir_block *b,
                     enum ir_type type, struct ir_operand pointer, uint32_t agg,
                     uint32_t field);
+
+/* Append a store of value into bitfield field of aggregate agg at pointer. */
 void ir_bitstore(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand value, struct ir_operand pointer,
                  uint32_t agg, uint32_t field);
 /* The operations on simd structs. lane is the type of one lane of agg,
-   and dst, x, y and mask are addresses of values. */
+   and dst, x, y and mask are addresses of values. ir_vbinary appends the
+   lane operation op of x and y into dst. */
 void ir_vbinary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                 enum ir_type lane, struct ir_operand dst, struct ir_operand x,
                 struct ir_operand y, uint32_t agg);
+
+/* Append the lane operation op of x into dst. */
 void ir_vunary(struct ir_function *f, struct ir_block *b, enum ir_op op,
                enum ir_type lane, struct ir_operand dst, struct ir_operand x,
                uint32_t agg);
+
+/* Append the scalar value into every lane of dst. */
 void ir_vsplat(struct ir_function *f, struct ir_block *b, enum ir_type lane,
                struct ir_operand dst, struct ir_operand value, uint32_t agg);
+
+/* Append, into dst, the lane of x where mask holds and the lane of y where
+   it does not. */
 void ir_vselect(struct ir_function *f, struct ir_block *b, enum ir_type lane,
                 struct ir_operand dst, struct ir_operand mask,
                 struct ir_operand x, struct ir_operand y, uint32_t agg);
+
+/* Append, into lane i of dst, lane lanes[i] of x, for each of the count
+   lanes. */
 void ir_vshuffle(struct ir_function *f, struct ir_block *b, enum ir_type lane,
                  struct ir_operand dst, struct ir_operand x,
                  const uint32_t *lanes, size_t count, uint32_t agg);
+
+/* Append the lanes of x folded by op into one value of type, as IR_VREDUCE
+   gives it. Returns the temporary of the value. */
 uint32_t ir_vreduce(struct ir_function *f, struct ir_block *b, enum ir_op op,
                     enum ir_type type, struct ir_operand x, uint32_t agg);
+
+/* Append a call of callee with the arg_count operands at args, which the
+   call copies. type is the result type. Returns the temporary of the
+   result, a pointer for an aggregate, or IR_NO_RESULT for void. */
 uint32_t ir_call(struct ir_function *f, struct ir_block *b, enum ir_type type,
                  struct ir_operand callee, const struct ir_operand *args,
                  size_t arg_count);
@@ -861,21 +982,36 @@ uint32_t ir_call_indirect(struct ir_function *f, struct ir_block *b,
                           enum ir_type type, struct ir_operand target,
                           const struct ir_function *signature,
                           const struct ir_operand *args, size_t arg_count);
+
+/* End b with a jump to target. */
 void ir_jump(struct ir_function *f, struct ir_block *b,
              const struct ir_block *target);
+
+/* End b with a branch to then_block when the operation that gave value
+   left the range of its type, else to else_block. That operation is the
+   last one of b. */
 void ir_branch_ov(struct ir_function *f, struct ir_block *b,
                   struct ir_operand value, const struct ir_block *then_block,
                   const struct ir_block *else_block);
 
+/* End b with a branch to then_block when cond is nonzero, else to
+   else_block. */
 void ir_branch(struct ir_function *f, struct ir_block *b,
                struct ir_operand cond, const struct ir_block *then_block,
                const struct ir_block *else_block);
+
+/* End b with a return of value of type, or of nothing for void. */
 void ir_ret(struct ir_function *f, struct ir_block *b, enum ir_type type,
             struct ir_operand value);
+
+/* End b as a block that nothing reaches, after a call of a function that
+   never returns. */
 void ir_unreachable(struct ir_function *f, struct ir_block *b);
 
-/* The names of types and operations in the text form. */
+/* The name of type in the text form. */
 const char *ir_type_name(enum ir_type type);
+
+/* The name of op in the text form. */
 const char *ir_op_name(enum ir_op op);
 
 /* Append `module.name`, or the name alone for a symbol without a module:

@@ -1,8 +1,15 @@
 #ifndef ANTIC_OPTIMIZE_H
 #define ANTIC_OPTIMIZE_H
 
+/* The optimizer of the IR over a program, a module or one function, and
+   the drop of the failure arms. */
+
 #include "ir.h"
 
+/* Run the passes on every function of program that has a body, then remove
+   what the entries do not reach. entry names the unit of main, as ir_reach
+   takes it. The class records go as well, since the removal renumbers the
+   functions and the globals they name. */
 void optimize_program(struct ir_module *program, const char *entry);
 
 /* Optimize the functions of module alone, for an object of its own in dev
