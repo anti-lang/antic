@@ -8,7 +8,7 @@ points are in `docs/decisions.md` under the same name.
 ## The layers
 
 One table of keys lives in `src/rt/conf.c`, one entry per key of `[runtime]`:
-`backtrace`, `logger`, `plugins`, `threads` and `trace`. Each entry holds
+`backtrace`, `hash_seed`, `logger`, `plugins`, `threads` and `trace`. Each entry holds
 the value, the layer that set it and the file of a value of the file
 layer. The layers are `build`, `file` and `command`, in that order, and
 a write is dropped when the entry stands at a higher layer. Two writes of
@@ -32,11 +32,12 @@ carries an interface and a path, which `anti_rt_inject_line` of
 `src/rt/inject.c` keeps, as it keeps a line of `[injections]`.
 
 `anti_rt_conf_start` runs after the pass. It prints the options and ends
-for `--anti.help`, reads the file of `--anti.conf` or of `ANTI_CONF`, and
-prints the effective configuration and ends for `--anti.inspect`. The
-help comes before the file so that a program with a broken file still
-answers it, and the inspection after it so that it shows what the file
-gave.
+for `--anti.help`, and reads the file of `--anti.conf` or of `ANTI_CONF`.
+It then hands `plugins` to `anti_rt_inject_start`, which loads the
+provider of every injection. Last it prints the effective configuration
+and ends for `--anti.inspect`. The help comes before the file so that a
+program with a broken file still answers it. The inspection comes after
+the injections, so that it shows what the file gave.
 
 ## The file
 
@@ -54,15 +55,17 @@ A cycle is found by the paths on the stack of files being read, compared
 as text. Two spellings of one path escape that comparison, and the depth
 limit of thirty-two catches them with the same message.
 
-The file is opened through `anti_rt_fs_open` of `src/rt/fs.c`, which calls the
+The file is read through `anti_rt_fs_read` of `src/rt/fs.c`, which calls the
 platform layer. The path of Windows therefore goes through UTF-16 as every
 other path of the runtime does.
 
 ## Who reads a key
 
-`backtrace` is the one key the configuration applies itself: it writes
-`anti_rt_option_backtrace`, which `anti_rt_backtrace_on` already read for
-`--anti.backtrace`. `threads` is read by `worker_count` of
+`backtrace` and `hash_seed` are the two keys the configuration applies
+itself. `backtrace` writes `anti_rt_option_backtrace`, which
+`anti_rt_backtrace_on` already read for `--anti.backtrace`, and
+`hash_seed` writes the seed through `anti_rt_hash_seed_set` of
+`src/rt/hash.c`. `threads` is read by `worker_count` of
 `src/rt/threads.c`, and `logger` by `from_configuration` of
 `src/std/anti/log.anti` through `anti_rt_conf_get`. `trace` is read the same
 way by `start` of `src/std/anti/trace.anti`, which the program calls.

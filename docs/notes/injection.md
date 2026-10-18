@@ -106,8 +106,12 @@ passes both names the library that the start opens once the
 configuration has been read, through the loader of `src/rt/plugin.c`.
 Every program links the loader for that reason.
 
-`--anti.inspect` prints one line per interface, its path and the class,
-the field and `final` in brackets.
+`--anti.inspect` prints one line per interface after the keys,
+`anti_rt_inject_inspect` of `src/rt/inject.c`. The line holds its path,
+the class, the field and `final` in brackets, then the version of the
+interface and the count of its slots the program's calls reach. The
+list `loaded plugins` follows, one line per interface that a line of
+`[injections]` or a `--anti.inject` names, with the library it names.
 
 ## The manifest
 
