@@ -226,13 +226,14 @@ static void check_inst(struct checker *c, const struct ir_inst *inst)
 void memcheck_function(const struct ir_module *m, struct ir_function *f,
                        struct layouts *l)
 {
+    bool *frame = frame_addresses(f);
     struct checker c;
     size_t b;
     size_t i;
 
     c.m = m;
     c.layouts = l;
-    c.frame = frame_addresses(f);
+    c.frame = frame;
     for (b = 0; b < f->block_count; b++) {
         struct ir_block *block = f->blocks[b];
         /* An instruction takes four checks at most, a vselect. */
@@ -248,5 +249,5 @@ void memcheck_function(const struct ir_module *m, struct ir_function *f,
         block->count = c.count;
         block->capacity = capacity;
     }
-    free((void *)c.frame);
+    free(frame);
 }
