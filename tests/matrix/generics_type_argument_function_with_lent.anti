@@ -1,0 +1,31 @@
+//! A type argument that is a function type with a `lent` parameter reads as
+//! a type argument after `<`, as one with `keep` or `own` does, and not as a
+//! comparison.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Holder<T>
+{
+	f: T,
+}
+
+fn size<T>() -> int
+{
+	return size_of(T) as int;
+}
+
+fn read(lent p: *int) -> int
+{
+	return *p + 1;
+}
+
+fn main() -> int
+{
+	let h = Holder<fn(lent *int) -> int> { f: read };
+	let n = 41;
+	printf("%d\n".ptr, h.f(&n) as c_int);
+	printf("%d\n".ptr, (size<fn(lent *int) -> int>() == size_of(*int) as int) as c_int);
+	return 0;
+}

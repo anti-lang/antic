@@ -135,10 +135,22 @@ static struct stmt *let_or_const(struct parser *p)
     return parser_expect(p, TOKEN_SEMICOLON) ? s : NULL;
 }
 
+/* Whether e is one of the calls that stand as a statement: a call, with
+   the handler it may carry, `free`, `dup`, `delete` and `destroy`, `join`
+   and an operation of a mutex or a channel. A statement and an arm both
+   take these, so the two readings cannot drift apart. */
+static bool is_call_statement(const struct expr *e)
+{
+    return e->kind == EXPR_CALL || e->kind == EXPR_FREE ||
+           e->kind == EXPR_OBJECT || e->kind == EXPR_JOIN ||
+           e->kind == EXPR_SYNC_OP;
+}
+
 /* DESIGN: the arms of a switch are separated by commas, so the body of an
    arm carries no `;` of its own. It is a block, or one assignment or call
    that the comma or the closing brace ends. Anything longer takes a
-   block. */
+   block. A call is every call a statement takes, the handler of a call
+   that can fail included, by a [provisional] entry of docs/decisions.md. */
 /* The refusal of an arm body that is none of the three forms. */
 #define SWITCH_ARM "an arm of a `switch` is a call, an assignment or a block"
 #define SELECT_ARM "an arm of a `select` is a call, an assignment or a block"
@@ -162,7 +174,11 @@ static struct stmt *arm_body(struct parser *p, const char *refusal)
         s->as.assign.target = e;
         return (s->as.assign.value = parser_expression(p)) == NULL ? NULL : s;
     }
-    if (e->kind != EXPR_CALL && e->kind != EXPR_SYNC_OP) {
+    if (e->kind == EXPR_CALL && parser_check(p, TOKEN_CATCH) &&
+        !read_handler(p, &e->as.call.handler, false)) {
+        return NULL;
+    }
+    if (!is_call_statement(e)) {
         parser_error_here(p, "%s", refusal);
         return NULL;
     }
@@ -774,9 +790,7 @@ static struct stmt *statement_level(struct parser *p)
                 parser_expect(p, TOKEN_SEMICOLON);
                 return NULL;
             }
-            if (e->kind != EXPR_CALL && e->kind != EXPR_FREE &&
-                e->kind != EXPR_OBJECT && e->kind != EXPR_JOIN &&
-                e->kind != EXPR_SYNC_OP) {
+            if (!is_call_statement(e)) {
                 parser_error_here(p, "expected a call or an assignment");
                 return NULL;
             }

@@ -1,0 +1,107 @@
+//! An arm of a `switch` or a `select` that is one call takes every call a
+//! statement takes: `free`, `delete`, `join` and a call with its handler.
+//! Each form is a function of its own, and the program prints one line per
+//! form and input.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub n: int = 0,
+}
+
+worker fn twice(b: *Box) -> int
+{
+	return b.n * 2;
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return 1;
+}
+
+fn with_free(n: int) -> int
+{
+	let held = alloc(int, 2);
+	let p = held else {
+		return -1;
+	};
+	p[0] = n;
+	let seen = p[0];
+	switch n {
+		0 => free(p),
+		else => free(p),
+	}
+	return seen;
+}
+
+fn with_delete(n: int) -> int
+{
+	let b = alloc Box { n: n };
+	let seen = b.n;
+	switch n {
+		0 => delete(b),
+		else => delete(b),
+	}
+	return seen;
+}
+
+fn with_join(n: int) -> int
+{
+	let b = alloc Box { n: n };
+	let job = dispatch b -> twice;
+	switch n {
+		0 => join(job),
+		else => join(job),
+	}
+	let seen = b.n;
+	delete(b);
+	return seen;
+}
+
+fn with_handler(n: int) -> int
+{
+	let caught = 0;
+	switch n {
+		0 => risky(n) catch e {
+			caught = 1;
+		},
+		else => risky(n) catch e {
+			caught = 2;
+		},
+	}
+	return caught;
+}
+
+fn in_select(n: int) -> int
+{
+	let c = chan int(1);
+	send(c, n);
+	let held = alloc(int, 1);
+	let p = held else {
+		delete(c);
+		return -1;
+	};
+	select {
+		c x => free(p),
+	}
+	delete(c);
+	return n;
+}
+
+fn main() -> int
+{
+	for n in 0..2 {
+		printf("free %d %d\n".ptr, n as c_int, with_free(n) as c_int);
+		printf("delete %d %d\n".ptr, n as c_int, with_delete(n) as c_int);
+		printf("join %d %d\n".ptr, n as c_int, with_join(n) as c_int);
+		printf("handler %d %d\n".ptr, n as c_int, with_handler(n) as c_int);
+		printf("select %d %d\n".ptr, n as c_int, in_select(n) as c_int);
+	}
+	return 0;
+}

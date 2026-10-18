@@ -63,13 +63,28 @@ static bool scan_list(const struct parser *p, struct angle_scan *s)
     }
 }
 
-/* The types of a list that `(` opened at the scan, up to its `)`. */
+/* Whether the token at the scan is the word `lent` before a type, as the
+   tuple and the parameter of a function type read it below. */
+static bool scan_lent(const struct parser *p, size_t at)
+{
+    enum token_kind next = parser_peek_at(p, at + 1)->kind;
+
+    return parser_is_word(p, parser_peek_at(p, at), "lent") &&
+           next != TOKEN_COMMA && next != TOKEN_RPAREN;
+}
+
+/* The types of a list that `(` opened at the scan, up to its `)`. Each may
+   carry the marks the parser reads before it: `keep`, `concurrent`, `own`
+   and `lent`. */
 static bool scan_types(const struct parser *p, struct angle_scan *s)
 {
     s->at++;
     while (parser_peek_at(p, s->at)->kind != TOKEN_RPAREN) {
         while (parser_is_fn_mark(p, s->at) ||
                parser_is_word(p, parser_peek_at(p, s->at), "own")) {
+            s->at++;
+        }
+        if (scan_lent(p, s->at)) {
             s->at++;
         }
         if (s->half || !scan_type(p, s) || s->half) {
