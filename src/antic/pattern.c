@@ -1123,7 +1123,9 @@ static struct set follow_within(const struct node *inner,
     set_all(&allowed);
     while (at != outer) {
         if (at->kind == NODE_CAT) {
-            for (i = 0; at->children[i] != child; i++) {
+            /* child is among the children of its parent, which add_child
+               keeps, and the bound holds the scan inside them anyway. */
+            for (i = 0; i < at->count && at->children[i] != child; i++) {
             }
             for (i++; i < at->count; i++) {
                 if (!set_meets(&f, &f)) {
