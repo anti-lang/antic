@@ -1,6 +1,10 @@
 #ifndef ANTI_FILES_H
 #define ANTI_FILES_H
 
+/* The interface of files.c: the allocation helpers and the file helpers
+   of the tool. An allocation that fails ends the tool through
+   files_out_of_memory, so none of them returns NULL for memory. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -116,6 +120,9 @@ bool files_list_dir(const char *dir, struct files_list *out);
    nothing, when the directory cannot be read, after the names it gave. */
 bool files_list_names(const char *dir, struct files_list *out);
 
+/* Free every path of list and its array, and leave list empty. It takes
+   a list a failed call of the three above left as well, which holds the
+   paths they gave before the failure. */
 void files_list_free(struct files_list *list);
 
 #endif

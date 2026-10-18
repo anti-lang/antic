@@ -1,6 +1,8 @@
 #ifndef ANTI_TEST_H
 #define ANTI_TEST_H
 
+/* The interface of test.c: `anti test`. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

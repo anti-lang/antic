@@ -1,6 +1,8 @@
 #ifndef ANTI_CHECK_H
 #define ANTI_CHECK_H
 
+/* The interface of check.c: `anti check`. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

@@ -1,6 +1,8 @@
 #ifndef ANTI_BUILD_H
 #define ANTI_BUILD_H
 
+/* The interface of build.c: `anti build` and `anti run`. */
+
 #include <stdbool.h>
 
 /* What `anti build` and `anti run` were asked for. A field that names

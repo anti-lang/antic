@@ -1,6 +1,9 @@
 #ifndef ANTI_PROJECT_H
 #define ANTI_PROJECT_H
 
+/* The interface of project.c: `anti new`, and the sources of a
+   project. */
+
 #include <stdbool.h>
 
 #include "files.h"

@@ -1,5 +1,6 @@
 /* The reader of an API description in the format of raylib's rlparser,
    raylib_api.json. */
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

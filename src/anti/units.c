@@ -2,7 +2,10 @@
    compile takes them, and the options every compile of the run starts
    from. `anti check`, `anti doc`, `anti build` and `anti test` need the
    module path of each source, the modules it imports and the interface
-   file the run writes for it. The list has one definition. */
+   file the run writes for it. The list has one definition. The file
+   also reads the `link framework` and `link linux` lines of the library
+   files a compile imports, and passes their names to the compile. */
+
 #include "units.h"
 
 #include <stdio.h>

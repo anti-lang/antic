@@ -17,11 +17,12 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-# Every file of antic and of the runtime. The shared headers of antic are
-# those header_sections checks. Every header of the runtime is public:
-# generated code, antic, anti or another file of the runtime calls what
-# it declares.
-set(parts antic rt)
+# Every file of antic, of the runtime and of anti. The shared headers of
+# antic are those header_sections checks. Every header of the runtime is
+# public: generated code, antic, anti or another file of the runtime
+# calls what it declares. Every header of anti is public as well, since
+# main.c or another file of anti calls what each declares.
+set(parts antic rt anti)
 set(shared antl_io.h driver_parts.h lower_lowerer.h parser_parser.h
     sema_checker.h whole_parts.h)
 

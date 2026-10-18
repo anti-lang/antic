@@ -8,6 +8,7 @@
    does not fail, because the specification makes each of its findings a
    warning. A backtick may hold code that is no name, and a `may fail`
    function that never fails is a warning of the checker on purpose. */
+
 #include "check.h"
 
 #include <stdio.h>

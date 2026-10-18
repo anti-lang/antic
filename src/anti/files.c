@@ -1,3 +1,5 @@
+/* The allocation helpers and the file helpers of the tool. */
+
 #include "files.h"
 
 #include <stdint.h>

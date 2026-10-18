@@ -1,6 +1,11 @@
 #ifndef ANTI_UNITS_H
 #define ANTI_UNITS_H
 
+/* The interface of units.c: the modules of a run over the sources of a
+   project in the order of their imports, the options every compile of
+   the run starts from, and the names of the `link framework` and `link
+   linux` lines of the library files a compile imports. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -40,6 +45,8 @@ bool unit_file(const char *dir, const char *module, const char *suffix,
 bool unit_read(const char *source, const char *const *roots,
                size_t root_count, const char *work, struct unit *out);
 
+/* Free the path, the imports, the tests and the library path of u. It
+   takes a unit of unit_read whether the read succeeded or not. */
 void unit_free(struct unit *u);
 
 /* DESIGN: every compile of a run over a project starts from

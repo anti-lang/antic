@@ -224,7 +224,7 @@ One file per command, and the code the commands share. Every file but
 | `src/anti/bindexpr.c` | The evaluator of a constant expression of C, and the constant it adds to the model. |
 | `src/anti/bindexpr.h` | The interface of `bindexpr.c`. |
 | `src/anti/bindmodel.c` | The model of a binding, with its memory, its warnings, the keyword test and the tables of what a bundled library links. |
-| `src/anti/bindmodel.h` | The interface of `bindmodel.c`. |
+| `src/anti/bindmodel.h` | The model of a binding, and the functions the files of `anti bind` give each other. |
 | `src/anti/bindtype.c` | The fixed C types and the parser of a C type spelling. |
 | `src/anti/bindwrite.c` | The choice of what a module holds, and the writer of the module, the shim and the two probes. |
 | `src/anti/build.c` | `anti build` and `anti run`: a manifest into the files of `build/` and the deliverable of `dist/`. |

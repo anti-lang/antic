@@ -1,6 +1,8 @@
 /* The evaluator of the constant expressions of a binding. It gives the
    value of an object-like macro of a header and of a define of
-   raylib_api.json. */
+   raylib_api.json. The file also writes a float as Anti writes it, and
+   adds the constant of a value and of a struct literal to the model. */
+
 #include <errno.h>
 #include <float.h>
 #include <math.h>

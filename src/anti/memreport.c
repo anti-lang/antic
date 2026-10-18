@@ -1,5 +1,6 @@
 /* The run of a program of --memory-checks whose report names its frames
    with Anti's symbolizer. */
+
 #include "memreport.h"
 
 #include <stdint.h>

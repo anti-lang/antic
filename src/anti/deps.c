@@ -1,5 +1,7 @@
 /* The dependency graph of a project: the lock file, the index of a
-   repository and the walk that closes the graph.
+   repository and the walk that closes the graph, with the comparison of
+   versions and constraints and the reader of the header of a library
+   file.
 
    DESIGN: resolution follows "Resolution" in docs/tooling.md. The lock
    file answers the manifest or it does not, and a lock that does answer
@@ -7,6 +9,7 @@
    build. The files under it are the developer's own and change without
    a version. A dependency of a repository is pinned by the lock, and
    its digest is checked at every build. */
+
 #include "deps.h"
 
 #include <inttypes.h>

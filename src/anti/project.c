@@ -1,5 +1,6 @@
 /* `anti new`, which writes a project of the default layout, and the
    sources of a project that a command reads without a file. */
+
 #include "project.h"
 
 #include <stdio.h>

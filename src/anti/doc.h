@@ -1,6 +1,8 @@
 #ifndef ANTI_DOC_H
 #define ANTI_DOC_H
 
+/* The interface of doc.c: `anti doc`. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

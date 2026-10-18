@@ -5,8 +5,8 @@
 #   RUNNER  tests/runners/run_file_headers.cmake
 #   WORK    a directory for the trees
 #
-# Each case writes a tree of two files of antic and one of the runtime,
-# runs the check on it and states whether it must accept the tree. A
+# Each case writes a tree of two files of antic, one of the runtime and
+# one of anti, runs the check on it and states whether it must accept the tree. A
 # case that must be refused names a text of the message, so a refusal
 # for another reason fails the case.
 
@@ -19,18 +19,26 @@ set(good_h "#ifndef ANTIC_LEXER_H\n#define ANTIC_LEXER_H\n\n/* The thing. */\n\n
 # A header of the runtime, whose comment stands before its guard.
 set(good_rt "/* The calls of hash.c. */\n\n#ifndef ANTI_HASH_H\n#define ANTI_HASH_H\n\n/* Gives a hash. */\nint anti_rt_hash(void);\n\n#endif\n")
 
+# A header of anti.
+set(good_anti "#ifndef ANTI_ZIP_H\n#define ANTI_ZIP_H\n\n/* The zip archive. */\n\n/* Frees an archive. */\nvoid zip_free(void *z);\n\n#endif\n")
+
 set(failures "")
 # tree_case(<name> accept|<text of the refusal> <text of lexer.c> <text of lexer.h>
-#           [<text of src/rt/hash.h>])
+#           [<text of src/rt/hash.h> [<text of src/anti/zip.h>]])
 function(tree_case name verdict c_text h_text)
     set(tree "${WORK}/${name}")
     set(rt_text "${good_rt}")
+    set(anti_text "${good_anti}")
     if(ARGC GREATER 4)
         set(rt_text "${ARGV4}")
+    endif()
+    if(ARGC GREATER 5)
+        set(anti_text "${ARGV5}")
     endif()
     file(WRITE "${tree}/src/antic/lexer.c" "${c_text}")
     file(WRITE "${tree}/src/antic/lexer.h" "${h_text}")
     file(WRITE "${tree}/src/rt/hash.h" "${rt_text}")
+    file(WRITE "${tree}/src/anti/zip.h" "${anti_text}")
     # A shared header needs no comment per function.
     file(WRITE "${tree}/src/antic/parser_parser.h"
         "/* The shared state. */\n\nint parser_one(void);\nint parser_two(void);\n")
@@ -101,6 +109,15 @@ tree_case(runtime_function_without_comment
           "src/rt/hash.h:6: anti_rt_hash has no comment of its own"
           "${good_c}" "${good_h}"
           "/* The calls of hash.c. */\n\n#ifndef ANTI_HASH_H\n#define ANTI_HASH_H\n\nint anti_rt_hash(void);\n\n#endif\n")
+
+tree_case(anti_header_after_includes "src/anti/zip.h: opens with no comment"
+          "${good_c}" "${good_h}" "${good_rt}"
+          "#ifndef ANTI_ZIP_H\n#define ANTI_ZIP_H\n\n#include <stddef.h>\n\n/* The zip archive. */\n\n#endif\n")
+
+tree_case(anti_function_without_comment
+          "src/anti/zip.h:8: zip_close has no comment of its own"
+          "${good_c}" "${good_h}" "${good_rt}"
+          "#ifndef ANTI_ZIP_H\n#define ANTI_ZIP_H\n\n/* The zip archive. */\n\n/* Frees an archive. */\nvoid zip_free(void *z);\nvoid zip_close(void *z);\n\n#endif\n")
 
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "run_file_headers.cmake:\n${failures}")

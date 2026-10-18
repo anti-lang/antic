@@ -1,4 +1,6 @@
-/* `anti fmt`, the canonical form of an Anti source.
+/* `anti fmt`: the canonical form of an Anti source, and the run that
+   reads the files of the command, compares each with its form and
+   replaces it.
 
    DESIGN: the formatter reads the compiler's own lexer, so the canonical
    form cannot disagree with the language. The lexer drops an ordinary
@@ -14,6 +16,7 @@
    line and the width of a doc comment. None of them re-flows an
    expression, so a wrapped line stays where it was written and takes one
    extra tab. See docs/notes/fmt.md. */
+
 #include "fmt.h"
 
 #include <stdio.h>

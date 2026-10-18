@@ -1,6 +1,10 @@
 #ifndef ANTI_DEPS_H
 #define ANTI_DEPS_H
 
+/* The interface of deps.c: the reader of the header of a library file,
+   the resolution of the dependency graph of a project, and the
+   comparison of versions and constraints. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -66,6 +70,9 @@ typedef bool (*dep_path_fn)(void *context, const char *directory,
 bool deps_resolve(const struct manifest *m, const char *root, bool offline,
                   dep_path_fn path_of, void *context, struct dep_graph *out);
 
+/* Free every package of g and its array, and leave g zeroed. It takes a
+   graph of deps_resolve and a zeroed one alike. A failed deps_resolve
+   leaves out zeroed, so freeing it again does nothing. */
 void deps_free(struct dep_graph *g);
 
 /* Compare two versions of the form major.minor.patch. A missing part is

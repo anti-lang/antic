@@ -1,14 +1,15 @@
 #ifndef ANTI_SYMMAP_H
 #define ANTI_SYMMAP_H
 
+/* The interface of symmap.c: the text map of a symbols archive and the
+   build id of a program. The map holds one line per function of a
+   program, with the range of its addresses and its name. Where the debug
+   information gives them, the file and the line follow. */
+
 #include <stdbool.h>
 
 #include "target.h"
 #include "text.h"
-
-/* The map of a symbols archive. It holds one line per function of a
-   program, with the range of its addresses and its name. Where the debug
-   information gives them, the file and the line follow. */
 
 /* The head of the line of a map that names the build id of its
    program. It follows the first line of the map. */

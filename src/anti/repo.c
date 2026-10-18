@@ -1,4 +1,5 @@
-/* The repositories a build fetches from and the cache it fetches into.
+/* The repositories a build fetches from and the cache it fetches into,
+   with the grammar of a name, a version and a digest.
 
    DESIGN: a repository is a URL prefix over static files, so the
    transport is a file copy or one HTTP request per file. antic links no
@@ -7,6 +8,7 @@
    later carry it. The cache lives in the user's cache directory of the
    platform, the one `anti.os` gives a program, so nothing outside the
    user's profile is written. */
+
 #include "repo.h"
 
 #include <errno.h>

@@ -1,6 +1,8 @@
 #ifndef ANTI_SDK_H
 #define ANTI_SDK_H
 
+/* The interface of sdk.c: `anti sdk export` and `anti sdk import`. */
+
 /* Pack the .tbd stubs and the version of a MacOSX.sdk into
    <out>/apple-sdk-<version>.tar.xz. sdk names the SDK, or NULL for the
    newest of the Command Line Tools that ld64.lld reads. A Mac alone runs

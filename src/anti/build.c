@@ -7,6 +7,7 @@
    Everything the compiler writes lands under `build/`, and the tool
    copies the deliverable into `dist/`. The split of docs/tooling.md then
    holds: `build/` is disposable and `dist/` is what a user runs. */
+
 #include "build.h"
 
 #include <stdint.h>

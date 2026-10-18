@@ -1,10 +1,13 @@
-/* The tables of `anti.toml` that a build passes to antic.
+/* The reader of `anti.toml`: the package, the layout, the targets, the
+   repositories, the dependencies and the `[inject]` tables that a build
+   passes to antic.
 
    DESIGN: the tool reads the manifest with the runtime's TOML reader,
    the one `anti.toml`, the logger and the runtime configuration share.
    The reader gives a flat list of keys, so `[inject]` and its sub-table
    `[inject.test]` arrive as `inject.<path>` and `inject.test.<path>`,
    which is what TOML itself makes of them. */
+
 #include "manifest.h"
 
 #include <stdio.h>

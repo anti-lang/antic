@@ -1,6 +1,11 @@
 #ifndef ANTI_MANIFEST_H
 #define ANTI_MANIFEST_H
 
+/* The interface of manifest.c: the names of the manifest and the lock
+   file, a key of a TOML document, and the reader of `anti.toml` with its
+   package, layout, targets, repositories, dependencies and `[inject]`
+   table. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -34,6 +39,9 @@ struct manifest_inject {
 bool manifest_inject_read(const char *path, bool tests,
                           struct manifest_inject *out);
 
+/* Free every entry of table and its array, and leave table empty.
+   manifest_inject_read leaves out empty before it reads, so the caller
+   may free a table whose read failed. */
 void manifest_inject_free(struct manifest_inject *table);
 
 /* The source and test directories of a project, which `[layout]` of the
@@ -94,6 +102,9 @@ struct manifest {
    caller frees a manifest read with manifest_free. */
 bool manifest_read(const char *path, bool tests, struct manifest *out);
 
+/* Free every text, list and table of m, its `[inject]` table among them,
+   and leave m zeroed. A failed manifest_read leaves out zeroed, so
+   freeing it does nothing. */
 void manifest_free(struct manifest *m);
 
 /* The URL prefix that alias names, or NULL when the manifest has no such

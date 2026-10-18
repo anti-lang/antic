@@ -1,6 +1,16 @@
 #ifndef ANTI_BINDMODEL_H
 #define ANTI_BINDMODEL_H
 
+/* The model of a binding and the functions the files of anti bind give
+   each other. The model holds the declarations of a C API that anti bind
+   writes as an Anti module. The reader of raylib_api.json in bindapi.c
+   and the reader of clang's AST in bindclang.c fill it, and the writer of
+   bindwrite.c turns it into the binding, the shim and the probes. It
+   records C types and never a size: antic lays out every struct.
+   bindmodel.c holds its memory, its warnings, the words of Anti and the
+   libraries each bundled library links, and bindtype.c the parser of a
+   C type spelling. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -8,11 +18,6 @@
 #include "arena.h"
 #include "attributes.h"
 #include "text.h"
-
-/* The declarations of a C API that anti bind writes as an Anti module.
-   The reader of raylib_api.json and the reader of clang's AST fill it,
-   and one writer turns it into the binding, the shim and the probe. It
-   records C types and never a size: antic lays out every struct. */
 
 enum bind_kind {
     BIND_VOID,
@@ -136,10 +141,17 @@ struct bind_module {
     size_t warnings;
 };
 
+/* Append item to list, whose array grows on the heap and exits through
+   files_out_of_memory when it cannot. The item is not copied. The caller
+   frees the array, items, with free once the list is done, and owns
+   nothing else of it: the items live in the memory pool of a module. */
 void bind_list_add(struct bind_list *list, void *item);
 
-/* A copy of s in the memory pool of b. */
+/* A copy of s, NUL-terminated, in the memory pool of b. */
 const char *bind_strdup(struct bind_module *b, const char *s);
+
+/* A copy of the first n bytes of s in the memory pool of b, with a NUL
+   after them. s need not end within n bytes. */
 const char *bind_strndup(struct bind_module *b, const char *s, size_t n);
 
 /* Print a warning that names the source of the binding. */
@@ -197,18 +209,39 @@ size_t bind_linux_libraries(const char *library, const char *const **names);
    that says why. */
 void bind_settle(struct bind_module *b);
 
-/* Write the binding module, the shim and the probe. */
+/* Append the binding module to out: its `//!` lines, the `link` lines of
+   the bundled library, the constants that bind_settle bound, every enum, and
+   the bound records and functions, each kind in the order the reader
+   added it. */
 void bind_write_module(const struct bind_module *b, struct text *out);
+
+/* Whether a bound function of b needs the shim: an inline or `static`
+   function of the header, which has no symbol of its own. */
 bool bind_needs_shim(const struct bind_module *b);
+
+/* Append the shim to out: the C file that gives every inline and
+   `static` function a bound function of b names a symbol. It repeats the
+   defines of b before it includes the header. Call it when
+   bind_needs_shim says so. */
 void bind_write_shim(const struct bind_module *b, struct text *out);
+
+/* Append the ABI probe in C to out. For every bound record that C can
+   name it prints the size, the alignment and the bytes of an object
+   cleared and given one field, through the header of b. */
 void bind_write_probe_c(const struct bind_module *b, struct text *out);
+
+/* Append the ABI probe in Anti to out, which imports the binding and
+   prints what bind_write_probe_c prints. */
 void bind_write_probe_anti(const struct bind_module *b, struct text *out);
 
-/* Read raylib_api.json, or the AST and the macros of a header through
-   clang, into b. Both return false after a message. */
+/* Read raylib_api.json, the length bytes at bytes, into b. Returns false
+   after a message for a text that is no JSON or a declaration it cannot
+   read. */
 bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
                    size_t length);
 
+/* What bind_read_clang reads: the header, the runtime archive that holds
+   the sysroot of its target, and the -I and -D options of the command. */
 struct bind_clang_request {
     const char *header;
     const char *runtime;
@@ -219,6 +252,12 @@ struct bind_clang_request {
     size_t define_count;
 };
 
+/* Read the AST and the macros of the header of r into b through clang.
+   clang reads it for the target of r against the headers of that
+   target's sysroot in the runtime archive. Returns false after a message
+   for an unknown target, a request without runtime or a runtime archive
+   that holds no such sysroot, a clang it cannot run or of another major
+   version, and an AST it cannot read. */
 bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *r);
 
 #endif

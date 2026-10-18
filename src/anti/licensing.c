@@ -8,6 +8,7 @@
    project is the text `anti license --from` prints for its program. The
    markers and the build id are facts of a binary and stand in none of
    them. */
+
 #include "licensing.h"
 
 #include <stdio.h>

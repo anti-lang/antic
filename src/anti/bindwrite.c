@@ -1,4 +1,6 @@
-/* The writer of anti bind: the module, the shim and the two probes. */
+/* The choice of what the module of a binding holds, bind_settle, and the
+   writer of anti bind: the module, the shim and the two probes. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

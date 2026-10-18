@@ -1,5 +1,9 @@
-/* The reader of a C header through clang: the AST that clang dumps as
-   JSON, and the macros and pragmas of the preprocessed text. */
+/* The run of clang on a header and the reader of what it gives into the
+   model of a binding: the AST that clang dumps as JSON, and the macros
+   and pragmas of the preprocessed text. The run finds clang, refuses
+   one of another major version and aims it at the target and the
+   sysroot of the runtime archive. */
+
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>

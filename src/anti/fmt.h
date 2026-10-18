@@ -1,6 +1,9 @@
 #ifndef ANTI_FMT_H
 #define ANTI_FMT_H
 
+/* The interface of fmt.c: the canonical form of one Anti source, and
+   `anti fmt` over the files of a command. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

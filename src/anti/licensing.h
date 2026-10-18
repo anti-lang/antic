@@ -1,19 +1,21 @@
 #ifndef ANTI_LICENSING_H
 #define ANTI_LICENSING_H
 
-#include <stdbool.h>
-#include <stddef.h>
-
-#include "antic.h"
-#include "text.h"
-
-/* `anti license` over the runtime archive, over a project and over a
-   static archive. Every form prints the lines of a notice: one `package
+/* The interface of licensing.c: `anti license` over the runtime archive,
+   over a project and over a static archive, and the readers of the
+   licence notice of a binary and of the record of upstream sources.
+   Every form prints the lines of a notice: one `package
    <name> <version> <identifier>` line per package with its `attribution`
    lines, then each distinct text once after `text for <names>`, and the
    `source` line of the record of upstream sources after the text of each
    component the record names. `--from` reads the notice of a binary
    through licensing_text_of and prints the same lines. */
+
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "antic.h"
+#include "text.h"
 
 /* The build id and the version of the licence notice in bytes. The id is
    the line after the begin marker of src/rt/license.h, and a line of the

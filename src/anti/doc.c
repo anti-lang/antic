@@ -10,6 +10,7 @@
    The output is plain semantic HTML with the eight class names below and
    no styling. `--markdown` writes Markdown instead and passes the doc
    text through unchanged, for a Hugo site to render. */
+
 #include "doc.h"
 
 #include <stdio.h>

@@ -1,3 +1,6 @@
+/* `anti sdk export` and `anti sdk import`: the stubs of Apple's SDK
+   into a bundle, and out of one into the sysroots of macOS. */
+
 #include "sdk.h"
 
 #include <stdio.h>

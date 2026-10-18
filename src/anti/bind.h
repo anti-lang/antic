@@ -1,6 +1,8 @@
 #ifndef ANTI_BIND_H
 #define ANTI_BIND_H
 
+/* The interface of bind.c: `anti bind` and `anti bind --header`. */
+
 #include <stdbool.h>
 #include <stddef.h>
 

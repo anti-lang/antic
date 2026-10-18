@@ -1,4 +1,5 @@
 /* The cursor over one line of text that comes from another machine. */
+
 #include "cursor.h"
 
 bool cursor_is_blank(char c)

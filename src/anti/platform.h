@@ -1,17 +1,18 @@
 #ifndef ANTI_PLATFORM_H
 #define ANTI_PLATFORM_H
 
+/* The interface of platform.c, the platform layer of anti, which
+   docs/c-guidelines.md names under rule 22: the calls that differ
+   between the systems and that antic does not make. A path is UTF-8 on
+   every host, and Windows sees UTF-16 at each of its calls, as in the
+   layer of antic. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 
 /* The platform layer of antic, which anti calls as well. */
 #include "../antic/platform.h"
-
-/* The platform layer of anti, which docs/c-guidelines.md names under rule
-   22: the calls that differ between the systems and that antic does not
-   make. A path is UTF-8 on every host, and Windows sees UTF-16 at each of
-   its calls, as in the layer of antic. */
 
 /* What a path names. A link is a symbolic link, and on Windows any
    reparse point, which a junction is as well. */

@@ -1,3 +1,7 @@
+/* The command line of `anti`, its usage text and one function per
+   command, which reads the options of the command into its request and
+   calls the file of the command. */
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

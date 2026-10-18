@@ -1,6 +1,9 @@
 #ifndef ANTI_CURSOR_H
 #define ANTI_CURSOR_H
 
+/* The interface of cursor.c: the cursor over one line of text from
+   another machine. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

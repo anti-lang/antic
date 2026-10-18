@@ -1,13 +1,15 @@
 #ifndef ANTI_ZIP_H
 #define ANTI_ZIP_H
 
-#include <stdbool.h>
-#include <stddef.h>
-
-/* The symbols archive of a release is a zip file, because every host
+/* The interface of zip.c: the writer and the reader of a zip archive.
+   The symbols archive of a release is a zip file, because every host
    opens one without a tool. The writer stores its entries and compresses
    nothing, so it needs no library and writes the same bytes from one
-   input on every host. */
+   input on every host. The reader also unpacks an entry compressed with
+   deflate. */
+
+#include <stdbool.h>
+#include <stddef.h>
 
 #include "text.h"
 
@@ -59,6 +61,8 @@ bool zip_read(const char *path, struct zip_archive *out);
    writes a message when its data is broken. */
 bool zip_unpack(const struct zip_archive *a, size_t index, struct text *out);
 
+/* Free the bytes and the entries of a, and leave a zeroed. A failed
+   zip_read leaves out zeroed, so freeing it does nothing. */
 void zip_archive_free(struct zip_archive *a);
 
 #endif

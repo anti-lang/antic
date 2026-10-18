@@ -1,10 +1,13 @@
-/* The zip writer of the symbols archive.
+/* The writer and the reader of a zip archive, with a decoder of deflate.
+   The writer makes the symbols archive of a release, and the reader
+   opens it again for `anti symbols`.
 
    DESIGN: the entries are stored and never compressed. The archive
    holds an executable and a text map, which a reader unpacks once. The
    bytes saved are worth neither a compressor nor a library. Every field
    that would carry a clock or a machine is fixed, so one input gives one
    archive on every host. */
+
 #include "zip.h"
 
 #include <stdio.h>

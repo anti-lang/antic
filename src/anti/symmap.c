@@ -1,4 +1,5 @@
-/* The text map of a symbols archive.
+/* The text map of a symbols archive, written with the readers of
+   src/rt/symbols.c, and the build id of a program.
 
    DESIGN: the readers of src/rt/symbols.c hold every format this needs, and
    `anti.lang.StackTrace.symbolize` reads a running program with the same
@@ -6,6 +7,7 @@
    written out once at the build. A Windows program carries no symbol
    table, because lld-link writes the symbols to the PDB that the archive
    holds beside the map. */
+
 #include "symmap.h"
 
 #include <stdio.h>

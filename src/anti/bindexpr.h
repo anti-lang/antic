@@ -1,6 +1,10 @@
 #ifndef ANTI_BINDEXPR_H
 #define ANTI_BINDEXPR_H
 
+/* The interface of bindexpr.c: the evaluator of a constant expression of
+   C, the text of a float as Anti writes it, and the constants of a
+   binding that the evaluator gives the model. */
+
 #include <stdbool.h>
 #include <stdint.h>
 

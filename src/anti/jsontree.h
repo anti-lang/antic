@@ -1,15 +1,17 @@
 #ifndef ANTI_JSONTREE_H
 #define ANTI_JSONTREE_H
 
+/* The interface of jsontree.c: a tree of a JSON document in a memory
+   pool, built over the scanner of src/rt/json.c. anti bind reads the
+   description of raylib and the AST that clang dumps with it. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "arena.h"
 
-/* A tree of a JSON document, built over the scanner of src/rt/json.c. anti
-   bind reads the description of raylib and the AST that clang dumps
-   with it. */
+/* The kind of a value of the tree. */
 enum json_kind {
     JSON_NULL,
     JSON_BOOL,
@@ -48,6 +50,9 @@ struct json_tree {
 bool json_read(const unsigned char *bytes, size_t length,
                struct json_tree *out, char *error, size_t error_size);
 
+/* Free the memory pool of tree, which ends every value and string it
+   gave, and leave tree empty. A failed json_read leaves out empty, so
+   freeing it does nothing. */
 void json_free(struct json_tree *tree);
 
 /* The value of the member key of an object, or NULL when value is no
