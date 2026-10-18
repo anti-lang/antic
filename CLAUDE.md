@@ -1015,9 +1015,11 @@ reports what it finished.
   `may fail` function, and `undo` runs on the fail path. The header writes the
   ABI and the `.antl` records the flag. Every module of the standard library
   follows the form: `text.parse_int`, the three user directories of anti.os,
-  every function of anti.fs, `toml.Document.read`, `log.FileSink.new`,
-  `args.Parser.parse`, `reflect.set`, `reflect.call` and `json.unquote` may
-  fail. The tests `std_may_fail_only` and `tests_may_fail_only` refuse a
+  every function of anti.fs, `toml.Document.read` and `open`,
+  `config.read` and `FileConfig.read`, `log.FileSink.new`, `args.Parser.parse`,
+  `reflect.set`, `reflect.call`, `json.unquote`, `plugin.load`,
+  `Library.unload`, `regex.compile`, `regex.compile_bytes` and the searches
+  of `anti.regex` may fail. The tests `std_may_fail_only` and `tests_may_fail_only` refuse a
   function of `src/std/` or `tests/` written by hand as `-> ?*Error`, apart
   from the tests of that form. A function fails by its `may fail`
   marking alone, and one that returns an error without it is ordinary.
