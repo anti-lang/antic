@@ -1,3 +1,7 @@
+/* Appends an error, a warning, a safety check or a doc warning, with its
+   position and its formatted text, to the growable list of one
+   compilation. */
+
 #include "diagnostic.h"
 
 #include <stdarg.h>

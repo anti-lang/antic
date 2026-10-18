@@ -1,6 +1,8 @@
 /* The parts of a declaration: the marks, the parameters and the result
-   of a signature, `may fail`, the type parameters with their constraints,
-   and the members, nested types and fields of a body. */
+   of a signature, `may fail` and `-> never`, the type parameters with
+   their constraints, the `compatible` line and `inherits` in a body, the
+   members and nested types of a body, and the guard, the clauses and the
+   struct-only refusal of a field. parser_item.c reads the fields. */
 
 #include <stdlib.h>
 #include <string.h>

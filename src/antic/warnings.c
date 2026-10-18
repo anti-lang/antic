@@ -1,3 +1,7 @@
+/* The one table of the names of the warnings and safety checks, the
+   application of the clauses `allow` and `unchecked`, and the promotion
+   of warnings to errors. */
+
 #include "warnings.h"
 
 #include <stdio.h>

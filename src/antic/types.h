@@ -1,6 +1,12 @@
 #ifndef ANTIC_TYPES_H
 #define ANTIC_TYPES_H
 
+/* The interface of types.c: the checked types of a compilation, their
+   constructors and predicates, and the names of the library modules the
+   compiler knows. Every type exists once, so two types are the same type
+   exactly when their pointers are equal. Structs are the exception
+   chapter 2 makes: each declaration is a new type. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -8,10 +14,6 @@
 #include "arena.h"
 #include "ast.h"
 #include "text.h"
-
-/* The checked types of a compilation. Every type exists once, so two
-   types are the same type exactly when their pointers are equal. Structs
-   are the exception chapter 2 makes: each declaration is a new type. */
 
 enum type_kind {
     TYPE_VOID,      /* the result of a function without -> R */
@@ -352,11 +354,17 @@ struct types {
     struct type *field_record;      /* anti.lang.FieldDescriptor */
 };
 
+/* Make types empty, with its built-in types in place, taking every later
+   type from arena, which outlives types and frees them. Nothing is
+   allocated here. */
 void types_init(struct types *types, struct arena *arena);
 /* Memory for count items of size bytes each, zeroed, in the pool, which
    frees it. antic stops when the product does not fit in a size_t, as on
    any failed allocation. */
 void *types_alloc_array(struct arena *arena, size_t count, size_t size);
+/* The one type of the built-in kind, from TYPE_VOID to TYPE_ERROR. kind
+   is below TYPE_BUILTIN_COUNT. The type lives in types and is never
+   freed apart. */
 struct type *types_builtin(struct types *types, enum type_kind kind);
 /* `*T`, the pointer that never holds `none`. */
 struct type *types_pointer(struct types *types, struct type *element);
@@ -369,6 +377,8 @@ struct type *types_lent(struct types *types, struct type *t);
 /* The pointer or slice t without `lent`, and t itself for any other
    type. */
 struct type *types_unlent(struct types *types, struct type *t);
+/* Whether t is a `lent` pointer or slice. A NULL t and every other type
+   are not. */
 bool types_is_lent(const struct type *t);
 /* Whether t is a tuple with a lent pointer among its parts, which the
    `operator fn value` of an iterator alone gives. */
@@ -391,8 +401,12 @@ struct type *types_without_none(struct types *types, struct type *t);
    of its own, so `?T` of a `?*U` still tells the two `none` apart. The
    error type stays itself. */
 struct type *types_with_none(struct types *types, struct type *t);
+/* `[element; length]` of a constant length, interned, so one element
+   and one length give one type. An array whose length is symbolic comes
+   from types_array_symbolic, and its length field holds 0. */
 struct type *types_array(struct types *types, struct type *element,
                          uint64_t length);
+/* `[]element`, interned. */
 struct type *types_slice(struct types *types, struct type *element);
 /* An array whose length is a symbolic value. */
 struct type *types_array_symbolic(struct types *types, struct type *element,
@@ -404,6 +418,9 @@ const struct symbolic *types_symbolic(struct types *types,
    struct name carries its module. */
 void types_symbolic_print(struct text *out, const struct symbolic *s,
                           bool qualified);
+/* The plain function type of param_count params and result, interned:
+   not bound to a context, not `may fail`, with no out pointer. params is
+   read and not kept. */
 struct type *types_fn(struct types *types, struct type *const *params,
                       size_t param_count, struct type *result);
 /* A function type in the ABI form of `may fail`: params end with the out
@@ -732,10 +749,17 @@ bool types_is_flags(const struct type *t);
 struct type *types_field_descriptor(struct types *types);
 /* Whether t is the struct that types_field_descriptor made. */
 bool types_is_field_descriptor(const struct type *t);
+/* Whether t is the struct `Watch` of `anti.lang`, through which an
+   iterator watches the changes of its collection. A NULL t is not. */
 bool types_is_watch(const struct type *t);
 /* The struct `anti.lang.Mutex`, one for the compilation. */
 struct type *types_mutex(struct types *types);
+/* The struct of the hidden lock of a synchronized class, one for the
+   compilation: a Mutex, the thread that holds it and how often, in the
+   order of `struct anti_object_lock` of src/rt/sync.h. */
 struct type *types_object_lock(struct types *types);
+/* Whether t is the struct that types_object_lock made. A NULL t is
+   not. */
 bool types_is_object_lock(const struct type *t);
 /* Whether t is the struct that types_mutex made. */
 bool types_is_mutex(const struct type *t);
@@ -815,6 +839,10 @@ struct name types_c_name(const struct type *t);
    and on, in the order the elements were written. */
 struct type *types_tuple(struct types *types, struct type *const *elements,
                          size_t count);
+/* A struct named name of module, with no fields yet. Each call returns
+   a distinct type, unlike the constructors above, since each declaration
+   of a struct is a type of its own. module and name are kept as given
+   and must outlive the type. */
 struct type *types_struct(struct types *types, struct name module,
                           struct name name);
 /* The name of the field of a variant that holds its tag, and of the one
@@ -839,6 +867,9 @@ bool types_case_index(const struct type *v, const struct name *name,
 /* A named integer type over base. Each call returns a distinct type. */
 struct type *types_enum(struct types *types, struct name module,
                         struct name name, struct type *base);
+/* Give s a copy of the count fields, in the pool, and set the `home` of
+   each copy to s, whatever the caller's fields held. The caller keeps
+   fields. Fields s held before are replaced. */
 void types_set_fields(struct types *types, struct type *s,
                       const struct struct_field *fields, size_t count);
 
@@ -925,6 +956,9 @@ void types_copy_args(struct text *out, struct type *const *args,
                      const struct symbolic *const *values, size_t count,
                      bool qualified);
 
+/* Whether t is an integer type: i8 to i64, u8 to u64 and the three
+   target-sized types. `char`, `bool` and an enum are not. t is not
+   NULL. */
 bool types_is_integer(const struct type *t);
 /* Whether f is a zero-width bitfield, written `_: T : 0`, which breaks the
    unit of the bitfields and holds no value. */
@@ -936,8 +970,13 @@ const struct struct_field *types_find_field(const struct type *s,
                                             const struct name *name);
 /* c_long, c_ulong and c_wchar, whose width the target decides. */
 bool types_is_target_sized(const struct type *t);
+/* Whether t is a signed integer type, i8 to i64 and c_long. t is not
+   NULL. */
 bool types_is_signed(const struct type *t);
+/* Whether t is f32 or f64. f16 is storage and is not. t is not NULL. */
 bool types_is_float(const struct type *t);
+/* Whether t is an integer or a float type, as types_is_integer and
+   types_is_float say. t is not NULL. */
 bool types_is_numeric(const struct type *t);
 /* The width in bits. A target-sized type has the narrower of its widths,
    the range a value must fit on every target. */

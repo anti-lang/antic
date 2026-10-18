@@ -1,6 +1,7 @@
 /* The checks of calls and members: fields, functions of a class,
-   visibility, `construct`, errors and their handlers, `mul_high` and the
-   calls of a plugin library. */
+   visibility, `construct`, errors and their handlers, `mul_high`, the
+   calls of a plugin library, and the cases and the field inits of a
+   literal. */
 
 #include <stdint.h>
 #include <stdlib.h>

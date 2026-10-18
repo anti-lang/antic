@@ -1,3 +1,7 @@
+/* The compiled copies of generics: clones the checked tree of a generic
+   per use, checks again the nodes it left open, and rewrites the calls
+   that name the copies. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

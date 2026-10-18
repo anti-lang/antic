@@ -1,13 +1,14 @@
 #ifndef ANTIC_MODPATH_H
 #define ANTIC_MODPATH_H
 
+/* The interface of modpath.c. A module path names a module: lowercase
+   identifiers joined by dots, as com.niese.geo, that mirror the
+   directories under a search root. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
 #include "text.h"
-
-/* A module path names a module: lowercase identifiers joined by dots, as
-   com.niese.geo, that mirror the directories under a search root. */
 
 /* The suffix of an Anti source file. It stands here alone, so the driver,
    the module path and every tool that walks a project spell it once. */
@@ -35,6 +36,8 @@ void modpath_file_of_source(const char *source, const char *const *roots,
    libraries use. */
 bool modpath_reserved(const char *path);
 
+/* The number of segments of the module path path, one more than its
+   dots. An empty path counts one segment. */
 size_t modpath_segments(const char *path);
 
 /* The last segment, the name an import declares. */

@@ -1,6 +1,9 @@
 #ifndef ANTIC_PARSER_H
 #define ANTIC_PARSER_H
 
+/* The one entry point of the parser, which builds the syntax tree of a
+   module from its tokens. */
+
 #include <stdbool.h>
 
 #include "arena.h"

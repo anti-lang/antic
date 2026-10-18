@@ -1,6 +1,10 @@
 #ifndef ANTIC_WARNINGS_H
 #define ANTIC_WARNINGS_H
 
+/* The interface of warnings.c: the names of the warnings and safety
+   checks, the clauses that silence them and the promotion of warnings to
+   errors. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -12,7 +16,12 @@ struct module;
    `unchecked` overrules. */
 enum name_kind { KIND_WARNING, KIND_SAFETY_CHECK };
 
+/* The stable name of name as a message prints it after the text, such
+   as "shadowed-catch". NAME_NONE gives the empty text. name is below
+   NAME_COUNT. */
 const char *warnings_name(enum diag_name name);
+/* Whether name is a warning or a safety check. name is below
+   NAME_COUNT. */
 enum name_kind warnings_kind(enum diag_name name);
 
 /* The name the text spells, or NAME_NONE. */

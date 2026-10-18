@@ -2,8 +2,9 @@
    they give. They are the calls of `anti.regex` that stand in their
    place, the groups of a literal as fields, a match as a condition and
    `if let` on one. `patch` of `[]byte` and the conversions `to_bytes` and
-   `to_text` stand here as well, and so do the pattern literal and
-   `Regex.compile`. */
+   `to_text` stand here as well, and so do the pattern literal,
+   `Regex.compile` and `if let` on a value that may be `none`, which the
+   checker writes as a `let` and a test against `none`. */
 
 #include <stdint.h>
 #include <string.h>

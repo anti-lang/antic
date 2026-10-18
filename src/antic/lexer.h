@@ -1,6 +1,10 @@
 #ifndef ANTIC_LEXER_H
 #define ANTIC_LEXER_H
 
+/* The token kinds, the records of a token and of a piece of an `f"..."`
+   text, the entry points of the lexer, its three caps and the depth
+   limit of the parser. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

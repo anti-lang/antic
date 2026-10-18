@@ -7,8 +7,8 @@
    types, parser_expr.c expressions and parser_stmt.c statements and
    blocks. parser_clause.c reads the clauses `allow` and `unchecked`.
    parser_decl.c reads the parts of a declaration: its signature, its
-   type parameters and the members and fields of a body. parser_item.c
-   reads the items. A function the files share takes the prefix
+   type parameters, the members of a body and the clauses of a field.
+   parser_item.c reads the items and the fields of a body. A function the files share takes the prefix
    `parser_`, and one used in a single file stays `static`. */
 
 #include <stdbool.h>

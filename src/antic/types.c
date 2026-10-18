@@ -1,3 +1,7 @@
+/* Builds and interns the checked types of a compilation and answers the
+   predicates on them. It declares the types of `anti.lang` the compiler
+   knows, names types in messages and measures how deep a value nests. */
+
 #include "types.h"
 
 #include <stdint.h>

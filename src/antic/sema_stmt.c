@@ -1,7 +1,8 @@
 /* The checks of statements and function bodies: narrowing, assignment,
    `switch`, `sync`, the fields a `construct` sets, closures and what
-   they capture, `main` and the `tests` blocks, and the walk over every
-   function a worker reaches. */
+   they capture, `main` and the `tests` blocks, the views an `as` gives,
+   whether a class of the program fills an abstract type, and the walk
+   over every function a worker reaches. */
 
 #include <stdint.h>
 #include <stdio.h>

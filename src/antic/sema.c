@@ -1,3 +1,8 @@
+/* The helpers every file of the checker shares, the passes that declare
+   the items of a module and resolve their signatures, the checks of the
+   `provides` and `link` lines, and sema_check, which runs the passes in
+   order. */
+
 #include "sema.h"
 
 #include <stdarg.h>

@@ -1,3 +1,8 @@
+/* Checks a pattern literal. It compiles the pattern through the PCRE2
+   wrapper of the runtime, numbers its groups, and reads it into a tree
+   for the safety check `exponential-pattern` and the least length of a
+   match. */
+
 #include "pattern.h"
 
 #include <stdint.h>

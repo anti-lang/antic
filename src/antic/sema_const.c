@@ -1,5 +1,6 @@
-/* The evaluation of constant expressions, and the order in which the
-   constants of a module are evaluated. */
+/* The evaluation of constant expressions, the order in which the
+   constants of a module are evaluated, and whether a type holds a class,
+   which no constant may. */
 
 #include <math.h>
 #include <stdint.h>

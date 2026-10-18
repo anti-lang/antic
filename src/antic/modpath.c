@@ -1,3 +1,6 @@
+/* Derives the module path and the root-relative file name of a source
+   path, and reads the segments of a module path. */
+
 #include "modpath.h"
 
 #include <string.h>

@@ -1,12 +1,13 @@
 #ifndef ANTIC_PATTERN_H
 #define ANTIC_PATTERN_H
 
+/* The interface of pattern.c, the checks of a pattern literal: the
+   compile with PCRE2, the count and the numbers of its groups, the least
+   length of a match and the safety check `exponential-pattern`. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-/* The checks of a pattern literal: the compile with PCRE2 and the safety
-   check `exponential-pattern`. */
 
 /* The room a message of PCRE2 takes in a diagnostic. */
 #define ANTI_PATTERN_MESSAGE 112

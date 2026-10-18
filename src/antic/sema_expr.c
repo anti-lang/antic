@@ -1,6 +1,8 @@
-/* The checks of expressions: places, literals, the unary operators,
-   iteration, casts, interpolation, `?.` and the dispatch over the kinds
-   of an expression. */
+/* The checks of expressions: places, literals, the unary operators, the
+   conversions a value makes where it stands, to a base, an interface or
+   a type with `none`, the forms of a function value, iteration, casts,
+   interpolation, `?.` and the dispatch over the kinds of an
+   expression. */
 
 #include <math.h>
 #include <stdint.h>

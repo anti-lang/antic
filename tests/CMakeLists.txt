@@ -1079,6 +1079,19 @@ add_test(NAME header_sections
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_header_sections.cmake")
 
+# Each file of the front end of antic opens with the comment of its
+# purpose, and each function a public header of it declares has a comment
+# of its own. Step 29 of the fix steps of docs/audit/summary.md adds the
+# other parts of the tree.
+add_test(NAME file_headers
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_file_headers.cmake")
+add_test(NAME file_headers_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_file_headers.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/file-headers"
+        -P "${ANTIC_RUNNERS}/run_file_headers_self.cmake")
+
 # docs/notes/source-tree.md holds one row per file of the root, src/,
 # tests/unit/, tools/ and tests/runners/, per file and script of tests/
 # and per directory of tests/, and no row of anything else.

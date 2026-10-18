@@ -1,3 +1,7 @@
+/* Splits a validated UTF-8 source into tokens under caps on its size,
+   its nesting and its errors. It decodes the literals and the doc
+   comments, and lexes each `{expr}` of an `f"..."` with a nested lexer. */
+
 #include "lexer.h"
 
 #include <stdarg.h>

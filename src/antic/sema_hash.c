@@ -2,9 +2,9 @@
    struct or variant with `operator fn hash` have a function of their
    own, which the call of a method reaches. Every other type has the
    default hash, which lowering writes from the type. A value of a type
-   parameter has the hook when its constraints name `hash`. */
-/* The default `==` of a struct and of a class value lives here as well,
-   since it keeps the rule that two values equal by `eq` hash alike. */
+   parameter has the hook when its constraints name `hash`. The default
+   `==` of a struct and of a class value lives here as well, since it
+   keeps the rule that two values equal by `eq` hash alike. */
 
 #include <stdlib.h>
 #include <string.h>

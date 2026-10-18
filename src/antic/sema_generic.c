@@ -1,3 +1,7 @@
+/* The generics of the checker: type parameters and constraints, `type`
+   aliases, the copies of generic types, substitution and inference, and
+   the strip of generics before the later passes. */
+
 #include <stdlib.h>
 #include <string.h>
 

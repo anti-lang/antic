@@ -1,3 +1,7 @@
+/* Takes apart a long chain of declarations that name each other, of
+   constants, `type` lines and `constraint` sets, and resolves it from its
+   leaves. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

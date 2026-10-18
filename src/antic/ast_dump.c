@@ -1,3 +1,7 @@
+/* Writes the syntax tree of a module, one node per line: untyped for
+   --dump-ast, and with the checked type of each node for --dump-types,
+   which it reads through sema.h and types.h. */
+
 #include "ast.h"
 
 #include <string.h>

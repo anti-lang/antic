@@ -1,16 +1,17 @@
 #ifndef ANTIC_AST_H
 #define ANTIC_AST_H
 
+/* The syntax tree of one module, the fields the checker adds to it, and
+   the entry points of the dump and the walk. Every node lives in the
+   compilation's memory pool, and names point into the source text, which
+   outlives the tree. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "lexer.h"
 #include "text.h"
-
-/* The syntax tree of one module. Every node lives in the compilation's
-   memory pool, and names point into the source text, which outlives the
-   tree. */
 
 /* A name as written in the source. */
 struct name {
@@ -608,8 +609,6 @@ enum stmt_kind {
     STMT_SELECT
 };
 
-
-
 struct stmt {
     enum stmt_kind kind;
     struct pos pos;
@@ -1166,9 +1165,14 @@ struct ast_visitor {
     void *data;
 };
 
-/* Walk e, s or b and everything inside it, as ast_walk.c describes. */
+/* Visit e and every expression and statement inside it, in the order of
+   the text, as ast_walk.c describes. A NULL e visits nothing. */
 void ast_walk_expr(const struct ast_visitor *v, const struct expr *e);
+/* Visit s and every statement and expression inside it, as
+   ast_walk_expr does. A NULL s visits nothing. */
 void ast_walk_stmt(const struct ast_visitor *v, const struct stmt *s);
+/* Visit every statement of b in turn, as ast_walk_stmt does. A NULL b
+   visits nothing. */
 void ast_walk_block(const struct ast_visitor *v, const struct block *b);
 
 #endif

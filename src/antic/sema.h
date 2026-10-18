@@ -1,6 +1,10 @@
 #ifndef ANTIC_SEMA_H
 #define ANTIC_SEMA_H
 
+/* The interface of the checker to the driver, lowering and the C header:
+   the symbols, the constants, the interface of a module, sema_check and
+   the queries of the later passes. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -262,6 +266,9 @@ bool sema_holds_class(const struct type *t);
    and `&`, a field, an element, a part of a slice and a tuple pass the
    view on. A field read through a view gives memory and no view. */
 bool sema_value_view(const struct expr *e);
+/* Whether the place e names lies in memory that a view gives: a field or
+   an element of a base that is a view or lies in one, `*` of a view, or
+   an `as`. A NULL e is no view. */
 bool sema_place_view(const struct expr *e);
 /* Whether fn has a body: here, in the runtime, or in the module whose
    library file declared it. */

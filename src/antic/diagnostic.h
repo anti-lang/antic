@@ -1,6 +1,9 @@
 #ifndef ANTIC_DIAGNOSTIC_H
 #define ANTIC_DIAGNOSTIC_H
 
+/* The record of one diagnostic with its stable name, and the list of the
+   diagnostics of one compilation. */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -50,17 +53,25 @@ struct diagnostic {
     char message[160];
 };
 
-/* The errors of one compilation, in the order they were found. A
-   zero-initialised struct diagnostics is empty and valid. */
+/* The errors, warnings, safety checks and doc warnings of one
+   compilation, in the order they were found. A zero-initialised struct
+   diagnostics is empty and valid. */
 struct diagnostics {
     struct diagnostic *items;
     size_t count;
     size_t capacity;
 };
 
+/* Append an error at line and column, with the message format and its
+   arguments write. A message longer than the room of a diagnostic is cut
+   and ends in three dots. The list grows as it needs, and a failed
+   allocation ends the run with status 70. */
 void diagnostics_add(struct diagnostics *d, int line, int column,
                      const char *format, ...)
     ATTRIBUTE_PRINTF(4, 5);
+/* Append a warning with its stable name, which `allow` silences and
+   --warnings-as-errors turns into an error. The message and the memory
+   follow diagnostics_add. */
 void diagnostics_warn(struct diagnostics *d, enum diag_name name, int line,
                       int column, const char *format, ...)
     ATTRIBUTE_PRINTF(5, 6);
@@ -73,6 +84,8 @@ void diagnostics_check(struct diagnostics *d, enum diag_name name, int line,
 void diagnostics_doc(struct diagnostics *d, enum diag_name name, int line,
                      int column, const char *format, ...)
     ATTRIBUTE_PRINTF(5, 6);
+/* Free the items of d and leave it empty and valid, as a
+   zero-initialised list is. The struct itself belongs to the caller. */
 void diagnostics_free(struct diagnostics *d);
 
 /* Print each diagnostic of d on standard error, one line each, as
