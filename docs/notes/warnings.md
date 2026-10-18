@@ -39,9 +39,11 @@ under `--warnings-as-errors` and in a release build.
 
 ## Safety checks
 
-`unchecked(name, "reason")` overrules one of these. Neither check is built
-yet: each waits for the feature it guards, concurrent classes and regular
-expressions. An `unchecked` of either overrules nothing until then.
+`unchecked(name, "reason")` overrules one of these. `sema_thread.c` holds
+`unguarded-field`, which reads the fields of a concurrent class, and
+`pattern.c` holds `exponential-pattern`, which `sema_check_pattern` runs on
+every pattern literal. `tests/programs/lock_free_queue.anti` and
+`tests/programs/pattern_literals.anti` overrule each.
 
 | Name | Meaning | Fix |
 |---|---|---|
