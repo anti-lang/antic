@@ -7,7 +7,7 @@ and tracing" of `docs/decisions.md`.
 
 ## The entries
 
-`root_names` in `src/antic/sema_class.c` names the seven functions of the root and
+`sema_root_fns` in `src/antic/sema_class.c` names the seven functions of the root and
 then the nine hooks, in the order `created destroyed copied dispatched
 joined enter leave failed changed`. `enum anti_hook` in `src/rt/object.h`
 repeats that order and `ANTI_ENTRY_OF_HOOK` gives the entry of one,
