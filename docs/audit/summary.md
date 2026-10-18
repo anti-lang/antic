@@ -437,7 +437,8 @@ A file without a header comment that says its one purpose:
   of their purpose: 44 of `src/antic/`, 15 of `src/rt/` and 5 of
   `src/anti/`. Six more headers say less than their file. New. tool-pass,
   middle, front-end, back-end, library-file, rt, anti-tool. The front
-  end fixed `5ee03303`, which the test `file_headers` holds.
+  end fixed `5ee03303` and the rest of `src/antic/` fixed `e18aea3b`,
+  which the test `file_headers` holds.
 - M347. `tests/unit/test_target.c:1`. 24 of the 56 unit files open
   without a header comment. Three test more than one part and no line
   says so. New. tests.
@@ -448,8 +449,8 @@ A public function or item without a comment:
   comment or have none. 198 of them stand in public headers. The reports
   list the worst: `types.h`, `reflect.h`, `utf.h` and fifteen of
   `src/anti/`. New. tool-pass, front-end, rt, anti-tool. The public
-  headers of the front end fixed `5ee03303`, which the test
-  `file_headers` holds.
+  headers of the front end fixed `5ee03303` and those of the rest of
+  `src/antic/` fixed `e18aea3b`, which the test `file_headers` holds.
 - M349. `src/std/anti/log.anti:40`. Public items of the library stand
   without a `///` comment. The public fields of `SlotsWalk` let a program
   read outside the blocks. New. std.
@@ -507,7 +508,8 @@ A header or a comment that differs from the code:
   suite on a banned function. No such test exists. New. tool-pass.
 - M365. `src/antic/memcheck.h:15`. The DESIGN gives a reason of the
   register allocator. `loop_depth` of `ir.h:312` is written and never
-  read. New. middle.
+  read. New. middle. Fixed `a89c1d19`, which the test
+  `native_back_end_gone` holds.
 - M366. `src/std/anti/collection/map.anti:47`. The growth of a `Map` is
   not what its DESIGN and `docs/decisions.md:2460` say. A full map that
   removes one entry rebuilds its room on every `add`. New. std. Fixed
