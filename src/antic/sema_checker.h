@@ -88,6 +88,13 @@ struct context {
     struct try_record *in_try;  /* the enclosing `try` block, or NULL */
     int quiet;                  /* above 0, errors are not reported */
     bool target_sized;          /* a symbolic array length is allowed */
+    /* A function type holds one C function pointer in every place, a
+       parameter of it included. The parameters of an `extern fn` are
+       checked so. */
+    bool plain_fns;
+    /* The result of an `operator fn value` resolves, where a part of a
+       tuple may be written `lent *T`. */
+    bool value_result;
 };
 
 struct scope {
@@ -171,13 +178,6 @@ struct checker {
     int const_depth;            /* constants evaluated inside each other */
     int alias_depth;            /* `type` lines resolved inside each other */
     int set_depth;              /* `constraint` sets resolved likewise */
-    /* Above 0, a function type holds one C function pointer in every
-       place, a parameter of it included. The signature of an `extern fn`
-       is checked so. */
-    int plain_fns;
-    /* Set while the result of an `operator fn value` resolves, where a
-       part of a tuple may be written `lent *T`. */
-    bool value_result;
     /* What a `lent` pointer refused where it stands would be: stored,
        returned or passed on. The message of the refusal names it. */
     enum lent_use lent_use;

@@ -990,8 +990,11 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
            and the loop binds what it gives. */
         struct type **elements =
             types_alloc_array(c->arena, t->param_count, sizeof *elements);
-        bool value_result = c->value_result;
-        c->value_result = false;
+        bool value_result = c->ctx.value_result;
+        struct context next = c->ctx;
+        struct context saved;
+        next.value_result = false;
+        sema_enter(c, &next, &saved);
         for (i = 0; i < t->param_count; i++) {
             elements[i] = sema_resolve_type(c, t->params[i]);
             if (!sema_is_error(elements[i]) && t->params[i]->lent &&
@@ -1009,11 +1012,11 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
                 elements[i] = types_lent(c->types, elements[i]);
             }
             if (sema_is_error(elements[i])) {
-                c->value_result = value_result;
+                sema_leave(c, &saved);
                 return elements[i];
             }
         }
-        c->value_result = value_result;
+        sema_leave(c, &saved);
         return types_tuple(c->types, elements, t->param_count);
     }
     case TYPEX_CHAN:
@@ -1058,12 +1061,12 @@ struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
     if (!fn) {
         return t;
     }
-    if (c->plain_fns > 0 && concurrent) {
+    if (c->ctx.plain_fns && concurrent) {
         sema_error_at(c, pos, "an `extern fn` takes plain C function "
                       "pointers, and `concurrent` marks a closure");
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (owned && c->plain_fns > 0) {
+    if (owned && c->ctx.plain_fns) {
         sema_error_at(c, pos, "an `extern fn` takes plain C function "
                       "pointers, and `keep own` holds a snapshot");
         return sema_builtin(c, TYPE_ERROR);
@@ -1076,7 +1079,7 @@ struct type *sema_param_form(struct checker *c, struct type *t, bool keep,
     if (owned) {
         return types_fn_owned(c->types, t);
     }
-    return types_fn_form(c->types, t, !keep && c->plain_fns == 0, concurrent);
+    return types_fn_form(c->types, t, !keep && !c->ctx.plain_fns, concurrent);
 }
 
 /* DESIGN: `lent` marks a pointer parameter whose pointer is valid only
@@ -1103,7 +1106,7 @@ struct type *sema_lent_form(struct checker *c, struct type *t, bool lent,
                       t->kind == TYPE_SLICE ? "slice" : "pointer");
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (c->plain_fns > 0) {
+    if (c->ctx.plain_fns) {
         sema_error_at(c, pos, "an `extern fn` takes no `lent` parameter, "
                       "since C may keep the pointer");
         return sema_builtin(c, TYPE_ERROR);
@@ -1310,6 +1313,8 @@ static struct type *function_type_of(struct checker *c, struct item *it)
     struct type **params = types_alloc_array(
         c->arena, it->param_count + extra + out + 1, sizeof *params);
     struct type *result = sema_builtin(c, TYPE_VOID);
+    struct context next;
+    struct context saved;
     size_t i;
 
     if (it->has_self) {
@@ -1320,10 +1325,10 @@ static struct type *function_type_of(struct checker *c, struct item *it)
         }
         params[0] = types_pointer(c->types, owner->symbol->type);
     }
+    next = c->ctx;
+    next.plain_fns = it->kind == ITEM_EXTERN_FN;
     for (i = 0; i < it->param_count; i++) {
-        if (it->kind == ITEM_EXTERN_FN) {
-            c->plain_fns++;
-        }
+        sema_enter(c, &next, &saved);
         params[i + extra] = sema_param_form(
             c, sema_resolve_type(c, it->params[i].type), it->params[i].keep,
             it->params[i].concurrent,
@@ -1332,9 +1337,7 @@ static struct type *function_type_of(struct checker *c, struct item *it)
         params[i + extra] =
             sema_lent_form(c, params[i + extra], it->params[i].lent,
                            it->params[i].owned, it->params[i].pos);
-        if (it->kind == ITEM_EXTERN_FN) {
-            c->plain_fns--;
-        }
+        sema_leave(c, &saved);
         if (sema_is_error(params[i + extra])) {
             return params[i + extra];
         }
@@ -1343,12 +1346,14 @@ static struct type *function_type_of(struct checker *c, struct item *it)
             return sema_builtin(c, TYPE_ERROR);
         }
     }
-    c->value_result = it->is_operator && it->result != NULL &&
-                      sema_name_is(&it->name, LANG_HOOK_VALUE);
+    next = c->ctx;
+    next.value_result = it->is_operator && it->result != NULL &&
+                        sema_name_is(&it->name, LANG_HOOK_VALUE);
     if (it->result != NULL) {
+        sema_enter(c, &next, &saved);
         result = sema_resolve_type(c, it->result);
+        sema_leave(c, &saved);
     }
-    c->value_result = false;
     if (it->result != NULL && sema_is_error(result)) {
         return result;
     }
