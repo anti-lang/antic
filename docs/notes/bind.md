@@ -6,8 +6,8 @@ and "ABI probe" of `docs/tooling-addendum.md`. The settled points are in
 `docs/decisions.md` under "The bind command". The code is in `src/anti/`:
 `bind.c` holds the command, `bindapi.c` reads a description of rlparser,
 `bindclang.c` reads a header through clang, `bindtype.c` parses a C type
-spelling, `bindexpr.c` evaluates a constant and `bindwrite.c` writes the
-module, the shim and the probes. `bindmodel.c` holds the memory of the
+spelling, `bindexpr.c` evaluates a constant and `bindwrite.c` chooses what the module
+holds with `bind_settle` and writes the module, the shim and the probes. `bindmodel.c` holds the memory of the
 model, the warnings and the libraries each bundled library links. `jsontree.c` builds a tree over the scanner
 of `src/rt/json.c`.
 
@@ -154,3 +154,12 @@ probed.
 The module passes through the formatter of `anti fmt` before it is
 written. A binding committed into a tree that `anti fmt --check` guards
 then stands as the generator wrote it.
+
+## The header of a library
+
+`anti bind --header <name>.antl` writes the C header of a library file,
+`bind_header` of `bind.c`. It runs the driver call with which `antic --lib`
+writes its header, over the interfaces of the library file and its
+imports, so the two cannot drift. The test `anti_bind_header` compares
+their bytes. The module path comes from the package header of the library
+file, and the header takes the name of its last segment.

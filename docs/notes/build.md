@@ -35,7 +35,8 @@ which is what a dependency of a path reads.
 ## The cache of a module
 
 The key of an output is the SHA-256 of its input, the version of antic, the
-target and the processor level, with a mark for `-g`. `options_key` adds every
+target and the processor level, with a mark for `-g`, `strict` and
+`memory-checks`, in `cache_key` of `src/anti/build.c`. `options_key` adds every
 option the compile takes from the manifest and the command. `imports_key` adds
 the digest of every library file the input reaches through its imports and of
 every library file of the graph. That is decision 15 of "Decisions of
