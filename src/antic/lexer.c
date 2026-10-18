@@ -411,6 +411,7 @@ static void push_doc(struct lexer *lx, enum token_kind kind, size_t start,
 {
     const char *s = text_cstr(raw);
     struct text out = {0};
+    struct token_text text;
     size_t common = SIZE_MAX;
     size_t i = 0;
 
@@ -445,7 +446,8 @@ static void push_doc(struct lexer *lx, enum token_kind kind, size_t start,
         }
         i = end + 1;
     }
-    push(lx, kind, start, line, column)->value.text = keep(lx, &out);
+    text = keep(lx, &out);
+    push(lx, kind, start, line, column)->value.text = text;
     text_free(&out);
 }
 
@@ -738,6 +740,7 @@ static bool after_dot(const struct lexer *lx)
 static void number(struct lexer *lx, size_t start, int line, int column)
 {
     struct text digits = {0};
+    struct token_text text;
     uint64_t value = 0;
     bool hex = at(lx, 0) == '0' && at(lx, 1) == 'x';
     bool element = after_dot(lx);
@@ -795,8 +798,8 @@ static void number(struct lexer *lx, size_t start, int line, int column)
                          "invalid character in numeric literal");
             goto done;
         }
-        push(lx, TOKEN_FLOAT, start, line, column)->value.text =
-            keep(lx, &digits);
+        text = keep(lx, &digits);
+        push(lx, TOKEN_FLOAT, start, line, column)->value.text = text;
         goto done;
     }
 
@@ -1179,11 +1182,12 @@ static void string(struct lexer *lx, const struct string_prefix *prefix,
         valid = false;
     }
     if (valid) {
+        struct token_text text = keep(lx, &bytes);
         push(lx,
              prefix->form == FORM_PATTERN ? TOKEN_PATTERN
              : prefix->bytes              ? TOKEN_BYTES
                                           : TOKEN_STRING,
-             start, line, column)->value.text = keep(lx, &bytes);
+             start, line, column)->value.text = text;
     } else {
         push(lx, TOKEN_ERROR, start, line, column);
     }

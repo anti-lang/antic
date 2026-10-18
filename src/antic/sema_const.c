@@ -271,7 +271,7 @@ static void operand_text(struct text *out, const struct expr *e,
         float_as_literal(out, v->as.floating, v->type->kind == TYPE_F32);
     } else if (types_is_signed(v->type->kind == TYPE_ENUM ? v->type->base
                                                           : v->type)) {
-        text_appendf(out, "%lld", (long long)v->as.integer);
+        text_appendf(out, "%lld", (long long)sema_signed_bits(v->as.integer));
     } else {
         text_appendf(out, "%llu", (unsigned long long)v->as.integer);
     }

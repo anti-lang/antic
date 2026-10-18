@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "arith.h"
 #include "ptrset.h"
 
 void *types_alloc_array(struct arena *arena, size_t count, size_t size)
@@ -374,7 +375,7 @@ void types_symbolic_print(struct text *out, const struct symbolic *s,
         if (s->type->kind == TYPE_BOOL) {
             text_append(out, s->value != 0 ? "true" : "false");
         } else if (types_is_signed(s->type)) {
-            text_appendf(out, "%lld", (long long)s->value);
+            text_appendf(out, "%lld", (long long)arith_signed(s->value, 64));
         } else {
             text_appendf(out, "%llu", (unsigned long long)s->value);
         }
