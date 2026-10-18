@@ -41,15 +41,15 @@ that lowering writes.
 Bounds. One unsigned comparison of the index against the count of elements. A
 negative index is a large unsigned value and fails the same test. An array
 takes the count from its type, and a `str` and a slice read it beside the
-pointer. `first_element` returns both, so the base is evaluated once. A raw
-pointer has no count and is not checked.
+pointer. `lower_first_element` of `lower_place.c` returns both, so the base
+is evaluated once. A raw pointer has no count and is not checked.
 
 Overflow. `IR_ADD_OV`, `IR_SUB_OV` and `IR_MUL_OV` give the result of the
 signed operation and record whether it left the range of its type. The
 terminator `IR_BRANCH_OV` reads that. The two are adjacent, which the verifier
 checks, so the back end emits the arithmetic once and branches on what it left.
-`binary_checks` therefore returns the operation's result, which becomes the
-value of the expression.
+`lower_binary_checks` of `lower_check.c` therefore returns the operation's
+result, which becomes the value of the expression.
 
 The LLVM text writes each of the three as the signed `with.overflow`
 intrinsic of its width, `llvm.sadd.with.overflow.i64` and the others, and the
@@ -122,7 +122,7 @@ flags form, which never stops.
 
 ## Compound assignment
 
-`x += y` lowers its own operation, so `lower_assign` calls `binary_checks`
+`x += y` lowers its own operation, so `lower_assign` calls `lower_binary_checks`
 before it, as `lower_binary` does.
 
 ## The path in the text
