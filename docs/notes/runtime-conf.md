@@ -27,7 +27,8 @@ with `--anti.` moves down into the slice that `main` receives, and the
 order of those is the order they came in. Everything else goes to
 `anti_rt_conf_option` with the name after the prefix and the value after
 the first `=`, or no value. Three names are the pass itself rather than a
-key: `conf` remembers the path, `inspect` and `help` set a flag. `inject`
+key: `conf` remembers the path, `inspect` and `help` set a flag and refuse
+a value. `inject`
 carries an interface and a path, which `anti_rt_inject_line` of
 `src/rt/inject.c` keeps, as it keeps a line of `[injections]`.
 

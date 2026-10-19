@@ -5862,6 +5862,8 @@ foreach(case
         "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"
         "exit_status|status||4294967299|empty.pattern||3"
         "help|report||--anti.help|help.pattern||0"
+        "help_value|report||--anti.help=x|empty.pattern|help-value.pattern|70"
+        "inspect_value|report||--anti.inspect=x|empty.pattern|inspect-value.pattern|70"
         "configure|configure||${CONF}/backtrace.toml|configure.pattern||0"
         "configure_dev|configure|--dev|${CONF}/no-backtrace.toml|configure.plain.pattern||0"
         "configure_missing|configure||${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"

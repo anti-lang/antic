@@ -303,6 +303,15 @@ static _Noreturn void unknown_option(const char *name, size_t length)
                   list_text(names, OPTION_COUNT, " --anti."));
 }
 
+/* An option that takes no value ends the program when it has one, as
+   any value the runtime does not know does. */
+static void no_value(const char *where, const char *value)
+{
+    if (value != NULL) {
+        startup_error("%s takes no value, found %s", where, value);
+    }
+}
+
 void anti_rt_conf_option(const char *name, int64_t length, const char *value)
 {
     size_t n = (size_t)length;
@@ -321,8 +330,10 @@ void anti_rt_conf_option(const char *name, int64_t length, const char *value)
         }
         conf_path = value;
     } else if (n == 7 && memcmp(name, "inspect", n) == 0) {
+        no_value(where, value);
         inspect_asked = 1;
     } else if (n == 4 && memcmp(name, "help", n) == 0) {
+        no_value(where, value);
         help_asked = 1;
     } else if (n == 6 && memcmp(name, "inject", n) == 0) {
         const char *at = value == NULL ? NULL : strchr(value, '=');
