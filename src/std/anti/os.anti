@@ -48,9 +48,15 @@ pub fn signal_pending() -> int
 }
 
 /// The value of the environment variable `name`, or `""`.
+///
+/// `getenv` reads a C string. A `str` that is a slice of a longer text has no
+/// NUL after its last byte, so the name goes to it as a copy, which ends in
+/// one.
 fn variable(name: str) -> str
 {
-	let value = getenv(name.ptr);
+	let named = text.Builder.new();
+	named.append(name);
+	let value = getenv(named.text().ptr);
 	if value == none {
 		return "";
 	}
