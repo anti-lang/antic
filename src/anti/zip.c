@@ -673,7 +673,10 @@ bool zip_unpack(const struct zip_archive *a, size_t index, struct text *out)
                 text_cstr(&item->name), item->method);
         return false;
     }
-    if (ok && crc32_of(out->data + from, out->length - from) != item->crc) {
+    /* An entry of no bytes inflated into an empty text leaves out->data
+       NULL, and C11 leaves NULL + 0 undefined. text_cstr gives "". */
+    if (ok && crc32_of(text_cstr(out) + from, out->length - from) !=
+                  item->crc) {
         ok = false;
     }
     if (!ok) {

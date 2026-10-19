@@ -286,6 +286,40 @@ static void stored_and_deflate(void)
     }
 }
 
+/* An entry of no bytes, stored and deflated, unpacks into a text that
+   holds nothing. The text then has no memory, and the CRC is read
+   without a sum on its null pointer. */
+static void empty_entries(void)
+{
+    static const unsigned char nothing[] = "";
+    struct entry e;
+    struct bits b;
+    struct text out = {0};
+
+    e.name = "empty.txt";
+    e.data = nothing;
+    e.packed = 0;
+    e.size = 0;
+    e.crc = crc_of(nothing, 0);
+    e.method = 0;
+    write_archive(&e, 1);
+    CHECK(unpack_one(&out));
+    CHECK(out.length == 0);
+    text_free(&out);
+
+    /* One fixed block that ends at once. */
+    memset(&b, 0, sizeof b);
+    bits_put(&b, 1, 1);
+    bits_put(&b, 1, 2);
+    fixed_end(&b);
+    bits_flush(&b);
+    e = deflated("empty.z", &b, 0, crc_of(nothing, 0));
+    write_archive(&e, 1);
+    CHECK(unpack_one(&out));
+    CHECK(out.length == 0);
+    text_free(&out);
+}
+
 /* An entry packed with bzip2, method 12 of the format. The reader takes
    stored and deflate, refuses the entry and leaves nothing behind. */
 static void other_method(void)
@@ -905,6 +939,7 @@ void test_zip(void)
 {
     fputs("anti test: the messages below are expected\n", stderr);
     stored_and_deflate();
+    empty_entries();
     other_method();
     deflate_bound();
     broken_deflate();

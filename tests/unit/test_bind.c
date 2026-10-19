@@ -273,6 +273,8 @@ static void json_messages(void)
     CHECK(strcmp(small + sizeof small - 4, "...") == 0);
     CHECK(!json_read(broken, sizeof broken - 1, &tree, large, sizeof large));
     CHECK(strstr(large, "at line 1, column 7") != NULL);
+    /* clang that writes nothing gives a text without memory. */
+    CHECK(!json_read(NULL, 0, &tree, large, sizeof large));
 }
 
 void test_bind(void)

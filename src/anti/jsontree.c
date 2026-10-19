@@ -253,8 +253,15 @@ static const struct json_value *read_value(struct builder *b, int depth)
 bool json_read(const unsigned char *bytes, size_t length,
                struct json_tree *out, char *error, size_t error_size)
 {
+    static const unsigned char nothing[1];
     struct builder b;
 
+    /* A text that holds nothing may come as NULL, as the output of clang
+       that wrote nothing does, and C11 leaves NULL + 0 undefined. */
+    if (bytes == NULL) {
+        bytes = nothing;
+        length = 0;
+    }
     memset(out, 0, sizeof *out);
     b.scan.at = bytes;
     b.scan.end = bytes + length;
