@@ -110,8 +110,9 @@ struct anti_descriptor;
    the same, and one NULL pattern differs from any other. */
 int8_t anti_rt_pattern_same(const void *a, const void *b);
 
-/* The hash of the text and the mode of the compiled pattern p, and the
-   offset basis of FNV-1a for a NULL p. */
+/* The hash of the mode and the text of the compiled pattern p, the two
+   parts in the order of a value of parts of hash.h, and ANTI_HASH_START
+   for a NULL p. */
 uint64_t anti_rt_pattern_hash(const void *p);
 
 /* The bytes of one element that a pointer or a slice of the type id

@@ -429,7 +429,7 @@ add_test(NAME rt_conf_race COMMAND rt_conf_tests)
 # program of its own with stand-ins for the classes, the registry and the
 # loader. The runtime of an Anti program carries no sanitizer, and this
 # program does in the sanitizer builds.
-antic_rt_sources(deserialize_sources registry object json utf f16 text cast
+antic_rt_sources(deserialize_sources registry object json utf f16 text cast hash
     mem assert atomic fs platform_posix platform_windows)
 add_executable(rt_deserialize_tests unit/test_deserialize.c
     ${deserialize_sources})
@@ -444,7 +444,7 @@ foreach(which one two)
     add_library(plugin_table_${which} SHARED unit/plugin_table.c)
 endforeach()
 antic_rt_sources(plugin_sources plugin assert loaded atomic digest text toml
-    utf platform_posix platform_windows object json cast mem)
+    utf platform_posix platform_windows object json cast mem hash)
 add_executable(rt_plugin_tests unit/test_plugin_race.c ${plugin_sources})
 target_link_libraries(rt_plugin_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
@@ -504,7 +504,7 @@ add_test(NAME rt_plugin_table COMMAND rt_plugin_table_tests)
 # its own, since each case ends the process. The files of the runtime it
 # links build with malloc and realloc named after the stand-ins of the
 # test, which refuse on request.
-antic_rt_sources(oom_sources text object json cast assert mem atomic utf
+antic_rt_sources(oom_sources text object json cast assert mem atomic utf hash
     fs platform_posix platform_windows)
 add_library(rt_oom_runtime OBJECT ${oom_sources})
 target_compile_definitions(rt_oom_runtime PRIVATE

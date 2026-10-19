@@ -8,6 +8,7 @@
 
 #include "f16.h"
 #include "fail.h"
+#include "hash.h"
 #include "json.h"
 #include "object.h"
 #include "plugin.h"
@@ -193,17 +194,6 @@ void anti_rt_store_integer(void *bytes, int64_t type, uint64_t value)
     }
 }
 
-/* FNV-1a of count bytes at p into h. */
-static uint64_t hash_run(uint64_t h, const unsigned char *p, size_t count)
-{
-    size_t k;
-
-    for (k = 0; k < count; k++) {
-        h = (h ^ p[k]) * 1099511628211u;
-    }
-    return h;
-}
-
 int8_t anti_rt_pattern_same(const void *a, const void *b)
 {
     const struct anti_pattern *x = a;
@@ -223,13 +213,13 @@ int8_t anti_rt_pattern_same(const void *a, const void *b)
 uint64_t anti_rt_pattern_hash(const void *p)
 {
     const struct anti_pattern *x = p;
-    uint64_t h = 1469598103934665603u;
+    uint64_t h = ANTI_HASH_START;
 
     if (x == NULL) {
         return h;
     }
-    h = hash_run(h, (const unsigned char *)&x->bytes, sizeof x->bytes);
-    return x->length > 0 ? hash_run(h, x->text, (size_t)x->length) : h;
+    h = anti_rt_hash_mix(h ^ anti_rt_hash_mix((uint64_t)x->bytes));
+    return anti_rt_hash_mix(h ^ anti_rt_hash_bytes(x->text, x->length));
 }
 
 /* The record of the case that the tag of the variant at bytes names,
