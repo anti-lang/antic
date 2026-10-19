@@ -22,12 +22,15 @@ extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 extern fn anti_rt_address_below(a: ?*byte, b: ?*byte) -> c_int;
 
+/// The top bits of a seeded hash that choose the part of a key.
+const PART_BITS: int = 4;
+
 /// The number of parts of a `ConcurrentMap`, each with a lock of its own.
 ///
 /// DESIGN: a power of two, so the part of a key is a few bits of its hash.
 /// Sixteen locks let as many threads work on different parts at once, and cost
 /// a lock word and two empty tables each.
-const PARTS: int = 16;
+const PARTS: int = 1 << PART_BITS;
 
 /// One part of a `ConcurrentMap`: its lock, the entries whose key hashes to it
 /// and the version of each.
@@ -634,7 +637,7 @@ pub concurrent class ConcurrentMap<K: eq + hash, V>
 	fn part_of(self, k: K) -> *Part<K, V>
 	{
 		let h = lang.seeded(k.hash(), self.seed);
-		return self.part((h >> 60) as int);
+		return self.part((h >> ((64 - PART_BITS) as u64)) as int);
 	}
 
 	/// The part at `i`, from 0.

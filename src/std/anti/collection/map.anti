@@ -31,7 +31,7 @@ extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
 const LIVE: u64 = 0x8000000000000000;
 
 /// The mark of a bucket or a slot whose entry was removed.
-const REMOVED: u64 = 1;
+internal const REMOVED: u64 = 1;
 
 /// The number of buckets or slots a table starts with.
 const FIRST_BUCKETS: int = 16;

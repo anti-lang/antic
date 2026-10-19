@@ -372,7 +372,7 @@ pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 	fn live(self, i: int) -> bool
 	{
 		let marks = self.marks catch fatal;
-		return marks[i] > 1;
+		return marks[i] > map.REMOVED;
 	}
 
 	/// The slot of `x`, or -1.

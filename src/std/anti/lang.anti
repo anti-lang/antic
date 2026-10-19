@@ -128,7 +128,7 @@ pub class StackTrace
 	/// innermost frames, in a new object the caller deletes.
 	pub fn capture(skip: int = 0) -> *StackTrace
 	{
-		let addresses: [64]u64 = [0; 64];
+		let addresses: [TRACE_DEPTH]u64 = [0; TRACE_DEPTH];
 		let count = anti_rt_trace_walk(&addresses[0], TRACE_DEPTH, skip + 1);
 		let t = alloc StackTrace {
 			frames: []RawFrame { ptr: none, len: 0 },

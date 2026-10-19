@@ -45,6 +45,10 @@ const PARENT: int = 1;
 /// The word of the first child, -1 in a leaf.
 const CHILDREN: int = 2;
 
+/// The depth of a sorted map or set in its chain of descriptors: the root, then
+/// `Collection`, then `BTree`, then the class.
+const TYPE_DEPTH: int = 3;
+
 /// The number of elements of the node `n`.
 fn held_in(links: *int, n: int) -> int
 {
@@ -1195,18 +1199,17 @@ pub class SortedMap<K: Ordered, V> inherits BTree<(K, V)>
 		return dup(self.slot(at).1);
 	}
 
-	/// The record of the key type in the descriptor of this copy of the class,
-	/// which sits three levels below the root.
+	/// The record of the key type in the descriptor of this copy of the class.
 	fn key_type(self) -> ?*byte
 	{
-		return anti_rt_type_arg(self as ?*byte, 3, 0);
+		return anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 0);
 	}
 
 	/// The record of the value type in the descriptor of this copy of the
 	/// class.
 	fn value_type(self) -> ?*byte
 	{
-		return anti_rt_type_arg(self as ?*byte, 3, 1);
+		return anti_rt_type_arg(self as ?*byte, TYPE_DEPTH, 1);
 	}
 }
 
