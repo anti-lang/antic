@@ -505,7 +505,7 @@ add_test(NAME rt_plugin_table COMMAND rt_plugin_table_tests)
 # links build with malloc and realloc named after the stand-ins of the
 # test, which refuse on request.
 antic_rt_sources(oom_sources text object json cast assert mem atomic utf hash
-    fs platform_posix platform_windows)
+    fs platform_posix platform_windows snapshot)
 add_library(rt_oom_runtime OBJECT ${oom_sources})
 target_compile_definitions(rt_oom_runtime PRIVATE
     malloc=refused_malloc realloc=refused_realloc)
@@ -516,7 +516,7 @@ target_link_libraries(rt_oom_tests PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 add_test(NAME rt_oom
     COMMAND "${CMAKE_COMMAND}"
         "-DPROGRAM=$<TARGET_FILE:rt_oom_tests>"
-        "-DCASES=take,append,fill,append_count,fill_count,copy_buffer,dup,start"
+        "-DCASES=take,append,fill,append_count,fill_count,copy_buffer,dup,start,snapshot"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-oom"
         -P "${ANTIC_RUNNERS}/run_rt_oom.cmake")
 # T139. The listing of anti.fs when the C library refuses its memory.

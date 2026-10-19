@@ -146,7 +146,7 @@ struct anti_matches {
 
 static _Noreturn void out_of_memory(void)
 {
-    anti_rt_fail_abort("anti: out of memory in a search of a pattern");
+    anti_rt_fail_memory("in a search of a pattern");
 }
 
 /* DESIGN: a search that reaches a limit of PCRE2, of matching, of depth

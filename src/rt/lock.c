@@ -94,7 +94,7 @@ static void orders_grow(void)
 
     orders = calloc(capacity, sizeof *orders);
     if (orders == NULL) {
-        anti_rt_fail_abort("out of memory for the order of the locks");
+        anti_rt_fail_memory("for the order of the locks");
     }
     anti_rt_atomic_store(&order_capacity, (int64_t)sizeof order_capacity,
                          (int64_t)capacity);

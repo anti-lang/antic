@@ -2,7 +2,8 @@
    an owned buffer stop the program through anti_rt_out_of_memory when
    the C library refuses their memory, as decision 4 of "Decisions of
    2026-10-11" says, and never come back with a literal or NULL. The
-   listing of anti.fs does the same, which T139 holds. The memory of the
+   listing of anti.fs does the same, which T139 holds, and the block of
+   a snapshot on the heap stops with the same form of line. The memory of the
    start of a program ends it with status 70, as a refusal at start does.
 
    The files of the runtime this program links are compiled with malloc
@@ -20,6 +21,7 @@
 #include "fail.h"
 #include "object.h"
 #include "plugin.h"
+#include "snapshot.h"
 #include "std.h"
 
 void *refused_malloc(size_t size);
@@ -107,6 +109,11 @@ int main(int argc, char **argv)
         object.table = (const struct anti_descriptor *const *)table;
         refusing = 1;
         made = anti_rt_dup(&object, &one);
+    } else if (strcmp(name, "snapshot") == 0) {
+        /* The block of a snapshot on the heap, whose line has the form of
+           every failure of memory of the runtime. */
+        refusing = 1;
+        made = anti_rt_snapshot_new(16);
     } else if (strcmp(name, "fs_list") == 0) {
         /* T139. The listing of anti.fs fails with ENOMEM, and fs.list
            passes the failure on. */

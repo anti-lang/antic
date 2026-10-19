@@ -82,7 +82,7 @@ ANTI_RT_NOINLINE void *anti_rt_alloc_aligned(int64_t count, int64_t size,
    Anti function right under malloc. Only the failure comes here. */
 _Noreturn void anti_rt_out_of_memory(int64_t size)
 {
-    anti_rt_fail_abort("anti: out of memory for %lld bytes", (long long)size);
+    anti_rt_fail_memory("for %lld bytes", (long long)size);
 }
 
 /* A size of zero is one byte, as for anti_rt_mem_alloc, since realloc may

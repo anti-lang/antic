@@ -7,7 +7,7 @@
 #   PROGRAM  rt_oom_tests, built from tests/unit/test_rt_oom.c
 #   CASES    the cases, separated by commas
 #   WORK     a directory this run writes into
-# A case without a count below gives any count of bytes.
+# A case without a count or a line below gives any count of bytes.
 #
 # DESIGN: abort() of the C runtime that the programs of the tests link on
 # Windows ends the process with the status 3, where the runtime of an Anti
@@ -26,9 +26,13 @@ set(bytes_append_count 9223372036854775803)
 set(bytes_fill_count 9223372036854775807)
 set(bytes_copy_buffer 3)
 set(bytes_dup 24)
+# A case whose line names what the memory was for.
+set(line_snapshot "anti: out of memory for a snapshot of 16 bytes\n")
 string(REPLACE "," ";" cases "${CASES}")
 foreach(case IN LISTS cases)
-    if(DEFINED bytes_${case})
+    if(DEFINED line_${case})
+        set(message ERR "${line_${case}}")
+    elseif(DEFINED bytes_${case})
         set(message ERR "anti: out of memory for ${bytes_${case}} bytes\n")
     else()
         set(message ERR_MATCH "^anti: out of memory for [0-9]+ bytes\n$")

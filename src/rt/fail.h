@@ -22,6 +22,12 @@ ANTI_RT_PRINTF(2, 3) _Noreturn void anti_rt_fail_exit(int status,
 ANTI_RT_PRINTF(1, 2) _Noreturn void anti_rt_fail_abort(const char *format,
                                                  ...);
 
+/* The failure of memory the runtime asked for: `anti: out of memory `,
+   then the text that format gives, as anti_rt_fail_abort writes it, and
+   an abort. Every such failure of the runtime has this one form. */
+ANTI_RT_PRINTF(1, 2) _Noreturn void anti_rt_fail_memory(const char *format,
+                                                  ...);
+
 /* The precision that `%.*s` takes for a text of length bytes, which is
    an int: the length, INT_MAX for a text that no int counts, and 0 for a
    length below zero. */

@@ -90,8 +90,8 @@ void *anti_rt_chan_new(int64_t size, int64_t capacity)
         ch = malloc(sizeof *ch + (size_t)(size * capacity));
     }
     if (ch == NULL) {
-        anti_rt_fail_abort("anti: no memory for a channel of %lld values",
-                           (long long)capacity);
+        anti_rt_fail_memory("for a channel of %lld values",
+                            (long long)capacity);
     }
     ch->monitor = anti_rt_monitor_new();
     if (ch->monitor == NULL) {

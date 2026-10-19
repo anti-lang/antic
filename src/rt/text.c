@@ -94,8 +94,7 @@ struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
     unsigned char *copy = malloc(len > 0 ? (size_t)len : 1);
 
     if (copy == NULL) {
-        anti_rt_fail_abort("anti: out of memory in a copy of %lld bytes",
-                           (long long)len);
+        anti_rt_fail_memory("in a copy of %lld bytes", (long long)len);
     }
     if (len > 0) {
         memcpy(copy, bytes, (size_t)len);

@@ -250,8 +250,8 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
         if (j.results == NULL) {
             /* DESIGN: the language has no way to report this, and a
                program that cannot hold its results cannot go on. */
-            anti_rt_fail_abort("anti: no memory for the results of %lld "
-                               "chunks", (long long)chunks);
+            anti_rt_fail_memory("for the results of %lld chunks",
+                                (long long)chunks);
         }
     }
     *results_out = j.results;
@@ -313,21 +313,21 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
     struct one *at;
 
     if (job == NULL) {
-        anti_rt_fail_abort("anti: no memory for a job of dispatch");
+        anti_rt_fail_memory("for a job of dispatch");
     }
     job->run = run;
     job->object = object;
     if (context_size > 0) {
         job->context = malloc((size_t)context_size);
         if (job->context == NULL) {
-            anti_rt_fail_abort("anti: no memory for the arguments of a job");
+            anti_rt_fail_memory("for the arguments of a job");
         }
         memcpy(job->context, context, (size_t)context_size);
     }
     if (result_size > 0) {
         job->result = malloc((size_t)result_size);
         if (job->result == NULL) {
-            anti_rt_fail_abort("anti: no memory for the result of a job");
+            anti_rt_fail_memory("for the result of a job");
         }
     }
     hold();

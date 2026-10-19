@@ -36,6 +36,18 @@ void anti_rt_fail_abort(const char *format, ...)
     abort();
 }
 
+void anti_rt_fail_memory(const char *format, ...)
+{
+    va_list rest;
+
+    fflush(stdout);
+    fputs("anti: out of memory ", stderr);
+    va_start(rest, format);
+    write_line(format, rest);
+    va_end(rest);
+    abort();
+}
+
 void anti_rt_note(const char *format, ...)
 {
     va_list rest;

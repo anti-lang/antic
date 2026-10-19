@@ -20,8 +20,7 @@ void *anti_rt_snapshot_new(int64_t size)
     void *made = malloc((size_t)size);
 
     if (made == NULL) {
-        anti_rt_fail_abort("out of memory for a snapshot of %lld bytes",
-                           (long long)size);
+        anti_rt_fail_memory("for a snapshot of %lld bytes", (long long)size);
     }
     memcpy(made, &size, sizeof size);
     anti_rt_atomic_add(&snapshots_alive, (int64_t)sizeof snapshots_alive, 1);
