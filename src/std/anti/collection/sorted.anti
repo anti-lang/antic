@@ -500,8 +500,9 @@ pub abstract class BTree<T> inherits collection.Collection<T>
 	}
 
 	/// Refill the node `n` after a removal left it with too few elements, from
-	/// a sibling that can spare one or by merging it with a sibling, and so on
-	/// up the tree. A root left empty gives way to its only child.
+	/// a sibling that can spare one or by merging it with a sibling. A merge
+	/// takes an element from the parent, which is refilled the same way, up to
+	/// the root. A root left empty gives way to its only child.
 	fn rebalance(self, n: int)
 	{
 		let node = n;

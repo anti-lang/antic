@@ -14,9 +14,9 @@ extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 /// A binary heap in one array, which gives the smallest element first.
 ///
 /// The element at `i` is no larger than those at `2i + 1` and `2i + 2`, so the
-/// smallest stands at 0. `push` and `pop` take a number of steps logarithmic in
-/// the count. The array grows as a list does: from 8 elements, or from the
-/// capacity it was made with, doubling as it fills.
+/// smallest stands at 0. `push` and `pop` take steps logarithmic in the count.
+/// The array grows as a list does: from 8 elements, or from the capacity it was
+/// made with, doubling as it fills.
 ///
 /// `for` walks copies of the elements in the order of the array, which is not
 /// the order of `pop`. An element is never lent in a walk, since a change in
