@@ -152,10 +152,12 @@ struct module *compilation_check(struct compilation *c, const char *name,
 void compilation_add(struct compilation *c, const struct interface *iface);
 
 /* Append the IR of m to out as ir_print does, without the lines of the
-   types the runtime declares, which start with "type anti.rt.". Their
-   layout is the subject of runtime_types in test_lower.c alone, and every
-   other expected text leaves them out, so a change of the descriptor
-   rewrites one text. */
+   types the runtime declares, which start with "type anti.rt.", and
+   without the globals that hold the text of a failed check, which only
+   a call of anti_rt_check_failed prints. Their forms are the
+   subjects of runtime_types and check_texts in test_lower.c alone, and
+   every other expected text leaves them out, so a change of the
+   descriptor or of the words of a check rewrites one text. */
 void ir_print_own(struct text *out, const struct ir_module *m);
 
 #endif

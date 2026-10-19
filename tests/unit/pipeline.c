@@ -15,6 +15,7 @@
 #include "lower.h"
 #include "optimize.h"
 #include "parser.h"
+#include "rt_abi.h"
 #include "sema.h"
 
 /* The first message of d, or an empty text when a stage failed without
@@ -248,22 +249,100 @@ void compilation_add(struct compilation *c, const struct interface *iface)
     c->libraries[c->library_count++] = iface;
 }
 
+/* Whether the call in calls the runtime with the text of a failed check,
+   anti_rt_check_failed. */
+static bool calls_check_failed(const struct ir_module *m,
+                               const struct ir_inst *in)
+{
+    return in->op == IR_CALL && in->a.kind == IR_FUNC &&
+           in->a.as.index < m->function_count &&
+           strcmp(m->functions[in->a.as.index]->name,
+                  rt_name(RT_FN_CHECK_FAILED)) == 0 &&
+           in->arg_count > 0 && in->args[0].kind == IR_TEMP;
+}
+
+/* Whether the temporary t of the function f is the text a call of
+   anti_rt_check_failed prints. */
+static bool is_check_argument(const struct ir_module *m,
+                              const struct ir_function *f, uint32_t t)
+{
+    size_t j;
+    size_t k;
+
+    for (j = 0; j < f->block_count; j++) {
+        const struct ir_block *b = f->blocks[j];
+        for (k = 0; k < b->count; k++) {
+            if (calls_check_failed(m, &b->insts[k]) &&
+                b->insts[k].args[0].as.temp == t) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* Whether the global g of m is the text of a failed check: a call of
+   anti_rt_check_failed prints every address of it, and there is one. The
+   optimizer folds the failure block of a check into others, so the call
+   tells the text and the kind of the block does not. */
+static bool is_check_text(const struct ir_module *m, uint32_t g)
+{
+    bool named = false;
+    size_t i;
+    size_t j;
+    size_t k;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        for (j = 0; j < f->block_count; j++) {
+            const struct ir_block *b = f->blocks[j];
+            for (k = 0; k < b->count; k++) {
+                const struct ir_inst *in = &b->insts[k];
+                if (in->op != IR_ADDR || in->a.kind != IR_GLOBAL ||
+                    in->a.as.index != g) {
+                    continue;
+                }
+                if (!is_check_argument(m, f, in->result)) {
+                    return false;
+                }
+                named = true;
+            }
+        }
+    }
+    return named;
+}
+
 void ir_print_own(struct text *out, const struct ir_module *m)
 {
     static const char runtime_type[] = "type anti.rt.";
     struct text all = {0};
+    struct text check = {0};
     const char *line;
+    uint32_t g = 0;
 
     ir_print(&all, m);
     line = text_cstr(&all);
     while (*line != '\0') {
         const char *end = strchr(line, '\n');
         size_t length = end == NULL ? strlen(line) : (size_t)(end - line) + 1;
+        bool skip = strncmp(line, runtime_type, sizeof runtime_type - 1) == 0;
 
-        if (strncmp(line, runtime_type, sizeof runtime_type - 1) != 0) {
+        /* ir_print writes the globals in their order, one line each. */
+        if (strncmp(line, "global ", 7) == 0 && g < m->global_count) {
+            text_free(&check);
+            text_append(&check, "global ");
+            ir_name_append(&check, m->globals[g]->module, m->globals[g]->name);
+            text_append(&check, " ");
+            if (strncmp(line, text_cstr(&check), check.length) == 0) {
+                skip = skip || is_check_text(m, g);
+                g++;
+            }
+        }
+        if (!skip) {
             text_append_bytes(out, line, length);
         }
         line += length;
     }
+    text_free(&check);
     text_free(&all);
 }

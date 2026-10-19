@@ -1123,13 +1123,12 @@ static void keeps_literals(void)
     if (ok) {
         lower_as(module, "main", &program, 0);
     }
-    ir_print(&ir, &program);
+    ir_print_own(&ir, &program);
     CHECK_STR(text_cstr(&ir),
               "type str = struct { ptr: ptr, len: i64 }\n"
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
               "global words.0 size 3 align 1 bytes 68 69 00\n"
               "global main.0 size 3 align 1 bytes 68 69 00\n"
-              "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
               "fn words.hi() -> agg str {\n"
               "b0:\n"
               "    %0 = slot str\n"

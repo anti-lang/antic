@@ -1315,9 +1315,42 @@ static void runtime_types(void)
     lowered_release(&l);
 }
 
+/* The text of a failed check, the file, the line and the operation, in a
+   global of its own. Every other expected text leaves these globals out
+   through ir_print_own, so a change of the words of a check or one more
+   line in a test source rewrites this test alone. A literal of the
+   program stays in the text. */
+static void check_texts(void)
+{
+    static const char check[] =
+        "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 "
+        "65 72 66 6c 6f 77 20 69 6e 20 2b 00\n";
+    static const char literal[] = "global main.0 size 3 align 1 bytes 68 69 00\n";
+    struct lowered l;
+    struct text all = {0};
+    struct text own = {0};
+
+    lowered_run(&l, "fn f(a: int) -> str {\n"
+                    "    let s = \"hi\";\n"
+                    "    let b = a + 1;\n"
+                    "    return s;\n"
+                    "}\n");
+    CHECK(l.ok);
+    ir_print(&all, &l.ir);
+    ir_print_own(&own, &l.ir);
+    CHECK(strstr(text_cstr(&all), check) != NULL);
+    CHECK(strstr(text_cstr(&own), check) == NULL);
+    CHECK(strstr(text_cstr(&own), literal) != NULL);
+    CHECK(strstr(text_cstr(&own), "@main.1") != NULL);
+    text_free(&all);
+    text_free(&own);
+    lowered_release(&l);
+}
+
 void test_lower(void)
 {
     runtime_types();
+    check_texts();
     flag_reads();
     /* A bitfield is read and written through the address of its struct and
        the field, and the back end lowers both to shifts and masks. A value
@@ -1338,8 +1371,6 @@ void test_lower(void)
            "global main.3 size 6 align 1 bytes 6c 65 76 65 6c 00\n"
            "global main.Flags.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 7, offset_of main.Flags.visible, i64 0, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 5, offset_of main.Flags.level, i64 0, i64 0, ptr 0 } }\n"
            "global main.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\n"
-           "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
-           "global main.7 size 51 align 1 bytes 6d 61 69 6e 3a 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 74 68 65 20 33 20 62 69 74 73 20 6f 66 20 6c 65 76 65 6c 00\n"
            "fn main.f(%0: ptr nonnull deref(size_of main.Flags)) -> i8 signext {\n"
            "b0:\n"
            "    bitstore i32 1, %0, main.Flags.visible\n"
@@ -1387,7 +1418,6 @@ void test_lower(void)
            "global main.A.descriptor anti.rt.Descriptor { @main.7, i64 1, ptr 0, size_of main.A, i64 0, ptr 0, i64 1, @main.A.fields, ptr 0, i64 0, i64 0, ptr 0, @main.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
            "global main.7 size 2 align 1 bytes 41 00\n"
            "global main.A.fields [1]anti.rt.Field { anti.rt.Field { @main.2, i64 1, offset_of main.A.a, i64 8, i64 0, ptr 0 } }\n"
-           "global main.9 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.f(%0: ptr nonnull deref(size_of main.P), %1: agg main.A) -> i32 {\n"
            "b0:\n"
            "    %2 = ptradd inbounds %0, offset_of main.P.b\n"
@@ -1430,9 +1460,6 @@ void test_lower(void)
            "}\n",
            "extern fn labs(clong) -> clong\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "global main.2 size 35 align 1 bytes 6d 61 69 6e 3a 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
            "fn main.f(%0: i32, %1: cwchar) -> i64 {\n"
            "b0:\n"
            "    %2 = sext clong %0\n"
@@ -1494,8 +1521,6 @@ void test_lower(void)
            "global main.3 size 2 align 1 bytes 6e 00\n"
            "global main.H.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 3, offset_of main.H.tag, i64 8, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 1, offset_of main.H.n, i64 5, i64 0, ptr 0 } }\n"
            "global main.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\n"
-           "global main.6 size 28 align 1 bytes 6d 61 69 6e 3a 34 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.7 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.f() -> i64 {\n"
            "b0:\n"
            "    %0 = slot [size_of(main.H) - 4]byte\n"
@@ -1541,8 +1566,6 @@ void test_lower(void)
            "    return scale(7);\n"
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
            "fn main.scale(%0: i64) -> i64 {\n"
            "b0:\n"
            "    %1 = addov nsw i64 2, 4\n"
@@ -1576,7 +1599,6 @@ void test_lower(void)
            "    return x;\n"
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.f() -> i64 {\n"
            "b0:\n"
            "    %0 = slot i64\n"
@@ -1609,7 +1631,6 @@ void test_lower(void)
            "    }\n"
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.g(%0: i64) -> i64 {\n"
            "b0:\n"
            "    %1 = copy i64 0\n"
@@ -1641,7 +1662,6 @@ void test_lower(void)
            "    return a / b > 1 && a != b;\n"
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 30 align 1 bytes 6d 61 69 6e 3a 32 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00\n"
            "fn main.h(%0: i32, %1: i32) -> i8 zeroext range 0, 2 {\n"
            "b0:\n"
            "    %2 = ne i8 %1, 0\n"
@@ -1673,7 +1693,6 @@ void test_lower(void)
            "}\n",
            "extern fn putchar(i32) -> i32\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 35 align 1 bytes 6d 61 69 6e 3a 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
            "fn main.main() -> i64 {\n"
            "b0:\n"
            "    %0 = copy i32 65\n"
@@ -1704,8 +1723,6 @@ void test_lower(void)
            "extern fn anti_rt_alloc_aligned(i64, i64, i64, i64) -> ptr\n"
            "extern fn free(ptr)\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 35 align 1 bytes 6d 61 69 6e 3a 36 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 31 36 00\n"
-           "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.k() -> i16 signext {\n"
            "b0:\n"
            "    %0 = call ptr @anti_rt_alloc_aligned(4, size_of i16, 16, 0)\n"
@@ -1802,7 +1819,6 @@ void test_lower(void)
            "    return i;\n"
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.count(%0: i64) -> i64 {\n"
            "b0:\n"
            "    %1 = copy i64 0\n"
@@ -1869,9 +1885,6 @@ void test_lower(void)
            "    return x as i16 + (x as u8 as i16);\n"
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
-           "global main.1 size 36 align 1 bytes 6d 61 69 6e 3a 35 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 62 79 74 65 00\n"
-           "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.bump(%0: i8 signext) -> i16 signext {\n"
            "b0:\n"
            "    %1 = slot i8\n"
@@ -1940,7 +1953,6 @@ void test_lower(void)
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "global main.0 size 3 align 1 bytes 68 69 00\n"
            "global main.1 size 3 align 1 bytes 68 00 00\n"
-           "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.f() -> i64 {\n"
            "b0:\n"
            "    %0 = slot str\n"
@@ -1995,11 +2007,6 @@ void test_lower(void)
            "type []i32 = struct { ptr: ptr, len: i64 }\n"
            "type []byte = struct { ptr: ptr, len: i64 }\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 32 align 1 bytes 6d 61 69 6e 3a 32 3a 20 73 6c 69 63 65 20 65 6e 64 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.1 size 34 align 1 bytes 6d 61 69 6e 3a 32 3a 20 73 6c 69 63 65 20 73 74 61 72 74 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.2 size 28 align 1 bytes 6d 61 69 6e 3a 33 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.3 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-           "global main.4 size 35 align 1 bytes 6d 61 69 6e 3a 33 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 69 33 32 00\n"
            "fn main.g(%0: agg str, %1: agg []i32, %2: i64) -> i32 {\n"
            "b0:\n"
            "    %3 = slot []byte\n"
@@ -2099,8 +2106,6 @@ void test_lower(void)
            "type []byte = struct { ptr: ptr, len: i64 }\n"
            "type []int = struct { ptr: ptr, len: i64 }\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 32 align 1 bytes 6d 61 69 6e 3a 34 3a 20 73 6c 69 63 65 20 65 6e 64 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.1 size 34 align 1 bytes 6d 61 69 6e 3a 34 3a 20 73 6c 69 63 65 20 73 74 61 72 74 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
            "fn main.h(%0: ptr nonnull deref(size_of i8), %1: i64) -> ptr {\n"
            "b0:\n"
            "    %2 = slot [3]int\n"
@@ -2180,7 +2185,6 @@ void test_lower(void)
            "global main.3 size 2 align 1 bytes 79 00\n"
            "global main.P.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 1, offset_of main.P.x, i64 6, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 1, offset_of main.P.y, i64 5, i64 0, ptr 0 } }\n"
            "global main.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\n"
-           "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.t(%0: agg main.P) -> i64 {\n"
            "b0:\n"
            "    %1 = load i64 %0 !type main.P.x\n"
@@ -2243,9 +2247,6 @@ void test_lower(void)
            "}\n",
            "type [3]i32 = array 3 of i32\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 28 align 1 bytes 6d 61 69 6e 3a 32 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.1 size 28 align 1 bytes 6d 61 69 6e 3a 33 3a 20 69 6e 64 65 78 20 6f 75 74 20 6f 66 20 62 6f 75 6e 64 73 00\n"
-           "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.sum3(%0: agg [3]i32) -> i32 {\n"
            "b0:\n"
            "    %1 = slot [3]i32\n"
@@ -2319,7 +2320,6 @@ void test_lower(void)
            "type [5]int = array 5 of i64\n"
            "extern fn make() -> agg [2]float\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.count(%0: agg [5]int) -> i64 {\n"
            "b0:\n"
            "    %1 = call agg @make()\n"
@@ -2426,8 +2426,6 @@ void test_lower(void)
            "}\n",
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "extern fn main.fn.0(i64) -> i64\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
-           "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.twice(%0: i64) -> i64 {\n"
            "b0:\n"
            "    %1 = mulov nsw i64 %0, 2\n"
@@ -2479,8 +2477,6 @@ void test_lower(void)
            "type main.0.context = struct { k: ptr }\n"
            "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
            "extern fn main.fn.0(i64, ptr) -> i64\n"
-           "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
-           "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 39 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.twice(%0: i64) -> i64 {\n"
            "b0:\n"
            "    %1 = mulov nsw i64 %0, 2\n"
@@ -2573,7 +2569,6 @@ void test_lower(void)
            "global main.3 size 7 align 1 bytes 6e 61 72 72 6f 77 00\n"
            "global main.Ops.fields [2]anti.rt.Field { anti.rt.Field { @main.2, i64 5, offset_of main.Ops.unary, i64 18, i64 0, ptr 0 }, anti.rt.Field { @main.3, i64 6, offset_of main.Ops.narrow, i64 18, i64 0, ptr 0 } }\n"
            "global main.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\n"
-           "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 35 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
            "fn main.call(%0: ptr nonnull deref(size_of main.Ops), %1: i32) -> i32 {\n"
            "b0:\n"
            "    %2 = addr @abs\n"

@@ -391,8 +391,6 @@ void test_optimize(void)
               "    return x * k;\n"
               "}\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-              "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
               "fn main.scale(%0: i64) -> i64 {\n"
               "b0:\n"
               "    %1 = addov nsw i64 2, 4\n"
@@ -421,7 +419,6 @@ void test_optimize(void)
               "    return x * 70000;\n"
               "}\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
               "fn main.f() -> clong {\n"
               "b0:\n"
               "    %0 = mulov nsw clong 65536, 70000\n"
@@ -445,9 +442,6 @@ void test_optimize(void)
               "type main.H = struct { tag: i8, n: i32 }\n"
               "type [2]anti.rt.Field = array 2 of anti.rt.Field\n"
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
-              "global main.7 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-              "global main.8 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
               "fn main.f() -> i64 {\n"
               "b0:\n"
               "    %0 = copy i64 size_of main.H\n"
@@ -482,12 +476,6 @@ void test_optimize(void)
               "fn f6() -> int { return (1.5 * 2.0) as int + (3.9 as int); }\n"
               "fn f7() -> bool { return 3 < 4 && 2.0 != 2.0; }\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
-              "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 31 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
-              "global main.6 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-              "global main.7 size 40 align 1 bytes 6d 61 69 6e 3a 34 3a 20 73 68 69 66 74 20 63 6f 75 6e 74 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 3e 3e 00\n"
-              "global main.9 size 40 align 1 bytes 6d 61 69 6e 3a 35 3a 20 73 68 69 66 74 20 63 6f 75 6e 74 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 3e 3e 00\n"
-              "global main.10 size 22 align 1 bytes 6d 61 69 6e 3a 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
               "fn main.f1() -> i64 {\n"
               "b0:\n"
               "    %0 = mulov nsw i64 7, 6\n"
@@ -569,9 +557,6 @@ void test_optimize(void)
               "fn u3() -> i8 { let m: i8 = -128; return m / -1; }\n"
               "fn u4() -> i32 { let x = 30000000000.0; return x as i32; }\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 30 align 1 bytes 6d 61 69 6e 3a 31 3a 20 64 69 76 69 73 69 6f 6e 20 62 79 20 7a 65 72 6f 20 69 6e 20 2f 00\n"
-              "global main.2 size 40 align 1 bytes 6d 61 69 6e 3a 32 3a 20 73 68 69 66 74 20 63 6f 75 6e 74 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 3c 3c 00\n"
-              "global main.4 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2f 00\n"
               "fn main.u1() -> i64 {\n"
               "b0:\n"
               "    %0 = addr @main.0\n"
@@ -611,10 +596,6 @@ void test_optimize(void)
               "    return (x & 0) | (x ^ 0) + (x >> 0) / 1;\n"
               "}\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-              "global main.1 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
-              "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 32 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
-              "global main.3 size 40 align 1 bytes 6d 61 69 6e 3a 35 3a 20 73 68 69 66 74 20 63 6f 75 6e 74 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 3e 3e 00\n"
               "fn main.p1(%0: i64) -> i64 {\n"
               "b0:\n"
               "    %1 = addov nsw i64 %0, 0\n"
@@ -695,9 +676,6 @@ void test_optimize(void)
               "    return b * 2;\n"
               "}\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-              "global main.1 size 23 align 1 bytes 6d 61 69 6e 3a 31 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
-              "global main.2 size 23 align 1 bytes 6d 61 69 6e 3a 31 36 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2a 00\n"
               "fn main.g(%0: i64) -> i64 {\n"
               "b0:\n"
               "    %1 = copy i64 0\n"
@@ -760,7 +738,6 @@ void test_optimize(void)
               "    return i;\n"
               "}\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
               "fn main.count(%0: i64) -> i64 {\n"
               "b0:\n"
               "    %1 = copy i64 0\n"
@@ -816,9 +793,6 @@ void test_optimize(void)
               "    return x as i16 + (x as u8 as i16);\n"
               "}\n",
               "extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never\n"
-              "global main.0 size 22 align 1 bytes 6d 61 69 6e 3a 33 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2d 00\n"
-              "global main.1 size 36 align 1 bytes 6d 61 69 6e 3a 34 3a 20 76 61 6c 75 65 20 6f 75 74 20 6f 66 20 72 61 6e 67 65 20 66 6f 72 20 62 79 74 65 00\n"
-              "global main.2 size 22 align 1 bytes 6d 61 69 6e 3a 34 3a 20 6f 76 65 72 66 6c 6f 77 20 69 6e 20 2b 00\n"
               "fn main.bump(%0: i8 signext) -> i16 signext {\n"
               "b0:\n"
               "    %1 = slot i8\n"
