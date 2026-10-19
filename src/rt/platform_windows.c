@@ -27,6 +27,7 @@
 #include <dbghelp.h>
 
 #include "cpu_level.h"
+#include "fail.h"
 #include "platform.h"
 #include "signals.h"
 #include "utf.h"
@@ -1449,15 +1450,21 @@ void __main(void)
    DLL. The program sets its type, which the message of an assertion
    reads, its arguments and its environment, which the UCRT keeps per
    module, runs its initialisers and leaves through exit, which runs the
-   atexit functions and flushes the streams. */
+   atexit functions and flushes the streams. A step that fails ends the
+   program through the failure routine with status 70, as a refusal at
+   start does. */
 _Noreturn void anti_rt_windows_start(int (*program)(int, char **))
 {
     set_security_cookie();
     _set_app_type(_crt_console_app);
-    if (_initialize_narrow_environment() != 0 ||
-        _configure_narrow_argv(_crt_argv_unexpanded_arguments) != 0 ||
-        !run_initialisers()) {
-        abort();
+    if (_initialize_narrow_environment() != 0) {
+        anti_rt_fail_exit(70, "anti: the C runtime gives no environment");
+    }
+    if (_configure_narrow_argv(_crt_argv_unexpanded_arguments) != 0) {
+        anti_rt_fail_exit(70, "anti: the C runtime gives no arguments");
+    }
+    if (!run_initialisers()) {
+        anti_rt_fail_exit(70, "anti: an initialiser of the program failed");
     }
     exit(program(*__p___argc(), *__p___argv()));
 }
