@@ -157,7 +157,7 @@ bool sema_needs_teardown(const struct type *t)
 
     memset(&answered, 0, sizeof answered);
     needs = needs_teardown(t, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return needs;
 }
 
@@ -372,7 +372,7 @@ void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
     }
     memset(&answered, 0, sizeof answered);
     found = concurrent_in(t, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     if (found == t) {
         sema_error_at(c, value->pos, "`%s` is a concurrent class and is not "
                       "copied by `=`, pass a pointer to it", sema_tn(t));
@@ -448,7 +448,7 @@ uint64_t sema_declared_align(const struct type *t)
 
     memset(&answered, 0, sizeof answered);
     align = declared_align(t, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return align;
 }
 

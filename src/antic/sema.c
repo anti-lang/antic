@@ -267,7 +267,7 @@ static bool depends_on(const struct checker *c, const struct interface *lib,
 
     memset(&searched, 0, sizeof searched);
     depends = imports_module(c, lib, module, &searched);
-    free(searched.slots);
+    ptr_set_free(&searched);
     return depends;
 }
 

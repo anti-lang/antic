@@ -111,7 +111,7 @@ void sema_walk_worker(struct checker *c, const struct item *worker)
         ast_walk_block(&v, w.queue[next]->body);
     }
     free(w.queue);
-    free(w.seen.slots);
+    ptr_set_free(&w.seen);
 }
 
 /* Whether some class of the program inherits t or implements it. */

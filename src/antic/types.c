@@ -1306,7 +1306,7 @@ bool types_holds_union(const struct type *t)
 
     memset(&answered, 0, sizeof answered);
     holds = union_in(t, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return holds;
 }
 
@@ -2156,7 +2156,7 @@ bool types_holds(const struct type *t, bool (*leaf)(const struct type *))
 
     memset(&answered, 0, sizeof answered);
     holds = holds_walk(t, leaf, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return holds;
 }
 
@@ -2293,6 +2293,6 @@ bool types_pointer_free(const struct type *t)
 
     memset(&answered, 0, sizeof answered);
     free_of = pointer_free(t, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return free_of;
 }

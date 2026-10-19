@@ -217,7 +217,7 @@ bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
         struct ptr_set walked;
         memset(&walked, 0, sizeof walked);
         walk(c, e, hashed, &walked);
-        free(walked.slots);
+        ptr_set_free(&walked);
     }
     e->type = sema_builtin(c, TYPE_U64);
     *result = e->type;
@@ -454,7 +454,7 @@ static bool holds_concurrent(struct checker *c, struct type *t)
 
     memset(&answered, 0, sizeof answered);
     holds = concurrent_in(c, t, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return holds;
 }
 
@@ -555,8 +555,8 @@ bool sema_default_eq(struct checker *c, struct type *t)
     c->eq_answers = &answers;
     eq = default_eq(c, t);
     c->eq_answers = NULL;
-    free(answers.yes.slots);
-    free(answers.no.slots);
+    ptr_set_free(&answers.yes);
+    ptr_set_free(&answers.no);
     return eq;
 }
 
@@ -572,7 +572,7 @@ bool sema_equals(struct checker *c, struct expr *e, struct type *t)
     e->as.binary.eq_count = 0;
     memset(&walked, 0, sizeof walked);
     walk_inside(c, e, t, &walked);
-    free(walked.slots);
+    ptr_set_free(&walked);
     return true;
 }
 
@@ -616,7 +616,7 @@ void sema_class_defaults(struct checker *c, struct item *it)
                         &walked);
             }
         }
-        free(walked.slots);
+        ptr_set_free(&walked);
         it->default_eq = e;
         it->operator_eq = sema_class_eq_operator(c, t, it->pos);
     }
@@ -637,7 +637,7 @@ void sema_class_defaults(struct checker *c, struct item *it)
                 }
             }
         }
-        free(walked.slots);
+        ptr_set_free(&walked);
         it->default_hash = e;
         it->operator_hash = sema_class_hash_operator(c, t, it->pos);
     }

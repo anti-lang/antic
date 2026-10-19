@@ -95,6 +95,12 @@ bool ptr_set_has(const struct ptr_set *s, const void *p)
     return s->capacity > 0 && s->slots[probe(s->slots, s->capacity, p)] != NULL;
 }
 
+void ptr_set_free(struct ptr_set *s)
+{
+    free(s->slots);
+    memset(s, 0, sizeof *s);
+}
+
 void *ptr_map_get(const struct ptr_map *m, const void *key)
 {
     size_t i;

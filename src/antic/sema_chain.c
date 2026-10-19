@@ -101,5 +101,5 @@ void sema_chain_prepare(struct checker *c, struct symbol *root,
     free(order);
     free(stack);
     free(deps.items);
-    free(seen.slots);
+    ptr_set_free(&seen);
 }

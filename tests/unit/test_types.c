@@ -215,8 +215,9 @@ void test_ptr_tables(void)
     CHECK(ptr_map_get(&map, &keys[7]) == &keys[7]);
     CHECK(ptr_index_get(&index, &keys[7], &found) && found == 1);
     CHECK(map.count == 1000 && index.count == 1000);
-    free(set.slots);
+    ptr_set_free(&set);
     ptr_map_free(&map);
     ptr_index_free(&index);
-    CHECK(map.capacity == 0 && index.capacity == 0);
+    CHECK(set.capacity == 0 && map.capacity == 0 && index.capacity == 0);
+    CHECK(set.count == 0 && !ptr_set_has(&set, &keys[0]));
 }

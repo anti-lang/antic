@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 /* A set of pointers, open addressed and at most half full. A zeroed
-   struct is empty, and the owner frees slots with free(). */
+   struct is empty, and the owner frees it with ptr_set_free. */
 struct ptr_set {
     const void **slots;
     size_t capacity;
@@ -39,6 +39,9 @@ bool ptr_set_add(struct ptr_set *s, const void *p);
 
 /* Whether p is in s. */
 bool ptr_set_has(const struct ptr_set *s, const void *p);
+
+/* Release the table of s and leave it empty. */
+void ptr_set_free(struct ptr_set *s);
 /* The value of key in m, or NULL. */
 void *ptr_map_get(const struct ptr_map *m, const void *key);
 

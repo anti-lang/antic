@@ -504,7 +504,7 @@ void sema_check_export(struct checker *c, struct item *it)
         if (it->nested_count > 0) {
             struct ptr_set seen = {0};
             check_nested_fields(c, it, t, &seen);
-            free(seen.slots);
+            ptr_set_free(&seen);
         }
         for (i = 0; i < it->member_count; i++) {
             const struct item *m = it->members[i];

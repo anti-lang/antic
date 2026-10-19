@@ -300,8 +300,8 @@ static const struct struct_field *promoting_field(struct checker *c,
     memset(&p, 0, sizeof p);
     found = promotes(c, s, name, ambiguous, &p);
     for (i = 0; i < 2; i++) {
-        free(p.yes[i].slots);
-        free(p.no[i].slots);
+        ptr_set_free(&p.yes[i]);
+        ptr_set_free(&p.no[i]);
     }
     return found;
 }
@@ -523,7 +523,7 @@ bool sema_field_takes_literal(const struct struct_field *f)
 
     memset(&answered, 0, sizeof answered);
     takes = takes_literal(f, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return takes;
 }
 

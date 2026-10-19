@@ -887,7 +887,7 @@ bool sema_has_params(const struct type *t)
 
     memset(&answered, 0, sizeof answered);
     found = has_params(t, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return found;
 }
 
@@ -1911,7 +1911,7 @@ bool sema_names_param(const struct type *t, const struct type *param)
 
     memset(&answered, 0, sizeof answered);
     found = names_param(t, param, &answered);
-    free(answered.slots);
+    ptr_set_free(&answered);
     return found;
 }
 
