@@ -13,6 +13,7 @@
 
 #include "arena.h"
 #include "ast.h"
+#include "shared.h"
 #include "text.h"
 
 enum type_kind {
@@ -546,7 +547,6 @@ struct type *types_object(struct types *types);
 #define REGEX_COMPILE_BYTES "compile_bytes"
 #define REGEX_HANDLE "handle"
 #define REGEX_COMPILE "compile"
-#define REGEX_MODULE "anti.regex"
 /* The fields of a `?T`, as the C header names them: the value and the
    flag that says it is there. */
 #define OPTIONAL_VALUE "value"
@@ -642,11 +642,6 @@ struct type *types_object(struct types *types);
    function of the same module. */
 #define TEXT_EQUAL "equal"
 #define ROOT_TO_TEXT "to_text"
-/* `Object.deserialize` takes its memory from an allocator of this
-   class, and `delete(p, from)` and `destroy(p, from)` give memory back
-   to one. */
-#define MEM_MODULE "anti.mem"
-#define MEM_ALLOCATOR "Allocator"
 #define ROOT_DESERIALIZE "deserialize"
 /* The module whose functions read the field lists, the function lists
    and the registry that `--no-reflect` drops. */

@@ -7,7 +7,7 @@
 
 #include <stdbool.h>
 
-#include "antic.h"
+#include "shared.h"
 #include "target.h"
 
 /* The suffixes of the intermediate files beside the output: the text and

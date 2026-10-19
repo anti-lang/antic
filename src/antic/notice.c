@@ -3,6 +3,7 @@
 
 #include "notice.h"
 
+#include <stdbool.h>
 #include <string.h>
 
 static const char *or_empty(const char *s)

@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "antic.h"
 #include "platform.h"
 
 static bool ends_with(const char *s, const char *suffix)

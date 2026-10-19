@@ -267,7 +267,7 @@ configure_file(LICENSE "${ANTIC_RUNTIME_DIR}/LICENSE" COPYONLY)
 # Beside the licence texts, licenses/sources.txt records the upstream
 # source of every pinned component, from tools/upstream-sources.cmake. The
 # packer copies it with the texts, and `anti license` prints the line of a
-# component after its text. RUNTIME_SOURCES_FILE of src/antic/antic.h
+# component after its text. RUNTIME_SOURCES_FILE of src/antic/shared.h
 # names the file, and the test runtime_sources reads it.
 include(tools/upstream-sources.cmake)
 antic_write_sources("${ANTIC_RUNTIME_DIR}/licenses/sources.txt")

@@ -14,7 +14,7 @@ set(names
     # The suffix of a symbols archive, as the end of a string.
     "-symbols\\.zip\"|src/anti/syms.h"
     # The sysroot directory of the runtime archive inside a path.
-    "\"[^\"]*/sysroot[/\"]|src/antic/antic.h")
+    "\"[^\"]*/sysroot[/\"]|src/antic/shared.h")
 
 file(GLOB_RECURSE sources RELATIVE "${ROOT}" "${ROOT}/src/*.c"
      "${ROOT}/src/*.h")

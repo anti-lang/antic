@@ -12,10 +12,10 @@
 
 #include "abi.h"
 #include "alloc.h"
-#include "antic.h"
 #include "llvm_debug.h"
 #include "llvm_target.h"
 #include "rt_abi.h"
+#include "shared.h"
 #include "../rt/plugin_index.h"
 
 /* DESIGN: the IR is not in SSA form, so every temporary gets an alloca in

@@ -7,8 +7,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "antic.h"
 #include "cpu.h"
+#include "shared.h"
 #include "target.h"
 #include "text.h"
 

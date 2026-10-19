@@ -9,10 +9,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "antic.h"
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
+#include "shared.h"
 #include "text.h"
 #include "types.h"
 

@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "antic.h"
 #include "platform.h"
+#include "shared.h"
 #include "target.h"
 
 /* DESIGN: an XDG variable counts only when it holds an absolute path.

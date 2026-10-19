@@ -7,6 +7,7 @@
 #include "check.h"
 #include <stdio.h>
 #include <string.h>
+#include "antic.h"
 #include "applesdk.h"
 #include "cpu.h"
 #include "linker.h"

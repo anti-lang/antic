@@ -10,7 +10,7 @@
    anti_licenses in any Anti binary, stand in src/rt/license.h, which the
    runtime and anti read as well. */
 #include "../rt/license.h"
-#include "antic.h"
+#include "shared.h"
 #include "text.h"
 
 /* Append the licence notice of the packages of a program between the

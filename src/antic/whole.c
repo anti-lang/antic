@@ -11,7 +11,7 @@
 #include "modpath.h"
 #include "reach.h"
 #include "rt_abi.h"
-#include "types.h"
+#include "shared.h"
 #include "whole_parts.h"
 
 /* DESIGN: a module that names a class of another module refers to its

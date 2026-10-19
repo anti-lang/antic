@@ -13,7 +13,7 @@ set(antic "${ROOT}/src/antic")
 set(anti "${ROOT}/src/anti")
 set(helpers
     antic.h applesdk.h arena.h attributes.h cpu.h modpath.h platform.h
-    sha256.h target.h text.h userdirs.h)
+    sha256.h shared.h target.h text.h userdirs.h)
 set(failures "")
 
 # The headers of src/antic/ that file includes, by their names.

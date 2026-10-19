@@ -13,7 +13,7 @@
 #include "applesdk.h"
 #include "coff.h"
 #include "platform.h"
-#include "types.h"
+#include "shared.h"
 
 /* Run xcrun and keep its output without the final newline. */
 static bool xcrun(const char *query, struct text *out)
