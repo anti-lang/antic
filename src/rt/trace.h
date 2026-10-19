@@ -26,8 +26,9 @@ struct anti_frame {
 };
 
 /* Whether `fail` captures the frames of the error it gives. The build
-   decides, on in dev mode and off in release, unless the command line
-   named --anti.backtrace. */
+   decides, on in dev mode and off in release, unless the key `backtrace`
+   of the runtime configuration says otherwise, from --anti.backtrace,
+   the file of the configuration or rt.configure. */
 bool anti_rt_backtrace_on(void);
 
 /* The default of anti_rt_backtrace_on, which the pass over the whole

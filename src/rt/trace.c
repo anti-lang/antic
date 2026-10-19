@@ -381,7 +381,8 @@ static void symbolize_elf(const struct anti_rt_module *m, uint64_t address,
 }
 
 /* The function and the line of address from the debugger library of the
-   system, which reads the PDB. A name of C++ is demangled. */
+   system, which reads the PDB. The COFF name of an Anti function becomes
+   its name in Anti through anti_rt_coff_demangle. */
 static void symbolize_pe(const struct anti_rt_module *m, uint64_t address,
                          struct anti_frame *out)
 {

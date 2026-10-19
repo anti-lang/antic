@@ -6,9 +6,9 @@
    pull it in, and it names main, which start.c defines for a program of
    Anti and which names the program: a DLL would then name a program. In
    start.c beside main, a program of C, which defines main itself and
-   links the runtime, would get a second main. This file holds the one
-   #if on a system outside the files named platform_<system>.c, as rule 22
-   of docs/c-guidelines.md says. */
+   links the runtime, would get a second main. This file holds a #if on
+   the system outside the files named platform_<system>.c, as
+   platform_stdio.c does and rule 22 of docs/c-guidelines.md says. */
 
 #if defined(_WIN32)
 

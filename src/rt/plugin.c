@@ -1176,7 +1176,8 @@ int8_t anti_rt_plugin_unload(void *handle)
 
 /* Discovery */
 
-/* Join a directory and a file name with the separator of the host. */
+/* Join a directory and a file name with `/`, which every host takes in a
+   path. */
 static int joined(char *out, size_t size, const char *dir, size_t dir_length,
                   const char *name)
 {

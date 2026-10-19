@@ -3,10 +3,12 @@
 
    DESIGN: rule 22 of docs/c-guidelines.md. A `#if` on the host system
    stands only in this header, in platform_posix.c and in
-   platform_windows.c. The build keeps one list of runtime sources, so
-   both .c files are compiled for every target. Each holds its code
-   inside one `#if` of its own system. The other file of a
-   target then compiles to nothing. Every function below takes and gives
+   platform_windows.c, and in platform_entry.c and platform_stdio.c,
+   whose comments say why each is a file of its own. The build keeps one
+   list of runtime sources, so the posix and the windows file are both
+   compiled for every target. Each holds its code inside one `#if` of
+   its own system. The other file of a target then compiles to
+   nothing. Every function below takes and gives
    text as UTF-8, whatever the system uses underneath, with one exception
    by decision 7 of "Decisions of 2026-10-11": a file name keeps the
    bytes the system holds, UTF-8 or not, so that it opens its file. Linux

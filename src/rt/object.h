@@ -204,8 +204,9 @@ struct anti_descriptor {
 
 /* DESIGN: the seven functions of the root take the entries after the
    descriptor, in this order, in the table of every class. The nine hooks
-   take the entries after them. The order is root_names in
-   src/antic/lower_desc.c, and a unit test pins the two together. The
+   take the entries after them. The order is sema_root_fns of
+   src/antic/sema_class.c, and the unit test records_hook_entries pins
+   the nine hooks against it. The
    destruct entry of a class holds the teardown the compiler writes for
    it. The copy entry holds its copy unless the chain declares one. */
 enum anti_entry {
@@ -229,7 +230,7 @@ enum anti_entry {
 #define ANTI_ENTRY_FREE (ANTI_ENTRY_ALLOC + 1)
 
 /* DESIGN: the nine hooks of anti.lang.Object, in the order of
-   root_names. Three are lifecycle and two are threads, which every
+   sema_root_fns. Three are lifecycle and two are threads, which every
    build compiles. Three are the calls of an instrumented class, which
    tracing compiles. One is a write, which `--trace writes` compiles. */
 enum anti_hook {
