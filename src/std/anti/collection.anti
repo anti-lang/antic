@@ -1046,6 +1046,27 @@ pub abstract class Indexed<T> inherits Collection<T>
 		}
 	}
 
+	/// Room for `n` more elements in one allocation, as `reserve` of `List<T>`
+	/// and `Deque<T>` gives it. A move of the room counts as a change at `at`.
+	protected fn reserve_room(self, n: int, at: lang.SourceLocation)
+	{
+		let need = room_plus(self.count, n);
+		if need > self.capacity {
+			self.resize(need);
+			self.resized(0, at);
+		}
+	}
+
+	/// The room past the last element given back, as `shrink` of `List<T>` and
+	/// `Deque<T>` does. A move of the room counts as a change at `at`.
+	protected fn shrink_room(self, at: lang.SourceLocation)
+	{
+		if self.capacity > self.count {
+			self.resize(self.count);
+			self.resized(0, at);
+		}
+	}
+
 	/// Move the elements in order into room for `n` and the spare slots, the
 	/// first at the start, and give back the old room. `n` is at least `count`,
 	/// and room for no slot at all gives back the room. Stops the program when

@@ -189,21 +189,14 @@ pub class List<T> inherits collection.Indexed<T>
 	/// as a change at `at`, which a `for` over the collection sees.
 	pub fn reserve(self, n: int, at: lang.SourceLocation = here)
 	{
-		let need = collection.room_plus(self.count, n);
-		if need > self.capacity {
-			self.resize(need);
-			self.resized(0, at);
-		}
+		self.reserve_room(n, at);
 	}
 
 	/// Give back the room past the last element. A move of the room counts as a
 	/// change at `at`.
 	pub fn shrink(self, at: lang.SourceLocation = here)
 	{
-		if self.capacity > self.count {
-			self.resize(self.count);
-			self.resized(0, at);
-		}
+		self.shrink_room(at);
 	}
 
 	operator fn iter(self) -> collection.IndexedWalk<T>
