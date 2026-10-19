@@ -24,3 +24,7 @@ memory_checks_bitfield T141 --memory-checks puts no check on a load or a store o
 error_frame_limit T142 A frame of 2^31 bytes or more compiles, since the step switch removed the check of the native back end.
 std_plugin_messages T145 The message of an error of plugin.load is the buffer the next load writes over.
 clib_regex_link_line T146 The link line of a static library names no glue of anti.regex and no PCRE2.
+modules_optional_class_field_release T148 antic crashes on the default none of a ?T of a class value of a library.
+modules_optional_class_field_dev T148 antic crashes on the default none of a ?T of a class value of a library.
+modules_later_class_default_release T149 A field default that names a class declared later damages the library file.
+modules_later_class_default_dev T149 A field default that names a class declared later damages the library file.

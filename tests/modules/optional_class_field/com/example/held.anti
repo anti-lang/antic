@@ -1,0 +1,17 @@
+//! A class whose field is a `?T` of a class value, with the default `none`.
+
+/// A class value that a field may hold.
+pub class Handle
+{
+	/// The number the handle holds.
+	pub n: int = 0,
+}
+
+/// A class with a `?Handle` field, which holds `none` until it is set.
+pub class Base
+{
+	/// A plain field beside it.
+	pub code: int = 0,
+	/// The handle, or `none`.
+	pub held: ?Handle = none,
+}

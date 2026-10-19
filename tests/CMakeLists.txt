@@ -3422,6 +3422,23 @@ antic_modules_test(field_defaults
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/field-defaults-modules")
 
+# A field of a class of a library that is a `?T` of a class value with
+# the default `none`, read by a client that derives from the class and by
+# one that builds it.
+antic_modules_test(optional_class_field
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/optional_class_field"
+    LIBRARIES held
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/optional-class-field-modules")
+
+# A field of a class of a library whose default is a literal of a class
+# that the library declares after it.
+antic_modules_test(later_class_default
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/later_class_default"
+    LIBRARIES later
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/later-class-default-modules")
+
 # The defaults of a class of a library over a length computed from
 # `size_of`, by R043 of "Rules of 2026-10-13". The library file holds the
 # value once, and the client fills the elements of its target.

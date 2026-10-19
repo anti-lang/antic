@@ -1,0 +1,18 @@
+//! A class whose field takes a literal of a class that the file declares after
+//! it as its default.
+
+/// A class with a field of the class value `Handle`, declared below.
+pub class Base
+{
+	/// A plain field beside it.
+	pub code: int = 0,
+	/// The handle, built from its own defaults.
+	pub held: Handle = Handle { },
+}
+
+/// A class value with a default of its own.
+pub class Handle
+{
+	/// The number the handle holds.
+	pub n: int = 7,
+}

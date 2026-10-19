@@ -1,0 +1,14 @@
+//! The client of the later library. It reads the default of a field whose
+//! class the library declares after the class of the field.
+
+import com.example.later;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = alloc later.Base { code: 5 };
+	printf("base %d %d\n".ptr, b.code as c_int, b.held.n as c_int);
+	delete(b);
+	return 0;
+}

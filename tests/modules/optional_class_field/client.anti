@@ -1,0 +1,24 @@
+//! The client of the held library. It builds the class of the library and a
+//! class below it, which take the default `none` of the `?Handle` field from
+//! the library file.
+
+import com.example.held;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Derived inherits held.Base
+{
+	pub extra: int = 3,
+}
+
+fn main() -> int
+{
+	let d = alloc Derived { };
+	printf("derived %d %d %d\n".ptr, d.code as c_int, d.extra as c_int,
+		(d.held == none) as c_int);
+	delete(d);
+	let b = alloc held.Base { code: 5 };
+	printf("base %d %d\n".ptr, b.code as c_int, (b.held == none) as c_int);
+	delete(b);
+	return 0;
+}
