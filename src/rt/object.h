@@ -331,18 +331,6 @@ void anti_rt_delete_from(void *object, const struct anti_descriptor *type,
 void anti_rt_destroy_from(void *object, const struct anti_descriptor *type,
                           struct anti_object *from);
 
-/* The teardown of each of count class values of the type in a row, last
-   to first, as an `own` slice of them holds. What they own goes back to
-   from. */
-void anti_rt_destroy_elements(void *elements, int64_t count,
-                              const struct anti_descriptor *type,
-                              struct anti_object *from);
-
-/* The copy of each of count class values of the type from one row into
-   another. */
-void anti_rt_copy_elements(void *from, void *into, int64_t count,
-                           const struct anti_descriptor *type);
-
 /* DESIGN: a generic collection reaches the type of its elements through
    the record of its type argument, which the descriptor of its copy
    holds. The four functions below write, copy and tear down one element

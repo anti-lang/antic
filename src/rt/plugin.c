@@ -1250,11 +1250,12 @@ static int index_lists(const struct anti_toml *doc, int64_t n,
 }
 
 /* The library of the directory that provides the interface, checked
-   against its digest. Writes its path into out. Gives 0 when the
+   against its digest. Writes its path into out, which has the room of
+   the buffer the path is joined in, so it always fits. Gives 0 when the
    directory has none, and -1 when one is broken or two answer. */
 static int discover_in(const char *dir, size_t dir_length,
-                       const unsigned char *path, int64_t length, char *out,
-                       size_t size)
+                       const unsigned char *path, int64_t length,
+                       char out[ANTI_PLUGIN_PATH])
 {
     struct anti_text version = anti_rt_runtime_version();
     char index[ANTI_PLUGIN_PATH];
@@ -1320,9 +1321,6 @@ static int discover_in(const char *dir, size_t dir_length,
             anti_rt_toml_free(doc);
             return -1;
         }
-        if (strlen(library) + 1 > size) {
-            continue;
-        }
         memcpy(out, library, strlen(library) + 1);
         found = 1;
     }
@@ -1340,7 +1338,7 @@ static int discover_in(const char *dir, size_t dir_length,
    system looks for a bare name on its own path, while the digest reads
    the file of the working directory. */
 static int discover(const char *dirs, const unsigned char *path,
-                    int64_t length, char *out, size_t size)
+                    int64_t length, char out[ANTI_PLUGIN_PATH])
 {
     const char *at = dirs != NULL ? dirs : "";
     const char separator[2] = {anti_rt_path_list_separator(), '\0'};
@@ -1350,8 +1348,8 @@ static int discover(const char *dirs, const unsigned char *path,
     }
     for (;;) {
         size_t n = strcspn(at, separator);
-        int found = n > 0 ? discover_in(at, n, path, length, out, size)
-                          : discover_in(".", 1, path, length, out, size);
+        int found = n > 0 ? discover_in(at, n, path, length, out)
+                          : discover_in(".", 1, path, length, out);
         if (found != 0 || at[n] == '\0') {
             return found;
         }
@@ -1370,8 +1368,7 @@ void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,
 
     message[0] = '\0';
     if (library_length == 0) {
-        int answer = discover(dirs, path, path_length, found,
-                              sizeof found);
+        int answer = discover(dirs, path, path_length, found);
         if (answer <= 0) {
             if (answer == 0) {
                 fail("no library of the search directories provides `%.*s`",

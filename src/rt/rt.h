@@ -10,7 +10,9 @@
    after the first does nothing. */
 void anti_rt_init(void);
 
-/* 1 after anti_rt_init, else 0. */
+/* 1 after anti_rt_init, else 0. The one caller is geo_ready of the
+   library for C of tests/clib, whose constructor starts the runtime, and
+   the C programs of the test ask it whether the start ran. */
 int anti_rt_ready(void);
 
 /* The key `backtrace` of the runtime configuration: 1 on, 0 off and -1

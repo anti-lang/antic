@@ -6,7 +6,6 @@
    process exit code. */
 
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "conf.h"

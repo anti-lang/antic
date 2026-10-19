@@ -1123,37 +1123,6 @@ void anti_rt_delete(void *object, const struct anti_descriptor *type)
     anti_rt_delete_from(object, type, NULL);
 }
 
-/* DESIGN: every sequence of class values is torn down last to first, a
-   local array and an `own` slice alike. */
-void anti_rt_destroy_elements(void *elements, int64_t count,
-                              const struct anti_descriptor *type,
-                              struct anti_object *from)
-{
-    int64_t i;
-
-    for (i = count - 1; elements != NULL && type != NULL && i >= 0; i--) {
-        anti_rt_destroy_from((char *)elements + i * type->size, type, from);
-    }
-}
-
-void anti_rt_copy_elements(void *from, void *into, int64_t count,
-                           const struct anti_descriptor *type)
-{
-    int64_t i;
-
-    for (i = 0; from != NULL && into != NULL && type != NULL && i < count;
-         i++) {
-        char *at = checked_object((char *)from + i * type->size, type);
-        void (*copy)(struct anti_object *, struct anti_object *) =
-            (void (*)(struct anti_object *, struct anti_object *))
-                anti_rt_entry_body(at, ANTI_ENTRY_COPY);
-        if (copy != NULL) {
-            copy((struct anti_object *)at,
-                 (struct anti_object *)((char *)into + i * type->size));
-        }
-    }
-}
-
 void *anti_rt_copy_buffer(const void *from, int64_t bytes)
 {
     void *made;

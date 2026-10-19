@@ -9,7 +9,6 @@
    splitting, which is what makes the construct free of data races. */
 
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
