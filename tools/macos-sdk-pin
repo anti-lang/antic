@@ -1,5 +1,5 @@
-# The Apple SDK that a release links its macOS binaries against.
-# tools/pack-anti.cmake resolves it by version through the Command Line
+# The Apple SDK that every build on a Mac links against.
+# tools/macos-sdk.cmake resolves it by version through the Command Line
 # Tools and never by a bare xcrun, which follows whatever Xcode is
 # installed. MACOS_SDK_DIGEST is the SHA-256 of usr/lib/libSystem.tbd of
 # that SDK, so an SDK that changed under the same name is caught rather

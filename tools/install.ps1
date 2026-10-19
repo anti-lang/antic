@@ -189,8 +189,8 @@ if (-not $local) { throw "anti: LOCALAPPDATA names no directory of this account"
 $app = if ($arch -eq $native) { "anti" } else { "anti-$arch" }
 $bin = "$local\Programs\anti\bin"
 # DESIGN: ANTI_HOME names one tree that carries everything, the two
-# executables included, and nothing outside it is written. A release
-# checks a package that way on each VM.
+# executables included, and nothing outside it is written. A user who
+# wants the whole install in one place asks for it that way.
 $one_tree = [bool]$env:ANTI_HOME
 $home_dir = if ($env:ANTI_HOME) { $env:ANTI_HOME } else { "$local\$app" }
 if ($arch -ne $native) {

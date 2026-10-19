@@ -5,7 +5,7 @@
 #   LLVM_AR   the llvm-ar executable
 #   RUNTIME   the runtime directory
 #   SOURCES   tests/clib
-#   DUMP      tests/dump, with the headers that chapter 25 prints
+#   DUMP      tests/dump, with the headers antic must write
 #   WORK      a directory for the output
 #   CASE      static, shared, exports, two, loader, header, bundle, twice,
 #             simd, classes, failing, tuples, flags, ledger, variants,
@@ -185,7 +185,7 @@ function(library name kind dir)
     set(library_link "${link}" PARENT_SCOPE)
 endfunction()
 
-# Compare the generated header with the one that chapter 25 prints.
+# Compare the generated header with the one of tests/dump.
 function(expect_header header expected)
     file(READ "${header}" got)
     file(READ "${DUMP}/${expected}" wanted)

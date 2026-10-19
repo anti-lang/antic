@@ -59,9 +59,9 @@ macro(antic_shared_path name default doc)
     endif()
 endmacro()
 
-# One warning set for clang, gcc and MSVC, from tools/warnings.cmake.
-# Warnings are errors so that the code in the book compiles without noise
-# on every platform.
+# One warning set for our own code, from tools/warnings.cmake. Warnings
+# are errors, as CLAUDE.md requires, so a warning stops the build on every
+# host.
 # DESIGN: the C runtime of Microsoft deprecates fopen, getenv and other
 # functions that C11 defines, for MSVC and for clang with its headers
 # alike. No build defines _CRT_SECURE_NO_WARNINGS to hide that. The code
@@ -138,12 +138,10 @@ add_executable(antic ${ANTIC_MAIN_SOURCES})
 target_link_libraries(antic PRIVATE antic_core)
 
 # DESIGN: anti is the user-facing command. docs/tooling.md places it in
-# src/anti/, linked against antic_core. Its commands are sdk export and
-# sdk import, which move the stubs of Apple's SDK from a Mac to a host
-# that links a program naming a framework, and test, which runs the
-# `tests` and `fixtures` blocks of a module. It reads the `[inject]`
-# table of anti.toml with src/rt/toml.c, the one parser that anti.toml, the
-# logger, the runtime configuration and the index of plugins share.
+# src/anti/, linked against antic_core, and its commands stand in the
+# usage of src/anti/main.c. It reads anti.toml with src/rt/toml.c, the one
+# parser that anti.toml, the logger, the runtime configuration and the
+# index of plugins share.
 # Every file of anti but its main is a library too, so that the unit tests
 # link the same objects as the anti executable.
 add_library(anti_core STATIC ${ANTI_CORE_SOURCES})
@@ -344,8 +342,10 @@ if(EXISTS "${ANTIC_SYSROOT_DIR}/licenses")
         "${ANTIC_RUNTIME_DIR}/licenses")
 endif()
 
-# The SDK that a cross compile for macOS reads. Apple clang has a default
-# and a clang of the LLVM release has none, so xcrun names it.
+# The Apple SDK that the C of the tests compiles against on a Mac. It is
+# the pinned SDK that tools/pinned-compiler.cmake sets as
+# CMAKE_OSX_SYSROOT. A reader's build of ANTIC_SYSTEM_COMPILER may leave
+# that empty, and xcrun names the SDK of the machine there.
 if(APPLE)
     set(ANTIC_MACOS_SDK "${CMAKE_OSX_SYSROOT}")
     if(ANTIC_MACOS_SDK STREQUAL "")

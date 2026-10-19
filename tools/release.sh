@@ -1087,9 +1087,6 @@ tag_and_release() {
     finished 07 release
 }
 
-# Write the index of the download area, which the site's build reads.
-# It names the version, the six packages with their digests and URLs,
-# and the fingerprint of the key that signs the manifest.
 # The downloads page, from tools/downloads.html.in and the digests of the
 # packages step 3 wrote. Every file it names is an asset of the release.
 write_page() {

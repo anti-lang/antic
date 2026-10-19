@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.21)
 # Every script that runs as `cmake -P` names the minimum version of CMake
 # that the root CMakeLists.txt names. Without the line the script sets no
 # policy, and CMake 3 keeps the old meaning of `IN_LIST` and of a quoted
-# argument of `if()`, which CMake 4 dropped. A GitHub runner with CMake
+# argument of `if()`, which CMake 4 dropped. A host with CMake
 # 3.31 failed 24 tests that the hosts of CMake 4 passed. A lower version
 # lets a script call a command that version lacks, as `file(COPY_FILE)`
 # of 3.21. The scripts are those that a build file, a recipe of

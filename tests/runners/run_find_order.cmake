@@ -17,9 +17,9 @@ if(NOT DEFINED ROOT)
                         "-P tests/runners/run_find_order.cmake")
 endif()
 
-# The files in the order CMake reads them. add_subdirectory(tests) is
-# the last line of CMakeLists.txt, so a name found there is set before
-# the first line of tests/CMakeLists.txt.
+# The files in the order CMake reads them. CMake reads CMakeLists.txt
+# down to add_subdirectory(tests) and then tests/CMakeLists.txt, so a
+# name the root file finds is set before the first line of the test file.
 set(files CMakeLists.txt tests/CMakeLists.txt)
 set(findings "")
 set(found "")

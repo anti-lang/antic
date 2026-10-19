@@ -1,4 +1,4 @@
-# The pinned components of the sysroots that tools/get-sysroot.sh installs,
+# The pinned components of the sysroots that tools/get-sysroot.cmake installs,
 # with the SHA-256 digest of each file at its first download.
 ALPINE_URL=https://dl-cdn.alpinelinux.org/alpine/v3.24/main
 MUSL_VERSION=1.2.6

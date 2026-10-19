@@ -23,8 +23,8 @@ foreach(archive IN LISTS archives)
     set(dir "${WORK}/${key}")
     file(REMOVE_RECURSE "${dir}")
     file(MAKE_DIRECTORY "${dir}")
-    # The runtime of the host is built by CMake, which names a member
-    # text.c.o or text.c.obj. The one of another target is text.o.
+    # Every runtime is a cross build of anti_cross_runtime_at of the root
+    # CMakeLists.txt, which names the member of src/rt/text.c text.o.
     execute_process(COMMAND "${LLVM_AR}" t "${archive}"
         RESULT_VARIABLE status OUTPUT_VARIABLE members ERROR_VARIABLE err
         ENCODING NONE)
@@ -41,7 +41,7 @@ foreach(archive IN LISTS archives)
         endif()
         set(member "")
         foreach(name IN LISTS members)
-            if(name MATCHES "^${source}(\\.c)?\\.o(bj)?$")
+            if(name STREQUAL "${source}.o")
                 set(member "${name}")
             endif()
         endforeach()

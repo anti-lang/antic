@@ -4,7 +4,7 @@
 #         -DRUNTIME=<dir> -DHOSTS=<host>[;<host>] [-DSYMBOLS=<dir>]
 #         [-DTOOLS=<dir>] -P tools/pack-anti.cmake
 #
-# CLANG is the pinned clang of build/clang, LLVM_BIN its tools, SYSROOT
+# CLANG is the pinned clang of build/deps/clang, LLVM_BIN its tools, SYSROOT
 # the directory of tools/get-sysroot.cmake and RUNTIME the runtime that the
 # CMake build wrote. SYMBOLS is where the PDB of a Windows program goes,
 # which is outside the package and is needed when a Windows host is

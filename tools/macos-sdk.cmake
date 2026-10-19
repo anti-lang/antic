@@ -1,4 +1,5 @@
-# The Apple SDK that a release links its macOS binaries against.
+# The Apple SDK that every build on a Mac links against, and that the two
+# media libraries of src/native/ compile against for macOS.
 #
 #   cmake -DPIN=<tools/macos-sdk-pin> [-DSDKS=<dir>] -P tools/macos-sdk.cmake
 #
@@ -7,7 +8,7 @@
 # SDKS names the directory the SDKs stand in, and the Command Line Tools
 # are the default.
 #
-# DESIGN: a release links its macOS binaries against a pinned Apple SDK
+# DESIGN: a build links its macOS binaries against a pinned Apple SDK
 # and never against whatever `xcrun --show-sdk-path` returns, because that
 # follows the Xcode of the machine. Xcode brought macOS SDK 27.0 on
 # 2026-09-20, whose libSystem.tbd names the target arm64e.x1-macos. The

@@ -19,8 +19,9 @@ if(written)
     message(FATAL_ERROR "the front end wrote ${written}")
 endif()
 
-# The same run without --runtime needs no linker and no runtime archive,
-# because nothing below the checker runs.
+# The same run without --runtime fails, since the library file of
+# anti.lang stands in the runtime archive. It asks for no link, because
+# nothing below the checker runs.
 antic_run(status out err COMMAND --front-end "${GOOD}")
 if(status EQUAL 0)
     message(FATAL_ERROR "a program that imports anti.lang needs the archive")

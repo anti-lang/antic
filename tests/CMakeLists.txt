@@ -4078,7 +4078,7 @@ add_test(NAME shared_inputs
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-inputs"
         -P "${ANTIC_RUNNERS}/run_shared_inputs.cmake")
 
-# The platform linker of the host links the first executable of chapter 3.
+# The platform linker of the host links return42.anti.
 if(NOT WIN32)
     antic_program_test(program_platform_linker
         "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
@@ -4113,7 +4113,7 @@ add_expect_test(error_missing_runtime STATUS 2
             "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
 # Dumps of compiler stages, compared with expected files in tests/dump.
-# scale.tokens is the token listing that chapter 1 prints.
+# scale.tokens is the token listing that antic prints for scale.anti.
 antic_dump_test(tokens scale
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.tokens"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
@@ -4153,7 +4153,7 @@ add_test(NAME error_source_nul
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-nul"
         -P "${ANTIC_RUNNERS}/run_source_nul.cmake")
 
-# scale.ast is the syntax tree listing that chapter 1 prints.
+# scale.ast is the syntax tree listing that antic prints for scale.anti.
 antic_dump_test(ast scale
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.ast"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
@@ -4209,12 +4209,12 @@ add_expect_test(error_syntax STATUS 1
     COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/syntax.s"
             syntax.anti)
 
-# scale.types is the typed tree listing that chapter 1 prints.
+# scale.types is the typed tree listing that antic prints for scale.anti.
 antic_dump_test(types scale
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.types"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
 
-# main.ir is the IR listing that chapter 1 prints for main.anti.
+# main.ir is the IR listing that antic prints for main.anti.
 antic_dump_test(ir main
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.ir"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
@@ -6488,7 +6488,7 @@ add_test(NAME ir_tuple_out
         "-DLINE=export fn com.example.tuples.tuples_divide(%0: i64, %1: i64, %2: ptr nonnull deref(size_of (int, int))) -> ptr {"
         -P "${ANTIC_RUNNERS}/run_ir_line.cmake")
 
-# The Windows unwind data of chapter 16, decoded by llvm-readobj from the
+# The Windows unwind data of unwind.anti, decoded by llvm-readobj from the
 # object that llvm-mc writes.
 foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
         "windows-arm64,aarch64-pc-windows-msvc")
@@ -6509,7 +6509,7 @@ foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
             -P "${ANTIC_RUNNERS}/run_unwind.cmake")
 endforeach()
 
-# targets.txt is the target matrix that chapter 11 prints.
+# targets.txt is the target matrix that antic --print-targets prints.
 add_test(NAME print_targets
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
@@ -6530,14 +6530,14 @@ foreach(target linux-x86_64 windows-x86_64)
         ARGS --dev "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
 endforeach()
 
-# main.opt is the optimized IR listing that chapter 1 prints.
+# main.opt is the optimized IR listing that antic prints for main.anti.
 antic_dump_test(opt main
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
 
-# The LLVM text of the programs of the chapters on selection, register
-# allocation, the back ends and emission, one golden per program and
-# target, the programs and targets whose machine code had a golden.
+# The LLVM text of programs of tests/dump, one golden per program and
+# target, for the pairs of a program and a target whose machine code had a
+# golden before antic wrote LLVM text.
 foreach(case "main,macos-arm64" "main,macos-x86_64" "main,linux-x86_64"
         "main,linux-arm64" "main,windows-x86_64" "main,windows-arm64"
         "twice,macos-arm64" "cell,macos-arm64" "spill12,macos-arm64"
@@ -6830,22 +6830,22 @@ endforeach()
 set_tests_properties(dump_llvm_main_dev_linux-x86_64 PROPERTIES
     FIXTURES_REQUIRED twice_antl)
 
-# Calls through function pointers in the IR of chapter 20.
+# Calls through function pointers in the IR.
 antic_dump_test(opt fnptr
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/fnptr.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/fnptr.anti")
 
-# String literals as globals in the IR of chapter 19.
+# String literals as globals in the IR.
 antic_dump_test(opt strings
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/strings.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/strings.anti")
 
-# Aggregates in the IR of chapter 18.
+# Aggregates in the IR.
 antic_dump_test(opt structs
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti")
 
-# The parameter extensions of chapter 15 in the IR.
+# The parameter extensions of ARM64 in the IR.
 antic_dump_test(opt arm64
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.anti")
@@ -6966,7 +6966,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     endif()
 endforeach()
 
-# The optimizer examples of chapter 10. Each NAME.anti in tests/opt has its
+# The optimizer examples. Each NAME.anti in tests/opt has its
 # IR before optimization in NAME.ir and after optimization in NAME.opt.
 file(GLOB opt_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/opt/*.anti")
 foreach(source ${opt_sources})
