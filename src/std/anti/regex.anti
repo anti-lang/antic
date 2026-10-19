@@ -130,10 +130,7 @@ pub fn compile(text: str) -> Regex may fail
 	let offset = 0;
 	let made = anti_rt_regex_compile(text.ptr, text.len, &code, &offset);
 	let handle = made else {
-		let e = alloc BadPattern { position: offset };
-		e.code = code as int;
-		e.message = anti_rt_regex_message(code);
-		fail e;
+		fail bad_pattern(code, offset);
 	};
 	return Regex { handle: handle };
 }
@@ -150,12 +147,19 @@ pub fn compile_bytes(text: str) -> ByteRegex may fail
 	let offset = 0;
 	let made = anti_rt_regex_compile_bytes(text.ptr, text.len, &code, &offset);
 	let handle = made else {
-		let e = alloc BadPattern { position: offset };
-		e.code = code as int;
-		e.message = anti_rt_regex_message(code);
-		fail e;
+		fail bad_pattern(code, offset);
 	};
 	return ByteRegex { handle: handle };
+}
+
+/// The failure of a pattern that did not compile, with the code of PCRE2 and
+/// the byte it stopped at.
+fn bad_pattern(code: i32, offset: int) -> *BadPattern
+{
+	let e = alloc BadPattern { position: offset };
+	e.code = code as int;
+	e.message = anti_rt_regex_message(code);
+	return e;
 }
 
 /// Where a walk over the matches of a pattern stands, which the runtime reads
@@ -314,6 +318,14 @@ fn too_expensive() -> *TooExpensive
 	return e;
 }
 
+/// The failure of a template that names a group the pattern lacks.
+fn missing_group() -> *MissingGroup
+{
+	let e = alloc MissingGroup { };
+	e.message = "the template names a group the pattern lacks";
+	return e;
+}
+
 /// The first match of `r` in `s`, or `none`. `s.matches(r)` calls it.
 ///
 /// It fails with `TooExpensive` when the search reaches the match limit.
@@ -404,9 +416,7 @@ pub fn find_all_literal(s: str, r: Regex, pattern: str, limit: int = 0,
 pub fn replace(s: str, r: Regex, with: str, limit: int = 0) -> str may fail
 {
 	if anti_rt_regex_template_fits(r.handle, with.ptr, with.len) == 0 {
-		let e = alloc MissingGroup { };
-		e.message = "the template names a group the pattern lacks";
-		fail e;
+		fail missing_group();
 	}
 	let out = "";
 	if anti_rt_regex_replace(r.handle, s.ptr, s.len, with.ptr, with.len, limit,
@@ -747,9 +757,7 @@ pub fn bytes_replace(data: []byte, r: ByteRegex, with: []byte,
 	limit: int = 0) -> []byte may fail
 {
 	if anti_rt_regex_template_fits(r.handle, with.ptr, with.len) == 0 {
-		let e = alloc MissingGroup { };
-		e.message = "the template names a group the pattern lacks";
-		fail e;
+		fail missing_group();
 	}
 	let out = data[0..0];
 	if anti_rt_regex_replace_bytes(r.handle, data.ptr, data.len, with.ptr,
