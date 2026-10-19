@@ -1399,7 +1399,7 @@ ret
 
 The runtime keeps `anti_rt_atomic_load` and its siblings as C functions for its own code. No program calls them for an atomic of 1, 2, 4 or 8 bytes.
 
-Where it lives: `sema_atomic_call` of `src/antic/sema_thread.c`, the case `EXPR_ATOMIC` of `src/antic/lower_expr.c`, `atomic_call` of `src/antic/llvm_emit.c`, and `src/rt/atomic.c`.
+Where it lives: `sema_atomic_call` of `src/antic/sema_thread.c`, the case `EXPR_ATOMIC` of `src/antic/lower_expr.c`, `atomic_call` of `src/antic/llvm_emit_call.c`, and `src/rt/atomic.c`.
 
 ### What it costs
 

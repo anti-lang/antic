@@ -697,7 +697,7 @@ b0:
 
 `size_of(Wide)` is a symbol in the IR, and the back end of each target writes its own number. Both sizes are what the C compiler of the platform gives the same declaration.
 
-Where it lives: `compute` and `bit_unit` of `src/antic/layout.c`. `lower_place` of `src/antic/lower_place.c` marks a place as a bitfield, and `ir_bitload` and `ir_bitstore` of `src/antic/ir.c` are its two instructions. `bits` of `src/antic/llvm_emit.c` writes the shifts and masks.
+Where it lives: `compute` and `bit_unit` of `src/antic/layout.c`. `lower_place` of `src/antic/lower_place.c` marks a place as a bitfield, and `ir_bitload` and `ir_bitstore` of `src/antic/ir.c` are its two instructions. `bits` of `src/antic/llvm_emit_function.c` writes the shifts and masks.
 
 ### What it costs
 

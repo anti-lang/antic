@@ -29,8 +29,8 @@ cmake_minimum_required(VERSION 3.21)
 # as well, since main.c or another file of anti calls what each declares,
 # and so is every header of the unit tests, whose files call it.
 set(parts src/antic src/rt src/anti tests/unit)
-set(shared antl_io.h driver_parts.h lower_lowerer.h parser_parser.h
-    sema_checker.h whole_parts.h)
+set(shared antl_io.h driver_parts.h llvm_emit_parts.h lower_lowerer.h
+    parser_parser.h sema_checker.h whole_parts.h)
 
 set(files "")
 foreach(part IN LISTS parts)

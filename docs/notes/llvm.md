@@ -2,8 +2,9 @@
 
 Choices made inside the back end, which translates the IR into LLVM IR text
 and runs opt and llc of the pinned release on it. `src/antic/llvm_emit.c`
-writes the text, `src/antic/llvm_debug.c` its debug information,
-`src/antic/llvm_target.c` the facts of each target and level,
+writes the text with `llvm_emit_function.c`, `llvm_emit_call.c` and
+`llvm_emit_facts.c` beside it, `src/antic/llvm_debug.c` its debug
+information, `src/antic/llvm_target.c` the facts of each target and level,
 `src/antic/abi.c` the classification of each parameter and result, and
 `src/antic/llvm_run.c` runs the two tools. They describe the inside of the
 compiler. `docs/decisions.md` holds what a reader of the language or a user

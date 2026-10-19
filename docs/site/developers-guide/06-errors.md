@@ -877,7 +877,7 @@ The LLVM module marks the function and the declaration `noreturn cold`. `noretur
 
 The runtime functions behind the checks, `anti_rt_check_failed` and `anti_rt_assert_failed`, carry the same two attributes.
 
-Where it lives: the `never` rules of `check_stmt` and of the function check in `src/antic/sema_stmt.c`. `lower_calls_never` of `src/antic/lower_stmt.c` ends the block with `IR_UNREACHABLE`. `src/antic/llvm_emit.c` writes `noreturn cold` for a function whose `never_returns` is set.
+Where it lives: the `never` rules of `check_stmt` and of the function check in `src/antic/sema_stmt.c`. `lower_calls_never` of `src/antic/lower_stmt.c` ends the block with `IR_UNREACHABLE`. `llvm_emit_definition` of `src/antic/llvm_emit_function.c` and `declaration` of `src/antic/llvm_emit.c` write `noreturn cold` for a function whose `never_returns` is set.
 
 ### What it costs
 

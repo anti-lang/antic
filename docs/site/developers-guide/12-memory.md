@@ -606,7 +606,7 @@ retq
 
 A dev build writes the same facts into its module and runs no optimizer. Every load of the source is a load of the code there.
 
-Where it lives: `ir_type_access` of `src/antic/ir.c` gives each access its type. The emitter of `src/antic/llvm_emit.c` writes the `!tbaa` facts. "Aliasing of views" in `docs/anti-language-additions.md` holds the full rules.
+Where it lives: `ir_type_access` of `src/antic/ir.c` gives each access its type. `src/antic/llvm_emit_facts.c` writes the `!tbaa` facts. "Aliasing of views" in `docs/anti-language-additions.md` holds the full rules.
 
 ### What it costs
 

@@ -749,7 +749,7 @@ The release object holds 9 functions with a type argument in their name, against
 
 `Slot<*Person>.get` and `Slot<int>.get` are the same two machine instructions and stay two functions. The merge works on the IR of antic, where a pointer and an `i64` are two types. The link of lld runs with `--icf=safe`, or `/OPT:SAFEICF` for a Windows target, which folds identical machine code of functions whose address nothing compares. A link with `--linker platform` folds nothing.
 
-Where it lives: `linkage` of `src/antic/llvm_emit.c` writes `weak_odr`. `merge_copies` and `same_function` of `src/antic/whole.c` merge. `src/antic/linker.c` passes `--icf=safe` and `/OPT:SAFEICF`. `tests/dump/copies_merge.anti` pins the merge with the goldens `copies_merge.opt` and `copies_merge.dev.opt`.
+Where it lives: `llvm_emit_linkage` of `src/antic/llvm_emit_call.c` writes `weak_odr`. `merge_copies` and `same_function` of `src/antic/whole.c` merge. `src/antic/linker.c` passes `--icf=safe` and `/OPT:SAFEICF`. `tests/dump/copies_merge.anti` pins the merge with the goldens `copies_merge.opt` and `copies_merge.dev.opt`.
 
 ### What it costs
 

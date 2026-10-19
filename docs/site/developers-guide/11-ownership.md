@@ -1600,7 +1600,7 @@ b6:
 
 `b1` is `return a;`. It tears down `b`, in `%1`, and returns `a`. `b2` is `return b;` and tears down `a`. The returned parameter is not cleared and not tested: the checker knows that it moved on this path.
 
-Where it lives: `sema_refuse_caller_value` and `sema_note_move` of `src/antic/sema_value.c`. `lower_push_own_action` and `lower_move_argument` of `src/antic/lower_stmt.c`. `param_facts` of `src/antic/llvm_emit.c` writes `noalias`, and `abi_classify` of `src/antic/abi.c` decides between registers and memory.
+Where it lives: `sema_refuse_caller_value` and `sema_note_move` of `src/antic/sema_value.c`. `lower_push_own_action` and `lower_move_argument` of `src/antic/lower_stmt.c`. `param_facts` of `src/antic/llvm_emit_call.c` writes `noalias`, and `abi_classify` of `src/antic/abi.c` decides between registers and memory.
 
 ### What it costs
 

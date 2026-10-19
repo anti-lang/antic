@@ -193,7 +193,7 @@ retq
 
 No dev check guards a dereference. A `*T` that holds 0 can only come from outside the rules, such as memory that C code filled. A read through it faults as in C.
 
-Where it lives: `types_with_none` and `types_is_nullable` of `src/antic/types.c`. `checked_against_none` and the narrowing of conditions in `src/antic/sema_stmt.c`. `param_facts` of `src/antic/llvm_emit.c` writes `nonnull` and `dereferenceable`.
+Where it lives: `types_with_none` and `types_is_nullable` of `src/antic/types.c`. `checked_against_none` and the narrowing of conditions in `src/antic/sema_stmt.c`. `param_facts` of `src/antic/llvm_emit_call.c` writes `nonnull` and `dereferenceable`.
 
 ### What it costs
 

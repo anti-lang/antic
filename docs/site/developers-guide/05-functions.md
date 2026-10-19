@@ -242,7 +242,7 @@ Only two functions of the example are left. `opt` inlined `area`, `clamp`, `move
 
 On the two Windows targets a function has no `hidden` marking, since COFF has none, and its name is written without dots.
 
-Where it lives: `parser_item.c` and `parser_decl.c` of `src/antic/` parse a function, and `sema_check_main` and the `return` rules of `src/antic/sema_stmt.c` check it. `lower_function` of `src/antic/lower_function.c` writes its IR. `linkage` and `param_facts` of `src/antic/llvm_emit.c` write the line of the module.
+Where it lives: `parser_item.c` and `parser_decl.c` of `src/antic/` parse a function, and `sema_check_main` and the `return` rules of `src/antic/sema_stmt.c` check it. `lower_function` of `src/antic/lower_function.c` writes its IR. `llvm_emit_linkage` and `param_facts` of `src/antic/llvm_emit_call.c` write the line of the module.
 
 ### What it costs
 
@@ -640,7 +640,7 @@ define noundef i64 @_A4conv_count(ptr %p0, ptr %p1) #0
 
 On windows-x86_64 a struct of 16 bytes fits no register. `flip` takes a pointer to a copy of its `Point` and returns through `%sret`. `dot` and `count` take two pointers each. A function that takes many small structs therefore costs more memory traffic on this target than on the other five.
 
-Where it lives: `src/antic/abi.c` holds the three classifications, `sysv`, `aapcs64` and `windows_x64`, and `abi_classify` chooses by the target. `src/antic/layout.c` gives the sizes they read. `param_facts` and the signature code of `src/antic/llvm_emit.c` write what they decide.
+Where it lives: `src/antic/abi.c` holds the three classifications, `sysv`, `aapcs64` and `windows_x64`, and `abi_classify` chooses by the target. `src/antic/layout.c` gives the sizes they read. `param_facts` and the signature code of `src/antic/llvm_emit_call.c` write what they decide.
 
 ### What it costs
 
@@ -784,7 +784,7 @@ The function is four instructions and has no frame.
 
 Under `-g` a release build records an inlined call in the debug information, so a debugger and a stack trace with line numbers still name `square`. [Chapter 20]({{% relref "20-targets" %}}) describes that.
 
-Where it lives: `llvm_opt_options` and `run_opt` of `src/antic/llvm_run.c` hold the pipeline and the threshold, which `LLVM_INLINE_THRESHOLD` of `src/antic/llvm_run.h` names. `src/antic/linker.c` passes the same threshold to the LTO link. `frames_kept` and `main_kept` of `src/antic/llvm_emit.c` mark the functions that stay.
+Where it lives: `llvm_opt_options` and `run_opt` of `src/antic/llvm_run.c` hold the pipeline and the threshold, which `LLVM_INLINE_THRESHOLD` of `src/antic/llvm_run.h` names. `src/antic/linker.c` passes the same threshold to the LTO link. `llvm_emit_frames_kept` of `src/antic/llvm_emit_facts.c` and `main_kept` of `src/antic/llvm_emit.c` mark the functions that stay.
 
 ### What it costs
 

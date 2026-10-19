@@ -261,7 +261,7 @@ On linux-arm64 the same function moves `w0` to `w1`, loads the format into `x0` 
 
 A dev build stores the argument in a slot of the frame and loads it again around the same call. It adds no check to a call of C.
 
-Where it lives: `src/antic/sema_export.c` checks the declaration, and `declare_function` of `src/antic/lower.c` names the function. `src/antic/llvm_emit.c` writes the `declare` and the call, and `src/antic/abi.c` classifies the arguments for each target.
+Where it lives: `src/antic/sema_export.c` checks the declaration, and `declare_function` of `src/antic/lower.c` names the function. `declaration` of `src/antic/llvm_emit.c` writes the `declare` and `llvm_emit_call` of `src/antic/llvm_emit_call.c` the call, and `src/antic/abi.c` classifies the arguments for each target.
 
 ### What it costs
 
@@ -522,7 +522,7 @@ checked(-1): error
 sorted 1 2 3 4
 ```
 
-Where it lives: `src/antic/sema_export.c` and `src/antic/sema.c` hold the signature rule. `linkage` of `src/antic/llvm_emit.c` writes `dso_local` or `internal`, `target_c_symbol` of `src/antic/target.c` the C name, and `src/antic/abi.c` the places of the arguments. `src/antic/header.c` writes the prototypes.
+Where it lives: `src/antic/sema_export.c` and `src/antic/sema.c` hold the signature rule. `llvm_emit_linkage` of `src/antic/llvm_emit_call.c` writes `dso_local` or `internal`, `target_c_symbol` of `src/antic/target.c` the C name, and `src/antic/abi.c` the places of the arguments. `src/antic/header.c` writes the prototypes.
 
 ### What it costs
 

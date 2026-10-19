@@ -262,7 +262,7 @@ retq
 
 `testq` and `je` are the test of `none`. The three instructions after the load compute the larger of the value and 0 without a branch. On arm64 the test of `none` is one `cbz` instruction.
 
-Where it lives: `if_statement` and `statement` of `src/antic/parser_stmt.c` parse the forms. `check_condition`, `checked_against_none` and `stmt_leaves` of `src/antic/sema_stmt.c` check the condition, the narrowing and the missing `return`. `lower_if` and `lower_loop` of `src/antic/lower_stmt.c` write the blocks, and `src/antic/llvm_emit.c` writes each `branch` as a `br`.
+Where it lives: `if_statement` and `statement` of `src/antic/parser_stmt.c` parse the forms. `check_condition`, `checked_against_none` and `stmt_leaves` of `src/antic/sema_stmt.c` check the condition, the narrowing and the missing `return`. `lower_if` and `lower_loop` of `src/antic/lower_stmt.c` write the blocks, and `src/antic/llvm_emit_function.c` writes each `branch` as a `br`.
 
 ### What it costs
 

@@ -204,7 +204,7 @@ b0:
 
 `ret i32 42` returns the literal as an immediate value. `0x3FE0000000000000` is 0.5, which the text writes as the bits of a `double` for both float types. `'q'` is the `i32` 113, its code point. `true` is the `i8` 1. `zeroext` says that the caller may read the byte as a full register. `range(i8 0, 2)` says that it is 0 or 1.
 
-`llvm_emit.c` writes a narrow integer parameter or result with `signext` or `zeroext`, by the signedness of its type.
+`llvm_emit_call.c` writes a narrow integer parameter or result with `signext` or `zeroext`, by the signedness of its type.
 
 Where it lives: `src/antic/lexer.c` reads a literal. `sema_const.c` and `sema_expr.c` of `src/antic/` give it its type and check that it fits. `src/antic/types.c` holds the types and `src/antic/layout.c` their sizes. `lower_cast` of `src/antic/lower_expr.c` lowers `as`.
 
@@ -445,7 +445,7 @@ b0:
 
 A `str` constant is the global of its literal, shared with every equal literal of the module. `GREETING` and a `"tea"` written elsewhere in the module are one global.
 
-Where it lives: `sema_const.c` of `src/antic/` computes a constant expression, and `lower_stmt.c` lowers a `let`. `src/antic/llvm_emit.c` writes the `alloca` of each temporary and slot.
+Where it lives: `sema_const.c` of `src/antic/` computes a constant expression, and `lower_stmt.c` lowers a `let`. `src/antic/llvm_emit_function.c` writes the `alloca` of each temporary and slot.
 
 ### What it costs
 
@@ -775,7 +775,7 @@ retq
 
 `addq (%rsi), %rax` adds the low words and sets the carry flag. The two `movq` lines after it leave the flag alone. `adcq 0x8(%rdi), %rax` adds the high words and that carry in one instruction. arm64 writes the pair as `adds` and `adc`. A flag that a function never reads costs nothing.
 
-Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the checks of an operator and `lower_narrow_check` of the same file the one of `as`. `optimize_drop_failures` of `src/antic/optimize.c` drops them. `src/antic/arith.c` computes the wrapping and saturating results of constants, and `src/antic/llvm_emit.c` writes the intrinsics. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
+Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the checks of an operator and `lower_narrow_check` of the same file the one of `as`. `optimize_drop_failures` of `src/antic/optimize.c` drops them. `src/antic/arith.c` computes the wrapping and saturating results of constants, and `src/antic/llvm_emit_function.c` writes the intrinsics. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
 
 ### What it costs
 
@@ -1002,7 +1002,7 @@ arm64 converts with `fcvt s0, h0` and `fcvt h0, s0` at every level. The x86_64 l
 
 A conversion to an integer is one instruction on arm64, `fcvtzs`, which saturates by itself. On x86_64 `to_int` is seven instructions: `vcvttsd2si` and two compares with conditional moves for the upper bound and the NaN.
 
-Where it lives: `src/antic/llvm_emit.c` writes the float instructions and both forms of the `f16` conversion. `lower_cast` of `src/antic/lower_expr.c` lowers `as`. `src/rt/f16.h` holds the conversion that the checker, the optimizer and the runtime share. `anti_rt_builder_float` of `src/rt/text.c` writes the digits.
+Where it lives: `src/antic/llvm_emit_function.c` writes the float instructions and both forms of the `f16` conversion. `lower_cast` of `src/antic/lower_expr.c` lowers `as`. `src/rt/f16.h` holds the conversion that the checker, the optimizer and the runtime share. `anti_rt_builder_float` of `src/rt/text.c` writes the digits.
 
 ### What it costs
 

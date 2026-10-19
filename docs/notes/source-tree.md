@@ -169,8 +169,12 @@ and the driver that runs a compilation.
 | `src/antic/linker.h` | The interface of `linker.c`. |
 | `src/antic/llvm_debug.c` | The debug metadata of the LLVM text: the compile unit, the files, the subprograms and the locations, and the spans the build id leaves out. |
 | `src/antic/llvm_debug.h` | The interface of `llvm_debug.c`. |
-| `src/antic/llvm_emit.c` | The translation of a laid-out module of the IR into LLVM IR text, with the small texts of a package header, a bundle marker, a notice and the names of a `.def` file. |
-| `src/antic/llvm_emit.h` | The interface of `llvm_emit.c`. |
+| `src/antic/llvm_emit.c` | The module of LLVM IR text: the names of the symbols, the globals, the imports of a COFF plugin, the declarations, the metadata, the roots and the constructors, with the small texts of a package header, a bundle marker, a notice and the names of a `.def` file. |
+| `src/antic/llvm_emit.h` | The interface of the translation of a laid-out module of the IR into LLVM IR text, which `llvm_emit.c` and its three files beside it define. |
+| `src/antic/llvm_emit_call.c` | The C convention of the LLVM text: the classification, the parameters and the prologue of a function, the arguments and the result of a call, the atomic calls, the signature and the linkage. |
+| `src/antic/llvm_emit_facts.c` | The facts for opt: the ranges of the loads, the `!tbaa` tree, the facts of the tables, the weights of a cold branch and the functions whose frame a stack trace keeps. |
+| `src/antic/llvm_emit_function.c` | The text of a function: the operands and constants, the scalar, memory, wide and simd operations, the flags, each instruction and the definition. |
+| `src/antic/llvm_emit_parts.h` | What the files of the LLVM text share, `struct emitter` and the functions of more than one file, each under the file that defines it. |
 | `src/antic/llvm_run.c` | The runs of opt and llc on the text, with the options of each mode. |
 | `src/antic/llvm_run.h` | The interface of `llvm_run.c`. |
 | `src/antic/llvm_target.c` | The triple, the data layout, the relocation model and the processor attributes the text carries per target and level. |

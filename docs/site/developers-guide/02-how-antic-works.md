@@ -27,7 +27,7 @@ The function `compile` of `src/antic/driver.c` runs the front end, `back_end` an
 | Dropped failures | the IR | the IR without the checks and the assertions the mode leaves out | `optimize_drop_failures` in `src/antic/optimize.c` |
 | Optimizer of antic | the IR | a smaller IR, without the functions nothing reaches | `optimize_program` and `optimize_module` in `src/antic/optimize.c` |
 | Layout | the IR and the target | the IR with every size and offset as a number | `layout_init`, `layout_data` and `layout_resolve` in `src/antic/layout.c` |
-| LLVM text | the IR | one LLVM module as text | `llvm_emit_module` in `src/antic/llvm_emit.c`, with `src/antic/abi.c` and `src/antic/llvm_target.c` |
+| LLVM text | the IR | one LLVM module as text | `llvm_emit_module` in `src/antic/llvm_emit.c`, with `llvm_emit_function.c`, `llvm_emit_call.c` and `llvm_emit_facts.c` beside it, `src/antic/abi.c` and `src/antic/llvm_target.c` |
 | `opt` | the LLVM text | bitcode after `default<O3>`, in release mode alone | `run_opt` and `run_lto` in `src/antic/llvm_run.c` |
 | `llc` | the text or the bitcode | the object, or the assembly under `-S` | `llvm_run` in `src/antic/llvm_run.c` |
 | Link | the object and the runtime archive | the executable | `driver_link_program` in `src/antic/driver_link.c` and `src/antic/linker.c` |
@@ -519,4 +519,4 @@ The first command writes the dev module as `walk.s.ll`. The second writes the re
 
 The test removes the `//!` lines of a block and writes `import anti.lang;` in front of a block that does not import it. A line number inside an excerpt counts the lines of that module.
 
-Where it lives: `compile`, `back_end`, `llvm_back_end` and `driver_run` of `src/antic/driver.c` hold the order of the steps. `src/antic/ir_print.c` writes the IR dumps and `src/antic/llvm_emit.c` the LLVM text. `src/antic/llvm_run.c` runs the tools, and `src/rt/start.c` starts a program.
+Where it lives: `compile`, `back_end`, `llvm_back_end` and `driver_run` of `src/antic/driver.c` hold the order of the steps. `src/antic/ir_print.c` writes the IR dumps and `src/antic/llvm_emit.c` with the three files `llvm_emit_*.c` the LLVM text. `src/antic/llvm_run.c` runs the tools, and `src/rt/start.c` starts a program.

@@ -2096,11 +2096,12 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return lower_none();
     /* DESIGN: an atomic operation is a call of the runtime in the IR,
        which keeps the IR and the library file free of a form of their
-       own, and atomic_call of llvm_emit.c writes it as the LLVM atomic
-       instruction of its width. The runtime holds one body per operation
-       for C callers, which compiles to the same instructions: `lock xadd`
-       and `lock cmpxchg` on x86_64, `ldaddal` and `casal` on an ARM64 with
-       LSE, and a load-store-exclusive loop on one without it. */
+       own, and atomic_call of llvm_emit_call.c writes it as the LLVM
+       atomic instruction of its width. The runtime holds one body per
+       operation for C callers, which compiles to the same instructions:
+       `lock xadd` and `lock cmpxchg` on x86_64, `ldaddal` and `casal` on
+       an ARM64 with LSE, and a load-store-exclusive loop on one without
+       it. */
     case EXPR_ATOMIC: {
         static const enum rt_function functions[] = {
             RT_FN_ATOMIC_LOAD, RT_FN_ATOMIC_STORE, RT_FN_ATOMIC_SWAP,

@@ -1,9 +1,9 @@
 # The shared headers of the library file, the driver, the parser, the
-# checker, lowering and the pass over the whole program group their
-# declarations under a comment that names a file, as /* sema_call.c */.
-# Every function declared under such a comment is defined in that file,
-# and the comment at the top of the header names every file of its
-# family. No file outside the family includes the header, since it holds
+# checker, lowering, the LLVM text and the pass over the whole program
+# group their declarations under a comment that names a file, as
+# /* sema_call.c */. Every function declared under such a comment is
+# defined in that file, and the comment at the top of the header names
+# every file of its family. No file outside the family includes the header, since it holds
 # the inside of one part. Run with cmake -P and ROOT, the root of the
 # repository.
 
@@ -90,6 +90,7 @@ check_header("driver_parts.h" "driver")
 check_header("parser_parser.h" "parser")
 check_header("sema_checker.h" "sema")
 check_header("lower_lowerer.h" "lower")
+check_header("llvm_emit_parts.h" "llvm_emit")
 check_header("whole_parts.h" "whole")
 
 if(NOT failures STREQUAL "")
