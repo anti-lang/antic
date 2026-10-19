@@ -388,6 +388,264 @@ static bool tuple_pattern(const struct parser *p)
 
 static struct stmt *statement(struct parser *p);
 
+/* DESIGN: `for i in lo..hi` and `for x in slice` read one variable,
+   a range or a sequence, and a block. The checker and lowering give
+   them the loop that the core would have written. `for i, x in items`
+   names two, which is the destructuring of the `(int, T)` of each
+   element. */
+static struct stmt *for_statement(struct parser *p, const struct token *t)
+{
+    struct stmt *s;
+    size_t from;
+    /* DESIGN: the binding is optional over a range, because a loop
+       that repeats a block needs no counter. A name and `in` open the
+       bound form, and anything else is the range itself. */
+    bool bound = parser_peek_at(p, 1)->kind == TOKEN_IDENT &&
+                 (parser_is_word(p, parser_peek_at(p, 2), "in") ||
+                  (parser_peek_at(p, 2)->kind == TOKEN_COMMA &&
+                   parser_peek_at(p, 3)->kind == TOKEN_IDENT &&
+                   parser_is_word(p, parser_peek_at(p, 4), "in")));
+    bool pattern = tuple_pattern(p);
+
+    parser_next(p);
+    s = new_stmt(p, STMT_FOR, t);
+    if (pattern) {
+        parser_next(p);
+    }
+    s->as.for_loop.pattern = pattern;
+    if (bound || pattern) {
+        struct list names = {NULL, 0, 0, sizeof(struct binding)};
+        do {
+            struct binding b;
+            memset(&b, 0, sizeof b);
+            b.pos = parser_pos_of(parser_peek(p));
+            if (!parser_expect_name(p, &b.name)) {
+                free(names.data);
+                return NULL;
+            }
+            parser_list_push(&names, &b);
+        } while (parser_accept(p, TOKEN_COMMA));
+        s->as.for_loop.names =
+            parser_list_finish(p, &names, &s->as.for_loop.name_count);
+        if (pattern) {
+            parser_next(p);
+        }
+        /* DESIGN: `in` is a contextual word, as `packed` and `align`
+           are. The decision adds four keywords and `in` is not among
+           them, so a program may still name a variable `in`. */
+        parser_next(p);
+    }
+    p->no_struct_literal = true;
+    from = parser_peek_at(p, parser_check(p, TOKEN_AMP) ? 1 : 0)->offset;
+    if (parser_accept(p, TOKEN_AMP)) {
+        s->as.for_loop.by_pointer = true;
+        s->as.for_loop.over = parser_expression(p);
+    } else if ((s->as.for_loop.low = parser_expression(p)) != NULL &&
+               parser_accept(p, TOKEN_DOT_DOT)) {
+        s->as.for_loop.high = parser_expression(p);
+    } else {
+        s->as.for_loop.over = s->as.for_loop.low;
+        s->as.for_loop.low = NULL;
+    }
+    /* The source of the walked expression, which the refusal of a
+       change to a copy and the trap of a dev build name. */
+    if (s->as.for_loop.over != NULL) {
+        size_t to = p->all[p->origin[p->pos - 1]].offset +
+                    p->all[p->origin[p->pos - 1]].length;
+        s->as.for_loop.over_text.bytes = p->source + from;
+        s->as.for_loop.over_text.length = to > from ? to - from : 0;
+    }
+    /* `by k` steps a range. It is the contextual word that `parallel`
+       uses for its chunk count. */
+    if (s->as.for_loop.high != NULL &&
+        parser_is_word(p, parser_peek(p), "by")) {
+        parser_next(p);
+        s->as.for_loop.step_pos = parser_pos_of(parser_peek(p));
+        s->as.for_loop.step = parser_expression(p);
+    }
+    p->no_struct_literal = false;
+    if (p->panic ||
+        (s->as.for_loop.over == NULL && s->as.for_loop.high == NULL)) {
+        return NULL;
+    }
+    if ((s->as.for_loop.body = parser_block(p)) == NULL) {
+        return NULL;
+    }
+    return s;
+}
+
+/* DESIGN: `switch e { A => stmt, else => stmt }` names one value per
+   arm and runs one statement. An arm falls through only where it
+   ends in `fallthrough;`, so no arm needs a break, and `else` takes
+   the rest. The switch keeps the place the text gives `else`, since
+   the arm after it is the one its `fallthrough` enters. */
+static struct stmt *switch_statement(struct parser *p, const struct token *t)
+{
+    struct stmt *s;
+    struct list arms = {NULL, 0, 0, sizeof(struct switch_arm)};
+
+    parser_next(p);
+    s = new_stmt(p, STMT_SWITCH, t);
+    p->no_struct_literal = true;
+    s->as.switch_stmt.value = parser_expression(p);
+    p->no_struct_literal = false;
+    if (s->as.switch_stmt.value == NULL ||
+        !parser_expect(p, TOKEN_LBRACE)) {
+        return NULL;
+    }
+    while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
+        struct switch_arm arm;
+        memset(&arm, 0, sizeof arm);
+        arm.pos = parser_pos_of(parser_peek(p));
+        if (parser_accept(p, TOKEN_ELSE)) {
+            if (s->as.switch_stmt.otherwise != NULL) {
+                parser_error_here(p, "a `switch` has one `else`");
+                free(arms.data);
+                return NULL;
+            }
+            s->as.switch_stmt.otherwise_at = arms.count;
+            if (!parser_expect(p, TOKEN_FAT_ARROW) ||
+                (s->as.switch_stmt.otherwise =
+                     arm_body(p, SWITCH_ARM)) == NULL) {
+                free(arms.data);
+                return NULL;
+            }
+        } else {
+            /* `Circle c =>` binds the fields of a case of a variant
+               to c. The case is a name, which the checker reads. */
+            if (parser_check(p, TOKEN_IDENT) &&
+                parser_peek_at(p, 1)->kind == TOKEN_IDENT &&
+                parser_peek_at(p, 2)->kind == TOKEN_FAT_ARROW) {
+                arm.value = parser_new_expr(p, EXPR_NAME, parser_peek(p));
+                parser_expect_name(p, &arm.value->as.name);
+                arm.binds_pos = parser_pos_of(parser_peek(p));
+                parser_expect_name(p, &arm.binds);
+            }
+            if ((arm.value == NULL &&
+                 (arm.value = parser_expression(p)) == NULL) ||
+                !parser_expect(p, TOKEN_FAT_ARROW) ||
+                (arm.body = arm_body(p, SWITCH_ARM)) == NULL) {
+                free(arms.data);
+                return NULL;
+            }
+            parser_list_push(&arms, &arm);
+        }
+        if (!parser_accept(p, TOKEN_COMMA)) {
+            break;
+        }
+    }
+    s->as.switch_stmt.arms = parser_list_finish(p, &arms,
+                                                &s->as.switch_stmt.count);
+    return parser_expect(p, TOKEN_RBRACE) ? s : NULL;
+}
+
+/* DESIGN: `select { a x => stmt, b => stmt }` is written like a
+   `switch` over the channels. Each arm names a channel and, before
+   the arrow, the name that takes what the channel gives. It has no
+   `else`, since it waits until one of its channels has a value or is
+   closed. */
+static struct stmt *select_statement(struct parser *p, const struct token *t)
+{
+    struct stmt *s;
+    struct list arms = {NULL, 0, 0, sizeof(struct switch_arm)};
+
+    parser_next(p);
+    s = new_stmt(p, STMT_SELECT, t);
+    if (!parser_expect(p, TOKEN_LBRACE)) {
+        return NULL;
+    }
+    if (parser_check(p, TOKEN_RBRACE)) {
+        parser_error_here(p, "a `select` waits on one channel or more");
+        return NULL;
+    }
+    while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
+        struct switch_arm arm;
+        memset(&arm, 0, sizeof arm);
+        arm.pos = parser_pos_of(parser_peek(p));
+        if (parser_check(p, TOKEN_ELSE)) {
+            parser_error_here(p, "a `select` has no `else`");
+            free(arms.data);
+            return NULL;
+        }
+        if ((arm.value = parser_expression(p)) == NULL) {
+            free(arms.data);
+            return NULL;
+        }
+        if (parser_check(p, TOKEN_IDENT) &&
+            parser_peek_at(p, 1)->kind == TOKEN_FAT_ARROW) {
+            arm.binds_pos = parser_pos_of(parser_peek(p));
+            parser_expect_name(p, &arm.binds);
+        }
+        if (!parser_expect(p, TOKEN_FAT_ARROW) ||
+            (arm.body = arm_body(p, SELECT_ARM)) == NULL) {
+            free(arms.data);
+            return NULL;
+        }
+        parser_list_push(&arms, &arm);
+        if (!parser_accept(p, TOKEN_COMMA)) {
+            break;
+        }
+    }
+    s->as.select.arms = parser_list_finish(p, &arms, &s->as.select.count);
+    return parser_expect(p, TOKEN_RBRACE) ? s : NULL;
+}
+
+/* A call or an assignment, the statement that no keyword opens. */
+static struct stmt *expression_statement(struct parser *p,
+                                         const struct token *t)
+{
+    struct stmt *s;
+    struct expr *e = parser_expression(p);
+
+    if (e == NULL) {
+        return NULL;
+    }
+    if (parser_is_assign_op(parser_peek(p)->kind)) {
+        s = new_stmt(p, STMT_ASSIGN, t);
+        s->as.assign.op = parser_next(p)->kind;
+        s->as.assign.target = e;
+        if ((s->as.assign.value = parser_expression(p)) == NULL) {
+            return NULL;
+        }
+        /* `*p = f(args) catch e { ... };` handles the error of the
+           call that fills the place, as the `let` of the same call
+           does. The two forms of a failing call stand wherever the
+           call stands, so neither `try` nor `catch` has a statement
+           it is missing from. A `catch` on anything else guards a
+           pointer and binds the one it proved, which an assignment
+           has no name for. */
+        if (parser_check(p, TOKEN_CATCH)) {
+            struct expr *v = s->as.assign.value;
+            if (v->kind != EXPR_CALL) {
+                parser_error_here(p, "`catch` stands after a call here, "
+                                     "and a `catch` that guards a pointer "
+                                     "stands in a `let`");
+                return NULL;
+            }
+            if (!read_handler(p, &v->as.call.handler, false)) {
+                return NULL;
+            }
+        }
+    } else {
+        /* A call that can fail carries its handler here. */
+        if (e->kind == EXPR_CALL && parser_check(p, TOKEN_CATCH) &&
+            !read_handler(p, &e->as.call.handler, false)) {
+            return NULL;
+        }
+        if (!parser_check(p, TOKEN_SEMICOLON)) {
+            parser_expect(p, TOKEN_SEMICOLON);
+            return NULL;
+        }
+        if (!is_call_statement(e)) {
+            parser_error_here(p, "expected a call or an assignment");
+            return NULL;
+        }
+        s = new_stmt(p, STMT_EXPR, t);
+        s->as.expr = e;
+    }
+    return parser_expect(p, TOKEN_SEMICOLON) ? s : NULL;
+}
+
 static struct stmt *statement_level(struct parser *p)
 {
     const struct token *t = parser_peek(p);
@@ -408,88 +666,8 @@ static struct stmt *statement_level(struct parser *p)
             return NULL;
         }
         return s;
-    /* DESIGN: `for i in lo..hi` and `for x in slice` read one variable,
-       a range or a sequence, and a block. The checker and lowering give
-       them the loop that the core would have written. `for i, x in items`
-       names two, which is the destructuring of the `(int, T)` of each
-       element. */
-    case TOKEN_FOR: {
-        size_t from;
-        /* DESIGN: the binding is optional over a range, because a loop
-           that repeats a block needs no counter. A name and `in` open the
-           bound form, and anything else is the range itself. */
-        bool bound = parser_peek_at(p, 1)->kind == TOKEN_IDENT &&
-                     (parser_is_word(p, parser_peek_at(p, 2), "in") ||
-                      (parser_peek_at(p, 2)->kind == TOKEN_COMMA &&
-                       parser_peek_at(p, 3)->kind == TOKEN_IDENT &&
-                       parser_is_word(p, parser_peek_at(p, 4), "in")));
-        bool pattern = tuple_pattern(p);
-        parser_next(p);
-        s = new_stmt(p, STMT_FOR, t);
-        if (pattern) {
-            parser_next(p);
-        }
-        s->as.for_loop.pattern = pattern;
-        if (bound || pattern) {
-            struct list names = {NULL, 0, 0, sizeof(struct binding)};
-            do {
-                struct binding b;
-                memset(&b, 0, sizeof b);
-                b.pos = parser_pos_of(parser_peek(p));
-                if (!parser_expect_name(p, &b.name)) {
-                    free(names.data);
-                    return NULL;
-                }
-                parser_list_push(&names, &b);
-            } while (parser_accept(p, TOKEN_COMMA));
-            s->as.for_loop.names =
-                parser_list_finish(p, &names, &s->as.for_loop.name_count);
-            if (pattern) {
-                parser_next(p);
-            }
-            /* DESIGN: `in` is a contextual word, as `packed` and `align`
-               are. The decision adds four keywords and `in` is not among
-               them, so a program may still name a variable `in`. */
-            parser_next(p);
-        }
-        p->no_struct_literal = true;
-        from = parser_peek_at(p, parser_check(p, TOKEN_AMP) ? 1 : 0)->offset;
-        if (parser_accept(p, TOKEN_AMP)) {
-            s->as.for_loop.by_pointer = true;
-            s->as.for_loop.over = parser_expression(p);
-        } else if ((s->as.for_loop.low = parser_expression(p)) != NULL &&
-                   parser_accept(p, TOKEN_DOT_DOT)) {
-            s->as.for_loop.high = parser_expression(p);
-        } else {
-            s->as.for_loop.over = s->as.for_loop.low;
-            s->as.for_loop.low = NULL;
-        }
-        /* The source of the walked expression, which the refusal of a
-           change to a copy and the trap of a dev build name. */
-        if (s->as.for_loop.over != NULL) {
-            size_t to = p->all[p->origin[p->pos - 1]].offset +
-                        p->all[p->origin[p->pos - 1]].length;
-            s->as.for_loop.over_text.bytes = p->source + from;
-            s->as.for_loop.over_text.length = to > from ? to - from : 0;
-        }
-        /* `by k` steps a range. It is the contextual word that `parallel`
-           uses for its chunk count. */
-        if (s->as.for_loop.high != NULL &&
-            parser_is_word(p, parser_peek(p), "by")) {
-            parser_next(p);
-            s->as.for_loop.step_pos = parser_pos_of(parser_peek(p));
-            s->as.for_loop.step = parser_expression(p);
-        }
-        p->no_struct_literal = false;
-        if (p->panic ||
-            (s->as.for_loop.over == NULL && s->as.for_loop.high == NULL)) {
-            return NULL;
-        }
-        if ((s->as.for_loop.body = parser_block(p)) == NULL) {
-            return NULL;
-        }
-        return s;
-    }
+    case TOKEN_FOR:
+        return for_statement(p, t);
     case TOKEN_DO:
         parser_next(p);
         s = new_stmt(p, STMT_DO_WHILE, t);
@@ -532,67 +710,8 @@ static struct stmt *statement_level(struct parser *p)
                    ? s
                    : NULL;
     }
-    /* DESIGN: `switch e { A => stmt, else => stmt }` names one value per
-       arm and runs one statement. An arm falls through only where it
-       ends in `fallthrough;`, so no arm needs a break, and `else` takes
-       the rest. The switch keeps the place the text gives `else`, since
-       the arm after it is the one its `fallthrough` enters. */
-    case TOKEN_SWITCH: {
-        struct list arms = {NULL, 0, 0, sizeof(struct switch_arm)};
-        parser_next(p);
-        s = new_stmt(p, STMT_SWITCH, t);
-        p->no_struct_literal = true;
-        s->as.switch_stmt.value = parser_expression(p);
-        p->no_struct_literal = false;
-        if (s->as.switch_stmt.value == NULL ||
-            !parser_expect(p, TOKEN_LBRACE)) {
-            return NULL;
-        }
-        while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
-            struct switch_arm arm;
-            memset(&arm, 0, sizeof arm);
-            arm.pos = parser_pos_of(parser_peek(p));
-            if (parser_accept(p, TOKEN_ELSE)) {
-                if (s->as.switch_stmt.otherwise != NULL) {
-                    parser_error_here(p, "a `switch` has one `else`");
-                    free(arms.data);
-                    return NULL;
-                }
-                s->as.switch_stmt.otherwise_at = arms.count;
-                if (!parser_expect(p, TOKEN_FAT_ARROW) ||
-                    (s->as.switch_stmt.otherwise =
-                         arm_body(p, SWITCH_ARM)) == NULL) {
-                    free(arms.data);
-                    return NULL;
-                }
-            } else {
-                /* `Circle c =>` binds the fields of a case of a variant
-                   to c. The case is a name, which the checker reads. */
-                if (parser_check(p, TOKEN_IDENT) &&
-                    parser_peek_at(p, 1)->kind == TOKEN_IDENT &&
-                    parser_peek_at(p, 2)->kind == TOKEN_FAT_ARROW) {
-                    arm.value = parser_new_expr(p, EXPR_NAME, parser_peek(p));
-                    parser_expect_name(p, &arm.value->as.name);
-                    arm.binds_pos = parser_pos_of(parser_peek(p));
-                    parser_expect_name(p, &arm.binds);
-                }
-                if ((arm.value == NULL &&
-                     (arm.value = parser_expression(p)) == NULL) ||
-                    !parser_expect(p, TOKEN_FAT_ARROW) ||
-                    (arm.body = arm_body(p, SWITCH_ARM)) == NULL) {
-                    free(arms.data);
-                    return NULL;
-                }
-                parser_list_push(&arms, &arm);
-            }
-            if (!parser_accept(p, TOKEN_COMMA)) {
-                break;
-            }
-        }
-        s->as.switch_stmt.arms = parser_list_finish(p, &arms,
-                                                    &s->as.switch_stmt.count);
-        return parser_expect(p, TOKEN_RBRACE) ? s : NULL;
-    }
+    case TOKEN_SWITCH:
+        return switch_statement(p, t);
     /* DESIGN: `sync m { }` holds the mutex m for the block. The operand
        is read as a condition is, so its `{` opens the block. `sync a, b
        { }` names two synchronized objects, whose locks the runtime takes
@@ -611,53 +730,8 @@ static struct stmt *statement_level(struct parser *p)
             return NULL;
         }
         return s;
-    /* DESIGN: `select { a x => stmt, b => stmt }` is written like a
-       `switch` over the channels. Each arm names a channel and, before
-       the arrow, the name that takes what the channel gives. It has no
-       `else`, since it waits until one of its channels has a value or is
-       closed. */
-    case TOKEN_SELECT: {
-        struct list arms = {NULL, 0, 0, sizeof(struct switch_arm)};
-        parser_next(p);
-        s = new_stmt(p, STMT_SELECT, t);
-        if (!parser_expect(p, TOKEN_LBRACE)) {
-            return NULL;
-        }
-        if (parser_check(p, TOKEN_RBRACE)) {
-            parser_error_here(p, "a `select` waits on one channel or more");
-            return NULL;
-        }
-        while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
-            struct switch_arm arm;
-            memset(&arm, 0, sizeof arm);
-            arm.pos = parser_pos_of(parser_peek(p));
-            if (parser_check(p, TOKEN_ELSE)) {
-                parser_error_here(p, "a `select` has no `else`");
-                free(arms.data);
-                return NULL;
-            }
-            if ((arm.value = parser_expression(p)) == NULL) {
-                free(arms.data);
-                return NULL;
-            }
-            if (parser_check(p, TOKEN_IDENT) &&
-                parser_peek_at(p, 1)->kind == TOKEN_FAT_ARROW) {
-                arm.binds_pos = parser_pos_of(parser_peek(p));
-                parser_expect_name(p, &arm.binds);
-            }
-            if (!parser_expect(p, TOKEN_FAT_ARROW) ||
-                (arm.body = arm_body(p, SELECT_ARM)) == NULL) {
-                free(arms.data);
-                return NULL;
-            }
-            parser_list_push(&arms, &arm);
-            if (!parser_accept(p, TOKEN_COMMA)) {
-                break;
-            }
-        }
-        s->as.select.arms = parser_list_finish(p, &arms, &s->as.select.count);
-        return parser_expect(p, TOKEN_RBRACE) ? s : NULL;
-    }
+    case TOKEN_SELECT:
+        return select_statement(p, t);
     /* DESIGN: `defer stmt;` records a statement that runs at every exit
        of the enclosing block, in reverse order of declaration, so a
        release stands beside what it releases and runs on every path. */
@@ -750,56 +824,7 @@ static struct stmt *statement_level(struct parser *p)
         break;
     }
 
-    {
-        struct expr *e = parser_expression(p);
-        if (e == NULL) {
-            return NULL;
-        }
-        if (parser_is_assign_op(parser_peek(p)->kind)) {
-            s = new_stmt(p, STMT_ASSIGN, t);
-            s->as.assign.op = parser_next(p)->kind;
-            s->as.assign.target = e;
-            if ((s->as.assign.value = parser_expression(p)) == NULL) {
-                return NULL;
-            }
-            /* `*p = f(args) catch e { ... };` handles the error of the
-               call that fills the place, as the `let` of the same call
-               does. The two forms of a failing call stand wherever the
-               call stands, so neither `try` nor `catch` has a statement
-               it is missing from. A `catch` on anything else guards a
-               pointer and binds the one it proved, which an assignment
-               has no name for. */
-            if (parser_check(p, TOKEN_CATCH)) {
-                struct expr *v = s->as.assign.value;
-                if (v->kind != EXPR_CALL) {
-                    parser_error_here(p, "`catch` stands after a call here, "
-                                         "and a `catch` that guards a pointer "
-                                         "stands in a `let`");
-                    return NULL;
-                }
-                if (!read_handler(p, &v->as.call.handler, false)) {
-                    return NULL;
-                }
-            }
-        } else {
-            /* A call that can fail carries its handler here. */
-            if (e->kind == EXPR_CALL && parser_check(p, TOKEN_CATCH) &&
-                !read_handler(p, &e->as.call.handler, false)) {
-                return NULL;
-            }
-            if (!parser_check(p, TOKEN_SEMICOLON)) {
-                parser_expect(p, TOKEN_SEMICOLON);
-                return NULL;
-            }
-            if (!is_call_statement(e)) {
-                parser_error_here(p, "expected a call or an assignment");
-                return NULL;
-            }
-            s = new_stmt(p, STMT_EXPR, t);
-            s->as.expr = e;
-        }
-        return parser_expect(p, TOKEN_SEMICOLON) ? s : NULL;
-    }
+    return expression_statement(p, t);
 }
 
 /* A nested block, `defer` and `undo` each hold a statement, so each
