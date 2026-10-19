@@ -57,7 +57,7 @@ static struct anti_text text_part(const char *s, size_t n)
 struct kept {
     struct kept *next;
     size_t length;
-    char bytes[1];
+    char bytes[];   /* length bytes and a NUL */
 };
 
 static struct kept *kept_names;
@@ -74,7 +74,7 @@ static struct anti_text keep_in(struct kept **list, const char *s, size_t n)
         }
     }
     if (k == NULL) {
-        k = malloc(sizeof *k + n);
+        k = n < SIZE_MAX - sizeof *k ? malloc(sizeof *k + n + 1) : NULL;
         if (k != NULL) {
             memcpy(k->bytes, s, n);
             k->bytes[n] = 0;
