@@ -14,7 +14,8 @@
 #     or without it, or names a test a second time
 #   - `host=` names a system that is none of the three, or one twice
 #   - a line names no test
-#   - the id of a line has no row in the table, or a row marked fixed
+#   - the id of a line has no row in the table, or a row marked fixed or
+#     no defect
 #   - a row is open and no line names its id
 #   - a row does not end with a grade and a state, or its id has a second
 #     row
@@ -24,7 +25,7 @@
 # DESIGN: a row of the table is a line that starts with `| T` and a digit.
 # Its first cell is the id, and its last two are the grade, `severe`,
 # `major` or `minor`, and the state, `open` or a text that starts with
-# `fixed`. The cells between them may hold a `|` of Anti, so the runner
+# `fixed` or `no defect`. The cells between them may hold a `|` of Anti, so the runner
 # reads the row from both ends and never counts its cells.
 
 cmake_minimum_required(VERSION 3.21)
@@ -41,7 +42,7 @@ get_filename_component(list_name "${LIST}" NAME)
 get_filename_component(findings_name "${FINDINGS}" NAME)
 set(faults "")
 
-# The rows of the table: the ids, and of each id whether it is fixed.
+# The rows of the table: the ids, and of each id whether it is open.
 known_failures_lines(rows "${FINDINGS}")
 set(row_ids "")
 set(number 0)
@@ -57,7 +58,7 @@ foreach(row IN LISTS rows)
     endif()
     list(APPEND row_ids "${id}")
     set(row_line_${id} ${number})
-    if(row MATCHES "\\| *(severe|major|minor) *\\| *(open|fixed)[^|]*\\|[ \t]*$")
+    if(row MATCHES "\\| *(severe|major|minor) *\\| *(open|fixed|no defect)[^|]*\\|[ \t]*$")
         set(row_state_${id} "${CMAKE_MATCH_2}")
     else()
         set(row_state_${id} open)
@@ -94,8 +95,8 @@ foreach(name id systems IN ZIP_LISTS names ids hosts)
     if(NOT id IN_LIST row_ids)
         string(APPEND faults "${list_name}: ${id} has no row in "
                              "${findings_name}, and ${name} names it\n")
-    elseif(row_state_${id} STREQUAL "fixed")
-        string(APPEND faults "${list_name}: ${id} is marked fixed in "
+    elseif(NOT row_state_${id} STREQUAL "open")
+        string(APPEND faults "${list_name}: ${id} is marked ${row_state_${id}} in "
                              "${findings_name}, and ${name} names it\n")
     endif()
 endforeach()

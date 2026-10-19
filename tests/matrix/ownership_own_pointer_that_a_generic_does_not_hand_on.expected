@@ -1,10 +1,10 @@
 exit 0
+not handed on: alive 1
   teardown of key 1
-not handed on: alive 0
 handed on by return: 2, alive 1
   teardown of key 2
+not handed on one path: 0, alive 1
   teardown of key 3
-not handed on one path: 0, alive 0
 handed on the other path: 4, alive 1
   teardown of key 4
 handed on into a field: 5, alive 1

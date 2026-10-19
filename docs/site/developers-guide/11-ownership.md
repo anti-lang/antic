@@ -1327,6 +1327,8 @@ An `own` parameter takes the argument over.
 
 `own` before a pointer parameter hands over the pointer and nothing more. The caller's name is dead after the call. The object is on the heap, and no block tears a heap object down. The function ends it with `delete(p)` or stores the pointer in an `own` field.
 
+A plain pointer owns nothing. In a generic, `own x: T` whose `T` is a plain pointer such as `*Key` owns the pointer value, one word, and not the object it names. A copy of the generic that does not hand `x` on deletes nothing, and the object stays with whoever else holds it. Only `own p: *Key`, written with the pointer, owns the object.
+
 The object of a call, `self`, is a pointer to the object. A function of a class reads and changes the object in place and takes no ownership of it.
 
 `keep` belongs to parameters of function type. A function may store such a parameter only when it is marked `keep`, and `keep own` takes a `snapshot fn` with its memory. [Chapter 5]({{% relref "05-functions" %}}) holds both.

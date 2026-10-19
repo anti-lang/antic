@@ -1,9 +1,11 @@
 //! An `own` parameter of a type parameter in a copy whose type argument is a
-//! pointer, by R081 of "Rules of 2026-10-13". A generic that does not hand the
-//! parameter on deletes what it points at when the function ends, as it tears
-//! down a value there. One that hands it on, by `return` or into a field,
-//! deletes nothing. Each `Key` prints its teardown, and each line prints the
-//! keys alive.
+//! plain pointer, by R081 of "Answers of 2026-10-18". `own x: T` with `T` a
+//! `*Key` owns the pointer value, one word, and not the object it names, so a
+//! generic that does not hand the parameter on deletes nothing, and neither
+//! does one that hands it on, by `return` or into a field. The program keeps a
+//! second pointer to each key and deletes it itself. A copy whose type argument
+//! is a value tears the value down where the function ends. Each `Key` prints
+//! its teardown, and each line prints the keys alive.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -11,7 +13,7 @@ class Key
 {
 	pub n: int = 0,
 
-	static atomic live: int = 0;
+	pub static atomic live: int = 0;
 
 	fn construct(self)
 	{
@@ -59,13 +61,19 @@ fn in_a_field<T>(own x: T) -> Slot<T>
 
 fn main() -> int
 {
-	dropped<*Key>(alloc Key { n: 1 });
+	let one = alloc Key { n: 1 };
+	let kept = one;
+	dropped<*Key>(one);
 	printf("not handed on: alive %d\n".ptr, alive());
+	delete(kept);
 	let p = handed_on<*Key>(alloc Key { n: 2 });
 	printf("handed on by return: %d, alive %d\n".ptr, p.n as c_int, alive());
 	delete(p);
-	let gone = on_one_path<*Key>(false, alloc Key { n: 3 });
+	let three = alloc Key { n: 3 };
+	let also = three;
+	let gone = on_one_path<*Key>(false, three);
 	printf("not handed on one path: %d, alive %d\n".ptr, (gone != none) as c_int, alive());
+	delete(also);
 	let q = on_one_path<*Key>(true, alloc Key { n: 4 }) else {
 		return 1;
 	};
