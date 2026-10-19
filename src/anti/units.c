@@ -3,8 +3,9 @@
    from. `anti check`, `anti doc`, `anti build` and `anti test` need the
    module path of each source, the modules it imports and the interface
    file the run writes for it. The list has one definition. The file
-   also reads the `link framework` and `link linux` lines of the library
-   files a compile imports, and passes their names to the compile. */
+   also reads the package header of a library file, and the `link
+   framework` and `link linux` lines of the library files a compile
+   imports, whose names it passes to the compile. */
 
 #include "units.h"
 
@@ -39,6 +40,26 @@ bool unit_host(enum target *target, enum cpu_level *cpu)
     }
     *cpu = cpu_default(*target);
     return true;
+}
+
+bool unit_library_header(const char *file, struct arena *arena,
+                         struct package *package, const char **module)
+{
+    struct text bytes = {0};
+    char message[256];
+    bool ok = false;
+
+    if (!files_read(file, &bytes)) {
+        fprintf(stderr, "anti: cannot read %s\n", file);
+    } else if (!antic_library_header((const uint8_t *)bytes.data,
+                                     bytes.length, arena, package, module,
+                                     message, sizeof message)) {
+        fprintf(stderr, "anti: %s: %s\n", file, message);
+    } else {
+        ok = true;
+    }
+    text_free(&bytes);
+    return ok;
 }
 
 bool unit_links_read(const struct options *search, struct arena *arena,

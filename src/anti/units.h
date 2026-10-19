@@ -67,6 +67,13 @@ void unit_options(struct options *o, const char *package, const char *runtime,
    Prints the message and returns false on a host antic does not know. */
 bool unit_host(enum target *target, enum cpu_level *cpu);
 
+/* Read the package header and the module path of the library file at
+   file into the memory pool. This is the one reader of the header of a
+   library file in anti. Prints the reason and returns false when the
+   file cannot be read or is no library file of this version. */
+bool unit_library_header(const char *file, struct arena *arena,
+                         struct package *package, const char **module);
+
 /* DESIGN: a binding names the frameworks of Apple's SDK it needs with
    `link framework`, and the libraries of the glibc sysroot with `link
    linux`. Its library file records both. A link reads them from every

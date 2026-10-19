@@ -8,7 +8,6 @@
 #include "files.h"
 #include "manifest.h"
 #include "modpath.h"
-#include "repo.h"
 #include "text.h"
 #include "units.h"
 
@@ -62,7 +61,7 @@ int project_new(const char *name)
     /* The name is the module path of the starter and the directory of the
        project, so it takes the form an index and the manifest take, and a
        path inside it writes nowhere. Defect 7 of the anti-tool audit. */
-    if (!repo_name_valid(name)) {
+    if (!manifest_name_valid(name)) {
         fprintf(stderr, "anti: `%s` is no package name, which is lowercase "
                         "segments of letters, digits and `_` joined by dots, "
                         "as com.example.app\n",

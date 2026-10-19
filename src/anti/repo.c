@@ -1,5 +1,4 @@
-/* The repositories a build fetches from and the cache it fetches into,
-   with the grammar of a name, a version and a digest.
+/* The repositories a build fetches from and the cache it fetches into.
 
    DESIGN: a repository is a URL prefix over static files, so the
    transport is a file copy or one HTTP request per file. antic links no
@@ -20,6 +19,7 @@
 #include "antic.h"
 #include "digest.h"
 #include "files.h"
+#include "manifest.h"
 #include "platform.h"
 #include "sha256.h"
 #include "text.h"
@@ -33,66 +33,6 @@ enum { REPO_INDEX_SECONDS = 3600 };
    beside it. */
 #define REPO_STAMP_SUFFIX ".checked"
 #define REPO_ETAG_SUFFIX ".etag"
-
-bool repo_name_valid(const char *name)
-{
-    const char *p = name;
-
-    for (;;) {
-        if (!((*p >= 'a' && *p <= 'z') || *p == '_')) {
-            return false;
-        }
-        while ((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') ||
-               *p == '_') {
-            p++;
-        }
-        if (*p == '\0') {
-            return true;
-        }
-        if (*p != '.') {
-            return false;
-        }
-        p++;
-    }
-}
-
-bool repo_digest_valid(const char *digest)
-{
-    size_t i;
-
-    for (i = 0; i < 64; i++) {
-        if (!((digest[i] >= '0' && digest[i] <= '9') ||
-              (digest[i] >= 'a' && digest[i] <= 'f'))) {
-            return false;
-        }
-    }
-    return digest[64] == '\0';
-}
-
-bool repo_version_valid(const char *version)
-{
-    const char *p = version;
-    int parts = 0;
-
-    for (;;) {
-        size_t digits = 0;
-        while (p[digits] >= '0' && p[digits] <= '9') {
-            digits++;
-        }
-        if (digits == 0 || digits > REPO_VERSION_DIGITS) {
-            return false;
-        }
-        p += digits;
-        parts++;
-        if (*p == '\0') {
-            return true;
-        }
-        if (*p != '.' || parts == 3) {
-            return false;
-        }
-        p++;
-    }
-}
 
 /* The cache of a user, which is per user and not per project. It holds
    the index files under index/<digest of the prefix>/<name>/ and the
@@ -402,7 +342,7 @@ static bool index_dir(const char *prefix, const char *name, struct text *out)
     struct anti_sha256 digest;
     char hex[65];
 
-    if (!repo_name_valid(name)) {
+    if (!manifest_name_valid(name)) {
         fprintf(stderr, "anti: %s names the package %s, which is no package "
                         "name\n", prefix, name);
         return false;
@@ -468,22 +408,22 @@ bool repo_module(const char *prefix, const char *name, const char *version,
     /* S45: each of the four stands in a path of the cache or in the
        check after the fetch. Each may come from a downloaded index or a
        cloned lock file. */
-    if (!repo_name_valid(name)) {
+    if (!manifest_name_valid(name)) {
         fprintf(stderr, "anti: %s names the package %s, which is no package "
                         "name\n", prefix, name);
         goto done;
     }
-    if (!repo_version_valid(version)) {
+    if (!manifest_version_valid(version)) {
         fprintf(stderr, "anti: %s names %s %s, which is no version\n", prefix,
                 name, version);
         goto done;
     }
-    if (!repo_name_valid(module)) {
+    if (!manifest_name_valid(module)) {
         fprintf(stderr, "anti: %s names the module %s of %s, which is no "
                         "module path\n", prefix, module, name);
         goto done;
     }
-    if (!repo_digest_valid(digest)) {
+    if (!manifest_digest_valid(digest)) {
         fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
                         "SHA-256 digest\n", prefix, digest, module);
         goto done;

@@ -42,7 +42,7 @@ int bind_header(const char *library, const char *out_dir,
     }
     unit_options(&o, NULL, runtime, roots, root_count, target, cpu);
     o.input = library;
-    if (!deps_library_header(library, &arena, &package, &module) ||
+    if (!unit_library_header(library, &arena, &package, &module) ||
         !files_make_dirs(out_dir) || !driver_library_header(&o, &header)) {
         goto done;
     }

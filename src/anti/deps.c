@@ -26,6 +26,7 @@
 #include "sha256.h"
 #include "text.h"
 #include "toml.h"
+#include "units.h"
 
 /* The walk stops after this many rounds. A round resolves every package
    whose pick no longer satisfies every constraint on it. A graph that
@@ -33,7 +34,7 @@
    other. */
 enum { DEPS_ROUNDS = 64 };
 
-/* The largest part of a version, the one of REPO_VERSION_DIGITS nines. */
+/* The largest part of a version, the one of MANIFEST_VERSION_DIGITS nines. */
 #define DEPS_VERSION_PART_MAX INT64_C(999999999)
 
 /* One part of a version, and where the next part starts. A part above
@@ -89,7 +90,7 @@ bool deps_constraint_valid(const char *constraint)
     } else if (constraint[0] == '>' && constraint[1] == '=') {
         constraint += 2;
     }
-    return repo_version_valid(constraint);
+    return manifest_version_valid(constraint);
 }
 
 bool deps_satisfies(const char *constraint, const char *version)
@@ -97,7 +98,7 @@ bool deps_satisfies(const char *constraint, const char *version)
     struct text bound = {0};
     bool ok;
 
-    if (!repo_version_valid(version)) {
+    if (!manifest_version_valid(version)) {
         return false;
     }
     if (constraint == NULL || constraint[0] == '\0') {
@@ -344,26 +345,6 @@ static void resolve_path(const struct resolver *r, const char *path,
     text_appendf(out, "%s/%s", r->root, path);
 }
 
-bool deps_library_header(const char *file, struct arena *arena,
-                         struct package *package, const char **module)
-{
-    struct text bytes = {0};
-    char message[256];
-    bool ok = false;
-
-    if (!files_read(file, &bytes)) {
-        fprintf(stderr, "anti: cannot read %s\n", file);
-    } else if (!antic_library_header((const uint8_t *)bytes.data,
-                                     bytes.length, arena, package, module,
-                                     message, sizeof message)) {
-        fprintf(stderr, "anti: %s: %s\n", file, message);
-    } else {
-        ok = true;
-    }
-    text_free(&bytes);
-    return ok;
-}
-
 /* The package header of a library file: its package name, its version,
    its module path and, with r, the dependencies it carries as
    requirements of the package from. */
@@ -377,7 +358,7 @@ static bool library_header(const char *file, struct text *name,
     size_t i;
     bool ok = false;
 
-    if (!deps_library_header(file, &arena, &package, &module)) {
+    if (!unit_library_header(file, &arena, &package, &module)) {
         goto done;
     }
     name->length = 0;
@@ -534,7 +515,7 @@ static bool best_version(const struct resolver *r,
         }
         /* S40, S45 and M13: a version reaches the comparison, a path of
            the cache and the lock file. */
-        if (!repo_version_valid(version)) {
+        if (!manifest_version_valid(version)) {
             fprintf(stderr, "anti: %s names the version %s of %s, which is "
                             "no version\n", file, version,
                     text_cstr(&req->name));
@@ -577,12 +558,12 @@ static bool index_modules(const struct anti_toml *doc, const char *file,
         if (module == NULL || digest == NULL) {
             break;
         }
-        if (!repo_name_valid(module)) {
+        if (!manifest_name_valid(module)) {
             fprintf(stderr, "anti: %s names the module %s, which is no "
                             "module path\n", file, module);
             return false;
         }
-        if (!repo_digest_valid(digest)) {
+        if (!manifest_digest_valid(digest)) {
             fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
                             "SHA-256 digest\n", file, digest, module);
             return false;
@@ -617,7 +598,7 @@ static bool index_dependencies(struct resolver *r,
         if (name == NULL) {
             break;
         }
-        if (!repo_name_valid(name)) {
+        if (!manifest_name_valid(name)) {
             fprintf(stderr, "anti: %s names the dependency %s, which is no "
                             "package name\n", file, name);
             return false;
@@ -904,10 +885,10 @@ static bool lock_package_valid(const char *path, const char *name,
     const char *kind = NULL;
     const char *what = NULL;
 
-    if (!repo_name_valid(name)) {
+    if (!manifest_name_valid(name)) {
         kind = "package name";
         what = name;
-    } else if (!repo_version_valid(version)) {
+    } else if (!manifest_version_valid(version)) {
         kind = "version";
         what = version;
     } else if (repo != NULL && strchr(repo, '"') != NULL) {
@@ -925,12 +906,12 @@ static bool lock_package_valid(const char *path, const char *name,
 static bool lock_module_valid(const char *path, const char *module,
                               const char *digest)
 {
-    if (!repo_name_valid(module)) {
+    if (!manifest_name_valid(module)) {
         fprintf(stderr, "anti: %s names %s, which is no module path, so %s "
                         "is not read\n", path, module, path);
         return false;
     }
-    if (!repo_digest_valid(digest)) {
+    if (!manifest_digest_valid(digest)) {
         fprintf(stderr, "anti: %s names %s, which is no SHA-256 digest, so "
                         "%s is not read\n", path, digest, path);
         return false;
@@ -1010,7 +991,7 @@ static bool lock_read(const char *path, struct dep_graph *out)
             if (need == NULL) {
                 break;
             }
-            if (!repo_name_valid(need)) {
+            if (!manifest_name_valid(need)) {
                 fprintf(stderr, "anti: %s names %s, which is no package "
                                 "name, so %s is not read\n", path, need, path);
                 valid = false;

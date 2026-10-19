@@ -1,6 +1,7 @@
 /* The reader of `anti.toml`: the package, the layout, the targets, the
    repositories, the dependencies and the `[inject]` tables that a build
-   passes to antic.
+   passes to antic, with the grammar of a name, a version and a digest
+   that the manifest, the lock file and an index share.
 
    DESIGN: the tool reads the manifest with the runtime's TOML reader,
    the one `anti.toml`, the logger and the runtime configuration share.
@@ -15,9 +16,68 @@
 #include <string.h>
 
 #include "files.h"
-#include "repo.h"
 #include "text.h"
 #include "toml.h"
+
+bool manifest_name_valid(const char *name)
+{
+    const char *p = name;
+
+    for (;;) {
+        if (!((*p >= 'a' && *p <= 'z') || *p == '_')) {
+            return false;
+        }
+        while ((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') ||
+               *p == '_') {
+            p++;
+        }
+        if (*p == '\0') {
+            return true;
+        }
+        if (*p != '.') {
+            return false;
+        }
+        p++;
+    }
+}
+
+bool manifest_digest_valid(const char *digest)
+{
+    size_t i;
+
+    for (i = 0; i < 64; i++) {
+        if (!((digest[i] >= '0' && digest[i] <= '9') ||
+              (digest[i] >= 'a' && digest[i] <= 'f'))) {
+            return false;
+        }
+    }
+    return digest[64] == '\0';
+}
+
+bool manifest_version_valid(const char *version)
+{
+    const char *p = version;
+    int parts = 0;
+
+    for (;;) {
+        size_t digits = 0;
+        while (p[digits] >= '0' && p[digits] <= '9') {
+            digits++;
+        }
+        if (digits == 0 || digits > MANIFEST_VERSION_DIGITS) {
+            return false;
+        }
+        p += digits;
+        parts++;
+        if (*p == '\0') {
+            return true;
+        }
+        if (*p != '.' || parts == 3) {
+            return false;
+        }
+        p++;
+    }
+}
 
 /* The directories of the default layout of docs/tooling.md. */
 #define DEFAULT_SRC "src"
@@ -369,7 +429,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
        plugin compares it, and into the index the resolver reads. Both
        read it alike only in the form the resolver takes. */
     if (out->version.length > 0 &&
-        !repo_version_valid(text_cstr(&out->version))) {
+        !manifest_version_valid(text_cstr(&out->version))) {
         fprintf(stderr, "anti: %s: [package] version `%s` is no version of "
                         "one to three parts of digits, as `1.2.0`\n",
                 path, text_cstr(&out->version));
@@ -382,7 +442,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
         /* R164 of "Rules of 2026-10-13": the name stands in the paths of
            the cache and of the lock file, so the reader refuses it here,
            before anything is fetched or built. */
-        if (!repo_name_valid(text_cstr(&d->name))) {
+        if (!manifest_name_valid(text_cstr(&d->name))) {
             fprintf(stderr, "anti: %s: the dependency %s is no package name\n",
                     path, text_cstr(&d->name));
             goto done;

@@ -21,8 +21,8 @@
 #include "cpu.h"
 #include "driver.h"
 #include "files.h"
+#include "manifest.h"
 #include "modpath.h"
-#include "repo.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -883,7 +883,7 @@ int doc_run(const struct doc_request *r)
         }
         /* M14: the module path of a library file names the file of its
            page, and a library file may come from a repository. */
-        if (!repo_name_valid(text_cstr(&pages[i].module))) {
+        if (!manifest_name_valid(text_cstr(&pages[i].module))) {
             fprintf(stderr, "anti: %s names the module %s, which is no module "
                             "path\n", r->sources[i],
                     text_cstr(&pages[i].module));

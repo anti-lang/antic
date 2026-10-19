@@ -234,7 +234,7 @@ One file per command, and the code the commands share. Every file but
 | `src/anti/check.h` | The interface of `check.c`. |
 | `src/anti/cursor.c` | The cursor over one line of text from another machine. |
 | `src/anti/cursor.h` | The interface of `cursor.c`. |
-| `src/anti/deps.c` | The dependency graph of a project: the lock file, the index, the walk, the comparison of versions and the reader of a library header. |
+| `src/anti/deps.c` | The dependency graph of a project: the lock file, the index, the walk and the comparison of versions. |
 | `src/anti/deps.h` | The interface of `deps.c`. |
 | `src/anti/doc.c` | `anti doc`, the pages of HTML and Markdown from the records antic fills. |
 | `src/anti/doc.h` | The interface of `doc.c`. |
@@ -247,7 +247,7 @@ One file per command, and the code the commands share. Every file but
 | `src/anti/licensing.c` | `anti license` over the runtime archive, a project and a static archive, with the reader of an `ar` archive. |
 | `src/anti/licensing.h` | The interface of `licensing.c`. |
 | `src/anti/main.c` | The command line of `anti`, its usage text and one function per command. |
-| `src/anti/manifest.c` | The reader of `anti.toml`. |
+| `src/anti/manifest.c` | The reader of `anti.toml`, and the grammar of a name, a version and a digest. |
 | `src/anti/manifest.h` | The interface of `manifest.c`. |
 | `src/anti/memreport.c` | The run of a `--memory-checks` program whose report names its frames through Anti's symbolizer. |
 | `src/anti/memreport.h` | The interface of `memreport.c`. |
@@ -255,7 +255,7 @@ One file per command, and the code the commands share. Every file but
 | `src/anti/platform.h` | The interface of `platform.c`. |
 | `src/anti/project.c` | `anti new`, a project of the default layout. |
 | `src/anti/project.h` | The interface of `project.c`. |
-| `src/anti/repo.c` | The fetch from a repository into the cache of the user, and the grammar of a name, a version and a digest. |
+| `src/anti/repo.c` | The fetch from a repository into the cache of the user. |
 | `src/anti/repo.h` | The interface of `repo.c`. |
 | `src/anti/sdk.c` | `anti sdk export` and `import`: the stubs of Apple's SDK into a bundle and out of one. |
 | `src/anti/sdk.h` | The interface of `sdk.c`. |
@@ -265,7 +265,7 @@ One file per command, and the code the commands share. Every file but
 | `src/anti/syms.h` | The interface of `syms.c`. |
 | `src/anti/test.c` | `anti test`, the runner of the `tests` and `fixtures` blocks of each module. |
 | `src/anti/test.h` | The interface of `test.c`. |
-| `src/anti/units.c` | The modules of a run in the order of their imports, the options every compile starts from, and the links of the library files. |
+| `src/anti/units.c` | The modules of a run in the order of their imports, the options every compile starts from, the reader of a library header and the links of the library files. |
 | `src/anti/units.h` | The interface of `units.c`. |
 | `src/anti/zip.c` | The writer and the reader of a zip archive, with a decoder of deflate. |
 | `src/anti/zip.h` | The interface of `zip.c`. |

@@ -218,7 +218,12 @@ static int symbols_command(int argc, char **argv)
     return status;
 }
 
-/* DESIGN: the sysroot of the runtime archive lies beside its lib/, so it
+/* DESIGN: anti finds the runtime archive where antic does, by the one
+   rule in user_runtime_archive. That is the directory above the running
+   executable when it holds lib/, and the user's data directory
+   otherwise. Every command without --runtime calls it.
+
+   DESIGN: the sysroot of the runtime archive lies beside its lib/, so it
    is found wherever the archive is. --sysroot names another one. */
 static bool default_sysroot(struct text *out)
 {
@@ -231,15 +236,6 @@ static bool default_sysroot(struct text *out)
     text_appendf(out, "%s/%s", text_cstr(&archive), RUNTIME_SYSROOT_DIR);
     text_free(&archive);
     return true;
-}
-
-/* DESIGN: anti finds the runtime archive where antic does, by the one
-   rule in user_runtime_archive. That is the directory above the running
-   executable when it holds lib/, and the user's data directory
-   otherwise. */
-static bool default_runtime(struct text *out)
-{
-    return user_runtime_archive(out);
 }
 
 /* The paths of every file in found, as sources of a command. The array
@@ -367,7 +363,7 @@ static int build_with_runtime(struct build_request *request)
     struct text home = {0};
     int status;
 
-    if (request->runtime == NULL && default_runtime(&home)) {
+    if (request->runtime == NULL && user_runtime_archive(&home)) {
         request->runtime = text_cstr(&home);
     }
     status = build_run(request);
@@ -543,7 +539,7 @@ static int check_command(int argc, char **argv)
             sources[count++] = argv[i];
         }
     }
-    if (runtime == NULL && default_runtime(&home)) {
+    if (runtime == NULL && user_runtime_archive(&home)) {
         runtime = text_cstr(&home);
     }
     request.sources = sources;
@@ -608,7 +604,7 @@ static int doc_command(int argc, char **argv)
             sources[count++] = argv[i];
         }
     }
-    if (runtime == NULL && default_runtime(&home)) {
+    if (runtime == NULL && user_runtime_archive(&home)) {
         runtime = text_cstr(&home);
     }
     /* DESIGN: without a file the command takes the source directory of
@@ -746,7 +742,7 @@ static int test_command(int argc, char **argv)
         }
     }
     /* The runtime archive lies beside bin/, as sdk import finds it. */
-    if (runtime == NULL && default_runtime(&home)) {
+    if (runtime == NULL && user_runtime_archive(&home)) {
         runtime = text_cstr(&home);
     }
     /* DESIGN: the manifest is `anti.toml` of the project root, and
@@ -829,7 +825,7 @@ static int bind_command(int argc, char **argv)
         status = usage(stderr);
         goto done;
     }
-    if (request.runtime == NULL && default_runtime(&home)) {
+    if (request.runtime == NULL && user_runtime_archive(&home)) {
         request.runtime = text_cstr(&home);
     }
     if (header != NULL) {

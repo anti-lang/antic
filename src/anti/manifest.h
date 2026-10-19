@@ -2,9 +2,9 @@
 #define ANTI_MANIFEST_H
 
 /* The interface of manifest.c: the names of the manifest and the lock
-   file, a key of a TOML document, and the reader of `anti.toml` with its
-   package, layout, targets, repositories, dependencies and `[inject]`
-   table. */
+   file, the grammar of a name, a version and a digest, a key of a TOML
+   document, and the reader of `anti.toml` with its package, layout,
+   targets, repositories, dependencies and `[inject]` table. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -16,6 +16,23 @@
 
 /* The lock file, beside the manifest. `anti build` writes it. */
 #define LOCK_FILE "anti.lock"
+
+/* Whether name is a module path: lowercase ASCII identifiers joined by
+   single dots. A package name and the module path of a library file both
+   take this form, and a string that does not stands in no path. */
+bool manifest_name_valid(const char *name);
+
+/* The most decimal digits a part of a version holds. */
+enum { MANIFEST_VERSION_DIGITS = 9 };
+
+/* Whether version is one to three parts of decimal digits joined by dots,
+   each part at most MANIFEST_VERSION_DIGITS digits long. A version of an
+   index, a lock file, a manifest or a library header that is not stands
+   nowhere in a path or in the comparison. */
+bool manifest_version_valid(const char *version);
+
+/* Whether digest is a SHA-256 digest in 64 lowercase hex digits. */
+bool manifest_digest_valid(const char *digest);
 
 struct anti_toml;
 

@@ -59,19 +59,19 @@ static void constraints(void)
    version that is none satisfies nothing, so no arithmetic overflows. */
 static void version_bounds(void)
 {
-    CHECK(repo_version_valid("1.2.4"));
-    CHECK(repo_version_valid("2.0"));
-    CHECK(repo_version_valid("7"));
-    CHECK(repo_version_valid("999999999.0.0"));
-    CHECK(!repo_version_valid("1000000000.0.0"));
-    CHECK(!repo_version_valid("99999999999999999999.0.0"));
-    CHECK(!repo_version_valid(""));
-    CHECK(!repo_version_valid("1..2"));
-    CHECK(!repo_version_valid("1.2."));
-    CHECK(!repo_version_valid(".1.2"));
-    CHECK(!repo_version_valid("1.2.3.4"));
-    CHECK(!repo_version_valid("1.2.0/../../x"));
-    CHECK(!repo_version_valid("1.2.0\"\nx = \"y"));
+    CHECK(manifest_version_valid("1.2.4"));
+    CHECK(manifest_version_valid("2.0"));
+    CHECK(manifest_version_valid("7"));
+    CHECK(manifest_version_valid("999999999.0.0"));
+    CHECK(!manifest_version_valid("1000000000.0.0"));
+    CHECK(!manifest_version_valid("99999999999999999999.0.0"));
+    CHECK(!manifest_version_valid(""));
+    CHECK(!manifest_version_valid("1..2"));
+    CHECK(!manifest_version_valid("1.2."));
+    CHECK(!manifest_version_valid(".1.2"));
+    CHECK(!manifest_version_valid("1.2.3.4"));
+    CHECK(!manifest_version_valid("1.2.0/../../x"));
+    CHECK(!manifest_version_valid("1.2.0\"\nx = \"y"));
     CHECK(!deps_satisfies("99999999999999999999", "1.0.0"));
     CHECK(!deps_satisfies(">=1.0.0", "99999999999999999999.0.0"));
     CHECK(!deps_satisfies("1.0.0", "1.2.0/../../x"));
@@ -82,26 +82,26 @@ static void version_bounds(void)
 /* S45. The parts of a cache path follow the grammar of their kind. */
 static void path_parts(void)
 {
-    CHECK(repo_name_valid("com.example.units"));
-    CHECK(repo_name_valid("a"));
-    CHECK(repo_name_valid("com.example_2.x9"));
-    CHECK(!repo_name_valid(""));
-    CHECK(!repo_name_valid(".."));
-    CHECK(!repo_name_valid("../x"));
-    CHECK(!repo_name_valid("com..example"));
-    CHECK(!repo_name_valid("com.example."));
-    CHECK(!repo_name_valid(".com"));
-    CHECK(!repo_name_valid("com/example"));
-    CHECK(!repo_name_valid("com\\example"));
-    CHECK(!repo_name_valid("Com.example"));
-    CHECK(!repo_name_valid("com.9x"));
-    CHECK(!repo_name_valid("com.ex\"ample"));
-    CHECK(repo_digest_valid(
+    CHECK(manifest_name_valid("com.example.units"));
+    CHECK(manifest_name_valid("a"));
+    CHECK(manifest_name_valid("com.example_2.x9"));
+    CHECK(!manifest_name_valid(""));
+    CHECK(!manifest_name_valid(".."));
+    CHECK(!manifest_name_valid("../x"));
+    CHECK(!manifest_name_valid("com..example"));
+    CHECK(!manifest_name_valid("com.example."));
+    CHECK(!manifest_name_valid(".com"));
+    CHECK(!manifest_name_valid("com/example"));
+    CHECK(!manifest_name_valid("com\\example"));
+    CHECK(!manifest_name_valid("Com.example"));
+    CHECK(!manifest_name_valid("com.9x"));
+    CHECK(!manifest_name_valid("com.ex\"ample"));
+    CHECK(manifest_digest_valid(
         "5b0c2d1e7a94f3c6b8d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6"));
-    CHECK(!repo_digest_valid(
+    CHECK(!manifest_digest_valid(
         "5B0C2D1E7A94F3C6B8D0E1F2A3B4C5D6E7F8091A2B3C4D5E6F708192A3B4C5D6"));
-    CHECK(!repo_digest_valid("5b0c"));
-    CHECK(!repo_digest_valid(
+    CHECK(!manifest_digest_valid("5b0c"));
+    CHECK(!manifest_digest_valid(
         "5b0c2d1e7a94f3c6b8d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d\""));
 }
 

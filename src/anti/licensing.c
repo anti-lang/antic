@@ -15,11 +15,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "antic.h"
 #include "arena.h"
-#include "deps.h"
 #include "driver.h"
 #include "files.h"
 #include "license.h"
+#include "units.h"
 
 /* The licence of antic and anti, which docs/distribution.md gives under
    "Licence choices for Anti itself", and their names in the plain
@@ -427,7 +428,7 @@ bool licensing_project(const struct licensing_project *p, struct text *out)
        once. */
     for (i = 0; ok && i < p->library_count; i++) {
         const char *module;
-        ok = deps_library_header(p->libraries[i], &arena, &found[i], &module);
+        ok = unit_library_header(p->libraries[i], &arena, &found[i], &module);
         if (ok && (p->own->name == NULL ||
                    strcmp(found[i].name, p->own->name) != 0)) {
             list[n++] = &found[i];

@@ -27,7 +27,6 @@
 #include "memreport.h"
 #include "modpath.h"
 #include "platform.h"
-#include "repo.h"
 #include "syms.h"
 #include "sha256.h"
 #include "symmap.h"
@@ -484,7 +483,7 @@ static bool library_module(const char *file, struct text *out)
     struct arena arena = {0};
     struct package package;
     const char *module;
-    bool ok = deps_library_header(file, &arena, &package, &module);
+    bool ok = unit_library_header(file, &arena, &package, &module);
 
     if (ok) {
         text_append(out, module);
@@ -1418,7 +1417,7 @@ static int build_project(const struct build_request *r,
     /* `antic` of the manifest is the minimum compiler version. A version
        of another form satisfies nothing, as one of an index does, and
        the comparison read `v0.3` as 0.0.0, which every compiler passed. */
-    if (b.m.antic.length > 0 && !repo_version_valid(text_cstr(&b.m.antic))) {
+    if (b.m.antic.length > 0 && !manifest_version_valid(text_cstr(&b.m.antic))) {
         fprintf(stderr, "anti: %s: [package] antic `%s` is no version of one "
                         "to three parts of digits, as `%s`\n",
                 text_cstr(&manifest_path), text_cstr(&b.m.antic),

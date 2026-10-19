@@ -1,9 +1,8 @@
 #ifndef ANTI_REPO_H
 #define ANTI_REPO_H
 
-/* The interface of repo.c: the grammar of a name, a version and a
-   digest, the rule of a repository URL and the fetch into the cache of
-   the user. A repository is a URL prefix serving static files, so a
+/* The interface of repo.c: the rule of a repository URL and the fetch
+   into the cache of the user. A repository is a URL prefix serving static files, so a
    fetch is one request per file. `docs/tooling.md` gives the three paths
    under a prefix, and `docs/decisions.md` allows `https://` and
    `file://`, with `http://` for `127.0.0.1` and `localhost` alone. */
@@ -15,23 +14,6 @@
 /* The index file of a package under a prefix, and the directory of the
    library files of one version. */
 #define REPO_INDEX_FILE "index.toml"
-
-/* Whether name is a module path: lowercase ASCII identifiers joined by
-   single dots. A package name and the module path of a library file both
-   take this form, and a string that does not stands in no path. */
-bool repo_name_valid(const char *name);
-
-/* The most decimal digits a part of a version holds. */
-enum { REPO_VERSION_DIGITS = 9 };
-
-/* Whether version is one to three parts of decimal digits joined by dots,
-   each part at most REPO_VERSION_DIGITS digits long. A version of an
-   index, a lock file, a manifest or a library header that is not stands
-   nowhere in a path or in the comparison. */
-bool repo_version_valid(const char *version);
-
-/* Whether digest is a SHA-256 digest in 64 lowercase hex digits. */
-bool repo_digest_valid(const char *digest);
 
 /* Whether url is a repository URL that the rules allow. Writes a message
    naming the URL and the rule otherwise. */
