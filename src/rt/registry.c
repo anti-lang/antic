@@ -762,12 +762,17 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
             return fill(r, bytes, d, false, depth + 1);
         }
         return skip_value(r, depth + 1);
-    /* A class value without a serialize entry was written as null. */
+    /* A class value was written as an object, and one without a
+       serialize entry as null, which keeps its default. Any other value
+       fails the text. */
     case ANTI_TYPE_CLASS:
+        if (take_word(r, "null")) {
+            return true;
+        }
         if (d != NULL && r->scan.at < r->scan.end && *r->scan.at == '{') {
             return fill(r, bytes, d, true, depth + 1);
         }
-        return skip_value(r, depth + 1);
+        return false;
     case ANTI_TYPE_TUPLE:
         if (d == NULL) {
             return skip_value(r, depth + 1);

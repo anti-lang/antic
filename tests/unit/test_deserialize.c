@@ -196,6 +196,11 @@ struct drawing {
     int8_t row[3];
 };
 
+struct holder {
+    struct anti_object base;
+    struct named inner;
+};
+
 struct node {
     struct anti_object base;
     int64_t value;
@@ -325,15 +330,23 @@ static const struct anti_field node_fields[] = {
     FIELD("callback", struct node, callback, ANTI_TYPE_FN, 0, NULL),
 };
 
-#define CLASSES 7
+static const struct anti_descriptor named_d;
+
+/* A class value field, which the serializer writes as an object or as
+   null. */
+static const struct anti_field holder_fields[] = {
+    FIELD("inner", struct holder, inner, ANTI_TYPE_CLASS, 0, &named_d),
+};
+
+#define CLASSES 8
 
 /* The classes of the registry, in its order. */
 enum {
-    NUMBERS, NAMED, DRAWING, NODE, TWIN_A, TWIN_B, REQUIRED
+    NUMBERS, NAMED, DRAWING, NODE, TWIN_A, TWIN_B, REQUIRED, HOLDER
 };
 
-static const struct anti_descriptor numbers_d, named_d, drawing_d, twin_a_d,
-    twin_b_d, required_d;
+static const struct anti_descriptor numbers_d, drawing_d, twin_a_d,
+    twin_b_d, required_d, holder_d;
 static const struct anti_descriptor *const numbers_up[2] = {
     &anti_lang_Object_descriptor, &numbers_d};
 static const struct anti_descriptor *const named_up[2] = {
@@ -348,6 +361,8 @@ static const struct anti_descriptor *const twin_b_up[2] = {
     &anti_lang_Object_descriptor, &twin_b_d};
 static const struct anti_descriptor *const required_up[2] = {
     &anti_lang_Object_descriptor, &required_d};
+static const struct anti_descriptor *const holder_up[2] = {
+    &anti_lang_Object_descriptor, &holder_d};
 
 static const struct anti_descriptor numbers_d =
     CLASS("Numbers", sizeof(struct numbers), numbers_up, numbers_fields, 9);
@@ -365,6 +380,8 @@ static const struct anti_descriptor twin_b_d =
 /* A class with an inline class field that no default fills. */
 static const struct anti_descriptor required_d =
     CLASS("Required", sizeof(struct named), required_up, named_fields, 1);
+static const struct anti_descriptor holder_d =
+    CLASS("Holder", sizeof(struct holder), holder_up, holder_fields, 1);
 
 static const void *tables[CLASSES][ANTI_ENTRY_HOOK];
 
@@ -414,6 +431,14 @@ static void init_required(void *object)
     prepare(object, REQUIRED);
 }
 
+/* The construct of a Holder makes its inner Named, as antic writes it. */
+static void init_holder(void *object)
+{
+    prepare(object, HOLDER);
+    ((struct holder *)object)->inner.base.table =
+        (const struct anti_descriptor *const *)tables[NAMED];
+}
+
 /* The teardown antic writes for a class: what a Node owns goes back to
    from. A str is no field's to free. */
 static void teardown(struct anti_object *self, struct anti_object *from)
@@ -435,6 +460,7 @@ static const struct anti_class classes[CLASSES] = {
     {&twin_a_d, init_twin_a, TEXT("a"), 0},
     {&twin_b_d, init_twin_b, TEXT("b"), 0},
     {&required_d, init_required, TEXT("app"), ANTI_CLASS_REQUIRED},
+    {&holder_d, init_holder, TEXT("app"), 0},
 };
 
 const struct anti_registry anti_rt_registry = {CLASSES, classes};
@@ -729,6 +755,16 @@ static void classes_and_depth(void)
     CHECK(!reads("{\"type\":\"Twin.\"}"));
     CHECK(!reads("{\"type\":\"Required\"}"));
     CHECK(reads("{\"type\":\"app.Named\"}"));
+    /* A class value field holds an object or null, which keeps the
+       default, and nothing else. */
+    reads_as("{\"type\":\"Holder\",\"inner\":{\"name\":\"a\"}}",
+             "{\"type\":\"Holder\",\"inner\":"
+             "{\"type\":\"Named\",\"name\":\"a\"}}");
+    CHECK(reads("{\"type\":\"Holder\",\"inner\":null}"));
+    CHECK(!reads("{\"type\":\"Holder\",\"inner\":5}"));
+    CHECK(!reads("{\"type\":\"Holder\",\"inner\":\"a\"}"));
+    CHECK(!reads("{\"type\":\"Holder\",\"inner\":[]}"));
+    CHECK(!reads("{\"type\":\"Holder\",\"inner\":true}"));
     /* A chain inside the depth of the scanner, and one past it. */
     deep = chain(ANTI_JSON_DEPTH / 2);
     CHECK(deep != NULL && reads(deep));
