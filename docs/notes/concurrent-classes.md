@@ -190,7 +190,7 @@ channels.
   `run_lock_order.cmake` reads the report of a dev build and the silence of a
   release build. The error tests `synchronized`, `concurrent`,
   `concurrent_forms`, `pointer_leak`, `mutex_copy` and `concurrent_modules`
-  hold the refusals. `sync_modules` takes both classes across a library,
+  hold the refusals. `modules_sync` takes both classes across a library,
   `clib_ledger` calls a synchronized class from two threads of C, and
   `mutex_size` reads the size of a Mutex from the listing of each target.
 - `programs/sync_pairs.anti` runs `sync a, b`, `sync b, a` and `==` both ways

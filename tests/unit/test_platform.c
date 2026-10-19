@@ -695,7 +695,7 @@ static void free_list(char **list, size_t count)
     free(list);
 }
 
-/* The arguments of the process as UTF-8, which rt_platform passes as
+/* The arguments of the process as UTF-8, which unit_platform passes as
    `one`, `two words` and u with diaeresis. macOS and Linux take them from
    argv and repair a byte that is no UTF-8. Windows reads them from the
    command line in UTF-16. */

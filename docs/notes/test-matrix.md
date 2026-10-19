@@ -503,7 +503,7 @@ read a cell it wrote:
   It holds each construct in a function of a `tests` block and in one of a
   `fixtures` block, since every build but `anti test` drops both blocks.
 - `modules/flow/com/example/flow` is the library of the test
-  `flow_modules`. It holds each construct in a plain function and in a
+  `modules_flow`. It holds each construct in a plain function and in a
   generic one, and `client` calls both across the module boundary.
 - A cell that the rules refuse names a refusal, a source with an `.err`
   file. `flow_switch_on_char`, `flow_switch_on_bool`,
@@ -702,7 +702,7 @@ read a cell it wrote:
   the LLVM text of 150 such functions in 21 s and of 72 in 2.4 s.
 - `anti-test/com/example/values` is the module of the test
   `anti_test_values`, and `modules/values/com/example/values` the library
-  of the test `values_modules`. They hold the `tests` block, the
+  of the test `modules_values`. They hold the `tests` block, the
   `fixtures` block and the library module, as the two tests of the flow
   area do.
 - `matrix/values_at_module_level` holds each construct that a constant
@@ -757,8 +757,8 @@ of lowering meet:
 | `values_assign_concurrent_class`, `values_let_copies_a_concurrent_class`, `values_assign_through_a_pointer_copies_a_concurrent_class`, `values_assign_a_struct_that_holds_a_concurrent_class`, `values_assign_a_tuple_that_holds_a_concurrent_class`, `values_assign_a_variant_that_holds_a_concurrent_class`, `values_concurrent_class_takes_a_fresh_value` | R039: `=` and `let` copy no concurrent class, alone, in a struct, in a tuple or in a variant, and a fresh value and `dup` are taken | |
 | `types_length_with_a_size_negated_twice` | R046: the length `-(-size_of(H))` prints with the parentheses of its unary minus | |
 | `classes_field_length_from_size_of` | R043: a field of a class takes a length computed from `size_of`, and a literal names the field | |
-| `classes_default_of_a_length_from_size_of` | R043: the default of a field of a class over a length computed from `size_of`, as a repeated number, a repeated array, an array of repeated arrays, a repeated struct and a struct that holds one. `default_lengths_modules` of `tests/modules/` holds it for a class of a library | |
-| `classes_default_repeats_over_a_constant_parameter` | R045: a default `[v; N]` over a constant parameter of the class, in two copies, with the parameter as the value and nested both ways. `generic_defaults_modules` of `tests/modules/` holds it for a generic class of a library | |
+| `classes_default_of_a_length_from_size_of` | R043: the default of a field of a class over a length computed from `size_of`, as a repeated number, a repeated array, an array of repeated arrays, a repeated struct and a struct that holds one. `modules_default_lengths` of `tests/modules/` holds it for a class of a library | |
+| `classes_default_repeats_over_a_constant_parameter` | R045: a default `[v; N]` over a constant parameter of the class, in two copies, with the parameter as the value and nested both ways. `modules_generic_defaults` of `tests/modules/` holds it for a generic class of a library | |
 | `classes_default_indexes_a_repeated_array_of_a_size_of_length` | an element of a repeated array of a length from `size_of` is no constant expression, so the default that reads one is refused | |
 | `classes_default_names_a_constant_parameter` | the default of a field that names a constant parameter of its class, in two copies, which R045 closed as T125 | |
 | `classes_default_is_a_copy_of_the_parameter` | the default of a field of a generic class that is a literal of another generic with the parameter as its argument | T126 |
@@ -879,7 +879,7 @@ themselves. `tests/matrix/` holds its sources under the names `types_*`.
 - `matrix/types_nested_and_simd` holds the types a class body declares,
   each with a layout word, and simd structs in every type that holds one.
 - `modules/types/com/example/types` is the library of the test
-  `types_modules`. `client` reads, writes and measures each type across
+  `modules_types`. `client` reads, writes and measures each type across
   the module boundary, and both modules print the same sizes.
 - `abi/probe_types` is the pair of the test `abi_probe_types`. A C source
   and an Anti source print the size, the alignment and the bytes of a
@@ -1010,7 +1010,7 @@ places a value goes. `tests/matrix/` holds its sources under the names
   `anti_test_ownership`. It holds the `tests` block and the `fixtures`
   block.
 - `modules/ownership/com/example/ownership` is the library of the test
-  `ownership_modules`. It holds each construct in a plain function and in a
+  `modules_ownership`. It holds each construct in a plain function and in a
   generic one. `client` makes, copies and deletes an object of a class of
   the library.
 - `matrix/ownership_dup_kinds`, `matrix/ownership_read_kinds`,
@@ -1070,7 +1070,7 @@ Where two rules meet, and where three do:
 - An `undo`, a `defer` and an owning local on the fail path:
   `matrix/ownership_teardown_at_every_exit`.
 - A generic of a library module and a `static atomic` field: the test
-  `generic_atomic_modules`, T029.
+  `modules_generic_atomic`, T029.
 - `if let`, `let ... else` and the result of `as?`:
   `matrix/ownership_downcast_in_an_if_let` and `_in_a_let_else`, T036.
 - `alloc(T, n)`, a count that fails and the optimizer of a release build:
@@ -1136,7 +1136,7 @@ The step `errors` filled the two tables above on 2026-10-12.
   A test takes no `may fail`, so a `fail`, a `try` on a call and an `undo`
   of the `tests` block stand in an anonymous function of a test.
 - `modules/errors/com/example/errors` is the library of the test
-  `errors_modules`. It holds each construct in a plain function and in a
+  `modules_errors`. It holds each construct in a plain function and in a
   generic one. `client` handles the errors of the library and tests the
   class of one with `is`.
 - `matrix/errors_yield_kinds` takes each kind through a function that may
@@ -1166,7 +1166,7 @@ The constructs of the area that have no row of their own:
   `matrix/errors_fatal_*`. They hold it on a call, on an error without a
   code, on a pointer and a value that hold `none`, and in a worker.
 - The origin of an error: `matrix/errors_origins`, and the test
-  `generic_origin_modules` for a generic of a library, T043.
+  `modules_generic_origin` for a generic of a library, T043.
 - 21 refusals hold messages of the area that antic gives. Some hold a
   handler and a `try` on a call that cannot fail. Some hold a failing call
   without a handler, in a handler and in an anonymous function. The others
@@ -1183,7 +1183,7 @@ Where two rules meet, and where three do:
   `matrix/errors_generic_yield_of_an_own_parameter`, T038, and
   `matrix/errors_generic_owning` for the teardown on the fail path.
 - A generic function, a library file and the origin of a `fail`:
-  `generic_origin_modules`, T043.
+  `modules_generic_origin`, T043.
 - A function that may fail, a `?T` result and each kind of value:
   `matrix/errors_optional_kinds`.
 - A `?T`, a `??T` and a conversion: `matrix/errors_optional_of_an_optional`,
@@ -1286,9 +1286,9 @@ The step `threads` filled the two tables above on 2026-10-12.
 - `anti-test/com/example/threads` is the module of the test
   `anti_test_threads`. It holds the `tests` block and the `fixtures` block.
 - `modules/threads/com/example/threads` is the library of the test
-  `threads_modules`. It holds each construct in a plain function and in a
+  `modules_threads`. It holds each construct in a plain function and in a
   generic one. `dispatch`, `join` and `join_all` in a generic function of
-  a library stand in `generic_dispatch_modules`, T061. The client runs four
+  a library stand in `modules_generic_dispatch`, T061. The client runs four
   workers of the library. A direct import brings two of the names, and
   `threads.keep` and `threads.count` stand after the arrow, by R086 of
   "Rules of 2026-10-13".
@@ -1347,7 +1347,7 @@ Where two rules meet, and where three do:
   `matrix/threads_atomic_field_of_a_type_parameter_that_is_f64`, T059.
   `matrix/threads_atomic_local_of_a_type_parameter` holds the local.
 - A generic function, a library file and a `dispatch`:
-  `generic_dispatch_modules`, T061.
+  `modules_generic_dispatch`, T061.
 - A generic worker, a `dispatch` and a type argument that is a pointer:
   `matrix/threads_worker_argument_of_a_type_parameter_is_a_pointer`.
 - A closure, a `concurrent` parameter and each way to change a captured
@@ -1381,7 +1381,7 @@ Where two rules meet, and where three do:
 The rules of threads of "Rules of 2026-10-13":
 
 - R086, a worker named `m.f` after the arrow: the client of
-  `threads_modules`, with and without arguments.
+  `modules_threads`, with and without arguments.
 - R087, the count of chunks: `matrix/threads_parallel_split` holds `by 0`,
   the refusal `matrix/threads_parallel_by_a_count_below_zero` a constant
   count below zero and `check_parallel_count_below_zero` of `tests/traps/`
@@ -1474,11 +1474,11 @@ The programs below hold them in the places of "The contexts".
   block. A block holds functions alone, so no row of the table has a cell
   there.
 - `modules/classes/com/example/classes` is the library of the test
-  `classes_modules`. It holds each construct in a plain function and in a
+  `modules_classes`. It holds each construct in a plain function and in a
   generic one. The client inherits a class of it and implements an
   interface of it. A static field or a constant of a class in a generic
-  function of a library stands in `generic_atomic_modules` and
-  `generic_class_constant_modules`, T029. A library file carries no type
+  function of a library stands in `modules_generic_atomic` and
+  `modules_generic_class_constant`, T029. A library file carries no type
   nested in a generic class yet, so that cell cannot exist.
 - A construct that gives a value is refused in a constant: six refusals
   `matrix/classes_*_in_a_constant` and
@@ -1535,9 +1535,9 @@ Where two rules meet, and where three do:
 - An `operator fn`, a second parameter of another type and a literal:
   `matrix/classes_operator_with_a_literal`, T074.
 - A generic function, a library file and a constant of a class:
-  `generic_class_constant_modules`, T029.
+  `modules_generic_class_constant`, T029.
 - A class of another module, `pub` and a static member:
-  `class_members_modules`, T076.
+  `modules_class_members`, T076.
 - A class, `dup` and a replaced `copy`: `matrix/classes_copy_replaced`,
   T082.
 - A singleton, a field that is fixed and its address:
@@ -1614,14 +1614,14 @@ hold what stands in a function.
 
 Across a library file, each as `<name>_modules_release` and `_dev`:
 
-- `items_modules`: every kind of item a module makes public, reached by
+- `modules_items`: every kind of item a module makes public, reached by
   the name of the module, by an alias and by a direct import.
-  `items_stripped_modules` runs it with a library file written with
+  `modules_items_stripped` runs it with a library file written with
   `--strip-docs`.
-- `levels_modules`: every kind of item at the level `internal`, from a
+- `modules_levels`: every kind of item at the level `internal`, from a
   module of the same package. A class below a class of the library reaches
   its protected members.
-- `kinds_modules`: one function per kind of value, which takes the kind
+- `modules_kinds`: one function per kind of value, which takes the kind
   and gives it back. The scalars are the eleven integers, twelve C types,
   the floats, `f16`, `bool`, `char` and `str`. The parts are a slice, an
   array, a pointer, a nullable pointer, an optional value and a tuple. The
@@ -1631,25 +1631,25 @@ Across a library file, each as `<name>_modules_release` and `_dev`:
   class by pointer and by value, a synchronized and a concurrent one. The
   rest is a channel, a Mutex, an owning value, a lent value, a type
   parameter, an error and `never`.
-- `field_defaults_modules`: the default of a field of a class of a
+- `modules_field_defaults`: the default of a field of a class of a
   library, one field per kind of value a default takes.
-  `optional_default_modules` holds the optional value, T085.
-- `diamond_modules`: two libraries import a third and the program imports
+  `modules_optional_default` holds the optional value, T085.
+- `modules_diamond`: two libraries import a third and the program imports
   the two. It holds one descriptor per class, one static field, one
   singleton and one copy of a generic per type argument. Three modules
   declare a struct and a class of one name.
-- `generic_private_modules`: generics of a library whose bodies reach
+- `modules_generic_private`: generics of a library whose bodies reach
   the private items of their module, in copies the client compiles. The
   items are a function, a constant, a struct, an enum, a class, a generic,
   an `extern fn`, an operator and an internal function.
-- `exports_modules`: the items that `export` marks, reached from Anti.
-- `constants_modules`: the constants of a library where a constant
+- `modules_exports`: the items that `export` marks, reached from Anti.
+- `modules_constants`: the constants of a library where a constant
   expression stands. The places are the length of an array, a constant,
   the value of an enum, the width of a bitfield and the N of `align(N)`.
   The default of a parameter and of a field and the arm of a `switch` are
-  the others. `constant_argument_modules` holds one as the argument of
+  the others. `modules_constant_argument` holds one as the argument of
   `N: int`, T094.
-- `generic_variant_modules`: a case of a generic variant named in full
+- `modules_generic_variant`: a case of a generic variant named in full
   under the name of a module, T091.
 
 The refusals at the boundary, `error_modules_*`, one message each:
@@ -1717,19 +1717,19 @@ Plugins:
 Where two rules meet, and where three do:
 
 - A class of a library, a field of type `?T` and its default:
-  `optional_default_modules`, T085.
+  `modules_optional_default`, T085.
 - A class of a library, `protected` and a function without `self`:
   `error_modules_member_protected_static_function`, T086.
 - A generic variant, the name of a module and the type arguments of a
-  case: `generic_variant_modules`, T091.
+  case: `modules_generic_variant`, T091.
 - A type parameter `N: int`, a constant and the name of a module:
-  `constant_argument_modules`, T094.
+  `modules_constant_argument`, T094.
 - A generic of a library, a private item of its module and a copy the
-  client compiles: `generic_private_modules`.
+  client compiles: `modules_generic_private`.
 - A generic class of a library, a type nested in it and a copy the client
   asks for: `error_modules_type_nested_in_a_generic_class`, T095.
 - Two libraries, a generic of a third and one type argument:
-  `diamond_modules`.
+  `modules_diamond`.
 - A plugin, a local object and a class without `destruct`:
   `plugin_locals`, T092.
 - A plugin, a module of the standard library and a host that imports and

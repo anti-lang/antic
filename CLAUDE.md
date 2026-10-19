@@ -489,7 +489,7 @@ The matrix, by decision 28 of "Decisions of 2026-10-11":
 - No build of the matrix keeps a `tests` or a `fixtures` block, and none
   reads a library file. `anti_test_flow` runs a module of
   `tests/anti-test/` through `tests/runners/run_anti_test_module.cmake` for the
-  first, and `flow_modules` holds a library of `tests/modules/` for the
+  first, and `modules_flow` holds a library of `tests/modules/` for the
   second.
 
 The known failures, by decision 30 of "Decisions of 2026-10-11":

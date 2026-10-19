@@ -1,5 +1,5 @@
 //! The root of a chain of classes over three modules. The test
-//! `inherits_modules` extends it in `com.example.dog` and in a program. `Pet`
+//! `modules_inherits` extends it in `com.example.dog` and in a program. `Pet`
 //! has a `construct` with an argument, which a class of the program calls
 //! through `self.super`.
 

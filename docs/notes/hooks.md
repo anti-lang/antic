@@ -75,7 +75,7 @@ where the write stands.
 `enter`, `leave` and `failed` stand in the body, so the build of the
 module that holds the body decides them. A library file carries the IR of
 a body as it was lowered, and a `--trace` on the program that links it
-adds nothing there. `hooks_modules_release` and `hooks_modules_dev` pin
+adds nothing there. `modules_hooks_release` and `modules_hooks_dev` pin
 both halves with a library built under `--trace` alone and a program
 built under `--trace` and `--trace writes`.
 

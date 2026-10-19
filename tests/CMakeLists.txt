@@ -119,7 +119,7 @@ endforeach()
 add_executable(files_oom_tests unit/test_files_oom.c)
 target_link_libraries(files_oom_tests PRIVATE anti_core)
 target_include_directories(files_oom_tests PRIVATE ../src/anti)
-add_test(NAME files_oom
+add_test(NAME unit_files_oom
     COMMAND "${CMAKE_COMMAND}"
         "-DPROGRAM=$<TARGET_FILE:files_oom_tests>"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/files-oom"
@@ -129,7 +129,7 @@ add_test(NAME files_oom
 # overflows, in a program of its own, since each ends the process.
 add_executable(alloc_oom_tests unit/test_alloc_oom.c)
 target_link_libraries(alloc_oom_tests PRIVATE antic_core)
-add_test(NAME alloc_oom
+add_test(NAME unit_alloc_oom
     COMMAND "${CMAKE_COMMAND}"
         "-DPROGRAM=$<TARGET_FILE:alloc_oom_tests>"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/alloc-oom"
@@ -307,8 +307,8 @@ endfunction()
 
 # A program of library modules under com/example and a program module,
 # through run_modules.cmake, once against the library files in release mode
-# and once from an object per module in dev mode: <name>_release and
-# <name>_dev.
+# and once from an object per module in dev mode: modules_<name>_release
+# and modules_<name>_dev.
 #   antic_modules_test(<name> ROOT <dir> LIBRARIES <module>...
 #                      PROGRAM <module> WORK <prefix> [STD <module>...]
 #                      [OPTIONS <option>...] [LIB_OPTIONS <option>...]
@@ -331,7 +331,7 @@ function(antic_modules_test name)
             antic_test_lto(options ${options})
         endif()
         list(JOIN options "," options)
-        add_test(NAME ${name}_${mode}
+        add_test(NAME modules_${name}_${mode}
             COMMAND "${CMAKE_COMMAND}"
                 "-DANTIC=$<TARGET_FILE:antic>"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
@@ -346,11 +346,11 @@ function(antic_modules_test name)
                 "-DOBJECT=${anti_object}"
                 -P "${ANTIC_RUNNERS}/run_modules.cmake")
         if(mode STREQUAL "dev" AND std_fixtures)
-            set_property(TEST ${name}_${mode} PROPERTY
+            set_property(TEST modules_${name}_${mode} PROPERTY
                 FIXTURES_REQUIRED ${std_fixtures})
         endif()
         if(arg_TIMEOUT)
-            set_tests_properties(${name}_${mode} PROPERTIES
+            set_tests_properties(modules_${name}_${mode} PROPERTIES
                 TIMEOUT ${arg_TIMEOUT})
         endif()
     endforeach()
@@ -411,7 +411,7 @@ antic_rt_sources(signal_sources signal atomic utf platform_posix
 add_executable(rt_signal_tests unit/test_signal.c ${signal_sources})
 target_link_libraries(rt_signal_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
-add_test(NAME rt_signal COMMAND rt_signal_tests)
+add_test(NAME unit_signal COMMAND rt_signal_tests)
 
 # rt.configure while another thread reads the keys, in a program of its own
 # with stand-ins for the loader. The runtime of an Anti program carries no
@@ -423,7 +423,7 @@ target_link_libraries(rt_conf_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 target_compile_definitions(rt_conf_tests PRIVATE
     ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-add_test(NAME rt_conf_race COMMAND rt_conf_tests)
+add_test(NAME unit_conf_race COMMAND rt_conf_tests)
 
 # M315. Object.deserialize against malformed and cut-off text, in a
 # program of its own with stand-ins for the classes, the registry and the
@@ -435,7 +435,7 @@ add_executable(rt_deserialize_tests unit/test_deserialize.c
     ${deserialize_sources})
 target_link_libraries(rt_deserialize_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
-add_test(NAME rt_deserialize COMMAND rt_deserialize_tests)
+add_test(NAME unit_deserialize COMMAND rt_deserialize_tests)
 
 # The loader of the runtime under threads that load at once, in a program
 # of its own with stand-ins for the rest of the runtime. It loads two
@@ -464,7 +464,7 @@ target_compile_definitions(rt_plugin_tests PRIVATE
     "PLUGIN_COPIES=\"${plugin_copies}\""
     "PLUGIN_NAME=\"$<TARGET_FILE_NAME:plugin_table_one>\"")
 add_dependencies(rt_plugin_tests plugin_table_one plugin_table_two)
-add_test(NAME rt_plugin_race COMMAND rt_plugin_tests)
+add_test(NAME unit_plugin_race COMMAND rt_plugin_tests)
 
 # The platform layer of the runtime on the host. Both platform files go
 # in, and the one of the other system compiles to nothing. The test starts
@@ -487,7 +487,7 @@ target_compile_definitions(rt_platform_tests PRIVATE
 add_dependencies(rt_platform_tests plugin_table_one)
 # The arguments after the name of the program are the ones
 # test_platform.c reads back, one with a blank and one outside ASCII.
-add_test(NAME rt_platform COMMAND rt_platform_tests one "two words" "ü")
+add_test(NAME unit_platform COMMAND rt_platform_tests one "two words" "ü")
 
 # The loader against a table of a plugin with one value damaged at a time.
 add_library(plugin_bad SHARED unit/plugin_bad.c)
@@ -498,7 +498,7 @@ target_link_libraries(rt_plugin_table_tests PRIVATE Threads::Threads
 target_compile_definitions(rt_plugin_table_tests PRIVATE
     "PLUGIN_BAD=\"$<TARGET_FILE:plugin_bad>\"")
 add_dependencies(rt_plugin_table_tests plugin_bad)
-add_test(NAME rt_plugin_table COMMAND rt_plugin_table_tests)
+add_test(NAME unit_plugin_table COMMAND rt_plugin_table_tests)
 # S312 and M301. The text builder, the copy of an object and the copy of
 # an owned buffer when the C library refuses their memory, in a program of
 # its own, since each case ends the process. The files of the runtime it
@@ -513,14 +513,14 @@ add_executable(rt_oom_tests unit/test_rt_oom.c
     $<TARGET_OBJECTS:rt_oom_runtime>)
 target_include_directories(rt_oom_tests PRIVATE ../src/rt)
 target_link_libraries(rt_oom_tests PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
-add_test(NAME rt_oom
+add_test(NAME unit_rt_oom
     COMMAND "${CMAKE_COMMAND}"
         "-DPROGRAM=$<TARGET_FILE:rt_oom_tests>"
         "-DCASES=take,append,fill,append_count,fill_count,copy_buffer,dup,start,snapshot"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-oom"
         -P "${ANTIC_RUNNERS}/run_rt_oom.cmake")
 # T139. The listing of anti.fs when the C library refuses its memory.
-add_test(NAME rt_oom_fs
+add_test(NAME unit_rt_oom_fs
     COMMAND "${CMAKE_COMMAND}"
         "-DPROGRAM=$<TARGET_FILE:rt_oom_tests>"
         "-DCASES=fs_list"
@@ -540,7 +540,7 @@ add_executable(rt_hash_draw_tests unit/test_hash_draw.c
 target_include_directories(rt_hash_draw_tests PRIVATE ../src/rt)
 target_link_libraries(rt_hash_draw_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
-add_test(NAME rt_hash_draw COMMAND rt_hash_draw_tests)
+add_test(NAME unit_hash_draw COMMAND rt_hash_draw_tests)
 # The programs of the runtime above compile its files themselves, so a
 # coverage tree measures src/rt/ through them.
 antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
@@ -4287,7 +4287,7 @@ add_test(NAME classlib
 # so the build of the module that holds the body decides them. The
 # library here is built with --trace and without --trace writes, and the
 # program with both.
-antic_modules_test(hooks_modules
+antic_modules_test(hooks
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/hooks"
     LIBRARIES store
     PROGRAM client
@@ -4299,7 +4299,7 @@ antic_modules_test(hooks_modules
 # The pattern of `--trace` names a package above the module of a class
 # that asks for no call hooks. The library is built with `--trace com`,
 # and the program without the option.
-antic_modules_test(trace_package_modules
+antic_modules_test(trace_package
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/trace_package"
     LIBRARIES plain
     PROGRAM client
@@ -4318,7 +4318,7 @@ antic_modules_test(shared_class
     WORK "${CMAKE_CURRENT_BINARY_DIR}/shared")
 # A chain of classes over three modules, each naming its base with the
 # module it comes from
-antic_modules_test(inherits_modules
+antic_modules_test(inherits
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/chain"
     LIBRARIES animal dog
     PROGRAM chain
@@ -4327,7 +4327,7 @@ antic_modules_test(inherits_modules
 # Ownership over two modules: the teardown and the copy of a class call
 # those of the base, the inline field and the elements that another module
 # declares
-antic_modules_test(owned_modules
+antic_modules_test(owned
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/owned"
     LIBRARIES parts
     PROGRAM crate
@@ -4338,7 +4338,7 @@ antic_modules_test(owned_modules
 # from the checked tree the library file carries, and a copy two modules
 # make is one type and one symbol. Release mode and dev mode print the
 # same.
-antic_modules_test(generics_modules
+antic_modules_test(generics
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generics"
     LIBRARIES gen mid
     PROGRAM client
@@ -4348,7 +4348,7 @@ antic_modules_test(generics_modules
 # Direct imports. A program and a library name the items of another
 # library without its module name, and reach the module by its name as
 # well. A generic among them has its copy made in the program.
-antic_modules_test(direct_modules
+antic_modules_test(direct
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/direct"
     LIBRARIES shapes frame
     PROGRAM client
@@ -4358,7 +4358,7 @@ antic_modules_test(direct_modules
 # `may fail` over a module boundary: the library file records the flag, so
 # the program handles the error, `try` forwards it and `undo` runs on the
 # fail path alone.
-antic_modules_test(failing_modules
+antic_modules_test(failing
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/failing"
     LIBRARIES counter
     PROGRAM client
@@ -4368,7 +4368,7 @@ antic_modules_test(failing_modules
 # Default values over a module boundary: the library file carries the
 # default of each parameter, and `here` is the position of the call in the
 # program.
-antic_modules_test(default_modules
+antic_modules_test(default
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/defaults"
     LIBRARIES greeter
     PROGRAM client
@@ -4378,7 +4378,7 @@ antic_modules_test(default_modules
 # A tuple over a module boundary: the library file carries the tuple of
 # each signature, so the two modules name one type and the program takes
 # the elements apart.
-antic_modules_test(tuple_modules
+antic_modules_test(tuple
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/tuples"
     LIBRARIES pairs
     PROGRAM client
@@ -4388,7 +4388,7 @@ antic_modules_test(tuple_modules
 # A variant of a library, which another module builds and switches on
 # with every case named. It tests one with `is` and `if let` and passes
 # it back inside a struct of the library.
-antic_modules_test(variant_modules
+antic_modules_test(variant
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/variants"
     LIBRARIES geo
     PROGRAM client
@@ -4396,7 +4396,7 @@ antic_modules_test(variant_modules
 
 # A public class of a library whose layout holds types nested in it,
 # which another module lays out, builds and calls.
-antic_modules_test(nested_modules
+antic_modules_test(nested
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/nested"
     LIBRARIES people
     PROGRAM client
@@ -4404,7 +4404,7 @@ antic_modules_test(nested_modules
 
 # The hash of the types of a library and its generics that hash and order,
 # which another module uses and hashes inside a struct of its own.
-antic_modules_test(hashing_modules
+antic_modules_test(hashing
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/hashing"
     LIBRARIES keys
     PROGRAM client
@@ -4413,7 +4413,7 @@ antic_modules_test(hashing_modules
 
 # The operators of a library reach the private fields and functions of its
 # classes, a generic one among them, in the copies another module makes.
-antic_modules_test(access_modules
+antic_modules_test(access
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/access"
     LIBRARIES ledger
     PROGRAM client
@@ -4423,7 +4423,7 @@ antic_modules_test(access_modules
 # A generic class with operator hooks in a library, which another module
 # compares, adds, indexes and walks. The library file carries the mark of
 # each hook, in the class and at module level.
-antic_modules_test(generic_hooks_modules
+antic_modules_test(generic_hooks
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_hooks"
     LIBRARIES row
     PROGRAM client
@@ -4432,7 +4432,7 @@ antic_modules_test(generic_hooks_modules
 
 # A collection, its iterator and a struct with the language hooks in a
 # library, which another module walks, indexes and collects.
-antic_modules_test(iteration_modules
+antic_modules_test(iteration
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/iteration"
     LIBRARIES bag
     PROGRAM client
@@ -4443,7 +4443,7 @@ antic_modules_test(iteration_modules
 # The library file carries each parameter in its form. A `concurrent` one
 # reaches the workers of `parallel`, and a `keep` one stores a C function
 # pointer.
-antic_modules_test(closures_modules
+antic_modules_test(closures
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/closures"
     LIBRARIES walk
     PROGRAM client
@@ -4453,7 +4453,7 @@ antic_modules_test(closures_modules
 # plain and generic. The library file carries the checked tree of each
 # generic one, and the client compiles its copy.
 # docs/notes/test-matrix.md names the cells.
-antic_modules_test(flow_modules
+antic_modules_test(flow
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/flow"
     LIBRARIES flow
     PROGRAM client
@@ -4464,7 +4464,7 @@ antic_modules_test(flow_modules
 # aliases, a generic packed struct and the marks `keep` and `concurrent`
 # of a parameter. The client reads, writes and measures each across the
 # module boundary. docs/notes/test-matrix.md names the cells.
-antic_modules_test(types_modules
+antic_modules_test(types
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/types"
     LIBRARIES types
     PROGRAM client
@@ -4472,10 +4472,10 @@ antic_modules_test(types_modules
     WORK "${CMAKE_CURRENT_BINARY_DIR}/types")
 
 # The constructs of the values area in the functions of a library module,
-# plain and generic, as flow_modules holds those of the flow area. The
+# plain and generic, as modules_flow holds those of the flow area. The
 # library writes `f"..."` and a pattern literal, so its dev link takes the
 # dev objects of anti.text and anti.regex.
-antic_modules_test(values_modules
+antic_modules_test(values
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/values"
     LIBRARIES values
     PROGRAM client
@@ -4483,21 +4483,21 @@ antic_modules_test(values_modules
     WORK "${CMAKE_CURRENT_BINARY_DIR}/values")
 
 # The constructs of the ownership area in the functions of a library
-# module, plain and generic, as flow_modules holds those of the flow area.
+# module, plain and generic, as modules_flow holds those of the flow area.
 # The client makes, copies and deletes an object of a class of the library
 # as well, so the teardown and the copy of that class run across the
 # module boundary.
-antic_modules_test(ownership_modules
+antic_modules_test(ownership
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/ownership"
     LIBRARIES ownership
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/ownership")
 
 # The constructs of the errors area in the functions of a library module,
-# plain and generic, as flow_modules holds those of the flow area. The
+# plain and generic, as modules_flow holds those of the flow area. The
 # client handles the errors of the library and tests the class of one that
 # the library declares.
-antic_modules_test(errors_modules
+antic_modules_test(errors
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/errors"
     LIBRARIES errors
     PROGRAM client
@@ -4505,10 +4505,10 @@ antic_modules_test(errors_modules
     WORK "${CMAKE_CURRENT_BINARY_DIR}/errors-modules")
 
 # The constructs of the threads area in the functions of a library module,
-# plain and generic, as flow_modules holds those of the flow area. The
+# plain and generic, as modules_flow holds those of the flow area. The
 # client runs four workers of the library: two named through a direct
 # import, and two named by their module after the arrow.
-antic_modules_test(threads_modules
+antic_modules_test(threads
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/threads"
     LIBRARIES threads
     PROGRAM client
@@ -4517,10 +4517,10 @@ antic_modules_test(threads_modules
 
 # The constructs of the classes area in a library module: the classes with
 # their members, and each construct in a function, plain and generic, as
-# flow_modules holds those of the flow area. The client inherits a class
+# modules_flow holds those of the flow area. The client inherits a class
 # of the library and implements an interface of it, and reaches the
 # constants, the static fields, the operators and the generics from there.
-antic_modules_test(classes_modules
+antic_modules_test(classes
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/classes"
     LIBRARIES classes
     PROGRAM client
@@ -4530,7 +4530,7 @@ antic_modules_test(classes_modules
 # A public static field and a public constant of a class of a library
 # module, reached from the client as `counter.Counter.total` and
 # `counter.Counter.STEP`. T076 of docs/audit/tests-findings.md.
-antic_modules_test(class_members_modules
+antic_modules_test(class_members
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/class_members"
     LIBRARIES counter
     PROGRAM client
@@ -4538,8 +4538,8 @@ antic_modules_test(class_members_modules
 
 # A constant of a class read in a generic function of a library module,
 # whose copy the client compiles. T029 of docs/audit/tests-findings.md,
-# which generic_atomic_modules shows for a static field.
-antic_modules_test(generic_class_constant_modules
+# which modules_generic_atomic shows for a static field.
+antic_modules_test(generic_class_constant
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_class_constant"
     LIBRARIES limits
     PROGRAM client
@@ -4549,7 +4549,7 @@ antic_modules_test(generic_class_constant_modules
 # is the negative and one that is the complement of a size, a struct that
 # names its own copy, a singleton, a `provides` line and an `inject final`
 # field.
-antic_modules_test(library_forms_modules
+antic_modules_test(library_forms
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/library_forms"
     LIBRARIES parts
     PROGRAM client
@@ -4559,7 +4559,7 @@ antic_modules_test(library_forms_modules
 # `dispatch`, `join` and `join_all` in a generic function of a library
 # module, whose copy the client compiles. T061 of
 # docs/audit/tests-findings.md.
-antic_modules_test(generic_dispatch_modules
+antic_modules_test(generic_dispatch
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_dispatch"
     LIBRARIES jobs
     PROGRAM client
@@ -4569,7 +4569,7 @@ antic_modules_test(generic_dispatch_modules
 # The origin of a `fail` and the position of a `here` in a generic function
 # of a library module, whose copy the client compiles. T043 of
 # docs/audit/tests-findings.md.
-antic_modules_test(generic_origin_modules
+antic_modules_test(generic_origin
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_origin"
     LIBRARIES origin
     PROGRAM client
@@ -4579,7 +4579,7 @@ antic_modules_test(generic_origin_modules
 # A generic function and a generic class of a library module that change
 # a `static atomic` field. The client makes its copies from the library
 # file. T029 of docs/audit/tests-findings.md.
-antic_modules_test(generic_atomic_modules
+antic_modules_test(generic_atomic
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_atomic"
     LIBRARIES tally
     PROGRAM client
@@ -4588,7 +4588,7 @@ antic_modules_test(generic_atomic_modules
 # A class of a library module built with arguments under the name of its
 # module, `built.Built(4)` and `alloc built.Built(5)`. T030 of
 # docs/audit/tests-findings.md.
-antic_modules_test(qualified_arguments_modules
+antic_modules_test(qualified_arguments
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/qualified_arguments"
     LIBRARIES built
     PROGRAM client
@@ -4596,7 +4596,7 @@ antic_modules_test(qualified_arguments_modules
 
 # A Mutex in a struct of a library and channels that pass between the
 # program and a library, which drains one and selects over two.
-antic_modules_test(sync_modules
+antic_modules_test(sync
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/sync"
     LIBRARIES queue
     PROGRAM client
@@ -4609,7 +4609,7 @@ antic_modules_test(sync_modules
 
 # Every kind of item a module makes public, reached by the name of the
 # module, by an alias of the module and by a direct import.
-antic_modules_test(items_modules
+antic_modules_test(items
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/items"
     LIBRARIES items
     PROGRAM client
@@ -4618,7 +4618,7 @@ antic_modules_test(items_modules
 # Every kind of item at the level `internal`, reached from a module of the
 # same package, and the protected members of a class of the library from a
 # class below it.
-antic_modules_test(levels_modules
+antic_modules_test(levels
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/levels"
     LIBRARIES levels
     PROGRAM near
@@ -4628,7 +4628,7 @@ antic_modules_test(levels_modules
 
 # One function of a library per kind of value, which takes the kind and
 # gives it back to another module.
-antic_modules_test(kinds_modules
+antic_modules_test(kinds
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/kinds"
     LIBRARIES kinds
     PROGRAM client
@@ -4637,14 +4637,14 @@ antic_modules_test(kinds_modules
 
 # The default of a bitfield of a class of a library, which a client writes
 # into the unit the bitfields share.
-antic_modules_test(bitfield_defaults_modules
+antic_modules_test(bitfield_defaults
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/bitfield_defaults"
     LIBRARIES bits
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/bitfield-defaults-modules")
 
 # A function of a library as the default of a field of its class.
-antic_modules_test(function_default_modules
+antic_modules_test(function_default
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/function_default"
     LIBRARIES handlers
     PROGRAM client
@@ -4652,7 +4652,7 @@ antic_modules_test(function_default_modules
 
 # The default of a field of a class of a library, one field per kind of
 # value a default takes, read by a client that names no field.
-antic_modules_test(field_defaults_modules
+antic_modules_test(field_defaults
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/field_defaults"
     LIBRARIES defaults
     PROGRAM client
@@ -4661,7 +4661,7 @@ antic_modules_test(field_defaults_modules
 # The defaults of a class of a library over a length computed from
 # `size_of`, by R043 of "Rules of 2026-10-13". The library file holds the
 # value once, and the client fills the elements of its target.
-antic_modules_test(default_lengths_modules
+antic_modules_test(default_lengths
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/default_lengths"
     LIBRARIES rooms
     PROGRAM client
@@ -4670,7 +4670,7 @@ antic_modules_test(default_lengths_modules
 # A `construct` that fails tears down the base whose `construct` finished,
 # by R114 and R025 of "Rules of 2026-10-13", where the base is a class of
 # the library and where the failing class is one.
-antic_modules_test(construct_fails_modules
+antic_modules_test(construct_fails
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/construct_fails"
     LIBRARIES parts
     STD lang
@@ -4680,7 +4680,7 @@ antic_modules_test(construct_fails_modules
 # The defaults of a generic class of a library that name its constant
 # parameter, by R045 of "Rules of 2026-10-13". Each copy of the client
 # takes them with its own number in place.
-antic_modules_test(generic_defaults_modules
+antic_modules_test(generic_defaults
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_defaults"
     LIBRARIES rows
     PROGRAM client
@@ -4688,7 +4688,7 @@ antic_modules_test(generic_defaults_modules
 
 # The default of a field whose type is an optional value, in a class of a
 # library. T085 of docs/audit/tests-findings.md.
-antic_modules_test(optional_default_modules
+antic_modules_test(optional_default
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/optional_default"
     LIBRARIES holder
     PROGRAM client
@@ -4697,7 +4697,7 @@ antic_modules_test(optional_default_modules
 # A literal of a case of a generic variant of a library, written under the
 # name of the module with its type arguments. T091 of
 # docs/audit/tests-findings.md.
-antic_modules_test(generic_variant_modules
+antic_modules_test(generic_variant
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_variant"
     LIBRARIES maybe
     PROGRAM client
@@ -4707,7 +4707,7 @@ antic_modules_test(generic_variant_modules
 # imports the two. The program holds one descriptor per class, one static
 # field, one singleton and one copy of a generic per type argument, and
 # three modules declare a struct and a class of one name.
-antic_modules_test(diamond_modules
+antic_modules_test(diamond
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/diamond"
     LIBRARIES base left right
     PROGRAM client
@@ -4716,7 +4716,7 @@ antic_modules_test(diamond_modules
 
 # Generics of a library whose bodies reach the private items of their
 # module. The client compiles the copies.
-antic_modules_test(generic_private_modules
+antic_modules_test(generic_private
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_private"
     LIBRARIES hidden
     PROGRAM client
@@ -4724,7 +4724,7 @@ antic_modules_test(generic_private_modules
 
 # Every kind of item that `export` marks, reached from a module of Anti as
 # a public item of the library.
-antic_modules_test(exports_modules
+antic_modules_test(exports
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/exports"
     LIBRARIES exports
     PROGRAM client
@@ -4735,7 +4735,7 @@ antic_modules_test(exports_modules
 # expression: the length of an array, a constant, the value of an enum, the
 # width of a bitfield, `align(N)`, the defaults of a parameter and of a
 # field, and the arms of a `switch`.
-antic_modules_test(constants_modules
+antic_modules_test(constants
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/constants"
     LIBRARIES limits
     PROGRAM client
@@ -4743,7 +4743,7 @@ antic_modules_test(constants_modules
 
 # A constant of a library as the argument of a type parameter `N: int`.
 # T094 of docs/audit/tests-findings.md.
-antic_modules_test(constant_argument_modules
+antic_modules_test(constant_argument
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/constants"
     LIBRARIES limits
     PROGRAM argument
@@ -4751,7 +4751,7 @@ antic_modules_test(constant_argument_modules
 
 # The items library once more, written with --strip-docs. A library file
 # without its doc text gives the client the same program.
-antic_modules_test(items_stripped_modules
+antic_modules_test(items_stripped
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/items"
     LIBRARIES items
     PROGRAM client

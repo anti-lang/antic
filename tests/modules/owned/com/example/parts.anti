@@ -1,4 +1,4 @@
-//! Classes that own memory, which the test `owned_modules` holds and extends in
+//! Classes that own memory, which the test `modules_owned` holds and extends in
 //! a program. Each prints when it is destroyed. A function takes a part with an
 //! `own` parameter, and two lend one with `lent`. Two more lend a slice.
 
