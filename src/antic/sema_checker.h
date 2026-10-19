@@ -529,6 +529,8 @@ bool sema_implemented_in(const struct type *t, const struct type *iface);
 struct symbol *sema_null_pointer_maker(struct checker *c, struct pos pos,
                                        const struct type *guarded);
 struct symbol *sema_error_maker(struct checker *c, struct pos pos);
+struct symbol *sema_error_text_maker(struct checker *c, struct pos pos,
+                                     bool takes);
 void sema_resolve_origin(struct checker *c, struct stmt *s);
 struct type *sema_caught_error(struct checker *c, struct type *result);
 void sema_refuse_try_on_optional(struct checker *c, struct pos at);

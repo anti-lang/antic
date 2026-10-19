@@ -1048,6 +1048,31 @@ struct symbol *sema_error_maker(struct checker *c, struct pos pos)
     return m->symbol;
 }
 
+/* DESIGN: R017 of "Answers of 2026-10-18". `fail` with a `str` that is
+   no literal builds an error that owns its text. `of_text` takes over the
+   memory of an `f"..."`, which was made for the error, and `of_copy`
+   copies any other text, whose bytes the program may free or change. Both
+   give code 0, as `fail "text"` does. */
+struct symbol *sema_error_text_maker(struct checker *c, struct pos pos,
+                                     bool takes)
+{
+    static const struct name of_text = {"of_text", 7};
+    static const struct name of_copy = {"of_copy", 7};
+    const struct name *maker = takes ? &of_text : &of_copy;
+    struct type *t = sema_error_class(c, pos);
+    const struct item *m = t != NULL ? sema_find_member(t, maker) : NULL;
+
+    if (m == NULL || m->symbol == NULL || m->symbol->type == NULL ||
+        m->symbol->type->param_count != 1) {
+        sema_error_at(c, pos,
+                      "`fail` with a text calls `" LANG_MODULE "." LANG_ERROR
+                      ".%.*s`, which takes the text",
+                      (int)maker->length, maker->text);
+        return NULL;
+    }
+    return m->symbol;
+}
+
 /* `anti.lang.StackTrace.capture`, which a `fail` calls with the count of
    frames to skip, or NULL after an error at pos. */
 static struct symbol *trace_capture(struct checker *c, struct pos pos)

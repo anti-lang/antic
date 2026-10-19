@@ -1,0 +1,234 @@
+//! `fail` with a `str` that is no literal, by R017 of "Answers of 2026-10-18",
+//! in each of these places: switch arm, if let, worker, dispatch or parallel,
+//! select arm, nested type, generic function, catch handler. The text is a
+//! parameter, an `f"..."`, a local whose bytes are freed before the error is
+//! read, a field and the result of a call. The error owns a copy of the text,
+//! and `dup` of the error copies it again. Each place is a function of its own
+//! that fails for some inputs and returns for the others. The program prints
+//! one line per place and input.
+
+import anti.lang;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+fn failed(place: str, e: *lang.Error) -> int
+{
+	printf("%.*s failed: %d %.*s\n".ptr, place.len as c_int, place.ptr,
+		e.code as c_int, e.message.len as c_int, e.message.ptr);
+	return -1;
+}
+
+fn reason(n: int) -> str
+{
+	if n == 1 {
+		return "one from a call";
+	}
+	return "more from a call";
+}
+
+fn in_arm(n: int, why: str) -> int may fail
+{
+	switch n {
+		1 => {
+			fail why;
+		},
+		2 => {
+			fail f"arm {n}";
+		},
+		else => { },
+	}
+	return n * 10;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let(n: int) -> int may fail
+{
+	let got = 0;
+	if let v = held(n) {
+		if v > 6 {
+			let built = f"held {v}";
+			defer free(built.ptr);
+			fail built;
+		}
+		got = v;
+	} else {
+		fail reason(n);
+	}
+	return got;
+}
+
+worker fn in_worker(t: *Task) -> int may fail
+{
+	if t.n > 2 {
+		fail f"worker {t.n}";
+	}
+	if t.n == 0 {
+		fail reason(t.n);
+	}
+	return t.n * 10;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int may fail) -> int
+{
+	let v = f(t.n) catch e {
+		yield failed("dispatch", e);
+	};
+	return v;
+}
+
+fn in_dispatch(t: *Task, n: int) -> int
+{
+	t.n = n;
+	let job = dispatch t -> work(fn(m) {
+		if m > 2 {
+			fail f"dispatched {m}";
+		}
+		if m == 0 {
+			fail reason(m);
+		}
+		return m * 10;
+	});
+	return join(job);
+}
+
+fn in_select(c: chan int, n: int, why: str) -> int may fail
+{
+	let got = 0;
+	send(c, n);
+	select {
+		c x => {
+			let v = x else {
+				fail why;
+			};
+			if *v > 2 {
+				fail f"selected {*v}";
+			}
+			if *v == 0 {
+				fail why;
+			}
+			got = *v * 10;
+		},
+	}
+	return got;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub limit: int = 0,
+		pub name: str = "nested by a field",
+
+		pub fn check(self, n: int) -> int may fail
+		{
+			if n > self.limit {
+				fail f"nested {n}";
+			}
+			if n == 0 {
+				fail self.name;
+			}
+			return n * 10;
+		}
+	}
+
+	pub fn go(self, n: int) -> int may fail
+	{
+		let inner = Inner { limit: 2 };
+		return try inner.check(n);
+	}
+}
+
+fn in_generic<T>(own x: T, n: int, why: str) -> T may fail
+{
+	if n > 2 {
+		fail why;
+	}
+	return x;
+}
+
+fn refuse(n: int) -> int may fail
+{
+	if n > 1 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn in_handler(n: int) -> int may fail
+{
+	let got = refuse(n) catch e {
+		fail f"handled {e.code}";
+	};
+	return got;
+}
+
+// The copy that `dup` makes keeps its text after the error it copied and the
+// bytes the text came from are gone.
+fn copied()
+{
+	let built = f"copied {7}";
+	let kept: ?*lang.Error = none;
+	in_arm(1, built) catch e {
+		kept = dup(e);
+	};
+	free(built.ptr);
+	let k = kept catch fatal;
+	failed("copy", k);
+	delete(k);
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	let c = chan int(1);
+	let outer = Outer { };
+	for n in 0..4 {
+		let a = in_arm(n, "arm by a parameter") catch e {
+			yield failed("arm", e);
+		};
+		printf("arm %d\n".ptr, a as c_int);
+		let b = in_if_let(n) catch e {
+			yield failed("if_let", e);
+		};
+		printf("if_let %d\n".ptr, b as c_int);
+		task.n = n;
+		let w = in_worker(task) catch e {
+			yield failed("worker", e);
+		};
+		printf("worker %d\n".ptr, w as c_int);
+		printf("dispatch %d\n".ptr, in_dispatch(task, n) as c_int);
+		let s = in_select(c, n, "selected nothing") catch e {
+			yield failed("select", e);
+		};
+		printf("select %d\n".ptr, s as c_int);
+		let o = outer.go(n) catch e {
+			yield failed("nested", e);
+		};
+		printf("nested %d\n".ptr, o as c_int);
+		let g = in_generic(n * 100, n, "generic") catch e {
+			yield failed("generic", e);
+		};
+		printf("generic %d\n".ptr, g as c_int);
+		let h = in_handler(n) catch e {
+			yield failed("handler", e);
+		};
+		printf("handler %d\n".ptr, h as c_int);
+	}
+	copied();
+	delete(c);
+	delete(task);
+	return 0;
+}

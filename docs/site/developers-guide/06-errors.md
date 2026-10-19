@@ -22,7 +22,7 @@ Java and C++ throw an exception, which leaves the function and every caller unti
 
 `may fail` after the result marks a function that can fail. Such a function leaves on one of two channels. `return v;` leaves with its result. `fail e;` leaves with an error, a `*Error`, and gives no result.
 
-`fail "text";` is `fail lang.Error.new(0, "text");`. `Error` is a class of `anti.lang`, and a file names it `lang.Error`. It holds a `code`, a `message`, the error that caused it and the position of its first `fail`. `Error.new(code, message)` makes one, and `Error.wrap(code, message, cause)` makes one that takes over the error below it. A program declares a class of its own that inherits `lang.Error` and adds fields, and a handler tests for it with `is`. [Chapter 9]({{% relref "09-classes" %}}) describes classes, inheritance and `is`.
+`fail "text";` is `fail lang.Error.new(0, "text");`. `fail` takes any other `str` as well, as `fail f"no file {path}";` or `fail reason;`. That error has code 0 too and owns a copy of the text, so the bytes it came from may be freed or changed before the error is read. `Error` is a class of `anti.lang`, and a file names it `lang.Error`. It holds a `code`, a `message`, the error that caused it and the position of its first `fail`. `Error.new(code, message)` makes one, and `Error.wrap(code, message, cause)` makes one that takes over the error below it. A program declares a class of its own that inherits `lang.Error` and adds fields, and a handler tests for it with `is`. [Chapter 9]({{% relref "09-classes" %}}) describes classes, inheritance and `is`.
 
 A call of a function that may fail is handled where it stands. The next section holds the forms: `try` forwards the error, and `catch` handles it. A call with neither is refused.
 
@@ -91,7 +91,7 @@ quarter(6) failed: code 7, odd value, odd true
 quarter(6) = -1
 quarter(-4) failed: code 0, negative, odd false
 quarter(-4) = -1
-sizes: Error 120, Odd 128, *Error 8
+sizes: Error 128, Odd 136, *Error 8
 ```
 
 `quarter(6)` fails in its second call of `half`, with 3. The `Odd` travels through `quarter` to the handler in `report`, which reads its fields and gives -1 in place of the result.
@@ -283,9 +283,10 @@ Where it lives: `lower_fail` and `write_origin` of `src/antic/lower_error.c` wri
 | A call that does not fail | one more argument, one compare with null, one branch not taken, one store of the result through the out pointer | the same, or nothing when `opt` inlines the callee |
 | `fail` of a new error | one `malloc` of the error and one call of `anti_rt_hook` for its `created` hook, one load and one compare of its line, one copy of 64 bytes, one call of `anti_rt_backtrace_on` | the same |
 | `fail` with backtraces on | one capture of the stack as well, see the later section | off by default |
+| `fail` of a `str` that is no literal | one `malloc` and one copy of its bytes, none for an `f"..."`, whose memory the error takes over | the same |
 | Each frame the error passes | one compare, one branch taken, one return | the same |
 | Handling it | one call of `anti_rt_delete`: the teardown with its `destroyed` hook and one `free` | the same |
-| Bytes of an error | 120 on the heap, and what a class of the program adds | the same |
+| Bytes of an error | 128 on the heap, and what a class of the program adds | the same |
 | Bytes in a frame | 8 for a result of 8 bytes that a failing call writes | the same or none |
 | Locks | 0 | 0 |
 | Atomic operations | one load in `anti_rt_backtrace_on`, and two loads in each call of `anti_rt_hook` for `created` or `destroyed`: the installed trace handler and the count of loaded libraries | the same |
@@ -742,7 +743,7 @@ Where it lives: `lower_fail` of `src/antic/lower_error.c` writes the origin and 
 | Bytes in the error | 64 for the origin, 8 for the pointer to the trace | the same | the same |
 | Read-only data | 64 bytes per `fail` statement | the same | the same |
 
-An error with a trace of 10 frames takes three heap blocks: 120 bytes for the error, 40 for the trace and 480 for the frames. Without a trace it takes one.
+An error with a trace of 10 frames takes three heap blocks: 128 bytes for the error, 40 for the trace and 480 for the frames. Without a trace it takes one.
 
 The walk reads two words per frame, and `anti_rt_trace_frame` asks the loader for the module of each address. A program that fails in a loop pays the capture at every new error in a dev build. Passing `--anti.backtrace=false` to a dev program turns the capture off and leaves the origin.
 

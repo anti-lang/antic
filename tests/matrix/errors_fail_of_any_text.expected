@@ -1,0 +1,49 @@
+exit 0
+arm 0
+if_let failed: 0 more from a call
+if_let -1
+worker failed: 0 more from a call
+worker -1
+dispatch failed: 0 more from a call
+dispatch -1
+select failed: 0 selected nothing
+select -1
+nested failed: 0 nested by a field
+nested -1
+generic 0
+handler 0
+arm failed: 0 arm by a parameter
+arm -1
+if_let 3
+worker 10
+dispatch 10
+select 10
+nested 10
+generic 100
+handler 10
+arm failed: 0 arm 2
+arm -1
+if_let 6
+worker 20
+dispatch 20
+select 20
+nested 20
+generic 200
+handler failed: 0 handled 2
+handler -1
+arm 30
+if_let failed: 0 held 9
+if_let -1
+worker failed: 0 worker 3
+worker -1
+dispatch failed: 0 dispatched 3
+dispatch -1
+select failed: 0 selected 3
+select -1
+nested failed: 0 nested 3
+nested -1
+generic failed: 0 generic
+generic -1
+handler failed: 0 handled 3
+handler -1
+copy failed: 0 copied 7

@@ -318,7 +318,8 @@ static void write_origin(struct lowerer *l, const struct stmt *s,
     l->b = rest;
 }
 
-/* `fail e;` and `fail "text";` leave on the error channel. The error is
+/* `fail e;`, `fail "text";` and `fail` of any other `str` leave on the
+   error channel. The error is
    built before the deferred statements of the block run, so an `undo` or
    a `defer` cannot change what the function reports. */
 void lower_fail(struct lowerer *l, const struct stmt *s)
@@ -326,12 +327,15 @@ void lower_fail(struct lowerer *l, const struct stmt *s)
     struct ir_operand err;
 
     if (s->as.fail.make != NULL) {
+        /* `Error.new` takes the code 0 and the text, and the makers of a
+           text that is no literal take the text alone. */
         struct ir_operand args[2];
         struct ir_function *maker = lower_callee_function(l, s->as.fail.make);
+        size_t count = s->as.fail.make->type->param_count;
         args[0] = ir_int_op(IR_I64, 0);
-        args[1] = lower_expr(l, s->as.fail.value);
+        args[count - 1] = lower_expr(l, s->as.fail.value);
         err = lower_temp(
-            l, ir_call(l->f, l->b, IR_PTR, ir_func_op(maker), args, 2));
+            l, ir_call(l->f, l->b, IR_PTR, ir_func_op(maker), args, count));
     } else {
         err = lower_expr(l, s->as.fail.value);
     }

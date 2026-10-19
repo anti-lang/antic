@@ -681,7 +681,7 @@ Where it lives: `check_optional` of `src/antic/sema_expr.c` checks `?.`, and `se
 
 `if let` and `let ... else` copy the value into the new name. For a `?int` that is 8 bytes. For a `?T` of a large struct it is the size of the struct. A test of the name with narrowing reads the value in place.
 
-`e catch err { }` allocates an error object of at least 120 bytes on the `none` path. Where `none` is expected, `??`, `if let` and `let ... else` handle it without an allocation.
+`e catch err { }` allocates an error object of at least 128 bytes on the `none` path. Where `none` is expected, `??`, `if let` and `let ... else` handle it without an allocation.
 
 ### Pitfalls
 

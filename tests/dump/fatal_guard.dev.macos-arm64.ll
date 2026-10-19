@@ -92,7 +92,7 @@ b2:
 @fatal_guard.5 = hidden constant <{ [48 x i8] }> <{ [48 x i8] c"fatal_guard.anti:23: value out of range for i32\00" }>, align 1
 
 declare void @anti_rt_exit(i32 noundef) noreturn cold #1
-declare void @anti.lang.Error.fatal(ptr noundef nonnull dereferenceable(120)) noreturn cold #1
+declare void @anti.lang.Error.fatal(ptr noundef nonnull dereferenceable(128)) noreturn cold #1
 declare noundef ptr @anti.lang.NoneDereference.new() #1
 declare void @anti_rt_check_failed(ptr noundef, i64 noundef, i32 noundef, i64 noundef, i64 noundef) noreturn cold #1
 declare void @llvm.lifetime.start.p0(ptr)

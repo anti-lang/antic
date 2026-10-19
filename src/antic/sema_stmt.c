@@ -2370,8 +2370,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
         s->error_exit = true;
         c->saw_fail = true;
         sema_resolve_origin(c, s);
-        /* `fail "text";` builds the error from the text. Every other
-           value is an error the program has in hand. */
+        /* `fail "text";` builds the error from the text, and so does a
+           `str` that is no literal, by R017 of "Answers of 2026-10-18".
+           Every other value is an error the program has in hand. */
         if (s->as.fail.value->kind == EXPR_STRING) {
             s->as.fail.make = sema_error_maker(c, s->pos);
             t = sema_builtin(c, TYPE_STR);
@@ -2381,8 +2382,15 @@ static void check_stmt(struct checker *c, struct stmt *s)
         }
         error = c->ctx.function->symbol->type->result;
         t = sema_caught_error(c, error);
-        sema_require(c, s->as.fail.value,
-                     sema_check_expr(c, s->as.fail.value, t), t);
+        {
+            struct type *given = sema_check_expr(c, s->as.fail.value, t);
+            if (!sema_is_error(given) && given->kind == TYPE_STR) {
+                s->as.fail.make = sema_error_text_maker(
+                    c, s->pos, s->as.fail.value->kind == EXPR_FORMAT);
+                return;
+            }
+            sema_require(c, s->as.fail.value, given, t);
+        }
         return;
     }
     case STMT_BREAK:

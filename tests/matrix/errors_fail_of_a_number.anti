@@ -1,0 +1,14 @@
+//! `fail` takes an error or a `str`, and a number is refused.
+
+import anti.lang;
+
+fn run(n: int) may fail
+{
+	fail n;
+}
+
+fn main() -> int
+{
+	run(3) catch { };
+	return 0;
+}

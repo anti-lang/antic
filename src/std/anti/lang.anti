@@ -23,6 +23,7 @@
 extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);
 extern fn anti_rt_exit(status: c_int) -> never;
 extern fn anti_rt_text_from_c(bytes: ?*byte) -> str;
+extern fn anti_rt_text_slice(bytes: ?*byte, len: int) -> str;
 extern fn anti_rt_trace_walk(into: ?*u64, room: int, skip: int) -> int;
 extern fn anti_rt_trace_frame(address: u64, out: ?*RawFrame);
 extern fn anti_rt_trace_text(frames: ?*RawFrame, count: int) -> ?*byte;
@@ -231,6 +232,10 @@ pub class Error
 	/// The bytes `text` gave, ended by a NUL. `dup` leaves the copy without
 	/// them, and it formats its own.
 	transient text_cache: ?*byte = none,
+	/// The bytes of `message` when the error owns them, ended by a NUL, or
+	/// `none`. `destruct` frees them, and `copied` gives the copy that `dup`
+	/// makes bytes of its own.
+	transient kept: ?*byte = none,
 
 	/// An error with a code and a message and no cause.
 	///
@@ -239,6 +244,29 @@ pub class Error
 	pub fn new(code: int, message: str) -> *Error
 	{
 		return alloc Error { code: code, message: message, cause: none };
+	}
+
+	/// An error with code 0 that owns a copy of `message`.
+	///
+	/// `fail` with a `str` that is no literal calls it, by R017 of "Answers of
+	/// 2026-10-18".
+	protected fn of_copy(message: str) -> *Error
+	{
+		let e = alloc Error { code: 0, cause: none };
+		e.keep(message);
+		return e;
+	}
+
+	/// An error with code 0 that takes over the bytes of `message`, memory of
+	/// the C library that nothing else frees.
+	///
+	/// `fail f"..."` calls it, since the text of an `f"..."` is a copy made for
+	/// the error already.
+	protected fn of_text(message: str) -> *Error
+	{
+		let e = alloc Error { code: 0, message: message, cause: none };
+		e.kept = message.ptr;
+		return e;
 	}
 
 	/// An error that wraps the one below it and takes it over. The error a
@@ -323,9 +351,37 @@ pub class Error
 		anti_rt_exit(1);
 	}
 
+	/// Take a copy of `message` that this error owns, ended by a NUL as the
+	/// text of a literal is. When the memory for it runs out, the program
+	/// stops with a message.
+	fn keep(self, message: str)
+	{
+		let room = alloc(byte, message.len +| 1) else {
+			anti_rt_out_of_memory(message.len +| 1);
+		};
+		let end = put_text(room, 0, message);
+		room[end] = 0;
+		self.kept = room;
+		self.message = anti_rt_text_slice(room, message.len);
+	}
+
+	/// The copy that `dup` makes of an error that owns its text owns a copy of
+	/// the text as well.
+	concrete fn copied(self, from: *Object)
+	{
+		/* DESIGN: `kept` is transient, so the copy starts without it and
+		   its `message` borrows the bytes of `from`. It takes bytes of its
+		   own here, so it keeps its text after `from` is deleted. */
+		let original = from as *Error;
+		if original.kept != none {
+			self.keep(self.message);
+		}
+	}
+
 	fn destruct(self)
 	{
 		free(self.text_cache);
+		free(self.kept);
 	}
 }
 
