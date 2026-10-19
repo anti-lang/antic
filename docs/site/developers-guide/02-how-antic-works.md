@@ -354,7 +354,7 @@ antic reads one directory beside its own executable. That directory is the runti
 | `include/` | the headers of the native libraries |
 | `licenses/` | the licence text of each component |
 
-antic looks for the archive in two places, in this order: the directory above its own `bin/`, then the data directory of the user. The option `--runtime <dir>` names another. `runtime_archive` of `src/antic/userdirs.c` holds the rule.
+antic looks for the archive in two places, in this order: the directory above its own `bin/`, then the data directory of the user. The option `--runtime <dir>` names another. `user_runtime_archive` of `src/antic/userdirs.c` holds the rule.
 
 `libanti_rt.a` is the runtime, written in C under `src/rt/`. It holds the entry point, the failure routines of the checks, the output functions, the thread pool and reflection. A program calls its functions as `anti_rt_*`. One runtime exists per target and processor level, so a program built with `--cpu v1` links a runtime compiled for `v1`.
 

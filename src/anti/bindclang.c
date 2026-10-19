@@ -42,7 +42,7 @@ static void find_clang(struct text *out)
     if (target_host(&host)) {
         suffix = target_info(host)->executable_suffix;
     }
-    if (self_directory(&dir)) {
+    if (platform_self_directory(&dir)) {
         slash = platform_last_separator(dir.data);
         if (slash != NULL) {
             struct text pinned = {0};
@@ -113,7 +113,7 @@ static bool check_version(const char *clang)
 {
     const char *argv[] = {clang, "--version", NULL};
     struct text out = {0};
-    int status = process_capture(argv, &out);
+    int status = platform_capture(argv, &out);
     int needed = leading_int(ANTI_CLANG_VERSION);
     int major;
 
@@ -134,7 +134,7 @@ static bool check_version(const char *clang)
 }
 
 /* The argument vector of a run of clang. Its elements are strings, as
-   process_capture reads them, and not the void pointers of a bind_list. */
+   platform_capture reads them, and not the void pointers of a bind_list. */
 struct arg_list {
     const char **items;
     size_t count;
@@ -162,7 +162,7 @@ static bool target_options(const char *clang, enum target t,
 
     text_appendf(&sysroot, "%s/%s/%s", runtime != NULL ? runtime : ".",
                  RUNTIME_SYSROOT_DIR, name);
-    if (runtime == NULL || !directory_exists(text_cstr(&sysroot))) {
+    if (runtime == NULL || !platform_directory_exists(text_cstr(&sysroot))) {
         fprintf(stderr, "anti: the runtime archive holds no sysroot for %s, "
                 "whose headers clang reads. Pass --runtime.\n", name);
         text_free(&sysroot);
@@ -190,7 +190,7 @@ static bool target_options(const char *clang, enum target t,
         struct text resource = {0};
         bool linux = strncmp(name, "linux-", 6) == 0;
 
-        if (process_capture(argv, &resource) != 0) {
+        if (platform_capture(argv, &resource) != 0) {
             fprintf(stderr, "anti: %s -print-resource-dir failed\n", clang);
             ok = false;
         }
@@ -1449,7 +1449,7 @@ static void read_macros(struct reader *r)
 static bool run(const struct arg_list *args, struct text *out,
                 const char *what)
 {
-    int status = process_capture(args->items, out);
+    int status = platform_capture(args->items, out);
 
     if (status != 0) {
         fprintf(stderr, "anti: clang could not %s, status %d\n", what, status);

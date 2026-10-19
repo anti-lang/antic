@@ -184,7 +184,7 @@ int sdk_export(const char *sdk, const char *out)
     {
         const char *argv[] = {"tar", "-cJf", text_cstr(&bundle), "-C",
                               text_cstr(&stage), ".", NULL};
-        if (process_run(argv) != 0) {
+        if (platform_run(argv) != 0) {
             fprintf(stderr, "anti: tar could not write %s\n", text_cstr(&bundle));
             goto done;
         }
@@ -223,7 +223,7 @@ static bool unpack(const char *bundle, const char *dir, const char *digest)
     }
     {
         const char *argv[] = {"tar", "-xJf", bundle, "-C", text_cstr(&part), NULL};
-        if (process_run(argv) != 0) {
+        if (platform_run(argv) != 0) {
             fprintf(stderr, "anti: tar could not unpack %s\n", bundle);
             goto done;
         }

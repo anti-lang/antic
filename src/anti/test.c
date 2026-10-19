@@ -308,7 +308,7 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
     }
     argv[0] = text_cstr(&program);
     argv[1] = NULL;
-    ok = (o.memory_checks ? memreport_run(argv) : process_run(argv)) == 0;
+    ok = (o.memory_checks ? memreport_run(argv) : platform_run(argv)) == 0;
 done:
     imports_free(&imports);
     arena_free(&framework_arena);

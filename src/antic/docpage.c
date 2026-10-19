@@ -59,7 +59,7 @@ static void entry_free(struct doc_entry *e)
     text_free(&e->copy_of);
 }
 
-void doc_page_free(struct doc_page *page)
+void antic_doc_page_free(struct doc_page *page)
 {
     size_t i;
 

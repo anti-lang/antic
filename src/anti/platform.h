@@ -76,11 +76,11 @@ bool platform_replace_program(const char *from, const char *to);
    permission bits, so there it does nothing. */
 bool platform_copy_permissions(const char *from, const char *to);
 
-/* Run a program as process_run does and hand each line of its standard
+/* Run a program as platform_run does and hand each line of its standard
    error to each, with the environment variable name set to value, as
-   process_run_lines does.
+   platform_run_lines does.
 
-   DESIGN: Windows runs the program as process_run does, sets no
+   DESIGN: Windows runs the program as platform_run does, sets no
    variable and hands no line, since Anti's symbolizer reads no PDB and
    would leave every frame of a report raw. There the report keeps the
    frames that AddressSanitizer symbolizes from the PDB of the link. */

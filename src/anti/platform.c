@@ -308,7 +308,7 @@ int platform_run_symbolized(const char *const argv[], const char *name,
     (void)value;
     (void)each;
     (void)context;
-    return process_run(argv);
+    return platform_run(argv);
 }
 
 #else
@@ -399,7 +399,7 @@ int platform_run_symbolized(const char *const argv[], const char *name,
                                          size_t length),
                             void *context)
 {
-    return process_run_lines(argv, name, value, each, context);
+    return platform_run_lines(argv, name, value, each, context);
 }
 
 #endif

@@ -915,7 +915,7 @@ int doc_run(const struct doc_request *r)
 
 done:
     for (i = 0; i < r->source_count; i++) {
-        doc_page_free(&pages[i]);
+        antic_doc_page_free(&pages[i]);
         if (units[i].source != NULL) {
             unit_free(&units[i]);
         }

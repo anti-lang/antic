@@ -65,21 +65,21 @@ static int run_llc(const char *llc, const struct args *options,
     push(&argv, output);
 
     if (name == output) {
-        return process_run(argv.v);
+        return platform_run(argv.v);
     }
     text_appendf(&directory, "%.*s", (int)(name - output), output);
     if (platform_file_name(llc) != llc) {
-        if (!absolute_path(llc, &program)) {
+        if (!platform_absolute_path(llc, &program)) {
             goto done;
         }
         argv.v[0] = text_cstr(&program);
     }
-    if (!absolute_path(input, &absolute)) {
+    if (!platform_absolute_path(input, &absolute)) {
         goto done;
     }
     argv.v[at_input] = text_cstr(&absolute);
     argv.v[at_output] = name;
-    run = process_run_in(text_cstr(&directory), argv.v);
+    run = platform_run_in(text_cstr(&directory), argv.v);
 done:
     text_free(&absolute);
     text_free(&program);
@@ -154,7 +154,7 @@ static bool run_lto(const struct llvm_run *r, const char *text_path,
     push(&opt, "-o");
     push(&opt, output);
     push(&opt, text_path);
-    ok = process_run(opt.v) == 0;
+    ok = platform_run(opt.v) == 0;
     text_free(&profile);
     if (!ok) {
         fprintf(stderr, "antic: opt failed\n");
@@ -211,7 +211,7 @@ static bool run_opt(const struct llvm_run *r, const char *text_path,
     push(&opt, "-o");
     push(&opt, bitcode_path);
     push(&opt, text_path);
-    ok = process_run(opt.v) == 0;
+    ok = platform_run(opt.v) == 0;
     text_free(&profile);
     if (!ok) {
         fprintf(stderr, "antic: opt failed\n");

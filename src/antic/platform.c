@@ -260,7 +260,7 @@ char **platform_arguments(char **argv)
     return list;
 }
 
-bool path_is_absolute(const char *path)
+bool platform_path_is_absolute(const char *path)
 {
     return path[0] == '/' || path[0] == '\\' ||
            ((path[0] | 32) >= 'a' && (path[0] | 32) <= 'z' && path[1] == ':');
@@ -279,7 +279,7 @@ char platform_separator(void)
     return '\\';
 }
 
-bool directory_exists(const char *path)
+bool platform_directory_exists(const char *path)
 {
     wchar_t *wide = platform_widen(path);
     DWORD attributes = wide != NULL ? GetFileAttributesW(wide)
@@ -342,7 +342,7 @@ static bool self_path(struct text *out)
     return append_narrow(out, wide);
 }
 
-bool absolute_path(const char *path, struct text *out)
+bool platform_absolute_path(const char *path, struct text *out)
 {
     wchar_t *wide = platform_widen(path);
     wchar_t *full = NULL;
@@ -430,7 +430,8 @@ static wchar_t *program_in(const char *directory, const char *program)
     const char *name = cut != NULL ? cut + 1 : program;
     wchar_t *wide;
 
-    if (directory == NULL || cut == NULL || path_is_absolute(program)) {
+    if (directory == NULL || cut == NULL ||
+        platform_path_is_absolute(program)) {
         return NULL;
     }
     text_appendf(&path, "%s\\%s%s", directory, program,
@@ -493,7 +494,7 @@ static int start(const char *directory, const char *const argv[],
     return 0;
 }
 
-int process_run_in(const char *directory, const char *const argv[])
+int platform_run_in(const char *directory, const char *const argv[])
 {
     PROCESS_INFORMATION info;
     int status;
@@ -507,12 +508,12 @@ int process_run_in(const char *directory, const char *const argv[])
     return status;
 }
 
-int process_run(const char *const argv[])
+int platform_run(const char *const argv[])
 {
-    return process_run_in(NULL, argv);
+    return platform_run_in(NULL, argv);
 }
 
-int process_capture(const char *const argv[], struct text *out)
+int platform_capture(const char *const argv[], struct text *out)
 {
     SECURITY_ATTRIBUTES attributes;
     PROCESS_INFORMATION info;
@@ -633,7 +634,7 @@ char **platform_arguments(char **argv)
     return argv;
 }
 
-bool path_is_absolute(const char *path)
+bool platform_path_is_absolute(const char *path)
 {
     return path[0] == '/';
 }
@@ -648,7 +649,7 @@ char platform_separator(void)
     return '/';
 }
 
-bool directory_exists(const char *path)
+bool platform_directory_exists(const char *path)
 {
     struct stat info;
 
@@ -727,7 +728,7 @@ static bool self_path(struct text *out)
 
 #endif
 
-bool absolute_path(const char *path, struct text *out)
+bool platform_absolute_path(const char *path, struct text *out)
 {
     char *real = realpath(path, NULL);
     const char *slash;
@@ -791,7 +792,7 @@ static int spawn(const char *const argv[], posix_spawn_file_actions_t *actions,
     return 0;
 }
 
-int process_run(const char *const argv[])
+int platform_run(const char *const argv[])
 {
     pid_t pid;
 
@@ -804,12 +805,12 @@ int process_run(const char *const argv[])
 /* DESIGN: posix_spawn sets no working directory before POSIX.1-2024, so
    the child changes to it between fork and exec. The child calls only
    chdir, execvp and _exit there, and a message on failure. */
-int process_run_in(const char *directory, const char *const argv[])
+int platform_run_in(const char *directory, const char *const argv[])
 {
     pid_t pid;
 
     if (directory == NULL) {
-        return process_run(argv);
+        return platform_run(argv);
     }
     pid = fork();
     if (pid < 0) {
@@ -831,7 +832,7 @@ int process_run_in(const char *directory, const char *const argv[])
     return wait_for(pid, argv[0]);
 }
 
-int process_capture(const char *const argv[], struct text *out)
+int platform_capture(const char *const argv[], struct text *out)
 {
     posix_spawn_file_actions_t actions;
     int fds[2];
@@ -891,9 +892,9 @@ static char **environment_with(const char *name, const char *value,
     return list;
 }
 
-int process_run_lines(const char *const argv[], const char *name,
-                      const char *value,
-                      void (*each)(void *context, const char *line,
+int platform_run_lines(const char *const argv[], const char *name,
+                       const char *value,
+                       void (*each)(void *context, const char *line,
                                    size_t length),
                       void *context)
 {
@@ -1000,7 +1001,7 @@ const char *platform_file_name(const char *path)
     return cut != NULL ? cut + 1 : path;
 }
 
-bool self_directory(struct text *out)
+bool platform_self_directory(struct text *out)
 {
     struct text path = {0};
     const char *bytes;
@@ -1069,7 +1070,8 @@ static size_t part(const char *path, size_t *at)
     return strcspn(path + *at, "/");
 }
 
-bool path_relative(struct text *out, const char *path, const char *directory)
+bool platform_path_relative(struct text *out, const char *path,
+                            const char *directory)
 {
     size_t root = root_length(path);
     size_t at = root;

@@ -535,9 +535,9 @@ static int run(int argc, char **argv, const struct lists *l)
        directory above itself. That is the tree of a build, and of a
        package before it is installed. An installed antic sits on the
        PATH instead, in the bin directory of the user, and the archive
-       stands in the user's data directory. runtime_archive holds the
+       stands in the user's data directory. user_runtime_archive holds the
        rule, and the anti tool asks the same function. */
-    if (options.runtime == NULL && runtime_archive(&home)) {
+    if (options.runtime == NULL && user_runtime_archive(&home)) {
         options.runtime = text_cstr(&home);
     }
     status = driver_run(&options);

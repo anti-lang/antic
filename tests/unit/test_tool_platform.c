@@ -86,7 +86,7 @@ static void utf8_on_windows(void)
 
     CHECK(CreateDirectoryW(WIDE_NAME, NULL) ||
           GetLastError() == ERROR_ALREADY_EXISTS);
-    CHECK(directory_exists(UTF8_NAME));
+    CHECK(platform_directory_exists(UTF8_NAME));
     f = platform_open(UTF8_NAME "/file.bin", true);
     CHECK(f != NULL);
     if (f != NULL) {
@@ -101,7 +101,7 @@ static void utf8_on_windows(void)
         CHECK(fgetc(f) == 'x');
         CHECK(fclose(f) == 0);
     }
-    CHECK(absolute_path(UTF8_NAME, &full));
+    CHECK(platform_absolute_path(UTF8_NAME, &full));
     CHECK(full.length >= sizeof UTF8_NAME - 1 &&
           strcmp(text_cstr(&full) + full.length - (sizeof UTF8_NAME - 1),
                  UTF8_NAME) == 0);
@@ -165,7 +165,7 @@ static void path_rules_of_host(void)
         const struct path_rule *r = &path_rules[i];
         const char *last = platform_last_separator(r->path);
 
-        CHECK(path_is_absolute(r->path) == (r->absolute != 0));
+        CHECK(platform_path_is_absolute(r->path) == (r->absolute != 0));
         CHECK(r->separator < 0 ? last == NULL
                                : last == r->path + r->separator);
         CHECK(platform_file_name(r->path) ==
@@ -195,7 +195,7 @@ static void list_directory(void)
 #endif
     write_all("tool_platform_dir/a.bin", "a", 1);
     write_all("tool_platform_dir/b.bin", "b", 1);
-    CHECK(directory_exists(dir));
+    CHECK(platform_directory_exists(dir));
     CHECK(platform_list_directory(dir, count_entry, &count));
     CHECK(count == 2);
     CHECK(platform_remove("tool_platform_dir/a.bin"));
@@ -207,7 +207,7 @@ static void list_directory(void)
     CHECK(rmdir(dir) == 0);
 #endif
     CHECK(!platform_list_directory("tool_platform_none", count_entry, &count));
-    CHECK(!directory_exists("tool_platform_none"));
+    CHECK(!platform_directory_exists("tool_platform_none"));
 }
 
 /* One frame of 64 KB per level. 512 levels take 32 MB, past the 8 MB of

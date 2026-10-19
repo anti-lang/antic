@@ -370,7 +370,7 @@ foreach(host IN LISTS HOSTS)
         build_program("${host}" "${tree}/bin/anti${suffix}" anti)
     endif()
     # The LLVM tools of the host, as the runtime archive holds them. antic
-    # finds them beside itself, by the rule of runtime_archive in
+    # finds them beside itself, by the rule of user_runtime_archive in
     # src/antic/userdirs.c: bin/ of the archive above its own bin/.
     file(COPY "${tools_of_${host}}/" DESTINATION "${tree}/bin")
     file(WRITE "${tree}/VERSION" "${version}\n")

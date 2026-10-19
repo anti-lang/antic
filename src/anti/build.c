@@ -1169,7 +1169,7 @@ static bool path_cycle(const struct path_context *c, const char *directory)
     size_t count = 0;
     size_t i;
 
-    if (!absolute_path(directory, &resolved)) {
+    if (!platform_absolute_path(directory, &resolved)) {
         text_free(&resolved);
         return false;
     }
@@ -1388,7 +1388,7 @@ static int run_built(const struct build *b)
     } else {
         argv[0] = text_cstr(&program);
         argv[1] = NULL;
-        status = r->memory_checks ? memreport_run(argv) : process_run(argv);
+        status = r->memory_checks ? memreport_run(argv) : platform_run(argv);
     }
     text_free(&program);
     return status;
@@ -1433,7 +1433,7 @@ static int build_project(const struct build_request *r,
     }
     if (r->runtime != NULL) {
         text_append(&b.runtime, r->runtime);
-    } else if (!runtime_archive(&b.runtime)) {
+    } else if (!user_runtime_archive(&b.runtime)) {
         fputs("anti: the system does not say where the runtime archive is, so "
               "the build needs --runtime\n", stderr);
         goto done;
@@ -1460,7 +1460,7 @@ static int build_project(const struct build_request *r,
     context.outer = outer;
     context.name = text_cstr(&b.m.name);
     context.depth = b.depth;
-    if (!absolute_path(r->root, &context.directory)) {
+    if (!platform_absolute_path(r->root, &context.directory)) {
         text_append(&context.directory, r->root);
     }
     if (!deps_resolve(&b.m, r->root, r->offline, path_dependency, &context,

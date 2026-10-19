@@ -121,7 +121,7 @@ release, tagged `<version>-anti.<build>` as in `23.1.1-anti.8`. Beside the archi
 `SHA256SUMS.sig`. The recipe, the hosts and the checks of each build are in that
 repository. Each release holds the tools and clang of each of the six hosts. antic takes
 the tools of its host from `bin/` of the archive above its own, by the rule of
-`runtime_archive` in `src/antic/userdirs.c`, and a build of antic takes clang as well. The clang archive also
+`user_runtime_archive` in `src/antic/userdirs.c`, and a build of antic takes clang as well. The clang archive also
 carries `libunwind.a` for the two glibc targets, which the build copies into
 `lib/<target>/` of the runtime archive. The runtime of AddressSanitizer calls its
 `_Unwind_Backtrace` and `_Unwind_GetIP` in a Linux program of `--memory-checks`. It

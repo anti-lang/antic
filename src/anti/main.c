@@ -224,7 +224,7 @@ static bool default_sysroot(struct text *out)
 {
     struct text archive = {0};
 
-    if (!runtime_archive(&archive)) {
+    if (!user_runtime_archive(&archive)) {
         text_free(&archive);
         return false;
     }
@@ -234,12 +234,12 @@ static bool default_sysroot(struct text *out)
 }
 
 /* DESIGN: anti finds the runtime archive where antic does, by the one
-   rule in runtime_archive. That is the directory above the running
+   rule in user_runtime_archive. That is the directory above the running
    executable when it holds lib/, and the user's data directory
    otherwise. */
 static bool default_runtime(struct text *out)
 {
-    return runtime_archive(out);
+    return user_runtime_archive(out);
 }
 
 /* The paths of every file in found, as sources of a command. The array
@@ -439,7 +439,7 @@ static int license_project(int count, char **rest, bool notice)
    --from and over a static library with --from-archive. The line of each
    component in the record of upstream sources follows its text, so the
    forms that print a component read the runtime archive: the one
-   --runtime names, or the one anti finds by the rule of runtime_archive,
+   --runtime names, or the one anti finds by the rule of user_runtime_archive,
    as every other command does. */
 static int license_command(int argc, char **argv)
 {
@@ -492,7 +492,7 @@ static int license_command(int argc, char **argv)
     if (archive != NULL) {
         return licensing_from_archive(archive);
     }
-    if (runtime.length == 0 && !runtime_archive(&runtime)) {
+    if (runtime.length == 0 && !user_runtime_archive(&runtime)) {
         fputs("anti: the system does not say where the runtime archive is, "
               "so license needs --runtime\n", stderr);
     } else if (binary == NULL) {

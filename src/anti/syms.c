@@ -85,7 +85,7 @@ static void directory_of(const char *path, struct text *out)
 /* path, resolved against the directory dir unless it is absolute. */
 static void resolved(const char *dir, const char *path, struct text *out)
 {
-    if (path_is_absolute(path)) {
+    if (platform_path_is_absolute(path)) {
         text_append(out, path);
     } else {
         text_appendf(out, "%s/%s", dir, path);

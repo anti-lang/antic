@@ -1050,7 +1050,7 @@ static void tbaa_nodes(struct emitter *e)
         const struct ir_aggtype *agg = e->m->aggs[e->tbaa_aggs[j]];
         const struct layout *layout = layout_agg(e->l, e->tbaa_aggs[j]);
         text_appendf(e->out, "!%" PRIu32 " = !{!", structs + (uint32_t)j);
-        llvm_metadata_string(e->out, agg->name);
+        llvm_debug_string(e->out, agg->name);
         for (k = 0; k < agg->field_count; k++) {
             unsigned scalar = tbaa_scalar(e, agg->fields[k].type.type);
             if (agg->fields[k].bits != 0 || scalar == TBAA_NONE) {
@@ -3357,7 +3357,7 @@ static void definition(struct emitter *e, const struct ir_function *f)
     text_append(out, "}\n\n");
     text_free(&body);
     text_free(&allocas);
-    debug_spans_free(&spans);
+    llvm_debug_spans_free(&spans);
     free(e->signature.params);
     e->signature.params = NULL;
 }

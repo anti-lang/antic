@@ -33,7 +33,7 @@ file(MAKE_DIRECTORY "${WORK}")
 # package and nothing else, so no tool of LLVM or of Anti comes from
 # anywhere else, and no --runtime names the archive: antic and anti find
 # it above their own bin/, and opt, llc and lld in that bin/, by the one
-# rule of runtime_archive in src/antic/userdirs.c.
+# rule of user_runtime_archive in src/antic/userdirs.c.
 # Run ARGN in dir with that PATH and a cache in WORK, which must succeed.
 # alone_out holds the standard output.
 function(run_alone what dir)

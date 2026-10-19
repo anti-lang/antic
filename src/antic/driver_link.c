@@ -20,7 +20,7 @@ static bool xcrun(const char *query, struct text *out)
 {
     const char *argv[] = {"xcrun", "--sdk", "macosx", query, NULL};
 
-    if (process_capture(argv, out) != 0) {
+    if (platform_capture(argv, out) != 0) {
         fprintf(stderr, "antic: xcrun %s failed\n", query);
         return false;
     }
@@ -272,7 +272,7 @@ bool driver_link_inputs_of(const struct options *o, const struct extras *extras,
         struct text dir = {0};
         text_appendf(&dir, "%s/%s/", o->runtime, RUNTIME_LIB_DIR);
         link_target_dir(&dir, o->target, false);
-        ok = absolute_path(text_cstr(&dir), &f->rpath);
+        ok = platform_absolute_path(text_cstr(&dir), &f->rpath);
         text_free(&dir);
         in->rpath = text_cstr(&f->rpath);
     }
@@ -297,11 +297,12 @@ static const char *windows_path(struct windows_link *w, const char *path,
     struct text from = {0};
     const char *result = path;
 
-    if (path == NULL || (!relative && path_is_absolute(path))) {
+    if (path == NULL || (!relative && platform_path_is_absolute(path))) {
         return path;
     }
-    if (absolute_path(path, &absolute)) {
-        result = path_relative(&from, text_cstr(&absolute), text_cstr(&w->base))
+    if (platform_absolute_path(path, &absolute)) {
+        result = platform_path_relative(&from, text_cstr(&absolute),
+                                        text_cstr(&w->base))
                      ? windows_keep(w, &from)
                      : windows_keep(w, &absolute);
     }
@@ -324,7 +325,8 @@ bool driver_windows_link_paths(struct windows_link *w, struct link_inputs *in,
         text_appendf(&w->directory, "%.*s", cut == exe ? 1 : (int)(cut - exe),
                      exe);
     }
-    if (!absolute_path(cut != NULL ? text_cstr(&w->directory) : ".", &w->base)) {
+    if (!platform_absolute_path(cut != NULL ? text_cstr(&w->directory) : ".",
+                                &w->base)) {
         fprintf(stderr, "antic: cannot find the directory of %s\n", exe);
         return false;
     }
@@ -366,7 +368,7 @@ bool driver_run_link(const struct windows_link *w, const struct link_command *c)
     const char *directory = w->directory.length > 0 ? text_cstr(&w->directory)
                                                     : NULL;
 
-    if (process_run_in(directory, c->argv) != 0) {
+    if (platform_run_in(directory, c->argv) != 0) {
         fprintf(stderr, "antic: the linker failed\n");
         return false;
     }

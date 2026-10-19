@@ -27,7 +27,7 @@
 
 static bool run_command(const struct link_command *c, const char *what)
 {
-    if (process_run(c->argv) != 0) {
+    if (platform_run(c->argv) != 0) {
         fprintf(stderr, "antic: %s failed\n", what);
         return false;
     }
@@ -172,7 +172,7 @@ static bool bundle(const struct options *o, const struct extras *extras,
     text_appendf(&output, "--output=%s", text_cstr(&dir));
     {
         const char *argv[] = {llvm_ar, "t", text_cstr(&library), NULL};
-        ok = process_capture(argv, &listing) == 0;
+        ok = platform_capture(argv, &listing) == 0;
     }
     driver_add_path(&objects, object);
     {
@@ -202,7 +202,7 @@ static bool bundle(const struct options *o, const struct extras *extras,
             argv[2] = text_cstr(&output);
             argv[3] = text_cstr(&library);
             argv[4] = text_cstr(&member);
-            ok = process_run(argv) == 0;
+            ok = platform_run(argv) == 0;
             driver_add_path(&objects, path);
             text_free(&member);
         }

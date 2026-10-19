@@ -41,13 +41,14 @@ char **platform_arguments(char **argv);
    Windows also with `\` or a drive letter and a colon. A drive without a
    separator names a file on that drive, which no directory can be put
    before. src/rt/platform.h follows the same rule. */
-bool path_is_absolute(const char *path);
+bool platform_path_is_absolute(const char *path);
 
 /* Append the path of path relative to the directory directory. Both are
    absolute and separate their parts with '/', and neither holds `.` or
    `..`. Returns false when the two stand on different roots, a drive or a
    share of Windows, and no relative path joins them. */
-bool path_relative(struct text *out, const char *path, const char *directory);
+bool platform_path_relative(struct text *out, const char *path,
+                            const char *directory);
 
 /* The last separator of the directories of path, or NULL when it has
    none: `/` on every host, and `\` as well on Windows. */
@@ -64,7 +65,7 @@ const char *platform_file_name(const char *path);
 char platform_separator(void);
 
 /* Whether path names a directory. */
-bool directory_exists(const char *path);
+bool platform_directory_exists(const char *path);
 
 /* Hand the name of each entry of the directory at path to each, without
    `.` and `..`, in the order the system gives. Returns false when the
@@ -77,13 +78,13 @@ bool platform_list_directory(const char *path,
 /* Append the directory that holds the running executable to out, without
    a trailing separator. Returns false when the system does not say where
    the executable is. */
-bool self_directory(struct text *out);
+bool platform_self_directory(struct text *out);
 
 /* Append the absolute form of path to out, with each part separated by
    `/`. The directory that holds path must exist, and path itself need
    not. A POSIX host resolves symbolic links, and Windows resolves `.` and
    `..` by name as it does for every path. */
-bool absolute_path(const char *path, struct text *out);
+bool platform_absolute_path(const char *path, struct text *out);
 
 /* Name the tool that starts every message of the layer: antic, unless
    the tool that runs gives its own name before it calls the layer. R163
@@ -100,17 +101,17 @@ void platform_binary_stdout(void);
    with the NULL-terminated argument list argv. Return its exit status, or
    -1 when it could not start or ended by a signal. The program inherits
    standard output and standard error. */
-int process_run(const char *const argv[]);
+int platform_run(const char *const argv[]);
 
-/* Run a program as process_run does, with directory as its working
+/* Run a program as platform_run does, with directory as its working
    directory, where every relative path of its arguments then starts. A
    relative argv[0] with a separator names the program from directory as
    well, and a bare name is found through PATH. */
-int process_run_in(const char *directory, const char *const argv[]);
+int platform_run_in(const char *directory, const char *const argv[]);
 
-/* Run a program as process_run does and append its standard output to
+/* Run a program as platform_run does and append its standard output to
    out. */
-int process_capture(const char *const argv[], struct text *out);
+int platform_capture(const char *const argv[], struct text *out);
 
 /* DESIGN: antic and anti run their work on a thread with a stack of 64 MB
    on every host, so the compiler owns its stack. The main thread has 8 MB
@@ -131,14 +132,14 @@ wchar_t *platform_widen(const char *text);
 #endif
 
 #if !defined(_WIN32)
-/* Run a program as process_run does, with the environment variable name
+/* Run a program as platform_run does, with the environment variable name
    set to value, and hand each line of its standard error to each, with
    its newline. A last line without one comes last. Standard output stays
    the one of the tool. Windows has no caller: anti symbols leaves the
    symbolizing of a report to AddressSanitizer there. */
-int process_run_lines(const char *const argv[], const char *name,
-                      const char *value,
-                      void (*each)(void *context, const char *line,
+int platform_run_lines(const char *const argv[], const char *name,
+                       const char *value,
+                       void (*each)(void *context, const char *line,
                                    size_t length),
                       void *context);
 #endif

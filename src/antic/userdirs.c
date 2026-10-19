@@ -164,17 +164,17 @@ static bool holds_runtime(const char *dir)
     bool found;
 
     text_appendf(&lib, "%s/%s", dir, RUNTIME_LIB_DIR);
-    found = directory_exists(text_cstr(&lib));
+    found = platform_directory_exists(text_cstr(&lib));
     text_free(&lib);
     return found;
 }
 
-bool runtime_archive(struct text *out)
+bool user_runtime_archive(struct text *out)
 {
     struct text bin = {0};
     struct text found = {0};
 
-    if (self_directory(&bin) && parent_of(&found, &bin) &&
+    if (platform_self_directory(&bin) && parent_of(&found, &bin) &&
         holds_runtime(text_cstr(&found))) {
         text_append_bytes(out, found.data, found.length);
         text_free(&bin);

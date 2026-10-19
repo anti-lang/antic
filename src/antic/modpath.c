@@ -76,7 +76,7 @@ static bool normal_file(const char *path, struct text *out)
     } else {
         text_appendf(&directory, "%.*s", (int)(slash - path), path);
     }
-    ok = absolute_path(text_cstr(&directory), out);
+    ok = platform_absolute_path(text_cstr(&directory), out);
     text_free(&directory);
     if (ok) {
         if (out->length == 0 || out->data[out->length - 1] != '/') {
@@ -103,7 +103,7 @@ static const char *under_roots(const char *source, const char *const *roots,
 
     for (i = 0; i < root_count && rest == NULL; i++) {
         struct text root = {0};
-        if (resolved && absolute_path(roots[i], &root)) {
+        if (resolved && platform_absolute_path(roots[i], &root)) {
             rest = under(text_cstr(&file), text_cstr(&root));
         }
         if (rest == NULL) {

@@ -126,7 +126,8 @@ static void cannot_create(const char *path)
     if (slash != NULL && slash != path) {
         text_appendf(&directory, "%.*s", (int)(slash - path), path);
     }
-    if (directory.length > 0 && !directory_exists(text_cstr(&directory))) {
+    if (directory.length > 0 &&
+        !platform_directory_exists(text_cstr(&directory))) {
         fprintf(stderr,
                 "antic: cannot create %s, the directory %s does not exist\n",
                 path, text_cstr(&directory));
@@ -906,7 +907,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
     }
     layout_free(&layouts);
     text_free(&out);
-    debug_spans_free(&spans);
+    llvm_debug_spans_free(&spans);
     return status;
 }
 

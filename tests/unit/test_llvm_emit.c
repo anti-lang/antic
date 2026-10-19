@@ -37,7 +37,7 @@ static void begin(struct fixture *x)
 
 static void end(struct fixture *x)
 {
-    debug_spans_free(&x->spans);
+    llvm_debug_spans_free(&x->spans);
     text_free(&x->out);
     ir_module_free(&x->m);
     arena_free(&x->arena);
@@ -61,7 +61,7 @@ static bool run_with(struct fixture *x, enum target t, bool one_module,
     o.constructor = x->constructor;
     o.debug = x->debug;
     o.spans = &x->spans;
-    debug_spans_free(&x->spans);
+    llvm_debug_spans_free(&x->spans);
     ok = layout_init(&l, t, &x->m, x->error, sizeof x->error) &&
          layout_data(&l, &x->m);
     for (i = 0; ok && i < x->m.function_count; i++) {

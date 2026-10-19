@@ -46,7 +46,7 @@ struct debug_spans {
 };
 
 /* Release the spans of s and leave it empty. */
-void debug_spans_free(struct debug_spans *s);
+void llvm_debug_spans_free(struct debug_spans *s);
 
 struct llvm_debug {
     enum target target;
@@ -88,7 +88,7 @@ void llvm_debug_free(struct llvm_debug *d);
 
 /* Append s as a metadata string in quotes. A quote, a backslash and a
    byte outside printable ASCII take the escape \XX. */
-void llvm_metadata_string(struct text *out, const char *s);
+void llvm_debug_string(struct text *out, const char *s);
 
 /* Append ` !dbg !N` to the definition of f, which out ends with, and
    write the subprogram of f. local says that f has internal linkage. */

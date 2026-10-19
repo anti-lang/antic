@@ -265,7 +265,7 @@ static bool fetch_http(const char *url, const char *temporary,
         argv[argc++] = text_cstr(&current);
         argv[argc] = NULL;
         status.length = 0;
-        ok = process_capture(argv, &status) == 0;
+        ok = platform_capture(argv, &status) == 0;
         /* The status, then the target of a redirect or nothing. */
         code = text_cstr(&status);
         space = strchr(text_cstr(&status), ' ');

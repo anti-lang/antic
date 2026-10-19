@@ -22,7 +22,7 @@
 # DESIGN: every tool is named by its path, and each runs with a PATH of
 # BIN alone and no LIB, so nothing of LLVM or of Anti comes from the
 # machine. No call names the archive: antic and anti find it by the one
-# rule of runtime_archive in src/antic/userdirs.c, as a user's call does.
+# rule of user_runtime_archive in src/antic/userdirs.c, as a user's call does.
 #
 # DESIGN: the raylib program asks for a mouse button, which pulls in rcore
 # and GLFW and opens no window, since neither VM has a display. It imports

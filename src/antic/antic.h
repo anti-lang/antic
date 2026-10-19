@@ -168,12 +168,12 @@ struct options;
    the front end checks as --front-end does. DOC_ITEMS_PRIVATE and
    DOC_ITEMS_DEV need a source. Returns false when the module cannot be
    read or does not check, and the reason is printed. The caller frees out
-   with doc_page_free, whether the call succeeded or not. */
+   with antic_doc_page_free, whether the call succeeded or not. */
 bool antic_doc_page(const struct options *options, enum doc_items items,
                     struct doc_page *out);
 
 /* Release every record of page that antic_doc_page wrote and leave page
    empty, so a page the call left half built is freed as well. */
-void doc_page_free(struct doc_page *page);
+void antic_doc_page_free(struct doc_page *page);
 
 #endif

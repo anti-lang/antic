@@ -14,7 +14,7 @@ bool llvm_debug_wanted(enum target t, bool lines)
     return lines || target_info(t)->format == FORMAT_COFF;
 }
 
-void debug_spans_free(struct debug_spans *s)
+void llvm_debug_spans_free(struct debug_spans *s)
 {
     free(s->items);
     memset(s, 0, sizeof *s);
@@ -37,7 +37,7 @@ void llvm_debug_mark(struct debug_spans *s, size_t start, size_t end)
 
 /* Append s as a metadata string in quotes. A quote, a backslash and a
    byte outside printable ASCII take the escape \XX. */
-void llvm_metadata_string(struct text *out, const char *s)
+void llvm_debug_string(struct text *out, const char *s)
 {
     text_append(out, "\"");
     for (; *s != '\0'; s++) {
@@ -130,7 +130,8 @@ void llvm_debug_init(struct llvm_debug *d, enum target t,
         }
         text_appendf(&d->nodes, "!%" PRIu32 " = !DIFile(filename: ",
                      d->files + (uint32_t)i);
-        llvm_metadata_string(&d->nodes, i < m->file_count ? m->files[i] : unit_file(d));
+        llvm_debug_string(&d->nodes,
+                          i < m->file_count ? m->files[i] : unit_file(d));
         text_append(&d->nodes, ", directory: \"\")\n");
     }
     text_appendf(&d->nodes, "!%" PRIu32 " = !DISubroutineType(types: !%"
@@ -178,7 +179,7 @@ void llvm_debug_open(struct llvm_debug *d, struct text *out,
     reader_name(&name, f);
     text_appendf(&d->nodes, "!%" PRIu32 " = distinct !DISubprogram(name: ",
                  d->subprogram);
-    llvm_metadata_string(&d->nodes, text_cstr(&name));
+    llvm_debug_string(&d->nodes, text_cstr(&name));
     text_appendf(&d->nodes, ", scope: !%" PRIu32 ", file: !%" PRIu32
                             ", line: %" PRIu32 ", type: !%" PRIu32
                             ", scopeLine: %" PRIu32 ", spFlags: %s"

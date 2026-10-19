@@ -47,6 +47,6 @@ bool user_dir(struct text *out, enum user_dir which, const char *app);
    one holds lib/, which is a build tree and an uninstalled package.
    Otherwise it is the user's data directory, when that one holds lib/.
    Returns false when neither does, and out is then untouched. */
-bool runtime_archive(struct text *out);
+bool user_runtime_archive(struct text *out);
 
 #endif
