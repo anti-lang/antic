@@ -36,7 +36,15 @@ static void *kept(void *compiled)
     return compiled;
 }
 
-void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+/* The compile of a pattern of text or of bytes, which the two literals
+   share. */
+typedef void *compile_fn(const unsigned char *bytes, int64_t length,
+                         int32_t *code, int64_t *offset);
+
+/* The literal of length bytes at bytes, compiled by compile, which kind
+   names in the message of a failure. */
+static void *literal(const unsigned char *bytes, int64_t length,
+                     compile_fn *compile, const char *kind)
 {
     unsigned char message[ANTI_RT_REGEX_MESSAGE_ROOM];
     int32_t code = 0;
@@ -44,35 +52,27 @@ void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
     void *compiled;
 
     anti_rt_cpu_check();
-    compiled = anti_rt_regex_compile(bytes, length, &code, &offset);
+    compiled = compile(bytes, length, &code, &offset);
     if (compiled == NULL) {
         anti_rt_regex_message_into(code, message, sizeof message);
-        anti_rt_fail_exit(70, "anti: the pattern `%.*s` does not compile at "
-                          "start: %s", anti_rt_print_width(length),
-                          (const char *)bytes,
-                          (const char *)message);
+        anti_rt_fail_exit(70, "anti: the %s `%.*s` does not compile at "
+                          "start: %s", kind, anti_rt_print_width(length),
+                          (const char *)bytes, (const char *)message);
     }
     return kept(compiled);
+}
+
+void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
+{
+    return literal(bytes, length, anti_rt_regex_compile, "pattern");
 }
 
 /* The byte pattern literal of length bytes at bytes, compiled before main
    as anti_rt_regex_literal compiles a pattern of text. */
 void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
 {
-    unsigned char message[ANTI_RT_REGEX_MESSAGE_ROOM];
-    int32_t code = 0;
-    int64_t offset = 0;
-    void *compiled;
-
-    anti_rt_cpu_check();
-    compiled = anti_rt_regex_compile_bytes(bytes, length, &code, &offset);
-    if (compiled == NULL) {
-        anti_rt_regex_message_into(code, message, sizeof message);
-        anti_rt_fail_exit(70, "anti: the byte pattern `%.*s` does not "
-                          "compile at start: %s", anti_rt_print_width(length),
-                          (const char *)bytes, (const char *)message);
-    }
-    return kept(compiled);
+    return literal(bytes, length, anti_rt_regex_compile_bytes,
+                   "byte pattern");
 }
 
 /* The error numbers of PCRE2 lie between -256 and 511: the failures of a
