@@ -620,8 +620,8 @@ static bool load_archive(const char *path, struct symbol_units *out)
     if (!ok) {
         return false;
     }
-    twin = symbol_unit_entry(u, ".debug");
-    map = symbol_unit_entry(u, ".map");
+    twin = symbol_unit_entry(u, SYMS_DEBUG_SUFFIX);
+    map = symbol_unit_entry(u, SYMS_MAP_SUFFIX);
     if (twin == NULL || !licensing_notice(twin, &u->id, &u->version)) {
         u->id.length = 0;
         if (map == NULL || !map_id(map, &u->id)) {
@@ -797,7 +797,8 @@ int syms_inventory(const char *conf, const char *from, const char *out)
             entries[entry_count].bytes = u->bytes.items[j].data;
             entries[entry_count].size = u->bytes.items[j].length;
             entries[entry_count].executable =
-                files_ends_with(text_cstr(&u->names.items[j]), ".debug");
+                files_ends_with(text_cstr(&u->names.items[j]),
+                                SYMS_DEBUG_SUFFIX);
             entry_count++;
         }
     }
@@ -1005,8 +1006,8 @@ bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
 static bool resolve_frame(const struct symbol_unit *u, uint64_t offset,
                           struct mapped *out)
 {
-    const struct text *twin = symbol_unit_entry(u, ".debug");
-    const struct text *map = symbol_unit_entry(u, ".map");
+    const struct text *twin = symbol_unit_entry(u, SYMS_DEBUG_SUFFIX);
+    const struct text *map = symbol_unit_entry(u, SYMS_MAP_SUFFIX);
     struct mapped mapped;
     uint64_t base = 0;
     uint64_t vaddr;

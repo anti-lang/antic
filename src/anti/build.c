@@ -838,8 +838,8 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
 
     memset(entries, 0, sizeof entries);
     archive_stem(t, deliverable, &stem);
-    text_appendf(&debug_name, "%s.debug", text_cstr(&stem));
-    text_appendf(&map_name, "%s.map", text_cstr(&stem));
+    text_appendf(&debug_name, "%s" SYMS_DEBUG_SUFFIX, text_cstr(&stem));
+    text_appendf(&map_name, "%s" SYMS_MAP_SUFFIX, text_cstr(&stem));
     text_appendf(&debug_path, "%s/%s%s", text_cstr(&b->build_dir),
                  text_cstr(&debug_name),
                  target_info(t)->format == FORMAT_COFF ? ".exe" : "");
@@ -872,7 +872,7 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     if (target_info(t)->format == FORMAT_COFF) {
         /* The PDB of the release link, beside the program in the build
            directory. Every Windows link writes one. */
-        text_appendf(&pdb_name, "%s.pdb", text_cstr(&stem));
+        text_appendf(&pdb_name, "%s" SYMS_PDB_SUFFIX, text_cstr(&stem));
         link_pdb_path(&pdb_path, text_cstr(&b->name));
         if (!files_exists(text_cstr(&pdb_path))) {
             fprintf(stderr, "anti: the link of %s wrote no %s\n",
