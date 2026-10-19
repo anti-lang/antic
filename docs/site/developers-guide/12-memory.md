@@ -1173,6 +1173,7 @@ For a C++ programmer:
 
 - The allocator is no part of a type. A `List<int>` over one allocator has the same type as one over another.
 - `delete(p, from)` gives every `own` field back to `from`. An object whose parts came from different allocators cannot be deleted in one call.
+- `=` to an `own` field gives the old value back to the C library, since `=` names no allocator. An object whose `own` memory came from an allocator ends the old value with `delete(o.f, from)` and stores the new one through the address of the field, `let at = &o.f; *at = v;`, which tears nothing down.
 - `ArenaAllocator` runs no teardown of what stands in its blocks. `destroy(p, from)` runs it, and `free_all()` then gives back the memory.
 
 ## --memory-checks
