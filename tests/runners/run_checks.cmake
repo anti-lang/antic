@@ -33,9 +33,10 @@ if(NOT on MATCHES "check_failed")
     message(FATAL_ERROR "dev mode dropped the checks")
 endif()
 
-# DESIGN: the decision belongs to the build that compiles the program. A
-# library file carries every check, and the same library gives a release
-# program without them and a dev program that stops on one.
+# The back end drops the dev-mode checks, as the entry on them in
+# docs/decisions.md says, so the build that compiles the program decides.
+# A library file carries every check, and the same library gives a
+# release program without them and a dev program that stops on one.
 file(MAKE_DIRECTORY "${WORK}/root/com/example" "${WORK}/lib/com/example")
 file(WRITE "${WORK}/root/com/example/nth.anti"
      "pub fn nth(a: []int, i: int) -> int\n{\n\treturn a[i];\n}\n")

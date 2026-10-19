@@ -2174,7 +2174,7 @@ add_test(NAME tests_may_fail_only
         "-DSKIP=errors/construct_forms.anti:construct,errors/failing.anti:by_hand,errors/failing.anti:fail_by_hand,programs/error_values.anti:stored,programs/error_values.anti:maybe,programs/error_values.anti:caught,programs/catch_exits.anti:passed,programs/catch_moves.anti:by_return"
         -P "${ANTIC_RUNNERS}/run_may_fail_only.cmake")
 
-# DESIGN: the three directory functions of anti.os fail when the
+# The three directory functions of anti.os fail when the
 # environment names no home, and the message names the variable that is
 # absent. The same program runs a second time without those variables,
 # and reads the failure rather than a directory.

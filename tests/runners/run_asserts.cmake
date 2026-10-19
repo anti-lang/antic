@@ -41,9 +41,11 @@ if(off MATCHES "assert_failed")
     message(FATAL_ERROR "--no-asserts kept the assertion")
 endif()
 
-# DESIGN: the decision belongs to the build that compiles the program. A
-# library file carries the assertion, and the same library gives a release
-# program without it and a program built with --asserts one that traps.
+# The back end decides on an assertion, as the entry on assert in
+# docs/decisions.md says, so the build that compiles the program decides.
+# A library file carries the assertion, and the same library gives a
+# release program without it and a program built with --asserts one that
+# traps.
 get_filename_component(here "${SOURCE}" DIRECTORY)
 file(MAKE_DIRECTORY "${WORK}/root/com/example" "${WORK}/lib/com/example")
 file(WRITE "${WORK}/root/com/example/checked.anti"
