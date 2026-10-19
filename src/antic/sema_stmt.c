@@ -1,8 +1,7 @@
 /* The checks of statements and function bodies: narrowing, assignment,
-   `switch`, `sync`, the fields a `construct` sets, closures and what
-   they capture, `main` and the `tests` blocks, the views an `as` gives,
-   whether a class of the program fills an abstract type, and the walk
-   over every function a worker reaches. */
+   `switch`, `sync`, `main` and the `tests` blocks, the views an `as`
+   gives, whether a class of the program fills an abstract type, and the
+   walk over every function a worker reaches. */
 
 #include <stdint.h>
 #include <stdio.h>
@@ -158,11 +157,9 @@ bool sema_filled_somewhere(const struct checker *c, const struct type *t)
     return false;
 }
 
-static bool block_returns(const struct block *b);
-
 /* Whether s is a call of a function that returns `never`, which ends its
    path as `return` does. */
-static bool calls_never(const struct stmt *s)
+bool sema_calls_never(const struct stmt *s)
 {
     const struct expr *e = s->kind == STMT_EXPR ? s->as.expr : NULL;
     const struct type *t = e != NULL && e->kind == EXPR_CALL &&
@@ -246,7 +243,7 @@ static bool stmt_returns(const struct stmt *s);
    of its function. */
 static bool arm_returns(const struct stmt *body)
 {
-    return body->kind == STMT_BLOCK ? block_returns(body->as.block)
+    return body->kind == STMT_BLOCK ? sema_block_returns(body->as.block)
                                     : stmt_returns(body);
 }
 
@@ -255,7 +252,7 @@ static bool stmt_returns(const struct stmt *s)
 {
     size_t i;
 
-    if (s->kind == STMT_RETURN || s->kind == STMT_FAIL || calls_never(s)) {
+    if (s->kind == STMT_RETURN || s->kind == STMT_FAIL || sema_calls_never(s)) {
         return true;
     }
     if (s->kind == STMT_SWITCH && !s->as.switch_stmt.if_let) {
@@ -266,31 +263,31 @@ static bool stmt_returns(const struct stmt *s)
     }
     /* A `sync` block returns when its last statement does. */
     if (s->kind == STMT_SYNC) {
-        return block_returns(s->as.sync.body);
+        return sema_block_returns(s->as.sync.body);
     }
     /* So does a block, which is also the form the checker writes for an
        `if let` on a `?T`: a `let` and an `if` with an `else`. */
     if (s->kind == STMT_BLOCK) {
-        return block_returns(s->as.block);
+        return sema_block_returns(s->as.block);
     }
     /* `if let` is an `if` with an `else`, whose two blocks are the arm
        and the `else` of its switch. */
     if (s->kind == STMT_SWITCH && s->as.switch_stmt.if_let) {
-        return block_returns(s->as.switch_stmt.arms[0].body->as.block) &&
-               block_returns(s->as.switch_stmt.otherwise->as.block);
+        return sema_block_returns(s->as.switch_stmt.arms[0].body->as.block) &&
+               sema_block_returns(s->as.switch_stmt.otherwise->as.block);
     }
     if (s->kind == STMT_IF && s->as.if_chain.else_body != NULL) {
         for (i = 0; i < s->as.if_chain.count; i++) {
-            if (!block_returns(s->as.if_chain.branches[i].body)) {
+            if (!sema_block_returns(s->as.if_chain.branches[i].body)) {
                 return false;
             }
         }
-        return block_returns(s->as.if_chain.else_body);
+        return sema_block_returns(s->as.if_chain.else_body);
     }
     return false;
 }
 
-static bool block_returns(const struct block *b)
+bool sema_block_returns(const struct block *b)
 {
     return b->count > 0 && stmt_returns(b->stmts[b->count - 1]);
 }
@@ -314,7 +311,7 @@ static bool stmt_leaves(const struct stmt *s)
     case STMT_YIELD:
         return true;
     case STMT_EXPR:
-        return calls_never(s);
+        return sema_calls_never(s);
     case STMT_BLOCK:
         return block_leaves(s->as.block);
     case STMT_SYNC:
@@ -526,59 +523,6 @@ static struct type *check_index_target(struct checker *c,
     t = sema_check_storage(c, target);
     base->prechecked = marked;
     return t;
-}
-
-/* The captured variable declared deepest of the closure that the value e
-   gives, or NULL when e gives none or one that captures nothing. */
-static const struct symbol *held_deepest(const struct expr *e)
-{
-    const struct symbol *deepest = NULL;
-    size_t i;
-
-    if (e->kind == EXPR_NAME && e->symbol != NULL) {
-        return e->symbol->holds;
-    }
-    /* A snapshot holds copies and depends on no variable. */
-    if (e->kind != EXPR_FN || e->as.fn->snapshot) {
-        return NULL;
-    }
-    for (i = 0; i < e->as.fn->capture_count; i++) {
-        const struct symbol *sym = e->as.fn->captures[i].symbol;
-        if (deepest == NULL || sym->depth > deepest->depth) {
-            deepest = sym;
-        }
-    }
-    return deepest;
-}
-
-/* DESIGN: a closure never outlives the variables it captures. A local of
-   its frame may hold one. A local declared in a block outside that of a
-   captured variable would hold it after the variable is gone. The
-   assignment is refused with the name of the variable. */
-static void check_closure_lifetime(struct checker *c, const struct expr *target,
-                                   const struct expr *value)
-{
-    const struct symbol *deepest = held_deepest(value);
-    struct symbol *sym = target->kind == EXPR_NAME ? target->symbol : NULL;
-
-    if (sym == NULL || deepest == NULL || sym->type == NULL ||
-        sym->type->kind != TYPE_FN || !sym->type->context) {
-        return;
-    }
-    if (deepest->depth > sym->depth) {
-        sema_error_at(c, value->pos, "`%.*s` outlives `%.*s`, which the "
-                      "closure captures, so a `snapshot fn` takes its value "
-                      "instead", (int)sym->name.length,
-                      sym->name.text, (int)deepest->name.length,
-                      deepest->name.text);
-        return;
-    }
-    if (sym->holds == NULL || deepest->depth > sym->holds->depth) {
-        sym->holds = deepest;
-    }
-    if (value->kind == EXPR_FN) {
-        sym->closure = value->as.fn;
-    }
 }
 
 /* Mark sym, the element variable of the `for` s over a sequence. It is
@@ -832,7 +776,7 @@ static void check_assign(struct checker *c, struct stmt *s)
             sema_bitfield_constant(c, s->as.assign.value, bits);
         }
         sema_bind_value(c, s->as.assign.value, sema_place_name(target), t);
-        check_closure_lifetime(c, target, s->as.assign.value);
+        sema_check_closure_lifetime(c, target, s->as.assign.value);
         sema_check_leak_store(c, target, s->as.assign.value, t);
         if (target->kind == EXPR_NAME && target->symbol != NULL &&
             (target->symbol->kind == SYMBOL_LOCAL ||
@@ -1236,7 +1180,7 @@ static void name_function(char *text, size_t size, const struct item *it)
 /* DESIGN: a `may fail` function writes what it computes through its out
    pointer and keeps `?*Error` for the error channel. `return` therefore
    names the declared result and not the result of the ABI. */
-static struct type *declared_result(struct checker *c)
+struct type *sema_declared_result(struct checker *c)
 {
     const struct item *it = c->ctx.function;
     const struct type *t = it->symbol->type;
@@ -1917,7 +1861,7 @@ static void check_let(struct checker *c, struct stmt *s)
     if (sym != NULL) {
         sym->type = t;
         s->as.let.symbol = sym;
-        sym->holds = held_deepest(s->as.let.value);
+        sym->holds = sema_held_deepest(s->as.let.value);
         sym->into_fields = sema_points_into_fields(s->as.let.value,
                                                    c->ctx.function, t);
         sema_note_guarded_pointer(c, sym, s->as.let.value);
@@ -2219,7 +2163,7 @@ static void check_stmt(struct checker *c, struct stmt *s)
     struct type *t;
     struct symbol *sym;
     size_t i;
-    struct type *result = declared_result(c);
+    struct type *result = sema_declared_result(c);
 
     switch (s->kind) {
     case STMT_LET:
@@ -2535,309 +2479,6 @@ static void check_block_narrowing(struct checker *c, struct block *b,
     sema_leave_scope(c, &scope);
 }
 
-/* DESIGN: a `construct` with arguments makes the object without a
-   literal, so it sets every field that has no default. A path that
-   succeeds ends at a `return;` or at the closing brace. Each such path
-   assigns each such field of the chain, or calls the `construct` of a
-   base, which sets the fields from that base up. The checker refuses
-   the construct and names the field otherwise. A path that fails leaves
-   no object behind and needs nothing. It is definite assignment, as a
-   local has it, applied to the fields of self. A loop body may not run,
-   so what it assigns counts only inside it. */
-struct required {
-    const struct item *fn;
-    const struct type *owner;
-    const struct struct_field **fields;
-    const struct type **levels;
-    size_t count;
-};
-
-static bool sets_block(struct checker *c, const struct required *r,
-                       const struct block *b, bool *set);
-
-static bool sets_stmt(struct checker *c, const struct required *r,
-                      const struct stmt *s, bool *set);
-
-/* Report the first field that a path which succeeds at pos leaves
-   unset. */
-static void require_set(struct checker *c, const struct required *r,
-                        const bool *set, struct pos pos)
-{
-    size_t i;
-
-    for (i = 0; i < r->count && set[i]; i++) {
-    }
-    if (i < r->count) {
-        sema_error_at(c, pos,
-                      "`construct` of `%s` returns `none` before it sets "
-                      "`%.*s`", sema_tn(r->owner),
-                      (int)r->fields[i]->name.length, r->fields[i]->name.text);
-    }
-}
-
-/* Mark the field that the target of `=` names on self. */
-static void set_target(const struct required *r, const struct expr *target,
-                       bool *set)
-{
-    const struct expr *base;
-    size_t i;
-
-    if (target->kind != EXPR_FIELD) {
-        return;
-    }
-    for (base = target->as.field.base;
-         base->kind == EXPR_FIELD &&
-         sema_name_is(&base->as.field.name, "super");
-         base = base->as.field.base) {
-    }
-    if (base->kind != EXPR_NAME || base->symbol == NULL ||
-        base->symbol != r->fn->self) {
-        return;
-    }
-    for (i = 0; i < r->count; i++) {
-        if (types_same_name(&r->fields[i]->name, &target->as.field.name)) {
-            set[i] = true;
-        }
-    }
-}
-
-/* Mark every field from the class whose `construct` e calls up, when e
-   is the call of a base's `construct`. */
-static void set_by_base(const struct required *r, const struct expr *e,
-                        bool *set)
-{
-    const struct item *callee;
-    const struct type *from;
-    const struct type *up;
-    size_t i;
-
-    if (e == NULL || e->kind != EXPR_CALL ||
-        e->as.call.callee->kind != EXPR_NAME ||
-        e->as.call.callee->symbol == NULL) {
-        return;
-    }
-    callee = e->as.call.callee->symbol->item;
-    if (callee == NULL || callee == r->fn ||
-        !sema_name_is(&callee->name, "construct")) {
-        return;
-    }
-    from = sema_declaring_class(callee);
-    for (up = from; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
-        for (i = 0; i < r->count; i++) {
-            if (r->levels[i] == up) {
-                set[i] = true;
-            }
-        }
-    }
-}
-
-/* The call that carries the handler of a statement: the value itself,
-   or the call after a `?.`. */
-static const struct expr *handled_call(const struct expr *e)
-{
-    if (e->kind == EXPR_OPTIONAL) {
-        e = e->as.optional.access;
-    }
-    return e->kind == EXPR_CALL ? e : NULL;
-}
-
-/* The handler of a failing call runs on a path of its own. What it
-   assigns does not count after the call. */
-static void sets_handler(struct checker *c, const struct required *r,
-                         const struct handler *h, const bool *set)
-{
-    bool *copy;
-
-    if (h->kind != HANDLE_BLOCK || h->body == NULL) {
-        return;
-    }
-    copy = arena_alloc(c->arena, r->count + 1);
-    memcpy(copy, set, r->count);
-    sets_block(c, r, h->body, copy);
-}
-
-/* Fold a path that goes on into the meet of the paths so far. */
-static void meet(const struct required *r, bool *into, const bool *path,
-                 bool *any)
-{
-    size_t i;
-
-    for (i = 0; i < r->count; i++) {
-        into[i] = (*any ? into[i] : true) && path[i];
-    }
-    *any = true;
-}
-
-static bool sets_stmt(struct checker *c, const struct required *r,
-                      const struct stmt *s, bool *set)
-{
-    bool *copy = arena_alloc(c->arena, r->count + 1);
-    bool *out = arena_alloc(c->arena, r->count + 1);
-    bool any = false;
-    size_t i;
-
-    switch (s->kind) {
-    case STMT_ASSIGN:
-        if (s->as.assign.op == TOKEN_ASSIGN) {
-            set_target(r, s->as.assign.target, set);
-        }
-        return true;
-    case STMT_EXPR:
-        set_by_base(r, s->as.expr, set);
-        if (handled_call(s->as.expr) != NULL) {
-            sets_handler(c, r, &handled_call(s->as.expr)->as.call.handler,
-                         set);
-        }
-        /* A call of a function that returns `never` ends the path. */
-        return !calls_never(s);
-    case STMT_LET:
-        if (s->as.let.value != NULL && handled_call(s->as.let.value) != NULL) {
-            sets_handler(c, r, &handled_call(s->as.let.value)->as.call.handler,
-                         set);
-        }
-        return true;
-    case STMT_IF:
-        for (i = 0; i < s->as.if_chain.count; i++) {
-            memcpy(copy, set, r->count);
-            if (sets_block(c, r, s->as.if_chain.branches[i].body, copy)) {
-                meet(r, out, copy, &any);
-            }
-        }
-        memcpy(copy, set, r->count);
-        if (s->as.if_chain.else_body == NULL ||
-            sets_block(c, r, s->as.if_chain.else_body, copy)) {
-            meet(r, out, copy, &any);
-        }
-        break;
-    /* An arm that ends in `fallthrough;` goes on into the next arm and
-       not past the switch. The next arm starts from what the switch
-       started from, since its test reaches it with that much set. */
-    case STMT_SWITCH:
-        for (i = 0; i < s->as.switch_stmt.count; i++) {
-            const struct stmt *body = s->as.switch_stmt.arms[i].body;
-            memcpy(copy, set, r->count);
-            if (sets_stmt(c, r, body, copy) &&
-                sema_arm_fallthrough(body) == NULL) {
-                meet(r, out, copy, &any);
-            }
-        }
-        memcpy(copy, set, r->count);
-        if (s->as.switch_stmt.otherwise == NULL ||
-            (sets_stmt(c, r, s->as.switch_stmt.otherwise, copy) &&
-             sema_arm_fallthrough(s->as.switch_stmt.otherwise) == NULL)) {
-            meet(r, out, copy, &any);
-        }
-        break;
-    case STMT_TRY:
-        memcpy(copy, set, r->count);
-        if (sets_block(c, r, s->as.try_block.body, copy)) {
-            meet(r, out, copy, &any);
-        }
-        memcpy(copy, set, r->count);
-        if (s->as.try_block.handler.kind != HANDLE_BLOCK ||
-            sets_block(c, r, s->as.try_block.handler.body, copy)) {
-            meet(r, out, copy, &any);
-        }
-        break;
-    case STMT_WHILE:
-    case STMT_DO_WHILE:
-        memcpy(copy, set, r->count);
-        sets_block(c, r, s->as.loop.body, copy);
-        return true;
-    case STMT_FOR:
-        memcpy(copy, set, r->count);
-        sets_block(c, r, s->as.for_loop.body, copy);
-        return true;
-    case STMT_BLOCK:
-        return sets_block(c, r, s->as.block, set);
-    case STMT_SYNC:
-        return sets_block(c, r, s->as.sync.body, set);
-    /* One arm of a `select` runs, and any of them may. */
-    case STMT_SELECT:
-        for (i = 0; i < s->as.select.count; i++) {
-            memcpy(copy, set, r->count);
-            if (sets_stmt(c, r, s->as.select.arms[i].body, copy)) {
-                meet(r, out, copy, &any);
-            }
-        }
-        break;
-    case STMT_RETURN:
-        if (s->as.return_value == NULL) {
-            require_set(c, r, set, s->pos);
-        }
-        return false;
-    case STMT_FAIL:
-    case STMT_BREAK:
-    case STMT_CONTINUE:
-    case STMT_YIELD:
-        return false;
-    default:
-        return true;
-    }
-    if (!any) {
-        return false;
-    }
-    memcpy(set, out, r->count);
-    return true;
-}
-
-/* A statement after one that leaves the block is never reached. */
-static bool sets_block(struct checker *c, const struct required *r,
-                       const struct block *b, bool *set)
-{
-    size_t i;
-
-    for (i = 0; i < b->count; i++) {
-        if (!sets_stmt(c, r, b->stmts[i], set)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static void check_construct_sets(struct checker *c, const struct item *it)
-{
-    const struct type *owner = sema_declaring_class(it);
-    const struct type *up;
-    struct required r;
-    bool *set;
-    size_t n = 0;
-    size_t i;
-
-    if (owner == NULL || owner->kind != TYPE_CLASS || !it->has_self ||
-        it->param_count == 0 || !sema_name_is(&it->name, "construct") ||
-        it->body == NULL) {
-        return;
-    }
-    for (up = owner; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
-        n += up->field_count;
-    }
-    r.fn = it;
-    r.owner = owner;
-    r.fields = types_alloc_array(c->arena, n + 1, sizeof *r.fields);
-    r.levels = types_alloc_array(c->arena, n + 1, sizeof *r.levels);
-    r.count = 0;
-    for (up = owner; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
-        for (i = 0; i < up->field_count; i++) {
-            const struct struct_field *f = &up->fields[i];
-            if ((f->form != FIELD_PLAIN && f->form != FIELD_USE) ||
-                types_field_is_unit_break(f) || f->value != NULL ||
-                f->constant != NULL || sema_field_takes_literal(f)) {
-                continue;
-            }
-            r.fields[r.count] = f;
-            r.levels[r.count++] = up;
-        }
-    }
-    if (r.count == 0) {
-        return;
-    }
-    set = arena_alloc(c->arena, r.count + 1);
-    if (sets_block(c, &r, it->body, set)) {
-        require_set(c, &r, set, it->body->end);
-    }
-}
-
 void sema_check_function(struct checker *c, struct item *it)
 {
     struct context at = c->ctx;
@@ -2883,15 +2524,16 @@ void sema_check_function(struct checker *c, struct item *it)
         c->top_call = it->body->stmts[0]->as.expr;
     }
     sema_check_block(c, it->body);
-    check_construct_sets(c, it);
+    sema_check_construct_sets(c, it);
     sema_leave_scope(c, &params);
-    if (it->symbol->type->never && !block_returns(it->body)) {
+    if (it->symbol->type->never && !sema_block_returns(it->body)) {
         char named[128];
         name_function(named, sizeof named, it);
         sema_error_at(c, it->name_pos, "%s returns `never` and can reach its "
                       "end", named);
     }
-    if (declared_result(c)->kind != TYPE_VOID && !block_returns(it->body)) {
+    if (sema_declared_result(c)->kind != TYPE_VOID &&
+        !sema_block_returns(it->body)) {
         if (it->enclosing != NULL) {
             sema_error_at(c, it->name_pos, "the anonymous function can reach "
                           "its end without `return`");
@@ -2915,320 +2557,6 @@ void sema_check_function(struct checker *c, struct item *it)
     }
     c->saw_fail = false;
     sema_leave(c, &saved);
-}
-
-/* Anonymous functions and closures */
-
-/* The named function whose body is checked, around every anonymous
-   function that stands in it. NULL outside a function. */
-const struct item *sema_named_function(const struct checker *c)
-{
-    const struct item *it = c->ctx.function;
-
-    while (it != NULL && it->enclosing != NULL) {
-        it = it->enclosing;
-    }
-    return it;
-}
-
-/* The capture of sym in the anonymous function it, added when it is not
-   there yet.
-   DESIGN: the list lives in the arena, as the item does. A copy of a
-   generic and an item read from a library file hold a list of the arena
-   as well, so realloc can grow none of them, and a list of the heap had
-   no owner to free it. A grown list leaves the old one in the arena. */
-static struct capture *capture_in(struct checker *c, struct item *it,
-                                  struct symbol *sym)
-{
-    size_t i;
-
-    for (i = 0; i < it->capture_count; i++) {
-        if (it->captures[i].symbol == sym) {
-            return &it->captures[i];
-        }
-    }
-    if (it->capture_count == it->capture_capacity) {
-        size_t capacity = it->capture_capacity == 0 ? 4
-                                                    : it->capture_capacity * 2;
-        struct capture *grown =
-            types_alloc_array(c->arena, capacity, sizeof *grown);
-
-        if (it->capture_count > 0) {
-            memcpy(grown, it->captures,
-                   it->capture_count * sizeof *grown);
-        }
-        it->captures = grown;
-        it->capture_capacity = capacity;
-    }
-    memset(&it->captures[it->capture_count], 0, sizeof *it->captures);
-    it->captures[it->capture_count].symbol = sym;
-    return &it->captures[it->capture_count++];
-}
-
-/* DESIGN: a variable an anonymous function names from another frame is
-   captured by reference. The variable then lives in memory. Every
-   anonymous function between the one that names it and its frame
-   captures it as well. A closure made inside a closure then finds the
-   address in the context of the one around it. */
-void sema_capture(struct checker *c, struct symbol *sym)
-{
-    struct item *it;
-
-    sym->address_taken = true;
-    sym->captured = true;
-    for (it = c->ctx.function; it != NULL && it != sym->frame;
-         it = it->enclosing) {
-        capture_in(c, it, sym);
-    }
-}
-
-/* The variable at the root of the place e, when a closure captures it,
-   else NULL. A place through a pointer or a slice changes what they
-   point to and not the variable. */
-static struct symbol *captured_root(const struct checker *c,
-                                    const struct expr *e)
-{
-    while (e->kind == EXPR_INDEX || e->kind == EXPR_FIELD) {
-        const struct expr *base = e->kind == EXPR_INDEX ? e->as.index.base
-                                                        : e->as.field.base;
-        if (base->type == NULL || base->type->kind == TYPE_POINTER ||
-            base->type->kind == TYPE_SLICE) {
-            return NULL;
-        }
-        e = base;
-    }
-    if (e->kind != EXPR_NAME || e->symbol == NULL ||
-        (e->symbol->kind != SYMBOL_LOCAL &&
-         e->symbol->kind != SYMBOL_PARAM) ||
-        e->symbol->frame == NULL || e->symbol->frame == c->ctx.function) {
-        return NULL;
-    }
-    return e->symbol;
-}
-
-/* Record that the closures around the place e change the variable at its
-   root, with the position of the first change. */
-void sema_note_write(struct checker *c, const struct expr *e)
-{
-    struct symbol *sym = captured_root(c, e);
-    struct item *it;
-
-    sema_note_field_write(c, e);
-    for (it = c->ctx.function; sym != NULL && it != NULL && it != sym->frame;
-         it = it->enclosing) {
-        struct capture *cap = capture_in(c, it, sym);
-        if (!cap->written) {
-            cap->written = true;
-            cap->write = e->pos;
-        }
-    }
-}
-
-/* Record a call through a captured function of the form that is not
-   `concurrent`, which a closure at a `concurrent` parameter may not
-   make. */
-void sema_note_call(struct checker *c, const struct expr *callee)
-{
-    struct symbol *sym = captured_root(c, callee);
-    struct item *it;
-
-    if (sym == NULL || callee->kind != EXPR_NAME || sym->type == NULL ||
-        sym->type->kind != TYPE_FN || !sym->type->context ||
-        sym->type->concurrent) {
-        return;
-    }
-    for (it = c->ctx.function; it != NULL && it != sym->frame;
-         it = it->enclosing) {
-        struct capture *cap = capture_in(c, it, sym);
-        if (!cap->called) {
-            cap->called = true;
-            cap->call = callee->pos;
-        }
-    }
-}
-
-/* DESIGN: a worker may take a function value as a parameter, and a
-   closure only through a `concurrent` one. A parameter without the mark
-   therefore takes a function that captures nothing. */
-void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
-                                const struct type *param)
-{
-    if (param->kind == TYPE_FN && param->context && !param->concurrent &&
-        arg->type != NULL && arg->type->kind == TYPE_FN &&
-        arg->type->context) {
-        sema_error_at(c, arg->pos, "a worker takes a closure through a "
-                      "`concurrent` parameter alone");
-    }
-}
-
-/* The checker's state of one function body, which an anonymous function
-   sets aside while its own body is checked. */
-struct body_state {
-    int loop_depth;
-    struct stmt *fallthrough;
-    struct handler_state handler;
-    bool saw_fail;
-    const struct expr *top_call;
-    int deferring;
-    const struct stmt *deferred;
-    int deferred_loops;
-    const struct expr *field_base;
-    const struct held_mutex *held_outside;
-    const struct stmt *loops_open[LOOPS_OPEN_MAX];
-};
-
-static void set_aside(struct checker *c, struct body_state *s)
-{
-    s->loop_depth = c->loop_depth;
-    s->fallthrough = c->fallthrough;
-    s->handler = c->handler;
-    s->saw_fail = c->saw_fail;
-    s->top_call = c->top_call;
-    s->deferring = c->deferring;
-    s->deferred = c->deferred;
-    s->deferred_loops = c->deferred_loops;
-    s->field_base = c->field_base;
-    s->held_outside = c->held_outside;
-    memcpy(s->loops_open, c->loops_open, sizeof s->loops_open);
-    c->loop_depth = 0;
-    c->fallthrough = NULL;
-    memset(&c->handler, 0, sizeof c->handler);
-    c->deferring = 0;
-    c->deferred = NULL;
-    c->deferred_loops = 0;
-    c->field_base = NULL;
-    /* DESIGN: the `sync` blocks around an anonymous function stay on the
-       chain, and held_outside marks where they begin. A guarded field
-       reads the blocks of its own function alone, since the anonymous
-       function may run after the block around it. A `sync` reads the
-       whole chain, by R093 of "Rules of 2026-10-13": a thread that runs
-       the function inside the block takes the Mutex it holds. */
-    c->held_outside = c->held;
-}
-
-static void take_back(struct checker *c, const struct body_state *s)
-{
-    c->loop_depth = s->loop_depth;
-    c->fallthrough = s->fallthrough;
-    c->handler = s->handler;
-    c->saw_fail = s->saw_fail;
-    c->top_call = s->top_call;
-    c->deferring = s->deferring;
-    c->deferred = s->deferred;
-    c->deferred_loops = s->deferred_loops;
-    c->field_base = s->field_base;
-    c->held_outside = s->held_outside;
-    memcpy(c->loops_open, s->loops_open, sizeof c->loops_open);
-}
-
-/* The type of the anonymous function it, from the types it writes and
-   the target where it leaves one out. NULL after an error. */
-static struct type *anonymous_type(struct checker *c, struct item *it,
-                                   const struct type *target)
-{
-    size_t shown = target != NULL
-                       ? target->param_count - (target->has_out ? 1 : 0)
-                       : 0;
-    struct type **params = types_alloc_array(
-        c->arena, it->param_count + 2, sizeof *params);
-    struct type *result = sema_builtin(c, TYPE_VOID);
-    size_t i;
-
-    if (target != NULL && shown != it->param_count) {
-        sema_error_at(c, it->pos, "the anonymous function takes %zu "
-                      "parameter%s, and `%s` gives %zu", it->param_count,
-                      it->param_count == 1 ? "" : "s", sema_tn(target), shown);
-        return NULL;
-    }
-    for (i = 0; i < it->param_count; i++) {
-        struct param *p = &it->params[i];
-        if (p->type != NULL) {
-            params[i] = sema_param_form(c, sema_resolve_type(c, p->type),
-                                        p->keep, p->concurrent,
-                                        p->owned && p->type->kind == TYPEX_FN,
-                                        p->pos);
-        } else if (target != NULL && !p->keep && !p->concurrent &&
-                   !p->owned) {
-            params[i] = target->params[i];
-        } else {
-            sema_error_at(c, p->pos, "`%.*s` needs a type, which an "
-                          "anonymous function takes from a parameter of "
-                          "function type", (int)p->name.length, p->name.text);
-            return NULL;
-        }
-        params[i] = sema_lent_form(c, params[i], p->lent, p->owned, p->pos);
-        if (sema_is_error(params[i])) {
-            return NULL;
-        }
-    }
-    if (it->result != NULL) {
-        result = sema_resolve_type(c, it->result);
-    } else if (target != NULL) {
-        result = target->has_out ? target->params[shown]->element
-                 : target->may_fail ? sema_builtin(c, TYPE_VOID)
-                                    : target->result;
-    }
-    if (sema_is_error(result)) {
-        return NULL;
-    }
-    if (target != NULL && target->may_fail && !it->may_fail) {
-        it->may_fail = true;
-    }
-    if (target != NULL && target->never && it->result == NULL) {
-        it->never = true;
-    }
-    if (it->never && it->may_fail) {
-        sema_error_at(c, it->pos,
-                      "a function that returns `never` cannot fail");
-        return NULL;
-    }
-    if (it->never) {
-        return types_fn_never(c->types, types_fn(c->types, params,
-                                                 it->param_count, result));
-    }
-    if (it->may_fail) {
-        struct type *error = sema_error_class(c, it->pos);
-        bool out = result->kind != TYPE_VOID;
-        if (error == NULL) {
-            return NULL;
-        }
-        if (out) {
-            params[it->param_count] = types_pointer(c->types, result);
-        }
-        return types_fn_failing(c->types, params,
-                                it->param_count + (out ? 1 : 0),
-                                types_pointer_nullable(c->types, error), out);
-    }
-    return types_fn(c->types, params, it->param_count, result);
-}
-
-/* Whether a value of t copies fully into a snapshot. A number, `bool`,
-   `char`, an enum and a struct of those do. So does a `str` at the top,
-   whose bytes the snapshot copies. */
-static bool snapshot_copies(const struct type *t, bool top)
-{
-    size_t i;
-
-    /* The kinds from TYPE_BOOL to TYPE_F64 are the scalars, bool, char,
-       the integers and the floats, in one range of enum type_kind. */
-    if (t->kind >= TYPE_BOOL && t->kind <= TYPE_F64) {
-        return true;
-    }
-    if (t->kind == TYPE_ENUM) {
-        return true;
-    }
-    if (t->kind == TYPE_STR) {
-        return top;
-    }
-    if (t->kind != TYPE_STRUCT) {
-        return false;
-    }
-    for (i = 0; i < t->field_count; i++) {
-        if (!snapshot_copies(t->fields[i].type, false)) {
-            return false;
-        }
-    }
-    return true;
 }
 
 /* DESIGN: a field of a singleton is read-only after creation, so
@@ -3320,139 +2648,6 @@ bool sema_refuse_count_write(struct checker *c, const struct expr *target,
     sema_error_at(c, pos, "`" COLLECTION_COUNT "` of `%s` is read-only "
                   "outside its module", sema_tn(sema_struct_of(receiver->type)));
     return true;
-}
-
-/* DESIGN: a snapshot is read-only, so two threads that call it never
-   write it at once. It holds values that copy fully: an address would
-   copy the address and not what it points at. The first write of a
-   captured value and each capture of another type are refused. An
-   atomic local is shared state, and a copy of it is not, so a snapshot
-   names none, by R090 of "Rules of 2026-10-13". */
-static void check_snapshot(struct checker *c, const struct expr *e)
-{
-    const struct item *it = e->as.fn;
-    size_t i;
-
-    for (i = 0; i < it->capture_count; i++) {
-        const struct capture *cap = &it->captures[i];
-        const struct symbol *sym = cap->symbol;
-        if (sym->type == NULL || sema_is_error(sym->type)) {
-            continue;
-        }
-        if (sym->atomic) {
-            sema_error_at(c, e->pos, "a snapshot holds copies, and the "
-                          "atomic `%.*s` is shared state",
-                          (int)sym->name.length, sym->name.text);
-        } else if (!snapshot_copies(sym->type, true)) {
-            sema_error_at(c, e->pos, "a snapshot holds values that copy "
-                          "fully, and `%.*s` is `%s`",
-                          (int)sym->name.length, sym->name.text,
-                          sema_tn(sym->type));
-        } else if (cap->written) {
-            sema_error_at(c, cap->write, "`%.*s` is changed in a snapshot, "
-                          "which is read-only", (int)sym->name.length,
-                          sym->name.text);
-        }
-    }
-}
-
-/* DESIGN: an anonymous function is checked as a function of its own,
-   whose scope sits inside the scope where it stands. A name of the
-   function around it is then found. Naming a local or a parameter of
-   another frame captures it. The types come from the target, a parameter
-   of function type, and never from the body. The value is an ordinary
-   function when nothing is captured. A closure takes the form of two
-   words. It is `concurrent` when it changes no captured variable whose
-   type is not thread-safe and calls no captured function that is not. */
-struct type *sema_check_anonymous(struct checker *c, struct expr *e,
-                                  struct type *expected)
-{
-    struct item *it = e->as.fn;
-    const struct type *target = NULL;
-    struct body_state state;
-    struct context at;
-    struct context saved;
-    struct scope params;
-    struct symbol *sym;
-    struct type *fn;
-    size_t i;
-    bool safe = true;
-
-    if (c->ctx.function == NULL) {
-        sema_error_at(c, e->pos, "an anonymous function stands in the body "
-                      "of a function");
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    if (expected != NULL && expected->kind == TYPE_FN && !expected->bound) {
-        target = expected;
-    }
-    it->enclosing = c->ctx.function;
-    it->capture_count = 0;
-    fn = anonymous_type(c, it, target);
-    if (fn == NULL) {
-        return sema_builtin(c, TYPE_ERROR);
-    }
-    sym = arena_alloc(c->arena, sizeof *sym);
-    sym->kind = SYMBOL_FN;
-    sym->name = it->name;
-    sym->pos = it->pos;
-    sym->type = fn;
-    sym->item = it;
-    sym->may_fail = it->may_fail;
-    it->symbol = sym;
-    set_aside(c, &state);
-    at = c->ctx;
-    at.function = it;
-    at.in_try = NULL;
-    sema_enter(c, &at, &saved);
-    c->saw_fail = false;
-    c->top_call = NULL;
-    sema_enter_scope(c, &params);
-    for (i = 0; i < it->param_count; i++) {
-        struct symbol *p =
-            sema_declare(c, SYMBOL_PARAM, &it->params[i].name,
-                         it->params[i].pos,
-                         "`%.*s` is already declared in this block");
-        if (p != NULL) {
-            p->type = fn->params[i];
-            it->params[i].symbol = p;
-        }
-    }
-    sema_check_block(c, it->body);
-    sema_leave_scope(c, &params);
-    if (fn->never && !block_returns(it->body)) {
-        sema_error_at(c, it->pos, "the anonymous function returns `never` "
-                      "and can reach its end");
-    }
-    if (declared_result(c)->kind != TYPE_VOID && !block_returns(it->body)) {
-        sema_error_at(c, it->pos, "the anonymous function can reach its end "
-                      "without `return`");
-    }
-    if (it->may_fail && !c->saw_fail && it->may_fail_pos.line != 0) {
-        diagnostics_warn(c->diags, NAME_NEVER_FAILS, it->may_fail_pos.line,
-                         it->may_fail_pos.column,
-                         "the anonymous function may fail and never does");
-    }
-    sema_leave(c, &saved);
-    take_back(c, &state);
-    if (it->snapshot) {
-        check_snapshot(c, e);
-    }
-    if (it->capture_count == 0) {
-        return fn;
-    }
-    /* A snapshot writes nothing it holds, so every thread may call it. */
-    if (it->snapshot) {
-        return types_fn_form(c->types, fn, true, true);
-    }
-    for (i = 0; i < it->capture_count; i++) {
-        const struct capture *cap = &it->captures[i];
-        if ((cap->written && !sema_thread_safe_symbol(cap->symbol)) ||
-            cap->called) {
-            safe = false;
-        }
-    }
-    return types_fn_form(c->types, fn, true, safe);
 }
 
 /* main takes one of the three forms of the language. */

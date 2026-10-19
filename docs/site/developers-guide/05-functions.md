@@ -1037,7 +1037,7 @@ define internal noundef i64 @clo.main() #4 {
 
 The two calls of `append_int` are `each(s[0..2], show)`. The loop of `each` and the call through the function value are gone. Each call of `show` stands in `main` with its element as a constant, 3 and then 4.
 
-Where it lives: `sema_check_anonymous`, `sema_capture` and `check_closure_lifetime` of `src/antic/sema_stmt.c` check a closure. `lower_closure` and `lower_anonymous_function` of `src/antic/lower_function.c` write the context and the function. `lower_add_param` of `src/antic/lower.c` splits a function parameter into its two words.
+Where it lives: `sema_check_anonymous`, `sema_capture` and `sema_check_closure_lifetime` of `src/antic/sema_closure.c` check a closure. `lower_closure` and `lower_anonymous_function` of `src/antic/lower_function.c` write the context and the function. `lower_add_param` of `src/antic/lower.c` splits a function parameter into its two words.
 
 ### What it costs
 
@@ -1220,7 +1220,7 @@ An `own fn` is two words, the code and the pointer to the snapshot. In `Panel` t
 
 The snapshot passed to `run` is the same record in a slot of the frame of `main`. Its `str` is copied as two words, and nothing calls the runtime.
 
-Where it lives: `check_snapshot` of `src/antic/sema_stmt.c` and `require_owned` of `src/antic/sema_expr.c`. `lower_snapshot` of `src/antic/lower_function.c`, and `lower_free_snapshot` and `lower_dup_snapshot` of `src/antic/lower_owning.c`. The four runtime functions are in `src/rt/snapshot.c`.
+Where it lives: `check_snapshot` of `src/antic/sema_closure.c` and `require_owned` of `src/antic/sema_expr.c`. `lower_snapshot` of `src/antic/lower_function.c`, and `lower_free_snapshot` and `lower_dup_snapshot` of `src/antic/lower_owning.c`. The four runtime functions are in `src/rt/snapshot.c`.
 
 ### What it costs
 

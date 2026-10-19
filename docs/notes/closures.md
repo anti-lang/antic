@@ -44,10 +44,10 @@ choices of `snapshot fn` and `own fn`.
 - `require_fn_form` in `sema_require` converts between the forms and gives the
   messages of `keep` and `concurrent`. A plain function where the two words
   are expected marks the expression `to_context`.
-- `check_closure_lifetime` refuses a closure held in a local of an outer block
-  than a variable it captures. A local keeps the anonymous function it holds
-  for the message of `concurrent`, and the captured variable declared deepest
-  for the lifetime.
+- `sema_check_closure_lifetime` of `sema_closure.c` refuses a closure held
+  in a local of an outer block than a variable it captures. A local keeps
+  the anonymous function it holds for the message of `concurrent`, and the
+  captured variable declared deepest for the lifetime.
 
 ## Lowering
 

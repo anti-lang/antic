@@ -19,7 +19,7 @@
 enum type_kind {
     TYPE_VOID,      /* the result of a function without -> R */
     /* The scalars, from TYPE_BOOL to TYPE_F64, which snapshot_copies of
-       sema_stmt.c reads as one range. */
+       sema_closure.c reads as one range. */
     TYPE_BOOL,
     TYPE_CHAR,
     TYPE_I8,

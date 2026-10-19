@@ -67,7 +67,8 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/sema_call.c` | Checks calls and members: fields and their visibility, the functions of a class, `construct`, errors and their handlers, `mul_high` and the calls of a plugin library. |
 | `src/antic/sema_chain.c` | Takes a chain of declarations that name each other apart and resolves them leaves first. |
 | `src/antic/sema_checker.h` | The state of the checker and the functions its files share, each under the file that defines it. |
-| `src/antic/sema_class.c` | Checks the class model of every type with fields once the module is declared, and gives lowering and the C header the primary table. |
+| `src/antic/sema_class.c` | Checks the class model of every type with fields once the module is declared, with the fields a `construct` sets, and gives lowering and the C header the primary table. |
+| `src/antic/sema_closure.c` | Checks an anonymous function as a function of its own, with its type from the target, what it captures, the writes and calls through a capture, a snapshot and a closure that would outlive a capture. |
 | `src/antic/sema_const.c` | Evaluates constant expressions and gives each constant symbol its value once, in dependency order. |
 | `src/antic/sema_copies.c` | The compiled copies: clones the checked tree of a generic per use, rechecks the open nodes, and rewrites the calls that name the copies. |
 | `src/antic/sema_doc.c` | The doc warnings of `anti check`, reading the module alone. |

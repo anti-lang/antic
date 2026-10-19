@@ -13,11 +13,12 @@
    checks the binary operators and finds the `operator fn` functions of
    a type, sema_simd.c checks simd structs, and sema_thread.c the
    atomics, the locks, the channels and the workers. sema_stmt.c
-   checks statements and function bodies with the closures in them, and
-   walks what a worker reaches. sema_value.c holds the value
-   rules: what a value owns, and when it moves, when it is copied and
-   when a copy is refused. sema_safety.c checks the thread-safe classes
-   and says which types are thread-safe. sema_generic.c checks generics,
+   checks statements and function bodies, and walks what a worker
+   reaches. sema_closure.c checks the anonymous functions and what they
+   capture. sema_value.c holds the value rules: what a value owns, and
+   when it moves, when it is copied and when a copy is refused.
+   sema_safety.c checks the thread-safe classes and says which types are
+   thread-safe. sema_generic.c checks generics,
    and sema_copies.c compiles their copies. sema_hash.c checks hashing
    and the default `==`, and sema_pattern.c the pattern literals and
    their calls. sema_export.c checks what crosses to C and writes the
@@ -588,6 +589,9 @@ extern const struct root_fn sema_root_fns[SEMA_ROOT_COUNT];
 
 /* Check the class model of every type with fields of the module. */
 void sema_check_classes(struct checker *c);
+/* Refuse a `construct` with arguments of the class of it that can end
+   without setting a field that has no default. */
+void sema_check_construct_sets(struct checker *c, const struct item *it);
 
 /* sema_chain.c */
 
@@ -653,21 +657,33 @@ size_t sema_proved_names(const struct expr *cond, bool want_true,
                          struct symbol **out, size_t count);
 struct type *sema_proved_type(struct checker *c, const struct symbol *sym);
 void sema_check_block(struct checker *c, struct block *b);
-const struct item *sema_named_function(const struct checker *c);
 /* e[i] = v in the statement s, which a copy reads again with the type of
    its argument. Returns false when the base has no hook, and s is then a
    plain assignment. */
 bool sema_set_index(struct checker *c, struct stmt *s);
+void sema_check_function(struct checker *c, struct item *it);
+void sema_check_main(struct checker *c, struct item *it);
+void sema_check_test_block(struct checker *c, struct item *it);
+/* Whether the last statement of b returns on every path, the form the
+   rule of the missing `return` reads. */
+bool sema_block_returns(const struct block *b);
+/* Whether s is a call of a function that returns `never`. */
+bool sema_calls_never(const struct stmt *s);
+struct type *sema_declared_result(struct checker *c);
+
+/* sema_closure.c */
+const struct item *sema_named_function(const struct checker *c);
 void sema_capture(struct checker *c, struct symbol *sym);
 void sema_note_write(struct checker *c, const struct expr *e);
 void sema_note_call(struct checker *c, const struct expr *callee);
 void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
                                 const struct type *param);
+const struct symbol *sema_held_deepest(const struct expr *e);
+void sema_check_closure_lifetime(struct checker *c,
+                                 const struct expr *target,
+                                 const struct expr *value);
 struct type *sema_check_anonymous(struct checker *c, struct expr *e,
                                   struct type *expected);
-void sema_check_function(struct checker *c, struct item *it);
-void sema_check_main(struct checker *c, struct item *it);
-void sema_check_test_block(struct checker *c, struct item *it);
 
 /* sema_value.c */
 
