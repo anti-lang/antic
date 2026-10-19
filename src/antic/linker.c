@@ -12,6 +12,7 @@
 #include "alloc.h"
 #include "antic.h"
 #include "platform.h"
+#include "say.h"
 
 static bool ends_with(const char *s, const char *suffix)
 {
@@ -47,8 +48,8 @@ static struct text *next(struct link_command *c)
 {
     if (c->string_count >= LINK_MAX_STRINGS) {
         /* Unreachable while LINK_MAX_STRINGS covers every command. */
-        fputs("antic: a link command needs more than LINK_MAX_STRINGS "
-              "strings\n", stderr);
+        say_antic("a link command needs more than LINK_MAX_STRINGS "
+                  "strings\n");
         abort();
     }
     return &c->strings[c->string_count++];

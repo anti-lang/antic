@@ -13,6 +13,7 @@
 #include "coff.h"
 #include "llvm_emit.h"
 #include "platform.h"
+#include "say.h"
 
 #define MARKER_SUFFIX ".bundle"
 #define EXPORTED_SUFFIX ".exported"
@@ -28,7 +29,7 @@
 static bool run_command(const struct link_command *c, const char *what)
 {
     if (platform_run(c->argv) != 0) {
-        fprintf(stderr, "antic: %s failed\n", what);
+        say_antic("%s failed\n", what);
         return false;
     }
     return true;
@@ -52,8 +53,8 @@ static bool join_coff(const struct paths *objects, const char *output)
         inputs[i].size = bytes[i].length;
     }
     if (ok && !coff_join(inputs, objects->count, &joined, &error)) {
-        fprintf(stderr, "antic: joining the runtime into the library: %s\n",
-                text_cstr(&error));
+        say_antic("joining the runtime into the library: %s\n",
+                  text_cstr(&error));
         ok = false;
     }
     ok = ok && driver_write_file(output, &joined);
@@ -239,7 +240,7 @@ static bool bundle(const struct options *o, const struct extras *extras,
         driver_add_path(members, copy);
     }
     if (!ok) {
-        fprintf(stderr, "antic: cannot bundle %s\n", text_cstr(&library));
+        say_antic("cannot bundle %s\n", text_cstr(&library));
     }
     free((void *)objects.items);
     text_free(&library);
@@ -358,7 +359,7 @@ bool driver_build_c_library(const struct options *o, const char *object,
         if (ok && o->soname) {
             const char *version = o->package_version;
             if (version == NULL) {
-                fputs("antic: --soname needs --package-version\n", stderr);
+                say_antic("--soname needs --package-version\n");
                 ok = false;
             } else {
                 text_appendf(&major, "%.*s", (int)strcspn(version, "."),
@@ -440,7 +441,7 @@ bool driver_build_c_library(const struct options *o, const char *object,
             ok = platform_symlink(platform_file_name(text_cstr(&versioned)),
                                   text_cstr(&path));
             if (!ok) {
-                fprintf(stderr, "antic: cannot write %s\n", text_cstr(&path));
+                say_antic("cannot write %s\n", text_cstr(&path));
             }
         }
         if (ok && s.plugin) {

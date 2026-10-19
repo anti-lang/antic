@@ -13,6 +13,7 @@
 #include "applesdk.h"
 #include "coff.h"
 #include "platform.h"
+#include "say.h"
 #include "shared.h"
 
 /* Run xcrun and keep its output without the final newline. */
@@ -21,7 +22,7 @@ static bool xcrun(const char *query, struct text *out)
     const char *argv[] = {"xcrun", "--sdk", "macosx", query, NULL};
 
     if (platform_capture(argv, out) != 0) {
-        fprintf(stderr, "antic: xcrun %s failed\n", query);
+        say_antic("xcrun %s failed\n", query);
         return false;
     }
     while (out->length > 0 && out->data[out->length - 1] == '\n') {
@@ -47,8 +48,8 @@ static bool find_crt_dir(enum target t, struct text *out)
             return true;
         }
     }
-    fprintf(stderr, "antic: cannot find Scrt1.o of the C library in %s, %s "
-                    "or %s\n", dirs[0], dirs[1], dirs[2]);
+    say_antic("cannot find Scrt1.o of the C library in %s, %s "
+              "or %s\n", dirs[0], dirs[1], dirs[2]);
     return false;
 }
 
@@ -69,17 +70,17 @@ const char *driver_archive_tool(const struct options *o, const char *name,
         target_host(&host) ? target_info(host)->executable_suffix : "";
 
     if (o->runtime == NULL) {
-        fprintf(stderr, "antic: no runtime archive holds %s. The package "
-                        "holds it in bin/ beside antic.\n",
-                name);
+        say_antic("no runtime archive holds %s. The package "
+                  "holds it in bin/ beside antic.\n",
+                  name);
         return NULL;
     }
     text_appendf(path, "%s/%s/%s%s", o->runtime, RUNTIME_BIN_DIR, name,
                  suffix);
     if (!driver_file_exists(text_cstr(path))) {
-        fprintf(stderr, "antic: %s is missing. The package holds it in bin/ "
-                        "beside antic.\n",
-                text_cstr(path));
+        say_antic("%s is missing. The package holds it in bin/ "
+                  "beside antic.\n",
+                  text_cstr(path));
         return NULL;
     }
     return text_cstr(path);
@@ -132,7 +133,7 @@ static bool apple_sdk(const struct options *o, struct link_facts *f)
     text_free(&version);
     text_appendf(&f->sdk_path, "%s/%s", text_cstr(&f->sysroot),
                  SYSROOT_APPLE_SDK_DIR);
-    fprintf(stderr, "antic: the frameworks");
+    say_antic("the frameworks");
     for (i = 0; i < o->framework_count; i++) {
         fprintf(stderr, "%s %s", i > 0 ? "," : "", o->frameworks[i]);
     }
@@ -200,9 +201,9 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
        the machine never stands in. Eddie decided this on 2026-09-27 under
        "Binary distribution" in docs/decisions.md. */
     if (!present) {
-        fprintf(stderr, "antic: linking for %s needs the sysroot %s of the "
-                        "package\n",
-                target_name(t), text_cstr(&f->sysroot));
+        say_antic("linking for %s needs the sysroot %s of the "
+                  "package\n",
+                  target_name(t), text_cstr(&f->sysroot));
         return false;
     }
     in->sysroot = text_cstr(&f->sysroot);
@@ -327,7 +328,7 @@ bool driver_windows_link_paths(struct windows_link *w, struct link_inputs *in,
     }
     if (!platform_absolute_path(cut != NULL ? text_cstr(&w->directory) : ".",
                                 &w->base)) {
-        fprintf(stderr, "antic: cannot find the directory of %s\n", exe);
+        say_antic("cannot find the directory of %s\n", exe);
         return false;
     }
     if (cut != NULL) {
@@ -369,7 +370,7 @@ bool driver_run_link(const struct windows_link *w, const struct link_command *c)
                                                     : NULL;
 
     if (platform_run_in(directory, c->argv) != 0) {
-        fprintf(stderr, "antic: the linker failed\n");
+        say_antic("the linker failed\n");
         return false;
     }
     return true;
@@ -410,8 +411,8 @@ static bool host_exports(const struct options *o, const char *object,
                                     bytes.length,
                                     (const unsigned char *)program.data,
                                     program.length, &all)) {
-        fprintf(stderr, "antic: cannot read the symbols of %s and %s\n",
-                text_cstr(&library), object);
+        say_antic("cannot read the symbols of %s and %s\n",
+                  text_cstr(&library), object);
         ok = false;
     }
     text_appendf(&content, "NAME %s\nEXPORTS\n", file);
@@ -454,10 +455,10 @@ bool driver_native_inputs(const struct options *o, const struct extras *extras,
         return true;
     }
     if (cpu_arch(o->cpu) == cpu_arch(level) && o->cpu < level) {
-        fprintf(stderr, "antic: " REGEX_MODULE " is built for %s%s, this "
-                "program targets %s\n",
-                target_info(o->target)->arch == ARCH_X86_64 ? "x86-64-" : "",
-                cpu_name(level), cpu_name(o->cpu));
+        say_antic(REGEX_MODULE " is built for %s%s, this "
+                  "program targets %s\n",
+                  target_info(o->target)->arch == ARCH_X86_64 ? "x86-64-" : "",
+                  cpu_name(level), cpu_name(o->cpu));
         return false;
     }
     link_native_library(glue, o->runtime, o->target, NATIVE_REGEX_GLUE);
@@ -527,9 +528,8 @@ bool driver_link_program(const struct options *o, const char *object,
     /* DESIGN: the .def file of a Windows host lists the names of the COFF
        symbols of its object, and under --lto the object is bitcode. */
     if (ok && in.exports && os == OS_WINDOWS && o->lto != LTO_NONE) {
-        fputs("antic: --lto links no Windows program that hosts plugins, "
-              "since the names it exports come from a COFF object\n",
-              stderr);
+        say_antic("--lto links no Windows program that hosts plugins, "
+                  "since the names it exports come from a COFF object\n");
         ok = false;
     }
     if (ok && in.exports && os == OS_WINDOWS) {

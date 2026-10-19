@@ -14,6 +14,7 @@
 #include "antl.h"
 #include "ir.h"
 #include "platform.h"
+#include "say.h"
 #include "sema.h"
 #include "types.h"
 
@@ -116,7 +117,7 @@ bool driver_find_libraries(const struct options *o, const struct module *tree,
             ok = driver_read_bytes(out->items[read], &bytes);
             if (ok && !antl_header((const uint8_t *)bytes.data, bytes.length,
                                    arena, &header, error, sizeof error)) {
-                fprintf(stderr, "antic: %s %s\n", out->items[read], error);
+                say_antic("%s %s\n", out->items[read], error);
                 ok = false;
             }
             text_free(&bytes);
@@ -191,7 +192,7 @@ static bool link_names(const char *const *paths, size_t count,
             !antl_header((const uint8_t *)bytes.data, bytes.length, arena,
                          &header, error, sizeof error)) {
             if (bytes.length > 0) {
-                fprintf(stderr, "antic: %s %s\n", paths[i], error);
+                say_antic("%s %s\n", paths[i], error);
             }
             text_free(&bytes);
             free((void *)list);
@@ -264,9 +265,9 @@ static void cycle(const struct module *tree, const char *input,
             return;
         }
     }
-    fprintf(stderr, "antic: %s depends on `%s`, so the import forms a "
-                    "cycle\n",
-            path, module);
+    say_antic("%s depends on `%s`, so the import forms a "
+              "cycle\n",
+              path, module);
 }
 
 /* Read the library files and load each after the libraries it imports,
@@ -294,20 +295,20 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
         if (ok && !antl_header((const uint8_t *)files[i].data,
                                files[i].length, arena, &headers[i], error,
                                sizeof error)) {
-            fprintf(stderr, "antic: %s %s\n", paths->items[i], error);
+            say_antic("%s %s\n", paths->items[i], error);
             ok = false;
         }
     }
     for (i = 0; i < n && ok; i++) {
         if (strcmp(headers[i].module, module) == 0) {
-            fprintf(stderr, "antic: %s holds module `%s`, which this command "
-                            "compiles\n", paths->items[i], module);
+            say_antic("%s holds module `%s`, which this command "
+                      "compiles\n", paths->items[i], module);
             ok = false;
         }
         for (j = 0; j < i && ok; j++) {
             if (strcmp(headers[i].module, headers[j].module) == 0) {
-                fprintf(stderr, "antic: %s and %s both hold module `%s`\n",
-                        paths->items[j], paths->items[i], headers[i].module);
+                say_antic("%s and %s both hold module `%s`\n",
+                          paths->items[j], paths->items[i], headers[i].module);
                 ok = false;
             }
         }
@@ -330,7 +331,7 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
                                    files[i].length, out, count, types, arena,
                                    program, error, sizeof error);
             if (out[count] == NULL) {
-                fprintf(stderr, "antic: %s %s\n", paths->items[i], error);
+                say_antic("%s %s\n", paths->items[i], error);
                 ok = false;
             } else {
                 loaded[i] = true;
@@ -354,16 +355,16 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
                                           headers[i].imports[j]) == 0;
                     }
                     if (!provided) {
-                        fprintf(stderr, "antic: %s needs module `%s`\n",
-                                paths->items[i], headers[i].imports[j]);
+                        say_antic("%s needs module `%s`\n",
+                                  paths->items[i], headers[i].imports[j]);
                         ok = false;
                         break;
                     }
                 }
             }
             if (ok) {
-                fputs("antic: the library files import each other in a "
-                      "cycle\n", stderr);
+                say_antic("the library files import each other in a "
+                          "cycle\n");
                 ok = false;
             }
         }

@@ -27,6 +27,7 @@
 #include "platform.h"
 #include "notice.h"
 #include "optimize.h"
+#include "say.h"
 #include "whole.h"
 #include "rt_abi.h"
 #include "parser.h"
@@ -69,13 +70,13 @@ static bool read_file(const char *path, struct text *out, bool source)
     bool ok = true;
 
     if (f == NULL) {
-        fprintf(stderr, "antic: cannot open %s\n", path);
+        say_antic("cannot open %s\n", path);
         return false;
     }
     while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
         if (n > limit - total) {
-            fprintf(stderr, "antic: %s is larger than " LEX_SOURCE_MAX_TEXT "\n",
-                    path);
+            say_antic("%s is larger than " LEX_SOURCE_MAX_TEXT "\n",
+                      path);
             ok = false;
             break;
         }
@@ -83,7 +84,7 @@ static bool read_file(const char *path, struct text *out, bool source)
         text_append_bytes(out, buffer, n);
     }
     if (ferror(f)) {
-        fprintf(stderr, "antic: cannot read %s\n", path);
+        say_antic("cannot read %s\n", path);
         ok = false;
     }
     fclose(f);
@@ -110,7 +111,7 @@ static bool read_text(const char *path, struct text *out)
         return false;
     }
     if (memchr(text_cstr(out), '\0', out->length) != NULL) {
-        fprintf(stderr, "antic: %s contains a NUL byte\n", path);
+        say_antic("%s contains a NUL byte\n", path);
         return false;
     }
     return true;
@@ -129,11 +130,10 @@ static void cannot_create(const char *path)
     }
     if (directory.length > 0 &&
         !platform_directory_exists(text_cstr(&directory))) {
-        fprintf(stderr,
-                "antic: cannot create %s, the directory %s does not exist\n",
-                path, text_cstr(&directory));
+        say_antic("cannot create %s, the directory %s does not exist\n", path,
+                  text_cstr(&directory));
     } else {
-        fprintf(stderr, "antic: cannot create %s\n", path);
+        say_antic("cannot create %s\n", path);
     }
     text_free(&directory);
 }
@@ -150,7 +150,7 @@ bool driver_write_file(const char *path, const struct text *content)
     ok = fwrite(text_cstr(content), 1, content->length, f) == content->length;
     ok = fclose(f) == 0 && ok;
     if (!ok) {
-        fprintf(stderr, "antic: cannot write %s\n", path);
+        say_antic("cannot write %s\n", path);
     }
     return ok;
 }
@@ -208,19 +208,19 @@ static bool module_name(const struct options *o, struct text *out,
 
     if (!modpath_of_source(o->input, o->roots, o->root_count, out, error,
                                sizeof error)) {
-        fprintf(stderr, "antic: %s\n", error);
+        say_antic("%s\n", error);
         return false;
     }
     if (strcmp(text_cstr(out), RUNTIME_MODULE) == 0) {
-        fprintf(stderr, "antic: %s: the module path `%s` is the runtime's\n",
-                o->input, RUNTIME_MODULE);
+        say_antic("%s: the module path `%s` is the runtime's\n",
+                  o->input, RUNTIME_MODULE);
         return false;
     }
     if (o->library && !o->front_end && !o->internal &&
         modpath_reserved(text_cstr(out))) {
-        fprintf(stderr, "antic: %s: the module path `%s` is reserved for the "
-                        "language's own libraries\n",
-                o->input, text_cstr(out));
+        say_antic("%s: the module path `%s` is reserved for the "
+                  "language's own libraries\n",
+                  o->input, text_cstr(out));
         return false;
     }
     /* The warning stands at the top of the file, where a clause of the
@@ -262,10 +262,10 @@ static bool can_link(const struct options *o)
     }
     if (!target_host(&host) ||
         target_info(host)->os != target_info(o->target)->os) {
-        fprintf(stderr, "antic: linking for %s with the platform linker needs "
-                        "a host with the same operating system. -S writes "
-                        "the assembly without linking.\n",
-                target_name(o->target));
+        say_antic("linking for %s with the platform linker needs "
+                  "a host with the same operating system. -S writes "
+                  "the assembly without linking.\n",
+                  target_name(o->target));
         return false;
     }
     return true;
@@ -305,9 +305,8 @@ static bool lto_usable(const struct options *o)
 
     if (o->dev || o->assembly_only || o->library || o->lib != LIB_NONE ||
         o->linker != LINKER_LLD) {
-        fputs("antic: --lto links a program in release mode, without --dev, "
-              "-S, -c, --lib or --linker platform\n",
-              stderr);
+        say_antic("--lto links a program in release mode, without --dev, "
+                  "-S, -c, --lib or --linker platform\n");
         return false;
     }
     /* DESIGN: the AddressSanitizer runtime of macOS is a dylib that
@@ -316,8 +315,7 @@ static bool lto_usable(const struct options *o)
        its LTO wrote as such an override, so the dylib kept its own
        options and a report ended the program with SIGABRT. */
     if (o->memory_checks && target_info(o->target)->os == OS_MACOS) {
-        fputs("antic: --lto links no macOS program of --memory-checks\n",
-              stderr);
+        say_antic("--lto links no macOS program of --memory-checks\n");
         return false;
     }
     if (o->runtime == NULL) {
@@ -325,14 +323,14 @@ static bool lto_usable(const struct options *o)
     }
     link_runtime_bitcode(&library, o->runtime, o->target, o->cpu, o->lto);
     if (!driver_file_exists(text_cstr(&library)) && o->lto_given) {
-        fprintf(stderr, "antic: --lto %s needs %s, the runtime as bitcode\n",
-                link_lto_name(o->lto), text_cstr(&library));
+        say_antic("--lto %s needs %s, the runtime as bitcode\n",
+                  link_lto_name(o->lto), text_cstr(&library));
         ok = false;
     } else if (!driver_file_exists(text_cstr(&library))) {
-        fprintf(stderr, "antic: a release build links the runtime as "
-                        "bitcode, %s, which is missing. --lto none links "
-                        "the runtime as objects\n",
-                text_cstr(&library));
+        say_antic("a release build links the runtime as "
+                  "bitcode, %s, which is missing. --lto none links "
+                  "the runtime as objects\n",
+                  text_cstr(&library));
         ok = false;
     }
     text_free(&library);
@@ -356,7 +354,7 @@ static bool indexed_profile_file(const char *path)
     size_t got;
 
     if (f == NULL) {
-        fprintf(stderr, "antic: cannot read %s\n", path);
+        say_antic("cannot read %s\n", path);
         return false;
     }
     got = fread(head, 1, sizeof head, f);
@@ -366,13 +364,13 @@ static bool indexed_profile_file(const char *path)
         return true;
     }
     if (got == sizeof head && memcmp(head, raw_profile, sizeof head) == 0) {
-        fprintf(stderr, "antic: %s is a raw profile. llvm-profdata merge "
-                        "-o <file> %s writes the profile that "
-                        "--profile-use reads\n",
-                path, path);
+        say_antic("%s is a raw profile. llvm-profdata merge "
+                  "-o <file> %s writes the profile that "
+                  "--profile-use reads\n",
+                  path, path);
         return false;
     }
-    fprintf(stderr, "antic: %s is no profile of llvm-profdata merge\n", path);
+    say_antic("%s is no profile of llvm-profdata merge\n", path);
     return false;
 }
 
@@ -393,22 +391,20 @@ static bool profile_usable(const struct options *o)
         o->profile_generate ? "--profile-generate" : "--profile-use";
 
     if (o->dev) {
-        fprintf(stderr, "antic: %s builds in release mode, without --dev\n",
-                option);
+        say_antic("%s builds in release mode, without --dev\n",
+                  option);
         return false;
     }
     if (o->profile_generate && o->profile_use != NULL) {
-        fputs("antic: --profile-generate and --profile-use exclude each "
-              "other\n",
-              stderr);
+        say_antic("--profile-generate and --profile-use exclude each "
+                  "other\n");
         return false;
     }
     if (o->profile_generate &&
         (o->assembly_only || o->library || o->lib != LIB_NONE ||
          o->linker != LINKER_LLD)) {
-        fputs("antic: --profile-generate links a program, without -S, -c, "
-              "--lib or --linker platform\n",
-              stderr);
+        say_antic("--profile-generate links a program, without -S, -c, "
+                  "--lib or --linker platform\n");
         return false;
     }
     return o->profile_use == NULL || indexed_profile_file(o->profile_use);
@@ -598,15 +594,15 @@ static bool lower_checked(const char *input, const char *file,
     tree->file = file;
     lower_module(tree, module, ir, options, patterns, pattern_count, version);
     if (ir->extern_clash != NULL) {
-        fprintf(stderr, "antic: %s declares `extern fn %s` with another "
-                        "signature than a library of the program\n",
-                input, ir->extern_clash);
+        say_antic("%s declares `extern fn %s` with another "
+                  "signature than a library of the program\n",
+                  input, ir->extern_clash);
         return false;
     }
     ok = ir_verify(ir, &errors);
     if (!ok) {
-        fprintf(stderr, "antic: internal error, the IR of %s fails "
-                        "verification\n%s", input, text_cstr(&errors));
+        say_antic("internal error, the IR of %s fails "
+                  "verification\n%s", input, text_cstr(&errors));
     }
     text_free(&errors);
     return ok;
@@ -674,9 +670,9 @@ static int dump_ir(const char *input, const char *file, struct module *tree,
         }
         optimize_program(program, module);
         if (!ir_verify(program, &errors)) {
-            fprintf(stderr, "antic: internal error, the optimized IR of %s "
-                            "fails verification\n%s", input,
-                    text_cstr(&errors));
+            say_antic("internal error, the optimized IR of %s "
+                      "fails verification\n%s", input,
+                      text_cstr(&errors));
             text_free(&errors);
             return 1;
         }
@@ -905,7 +901,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
         }
     }
     if (!ok) {
-        fprintf(stderr, "antic: %s\n", error);
+        say_antic("%s\n", error);
     }
     layout_free(&layouts);
     text_free(&out);
@@ -1092,8 +1088,8 @@ static int back_end(const struct options *o, struct module *tree,
     }
     if (!o->dump_llvm && !o->assembly_only && !o->dev && o->lib == LIB_NONE &&
         !has_main(program, module)) {
-        fprintf(stderr, "antic: %s: the program has no function `main`\n",
-                o->input);
+        say_antic("%s: the program has no function `main`\n",
+                  o->input);
         return 1;
     }
     program->plugin = driver_is_plugin(o);
@@ -1125,8 +1121,8 @@ static bool package_header(const struct options *o, struct arena *arena,
         const char *second = first != NULL ? strchr(first + 1, ',') : NULL;
         char *copy;
         if (second == NULL) {
-            fprintf(stderr, "antic: --dependency %s is not "
-                            "<name>,<constraint>,<url>\n", spec);
+            say_antic("--dependency %s is not "
+                      "<name>,<constraint>,<url>\n", spec);
             return false;
         }
         copy = arena_alloc(arena, strlen(spec) + 1);
@@ -1176,8 +1172,8 @@ static int write_library(const struct options *o, struct module *tree,
                       o->trace_pattern_count, o->package_version) &&
         own_interface(o, tree, module, arena, &iface)) {
         if (!antl_write(&bytes, &iface, &ir, o->strip_docs)) {
-            fprintf(stderr, "antic: %s is too large for a library file\n",
-                    o->input);
+            say_antic("%s is too large for a library file\n",
+                      o->input);
             goto done;
         }
         if (o->output != NULL) {
@@ -1386,8 +1382,8 @@ static int compile(const struct options *o, struct text *source,
         goto done;
     }
     if (o->lib != LIB_NONE && defines_main(tree)) {
-        fprintf(stderr, "antic: %s: a library for C has no function `main`\n",
-                o->input);
+        say_antic("%s: a library for C has no function `main`\n",
+                  o->input);
         goto done;
     }
     if (o->lib != LIB_NONE || links(o)) {
@@ -1412,8 +1408,8 @@ static int compile(const struct options *o, struct text *source,
             header_write(&extras->header, text_cstr(&extras->name), all,
                          paths.count + 1, o->bundle_runtime);
             if (!antl_write_header(&extras->package, &own)) {
-                fprintf(stderr, "antic: %s is too large for a library file\n",
-                        o->input);
+                say_antic("%s is too large for a library file\n",
+                          o->input);
                 free((void *)all);
                 goto done;
             }
@@ -1496,7 +1492,7 @@ static const struct interface *interface_of(const struct options *o,
             !antl_header((const uint8_t *)source.data, source.length, arena,
                          &header, error, sizeof error)) {
             if (source.length > 0) {
-                fprintf(stderr, "antic: %s %s\n", o->input, error);
+                say_antic("%s %s\n", o->input, error);
             }
             free(listed);
             goto done;
@@ -1519,8 +1515,8 @@ static const struct interface *interface_of(const struct options *o,
             }
         }
         if (iface == NULL) {
-            fprintf(stderr, "antic: %s holds no module `%s`\n", o->input,
-                    text_cstr(&module));
+            say_antic("%s holds no module `%s`\n", o->input,
+                      text_cstr(&module));
         }
         goto done;
     }
@@ -1624,7 +1620,7 @@ bool driver_library_header(const struct options *o, struct text *out)
         !antl_header((const uint8_t *)source.data, source.length, &arena,
                      &header, error, sizeof error)) {
         if (source.length > 0) {
-            fprintf(stderr, "antic: %s %s\n", o->input, error);
+            say_antic("%s %s\n", o->input, error);
         }
         goto done;
     }
@@ -1654,8 +1650,8 @@ bool driver_library_header(const struct options *o, struct text *out)
         }
     }
     if (own == NULL) {
-        fprintf(stderr, "antic: %s holds no module `%s`\n", o->input,
-                header.module);
+        say_antic("%s holds no module `%s`\n", o->input,
+                  header.module);
         goto done;
     }
     libraries[kept] = own;
@@ -1709,7 +1705,7 @@ static int compile_library_file(const struct options *o,
     }
     if (!antl_header((const uint8_t *)bytes.data, bytes.length, &arena,
                      &header, error, sizeof error)) {
-        fprintf(stderr, "antic: %s %s\n", o->input, error);
+        say_antic("%s %s\n", o->input, error);
         goto done;
     }
     if (!driver_find_libraries(&with_input, &empty, &arena, &paths)) {
@@ -1724,8 +1720,8 @@ static int compile_library_file(const struct options *o,
        program. The passes and the optimizer rely on the verifier, and a
        library file may come from anywhere. */
     if (!ir_verify(&program, &verify_errors)) {
-        fprintf(stderr, "antic: the IR of the library files fails "
-                        "verification\n%s", text_cstr(&verify_errors));
+        say_antic("the IR of the library files fails "
+                  "verification\n%s", text_cstr(&verify_errors));
         goto done;
     }
     status = back_end(o, NULL, header.module, &program, llvm_text, extras);
@@ -1808,26 +1804,22 @@ bool driver_compile_llvm(const struct options *o, const struct text *text,
 static bool library_options_usable(const struct options *o)
 {
     if (o->lib == LIB_SHARED && o->bundle_runtime) {
-        fputs("antic: --bundle-runtime puts the runtime into a library of "
-              "--lib static, and a library of --lib shared links it\n",
-              stderr);
+        say_antic("--bundle-runtime puts the runtime into a library of "
+                  "--lib static, and a library of --lib shared links it\n");
         return false;
     }
     if (o->lib == LIB_STATIC && o->no_runtime) {
-        fputs("antic: --no-runtime builds a plugin, which is a library of "
-              "--lib shared\n",
-              stderr);
+        say_antic("--no-runtime builds a plugin, which is a library of "
+                  "--lib shared\n");
         return false;
     }
     if (o->lib == LIB_STATIC && o->soname) {
-        fputs("antic: --soname gives a library of --lib shared its major "
-              "version, and a library of --lib static has none\n",
-              stderr);
+        say_antic("--soname gives a library of --lib shared its major "
+                  "version, and a library of --lib static has none\n");
         return false;
     }
     if (o->lib == LIB_STATIC && o->dev) {
-        fputs("antic: --lib static builds in release mode, without --dev\n",
-              stderr);
+        say_antic("--lib static builds in release mode, without --dev\n");
         return false;
     }
     return true;
@@ -1852,14 +1844,14 @@ int driver_run(const struct options *given)
        default. A level of the other architecture is that mistake, and it
        would link a runtime directory that does not exist. */
     if (cpu_arch(o->cpu) != target_info(o->target)->arch) {
-        fprintf(stderr, "antic: %s is no processor level of %s\n",
-                cpu_name(o->cpu), target_name(o->target));
+        say_antic("%s is no processor level of %s\n",
+                  cpu_name(o->cpu), target_name(o->target));
         return 2;
     }
 
     if (o->memory_checks && !memcheck_available(o->target)) {
-        fprintf(stderr, "antic: `--memory-checks` is not available for %s\n",
-                target_name(o->target));
+        say_antic("`--memory-checks` is not available for %s\n",
+                  target_name(o->target));
         return 2;
     }
     resolved.lto = lto_mode(given);
@@ -1874,9 +1866,8 @@ int driver_run(const struct options *given)
        and the `created` and `destroyed` hooks count them. The code of the
        library's own classes calls both, so a plugin keeps its hooks. */
     if (o->no_hooks && driver_is_plugin(o)) {
-        fputs("antic: `--no-hooks` drops the hooks that count the objects of "
-              "a plugin for `unload`, and `--no-runtime` builds a plugin\n",
-              stderr);
+        say_antic("`--no-hooks` drops the hooks that count the objects of a "
+                  "plugin for `unload`, and `--no-runtime` builds a plugin\n");
         return 2;
     }
     if (!library_options_usable(o)) {
@@ -1886,14 +1877,14 @@ int driver_run(const struct options *given)
 
     if (!ends_with(o->input, SOURCE_SUFFIX) &&
         !(o->dev && ends_with(o->input, ANTL_SUFFIX))) {
-        fprintf(stderr, "antic: %s: expected a %s file\n", o->input,
-                SOURCE_SUFFIX);
+        say_antic("%s: expected a %s file\n", o->input,
+                  SOURCE_SUFFIX);
         return 2;
     }
     if (links(o) && !o->dev && o->runtime == NULL) {
-        fprintf(stderr, "antic: linking needs --runtime <dir>, the directory "
-                        "that holds %s/<target>/<level>/\n",
-                RUNTIME_LIB_DIR);
+        say_antic("linking needs --runtime <dir>, the directory "
+                  "that holds %s/<target>/<level>/\n",
+                  RUNTIME_LIB_DIR);
         return 2;
     }
     if (links(o) && !o->dev && !can_link(o)) {
@@ -1906,9 +1897,9 @@ int driver_run(const struct options *given)
             target_info(o->target)->format == FORMAT_ELF)) &&
           !can_link(o)))) {
         if (o->runtime == NULL) {
-            fprintf(stderr, "antic: --lib needs --runtime <dir>, the directory "
-                            "that holds %s/<target>/<level>/\n",
-                    RUNTIME_LIB_DIR);
+            say_antic("--lib needs --runtime <dir>, the directory "
+                      "that holds %s/<target>/<level>/\n",
+                      RUNTIME_LIB_DIR);
         }
         return 2;
     }
@@ -1935,9 +1926,9 @@ int driver_run(const struct options *given)
     if (o->dev && !object_only && !o->assembly_only &&
         (o->runtime == NULL || !can_link(o))) {
         if (o->runtime == NULL) {
-            fprintf(stderr, "antic: linking needs --runtime <dir>, the "
-                            "directory that holds %s/<target>/\n",
-                    RUNTIME_LIB_DIR);
+            say_antic("linking needs --runtime <dir>, the "
+                      "directory that holds %s/<target>/\n",
+                      RUNTIME_LIB_DIR);
         }
         goto done;
     }

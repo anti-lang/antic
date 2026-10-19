@@ -12,6 +12,7 @@
 #include "linker.h"
 #include "llvm_target.h"
 #include "platform.h"
+#include "say.h"
 #include "userdirs.h"
 #include "target.h"
 
@@ -196,7 +197,7 @@ static bool ends_with(const char *s, const char *suffix)
 static const char *value_of(int argc, char **argv, int *i)
 {
     if (*i + 1 >= argc) {
-        fprintf(stderr, "antic: %s needs a value\n", argv[*i]);
+        say_antic("%s needs a value\n", argv[*i]);
         return NULL;
     }
     *i += 1;
@@ -248,7 +249,7 @@ static int run(int argc, char **argv, const struct lists *l)
             return usage(stdout);
         } else if (strcmp(arg, "--print-host-target") == 0) {
             if (!have_host) {
-                fputs("antic: unknown host target\n", stderr);
+                say_antic("unknown host target\n");
                 return 1;
             }
             printf("%s\n", target_name(options.target));
@@ -299,8 +300,8 @@ static int run(int argc, char **argv, const struct lists *l)
             } else if (strcmp(kind, "shared") == 0) {
                 options.lib = LIB_SHARED;
             } else {
-                fprintf(stderr, "antic: --lib takes static or shared, not %s\n",
-                        kind);
+                say_antic("--lib takes static or shared, not %s\n",
+                          kind);
                 return 2;
             }
             continue;
@@ -387,7 +388,7 @@ static int run(int argc, char **argv, const struct lists *l)
             } else if (strcmp(value, "platform") == 0) {
                 options.linker = LINKER_PLATFORM;
             } else {
-                fprintf(stderr, "antic: --linker takes lld or platform\n");
+                say_antic("--linker takes lld or platform\n");
                 return 2;
             }
             continue;
@@ -397,9 +398,9 @@ static int run(int argc, char **argv, const struct lists *l)
                 return 2;
             }
             if (!link_lto_from_name(value, &options.lto)) {
-                fprintf(stderr, "antic: --lto takes %s, %s or %s, not %s\n",
-                        link_lto_name(LTO_FULL), link_lto_name(LTO_THIN),
-                        link_lto_name(LTO_NONE), value);
+                say_antic("--lto takes %s, %s or %s, not %s\n",
+                          link_lto_name(LTO_FULL), link_lto_name(LTO_THIN),
+                          link_lto_name(LTO_NONE), value);
                 return 2;
             }
             options.lto_given = true;
@@ -436,9 +437,9 @@ static int run(int argc, char **argv, const struct lists *l)
                 return 2;
             }
             if (strchr(value, '=') == NULL) {
-                fprintf(stderr, "antic: --inject takes an interface and its "
-                                "provider, as --inject Interface=Provider, "
-                                "found %s\n", value);
+                say_antic("--inject takes an interface and its "
+                          "provider, as --inject Interface=Provider, "
+                          "found %s\n", value);
                 return 2;
             }
             l->inject[options.inject_count++] = value;
@@ -483,7 +484,7 @@ static int run(int argc, char **argv, const struct lists *l)
         } else if (strcmp(arg, "--runtime") == 0) {
             slot = &options.runtime;
         } else if (arg[0] == '-') {
-            fprintf(stderr, "antic: unknown option %s\n", arg);
+            say_antic("unknown option %s\n", arg);
             return usage(stderr);
         } else if (ends_with(arg, ANTL_SUFFIX)) {
             l->libraries[options.library_count++] = arg;
@@ -495,7 +496,7 @@ static int run(int argc, char **argv, const struct lists *l)
             options.input = arg;
             continue;
         } else {
-            fputs("antic: one input file only\n", stderr);
+            say_antic("one input file only\n");
             return usage(stderr);
         }
         if ((*slot = value_of(argc, argv, &i)) == NULL) {
@@ -515,19 +516,19 @@ static int run(int argc, char **argv, const struct lists *l)
     }
     if (target != NULL) {
         if (!target_from_name(target, &options.target)) {
-            fprintf(stderr, "antic: unknown target %s\n", target);
+            say_antic("unknown target %s\n", target);
             return 2;
         }
     } else if (!have_host) {
-        fputs("antic: unknown host target, pass --target\n", stderr);
+        say_antic("unknown host target, pass --target\n");
         return 2;
     }
     /* The level follows the target, so --cpu is read after it and its
        name is checked against the target's architecture. */
     options.cpu = cpu_default(options.target);
     if (cpu != NULL && !cpu_from_name(cpu, options.target, &options.cpu)) {
-        fprintf(stderr, "antic: %s is no processor level of %s\n", cpu,
-                target_name(options.target));
+        say_antic("%s is no processor level of %s\n", cpu,
+                  target_name(options.target));
         return 2;
     }
     /* DESIGN: antic looks for the runtime archive in two places, in this

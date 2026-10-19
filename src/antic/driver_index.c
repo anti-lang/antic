@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "platform.h"
+#include "say.h"
 #include "sha256.h"
 #include "../rt/toml.h"
 
@@ -213,12 +214,12 @@ bool driver_write_plugin_index(const char *dir, const char *name,
     text_appendf(&path, "%s%s", dir, ANTI_PLUGIN_INDEX);
     ok = sha256_file(library, digest);
     if (!ok) {
-        fprintf(stderr, "antic: cannot read %s\n", library);
+        say_antic("cannot read %s\n", library);
     } else if (!index_others(&content, text_cstr(&path), name) ||
                !index_entry(&content, name, digest, provides)) {
-        fprintf(stderr, "antic: %s cannot hold a name with both quotes or "
-                        "a line break: %s\n",
-                text_cstr(&path), name);
+        say_antic("%s cannot hold a name with both quotes or "
+                  "a line break: %s\n",
+                  text_cstr(&path), name);
         ok = false;
     } else {
         ok = driver_write_file(text_cstr(&path), &content);

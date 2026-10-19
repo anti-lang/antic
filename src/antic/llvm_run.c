@@ -7,6 +7,7 @@
 
 #include "llvm_target.h"
 #include "platform.h"
+#include "say.h"
 #include "text.h"
 
 /* The most arguments of a run of opt or llc. The longest is llc with
@@ -26,8 +27,8 @@ static void push(struct args *a, const char *arg)
 {
     if (a->n >= RUN_ARGS) {
         /* Unreachable while RUN_ARGS covers every command. */
-        fputs("antic: a run of opt or llc needs more than RUN_ARGS "
-              "arguments\n", stderr);
+        say_antic("a run of opt or llc needs more than RUN_ARGS "
+                  "arguments\n");
         abort();
     }
     a->v[a->n++] = arg;
@@ -157,7 +158,7 @@ static bool run_lto(const struct llvm_run *r, const char *text_path,
     ok = platform_run(opt.v) == 0;
     text_free(&profile);
     if (!ok) {
-        fprintf(stderr, "antic: opt failed\n");
+        say_antic("opt failed\n");
     }
     return ok;
 }
@@ -214,7 +215,7 @@ static bool run_opt(const struct llvm_run *r, const char *text_path,
     ok = platform_run(opt.v) == 0;
     text_free(&profile);
     if (!ok) {
-        fprintf(stderr, "antic: opt failed\n");
+        say_antic("opt failed\n");
     }
     return ok;
 }
@@ -280,7 +281,7 @@ bool llvm_run(const struct llvm_run *r, const char *text_path,
                   output);
     text_free(&model);
     if (run != 0) {
-        fprintf(stderr, "antic: llc failed\n");
+        say_antic("llc failed\n");
         return false;
     }
     return true;

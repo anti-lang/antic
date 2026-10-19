@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "say.h"
 
 /* Grow to hold extra more bytes plus the terminating NUL. The compiler
    stops on an allocation failure, because it has no way to continue. */
@@ -113,7 +114,7 @@ void text_format_name(char *buffer, size_t size, const char *format, ...)
     va_end(args);
     if (n < 0 || (size_t)n >= size) {
         /* Unreachable while each buffer holds the longest text it takes. */
-        fputs("antic: a generated text does not fit its buffer\n", stderr);
+        say_antic("a generated text does not fit its buffer\n");
         abort();
     }
 }

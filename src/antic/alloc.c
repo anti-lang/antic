@@ -7,9 +7,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "say.h"
+
 void alloc_out_of_memory(void)
 {
-    fputs("antic: out of memory\n", stderr);
+    say_antic("out of memory\n");
     exit(70);
 }
 
