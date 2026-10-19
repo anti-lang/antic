@@ -59,7 +59,9 @@ endfunction()
 # test <run> also runs the program. Both work below WORK, and OPTIONS,
 # separated by commas, go to antic.
 function(antic_native_tests run link target)
-    cmake_parse_arguments(PARSE_ARGV 3 arg "" "SOURCE;WORK;OPTIONS" "OBJECTS")
+    # OPTIONS is a list keyword, since the options of a target may be
+    # empty, which a keyword of one value refuses with a warning.
+    cmake_parse_arguments(PARSE_ARGV 3 arg "" "SOURCE;WORK" "OBJECTS;OPTIONS")
     list(JOIN arg_OBJECTS "," objects)
     set(common "-DANTIC=$<TARGET_FILE:antic>" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         "-DSOURCE=${arg_SOURCE}" "-DOBJECTS=${objects}")
