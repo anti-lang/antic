@@ -159,11 +159,13 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
    that before deserialize took an allocator. A string takes one. */
 #define OBJECT_ALIGN 16
 
-/* An object whose construct ran, and the field of the object that owns
-   it, or NULL before the reader stores it there. */
+/* An object whose construct ran, and the address of the field of the
+   object that owns it, or NULL before the reader stores it there. A
+   field may stand at any offset, so the address is kept as bytes and
+   written through memcpy. */
 struct built {
     void *object;
-    void **owner;
+    unsigned char *owner;
 };
 
 /* The blocks that one deserialize took from its allocator, which a
@@ -234,7 +236,7 @@ static bool room_for_object(struct made *m)
 }
 
 /* Record that owner, a field of another object, holds object. */
-static void owned_by(struct made *m, void *object, void **owner)
+static void owned_by(struct made *m, void *object, unsigned char *owner)
 {
     int64_t i;
 
@@ -264,7 +266,8 @@ static void give_back(struct reader *r)
 
     for (i = m->object_count - 1; i >= 0; i--) {
         if (m->objects[i].owner != NULL) {
-            *m->objects[i].owner = NULL;
+            void *none = NULL;
+            memcpy(m->objects[i].owner, &none, sizeof none);
         }
     }
     while (m->object_count > 0) {
@@ -732,7 +735,7 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
             if (!read_owned(r, &value, type, d, depth)) {
                 return false;
             }
-            owned_by(r->made, value, (void **)bytes);
+            owned_by(r->made, value, bytes);
         } else {
             return false;
         }

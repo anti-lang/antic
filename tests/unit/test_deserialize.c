@@ -201,6 +201,15 @@ struct holder {
     struct named inner;
 };
 
+/* A packed class: a bool, then an owned Node at an offset that no
+   pointer is aligned to. */
+struct packed_owner {
+    struct anti_object base;
+    unsigned char bytes[1 + sizeof(void *)];
+};
+
+#define PACKED_NEXT (offsetof(struct packed_owner, bytes) + 1)
+
 struct node {
     struct anti_object base;
     int64_t value;
@@ -338,15 +347,25 @@ static const struct anti_field holder_fields[] = {
     FIELD("inner", struct holder, inner, ANTI_TYPE_CLASS, 0, &named_d),
 };
 
-#define CLASSES 8
+static const struct anti_descriptor node_d;
+
+static const struct anti_field packed_fields[] = {
+    {TEXT("flag"), (int64_t)offsetof(struct packed_owner, bytes),
+     (int64_t)ANTI_TYPE_BOOL, 0, NULL},
+    {TEXT("next"), (int64_t)PACKED_NEXT,
+     TYPE2(ANTI_TYPE_PTR, ANTI_TYPE_CLASS), 1, &node_d},
+};
+
+#define CLASSES 9
 
 /* The classes of the registry, in its order. */
 enum {
-    NUMBERS, NAMED, DRAWING, NODE, TWIN_A, TWIN_B, REQUIRED, HOLDER
+    NUMBERS, NAMED, DRAWING, NODE, TWIN_A, TWIN_B, REQUIRED, HOLDER,
+    PACKED
 };
 
 static const struct anti_descriptor numbers_d, drawing_d, twin_a_d,
-    twin_b_d, required_d, holder_d;
+    twin_b_d, required_d, holder_d, packed_d;
 static const struct anti_descriptor *const numbers_up[2] = {
     &anti_lang_Object_descriptor, &numbers_d};
 static const struct anti_descriptor *const named_up[2] = {
@@ -363,6 +382,8 @@ static const struct anti_descriptor *const required_up[2] = {
     &anti_lang_Object_descriptor, &required_d};
 static const struct anti_descriptor *const holder_up[2] = {
     &anti_lang_Object_descriptor, &holder_d};
+static const struct anti_descriptor *const packed_up[2] = {
+    &anti_lang_Object_descriptor, &packed_d};
 
 static const struct anti_descriptor numbers_d =
     CLASS("Numbers", sizeof(struct numbers), numbers_up, numbers_fields, 9);
@@ -382,6 +403,9 @@ static const struct anti_descriptor required_d =
     CLASS("Required", sizeof(struct named), required_up, named_fields, 1);
 static const struct anti_descriptor holder_d =
     CLASS("Holder", sizeof(struct holder), holder_up, holder_fields, 1);
+static const struct anti_descriptor packed_d =
+    CLASS("Packed", sizeof(struct packed_owner), packed_up, packed_fields,
+          2);
 
 static const void *tables[CLASSES][ANTI_ENTRY_HOOK];
 
@@ -431,6 +455,11 @@ static void init_required(void *object)
     prepare(object, REQUIRED);
 }
 
+static void init_packed(void *object)
+{
+    prepare(object, PACKED);
+}
+
 /* The construct of a Holder makes its inner Named, as antic writes it. */
 static void init_holder(void *object)
 {
@@ -461,6 +490,7 @@ static const struct anti_class classes[CLASSES] = {
     {&twin_b_d, init_twin_b, TEXT("b"), 0},
     {&required_d, init_required, TEXT("app"), ANTI_CLASS_REQUIRED},
     {&holder_d, init_holder, TEXT("app"), 0},
+    {&packed_d, init_packed, TEXT("app"), 0},
 };
 
 const struct anti_registry anti_rt_registry = {CLASSES, classes};
@@ -701,6 +731,10 @@ static void owned(void)
     CHECK(!reads("{\"type\":\"Node\",\"next\":{\"type\":\"Node\",\"next\":"
                  "{\"type\":\"Node\",\"items\":[1,2,\"x\"]}}}"));
     CHECK(!reads("{\"type\":\"Node\",\"items\":[1,2,2147483648]}"));
+    /* A failure clears an owning field at any offset, where no pointer
+       is aligned. */
+    CHECK(!reads("{\"type\":\"Packed\",\"next\":{\"type\":\"Node\"},"
+                 "\"flag\":5}"));
 }
 
 /* The text of a chain of count Nodes, each the next of the one before. */
