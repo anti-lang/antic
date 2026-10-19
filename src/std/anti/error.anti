@@ -55,11 +55,7 @@ pub class SystemError inherits lang.Error
 /// before it.
 pub fn on_fatal(keep f: fn())
 {
-	/* The singleton is bound to a local first. The checker refuses the
-	   chained `lang.Fatal.get().hook.store(f)` across modules, a defect
-	   that docs/reports/2026-09-21-anti-lang-error.md reports. */
-	let fatal = lang.Fatal.get();
-	fatal.hook.store(f);
+	lang.Fatal.get().hook.store(f);
 }
 
 /// Call `fatal` on an error, and return on `none`.

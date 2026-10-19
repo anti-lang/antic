@@ -506,10 +506,9 @@ fn blank_pool<T>(from: *mem.Allocator) -> SyncPool<T>
 
 /// A copy of the element at `at` of `items`, or `none` outside the list.
 ///
-/// DESIGN: the functions of `SyncList` that give a `?T` call it or `taken`,
-/// since antic fails to lower a public function of a synchronized class that
-/// returns a value where its result is a `?T`. The element comes apart from the
-/// result of a call, which hands each part to its name.
+/// The functions of `SyncList` that give a `?T` call it or `taken`, which take
+/// the element out of the pair that holds it with its version, at a place that
+/// may lie outside the list.
 fn copied<T>(items: *list.List<(T, int)>, at: int) -> ?T
 {
 	if at < 0 || at >= items.count {
@@ -528,18 +527,6 @@ fn taken<T>(items: *list.List<(T, int)>, at: int) -> ?T
 	}
 	let (x, version) = items.remove_at(at);
 	return x;
-}
-
-/// A copy of the value under `k` in `entries` and its version in `versions`, or
-/// `none`, for the reason of `copied`.
-fn versioned<K: eq + hash, V>(entries: *maps.Map<K, V>,
-	versions: *maps.Map<K, collection.Stamp>, k: K) -> ?(V, int)
-{
-	let value = entries.get(k) else {
-		return none;
-	};
-	let stamp = versions.get(k) ?? collection.Stamp { version: 0 };
-	return (dup(value), stamp.version);
 }
 
 /// A shared lookup table with modest traffic, in insertion order.
@@ -673,7 +660,11 @@ pub synchronized class SyncMap<K: eq + hash, V>
 	/// `set_if_version` takes the version back.
 	pub fn get_versioned(self, k: K) -> ?(V, int)
 	{
-		return versioned<K, V>(&self.entries, &self.versions, k);
+		let value = self.entries.get(k) else {
+			return none;
+		};
+		let stamp = self.versions.get(k) ?? collection.Stamp { version: 0 };
+		return (dup(value), stamp.version);
 	}
 
 	/// Write `v` under `k` when its version is still `version`, as
