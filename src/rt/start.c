@@ -14,15 +14,12 @@
 #include "fail.h"
 #include "platform.h"
 #include "rt.h"
+#include "str.h"
 
-/* The layouts of Anti's str and []str. */
-struct anti_str {
-    const unsigned char *ptr;
-    int64_t len;
-};
-
+/* The layout of Anti's []str, whose str is struct anti_text of
+   str.h. */
 struct anti_slice {
-    struct anti_str *ptr;
+    struct anti_text *ptr;
     int64_t len;
 };
 
