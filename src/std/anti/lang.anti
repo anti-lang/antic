@@ -194,7 +194,7 @@ pub class StackTrace
 		return []Frame { ptr: list, len: self.frames.len };
 	}
 
-	concrete fn destruct(self)
+	fn destruct(self)
 	{
 		free(self.text_cache);
 		let made = self.named;
@@ -323,7 +323,7 @@ pub class Error
 		anti_rt_exit(1);
 	}
 
-	concrete fn destruct(self)
+	fn destruct(self)
 	{
 		free(self.text_cache);
 	}

@@ -867,7 +867,7 @@ pub class Composite inherits lang.TraceHandler
 		}
 	}
 
-	concrete fn destruct(self)
+	fn destruct(self)
 	{
 		let held = self.count.load();
 		let i = 0;
