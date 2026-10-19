@@ -1129,7 +1129,7 @@ The functions of a `Library`:
 | Function | Gives |
 |---|---|
 | `plugin.load(path)` | a `*Library`, or fails |
-| `lib.instance(Interface)` | a new object of the class the library provides, as a `?*Interface` |
+| `lib.instance(Interface)` | a new object of the class the library provides, as a `*Interface`, or fails with the reason |
 | `lib.supports(Interface, "f")` | whether the class of the library has the function `f` |
 | `lib.live()` | the count of objects of the library on the heap that are alive |
 | `lib.unload()` | closes the library, or fails with `IN_USE` while an object of it is alive |
@@ -1144,9 +1144,7 @@ import anti.text;
 fn speak(path: str) may fail
 {
 	let lib = try plugin.load(path);
-	let logger = lib.instance(log.Logger) else {
-		fail "the library provides no Logger";
-	};
+	let logger = try lib.instance(log.Logger);
 	logger.log(log.Level.Info, "first");
 	logger.log(log.Level.Info, "second");
 	let known = lib.supports(log.Logger, "log");
@@ -1262,7 +1260,7 @@ class Plain { pub n: int = 0, }
 
 fn take(lib: *plugin.Library) -> bool
 {
-	let p = lib.instance(Plain) else {
+	let p = lib.instance(Plain) catch {
 		return false;
 	};
 	return true;
@@ -1297,18 +1295,21 @@ The host is built to be bound against. Its functions and data are global and non
 `lib.instance(Interface)` is rewritten by the checker into a call that passes the address of the descriptor of the interface. The lines below are that call in `speak` of the host above, in a dev build.
 
 ```ir excerpt=host target=linux-x86_64 mode=dev
-    %6 = addr @anti.log.Logger.descriptor
+    %7 = addr @anti.log.Logger.descriptor
 ...
-    %12 = load ptr %11 !entry
-    %13 = call ptr %12 via @host.fn.0(%5, %6) table @anti.plugin.Library.descriptor 17
-    %14 = copy ptr %13
+    %13 = load ptr %12 !entry
+    %14 = call ptr %13 via @host.fn.0(%6, %7, %2) table @anti.plugin.Library.descriptor 17
     %15 = eq i8 %14, 0
-    branch %15, b5, b6
+    branch %15, b6, b5
+b5:
+    ret ptr %14
+b6:
+    %16 = load ptr %2 !type ptr
 ```
 
 - `addr @anti.log.Logger.descriptor` stands where the source names the type `log.Logger`. It is the descriptor of the interface in the host, the same address the loader compared at `plugin.load`.
-- The call goes through entry 17 of the table of the `Library`. That entry is `instance_at` of `anti.plugin`, which hands the handle of the library and the descriptor to `anti_rt_plugin_instance`.
-- The compare with 0 is the `else` of the `let`. The result is `none` when the library provides no class for the interface.
+- The call goes through entry 17 of the table of the `Library`. That entry is `instance_at` of `anti.plugin`, which hands the handle of the library and the descriptor to `anti_rt_plugin_instance`. The third argument, `%2`, is the slot the object is written to, since `instance_at` may fail.
+- The compare with 0 is the test of a call that may fail. `b5` is the `try`, which hands the error of a library that provides no class for the interface to the caller. `b6` reads the object from the slot.
 
 The runtime allocates the size the descriptor of the class gives, calls the function that prepares the object and adds the offset of the interface.
 
@@ -1345,7 +1346,7 @@ For a Java programmer:
 
 For a C programmer:
 
-- No `dlsym` and no cast. `lib.instance` gives a typed pointer or `none`, and the checks have run before it.
+- No `dlsym` and no cast. `lib.instance` gives a typed pointer or fails with the reason, and the checks have run before it.
 - A static program of musl loads nothing. A Linux host is the dynamic link against glibc, with the system's `libc.so.6` at run time.
 
 For a C++ programmer:

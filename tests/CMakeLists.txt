@@ -2453,8 +2453,9 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
 endif()
 # A provided class that the loader cannot build without arguments: one
 # whose `construct` takes one, and one that holds such a class in a field
-# no default fills. `instance` gives `none` for each, and the link of the
-# library succeeds.
+# no default fills. `instance` fails for each with the reason of the
+# loader, by R134 of "Answers of 2026-10-18", and the link of the library
+# succeeds.
 foreach(library needy holder)
     add_test(NAME plugin_refused_${library}
         COMMAND "${CMAKE_COMMAND}"
@@ -2466,7 +2467,7 @@ foreach(library needy holder)
             "-DHOST=refused_host"
             "-DLIBRARY=${library}"
             "-DINTERFACE=tasks"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/refused_host.expected"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/refused_host_${library}.expected"
             -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
 endforeach()
 # The three checks of "Versions": the chain of the interface, the

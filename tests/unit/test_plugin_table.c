@@ -214,7 +214,30 @@ static void refused_with(int line, const char *want)
 /* The load refuses and names the damage. */
 #define REFUSED() refused_with(__LINE__, "damaged table")
 
-/* The table as the library carries it loads, builds and unloads. */
+/* The message of the plugin loader holds want. */
+static void says(int line, const char *want)
+{
+    struct anti_text why = anti_rt_plugin_message();
+    char text[600];
+
+    snprintf(text, sizeof text, "%.*s", (int)why.len, why.ptr);
+    if (strstr(text, want) == NULL) {
+        check_failures++;
+        fprintf(stderr, "line %d: the message does not say `%s`: %s\n", line,
+                want, text);
+    }
+}
+
+/* An interface that the library does not provide. */
+static const struct anti_descriptor other = {
+    (const unsigned char *)"Other", 5, NULL, 16, 0, NULL, 0, NULL, NULL,
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL
+};
+
+/* The table as the library carries it loads, builds and unloads. An
+   interface it does not provide, and any interface once it is unloaded,
+   give no object and the reason, which `lib.instance` fails with by R134
+   of "Answers of 2026-10-18". */
 static void good_table_loads(void)
 {
     void *handle = load();
@@ -229,7 +252,12 @@ static void good_table_loads(void)
     if (sub != NULL) {
         free((unsigned char *)sub - entry->offset);
     }
+    CHECK(anti_rt_plugin_instance(handle, &other) == NULL);
+    says(__LINE__, "the library provides no `Other`");
     CHECK(anti_rt_plugin_unload(handle) == 1);
+    /* `unload` of anti.plugin leaves no handle behind. */
+    CHECK(anti_rt_plugin_instance(NULL, &service) == NULL);
+    says(__LINE__, "the library is not open");
 }
 
 static void damaged_texts(void)

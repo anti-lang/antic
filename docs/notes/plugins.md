@@ -105,8 +105,10 @@ receiver of type `*anti.plugin.Library`. It resolves the path of the
 first argument to an abstract class and replaces that argument with an
 `EXPR_DESCRIPTOR` node. It renames the call to `instance_at` or
 `supports_at`, which are ordinary functions of the class. The method
-call carries it from there. `instance` has the type `?*I`, which
-`catch fatal` narrows.
+call carries it from there. `instance_at` may fail, so the call takes a
+handler, and `check_handled` gives it the type `*I` of the interface it
+names. Its error holds the message of the loader, `fail` of a text, which
+the error copies.
 
 `EXPR_DESCRIPTOR` lowers to the address of the class descriptor, and no
 source text writes one.

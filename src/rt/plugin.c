@@ -1084,6 +1084,7 @@ void *anti_rt_plugin_instance(void *handle, const struct anti_descriptor *d)
     message[0] = '\0';
     e = reserve(handle, d, NULL, 0, &p);
     if (p == NULL) {
+        fail("the library is not open");
         return NULL;
     }
     if (e == NULL) {

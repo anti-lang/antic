@@ -1299,10 +1299,15 @@ void sema_check_handler(struct checker *c, struct handler *h,
    one, because an error that nothing reads is a bug the checker can
    see. */
 static struct type *check_handled(struct checker *c, struct expr *e,
-                                  struct type *fn, struct type *expected)
+                                  struct type *fn, struct type *expected,
+                                  struct type *provided)
 {
     struct handler *h = &e->as.call.handler;
-    struct type *result = handled_result(c, e, fn);
+    /* R134 of "Answers of 2026-10-18": `lib.instance(I)` may fail, and
+       the object it gives is the `*I` the call names. */
+    struct type *result = provided != NULL
+                              ? types_pointer(c->types, provided)
+                              : handled_result(c, e, fn);
     const struct symbol *callee = function_symbol(e->as.call.callee);
     struct scope scope;
 
@@ -1546,7 +1551,7 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         sema_append_defaults(c, e, m->symbol, fn, given + 1, filled);
     }
     if (m->may_fail) {
-        return check_handled(c, e, fn, expected);
+        return check_handled(c, e, fn, expected, NULL);
     }
     return handled_result(c, e, fn);
 }
@@ -1685,7 +1690,8 @@ static bool name_path(struct checker *c, const struct expr *e,
    interface where a value stands, so the compiler carries them. Each
    becomes the call of an ordinary function of `anti.plugin.Library`
    with the descriptor of the interface in the place of the name.
-   `instance` then has the type `?*I`, which `catch fatal` narrows. */
+   `instance` may fail, by R134 of "Answers of 2026-10-18", and gives the
+   `*I` the call names. */
 static struct type *plugin_call(struct checker *c, struct expr *e, bool *ok)
 {
     struct expr *callee = e->as.call.callee;
@@ -2370,7 +2376,7 @@ static struct type *check_call(struct checker *c, struct expr *e,
         sema_append_defaults(c, e, sym, fn, given, filled);
     }
     if (is_failing(fn)) {
-        return check_handled(c, e, fn, expected);
+        return check_handled(c, e, fn, expected, form.provided);
     }
     return unfailing_result(c, e, fn, form.provided);
 }
