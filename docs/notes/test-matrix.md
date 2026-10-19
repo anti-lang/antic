@@ -506,8 +506,9 @@ read a cell it wrote:
   `modules_flow`. It holds each construct in a plain function and in a
   generic one, and `client` calls both across the module boundary.
 - A cell that the rules refuse names a refusal, a source with an `.err`
-  file. `flow_switch_on_char`, `flow_switch_on_bool`,
-  `flow_switch_on_generic` and `flow_return_f16` are refusals.
+  file. `flow_switch_on_bool`, `flow_switch_on_generic` and
+  `flow_return_f16` are refusals. `flow_switch_on_char` is a program
+  since R009 of "Answers of 2026-10-18".
 - An id after a source, as `T001`, names the finding of
   `docs/audit/tests-findings.md` that the test shows. The suite expects
   that test to fail.

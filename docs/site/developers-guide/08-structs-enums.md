@@ -1646,7 +1646,7 @@ fn radius(s: Shape) -> f32
 ```
 
 ```anti refused
-//! error: `switch` takes an enum, an integer, a `str` or a variant, found `*Shape`
+//! error: `switch` takes an enum, an integer, a `char`, a `str` or a variant, found `*Shape`
 variant Shape { Circle { r: f32 }, Empty }
 
 fn radius(s: *Shape) -> f32

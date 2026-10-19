@@ -978,6 +978,10 @@ static bool arm_integer(const struct const_value *v, uint64_t *out)
     if (v->kind == CONST_SYMBOLIC) {
         return size_on_every_target(v->as.symbolic, out);
     }
+    if (v->kind == CONST_CHAR) {
+        *out = v->as.character;
+        return true;
+    }
     *out = v->as.integer;
     return true;
 }
@@ -1670,10 +1674,14 @@ static void check_switch(struct checker *c, struct stmt *s)
             s->as.switch_stmt.bound = bound;
         }
     } else if (!sema_is_error(over) && !types_is_integer(over) &&
-               over->kind != TYPE_ENUM && over->kind != TYPE_VARIANT) {
+               over->kind != TYPE_CHAR && over->kind != TYPE_ENUM &&
+               over->kind != TYPE_VARIANT) {
+        /* R009 of "Answers of 2026-10-18": a `char` is switched as the
+           integer of its scalar value. A `bool` and a value of a type
+           parameter stay refused. */
         sema_error_at(c, s->as.switch_stmt.value->pos,
-                      "`switch` takes an enum, an integer, a `str` or a "
-                      "variant, found `%s`", sema_tn(over));
+                      "`switch` takes an enum, an integer, a `char`, a "
+                      "`str` or a variant, found `%s`", sema_tn(over));
         over = sema_builtin(c, TYPE_ERROR);
     }
     variant = !sema_is_error(over) && over->kind == TYPE_VARIANT;

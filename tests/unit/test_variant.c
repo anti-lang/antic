@@ -294,8 +294,8 @@ void test_variant(void)
                    "`*Shape`");
     rejects(SHAPE
             "fn f(p: *Shape) { switch p { Empty => { }, else => { } } }\n",
-            2, 26, "`switch` takes an enum, an integer, a `str` or a "
-                   "variant, found `*Shape`");
+            2, 26, "`switch` takes an enum, an integer, a `char`, a "
+                   "`str` or a variant, found `*Shape`");
 
     /* The tag is the smallest unsigned integer that holds the number of
        cases. */

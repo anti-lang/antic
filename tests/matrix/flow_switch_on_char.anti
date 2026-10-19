@@ -1,16 +1,330 @@
-//! A `switch` on a `char` is refused.
+//! A `switch` on a `char` without an `else`, by R009 of "Answers of
+//! 2026-10-18", in each of these places: switch arm, if let, defer, undo,
+//! catch handler, closure, dispatch or parallel, sync block, select arm,
+//! nested type. Each place is a function of its own, and the program prints
+//! one line per place and input. `kinds` takes the escapes, the largest
+//! scalar value and `fallthrough`.
 
-fn run(c: char) -> int
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// 1 gives `a` and 3 gives `\u{e9}`, the two arms of each place.
+fn letter(n: int) -> char
+{
+	if n == 3 {
+		return '\u{e9}';
+	}
+	return (0x60 + n) as u32 as char;
+}
+
+fn kinds(c: char) -> int
 {
 	let acc = 0;
 	switch c {
-		'a' => acc = 1,
-		else => acc = 2,
+		'\n' => acc = 1,
+		'\t' => acc = 2,
+		'\u{10FFFF}' => acc = 3,
+		'Z' => {
+			acc = 4;
+			fallthrough;
+		},
+		'\'' => acc += 5,
+		else => acc = 6,
 	}
 	return acc;
 }
 
+class Task
+{
+	pub n: int = 0,
+}
+
+fn in_arm(n: int) -> int
+{
+	let acc = 0;
+	switch letter(n) {
+		'`' => acc = -1,
+		else => {
+			switch letter(n) {
+				'a' => acc += 10,
+				'\u{e9}' => {
+					acc += 20;
+				},
+			}
+		},
+	}
+	return acc;
+}
+
+fn held(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+fn in_if_let(n: int) -> int
+{
+	let acc = 0;
+	if let v = held(n) {
+		acc += v - n * 3;
+		switch letter(n) {
+			'a' => acc += 10,
+			'\u{e9}' => {
+				acc += 20;
+			},
+		}
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+fn in_defer(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		switch letter(n) {
+			'a' => acc += 10,
+			'\u{e9}' => {
+				acc += 20;
+			},
+		}
+	}
+	acc = 5;
+}
+
+fn in_undo(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		switch letter(n) {
+			'a' => acc += 10,
+			'\u{e9}' => {
+				acc += 20;
+			},
+		}
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+fn risky(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+fn in_catch(n: int) -> int
+{
+	let acc = 0;
+	let got = risky(n) catch {
+		switch letter(n) {
+			'a' => acc += 10,
+			'\u{e9}' => {
+				acc += 20;
+			},
+		}
+		yield acc;
+	};
+	return got;
+}
+
+fn apply(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn in_closure(start: int) -> int
+{
+	let acc = 0;
+	let got = apply(start, fn(n) {
+		switch letter(n) {
+			'a' => acc += 10,
+			'\u{e9}' => {
+				acc += 20;
+			},
+		}
+		return acc;
+	});
+	return got + acc;
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work(fn(n) {
+		let acc = 0;
+		switch letter(n) {
+			'a' => acc += 10,
+			'\u{e9}' => {
+				acc += 20;
+			},
+		}
+		return acc;
+	});
+	return join(job);
+}
+
+struct Guarded
+{
+	lock: Mutex,
+	entered: int,
+}
+
+fn in_sync(g: *Guarded, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		switch letter(n) {
+			'a' => acc += 10,
+			'\u{e9}' => {
+				acc += 20;
+			},
+		}
+	}
+	return acc;
+}
+
+fn in_select(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			switch letter(n) {
+				'a' => acc += 10,
+				'\u{e9}' => {
+					acc += 20;
+				},
+			}
+		},
+	}
+	return acc;
+}
+
+class Outer
+{
+	class Inner
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			switch letter(n) {
+				'a' => acc += 10,
+				'\u{e9}' => {
+					acc += 20;
+				},
+			}
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner { base: 1000 };
+		return inner.run(n);
+	}
+}
+
 fn main() -> int
 {
-	return run('a');
+	let task = alloc Task { };
+	printf("arm %d\n".ptr, in_arm(0) as c_int);
+	printf("arm %d\n".ptr, in_arm(1) as c_int);
+	printf("arm %d\n".ptr, in_arm(2) as c_int);
+	printf("arm %d\n".ptr, in_arm(3) as c_int);
+	printf("arm %d\n".ptr, in_arm(4) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(0) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(1) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(2) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(3) as c_int);
+	printf("if_let %d\n".ptr, in_if_let(4) as c_int);
+	let deferred = 0;
+	in_defer(1, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(2, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(3, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	in_defer(4, &deferred);
+	printf("defer %d\n".ptr, deferred as c_int);
+	let undone = 0;
+	in_undo(0, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(1, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(2, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(3, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	in_undo(4, &undone) catch {
+		yield;
+	};
+	printf("undo %d\n".ptr, undone as c_int);
+	printf("catch %d\n".ptr, in_catch(0) as c_int);
+	printf("catch %d\n".ptr, in_catch(1) as c_int);
+	printf("catch %d\n".ptr, in_catch(2) as c_int);
+	printf("catch %d\n".ptr, in_catch(3) as c_int);
+	printf("catch %d\n".ptr, in_catch(4) as c_int);
+	printf("closure %d\n".ptr, in_closure(1) as c_int);
+	printf("closure %d\n".ptr, in_closure(2) as c_int);
+	printf("closure %d\n".ptr, in_closure(3) as c_int);
+	printf("closure %d\n".ptr, in_closure(4) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 1) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 2) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 3) as c_int);
+	printf("dispatch %d\n".ptr, in_dispatch(task, 4) as c_int);
+	let g = Guarded { lock: Mutex.new(), entered: 0 };
+	printf("sync %d\n".ptr, in_sync(&g, 1) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 2) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 3) as c_int);
+	printf("sync %d\n".ptr, in_sync(&g, 4) as c_int);
+	printf("sync entered %d\n".ptr, g.entered as c_int);
+	g.lock.destroy();
+	let c = chan int(1);
+	printf("select %d\n".ptr, in_select(c, 1) as c_int);
+	printf("select %d\n".ptr, in_select(c, 2) as c_int);
+	printf("select %d\n".ptr, in_select(c, 3) as c_int);
+	printf("select %d\n".ptr, in_select(c, 4) as c_int);
+	delete(c);
+	let outer = Outer { };
+	printf("nested %d\n".ptr, outer.go(1) as c_int);
+	printf("nested %d\n".ptr, outer.go(2) as c_int);
+	printf("nested %d\n".ptr, outer.go(3) as c_int);
+	printf("nested %d\n".ptr, outer.go(4) as c_int);
+	printf("kinds %d %d %d %d %d %d\n".ptr, kinds('\n') as c_int,
+		kinds('\t') as c_int, kinds('\u{10FFFF}') as c_int, kinds('Z') as c_int,
+		kinds('\'') as c_int, kinds('a') as c_int);
+	delete(task);
+	return 0;
 }

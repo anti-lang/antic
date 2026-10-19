@@ -1,1 +1,1 @@
-types_switch_on_a_pointer_to_a_variant.anti:13:9: error: `switch` takes an enum, an integer, a `str` or a variant, found `*Shape`
+types_switch_on_a_pointer_to_a_variant.anti:13:9: error: `switch` takes an enum, an integer, a `char`, a `str` or a variant, found `*Shape`

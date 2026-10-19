@@ -1,1 +1,1 @@
-flow_switch_on_bool.anti:6:9: error: `switch` takes an enum, an integer, a `str` or a variant, found `bool`
+flow_switch_on_bool.anti:6:9: error: `switch` takes an enum, an integer, a `char`, a `str` or a variant, found `bool`

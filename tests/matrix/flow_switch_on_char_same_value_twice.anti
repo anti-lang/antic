@@ -1,0 +1,18 @@
+//! Two arms of a `switch` on a `char` that spell one value two ways are
+//! refused.
+
+fn run(c: char) -> int
+{
+	let acc = 0;
+	switch c {
+		'a' => acc = 1,
+		'\u{61}' => acc = 2,
+		else => acc = 3,
+	}
+	return acc;
+}
+
+fn main() -> int
+{
+	return run('a');
+}

@@ -1,7 +1,7 @@
 ---
 title: "Flow"
 description: "if and while, for over ranges and collections, switch on values and what each compiles to, break and continue, defer and undo."
-summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `str` and a variant with what each compiles to, `break` and `continue`, `defer` and `undo`, each with how antic builds it and what it costs."
+summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `char`, a `str` and a variant with what each compiles to, `break` and `continue`, `defer` and `undo`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
 lastmod: 2026-10-11T20:24:00+02:00
 draft: true
@@ -599,13 +599,13 @@ For a C++ programmer:
 
 ### The feature
 
-`switch` takes a value of an integer type, an enum, a `str` or a variant. Each arm names one value, then `=>`, then a body. A comma separates the arms. One arm runs, and none falls into the next unless it says so.
+`switch` takes a value of an integer type, an enum, a `char`, a `str` or a variant. Each arm names one value, then `=>`, then a body. A comma separates the arms. One arm runs, and none falls into the next unless it says so.
 
 The body of an arm is a call, an assignment or a block. Anything else, such as a `return`, stands in a block.
 
 The value of an arm is a constant expression of the type of the `switch`, and an enum value is written with its type, `Kind.Circle`. Each value has one arm. `else` takes every value that no arm names, and a `switch` has at most one.
 
-A `switch` on an enum without `else` names every value of the enum. A `switch` on a variant without `else` names every case. A `switch` on an integer or a `str` without `else` does nothing when no arm matches.
+A `switch` on an enum without `else` names every value of the enum. A `switch` on a variant without `else` names every case. A `switch` on an integer, a `char` or a `str` without `else` does nothing when no arm matches. A `switch` on a `char` takes `char` literals as its arms, `'a' =>` or `'\n' =>`, and compares the scalar values as integers. A `bool` and a value of a type parameter are refused.
 
 `fallthrough;` as the last statement of a block arm enters the body of the next arm without testing its value.
 
@@ -697,7 +697,7 @@ corners 0 4 4
 The checker refuses each of the following.
 
 ```anti refused
-//! error: `switch` takes an enum, an integer, a `str` or a variant, found `float`
+//! error: `switch` takes an enum, an integer, a `char`, a `str` or a variant, found `float`
 let x = 1.5;
 switch x {
 	1.5 => x = 0.0,
@@ -705,11 +705,11 @@ switch x {
 ```
 
 ```anti refused
-//! error: `switch` takes an enum, an integer, a `str` or a variant, found `char`
-let c = 'a';
+//! error: `switch` takes an enum, an integer, a `char`, a `str` or a variant, found `bool`
+let b = true;
 let n = 0;
-switch c {
-	'a' => n = 1,
+switch b {
+	true => n = 1,
 }
 ```
 
@@ -871,7 +871,7 @@ Where it lives: the `TOKEN_SWITCH` case of `statement` and `arm_body` of `src/an
 
 | Cost | Dev | Release |
 |---|---|---|
-| An integer or enum `switch` of n arms | up to n compares and n branches, in the order of the arms | what `opt` chooses: a lookup table, a jump table or a shorter chain |
+| An integer, `char` or enum `switch` of n arms | up to n compares and n branches, in the order of the arms | what `opt` chooses: a lookup table, a jump table or a shorter chain |
 | A `str` `switch` of n arms | up to n calls of `anti.text.equal`, and two stores per call | the same calls, inlined where `opt` chooses |
 | A variant `switch` of n arms | one load of the tag, up to n compares | one load, and what `opt` chooses |
 | An arm that binds | one copy of the fields of the case | the copy, where `opt` cannot remove it |
@@ -896,7 +896,7 @@ For a C programmer:
 
 - An arm does not fall into the next one. No `break` ends it, and `fallthrough;` asks for the old behaviour.
 - `break` inside an arm leaves the enclosing loop, as the next section shows.
-- A `char` is not an integer here. `switch c as u32` switches on its code.
+- A `switch` on a `char` takes `'a'` as an arm and refuses the number `97`. The arms are compared as integers all the same.
 - A `switch` on an enum that misses a value is an error, not a warning.
 
 For a C++ programmer:
