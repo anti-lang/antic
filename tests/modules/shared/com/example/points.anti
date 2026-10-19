@@ -1,6 +1,6 @@
 //! A class that a program of another module builds, tests and compares, and a
-//! struct that a class of each module holds. The test `modules_shared_class` links it
-//! in release mode and in dev mode.
+//! struct that a class of each module holds. The test `modules_shared_class`
+//! links it in release mode and in dev mode.
 
 /// A point that this module and the program both build.
 pub class Point
