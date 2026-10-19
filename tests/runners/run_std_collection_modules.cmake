@@ -4,7 +4,7 @@
 #   cmake -DROOT=<repository> -DRUNTIME=<runtime dir> -DWORK=<dir>
 #         -P tests/runners/run_std_collection_modules.cmake
 #
-# The test orders a tree of its own through anti_std_collection_modules of
+# The test orders a tree of its own through antic_std_collection_modules of
 # tools/std-modules.cmake, refuses a cycle, finds a library file of the
 # runtime archive for every module of the real tree, and reads that
 # CMakeLists.txt names no file of the tree.
@@ -13,7 +13,7 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${ROOT}/tools/std-modules.cmake")
 
-set(tree "${WORK}/${ANTI_STD_COLLECTION_DIR}")
+set(tree "${WORK}/${ANTIC_STD_COLLECTION_DIR}")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${tree}/synchronized")
 file(WRITE "${tree}/list.anti"
@@ -24,7 +24,7 @@ file(WRITE "${tree}/map.anti"
 file(WRITE "${tree}/set.anti" "import anti.text;\n")
 file(WRITE "${tree}/synchronized/list.anti"
     "import anti.collection.map.{Map};\nimport anti.collection.list;\n")
-anti_std_collection_modules("${tree}" modules)
+antic_std_collection_modules("${tree}" modules)
 
 list(LENGTH modules count)
 if(NOT count EQUAL 5)
@@ -34,8 +34,8 @@ foreach(pair "deque;list" "set;map" "list;map" "map;synchronized/list"
         "list;synchronized/list")
     list(GET pair 0 first)
     list(GET pair 1 then)
-    list(FIND modules "${ANTI_STD_COLLECTION_DIR}/${first}" a)
-    list(FIND modules "${ANTI_STD_COLLECTION_DIR}/${then}" b)
+    list(FIND modules "${ANTIC_STD_COLLECTION_DIR}/${first}" a)
+    list(FIND modules "${ANTIC_STD_COLLECTION_DIR}/${then}" b)
     if(a LESS 0 OR b LESS 0 OR NOT a LESS b)
         message(FATAL_ERROR "`${first}` must come before `${then}`: ${modules}")
     endif()
@@ -45,7 +45,7 @@ endforeach()
 file(WRITE "${tree}/set.anti" "import anti.collection.synchronized.list;\n")
 file(WRITE "${WORK}/cycle.cmake"
     "include(\"${ROOT}/tools/std-modules.cmake\")\n"
-    "anti_std_collection_modules(\"${tree}\" modules)\n")
+    "antic_std_collection_modules(\"${tree}\" modules)\n")
 execute_process(COMMAND "${CMAKE_COMMAND}" -P "${WORK}/cycle.cmake"
     RESULT_VARIABLE result ERROR_VARIABLE error ENCODING NONE)
 if(result EQUAL 0 OR NOT error MATCHES "import each other")
@@ -53,8 +53,8 @@ if(result EQUAL 0 OR NOT error MATCHES "import each other")
 endif()
 
 # Every module of the real tree reaches the runtime archive.
-set(source "${ROOT}/src/std/anti/${ANTI_STD_COLLECTION_DIR}")
-anti_std_collection_modules("${source}" real)
+set(source "${ROOT}/src/std/anti/${ANTIC_STD_COLLECTION_DIR}")
+antic_std_collection_modules("${source}" real)
 file(GLOB_RECURSE files "${source}/*.anti")
 list(LENGTH files file_count)
 list(LENGTH real real_count)
@@ -68,6 +68,6 @@ foreach(module IN LISTS real)
 endforeach()
 
 file(READ "${ROOT}/CMakeLists.txt" lists)
-if(lists MATCHES "${ANTI_STD_COLLECTION_DIR}/[a-z_]")
+if(lists MATCHES "${ANTIC_STD_COLLECTION_DIR}/[a-z_]")
     message(FATAL_ERROR "CMakeLists.txt names a collection module")
 endif()

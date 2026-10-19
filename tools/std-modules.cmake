@@ -10,12 +10,12 @@
 
 # The directory under src/std/anti/ that holds the collection modules, and
 # the path segment of their library files under std/anti/.
-set(ANTI_STD_COLLECTION_DIR collection)
+set(ANTIC_STD_COLLECTION_DIR collection)
 
 # Sets out to the modules under dir, each as collection/<path> without
 # .anti, ordered so that a module follows every module of the tree it
 # imports.
-function(anti_std_collection_modules dir out)
+function(antic_std_collection_modules dir out)
     file(GLOB_RECURSE files RELATIVE "${dir}" "${dir}/*.anti")
     list(SORT files)
     set(pending "")
@@ -23,11 +23,11 @@ function(anti_std_collection_modules dir out)
         string(REGEX REPLACE "\\.anti$" "" module "${file}")
         list(APPEND pending "${module}")
         file(STRINGS "${dir}/${file}" lines
-            REGEX "^[ \t]*import[ \t]+anti\\.${ANTI_STD_COLLECTION_DIR}\\.[a-z]")
+            REGEX "^[ \t]*import[ \t]+anti\\.${ANTIC_STD_COLLECTION_DIR}\\.[a-z]")
         set(needs "")
         foreach(line IN LISTS lines)
             string(REGEX MATCH
-                "anti\\.${ANTI_STD_COLLECTION_DIR}\\.([a-z0-9_.]*[a-z0-9_])"
+                "anti\\.${ANTIC_STD_COLLECTION_DIR}\\.([a-z0-9_.]*[a-z0-9_])"
                 found "${line}")
             string(REPLACE "." "/" path "${CMAKE_MATCH_1}")
             list(APPEND needs "${path}")
@@ -58,7 +58,7 @@ function(anti_std_collection_modules dir out)
         endif()
         foreach(module IN LISTS next)
             list(REMOVE_ITEM pending "${module}")
-            list(APPEND ordered "${ANTI_STD_COLLECTION_DIR}/${module}")
+            list(APPEND ordered "${ANTIC_STD_COLLECTION_DIR}/${module}")
         endforeach()
         list(LENGTH pending left)
     endwhile()

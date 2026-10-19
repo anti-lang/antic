@@ -621,7 +621,7 @@ add_expect_test(runtime_licenses STATUS 0
 add_test(NAME runtime_sources
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DSOURCES=${ANTIC_RUNTIME_DIR}/licenses/sources.txt"
-            -P "${ANTIC_RUNNERS}/run_sources.cmake")
+            -P "${ANTIC_RUNNERS}/run_upstream_sources.cmake")
 
 # The processor levels. src/antic/cpu.c holds the table for antic and
 # tools/cpu-levels holds it for the build, so the two are compared.
@@ -1169,7 +1169,7 @@ add_test(NAME repo_layout_runner
 # checker, and the configure step installed it in this checkout.
 add_test(NAME pre_commit_hook
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        "-DHOOKS=${ANTI_HOOKS_DIR}"
+        "-DHOOKS=${ANTIC_HOOKS_DIR}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pre-commit"
         -P "${ANTIC_RUNNERS}/run_pre_commit.cmake")
 set_tests_properties(pre_commit_hook PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
@@ -3216,7 +3216,7 @@ else()
     add_test(NAME package_sources
         COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
                 "-DSOURCES=${package_dir}/unpacked/anti/licenses/sources.txt"
-                -P "${ANTIC_RUNNERS}/run_sources.cmake")
+                -P "${ANTIC_RUNNERS}/run_upstream_sources.cmake")
     set_tests_properties(package_sources PROPERTIES FIXTURES_REQUIRED package)
     # A host that is not Linux packs linux-arm64 as well. It packs a
     # package of its own beside package_pack, which xz takes two minutes

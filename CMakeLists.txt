@@ -370,8 +370,8 @@ endfunction()
 
 # DESIGN: one runtime library per target and level, so that a second root
 # can hold the same target at a lower level. The archive that ships holds
-# the default level of each target, which anti_cross_runtime builds.
-function(anti_cross_runtime_at target triple level root)
+# the default level of each target, which antic_cross_runtime builds.
+function(antic_cross_runtime_at target triple level root)
     set(objects "")
     set(work "${CMAKE_BINARY_DIR}/cross/${target}-${level}")
     # The level of the library, so that its atomics are one instruction
@@ -542,10 +542,10 @@ function(anti_cross_runtime_at target triple level root)
         DEPENDS "${library}" "${stub}" ${bitcode_libraries})
 endfunction()
 
-function(anti_cross_runtime target triple)
+function(antic_cross_runtime target triple)
     antic_cpu_levels(levels "${target}")
     foreach(level IN LISTS levels)
-        anti_cross_runtime_at("${target}" "${triple}" "${level}"
+        antic_cross_runtime_at("${target}" "${triple}" "${level}"
             "${ANTIC_RUNTIME_DIR}" ${ARGN})
     endforeach()
 endfunction()
@@ -566,9 +566,9 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
         # one target's runtime is the same bytes whichever host built it,
         # and its atomics at armv8.0 were calls of __aarch64_*. The test
         # runtime_hosts reads every library and member.
-        set(no_outline "")
+        set(code_options "")
         if(target MATCHES "^linux-arm64")
-            set(no_outline -mno-outline-atomics)
+            set(code_options -mno-outline-atomics)
         endif()
         # [provisional] DESIGN: a runtime of Linux keeps the frame record of
         # every function that calls another, as every Anti function does on
@@ -579,13 +579,13 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
         # macOS keeps them on both processors. The test runtime_frames reads
         # main of every runtime of Linux and macOS.
         if(target MATCHES "^linux-")
-            list(APPEND no_outline -fno-omit-frame-pointer
+            list(APPEND code_options -fno-omit-frame-pointer
                  -momit-leaf-frame-pointer)
         endif()
         antic_target_triple(triple "${target}")
         antic_target_c_options(c_options "${target}" "${sysroot}"
             "${clang_resource}")
-        anti_cross_runtime(${target} ${triple} ${c_options} ${no_outline})
+        antic_cross_runtime(${target} ${triple} ${c_options} ${code_options})
     endforeach()
 endif()
 
@@ -667,10 +667,10 @@ set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/std/anti")
 # again.
 include(tools/std-modules.cmake)
 file(GLOB_RECURSE std_collection_sources CONFIGURE_DEPENDS
-    "${ANTIC_STD_SOURCE_DIR}/${ANTI_STD_COLLECTION_DIR}/*.anti")
-anti_std_collection_modules(
-    "${ANTIC_STD_SOURCE_DIR}/${ANTI_STD_COLLECTION_DIR}" std_collection_modules)
-list(FIND ANTIC_STD_MODULES "${ANTI_STD_COLLECTION_DIR}" at)
+    "${ANTIC_STD_SOURCE_DIR}/${ANTIC_STD_COLLECTION_DIR}/*.anti")
+antic_std_collection_modules(
+    "${ANTIC_STD_SOURCE_DIR}/${ANTIC_STD_COLLECTION_DIR}" std_collection_modules)
+list(FIND ANTIC_STD_MODULES "${ANTIC_STD_COLLECTION_DIR}" at)
 math(EXPR at "${at} + 1")
 if(std_collection_modules)
     list(INSERT ANTIC_STD_MODULES ${at} ${std_collection_modules})

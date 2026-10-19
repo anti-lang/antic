@@ -23,7 +23,7 @@ foreach(archive IN LISTS archives)
     set(dir "${WORK}/${key}")
     file(REMOVE_RECURSE "${dir}")
     file(MAKE_DIRECTORY "${dir}")
-    # Every runtime is a cross build of anti_cross_runtime_at of the root
+    # Every runtime is a cross build of antic_cross_runtime_at of the root
     # CMakeLists.txt, which names the member of src/rt/text.c text.o.
     execute_process(COMMAND "${LLVM_AR}" t "${archive}"
         RESULT_VARIABLE status OUTPUT_VARIABLE members ERROR_VARIABLE err

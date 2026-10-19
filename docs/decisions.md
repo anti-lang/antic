@@ -474,7 +474,7 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
   is folded.
 - [provisional] The triple and the flags of each target stand in `antic_native_target`
   of `src/native/CMakeLists.txt`, a second copy of the arguments that the top-level file
-  passes to `anti_cross_runtime`. Reason: the step could change no other line of the
+  passes to `antic_cross_runtime`. Reason: the step could change no other line of the
   top-level file. The fold makes both builds read one function. Since step 23 of "Fix
   steps" in `docs/audit/summary.md` both read `antic_target_triple` and
   `antic_target_c_options` of `tools/target-compile.cmake`.

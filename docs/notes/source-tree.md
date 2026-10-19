@@ -782,7 +782,6 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_source_nul.cmake` | Checks the refusal of a NUL byte outside a literal at each place the driver reads, and a NUL inside a bytes literal. |
 | `tests/runners/run_source_tree.cmake` | Refuses a file or a directory without a row in `docs/notes/source-tree.md`, and a row of nothing. |
 | `tests/runners/run_source_tree_self.cmake` | Tests `run_source_tree.cmake` on made-up trees. |
-| `tests/runners/run_sources.cmake` | Checks `licenses/sources.txt` against the pins and the licence texts. |
 | `tests/runners/run_std_collection_modules.cmake` | Tests the ordering function of `tools/std-modules.cmake`. |
 | `tests/runners/run_std_out_of_memory.cmake` | Checks that memory that runs out in the standard library stops the program with a message. |
 | `tests/runners/run_std_tests.cmake` | Runs `anti test` on one module in both modes. |
@@ -797,6 +796,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_unicode_paths.cmake` | Runs antic and anti with names outside ASCII. |
 | `tests/runners/run_unit_messages.cmake` | Runs one group of the unit tests and compares its standard error with a file. |
 | `tests/runners/run_unwind.cmake` | Compares the Windows unwind data of a program with an expected file. |
+| `tests/runners/run_upstream_sources.cmake` | Checks `licenses/sources.txt` against the pins and the licence texts. |
 | `tests/runners/run_usage.cmake` | Checks the usage of a tool: the option that asks for it, and a command line the tool refuses with it. |
 | `tests/runners/run_variant_wide_tag.cmake` | Compiles and runs a program whose variant has 65536 cases, so that its tag is a `u32`. |
 | `tests/runners/run_warning_names.cmake` | Holds the warning table of antic equal to the note. |
