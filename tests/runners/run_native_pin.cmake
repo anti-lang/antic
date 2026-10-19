@@ -1,8 +1,9 @@
 # The version, the digest and the URL of a third-party library live in
 # tools/<NAME>-pin alone. Its download script reads them from there, and
 # the record of the upstream sources of the runtime archive reads the URL
-# there too, so no second copy can drift. Run with cmake -P and these
-# values:
+# there too, so no second copy can drift. src/native/warnings.cmake, which
+# holds the warning flags of the release of every pin, spells neither
+# either. Run with cmake -P and these values:
 #   ROOT    the repository
 #   NAME    the library, as in tools/<NAME>-pin. The keys of the pin are
 #           <NAME>_VERSION, <NAME>_DIGEST and <NAME>_URL in capitals
@@ -35,6 +36,7 @@ set(script "${ROOT}/${SCRIPT}")
 set(caller "${ROOT}/${CALLER}")
 string(REPLACE "," ";" others "${FILES}")
 list(TRANSFORM others PREPEND "${ROOT}/")
+list(APPEND others "${ROOT}/src/native/warnings.cmake")
 foreach(file "${pin}" "${script}" "${caller}" ${others})
     if(NOT EXISTS "${file}")
         message(FATAL_ERROR "${file} is missing")

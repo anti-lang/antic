@@ -32,6 +32,8 @@ function(write_root recipe)
     file(WRITE "${root}/src/native/get-source.cmake" "${script}")
     file(WRITE "${root}/src/native/demo-source.cmake" "${call}")
     file(WRITE "${root}/src/native/demo.cmake" "${recipe}")
+    file(WRITE "${root}/src/native/warnings.cmake"
+         "# demo, at the release of its pin.\n")
 endfunction()
 
 # Run the check and set <status> and <output>.
@@ -79,6 +81,16 @@ foreach(case IN LISTS cases)
         endif()
     endif()
 endforeach()
+
+# The file of the warning flags of the libraries names no version.
+write_root("")
+file(WRITE "${root}/src/native/warnings.cmake" "# demo ${version}.\n")
+check(status output)
+string(FIND "${output}" "warnings.cmake spells `${version}`" at)
+if(status EQUAL 0 OR at EQUAL -1)
+    message(FATAL_ERROR "the check passed the version in the file of the "
+                        "warning flags\n${output}")
+endif()
 
 # A download over plain HTTP is refused.
 write_root("")

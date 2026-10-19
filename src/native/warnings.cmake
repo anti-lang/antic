@@ -7,25 +7,28 @@
 # DESIGN: where a project has a Makefile and a CMake build, the flags
 # are those of the Makefile, the build a static library of the release
 # comes from. Each set is the warnings of that build for clang, nothing
-# added and nothing taken away. See "Libraries and runtime" in
-# docs/decisions.md.
+# added and nothing taken away, in the release that the pin of the library
+# names. The version stands in the pin alone, which the test of each pin
+# checks, so no comment here goes stale when a pin moves. A move of a pin
+# compares these flags with the build of the new release.
+# See "Libraries and runtime" in docs/decisions.md.
 
-# PCRE2 10.48. Neither configure nor CMakeLists.txt adds a warning flag
+# PCRE2. Neither configure nor CMakeLists.txt adds a warning flag
 # unless asked to. --enable-Werror is off by default.
 set(ANTIC_PCRE2_WARNINGS "")
 
-# SQLite 3.53.4. The amalgamation is compiled as sqlite.org documents it,
+# SQLite. The amalgamation is compiled as sqlite.org documents it,
 # with no warning flag.
 set(ANTIC_SQLITE_WARNINGS "")
 
-# Mbed TLS 3.6.7. WARNING_CFLAGS of library/Makefile.
+# Mbed TLS. WARNING_CFLAGS of library/Makefile.
 set(ANTIC_MBEDTLS_WARNINGS -Wall -Wextra -Wformat=2 -Wno-format-nonliteral)
 
-# miniaudio 0.11.24. It ships one CMakeLists.txt, which adds these for
+# miniaudio. It ships one CMakeLists.txt, which adds these for
 # clang.
 set(ANTIC_MINIAUDIO_WARNINGS -Wall -Wextra -Wpedantic)
 
-# raylib 6.0. CFLAGS of src/Makefile for PLATFORM_DESKTOP_GLFW.
+# raylib. CFLAGS of src/Makefile for PLATFORM_DESKTOP_GLFW.
 set(ANTIC_RAYLIB_WARNINGS -Wall -Wno-missing-braces -Werror=pointer-arith
     -Werror=implicit-function-declaration)
 # Two definitions of raylib's CMake build turn off the deprecation
@@ -36,7 +39,7 @@ set(ANTIC_RAYLIB_WARNINGS -Wall -Wno-missing-braces -Werror=pointer-arith
 set(ANTIC_RAYLIB_WARNINGS_windows -D_CRT_SECURE_NO_WARNINGS)
 set(ANTIC_RAYLIB_WARNINGS_macos -DGL_SILENCE_DEPRECATION)
 
-# mimalloc 3.5.3. The warnings its CMakeLists.txt adds for clang, which is
+# mimalloc. The warnings its CMakeLists.txt adds for clang, which is
 # also its C++ compiler here.
 set(ANTIC_MIMALLOC_WARNINGS -Wall -Wextra -Wpedantic -Wno-deprecated
     -Wno-unknown-pragmas -Wstrict-prototypes -Wno-static-in-inline)
