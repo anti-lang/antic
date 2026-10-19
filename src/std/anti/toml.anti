@@ -100,10 +100,7 @@ pub class Document
 	/// A text outside the subset fails with an error of code 1.
 	pub fn read(source: str) -> Document may fail
 	{
-		let handle = anti_rt_toml_read(source.ptr, source.len);
-		if handle == none {
-			fail lang.Error.new(1, "the text is not the TOML subset");
-		}
+		let handle = try parsed(source);
 		return Document { handle: handle };
 	}
 
@@ -113,12 +110,20 @@ pub class Document
 	/// value would end with the block that made it, and fails as `read` does.
 	pub fn open(source: str) -> *Document may fail
 	{
-		let handle = anti_rt_toml_read(source.ptr, source.len);
-		if handle == none {
-			fail lang.Error.new(1, "the text is not the TOML subset");
-		}
+		let handle = try parsed(source);
 		return alloc Document { handle: handle };
 	}
+}
+
+/// The parsed form of `source` for a `Document`, which `read` and `open` share.
+///
+/// A text outside the subset fails with an error of code 1.
+fn parsed(source: str) -> *byte may fail
+{
+	let handle = anti_rt_toml_read(source.ptr, source.len) else {
+		fail lang.Error.new(1, "the text is not the TOML subset");
+	};
+	return handle;
 }
 
 /// The integer the value text `v` spells, or `fallback` when it spells none.
