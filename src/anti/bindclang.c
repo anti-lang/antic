@@ -957,8 +957,8 @@ static void name_owned(struct reader *r, const struct json_value *node)
         return;
     }
     if (json_member_string(decl, "name")[0] != '\0') {
-        /* A typedef of a tagged enum takes the typedef name when the two
-           differ, since C code names the typedef. */
+        /* A tagged enum keeps its tag, and the typedef name stands for
+           it, as every typedef name stands for the type it names. */
         return;
     }
     e = enum_by_id(r, id);
@@ -1194,10 +1194,6 @@ static bool marker_line(const char *s, int64_t *line)
     return true;
 }
 
-/* The line markers, the macros and the pragmas of the output of
-   `clang -E -dD`. A line marker `# 12 "file" 2` says that the next line
-   is line 12 of file, and every line after it counts one. A marker past
-   the lines clang counts is refused, and the reading stops there. */
 /* The stack of `#pragma pack` values that `push` saves. */
 struct pack_stack {
     int items[64];
@@ -1283,6 +1279,10 @@ static void read_define(struct reader *r, const char *name)
     }
 }
 
+/* The line markers, the macros and the pragmas of the output of
+   `clang -E -dD`. A line marker `# 12 "file" 2` says that the next line
+   is line 12 of file, and every line after it counts one. A marker past
+   the lines clang counts is refused, and the reading stops there. */
 static void read_preprocessed(struct reader *r, char *text)
 {
     const char *file = NULL;
@@ -1458,8 +1458,9 @@ static bool run(const struct arg_list *args, struct text *out,
     return true;
 }
 
-/* The anonymous enums of the header hold constants, which become
-   `const` values of c_int. */
+/* Every named enum of the header goes into the module. An anonymous
+   enum holds constants, which become `const` values of its base type,
+   c_int without one. */
 static void settle_enums(struct reader *r)
 {
     size_t i;

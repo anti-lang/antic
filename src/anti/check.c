@@ -28,9 +28,9 @@
 #include "text.h"
 #include "units.h"
 
-/* The directories of the work tree. The interface files stand in its
-   root. The module of a user doc block goes under docs and the module of
-   a developer doc block under dev. */
+/* The directories of the blocks below the work directory, whose root
+   holds the interface files. The module of a user doc block goes under
+   check/docs and the module of a developer doc block under check/dev. */
 #define CHECK_DOCS_DIR "check/docs"
 #define CHECK_DEV_DIR "check/dev"
 

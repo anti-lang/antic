@@ -168,7 +168,7 @@ struct bind_names {
     /* The record of a tag, or NULL. */
     struct bind_record *(*record_named)(void *context, const char *tag,
                                         bool is_union);
-    /* Whether the enum of a tag exists, whose Anti name goes to out. */
+    /* The Anti name of the enum of a tag, or NULL when there is none. */
     const char *(*enum_named)(void *context, const char *tag);
     void *context;
 };

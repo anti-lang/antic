@@ -2,17 +2,17 @@
 #define ANTI_REPO_H
 
 /* The interface of repo.c: the rule of a repository URL and the fetch
-   into the cache of the user. A repository is a URL prefix serving static files, so a
-   fetch is one request per file. `docs/tooling.md` gives the three paths
-   under a prefix, and `docs/decisions.md` allows `https://` and
-   `file://`, with `http://` for `127.0.0.1` and `localhost` alone. */
+   into the cache of the user. A repository is a URL prefix serving
+   static files, so a fetch is one request per file. `docs/tooling.md`
+   gives the three paths under a prefix, and `docs/decisions.md` allows
+   `https://` and `file://`, with `http://` for `127.0.0.1`, `localhost`
+   and `[::1]` alone. */
 
 #include <stdbool.h>
 
 #include "text.h"
 
-/* The index file of a package under a prefix, and the directory of the
-   library files of one version. */
+/* The index file of a package under a prefix. */
 #define REPO_INDEX_FILE "index.toml"
 
 /* Whether url is a repository URL that the rules allow. Writes a message
