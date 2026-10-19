@@ -64,14 +64,18 @@ void *anti_rt_start_alloc(size_t size)
    assertion reports which one failed before it prints the position the
    compiler built. Nothing else sets a name, and the report line is then
    the assertion alone. The name is the runner's own read-only text, so
-   this keeps the pointer and copies nothing. */
+   this keeps the pointer and copies nothing. A worker of the test may
+   fail while the runner names the next, so ANTI_RT_LOCK_TEST guards the
+   pointer and the length as one pair. */
 static const unsigned char *running_name;
 static int64_t running_length;
 
 void anti_rt_test_running(const unsigned char *name, int64_t length)
 {
+    anti_rt_lock_hold(ANTI_RT_LOCK_TEST);
     running_name = name;
     running_length = length;
+    anti_rt_lock_release(ANTI_RT_LOCK_TEST);
 }
 
 /* DESIGN: the compiler builds the text of a failed assertion, and it
@@ -81,11 +85,17 @@ void anti_rt_test_running(const unsigned char *name, int64_t length)
 _Noreturn void anti_rt_assert_failed(const unsigned char *text,
                                      int64_t length)
 {
-    if (running_name != NULL) {
-        anti_rt_fail_abort("FAIL %.*s\n%.*s",
-                           anti_rt_print_width(running_length),
-                           (const char *)running_name,
-                           anti_rt_print_width(length), (const char *)text);
+    const unsigned char *name;
+    int64_t name_length;
+
+    anti_rt_lock_hold(ANTI_RT_LOCK_TEST);
+    name = running_name;
+    name_length = running_length;
+    anti_rt_lock_release(ANTI_RT_LOCK_TEST);
+    if (name != NULL) {
+        anti_rt_fail_abort("FAIL %.*s\n%.*s", anti_rt_print_width(name_length),
+                           (const char *)name, anti_rt_print_width(length),
+                           (const char *)text);
     }
     anti_rt_fail_abort("%.*s", anti_rt_print_width(length),
                        (const char *)text);

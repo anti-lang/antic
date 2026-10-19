@@ -1062,6 +1062,11 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type)
     return made + ((char *)object - start);
 }
 
+/* DESIGN: the address of anti_rt_give_nothing is the mark, and nothing
+   reads or writes the object. It is not const, because a teardown takes
+   its allocator as a struct anti_object *, which anti_rt_give hands to
+   the entries of a real one, and a const mark would need a cast that
+   drops the qualifier at every use. */
 struct anti_object anti_rt_give_nothing = {NULL};
 
 void anti_rt_give(struct anti_object *from, void *p)

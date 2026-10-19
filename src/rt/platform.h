@@ -180,6 +180,7 @@ enum anti_rt_lock {
     ANTI_RT_LOCK_TRACE_TEXTS,   /* the kept texts of src/rt/trace.c */
     ANTI_RT_LOCK_TRACE_FILES,   /* the files and build ids, src/rt/trace.c */
     ANTI_RT_LOCK_DEBUG,         /* the debugger library of the system */
+    ANTI_RT_LOCK_TEST,          /* the running test, src/rt/assert.c */
     ANTI_RT_LOCK_COUNT
 };
 

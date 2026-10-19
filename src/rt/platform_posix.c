@@ -78,6 +78,7 @@ static struct anti_rt_monitor monitors[] = {
     MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
     MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
     MONITOR_INIT, MONITOR_INIT, MONITOR_INIT,
+    MONITOR_INIT,
 };
 
 _Static_assert(sizeof monitors / sizeof monitors[0] == ANTI_RT_LOCK_COUNT,
