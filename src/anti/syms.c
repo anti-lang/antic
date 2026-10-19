@@ -170,7 +170,7 @@ static void add_binary(struct binaries *list, const char *path)
             return;
         }
     }
-    if (!files_read(path, &bytes)) {
+    if (!files_read_file(path, &bytes)) {
         printf("missing %s: no such file\n", path);
         list->problems++;
         return;
@@ -249,7 +249,7 @@ static bool read_configuration(struct configuration *c, const char *path,
         return false;
     }
     c->files++;
-    if (!files_read(path, &bytes)) {
+    if (!files_read_file(path, &bytes)) {
         fprintf(stderr, "anti: cannot read %s\n", path);
         return false;
     }
@@ -342,7 +342,8 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct text id = {0};
         struct text version = {0};
         const char *path = text_cstr(&files.items[i]);
-        if (files_read(path, &bytes) && is_program(files_base_name(path), &bytes) &&
+        if (files_read_file(path, &bytes) &&
+            is_program(files_base_name(path), &bytes) &&
             licensing_notice(&bytes, &id, &version)) {
             add_binary(out, path);
         }
@@ -364,7 +365,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct anti_toml *doc = NULL;
         resolved(text_cstr(&c.dir), text_cstr(&c.plugins.items[i]), &dir);
         text_appendf(&index, "%s/%s", text_cstr(&dir), ANTI_PLUGIN_INDEX);
-        if (files_read(text_cstr(&index), &bytes)) {
+        if (files_read_file(text_cstr(&index), &bytes)) {
             doc = anti_rt_toml_read((const unsigned char *)bytes.data,
                                     (int64_t)bytes.length);
         }

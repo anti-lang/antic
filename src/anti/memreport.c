@@ -118,7 +118,7 @@ static const struct text *report_module(struct report *r, const char *path,
     }
     m = &r->items[r->count++];
     text_append_bytes(&m->key, path, length);
-    if (!files_read(text_cstr(&m->key), &m->file) ||
+    if (!files_read_file(text_cstr(&m->key), &m->file) ||
         !thin_slice(&m->file, arch, arch_length)) {
         m->file.length = 0;
     }

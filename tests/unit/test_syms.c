@@ -1,7 +1,8 @@
 /* anti symbols over archives and programs that name nothing: a unit of a
    deployment index with no id, and a program with no function. Each
    used to hand a null pointer to memcmp or qsort with a count of zero,
-   which the sanitizer builds catch. */
+   which the sanitizer builds catch. The paths a configuration and a
+   report of --memory-checks name are read as regular files alone. */
 
 #if !defined(_WIN32)
 /* mkfifo is POSIX, outside the C11 library. */
@@ -16,6 +17,8 @@
 #include "../../src/anti/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
+#include "files.h"
+#include "memreport.h"
 #include "symmap.h"
 #include "syms.h"
 #include "target.h"
@@ -32,6 +35,7 @@
 #define MAP "test_syms.map"
 #define FIFO "test_syms-fifo"
 #define TREE_DIR "test_syms-dir"
+#define CONF_DIR "test_syms-conf"
 
 static void write_file(const char *path, const char *text)
 {
@@ -269,6 +273,47 @@ static void object_no_file(void)
 #endif
 }
 
+#if !defined(_WIN32)
+/* A path the configuration names, or one that stands beside it, is read
+   when it is a regular file alone. A FIFO without a writer is refused,
+   never waited on: as an include, beside the configuration and as the
+   index of a directory of plugins. */
+static void configuration_fifo(void)
+{
+    static const char *const confs[] = {
+        "include = [\"fifo\"]\n",
+        "[runtime]\nthreads = 2\n",
+        "[runtime]\nplugins = \"plugins\"\n",
+    };
+    size_t i;
+
+    CHECK(files_remove_tree(CONF_DIR));
+    CHECK(platform_make_dir(CONF_DIR));
+    CHECK(platform_make_dir(CONF_DIR "/plugins"));
+    CHECK(mkfifo(CONF_DIR "/fifo", 0600) == 0);
+    CHECK(mkfifo(CONF_DIR "/plugins/anti-plugins.toml", 0600) == 0);
+    for (i = 0; i < sizeof confs / sizeof confs[0]; i++) {
+        write_file(CONF_DIR "/conf.toml", confs[i]);
+        CHECK(syms_check(CONF_DIR "/conf.toml", NULL, 0) == 1);
+    }
+    CHECK(files_remove_tree(CONF_DIR));
+}
+
+/* A frame of a report of --memory-checks whose module is a FIFO. The
+   line comes out as it went in, and the run does not wait on the FIFO. */
+static void report_fifo(void)
+{
+    static const char *const argv[] = {
+        "/bin/sh", "-c", "echo '    #0 0x1 (" FIFO "+0x10)' >&2", NULL,
+    };
+
+    remove(FIFO);
+    CHECK(mkfifo(FIFO, 0600) == 0);
+    CHECK(memreport_run(argv) == 0);
+    remove(FIFO);
+}
+#endif
+
 void test_syms(void)
 {
     unit_without_id();
@@ -276,4 +321,8 @@ void test_syms(void)
     map_names();
     build_id_of_notice();
     object_no_file();
+#if !defined(_WIN32)
+    configuration_fifo();
+    report_fifo();
+#endif
 }
