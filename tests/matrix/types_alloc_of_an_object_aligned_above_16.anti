@@ -1,7 +1,8 @@
 //! `alloc C { }` of a class whose `align(N)` lies above 16 gives an object at a
-//! multiple of N, as `alloc(T, n)` does by R050 of "Rules of 2026-10-13". A
-//! block of one byte stands between two objects, so the memory of `malloc`
-//! would move each by 16. The line counts the objects that stand elsewhere.
+//! multiple of N, as `alloc(T, n)` does by R050 of "Rules of 2026-10-13".
+//! Sixteen objects stay alive together, each after a block of one byte, so the
+//! memory of `malloc` would put them at different multiples of 16. The line
+//! counts the objects that stand at no multiple of 64.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -18,16 +19,24 @@ class Wide align(64)
 
 fn main() -> int
 {
+	let objects: [16]?*Wide = [none; 16];
+	let pads: [16]?*u8 = [none; 16];
 	let bad = 0;
-	for i in 0..8 {
-		let pad = alloc(u8, 1);
+	for i in 0..16 {
+		pads[i] = alloc(u8, 1);
 		let o = alloc Wide { };
 		let a = Address { p: o as *byte };
 		if a.n % 64 != 0 {
 			bad += 1;
 		}
+		objects[i] = o;
+	}
+	for i in 0..16 {
+		free(pads[i]);
+		let o = objects[i] else {
+			continue;
+		};
 		delete(o);
-		free(pad);
 	}
 	printf("misaligned %lld\n".ptr, bad);
 	return 0;
