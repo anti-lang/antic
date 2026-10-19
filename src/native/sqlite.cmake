@@ -1,5 +1,7 @@
-# SQLite, the reference driver of anti.db, built for every target of the
-# runtime tree as lib/<target>/libsqlite3.a, or sqlite3.lib on Windows.
+# SQLite, a library of the runtime archive that no module binds yet, built
+# for every target of the runtime tree as lib/<target>/libsqlite3.a, or
+# sqlite3.lib on Windows. anti.db of docs/anti-language-additions.md is to
+# open it, and is not built.
 #
 # The source is the amalgamation of the release that tools/sqlite-pin
 # names, which antic_get_source of get-source.cmake downloads into

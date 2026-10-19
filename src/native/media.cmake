@@ -2,10 +2,11 @@
 # and raylib, which src/native/miniaudio.cmake and src/native/raylib.cmake
 # build.
 #
-# DESIGN: a program that imports anti.raylib or anti.miniaudio links
-# dynamically against glibc 2.35 on Linux, as "Runtime archive" in
-# docs/decisions.md settles, so both Linux libraries compile against the
-# glibc sysroot and not against musl. tools/get-sysroot.cmake installs
+# DESIGN: a program that links raylib or miniaudio links dynamically
+# against glibc 2.35 on Linux, as "Runtime archive" in docs/decisions.md
+# settles for the modules anti.raylib and anti.miniaudio, which are not
+# built. So both Linux libraries compile against the glibc sysroot and not
+# against musl. tools/get-sysroot.cmake installs
 # that sysroot with the X11 and OpenGL development files of
 # tools/sysroot-pins, and the build copies it to sysroot/ of the runtime
 # tree. A Linux target whose glibc sysroot is missing builds neither

@@ -1,6 +1,7 @@
-# raylib, the library of anti.raylib, built for every target of
-# ANTIC_MEDIA_TARGETS as lib/<target>/libraylib.a, or raylib.lib on
-# Windows.
+# raylib, a library of the runtime archive that no module binds yet, built
+# for every target of ANTIC_MEDIA_TARGETS as lib/<target>/libraylib.a, or
+# raylib.lib on Windows. anti bind --clang writes a binding of it, and the
+# module anti.raylib of docs/decisions.md is not built.
 #
 # The source is the release that tools/raylib-pin names, which
 # raylib-source.cmake fetches as ANTIC_RAYLIB_SOURCE.

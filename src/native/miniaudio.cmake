@@ -1,6 +1,7 @@
-# miniaudio, the audio library of anti.miniaudio, built for every target
-# of ANTIC_MEDIA_TARGETS as lib/<target>/libminiaudio.a, or miniaudio.lib
-# on Windows.
+# miniaudio, an audio library of the runtime archive that no module binds
+# yet, built for every target of ANTIC_MEDIA_TARGETS as
+# lib/<target>/libminiaudio.a, or miniaudio.lib on Windows. The module
+# anti.miniaudio of docs/decisions.md is not built.
 #
 # The source comes from the release that tools/miniaudio-pin names, which
 # antic_get_source of get-source.cmake downloads into

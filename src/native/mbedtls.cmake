@@ -1,6 +1,7 @@
-# Mbed TLS, the TLS library of anti.net and of the HTTPS client of anti,
+# Mbed TLS, a TLS library of the runtime archive that no module binds yet,
 # built for every target of the runtime tree as lib/<target>/libmbedtls.a,
-# or mbedtls.lib on Windows.
+# or mbedtls.lib on Windows. anti.net of docs/decisions.md is to wrap it,
+# and is not built.
 #
 # The source comes from the release that tools/mbedtls-pin names, which
 # antic_get_source of get-source.cmake downloads into
