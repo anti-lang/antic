@@ -630,11 +630,165 @@ struct type *sema_chan_element(struct checker *c, struct type_expr *t)
     return element;
 }
 
+/* A type of an imported module, `module.Name`. */
+static struct type *resolve_imported(struct checker *c, struct type_expr *t)
+{
+    struct type *imported =
+        sema_imported_struct(c, &t->module, &t->name, t->pos);
+
+    /* A generic of a library is named with its arguments, as one of the
+       module is. */
+    if (!sema_is_error(imported) && imported->type_param_count > 0) {
+        if (t->arg_count == 0) {
+            sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
+                          sema_tn(imported), imported->type_param_count,
+                          imported->type_param_count == 1 ? "" : "s");
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        return sema_copy_of(c, imported, t->args, t->arg_count, t->pos);
+    }
+    if (t->arg_count > 0 && !sema_is_error(imported)) {
+        sema_error_at(c, t->pos, "`%.*s.%.*s` is not generic",
+                      (int)t->module.length, t->module.text,
+                      (int)t->name.length, t->name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return imported;
+}
+
+/* A type the module declares or names in `anti.lang`, `Name` or
+   `Name<Args>`. */
+static struct type *resolve_named(struct checker *c, struct type_expr *t)
+{
+    struct symbol *sym;
+    struct type *declared;
+
+    if (t->module.length > 0) {
+        return resolve_imported(c, t);
+    }
+    sym = sema_module_find(c, &t->name);
+    /* DESIGN: `Object` is the root of every class chain, which the
+       compiler declares. A program writes the name where the object model
+       uses it, as in `equals(self, other: *Object)`, and a class of that
+       name in the module wins over it. The other types the compiler
+       declares in `anti.lang` resolve the same way. */
+    if (sym == NULL &&
+        (declared = types_declared(c->types, &t->name, false)) != NULL) {
+        return declared;
+    }
+    /* DESIGN: `never` is a result alone, written after `->`, and the type
+       has no values. Elsewhere the word names a type of the program, and
+       without one the message says why. */
+    if (sym == NULL && sema_name_is(&t->name, "never")) {
+        sema_error_at(c, t->pos, "`never` is the result of a function "
+                      "that does not return, and no value has it");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
+        sema_error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
+                      t->name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sym->item != NULL && sym->item->kind == ITEM_TYPE) {
+        struct type *aliased = sema_alias_type(c, sym);
+        if (t->arg_count > 0 && !sema_is_error(aliased)) {
+            sema_error_at(c, t->pos, "`%.*s` is not generic",
+                          (int)t->name.length, t->name.text);
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        return aliased;
+    }
+    /* A generic is named with its type arguments, and the name of
+       anything else takes none. */
+    if (sym->type != NULL && sym->type->type_param_count > 0) {
+        if (t->arg_count == 0 && sym->type->nested_in != NULL &&
+            sema_nested_own(sym->type) == 0) {
+            return sym->type;
+        }
+        if (t->arg_count == 0) {
+            sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
+                          sema_tn(sym->type),
+                          sym->type->type_param_count,
+                          sym->type->type_param_count == 1 ? "" : "s");
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        return sema_copy_of(c, sym->type, t->args, t->arg_count, t->pos);
+    }
+    if (t->arg_count > 0 && sym->type != NULL &&
+        !sema_is_error(sym->type)) {
+        sema_error_at(c, t->pos, "`%.*s` is not generic",
+                      (int)t->name.length, t->name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A type whose own declaration names it, as `enum A: A`, has no
+       type yet while that declaration is resolved. */
+    if (sym->type == NULL) {
+        sema_error_at(c, t->pos, "`%.*s` names itself in its own "
+                      "declaration", (int)t->name.length, t->name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return sym->type;
+}
+
+/* A function type, `fn(A) -> R` with its marks. */
+static struct type *resolve_fn_type(struct checker *c, struct type_expr *t)
+{
+    struct type **params =
+        types_alloc_array(c->arena, t->param_count + 1, sizeof *params);
+    struct type *result = sema_builtin(c, TYPE_VOID);
+    struct type *fn;
+    size_t i;
+
+    for (i = 0; i < t->param_count; i++) {
+        params[i] = sema_param_form(c, sema_resolve_type(c, t->params[i]),
+                                    t->params[i]->keep,
+                                    t->params[i]->concurrent,
+                                    t->params[i]->owned,
+                                    t->params[i]->pos);
+        params[i] = sema_lent_form(c, params[i], t->params[i]->lent, false,
+                                   t->params[i]->pos);
+        if (sema_is_error(params[i])) {
+            return params[i];
+        }
+        if (refuses_half_value(c, t->params[i]->pos, params[i],
+                               "a parameter")) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
+    }
+    if (t->result != NULL &&
+        sema_is_error(result = sema_resolve_type(c, t->result))) {
+        return result;
+    }
+    if (t->result != NULL &&
+        refuses_half_value(c, t->result->pos, result, "a result")) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* `fn(A) -> R may fail` takes the ABI form a `may fail` function
+       has, so a value of it holds such a function as it is. */
+    if (t->may_fail) {
+        struct type *error = sema_error_class(c, t->pos);
+        if (error == NULL) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        if (t->result != NULL) {
+            params[t->param_count] = types_pointer(c->types, result);
+        }
+        fn = types_fn_failing(c->types, params,
+                              t->param_count + (t->result != NULL ? 1 : 0),
+                              types_pointer_nullable(c->types, error),
+                              t->result != NULL);
+    } else {
+        fn = types_fn(c->types, params, t->param_count, result);
+    }
+    if (t->never) {
+        fn = types_fn_never(c->types, fn);
+    }
+    return t->nullable ? types_with_none(c->types, fn) : fn;
+}
+
 static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
 {
     struct type *element;
-    struct type *declared;
-    struct symbol *sym;
     size_t i;
 
     switch (t->kind) {
@@ -646,92 +800,7 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
     case TYPEX_OPTIONAL:
         return types_with_none(c->types, sema_resolve_type(c, t->element));
     case TYPEX_NAMED:
-        if (t->module.length > 0) {
-            struct type *imported =
-                sema_imported_struct(c, &t->module, &t->name, t->pos);
-            /* A generic of a library is named with its arguments, as
-               one of the module is. */
-            if (!sema_is_error(imported) && imported->type_param_count > 0) {
-                if (t->arg_count == 0) {
-                    sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
-                                  sema_tn(imported),
-                                  imported->type_param_count,
-                                  imported->type_param_count == 1 ? "" : "s");
-                    return sema_builtin(c, TYPE_ERROR);
-                }
-                return sema_copy_of(c, imported, t->args, t->arg_count,
-                                    t->pos);
-            }
-            if (t->arg_count > 0 && !sema_is_error(imported)) {
-                sema_error_at(c, t->pos, "`%.*s.%.*s` is not generic",
-                              (int)t->module.length, t->module.text,
-                              (int)t->name.length, t->name.text);
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            return imported;
-        }
-        sym = sema_module_find(c, &t->name);
-        /* DESIGN: `Object` is the root of every class chain, which the
-           compiler declares. A program writes the name where the object
-           model uses it, as in `equals(self, other: *Object)`, and a
-           class of that name in the module wins over it. The other types
-           the compiler declares in `anti.lang` resolve the same way. */
-        if (sym == NULL &&
-            (declared = types_declared(c->types, &t->name, false)) != NULL) {
-            return declared;
-        }
-        /* DESIGN: `never` is a result alone, written after `->`, and
-           the type has no values. Elsewhere the word names a type of
-           the program, and without one the message says why. */
-        if (sym == NULL && sema_name_is(&t->name, "never")) {
-            sema_error_at(c, t->pos, "`never` is the result of a function "
-                          "that does not return, and no value has it");
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
-            sema_error_at(c, t->pos, "unknown type `%.*s`", (int)t->name.length,
-                          t->name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sym->item != NULL && sym->item->kind == ITEM_TYPE) {
-            struct type *aliased = sema_alias_type(c, sym);
-            if (t->arg_count > 0 && !sema_is_error(aliased)) {
-                sema_error_at(c, t->pos, "`%.*s` is not generic",
-                              (int)t->name.length, t->name.text);
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            return aliased;
-        }
-        /* A generic is named with its type arguments, and the name of
-           anything else takes none. */
-        if (sym->type != NULL && sym->type->type_param_count > 0) {
-            if (t->arg_count == 0 && sym->type->nested_in != NULL &&
-                sema_nested_own(sym->type) == 0) {
-                return sym->type;
-            }
-            if (t->arg_count == 0) {
-                sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
-                              sema_tn(sym->type),
-                              sym->type->type_param_count,
-                              sym->type->type_param_count == 1 ? "" : "s");
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            return sema_copy_of(c, sym->type, t->args, t->arg_count, t->pos);
-        }
-        if (t->arg_count > 0 && sym->type != NULL &&
-            !sema_is_error(sym->type)) {
-            sema_error_at(c, t->pos, "`%.*s` is not generic",
-                          (int)t->name.length, t->name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* A type whose own declaration names it, as `enum A: A`, has no
-           type yet while that declaration is resolved. */
-        if (sym->type == NULL) {
-            sema_error_at(c, t->pos, "`%.*s` names itself in its own "
-                          "declaration", (int)t->name.length, t->name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return sym->type;
+        return resolve_named(c, t);
     case TYPEX_POINTER:
         element = sema_resolve_type(c, t->element);
         return sema_is_error(element)
@@ -743,57 +812,8 @@ static struct type *resolve_type_inner(struct checker *c, struct type_expr *t)
                                                               element);
     case TYPEX_ARRAY:
         return sema_array_of(c, t->length, sema_resolve_type(c, t->element));
-    case TYPEX_FN: {
-        struct type **params =
-            types_alloc_array(c->arena, t->param_count + 1, sizeof *params);
-        struct type *result = sema_builtin(c, TYPE_VOID);
-        struct type *fn;
-        for (i = 0; i < t->param_count; i++) {
-            params[i] = sema_param_form(c, sema_resolve_type(c, t->params[i]),
-                                        t->params[i]->keep,
-                                        t->params[i]->concurrent,
-                                        t->params[i]->owned,
-                                        t->params[i]->pos);
-            params[i] = sema_lent_form(c, params[i], t->params[i]->lent, false,
-                                       t->params[i]->pos);
-            if (sema_is_error(params[i])) {
-                return params[i];
-            }
-            if (refuses_half_value(c, t->params[i]->pos, params[i],
-                                   "a parameter")) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-        }
-        if (t->result != NULL &&
-            sema_is_error(result = sema_resolve_type(c, t->result))) {
-            return result;
-        }
-        if (t->result != NULL &&
-            refuses_half_value(c, t->result->pos, result, "a result")) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* `fn(A) -> R may fail` takes the ABI form a `may fail` function
-           has, so a value of it holds such a function as it is. */
-        if (t->may_fail) {
-            struct type *error = sema_error_class(c, t->pos);
-            if (error == NULL) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            if (t->result != NULL) {
-                params[t->param_count] = types_pointer(c->types, result);
-            }
-            fn = types_fn_failing(c->types, params,
-                                  t->param_count + (t->result != NULL ? 1 : 0),
-                                  types_pointer_nullable(c->types, error),
-                                  t->result != NULL);
-        } else {
-            fn = types_fn(c->types, params, t->param_count, result);
-        }
-        if (t->never) {
-            fn = types_fn_never(c->types, fn);
-        }
-        return t->nullable ? types_with_none(c->types, fn) : fn;
-    }
+    case TYPEX_FN:
+        return resolve_fn_type(c, t);
     case TYPEX_TUPLE: {
         /* DESIGN: a part of a tuple is written `lent *T` in the result
            of `operator fn value` alone, at the top level of the tuple.
