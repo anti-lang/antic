@@ -67,8 +67,10 @@ foreach(library IN LISTS libraries)
             if(NOT section STREQUAL "0" AND NOT name IN_LIST windows_crt)
                 list(APPEND names "${name}")
             endif()
-        elseif(line MATCHES "^[0-9a-f]+ g " AND NOT line MATCHES "\\*UND\\*")
-            # ELF and Mach-O: a global symbol that is not undefined.
+        elseif(line MATCHES "^[0-9a-f]+ (g | w)" AND NOT line MATCHES "\\*UND\\*")
+            # ELF and Mach-O: a global or a weak symbol that is not
+            # undefined. llvm-objdump writes g in the first column of the
+            # flags for a global one and w in the second for a weak one.
             string(REGEX REPLACE "^.*[ \t]" "" name "${line}")
             if(library MATCHES "/lib/macos-")
                 string(REGEX REPLACE "^_" "" name "${name}")

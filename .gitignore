@@ -1,6 +1,7 @@
 tools/keys/private/
 /build/
 .DS_Store
+__pycache__/
 *.o
 *.obj
 *.s

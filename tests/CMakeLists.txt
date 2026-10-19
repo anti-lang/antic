@@ -1073,6 +1073,11 @@ add_test(NAME message_forms
 add_test(NAME warning_set
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_warning_set.cmake")
+add_test(NAME warning_set_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_warning_set.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/warning-set"
+        -P "${ANTIC_RUNNERS}/run_warning_set_self.cmake")
 
 # No header of ours hides a header of the C library on an include path.
 add_test(NAME header_names
@@ -1087,6 +1092,13 @@ add_test(NAME rt_names
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
         -P "${ANTIC_RUNNERS}/run_rt_names.cmake")
 set_tests_properties(rt_names PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+add_test(NAME rt_names_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_rt_names.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-names"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}" "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        -P "${ANTIC_RUNNERS}/run_rt_names_self.cmake")
 
 # Each declaration of antl_io.h, driver_parts.h, parser_parser.h,
 # sema_checker.h, lower_lowerer.h and whole_parts.h stands under the file
@@ -1155,6 +1167,11 @@ add_test(NAME names_once
 add_test(NAME repo_layout
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_repo_layout.cmake")
+add_test(NAME repo_layout_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_repo_layout.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/repo-layout"
+        -P "${ANTIC_RUNNERS}/run_repo_layout_self.cmake")
 
 # The pre-commit hook refuses staged .md files that fail the docs-style
 # checker, and the configure step installed it in this checkout.

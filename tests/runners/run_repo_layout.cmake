@@ -1,7 +1,9 @@
 # The layout rule of "Repository layout" in CLAUDE.md. Every tracked path
 # stands in an allowed entry of the top level, and every directory directly
-# under src/, tests/ and docs/ is one of the lists below. A runner
-# run_*.cmake stands in tests/runners/. Nothing under build/ is tracked.
+# under src/, tests/ and docs/ is one of the lists below. src/ holds
+# directories alone. A runner run_*.cmake stands in tests/runners/.
+# Nothing under build/ is tracked, and no other path holds what a tool
+# writes, the compiled files of Python or the folder files of the Finder.
 # Adding to any list is Eddie's decision, and the rule in CLAUDE.md names
 # the same entries.
 #
@@ -76,6 +78,8 @@ foreach(path IN LISTS paths)
     endforeach()
     if(top STREQUAL "build")
         list(APPEND wrong "${path}: nothing under build/ is committed")
+    elseif(path MATCHES "(^|/)(__pycache__/|[^/]*\\.py[co]$|\\.DS_Store$)")
+        list(APPEND wrong "${path}: the output of a tool goes under build/")
     elseif(NOT allowed)
         list(APPEND wrong "${path}: ${top} is no entry of the top level")
     elseif(path MATCHES "^(src|tests|docs)/([^/]+)/")
@@ -84,6 +88,8 @@ foreach(path IN LISTS paths)
         if(NOT directory IN_LIST ${kind}_directories)
             list(APPEND wrong "${path}: ${kind}/${directory}/ is no directory of ${kind}/")
         endif()
+    elseif(path MATCHES "^src/[^/]+$")
+        list(APPEND wrong "${path}: src/ holds directories alone")
     elseif(path MATCHES "^tests/run_[^/]*\\.cmake$")
         # Decision 13 of "Decisions of 2026-10-11".
         list(APPEND wrong "${path}: a runner stands in tests/runners/")

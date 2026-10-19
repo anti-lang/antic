@@ -759,10 +759,12 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_release_vm_commands.cmake` | Checks that the commands that take a VM off the network and back stand in `tools/release.sh`, as `docs/vm-setup.md` shows them. |
 | `tests/runners/run_release_vm_failures.cmake` | Checks that step 5 of `./r --dry-run` stops when the offline check of a VM fails or its network does not come back. |
 | `tests/runners/run_repo_layout.cmake` | Checks every tracked path against the allowed entries. |
+| `tests/runners/run_repo_layout_self.cmake` | Tests `run_repo_layout.cmake` on made-up trees. |
 | `tests/runners/run_rt_extensions.cmake` | Refuses a compiler extension in the runtime outside the files that exist to hold one. |
 | `tests/runners/run_rt_format.cmake` | Compiles every file of the runtime with the warning of a missing format attribute and refuses a warning. |
 | `tests/runners/run_rt_headers.cmake` | Checks that each header of the runtime with one interface opens with its purpose and alone declares what its file defines. |
 | `tests/runners/run_rt_names.cmake` | Refuses an exported name of the runtime outside its prefixes. |
+| `tests/runners/run_rt_names_self.cmake` | Tests `run_rt_names.cmake` on made-up runtime archives. |
 | `tests/runners/run_rt_oom.cmake` | Runs each case of `test_rt_oom.c` and expects the stop through `anti_rt_out_of_memory`. |
 | `tests/runners/run_rt_wide_text.cmake` | Refuses a call of an ANSI entry point of Windows in the runtime. |
 | `tests/runners/run_runtime_frames.cmake` | Requires the frame record in `main` of every Linux and macOS runtime. |
@@ -796,6 +798,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_variant_wide_tag.cmake` | Compiles and runs a program whose variant has 65536 cases, so that its tag is a `u32`. |
 | `tests/runners/run_warning_names.cmake` | Holds the warning table of antic equal to the note. |
 | `tests/runners/run_warning_set.cmake` | Refuses a warning flag outside the two warning files. |
+| `tests/runners/run_warning_set_self.cmake` | Tests `run_warning_set.cmake` on made-up trees. |
 | `tests/runners/run_warnings.cmake` | Runs antic and requires or forbids texts in its messages. |
 | `tests/runners/run_windows_addresses.cmake` | Refuses 32-bit address relocations in a windows-x86_64 object. |
 | `tests/runners/run_windows_sysroot.cmake` | Checks the mingw-w64 pins and runs the sysroot script on a stand-in release. |
@@ -821,7 +824,6 @@ the data the scripts read.
 | `tools/coverage-report.cmake` | Merges the raw profiles of a coverage tree and writes its summary and its annotated sources. |
 | `tools/coverage.cmake` | The flags of the coverage measurement and the directory of its raw profiles. |
 | `tools/deps-dir.cmake` | Names the directory of the pinned downloads. |
-| `tools/docs-style/__pycache__/check_docs.cpython-314.pyc` | A compiled copy of the checker that Python wrote, tracked by mistake. |
 | `tools/docs-style/banned-terms.md` | Lists the banned terms for a reader. |
 | `tools/docs-style/check_docs.py` | Checks `.md` files against the docs-style rules. |
 | `tools/download.cmake` | `antic_download`, the one download of the build, with the check of its digest. |

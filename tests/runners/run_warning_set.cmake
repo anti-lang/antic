@@ -8,13 +8,16 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+# The check and its own test spell the flags they look for.
 set(allowed "tools/warnings.cmake" "src/native/warnings.cmake"
-    "tests/runners/run_warning_set.cmake")
+    "tests/runners/run_warning_set.cmake"
+    "tests/runners/run_warning_set_self.cmake")
 
 file(GLOB build_files RELATIVE "${ROOT}"
     "${ROOT}/CMakeLists.txt" "${ROOT}/CMakePresets.json" "${ROOT}/r"
     "${ROOT}/tools/*.cmake" "${ROOT}/tools/*.sh" "${ROOT}/tools/*.ps1"
-    "${ROOT}/src/native/*.cmake" "${ROOT}/tests/*.cmake"
+    "${ROOT}/src/native/*.cmake" "${ROOT}/src/native/CMakeLists.txt"
+    "${ROOT}/tests/*.cmake"
     "${ROOT}/tests/runners/*.cmake"
     "${ROOT}/tests/CMakeLists.txt")
 file(GLOB_RECURSE c_files RELATIVE "${ROOT}"

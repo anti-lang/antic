@@ -395,7 +395,8 @@ changes its row, and the test `source_tree` refuses a file without one.
   never in the source tree. Nothing under `build/` is committed.
 
 The test `repo_layout` reads `git ls-files` and holds these lists and the
-directories of `tests/` and `docs/`. Adding to any list is Eddie's decision.
+directories of `tests/` and `docs/`. It refuses a file directly in `src/`
+and the output of a tool anywhere. Adding to any list is Eddie's decision.
 
 ## Tests
 
