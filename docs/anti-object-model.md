@@ -45,7 +45,7 @@ Contents:
 ## Struct
 
 - `struct Rect { x: f32, y: f32, w: f32, h: f32 }`. A struct body holds fields, nothing else. No functions, no constants, no defaults, no `inherits`, no visibility markers. Every field is readable and writable everywhere.
-- A struct has C layout on the target. Unions, bitfields, `packed` and `align(N)` follow the rules of `docs/decisions.md`.
+- A struct has C layout on the target. Unions, bitfields, `packed` and `align(N)` follow the rules of `docs/decisions.md`. The largest N of `align(N)` is 4096.
 - The method-call sugar of the core applies. `v.f(args)` rewrites to `f(&v, args)` or `f(v, args)` for a free function `f` in the module that declares `v`'s type. The struct does not know the function exists.
 - A struct bound from C with `anti bind` is a struct. An exported struct is a struct.
 - A struct that appears in a class, or is exported, gets a descriptor in read-only data. The struct does not reference it. See [Descriptor and reflection](#descriptor-and-reflection).

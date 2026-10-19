@@ -177,7 +177,11 @@ static void check_simd_struct(struct checker *c, const struct item *it)
     }
 }
 
-/* The N of align(N): a constant power of two, or 0 after an error. */
+/* The largest N of align(N). */
+#define ALIGN_LARGEST 4096
+
+/* The N of align(N): a constant power of two up to ALIGN_LARGEST, or 0
+   after an error. */
 static uint64_t alignment(struct checker *c, struct expr *e)
 {
     struct const_value v;
@@ -197,6 +201,13 @@ static uint64_t alignment(struct checker *c, struct expr *e)
     if (sema_signed_bits(v.as.integer) < 1 ||
         (v.as.integer & (v.as.integer - 1)) != 0) {
         sema_error_at(c, e->pos, "an alignment is a power of two");
+        return 0;
+    }
+    /* R051 of "Answers of 2026-10-18": the largest alignment is the
+       size of a page. */
+    if (v.as.integer > ALIGN_LARGEST) {
+        sema_error_at(c, e->pos, "an alignment is at most %d, found %lld",
+                      ALIGN_LARGEST, (long long)v.as.integer);
         return 0;
     }
     return v.as.integer;

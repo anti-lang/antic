@@ -1,0 +1,12 @@
+//! The largest N of `align(N)` is 4096, by R051 of "Answers of 2026-10-18", and
+//! 8192 is refused.
+
+struct Huge align(8192)
+{
+	a: u8,
+}
+
+fn main() -> int
+{
+	return 0;
+}

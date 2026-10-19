@@ -1,0 +1,57 @@
+//! `align(4096)`, the largest alignment by R051 of "Answers of 2026-10-18", on a
+//! struct, a class and a union. Each line gives the size and how far a local,
+//! a field and an element of `alloc(T, n)` stand from a multiple of 4096.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Address
+{
+	p: ?*byte,
+	n: u64,
+}
+
+struct Page align(4096)
+{
+	a: u8,
+}
+
+struct Holder
+{
+	lead: u8,
+	page: Page,
+}
+
+class Frame align(4096)
+{
+	pub a: u8 = 7,
+}
+
+union Slot align(4096)
+{
+	a: u8,
+	b: i64,
+}
+
+fn off(p: *byte) -> int
+{
+	let a = Address { p: p };
+	return (a.n % 4096) as int;
+}
+
+fn main() -> int
+{
+	let page = Page { a: 1 };
+	let holder = Holder { lead: 2, page: Page { a: 3 } };
+	let block = alloc(Page, 2) else {
+		return 1;
+	};
+	printf("struct %lld %lld %lld %lld\n".ptr, size_of(Page), off(&page as *byte),
+		off(&holder.page as *byte), off(&block[1] as *byte));
+	free(block);
+	let frame = Frame { };
+	printf("class %lld %lld %d\n".ptr, size_of(Frame), off(&frame as *byte),
+		frame.a as c_int);
+	let slot = Slot { b: 5 };
+	printf("union %lld %lld\n".ptr, size_of(Slot), off(&slot as *byte));
+	return 0;
+}

@@ -312,7 +312,7 @@ C and C++ change a layout with `#pragma pack` or `__attribute__((packed))`, and 
 
 `packed` before `struct`, `union`, `class` or `variant` removes the padding. Every field then starts at the byte after the one before it, and the type has alignment 1.
 
-`align(N)` after the name raises the alignment of the type to `N` bytes, and its size becomes a multiple of `N`. `N` is a constant power of two. On a class, `align(N)` stands before `inherits`.
+`align(N)` after the name raises the alignment of the type to `N` bytes, and its size becomes a multiple of `N`. `N` is a constant power of two up to 4096, the size of a page, and a larger `N` is refused. On a class, `align(N)` stands before `inherits`.
 
 Both may stand on one declaration. `packed struct Frame align(4)` has no padding between its fields and is 8 bytes, a multiple of 4.
 
