@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "atomic.h"
+#include "grow.h"
 #include "json.h"
 #include "plugin.h"
 #include "registry.h"
@@ -171,7 +172,8 @@ struct built {
 /* The blocks that one deserialize took from its allocator, which a
    failure gives back, and the objects it prepared, which a failure
    destroys first. The lists are memory of the runtime and go before
-   deserialize returns. */
+   deserialize returns. Each grows by the rule of grow.h, and its room
+   counts bytes. */
 struct made {
     void **blocks;
     int64_t count;
@@ -195,20 +197,19 @@ static void *lend(struct reader *r, size_t size, int64_t align)
         (void *(*)(struct anti_object *, int64_t, int64_t))
             anti_rt_entry_body(r->from, ANTI_ENTRY_ALLOC);
     struct made *m = r->made;
+    int64_t one = (int64_t)sizeof *m->blocks;
+    void **blocks;
     void *p;
 
     if ((uint64_t)size > (uint64_t)INT64_MAX) {
         return NULL;
     }
-    if (m->count == m->room) {
-        int64_t room = m->room == 0 ? 16 : m->room * 2;
-        void **blocks = realloc(m->blocks, (size_t)room * sizeof *blocks);
-        if (blocks == NULL) {
-            return NULL;
-        }
-        m->blocks = blocks;
-        m->room = room;
+    blocks = anti_rt_reserve(m->blocks, &m->room, m->count * one, one,
+                             16 * one);
+    if (blocks == NULL) {
+        return NULL;
     }
+    m->blocks = blocks;
     p = alloc(r->from, (int64_t)size, align);
     if (p == NULL) {
         return NULL;
@@ -222,16 +223,15 @@ static void *lend(struct reader *r, size_t size, int64_t align)
    so that every object whose construct ran is on the list. */
 static bool room_for_object(struct made *m)
 {
-    if (m->object_count == m->object_room) {
-        int64_t room = m->object_room == 0 ? 8 : m->object_room * 2;
-        struct built *objects =
-            realloc(m->objects, (size_t)room * sizeof *objects);
-        if (objects == NULL) {
-            return false;
-        }
-        m->objects = objects;
-        m->object_room = room;
+    int64_t one = (int64_t)sizeof *m->objects;
+    struct built *objects =
+        anti_rt_reserve(m->objects, &m->object_room, m->object_count * one,
+                        one, 8 * one);
+
+    if (objects == NULL) {
+        return false;
     }
+    m->objects = objects;
     return true;
 }
 
