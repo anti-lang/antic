@@ -1,0 +1,34 @@
+//! A parser holds more options and more arguments that are no option than its
+//! first room of 8 takes. Ten flags are declared and given, and twenty
+//! arguments follow them, so both lists grow twice past their first room.
+import anti.args;
+import anti.io;
+import anti.text;
+
+fn main(argv: []str, env: []str) -> int
+{
+	let names: [10]str = ["a", "b", "c", "d", "e", "f", "g", "i", "j", "k"];
+	let letters: [10]byte = [0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x69,
+		0x6A, 0x6B];
+	let p = args.Parser.new("grow", "");
+	for i in 0..10 {
+		p.flag(names[i], letters[i], "a flag");
+	}
+	p.parse(argv) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let given = 0;
+	for name in names {
+		if p.given(name) {
+			given += 1;
+		}
+	}
+	io.println(f"{given} flags, {p.len()} arguments");
+	for i in 0..p.len() {
+		io.print(p.at(i) ?? "none");
+		io.print(" ");
+	}
+	io.println("");
+	return 0;
+}

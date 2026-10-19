@@ -316,24 +316,7 @@ pub class Parser
 	/// Add one argument that is no option.
 	fn keep(self, arg: str)
 	{
-		if self.rest_count + 1 > self.rest.len {
-			let size = self.rest.len;
-			if size == 0 {
-				size = 8;
-			}
-			while size < self.rest_count + 1 do {
-				size = size * 2;
-			}
-			let room = alloc(str, size) else {
-				anti_rt_out_of_memory(size *| size_of(str));
-			};
-			if self.rest.ptr != none {
-				memcpy(room as ?*byte, self.rest.ptr as ?*byte,
-					(self.rest_count * size_of(str)) as c_size_t);
-				free(self.rest.ptr);
-			}
-			self.rest = []str { ptr: room, len: size };
-		}
+		self.rest = grown<str>(self.rest, self.rest_count, self.rest_count + 1);
 		self.rest[self.rest_count] = arg;
 		self.rest_count = self.rest_count + 1;
 	}
@@ -341,24 +324,33 @@ pub class Parser
 	/// Make room for `wanted` options.
 	fn reserve(self, wanted: int)
 	{
-		if wanted <= self.options.len {
-			return;
-		}
-		let size = self.options.len;
-		if size == 0 {
-			size = 8;
-		}
-		while size < wanted do {
-			size = size * 2;
-		}
-		let room = alloc(Option, size) else {
-			anti_rt_out_of_memory(size *| size_of(Option));
-		};
-		if self.options.ptr != none {
-			memcpy(room as ?*byte, self.options.ptr as ?*byte,
-				(self.count * size_of(Option)) as c_size_t);
-			free(self.options.ptr);
-		}
-		self.options = []Option { ptr: room, len: size };
+		self.options = grown<Option>(self.options, self.count, wanted);
 	}
+}
+
+/// `items` with room for `wanted` elements, of which it keeps the first `used`.
+///
+/// The room starts at 8 and doubles until it holds `wanted`, and the old room
+/// is freed. `items` comes back as it is when it holds `wanted` already.
+fn grown<T>(items: []T, used: int, wanted: int) -> []T
+{
+	if wanted <= items.len {
+		return items;
+	}
+	let size = items.len;
+	if size == 0 {
+		size = 8;
+	}
+	while size < wanted do {
+		size = size * 2;
+	}
+	let room = alloc(T, size) else {
+		anti_rt_out_of_memory(size *| size_of(T));
+	};
+	if items.ptr != none {
+		memcpy(room as ?*byte, items.ptr as ?*byte,
+			(used * size_of(T)) as c_size_t);
+		free(items.ptr);
+	}
+	return []T { ptr: room, len: size };
 }
