@@ -409,7 +409,7 @@ static bool find_binaries(const char *conf, struct binaries *out)
 
 /* The symbols of one build: its id, the module and version they name,
    the archive they came from and the entries that hold them. */
-struct unit {
+struct symbol_unit {
     struct text module;
     struct text id;
     struct text version;
@@ -418,15 +418,15 @@ struct unit {
     struct texts bytes;
 };
 
-struct units {
-    struct unit *items;
+struct symbol_units {
+    struct symbol_unit *items;
     size_t count;
     size_t capacity;
 };
 
-static struct unit *units_add(struct units *list)
+static struct symbol_unit *symbol_units_add(struct symbol_units *list)
 {
-    struct unit *u;
+    struct symbol_unit *u;
 
     if (list->count == list->capacity) {
         list->items = files_grow(list->items, &list->capacity,
@@ -437,12 +437,12 @@ static struct unit *units_add(struct units *list)
     return u;
 }
 
-static void units_free(struct units *list)
+static void symbol_units_free(struct symbol_units *list)
 {
     size_t i;
 
     for (i = 0; i < list->count; i++) {
-        struct unit *u = &list->items[i];
+        struct symbol_unit *u = &list->items[i];
         text_free(&u->module);
         text_free(&u->id);
         text_free(&u->version);
@@ -455,7 +455,8 @@ static void units_free(struct units *list)
 }
 
 /* The entry of a unit whose name ends with suffix, or NULL. */
-static const struct text *unit_entry(const struct unit *u, const char *suffix)
+static const struct text *symbol_unit_entry(const struct symbol_unit *u,
+                                            const char *suffix)
 {
     size_t i;
 
@@ -510,7 +511,7 @@ static uint64_t map_text(const struct text *map)
 /* A deployment archive: the index names each unit, and the entries of
    a unit stand under its id. */
 static bool load_deployment(const struct zip_archive *z, const char *path,
-                            const struct text *index, struct units *out)
+                            const struct text *index, struct symbol_units *out)
 {
     struct anti_toml *doc = anti_rt_toml_read(
         (const unsigned char *)index->data, (int64_t)index->length);
@@ -526,7 +527,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
         const char *key = (const char *)anti_rt_toml_key(doc, n).ptr;
         const char *value = (const char *)anti_rt_toml_value(doc, n).ptr;
         const char *field = strrchr(key, '.');
-        struct unit *u;
+        struct symbol_unit *u;
         /* R184 of "Rules of 2026-10-13": every key stands in a module
            table, and one outside them names nothing an index knows. */
         if (strncmp(key, "module.", 7) != 0 || field == NULL ||
@@ -537,7 +538,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
             return false;
         }
         if (files_ends_with(key, ".module")) {
-            u = units_add(out);
+            u = symbol_units_add(out);
             text_append(&u->module, value);
             continue;
         }
@@ -562,7 +563,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
             continue;
         }
         for (k = first; k < out->count; k++) {
-            struct unit *u = &out->items[k];
+            struct symbol_unit *u = &out->items[k];
             /* A unit the index gives no id names no entry. An entry
                name that starts with `/` would otherwise match it, with
                memcmp over a null pointer. */
@@ -584,10 +585,10 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
 /* Read the archive at path into units. A deployment archive holds an
    index and one directory per id. The archive of one build holds its
    entries at the top, and its id is the one of the twin or the map. */
-static bool load_archive(const char *path, struct units *out)
+static bool load_archive(const char *path, struct symbol_units *out)
 {
     struct zip_archive z;
-    struct unit *u;
+    struct symbol_unit *u;
     struct text index = {0};
     const struct text *twin;
     const struct text *map;
@@ -607,7 +608,7 @@ static bool load_archive(const char *path, struct units *out)
             return ok;
         }
     }
-    u = units_add(out);
+    u = symbol_units_add(out);
     text_append(&u->source, path);
     for (i = 0; ok && i < z.count; i++) {
         struct text *bytes;
@@ -619,8 +620,8 @@ static bool load_archive(const char *path, struct units *out)
     if (!ok) {
         return false;
     }
-    twin = unit_entry(u, ".debug");
-    map = unit_entry(u, ".map");
+    twin = symbol_unit_entry(u, ".debug");
+    map = symbol_unit_entry(u, ".map");
     if (twin == NULL || !licensing_notice(twin, &u->id, &u->version)) {
         u->id.length = 0;
         if (map == NULL || !map_id(map, &u->id)) {
@@ -639,7 +640,8 @@ static bool load_archive(const char *path, struct units *out)
 }
 
 /* The unit of id, or NULL. */
-static const struct unit *unit_of(const struct units *list, const char *id)
+static const struct symbol_unit *symbol_unit_of(const struct symbol_units *list,
+                                                const char *id)
 {
     size_t i;
 
@@ -653,7 +655,7 @@ static const struct unit *unit_of(const struct units *list, const char *id)
 
 /* Whether a unit belongs to the binary at path by name: its module has
    the stem of the binary. */
-static bool same_module(const struct unit *u, const char *path)
+static bool same_module(const struct symbol_unit *u, const char *path)
 {
     struct text a = {0};
     struct text b = {0};
@@ -695,12 +697,13 @@ static const char *state_name(enum state s)
 
 /* The state of the binary b against units, and the unit that holds its
    symbols when they are present. */
-static enum state state_of(const struct binary *b, const struct units *units,
-                           const struct unit **found)
+static enum state state_of(const struct binary *b,
+                           const struct symbol_units *units,
+                           const struct symbol_unit **found)
 {
     size_t i;
 
-    *found = unit_of(units, text_cstr(&b->id));
+    *found = symbol_unit_of(units, text_cstr(&b->id));
     if (*found != NULL) {
         return PRESENT;
     }
@@ -729,7 +732,7 @@ static void toml_literal(struct text *out, const char *key, const char *value)
 int syms_inventory(const char *conf, const char *from, const char *out)
 {
     struct binaries binaries = {0};
-    struct units folded = {0};
+    struct symbol_units folded = {0};
     struct text index = {0};
     struct zip_entry *entries = NULL;
     size_t entry_count = 0;
@@ -746,9 +749,9 @@ int syms_inventory(const char *conf, const char *from, const char *out)
                         "after its id.\n");
     for (i = 0; i < binaries.count; i++) {
         const struct binary *b = &binaries.items[i];
-        struct units units = {0};
+        struct symbol_units units = {0};
         struct text archive = {0};
-        const struct unit *found = NULL;
+        const struct symbol_unit *found = NULL;
         enum state s = MISSING;
         archive_of(text_cstr(&b->path), from, &archive);
         if (files_exists(text_cstr(&archive)) &&
@@ -757,8 +760,9 @@ int syms_inventory(const char *conf, const char *from, const char *out)
         }
         printf("%s %s %s\n", state_name(s), text_cstr(&b->path),
                text_cstr(&b->id));
-        if (s == PRESENT && unit_of(&folded, text_cstr(&b->id)) == NULL) {
-            struct unit *u = units_add(&folded);
+        if (s == PRESENT &&
+            symbol_unit_of(&folded, text_cstr(&b->id)) == NULL) {
+            struct symbol_unit *u = symbol_units_add(&folded);
             text_append(&u->module, files_base_name(text_cstr(&b->path)));
             text_append(&u->id, text_cstr(&b->id));
             text_append(&u->version, text_cstr(&b->version));
@@ -778,7 +782,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
             toml_literal(&index, "version", text_cstr(&u->version));
             toml_literal(&index, "source", text_cstr(&u->source));
         }
-        units_free(&units);
+        symbol_units_free(&units);
         text_free(&archive);
     }
     entries = files_array(total, sizeof *entries);
@@ -787,7 +791,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
     entries[entry_count].size = index.length;
     entry_count++;
     for (i = 0; i < folded.count; i++) {
-        const struct unit *u = &folded.items[i];
+        const struct symbol_unit *u = &folded.items[i];
         for (j = 0; j < u->names.count; j++) {
             entries[entry_count].name = text_cstr(&u->names.items[j]);
             entries[entry_count].bytes = u->bytes.items[j].data;
@@ -803,7 +807,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
                binaries.count + binaries.problems);
     }
     free(entries);
-    units_free(&folded);
+    symbol_units_free(&folded);
     binaries_free(&binaries);
     text_free(&index);
     return ok ? 0 : 1;
@@ -812,7 +816,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
 int syms_check(const char *conf, const char *const *symbols, size_t count)
 {
     struct binaries binaries = {0};
-    struct units given = {0};
+    struct symbol_units given = {0};
     size_t absent;
     size_t i;
     int status = 1;
@@ -828,8 +832,8 @@ int syms_check(const char *conf, const char *const *symbols, size_t count)
     absent = binaries.problems;
     for (i = 0; i < binaries.count; i++) {
         const struct binary *b = &binaries.items[i];
-        const struct unit *found = NULL;
-        struct units beside = {0};
+        const struct symbol_unit *found = NULL;
+        struct symbol_units beside = {0};
         struct text archive = {0};
         enum state s = MISSING;
         if (count > 0) {
@@ -844,14 +848,14 @@ int syms_check(const char *conf, const char *const *symbols, size_t count)
         printf("%s %s %s\n", state_name(s), text_cstr(&b->path),
                text_cstr(&b->id));
         absent += s != PRESENT;
-        units_free(&beside);
+        symbol_units_free(&beside);
         text_free(&archive);
     }
     status = absent > 0 ? 1 : 0;
 
 done:
     binaries_free(&binaries);
-    units_free(&given);
+    symbol_units_free(&given);
     return status;
 }
 
@@ -998,11 +1002,11 @@ bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
 /* The function and the line of offset into the module the unit holds
    the symbols of. The twin answers first. The map answers for what it
    does not. */
-static bool resolve_frame(const struct unit *u, uint64_t offset,
+static bool resolve_frame(const struct symbol_unit *u, uint64_t offset,
                           struct mapped *out)
 {
-    const struct text *twin = unit_entry(u, ".debug");
-    const struct text *map = unit_entry(u, ".map");
+    const struct text *twin = symbol_unit_entry(u, ".debug");
+    const struct text *map = symbol_unit_entry(u, ".map");
     struct mapped mapped;
     uint64_t base = 0;
     uint64_t vaddr;
@@ -1052,13 +1056,14 @@ static bool resolve_frame(const struct unit *u, uint64_t offset,
 /* The function and the line of the frame that the line at c names, as
    `<address> <module>+<offset>`, written after it. A line of another form,
    or of a module no archive answers for, gains nothing. */
-static void resolve_frame_line(struct cursor *c, const struct units *units,
+static void resolve_frame_line(struct cursor *c,
+                               const struct symbol_units *units,
                                const struct texts *modules)
 {
     uint64_t address;
     uint64_t offset;
     uint64_t number;
-    const struct unit *u;
+    const struct symbol_unit *u;
     struct mapped m;
 
     cursor_blank(c);
@@ -1068,7 +1073,7 @@ static void resolve_frame_line(struct cursor *c, const struct units *units,
         number >= modules->count) {
         return;
     }
-    u = unit_of(units, text_cstr(&modules->items[number]));
+    u = symbol_unit_of(units, text_cstr(&modules->items[number]));
     memset(&m, 0, sizeof m);
     if (u != NULL && resolve_frame(u, offset, &m)) {
         printf(" %s", text_cstr(&m.function));
@@ -1086,7 +1091,7 @@ static void resolve_frame_line(struct cursor *c, const struct units *units,
    frame, such as the message of an error before its trace. */
 int syms_resolve(const char *trace, const char *const *symbols, size_t count)
 {
-    struct units units = {0};
+    struct symbol_units units = {0};
     struct texts modules = {0};
     struct text input = {0};
     const char *line;
@@ -1137,6 +1142,6 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
 done:
     texts_free(&modules);
     text_free(&input);
-    units_free(&units);
+    symbol_units_free(&units);
     return status;
 }
