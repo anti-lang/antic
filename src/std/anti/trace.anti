@@ -889,8 +889,9 @@ pub class Composite inherits lang.TraceHandler
 /// and give it back.
 ///
 /// The key is empty in a program that was given none, and the call then
-/// installs nothing and gives `none`. The program owns what it gets back and
-/// deletes it once it has installed `none` in its place.
+/// installs `none`, which takes out a handler installed before, and gives
+/// `none`. The program owns what it gets back and deletes it once it has
+/// installed `none` in its place.
 pub fn start() -> ?*lang.TraceHandler
 {
 	return install(runtime.get("trace") ?? "");

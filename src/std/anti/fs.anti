@@ -40,7 +40,7 @@ pub enum Mode: u8 { Read, Write, Append }
 
 /// An open file, which `open` gives and `close` frees.
 ///
-/// Both modes are binary, so no byte is translated on Windows.
+/// Every mode is binary, so no byte is translated on Windows.
 pub struct File
 {
 	/// The C stream of the file.

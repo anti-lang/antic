@@ -2,7 +2,7 @@
 //!
 //! `Random` is a class, so a program holds one per thread or one per task and
 //! never shares a hidden global. The generator is xoshiro256**, which passes
-//! the usual statistical tests and needs eight words of state. It is not a
+//! the usual statistical tests and needs four words of state. It is not a
 //! cryptographic generator, and `anti.crypto` will hold one of those.
 //!
 //! `Source` is the standard interface. It draws everything from `next`, so a

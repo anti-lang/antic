@@ -50,10 +50,11 @@ const NO_SLOT: int = -1;
 /// slot and the generation of the slot when the element was added.
 ///
 /// A handle is two integers. It may be copied, stored and passed between
-/// threads. Two handles are the same when both fields are, and a handle has no
-/// `==` of its own, since the `==` of this module is that of `Pool<T>`. It
-/// never finds the wrong element: once its element is removed it finds nothing,
-/// even after the slot is reused.
+/// threads. Two handles are the same when both fields are, which the default
+/// `==` of a struct compares. Inside its pool a handle never finds the wrong
+/// element: once its element is removed it finds nothing, even after the slot
+/// is reused. A handle of another pool with the same slot and generation finds
+/// the element of that slot.
 pub struct Handle<T>
 {
 	index: int,

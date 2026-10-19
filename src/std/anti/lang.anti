@@ -17,7 +17,7 @@
 //! that form by hand, and a call handles it the same way.
 //!
 //! A function that cannot fail returns its value. A function whose only failure
-//! is "not present" returns `?*T` or `bool`. The error a handler binds is
+//! is "not present" returns `?T`, `?*T` or `bool`. The error a handler binds is
 //! deleted when the handler exits, unless the handler returns it.
 
 extern fn anti_rt_write(stream: c_int, bytes: ?*byte, count: c_size_t);

@@ -26,8 +26,8 @@ const NO_NODE: int = -1;
 ///
 /// `add_root` adds an element at the top and `add_child` one below another,
 /// after its other children. `remove` takes an element out with its whole
-/// subtree. The reading and lending forms are those of `pool.Pool<T>`, and
-/// every one of them finds nothing for a handle whose element is gone.
+/// subtree. The reading and lending forms are those `pool.Slots<T>` declares,
+/// and every one of them finds nothing for a handle whose element is gone.
 ///
 /// `for` walks the elements in the order of their slots. `depth_first` and
 /// `breadth_first` give the handles of a subtree in the order of the tree. A
