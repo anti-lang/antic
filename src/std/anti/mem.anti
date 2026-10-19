@@ -246,9 +246,12 @@ pub final class Shared<T>
 	/* DESIGN: the handle owns its cell with `own`, which is what makes `=`
 	   refuse to copy a handle. `destruct` frees the cell itself when it
 	   holds the last count, and leaves `none` in the field in every case,
-	   so the teardown of `own` fields that follows it frees nothing. The
-	   field has no default, so a literal outside the module makes no
-	   handle, and a handle holds `none` only after its teardown. */
+	   so the teardown of `own` fields that follows it frees nothing. `=`
+	   to the field would delete the cell, by R074 of "Answers of
+	   2026-10-18", so `destruct` writes `none` through the address of the
+	   field and the cell stays. The field has no default, so a literal
+	   outside the module makes no handle, and a handle holds `none` only
+	   after its teardown. */
 	own cell: ?*Cell<T>,
 
 	/// The first handle of `value`, which the handle takes.
@@ -305,7 +308,8 @@ pub final class Shared<T>
 		let cell = self.cell else {
 			return;
 		};
-		self.cell = none;
+		let field = &self.cell;
+		*field = none;
 		if cell.count.sub(1) == 1 {
 			delete(cell);
 		}

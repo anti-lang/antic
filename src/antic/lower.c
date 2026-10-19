@@ -1336,6 +1336,7 @@ void lower_module(struct module *module, const char *module_name,
     }
     free(l.anonymous);
     free(l.temps);
+    free(l.received);
     lower_patterns_start(&l);
     free(l.regex_literals);
     /* A function or a datum defined here under the path of another

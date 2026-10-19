@@ -516,6 +516,46 @@ static void destroy_buffer(struct lowerer *l, const struct type *t,
     ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
 }
 
+const struct struct_field *lower_own_field(const struct expr *e)
+{
+    const struct type *s;
+    const struct struct_field *f;
+
+    if (e->kind != EXPR_FIELD || e->symbol != NULL) {
+        return NULL;
+    }
+    s = e->as.field.base->type;
+    s = s->kind == TYPE_POINTER ? s->element : s;
+    if (s->kind != TYPE_CLASS) {
+        return NULL;
+    }
+    s = lower_field_owner(s, &e->as.field.name);
+    f = s != NULL ? types_find_field(s, &e->as.field.name) : NULL;
+    return f != NULL && owns_buffer(f) ? f : NULL;
+}
+
+/* DESIGN: R074 of "Answers of 2026-10-18". `=` to an `own` pointer or
+   slice tears down what the field held before the new value goes in, as
+   the teardown of its object would, and the new value is complete before
+   the old one goes. The old buffer goes back to the C library, as
+   `delete(p)` without an allocator gives it. A field given the buffer it
+   holds keeps it, so `b.one = b.one` frees nothing. */
+void lower_replace_buffer(struct lowerer *l, const struct type *t,
+                          struct ir_operand at, struct ir_operand next)
+{
+    struct ir_operand old = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+    struct ir_block *other = lower_new_block(l);
+    struct ir_block *after = lower_new_block(l);
+
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, old, next)),
+              other, after);
+    l->b = other;
+    destroy_buffer(l, t, at, ir_int_op(IR_PTR, 0));
+    ir_jump(l->f, l->b, after);
+    l->b = after;
+}
+
 /* DESIGN: the copy of an `own` pointer or slice gets a buffer of its own.
    An object behind a pointer to a class is copied through its table. Any
    other buffer is copied byte for byte, and then each element copies

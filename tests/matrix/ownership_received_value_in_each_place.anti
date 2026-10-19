@@ -1,0 +1,192 @@
+//! A value that `recv` gives belongs to the block that holds the `recv`, by
+//! R074 of "Answers of 2026-10-18", and the end of that block tears it down on
+//! every exit. The places: the block of a `let` and of a `let ... else`, the
+//! body of a loop, which ends each turn, an `if let`, the arm of a `select`
+//! that binds the value and one that does not, a `recv` that no local holds, a
+//! `recv` in the condition of a loop, which tears down the value it gave before
+//! when it runs again, a `break` and a `return` out of the block, and `destroy`
+//! of the value, after which the block tears nothing down. Each `Key` prints
+//! its teardown, and each line prints the keys alive.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+
+	pub static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Key.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+		printf("  teardown of key %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn alive() -> c_int
+{
+	return Key.live.load() as c_int;
+}
+
+/// A channel that holds the keys `first` to `last`, closed.
+fn filled(first: int, last: int) -> chan Key
+{
+	let c = chan Key(8);
+	for n in first..last + 1 {
+		send(c, key(n));
+	}
+	close(c);
+	return c;
+}
+
+fn in_a_block()
+{
+	let c = filled(1, 2);
+	{
+		let k = recv(c);
+		printf("in the block of a let: %d, alive %d\n".ptr, (k != none) as c_int, alive());
+	}
+	printf("after the block: alive %d\n".ptr, alive());
+	{
+		let k = recv(c) else {
+			return;
+		};
+		printf("in the block of a let else: %d, alive %d\n".ptr, k.n as c_int, alive());
+	}
+	printf("after the block: alive %d\n".ptr, alive());
+	delete(c);
+}
+
+fn in_a_loop()
+{
+	let c = filled(3, 5);
+	while true do {
+		let k = recv(c) else {
+			break;
+		};
+		printf("in the body of a loop: %d, alive %d\n".ptr, k.n as c_int, alive());
+	}
+	printf("after the loop: alive %d\n".ptr, alive());
+	delete(c);
+}
+
+fn in_an_if_let()
+{
+	let c = filled(6, 6);
+	if let k = recv(c) {
+		printf("in an if let: %d, alive %d\n".ptr, k.n as c_int, alive());
+	}
+	printf("after the if let: alive %d\n".ptr, alive());
+	delete(c);
+}
+
+fn in_a_select()
+{
+	let c = filled(7, 8);
+	{
+		select {
+			c k => printf("in an arm that binds it: %d, alive %d\n".ptr, (k != none) as c_int, alive()),
+		}
+		printf("after the select: alive %d\n".ptr, alive());
+	}
+	printf("after the block of the select: alive %d\n".ptr, alive());
+	{
+		select {
+			c => printf("in an arm that does not bind it: alive %d\n".ptr, alive()),
+		}
+	}
+	printf("after the block of the select: alive %d\n".ptr, alive());
+	delete(c);
+}
+
+fn held_by_no_local()
+{
+	let c = filled(9, 10);
+	{
+		recv(c);
+		printf("a recv that no local holds: alive %d\n".ptr, alive());
+	}
+	printf("after the block: alive %d\n".ptr, alive());
+	let seen = 0;
+	while recv(c) != none do {
+		seen += 1;
+		printf("in a loop whose condition receives: alive %d\n".ptr, alive());
+	}
+	printf("after the loop: %d, alive %d\n".ptr, seen as c_int, alive());
+	delete(c);
+}
+
+fn out_by_break()
+{
+	let c = filled(11, 12);
+	while true do {
+		let k = recv(c) else {
+			break;
+		};
+		if k.n == 11 {
+			printf("break: alive %d\n".ptr, alive());
+			break;
+		}
+	}
+	printf("after the break: alive %d\n".ptr, alive());
+	delete(c);
+}
+
+fn out_by_return(c: chan Key) -> int
+{
+	let k = recv(c) else {
+		return 0;
+	};
+	if k.n == 13 {
+		printf("return: alive %d\n".ptr, alive());
+		return k.n;
+	}
+	return 0;
+}
+
+fn destroyed()
+{
+	let c = filled(14, 14);
+	{
+		let k = recv(c) else {
+			return;
+		};
+		destroy(k);
+		printf("after destroy: alive %d\n".ptr, alive());
+	}
+	printf("after the block: alive %d\n".ptr, alive());
+	delete(c);
+}
+
+fn main() -> int
+{
+	in_a_block();
+	in_a_loop();
+	in_an_if_let();
+	in_a_select();
+	held_by_no_local();
+	out_by_break();
+	let c = filled(13, 13);
+	let n = out_by_return(c);
+	printf("after the return: %d, alive %d\n".ptr, n as c_int, alive());
+	delete(c);
+	destroyed();
+	printf("at the end: alive %d\n".ptr, alive());
+	return 0;
+}

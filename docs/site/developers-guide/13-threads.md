@@ -744,6 +744,8 @@ A channel is a bounded queue of values that threads share.
 
 `recv(c)` gives a `?*T`. It points at the value, or is `none` once the channel is closed and empty. What a channel holds at its `close` is still received. The pointer goes into a slot of the frame of the function that wrote the `recv`. Each `recv` in the source has one slot and fills it again each time it runs.
 
+A value that owns something belongs to the block that holds the `recv`, which for `let v = recv(c)` is the block of `v`. The end of that block tears it down on every exit, so the program writes no `destroy`. `destroy(v)` ends it before, and the block then tears nothing down. A `recv` in the condition of a loop tears down the value of the turn before when it runs again. The value an arm of `select` takes belongs to the block that holds the `select` in the same way.
+
 `close` twice changes nothing. A `send` on a closed channel stops the program with the message `` `send` on a closed channel ``, a waiting one included. `send`, `recv`, `close` and `select` cannot fail, so none takes a handler.
 
 A worker takes a channel beside its values and shares it with the thread that made it. It cannot `delete` one.

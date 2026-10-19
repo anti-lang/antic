@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "sema.h"
 #include "text.h"
 #include "types.h"
@@ -135,12 +136,23 @@ struct ir_operand lower_sync_op(struct lowerer *l,
         return lower_none();
     /* `recv` gives the address of the slot it filled, or `none` when
        the channel is closed and empty. */
-    case SYNC_RECV:
+    case SYNC_RECV: {
+        uint32_t holder;
+        struct ir_operand got;
         element = target->type->element;
         args[0] = load_handle(l, target);
         slot = ir_entry_slot(l->f, lower_vtype_of(l, element));
         args[1] = lower_temp(l, slot);
-        return lower_rt_call(l, RT_FN_CHAN_RECV, args);
+        if (!sema_needs_teardown(element)) {
+            return lower_rt_call(l, RT_FN_CHAN_RECV, args);
+        }
+        holder = ir_entry_zero_slot(l->f);
+        lower_end_received(l, holder, element);
+        got = lower_rt_call(l, RT_FN_CHAN_RECV, args);
+        ir_store(l->f, l->b, IR_PTR, got, lower_temp(l, holder));
+        lower_push_received(l, holder, element);
+        return got;
+    }
     case SYNC_CLOSE:
     case SYNC_CHAN_DELETE:
         args[0] = load_handle(l, target);
@@ -332,6 +344,13 @@ void lower_sync(struct lowerer *l, const struct stmt *s)
     free(scope.items);
 }
 
+/* The element type of the channel t, or of the channel a pointer t
+   points at. */
+static const struct type *received_element(const struct type *t)
+{
+    return t->kind == TYPE_POINTER ? t->element->element : t->element;
+}
+
 /* An array of count pointers, the form in which `select` hands its
    channels and its slots to the runtime. */
 static uint32_t pointer_array(struct lowerer *l, size_t count)
@@ -357,8 +376,21 @@ void lower_select(struct lowerer *l, const struct stmt *s)
     struct ir_block *join = NULL;
     struct ir_operand args[4];
     struct ir_operand index;
+    uint32_t *holders = alloc_zeroed(count, sizeof *holders);
     size_t i;
 
+    /* What an arm takes is owned by the block that holds the `select`,
+       as what `recv` gives is. A `select` that runs again first tears
+       down what it took before. */
+    for (i = 0; i < count; i++) {
+        const struct type *element =
+            received_element(s->as.select.arms[i].value->type);
+        if (sema_needs_teardown(element)) {
+            holders[i] = ir_entry_zero_slot(l->f);
+            lower_end_received(l, holders[i], element);
+            lower_push_received(l, holders[i], element);
+        }
+    }
     for (i = 0; i < count; i++) {
         const struct switch_arm *arm = &s->as.select.arms[i];
         struct ir_operand handle = load_handle(l, arm->value);
@@ -391,15 +423,21 @@ void lower_select(struct lowerer *l, const struct stmt *s)
             ir_jump(l->f, l->b, body);
         }
         l->b = body;
-        if (arm->bound != NULL) {
-            lower_bind_value(l, arm->bound,
-                             lower_temp(l,
-                                        ir_load(l->f, l->b, IR_PTR,
-                                                lower_temp(l, got))));
+        if (arm->bound != NULL || holders[i] != 0) {
+            struct ir_operand value =
+                lower_temp(l, ir_load(l->f, l->b, IR_PTR, lower_temp(l, got)));
+            if (arm->bound != NULL) {
+                lower_bind_value(l, arm->bound, value);
+            }
+            if (holders[i] != 0) {
+                ir_store(l->f, l->b, IR_PTR, value,
+                         lower_temp(l, holders[i]));
+            }
         }
         lower_stmt(l, arm->body);
         lower_jump_to_join(l, &join);
         l->b = next;
     }
     l->b = join;
+    free(holders);
 }

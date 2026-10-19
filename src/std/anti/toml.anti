@@ -26,7 +26,7 @@ extern fn anti_rt_toml_free(doc: ?*byte);
 /// it gave out ends with it.
 pub class Document
 {
-	own handle: ?*byte,
+	handle: ?*byte,
 
 	/// The number of keys the document holds.
 	pub fn len(self) -> int
@@ -92,7 +92,6 @@ pub class Document
 	fn destruct(self)
 	{
 		anti_rt_toml_free(self.handle);
-		self.handle = none;
 	}
 
 	/// Read `source` as a TOML document, which may fail.

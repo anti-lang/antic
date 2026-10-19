@@ -2,9 +2,9 @@
 //! holds is torn down, the oldest first, as `recv` would give them: a class
 //! with a `destruct`, a class with an `own` field, an owning struct, tuple,
 //! variant, optional and array. A value the program received before stays with
-//! the program. A channel that was closed, one that wrapped around its queue
-//! and one that holds nothing are deleted the same way. Each `Key` prints its
-//! teardown, so the order shows.
+//! the local that holds it, whose block tears it down. A channel that was
+//! closed, one that wrapped around its queue and one that holds nothing are
+//! deleted the same way. Each `Key` prints its teardown, so the order shows.
 
 import anti.lang;
 
@@ -148,13 +148,14 @@ fn received_before()
 	let c = chan Key(3);
 	send(c, key(60));
 	send(c, key(61));
-	let first = recv(c) else {
-		return;
-	};
-	delete(c);
-	printf("one value received before: %d, alive %d\n".ptr, (*first).n as c_int, alive());
-	destroy(first);
-	printf("after its destroy: alive %d\n".ptr, alive());
+	{
+		let first = recv(c) else {
+			return;
+		};
+		delete(c);
+		printf("one value received before: %d, alive %d\n".ptr, (*first).n as c_int, alive());
+	}
+	printf("after the block of its local: alive %d\n".ptr, alive());
 }
 
 fn closed()
@@ -172,10 +173,11 @@ fn wrapped()
 	let c = chan Key(2);
 	send(c, key(80));
 	send(c, key(81));
-	let first = recv(c) else {
-		return;
-	};
-	destroy(first);
+	{
+		let first = recv(c) else {
+			return;
+		};
+	}
 	send(c, key(82));
 	delete(c);
 	printf("a channel that wrapped around after delete: alive %d\n".ptr, alive());
@@ -185,10 +187,11 @@ fn empty()
 {
 	let c = chan Key(2);
 	send(c, key(90));
-	let first = recv(c) else {
-		return;
-	};
-	destroy(first);
+	{
+		let first = recv(c) else {
+			return;
+		};
+	}
 	delete(c);
 	printf("an empty channel after delete: alive %d\n".ptr, alive());
 }

@@ -24,6 +24,7 @@ Java frees an object when no reference reaches it, so no reference owns anything
 
 - The teardown of the object frees the memory. An `own` pointer to a class is deleted through the table of the object it points at. An object of a derived class therefore runs its own teardown. The elements of an `own` slice are torn down last to first, and then the buffer is freed.
 - `dup` of the object gives the copy memory of its own, with a copy of the contents.
+- `=` to the field tears down what the field held before the new value goes in, as `reset` of a `unique_ptr` does. A field given the pointer it holds keeps it.
 
 A pointer field without `own` is an address. The teardown leaves it alone, and `dup` copies the address.
 
@@ -367,13 +368,14 @@ For a Java programmer:
 
 For a C programmer:
 
-- `own` frees with the object. A `free` of the same field in `destruct` frees it twice, unless `destruct` stores `none` there.
+- `own` frees with the object. A `free` of the same field in `destruct` frees it twice. Memory that a class gives back its own way, with `fclose` or a function of a library, stands in a field without `own`.
+- `=` to an `own` field frees what the field held. A `delete` or a `free` of the old value before the `=` frees it twice.
 - An `own` field takes memory of `alloc`. The address of a local stored there compiles, and the teardown frees a stack address.
 - A `lent` parameter cannot be saved for later, not even in a local of the plain pointer type.
 
 For a C++ programmer:
 
-- An `own` field is a `unique_ptr` without the wrapper type: the field is 8 bytes, and the class teardown frees it.
+- An `own` field is a `unique_ptr` without the wrapper type: the field is 8 bytes, the class teardown frees it, and `=` deletes the old object as `reset` does.
 - `lent` is checked. A reference parameter of C++ may be stored by the callee, and the checker refuses the same store of a `lent` pointer.
 - A plain `*T` parameter is not lent. The function may store it, and the caller keeps the object alive.
 
@@ -908,7 +910,7 @@ An object on the heap is never torn down by itself. `delete(p)` runs the teardow
 
 `destroy(&x)` tears a local down before the end of its block. It counts as a move, so the name is dead after it and the block tears nothing down a second time. A part of a local cannot be destroyed alone.
 
-`=` into a place that holds a value destroys the old value first and then moves the new one in.
+`=` into a place that holds a value destroys the old value first and then moves the new one in. `=` to an `own` field deletes the object the field held, or tears down the elements of its slice and frees the buffer.
 
 An `own` parameter is a local of its function. It is torn down at every exit, unless it moved on.
 

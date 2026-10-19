@@ -11,7 +11,7 @@ extern fn printf(format: ?*byte, ...) -> c_int;
 
 class TextFile
 {
-	own handle: ?*byte,
+	handle: ?*byte,
 
 	pub fn open(path: str, mode: str) -> *TextFile
 	{
@@ -31,7 +31,6 @@ class TextFile
 	concrete fn destruct(self)
 	{
 		fclose(self.handle);
-		self.handle = none;
 	}
 }
 

@@ -1,7 +1,9 @@
 //! Each kind of owning value through a channel: `send` of a fresh value hands
-//! it to the channel, `recv` gives a pointer to it in a slot of the frame, and
-//! the program tears it down there with `destroy`. Each line prints the value
-//! received and the values alive, before and after the teardown.
+//! it to the channel, and `recv` gives a pointer to it in a slot of the frame.
+//! The local that holds the pointer owns the value, by R074 of "Answers of
+//! 2026-10-18", and the end of its block tears it down. Each line prints the
+//! value received and the values alive, while the locals hold them and after
+//! their block.
 
 import anti.lang;
 
@@ -116,14 +118,12 @@ fn in_counted()
 		return;
 	};
 	printf("channel of a class with a destruct: %d, alive %d\n".ptr, (*first).n as c_int, alive());
-	destroy(first);
 	let second = recv(c) else {
 		return;
 	};
 	let n = (*second).n;
-	destroy(second);
 	delete(c);
-	printf("channel of a class with a destruct after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+	printf("channel of a class with a destruct with both received: %d, alive %d\n".ptr, n as c_int, alive());
 }
 
 fn in_key()
@@ -135,14 +135,12 @@ fn in_key()
 		return;
 	};
 	printf("channel of a class with an own field: %d, alive %d\n".ptr, (*first).n as c_int, alive());
-	destroy(first);
 	let second = recv(c) else {
 		return;
 	};
 	let n = (*second).n;
-	destroy(second);
 	delete(c);
-	printf("channel of a class with an own field after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+	printf("channel of a class with an own field with both received: %d, alive %d\n".ptr, n as c_int, alive());
 }
 
 fn in_pair()
@@ -154,14 +152,12 @@ fn in_pair()
 		return;
 	};
 	printf("channel of an owning struct: %d, alive %d\n".ptr, (*first).k.n as c_int, alive());
-	destroy(first);
 	let second = recv(c) else {
 		return;
 	};
 	let n = (*second).k.n;
-	destroy(second);
 	delete(c);
-	printf("channel of an owning struct after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+	printf("channel of an owning struct with both received: %d, alive %d\n".ptr, n as c_int, alive());
 }
 
 fn in_tuple()
@@ -173,14 +169,12 @@ fn in_tuple()
 		return;
 	};
 	printf("channel of an owning tuple: %d, alive %d\n".ptr, (*first).0.n as c_int, alive());
-	destroy(first);
 	let second = recv(c) else {
 		return;
 	};
 	let n = (*second).0.n;
-	destroy(second);
 	delete(c);
-	printf("channel of an owning tuple after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+	printf("channel of an owning tuple with both received: %d, alive %d\n".ptr, n as c_int, alive());
 }
 
 fn in_shape()
@@ -192,14 +186,12 @@ fn in_shape()
 		return;
 	};
 	printf("channel of an owning variant: %d, alive %d\n".ptr, ((*first) is Shape.Keyed) as int as c_int, alive());
-	destroy(first);
 	let second = recv(c) else {
 		return;
 	};
 	let n = ((*second) is Shape.Keyed) as int;
-	destroy(second);
 	delete(c);
-	printf("channel of an owning variant after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+	printf("channel of an owning variant with both received: %d, alive %d\n".ptr, n as c_int, alive());
 }
 
 fn in_maybe()
@@ -211,14 +203,12 @@ fn in_maybe()
 		return;
 	};
 	printf("channel of an owning optional: %d, alive %d\n".ptr, ((*first) != none) as int as c_int, alive());
-	destroy(first);
 	let second = recv(c) else {
 		return;
 	};
 	let n = ((*second) != none) as int;
-	destroy(second);
 	delete(c);
-	printf("channel of an owning optional after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+	printf("channel of an owning optional with both received: %d, alive %d\n".ptr, n as c_int, alive());
 }
 
 fn in_row()
@@ -230,25 +220,30 @@ fn in_row()
 		return;
 	};
 	printf("channel of an owning array: %d, alive %d\n".ptr, (*first)[0].n as c_int, alive());
-	destroy(first);
 	let second = recv(c) else {
 		return;
 	};
 	let n = (*second)[0].n;
-	destroy(second);
 	delete(c);
-	printf("channel of an owning array after destroy: %d, alive %d\n".ptr, n as c_int, alive());
+	printf("channel of an owning array with both received: %d, alive %d\n".ptr, n as c_int, alive());
 }
 
 fn main() -> int
 {
 	in_counted();
+	printf("after the block: alive %d\n".ptr, alive());
 	in_key();
+	printf("after the block: alive %d\n".ptr, alive());
 	in_pair();
+	printf("after the block: alive %d\n".ptr, alive());
 	in_tuple();
+	printf("after the block: alive %d\n".ptr, alive());
 	in_shape();
+	printf("after the block: alive %d\n".ptr, alive());
 	in_maybe();
+	printf("after the block: alive %d\n".ptr, alive());
 	in_row();
+	printf("after the block: alive %d\n".ptr, alive());
 	printf("at the end: alive %d\n".ptr, alive());
 	return 0;
 }

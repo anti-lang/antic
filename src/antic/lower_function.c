@@ -331,6 +331,7 @@ static void lower_function_body(struct lowerer *l, const struct item *it)
     l->may_fail = it->may_fail;
     l->result_out = lower_none();
     l->temp_count = 0;
+    l->received_count = 0;
     entry = lower_new_block(l);
     l->b = entry;
     param_slots(l, it, entry);

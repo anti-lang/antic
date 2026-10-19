@@ -330,8 +330,9 @@ pub class Parser
 
 /// `items` with room for `wanted` elements, of which it keeps the first `used`.
 ///
-/// The room starts at 8 and doubles until it holds `wanted`, and the old room
-/// is freed. `items` comes back as it is when it holds `wanted` already.
+/// The room starts at 8 and doubles until it holds `wanted`. The old room
+/// stays, and `=` to the `own` field that held it frees it. `items` comes back
+/// as it is when it holds `wanted` already.
 fn grown<T>(items: []T, used: int, wanted: int) -> []T
 {
 	if wanted <= items.len {
@@ -350,7 +351,6 @@ fn grown<T>(items: []T, used: int, wanted: int) -> []T
 	if items.ptr != none {
 		memcpy(room as ?*byte, items.ptr as ?*byte,
 			(used * size_of(T)) as c_size_t);
-		free(items.ptr);
 	}
 	return []T { ptr: room, len: size };
 }

@@ -103,11 +103,13 @@ fn run()
 	printf("capture: handles %d\n".ptr, seen as c_int);
 	let ch = chan Shared<Key>(1);
 	send(ch, a.share());
-	let got = recv(ch) else {
-		return;
-	};
-	let in_the_channel = got.count();
-	destroy(got);
+	let in_the_channel = 0;
+	{
+		let got = recv(ch) else {
+			return;
+		};
+		in_the_channel = got.count();
+	}
 	delete(ch);
 	printf("channel: handles %d then %d\n".ptr, in_the_channel as c_int, a.count() as c_int);
 	shared(5);

@@ -1,0 +1,41 @@
+exit 0
+in the block of a let: 1, alive 2
+  teardown of key 1
+after the block: alive 1
+in the block of a let else: 2, alive 1
+  teardown of key 2
+after the block: alive 0
+in the body of a loop: 3, alive 3
+  teardown of key 3
+in the body of a loop: 4, alive 2
+  teardown of key 4
+in the body of a loop: 5, alive 1
+  teardown of key 5
+after the loop: alive 0
+in an if let: 6, alive 1
+  teardown of key 6
+after the if let: alive 0
+in an arm that binds it: 1, alive 2
+after the select: alive 2
+  teardown of key 7
+after the block of the select: alive 1
+in an arm that does not bind it: alive 1
+  teardown of key 8
+after the block of the select: alive 0
+a recv that no local holds: alive 2
+  teardown of key 9
+after the block: alive 1
+in a loop whose condition receives: alive 1
+  teardown of key 10
+after the loop: 1, alive 0
+break: alive 2
+  teardown of key 11
+after the break: alive 1
+  teardown of key 12
+return: alive 1
+  teardown of key 13
+after the return: 13, alive 0
+  teardown of key 14
+after destroy: alive 0
+after the block: alive 0
+at the end: alive 0

@@ -247,12 +247,15 @@ void lower_build_into(struct lowerer *l, const struct expr *e,
 }
 
 /* `destroy(&c)` of a local moved `c` out, so the teardown of its block
-   passes over it: its tables are cleared, as after every move. */
-static void destroyed_local(struct lowerer *l, const struct expr *operand)
+   passes over it: its tables are cleared, as after every move. A value
+   that a `recv` gave at the address p ended as well. */
+static void destroyed_local(struct lowerer *l, const struct expr *operand,
+                            struct ir_operand p)
 {
     if (operand->kind == EXPR_UNARY && operand->as.unary.op == TOKEN_AMP) {
         lower_clear_moved(l, operand->as.unary.operand);
     }
+    lower_forget_received(l, operand->type->element, p);
 }
 
 /* The copy of every part of the value of an iterator, `*v` over a tuple
@@ -2158,7 +2161,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                                         : ir_int_op(IR_PTR, 0),
                                     false);
             }
-            destroyed_local(l, e->as.object.operand);
+            destroyed_local(l, e->as.object.operand, v);
             return lower_none();
         }
         if (e->as.object.from != NULL) {
@@ -2172,7 +2175,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                               : RT_FN_DESTROY_FROM,
                           args);
             if (e->as.object.op == TOKEN_DESTROY) {
-                destroyed_local(l, e->as.object.operand);
+                destroyed_local(l, e->as.object.operand, v);
             }
             return lower_none();
         }
@@ -2184,7 +2187,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         }
         lower_object_call(l, f, v, e->as.object.operand->type);
         if (e->as.object.op == TOKEN_DESTROY) {
-            destroyed_local(l, e->as.object.operand);
+            destroyed_local(l, e->as.object.operand, v);
         }
         return lower_none();
     }

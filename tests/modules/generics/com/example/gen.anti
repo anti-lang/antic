@@ -69,7 +69,6 @@ pub class List<T>
 		for i in 0..self.count {
 			grown[i] = self.items[i];
 		}
-		free(self.items.ptr);
 		self.items = []T { ptr: grown, len: self.items.len * 2 + 4 };
 	}
 

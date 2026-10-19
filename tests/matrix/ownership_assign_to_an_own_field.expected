@@ -1,0 +1,35 @@
+exit 0
+  teardown of key 1
+through self: 2, alive 1
+  teardown of key 2
+  teardown of key 3
+through a pointer: 4, alive 1
+  teardown of key 4
+  teardown of key 5
+in a class value: 6, alive 1
+  teardown of key 6
+  teardown of key 7
+in a struct: 8, alive 1
+  teardown of key 8
+  teardown of key 9
+in an element: 10, alive 1
+  teardown of key 10
+  teardown of key 11
+in a base: 12, alive 1
+  teardown of key 12
+  teardown of key 21
+  teardown of key 20
+an own slice: 1, alive 1
+  teardown of key 30
+an own buffer of bytes: 1, alive 0
+  teardown of key 13
+none: 1, alive 0
+after none: 14, alive 1
+  teardown of key 14
+the same pointer: 15, alive 1
+  teardown of key 15
+  teardown of key 16
+from a call that may fail: 17, alive 1
+a call that failed leaves the field: 17, alive 1
+  teardown of key 17
+at the end: alive 0

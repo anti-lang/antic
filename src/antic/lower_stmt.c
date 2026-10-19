@@ -61,6 +61,79 @@ static void push_exit_action(struct lowerer *l, const struct stmt *stmt,
     action->undo = undo;
 }
 
+/* DESIGN: R074 of "Answers of 2026-10-18". A value that `recv` gives
+   is owned by the block that holds the `recv`, which is the block of the
+   local a `let` binds it to, and is torn down at its end on every exit.
+   A `recv` that runs again before its block ends, in the condition of a
+   loop, tears down the value it gave before. `destroy(p)` of the value
+   ends it there, and the block then passes over it. The slot holder
+   holds the address of the value while the block owns it and zero
+   otherwise. */
+void lower_push_received(struct lowerer *l, uint32_t holder,
+                         const struct type *t)
+{
+    struct exit_action *action = new_exit_action(l);
+    struct received_value *r;
+
+    action->received = true;
+    action->holder = holder;
+    action->received_type = t;
+    l->received = alloc_grow(l->received, &l->received_capacity,
+                             l->received_count, sizeof *l->received);
+    r = &l->received[l->received_count++];
+    r->f = l->f;
+    r->holder = holder;
+    r->type = t;
+}
+
+void lower_end_received(struct lowerer *l, uint32_t holder,
+                        const struct type *t)
+{
+    struct ir_operand at = lower_temp(l, holder);
+    struct ir_operand p = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+    struct ir_block *held = lower_new_block(l);
+    struct ir_block *after = lower_new_block(l);
+
+    ir_branch(l->f, l->b,
+              lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, p,
+                                      ir_int_op(IR_PTR, 0))),
+              held, after);
+    l->b = held;
+    lower_destroy_owned(l, t, p, ir_int_op(IR_PTR, 0), false);
+    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+    ir_jump(l->f, l->b, after);
+    l->b = after;
+}
+
+void lower_forget_received(struct lowerer *l, const struct type *t,
+                           struct ir_operand p)
+{
+    size_t i;
+
+    for (i = 0; i < l->received_count && l->b != NULL; i++) {
+        const struct received_value *r = &l->received[i];
+        struct ir_operand at;
+        struct ir_operand held;
+        struct ir_block *same;
+        struct ir_block *after;
+        if (r->f != l->f || r->type != t) {
+            continue;
+        }
+        at = lower_temp(l, r->holder);
+        held = lower_temp(l, ir_load(l->f, l->b, IR_PTR, at));
+        same = lower_new_block(l);
+        after = lower_new_block(l);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, held,
+                                          p)),
+                  same, after);
+        l->b = same;
+        ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), at);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+    }
+}
+
 /* Record the `leave` hook of the function around the scope. */
 void lower_push_leave_action(struct lowerer *l)
 {
@@ -724,6 +797,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     const struct expr *target = s->as.assign.target;
     const struct expr *value = s->as.assign.value;
     bool handled = lower_is_handled_call(value) && value->as.call.out != NULL;
+    const struct struct_field *own = s->as.assign.op == TOKEN_ASSIGN
+                                         ? lower_own_field(target)
+                                         : NULL;
     struct place p;
     struct ir_operand old = lower_none();
     struct ir_operand v;
@@ -739,7 +815,7 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         return;
     }
     /* The place itself is the out parameter of the call that fills it. */
-    if (handled && !p.in_temp && !p.bitfield &&
+    if (handled && !p.in_temp && !p.bitfield && own == NULL &&
         s->as.assign.op == TOKEN_ASSIGN) {
         struct ir_operand err;
         l->out_address = p.address;
@@ -759,6 +835,10 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
         if (sema_needs_teardown(target->type)) {
             lower_destroy_owned(l, target->type, p.address,
                                 ir_int_op(IR_PTR, 0), true);
+        }
+        if (own != NULL) {
+            lower_replace_buffer(l, own->type, p.address,
+                                 lower_temp(l, ir_load(l->f, l->b, IR_PTR, v)));
         }
         ir_memcopy(l->f, l->b, p.address, v, lower_vtype_of(l, target->type));
         lower_clear_moved(l, value);
@@ -782,6 +862,9 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
                 : lower_temp(l, ir_binary(l->f, l->b,
                                           lower_binary_op(op, target->type),
                                           p.type, old, v));
+    }
+    if (own != NULL) {
+        lower_replace_buffer(l, own->type, p.address, v);
     }
     if (p.in_temp) {
         ir_assign(l->f, l->b, p.temp, v);
@@ -1805,6 +1888,8 @@ void lower_run_defers(struct lowerer *l, const struct defers *scope,
                 ir_lifetime(l->f, l->b, IR_LIFE_END,
                             lower_temp(l, action->slot));
             }
+        } else if (action->received) {
+            lower_end_received(l, action->holder, action->received_type);
         } else if (action->unbuild) {
             if (failing) {
                 lower_unbuild(l);

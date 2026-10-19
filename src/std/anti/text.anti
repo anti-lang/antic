@@ -210,7 +210,6 @@ pub class Builder
 		};
 		memcpy(room, collected.ptr, (collected.len + 1) as c_size_t);
 		let made = anti_rt_text_slice(room, collected.len);
-		free(self.room);
 		self.room = none;
 		self.length = 0;
 		self.capacity = 0;

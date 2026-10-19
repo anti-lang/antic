@@ -23,7 +23,7 @@ a channel of an owning array after delete: alive 0
   teardown of key 61
 one value received before: 60, alive 1
   teardown of key 60
-after its destroy: alive 0
+after the block of its local: alive 0
   teardown of key 70
   teardown of key 71
 a closed channel after delete: alive 0

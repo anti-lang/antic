@@ -86,10 +86,6 @@ fn drop_all(own s: []Key) -> int
 
 fn store(b: *Box, own p: *Key)
 {
-	let old = b.one;
-	if old != none {
-		delete(old);
-	}
 	b.one = p;
 }
 

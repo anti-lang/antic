@@ -87,6 +87,11 @@ struct exit_action {
        IR_SLOT gave in slot. */
     bool life_end;
     uint32_t slot;
+    /* The end of the value of received_type that a `recv` gave, whose
+       address the slot holder holds, or zero once it ended. */
+    bool received;
+    uint32_t holder;
+    const struct type *received_type;
     /* A `construct` that may fail: an exit that gives an error tears
        down what was built before it. See lower_unbuild. */
     bool unbuild;
@@ -145,6 +150,14 @@ struct statement_temp {
     const struct type *type;
 };
 
+/* A value of type that a `recv` of the function f gave, whose address
+   the slot holder holds until it ends. */
+struct received_value {
+    const struct ir_function *f;
+    uint32_t holder;
+    const struct type *type;
+};
+
 struct lowerer {
     struct ir_module *m;
     const char *file;           /* the source path, for an assertion */
@@ -175,6 +188,11 @@ struct lowerer {
     struct statement_temp *temps;
     size_t temp_count;
     size_t temp_capacity;
+    /* The values the `recv` expressions of the function being lowered
+       give, which `destroy` ends before their block does. */
+    struct received_value *received;
+    size_t received_count;
+    size_t received_capacity;
     bool may_fail;              /* the function was written `may fail` */
     bool no_reflect;            /* --no-reflect: no field list */
     bool dev;                   /* --dev: every dispatch checks its table */
@@ -672,6 +690,18 @@ bool lower_is_fresh(const struct expr *e);
    teardown. */
 void lower_keep_temp(struct lowerer *l, const struct expr *e,
                      struct ir_operand address);
+/* The value of type t that a `recv` gave into its slot, whose address
+   the slot holder holds, belongs to the block that holds the `recv`. */
+void lower_push_received(struct lowerer *l, uint32_t holder,
+                         const struct type *t);
+/* Tear down the value of type t whose address holder holds, unless it is
+   zero, and write zero there. */
+void lower_end_received(struct lowerer *l, uint32_t holder,
+                        const struct type *t);
+/* `destroy(p)` of a value of type t ended it. A value that a `recv` gave
+   at p is no longer for its block to tear down. */
+void lower_forget_received(struct lowerer *l, const struct type *t,
+                           struct ir_operand p);
 /* Tear down the values kept since mark, last first. pop forgets them,
    which the end of a statement does and an exit of the function does
    not, since other paths still reach them. */
@@ -782,6 +812,12 @@ struct ir_operand lower_simd(struct lowerer *l, const struct expr *e);
 void lower_destroy_owned(struct lowerer *l, const struct type *t,
                          struct ir_operand at, struct ir_operand from,
                          bool made_only);
+/* The `own` pointer or slice field that the place e names, or NULL. */
+const struct struct_field *lower_own_field(const struct expr *e);
+/* `=` to the `own` pointer or slice of type t at at, which is about to
+   take a buffer whose address is next. */
+void lower_replace_buffer(struct lowerer *l, const struct type *t,
+                          struct ir_operand at, struct ir_operand next);
 /* The copy of what the value of type t at from owns into the value at
    into, whose bytes are already the same. Each class value, each `own fn`
    and each part that holds one is copied as `dup` copies it. */
