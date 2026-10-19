@@ -33,7 +33,7 @@ pub fn eprintln(text: str)
 }
 
 /// End the program with the exit code `status` after flushing both streams.
-pub fn exit(status: int)
+pub fn exit(status: int) -> never
 {
 	anti_rt_exit(status as c_int);
 }

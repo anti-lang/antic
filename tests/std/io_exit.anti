@@ -1,0 +1,22 @@
+//! `io.exit` returns `never`, so a call of it ends the path of a function with
+//! a result, as `return` does. `half` returns on one path and calls `io.exit`
+//! on the other. The second call ends the program with the status 3.
+
+import anti.io;
+import anti.text;
+
+fn half(n: int) -> int
+{
+	if n % 2 == 0 {
+		return n / 2;
+	}
+	io.exit(3);
+}
+
+fn main() -> int
+{
+	io.println(f"{half(8)}");
+	half(7);
+	io.println("not reached");
+	return 0;
+}
