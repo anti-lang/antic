@@ -1,5 +1,6 @@
 /* Integer bounds of the runtime: the growth of a block, the places of a
-   text builder and atomic subtraction at the minimum of each width. */
+   text builder, atomic subtraction at the minimum of each width and the
+   precision a text of the failure routine prints with. */
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include "../binary_stdio.h"
 #include "atomic.h"
 #include "check.h"
+#include "fail.h"
 #include "grow.h"
 #include "std.h"
 
@@ -79,9 +81,24 @@ static void atomic_sub_minimum(void)
     CHECK(i32 == -2);
 }
 
+/* The precision of `%.*s` for a text of an Anti length: the length, or
+   INT_MAX for one that no int holds, which once kept the low 32 bits
+   alone. */
+static void print_width(void)
+{
+    CHECK(anti_rt_print_width(0) == 0);
+    CHECK(anti_rt_print_width(5) == 5);
+    CHECK(anti_rt_print_width(INT32_MAX) == INT32_MAX);
+    CHECK(anti_rt_print_width((int64_t)INT32_MAX + 1) == INT32_MAX);
+    CHECK(anti_rt_print_width(((int64_t)1 << 32) + 3) == INT32_MAX);
+    CHECK(anti_rt_print_width(INT64_MAX) == INT32_MAX);
+    CHECK(anti_rt_print_width(-1) == 0);
+}
+
 void test_rt_bounds(void)
 {
     block_growth();
     builder_bounds();
     atomic_sub_minimum();
+    print_width();
 }

@@ -10,8 +10,8 @@
 _Noreturn void anti_rt_cast_failed(const unsigned char *name,
                                    int64_t length)
 {
-    anti_rt_fail_abort("cast failed: the object is no %.*s", (int)length,
-                       (const char *)name);
+    anti_rt_fail_abort("cast failed: the object is no %.*s",
+                       anti_rt_print_width(length), (const char *)name);
 }
 
 /* DESIGN: an object whose table is zero was never made, as an element of
@@ -22,6 +22,6 @@ _Noreturn void anti_rt_cast_failed(const unsigned char *name,
 _Noreturn void anti_rt_table_unset(const unsigned char *name,
                                    int64_t length)
 {
-    anti_rt_fail_abort("table not set: the object is no %.*s", (int)length,
-                       (const char *)name);
+    anti_rt_fail_abort("table not set: the object is no %.*s",
+                       anti_rt_print_width(length), (const char *)name);
 }

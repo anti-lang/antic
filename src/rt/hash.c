@@ -17,7 +17,7 @@
 
 /* The seed of the program, written at start and by the configuration,
    and read by any thread. */
-static int64_t seed = (int64_t)ANTI_HASH_START;
+static uint64_t seed = ANTI_HASH_START;
 
 uint64_t anti_rt_hash_bytes(const unsigned char *bytes, int64_t count)
 {
@@ -44,7 +44,13 @@ uint64_t anti_rt_hash_seed(void)
 
 void anti_rt_hash_seed_set(uint64_t value)
 {
-    anti_rt_atomic_store(&seed, (int64_t)sizeof seed, (int64_t)value);
+    int64_t bits;
+
+    /* The atomic store takes its value as an int64_t. The bits go over
+       unchanged, since a conversion of a value above INT64_MAX to it is
+       left to the implementation. */
+    memcpy(&bits, &value, sizeof bits);
+    anti_rt_atomic_store(&seed, (int64_t)sizeof seed, bits);
 }
 
 /* DESIGN: a system that gives no random bytes still starts the program,

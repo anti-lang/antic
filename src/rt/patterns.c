@@ -48,7 +48,8 @@ void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
     if (compiled == NULL) {
         anti_rt_regex_message_into(code, message, sizeof message);
         anti_rt_fail_exit(70, "anti: the pattern `%.*s` does not compile at "
-                          "start: %s", (int)length, (const char *)bytes,
+                          "start: %s", anti_rt_print_width(length),
+                          (const char *)bytes,
                           (const char *)message);
     }
     return kept(compiled);
@@ -68,7 +69,7 @@ void *anti_rt_regex_literal_bytes(const unsigned char *bytes, int64_t length)
     if (compiled == NULL) {
         anti_rt_regex_message_into(code, message, sizeof message);
         anti_rt_fail_exit(70, "anti: the byte pattern `%.*s` does not "
-                          "compile at start: %s", (int)length,
+                          "compile at start: %s", anti_rt_print_width(length),
                           (const char *)bytes, (const char *)message);
     }
     return kept(compiled);
@@ -839,12 +840,14 @@ _Noreturn void anti_rt_regex_stop_limit(const unsigned char *file,
 {
     if (pattern_length == 0) {
         anti_rt_fail_abort("%.*s:%lld: a search reached the match limit of "
-                           "its pattern", (int)length, (const char *)file,
+                           "its pattern", anti_rt_print_width(length),
+                           (const char *)file,
                            (long long)line);
     }
     anti_rt_fail_abort("%.*s:%lld: the pattern `%.*s` reached the match "
-                       "limit", (int)length, (const char *)file,
-                       (long long)line, (int)pattern_length,
+                       "limit", anti_rt_print_width(length),
+                       (const char *)file,
+                       (long long)line, anti_rt_print_width(pattern_length),
                        (const char *)pattern);
 }
 
@@ -857,9 +860,10 @@ _Noreturn void anti_rt_regex_stop_group(const unsigned char *file,
     int64_t count = anti_rt_regex_group_count(m->pattern);
 
     anti_rt_fail_abort("%.*s:%lld: the pattern has %lld group%s, and "
-                       "`%.*s(%lld)` names none of them", (int)length,
-                       (const char *)file, (long long)line, (long long)count,
-                       count == 1 ? "" : "s", (int)what_length,
+                       "`%.*s(%lld)` names none of them",
+                       anti_rt_print_width(length), (const char *)file,
+                       (long long)line, (long long)count,
+                       count == 1 ? "" : "s", anti_rt_print_width(what_length),
                        (const char *)what, (long long)n);
 }
 
@@ -869,8 +873,9 @@ _Noreturn void anti_rt_regex_stop_name(const unsigned char *file,
                                        int64_t name_length)
 {
     anti_rt_fail_abort("%.*s:%lld: the pattern has no group `%.*s`",
-                       (int)length, (const char *)file, (long long)line,
-                       (int)name_length, (const char *)name);
+                       anti_rt_print_width(length), (const char *)file,
+                       (long long)line, anti_rt_print_width(name_length),
+                       (const char *)name);
 }
 
 _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
@@ -881,10 +886,12 @@ _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
                                            int64_t pattern_length)
 {
     anti_rt_fail_abort("%.*s:%lld: the template `%.*s` names a group the "
-                       "pattern `%.*s` lacks", (int)length,
+                       "pattern `%.*s` lacks", anti_rt_print_width(length),
                        (const char *)file, (long long)line,
-                       (int)template_length, (const char *)bytes,
-                       (int)pattern_length, (const char *)pattern);
+                       anti_rt_print_width(template_length),
+                       (const char *)bytes,
+                       anti_rt_print_width(pattern_length),
+                       (const char *)pattern);
 }
 
 /* DESIGN: a `ByteMatch` has the layout of a `Match`, and a `[]byte` the

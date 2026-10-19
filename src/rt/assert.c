@@ -67,9 +67,11 @@ _Noreturn void anti_rt_assert_failed(const unsigned char *text,
                                      int64_t length)
 {
     if (running_name != NULL) {
-        anti_rt_fail_abort("FAIL %.*s\n%.*s", (int)running_length,
-                           (const char *)running_name, (int)length,
-                           (const char *)text);
+        anti_rt_fail_abort("FAIL %.*s\n%.*s",
+                           anti_rt_print_width(running_length),
+                           (const char *)running_name,
+                           anti_rt_print_width(length), (const char *)text);
     }
-    anti_rt_fail_abort("%.*s", (int)length, (const char *)text);
+    anti_rt_fail_abort("%.*s", anti_rt_print_width(length),
+                       (const char *)text);
 }

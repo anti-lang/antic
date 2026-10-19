@@ -5,6 +5,7 @@
 #ifndef ANTI_RT_FAIL_H
 #define ANTI_RT_FAIL_H
 
+#include <limits.h>
 #include <stdint.h>
 
 #include "platform.h"
@@ -19,6 +20,17 @@ ANTI_RT_PRINTF(2, 3) _Noreturn void anti_rt_fail_exit(int status,
                                                 const char *format, ...);
 ANTI_RT_PRINTF(1, 2) _Noreturn void anti_rt_fail_abort(const char *format,
                                                  ...);
+
+/* The precision that `%.*s` takes for a text of length bytes, which is
+   an int: the length, INT_MAX for a text that no int counts, and 0 for a
+   length below zero. */
+static inline int anti_rt_print_width(int64_t length)
+{
+    if (length < 0) {
+        return 0;
+    }
+    return length > INT_MAX ? INT_MAX : (int)length;
+}
 
 /* The same form for a line that reports and goes on, as a library that
    discovery passes over. */

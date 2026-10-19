@@ -1,4 +1,6 @@
-/* The empty licence text and version of a bundled static library. */
+/* The empty licence text and version of a bundled static library. Each
+   is the empty text that src/rt/license.c gives for a notice without
+   one, never a NULL pointer, since a caller prints it with `%.*s`. */
 
 #include "std.h"
 
@@ -10,7 +12,7 @@ struct anti_text anti_rt_license_text(void)
 {
     struct anti_text text;
 
-    text.ptr = NULL;
+    text.ptr = (const unsigned char *)"";
     text.len = 0;
     return text;
 }
@@ -21,7 +23,7 @@ struct anti_text anti_rt_runtime_version(void)
 {
     struct anti_text text;
 
-    text.ptr = NULL;
+    text.ptr = (const unsigned char *)"";
     text.len = 0;
     return text;
 }

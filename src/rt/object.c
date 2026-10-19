@@ -131,6 +131,16 @@ int anti_rt_type_signed(int64_t type)
     }
 }
 
+/* The value of the low bits of v as two's complement, extended to 64
+   bits through arithmetic that C defines. A conversion to a signed type
+   of a value outside its range is left to the implementation. */
+static uint64_t sign_extended(uint64_t v, int bits)
+{
+    uint64_t sign = (uint64_t)1 << (bits - 1);
+
+    return (v ^ sign) - sign;
+}
+
 uint64_t anti_rt_load_integer(const void *bytes, int64_t type)
 {
     int sign = anti_rt_type_signed(type);
@@ -139,17 +149,17 @@ uint64_t anti_rt_load_integer(const void *bytes, int64_t type)
     case 1: {
         uint8_t v;
         memcpy(&v, bytes, sizeof v);
-        return sign ? (uint64_t)(int64_t)(int8_t)v : v;
+        return sign ? sign_extended(v, 8) : v;
     }
     case 2: {
         uint16_t v;
         memcpy(&v, bytes, sizeof v);
-        return sign ? (uint64_t)(int64_t)(int16_t)v : v;
+        return sign ? sign_extended(v, 16) : v;
     }
     case 4: {
         uint32_t v;
         memcpy(&v, bytes, sizeof v);
-        return sign ? (uint64_t)(int64_t)(int32_t)v : v;
+        return sign ? sign_extended(v, 32) : v;
     }
     default: {
         uint64_t v;

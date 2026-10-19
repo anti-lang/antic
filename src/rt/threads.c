@@ -89,15 +89,15 @@ static int64_t finished;
    without a rebuild. `--anti.threads` and the configuration file set
    that key, and the runtime reads no environment variable of its own
    but ANTI_CONF. */
-static int worker_count(void)
+static int64_t worker_count(void)
 {
-    int n = (int)anti_rt_conf_threads(
+    int64_t n = anti_rt_conf_threads(
         anti_rt_conf_get((const unsigned char *)"threads", 7));
 
     if (n > 0) {
         return n;
     }
-    return (int)anti_rt_processors();
+    return anti_rt_processors();
 }
 
 /* The first element and the length of chunk index. The first
@@ -197,8 +197,8 @@ static void worker_main(void)
    worker waits for it before it looks for work. */
 static void start_locked(void)
 {
-    int n;
-    int i;
+    int64_t n;
+    int64_t i;
 
     if (started) {
         return;

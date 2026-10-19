@@ -12,7 +12,7 @@ _Noreturn void anti_rt_check_failed(const unsigned char *text,
                                     int64_t length, int32_t kind, int64_t a,
                                     int64_t b)
 {
-    int n = (int)length;
+    int n = anti_rt_print_width(length);
     const char *at = (const char *)text;
 
     switch (kind) {
@@ -48,9 +48,11 @@ _Noreturn void anti_rt_walk_changed(const unsigned char *text,
                                     int64_t file_length, int64_t line)
 {
     if (line == 0) {
-        anti_rt_fail_abort("%.*s", (int)length, (const char *)text);
+        anti_rt_fail_abort("%.*s", anti_rt_print_width(length),
+                           (const char *)text);
     }
-    anti_rt_fail_abort("%.*s: changed at %.*s:%lld", (int)length,
-                       (const char *)text, (int)file_length,
+    anti_rt_fail_abort("%.*s: changed at %.*s:%lld",
+                       anti_rt_print_width(length), (const char *)text,
+                       anti_rt_print_width(file_length),
                        (const char *)file, (long long)line);
 }
