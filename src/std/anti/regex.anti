@@ -47,11 +47,11 @@ extern fn anti_rt_regex_replace(pattern: ?*byte, s: ?*byte, length: int,
 extern fn anti_rt_regex_append(g: ?*Growing, bytes: ?*byte, length: int);
 extern fn anti_rt_regex_take(g: ?*Growing) -> str;
 extern fn anti_rt_regex_stop_limit(file: ?*byte, length: int, line: int,
-	pattern: ?*byte, pattern_length: int);
+	pattern: ?*byte, pattern_length: int) -> never;
 extern fn anti_rt_regex_stop_group(file: ?*byte, length: int, line: int,
-	m: ?*Match, n: int, what: ?*byte, what_length: int);
+	m: ?*Match, n: int, what: ?*byte, what_length: int) -> never;
 extern fn anti_rt_regex_stop_name(file: ?*byte, length: int, line: int,
-	name: ?*byte, name_length: int);
+	name: ?*byte, name_length: int) -> never;
 extern fn anti_rt_regex_compile_bytes(bytes: ?*byte, length: int,
 	code: ?*i32, offset: ?*int) -> ?*byte;
 extern fn anti_rt_regex_first_bytes(pattern: ?*byte, s: ?*byte, length: int,
@@ -59,7 +59,7 @@ extern fn anti_rt_regex_first_bytes(pattern: ?*byte, s: ?*byte, length: int,
 extern fn anti_rt_regex_next_bytes(c: ?*Cursor, current: ?*?ByteMatch) -> int;
 extern fn anti_rt_regex_current_bytes(current: ?*?ByteMatch) -> ?*ByteMatch;
 extern fn anti_rt_regex_stop_group_bytes(file: ?*byte, length: int, line: int,
-	m: ?*ByteMatch, n: int, what: ?*byte, what_length: int);
+	m: ?*ByteMatch, n: int, what: ?*byte, what_length: int) -> never;
 extern fn anti_rt_regex_group_bytes(m: ?*ByteMatch, n: int,
 	out: ?*[]byte) -> int;
 extern fn anti_rt_regex_group_named_bytes(m: ?*ByteMatch, name: ?*byte,
@@ -75,7 +75,9 @@ extern fn anti_rt_bytes_patch(data: ?*byte, length: int, find: ?*byte,
 	limit: int) -> int;
 extern fn anti_rt_regex_stop_template(file: ?*byte, length: int, line: int,
 	bytes: ?*byte, template_length: int, pattern: ?*byte,
-	pattern_length: int);
+	pattern_length: int) -> never;
+extern fn anti_rt_regex_stop_into(file: ?*byte, length: int, line: int,
+	pattern: ?*byte, into: int) -> never;
 
 /// What a search gives at the match limit, as `ANTI_RT_REGEX_EXPENSIVE` of
 /// `src/rt/regex.h`.
@@ -298,7 +300,7 @@ struct Growing
 
 /// Stop the program where a search with the pattern literal `pattern` reached
 /// the match limit.
-fn stop_expensive(pattern: str, at: lang.SourceLocation)
+fn stop_expensive(pattern: str, at: lang.SourceLocation) -> never
 {
 	anti_rt_regex_stop_limit(at.file.ptr, at.file.len, at.line, pattern.ptr,
 		pattern.len);
@@ -967,7 +969,7 @@ pub fn patch_literal(data: []byte, r: ByteRegex, pattern: str, with: []byte,
 		fail length_mismatch();
 	}
 	if n == MISSING {
-		stop_into(pattern, into, name, at);
+		stop_into(r, into, name, at);
 	}
 	return n;
 }
@@ -984,21 +986,21 @@ pub fn patch_fixed(data: []byte, r: ByteRegex, pattern: str, with: []byte,
 		stop_expensive(pattern, at);
 	}
 	if n < 0 {
-		stop_into(pattern, into, name, at);
+		stop_into(r, into, name, at);
 	}
 	return n;
 }
 
-/// Stop the program where a `patch` with the pattern literal `pattern` names no
-/// group of it.
-fn stop_into(pattern: str, into: int, name: str, at: lang.SourceLocation)
+/// Stop the program where a `patch` with the pattern literal `r` names no group
+/// of it, by the name `name` or else by the number `into`.
+fn stop_into(r: ByteRegex, into: int, name: str, at: lang.SourceLocation)
+	-> never
 {
 	if name.len > 0 {
 		anti_rt_regex_stop_name(at.file.ptr, at.file.len, at.line, name.ptr,
 			name.len);
 	}
-	anti_rt_regex_stop_template(at.file.ptr, at.file.len, at.line, "into".ptr,
-		4, pattern.ptr, pattern.len);
+	anti_rt_regex_stop_into(at.file.ptr, at.file.len, at.line, r.handle, into);
 }
 
 /// Write `with` at `offset` inside every place of `find` in `data`, left to

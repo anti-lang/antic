@@ -894,6 +894,19 @@ _Noreturn void anti_rt_regex_stop_template(const unsigned char *file,
                        (const char *)pattern);
 }
 
+_Noreturn void anti_rt_regex_stop_into(const unsigned char *file,
+                                       int64_t length, int64_t line,
+                                       const void *pattern, int64_t into)
+{
+    int64_t count = anti_rt_regex_group_count(pattern);
+
+    anti_rt_fail_abort("%.*s:%lld: the pattern has %lld group%s, and "
+                       "`into` %lld names none of them",
+                       anti_rt_print_width(length), (const char *)file,
+                       (long long)line, (long long)count,
+                       count == 1 ? "" : "s", (long long)into);
+}
+
 /* DESIGN: a `ByteMatch` has the layout of a `Match`, and a `[]byte` the
    layout of a `str`. The searches of a `[]byte` are therefore the same
    functions, under names of their own, since anti.regex declares each

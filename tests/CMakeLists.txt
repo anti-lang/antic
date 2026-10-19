@@ -5466,7 +5466,9 @@ add_test(NAME trap_table
 # that reaches the match limit stops with the pattern and the line.
 # pattern_group_count: a match whose `count` the program raised reads no
 # group past those of its pattern, and stops with the count of the
-# pattern. chan_capacity: a channel made for no value stops the program.
+# pattern. pattern_patch_into: a `patch` whose computed `into` names no
+# group of its pattern literal stops with the count of the pattern and the
+# `into`. chan_capacity: a channel made for no value stops the program.
 # send_closed and send_closed_waiting: a `send` on a closed channel stops
 # it, one that waits on a full channel included. take_in_refused,
 # error_text_refused and trace_names_refused: the text that `take_in`
@@ -5476,7 +5478,8 @@ add_test(NAME trap_table
 # holds stops the program as memory that runs out, finding S316, in a
 # product, a sum, a doubling and a shift of the room of each collection.
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
-        singleton_memory pattern_limit pattern_group_count chan_capacity
+        singleton_memory pattern_limit pattern_group_count pattern_patch_into
+        chan_capacity
         send_closed send_closed_waiting take_in_refused error_text_refused
         trace_names_refused room_list room_list_reserve room_deque_reserve
         room_grid room_map room_map_reserve room_hash_map room_sorted
