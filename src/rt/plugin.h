@@ -188,7 +188,9 @@ void anti_rt_plugin_destroyed(const void *table);
    directories that provides it when library is empty. NULL when there
    is none, with the reason in anti_rt_plugin_message. dirs is the
    `plugins` key, one directory per part between the separators of
-   anti_rt_path_list_separator. */
+   anti_rt_path_list_separator. The object is on the heap of the C
+   library and belongs to the caller, as one of anti_rt_plugin_instance
+   does. The injections keep theirs until the program ends. */
 void *anti_rt_plugin_provider(const unsigned char *path, int64_t path_length,
                               const unsigned char *library,
                               int64_t library_length, const char *dirs);

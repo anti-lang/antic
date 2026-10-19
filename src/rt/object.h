@@ -377,7 +377,8 @@ void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg);
 void *anti_rt_copy_buffer(const void *from, int64_t bytes);
 
 /* A snapshot on the heap of size bytes, the size in its first eight.
-   It aborts when the memory is not there. */
+   It aborts when the memory is not there. The owner of the snapshot, the
+   `own fn` that holds it, frees it with anti_rt_snapshot_free. */
 void *anti_rt_snapshot_new(int64_t size);
 
 /* Copy length bytes of a captured str into the snapshot at offset at,
@@ -389,7 +390,8 @@ void anti_rt_snapshot_text(void *snapshot, int64_t at,
    nothing, frees nothing. */
 void anti_rt_snapshot_free(void *snapshot);
 
-/* A copy of a snapshot, byte for byte, or NULL for NULL. */
+/* A copy of a snapshot, byte for byte, or NULL for NULL. The copy is the
+   caller's, and anti_rt_snapshot_free frees it. */
 void *anti_rt_snapshot_dup(const void *snapshot);
 
 /* The count of the snapshots on the heap that are not freed. */

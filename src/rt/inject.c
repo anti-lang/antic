@@ -37,6 +37,9 @@ struct injection {
 static struct injection injections[INJECTION_MAX];
 static size_t injection_count;
 
+/* The length bytes at text and a NUL, in memory of the start. A slot
+   keeps its copies until the program ends, and the caller frees any
+   other with free. */
 static char *copy(const char *text, size_t length)
 {
     char *out = anti_rt_start_alloc(length + 1);

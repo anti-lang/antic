@@ -155,6 +155,9 @@ static char *list_text(const char *const *names, size_t count,
     return out;
 }
 
+/* The length bytes at text and a NUL, in memory of the start. The
+   caller frees the copy with free, or hands it to a key or to read_file,
+   which keep it until the program ends. */
 static char *copy(const char *text, size_t length)
 {
     char *out = anti_rt_start_alloc(length + 1);
@@ -352,7 +355,7 @@ void anti_rt_conf_option(const char *name, int64_t length, const char *value)
 }
 
 /* The path of an include, which is relative to the file that names
-   it. */
+   it, in memory of the start that read_file takes and keeps. */
 static char *resolve(const char *base, const char *path)
 {
     const char *last = anti_rt_path_last_separator(base);
@@ -471,7 +474,8 @@ static int element_of(struct anti_text name, size_t *name_length)
    of directories, which --anti.plugins=dir:dir writes, `;` on Windows.
    The reader numbers the elements, so
    they stand in order under the keys runtime.<name>.0 and further. The
-   length of the result goes to length. */
+   length of the result goes to length, and the caller frees it with
+   free. */
 static char *join_elements(const struct anti_toml *doc, int64_t from,
                            const char *name, const char *path,
                            size_t *length)
@@ -655,7 +659,7 @@ static void read_file(char *path, const struct including *from, int *files,
 }
 
 /* The path of ANTI_CONF in memory of its own, or NULL. It is the one
-   variable the runtime reads. */
+   variable the runtime reads. read_file takes the path and keeps it. */
 static char *environment_path(void)
 {
     char *text;

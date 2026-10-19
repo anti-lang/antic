@@ -318,7 +318,8 @@ static int needs_stubs(const struct anti_provides *e)
 
 /* The table of the sub-object an object of the entry gets, with a stub
    in every slot the library lacks. NULL when there is no memory for
-   it. */
+   it. The library keeps the table in its list of stubs, and free_stubs
+   frees it when the library closes. */
 static const void **stubs_of(const struct anti_provides *e)
 {
     const struct anti_descriptor *d = e->descriptor;

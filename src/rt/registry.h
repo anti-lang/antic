@@ -51,7 +51,10 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length);
 /* A new object from the JSON that the default serialize writes. The
    object, every string and every owned object come from the
    anti.mem.Allocator from. NULL when the text is not such an object of a
-   class of the program, and every block it took is back with from. */
+   class of the program, and every block it took is back with from. The
+   caller ends the object with destroy(p, from), which gives what it owns
+   back to from, and then gives the object and its strings back to from,
+   or with delete(p, from) for the object and what it owns. */
 void *anti_lang_Object_deserialize(struct anti_text input,
                                    struct anti_object *from);
 
