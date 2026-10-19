@@ -915,7 +915,7 @@ The counts are the same in dev and in release, apart from the checks of dev mode
 | The probe | one compare of 8 bytes per slot passed, and one compare of the keys per slot with an equal mark |
 | `set` and `add` of a new key | a second probe for a free slot, a copy of the key as `dup` makes it, and a copy of 64 bytes for the place of the call |
 | `remove` | marks the slot. No entry moves |
-| A walk of a `HashMap` | every slot, live or not. The first walk draws 8 bytes with `anti_rt_entropy` |
+| A walk of a `HashMap` | every slot, live or not. The first walk draws a number with `anti_rt_hash_draw` |
 | A walk of a `Map` | every entry written, removed ones included |
 | Calls into the runtime | `anti_rt_hash_seed` when a map is made, and `anti_rt_hash_bytes` per hash of a `str` key |
 | Atomic operations | one load, inside `anti_rt_hash_seed`, when a map is made |
@@ -1970,7 +1970,7 @@ define internal noundef ptr @"anti.collection.IndexedWalk$3cint$3e.value"(ptr
 - The `add` is `head + at`, and the compare, the `select` and the `sub` take the capacity off when the sum reaches it.
 - The shift by 3 turns the slot into the offset of an `int`.
 
-A walk of a `Map` steps over the entries in order and passes over the removed ones. A walk of a `HashMap` starts at a random slot and steps by a random odd stride. Such a stride reaches every slot of a table of a power of two once. The random number comes from 8 bytes that `anti_rt_entropy` draws at the first walk of the map. Each walk mixes them with the count of walks so far.
+A walk of a `Map` steps over the entries in order and passes over the removed ones. A walk of a `HashMap` starts at a random slot and steps by a random odd stride. Such a stride reaches every slot of a table of a power of two once. `anti_rt_hash_draw` gives the random number at the first walk of the map. It takes 8 bytes of the random source of the system, or the two clocks when the system gives none. Each walk mixes them with the count of walks so far.
 
 `to_slice` writes each value into memory from `anti_rt_grow`, which is `realloc` of the C library.
 
@@ -1989,7 +1989,7 @@ Where it lives: `sema_iterate` and `watch_changes` of `src/antic/sema_expr.c`, `
 | `for x in c` | one copy of the element per turn, as `dup` makes it | the same |
 | `for x in &c` | no copy | no copy |
 | Every `push`, `pop`, `add` and `remove` | one add, and a copy of 64 bytes for the place of the change | the same |
-| The first walk of a `HashMap` or a `HashSet` | one call of `anti_rt_entropy` | the same |
+| The first walk of a `HashMap` or a `HashSet` | one call of `anti_rt_hash_draw` | the same |
 | `to_slice` | one `realloc` per growth of the slice | the same |
 | Atomic operations and locks | none | none |
 

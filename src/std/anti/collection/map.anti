@@ -21,7 +21,7 @@ import anti.text;
 extern fn memcpy(to: ?*byte, from: ?*byte, count: c_size_t) -> ?*byte;
 extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
 extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
-extern fn anti_rt_entropy(out: ?*byte, count: c_size_t) -> c_int;
+extern fn anti_rt_hash_draw() -> u64;
 extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
 extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
@@ -499,16 +499,15 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 
 	/// A random number for the order of the next walk.
 	///
-	/// DESIGN: the order comes from a number the system draws for the table at
+	/// DESIGN: the order comes from a number the runtime draws for the table at
 	/// its first walk, never from the seed of the hashes, which a test may fix.
 	/// So the seed never decides the order a program sees, and each walk mixes
-	/// in its own count.
+	/// in its own count. The number comes from the random source of the system,
+	/// and from the clocks when the system gives no bytes, as the seed does.
 	protected fn shuffle(self) -> u64
 	{
 		if self.walk_seed == 0 {
-			let drawn: u64 = 0;
-			anti_rt_entropy(&drawn as ?*byte, size_of(u64) as c_size_t);
-			self.walk_seed = drawn | 1;
+			self.walk_seed = anti_rt_hash_draw() | 1;
 		}
 		self.walks += 1;
 		return lang.seeded(self.walks, self.walk_seed);

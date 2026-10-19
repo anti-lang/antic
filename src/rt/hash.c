@@ -54,10 +54,10 @@ void anti_rt_hash_seed_set(uint64_t value)
 }
 
 /* DESIGN: a system that gives no random bytes still starts the program,
-   with a seed of the wall clock and the monotonic clock. The buckets are
-   then foreseeable to someone who knows the time, which is less than the
-   system gives and more than a constant. */
-void anti_rt_hash_seed_start(void)
+   with a number of the wall clock and the monotonic clock. The buckets
+   and the order of a walk are then foreseeable to someone who knows the
+   time, which is less than the system gives and more than a constant. */
+uint64_t anti_rt_hash_draw(void)
 {
     uint64_t value;
 
@@ -65,5 +65,10 @@ void anti_rt_hash_seed_start(void)
         value = anti_rt_hash_mix((uint64_t)anti_rt_wall()) ^
                 (uint64_t)anti_rt_monotonic();
     }
-    anti_rt_hash_seed_set(value);
+    return value;
+}
+
+void anti_rt_hash_seed_start(void)
+{
+    anti_rt_hash_seed_set(anti_rt_hash_draw());
 }

@@ -521,6 +521,7 @@ Each holds one case per message of a command, which
 | `tests/unit/test_float_read.c` | The reader and the writer of the text of a float in `src/rt/text.c`. |
 | `tests/unit/test_fmt.c` | `anti fmt` over two sources the parser would refuse. |
 | `tests/unit/test_fs.c` | `anti_rt_fs_read`. |
+| `tests/unit/test_hash_draw.c` | The number of the walk order of a hashed collection and the seed of the hashes when the system gives no random bytes. |
 | `tests/unit/test_header.c` | The C header antic writes for a library, for owning structs and simd lanes. |
 | `tests/unit/test_interface.c` | The walks of `antic.h` that the commands of `anti` call. |
 | `tests/unit/test_ir.c` | The IR built by hand, its printed form and its verifier. |

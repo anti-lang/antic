@@ -44,8 +44,12 @@ uint64_t anti_rt_hash_seed(void);
    before keeps the seed it read. */
 void anti_rt_hash_seed_set(uint64_t value);
 
-/* Chooses the seed from the random source of the system at start, or
-   from the two clocks when the system gives no random bytes. */
+/* A number from the random source of the system, or from the two clocks
+   when the system gives no random bytes. The seed at start and the order
+   of the walks of a HashMap and a HashSet take one each. */
+uint64_t anti_rt_hash_draw(void);
+
+/* Chooses the seed with anti_rt_hash_draw at start. */
 void anti_rt_hash_seed_start(void);
 
 #endif

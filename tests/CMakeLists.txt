@@ -526,10 +526,26 @@ add_test(NAME rt_oom_fs
         "-DCASES=fs_list"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-oom-fs"
         -P "${ANTIC_RUNNERS}/run_rt_oom.cmake")
+# The number of the walk order of a HashMap and the seed of the hashes when
+# the system gives no random bytes. hash.c builds with anti_rt_entropy
+# named after the stand-in of the test, which gives none.
+antic_rt_sources(draw_sources hash)
+antic_rt_sources(draw_platform_sources atomic utf platform_posix
+    platform_windows)
+add_library(rt_hash_draw_runtime OBJECT ${draw_sources})
+target_compile_definitions(rt_hash_draw_runtime PRIVATE
+    anti_rt_entropy=refused_entropy)
+add_executable(rt_hash_draw_tests unit/test_hash_draw.c
+    $<TARGET_OBJECTS:rt_hash_draw_runtime> ${draw_platform_sources})
+target_include_directories(rt_hash_draw_tests PRIVATE ../src/rt)
+target_link_libraries(rt_hash_draw_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
+add_test(NAME rt_hash_draw COMMAND rt_hash_draw_tests)
 # The programs of the runtime above compile its files themselves, so a
 # coverage tree measures src/rt/ through them.
 antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
-    rt_platform_tests rt_plugin_table_tests rt_oom_runtime rt_oom_tests)
+    rt_platform_tests rt_plugin_table_tests rt_oom_runtime rt_oom_tests
+    rt_hash_draw_runtime rt_hash_draw_tests)
 
 # add_expect_test(<name> STATUS <status> [DIRECTORY <dir>]
 #                 [TIMEOUT <seconds>]
