@@ -39,7 +39,6 @@ static const char *search_roots(const struct options *o, const char *module,
     for (i = 0; i < o->root_count + (o->runtime != NULL); i++) {
         struct text path = {0};
         const char *p;
-        FILE *f;
         char *copy;
         text_appendf(&path, "%s/", i < o->root_count ? o->roots[i]
                                                      : text_cstr(&std_root));
@@ -47,9 +46,7 @@ static const char *search_roots(const struct options *o, const char *module,
             text_appendf(&path, "%c", *p == '.' ? '/' : *p);
         }
         text_append(&path, ANTL_SUFFIX);
-        f = platform_open(text_cstr(&path), false);
-        if (f != NULL) {
-            fclose(f);
+        if (driver_file_exists(text_cstr(&path))) {
             copy = arena_alloc(arena, path.length + 1);
             memcpy(copy, text_cstr(&path), path.length + 1);
             text_free(&path);

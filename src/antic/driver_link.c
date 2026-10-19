@@ -38,12 +38,11 @@ static bool find_crt_dir(enum target t, struct text *out)
 
     for (i = 0; dirs[i] != NULL; i++) {
         struct text path = {0};
-        FILE *f;
+        bool found;
         text_appendf(&path, "%s/Scrt1.o", dirs[i]);
-        f = platform_open(text_cstr(&path), false);
+        found = driver_file_exists(text_cstr(&path));
         text_free(&path);
-        if (f != NULL) {
-            fclose(f);
+        if (found) {
             text_append(out, dirs[i]);
             return true;
         }
