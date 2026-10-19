@@ -18,6 +18,10 @@ cmake_minimum_required(VERSION 3.21)
 file(REMOVE_RECURSE "${WORK}")
 
 set(failures "")
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/target-compile.cmake")
+antic_target_triple(elf linux-arm64)
+antic_target_triple(macho macos-arm64)
+
 # names_case(<name> accept|<text of the refusal> <directory> <triple> <asm>)
 # The library stands at lib/<directory>/libanti_rt.a of the archive.
 function(names_case name verdict directory triple assembly)
@@ -26,7 +30,7 @@ function(names_case name verdict directory triple assembly)
     file(WRITE "${archive}/a.s" "${assembly}")
     execute_process(COMMAND "${LLVM_MC}" -triple "${triple}" -filetype=obj
                             "${archive}/a.s" -o "${archive}/a.o"
-                    RESULT_VARIABLE status ERROR_VARIABLE err)
+                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         set(failures "${failures}${name}: llvm-mc failed\n${err}\n"
             PARENT_SCOPE)
@@ -35,7 +39,7 @@ function(names_case name verdict directory triple assembly)
     get_filename_component(where "${library}" DIRECTORY)
     file(MAKE_DIRECTORY "${where}")
     execute_process(COMMAND "${LLVM_AR}" rcs "${library}" "${archive}/a.o"
-                    RESULT_VARIABLE status ERROR_VARIABLE err)
+                    RESULT_VARIABLE status ERROR_VARIABLE err ENCODING NONE)
     if(NOT status EQUAL 0)
         set(failures "${failures}${name}: llvm-ar failed\n${err}\n"
             PARENT_SCOPE)
@@ -67,18 +71,18 @@ endfunction()
 set(elf_ok ".text\n.globl anti_rt_ok\nanti_rt_ok:\n ret\n")
 set(macho_ok ".text\n.globl _anti_rt_ok\n_anti_rt_ok:\n ret\n")
 
-names_case(elf_prefixed accept linux-arm64/armv8.0 aarch64-linux-musl
+names_case(elf_prefixed accept linux-arm64/armv8.0 "${elf}"
            "${elf_ok}")
 names_case(elf_global "linux-arm64/armv8.0/libanti_rt.a: bad_global"
-           linux-arm64/armv8.0 aarch64-linux-musl
+           linux-arm64/armv8.0 "${elf}"
            "${elf_ok}.globl bad_global\nbad_global:\n ret\n")
 names_case(elf_weak "linux-arm64/armv8.0/libanti_rt.a: bad_weak"
-           linux-arm64/armv8.0 aarch64-linux-musl
+           linux-arm64/armv8.0 "${elf}"
            "${elf_ok}.weak bad_weak\nbad_weak:\n ret\n")
-names_case(macho_prefixed accept macos-arm64/armv8.5 arm64-apple-macos11
+names_case(macho_prefixed accept macos-arm64/armv8.5 "${macho}"
            "${macho_ok}")
 names_case(macho_weak "macos-arm64/armv8.5/libanti_rt.a: bad_weak"
-           macos-arm64/armv8.5 arm64-apple-macos11
+           macos-arm64/armv8.5 "${macho}"
            "${macho_ok}.globl _bad_weak\n.weak_definition _bad_weak\n_bad_weak:\n ret\n")
 
 if(NOT failures STREQUAL "")
