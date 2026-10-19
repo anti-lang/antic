@@ -867,7 +867,6 @@ A pin or a data file has no code. Its row says what it holds.
 | `tools/clang-pin` | The release, the asset names and the digests of the pinned clang of every host. |
 | `tools/cpu-levels` | The processor levels and the default level of each target. |
 | `tools/cpu-levels.cmake` | Reads `tools/cpu-levels` into the targets and the levels of each. |
-| `tools/keys/public/release.pem` | A second copy of `tools/keys/release.pem`, which no script reads. |
 | `tools/keys/release.pem` | The public key that checks the signature of the LLVM tools. |
 | `tools/llvm-pin` | The release, the asset names and the digests of the pinned LLVM tools of every host. |
 | `tools/llvm-version` | The LLVM version, one line. |

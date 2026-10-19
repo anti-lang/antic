@@ -20,6 +20,15 @@ if(NOT pem MATCHES "^-----BEGIN PUBLIC KEY-----\n[A-Za-z0-9+/=\n]+-----END PUBLI
 endif()
 string(STRIP "${pem}" pem)
 
+# The file is the one copy of the key under tools/keys/ outside the
+# ignored private/, so a reader cannot take a second file for the anchor.
+file(GLOB_RECURSE copies RELATIVE "${ROOT}/tools/keys" "${ROOT}/tools/keys/*")
+list(FILTER copies EXCLUDE REGEX "^private/")
+if(NOT copies STREQUAL "release.pem")
+    message(FATAL_ERROR "tools/keys/ holds ${copies} beside private/, and the "
+                        "one key is tools/keys/release.pem")
+endif()
+
 foreach(installer install.sh install.ps1)
     file(READ "${ROOT}/tools/${installer}" text)
     string(REGEX MATCHALL "-----BEGIN [A-Z ]*KEY-----[A-Za-z0-9+/=\r\n]+-----END [A-Z ]*KEY-----"
