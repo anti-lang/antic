@@ -89,7 +89,7 @@ string(STRIP "${version}" version)
 # is compiled, since a package with the tools of another host fails on
 # every machine it installs on. llvm-version of each directory has to
 # name the pin, so a directory of an earlier release is refused as well.
-include("${tools_dir}/fetch-release.cmake")
+include("${tools_dir}/host.cmake")
 antic_machine_host(machine)
 file(READ "${tools_dir}/llvm-version" llvm_version)
 string(STRIP "${llvm_version}" llvm_version)

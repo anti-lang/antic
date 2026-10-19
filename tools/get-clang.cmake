@@ -21,9 +21,9 @@ endif()
 include("${CMAKE_CURRENT_LIST_DIR}/fetch-release.cmake")
 fetch_release("${CMAKE_CURRENT_LIST_DIR}/clang-pin" "${DEST}")
 
-if(CMAKE_HOST_WIN32)
-    set(exe ".exe")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/host.cmake")
+antic_machine_host(machine)
+antic_executable_suffix(exe "${machine}")
 execute_process(COMMAND "${DEST}/bin/clang${exe}" --version
                 OUTPUT_VARIABLE out RESULT_VARIABLE status)
 if(NOT status EQUAL 0 OR NOT out MATCHES "clang version ${fetched_version}[ \n]")

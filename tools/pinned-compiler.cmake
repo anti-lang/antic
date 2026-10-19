@@ -1,6 +1,8 @@
 # Pick the C compiler of a build of antic, and install the LLVM tools that
-# the build and its tests take. CMakeLists.txt and src/native/CMakeLists.txt
-# include this file before their project() command.
+# the build and its tests take. CMakeLists.txt includes this file before
+# its project() command. It also names the host: ANTIC_HOST_TARGET, such
+# as macos-arm64, with its parts ANTIC_HOST_OS and ANTIC_HOST_CPU, from
+# antic_machine_host of tools/host.cmake.
 #
 # DESIGN: every build of antic that is not a reader's compiles with the
 # clang of the pinned release from anti-lang/llvm-tools, and so does every
@@ -34,14 +36,11 @@ foreach(name IN LISTS antic_fetch)
     endif()
 endforeach()
 
-set(antic_exe "")
-set(antic_host_os linux)
-if(CMAKE_HOST_WIN32)
-    set(antic_exe ".exe")
-    set(antic_host_os windows)
-elseif(CMAKE_HOST_APPLE)
-    set(antic_host_os macos)
-endif()
+include("${antic_root}/tools/host.cmake")
+antic_machine_host(ANTIC_HOST_TARGET)
+string(REGEX REPLACE "-.*$" "" ANTIC_HOST_OS "${ANTIC_HOST_TARGET}")
+string(REGEX REPLACE "^[^-]*-" "" ANTIC_HOST_CPU "${ANTIC_HOST_TARGET}")
+antic_executable_suffix(antic_exe "${ANTIC_HOST_TARGET}")
 # The archiver of the pinned release, which the runtime and the native
 # libraries run, and its assembler, which the tests of `antic -S` run.
 # Each has this one definition.
@@ -73,7 +72,7 @@ if(NOT ANTIC_SYSTEM_COMPILER)
         FORCE)
     set(CMAKE_RANLIB ":" CACHE INTERNAL "no ranlib, since llvm-ar writes the index")
     set(CMAKE_C_ARCHIVE_FINISH "")
-    antic_pinned_linker(antic_linker "${ANTIC_LLVM_DIR}" "${antic_host_os}")
+    antic_pinned_linker(antic_linker "${ANTIC_LLVM_DIR}" "${ANTIC_HOST_OS}")
     set(CMAKE_LINKER "${antic_linker}" CACHE FILEPATH
         "the linker of the pinned release" FORCE)
 endif()
@@ -91,7 +90,7 @@ endif()
 # as the packer does.
 set(ANTIC_HOST_LINK_OPTIONS "")
 if(NOT ANTIC_SYSTEM_COMPILER)
-    if(CMAKE_HOST_APPLE)
+    if(ANTIC_HOST_OS STREQUAL "macos")
         execute_process(COMMAND "${CMAKE_COMMAND}"
                                 "-DPIN=${antic_root}/tools/macos-sdk-pin"
                                 -P "${antic_root}/tools/macos-sdk.cmake"
@@ -106,7 +105,7 @@ if(NOT ANTIC_SYSTEM_COMPILER)
             FORCE)
     endif()
     antic_pinned_link_options(ANTIC_HOST_LINK_OPTIONS "${ANTIC_LLVM_DIR}"
-                              "${antic_host_os}")
+                              "${ANTIC_HOST_OS}")
     list(JOIN ANTIC_HOST_LINK_OPTIONS " " antic_link_text)
     # The flags of the cache reach the checks of project() as well, and a
     # tree configured before keeps no other linker.

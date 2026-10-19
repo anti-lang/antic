@@ -19,23 +19,7 @@ cmake_minimum_required(VERSION 3.21)
 set(fetch_release_root "${CMAKE_CURRENT_LIST_DIR}/..")
 include("${CMAKE_CURRENT_LIST_DIR}/download.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/pins.cmake")
-
-# Set <out> to the name of this machine among the six hosts of antic. The
-# host is named as the six targets of antic are, so one spelling serves
-# the pins, the archive of the runtime and the option --target. The packer
-# reads it to tell the host of the runtime archive from the others.
-function(antic_machine_host out)
-    cmake_host_system_information(RESULT os QUERY OS_NAME)
-    cmake_host_system_information(RESULT platform QUERY OS_PLATFORM)
-    string(TOLOWER "${os}" os)
-    string(TOLOWER "${platform}" platform)
-    if(platform MATCHES "^(arm64|aarch64)$")
-        set(platform arm64)
-    elseif(platform MATCHES "^(x86_64|amd64|x64)$")
-        set(platform x86_64)
-    endif()
-    set(${out} "${os}-${platform}" PARENT_SCOPE)
-endfunction()
+include("${CMAKE_CURRENT_LIST_DIR}/host.cmake")
 
 function(fetch_release pin dest)
     get_filename_component(root "${fetch_release_root}" ABSOLUTE)

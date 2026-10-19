@@ -13,7 +13,9 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/libanti_rt.a")
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/host.cmake")
+antic_static_library(library_name anti_rt "${TARGET}")
+file(GLOB runtime_library "${RUNTIME}/lib/${TARGET}/*/${library_name}")
 if(runtime_library STREQUAL "")
     message("SKIP: the runtime archive has no runtime for ${TARGET}")
     return()

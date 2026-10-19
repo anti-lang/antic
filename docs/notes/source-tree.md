@@ -659,6 +659,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_hash_seed.cmake` | Runs a program twice and expects two seeds. |
 | `tests/runners/run_header_names.cmake` | Refuses one of our headers included with angle brackets. |
 | `tests/runners/run_header_sections.cmake` | Checks that each function under a section of a shared header is defined in that file, and that no file outside its family includes the header. |
+| `tests/runners/run_host_names.cmake` | Refuses the host of the machine worked out outside `tools/host.cmake`. |
 | `tests/runners/run_host_sources.cmake` | Compiles every source of antic and anti for one host under the warning set. |
 | `tests/runners/run_installer_alone.cmake` | Runs the installer with a failing cmake on the path and refuses words of removed steps. |
 | `tests/runners/run_installer_github.cmake` | Pins the addresses in both installers and runs one against a fake release. |
@@ -838,6 +839,7 @@ the data the scripts read.
 | `tools/git-hooks.cmake` | Points `core.hooksPath` of the checkout at `tools/hooks`. |
 | `tools/hooks/pre-commit` | Refuses a commit whose staged `.md` files fail the checker. |
 | `tools/host-compile.cmake` | Gives the options of the pinned clang that compile antic or `anti` for one host. |
+| `tools/host.cmake` | Names the host of the machine, the suffix of an executable and the file of a static library of a target. |
 | `tools/install.ps1` | Installs the package of a Windows host after checking the signature and the digest. |
 | `tools/install.sh` | Installs the package of a macOS or Linux host after checking the signature and the digest. |
 | `tools/libc-versions.cmake` | Gives the versions of musl and mimalloc to the build of antic. |

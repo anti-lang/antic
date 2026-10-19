@@ -77,7 +77,7 @@ add_executable(antic_unit_tests
 target_link_libraries(antic_unit_tests PRIVATE anti_core ${CMAKE_DL_LIBS})
 # test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
 # CRT of Windows hold it themselves.
-if(UNIX AND NOT APPLE)
+if(ANTIC_HOST_OS STREQUAL "linux")
     target_link_libraries(antic_unit_tests PRIVATE m)
 endif()
 target_include_directories(antic_unit_tests PRIVATE ../src/rt ../src/anti)
@@ -171,7 +171,7 @@ add_test(NAME anti_interface
 # The suffix antic gives an object of the host target, the one that
 # src/antic/target.c names: .obj on Windows and .o elsewhere. Every dev
 # object a test links is named with it.
-if(ANTIC_HOST_TARGET MATCHES "^windows-")
+if(ANTIC_HOST_OS STREQUAL "windows")
     set(anti_object ".obj")
 else()
     set(anti_object ".o")
@@ -808,11 +808,8 @@ foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
     list(GET parts 1 level)
     list(GET parts 2 uses)
     list(GET parts 3 avoids)
-    if(target STREQUAL "windows-arm64")
-        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/anti_rt.lib")
-    else()
-        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/libanti_rt.a")
-    endif()
+    antic_static_library(library_name anti_rt "${target}")
+    set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/${library_name}")
     add_test(NAME cpu_level_${level}
         COMMAND "${CMAKE_COMMAND}"
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
@@ -910,11 +907,8 @@ endforeach()
 # `volatile` once, which is a plain load there.
 foreach(target linux-arm64 macos-arm64 windows-arm64)
     foreach(level armv8.0 armv8.2 armv8.5)
-        if(target STREQUAL "windows-arm64")
-            set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/anti_rt.lib")
-        else()
-            set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/libanti_rt.a")
-        endif()
+        antic_static_library(library_name anti_rt "${target}")
+        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/${library_name}")
         add_test(NAME atomic_load_${target}_${level}
             COMMAND "${CMAKE_COMMAND}"
                 "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
@@ -1440,7 +1434,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     set(ANTIC_REFERENCE_C_FLAGS -ffp-contract=off)
 endif()
 set(ANTIC_TEST_CC "${CMAKE_C_COMPILER}" ${ANTIC_REFERENCE_C_FLAGS})
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND ANTIC_TEST_CC -isysroot "${ANTIC_MACOS_SDK}")
 endif()
 if(ANTIC_SYSTEM_COMPILER)
@@ -1988,10 +1982,10 @@ foreach(source IN LISTS std_sources)
     set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
     set(lto_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.lto.expected")
     set(musl_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.musl.expected")
-    if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${win32_expected}")
+    if(ANTIC_HOST_OS STREQUAL "windows" AND EXISTS "${win32_expected}")
         set(expected EXPECTED "${win32_expected}")
     endif()
-    if(ANTIC_HOST_TARGET MATCHES "^linux-" AND EXISTS "${musl_expected}")
+    if(ANTIC_HOST_OS STREQUAL "linux" AND EXISTS "${musl_expected}")
         set(expected EXPECTED "${musl_expected}")
     endif()
     if(ANTIC_TEST_LTO AND EXISTS "${lto_expected}")
@@ -2176,7 +2170,7 @@ add_test(NAME tests_may_fail_only
 # absent. The same program runs a second time without those variables,
 # and reads the failure rather than a directory.
 set(no_home "${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs-no-home.expected")
-if(ANTIC_HOST_TARGET MATCHES "^windows-")
+if(ANTIC_HOST_OS STREQUAL "windows")
     set(no_home "${CMAKE_CURRENT_SOURCE_DIR}/std/userdirs-no-home.win32.expected")
 endif()
 antic_program_test(std_userdirs_no_home
@@ -2197,7 +2191,7 @@ set_tests_properties(std_userdirs PROPERTIES ENVIRONMENT
 add_library(abi_structs OBJECT abi/structs.c)
 set_target_properties(abi_structs PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_structs PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     target_compile_options(abi_structs PRIVATE -mmacosx-version-min=11.0)
 endif()
 # Anti programs link these objects without a sanitizer runtime, like the
@@ -2215,7 +2209,7 @@ antic_program_test(program_abi_structs
 add_library(abi_simd OBJECT abi/simd.c)
 set_target_properties(abi_simd PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_simd PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     target_compile_options(abi_simd PRIVATE -mmacosx-version-min=11.0)
 endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
@@ -2231,7 +2225,7 @@ antic_program_test(program_abi_simd
 add_library(abi_system_error OBJECT abi/system_error.c)
 set_target_properties(abi_system_error PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_system_error PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     target_compile_options(abi_system_error PRIVATE -mmacosx-version-min=11.0)
 endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
@@ -2245,7 +2239,7 @@ antic_program_test(program_abi_system_error
 add_library(abi_wchar OBJECT abi/wchar.c)
 set_target_properties(abi_wchar PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_wchar PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     target_compile_options(abi_wchar PRIVATE -mmacosx-version-min=11.0)
 endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
@@ -2266,7 +2260,7 @@ antic_program_test(program_abi_wchar
 add_library(abi_ctypes OBJECT abi/ctypes.c)
 set_target_properties(abi_ctypes PROPERTIES MSVC_RUNTIME_LIBRARY "")
 target_compile_options(abi_ctypes PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     target_compile_options(abi_ctypes PRIVATE -mmacosx-version-min=11.0)
 endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
@@ -2318,6 +2312,10 @@ add_test(NAME pinned_compiler
 add_test(NAME pin_readers
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${ANTIC_RUNNERS}/run_pin_readers.cmake")
+# The host of the machine is worked out in tools/host.cmake alone.
+add_test(NAME host_names
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_host_names.cmake")
 # The six targets are listed once, in tools/cpu-levels.
 add_test(NAME target_lists
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -2390,7 +2388,7 @@ endforeach()
 # DESIGN: the test stands on a Mac alone. The measurement runs on the
 # development Mac, and the script that links a program of the host here,
 # as release_dry_run does, names the Apple SDK.
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     set(coverage_work "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
     antic_coverage_compile_flags(coverage_flags "${coverage_work}/root")
     add_test(NAME coverage_report
@@ -2622,7 +2620,7 @@ add_test(NAME anti_symbols_input
 
 # A binding names its framework with `link framework`, and `anti build`
 # passes it to antic. A Mac takes the SDK from the Command Line Tools.
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     add_test(NAME anti_build_framework
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
@@ -2872,7 +2870,7 @@ endforeach()
 # A program run from dist/ and built again at once, fifteen times. Windows
 # maps a program that just ran for a moment, and the copy into dist/
 # failed there. A turn takes about two seconds on the Windows VM.
-if(ANTIC_HOST_TARGET MATCHES "^windows-")
+if(ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME anti_build_rerun
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
@@ -2906,7 +2904,7 @@ add_test(NAME anti_fmt
         -P "${ANTIC_RUNNERS}/run_anti_fmt.cmake")
 # A failed write of `anti fmt` leaves the source as it was. The limit on
 # the size of a written file is a POSIX one, and Windows has none.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME anti_fmt_write
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
@@ -2916,7 +2914,7 @@ endif()
 
 # antic runs its passes on a stack of its own size, whatever stack the
 # main thread has. The limit of the main thread is a POSIX one too.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME antic_stack
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -3070,7 +3068,7 @@ endforeach()
 # that names every link three times. clang_of_the_tree runs a copy of anti in a tree whose deps/clang is the
 # pinned clang, with no clang on PATH.
 set(anti_bind_cc ${ANTIC_TEST_CC})
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
 set(anti_bind_cases header clang escaped_path raymath raylib api
@@ -3078,7 +3076,7 @@ set(anti_bind_cases header clang escaped_path raymath raylib api
     nested_enum api_parts api_callbacks api_literals api_types
     api_words words unsigned_bitfield fixed_enum api_typedef_chain
     clang_of_the_tree)
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     # The cases refusals, ast_malformed and clang_typedef_chain stand a
     # shell script in for clang.
     list(APPEND anti_bind_cases refusals ast_malformed clang_typedef_chain)
@@ -3223,7 +3221,7 @@ else()
     # A host that is not Linux packs linux-arm64 as well. It packs a
     # package of its own beside package_pack, which xz takes two minutes
     # for, so its cost starts it early too.
-    if(NOT ANTIC_HOST_TARGET MATCHES "^linux-")
+    if(NOT ANTIC_HOST_OS STREQUAL "linux")
         add_test(NAME package_cross
             COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
                     "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
@@ -3370,7 +3368,7 @@ if(EXISTS "${ANTIC_RAYLIB_SOURCE}/src/raymath.h")
     set_target_properties(abi_raymath PROPERTIES MSVC_RUNTIME_LIBRARY "")
     target_compile_options(abi_raymath PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
     target_include_directories(abi_raymath PRIVATE "${ANTIC_RAYLIB_SOURCE}/src")
-    if(APPLE)
+    if(ANTIC_HOST_OS STREQUAL "macos")
         target_compile_options(abi_raymath PRIVATE -mmacosx-version-min=11.0)
     endif()
     if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
@@ -4022,7 +4020,7 @@ add_test(NAME emit_identity
 
 # The runner keeps the texts of its manifest and names the first line that
 # moved in each text that differs. It writes a manifest on the Mac alone.
-if(CMAKE_HOST_APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     add_test(NAME emit_identity_texts
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -4080,7 +4078,7 @@ add_test(NAME shared_inputs
         -P "${ANTIC_RUNNERS}/run_shared_inputs.cmake")
 
 # The platform linker of the host links return42.anti.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     antic_program_test(program_platform_linker
         "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         OPTIONS "--linker,platform"
@@ -5453,14 +5451,14 @@ add_test(NAME checks_override
 # a debugger reports the test skipped and names the reason.
 find_program(ANTIC_LLDB NAMES lldb DOC "the debugger of macOS")
 find_program(ANTIC_GDB NAMES gdb DOC "the debugger of Linux")
-if(NOT WIN32 AND NOT ANTIC_LLDB AND NOT ANTIC_GDB)
+if(NOT ANTIC_HOST_OS STREQUAL "windows" AND NOT ANTIC_LLDB AND NOT ANTIC_GDB)
     add_test(NAME debug_info
         COMMAND "${CMAKE_COMMAND}" -E echo
             "SKIP: neither lldb nor gdb is on the path")
     set_tests_properties(debug_info PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")
-elseif(NOT WIN32)
-    if(APPLE AND ANTIC_LLDB)
+elseif(NOT ANTIC_HOST_OS STREQUAL "windows")
+    if(ANTIC_HOST_OS STREQUAL "macos" AND ANTIC_LLDB)
         set(debugger "${ANTIC_LLDB}")
         set(debugger_kind lldb)
     elseif(ANTIC_GDB)
@@ -5756,7 +5754,7 @@ foreach(target macos-arm64 linux-arm64 windows-arm64)
 endforeach()
 
 # The ABI probe compares the layouts of C and antic on the host.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME abi_probe
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -5772,7 +5770,7 @@ endif()
 # docs/notes/test-matrix.md: packed and aligned types with fields at odd
 # offsets, unions, the tag and the union of a variant, an enum, an array
 # of arrays, an optional value, a tuple and a slice.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME abi_probe_types
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -5796,7 +5794,7 @@ if(NOT WIN32)
 endif()
 
 # A linked program holds the licence notice of its packages.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME program_licenses
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -5944,7 +5942,7 @@ foreach(case
     list(GET parts 5 errors)
     list(GET parts 6 status)
     string(REGEX REPLACE "[.]pattern$" ".win32.pattern" win32 "${expected}")
-    if(ANTIC_HOST_TARGET MATCHES "^windows-" AND EXISTS "${CONF}/${win32}")
+    if(ANTIC_HOST_OS STREQUAL "windows" AND EXISTS "${CONF}/${win32}")
         set(expected "${win32}")
     endif()
     set(error_patterns "")
@@ -6319,7 +6317,7 @@ add_test(NAME build_id_reader
 # The build id in the notice is the digest of the code. Two builds of one
 # program carry the same id, and another program carries another. An
 # object that opens and fails to read is refused.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME program_build_id
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -6335,7 +6333,7 @@ endif()
 # id, since the digest leaves out every span of the text that -g added.
 # The program has several functions, so -g adds a subprogram and lines to
 # each. COFF writes subprograms in the plain build too.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     foreach(target ${ANTIC_HOST_TARGET} windows-x86_64)
         add_test(NAME llvm_build_id_${target}
             COMMAND "${CMAKE_COMMAND}"
@@ -6351,7 +6349,7 @@ endif()
 
 # A program that imports a standard library module carries the package of
 # the library, which is the reserved root anti.
-if(NOT WIN32)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME program_licenses_std
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -6385,7 +6383,7 @@ if(ANTIC_LLVM_AR)
             generics optional forms views never never_cpp ctypes
             ctypes_shared ctypes_bundle tight tight_aligned)
         # The C program of ledger starts its threads with pthreads.
-        if(case STREQUAL "ledger" AND WIN32)
+        if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
             continue()
         endif()
         add_test(NAME clib_${case}
@@ -7212,7 +7210,7 @@ endforeach()
 # aligned above 16 stands at 16 on a Windows host. The entry on R050 under
 # "What the rules run added" in docs/decisions.md holds it. The tests stay
 # registered there, as the tests of --memory-checks do on windows-arm64.
-if(ANTIC_HOST_TARGET MATCHES "^windows-")
+if(ANTIC_HOST_OS STREQUAL "windows")
     set_tests_properties(matrix_types_alloc_of_a_type_aligned_above_16_dev
         matrix_types_alloc_of_a_type_aligned_above_16_release
         matrix_types_alloc_of_a_type_aligned_above_16_memory_checks

@@ -12,7 +12,10 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-set(opt "${RUNTIME}/bin/opt${CMAKE_EXECUTABLE_SUFFIX}")
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/host.cmake")
+antic_machine_host(machine)
+antic_executable_suffix(exe "${machine}")
+set(opt "${RUNTIME}/bin/opt${exe}")
 file(GLOB libraries "${RUNTIME}/lib/linux-arm64*/*/libanti_rt.a")
 file(GLOB archives "${RUNTIME}/lib/linux-arm64*/*/bitcode/*/libanti_rt.a")
 if(libraries STREQUAL "")

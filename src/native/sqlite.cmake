@@ -44,7 +44,7 @@ antic_native_headers(sqlite3 "${ANTIC_SQLITE_SOURCE}" sqlite3.h sqlite3ext.h)
 set(antic_sqlite_probe "${PROJECT_SOURCE_DIR}/tests/abi/sqlite_probe.c")
 foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     antic_native_target(triple flags "${target}")
-    antic_native_library(name "${target}" sqlite3)
+    antic_static_library(name sqlite3 "${target}")
     set(work "${ANTIC_SQLITE_WORK}/${target}")
     set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${name}")
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2

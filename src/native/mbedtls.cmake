@@ -59,7 +59,7 @@ set(ANTIC_MBEDTLS_SOURCES
 set(antic_mbedtls_probe "${PROJECT_SOURCE_DIR}/tests/abi/mbedtls_probe.c")
 foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     antic_native_target(triple flags "${target}")
-    antic_native_library(name "${target}" mbedtls)
+    antic_static_library(name mbedtls "${target}")
     set(work "${ANTIC_MBEDTLS_WORK}/${target}")
     set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${name}")
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2

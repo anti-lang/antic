@@ -13,7 +13,7 @@ antic_native_headers(pcre2 "${ANTIC_PCRE2_INCLUDE}" pcre2.h)
 
 foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     antic_native_target(triple flags "${target}")
-    antic_native_library(name "${target}" pcre2-8)
+    antic_static_library(name pcre2-8 "${target}")
     set(work "${ANTIC_PCRE2_WORK}/${target}")
     set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${name}")
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
@@ -63,7 +63,7 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     # headers of the glue in a dependency file, as for anti_rt, and pcre2.h
     # stands in DEPENDS because the dependency file leaves out a system
     # header.
-    antic_native_library(glue_name "${target}" anti_rt_regex)
+    antic_static_library(glue_name anti_rt_regex "${target}")
     set(glue "${ANTIC_RUNTIME_DIR}/lib/${target}/${glue_name}")
     set(glue_objects "")
     antic_runtime_sections(sections "${target}")

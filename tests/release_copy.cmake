@@ -356,8 +356,9 @@ file(MAKE_DIRECTORY "${WORK}/deps")
 file(CREATE_LINK "${llvm_dir}" "${WORK}/deps/llvm" SYMBOLIC)
 file(READ "${ROOT}/tools/llvm-version" llvm_version)
 string(STRIP "${llvm_version}" llvm_version)
-cmake_host_system_information(RESULT machine_cpu QUERY OS_PLATFORM)
-set(machine "macos-${machine_cpu}")
+# A release is made on a Mac, so the machine is a macOS host.
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/host.cmake")
+antic_machine_host(machine)
 
 set(saved_path "$ENV{PATH}")
 # Step 9 rsyncs the text of the site to the webroot that ANTI_SITE names,

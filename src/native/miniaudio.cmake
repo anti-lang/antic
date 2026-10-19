@@ -30,7 +30,7 @@ set(ANTIC_MINIAUDIO_LIBS_linux m,pthread,dl)
 set(antic_miniaudio_probe "${PROJECT_SOURCE_DIR}/tests/abi/miniaudio_probe.c")
 foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     antic_media_target(triple flags "${target}")
-    antic_native_library(name "${target}" miniaudio)
+    antic_static_library(name miniaudio "${target}")
     set(work "${ANTIC_MINIAUDIO_WORK}/${target}")
     set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${name}")
     set(compile "${CMAKE_C_COMPILER}" --target=${triple} -std=c99 -O2

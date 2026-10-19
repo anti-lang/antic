@@ -56,15 +56,6 @@ function(antic_native_target out_triple out_flags target)
     set(${out_flags} "${flags}" PARENT_SCOPE)
 endfunction()
 
-# The file name of a static library <name> on <target>.
-function(antic_native_library out target name)
-    if(target MATCHES "^windows-")
-        set(${out} "${name}.lib" PARENT_SCOPE)
-    else()
-        set(${out} "lib${name}.a" PARENT_SCOPE)
-    endif()
-endfunction()
-
 # Copy the licence text <source> of the native library <name> to
 # licenses/<name>.txt of the runtime tree, which the packer and anti
 # license read, and note the name for the test native_licenses.

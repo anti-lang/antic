@@ -84,31 +84,17 @@ else()
     # compile, and LF_BUILDINFO holds the command line. A compile for
     # Windows keeps the object relative and records no command line, so a
     # PDB that links anti_rt names no directory of this checkout either.
-    if(WIN32)
+    if(ANTIC_HOST_OS STREQUAL "windows")
         add_compile_options(-fdebug-compilation-dir=. -gno-codeview-command-line)
     endif()
 endif()
 
 # The host target name, in the form of the runtime archive directories
-# lib/<os>-<cpu>. The file src/antic/target.c detects the same name from the
-# compiler's predefined macros. The antic_host_target test compares both.
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(ANTIC_HOST_OS macos)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(ANTIC_HOST_OS linux)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(ANTIC_HOST_OS windows)
-else()
-    message(FATAL_ERROR "antic does not support the host system ${CMAKE_SYSTEM_NAME}")
-endif()
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
-    set(ANTIC_HOST_CPU arm64)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
-    set(ANTIC_HOST_CPU x86_64)
-else()
-    message(FATAL_ERROR "antic does not support the host processor ${CMAKE_SYSTEM_PROCESSOR}")
-endif()
-set(ANTIC_HOST_TARGET "${ANTIC_HOST_OS}-${ANTIC_HOST_CPU}")
+# lib/<os>-<cpu>, which tools/pinned-compiler.cmake sets as
+# ANTIC_HOST_TARGET. The file src/antic/target.c detects the same name from
+# the compiler's predefined macros. The antic_host_target test compares
+# both, and the read of tools/cpu-levels below refuses a host that is no
+# target.
 
 # Every tool the build runs is one of the pinned release, and a tool of
 # the host stops the configure step here. See tools/pinned-tools.cmake.
@@ -189,6 +175,9 @@ target_compile_definitions(anti_core PRIVATE
 set(ANTIC_CPU_LEVELS "${CMAKE_SOURCE_DIR}/tools/cpu-levels")
 include(tools/cpu-levels.cmake)
 antic_read_cpu_levels("${ANTIC_CPU_LEVELS}")
+if(NOT ANTIC_HOST_TARGET IN_LIST ANTIC_TARGETS)
+    message(FATAL_ERROR "antic does not support the host ${ANTIC_HOST_TARGET}")
+endif()
 
 # The default level of a target, and the -march= value of a level.
 function(antic_cpu_level out target)
@@ -330,7 +319,7 @@ endif()
 # the pinned SDK that tools/pinned-compiler.cmake sets as
 # CMAKE_OSX_SYSROOT. A reader's build of ANTIC_SYSTEM_COMPILER may leave
 # that empty, and xcrun names the SDK of the machine there.
-if(APPLE)
+if(ANTIC_HOST_OS STREQUAL "macos")
     set(ANTIC_MACOS_SDK "${CMAKE_OSX_SYSROOT}")
     if(ANTIC_MACOS_SDK STREQUAL "")
         execute_process(COMMAND xcrun --show-sdk-path
@@ -400,11 +389,8 @@ function(anti_cross_runtime_at target triple level root)
         set(align -falign-functions=16)
     endif()
     set(out "${root}/lib/${target}/${level}")
-    if(target MATCHES "^windows")
-        set(library "${out}/anti_rt.lib")
-    else()
-        set(library "${out}/libanti_rt.a")
-    endif()
+    antic_static_library(library_name anti_rt "${target}")
+    set(library "${out}/${library_name}")
     # The compiler names the headers each object includes in a dependency
     # file, so a change of any header rebuilds the objects that read it.
     set(sources ${ANTIC_RUNTIME_SOURCES})

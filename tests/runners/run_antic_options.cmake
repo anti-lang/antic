@@ -66,6 +66,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/host.cmake")
+
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
 foreach(value ANTIC CASE RUNTIME SOURCES WORK)
@@ -365,11 +367,8 @@ if(CASE STREQUAL "bundle_static")
           "the archive of --bundle-runtime")
     # The line antic prints names what the C program links beside the
     # archive: the runtime of the host, unless the archive holds it.
-    if(CMAKE_HOST_WIN32)
-        set(runtime_file "anti_rt.lib")
-    else()
-        set(runtime_file "libanti_rt.a")
-    endif()
+    antic_machine_host(machine)
+    antic_static_library(runtime_file anti_rt "${machine}")
     holds("${plain_said}" "${runtime_file}"
           "the line of the build without --bundle-runtime")
     lacks("${bundle_said}" "${runtime_file}"

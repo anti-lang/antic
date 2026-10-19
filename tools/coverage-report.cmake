@@ -35,10 +35,9 @@ endforeach()
 # sources a program carries stay out of it.
 set(measured src/antic src/anti src/rt)
 
-set(exe "")
-if(CMAKE_HOST_WIN32)
-    set(exe ".exe")
-endif()
+include("${CMAKE_CURRENT_LIST_DIR}/host.cmake")
+antic_machine_host(machine)
+antic_executable_suffix(exe "${machine}")
 set(profdata "${LLVM_BIN}/llvm-profdata${exe}")
 set(cov "${LLVM_BIN}/llvm-cov${exe}")
 
