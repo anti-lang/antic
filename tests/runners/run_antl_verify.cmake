@@ -1,7 +1,7 @@
-# M7: the IR of a library file that antic --dev compiles passes ir_verify.
-# The copy of scale.antl returns i32 from a function that returns i64,
-# which the reader accepts and the verifier refuses. Run with cmake -P and
-# these values:
+# M7 of the first audit: the IR of a library file that antic --dev compiles
+# passes ir_verify. The copy of scale.antl returns i32 from a function that
+# returns i64, which the reader accepts and the verifier refuses. Run with
+# cmake -P and these values:
 #   ANTIC     the antic executable
 #   POKE      the poke_byte executable
 #   LIBS      the directory of the library files

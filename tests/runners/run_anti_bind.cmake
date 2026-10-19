@@ -174,9 +174,9 @@ if(CASE STREQUAL "header")
         expect_same_text("${name}.h, against ${DUMP}/${name}.h," "${wanted}"
                          "${got}")
     endforeach()
-    # M26: the header takes the last segment of the module path, whatever
-    # the library file is called and however its path is written. A
-    # Windows host names it with backslashes as well.
+    # M26 of the second audit: the header takes the last segment of the module
+    # path, whatever the library file is called and however its path is
+    # written. A Windows host names it with backslashes as well.
     file(MAKE_DIRECTORY "${WORK}/renamed")
     file(COPY_FILE "${WORK}/geo.antl" "${WORK}/renamed/other.antl")
     set(spellings "${WORK}/renamed/other.antl")
@@ -534,14 +534,14 @@ elseif(CASE STREQUAL "clang_malformed")
     string(APPEND text "struct L${long} { struct { int a; } f1; "
            "struct { float b; } f2; };\n"
            "void g(struct L${long} *p);\n")
-    # S32. An enumerator without a value after INT64_MAX. The next value
-    # is 2^63, as a value written above INT64_MAX is, in an enum of
-    # c_ulonglong.
+    # S32 of the second audit. An enumerator without a value after INT64_MAX.
+    # The next value is 2^63, as a value written above INT64_MAX is, in an enum
+    # of c_ulonglong.
     string(APPEND text "enum Wide : unsigned long long "
            "{ WIDE_TOP = 0x7fffffffffffffff, WIDE_NEXT };\n"
            "void wide(enum Wide w);\n")
-    # S31. The last line C allows a #line to name, and lines after it,
-    # which a line counter of 32 bits took past its range.
+    # S31 of the second audit. The last line C allows a #line to name, and
+    # lines after it, which a line counter of 32 bits took past its range.
     string(APPEND text "#line 2147483647\n#define LATE 1\n"
            "struct Late { int a; };\nvoid late(struct Late *p);\n")
     file(WRITE "${h}" "${text}")
@@ -575,8 +575,9 @@ elseif(CASE STREQUAL "ast_malformed")
          "clang version 99999999999999999999.1.0\nTarget: x\n")
     expect_refusal("is clang -1, and bind --clang ${clang_where}" ${fake})
     file(WRITE "${WORK}/fake/version" "clang version 23.1.0\nTarget: x\n")
-    # S31. A line marker past the lines clang counts, one that no integer
-    # holds, and one at the end of int64_t with a line after it.
+    # S31 of the second audit. A line marker past the lines clang counts, one
+    # that no integer holds, and one at the end of int64_t with a line after
+    # it.
     file(WRITE "${WORK}/fake/ast" "{\"kind\": \"TranslationUnitDecl\", \"inner\": []}")
     foreach(marker 4294967296 99999999999999999999 9223372036854775807)
         file(WRITE "${WORK}/fake/pre" "# ${marker} \"${h}\"\nint a;\nint b;\n")

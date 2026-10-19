@@ -32,9 +32,9 @@ static void deep_source(struct text *src, const char *level, const char *close)
     text_append(src, ">(x);\n}\n");
 }
 
-/* M39: the scan of an angle list recursed once per `chan`, `*` or `<`
-   and ended the formatter on the stack. A list past the depth of the
-   parser is no list, so its `<` keeps the spaces of a comparison. */
+/* M39 of the second audit: the scan of an angle list recursed once per `chan`,
+   `*` or `<` and ended the formatter on the stack. A list past the depth of
+   the parser is no list, so its `<` keeps the spaces of a comparison. */
 static void deep_angles(void)
 {
     static const char *const levels[][2] = {
@@ -59,9 +59,9 @@ static void deep_angles(void)
     }
 }
 
-/* M46: a file that ends inside the body of an anonymous function left
-   the open brackets the body saved unfreed. The sanitizer builds check
-   the leak. */
+/* M46 of the second audit: a file that ends inside the body of an anonymous
+   function left the open brackets the body saved unfreed. The sanitizer builds
+   check the leak. */
 static void open_anonymous(void)
 {
     static const char *const sources[] = {

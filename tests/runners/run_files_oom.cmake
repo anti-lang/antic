@@ -1,6 +1,7 @@
-# S30. Each allocation helper of anti exits through files_out_of_memory
-# when the C library refuses the memory, with status 70 and the message,
-# and never comes back with NULL. Run with cmake -P and these values:
+# S30 of the second audit. Each allocation helper of anti exits through
+# files_out_of_memory when the C library refuses the memory, with status 70 and
+# the message, and never comes back with NULL. Run with cmake -P and these
+# values:
 #   PROGRAM  files_oom_tests, built from tests/unit/test_files_oom.c
 #   WORK     a directory this run writes into
 # The C library of macOS writes a line of its own about the refused

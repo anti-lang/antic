@@ -332,9 +332,9 @@ static void runtime_entry(void)
     text_free(&start);
 }
 
-/* M24: the markers of the notice stand in src/rt/license.h alone. Every
-   file that writes or reads a notice takes them from there, so the
-   writer and the four readers cannot drift. */
+/* M24 of the second audit: the markers of the notice stand in src/rt/license.h
+   alone. Every file that writes or reads a notice takes them from there, so
+   the writer and the four readers cannot drift. */
 static void runtime_markers(void)
 {
     static const char *const files[] = {

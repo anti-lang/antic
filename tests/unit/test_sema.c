@@ -1333,7 +1333,8 @@ void test_sema_members(void)
     static const char pair[] = "simd struct V { x: i32, y: i32 }\n";
     char source[512];
 
-    /* S09: the base of `E.A` names a type and has it as its type. */
+    /* S09 of the second audit: the base of `E.A` names a type and has it as
+       its type. */
     rejects("enum E { A, B }\nfn f() { let p = &E.A; }", 2, 19,
             "unary `&` needs a place");
     rejects("enum E { A, carry }\nfn f() -> int { return 1 + E.carry; }", 2,
@@ -1343,7 +1344,7 @@ void test_sema_members(void)
     rejects("enum E { A, B }\nfn f() { E.A.compare_swap(E.A, E.B); }", 2, 10,
             "`E` has no field `compare_swap`");
     accepts("enum E { A, B }\nfn f() -> E { let e = E.B; return e; }");
-    /* S12: a bound function is a value and no place. */
+    /* S12 of the second audit: a bound function is a value and no place. */
     rejects("class C\n{\n\tpub w: int = 1,\n\n"
             "\tpub fn area(self) -> int\n\t{\n\t\treturn self.w;\n\t}\n}\n"
             "fn f(c: *C) { let p = &c.area; }", 10, 24,
@@ -1351,7 +1352,7 @@ void test_sema_members(void)
     accepts("class C\n{\n\tpub w: int = 1,\n\n"
             "\tpub fn area(self) -> int\n\t{\n\t\treturn self.w;\n\t}\n}\n"
             "fn f(c: *C) -> int { let g = c.area; return g(); }");
-    /* S10: the values of an enum are integers. */
+    /* S10 of the second audit: the values of an enum are integers. */
     rejects("enum A: A { X }\nfn f() -> A { return A.X; }", 1, 9,
             "`A` names itself in its own declaration");
     rejects("struct P { x: int }\nenum A: P { X }\nfn f() -> A { return A.X; }",
@@ -1363,8 +1364,8 @@ void test_sema_members(void)
             9, "the underlying type of an enum is an integer type, found "
             "`B`");
     accepts("type W = u8;\nenum A: W { X = 3 }\nfn f() -> A { return A.X; }");
-    /* S02: a unit break and the word of a Mutex have no one layout, so a
-       struct that holds either converts to no simd struct. */
+    /* S02 of the second audit: a unit break and the word of a Mutex have no
+       one layout, so a struct that holds either converts to no simd struct. */
     snprintf(source, sizeof source,
              "struct S { a: i16, _: i32 : 0 }\n%s"
              "fn f(s: S) -> V { return s as V; }", pair);

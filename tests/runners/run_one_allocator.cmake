@@ -1,13 +1,13 @@
-# M03. antic allocates through src/antic/alloc.c alone. That file calls
-# malloc, calloc and realloc, writes the message of a failed allocation
-# and ends the run with status 70. No other file of src/antic/ does any of
-# the three, and the front end includes no header of the IR for its
-# memory. The unit tests that link antic_core take their memory from it
-# too, so none of their allocations goes unchecked. Run with cmake -P,
-# ROOT, the root of the repository, and UNIT_SOURCES, the sources of the
-# programs of tests/ that link antic_core joined with |. A relative path
-# is one of tests/. The test reads each C file of tests/ among them, and
-# the sources of src/ that a program compiles beside it stand outside.
+# M03 of the second audit. antic allocates through src/antic/alloc.c alone.
+# That file calls malloc, calloc and realloc, writes the message of a failed
+# allocation and ends the run with status 70. No other file of src/antic/ does
+# any of the three, and the front end includes no header of the IR for its
+# memory. The unit tests that link antic_core take their memory from it too, so
+# none of their allocations goes unchecked. Run with cmake -P, ROOT, the root
+# of the repository, and UNIT_SOURCES, the sources of the programs of tests/
+# that link antic_core joined with |. A relative path is one of tests/. The
+# test reads each C file of tests/ among them, and the sources of src/ that a
+# program compiles beside it stand outside.
 
 cmake_minimum_required(VERSION 3.21)
 

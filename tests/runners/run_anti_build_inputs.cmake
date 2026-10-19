@@ -8,7 +8,7 @@
 # Every string of an index or a lock names a part of a path in the cache,
 # a number the resolver compares or a string of the lock file. A name,
 # version or module path that is not the grammar of its kind is refused
-# before it reaches any of them (S45, S40, M13 of docs/audit/summary.md),
+# before it reaches any of them (S45, S40 and M13 of the first audit),
 # and nothing is written outside the cache.
 
 # The file:// URL of a directory: file:///tmp/repo, and file:///C:/repo

@@ -340,8 +340,9 @@ static void other_method(void)
     text_free(&out);
 }
 
-/* M11: a stream that unpacks to far more than its entry declares stops
-   at the declared size, rather than growing until memory runs out. */
+/* M11 of the first audit: a stream that unpacks to far more than its entry
+   declares stops at the declared size, rather than growing until memory runs
+   out. */
 static void deflate_bound(void)
 {
     struct bits b;
@@ -772,9 +773,9 @@ static void broken_archives(void)
         CHECK(read_fails_empty());
     }
 
-    /* M17: the data of the entry runs past the central directory. The
-       reader fails after it has read the name of the entry, and leaves
-       nothing behind. */
+    /* M17 of the first audit: the data of the entry runs past the central
+       directory. The reader fails after it has read the name of the entry, and
+       leaves nothing behind. */
     text_append_bytes(&bad, good.data, good.length);
     bad.data[CENTRAL + 20] = (char)0xff;
     bad.data[CENTRAL + 21] = (char)0xff;
@@ -823,9 +824,9 @@ static void broken_archives(void)
     remove(ARCHIVE);
 }
 
-/* M41: entries whose data overlap, and entries whose sizes add up past
-   what one archive holds. 65535 central entries could name one local
-   header that declares 4 GiB, so a few megabytes of deflate data asked
+/* M41 of the second audit: entries whose data overlap, and entries whose sizes
+   add up past what one archive holds. 65535 central entries could name one
+   local header that declares 4 GiB, so a few megabytes of deflate data asked
    for terabytes. */
 static void archive_bounds(void)
 {

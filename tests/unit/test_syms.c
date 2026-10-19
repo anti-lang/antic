@@ -47,8 +47,8 @@ static void write_file(const char *path, const char *text)
     }
 }
 
-/* S42: an index unit with no id beside an entry whose name starts with
-   `/`. The id and the part before the slash are then both empty. */
+/* S42 of the first audit: an index unit with no id beside an entry whose name
+   starts with `/`. The id and the part before the slash are then both empty. */
 static void unit_without_id(void)
 {
     static const char index[] = "[module.a]\nmodule = \"prog\"\n";
@@ -71,8 +71,8 @@ static void unit_without_id(void)
     remove(TRACE);
 }
 
-/* S42: a program the ELF reader finds no function in still gets a map,
-   with its header lines alone. */
+/* S42 of the first audit: a program the ELF reader finds no function in still
+   gets a map, with its header lines alone. */
 static void program_without_functions(void)
 {
     struct text map = {0};
@@ -129,9 +129,9 @@ static void map_names(void)
     text_free(&where);
 }
 
-/* M24: the build id of a program is the line after the begin marker of
-   its notice. A line of the same form that the data of the program holds
-   before the notice is not its id. */
+/* M24 of the second audit: the build id of a program is the line after the
+   begin marker of its notice. A line of the same form that the data of the
+   program holds before the notice is not its id. */
 static void build_id_of_notice(void)
 {
     static const char program[] =
@@ -216,11 +216,11 @@ static void twin_naming(const char *object, struct text *out)
     text_append_bytes(out, "_f", 3);
 }
 
-/* M42: the object path of a debug map comes from the archive, which
-   need not be the user's. A path to what is no regular file is not
-   read: a directory, and on POSIX a FIFO, which waited for a writer
-   without end, and /dev/zero, which grew the buffer until anti ended.
-   The frame then resolves as far as the twin and the map go. */
+/* M42 of the second audit: the object path of a debug map comes from the
+   archive, which need not be the user's. A path to what is no regular file is
+   not read: a directory, and on POSIX a FIFO, which waited for a writer
+   without end, and /dev/zero, which grew the buffer until anti ended. The
+   frame then resolves as far as the twin and the map go. */
 static void object_no_file(void)
 {
     static const char map[] =

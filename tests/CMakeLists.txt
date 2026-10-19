@@ -163,7 +163,7 @@ add_test(NAME rt_wide_text
         -P "${ANTIC_RUNNERS}/run_rt_wide_text.cmake")
 
 # anti reaches antic through driver.h, antic.h and the shared helpers
-# alone, M02 of the audit.
+# alone, M02 of the second audit.
 add_test(NAME anti_interface
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
         -P "${ANTIC_RUNNERS}/run_anti_interface.cmake")

@@ -58,9 +58,9 @@ static void read_whole(void)
     text_free(&back);
 }
 
-/* M1. A directory opens for reading on POSIX systems and then fails its
-   first read. The reader took that for the end of an empty file. It
-   fails now and leaves the text as it was. */
+/* M1 of the first audit. A directory opens for reading on POSIX systems and
+   then fails its first read. The reader took that for the end of an empty
+   file. It fails now and leaves the text as it was. */
 static void read_error(void)
 {
     struct text back = {0};
@@ -105,8 +105,9 @@ static void touch(const char *path)
     CHECK(files_write(path, &empty));
 }
 
-/* M15. A directory without permission to read failed nothing and added
-   nothing. A superuser reads it anyway, so the case is passed over. */
+/* M15 of the first audit. A directory without permission to read failed
+   nothing and added nothing. A superuser reads it anyway, so the case is
+   passed over. */
 static void walk_unreadable(void)
 {
     struct files_list found = {0};
@@ -128,9 +129,9 @@ static void walk_unreadable(void)
     files_remove_tree(TREE);
 }
 
-/* M15. A link to a parent directory led the walk round until opendir ran
-   out of descriptors. A link to a directory is not followed now, and a
-   link to a file is listed as the file. */
+/* M15 of the first audit. A link to a parent directory led the walk round
+   until opendir ran out of descriptors. A link to a directory is not followed
+   now, and a link to a file is listed as the file. */
 static void walk_links(void)
 {
     struct files_list found = {0};
@@ -151,9 +152,9 @@ static void walk_links(void)
 }
 #endif
 
-/* M31. Every helper takes a path as UTF-8, and on Windows the names on
-   the disk are the UTF-16 of that text. The helpers called the ANSI
-   entry points of Windows, which read the bytes in the code page of the
+/* M31 of the second audit. Every helper takes a path as UTF-8, and on Windows
+   the names on the disk are the UTF-16 of that text. The helpers called the
+   ANSI entry points of Windows, which read the bytes in the code page of the
    machine and wrote a directory of another name. */
 static void utf8_names(void)
 {
@@ -238,8 +239,8 @@ static void anti_layer(void)
     text_free(&bytes);
 }
 
-/* M42: files_read_file reads a regular file, also through a link, and
-   refuses a directory, a device and a FIFO, which it neither reads
+/* M42 of the second audit: files_read_file reads a regular file, also through
+   a link, and refuses a directory, a device and a FIFO, which it neither reads
    without end nor waits on. */
 static void regular_files(void)
 {

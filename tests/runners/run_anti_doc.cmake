@@ -124,9 +124,9 @@ if(at LESS 0)
     message(FATAL_ERROR "--dev on a library file said: ${text}")
 endif()
 
-# M14. A library file from a repository names its own module path and its
-# item names. A module path that is not the grammar of one becomes no file
-# name, and an item name with markup reaches the page escaped.
+# M14 of the first audit. A library file from a repository names its own module
+# path and its item names. A module path that is not the grammar of one becomes
+# no file name, and an item name with markup reaches the page escaped.
 set(hostile "${WORK}/hostile")
 file(MAKE_DIRECTORY "${hostile}/lib/com/example" "${hostile}/out/a/b")
 execute_process(

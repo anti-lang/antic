@@ -127,9 +127,9 @@ if(status EQUAL 0)
     message(FATAL_ERROR "anti sdk import took a file that does not exist")
 endif()
 
-# S45. The Version of SDKSettings.json names the directory that export
-# empties and removes. A Version that is not digits and dots is refused,
-# and the directory it climbs to stays.
+# S45 of the first audit. The Version of SDKSettings.json names the directory
+# that export empties and removes. A Version that is not digits and dots is
+# refused, and the directory it climbs to stays.
 if(CMAKE_HOST_APPLE)
     set(hostile "${WORK}/hostile")
     file(COPY "${sdk}/" DESTINATION "${hostile}/MacOSX.sdk")

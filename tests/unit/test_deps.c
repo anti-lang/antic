@@ -55,8 +55,9 @@ static void constraints(void)
     CHECK(!deps_satisfies("0.3.0", "1.0.0"));
 }
 
-/* S40. A part of twenty digits is no version, and a constraint or a
-   version that is none satisfies nothing, so no arithmetic overflows. */
+/* S40 of the first audit. A part of twenty digits is no version, and a
+   constraint or a version that is none satisfies nothing, so no arithmetic
+   overflows. */
 static void version_bounds(void)
 {
     CHECK(manifest_version_valid("1.2.4"));
@@ -79,7 +80,8 @@ static void version_bounds(void)
     CHECK(deps_version_compare("99999999999999999999", "1") > 0);
 }
 
-/* S45. The parts of a cache path follow the grammar of their kind. */
+/* S45 of the first audit. The parts of a cache path follow the grammar of
+   their kind. */
 static void path_parts(void)
 {
     CHECK(manifest_name_valid("com.example.units"));
@@ -115,8 +117,8 @@ static void urls(void)
     CHECK(!repo_url_allowed("ftp://example.com/repo"));
     CHECK(repo_url_allowed("http://localhost:8080"));
     CHECK(repo_url_allowed("http://[::1]:80/repo"));
-    /* M12. curl reads the part before an `@` as a user, so each of these
-       names another host. */
+    /* M12 of the first audit. curl reads the part before an `@` as a user, so
+       each of these names another host. */
     fputs("anti test: the messages below are expected\n", stderr);
     CHECK(!repo_url_allowed("http://localhost:@repo.example.com/"));
     CHECK(!repo_url_allowed("http://localhost:@repo.example.com"));
@@ -261,9 +263,9 @@ static bool manifest_empty(const struct manifest *m)
            m->name.data == NULL && m->dependencies == NULL;
 }
 
-/* A manifest that is not there is no project. M17: the reader wrote the
-   four default directories and returned false without freeing them. It
-   did so here and for a file that is no TOML. A caller that frees
+/* A manifest that is not there is no project. M17 of the first audit: the
+   reader wrote the four default directories and returned false without freeing
+   them. It did so here and for a file that is no TOML. A caller that frees
    nothing on failure leaked them. */
 static void manifest_missing(void)
 {

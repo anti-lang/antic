@@ -1,8 +1,8 @@
-/* M03. Each allocation helper of antic, and the memory pool and the text
-   buffer built on them, exits through alloc_out_of_memory when the C
-   library refuses the memory or a size overflows, with status 70 and the
-   message, and never comes back with NULL. The program asks one helper,
-   named by its argument, for more memory than any host gives, and
+/* M03 of the second audit. Each allocation helper of antic, and the memory
+   pool and the text buffer built on them, exits through alloc_out_of_memory
+   when the C library refuses the memory or a size overflows, with status 70
+   and the message, and never comes back with NULL. The program asks one
+   helper, named by its argument, for more memory than any host gives, and
    tests/runners/run_alloc_oom.cmake checks the exit. A helper that comes back
    prints what it returned and ends with status 0. */
 

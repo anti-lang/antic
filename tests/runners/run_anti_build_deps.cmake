@@ -141,11 +141,11 @@ if(NOT lock MATCHES "${digest}" OR NOT lock MATCHES "file://")
     message(FATAL_ERROR "the lock file names no repository and digest:\n${lock}")
 endif()
 
-# S34. The stamp beside a cached index says when it was last checked. A
-# stamp far below 0 overflowed `now - then` and passed for one written
-# within the hour, so the index stayed as cached. It is refused now, and
-# the build fetches the index again. The names of the index and its
-# stamp are REPO_INDEX_FILE and REPO_STAMP_SUFFIX of src/anti/repo.c.
+# S34 of the second audit. The stamp beside a cached index says when it was
+# last checked. A stamp far below 0 overflowed `now - then` and passed for one
+# written within the hour, so the index stayed as cached. It is refused now,
+# and the build fetches the index again. The names of the index and its stamp
+# are REPO_INDEX_FILE and REPO_STAMP_SUFFIX of src/anti/repo.c.
 file(GLOB_RECURSE stamps "${WORK}/cache/*/index.toml.checked")
 list(LENGTH stamps stamp_count)
 if(NOT stamp_count EQUAL 1)

@@ -1,10 +1,10 @@
-# The interface anti uses of antic, M02 of the audit. A file of src/anti/
-# includes, of the headers of src/antic/, driver.h, antic.h and the
-# shared helpers alone. driver.h and antic.h include nothing of the front
-# end, the IR, the library reader or the back end, apart from the token
-# list of lexer.h that antic.h hands to `anti fmt`. The shared helpers
-# and notice.h include no header of a pass either, apart from that list. No file of src/anti/
-# calls driver_interface, whose result is a structure of the checker.
+# The interface anti uses of antic, M02 of the second audit. A file of
+# src/anti/ includes, of the headers of src/antic/, driver.h, antic.h and the
+# shared helpers alone. driver.h and antic.h include nothing of the front end,
+# the IR, the library reader or the back end, apart from the token list of
+# lexer.h that antic.h hands to `anti fmt`. The shared helpers and notice.h
+# include no header of a pass either, apart from that list. No file of
+# src/anti/ calls driver_interface, whose result is a structure of the checker.
 # Run with cmake -P and ROOT, the root of the repository.
 
 cmake_minimum_required(VERSION 3.21)

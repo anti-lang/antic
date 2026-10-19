@@ -405,8 +405,8 @@ static uint8_t *exactly(const uint8_t *image, size_t size)
     return copy;
 }
 
-/* S28: a section of type NOBITS holds no bytes of the file. A reader of
-   names, strings or lines refuses it whatever its size says. */
+/* S28 of the first audit: a section of type NOBITS holds no bytes of the file.
+   A reader of names, strings or lines refuses it whatever its size says. */
 static void nobits_sections(void)
 {
     struct blob line = {{0}, 0};
@@ -434,9 +434,9 @@ static void nobits_sections(void)
     CHECK(!anti_rt_elf_line(image, size, 0x1004, &found));
 }
 
-/* S29: the line register refuses a step that leaves int64_t, from
-   advance_line and from a special opcode, and keeps one that reaches
-   the edge. */
+/* S29 of the first audit: the line register refuses a step that leaves
+   int64_t, from advance_line and from a special opcode, and keeps one that
+   reaches the edge. */
 static void line_overflow(void)
 {
     struct blob line = {{0}, 0};
@@ -474,9 +474,9 @@ static void line_overflow(void)
     CHECK(!line_of(&line, 0x1014, &found));
 }
 
-/* M9: an entry table of DWARF 5 with a count and no formats has entries
-   of no bytes, which a count of 2^64 - 1 walks for ever. The reader
-   refuses such a table. */
+/* M9 of the first audit: an entry table of DWARF 5 with a count and no formats
+   has entries of no bytes, which a count of 2^64 - 1 walks for ever. The
+   reader refuses such a table. */
 static void empty_entry_formats(void)
 {
     struct blob line = {{0}, 0};
@@ -514,10 +514,10 @@ static void empty_entry_formats(void)
     CHECK(found.file == NULL);
 }
 
-/* S11: a LEB128 number of 310 million bytes counts its shift past the
-   range of int. Its value is 0, so an extended opcode of that length
-   ends the unit and an advance_line of it moves nothing. The unit is the
-   last section of the file, which grows to hold it. */
+/* S11 of the first audit: a LEB128 number of 310 million bytes counts its
+   shift past the range of int. Its value is 0, so an extended opcode of that
+   length ends the unit and an advance_line of it moves nothing. The unit is
+   the last section of the file, which grows to hold it. */
 static void long_leb(void)
 {
     enum { CONTINUED = 310000000 };
@@ -554,8 +554,8 @@ static void long_leb(void)
     free(file);
 }
 
-/* S37: a build id is read only where a readable PT_LOAD of the mapped
-   module holds it. The read ends at the end of that segment. */
+/* S37 of the first audit: a build id is read only where a readable PT_LOAD of
+   the mapped module holds it. The read ends at the end of that segment. */
 static void loaded_room(void)
 {
     uint8_t headers[3 * 56];

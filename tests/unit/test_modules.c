@@ -1702,8 +1702,8 @@ static void damaged_files(void)
     refuses_file(copy, sizeof copy, "is damaged at byte 86");
     copy[FN_FLAGS] = 8;
     refuses_file(copy, sizeof copy, "is damaged at byte 86");
-    /* S16: a body without a block. The count of blocks follows the
-       temporaries, and the classes follow the blocks. */
+    /* S16 of the first audit: a body without a block. The count of blocks
+       follows the temporaries, and the classes follow the blocks. */
     n = sizeof scale_antl - TAIL + 6;
     memcpy(copy, scale_antl, n);
     memset(copy + n, 0, 4);
@@ -1948,15 +1948,16 @@ static void damaged_records(void)
     f64_type = u32_at(&bytes, name_end(&bytes, "ZZF", false));
     fn_type = u32_at(&bytes, name_end(&bytes, "zbits", false));
 
-    /* S12: a member of a class body whose type is `int`, and one whose
-       type has a parameter the declaration did not write. */
+    /* S12 of the first audit: a member of a class body whose type is `int`,
+       and one whose type has a parameter the declaration did not write. */
     at = name_end(&bytes, "zzm", false) + 4;
     poke_u32(value, int_type);
     refuses_poke(&bytes, at, value, 4);
     poke_u32(value, fn_type);
     refuses_poke(&bytes, at, value, 4);
 
-    /* S15: a jump and a branch whose target is the integer 65536. */
+    /* S15 of the first audit: a jump and a branch whose target is the integer
+       65536. */
     memset(value, 0, sizeof value);
     value[0] = IR_INT;
     value[1] = IR_VOID;
@@ -1965,35 +1966,35 @@ static void damaged_records(void)
     refuses_poke(&bytes, block_operand(&bytes, IR_BRANCH, 1), value, 10);
     refuses_poke(&bytes, block_operand(&bytes, IR_BRANCH, 2), value, 10);
 
-    /* S1: a simd aggregate of the IR whose lane is the unit break `_`,
-       and one whose lane is a bitfield. */
+    /* S1 of the first audit: a simd aggregate of the IR whose lane is the unit
+       break `_`, and one whose lane is a bitfield. */
     at = name_end(&bytes, "q", true);
     refuses_poke(&bytes, at - 1, "_", 1);
     value[0] = 4;
     refuses_poke(&bytes, at + 5, value, 1);
 
-    /* M3: a bitfield of 40 bits on an `i8` field, in the type table and
-       in the aggregate of the IR. */
+    /* M3 of the first audit: a bitfield of 40 bits on an `i8` field, in the
+       type table and in the aggregate of the IR. */
     value[0] = 40;
     refuses_poke(&bytes, name_end(&bytes, "zw", false) + 4, value, 1);
     refuses_poke(&bytes, name_end(&bytes, "zw", true) + 5, value, 1);
 
-    /* M4: an aggregate of the IR aligned to 3. Before its first field
-       stand the count, the empty length text, the length and the
+    /* M4 of the first audit: an aggregate of the IR aligned to 3. Before its
+       first field stand the count, the empty length text, the length and the
        alignment. */
     at = name_end(&bytes, "zw", true) - 6 - 4 - 4 - 4 - 8;
     memset(value, 0, sizeof value);
     value[0] = 3;
     refuses_poke(&bytes, at, value, 8);
 
-    /* M5: the text constant of `ZZT` typed as a slice of `int`. The
-       slice is the one record of its kind in the type table, which ends
-       before the items. */
+    /* M5 of the first audit: the text constant of `ZZT` typed as a slice of
+       `int`. The slice is the one record of its kind in the type table, which
+       ends before the items. */
     at = find_slice(&bytes, name_end(&bytes, "ZZK", false));
     poke_u32(value, int_type);
     refuses_poke(&bytes, at, value, 4);
 
-    /* M6: the enum `ZE` over `f64`. */
+    /* M6 of the first audit: the enum `ZE` over `f64`. */
     at = name_end(&bytes, "ZE", false);
     poke_u32(value, f64_type);
     refuses_poke(&bytes, at, value, 4);
@@ -2122,8 +2123,8 @@ static void damaged_simd(void)
     }
     CHECK(verifies_file((const uint8_t *)bytes.data, bytes.length));
 
-    /* S03: the lane `zq` of `ZV` in the type table, as every other type
-       of the table, `ZZ` of no bytes and `f64` among them. */
+    /* S03 of the second audit: the lane `zq` of `ZV` in the type table, as
+       every other type of the table, `ZZ` of no bytes and `f64` among them. */
     lane = name_end(&bytes, "zq", false);
     own = u32_at(&bytes, lane);
     for (i = 0; i < 64; i++) {
@@ -2132,8 +2133,8 @@ static void damaged_simd(void)
             refuses_poke(&bytes, lane, value, 4);
         }
     }
-    /* S03: the same lane in the IR, as every other scalar and as each
-       aggregate, `ZZ` among them. */
+    /* S03 of the second audit: the same lane in the IR, as every other scalar
+       and as each aggregate, `ZZ` among them. */
     lane = name_end(&bytes, "zq", true);
     for (i = IR_VOID; i <= IR_LOCK; i++) {
         if (i != IR_F32 && i != IR_AGG) {
@@ -2154,16 +2155,17 @@ static void damaged_simd(void)
     CHECK(((const uint8_t *)bytes.data)[type_flags(&bytes, "za")] == 0);
     CHECK(((const uint8_t *)bytes.data)[agg_flags(&bytes, "za")] == 0);
 
-    /* S24: three lanes, and one lane of four bytes, in both tables. */
+    /* S24 of the second audit: three lanes, and one lane of four bytes, in
+       both tables. */
     value[0] = 16;
     refuses_poke(&bytes, type_flags(&bytes, "za"), value, 1);
     refuses_poke(&bytes, type_flags(&bytes, "zo"), value, 1);
     value[0] = 2;
     refuses_poke(&bytes, agg_flags(&bytes, "za"), value, 1);
     refuses_poke(&bytes, agg_flags(&bytes, "zo"), value, 1);
-    /* S24: `ZV` packed, and `ZV` aligned to 16, in both tables. The
-       alignment follows the flags, the safety and the empty `compatible`
-       line in the type table, and the flags in the IR. */
+    /* S24 of the second audit: `ZV` packed, and `ZV` aligned to 16, in both
+       tables. The alignment follows the flags, the safety and the empty
+       `compatible` line in the type table, and the flags in the IR. */
     value[0] = 16 | 2;
     refuses_poke(&bytes, type_flags(&bytes, "zq"), value, 1);
     value[0] = 2 | 1;
@@ -2187,8 +2189,8 @@ static void damaged_simd(void)
         refuses_file((const uint8_t *)bytes.data, at, NULL);
     }
 
-    /* S24: the sum over `ZV` made a sum over each other aggregate, `ZW`
-       above the vector cap among them. */
+    /* S24 of the second audit: the sum over `ZV` made a sum over each other
+       aggregate, `ZW` above the vector cap among them. */
     at = vreduce_agg(&bytes);
     own = at == SIZE_MAX ? 0 : u32_at(&bytes, at);
     for (i = 0; i < 64 && at != SIZE_MAX; i++) {
@@ -2313,10 +2315,10 @@ static void damaged_constants(void)
         text_free(&poked);
     }
 
-    /* S23: the scalar of the first item of a global's value made an
-       aggregate and void. The global's name, its size, its alignment,
-       its bytes, its relocations and its marks come before the value,
-       and the value opens with its kind, its scalar, its count and its
+    /* S23 of the second audit: the scalar of the first item of a global's
+       value made an aggregate and void. The global's name, its size, its
+       alignment, its bytes, its relocations and its marks come before the
+       value, and the value opens with its kind, its scalar, its count and its
        aggregate. */
     compilation_open(&r);
     ir_module_init(&program, &r.arena, "main");
@@ -2869,8 +2871,8 @@ static void struct_chain(struct text *b, uint32_t n, bool forward)
                       sizeof scale_antl - SCALE_ITEMS);
 }
 
-/* S13: a table of a library file that nests deeper than the reader
-   allows is refused. Its entries may point forward, which the reader
+/* S13 of the first audit: a table of a library file that nests deeper than the
+   reader allows is refused. Its entries may point forward, which the reader
    follows on demand, or back. A short chain reads either way. */
 static void deep_tables(void)
 {
@@ -3191,9 +3193,9 @@ static void flags_refused(const char *name, const char *source)
     compilation_close(&s);
 }
 
-/* S01: the checked tree of a generic that a library file carries. Each
-   test below writes the tree of `tree` with one relation the checker
-   never leaves, and the reader refuses the file. */
+/* S01 of the second audit: the checked tree of a generic that a library file
+   carries. Each test below writes the tree of `tree` with one relation the
+   checker never leaves, and the reader refuses the file. */
 static const char tree_source[] =
     "pub variant TShape { Circle { r: int }, Empty }\n"
     "pub enum TColor: u8 { Red, Green }\n"
@@ -3594,9 +3596,9 @@ static void refuses_count(const struct text *plain, size_t at, uint32_t value)
     free(copy);
 }
 
-/* M33: a count of a tree is measured against the rest of the file before
-   the reader allocates for it. A list of arguments takes four bytes per
-   element and a record of the table of expressions more than two. */
+/* M33 of the second audit: a count of a tree is measured against the rest of
+   the file before the reader allocates for it. A list of arguments takes four
+   bytes per element and a record of the table of expressions more than two. */
 static void tree_counts(void)
 {
     struct compilation s;
