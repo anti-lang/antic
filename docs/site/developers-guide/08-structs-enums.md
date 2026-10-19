@@ -751,6 +751,8 @@ The operators work lane by lane on two values of one simd struct.
 |---|---|---|
 | `a + b`, `a - b`, `a * b`, `a / b`, `-a` | numbers | the simd struct |
 | `a & b`, `a \| b`, `a ^ b`, `a << b`, `a >> b`, `~a` | integers | the simd struct |
+| `a += b`, `a -= b`, `a *= b`, `a /= b` | numbers | `a` holds the result |
+| `a &= b`, `a \|= b`, `a ^= b`, `a <<= b`, `a >>= b` | integers | `a` holds the result |
 | `a == b`, `a != b`, `a < b`, `a <= b`, `a > b`, `a >= b` | any | a mask |
 | `T.splat(x)` | any | every lane holds `x` |
 | `T.load(slice, i)`, `v.store(slice, i)` | any | the lanes from, or to, the elements from `i` on |

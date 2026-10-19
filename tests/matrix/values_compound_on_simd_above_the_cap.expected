@@ -1,0 +1,5 @@
+exit 0
+add 7 7
+mul 42 42
+div 6 6
+shl 24 24

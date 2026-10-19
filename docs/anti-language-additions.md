@@ -217,7 +217,7 @@ if f.overflow {
 ## Simd structs
 
 - `simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }` declares a vector. Every field is the same primitive type and the field count is a power of two. The size is a multiple of eight bytes up to the level table's cap, 256 bytes to start. The alignment is the size or sixteen, whichever is smaller. Fields are visible and named, so `v.x` is a lane.
-- `+ - * /`, the bitwise operators on integer lanes, comparisons and unary minus apply element-wise, built in. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select(mask, a, b)`, `simd.any(mask)` and `simd.all(mask)` live in `anti.simd`.
+- `+ - * /`, the bitwise operators on integer lanes, comparisons and unary minus apply element-wise, built in. So do the compound assignments `+= -= *= /=` and, on integer lanes, `&= |= ^= <<= >>=`, by R037 of "Answers of 2026-10-18". A compound assignment on a value of a type parameter stays refused. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select(mask, a, b)`, `simd.any(mask)` and `simd.all(mask)` live in `anti.simd`.
 - Built-ins on the type and on values, lowered straight to instructions: `Vec4.splat(v)`, `Vec4.load(slice, i)`, `v.store(slice, i)`, `v.shuffle(...)` with constant indexes, `v.sum()`, `v.min()`, `v.max()`, `a.dot(b)`. Anything that costs more than one instruction on the native width is a named function, so a reader sees it.
 - `as` between a `simd struct` and the array or plain struct of the same bytes is free, both ways. A raylib `Vector4` becomes a `Vec4` that way.
 - C layout: a 16-byte `simd struct` is `float32x4_t` on ARM64 and `__m128` on x86_64, passed and returned in vector registers. The header writes the vector type.

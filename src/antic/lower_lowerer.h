@@ -794,6 +794,10 @@ void lower_class_hash(struct lowerer *l, const struct item *it);
 
 /* lower_simd.c */
 
+struct ir_operand lower_simd_compound(struct lowerer *l, enum token_kind op,
+                                      const struct type *t,
+                                      struct ir_operand old,
+                                      struct ir_operand v, int line);
 struct ir_operand lower_simd_binary(struct lowerer *l,
                                     const struct expr *e);
 struct ir_operand lower_simd_unary(struct lowerer *l,

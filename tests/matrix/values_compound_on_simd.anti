@@ -1,17 +1,127 @@
-//! A compound assignment on a simd struct is refused: the operators of a simd
-//! struct are the ones its section names, and `+=` is not among them.
+//! The compound assignments on a simd struct, lane by lane, by R037 of
+//! "Answers of 2026-10-18": `+= -= *= /=` on lanes of `i32`, `f32` and `f16`,
+//! and `&= |= ^= <<= >>=` on lanes of `i32`. Each stands on a local, a field, an
+//! element of an array, a place through a pointer, a captured local of a
+//! closure and a field of `self`. The place is read before the value, as a
+//! compound assignment of a number reads it.
 
-simd struct I32x4
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct I32x4 { a: i32, b: i32, c: i32, d: i32 }
+
+simd struct F32x4 { a: f32, b: f32, c: f32, d: f32 }
+
+simd struct H4 { a: f16, b: f16, c: f16, d: f16 }
+
+struct Holder
 {
-	a: i32,
-	b: i32,
-	c: i32,
-	d: i32,
+	v: I32x4,
+}
+
+class Counter
+{
+	pub total: I32x4 = I32x4 { a: 0, b: 0, c: 0, d: 0 },
+
+	pub fn add(self, more: I32x4)
+	{
+		self.total += more;
+	}
+}
+
+fn show(label: str, v: I32x4)
+{
+	printf("%.*s %d %d %d %d\n".ptr, label.len as c_int, label.ptr, v.a as c_int,
+		v.b as c_int, v.c as c_int, v.d as c_int);
+}
+
+fn show_f(label: str, v: F32x4)
+{
+	printf("%.*s %.2f %.2f %.2f %.2f\n".ptr, label.len as c_int, label.ptr,
+		v.a as f64, v.b as f64, v.c as f64, v.d as f64);
+}
+
+fn i4(a: i32, b: i32, c: i32, d: i32) -> I32x4
+{
+	return I32x4 { a: a, b: b, c: c, d: d };
+}
+
+fn operators()
+{
+	let v = i4(10, 20, 30, 40);
+	v += i4(1, 2, 3, 4);
+	show("add", v);
+	v -= i4(1, 1, 1, 1);
+	show("sub", v);
+	v *= i4(2, 3, 4, 5);
+	show("mul", v);
+	v /= i4(2, 3, 4, 5);
+	show("div", v);
+	v &= i4(0xF, 0xF, 0xF, 0xF);
+	show("and", v);
+	v |= i4(0x10, 0x20, 0x40, 0x80);
+	show("or", v);
+	v ^= i4(1, 1, 1, 1);
+	show("xor", v);
+	v <<= i4(1, 2, 3, 4);
+	show("shl", v);
+	v >>= i4(1, 2, 3, 4);
+	show("shr", v);
+	let f = F32x4 { a: 1.5, b: 2.5, c: 3.5, d: 4.5 };
+	f += F32x4 { a: 0.5, b: 0.5, c: 0.5, d: 0.5 };
+	f -= F32x4 { a: 1.0, b: 1.0, c: 1.0, d: 1.0 };
+	f *= F32x4 { a: 2.0, b: 2.0, c: 2.0, d: 2.0 };
+	f /= F32x4 { a: 4.0, b: 4.0, c: 4.0, d: 4.0 };
+	show_f("float", f);
+	let h = H4 { a: 1.0 as f16, b: 2.0 as f16, c: 3.0 as f16, d: 4.0 as f16 };
+	h += H4 { a: 0.5 as f16, b: 0.5 as f16, c: 0.5 as f16, d: 0.5 as f16 };
+	h *= H4 { a: 2.0 as f16, b: 2.0 as f16, c: 2.0 as f16, d: 2.0 as f16 };
+	h -= H4 { a: 1.0 as f16, b: 1.0 as f16, c: 1.0 as f16, d: 1.0 as f16 };
+	h /= H4 { a: 2.0 as f16, b: 2.0 as f16, c: 2.0 as f16, d: 2.0 as f16 };
+	printf("half %.2f %.2f %.2f %.2f\n".ptr, h.a as f64, h.b as f64, h.c as f64,
+		h.d as f64);
+}
+
+fn apply(f: fn())
+{
+	f();
+}
+
+// Gives `x` and changes the place it points at, so a place read after the
+// value would show the change.
+fn bump(p: *I32x4, x: I32x4) -> I32x4
+{
+	*p = i4(100, 100, 100, 100);
+	return x;
+}
+
+fn places()
+{
+	let h = Holder { v: i4(1, 2, 3, 4) };
+	h.v += i4(10, 10, 10, 10);
+	show("field", h.v);
+	let items: [2]I32x4 = [i4(1, 1, 1, 1), i4(2, 2, 2, 2)];
+	items[1] *= i4(3, 4, 5, 6);
+	show("element", items[1]);
+	let p = &items[0];
+	*p -= i4(1, 2, 3, 4);
+	show("pointer", items[0]);
+	let captured = i4(5, 6, 7, 8);
+	apply(fn() {
+		captured <<= i4(1, 1, 1, 1);
+	});
+	show("closure", captured);
+	let c = Counter { };
+	c.add(i4(1, 2, 3, 4));
+	c.add(i4(1, 2, 3, 4));
+	show("self", c.total);
+	let first = i4(1, 2, 3, 4);
+	first += bump(&first, i4(1, 1, 1, 1));
+	show("order", first);
 }
 
 fn main() -> int
 {
-	let v = I32x4 { a: 1, b: 2, c: 3, d: 4 };
-	v += v;
+	operators();
+	places();
 	return 0;
 }

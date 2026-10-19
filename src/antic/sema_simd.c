@@ -123,6 +123,48 @@ struct type *sema_check_simd_binary(struct checker *c, struct expr *e,
     }
 }
 
+/* DESIGN: R037 of "Answers of 2026-10-18". A compound assignment on a
+   simd struct applies its operator lane by lane wherever the operator
+   applies: `+= -= *= /=` on lanes of numbers and `&= |= ^= <<= >>=` on
+   integer lanes. The value is of the type of the place, which the
+   caller required. Every other compound operator stays refused, as its
+   operator is. */
+void sema_check_simd_compound(struct checker *c, struct pos pos,
+                              enum token_kind op, struct type *t)
+{
+    struct type *lane = types_simd_lane(t);
+    char spelling[OP_TEXT];
+    const char *o = sema_op_text(op, spelling);
+
+    if (sema_simd_lane_refused(lane)) {
+        return;
+    }
+    switch (op) {
+    case TOKEN_PLUS_ASSIGN:
+    case TOKEN_MINUS_ASSIGN:
+    case TOKEN_STAR_ASSIGN:
+    case TOKEN_SLASH_ASSIGN:
+        if (!simd_numeric(lane)) {
+            sema_error_at(c, pos, "`%s` needs lanes of numbers, and `%s` has "
+                          "`%s`", o, sema_tn(t), sema_tn(lane));
+        }
+        return;
+    case TOKEN_AMP_ASSIGN:
+    case TOKEN_PIPE_ASSIGN:
+    case TOKEN_CARET_ASSIGN:
+    case TOKEN_SHL_ASSIGN:
+    case TOKEN_SHR_ASSIGN:
+        if (!types_is_integer(lane)) {
+            sema_error_at(c, pos, "`%s` needs integer lanes, and `%s` has `%s`",
+                          o, sema_tn(t), sema_tn(lane));
+        }
+        return;
+    default:
+        sema_error_at(c, pos, "`%s` does not apply to `%s`", o, sema_tn(t));
+        return;
+    }
+}
+
 /* What fixed_layout found for one struct or tuple. */
 struct fixed_answer {
     bool fixed;

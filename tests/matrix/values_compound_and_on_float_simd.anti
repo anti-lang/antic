@@ -1,0 +1,17 @@
+//! `&=` on a simd struct with lanes of `f32` is refused, as `&` is: the bitwise
+//! operators take integer lanes.
+
+simd struct F32x4
+{
+	a: f32,
+	b: f32,
+	c: f32,
+	d: f32,
+}
+
+fn main() -> int
+{
+	let v = F32x4 { a: 1.0, b: 2.0, c: 3.0, d: 4.0 };
+	v &= v;
+	return 0;
+}

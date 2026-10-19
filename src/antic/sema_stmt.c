@@ -785,6 +785,10 @@ static void check_assign(struct checker *c, struct stmt *s)
         }
         return;
     }
+    if (types_is_simd(t)) {
+        sema_check_simd_compound(c, s->pos, op, t);
+        return;
+    }
     if ((op == TOKEN_PLUS_ASSIGN || op == TOKEN_MINUS_ASSIGN ||
          op == TOKEN_STAR_ASSIGN || op == TOKEN_SLASH_ASSIGN)
             ? !types_is_numeric(t)

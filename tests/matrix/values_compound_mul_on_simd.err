@@ -1,1 +1,0 @@
-values_compound_mul_on_simd.anti:14:2: error: `*=` does not apply to `I32x4`

@@ -474,6 +474,8 @@ struct type *sema_check_in(struct checker *c, struct expr *e);
 bool sema_simd_lane_refused(const struct type *lane);
 struct type *sema_check_simd_unary(struct checker *c, struct expr *e,
                                    struct type *t);
+void sema_check_simd_compound(struct checker *c, struct pos pos,
+                              enum token_kind op, struct type *t);
 struct type *sema_check_simd_binary(struct checker *c, struct expr *e,
                                     struct type *left, struct type *right);
 struct type *sema_check_simd_cast(struct checker *c, struct expr *e,

@@ -165,22 +165,23 @@ static struct ir_operand simd_value(struct lowerer *l, const struct expr *e)
                                          : lower_address(l, e);
 }
 
-/* `a op b` on two values of a simd struct. A comparison writes the mask. */
-struct ir_operand lower_simd_binary(struct lowerer *l,
-                                    const struct expr *e)
+/* `x op y` on the values of the simd struct t at the addresses x and y,
+   into a new slot of type result, the mask of a comparison or t. line is
+   the line of the checks. */
+static struct ir_operand simd_operation(struct lowerer *l, enum token_kind op,
+                                        const struct type *t,
+                                        const struct type *result,
+                                        struct ir_operand x,
+                                        struct ir_operand y, int line)
 {
-    enum token_kind op = e->as.binary.op;
-    const struct type *t = e->as.binary.left->type;
     const struct type *lane = types_simd_lane(t);
     bool checked = types_is_integer(lane) &&
                    (op == TOKEN_SLASH || op == TOKEN_SHL || op == TOKEN_SHR);
-    struct ir_operand x = lower_address(l, e->as.binary.left);
-    struct ir_operand y = lower_address(l, e->as.binary.right);
     struct ir_operand dst;
     struct lanes c;
     size_t k;
 
-    dst = new_value(l, e->type);
+    dst = new_value(l, result);
     if (!simd_loops(t) && lane->kind != TYPE_F16 && !checked) {
         ir_vbinary(l->f, l->b, simd_lane_op(op, lane), lower_ir_type_of(lane),
                    dst,
@@ -193,20 +194,44 @@ struct ir_operand lower_simd_binary(struct lowerer *l,
         struct ir_operand b = read_lane(l, lane, lane_at(l, &c, t, y, k));
         struct ir_operand r;
         if (checked) {
-            lower_binary_checks(l, op, lane, a, b, e->pos.line);
+            lower_binary_checks(l, op, lane, a, b, line);
         }
         r = lower_temp(l, ir_binary(l->f, l->b, simd_lane_op(op, lane),
                                     lower_is_comparison(op) ? IR_I8
                                                             : lane_math(lane),
                                     a, b));
         if (lower_is_comparison(op)) {
-            ir_store(l->f, l->b, IR_I8, r, lane_at(l, &c, e->type, dst, k));
+            ir_store(l->f, l->b, IR_I8, r, lane_at(l, &c, result, dst, k));
         } else {
             write_lane(l, lane, r, lane_at(l, &c, t, dst, k));
         }
     }
     lanes_end(l, &c);
     return dst;
+}
+
+/* `a op b` on two values of a simd struct. A comparison writes the mask. */
+struct ir_operand lower_simd_binary(struct lowerer *l,
+                                    const struct expr *e)
+{
+    struct ir_operand x = lower_address(l, e->as.binary.left);
+    struct ir_operand y = lower_address(l, e->as.binary.right);
+
+    return simd_operation(l, e->as.binary.op, e->as.binary.left->type,
+                          e->type, x, y, e->pos.line);
+}
+
+/* DESIGN: R037 of "Answers of 2026-10-18". `place op= v` on a simd
+   struct is `place = place op v`, lane by lane, with the place evaluated
+   once. The old value is copied out before v is evaluated, as a compound
+   assignment of a number reads the place first. old and v are addresses
+   of values of type t, and the result is the address of a new slot. */
+struct ir_operand lower_simd_compound(struct lowerer *l, enum token_kind op,
+                                      const struct type *t,
+                                      struct ir_operand old,
+                                      struct ir_operand v, int line)
+{
+    return simd_operation(l, op, t, t, old, v, line);
 }
 
 /* `-v` and `~v` on a value of a simd struct. */

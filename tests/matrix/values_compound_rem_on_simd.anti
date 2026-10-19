@@ -1,0 +1,17 @@
+//! `%=` on a simd struct is refused, as `%` is: R037 of "Answers of
+//! 2026-10-18" gives a compound assignment where its operator applies.
+
+simd struct I32x4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+fn main() -> int
+{
+	let v = I32x4 { a: 1, b: 2, c: 3, d: 4 };
+	v %= v;
+	return 0;
+}

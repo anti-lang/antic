@@ -830,6 +830,19 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
        place whose table is zero, an unfilled element of `alloc(T, n)`,
        holds no value, and nothing is destroyed. The zero-table trap is for
        use, not for assignment into. */
+    if (lower_is_aggregate(target->type) &&
+        s->as.assign.op != TOKEN_ASSIGN && types_is_simd(target->type)) {
+        struct ir_operand before = lower_temp(
+            l, ir_entry_slot(l->f, lower_vtype_of(l, target->type)));
+        ir_memcopy(l->f, l->b, before, p.address,
+                   lower_vtype_of(l, target->type));
+        v = lower_expr(l, value);
+        v = lower_simd_compound(l, compound_op(s->as.assign.op),
+                                target->type, before, v, target->pos.line);
+        ir_memcopy(l->f, l->b, p.address, v, lower_vtype_of(l, target->type));
+        lower_hook_changed(l, &p, target);
+        return;
+    }
     if (lower_is_aggregate(target->type)) {
         v = lower_expr(l, value);
         if (sema_needs_teardown(target->type)) {
