@@ -14,61 +14,47 @@
 #include "lower.h"
 #include "optimize.h"
 #include "parser.h"
+#include "pipeline.h"
 #include "sema.h"
 #include "types.h"
 #include "whole.h"
 
-/* One program: the modules share the memory pool, the types and the IR,
+/* One program: its modules make one compilation and lower into one IR,
    as they do in antic. */
 struct program {
-    struct arena arena;
-    struct types types;
-    struct diagnostics diags;
-    struct token_list tokens[4];
-    size_t token_lists;
-    const struct interface *libraries[4];
-    size_t library_count;
+    struct compilation front;
     struct ir_module ir;
 };
 
 static void open_program(struct program *p)
 {
-    memset(p, 0, sizeof *p);
-    types_init(&p->types, &p->arena);
-    ir_module_init(&p->ir, &p->arena, "");
+    compilation_open(&p->front);
+    ir_module_init(&p->ir, &p->front.arena, "");
 }
 
 static void close_program(struct program *p)
 {
-    size_t i;
-
     ir_module_free(&p->ir);
-    for (i = 0; i < p->token_lists; i++) {
-        lexer_token_list_free(&p->tokens[i]);
-    }
-    diagnostics_free(&p->diags);
-    arena_free(&p->arena);
+    compilation_close(&p->front);
 }
 
 /* Check and lower source as module name into out. */
 static struct module *compile(struct program *p, const char *name,
                               const char *source, struct ir_module *out)
 {
-    struct token_list *tokens = &p->tokens[p->token_lists++];
-    struct module *module = NULL;
-    bool ok = lexer_lex(source, strlen(source), &p->arena, &p->diags, tokens) &&
-              parser_parse(source, tokens, &p->arena, &p->diags, &module) &&
-              sema_check(module, name, NULL, p->libraries, p->library_count,
-                         &p->types, &p->arena, &p->diags, true);
+    bool ok;
+    struct module *module =
+        compilation_check(&p->front, name, source, true, &ok);
 
     if (!ok) {
         check_failures++;
         fprintf(stderr, "module %s does not compile: %s\n%s\n", name,
-                p->diags.count > 0 ? p->diags.items[0].message : "",
+                p->front.diags.count > 0 ? p->front.diags.items[0].message
+                                         : "",
                 source);
         return NULL;
     }
-    lower_module(module, name, out, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+    lower_as(module, name, out, 0);
     return module;
 }
 
@@ -83,17 +69,17 @@ static void load_library(struct program *p, const char *name,
     struct module *module;
     char error[160] = "";
 
-    ir_module_init(&ir, &p->arena, name);
+    ir_module_init(&ir, &p->front.arena, name);
     module = compile(p, name, source, &ir);
     if (module != NULL) {
-        sema_interface(module, name, &p->arena, &iface);
+        sema_interface(module, name, &p->front.arena, &iface);
         antl_write(&bytes, &iface, &ir, false);
-        p->libraries[p->library_count] =
-            antl_read((const uint8_t *)bytes.data, bytes.length,
-                      p->libraries, p->library_count, &p->types, &p->arena,
-                      &p->ir, error, sizeof error);
+        compilation_add(&p->front,
+                        antl_read((const uint8_t *)bytes.data, bytes.length,
+                                  p->front.libraries, p->front.library_count,
+                                  &p->front.types, &p->front.arena, &p->ir,
+                                  error, sizeof error));
         CHECK_STR(error, "");
-        p->library_count++;
     }
     text_free(&bytes);
     ir_module_free(&ir);

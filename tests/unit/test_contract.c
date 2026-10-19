@@ -32,28 +32,21 @@
 #include "regex.h"
 #include "trace.h"
 
-/* The modules a test reads, in the order of their imports. */
-#define MODULES_MAX 8
-
 /* The modules of the standard library compiled as antic compiles them,
-   each against the interfaces of the ones before it. Every module shares
-   the memory pool and the types, as in antic. */
+   each against the interfaces of the ones before it, with the source, the
+   IR and the name of each. */
 struct library {
-    struct arena arena;
-    struct types types;
-    struct diagnostics diags;
-    struct token_list tokens[MODULES_MAX];
-    struct text sources[MODULES_MAX];
-    struct ir_module irs[MODULES_MAX];
-    const struct interface *interfaces[MODULES_MAX];
-    const char *names[MODULES_MAX];
+    struct compilation front;
+    struct text sources[COMPILATION_MODULES];
+    struct ir_module irs[COMPILATION_MODULES];
+    const char *names[COMPILATION_MODULES];
     size_t count;
 };
 
 static void library_open(struct library *lib)
 {
     memset(lib, 0, sizeof *lib);
-    types_init(&lib->types, &lib->arena);
+    compilation_open(&lib->front);
 }
 
 static void library_close(struct library *lib)
@@ -62,11 +55,9 @@ static void library_close(struct library *lib)
 
     for (i = 0; i < lib->count; i++) {
         ir_module_free(&lib->irs[i]);
-        lexer_token_list_free(&lib->tokens[i]);
         text_free(&lib->sources[i]);
     }
-    diagnostics_free(&lib->diags);
-    arena_free(&lib->arena);
+    compilation_close(&lib->front);
 }
 
 /* Compile the module name of src/std/, with probe after its text, and add
@@ -76,13 +67,22 @@ static bool library_load(struct library *lib, const char *name,
                          const char *probe)
 {
     struct text path = {0};
-    struct text *source = &lib->sources[lib->count];
-    struct ir_module *ir = &lib->irs[lib->count];
-    struct interface *iface = arena_alloc(&lib->arena, sizeof *iface);
-    struct module *module = NULL;
+    struct text *source;
+    struct ir_module *ir;
+    struct interface *iface;
+    struct module *module;
     const char *c;
     bool ok;
 
+    if (lib->count == COMPILATION_MODULES) {
+        check_failures++;
+        fprintf(stderr, "%s is one past the %d modules of a test\n", name,
+                COMPILATION_MODULES);
+        return false;
+    }
+    source = &lib->sources[lib->count];
+    ir = &lib->irs[lib->count];
+    iface = arena_alloc(&lib->front.arena, sizeof *iface);
     text_append(&path, ANTIC_SOURCE_DIR "/src/std/");
     for (c = name; *c != '\0'; c++) {
         text_appendf(&path, "%c", *c == '.' ? '/' : *c);
@@ -96,27 +96,25 @@ static bool library_load(struct library *lib, const char *name,
     if (ok && probe != NULL) {
         text_append(source, probe);
     }
-    ir_module_init(ir, &lib->arena, name);
+    ir_module_init(ir, &lib->front.arena, name);
     lib->names[lib->count] = name;
     lib->count++;
-    ok = ok &&
-         lexer_lex(text_cstr(source), source->length, &lib->arena,
-                   &lib->diags, &lib->tokens[lib->count - 1]) &&
-         parser_parse(text_cstr(source), &lib->tokens[lib->count - 1],
-                      &lib->arena, &lib->diags, &module) &&
-         sema_check(module, name, NULL, lib->interfaces, lib->count - 1,
-                    &lib->types, &lib->arena, &lib->diags, false);
+    module = ok ? compilation_check(&lib->front, name, text_cstr(source),
+                                    false, &ok)
+                : NULL;
     if (!ok) {
         check_failures++;
         fprintf(stderr, "%s does not compile: %s\n", name,
-                lib->diags.count > 0 ? lib->diags.items[0].message : "");
+                lib->front.diags.count > 0
+                    ? lib->front.diags.items[0].message
+                    : "");
         return false;
     }
     /* The generics leave the module before lowering, as in the driver. */
-    sema_strip_generics(module, &lib->arena);
-    lower_module(module, name, ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
-    sema_interface(module, name, &lib->arena, iface);
-    lib->interfaces[lib->count - 1] = iface;
+    sema_strip_generics(module, &lib->front.arena);
+    lower_as(module, name, ir, 0);
+    sema_interface(module, name, &lib->front.arena, iface);
+    compilation_add(&lib->front, iface);
     return true;
 }
 
@@ -127,9 +125,11 @@ static const struct symbol *library_item(const struct library *lib,
     size_t i;
     size_t k;
 
-    for (i = 0; i < lib->count; i++) {
-        const struct interface *iface = lib->interfaces[i];
-        if (iface == NULL || strcmp(lib->names[i], module) != 0) {
+    /* A load that fails ends the loads of a test, so the libraries and
+       the names stand at the same index. */
+    for (i = 0; i < lib->front.library_count; i++) {
+        const struct interface *iface = lib->front.libraries[i];
+        if (strcmp(lib->names[i], module) != 0) {
             continue;
         }
         for (k = 0; k < iface->item_count; k++) {

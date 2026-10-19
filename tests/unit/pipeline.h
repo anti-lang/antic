@@ -1,6 +1,7 @@
 /* The compiler stages the unit tests run a source through: the front end
-   alone, or the front end and lowering. One copy, so a change of a stage
-   reaches every test that runs it. */
+   alone, or the front end and lowering, for one module or for a
+   compilation of several. One copy, so a change of a stage reaches every
+   test that runs it. */
 
 #ifndef ANTIC_TEST_PIPELINE_H
 #define ANTIC_TEST_PIPELINE_H
@@ -108,6 +109,47 @@ void lowered_run_with(struct lowered *l, const char *source,
 
 /* Free the IR and the checked source of l, whatever lowered_run gave. */
 void lowered_release(struct lowered *l);
+
+/* Lower the checked module as name into out, with the options of
+   lower_module, no `--trace` pattern and the default package version. */
+void lower_as(struct module *module, const char *name, struct ir_module *out,
+              unsigned options);
+
+/* The modules one compilation holds. */
+#define COMPILATION_MODULES 16
+
+/* One compilation of several modules, as antic runs it. The modules share
+   the memory pool, the types and the messages, so a type keeps one
+   identity, and each module checks against the libraries added before
+   it. */
+struct compilation {
+    struct arena arena;
+    struct types types;
+    struct diagnostics diags;
+    struct token_list tokens[COMPILATION_MODULES];
+    size_t token_lists;
+    const struct interface *libraries[COMPILATION_MODULES];
+    size_t library_count;
+};
+
+/* Set up c, which needs no setup before. */
+void compilation_open(struct compilation *c);
+
+/* Free the tokens, the messages and the memory pool of c, which holds
+   every tree and type of its modules. */
+void compilation_close(struct compilation *c);
+
+/* Lex, parse and check source as the module name against the libraries
+   of c. program is that of sema_check. *ok tells whether all three
+   passed, with the messages in c->diags. Gives the tree the parser built,
+   or NULL. A module past COMPILATION_MODULES counts a failure, gives NULL
+   and leaves *ok false. */
+struct module *compilation_check(struct compilation *c, const char *name,
+                                 const char *source, bool program, bool *ok);
+
+/* Add iface to the libraries of c. A library past COMPILATION_MODULES
+   counts a failure and is dropped. */
+void compilation_add(struct compilation *c, const struct interface *iface);
 
 /* Append the IR of m to out as ir_print does, without the lines of the
    types the runtime declares, which start with "type anti.rt.". Their

@@ -1,7 +1,7 @@
 /* The stages that pipeline.h declares: a source lexed and parsed,
-   checked, or checked and lowered for the unit tests, the checks of what
-   the checker accepts and refuses, and the IR print without the types of
-   the runtime. */
+   checked, or checked and lowered for the unit tests, a compilation of
+   several modules, the checks of what the checker accepts and refuses,
+   and the IR print without the types of the runtime. */
 
 #include "../binary_stdio.h"
 #include "pipeline.h"
@@ -183,8 +183,7 @@ void lowered_run_with(struct lowered *l, const char *source,
                 first_message(&l->front.diags), source);
     }
     if (l->ok) {
-        lower_module(l->front.module, "main", &l->ir, options, NULL, 0,
-                     PACKAGE_VERSION_DEFAULT);
+        lower_as(l->front.module, "main", &l->ir, options);
     }
 }
 
@@ -192,6 +191,61 @@ void lowered_release(struct lowered *l)
 {
     ir_module_free(&l->ir);
     checked_release(&l->front);
+}
+
+void lower_as(struct module *module, const char *name, struct ir_module *out,
+              unsigned options)
+{
+    lower_module(module, name, out, options, NULL, 0, PACKAGE_VERSION_DEFAULT);
+}
+
+void compilation_open(struct compilation *c)
+{
+    memset(c, 0, sizeof *c);
+    types_init(&c->types, &c->arena);
+}
+
+void compilation_close(struct compilation *c)
+{
+    size_t i;
+
+    for (i = 0; i < c->token_lists; i++) {
+        lexer_token_list_free(&c->tokens[i]);
+    }
+    diagnostics_free(&c->diags);
+    arena_free(&c->arena);
+}
+
+struct module *compilation_check(struct compilation *c, const char *name,
+                                 const char *source, bool program, bool *ok)
+{
+    struct token_list *tokens;
+    struct module *module = NULL;
+
+    *ok = false;
+    if (c->token_lists == COMPILATION_MODULES) {
+        check_failures++;
+        fprintf(stderr, "module %s is one past the %d of a compilation\n",
+                name, COMPILATION_MODULES);
+        return NULL;
+    }
+    tokens = &c->tokens[c->token_lists++];
+    *ok = lexer_lex(source, strlen(source), &c->arena, &c->diags, tokens) &&
+          parser_parse(source, tokens, &c->arena, &c->diags, &module) &&
+          sema_check(module, name, NULL, c->libraries, c->library_count,
+                     &c->types, &c->arena, &c->diags, program);
+    return module;
+}
+
+void compilation_add(struct compilation *c, const struct interface *iface)
+{
+    if (c->library_count == COMPILATION_MODULES) {
+        check_failures++;
+        fprintf(stderr, "a library is one past the %d of a compilation\n",
+                COMPILATION_MODULES);
+        return;
+    }
+    c->libraries[c->library_count++] = iface;
 }
 
 void ir_print_own(struct text *out, const struct ir_module *m)

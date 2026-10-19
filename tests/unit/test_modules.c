@@ -19,57 +19,20 @@
 #include "sema.h"
 #include "types.h"
 
-/* One compilation with its libraries. Every module shares the memory pool
-   and the types, as in antic, so a struct keeps one identity. */
-struct session {
-    struct arena arena;
-    struct types types;
-    struct diagnostics diags;
-    struct token_list tokens[8];
-    size_t token_lists;
-    const struct interface *libraries[8];
-    size_t library_count;
-    /* The interface build_damaged writes, which its damage changes. */
+/* What the damage of build_damaged changes: the interface it writes, and
+   the memory pool of its compilation for what the damage adds. */
+struct damaged {
     struct interface *written;
+    struct arena *arena;
 };
 
-static void open_session(struct session *s)
-{
-    memset(s, 0, sizeof *s);
-    types_init(&s->types, &s->arena);
-}
-
-static void close_session(struct session *s)
-{
-    size_t i;
-
-    for (i = 0; i < s->token_lists; i++) {
-        lexer_token_list_free(&s->tokens[i]);
-    }
-    diagnostics_free(&s->diags);
-    arena_free(&s->arena);
-}
-
-/* Parse and check source as module name. */
-static struct module *check_module(struct session *s, const char *name,
-                                   const char *source, bool *ok)
-{
-    struct token_list *tokens = &s->tokens[s->token_lists++];
-    struct module *module = NULL;
-
-    *ok = lexer_lex(source, strlen(source), &s->arena, &s->diags, tokens) &&
-          parser_parse(source, tokens, &s->arena, &s->diags, &module) &&
-          sema_check(module, name, NULL, s->libraries, s->library_count, &s->types,
-                     &s->arena, &s->diags, true);
-    return module;
-}
-
-/* Compile a library and add its interface to the session. */
-static void library(struct session *s, const char *name, const char *source)
+/* Compile a library and add its interface to the compilation. */
+static void library(struct compilation *s, const char *name,
+                    const char *source)
 {
     struct interface *iface = arena_alloc(&s->arena, sizeof *iface);
     bool ok;
-    struct module *module = check_module(s, name, source, &ok);
+    struct module *module = compilation_check(s, name, source, true, &ok);
 
     if (!ok) {
         check_failures++;
@@ -78,7 +41,7 @@ static void library(struct session *s, const char *name, const char *source)
         return;
     }
     sema_interface(module, name, &s->arena, iface);
-    s->libraries[s->library_count++] = iface;
+    compilation_add(s, iface);
 }
 
 static const char geometry[] =
@@ -101,27 +64,27 @@ static const char geometry[] =
 
 static void geometry_accepts(const char *source)
 {
-    struct session s;
+    struct compilation s;
     bool ok;
 
-    open_session(&s);
+    compilation_open(&s);
     library(&s, "geometry", geometry);
-    check_module(&s, "main", source, &ok);
+    compilation_check(&s, "main", source, true, &ok);
     expect_accepted(ok, &s.diags, source);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 static void geometry_rejects(const char *source, int line, int column,
                                       const char *message)
 {
-    struct session s;
+    struct compilation s;
     bool ok;
 
-    open_session(&s);
+    compilation_open(&s);
     library(&s, "geometry", geometry);
-    check_module(&s, "main", source, &ok);
+    compilation_check(&s, "main", source, true, &ok);
     expect_refused(ok, &s.diags, source, line, column, message);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 static void imports(void)
@@ -164,10 +127,7 @@ static void damaged_imports(void)
     static const char *imports[COUNT][COUNT - 1];
     static struct interface libs[COUNT];
     static const char source[] = "import l0;\n";
-    const struct interface *list[COUNT];
-    struct token_list *tokens;
-    struct module *module = NULL;
-    struct session s;
+    struct compilation s;
     bool ok;
     size_t i;
     size_t j;
@@ -186,32 +146,30 @@ static void damaged_imports(void)
         libs[i].module = names[i];
         libs[i].imports = imports[i];
         libs[i].import_count = n;
-        list[i] = &libs[i];
     }
-    open_session(&s);
-    tokens = &s.tokens[s.token_lists++];
-    ok = lexer_lex(source, strlen(source), &s.arena, &s.diags, tokens) &&
-         parser_parse(source, tokens, &s.arena, &s.diags, &module) &&
-         sema_check(module, "main", NULL, list, COUNT, &s.types, &s.arena,
-                    &s.diags, true);
+    compilation_open(&s);
+    for (i = 0; i < COUNT; i++) {
+        compilation_add(&s, &libs[i]);
+    }
+    compilation_check(&s, "main", source, true, &ok);
     CHECK(ok);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 static void cycles(void)
 {
-    struct session s;
+    struct compilation s;
     bool ok;
 
     /* c was built against an earlier main, and b against c. */
-    open_session(&s);
+    compilation_open(&s);
     library(&s, "main", "pub fn g() {}\n");
     library(&s, "c", "import main;\npub fn h() {}\n");
     library(&s, "b", "import c;\npub fn f() {}\n");
     s.libraries[0] = s.libraries[1];
     s.libraries[1] = s.libraries[2];
     s.library_count = 2;
-    check_module(&s, "main", "import b;\n", &ok);
+    compilation_check(&s, "main", "import b;\n", true, &ok);
     CHECK(!ok);
     CHECK(s.diags.count == 1);
     if (s.diags.count == 1) {
@@ -219,13 +177,35 @@ static void cycles(void)
         CHECK_STR(s.diags.items[0].message,
                   "`b` depends on `main`, so the import forms a cycle");
     }
-    close_session(&s);
+    compilation_close(&s);
     damaged_imports();
+}
+
+/* A compilation holds COMPILATION_MODULES modules. One more counts a
+   failure, is refused and leaves the arrays of the compilation alone. */
+static void compilation_bound(void)
+{
+    struct compilation s;
+    int failures;
+    bool ok = false;
+    size_t i;
+
+    compilation_open(&s);
+    for (i = 0; i < COMPILATION_MODULES; i++) {
+        compilation_check(&s, "main", "fn f() {}\n", true, &ok);
+        CHECK(ok);
+    }
+    failures = check_failures;
+    CHECK(compilation_check(&s, "main", "fn f() {}\n", true, &ok) == NULL);
+    CHECK(!ok);
+    CHECK(check_failures == failures + 1);
+    check_failures = failures;
+    compilation_close(&s);
 }
 
 static void lowers_imports(void)
 {
-    struct session s;
+    struct compilation s;
     struct ir_module ir;
     struct text out = {0};
     struct text errors = {0};
@@ -239,13 +219,13 @@ static void lowers_imports(void)
                          "    return geometry.area(geometry.SIDES, 2);\n"
                          "}\n";
 
-    open_session(&s);
+    compilation_open(&s);
     library(&s, "geometry", geometry);
-    module = check_module(&s, "main", source, &ok);
+    module = compilation_check(&s, "main", source, true, &ok);
     CHECK(ok);
     ir_module_init(&ir, &s.arena, "main");
     if (ok) {
-        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "main", &ir, 0);
     }
     ir_print(&out, &ir);
     CHECK_STR(text_cstr(&out),
@@ -268,15 +248,15 @@ static void lowers_imports(void)
     text_free(&out);
     text_free(&errors);
     ir_module_free(&ir);
-    close_session(&s);
+    compilation_close(&s);
 }
 
-/* Check, lower and write a library, and add its interface. */
-/* Compile a library and write its file. damage, when set, changes the
-   checked trees of its generics before the writer reads them. */
-static bool build_damaged(struct session *s, const char *name,
+/* Compile a library, add its interface and write its file. damage, when
+   set, changes the checked trees of its generics before the writer reads
+   them. */
+static bool build_damaged(struct compilation *s, const char *name,
                           const char *source,
-                          void (*damage)(struct session *),
+                          void (*damage)(struct damaged *),
                           struct text *bytes)
 {
     struct interface *iface = arena_alloc(&s->arena, sizeof *iface);
@@ -284,14 +264,14 @@ static bool build_damaged(struct session *s, const char *name,
     struct module *module;
     bool ok;
 
-    module = check_module(s, name, source, &ok);
+    module = compilation_check(s, name, source, true, &ok);
     /* The generics leave the module before lowering, as in the driver. */
     if (ok) {
         sema_strip_generics(module, &s->arena);
     }
     ir_module_init(&ir, &s->arena, name);
     if (ok) {
-        lower_module(module, name, &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, name, &ir, 0);
     }
     if (!ok) {
         check_failures++;
@@ -299,10 +279,10 @@ static bool build_damaged(struct session *s, const char *name,
         print_diagnostics(&s->diags, source);
     } else {
         sema_interface(module, name, &s->arena, iface);
-        s->libraries[s->library_count++] = iface;
+        compilation_add(s, iface);
         if (damage != NULL) {
-            s->written = iface;
-            damage(s);
+            struct damaged d = {iface, &s->arena};
+            damage(&d);
         }
         antl_write(bytes, iface, &ir, false);
     }
@@ -310,7 +290,7 @@ static bool build_damaged(struct session *s, const char *name,
     return ok;
 }
 
-static bool build_library(struct session *s, const char *name,
+static bool build_library(struct compilation *s, const char *name,
                           const char *source, struct text *bytes)
 {
     return build_damaged(s, name, source, NULL, bytes);
@@ -385,11 +365,11 @@ static const uint8_t scale_antl[] = {
 
 static void writes_format(void)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     size_t i;
 
-    open_session(&s);
+    compilation_open(&s);
     build_library(&s, "scale", scale_source, &bytes);
     CHECK(bytes.length == sizeof scale_antl);
     for (i = 0; i < bytes.length && i < sizeof scale_antl; i++) {
@@ -406,7 +386,7 @@ static void writes_format(void)
     CHECK(!antl_starts((const uint8_t *)bytes.data, 3));
     CHECK(!antl_starts((const uint8_t *)"ANTX", 4));
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 static const char vec_source[] = "pub struct V2 { x: int, y: int }\n"
@@ -430,8 +410,8 @@ static const char shapes_source[] = "import vec;\n"
 /* Write a library, read it into a new session and write it again. */
 static void round_trip(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text first = {0};
     struct text second = {0};
     struct text ir_a = {0};
@@ -440,10 +420,10 @@ static void round_trip(void)
     struct interface *vec;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "vec", vec_source, &first);
 
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "vec");
     vec = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
                     &b.types, &b.arena, &program, error, sizeof error);
@@ -498,8 +478,8 @@ static void round_trip(void)
     text_free(&ir_a);
     text_free(&ir_b);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A library whose symbolic values and aggregates were made interleaved
@@ -508,19 +488,19 @@ static void round_trip(void)
    array that holds the records. */
 static void round_trip_class(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text first = {0};
     struct text second = {0};
     struct ir_module program;
     struct interface *iface;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "boxes",
                   "pub class Box { pub w: int = 1, pub h: int = 2 }\n",
                   &first);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "boxes");
     iface = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
                       &b.types, &b.arena, &program, error, sizeof error);
@@ -534,8 +514,8 @@ static void round_trip_class(void)
     text_free(&first);
     text_free(&second);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A constant and an array length computed from size_of stay symbolic in
@@ -543,8 +523,8 @@ static void round_trip_class(void)
    them in its own types. */
 static void keeps_symbolic_sizes(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text first = {0};
     struct text second = {0};
     struct text ir = {0};
@@ -555,13 +535,13 @@ static void keeps_symbolic_sizes(void)
     char error[160] = "";
     bool ok;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "sized",
                   "pub struct H { tag: u8, n: i32 }\n"
                   "pub const N: int = size_of(H) * 2;\n"
                   "pub struct B { data: [N]byte }\n",
                   &first);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&reread, &b.arena, "sized");
     sized = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
                       &b.types, &b.arena, &reread, error, sizeof error);
@@ -573,17 +553,17 @@ static void keeps_symbolic_sizes(void)
         CHECK(sized->items[1]->value->kind == CONST_SYMBOLIC);
     }
     ir_module_init(&program, &b.arena, "main");
-    b.libraries[b.library_count++] = sized;
-    module = check_module(&b, "main",
-                          "import sized;\n"
-                          "fn main() -> int {\n"
-                          "    let b = sized.B { data: [3; sized.N] };\n"
-                          "    return b.data.len;\n"
-                          "}\n",
-                          &ok);
+    compilation_add(&b, sized);
+    module = compilation_check(&b, "main",
+                               "import sized;\n"
+                               "fn main() -> int {\n"
+                               "    let b = sized.B { data: [3; sized.N] };\n"
+                               "    return b.data.len;\n"
+                               "}\n",
+                               true, &ok);
     CHECK(ok);
     if (ok) {
-        lower_module(module, "main", &program, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "main", &program, 0);
     }
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
@@ -614,27 +594,27 @@ static void keeps_symbolic_sizes(void)
     text_free(&ir);
     ir_module_free(&program);
     ir_module_free(&reread);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* Two modules may not export one name, because an export fn has the
    symbol of its name. */
 static void unique_exports(void)
 {
-    struct session a;
+    struct compilation a;
     struct text bytes = {0};
     char error[160] = "";
     bool ok;
     struct ir_module program;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "geo", "export fn dot(a: int) -> int { return a; }\n",
                   &bytes);
-    check_module(&a, "main",
-                 "import geo;\n"
-                 "export fn dot(b: int) -> int { return b; }\n",
-                 &ok);
+    compilation_check(&a, "main",
+                      "import geo;\n"
+                      "export fn dot(b: int) -> int { return b; }\n",
+                      true, &ok);
     CHECK(!ok);
     CHECK(a.diags.count == 1);
     if (a.diags.count == 1) {
@@ -648,7 +628,7 @@ static void unique_exports(void)
     CHECK(program.function_count == 1 && program.functions[0]->exported);
     ir_module_free(&program);
     text_free(&bytes);
-    close_session(&a);
+    compilation_close(&a);
 }
 
 static void path_of(const char *source, const char *const *roots,
@@ -710,36 +690,36 @@ static void module_paths(void)
    after as, is the name in the importing module. */
 static void dotted_imports(void)
 {
-    struct session s;
+    struct compilation s;
     bool ok;
 
-    open_session(&s);
+    compilation_open(&s);
     library(&s, "com.example.scale", "pub fn scale(x: int) -> int { return x; }\n");
     library(&s, "org.other.scale", "pub fn half(x: int) -> int { return x; }\n");
-    check_module(&s, "main",
-                 "import com.example.scale;\n"
-                 "import org.other.scale as other;\n"
-                 "fn main() -> int { return scale.scale(2) + other.half(4); }\n",
-                 &ok);
+    compilation_check(&s, "main",
+                      "import com.example.scale;\n"
+                      "import org.other.scale as other;\n"
+                      "fn main() -> int { return scale.scale(2) + other.half(4); }\n",
+                      true, &ok);
     CHECK(ok);
     CHECK(s.diags.count == 0);
-    check_module(&s, "main",
-                 "import com.example.scale;\n"
-                 "import org.other.scale;\n",
-                 &ok);
+    compilation_check(&s, "main",
+                      "import com.example.scale;\n"
+                      "import org.other.scale;\n",
+                      true, &ok);
     CHECK(!ok && s.diags.count == 1 &&
           strcmp(s.diags.items[0].message, "`scale` is already declared") == 0);
     diagnostics_free(&s.diags);
     memset(&s.diags, 0, sizeof s.diags);
-    check_module(&s, "main", "import com.Example.scale;\n", &ok);
+    compilation_check(&s, "main", "import com.Example.scale;\n", true, &ok);
     CHECK(!ok && s.diags.count == 1 &&
           strcmp(s.diags.items[0].message,
                  "the module path `com.Example.scale` is not lowercase") == 0);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* Write a library of source with the given package header. */
-static void write_with(struct session *s, const char *source,
+static void write_with(struct compilation *s, const char *source,
                        const struct package *package, bool strip,
                        struct text *bytes)
 {
@@ -748,11 +728,11 @@ static void write_with(struct session *s, const char *source,
     struct module *module;
     bool ok;
 
-    module = check_module(s, "com.example.geo", source, &ok);
+    module = compilation_check(s, "com.example.geo", source, true, &ok);
     ir_module_init(&ir, &s->arena, "com.example.geo");
     CHECK(ok);
     if (ok) {
-        lower_module(module, "com.example.geo", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "com.example.geo", &ir, 0);
     }
     sema_interface(module, "com.example.geo", &s->arena, iface);
     if (package != NULL) {
@@ -835,8 +815,8 @@ static const char no_docs[] =
    text a file equals the file of the source without comments. */
 static void package_and_docs(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text lines = {0};
     struct text blocks = {0};
     struct text stripped = {0};
@@ -860,7 +840,7 @@ static void package_and_docs(void)
     package.license_text = "Permission is hereby granted.\n";
     package.attribution = attribution;
     package.attribution_count = 2;
-    open_session(&a);
+    compilation_open(&a);
     write_with(&a, line_docs, &package, false, &lines);
     write_with(&a, block_docs, &package, false, &blocks);
     write_with(&a, line_docs, &package, true, &stripped);
@@ -883,7 +863,7 @@ static void package_and_docs(void)
     CHECK_STR(header.package.license, "MIT");
     CHECK_STR(header.package.license_text, "Permission is hereby granted.\n");
     CHECK(header.package.attribution_count == 2);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
     read = antl_read((const uint8_t *)lines.data, lines.length, NULL, 0,
                      &b.types, &b.arena, &program, error, sizeof error);
@@ -902,26 +882,26 @@ static void package_and_docs(void)
               read->items[1]->params[1].text[0] == 'b');
     }
     ir_module_free(&program);
-    close_session(&b);
+    compilation_close(&b);
     text_free(&lines);
     text_free(&blocks);
     text_free(&stripped);
     text_free(&bare);
-    close_session(&a);
+    compilation_close(&a);
 }
 
 /* A private struct that a pub item reaches keeps its fields and loses the
    /// text of them, like every other private item. */
 static void private_field_docs(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct interface *read;
     struct ir_module program;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     write_with(&a,
                "struct Inner {\n"
                "    /// Private, not in the file.\n"
@@ -929,7 +909,7 @@ static void private_field_docs(void)
                "}\n"
                "pub fn make() -> Inner { return Inner { v: 1 }; }\n",
                NULL, false, &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
     read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                      &b.types, &b.arena, &program, error, sizeof error);
@@ -941,29 +921,29 @@ static void private_field_docs(void)
         CHECK(inner->field_count == 1 && inner->fields[0].doc.length == 0);
     }
     ir_module_free(&program);
-    close_session(&b);
+    compilation_close(&b);
     text_free(&bytes);
-    close_session(&a);
+    compilation_close(&a);
 }
 
 /* A library keeps how each narrow parameter extends to 32 bits. */
 static void keeps_extensions(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text ir = {0};
     struct ir_module program;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "narrow",
                   "extern fn putb(b: u8) -> i32;\n"
                   "pub fn pick(a: i8, b: u16, c: bool, d: i32) -> i32 {\n"
                   "    return putb(1);\n"
                   "}\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "narrow");
     CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                     &b.types, &b.arena, &program, error,
@@ -981,8 +961,8 @@ static void keeps_extensions(void)
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* The C function name of program, or NULL. */
@@ -1005,8 +985,8 @@ static const struct ir_function *c_function(const struct ir_module *program,
    and writes it again byte for byte. */
 static void keeps_access_types(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text first = {0};
     struct text second = {0};
     struct text ir = {0};
@@ -1014,13 +994,13 @@ static void keeps_access_types(void)
     struct interface *read;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "geo",
                   "pub struct P { x: int, y: float }\n"
                   "pub fn y(p: *P) -> float { return p.y; }\n"
                   "pub fn at(a: []int, i: int) -> int { return a[i]; }\n",
                   &first);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "geo");
     read = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
                      &b.types, &b.arena, &program, error, sizeof error);
@@ -1038,8 +1018,8 @@ static void keeps_access_types(void)
     text_free(&second);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A library keeps the memory effects of a runtime function it calls. A
@@ -1048,9 +1028,9 @@ static void keeps_access_types(void)
    returns. */
 static void keeps_effects(void)
 {
-    struct session a;
-    struct session b;
-    struct session c;
+    struct compilation a;
+    struct compilation b;
+    struct compilation c;
     struct text same = {0};
     struct text mine = {0};
     struct text ir = {0};
@@ -1058,13 +1038,13 @@ static void keeps_effects(void)
     const struct ir_function *f;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "same",
                   "pub fn eq(a: str, b: str) -> bool {\n"
                   "    return a == b;\n"
                   "}\n",
                   &same);
-    open_session(&b);
+    compilation_open(&b);
     build_library(&b, "mine",
                   "extern fn anti_rt_same_bytes(a: ?*byte, an: int, "
                   "b: ?*byte, bn: int) -> c_int;\n"
@@ -1073,7 +1053,7 @@ static void keeps_effects(void)
                   "b.len) != 0;\n"
                   "}\n",
                   &mine);
-    open_session(&c);
+    compilation_open(&c);
     ir_module_init(&program, &c.arena, "main");
     CHECK(antl_read((const uint8_t *)same.data, same.length, NULL, 0,
                     &c.types, &c.arena, &program, error,
@@ -1103,17 +1083,17 @@ static void keeps_effects(void)
     text_free(&mine);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&c);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&c);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A library keeps the globals of its literals, and a module that imports
    it numbers its own literals from 0. */
 static void keeps_literals(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text ir = {0};
     struct ir_module program;
@@ -1121,27 +1101,27 @@ static void keeps_literals(void)
     char error[160] = "";
     bool ok;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "words",
                   "pub fn hi() -> str {\n"
                   "    return \"hi\";\n"
                   "}\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    b.libraries[b.library_count++] =
-        antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                  &b.types, &b.arena, &program, error, sizeof error);
+    compilation_add(&b, antl_read((const uint8_t *)bytes.data, bytes.length,
+                                  NULL, 0, &b.types, &b.arena, &program, error,
+                                  sizeof error));
     CHECK_STR(error, "");
-    module = check_module(&b, "main",
-                          "import words;\n"
-                          "fn main() -> int {\n"
-                          "    return words.hi().len + \"hi\".len;\n"
-                          "}\n",
-                          &ok);
+    module = compilation_check(&b, "main",
+                               "import words;\n"
+                               "fn main() -> int {\n"
+                               "    return words.hi().len + \"hi\".len;\n"
+                               "}\n",
+                               true, &ok);
     CHECK(ok);
     if (ok) {
-        lower_module(module, "main", &program, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "main", &program, 0);
     }
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
@@ -1183,16 +1163,16 @@ static void keeps_literals(void)
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A library keeps the value of an aggregate constant, which the back end
    turns into bytes for its target. */
 static void keeps_constants(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text ir = {0};
     struct ir_module program;
@@ -1200,7 +1180,7 @@ static void keeps_constants(void)
     char error[160] = "";
     bool ok;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "pair",
                   "pub struct Pair { a: u8, b: i32 }\n"
                   "const BASE: Pair = Pair { a: 7, b: 11 };\n"
@@ -1208,21 +1188,21 @@ static void keeps_constants(void)
                   "    return BASE;\n"
                   "}\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    b.libraries[b.library_count++] =
-        antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                  &b.types, &b.arena, &program, error, sizeof error);
+    compilation_add(&b, antl_read((const uint8_t *)bytes.data, bytes.length,
+                                  NULL, 0, &b.types, &b.arena, &program, error,
+                                  sizeof error));
     CHECK_STR(error, "");
-    module = check_module(&b, "main",
-                          "import pair;\n"
-                          "fn main() -> int {\n"
-                          "    return pair.base().b as int;\n"
-                          "}\n",
-                          &ok);
+    module = compilation_check(&b, "main",
+                               "import pair;\n"
+                               "fn main() -> int {\n"
+                               "    return pair.base().b as int;\n"
+                               "}\n",
+                               true, &ok);
     CHECK(ok);
     if (ok) {
-        lower_module(module, "main", &program, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "main", &program, 0);
     }
     ir_print(&ir, &program);
     CHECK(strstr(text_cstr(&ir),
@@ -1230,16 +1210,16 @@ static void keeps_constants(void)
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* An f16 constant and a struct of f16 fields cross a library file. The
    constant is its value, which the importer writes as its bits. */
 static void keeps_halves(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text ir = {0};
     struct ir_module program;
@@ -1247,36 +1227,36 @@ static void keeps_halves(void)
     char error[160] = "";
     bool ok;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "tone",
                   "pub struct Texel { u: f16, v: f16 }\n"
                   "pub const ONE: f16 = 1.0 as f16;\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    b.libraries[b.library_count++] =
-        antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                  &b.types, &b.arena, &program, error, sizeof error);
+    compilation_add(&b, antl_read((const uint8_t *)bytes.data, bytes.length,
+                                  NULL, 0, &b.types, &b.arena, &program, error,
+                                  sizeof error));
     CHECK_STR(error, "");
-    module = check_module(&b, "main",
-                          "import tone;\n"
-                          "fn main() -> int {\n"
-                          "    let t = tone.Texel { u: tone.ONE as f16,"
-                          " v: 0.5 as f16 };\n"
-                          "    return (t.u + t.v) as int;\n"
-                          "}\n",
-                          &ok);
+    module = compilation_check(&b, "main",
+                               "import tone;\n"
+                               "fn main() -> int {\n"
+                               "    let t = tone.Texel { u: tone.ONE as f16,"
+                               " v: 0.5 as f16 };\n"
+                               "    return (t.u + t.v) as int;\n"
+                               "}\n",
+                               true, &ok);
     CHECK(ok);
     if (ok) {
-        lower_module(module, "main", &program, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "main", &program, 0);
     }
     ir_print(&ir, &program);
     CHECK(strstr(text_cstr(&ir), "hext f32 15360\n") != NULL);
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A call through a function pointer keeps its signature in the library
@@ -1287,21 +1267,21 @@ static void keeps_halves(void)
    is the one that gives a `str`. */
 static void keeps_extern_aggregates(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text ir = {0};
     struct ir_module program;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "wrap",
                   "extern fn anti_rt_make() -> str;\n"
                   "pub fn wrap() -> str {\n"
                   "    return anti_rt_make();\n"
                   "}\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "wrap");
     CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                     &b.types, &b.arena, &program, error,
@@ -1324,8 +1304,8 @@ static void keeps_extern_aggregates(void)
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A parameter that does not keep its argument crosses the library file
@@ -1333,8 +1313,8 @@ static void keeps_extern_aggregates(void)
    it passes the code and the context. */
 static void keeps_context_signatures(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text ir = {0};
     struct ir_module program;
@@ -1342,13 +1322,13 @@ static void keeps_context_signatures(void)
     const struct interface *lib;
     const struct type *f = NULL;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "calls",
                   "pub fn run(concurrent f: fn(i16) -> int) -> int {\n"
                   "    return f(1);\n"
                   "}\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "calls");
     lib = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                     &b.types, &b.arena, &program, error, sizeof error);
@@ -1378,26 +1358,26 @@ static void keeps_context_signatures(void)
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 static void keeps_signatures(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text ir = {0};
     struct ir_module program;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "calls",
                   "pub fn run(keep f: fn(i16) -> int) -> int {\n"
                   "    return f(1);\n"
                   "}\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "calls");
     CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                     &b.types, &b.arena, &program, error,
@@ -1414,8 +1394,8 @@ static void keeps_signatures(void)
     text_free(&bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* The generic named name among the generics of lib, or NULL. */
@@ -1440,8 +1420,8 @@ static const struct item *generic_of(const struct interface *lib,
    copy hands that receiver to the checker again as it stands. */
 static void keeps_generic_marks(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct ir_module program;
     char error[160] = "";
@@ -1452,7 +1432,7 @@ static void keeps_generic_marks(void)
     const struct expr *call = NULL;
     const struct expr *at = NULL;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "marks",
                   "pub struct Box<T> { v: T }\n"
                   "pub operator fn eq<T: eq>(a: Box<T>, b: Box<T>) -> bool {\n"
@@ -1469,7 +1449,7 @@ static void keeps_generic_marks(void)
                   "    return (v, Name { n: 1 }).hash();\n"
                   "}\n",
                   &bytes);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "marks");
     lib = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                     &b.types, &b.arena, &program, error, sizeof error);
@@ -1495,15 +1475,15 @@ static void keeps_generic_marks(void)
     CHECK(at != NULL && at->prechecked && at->as.unary.operand->prechecked);
     text_free(&bytes);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A struct keeps one identity when two libraries mention it. */
 static void dependencies(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text vec_bytes = {0};
     struct text shapes_bytes = {0};
     struct text ir = {0};
@@ -1511,11 +1491,11 @@ static void dependencies(void)
     const struct interface *libs[2];
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "vec", vec_source, &vec_bytes);
     build_library(&a, "shapes", shapes_source, &shapes_bytes);
 
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
     CHECK(antl_read((const uint8_t *)shapes_bytes.data, shapes_bytes.length,
                     NULL, 0, &b.types, &b.arena, &program, error,
@@ -1592,18 +1572,18 @@ static void dependencies(void)
     text_free(&shapes_bytes);
     text_free(&ir);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 static void refuses_file(const uint8_t *data, size_t size,
                          const char *expected)
 {
-    struct session s;
+    struct compilation s;
     struct ir_module program;
     char error[160] = "";
 
-    open_session(&s);
+    compilation_open(&s);
     ir_module_init(&program, &s.arena, "main");
     CHECK(antl_read(data, size, NULL, 0, &s.types, &s.arena, &program, error,
                     sizeof error) == NULL);
@@ -1613,7 +1593,7 @@ static void refuses_file(const uint8_t *data, size_t size,
         CHECK(error[0] != '\0');
     }
     ir_module_free(&program);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 static bool reads_file(const struct text *bytes);
@@ -1775,12 +1755,12 @@ static uint32_t u32_at(const struct text *bytes, size_t at)
 
 static bool reads_file(const struct text *bytes)
 {
-    struct session s;
+    struct compilation s;
     struct ir_module program;
     char error[160] = "";
     bool ok;
 
-    open_session(&s);
+    compilation_open(&s);
     ir_module_init(&program, &s.arena, "main");
     ok = antl_read((const uint8_t *)bytes->data, bytes->length, NULL, 0, &s.types, &s.arena,
                    &program, error, sizeof error) != NULL;
@@ -1788,7 +1768,7 @@ static bool reads_file(const struct text *bytes)
         fprintf(stderr, "  %s\n", error);
     }
     ir_module_free(&program);
-    close_session(&s);
+    compilation_close(&s);
     return ok;
 }
 
@@ -1825,8 +1805,8 @@ static void class_literal_defaults(void)
         CONST_DEFAULT,
     };
     static const uint8_t left_out = CONST_DEFAULT;
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text first = {0};
     struct text second = {0};
     struct ir_module program;
@@ -1835,7 +1815,7 @@ static void class_literal_defaults(void)
     size_t at = SIZE_MAX;
     size_t i;
 
-    open_session(&a);
+    compilation_open(&a);
     build_library(&a, "boxes",
                   "pub class Box { pub w: int = 1, pub h: int = 2 }\n"
                   "pub class Shelf { pub box: Box = Box { w: 3 }, "
@@ -1847,7 +1827,7 @@ static void class_literal_defaults(void)
         }
     }
     CHECK(at != SIZE_MAX);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "boxes");
     iface = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
                       &b.types, &b.arena, &program, error, sizeof error);
@@ -1865,8 +1845,8 @@ static void class_literal_defaults(void)
     text_free(&first);
     text_free(&second);
     ir_module_free(&program);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 static void poke_u32(uint8_t out[4], uint32_t v)
@@ -1950,7 +1930,7 @@ static size_t find_slice(const struct text *bytes, size_t end)
 
 static void damaged_records(void)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     uint8_t value[10];
     size_t at;
@@ -1958,9 +1938,9 @@ static void damaged_records(void)
     uint32_t f64_type;
     uint32_t fn_type;
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, "zz", record_source, &bytes)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     CHECK(reads_file(&bytes));
@@ -2019,27 +1999,27 @@ static void damaged_records(void)
     refuses_poke(&bytes, at, value, 4);
 
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* Whether the file reads into a program whose IR passes the verifier,
    as the driver takes a library it links. */
 static bool verifies_file(const uint8_t *data, size_t size)
 {
-    struct session s;
+    struct compilation s;
     struct ir_module program;
     struct text errors = {0};
     char error[160] = "";
     bool ok;
 
-    open_session(&s);
+    compilation_open(&s);
     ir_module_init(&program, &s.arena, "main");
     ok = antl_read(data, size, NULL, 0, &s.types, &s.arena, &program, error,
                    sizeof error) != NULL &&
          ir_verify(&program, &errors);
     text_free(&errors);
     ir_module_free(&program);
-    close_session(&s);
+    compilation_close(&s);
     return ok;
 }
 
@@ -2117,7 +2097,7 @@ static const char simd_source[] =
 
 static void damaged_simd(void)
 {
-    struct session s;
+    struct compilation s;
     struct text source = {0};
     struct text bytes = {0};
     uint8_t value[8];
@@ -2134,10 +2114,10 @@ static void damaged_simd(void)
         text_appendf(&source, ", w%u: f32", i);
     }
     text_append(&source, " }\npub fn zwide(w: ZW) -> f32 { return w.w0; }\n");
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, "zs", text_cstr(&source), &bytes)) {
         text_free(&source);
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     CHECK(verifies_file((const uint8_t *)bytes.data, bytes.length));
@@ -2220,7 +2200,7 @@ static void damaged_simd(void)
 
     text_free(&bytes);
     text_free(&source);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* A library of constants: a class with defaults, and a class whose
@@ -2244,7 +2224,8 @@ static bool same_name(const struct name *n, const char *text)
 /* The type of the field field of the class or struct name of the file,
    or NULL when the file is refused. */
 static const struct type *field_type_of(const struct text *bytes,
-                                        struct session *s, const char *name,
+                                        struct compilation *s,
+                                        const char *name,
                                         const char *field)
 {
     struct ir_module program;
@@ -2293,8 +2274,8 @@ static const struct ir_global *valued_global(const struct ir_module *program)
 
 static void damaged_constants(void)
 {
-    struct session s;
-    struct session r;
+    struct compilation s;
+    struct compilation r;
     struct text bytes = {0};
     struct ir_module program;
     const struct ir_global *g;
@@ -2304,9 +2285,9 @@ static void damaged_constants(void)
     uint32_t own;
     uint32_t i;
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, "zk", const_source, &bytes)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     CHECK(reads_file(&bytes));
@@ -2317,7 +2298,7 @@ static void damaged_constants(void)
     at = name_end(&bytes, "zp", false);
     own = u32_at(&bytes, at);
     for (i = 0; i < 64; i++) {
-        struct session t;
+        struct compilation t;
         struct text poked = {0};
         const struct type *type;
         if (i == own) {
@@ -2325,10 +2306,10 @@ static void damaged_constants(void)
         }
         text_append_bytes(&poked, bytes.data, bytes.length);
         poke_u32((uint8_t *)poked.data + at, i);
-        open_session(&t);
+        compilation_open(&t);
         type = field_type_of(&poked, &t, "ZN", "zp");
         CHECK(type == NULL || types_is_nullable(type));
-        close_session(&t);
+        compilation_close(&t);
         text_free(&poked);
     }
 
@@ -2337,7 +2318,7 @@ static void damaged_constants(void)
        its bytes, its relocations and its marks come before the value,
        and the value opens with its kind, its scalar, its count and its
        aggregate. */
-    open_session(&r);
+    compilation_open(&r);
     ir_module_init(&program, &r.arena, "main");
     CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                     &r.types, &r.arena, &program, error,
@@ -2363,10 +2344,10 @@ static void damaged_constants(void)
         refuses_poke(&bytes, name + 8, value, 8);
     }
     ir_module_free(&program);
-    close_session(&r);
+    compilation_close(&r);
 
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* bytes with the relocations of the global named name, which has none,
@@ -2416,13 +2397,13 @@ static void damaged_relocations(void)
     static const uint64_t apart[] = {0, 8};
     static const uint64_t overlap[] = {0, 4};
     static const uint64_t past[] = {24};
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     struct text changed = {0};
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, "zr", source, &bytes)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     with_relocations(&bytes, "0", apart, 2, 0, &changed);
@@ -2445,7 +2426,7 @@ static void damaged_relocations(void)
     }
     text_free(&changed);
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* Rule 14: the address of a constant of the IR names a global by an index
@@ -2453,16 +2434,16 @@ static void damaged_relocations(void)
    The descriptor of `V2` starts with the address of its name. */
 static void wide_addresses(void)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     size_t at;
     uint64_t size;
     size_t item;
     const uint8_t high = 1;
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, "vec", vec_source, &bytes)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     at = name_end(&bytes, "V2.descriptor", false);
@@ -2476,7 +2457,7 @@ static void wide_addresses(void)
     CHECK(reads_file(&bytes));
     refuses_poke(&bytes, item + 2 + 4, &high, 1);
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* M336: every type of `anti.lang` that the compiler declares, in the
@@ -2528,8 +2509,8 @@ static const struct symbol *item_of(const struct interface *lib,
    name. The file reads back and writes again byte for byte. */
 static void declared_types(void)
 {
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct text again = {0};
     struct ir_module program;
@@ -2538,12 +2519,12 @@ static void declared_types(void)
     const struct symbol *guarded;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     if (!build_library(&a, "decl", declared_source, &bytes)) {
-        close_session(&a);
+        compilation_close(&a);
         return;
     }
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "decl");
     read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                      &b.types, &b.arena, &program, error, sizeof error);
@@ -2580,10 +2561,10 @@ static void declared_types(void)
               memcmp(again.data, bytes.data, bytes.length) == 0);
     }
     ir_module_free(&program);
-    close_session(&b);
+    compilation_close(&b);
     text_free(&again);
     text_free(&bytes);
-    close_session(&a);
+    compilation_close(&a);
 }
 
 /* A library file keeps the class records, the mark of a `worker fn` and
@@ -2627,8 +2608,8 @@ static void keeps_classes(void)
         "{\n"
         "    return s.area();\n"
         "}\n";
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct interface *iface;
     struct ir_module ir;
     struct ir_module program;
@@ -2639,11 +2620,11 @@ static void keeps_classes(void)
     char error[160] = "";
     bool ok;
 
-    open_session(&a);
-    module = check_module(&a, "shapes", source, &ok);
+    compilation_open(&a);
+    module = compilation_check(&a, "shapes", source, true, &ok);
     ir_module_init(&ir, &a.arena, "shapes");
     if (ok) {
-        lower_module(module, "shapes", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "shapes", &ir, 0);
     }
     CHECK(ok);
     iface = arena_alloc(&a.arena, sizeof *iface);
@@ -2656,7 +2637,7 @@ static void keeps_classes(void)
     CHECK(strstr(text_cstr(&before), "worker fn shapes.tally") != NULL);
     CHECK(strstr(text_cstr(&before), " table @shapes.Shape.descriptor 17") !=
           NULL);
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "");
     CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                     &b.types, &b.arena, &program, error,
@@ -2669,8 +2650,8 @@ static void keeps_classes(void)
     text_free(&after);
     ir_module_free(&program);
     ir_module_free(&ir);
-    close_session(&b);
-    close_session(&a);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* The global of ir named name in module, or NULL. */
@@ -2704,7 +2685,7 @@ static void one_struct_descriptor(void)
         "    pub at: vec.V2 = vec.V2 { x: 0, y: 0 },\n"
         "    pub p: ?*vec.V2 = none,\n"
         "}\n";
-    struct session s;
+    struct compilation s;
     struct interface *iface;
     struct ir_module lib;
     struct ir_module ir;
@@ -2713,11 +2694,11 @@ static void one_struct_descriptor(void)
     size_t i;
     bool ok;
 
-    open_session(&s);
-    module = check_module(&s, "vec", vec, &ok);
+    compilation_open(&s);
+    module = compilation_check(&s, "vec", vec, true, &ok);
     ir_module_init(&lib, &s.arena, "vec");
     if (ok) {
-        lower_module(module, "vec", &lib, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "vec", &lib, 0);
     }
     CHECK(ok);
     g = global_in(&lib, "vec", "V2.descriptor");
@@ -2728,13 +2709,13 @@ static void one_struct_descriptor(void)
     iface = arena_alloc(&s.arena, sizeof *iface);
     if (ok) {
         sema_interface(module, "vec", &s.arena, iface);
-        s.libraries[s.library_count++] = iface;
+        compilation_add(&s, iface);
     }
 
-    module = check_module(&s, "main", source, &ok);
+    module = compilation_check(&s, "main", source, true, &ok);
     ir_module_init(&ir, &s.arena, "main");
     if (ok) {
-        lower_module(module, "main", &ir, 0, NULL, 0, PACKAGE_VERSION_DEFAULT);
+        lower_as(module, "main", &ir, 0);
     }
     CHECK(ok);
     g = global_in(&ir, "vec", "V2.descriptor");
@@ -2749,7 +2730,7 @@ static void one_struct_descriptor(void)
     }
     ir_module_free(&ir);
     ir_module_free(&lib);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 static void put_u8(struct text *b, uint8_t v)
@@ -3000,8 +2981,8 @@ static void copy_depths(void)
                                  "pub fn deep(b: Box<Box<Box<int>>>) -> int {\n"
                                  "    return 0;\n"
                                  "}\n";
-    struct session a;
-    struct session b;
+    struct compilation a;
+    struct compilation b;
     struct text bytes = {0};
     struct ir_module program;
     const struct interface *read;
@@ -3009,13 +2990,13 @@ static void copy_depths(void)
     const struct type *got;
     char error[160] = "";
 
-    open_session(&a);
+    compilation_open(&a);
     if (!build_library(&a, "boxes", source, &bytes)) {
-        close_session(&a);
+        compilation_close(&a);
         return;
     }
     written = param_of(a.libraries[0], "deep");
-    open_session(&b);
+    compilation_open(&b);
     ir_module_init(&program, &b.arena, "boxes");
     read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
                      &b.types, &b.arena, &program, error, sizeof error);
@@ -3024,9 +3005,9 @@ static void copy_depths(void)
     CHECK(written != NULL && written->depth == 3);
     CHECK(got != NULL && got->depth == 3);
     ir_module_free(&program);
-    close_session(&b);
+    compilation_close(&b);
     text_free(&bytes);
-    close_session(&a);
+    compilation_close(&a);
 }
 
 /* M329: a library of structs that nest levels deep, a constant of the
@@ -3074,18 +3055,18 @@ static void deep_source(struct text *out, int levels)
    IR and a symbolic value that the checker took read back. */
 static void deep_values(void)
 {
-    struct session s;
+    struct compilation s;
     struct text source = {0};
     struct text bytes = {0};
 
     deep_source(&source, 100);
-    open_session(&s);
+    compilation_open(&s);
     if (build_library(&s, "deepv", text_cstr(&source), &bytes)) {
         CHECK(reads_file(&bytes));
     }
     text_free(&bytes);
     text_free(&source);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* scale_antl with an entry of the builtin kind and a struct or a class
@@ -3150,12 +3131,12 @@ static void field_kinds(void)
 static bool read_and_write(const uint8_t *bytes, size_t length,
                            const char *name, struct text *out)
 {
-    struct session s;
+    struct compilation s;
     struct ir_module program;
     struct interface *read;
     char error[160] = "";
 
-    open_session(&s);
+    compilation_open(&s);
     ir_module_init(&program, &s.arena, name);
     read = antl_read(bytes, length, NULL, 0, &s.types, &s.arena, &program,
                      error, sizeof error);
@@ -3164,7 +3145,7 @@ static bool read_and_write(const uint8_t *bytes, size_t length,
         antl_write(out, read, &program, false);
     }
     ir_module_free(&program);
-    close_session(&s);
+    compilation_close(&s);
     return read != NULL;
 }
 
@@ -3174,15 +3155,15 @@ static bool read_and_write(const uint8_t *bytes, size_t length,
    writes what it read, so the test refuses that outcome. */
 static void flags_refused(const char *name, const char *source)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     struct text again = {0};
     uint8_t *copy;
     size_t at;
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, name, source, &bytes)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     CHECK(read_and_write((const uint8_t *)bytes.data, bytes.length, name,
@@ -3207,7 +3188,7 @@ static void flags_refused(const char *name, const char *source)
     free(copy);
     text_free(&again);
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* S01: the checked tree of a generic that a library file carries. Each
@@ -3262,7 +3243,7 @@ static const char tree_source[] =
     "}\n";
 
 /* The tree of the generic `tree` among the generics s writes. */
-static struct item *tree_of(struct session *s)
+static struct item *tree_of(struct damaged *s)
 {
     size_t i;
 
@@ -3279,7 +3260,7 @@ static struct item *tree_of(struct session *s)
 
 /* The statement of kind among the top statements of the body of `tree`,
    the nth of that kind. */
-static struct stmt *tree_stmt(struct session *s, enum stmt_kind kind,
+static struct stmt *tree_stmt(struct damaged *s, enum stmt_kind kind,
                               size_t nth)
 {
     struct item *it = tree_of(s);
@@ -3297,7 +3278,7 @@ static struct stmt *tree_stmt(struct session *s, enum stmt_kind kind,
 }
 
 /* The value of `let name` in the body of `tree`. */
-static struct expr *tree_let(struct session *s, const char *name)
+static struct expr *tree_let(struct damaged *s, const char *name)
 {
     struct item *it = tree_of(s);
     size_t i;
@@ -3314,52 +3295,52 @@ static struct expr *tree_let(struct session *s, const char *name)
     return NULL;
 }
 
-static void otherwise_past_arms(struct session *s)
+static void otherwise_past_arms(struct damaged *s)
 {
     tree_stmt(s, STMT_SWITCH, 0)->as.switch_stmt.otherwise_at = 2;
 }
 
-static void arm_case_past_cases(struct session *s)
+static void arm_case_past_cases(struct damaged *s)
 {
     tree_stmt(s, STMT_SWITCH, 0)->as.switch_stmt.arms[0].variant_case =
         65536;
 }
 
-static void cast_case_past_cases(struct session *s)
+static void cast_case_past_cases(struct damaged *s)
 {
     tree_let(s, "tested")->as.cast.variant_case = 3;
 }
 
-static void literal_case_past_cases(struct session *s)
+static void literal_case_past_cases(struct damaged *s)
 {
     tree_let(s, "made")->as.struct_lit.variant_case = 7;
 }
 
-static void enum_value_past_values(struct session *s)
+static void enum_value_past_values(struct damaged *s)
 {
     tree_let(s, "color")->as.field.enum_value = 9;
 }
 
-static void name_without_symbol(struct session *s)
+static void name_without_symbol(struct damaged *s)
 {
     tree_let(s, "sum")->as.binary.right->symbol = NULL;
 }
 
-static void operand_without_type(struct session *s)
+static void operand_without_type(struct damaged *s)
 {
     tree_let(s, "neg")->as.unary.operand->type = NULL;
 }
 
-static void pattern_without_element(struct session *s)
+static void pattern_without_element(struct damaged *s)
 {
     tree_stmt(s, STMT_FOR, 0)->as.for_loop.element = NULL;
 }
 
 /* Three names for the two parts of `(int, int)`. */
-static void pattern_past_parts(struct session *s)
+static void pattern_past_parts(struct damaged *s)
 {
     struct stmt *loop = tree_stmt(s, STMT_FOR, 0);
-    struct binding *names = arena_alloc(&s->arena, 3 * sizeof *names);
+    struct binding *names = arena_alloc(s->arena, 3 * sizeof *names);
 
     names[0] = loop->as.for_loop.names[0];
     names[1] = loop->as.for_loop.names[1];
@@ -3368,13 +3349,13 @@ static void pattern_past_parts(struct session *s)
     loop->as.for_loop.name_count = 3;
 }
 
-static void walk_without_name(struct session *s)
+static void walk_without_name(struct damaged *s)
 {
     tree_stmt(s, STMT_FOR, 1)->as.for_loop.name_count = 0;
 }
 
 /* The `break` of the `while` in place of the loop, outside it. */
-static void break_outside_loop(struct session *s)
+static void break_outside_loop(struct damaged *s)
 {
     struct item *it = tree_of(s);
     size_t i;
@@ -3389,10 +3370,10 @@ static void break_outside_loop(struct session *s)
 }
 
 /* Two parameters on a function whose type takes one. */
-static void closure_past_params(struct session *s)
+static void closure_past_params(struct damaged *s)
 {
     struct item *fn = tree_let(s, "f")->as.fn;
-    struct param *params = arena_alloc(&s->arena, 2 * sizeof *params);
+    struct param *params = arena_alloc(s->arena, 2 * sizeof *params);
 
     params[0] = fn->params[0];
     params[1] = fn->params[0];
@@ -3400,26 +3381,26 @@ static void closure_past_params(struct session *s)
     fn->param_count = 2;
 }
 
-static void generic_short_of_params(struct session *s)
+static void generic_short_of_params(struct damaged *s)
 {
     tree_of(s)->param_count = 4;
 }
 
 /* One argument recorded for a copy of a generic of two. */
-static void copy_short_of_args(struct session *s)
+static void copy_short_of_args(struct damaged *s)
 {
     tree_let(s, "kept")->as.call.copy_count = 1;
 }
 
 /* The nested block holds the statement that holds it. */
-static void block_holds_itself(struct session *s)
+static void block_holds_itself(struct damaged *s)
 {
     struct stmt *nested = tree_stmt(s, STMT_BLOCK, 0);
 
     nested->as.block->stmts[0] = nested;
 }
 
-static void expr_holds_itself(struct session *s)
+static void expr_holds_itself(struct damaged *s)
 {
     struct expr *sum = tree_let(s, "sum");
 
@@ -3427,7 +3408,7 @@ static void expr_holds_itself(struct session *s)
 }
 
 /* One statement in two places of the body. */
-static void stmt_twice(struct session *s)
+static void stmt_twice(struct damaged *s)
 {
     struct stmt *nested = tree_stmt(s, STMT_BLOCK, 0);
     struct item *it = tree_of(s);
@@ -3439,41 +3420,41 @@ static void stmt_twice(struct session *s)
 static const struct name no_field = {"zz", 2};
 
 /* `pt.zz`, which lowering finds no field for. */
-static void field_past_struct(struct session *s)
+static void field_past_struct(struct damaged *s)
 {
     tree_let(s, "px")->as.field.name = no_field;
 }
 
 /* `TPoint { zz: n, y: 1 }`. */
-static void init_past_struct(struct session *s)
+static void init_past_struct(struct damaged *s)
 {
     tree_let(s, "pt")->as.struct_lit.fields[0].name = no_field;
 }
 
 /* `TShape.Circle { zz: n }`, a name the fields of the case lack. */
-static void init_past_case(struct session *s)
+static void init_past_case(struct damaged *s)
 {
     tree_let(s, "made")->as.struct_lit.fields[0].name = no_field;
 }
 
 /* A literal of the variant that names no case, whose case lowering
    counts from 1. */
-static void variant_without_case(struct session *s)
+static void variant_without_case(struct damaged *s)
 {
     tree_let(s, "made")->as.struct_lit.variant_case = 0;
 }
 
 /* `[]int { zz: none, len: 0 }`. */
-static void init_past_slice(struct session *s)
+static void init_past_slice(struct damaged *s)
 {
     tree_let(s, "sl")->as.slice_lit.fields[0].name = no_field;
 }
 
 /* A copy of the symbol that e names, which the file then writes as an
    extern of its own. */
-static struct symbol *own_symbol(struct session *s, struct expr *e)
+static struct symbol *own_symbol(struct damaged *s, struct expr *e)
 {
-    struct symbol *copy = arena_alloc(&s->arena, sizeof *copy);
+    struct symbol *copy = arena_alloc(s->arena, sizeof *copy);
 
     *copy = *e->symbol;
     e->symbol = copy;
@@ -3481,7 +3462,7 @@ static struct symbol *own_symbol(struct session *s, struct expr *e)
 }
 
 /* The private function `thelper` written with the type `int`. */
-static void extern_fn_not_fn(struct session *s)
+static void extern_fn_not_fn(struct damaged *s)
 {
     struct expr *call = tree_let(s, "helped")->as.binary.left;
 
@@ -3489,26 +3470,26 @@ static void extern_fn_not_fn(struct session *s)
 }
 
 /* The private constant `TLIMIT` written without its value. */
-static void extern_const_without_value(struct session *s)
+static void extern_const_without_value(struct damaged *s)
 {
     own_symbol(s, tree_let(s, "helped")->as.binary.right)->value = NULL;
 }
 
 /* A line above INT_MAX, which a negative line of the compiler writes. */
-static void line_negative(struct session *s)
+static void line_negative(struct damaged *s)
 {
     tree_let(s, "sum")->pos.line = -1;
 }
 
 /* A chain of `-` as deep as depth, with the operand of `-n` at its end. */
-static void unary_chain(struct session *s, size_t depth)
+static void unary_chain(struct damaged *s, size_t depth)
 {
     struct expr *neg = tree_let(s, "neg");
     struct expr *chain = neg->as.unary.operand;
     size_t k;
 
     for (k = 0; k < depth; k++) {
-        struct expr *link = arena_alloc(&s->arena, sizeof *link);
+        struct expr *link = arena_alloc(s->arena, sizeof *link);
         *link = *neg;
         link->as.unary.operand = chain;
         chain = link;
@@ -3516,24 +3497,24 @@ static void unary_chain(struct session *s, size_t depth)
     neg->as.unary.operand = chain;
 }
 
-static void short_chain(struct session *s)
+static void short_chain(struct damaged *s)
 {
     unary_chain(s, 16);
 }
 
-static void deep_chain(struct session *s)
+static void deep_chain(struct damaged *s)
 {
     unary_chain(s, ANTL_TREE_DEPTH_MAX + 16);
 }
 
 /* Read the library of tree_source written with damage, or refuse it. */
-static void tree_file(void (*damage)(struct session *),
+static void tree_file(void (*damage)(struct damaged *),
                       bool reads)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
 
-    open_session(&s);
+    compilation_open(&s);
     if (build_damaged(&s, "tt", tree_source, damage, &bytes)) {
         if (reads) {
             CHECK(reads_file(&bytes));
@@ -3542,15 +3523,15 @@ static void tree_file(void (*damage)(struct session *),
         }
     }
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* `tpair(x, n, n)`, the last argument shared. Every table keeps its
    size, and the first byte that differs is the count of the arguments. */
-static void arg_repeated(struct session *s)
+static void arg_repeated(struct damaged *s)
 {
     struct expr *call = tree_let(s, "kept");
-    struct expr **args = arena_alloc(&s->arena, 3 * sizeof *args);
+    struct expr **args = arena_alloc(s->arena, 3 * sizeof *args);
 
     args[0] = call->as.call.args[0];
     args[1] = call->as.call.args[1];
@@ -3561,7 +3542,7 @@ static void arg_repeated(struct session *s)
 
 /* `tpair(x)`: the table of expressions of the tree loses `n`, and the
    first byte that differs is the count of that table. */
-static void arg_dropped(struct session *s)
+static void arg_dropped(struct damaged *s)
 {
     tree_let(s, "kept")->as.call.arg_count = 1;
 }
@@ -3569,14 +3550,14 @@ static void arg_dropped(struct session *s)
 /* The first byte where the file of tree_source written with damage
    differs from the one written without, or SIZE_MAX. */
 static size_t tree_difference(const struct text *plain,
-                              void (*damage)(struct session *))
+                              void (*damage)(struct damaged *))
 {
-    struct session s;
+    struct compilation s;
     struct text other = {0};
     size_t at = SIZE_MAX;
     size_t i;
 
-    open_session(&s);
+    compilation_open(&s);
     if (build_damaged(&s, "tt", tree_source, damage, &other)) {
         for (i = 0; i < plain->length && i < other.length; i++) {
             if (plain->data[i] != other.data[i]) {
@@ -3586,7 +3567,7 @@ static size_t tree_difference(const struct text *plain,
         }
     }
     text_free(&other);
-    close_session(&s);
+    compilation_close(&s);
     return at;
 }
 
@@ -3618,17 +3599,17 @@ static void refuses_count(const struct text *plain, size_t at, uint32_t value)
    element and a record of the table of expressions more than two. */
 static void tree_counts(void)
 {
-    struct session s;
+    struct compilation s;
     struct text plain = {0};
     size_t list;
     size_t table;
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_damaged(&s, "tt", tree_source, NULL, &plain)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
-    close_session(&s);
+    compilation_close(&s);
     list = tree_difference(&plain, arg_repeated);
     table = tree_difference(&plain, arg_dropped);
     if (list == SIZE_MAX || table == SIZE_MAX) {
@@ -3651,11 +3632,11 @@ static void tree_counts(void)
    length, so a sanitizer sees a read past it. */
 static void truncated_trees(void)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     size_t n;
 
-    open_session(&s);
+    compilation_open(&s);
     if (build_library(&s, "tt", tree_source, &bytes)) {
         CHECK(reads_file(&bytes));
         for (n = 0; n < bytes.length; n++) {
@@ -3666,13 +3647,13 @@ static void truncated_trees(void)
         }
     }
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* The negative step of `for j in 0..10 by -3` reads back as -3. */
 static void signed_numbers(void)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     struct ir_module program;
     const struct interface *read = NULL;
@@ -3680,7 +3661,7 @@ static void signed_numbers(void)
     size_t found = 0;
     size_t i;
 
-    open_session(&s);
+    compilation_open(&s);
     if (build_library(&s, "tt", tree_source, &bytes)) {
         ir_module_init(&program, &s.arena, "main");
         read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
@@ -3704,7 +3685,7 @@ static void signed_numbers(void)
         CHECK(found == 1);
     }
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* A library of the records the sweep below damages: a constraint, a
@@ -3757,16 +3738,16 @@ static const char sweep_source[] =
    the reader for twice the time. */
 static void sweep_file(const char *name, const char *source)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     uint8_t *copy;
     size_t at;
     size_t pokes = 0;
     size_t refused = 0;
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, name, source, &bytes)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     CHECK(reads_file(&bytes));
@@ -3792,7 +3773,7 @@ static void sweep_file(const char *name, const char *source)
     CHECK(refused > 0 && refused < pokes);
     free(copy);
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 static void damaged_bytes(void)
@@ -3803,7 +3784,7 @@ static void damaged_bytes(void)
 
 static void damaged_trees(void)
 {
-    void (*const damages[])(struct session *) = {
+    void (*const damages[])(struct damaged *) = {
         otherwise_past_arms,     arm_case_past_cases,
         cast_case_past_cases,    literal_case_past_cases,
         enum_value_past_values,  name_without_symbol,
@@ -3847,7 +3828,7 @@ static const char capture_source[] =
 static struct item *capturing;
 static size_t capture_room;
 
-static void find_closure(struct session *s)
+static void find_closure(struct damaged *s)
 {
     const struct item *grab = generic_of(s->written, "grab");
     size_t i;
@@ -3869,16 +3850,16 @@ static void find_closure(struct session *s)
    room of the captures of a closure stays as the checker left it. */
 static void writer_keeps_trees(void)
 {
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
 
-    open_session(&s);
+    compilation_open(&s);
     CHECK(build_damaged(&s, "cap", capture_source, find_closure, &bytes));
     CHECK(capturing != NULL && capturing->capture_count == 1);
     CHECK(capturing != NULL && capture_room > 1 &&
           capturing->capture_capacity == capture_room);
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* Rule 14: the C symbol of a function of the root becomes a C string,
@@ -3887,14 +3868,14 @@ static void writer_keeps_trees(void)
 static void runtime_names(void)
 {
     static const char name[] = "type_name";
-    struct session s;
+    struct compilation s;
     struct text bytes = {0};
     size_t at;
     size_t found = SIZE_MAX;
 
-    open_session(&s);
+    compilation_open(&s);
     if (!build_library(&s, "rn", root_source, &bytes)) {
-        close_session(&s);
+        compilation_close(&s);
         return;
     }
     CHECK(reads_file(&bytes));
@@ -3912,7 +3893,7 @@ static void runtime_names(void)
     CHECK(found != SIZE_MAX);
     refuses_poke(&bytes, found, "", 1);
     text_free(&bytes);
-    close_session(&s);
+    compilation_close(&s);
 }
 
 /* A variadic C function that a generic calls. */
@@ -3949,6 +3930,7 @@ void test_modules(void)
     deep_tables();
     imports();
     cycles();
+    compilation_bound();
     lowers_imports();
     writes_format();
     round_trip();

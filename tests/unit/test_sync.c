@@ -18,26 +18,11 @@
 static void syntax_error(const char *source, int line, int column,
                          const char *message)
 {
-    struct arena arena = {0};
-    struct diagnostics diags = {0};
-    struct token_list tokens = {0};
-    struct module *module = NULL;
+    struct parsed p;
 
-    CHECK(lexer_lex(source, strlen(source), &arena, &diags, &tokens));
-    CHECK(!parser_parse(source, &tokens, &arena, &diags, &module));
-    if (diags.count == 0 || diags.items[0].line != line ||
-        diags.items[0].column != column ||
-        strcmp(diags.items[0].message, message) != 0) {
-        check_failures++;
-        fprintf(stderr, "expected %d:%d: %s\ngot      %d:%d: %s\n%s\n", line,
-                column, message, diags.count > 0 ? diags.items[0].line : 0,
-                diags.count > 0 ? diags.items[0].column : 0,
-                diags.count > 0 ? diags.items[0].message : "nothing",
-                source);
-    }
-    lexer_token_list_free(&tokens);
-    diagnostics_free(&diags);
-    arena_free(&arena);
+    parsed_run(&p, source);
+    expect_refused(p.ok, &p.diags, source, line, column, message);
+    parsed_release(&p);
 }
 
 /* The type of the first `let` of the last function of source. */
