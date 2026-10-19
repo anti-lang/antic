@@ -39,6 +39,81 @@ static bool align_clause(struct parser *p, struct item *it)
            parser_expect(p, TOKEN_RPAREN);
 }
 
+/* The marks before the name of a field of a class: `implements` or
+   `use`, its level, `inject` and the contextual words of its kind. */
+static void field_marks(struct parser *p, struct param *field)
+{
+    if (parser_accept(p, TOKEN_IMPLEMENTS)) {
+        field->form = FIELD_IMPL;
+    } else if (parser_accept(p, TOKEN_USE)) {
+        field->form = FIELD_USE;
+    }
+    if (field->form == FIELD_PLAIN) {
+        if (parser_accept(p, TOKEN_PUB)) {
+            field->vis = VIS_PUB;
+        } else if (parser_accept(p, TOKEN_PROTECTED)) {
+            field->vis = VIS_PROTECTED;
+        }
+    }
+    /* DESIGN: `inject` and `inject final` name a field a provider
+       fills before `construct` runs. Both are contextual, so
+       `inject: int` is still a field named `inject` and
+       `inject final: *L` a field named `final` a provider fills.
+       The `final` form is read first, because its second word is a
+       name as well. */
+    if (parser_is_word(p, parser_peek(p), "inject") &&
+        parser_is_word(p, parser_peek_at(p, 1), "final") &&
+        parser_is_field_name(parser_peek_at(p, 2))) {
+        parser_next(p);
+        parser_next(p);
+        field->injected = true;
+        field->inject_final = true;
+    } else if (parser_is_word(p, parser_peek(p), "inject") &&
+               parser_is_field_name(parser_peek_at(p, 1))) {
+        parser_next(p);
+        field->injected = true;
+    }
+    /* `transient`, `own`, `atomic` and `mutable` are contextual
+       words before a field name, so a field may still carry one of
+       those names. */
+    if (parser_is_word(p, parser_peek(p), "transient") &&
+        (parser_peek_at(p, 1)->kind == TOKEN_IDENT ||
+         parser_peek_at(p, 1)->kind == TOKEN_ATOMIC)) {
+        parser_next(p);
+        field->transient = true;
+    }
+    if (parser_is_word(p, parser_peek(p), "own") &&
+        parser_peek_at(p, 1)->kind == TOKEN_IDENT) {
+        parser_next(p);
+        field->owned = true;
+    }
+    if (parser_is_word(p, parser_peek(p), "mutable") &&
+        parser_peek_at(p, 1)->kind == TOKEN_IDENT) {
+        parser_next(p);
+        field->writable = true;
+    }
+    if (parser_check(p, TOKEN_ATOMIC) &&
+        parser_peek_at(p, 1)->kind == TOKEN_IDENT) {
+        parser_next(p);
+        field->atomic = true;
+    }
+}
+
+/* The name, the type, the guard and clauses and the width of a field of
+   a struct, a union or a class. A member name stands after `inject`.
+   Returns false after an error. */
+static bool field_declaration(struct parser *p, struct param *field,
+                              bool member_name)
+{
+    return (member_name ? parser_expect_member_name(p, &field->name)
+                        : parser_expect_name(p, &field->name)) &&
+           parser_expect(p, TOKEN_COLON) &&
+           (field->type = parser_type(p)) != NULL &&
+           parser_guard_clause(p, field) && parser_field_clauses(p) &&
+           (!parser_accept(p, TOKEN_COLON) ||
+            (field->bits = parser_expression(p)) != NULL);
+}
+
 /* The lines of a class body and its `}`: the fields, the functions and
    constants and the nested types. Returns false after an error. */
 static bool class_body(struct parser *p, struct item *it, struct list *fields,
@@ -98,73 +173,13 @@ static bool class_body(struct parser *p, struct item *it, struct list *fields,
             }
             continue;
         }
-        if (parser_accept(p, TOKEN_IMPLEMENTS)) {
-            field.form = FIELD_IMPL;
-        } else if (parser_accept(p, TOKEN_USE)) {
-            field.form = FIELD_USE;
-        }
-        if (field.form == FIELD_PLAIN) {
-            if (parser_accept(p, TOKEN_PUB)) {
-                field.vis = VIS_PUB;
-            } else if (parser_accept(p, TOKEN_PROTECTED)) {
-                field.vis = VIS_PROTECTED;
-            }
-        }
-        /* DESIGN: `inject` and `inject final` name a field a provider
-           fills before `construct` runs. Both are contextual, so
-           `inject: int` is still a field named `inject` and
-           `inject final: *L` a field named `final` a provider fills.
-           The `final` form is read first, because its second word is a
-           name as well. */
-        if (parser_is_word(p, parser_peek(p), "inject") &&
-            parser_is_word(p, parser_peek_at(p, 1), "final") &&
-            parser_is_field_name(parser_peek_at(p, 2))) {
-            parser_next(p);
-            parser_next(p);
-            field.injected = true;
-            field.inject_final = true;
-        } else if (parser_is_word(p, parser_peek(p), "inject") &&
-                   parser_is_field_name(parser_peek_at(p, 1))) {
-            parser_next(p);
-            field.injected = true;
-        }
-        /* `transient`, `own`, `atomic` and `mutable` are contextual
-           words before a field name, so a field may still carry one of
-           those names. */
-        if (parser_is_word(p, parser_peek(p), "transient") &&
-            (parser_peek_at(p, 1)->kind == TOKEN_IDENT ||
-             parser_peek_at(p, 1)->kind == TOKEN_ATOMIC)) {
-            parser_next(p);
-            field.transient = true;
-        }
-        if (parser_is_word(p, parser_peek(p), "own") &&
-            parser_peek_at(p, 1)->kind == TOKEN_IDENT) {
-            parser_next(p);
-            field.owned = true;
-        }
-        if (parser_is_word(p, parser_peek(p), "mutable") &&
-            parser_peek_at(p, 1)->kind == TOKEN_IDENT) {
-            parser_next(p);
-            field.writable = true;
-        }
-        if (parser_check(p, TOKEN_ATOMIC) &&
-            parser_peek_at(p, 1)->kind == TOKEN_IDENT) {
-            parser_next(p);
-            field.atomic = true;
-        }
+        field_marks(p, &field);
         /* An `inject` field may be called `alloc` or `free`, as the
            example of `docs/anti-syntax-overview.md` writes it. A name
            must stand after `inject`, so the position has one reading. */
         mark = p->clauses->count;
         field.name_pos = parser_pos_of(parser_peek(p));
-        if (!(field.injected ? parser_expect_member_name(p, &field.name)
-                             : parser_expect_name(p, &field.name)) ||
-            !parser_expect(p, TOKEN_COLON) ||
-            (field.type = parser_type(p)) == NULL ||
-            !parser_guard_clause(p, &field) ||
-            !parser_field_clauses(p) ||
-            (parser_accept(p, TOKEN_COLON) &&
-             (field.bits = parser_expression(p)) == NULL) ||
+        if (!field_declaration(p, &field, field.injected) ||
             (parser_accept(p, TOKEN_ASSIGN) &&
              (field.value = parser_expression(p)) == NULL) ||
             !parser_guard_clause(p, &field) || !parser_field_clauses(p)) {
@@ -320,6 +335,106 @@ static struct item *variant_item(struct parser *p, struct item *it)
         }
     }
     it->cases = parser_list_finish(p, &cases, &it->case_count);
+    return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
+}
+
+/* `struct Point { x: f32, y: f32 }` and `union`, with their fields.
+   DESIGN: a struct body holds fields and nothing else. It is exactly the
+   bytes C declares, so a function, a constant, a default or a base
+   belongs to a class. */
+static struct item *struct_item(struct parser *p, struct item *it)
+{
+    struct list fields = {NULL, 0, 0, sizeof(struct param)};
+    it->kind =
+        parser_next(p)->kind == TOKEN_UNION ? ITEM_UNION : ITEM_STRUCT;
+    if (!parser_expect_name(p, &it->name) ||
+        (it->kind == ITEM_STRUCT && !parser_type_params(p, it))) {
+        return NULL;
+    }
+    /* A union reads the bytes of one field through another, which a
+       type parameter leaves open, so it takes none, by R060. */
+    if (it->kind == ITEM_UNION && parser_check(p, TOKEN_LT)) {
+        parser_error_here(p, "a union takes no type parameters");
+        return NULL;
+    }
+    if (!align_clause(p, it)) {
+        return NULL;
+    }
+    if (!parser_header_clauses(p) || !parser_expect(p, TOKEN_LBRACE)) {
+        return NULL;
+    }
+    do {
+        struct param field;
+        size_t mark;
+        memset(&field, 0, sizeof field);
+        field.doc = parser_doc_before(p, TOKEN_DOC);
+        field.note = parser_doc_before(p, TOKEN_NOTE);
+        field.pos = parser_pos_of(parser_peek(p));
+        if (!parser_struct_field_only(p, it)) {
+            free(fields.data);
+            return NULL;
+        }
+        mark = p->clauses->count;
+        if (!field_declaration(p, &field, false)) {
+            free(fields.data);
+            return NULL;
+        }
+        field.unchecked = parser_unchecks_guard(p, mark);
+        parser_close_clauses(p, mark, field.pos);
+        if (parser_check(p, TOKEN_ASSIGN)) {
+            parser_error_here(p, "a field of a %s has no default, "
+                                 "which belongs to a class",
+                              it->kind == ITEM_UNION ? "union" : "struct");
+            free(fields.data);
+            return NULL;
+        }
+        parser_list_push(&fields, &field);
+    } while (parser_accept(p, TOKEN_COMMA) && !parser_check(p, TOKEN_RBRACE));
+    it->params = parser_list_finish(p, &fields, &it->param_count);
+    return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
+}
+
+/* `enum Mode: u8 { Read, Write = 2 }`, its values and then its
+   members. */
+static struct item *enum_item(struct parser *p, struct item *it)
+{
+    struct list values = {NULL, 0, 0, sizeof(struct param)};
+    parser_next(p);
+    it->kind = ITEM_ENUM;
+    if (!parser_expect_name(p, &it->name)) {
+        return NULL;
+    }
+    /* `enum Mode: u8` names the underlying type. Without one the type
+       is c_int, which the checker fills in. */
+    if (parser_accept(p, TOKEN_COLON) &&
+        (it->base = parser_type(p)) == NULL) {
+        return NULL;
+    }
+    if (!parser_expect(p, TOKEN_LBRACE)) {
+        return NULL;
+    }
+    while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF) &&
+           !parser_starts_member(p)) {
+        struct param value;
+        memset(&value, 0, sizeof value);
+        value.doc = parser_doc_before(p, TOKEN_DOC);
+        value.note = parser_doc_before(p, TOKEN_NOTE);
+        value.pos = parser_pos_of(parser_peek(p));
+        if (!parser_expect_name(p, &value.name) ||
+            (parser_accept(p, TOKEN_ASSIGN) &&
+             (value.value = parser_expression(p)) == NULL)) {
+            free(values.data);
+            return NULL;
+        }
+        parser_list_push(&values, &value);
+        if (!parser_accept(p, TOKEN_COMMA)) {
+            break;
+        }
+    }
+    it->params = parser_list_finish(p, &values, &it->param_count);
+    if (!parser_members_of(p, it, NULL)) {
+        return NULL;
+    }
     return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
 }
 
@@ -493,111 +608,14 @@ static struct item *item_level(struct parser *p)
         }
         return it;
     case TOKEN_STRUCT:
-    case TOKEN_UNION: {
-        struct list fields = {NULL, 0, 0, sizeof(struct param)};
-        it->kind = parser_next(p)->kind == TOKEN_UNION ? ITEM_UNION
-                                                       : ITEM_STRUCT;
-        if (!parser_expect_name(p, &it->name) ||
-            (it->kind == ITEM_STRUCT && !parser_type_params(p, it))) {
-            return NULL;
-        }
-        /* A union reads the bytes of one field through another, which a
-           type parameter leaves open, so it takes none, by R060. */
-        if (it->kind == ITEM_UNION && parser_check(p, TOKEN_LT)) {
-            parser_error_here(p, "a union takes no type parameters");
-            return NULL;
-        }
-        if (!align_clause(p, it)) {
-            return NULL;
-        }
-        if (!parser_header_clauses(p) || !parser_expect(p, TOKEN_LBRACE)) {
-            return NULL;
-        }
-        /* DESIGN: a struct body holds fields and nothing else. It is
-           exactly the bytes C declares, so a function, a constant, a
-           default or a base belongs to a class. */
-        do {
-            struct param field;
-            size_t mark;
-            memset(&field, 0, sizeof field);
-            field.doc = parser_doc_before(p, TOKEN_DOC);
-            field.note = parser_doc_before(p, TOKEN_NOTE);
-            field.pos = parser_pos_of(parser_peek(p));
-            if (!parser_struct_field_only(p, it)) {
-                free(fields.data);
-                return NULL;
-            }
-            mark = p->clauses->count;
-            if (!parser_expect_name(p, &field.name) ||
-                !parser_expect(p, TOKEN_COLON) ||
-                (field.type = parser_type(p)) == NULL ||
-                !parser_guard_clause(p, &field) ||
-                !parser_field_clauses(p) ||
-                (parser_accept(p, TOKEN_COLON) &&
-                 (field.bits = parser_expression(p)) == NULL)) {
-                free(fields.data);
-                return NULL;
-            }
-            field.unchecked = parser_unchecks_guard(p, mark);
-            parser_close_clauses(p, mark, field.pos);
-            if (parser_check(p, TOKEN_ASSIGN)) {
-                parser_error_here(p, "a field of a %s has no default, "
-                                     "which belongs to a class",
-                                  it->kind == ITEM_UNION ? "union"
-                                                         : "struct");
-                free(fields.data);
-                return NULL;
-            }
-            parser_list_push(&fields, &field);
-        } while (parser_accept(p, TOKEN_COMMA) &&
-                 !parser_check(p, TOKEN_RBRACE));
-        it->params = parser_list_finish(p, &fields, &it->param_count);
-        return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
-    }
+    case TOKEN_UNION:
+        return struct_item(p, it);
     case TOKEN_CLASS:
         return class_item(p, it);
     case TOKEN_VARIANT:
         return variant_item(p, it);
-    case TOKEN_ENUM: {
-        struct list values = {NULL, 0, 0, sizeof(struct param)};
-        parser_next(p);
-        it->kind = ITEM_ENUM;
-        if (!parser_expect_name(p, &it->name)) {
-            return NULL;
-        }
-        /* `enum Mode: u8` names the underlying type. Without one the type
-           is c_int, which the checker fills in. */
-        if (parser_accept(p, TOKEN_COLON) &&
-            (it->base = parser_type(p)) == NULL) {
-            return NULL;
-        }
-        if (!parser_expect(p, TOKEN_LBRACE)) {
-            return NULL;
-        }
-        while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF) &&
-               !parser_starts_member(p)) {
-            struct param value;
-            memset(&value, 0, sizeof value);
-            value.doc = parser_doc_before(p, TOKEN_DOC);
-            value.note = parser_doc_before(p, TOKEN_NOTE);
-            value.pos = parser_pos_of(parser_peek(p));
-            if (!parser_expect_name(p, &value.name) ||
-                (parser_accept(p, TOKEN_ASSIGN) &&
-                 (value.value = parser_expression(p)) == NULL)) {
-                free(values.data);
-                return NULL;
-            }
-            parser_list_push(&values, &value);
-            if (!parser_accept(p, TOKEN_COMMA)) {
-                break;
-            }
-        }
-        it->params = parser_list_finish(p, &values, &it->param_count);
-        if (!parser_members_of(p, it, NULL)) {
-            return NULL;
-        }
-        return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
-    }
+    case TOKEN_ENUM:
+        return enum_item(p, it);
     case TOKEN_CONSTRAINT:
         /* `constraint Ordered = eq + lt;` names a set of constraints. C
            has none, so a constraint is never exported. */
