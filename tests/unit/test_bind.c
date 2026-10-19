@@ -1,15 +1,18 @@
 /* The parser of C type spellings and the evaluator of constant
-   expressions of anti bind. */
+   expressions of anti bind, and a binding written from a description in
+   the format of rlparser. */
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../binary_stdio.h"
+#include "bind.h"
 #include "bindexpr.h"
 #include "bindmodel.h"
 #include "check.h"
 #include "alloc.h"
+#include "files.h"
 #include "jsontree.h"
 
 static const struct bind_type *no_typedef(void *context, const char *name)
@@ -277,10 +280,39 @@ static void json_messages(void)
     CHECK(!json_read(NULL, 0, &tree, large, sizeof large));
 }
 
+/* `anti bind api_parts.json` in the process: the reader of the
+   description, the module it settles and the writer, with the probes in
+   C and in Anti. The module is the one tests/bind/ holds, which the test
+   anti_bind_api_parts compiles as well. */
+static void binds_description(void)
+{
+    struct bind_request q;
+    struct text written = {0};
+    struct text expected = {0};
+
+    memset(&q, 0, sizeof q);
+    q.input = ANTIC_SOURCE_DIR "/tests/bind/api_parts.json";
+    q.module = "bindtest.api_parts";
+    q.out_dir = "bind-out";
+    q.probe = true;
+    CHECK(bind_run(&q) == 0);
+    CHECK(files_read("bind-out/api_parts.anti", &written));
+    CHECK(files_read(ANTIC_SOURCE_DIR "/tests/bind/api_parts.anti.expected",
+                     &expected));
+    CHECK_STR(text_cstr(&written), text_cstr(&expected));
+    CHECK(files_exists("bind-out/probe_api_parts.c"));
+    CHECK(files_exists("bind-out/probe_api_parts.anti"));
+    text_free(&written);
+    text_free(&expected);
+    q.input = "bind-out/none.json";
+    CHECK(bind_run(&q) == 1);
+}
+
 void test_bind(void)
 {
     json_messages();
     spellings();
     expressions();
     deep_input();
+    binds_description();
 }

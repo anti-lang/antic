@@ -1,6 +1,7 @@
-/* Three parts. The command lines of the linker per target and mode, of
+/* Four parts. The command lines of the linker per target and mode, of
    src/antic/linker.c. The names of an Apple SDK, of src/antic/applesdk.c.
-   The markers of the notice, which src/rt/license.h alone holds. */
+   The markers of the notice, which src/rt/license.h alone holds, and the
+   notice that src/antic/notice.c writes between them. */
 
 #include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
@@ -1067,6 +1068,41 @@ static void sdk_names(void)
     sdk_name("", false, 0, 0);
 }
 
+/* The notice of src/antic/notice.c: one line per package with its
+   attribution, once per name, then each licence text once, after the
+   names of the packages it covers. A component of the runtime archive
+   names its SPDX identifier, or LicenseRef- for one the table lacks. */
+static void notice_texts(void)
+{
+    static const char *const credit[] = {"Copyright A"};
+    static const struct package a = {"a", "1.0", NULL, 0, "MIT",
+                                     "the text of MIT\n", credit, 1};
+    static const struct package b = {"b", "2.0", NULL, 0, "MIT",
+                                     "the text of MIT\n", NULL, 0};
+    static const struct package c = {"c", "3.0", NULL, 0, "0BSD",
+                                     "the text of 0BSD", NULL, 0};
+    const struct package *const packages[] = {&a, &b, &a, &c};
+    struct text out = {0};
+
+    notice_text(&out, packages, sizeof packages / sizeof packages[0]);
+    CHECK_STR(text_cstr(&out), ANTI_NOTICE_BEGIN
+              "package a 1.0 MIT\n"
+              "attribution Copyright A\n"
+              "package b 2.0 MIT\n"
+              "package c 3.0 0BSD\n"
+              "text for a b\n"
+              "the text of MIT\n"
+              "text for c\n"
+              "the text of 0BSD\n" ANTI_NOTICE_END);
+    text_free(&out);
+    notice_component_license("pcre2", &out);
+    CHECK_STR(text_cstr(&out), "BSD-3-Clause WITH PCRE2-exception");
+    text_free(&out);
+    notice_component_license("mingw-w64", &out);
+    CHECK_STR(text_cstr(&out), "LicenseRef-mingw-w64");
+    text_free(&out);
+}
+
 void test_link(void)
 {
     sdk_names();
@@ -1086,6 +1122,7 @@ void test_link(void)
     host_separators();
     runtime_entry();
     runtime_markers();
+    notice_texts();
     runtime_licence(ANTIC_SOURCE_DIR "/src/rt/LICENSE");
     runtime_licence(ANTIC_SOURCE_DIR "/src/std/LICENSE");
     links(TARGET_MACOS_ARM64, &unix_inputs,

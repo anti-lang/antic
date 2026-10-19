@@ -62,6 +62,12 @@ void test_files(void);
 void test_tool_platform(void);
 void test_interface(void);
 void test_contract(void);
+void test_memcheck(void);
+void test_units(void);
+void test_llvm_run(void);
+void test_project(void);
+void test_licensing(void);
+void test_commands(void);
 
 /* Each group of checks under the name of its file, tests/unit/test_<name>.c.
    ctest runs one file per test, unit_<name>, so a failure names its file. */
@@ -126,6 +132,12 @@ static const struct group groups[] = {
     {"tool_platform", test_tool_platform},
     {"interface", test_interface},
     {"contract", test_contract},
+    {"memcheck", test_memcheck},
+    {"units", test_units},
+    {"llvm_run", test_llvm_run},
+    {"project", test_project},
+    {"licensing", test_licensing},
+    {"commands", test_commands},
 };
 
 /* The name of the file whose groups run, or NULL for every group, and

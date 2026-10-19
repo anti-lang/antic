@@ -1,13 +1,19 @@
 /* The walks of src/antic/antic.h, which the commands of anti call in
-   place of the lexer, the parser and the library reader. */
+   place of the lexer, the parser and the library reader, and the doc
+   page of src/antic/docpage.c that `anti doc` renders. */
 
 #include "../binary_stdio.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
+#include "../../src/antic/platform.h"
 #include "antic.h"
 #include "check.h"
+#include "cpu.h"
+#include "driver.h"
+#include "target.h"
 
 static void identifiers(void)
 {
@@ -132,10 +138,49 @@ static void library_headers(void)
     arena_free(&arena);
 }
 
+/* The page of a source: the doc text of the module and of each public
+   item, and the private items only where the page asks for them. */
+static void doc_pages(void)
+{
+    static const char path[] = "doc_page.anti";
+    static const char source[] = "//! The answers.\n"
+                                 "/// The answer.\n"
+                                 "pub fn answer() -> int { return 42; }\n"
+                                 "fn hidden() -> int { return 1; }\n";
+    struct options o;
+    struct doc_page page = {0};
+    FILE *f = platform_open(path, true);
+
+    CHECK(f != NULL);
+    if (f == NULL) {
+        return;
+    }
+    CHECK(fwrite(source, 1, sizeof source - 1, f) == sizeof source - 1);
+    CHECK(fclose(f) == 0);
+    memset(&o, 0, sizeof o);
+    o.input = path;
+    CHECK(target_host(&o.target));
+    o.cpu = cpu_default(o.target);
+    CHECK(antic_doc_page(&o, DOC_ITEMS_PUBLIC, &page));
+    CHECK_STR(text_cstr(&page.module), "doc_page");
+    CHECK_STR(text_cstr(&page.doc), "The answers.");
+    CHECK(page.item_count == 1);
+    if (page.item_count == 1) {
+        CHECK_STR(text_cstr(&page.items[0].name), "answer");
+        CHECK_STR(text_cstr(&page.items[0].doc), "The answer.");
+    }
+    antic_doc_page_free(&page);
+    CHECK(page.item_count == 0);
+    CHECK(antic_doc_page(&o, DOC_ITEMS_PRIVATE, &page));
+    CHECK(page.item_count == 2);
+    antic_doc_page_free(&page);
+}
+
 void test_interface(void)
 {
     identifiers();
     builtin_types();
     outlines();
     library_headers();
+    doc_pages();
 }

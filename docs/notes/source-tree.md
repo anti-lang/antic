@@ -510,8 +510,9 @@ Each holds one case per message of a command, which
 | `tests/unit/test_abi.c` | `abi_classify`, one case per rule of the calling conventions. |
 | `tests/unit/test_alloc_oom.c` | A program that asks one allocation helper of antic for more memory than a host gives, for `run_alloc_oom.cmake`. |
 | `tests/unit/test_arith.c` | The upper half of a product and the saturating operations of `arith.c` at every width. |
-| `tests/unit/test_bind.c` | The parser of C type spellings and the evaluator of constant expressions of `anti bind`. |
+| `tests/unit/test_bind.c` | The parser of C type spellings and the evaluator of constant expressions of `anti bind`, and a binding written from a description of rlparser. |
 | `tests/unit/test_coff.c` | The join of COFF objects and the exports of an archive. |
+| `tests/unit/test_commands.c` | `anti check`, `anti doc`, `anti build`, `anti run` and `anti test` in the process on the project of `anti new`, and a plugin built through `driver_run`. |
 | `tests/unit/test_conf_race.c` | `rt.configure` replacing a value while another thread reads it. |
 | `tests/unit/test_contract.c` | The layouts and the numbers that a module of the standard library and the runtime both write, read from both sides. |
 | `tests/unit/test_cpu.c` | The level table of antic, the names of `--cpu` and the start-up check of the runtime. |
@@ -525,16 +526,19 @@ Each holds one case per message of a command, which
 | `tests/unit/test_fs.c` | `anti_rt_fs_read`. |
 | `tests/unit/test_hash_draw.c` | The number of the walk order of a hashed collection and the seed of the hashes when the system gives no random bytes. |
 | `tests/unit/test_header.c` | The C header antic writes for a library, for owning structs and simd lanes. |
-| `tests/unit/test_interface.c` | The walks of `antic.h` that the commands of `anti` call. |
+| `tests/unit/test_interface.c` | The walks of `antic.h` that the commands of `anti` call in place of the lexer, the parser and the library reader, and the doc page of `docpage.c`. |
 | `tests/unit/test_ir.c` | The IR built by hand, its printed form and its verifier. |
 | `tests/unit/test_json.c` | The JSON scanner on malformed input. |
 | `tests/unit/test_layout.c` | The sizes, alignments, bitfields and refusals of `layout.c`. |
 | `tests/unit/test_lexer.c` | The tokens, the literals and the errors of the lexer. |
-| `tests/unit/test_link.c` | The command lines of the linker per target and mode, the names of an SDK and the markers of the notice. |
+| `tests/unit/test_licensing.c` | The readers of the licence notice in a binary and of the record of upstream sources, of `src/anti/licensing.c`. |
+| `tests/unit/test_link.c` | The command lines of the linker per target and mode, the names of an SDK, the markers of the notice and the notice between them. |
 | `tests/unit/test_llvm_emit.c` | `llvm_emit_module`, by the sections of the work order of the LLVM back end. |
+| `tests/unit/test_llvm_run.c` | The run of opt and llc of the runtime archive by `llvm_run.c`, in dev and release mode and on text they refuse. |
 | `tests/unit/test_llvm_target.c` | The triple, the relocation model and the function attributes per target and level. |
 | `tests/unit/test_lower.c` | The IR that lowering writes for a source, and the table of the runtime functions against the prototypes of `src/rt/`. |
 | `tests/unit/test_main.c` | The table of the entry functions of the unit tests by file, and the `main` that runs the files one argument names. |
+| `tests/unit/test_memcheck.c` | The checks of AddressSanitizer that `--memory-checks` puts before a load and a store, and the declarations they need. |
 | `tests/unit/test_modules.c` | The library file written, read back and damaged, the imports across modules and the module paths. |
 | `tests/unit/test_nullable.c` | The rules of nullable pointers in the checker. |
 | `tests/unit/test_optimize.c` | The passes of `optimize.c` over the IR of a source. |
@@ -543,11 +547,12 @@ Each holds one case per message of a command, which
 | `tests/unit/test_platform.c` | The platform layer of the runtime on the host. |
 | `tests/unit/test_plugin_race.c` | The table of open libraries under threads that load and unload at once. |
 | `tests/unit/test_plugin_table.c` | The loader of the runtime against a damaged plugin table and a damaged index. |
+| `tests/unit/test_project.c` | `anti new` and the sources of a project, of `src/anti/project.c`. |
 | `tests/unit/test_regex.c` | The rewriter of a byte pattern of `src/rt/regex.c` on every prefix of one pattern, and a group named by a text that holds a NUL. |
 | `tests/unit/test_rt_bounds.c` | The growth of a block, the size of a text builder and atomic subtraction at the minimum of each width. |
 | `tests/unit/test_rt_oom.c` | A program that runs the text builder, the copy of an object and the copy of an owned buffer out of memory, for `run_rt_oom.cmake`. |
 | `tests/unit/test_sema.c` | What the checker accepts, refuses and warns of. |
-| `tests/unit/test_sha256.c` | The SHA-256 of `src/rt/digest.c` over inputs given in pieces. |
+| `tests/unit/test_sha256.c` | The SHA-256 of `src/rt/digest.c` over inputs given in pieces, and the digest of a file. |
 | `tests/unit/test_signal.c` | The signal table of the runtime under threads that register at once. |
 | `tests/unit/test_symbols.c` | The readers of `src/rt/symbols.c`: the names of COFF, the sections and line tables of ELF and the symbols of Mach-O. |
 | `tests/unit/test_syms.c` | `anti symbols` over archives and programs that name nothing. |
@@ -557,6 +562,7 @@ Each holds one case per message of a command, which
 | `tests/unit/test_toml.c` | The TOML subset of `src/rt/toml.c`. |
 | `tests/unit/test_tool_platform.c` | The platform layer of antic and `anti` on the host. |
 | `tests/unit/test_types.c` | The type table and the pointer sets of `ptrset.c`. |
+| `tests/unit/test_units.c` | The modules of a run of `src/anti/units.c`: the options, the file of a module, one module read and the order of the imports. |
 | `tests/unit/test_userdirs.c` | The three user directories under an environment the test gives. |
 | `tests/unit/test_utf.c` | The UTF-8 of `src/rt/utf.c`: the repair of bytes, the conversion from UTF-16, a Windows file name, the split of a command line and a scalar value encoded and decoded. |
 | `tests/unit/test_variant.c` | The rules of sum types in the checker. |

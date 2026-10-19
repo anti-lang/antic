@@ -418,6 +418,12 @@ add_executable(antic_unit_tests
     unit/test_symbols.c
     unit/test_float_read.c
     unit/test_coff.c
+    unit/test_memcheck.c
+    unit/test_units.c
+    unit/test_llvm_run.c
+    unit/test_project.c
+    unit/test_licensing.c
+    unit/test_commands.c
     unit/test_toml.c
     unit/test_rt_bounds.c
     unit/test_fs.c
@@ -446,9 +452,15 @@ target_include_directories(antic_unit_tests PRIVATE ../src/rt ../src/anti)
 # archive is compiled without it. ANTI_CPU_LEVEL_ID is the level of a
 # runtime, which every build of src/rt/cpu.c names.
 antic_cpu_level(unit_level "${ANTIC_HOST_TARGET}")
+# ANTIC_TEST_RUNTIME is the runtime archive, which test_commands.c builds
+# against. ANTIC_TEST_OPT and ANTIC_TEST_LLC are opt and llc of its bin/,
+# which test_llvm_run.c runs as antic runs them.
 target_compile_definitions(antic_unit_tests PRIVATE
     ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}" ANTI_DEV_CPU
-    ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
+    ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}}
+    ANTIC_TEST_RUNTIME="${ANTIC_RUNTIME_DIR}"
+    ANTIC_TEST_OPT="${ANTIC_RUNTIME_DIR}/bin/opt${CMAKE_EXECUTABLE_SUFFIX}"
+    ANTIC_TEST_LLC="${ANTIC_RUNTIME_DIR}/bin/llc${CMAKE_EXECUTABLE_SUFFIX}")
 # One test per file of the unit tests, unit_<name> for test_<name>.c, each
 # in a directory of its own for the files it writes.
 get_target_property(unit_sources antic_unit_tests SOURCES)

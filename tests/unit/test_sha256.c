@@ -1,11 +1,35 @@
 /* The SHA-256 of src/rt/digest.c over the vectors of FIPS 180-4, whole
-   and in pieces that cross its blocks. */
+   and in pieces that cross its blocks, and the digest of a file that
+   src/antic/sha256.c reads with it. */
 
+#include <stdio.h>
 #include <string.h>
 
+#include "../../src/antic/platform.h"
 #include "../binary_stdio.h"
 #include "check.h"
 #include "digest.h"
+#include "sha256.h"
+
+/* The digest of a file of the run's directory, which ctest makes the
+   working directory of the group, and no digest of a file that is not
+   there. */
+static void file_digest(void)
+{
+    static const char path[] = "sha256_input.txt";
+    char hex[65] = "";
+    FILE *f = platform_open(path, true);
+
+    CHECK(f != NULL);
+    if (f != NULL) {
+        CHECK(fwrite("abc", 1, 3, f) == 3);
+        CHECK(fclose(f) == 0);
+        CHECK(sha256_file(path, hex));
+        CHECK_STR(hex, "ba7816bf8f01cfea414140de5dae2223"
+                       "b00361a396177a9cb410ff61f20015ad");
+    }
+    CHECK(!sha256_file("no_such_file.txt", hex));
+}
 
 /* The digest of the bytes given in pieces of step, as 64 digits. */
 static void digest_of(const char *bytes, size_t length, size_t step,
@@ -53,4 +77,5 @@ void test_sha256(void)
     anti_rt_sha256_hex(&s, hex);
     CHECK_STR(hex, "cdc76e5c9914fb9281a1c7e284d73e67"
                    "f1809a48a497200e046d39ccc7112cd0");
+    file_digest();
 }
