@@ -708,6 +708,10 @@ bool ir_is_patterns_start(const struct ir_function *f);
 /* Whether a function or a global of module, made in unit, belongs to the
    object of module entry. */
 bool ir_in_unit(const char *module, const char *unit, const char *entry);
+/* Whether f is the function main that the object of module defines, the
+   main of a program whose main module is module, which the runtime calls
+   through its entry. */
+bool ir_is_main_of(const struct ir_function *f, const char *module);
 
 /* DESIGN: whether name is that of a copy of a generic, or of a function
    or a datum of one. types_symbol_name writes the arguments of a copy in

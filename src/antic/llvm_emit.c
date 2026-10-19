@@ -3283,8 +3283,7 @@ static void frames_kept(const struct ir_module *m, bool *kept)
    runtime calls through its entry. */
 static bool is_main(const struct emitter *e, const struct ir_function *f)
 {
-    return !f->is_extern && f->module != NULL &&
-           strcmp(f->module, e->o->module) == 0 && strcmp(f->name, "main") == 0;
+    return ir_is_main_of(f, e->o->module);
 }
 
 static void definition(struct emitter *e, const struct ir_function *f)

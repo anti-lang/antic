@@ -153,14 +153,6 @@ static uint32_t *definitions_of(const struct ir_module *m)
     return out;
 }
 
-/* Whether f is main of the unit entry. */
-static bool is_main_of(const struct ir_function *f, const char *entry)
-{
-    return !f->is_extern && f->module != NULL &&
-           ir_in_unit(f->module, f->unit, entry) &&
-           strcmp(f->name, "main") == 0;
-}
-
 void ir_reach(const struct ir_module *m, const char *entry, bool all,
               struct ir_reach *out)
 {
@@ -178,7 +170,7 @@ void ir_reach(const struct ir_module *m, const char *entry, bool all,
                           sizeof *w.work);
     w.work_count = 0;
     for (i = 0; entry != NULL && !all && i < m->function_count; i++) {
-        has_main = has_main || is_main_of(m->functions[i], entry);
+        has_main = has_main || ir_is_main_of(m->functions[i], entry);
     }
     for (i = 0; i < m->function_count; i++) {
         const struct ir_function *f = m->functions[i];
@@ -186,7 +178,7 @@ void ir_reach(const struct ir_module *m, const char *entry, bool all,
             (entry == NULL || m->hosts || f->exported ||
              ir_is_patterns_start(f) ||
              (ir_in_unit(f->module, f->unit, entry) &&
-              (!has_main || strcmp(f->name, "main") == 0)))) {
+              (!has_main || ir_is_main_of(f, entry))))) {
             reach_function(&w, (uint32_t)i);
         }
     }

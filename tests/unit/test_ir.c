@@ -1097,6 +1097,42 @@ static void no_module(void)
     arena_free(&arena);
 }
 
+/* The main of a program is the function main that the object of its
+   module defines. A main of another module, a declared one and a C
+   function main are not, and neither is a function main that the object
+   of another module defines. */
+static void main_of(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *own;
+    struct ir_function *other;
+    struct ir_function *c;
+    struct ir_function *helper;
+    struct ir_function *declared;
+    struct ir_function *made;
+
+    ir_module_init(&m, &arena, "app");
+    own = ir_function_add(&m, "app", "main", IR_I32, IR_NO_AGG);
+    other = ir_function_add(&m, "lib", "main", IR_I32, IR_NO_AGG);
+    c = ir_function_add(&m, NULL, "main", IR_I32, IR_NO_AGG);
+    helper = ir_function_add(&m, "app", "helper", IR_I32, IR_NO_AGG);
+    declared = ir_function_add(&m, "app", "main", IR_I32, IR_NO_AGG);
+    declared->is_extern = true;
+    made = ir_function_add(&m, "lib", "main", IR_I32, IR_NO_AGG);
+    made->unit = "app";
+    CHECK(ir_is_main_of(own, "app"));
+    CHECK(!ir_is_main_of(other, "app"));
+    CHECK(ir_is_main_of(other, "lib"));
+    CHECK(!ir_is_main_of(c, "app"));
+    CHECK(!ir_is_main_of(helper, "app"));
+    CHECK(!ir_is_main_of(declared, "app"));
+    CHECK(ir_is_main_of(made, "app"));
+    CHECK(!ir_is_main_of(made, "lib"));
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 void test_ir(void)
 {
     constants();
@@ -1120,4 +1156,5 @@ void test_ir(void)
     type_accesses();
     refused_forms();
     no_module();
+    main_of();
 }

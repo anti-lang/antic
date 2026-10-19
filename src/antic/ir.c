@@ -399,6 +399,13 @@ bool ir_in_unit(const char *module, const char *unit, const char *entry)
                         : module != NULL && strcmp(module, entry) == 0;
 }
 
+bool ir_is_main_of(const struct ir_function *f, const char *module)
+{
+    return !f->is_extern && f->module != NULL &&
+           ir_in_unit(f->module, f->unit, module) &&
+           strcmp(f->name, "main") == 0;
+}
+
 bool ir_is_patterns_start(const struct ir_function *f)
 {
     return !f->is_extern && f->module != NULL &&

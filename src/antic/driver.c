@@ -704,9 +704,7 @@ static bool has_main(const struct ir_module *program, const char *module)
     size_t i;
 
     for (i = 0; i < program->function_count; i++) {
-        const struct ir_function *f = program->functions[i];
-        if (!f->is_extern && f->module != NULL &&
-            strcmp(f->module, module) == 0 && strcmp(f->name, "main") == 0) {
+        if (ir_is_main_of(program->functions[i], module)) {
             return true;
         }
     }
