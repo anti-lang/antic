@@ -3829,6 +3829,53 @@ static const char root_source[] =
     "    return c.type_name();\n"
     "}\n";
 
+/* A generic whose closure captures a local. */
+static const char capture_source[] =
+    "pub fn grab<T>(v: T) -> int {\n"
+    "    let n = 1;\n"
+    "    let f = fn(k: int) -> int { return k + n; };\n"
+    "    return f(2);\n"
+    "}\n";
+
+/* The closure of `grab`, with the room for captures the checker gave
+   it, as find_closure finds it before the writer runs. */
+static struct item *capturing;
+static size_t capture_room;
+
+static void find_closure(struct session *s)
+{
+    const struct item *grab = generic_of(s->written, "grab");
+    size_t i;
+
+    capturing = NULL;
+    for (i = 0; grab != NULL && i < grab->body->count; i++) {
+        const struct stmt *st = grab->body->stmts[i];
+        if (st->kind == STMT_LET && st->as.let.value != NULL &&
+            st->as.let.value->kind == EXPR_FN) {
+            capturing = st->as.let.value->as.fn;
+        }
+    }
+    if (capturing != NULL) {
+        capture_room = capturing->capture_capacity;
+    }
+}
+
+/* The writer reads the trees it writes and changes none of them: the
+   room of the captures of a closure stays as the checker left it. */
+static void writer_keeps_trees(void)
+{
+    struct session s;
+    struct text bytes = {0};
+
+    open_session(&s);
+    CHECK(build_damaged(&s, "cap", capture_source, find_closure, &bytes));
+    CHECK(capturing != NULL && capturing->capture_count == 1);
+    CHECK(capturing != NULL && capture_room > 1 &&
+          capturing->capture_capacity == capture_room);
+    text_free(&bytes);
+    close_session(&s);
+}
+
 /* Rule 14: the C symbol of a function of the root becomes a C string,
    so one with a NUL inside is refused, where it would name a shorter
    symbol. */
@@ -3885,6 +3932,7 @@ void test_modules(void)
     deep_values();
     field_kinds();
     runtime_names();
+    writer_keeps_trees();
     flag_bytes();
     wide_addresses();
     declared_types();

@@ -846,7 +846,11 @@ static void io_item_body(struct io *io, struct item *it)
     io_count(io, &array, &it->capture_count, sizeof *it->captures,
              W_REF + 2 * W_BYTE + 2 * W_POS);
     it->captures = array;
-    it->capture_capacity = it->capture_count;
+    /* The writer reads the tree and changes none of it, so only the
+       reader sets the room of the list it made. */
+    if (reading(io)) {
+        it->capture_capacity = it->capture_count;
+    }
     for (i = 0; i < it->capture_count && !failed(io); i++) {
         struct capture *c = &it->captures[i];
         io_sym(io, &c->symbol);
