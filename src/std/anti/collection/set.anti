@@ -21,8 +21,6 @@ extern fn anti_lang_Object_copy(object: ?*byte, to: ?*byte);
 extern fn anti_rt_type_arg(object: ?*byte, depth: int, index: int) -> ?*byte;
 extern fn anti_rt_element_serialize(out: ?*text.Builder, bytes: ?*byte,
 	arg: ?*byte);
-extern fn anti_rt_element_text(out: ?*text.Builder, bytes: ?*byte,
-	arg: ?*byte);
 
 /// A set in insertion order.
 ///
@@ -134,11 +132,6 @@ pub class Set<T: eq + hash> inherits map.EntryTable<T>
 	{
 		return SetWalk<T>.over(self.entries, self.hashes, self.used,
 			self.watch());
-	}
-
-	concrete fn entry_hash(self, e: *T) -> u64
-	{
-		return e.hash();
 	}
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))
@@ -330,11 +323,6 @@ pub class HashSet<T: eq + hash> inherits map.SlotTable<T>
 		let r = self.shuffle();
 		return HashSetWalk<T>.over(self.marks, self.slots, self.size, r,
 			self.watch());
-	}
-
-	concrete fn entry_hash(self, e: *T) -> u64
-	{
-		return e.hash();
 	}
 
 	concrete fn lend_place(self, at: int, f: fn(lent *T))

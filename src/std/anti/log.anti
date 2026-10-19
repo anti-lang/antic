@@ -220,7 +220,7 @@ pub class SinkLogger inherits Logger
 
 	concrete fn log(self, level: Level, message: str)
 	{
-		if (level as int) < (self.level as int) || self.sink == none {
+		if (level as int) < (self.level as int) {
 			return;
 		}
 		let line = text.Builder.new();
@@ -327,12 +327,11 @@ pub singleton class Log
 	/// The logger every function of the module writes through.
 	pub fn current(self) -> *Logger
 	{
-		/* `construct` stores one before any caller reaches this, so the
-		   `else` stands for a logger that `set` replaced with `none`. */
+		/* The field is `none` until `construct` stores the logger, before
+		   any caller reaches this, and `set` takes a `*Logger`, so it
+		   never holds `none` here. */
 		let held = self.logger.load() else {
-			let made = SinkLogger.new("", Level.Info, StderrSink.new());
-			self.logger.store(made);
-			return made;
+			lang.Error.new(1, "anti.log holds no logger").fatal();
 		};
 		return held;
 	}

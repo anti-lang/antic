@@ -70,9 +70,6 @@ pub abstract class EntryTable<E> inherits collection.Collection<E>
 	/// The number of buckets, a power of two.
 	bucket_count: int = 0,
 
-	/// The hash of the key of the element at `e`, before the seed.
-	abstract fn entry_hash(self, e: *E) -> u64;
-
 	/// The number of elements the room holds before it grows.
 	pub fn capacity(self) -> int
 	{
@@ -403,9 +400,6 @@ pub abstract class SlotTable<E> inherits collection.Collection<E>
 	walks: u64 = 0,
 	/// The random number of the walks, drawn at the first walk, or 0 before.
 	walk_seed: u64 = 0,
-
-	/// The hash of the key of the element at `e`, before the seed.
-	abstract fn entry_hash(self, e: *E) -> u64;
 
 	/// The number of elements the room holds before it grows.
 	pub fn capacity(self) -> int
@@ -838,11 +832,6 @@ pub class Map<K: eq + hash, V> inherits EntryTable<(K, V)>
 			self.watch());
 	}
 
-	concrete fn entry_hash(self, e: *(K, V)) -> u64
-	{
-		return e.0.hash();
-	}
-
 	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))
 	{
 		self.check_place("lend_place", at);
@@ -1182,11 +1171,6 @@ pub class HashMap<K: eq + hash, V> inherits SlotTable<(K, V)>
 		let r = self.shuffle();
 		return HashMapWalk<K, V>.over(self.marks, self.slots, self.size, r,
 			self.watch());
-	}
-
-	concrete fn entry_hash(self, e: *(K, V)) -> u64
-	{
-		return e.0.hash();
 	}
 
 	concrete fn lend_place(self, at: int, f: fn(lent *(K, V)))

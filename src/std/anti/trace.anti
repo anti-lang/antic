@@ -403,7 +403,6 @@ pub class ErrorMonitor inherits lang.TraceHandler
 	atomic total: int = 0,
 	code: int = 0,
 	message: [MESSAGE_BYTES]byte,
-	message_len: int = 0,
 	name: str = "",
 
 	/// A monitor that has seen no failure.
@@ -492,7 +491,6 @@ pub class ErrorMonitor inherits lang.TraceHandler
 				i += 1;
 			}
 			self.message[n] = 0;
-			self.message_len = n;
 		}
 	}
 
