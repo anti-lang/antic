@@ -1154,7 +1154,6 @@ static void runtime_records(void)
         c_layouts[r](&c);
         ir_module_init(&m, &arena, "abi");
         agg = rt_record_agg(&m, (enum rt_record)r);
-        CHECK(rt_record_items((enum rt_record)r) == c.count);
         CHECK(m.aggs[agg]->field_count == c.count);
         CHECK(layout_init(&layouts, host, &m, error, sizeof error));
         ir = layout_agg(&layouts, agg);

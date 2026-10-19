@@ -511,9 +511,6 @@ enum rt_record { RT_RECORDS(RT_RECORD_ENUM) RT_RECORD_COUNT };
 /* The name of record r in the IR. */
 const char *rt_record_name(enum rt_record r);
 
-/* The count of items of record r. */
-size_t rt_record_items(enum rt_record r);
-
 /* The aggregate of record r in m, added on its first use. */
 uint32_t rt_record_agg(struct ir_module *m, enum rt_record r);
 

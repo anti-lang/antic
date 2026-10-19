@@ -58,11 +58,6 @@ const char *rt_record_name(enum rt_record r)
     return records[r].name;
 }
 
-size_t rt_record_items(enum rt_record r)
-{
-    return records[r].count;
-}
-
 uint32_t rt_record_agg(struct ir_module *m, enum rt_record r)
 {
     const struct rt_record_form *form = &records[r];
