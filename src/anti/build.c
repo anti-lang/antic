@@ -902,6 +902,24 @@ done:
     return ok;
 }
 
+/* Append <root>/<dir>/<target>/<mode> to out: the directory of
+   docs/tooling.md that dir, the build or the dist directory of the
+   manifest, holds for one target in the dev or the release mode. */
+static void target_dir(const char *root, const struct text *dir,
+                       enum target t, bool release, struct text *out)
+{
+    text_appendf(out, "%s/%s/%s/%s", root, text_cstr(dir), target_name(t),
+                 release ? "release" : "dev");
+}
+
+/* The file name of the program of the package m on a target. */
+static void program_name(const struct manifest *m, enum target t,
+                         struct text *out)
+{
+    text_appendf(out, "%s%s", modpath_last(text_cstr(&m->name)),
+                 target_info(t)->executable_suffix);
+}
+
 /* The file name of a library for C on a target. */
 static void library_name(enum target t, bool shared, const char *name,
                          struct text *out)
@@ -1020,7 +1038,6 @@ static bool write_library_files(const struct build *b,
 /* Build one target in one mode. */
 static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
 {
-    const char *mode = b->r->release ? "release" : "dev";
     struct strings shared = {0};
     struct strings libraries = {0};
     struct text *files = NULL;
@@ -1037,10 +1054,8 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     b->obj_dir.length = 0;
     b->name.length = 0;
     b->links_musl = false;
-    text_appendf(&b->build_dir, "%s/%s/%s/%s", b->r->root,
-                 text_cstr(&b->m.build), target_name(t), mode);
-    text_appendf(&b->dist_dir, "%s/%s/%s/%s", b->r->root,
-                 text_cstr(&b->m.dist), target_name(t), mode);
+    target_dir(b->r->root, &b->m.build, t, b->r->release, &b->build_dir);
+    target_dir(b->r->root, &b->m.dist, t, b->r->release, &b->dist_dir);
     text_appendf(&b->lib_dir, "%s/lib", text_cstr(&b->build_dir));
     text_appendf(&b->obj_dir, "%s/obj", text_cstr(&b->build_dir));
     if (!files_make_dirs_or_say(text_cstr(&b->build_dir)) ||
@@ -1087,9 +1102,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
         library_name(t, b->r->lib == BUILD_LIB_SHARED,
                      modpath_last(text_cstr(&b->m.name)), &deliverable);
     } else {
-        text_appendf(&deliverable, "%s%s",
-                     modpath_last(text_cstr(&b->m.name)),
-                     target_info(t)->executable_suffix);
+        program_name(&b->m, t, &deliverable);
     }
     text_appendf(&b->name, "%s/%s", text_cstr(&b->build_dir),
                  text_cstr(&deliverable));
@@ -1240,8 +1253,7 @@ static bool path_dependency(void *context, const char *directory,
     sub.run = false;
     sub.notice = BUILD_NOTICE_BUILD;
     if (build_project(&sub, c) == 0) {
-        text_appendf(out, "%s/%s/%s/%s", directory, text_cstr(&m.dist),
-                     target_name(host), c->r->release ? "release" : "dev");
+        target_dir(directory, &m.dist, host, c->r->release, out);
         ok = true;
     }
     manifest_free(&m);
@@ -1376,11 +1388,9 @@ static int run_built(const struct build *b)
         fputs("anti: this host is no target of Anti\n", stderr);
         return 1;
     }
-    text_appendf(&program, "%s/%s/%s/%s/%s%s", r->root,
-                 text_cstr(&b->m.dist), target_name(host),
-                 r->release ? "release" : "dev",
-                 modpath_last(text_cstr(&b->m.name)),
-                 target_info(host)->executable_suffix);
+    target_dir(r->root, &b->m.dist, host, r->release, &program);
+    text_append(&program, "/");
+    program_name(&b->m, host, &program);
     if (!files_exists(text_cstr(&program))) {
         fprintf(stderr, "anti: %s was not built, so there is nothing "
                         "to run\n", text_cstr(&program));
