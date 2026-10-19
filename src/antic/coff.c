@@ -1202,8 +1202,8 @@ bool coff_archive_exports(const unsigned char *archive, size_t archive_size,
             if (index.lengths[i] != n || memcmp(index.names[i], next, n) != 0) {
                 continue;
             }
-            snprintf(offset, sizeof offset, "%" PRIu32 "\n",
-                     big_endian(index.offsets + 4 * (size_t)i));
+            text_format_name(offset, sizeof offset, "%" PRIu32 "\n",
+                             big_endian(index.offsets + 4 * (size_t)i));
             if (listed(&taken, offset, strlen(offset) - 1)) {
                 break;
             }

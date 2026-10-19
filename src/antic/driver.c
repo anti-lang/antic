@@ -542,7 +542,8 @@ static void dump_tokens(const char *source, const struct token_list *tokens)
                                     : t->length;
         char position[32];
 
-        snprintf(position, sizeof position, "%d:%d", t->line, t->column);
+        text_format_name(position, sizeof position, "%d:%d", t->line,
+                         t->column);
         printf("%-5s %-8s %.*s\n", position, lexer_token_category(t->kind),
                (int)length, source + t->offset);
     }

@@ -50,9 +50,10 @@ void text_format(char *buffer, size_t size, const char *format, ...)
    together, the 20 digits of the largest size_t and the NUL. */
 #define TEXT_NAME_SIZE 48
 
-/* Format the name of a generated symbol into buffer of size bytes, as
-   snprintf does. A name that does not fit stops antic, since a name cut
-   to fit could equal another. */
+/* Format the name of a generated symbol, or another text antic writes
+   into its output, into buffer of size bytes, as snprintf does. A text
+   that does not fit stops antic, since a name cut to fit could equal
+   another, and a cut type or line would enter the output as it stands. */
 void text_format_name(char *buffer, size_t size, const char *format, ...)
     ATTRIBUTE_PRINTF(3, 4);
 

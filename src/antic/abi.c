@@ -3,8 +3,9 @@
 
 #include "abi.h"
 
-#include <stdio.h>
 #include <string.h>
+
+#include "text.h"
 
 /* The registers that pass arguments under System V, six integer and eight
    vector registers. */
@@ -12,7 +13,7 @@ enum { SYSV_INT_ARGS = 6, SYSV_FP_ARGS = 8 };
 
 static void set_word(struct abi_param *p, size_t k, const char *type)
 {
-    snprintf(p->types[k], sizeof p->types[k], "%s", type);
+    text_format_name(p->types[k], sizeof p->types[k], "%s", type);
 }
 
 static const char *scalar_name(enum ir_type type, uint64_t bytes)
@@ -72,9 +73,9 @@ static void vector(struct layouts *l, const struct layout *agg,
 
     out->kind = ABI_VECTOR;
     out->word_count = 1;
-    snprintf(out->types[0], sizeof out->types[0], "<%llu x %s>",
-             (unsigned long long)(agg->size / bytes),
-             scalar_name(lane, bytes));
+    text_format_name(out->types[0], sizeof out->types[0], "<%llu x %s>",
+                     (unsigned long long)(agg->size / bytes),
+                     scalar_name(lane, bytes));
     out->size = agg->size;
     out->align = agg->align;
 }
@@ -222,8 +223,9 @@ static void aapcs64_aggregate(struct layouts *l, const struct layout *agg,
     if (members > 0) {
         coerce(agg, out);
         out->word_count = 1;
-        snprintf(out->types[0], sizeof out->types[0], "[%zu x %s]", members,
-                 agg->members[0].type == IR_F32 ? "float" : "double");
+        text_format_name(out->types[0], sizeof out->types[0], "[%zu x %s]",
+                         members,
+                         agg->members[0].type == IR_F32 ? "float" : "double");
         return;
     }
     if (agg->size > 16) {
@@ -236,8 +238,8 @@ static void aapcs64_aggregate(struct layouts *l, const struct layout *agg,
         set_word(out, 0, "i128");
         return;
     }
-    snprintf(out->types[0], sizeof out->types[0], "[%llu x i64]",
-             (unsigned long long)((agg->size + 7) / 8));
+    text_format_name(out->types[0], sizeof out->types[0], "[%llu x i64]",
+                     (unsigned long long)((agg->size + 7) / 8));
 }
 
 /* DESIGN: LLVM allocates an array argument of AArch64 as one block of
@@ -284,8 +286,8 @@ static void windows_x64_aggregate(struct layouts *l, const struct layout *agg,
         agg->size == 8) {
         coerce(agg, out);
         out->word_count = 1;
-        snprintf(out->types[0], sizeof out->types[0], "i%llu",
-                 (unsigned long long)(agg->size * 8));
+        text_format_name(out->types[0], sizeof out->types[0], "i%llu",
+                         (unsigned long long)(agg->size * 8));
         return;
     }
     pointer(other, agg, out);

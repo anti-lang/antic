@@ -112,8 +112,8 @@ void text_format_name(char *buffer, size_t size, const char *format, ...)
     n = vsnprintf(buffer, size, format, args);
     va_end(args);
     if (n < 0 || (size_t)n >= size) {
-        /* Unreachable while TEXT_NAME_SIZE covers every name. */
-        fputs("antic: a generated name does not fit its buffer\n", stderr);
+        /* Unreachable while each buffer holds the longest text it takes. */
+        fputs("antic: a generated text does not fit its buffer\n", stderr);
         abort();
     }
 }

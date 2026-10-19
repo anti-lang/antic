@@ -500,8 +500,8 @@ static void intrinsic(struct emitter *e, const char *result, const char *name,
 {
     char line[160];
 
-    text_format(line, sizeof line, "declare %s @%s(%s)\n", result, name,
-                parameters);
+    text_format_name(line, sizeof line, "declare %s @%s(%s)\n", result, name,
+                     parameters);
     if (strstr(text_cstr(&e->intrinsics), line) == NULL) {
         text_append(&e->intrinsics, line);
     }
@@ -620,7 +620,7 @@ static void binary(struct emitter *e, const struct ir_inst *inst)
         }
         break;
     }
-    text_format(value, sizeof value, "%%v%" PRIu32, e->value - 1);
+    text_format_name(value, sizeof value, "%%v%" PRIu32, e->value - 1);
     store_result(e, inst, value);
     text_free(&a);
     text_free(&b);
@@ -666,9 +666,9 @@ static void conversion(struct emitter *e, const struct ir_inst *inst)
     case IR_FTOSI:
     case IR_FTOUI: {
         char name[48];
-        text_format(name, sizeof name, "llvm.fpto%s.sat.i%u.%s",
-                    inst->op == IR_FTOSI ? "si" : "ui", width_of(inst->type),
-                    float_suffix(from));
+        text_format_name(name, sizeof name, "llvm.fpto%s.sat.i%u.%s",
+                         inst->op == IR_FTOSI ? "si" : "ui",
+                         width_of(inst->type), float_suffix(from));
         intrinsic(e, target, name, source);
         text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %s)\n",
                      fresh(e), target, name, source, text_cstr(&a));
@@ -723,7 +723,7 @@ static void conversion(struct emitter *e, const struct ir_inst *inst)
                      source, text_cstr(&a), target);
         break;
     }
-    text_format(value, sizeof value, "%%v%" PRIu32, e->value - 1);
+    text_format_name(value, sizeof value, "%%v%" PRIu32, e->value - 1);
     store_result(e, inst, value);
     text_free(&a);
 }
@@ -753,7 +753,7 @@ static void unary(struct emitter *e, const struct ir_inst *inst)
         text_appendf(e->out, "  %%v%" PRIu32 " = fneg %s %s\n", fresh(e),
                      name, text_cstr(&a));
     }
-    text_format(value, sizeof value, "%%v%" PRIu32, e->value - 1);
+    text_format_name(value, sizeof value, "%%v%" PRIu32, e->value - 1);
     store_result(e, inst, value);
     text_free(&a);
 }
@@ -779,7 +779,7 @@ static void slot(struct emitter *e, const struct ir_inst *inst)
                              " x i8], align %" PRIu64 "\n",
                  inst->result, layout_size(e->l, inst->of),
                  layout_align(e->l, inst->of));
-    text_format(value, sizeof value, "%%s%" PRIu32, inst->result);
+    text_format_name(value, sizeof value, "%%s%" PRIu32, inst->result);
     store_result(e, inst, value);
 }
 
@@ -1164,7 +1164,7 @@ static void ptradd(struct emitter *e, const struct ir_inst *inst)
                      e->value,
                      inst->field == IR_INBOUNDS ? "inbounds " : "",
                      text_cstr(&pointer), text_cstr(&offset));
-        text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+        text_format_name(value, sizeof value, "%%v%" PRIu32, e->value++);
         store_result(e, inst, value);
     }
     text_free(&pointer);
@@ -1323,8 +1323,8 @@ static void bits(struct emitter *e, const struct ir_inst *inst)
 static void vector_of(struct emitter *e, const struct ir_inst *inst,
                       const char *element, char *out, size_t size)
 {
-    text_format(out, size, "<%zu x %s>",
-                e->m->aggs[inst->of.agg]->field_count, element);
+    text_format_name(out, size, "<%zu x %s>",
+                     e->m->aggs[inst->of.agg]->field_count, element);
 }
 
 /* DESIGN: a simd operation loads whole vectors at the alignment of the
@@ -1466,9 +1466,9 @@ static uint32_t with_overflow(struct emitter *e, const char *kind,
     char parameters[32];
     uint32_t n = fresh(e);
 
-    text_format(name, sizeof name, "llvm.%s.with.overflow.%s", kind, type);
-    text_format(result, sizeof result, "{ %s, i1 }", type);
-    text_format(parameters, sizeof parameters, "%s, %s", type, type);
+    text_format_name(name, sizeof name, "llvm.%s.with.overflow.%s", kind, type);
+    text_format_name(result, sizeof result, "{ %s, i1 }", type);
+    text_format_name(parameters, sizeof parameters, "%s, %s", type, type);
     intrinsic(e, result, name, parameters);
     text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %s, %s %s)\n", n,
                  result, name, type, x, type, y);
@@ -1490,7 +1490,7 @@ static uint32_t field_of(struct emitter *e, const char *type, uint32_t v,
 /* Keep the value %v<v> as the flag of the last flag operation. */
 static void keep_flag(struct emitter *e, enum ir_flag flag, uint32_t v)
 {
-    text_format(e->flags[flag], sizeof e->flags[flag], "%%v%" PRIu32, v);
+    text_format_name(e->flags[flag], sizeof e->flags[flag], "%%v%" PRIu32, v);
 }
 
 /* Keep zero and sign of the result r of type, and r as the result of the
@@ -1509,7 +1509,7 @@ static void finish_flags(struct emitter *e, const struct ir_inst *inst,
     keep_flag(e, IR_FLAG_ZERO, zero);
     keep_flag(e, IR_FLAG_NEGATIVE, sign);
     e->flag_result = inst->result;
-    text_format(value, sizeof value, "%%v%" PRIu32, r);
+    text_format_name(value, sizeof value, "%%v%" PRIu32, r);
     store_result(e, inst, value);
 }
 
@@ -1543,8 +1543,8 @@ static void arithmetic_flags(struct emitter *e, const struct ir_inst *inst,
         text_free(&c);
         return;
     }
-    text_format(signed_kind, sizeof signed_kind, "s%s", kind);
-    text_format(unsigned_kind, sizeof unsigned_kind, "u%s", kind);
+    text_format_name(signed_kind, sizeof signed_kind, "s%s", kind);
+    text_format_name(unsigned_kind, sizeof unsigned_kind, "u%s", kind);
     s = with_overflow(e, signed_kind, type, a, b);
     u = with_overflow(e, unsigned_kind, type, a, b);
     r = field_of(e, type, s, 0);
@@ -1560,8 +1560,8 @@ static void arithmetic_flags(struct emitter *e, const struct ir_inst *inst,
         text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %%v%" PRIu32
                              " to %s\n",
                      wide, set, type);
-        text_format(partial, sizeof partial, "%%v%" PRIu32, r);
-        text_format(in, sizeof in, "%%v%" PRIu32, wide);
+        text_format_name(partial, sizeof partial, "%%v%" PRIu32, r);
+        text_format_name(in, sizeof in, "%%v%" PRIu32, wide);
         s = with_overflow(e, signed_kind, type, partial, in);
         u = with_overflow(e, unsigned_kind, type, partial, in);
         r = field_of(e, type, s, 0);
@@ -1622,8 +1622,8 @@ static void shift_flags(struct emitter *e, const struct ir_inst *inst,
                      overflow, type, back, a);
         keep_flag(e, IR_FLAG_OVERFLOW, overflow);
     } else {
-        text_format(e->flags[IR_FLAG_OVERFLOW],
-                    sizeof e->flags[IR_FLAG_OVERFLOW], "false");
+        text_format_name(e->flags[IR_FLAG_OVERFLOW],
+                         sizeof e->flags[IR_FLAG_OVERFLOW], "false");
     }
     moved = fresh(e);
     less = fresh(e);
@@ -1724,7 +1724,7 @@ static void flag_read(struct emitter *e, const struct ir_inst *inst)
     }
     text_appendf(e->out, "  %%v%" PRIu32 " = zext i1 %s to i8\n", e->value,
                  e->flags[inst->field]);
-    text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+    text_format_name(value, sizeof value, "%%v%" PRIu32, e->value++);
     store_result(e, inst, value);
 }
 
@@ -1768,7 +1768,7 @@ static void overflow_operation(struct emitter *e, const struct ir_inst *inst)
         }
         e->overflow = field_of(e, type, pair, 1);
         e->overflow_result = inst->result;
-        text_format(value, sizeof value, "%%v%" PRIu32, r);
+        text_format_name(value, sizeof value, "%%v%" PRIu32, r);
         store_result(e, inst, value);
     }
     text_free(&a);
@@ -1802,7 +1802,7 @@ static uint32_t wide_product(struct emitter *e, const struct ir_inst *inst,
     uint32_t y;
     uint32_t p = 0;
 
-    text_format(wide, size, "i%u", 2 * width_of(inst->type));
+    text_format_name(wide, size, "i%u", 2 * width_of(inst->type));
     operand(e, &inst->a, inst->type, &a);
     operand(e, &inst->b, inst->type, &b);
     if (!e->failed && type != NULL) {
@@ -1832,7 +1832,7 @@ static void narrow_result(struct emitter *e, const struct ir_inst *inst,
 
     text_appendf(e->out, "  %%v%" PRIu32 " = trunc %s %%v%" PRIu32 " to %s\n",
                  r, wide, v, value_type(e, inst->type));
-    text_format(value, sizeof value, "%%v%" PRIu32, r);
+    text_format_name(value, sizeof value, "%%v%" PRIu32, r);
     store_result(e, inst, value);
 }
 
@@ -1864,8 +1864,8 @@ static uint32_t clamp(struct emitter *e, const char *kind, const char *wide,
     char parameters[24];
     uint32_t n = fresh(e);
 
-    text_format(name, sizeof name, "llvm.%s.%s", kind, wide);
-    text_format(parameters, sizeof parameters, "%s, %s", wide, wide);
+    text_format_name(name, sizeof name, "llvm.%s.%s", kind, wide);
+    text_format_name(parameters, sizeof parameters, "%s, %s", wide, wide);
     intrinsic(e, wide, name, parameters);
     text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %%v%" PRIu32
                          ", %s %s)\n",
@@ -1891,16 +1891,16 @@ static void saturating(struct emitter *e, const struct ir_inst *inst)
             return;
         }
         if (inst->op == IR_MUL_SAT_S) {
-            text_format(bound, sizeof bound, "%" PRId64,
-                        width == 64 ? INT64_MIN
+            text_format_name(bound, sizeof bound, "%" PRId64,
+                             width == 64 ? INT64_MIN
                                     : -((int64_t)1 << (width - 1)));
             p = clamp(e, "smax", wide, p, bound);
-            text_format(bound, sizeof bound, "%" PRIu64,
-                        ((uint64_t)1 << (width - 1)) - 1);
+            text_format_name(bound, sizeof bound, "%" PRIu64,
+                             ((uint64_t)1 << (width - 1)) - 1);
             p = clamp(e, "smin", wide, p, bound);
         } else {
-            text_format(bound, sizeof bound, "%" PRIu64,
-                        width == 64 ? UINT64_MAX
+            text_format_name(bound, sizeof bound, "%" PRIu64,
+                             width == 64 ? UINT64_MAX
                                     : ((uint64_t)1 << width) - 1);
             p = clamp(e, "umin", wide, p, bound);
         }
@@ -1922,14 +1922,15 @@ static void saturating(struct emitter *e, const struct ir_inst *inst)
         operand(e, &inst->a, inst->type, &a);
         operand(e, &inst->b, inst->type, &b);
         if (!e->failed && type != NULL) {
-            text_format(name, sizeof name, "llvm.%s.sat.%s", kind, type);
-            text_format(parameters, sizeof parameters, "%s, %s", type, type);
+            text_format_name(name, sizeof name, "llvm.%s.sat.%s", kind, type);
+            text_format_name(parameters, sizeof parameters, "%s, %s", type,
+                             type);
             intrinsic(e, type, name, parameters);
             text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %s, %s "
                                  "%s)\n",
                          e->value, type, name, type, text_cstr(&a), type,
                          text_cstr(&b));
-            text_format(value, sizeof value, "%%v%" PRIu32, e->value++);
+            text_format_name(value, sizeof value, "%%v%" PRIu32, e->value++);
             store_result(e, inst, value);
         }
         text_free(&a);
@@ -2183,15 +2184,15 @@ static void vreduce(struct emitter *e, const struct ir_inst *inst)
     if (fold == NULL) {
         v = halve(e, op, lane, lanes, v);
     } else {
-        text_format(name, sizeof name, "llvm.vector.reduce.%s.v%zu%s", fold,
-                    lanes, type_suffix(e, inst->type));
+        text_format_name(name, sizeof name, "llvm.vector.reduce.%s.v%zu%s",
+                         fold, lanes, type_suffix(e, inst->type));
         intrinsic(e, lane, name, vector);
         text_appendf(e->out, "  %%v%" PRIu32 " = call %s @%s(%s %%v%" PRIu32
                              ")\n",
                      e->value, lane, name, vector, v);
         v = fresh(e);
     }
-    text_format(value, sizeof value, "%%v%" PRIu32, v);
+    text_format_name(value, sizeof value, "%%v%" PRIu32, v);
     store_result(e, inst, value);
     text_free(&x);
 }
@@ -2449,7 +2450,7 @@ static void return_aggregate(struct emitter *e, const struct ir_operand *a)
     } else {
         char name[24];
         slot = word_slot(e, r);
-        text_format(name, sizeof name, "%%a%" PRIu32, slot);
+        text_format_name(name, sizeof name, "%%a%" PRIu32, slot);
         copy_bytes(e, name, text_cstr(&pointer), r->size);
         load_words(e, r, slot, words);
         if (r->word_count == 1) {
@@ -2510,7 +2511,7 @@ static void argument(struct emitter *e, const struct abi_param *p,
     case ABI_INDIRECT: {
         char name[24];
         slot = entry_slot(e, p->size, p->align);
-        text_format(name, sizeof name, "%%a%" PRIu32, slot);
+        text_format_name(name, sizeof name, "%%a%" PRIu32, slot);
         copy_bytes(e, name, text_cstr(&value), p->size);
         separate(args);
         text_appendf(args, "ptr %s", name);
@@ -2526,7 +2527,7 @@ static void argument(struct emitter *e, const struct abi_param *p,
     default: {
         char name[24];
         slot = word_slot(e, p);
-        text_format(name, sizeof name, "%%a%" PRIu32, slot);
+        text_format_name(name, sizeof name, "%%a%" PRIu32, slot);
         copy_bytes(e, name, text_cstr(&value), p->size);
         load_words(e, p, slot, words);
         for (k = 0; k < p->word_count; k++) {
@@ -2782,7 +2783,7 @@ static bool atomic_call(struct emitter *e, const struct ir_inst *inst,
             }
             result = reinterpret(e, result, IR_I64, inst->type);
         }
-        text_format(name, sizeof name, "%%v%" PRIu32, result);
+        text_format_name(name, sizeof name, "%%v%" PRIu32, result);
         store_result(e, inst, name);
     }
 done:
@@ -2848,8 +2849,8 @@ static void call(struct emitter *e, const struct ir_inst *inst)
             memset(&p, 0, sizeof p);
             p.kind = ABI_DIRECT;
             p.word_count = 1;
-            text_format(p.types[0], sizeof p.types[0], "%s",
-                        value_type(e, extra.type));
+            text_format_name(p.types[0], sizeof p.types[0], "%s",
+                             value_type(e, extra.type));
             /* The variadic part of a C function stays out of its type. */
             argument(e, &p, &extra, &inst->args[i], &args,
                      callee->variadic ? &unnamed : &types);
@@ -2884,7 +2885,7 @@ static void call(struct emitter *e, const struct ir_inst *inst)
         } else {
             char name[24];
             value = reinterpret(e, value, callee->result, inst->type);
-            text_format(name, sizeof name, "%%v%" PRIu32, value);
+            text_format_name(name, sizeof name, "%%v%" PRIu32, value);
             store_result(e, inst, name);
         }
     }
