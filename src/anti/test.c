@@ -23,6 +23,10 @@
 #include "text.h"
 #include "units.h"
 
+/* The directory of the runners under the work directory, which the module
+   path anti.test.<module> of a runner names. */
+#define TEST_RUNNER_DIR "anti/test"
+
 /* One module of the run and the object a dev build writes for it. */
 struct test_unit {
     struct unit unit;
@@ -148,7 +152,7 @@ static bool compile_imports(const struct test_unit *u,
         ok = false;
         goto done;
     }
-    text_appendf(&directory, "%s/anti/test/imports/%s", work, flat);
+    text_appendf(&directory, "%s/" TEST_RUNNER_DIR "/imports/%s", work, flat);
     if (!files_make_dirs(text_cstr(&directory))) {
         ok = false;
         goto done;
@@ -265,12 +269,12 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
     bool ok = false;
     size_t i;
 
-    /* DESIGN: the runner lives at anti/test/ under the work directory.
+    /* DESIGN: the runner lives at TEST_RUNNER_DIR under the work directory.
        Its own module path is `anti.test.<module>`, never a name the
        module under test could take. Each dot of that module becomes an
        `_`, since a dot in the file name is a segment of its own. */
     write_runner(u, &source);
-    text_appendf(&directory, "%s/anti/test", work);
+    text_appendf(&directory, "%s/%s", work, TEST_RUNNER_DIR);
     if (!files_make_dirs(text_cstr(&directory))) {
         goto done;
     }

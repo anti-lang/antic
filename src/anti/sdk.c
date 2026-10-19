@@ -15,8 +15,10 @@
 #include "target.h"
 #include "text.h"
 
-/* The macOS sysroots that an import fills. */
-static const char *const macos_targets[] = {"macos-arm64", "macos-x86_64"};
+/* The macOS sysroots that an import fills, by the names target_name
+   gives them. */
+static const enum target macos_targets[] = {TARGET_MACOS_ARM64,
+                                            TARGET_MACOS_X86_64};
 
 /* Write line and a line feed as the whole file at path. */
 static bool write_line(const char *path, const char *line)
@@ -267,7 +269,7 @@ int sdk_import(const char *bundle, const char *sysroot)
     for (i = 0; i < sizeof macos_targets / sizeof macos_targets[0]; i++) {
         struct text dir = {0};
         bool ok;
-        text_appendf(&dir, "%s/%s", sysroot, macos_targets[i]);
+        text_appendf(&dir, "%s/%s", sysroot, target_name(macos_targets[i]));
         ok = files_make_dirs_or_say(text_cstr(&dir)) &&
              unpack(bundle, text_cstr(&dir), digest);
         text_free(&dir);
@@ -275,7 +277,7 @@ int sdk_import(const char *bundle, const char *sysroot)
             return 1;
         }
     }
-    text_appendf(&path, "%s/%s/%s/%s", sysroot, macos_targets[0],
+    text_appendf(&path, "%s/%s/%s/%s", sysroot, target_name(macos_targets[0]),
                  SYSROOT_APPLE_SDK_DIR, SYSROOT_SDK_VERSION);
     files_read(text_cstr(&path), &version);
     while (version.length > 0 && (version.data[version.length - 1] == '\n' ||
