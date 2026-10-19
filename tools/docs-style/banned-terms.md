@@ -3,7 +3,7 @@
 # Banned terms
 
 Every term here is banned in comments, docstrings, and `.md` files. The list is the same
-one `scripts/check_docs.py` enforces. Groups exist for reading, not for exceptions.
+one `tools/docs-style/check_docs.py` enforces. Groups exist for reading, not for exceptions.
 
 Contents:
 

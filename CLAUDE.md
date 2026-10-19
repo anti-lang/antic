@@ -205,8 +205,8 @@ not re-open a settled decision without asking Eddie.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
-- Every comment and every `.md` file follows the docs-style rules. The checker
-  reads `.md` files alone. Run `python3 tools/docs-style/check_docs.py <files>`
+- Every comment and every `.md` file follows the docs-style rules of
+  `tools/docs-style/rules.md`. The checker reads `.md` files alone. Run `python3 tools/docs-style/check_docs.py <files>`
   on the `.md` files before committing, read its exit status without a pipe,
   and fix every finding. The configure step installs `tools/hooks/pre-commit`,
   which runs the checker on the staged `.md` files and refuses a commit with a

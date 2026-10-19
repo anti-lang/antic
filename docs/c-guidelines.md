@@ -78,4 +78,4 @@ The bar differs by where the code runs.
 
 ### Comments
 
-27. Comments follow the docs-style rules of the repository.
+27. Comments follow the docs-style rules of the repository, `tools/docs-style/rules.md`.

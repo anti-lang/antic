@@ -826,6 +826,7 @@ the data the scripts read.
 | `tools/deps-dir.cmake` | Names the directory of the pinned downloads. |
 | `tools/docs-style/banned-terms.md` | Lists the banned terms for a reader. |
 | `tools/docs-style/check_docs.py` | Checks `.md` files against the docs-style rules. |
+| `tools/docs-style/rules.md` | States the docs-style rules for a comment and a `.md` file. |
 | `tools/download.cmake` | `antic_download`, the one download of the build, with the check of its digest. |
 | `tools/downloads.html.in` | The template of the downloads page that step 9 of a release fills. |
 | `tools/fetch-release.cmake` | Downloads one archive of the LLVM release and checks it against the pin, the manifest and the signature. |
