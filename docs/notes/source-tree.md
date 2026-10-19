@@ -360,7 +360,6 @@ The modules of the standard library, in Anti. The header of a module is its
 
 | File | Purpose |
 |---|---|
-| `src/std/.gitkeep` | An empty file, left from before the directory held a module. |
 | `src/std/LICENSE` | The 0BSD text of the library. |
 | `src/std/anti/args.anti` | A command line declared once, parsed and read by name. |
 | `src/std/anti/collection.anti` | The interfaces of walking, the bases `Collection<T>` and `Indexed<T>`, the failures `NotOne` and `Changed`, `Snapshot<T>`, `Copies<T>`, the hashes, the writers of a map entry and the stable sort. |
