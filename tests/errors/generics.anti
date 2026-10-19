@@ -121,7 +121,7 @@ fn uses(a: int, b: int, c: int, size: int, circles: []*Circle)
 	let named = max;
 	let area = total(circles);
 	let many = max<int, int>(1, 2);
-	let pair = Pair { first: 1, second: 2 };
+	let pair = Pair { first: 1 };
 	let typed: Ring<3, 4> = none;
 	let counted: Ring<int, int> = none;
 	let constraint_value = Loop;

@@ -160,6 +160,10 @@ struct checker {
        later value of it gets a message of its own. */
     const struct item *enum_item;
     size_t enum_value;
+    /* The type of each field value of the literal checked next that
+       inference checked already, or NULL. sema_check_field_inits takes
+       it and clears it. */
+    struct type **field_given;
     bool atomic_place;          /* the place of an atomic operation */
     /* The operand of `delete` or `destroy`, whose address a field of a
        singleton gives there. R083 of "Answers of 2026-10-18" then refuses
@@ -331,6 +335,10 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
 void sema_warn_catch_shadow(struct checker *c, const struct name *name,
                             struct pos pos);
 bool sema_later_enum_value(struct checker *c, const struct expr *e);
+bool sema_generic_open(struct checker *c, const struct expr *e,
+                       const struct type *t, struct type *expected);
+struct type *sema_infer_literal(struct checker *c, struct expr *e,
+                                struct type *t, struct type ***given);
 void sema_enter_scope(struct checker *c, struct scope *s);
 void sema_leave_scope(struct checker *c, struct scope *s);
 /* The only writers of c->ctx. sema_enter makes next the context and

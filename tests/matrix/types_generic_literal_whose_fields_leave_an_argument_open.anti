@@ -1,0 +1,15 @@
+//! A literal of a generic struct whose fields do not settle every type argument
+//! names the struct with its arguments, by R066 of "Answers of 2026-10-18".
+//! `none` gives nothing for `B`.
+
+struct Pair<A, B>
+{
+	left: A,
+	right: ?B,
+}
+
+fn main() -> int
+{
+	let p = Pair { left: 1, right: none };
+	return p.left;
+}

@@ -1726,6 +1726,20 @@ struct type *sema_generic_named(struct checker *c, struct expr *e,
     return sema_builtin(c, TYPE_ERROR);
 }
 
+/* Whether a literal e of the generic t gets no type arguments from what
+   it writes or from the context, so that sema_generic_named refuses it. */
+bool sema_generic_open(struct checker *c, const struct expr *e,
+                       const struct type *t, struct type *expected)
+{
+    struct type *s = expected != NULL ? sema_struct_of(expected) : NULL;
+
+    return !sema_is_error(t) && t->type_param_count > 0 &&
+           e->type_arg_count == 0 &&
+           !(s != NULL && (s == t || s->generic == t)) &&
+           !(t->nested_in != NULL && sema_nested_own(t) == 0) &&
+           !(in_generic(c) && sema_checking_class(c) == t);
+}
+
 /* Inference */
 
 /* Bind a constant parameter that stands as param to the constant arg. */
@@ -2114,6 +2128,55 @@ static struct type *infer(struct checker *c, struct expr *e,
         unify(p, t, map);
     }
     return NULL;
+}
+
+/* DESIGN: R066 of "Answers of 2026-10-18". A literal of a generic
+   struct that writes no type arguments, where the context gives none,
+   takes them from its field values, as a call takes them from its
+   arguments. Each value of a field whose type names a parameter is
+   checked with no type expected and binds what stands in the same place.
+   Gives the copy, the type of a value that failed its check, or NULL
+   where the fields leave a parameter open. *given receives the type of
+   each value checked, for the check of the fields that follows. */
+struct type *sema_infer_literal(struct checker *c, struct expr *e,
+                                struct type *t, struct type ***given)
+{
+    size_t count = e->as.struct_lit.field_count;
+    struct type **checked =
+        types_alloc_array(c->arena, count + 1, sizeof *checked);
+    struct generic_map map;
+    size_t i;
+    size_t j;
+
+    open_map(c, &map, t, t->type_param_count, NULL, 0);
+    for (i = 0; i < count; i++) {
+        struct field_init *init = &e->as.struct_lit.fields[i];
+        for (j = 0; j < t->field_count; j++) {
+            if (!types_same_name(&t->fields[j].name, &init->name) ||
+                !sema_has_params(t->fields[j].type)) {
+                continue;
+            }
+            /* `none` and an anonymous function take their types from the
+               field, so they give nothing here. */
+            if (init->value->kind == EXPR_NONE ||
+                init->value->kind == EXPR_FN) {
+                break;
+            }
+            checked[i] = sema_check_expr(c, init->value, NULL);
+            if (sema_is_error(checked[i])) {
+                return checked[i];
+            }
+            unify(t->fields[j].type, checked[i], &map);
+            break;
+        }
+    }
+    *given = checked;
+    for (i = 0; i < map.count; i++) {
+        if (map.args[i] == NULL && map.values[i] == NULL) {
+            return NULL;
+        }
+    }
+    return make_copy(c, t, map.args, map.values, e->pos);
 }
 
 /* A copy of the class outer that inference completed replaces the class

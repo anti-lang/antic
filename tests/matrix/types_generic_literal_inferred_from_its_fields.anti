@@ -1,0 +1,82 @@
+//! A literal of a generic struct that writes no type arguments takes them from
+//! its field values, by R066 of "Answers of 2026-10-18", as a call takes them
+//! from its arguments. Each place is a function of its own: a plain function,
+//! a generic function, a field of a pointer, an array and a slice, a nested
+//! literal and a closure. The program prints one line per place.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair<A, B>
+{
+	left: A,
+	right: B,
+}
+
+struct Boxed<T>
+{
+	value: T,
+	count: int,
+}
+
+struct Row<T, N: int>
+{
+	cells: [N]T,
+}
+
+fn plain() -> int
+{
+	let p = Pair { left: 1, right: 2.5 };
+	return p.left + (p.right * 2.0) as int;
+}
+
+fn make<T>(own x: T) -> int
+{
+	let p = Pair { left: 1, right: true };
+	if p.right {
+		return p.left + size_of(T);
+	}
+	return 0;
+}
+
+fn through(n: *int) -> int
+{
+	let b = Boxed { value: n, count: 2 };
+	return *b.value * b.count;
+}
+
+fn row() -> int
+{
+	let r = Row { cells: [1, 2, 3] };
+	return r.cells[0] + r.cells[1] + r.cells[2];
+}
+
+fn nested() -> int
+{
+	let p = Pair { left: Boxed { value: 7, count: 1 }, right: "seven" };
+	return p.left.value + p.right.len;
+}
+
+fn apply(f: fn() -> int) -> int
+{
+	return f();
+}
+
+fn in_closure(start: int) -> int
+{
+	return apply(fn() {
+		let b = Boxed { value: start, count: 3 };
+		return b.value * b.count;
+	});
+}
+
+fn main() -> int
+{
+	let n = 21;
+	printf("plain %lld\n".ptr, plain());
+	printf("generic %lld\n".ptr, make(5));
+	printf("pointer %lld\n".ptr, through(&n));
+	printf("array %lld\n".ptr, row());
+	printf("nested %lld\n".ptr, nested());
+	printf("closure %lld\n".ptr, in_closure(4));
+	return 0;
+}

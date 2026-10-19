@@ -34,6 +34,7 @@ A use names its arguments, or the compiler infers them.
 - A call writes them out where nothing gives them, `largest<f64>(2.5, 1.5)`.
 - A type always writes them: `Pair<int, str>`, `Maybe<int>.Some { value: 6 }`, `Cell<f64> { value: 2.5 }`.
 - A literal takes them from the type the context expects: `let p: Pair<int, str> = Pair { first: 1, second: "one" };`.
+- A literal of a generic struct infers them from its field values where the context gives none, as a call infers them from its arguments. `Pair { first: 1, second: "one" }` is a `Pair<int, str>`. Where the fields do not settle every argument, the literal writes them out. A field given `none` settles nothing.
 
 In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows it. The token after that `>` must be `(`, `.` or `{`. So `m < 9 && 2 > 1` stays two comparisons. `>>` closes two lists.
 

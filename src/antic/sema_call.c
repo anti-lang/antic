@@ -2801,10 +2801,12 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
     /* literal_name may be a buffer of sema_tn, which the literals nested
        in this one take again, so the function keeps a copy of its own. */
     char type_name[160];
+    struct type **given = c->field_given;
     bool ok = true;
     size_t i;
     size_t j;
 
+    c->field_given = NULL;
     text_format(type_name, sizeof type_name, "%s", literal_name);
     for (i = 0; i < count; i++) {
         const struct struct_field *f = NULL;
@@ -2844,7 +2846,9 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
             ok = false;
         }
         if (!sema_require(c, inits[i].value,
-                          sema_check_expr(c, inits[i].value, f->type),
+                          given != NULL && given[i] != NULL
+                              ? given[i]
+                              : sema_check_expr(c, inits[i].value, f->type),
                           f->type)) {
             ok = false;
         } else if (sema_bitfield_constant(c, inits[i].value, f)) {

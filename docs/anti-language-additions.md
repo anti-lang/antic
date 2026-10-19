@@ -983,7 +983,7 @@ let m = max(3, 7);
 - In an expression, `<` after a name opens type arguments under two conditions. What follows parses as a list of types closed by `>`, and the token after the `>` is `(`, `.` or `{`. Otherwise `<` is a comparison. This is the rule of C#. `List<int>.new()` and `max<int>(a, b)` are generic, and `a < b > c` stays two comparisons.
 - That rule can read a generic call where the name is not generic, as in `f(g < a, b > (c))` with an ordinary `g`. The compiler then refuses it and names the fix: parentheses around the comparison.
 - `>>` closes two lists of type arguments: `List<List<int>>`.
-- Type arguments are inferred from the arguments of a call where they can be. So `max(3, 7)` is `max<int>`. They are written out where nothing gives them, as in `List<Person>.new()`. Inference reads the arguments, never the body and never later uses of the result.
+- Type arguments are inferred from the arguments of a call where they can be. So `max(3, 7)` is `max<int>`. They are written out where nothing gives them, as in `List<Person>.new()`. Inference reads the arguments, never the body and never later uses of the result. By R066 of "Answers of 2026-10-18", a literal of a generic struct infers them from its field values where the context gives none. It writes them out where the fields do not settle them.
 
 ### Compilation
 

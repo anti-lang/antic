@@ -2130,6 +2130,7 @@ static struct type *check_struct_lit(struct checker *c, struct expr *e,
     struct symbol *sym;
     struct name *name = &e->as.struct_lit.name;
     const struct symbol *named;
+    struct type **given = NULL;
     /* A literal the checker wrote from `Shape.Empty` is complete. */
     if (e->as.struct_lit.variant_case != 0 && e->type != NULL) {
         return e->type;
@@ -2183,7 +2184,15 @@ static struct type *check_struct_lit(struct checker *c, struct expr *e,
                     : sym->type;
         }
     }
-    t = sema_generic_named(c, e, t, name, expected);
+    if (t->kind == TYPE_STRUCT && sema_generic_open(c, e, t, expected)) {
+        struct type *inferred = sema_infer_literal(c, e, t, &given);
+        if (inferred != NULL) {
+            t = inferred;
+        }
+    }
+    if (given == NULL || sema_is_error(t) || t->type_param_count > 0) {
+        t = sema_generic_named(c, e, t, name, expected);
+    }
     if (sema_is_error(t)) {
         return t;
     }
@@ -2234,6 +2243,7 @@ static struct type *check_struct_lit(struct checker *c, struct expr *e,
                    ? t
                    : sema_builtin(c, TYPE_ERROR);
     }
+    c->field_given = given;
     return sema_check_field_inits(c, e, e->as.struct_lit.fields,
                                   e->as.struct_lit.field_count, t->fields,
                                   t->field_count, sema_tn(t), t->is_union)

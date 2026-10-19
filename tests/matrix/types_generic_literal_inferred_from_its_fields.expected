@@ -1,0 +1,7 @@
+exit 0
+plain 6
+generic 9
+pointer 42
+array 6
+nested 12
+closure 12
