@@ -1,5 +1,5 @@
 /* The header of com.example.shapes compiles as C++17, with the sizes that
-   chapter 25 states for a packed and an aligned struct. */
+   com/example/shapes.anti gives a packed and an aligned struct. */
 #include "../binary_stdio.h"
 #include "shapes.h"
 

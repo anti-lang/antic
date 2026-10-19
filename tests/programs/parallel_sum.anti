@@ -1,4 +1,4 @@
-/* The worker pool of chapter 22. Each chunk is summed on a worker, and
+/* Sums over the worker pool. Each chunk is summed on a worker, and
    the sums come back in chunk order. */
 
 worker fn total(chunk: []int) -> int

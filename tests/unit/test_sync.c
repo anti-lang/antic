@@ -51,8 +51,8 @@ static void let_type(const char *source, const char *expected)
 
 void test_sync(void)
 {
-    /* The five words the threading chapter reserved are keywords now.
-       `thread` stays reserved, and `close` is a name. */
+    /* `sync`, `chan`, `send`, `recv` and `select` are keywords. `thread`
+       stays reserved, and `close` and `Mutex` are names. */
     {
         static const enum token_kind k[] = {
             TOKEN_SYNC, TOKEN_CHAN, TOKEN_SEND, TOKEN_RECV, TOKEN_SELECT,
