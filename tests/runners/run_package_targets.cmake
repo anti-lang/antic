@@ -28,8 +28,9 @@ if(NOT alone_out MATCHES "hello")
 endif()
 
 set(ANTIC "${package_bin}/antic${suffix}")
-foreach(target linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
-        windows-x86_64 windows-arm64)
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels")
+foreach(target IN LISTS ANTIC_TARGETS)
     set(exe "${WORK}/return42-${target}")
     if(target MATCHES "^windows-")
         string(APPEND exe ".exe")

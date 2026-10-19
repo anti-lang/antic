@@ -12,8 +12,9 @@ cmake_minimum_required(VERSION 3.21)
 file(REMOVE_RECURSE "${WORK}")
 # The sysroots that a package carries, and an SDK of Apple beside the
 # stubs of a macOS sysroot, as APPLE_SDK or anti sdk import leave it.
-foreach(name linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
-             windows-x86_64 windows-arm64 licenses)
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels")
+foreach(name IN LISTS ANTIC_TARGETS ITEMS licenses)
     file(COPY "${SYSROOT}/${name}" DESTINATION "${WORK}/sysroot")
 endforeach()
 file(WRITE "${WORK}/sysroot/macos-arm64/sdk/sdk-version" "26.5\n")

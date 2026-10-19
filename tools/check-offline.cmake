@@ -41,8 +41,9 @@ foreach(name BIN ARCHIVE ROOT WORK)
     file(TO_CMAKE_PATH "${${name}}" ${name})
 endforeach()
 
-set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
-    windows-x86_64 windows-arm64)
+include("${CMAKE_CURRENT_LIST_DIR}/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/cpu-levels")
+set(targets ${ANTIC_TARGETS})
 if(NOT HOST IN_LIST targets)
     message(FATAL_ERROR "check-offline: ${HOST} is no target")
 endif()

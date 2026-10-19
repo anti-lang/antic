@@ -40,8 +40,9 @@ endif()
 set(offline_lines "a raylib program of ${HOST} builds and runs"
     "a plugin host of ${HOST} loads its plugin"
     "the install builds for ${HOST} and links for the other five targets")
-foreach(target linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
-        windows-x86_64 windows-arm64)
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels")
+foreach(target IN LISTS ANTIC_TARGETS)
     if(NOT target STREQUAL HOST)
         list(APPEND offline_lines "a hello program links for ${target}: ")
     endif()

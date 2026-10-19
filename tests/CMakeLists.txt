@@ -647,8 +647,7 @@ add_test(NAME llvm_datalayout_pin
 # DESIGN: one test per target, since each runs antic twice per program. As
 # one test the twelve runs per program took over nine minutes under ASan,
 # whose start alone costs a fifth of a second.
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+foreach(target IN LISTS ANTIC_TARGETS)
     add_test(NAME llvm_verify_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -714,8 +713,7 @@ add_test(NAME llvm_inline_lines
 # directly after opt, across the call of the `created` hook. Every host
 # builds for every target, so each spelling of the name is read on every
 # host. The Windows VM found the COFF one missing.
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+foreach(target IN LISTS ANTIC_TARGETS)
     add_test(NAME direct_calls_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -1408,8 +1406,7 @@ foreach(case IN LISTS antic_option_cases)
 endforeach()
 # --cpu beside --target, for each target: its three levels, its default
 # and the three levels of the other architecture, which it refuses.
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+foreach(target IN LISTS ANTIC_TARGETS)
     add_test(NAME antic_option_target_cpu_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -2316,10 +2313,15 @@ add_test(NAME pinned_compiler
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
             -P "${ANTIC_RUNNERS}/run_pinned_compiler.cmake")
-# A pin of tools/ is read through tools/pins.cmake alone.
+# A pin of tools/ is read through tools/pins.cmake alone, and
+# tools/cpu-levels through tools/cpu-levels.cmake.
 add_test(NAME pin_readers
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${ANTIC_RUNNERS}/run_pin_readers.cmake")
+# The six targets are listed once, in tools/cpu-levels.
+add_test(NAME target_lists
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_target_lists.cmake")
 add_test(NAME release_key
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${ANTIC_RUNNERS}/run_release_key.cmake")
@@ -2836,8 +2838,7 @@ if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
 endif()
 # --target all links a program for each of the six targets.
 set(anti_option_six ON)
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+foreach(target IN LISTS ANTIC_TARGETS)
     if(NOT EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
         set(anti_option_six OFF)
     endif()
@@ -3138,8 +3139,7 @@ add_test(NAME sysroot_links
 # package_pack packs and unpacks it in package/, the tests package_* read
 # it there, each in a directory of its own, and package_clean removes it.
 set(package_missing "")
-foreach(dir linux-x86_64 linux-arm64 macos-arm64 macos-x86_64
-        windows-x86_64 windows-arm64 licenses)
+foreach(dir IN LISTS ANTIC_TARGETS ITEMS licenses)
     if(NOT EXISTS "${ANTIC_SYSROOT_DIR}/${dir}")
         list(APPEND package_missing "${dir}")
     endif()
@@ -3803,8 +3803,7 @@ endforeach()
 # Every link drops the code a program never calls. A hello-world program
 # calls anti_rt_write of src/rt/io.c and never anti_rt_exit of the same
 # file, so the second must be gone from the executable of every target.
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+foreach(target IN LISTS ANTIC_TARGETS)
     add_test(NAME dead_code_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"
@@ -3824,8 +3823,7 @@ endforeach()
 # addresses of their own in a release program of every target, in the
 # default LTO link and in the object link of --lto none.
 set(distinct_source "${CMAKE_CURRENT_SOURCE_DIR}/link-identity/distinct.anti")
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+foreach(target IN LISTS ANTIC_TARGETS)
     foreach(lto full none)
         if(lto STREQUAL "full")
             set(name distinct_addresses_${target})
@@ -3849,8 +3847,7 @@ endforeach()
 
 # Every object of a program and of its runtime carries the
 # address-significance table that the safe folding of lld reads.
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+foreach(target IN LISTS ANTIC_TARGETS)
     add_test(NAME address_tables_${target}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTIC=$<TARGET_FILE:antic>"

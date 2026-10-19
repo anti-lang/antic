@@ -28,8 +28,8 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-set(targets linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
-            windows-arm64)
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels")
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(GLOB sources "${PROGRAMS}/*.anti")
@@ -37,7 +37,7 @@ list(SORT sources)
 set(lines "")
 foreach(source IN LISTS sources)
     get_filename_component(name "${source}" NAME_WE)
-    foreach(target IN LISTS targets)
+    foreach(target IN LISTS ANTIC_TARGETS)
         set(out "${WORK}/${name}.${target}.ll")
         antic_build(OUTPUT text COMMAND --target ${target} --runtime
                     "${RUNTIME}" --dump-llvm "${source}")

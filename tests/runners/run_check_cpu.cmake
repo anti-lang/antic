@@ -9,8 +9,9 @@ cmake_minimum_required(VERSION 3.21)
 
 file(REMOVE_RECURSE "${WORK}")
 set(tree "${WORK}/package")
-foreach(target macos-arm64 macos-x86_64 linux-x86_64 linux-arm64
-        windows-x86_64 windows-arm64)
+include("${ROOT}/tools/cpu-levels.cmake")
+antic_read_cpu_levels("${ROOT}/tools/cpu-levels")
+foreach(target IN LISTS ANTIC_TARGETS)
     set(levels v1 v2 v3)
     set(library libanti_rt.a)
     if(target MATCHES "arm64$")

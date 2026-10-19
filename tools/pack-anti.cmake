@@ -53,8 +53,8 @@ foreach(name IN LISTS needed)
     endif()
 endforeach()
 
-set(TARGETS macos-arm64 macos-x86_64 linux-x86_64 linux-arm64
-            windows-x86_64 windows-arm64)
+include("${CMAKE_CURRENT_LIST_DIR}/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/cpu-levels")
 
 # DESIGN: every binary Anti ships is compiled with the pinned clang. The
 # cache of the build beside RUNTIME names its compiler, and CLANG must
@@ -193,14 +193,11 @@ endif()
 # lists for its architecture.
 function(lowest_level out host)
     string(REGEX REPLACE "^[a-z]+-" "" arch "${host}")
-    file(STRINGS "${tools_dir}/cpu-levels" rows REGEX "^level ")
-    foreach(row IN LISTS rows)
-        if(row MATCHES "^level ([^ ]+) ${arch} ")
-            set("${out}" "${CMAKE_MATCH_1}" PARENT_SCOPE)
-            return()
-        endif()
-    endforeach()
-    message(FATAL_ERROR "tools/cpu-levels lists no level of ${arch}")
+    if(ANTIC_CPU_LEVELS_${arch} STREQUAL "")
+        message(FATAL_ERROR "tools/cpu-levels lists no level of ${arch}")
+    endif()
+    list(GET ANTIC_CPU_LEVELS_${arch} 0 level)
+    set("${out}" "${level}" PARENT_SCOPE)
 endfunction()
 
 function(build_program host output program)
@@ -380,7 +377,7 @@ foreach(host IN LISTS HOSTS)
     # beside the runtime of each level goes in. The bitcode of ThinLTO,
     # bitcode/thin/, stays out, since no build takes it without being
     # asked. CMakeLists.txt names both directories.
-    foreach(target IN LISTS TARGETS)
+    foreach(target IN LISTS ANTIC_TARGETS)
         file(COPY "${RUNTIME}/lib/${target}" DESTINATION "${tree}/lib"
              REGEX "/bitcode/thin$" EXCLUDE)
     endforeach()

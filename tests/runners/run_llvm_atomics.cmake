@@ -23,8 +23,9 @@ set(wanted
     "cmpxchg ptr [^\n]*, i64 [^\n]*, i64 [^\n]* seq_cst seq_cst, align 8"
     "sext i8 [^\n]* to i64"
     "inttoptr i64 ")
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-        windows-x86_64 windows-arm64)
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels")
+foreach(target IN LISTS ANTIC_TARGETS)
     antic_build(OUTPUT_FILE "${WORK}/atomics.${target}.ll"
                 COMMAND --runtime "${RUNTIME}" --dev --dump-llvm
                         --target ${target} "${SOURCE}")

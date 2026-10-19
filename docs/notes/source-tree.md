@@ -734,7 +734,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_package_version.cmake` | Checks that antic and `anti` of the package print the version of `tools/version`. |
 | `tests/runners/run_pdb_guid.cmake` | Runs `check-pdb.cmake` on a linked Windows program. |
 | `tests/runners/run_pdb_names.cmake` | Checks the names in a PDB and that it holds no build path. |
-| `tests/runners/run_pin_readers.cmake` | Refuses a pin read outside `tools/pins.cmake`. |
+| `tests/runners/run_pin_readers.cmake` | Refuses a pin read outside `tools/pins.cmake` and `tools/cpu-levels` read outside `tools/cpu-levels.cmake`. |
 | `tests/runners/run_pinned_compiler.cmake` | Checks that the cache names the pinned clang and no runner a compiler or a binary tool of the host. |
 | `tests/runners/run_pinned_tools.cmake` | Runs the tool check of the configure step on the cache and on changed copies. |
 | `tests/runners/run_platform_layer.cmake` | Refuses a host `#if` outside the platform files. |
@@ -788,6 +788,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_symbols.cmake` | Looks up two functions in a program built with `-g`. |
 | `tests/runners/run_symbols_layout.cmake` | Compares the sections of a shipped program with those of its debug link. |
 | `tests/runners/run_sysroot_links.cmake` | Checks that the sysroot script turns an absolute link relative. |
+| `tests/runners/run_target_lists.cmake` | Refuses the six targets spelled outside `tools/cpu-levels`. |
 | `tests/runners/run_target_triples.cmake` | Refuses a triple of the C of a target outside `antic_target_triple` of `tools/target-compile.cmake`. |
 | `tests/runners/run_trace.cmake` | Runs a program and matches its output against pattern files. |
 | `tests/runners/run_trap.cmake` | Builds a program that must stop and compares its message. |
@@ -863,6 +864,7 @@ A pin or a data file has no code. Its row says what it holds.
 |---|---|
 | `tools/clang-pin` | The release, the asset names and the digests of the pinned clang of every host. |
 | `tools/cpu-levels` | The processor levels and the default level of each target. |
+| `tools/cpu-levels.cmake` | Reads `tools/cpu-levels` into the targets and the levels of each. |
 | `tools/keys/public/release.pem` | A second copy of `tools/keys/release.pem`, which no script reads. |
 | `tools/keys/release.pem` | The public key that checks the signature of the LLVM tools. |
 | `tools/llvm-pin` | The release, the asset names and the digests of the pinned LLVM tools of every host. |

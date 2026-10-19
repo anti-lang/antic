@@ -40,9 +40,9 @@ if(NOT GIT)
 endif()
 
 set(version "99.0.0")
-set(hosts macos-arm64 macos-x86_64 linux-x86_64 linux-arm64
-          windows-x86_64 windows-arm64)
-string(REPLACE ";" " " host_words "${hosts}")
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../tools/cpu-levels")
+string(REPLACE ";" " " host_words "${ANTIC_TARGETS}")
 
 # The fixtures are C this test writes, under the warnings of the
 # repository.

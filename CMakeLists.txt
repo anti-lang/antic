@@ -187,22 +187,8 @@ target_compile_definitions(anti_core PRIVATE
 # than repeating the names, so the runtime archive's native libraries are
 # built for the level each target defaults to.
 set(ANTIC_CPU_LEVELS "${CMAKE_SOURCE_DIR}/tools/cpu-levels")
-file(STRINGS "${ANTIC_CPU_LEVELS}" antic_cpu_lines REGEX "^(level|default) ")
-foreach(line IN LISTS antic_cpu_lines)
-    string(REPLACE " " ";" fields "${line}")
-    list(GET fields 0 kind)
-    list(GET fields 1 key)
-    if(kind STREQUAL "level")
-        list(GET fields 2 arch)
-        list(GET fields 3 id)
-        list(GET fields 4 march)
-        set(ANTIC_CPU_MARCH_${key} "${march}")
-        set(ANTIC_CPU_ID_${key} "${id}")
-        list(APPEND ANTIC_CPU_LEVELS_${arch} "${key}")
-    else()
-        list(GET fields 2 ANTIC_CPU_LEVEL_${key})
-    endif()
-endforeach()
+include(tools/cpu-levels.cmake)
+antic_read_cpu_levels("${ANTIC_CPU_LEVELS}")
 
 # The default level of a target, and the -march= value of a level.
 function(antic_cpu_level out target)
@@ -275,8 +261,6 @@ antic_write_sources("${ANTIC_RUNTIME_DIR}/licenses/sources.txt")
 # archive with the licences of its components.
 antic_shared_path(ANTIC_SYSROOT_DIR "${ANTIC_DEPS_DIR}/sysroot"
     "sysroots from tools/get-sysroot.cmake")
-set(ANTIC_TARGETS linux-x86_64 linux-arm64 macos-x86_64 macos-arm64
-    windows-x86_64 windows-arm64)
 # DESIGN: the Linux link mode against glibc takes a sysroot and a runtime
 # of its own, named after the target with -glibc, the suffix
 # LINUX_GLIBC_SUFFIX of src/antic/linker.h.

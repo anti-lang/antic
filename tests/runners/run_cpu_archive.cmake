@@ -8,13 +8,10 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-file(STRINGS "${LEVELS}" lines REGEX "^level ")
-foreach(line IN LISTS lines)
-    string(REPLACE " " ";" fields "${line}")
-    list(GET fields 1 name)
-    list(GET fields 2 arch)
-    list(APPEND levels_${arch} "${name}")
-endforeach()
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${LEVELS}")
+set(levels_x86_64 ${ANTIC_CPU_LEVELS_x86_64})
+set(levels_arm64 ${ANTIC_CPU_LEVELS_arm64})
 
 string(REPLACE "|" ";" targets "${TARGETS}")
 set(checked 0)

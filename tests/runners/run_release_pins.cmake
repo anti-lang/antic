@@ -13,8 +13,9 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
 
-set(hosts linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
-          windows-arm64)
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${ROOT}/tools/cpu-levels")
+set(hosts ${ANTIC_TARGETS})
 file(READ "${ROOT}/tools/llvm-version" version)
 string(STRIP "${version}" version)
 if(NOT version MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
