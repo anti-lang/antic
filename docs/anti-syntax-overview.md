@@ -635,7 +635,7 @@ Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus 
 
 ## Enums
 
-A named integer type with C layout, over `c_int` unless the declaration names the type. A value without `=` follows the one before it, and every value fits the underlying type. `as` converts an enum to any numeric type and an integer to an enum, and a dev build checks a conversion to an enum. A float and a value of another enum convert to an enum through an integer. `==` and `!=` compare two values, and `switch` takes them with their type.
+A named integer type with C layout, over `c_int` unless the declaration names the type. A value without `=` follows the one before it, and every value fits the underlying type. The expression after `=` names the values before it by their bare names, as numbers of the underlying type, `All = Read | Write`, and a later value is refused. `as` converts an enum to any numeric type and an integer to an enum, and a dev build checks a conversion to an enum. A float and a value of another enum convert to an enum through an integer. `==` and `!=` compare two values, and `switch` takes them with their type.
 
 ```anti
 enum Kind { Circle, Square, Empty }

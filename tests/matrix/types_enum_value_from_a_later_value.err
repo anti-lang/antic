@@ -1,0 +1,1 @@
+types_enum_value_from_a_later_value.anti:6:10: error: a value of `Mode` names the values before it alone, and `Second` is not one

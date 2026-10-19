@@ -156,6 +156,10 @@ struct checker {
        far as LOOPS_OPEN_MAX. */
     const struct stmt *loops_open[LOOPS_OPEN_MAX];
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
+    /* The enum whose value checked now is enum_value, so a name of a
+       later value of it gets a message of its own. */
+    const struct item *enum_item;
+    size_t enum_value;
     bool atomic_place;          /* the place of an atomic operation */
     /* The operand of `delete` or `destroy`, whose address a field of a
        singleton gives there. R083 of "Answers of 2026-10-18" then refuses
@@ -326,6 +330,7 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
                             const char *duplicate_message);
 void sema_warn_catch_shadow(struct checker *c, const struct name *name,
                             struct pos pos);
+bool sema_later_enum_value(struct checker *c, const struct expr *e);
 void sema_enter_scope(struct checker *c, struct scope *s);
 void sema_leave_scope(struct checker *c, struct scope *s);
 /* The only writers of c->ctx. sema_enter makes next the context and

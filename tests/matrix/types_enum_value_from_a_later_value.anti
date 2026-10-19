@@ -1,0 +1,13 @@
+//! A value of an enum names the values before it alone, by R054 of "Answers of
+//! 2026-10-18", so no cycle can form. A later value is refused.
+
+enum Mode: u8
+{
+	First = Second,
+	Second = 2,
+}
+
+fn main() -> int
+{
+	return Mode.First as int;
+}

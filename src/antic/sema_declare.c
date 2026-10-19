@@ -1085,6 +1085,68 @@ static bool follows_in(const struct type *base, uint64_t before)
     return before < top;
 }
 
+/* Whether the name e is the value of the enum checked now whose
+   expression holds it, or a value after it, which it refuses. */
+bool sema_later_enum_value(struct checker *c, const struct expr *e)
+{
+    const struct item *it = c->enum_item;
+    size_t k;
+
+    for (k = c->enum_value; it != NULL && k < it->param_count; k++) {
+        if (types_same_name(&it->params[k].name, &e->as.name)) {
+            sema_error_at(c, e->pos, "a value of `%.*s` names the values "
+                          "before it alone, and `%.*s` is not one",
+                          (int)it->name.length, it->name.text,
+                          (int)e->as.name.length, e->as.name.text);
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: R054 of "Answers of 2026-10-18". The expression of a value of
+   an enum names the values before it by their bare names, as
+   `All = Read | Write`. Each is a constant of the base of the enum that
+   holds its number, so the operators of integers take it, and a later
+   value is refused, so no cycle forms. The names live in a scope of the
+   expression alone. */
+static void check_enum_value(struct checker *c, struct item *it,
+                             const struct struct_field *values, size_t j,
+                             struct const_value *v, bool *folded)
+{
+    struct type *base = it->symbol->type->base;
+    struct expr *e = it->params[j].value;
+    struct scope earlier;
+    size_t k;
+
+    memset(&earlier, 0, sizeof earlier);
+    sema_enter_scope(c, &earlier);
+    for (k = 0; k < j; k++) {
+        struct symbol *sym;
+        struct const_value *number;
+        if (sema_scope_find_local(&earlier, &values[k].name) != NULL) {
+            continue;
+        }
+        sym = sema_declare(c, SYMBOL_CONST, &values[k].name, values[k].pos,
+                           "`%.*s` is already declared in this block");
+        number = arena_alloc(c->arena, sizeof *number);
+        memset(number, 0, sizeof *number);
+        number->kind = CONST_INT;
+        number->type = base;
+        number->as.integer = values[k].number;
+        sym->type = base;
+        sym->value = number;
+        sym->state = EVAL_DONE;
+    }
+    c->enum_item = it;
+    c->enum_value = j;
+    *folded = !sema_refuse_runtime_parts(c, e) &&
+              sema_require(c, e, sema_check_expr(c, e, base), base) &&
+              sema_eval_const(c, e, v);
+    c->enum_item = NULL;
+    sema_leave_scope(c, &earlier);
+}
+
 /* DESIGN: the values of an enum live in its fields, each with the
    enum as its type. A value without `=` follows the one before it,
    starting at 0, as C numbers an enumerator. */
@@ -1116,17 +1178,14 @@ static void declare_enum_values(struct checker *c, struct item *it)
         }
         if (it->params[j].value != NULL) {
             struct const_value v;
-            struct type *base = it->symbol->type->base;
+            bool folded;
             /* DESIGN: every value of an enum is a number the checker
                knows, since `switch` covers the values and the C header
                writes them. A value computed from `size_of` differs per
                target and is refused as the N of `align(N)` is, by T021
                of `docs/audit/tests-findings.md`. */
-            if (!sema_refuse_runtime_parts(c, it->params[j].value) &&
-                sema_require(c, it->params[j].value,
-                             sema_check_expr(c, it->params[j].value, base),
-                             base) &&
-                sema_eval_const(c, it->params[j].value, &v)) {
+            check_enum_value(c, it, values, j, &v, &folded);
+            if (folded) {
                 if (v.kind == CONST_INT) {
                     values[j].number = v.as.integer;
                 } else if (v.kind == CONST_SYMBOLIC) {

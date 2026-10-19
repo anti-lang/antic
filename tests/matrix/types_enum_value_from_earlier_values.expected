@@ -1,0 +1,4 @@
+exit 0
+mode 1 2 3 4 8 10
+level -2 2 4
+switch all

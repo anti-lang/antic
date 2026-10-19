@@ -1963,6 +1963,9 @@ static struct type *check_name(struct checker *c, struct expr *e)
 
     sym = sema_lookup(c, &e->as.name);
     e->symbol = sym;
+    if (sym == NULL && sema_later_enum_value(c, e)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (sym == NULL) {
         sema_error_at(c, e->pos, "unknown name `%.*s`",
                       (int)e->as.name.length,

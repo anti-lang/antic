@@ -1032,6 +1032,7 @@ An `enum` of C is an `int` with names, and any integer converts to it without a 
 `enum` declares a named integer type and its values.
 
 - The values count from 0. A value without `=` is one more than the value before it.
+- The constant expression after `=` may name the values before it by their bare names, as numbers of the underlying type: `All = Read | Write`. A value named there that stands later, or the value itself, is refused, so no cycle forms.
 - The underlying type follows the name after a colon, `enum Mode: u8`. Without one it is `c_int`. Every value fits the underlying type.
 - A value is written with its type, `Kind.Circle`, and is a constant expression.
 - `==` and `!=` compare two values of one enum. `<` and the other order comparisons are refused.

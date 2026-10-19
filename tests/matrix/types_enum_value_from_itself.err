@@ -1,0 +1,1 @@
+types_enum_value_from_itself.anti:7:9: error: a value of `Mode` names the values before it alone, and `Loop` is not one

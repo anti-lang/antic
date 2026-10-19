@@ -1,0 +1,13 @@
+//! A value of an enum that names itself names no value before it, and is
+//! refused as a later one is.
+
+enum Mode: u8
+{
+	Read = 1,
+	Loop = Loop + 1,
+}
+
+fn main() -> int
+{
+	return Mode.Loop as int;
+}

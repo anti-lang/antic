@@ -58,6 +58,7 @@ Contents:
 - An enum has C layout. It converts with `as` to and from its underlying type, both ways unchecked. It compares with `== != < <= > >=`. A value is written `Kind.Circle`.
 - An enum value is a constant expression.
 - `switch` on an enum without `else` must cover every value. The message names the missing ones.
+- The value of an enum after `=` is a constant expression. It may name the values before it by their bare names, as numbers of the underlying type, `All = Read | Write`. A later value is refused, so no cycle forms.
 - `anti bind` emits a C enum as an Anti enum, and the header writes `enum`.
 
 ## Class declaration

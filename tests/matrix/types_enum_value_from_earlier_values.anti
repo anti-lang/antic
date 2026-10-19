@@ -1,0 +1,65 @@
+//! A value of an enum names the values before it in its constant expression,
+//! by R054 of "Answers of 2026-10-18": `All = Read | Write`. Each name is the
+//! number of that value in the base of the enum, and a value without `=` after
+//! it follows it. The values serve a `switch`, `as` and a field of a struct.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Mode: u8
+{
+	Read = 1,
+	Write = 2,
+	All = Read | Write,
+	Next,
+	Twice = Next * 2,
+	Last = Twice + All - Read,
+}
+
+enum Level
+{
+	Low = -2,
+	High = -Low,
+	Span = High - Low,
+}
+
+struct Access
+{
+	mode: Mode,
+}
+
+fn name(m: Mode) -> str
+{
+	switch m {
+		Mode.Read => {
+			return "read";
+		},
+		Mode.Write => {
+			return "write";
+		},
+		Mode.All => {
+			return "all";
+		},
+		Mode.Next => {
+			return "next";
+		},
+		Mode.Twice => {
+			return "twice";
+		},
+		Mode.Last => {
+			return "last";
+		},
+	}
+}
+
+fn main() -> int
+{
+	printf("mode %d %d %d %d %d %d\n".ptr, Mode.Read as c_int, Mode.Write as c_int,
+		Mode.All as c_int, Mode.Next as c_int, Mode.Twice as c_int,
+		Mode.Last as c_int);
+	printf("level %d %d %d\n".ptr, Level.Low as c_int, Level.High as c_int,
+		Level.Span as c_int);
+	let a = Access { mode: Mode.All };
+	let n = name(a.mode);
+	printf("switch %.*s\n".ptr, n.len as c_int, n.ptr);
+	return 0;
+}
