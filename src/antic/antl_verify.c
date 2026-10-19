@@ -13,8 +13,10 @@
    tree the reader built as they take one the checker built, so every
    rule the checker makes true of a tree has to hold for it as well. The
    verifier holds each tree to those rules once the reader has read it,
-   and a tree that breaks one is damaged. The rules of a library file
-   stand here and nowhere else.
+   and a tree that breaks one is damaged. The rules of a tree stand here
+   and nowhere else. A rule of a record of the tables, such as the width
+   of a bitfield, the target of a branch or the type of a load, stands in
+   the reader of that record, which refuses it as it reads it.
 
    The walk starts at the function of the tree and follows what the copy
    pass and lowering follow. It keeps one mark per record, so it takes

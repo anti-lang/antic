@@ -42,9 +42,10 @@ bool antl_write_header(struct text *out, const struct interface *iface);
    as well, and antl_header names it. */
 bool antl_starts(const uint8_t *data, size_t size);
 
-/* Read the package header, the module name, the imports and the module's
-   doc text of a library file into out, with no items. Returns false and writes a message to error when the file is
-   not a library file of this version. */
+/* Read the package header, the module name, the imports, the frameworks
+   and the Linux libraries the module links and the module's doc text of
+   a library file into out, with no items. Returns false and writes a
+   message to error when the file is not a library file of this version. */
 bool antl_header(const uint8_t *data, size_t size, struct arena *arena,
                  struct interface *out, char *error, size_t error_size);
 

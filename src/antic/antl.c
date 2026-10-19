@@ -1,7 +1,7 @@
 /* The format of the library file and the top of its reader: the magic,
-   the checks that tie the format to the enums it stores, the helpers the
-   files share, and antl_header and antl_read, which read the header and
-   hand the type table, the items and the IR to antl_read.c and
+   the checks that tie the format to the enums of its tables, the helpers
+   the files share, and antl_header and antl_read, which read the header
+   and hand the type table, the items and the IR to antl_read.c and
    antl_read_ir.c. */
 
 #include "antl.h"
