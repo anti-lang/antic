@@ -166,7 +166,14 @@ struct options {
     enum cpu_level cpu;
 };
 
-/* Compile options->input and return the process exit status for antic. */
+/* The status of driver_run for a dev object of a module without main,
+   which stops at its object. antic exits with it, and anti counts it as
+   a success. */
+#define DRIVER_OBJECT_ONLY 3
+
+/* Compile options->input and return the process exit status for antic:
+   0, DRIVER_OBJECT_ONLY, 2 after a dump or a refused option and 1 after
+   an error. */
 int driver_run(const struct options *options);
 struct arena;
 struct package;

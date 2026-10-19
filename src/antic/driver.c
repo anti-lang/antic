@@ -807,8 +807,8 @@ static void identified_notice(struct text *out, const struct text *notice,
    translates the module into LLVM IR text. --dump-llvm prints the text.
    Otherwise the text goes to llvm_text with the notice after the build
    id, and driver_run hands it to opt and llc. Returns 0 with the text, 2
-   after the dump, 3 for a dev object of a module without main and 1
-   after an error. */
+   after the dump, DRIVER_OBJECT_ONLY for a dev object of a module without
+   main and 1 after an error. */
 static int llvm_back_end(const struct options *o, struct ir_module *program,
                          const char *module, struct text *llvm_text,
                          struct extras *extras)
@@ -878,7 +878,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
         fputs(text_cstr(&out), stdout);
         status = 2;
     } else if (ok) {
-        status = o->dev && !has_main(program, module) ? 3 : 0;
+        status = o->dev && !has_main(program, module) ? DRIVER_OBJECT_ONLY : 0;
         /* The build id digests the text without the notice, which holds
            it. */
         if (with_notice) {
@@ -1016,8 +1016,8 @@ static void build_notice(const struct options *o,
 }
 
 /* Lower the program, run the optimizer passes and run llvm_back_end for
-   the target. Returns 0 with the text, 2 after a dump, 3 for a dev object
-   of a module without main and 1 after an error. */
+   the target. Returns 0 with the text, 2 after a dump, DRIVER_OBJECT_ONLY
+   for a dev object of a module without main and 1 after an error. */
 static int back_end(const struct options *o, struct module *tree,
                     const char *module, struct ir_module *program,
                     struct text *llvm_text, struct extras *extras)
@@ -1424,7 +1424,7 @@ static int compile(const struct options *o, struct text *source,
     /* Both lie in this frame and in the list freed below. */
     extras->own = NULL;
     extras->libraries = NULL;
-    if (status != 0 && status != 3) {
+    if (status != 0 && status != DRIVER_OBJECT_ONLY) {
         goto done;
     }
     if (o->lib != LIB_NONE && !o->assembly_only) {
@@ -1729,8 +1729,8 @@ static int compile_library_file(const struct options *o,
         goto done;
     }
     status = back_end(o, NULL, header.module, &program, llvm_text, extras);
-    if (status == 0 || status == 3) {
-        status = 3;
+    if (status == 0 || status == DRIVER_OBJECT_ONLY) {
+        status = DRIVER_OBJECT_ONLY;
         if (o->output != NULL) {
             text_append(base, o->output);
         } else {

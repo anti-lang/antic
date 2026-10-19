@@ -469,7 +469,7 @@ static bool module_object(struct build *b, const char *library,
     }
     drop_key(text_cstr(out));
     status = driver_run(&o);
-    ok = (status == 0 || status == 3) && write_key(text_cstr(out), &key);
+    ok = (status == 0 || status == DRIVER_OBJECT_ONLY) && write_key(text_cstr(out), &key);
 done:
     strings_free(&rest);
     text_free(&base);

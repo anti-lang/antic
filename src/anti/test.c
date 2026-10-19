@@ -95,10 +95,10 @@ static bool compile_object(struct test_unit *u, const struct options *base,
     o.input = u->unit.source;
     o.output = text_cstr(&base_path);
     o.dev = true;
-    /* A module without `main` stops at its object, which is status 3. */
+    /* A module without `main` stops at its object. */
     status = driver_run(&o);
     text_free(&base_path);
-    return status == 0 || status == 3;
+    return status == 0 || status == DRIVER_OBJECT_ONLY;
 }
 
 /* The objects of the modules a unit imports, for a dev link. */
@@ -168,9 +168,9 @@ static bool compile_imports(const struct test_unit *u,
         one.input = paths[i];
         one.output = text_cstr(&base_path);
         one.dev = true;
-        /* A module without `main` stops at its object, which is status 3. */
+        /* A module without `main` stops at its object. */
         status = driver_run(&one);
-        ok = status == 0 || status == 3;
+        ok = status == 0 || status == DRIVER_OBJECT_ONLY;
         if (ok) {
             out->items[out->count++] = object;
         } else {
