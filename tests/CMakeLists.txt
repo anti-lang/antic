@@ -6367,42 +6367,38 @@ endif()
 
 # The text of a float takes no digit from the C library in any runtime of
 # the archive. std/float_text.anti holds the text itself.
-if(ANTIC_LLVM_AR)
-    add_test(NAME float_digits
+add_test(NAME float_digits
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/float_digits"
+        -P "${ANTIC_RUNNERS}/run_float_digits.cmake")
+foreach(case static shared exports two loader header bundle classes
+        failing tuples flags variants nested simd names handlers ledger
+        generics optional forms views never never_cpp ctypes
+        ctypes_shared ctypes_bundle tight tight_aligned)
+    # The C program of ledger starts its threads with pthreads.
+    if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
+        continue()
+    endif()
+    add_test(NAME clib_${case}
         COMMAND "${CMAKE_COMMAND}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DANTIC=$<TARGET_FILE:antic>"
             "-DLLVM_AR=${ANTIC_LLVM_AR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/float_digits"
-            -P "${ANTIC_RUNNERS}/run_float_digits.cmake")
-endif()
-if(ANTIC_LLVM_AR)
-    foreach(case static shared exports two loader header bundle classes
-            failing tuples flags variants nested simd names handlers ledger
-            generics optional forms views never never_cpp ctypes
-            ctypes_shared ctypes_bundle tight tight_aligned)
-        # The C program of ledger starts its threads with pthreads.
-        if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
-            continue()
-        endif()
-        add_test(NAME clib_${case}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_AR=${ANTIC_LLVM_AR}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-                "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib"
-                "-DCASE=${case}"
-                "-DCC=${ANTIC_TEST_CC}"
-                "-DCXX=${ANTIC_TEST_CXX}"
-                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-                "-DTARGET=${ANTIC_HOST_TARGET}"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                -P "${ANTIC_RUNNERS}/run_clib.cmake")
-        set_tests_properties(clib_${case} PROPERTIES
-            SKIP_REGULAR_EXPRESSION "SKIP: ")
-    endforeach()
-endif()
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib"
+            "-DCASE=${case}"
+            "-DCC=${ANTIC_TEST_CC}"
+            "-DCXX=${ANTIC_TEST_CXX}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            "-DTARGET=${ANTIC_HOST_TARGET}"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            -P "${ANTIC_RUNNERS}/run_clib.cmake")
+    set_tests_properties(clib_${case} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
 # Two bundled libraries of each Windows target on every host. The pinned
 # clang compiles the C program for the target and lld-link links it, and
 # nothing runs.

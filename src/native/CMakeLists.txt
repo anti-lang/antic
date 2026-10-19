@@ -19,8 +19,8 @@
 # directories of anti_rt. The levels come from tools/cpu-levels through
 # antic_cpu_level and antic_cpu_march of the top-level file.
 
-if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang" OR NOT ANTIC_LLVM_AR)
-    message(STATUS "Native libraries: skipped, they need clang and llvm-ar")
+if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+    message(STATUS "Native libraries: skipped, they need clang")
     return()
 endif()
 

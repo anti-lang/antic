@@ -561,7 +561,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
-if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
         if(NOT EXISTS "${sysroot}")
