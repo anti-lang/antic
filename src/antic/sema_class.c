@@ -1,10 +1,10 @@
 /* The class model: the tables a class fills and the bodies that fill
    them, the interfaces it implements, its contracts, its hooks and
    operators, its `construct` with the fields it sets, and the nested
-   types its signatures may not name. sema.c declares the classes, their
-   fields and their members first, and sema_check_classes checks each
-   class once the whole module is declared. sema_table_of gives lowering
-   and the C header the primary table of a class. */
+   types its signatures may not name. sema_declare.c declares the
+   classes, their fields and their members first, and sema_check_classes
+   checks each class once the whole module is declared. sema_table_of
+   gives lowering and the C header the primary table of a class. */
 
 #include <stdlib.h>
 #include <string.h>

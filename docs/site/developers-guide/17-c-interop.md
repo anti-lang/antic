@@ -522,7 +522,7 @@ checked(-1): error
 sorted 1 2 3 4
 ```
 
-Where it lives: `src/antic/sema_export.c` and `src/antic/sema.c` hold the signature rule. `llvm_emit_linkage` of `src/antic/llvm_emit_call.c` writes `dso_local` or `internal`, `target_c_symbol` of `src/antic/target.c` the C name, and `src/antic/abi.c` the places of the arguments. `src/antic/header.c` writes the prototypes.
+Where it lives: `src/antic/sema_export.c` and `src/antic/sema_declare.c` hold the signature rule. `llvm_emit_linkage` of `src/antic/llvm_emit_call.c` writes `dso_local` or `internal`, `target_c_symbol` of `src/antic/target.c` the C name, and `src/antic/abi.c` the places of the arguments. `src/antic/header.c` writes the prototypes.
 
 ### What it costs
 
@@ -862,7 +862,7 @@ The table holds the two link modes of Linux, built on macOS for linux-x86_64. Th
 
 The second column is the output of `llvm-readobj --needed-libs` of the pinned tools.
 
-Where it lives: `parser_decl.c` and `sema.c` of `src/antic/` read and check the line, `src/anti/units.c` collects the names of every module for the link, and `src/antic/driver_link.c` and `src/antic/linker.c` write the link of both modes.
+Where it lives: `parser_decl.c` and `sema_declare.c` of `src/antic/` read and check the line, `src/anti/units.c` collects the names of every module for the link, and `src/antic/driver_link.c` and `src/antic/linker.c` write the link of both modes.
 
 ### What it costs
 

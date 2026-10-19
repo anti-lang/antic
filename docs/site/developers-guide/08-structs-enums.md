@@ -982,7 +982,7 @@ A register of arm64 holds 16 bytes, so the same `fadd <8 x float>` is two `fadd`
 
 An operation on `f16` lanes, an integer division and a shift are one scalar operation per lane. Lowering writes them that way.
 
-Where it lives: `check_simd_struct` of `src/antic/sema.c` and `src/antic/sema_simd.c` check the declaration and the operations. `lower_simd`, `lower_simd_binary` and `lower_simd_unary` of `src/antic/lower_simd.c` write the IR. `compute` of `src/antic/layout.c` gives the alignment, and `CPU_VECTOR_BYTE_CAP` of `src/antic/cpu.h` is the cap.
+Where it lives: `check_simd_struct` of `src/antic/sema_declare.c` and `src/antic/sema_simd.c` check the declaration and the operations. `lower_simd`, `lower_simd_binary` and `lower_simd_unary` of `src/antic/lower_simd.c` write the IR. `compute` of `src/antic/layout.c` gives the alignment, and `CPU_VECTOR_BYTE_CAP` of `src/antic/cpu.h` is the cap.
 
 ### What it costs
 
@@ -1205,7 +1205,7 @@ retq
 
 The C header of a library writes an exported enum as an `enum` of C.
 
-Where it lives: `declare_enums_and_variants` of `src/antic/sema.c` gives each value its number. `enum_check` of `src/antic/lower_check.c` writes the dev check, and `lower_switch` of `src/antic/lower_stmt.c` the chain of compares.
+Where it lives: `sema_declare_enums_and_variants` of `src/antic/sema_declare.c` gives each value its number. `enum_check` of `src/antic/lower_check.c` writes the dev check, and `lower_switch` of `src/antic/lower_stmt.c` the chain of compares.
 
 ### What it costs
 
@@ -1461,7 +1461,7 @@ retq
 
 The C header of a library writes `enum Shape_tag` with `Shape_Circle = 0` and the following values, and then the struct with the tag and the union.
 
-Where it lives: `declare_cases` of `src/antic/sema.c` and `types_set_cases` of `src/antic/types.c` build the parts. `build_variant`, `lower_load_tag` and `lower_case_address` of `src/antic/lower_expr.c`. `each_case` of `src/antic/lower_owning.c` tears down, copies and clears a variant by its tag. `variant_view` of `src/antic/header.c` writes the header.
+Where it lives: `declare_cases` of `src/antic/sema_declare.c` and `types_set_cases` of `src/antic/types.c` build the parts. `build_variant`, `lower_load_tag` and `lower_case_address` of `src/antic/lower_expr.c`. `each_case` of `src/antic/lower_owning.c` tears down, copies and clears a variant by its tag. `variant_view` of `src/antic/header.c` writes the header.
 
 ### What it costs
 

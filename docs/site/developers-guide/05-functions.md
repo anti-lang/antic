@@ -430,7 +430,7 @@ A `SourceLocation` is 64 bytes. A `str` of 16 bytes holds the file, two `int` th
 
 The texts of the record are literals of the module. Two locations in one function share the bytes of the file, the function and the module name.
 
-Where it lives: `check_defaults` of `src/antic/sema.c` checks a default, with `sema_eval_const` of `src/antic/sema_const.c` for the constant. `default_argument` of `src/antic/sema_call.c` fills a call. The `EXPR_HERE` case of `lower_address` in `src/antic/lower_expr.c` takes the address of the record, which `lower_location_value` of `src/antic/lower_place.c` writes. `SourceLocation` is declared in `src/std/anti/lang.anti`.
+Where it lives: `check_defaults` of `src/antic/sema_declare.c` checks a default, with `sema_eval_const` of `src/antic/sema_const.c` for the constant. `default_argument` of `src/antic/sema_call.c` fills a call. The `EXPR_HERE` case of `lower_address` in `src/antic/lower_expr.c` takes the address of the record, which `lower_location_value` of `src/antic/lower_place.c` writes. `SourceLocation` is declared in `src/std/anti/lang.anti`.
 
 ### What it costs
 

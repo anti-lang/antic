@@ -34,7 +34,7 @@ under "Generics and collections".
 
 ## Operator functions that share a name
 
-- `declared_name` of `sema.c` gives a module-level `operator fn` whose name another one of the module has the shared name `op:Type`, from the syntax of its first parameter, and marks the item `overloaded`. The item keeps its own name, which `check_operator_item` checks against the operator table, and its symbol takes the shared one.
+- `declared_name` of `sema_declare.c` gives a module-level `operator fn` whose name another one of the module has the shared name `op:Type`, from the syntax of its first parameter, and marks the item `overloaded`. The item keeps its own name, which `check_operator_item` checks against the operator table, and its symbol takes the shared one.
 - `shared_operator` of `sema_call.c` builds `op:Type` from the type of a receiver, its generic where it is a copy, and looks it up in the module scope or the library of the type before `sema_method_symbol` looks up the plain name. `sema_operator_symbol`, `sema_hook` and `a.eq(b)` all go through it.
 - `declare_function` of `lower.c` names the IR function by the symbol, as for a function of a struct body. `copy_function` names a copy of a shared generic by the shared name, and `put_declaration` of `antl_tree.c` writes the declaration of one under it, so the reader finds its symbol in the items section.
 - `interface_item` of `src/antic/docpage.c` cuts the signature name at the colon.

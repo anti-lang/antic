@@ -17,7 +17,7 @@ static bool simd_numeric(const struct type *lane)
 }
 
 /* Whether the declaration of a simd struct refuses lane, the type of
-   its first field, as check_simd_struct of sema.c does. */
+   its first field, as check_simd_struct of sema_declare.c does. */
 bool sema_simd_lane_refused(const struct type *lane)
 {
     return types_lane_bytes(lane) == 0 || lane->kind == TYPE_CHAR;

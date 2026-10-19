@@ -62,7 +62,7 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/parser_type.c` | Types, and the scan that tells type arguments after `<` from a comparison. |
 | `src/antic/pattern.c` | Checks a pattern literal: compiles it through the PCRE2 wrapper of the runtime, numbers its groups, and reads it into a tree for `exponential-pattern` and the least match length. Reads the pieces of a replacement template for the checker. |
 | `src/antic/pattern.h` | The interface of `pattern.c`. |
-| `src/antic/sema.c` | The shared helpers of the checker, every declaration pass over the items of a module with the checks of `provides`, `link` and a simd struct, and `sema_check`, which runs the passes in order. |
+| `src/antic/sema.c` | The shared helpers of the checker, the resolution of types and signatures, the passes over the function bodies and over what crosses to C, and `sema_check`, which runs every pass in order. |
 | `src/antic/sema.h` | The interface of the checker to the driver, lowering and the header: symbols, constants, the interface of a module, `sema_check` and the queries of the later passes. |
 | `src/antic/sema_call.c` | Checks calls and members: fields and their visibility, the functions of a class, `construct`, errors and their handlers, `mul_high` and the calls of a plugin library. |
 | `src/antic/sema_chain.c` | Takes a chain of declarations that name each other apart and resolves them leaves first. |
@@ -71,6 +71,7 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/sema_closure.c` | Checks an anonymous function as a function of its own, with its type from the target, what it captures, the writes and calls through a capture, a snapshot and a closure that would outlive a capture. |
 | `src/antic/sema_const.c` | Evaluates constant expressions and gives each constant symbol its value once, in dependency order. |
 | `src/antic/sema_copies.c` | The compiled copies: clones the checked tree of a generic per use, rechecks the open nodes, and rewrites the calls that name the copies. |
+| `src/antic/sema_declare.c` | Every pass that declares the items of a module, with the checks of `provides`, `link` and a simd struct. |
 | `src/antic/sema_doc.c` | The doc warnings of `anti check`, reading the module alone. |
 | `src/antic/sema_export.c` | The checks of what crosses to C, export items and the pointers of an `extern fn`, and the interface of a checked module. |
 | `src/antic/sema_expr.c` | Checks expressions and the conversions a value makes where it stands, and dispatches over the kinds of expression. |

@@ -3,9 +3,10 @@
 
 /* The state of the checker and the functions its files share. sema.c
    holds the helpers every file uses, scopes and lookup, and the
-   resolution of types. It declares the items of a module, checks the
-   `provides` and `link` lines and the declaration of a simd struct, and
-   runs the passes over the items. sema_class.c checks the class model: the
+   resolution of types and signatures, and runs the passes over the
+   items. sema_declare.c declares the items of a module and checks the
+   `provides` and `link` lines and the declaration of a simd struct.
+   sema_class.c checks the class model: the
    tables, the contracts and the bodies that fill them, the interfaces,
    the hooks and the operators. sema_chain.c takes chains of
    declarations apart, and sema_const.c evaluates constants. sema_expr.c
@@ -291,7 +292,6 @@ void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
                    const char *format, ...)
     ATTRIBUTE_PRINTF(4, 5);
 const char *sema_tn(const struct type *t);
-void sema_check_nesting(struct checker *c, struct type *t, struct pos pos);
 struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);
 bool sema_name_is(const struct name *a, const char *text);
@@ -301,10 +301,6 @@ const struct expr *sema_bare_place(const struct expr *e);
 /* Whether a and b name one place: the same variable, or the same path of
    fields from it, each after sema_bare_place. */
 bool sema_same_place(const struct expr *a, const struct expr *b);
-/* The shared name `op:Type` of a module-level `operator fn` whose name
-   another one of its module has, in arena, which owns it. */
-struct name sema_shared_name(struct arena *arena, const struct name *op,
-                             const struct name *type);
 /* A node of kind at pos, in the arena of the checker, which owns it. */
 struct expr *sema_new_node(struct checker *c, enum expr_kind kind,
                            struct pos pos);
@@ -320,6 +316,9 @@ struct symbol *sema_library_item(const struct checker *c,
                                  const struct interface *lib,
                                  const struct name *name);
 bool sema_direct_item(const struct symbol *sym);
+/* Put name with its symbol sym into the scope s. */
+void sema_scope_put(struct scope *s, const struct name *name,
+                    struct symbol *sym);
 /* Declare name of kind at pos in the current scope. A name the scope
    holds already is refused with duplicate_message, a format that holds
    exactly one `%.*s`, which takes the name. */
@@ -374,10 +373,41 @@ struct symbol *sema_std_item(struct checker *c, const struct name *module,
                              const struct name *name, bool own);
 struct type *sema_error_class(struct checker *c, struct pos pos);
 struct type *sema_location_type(struct checker *c, struct pos pos);
+/* The class anti.lang.Error, or NULL when the compilation lacks
+   anti.lang. */
+struct type *sema_lang_error_or_null(struct checker *c);
 struct type *sema_deserialize_type(struct checker *c, struct pos pos,
                                    const struct type *declared);
 bool sema_check_object_from(struct checker *c, struct expr *e,
                             const char *what);
+/* The type of the function item it, fn(params) -> result. */
+struct type *sema_function_type(struct checker *c, struct item *it);
+
+/* sema_declare.c */
+
+/* The passes of sema_check that declare the items, in the order it runs
+   them. */
+void sema_declare_root(struct checker *c);
+void sema_declare_import(struct checker *c, const struct import *imp);
+void sema_declare_items(struct checker *c);
+void sema_declare_direct_names(struct checker *c, const struct import *imp);
+void sema_resolve_bases(struct checker *c);
+void sema_declare_enums_and_variants(struct checker *c);
+void sema_declare_body_constants(struct checker *c);
+void sema_declare_all_fields(struct checker *c);
+void sema_declare_function_types(struct checker *c);
+void sema_declare_all_members(struct checker *c);
+void sema_check_signatures(struct checker *c);
+/* The checks of the `provides` lines and of the names of one kind of
+   `link` line of a module, which check_boundary of sema.c runs. */
+void sema_check_provides(struct checker *c, struct module *module);
+void sema_check_link_names(struct checker *c, const struct link_name *names,
+                           size_t count, const char *kind, const char *what);
+void sema_check_nesting(struct checker *c, struct type *t, struct pos pos);
+/* The shared name `op:Type` of a module-level `operator fn` whose name
+   another one of its module has, in arena, which owns it. */
+struct name sema_shared_name(struct arena *arena, const struct name *op,
+                             const struct name *type);
 
 /* sema_expr.c */
 
@@ -581,8 +611,9 @@ struct root_fn {
 };
 /* The sixteen functions of anti.lang.Object in the order of every table:
    the seven of the runtime, then the nine hooks from
-   SEMA_ROOT_FIRST_HOOK. declare_root of sema.c builds their items from
-   it, and the tables of sema_class.c take their first entries from it. */
+   SEMA_ROOT_FIRST_HOOK. sema_declare_root of sema_declare.c builds
+   their items from it, and the tables of sema_class.c take their first
+   entries from it. */
 #define SEMA_ROOT_COUNT 16
 #define SEMA_ROOT_FIRST_HOOK 7
 extern const struct root_fn sema_root_fns[SEMA_ROOT_COUNT];
