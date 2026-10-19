@@ -8,8 +8,8 @@
    default mode. A NaN keeps its sign and the top of its payload and
    becomes quiet, as it does in both instructions. */
 
-#ifndef ANTI_F16_H
-#define ANTI_F16_H
+#ifndef ANTI_RT_F16_H
+#define ANTI_RT_F16_H
 
 #include <stdint.h>
 #include <string.h>

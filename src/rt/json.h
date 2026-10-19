@@ -1,13 +1,17 @@
+/* A scanner of JSON text, at the level of tokens and positions, which
+   src/rt/json.c holds, and the two writers of a JSON string into a text
+   builder. The scanner knows no descriptor and builds no tree.
+   Object.deserialize reads into objects on top of it. anti bind builds a
+   tree of the output of clang with it. */
+
 #ifndef ANTI_RT_JSON_H
 #define ANTI_RT_JSON_H
-
-/* A scanner of JSON text, at the level of tokens and positions. It knows
-   no descriptor and builds no tree. Object.deserialize reads into objects
-   on top of it. anti bind builds a tree of the output of clang with it. */
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+struct anti_builder;
 
 /* The scanner: the next byte to read and the end of the text. Every
    function reads only between at and end, and a function that
@@ -77,5 +81,24 @@ bool anti_rt_json_value(struct anti_json *s);
 bool anti_rt_json_member(const unsigned char *source, int64_t length,
                          const unsigned char *name, int64_t name_length,
                          int64_t *start, int64_t *value_length);
+
+/* DESIGN: src/rt/object.c defines the two writers beside serialize,
+   which writes every string through the first. They append to a text
+   builder, and anti links json.c without the builder of the runtime. */
+
+/* Append the len bytes at bytes to b as a JSON string, with the escapes
+   that JSON requires. Every other byte goes out as it is, so the text
+   keeps the bytes of a str. serialize and json.write_text write every
+   string through it. */
+void anti_rt_json_write_text(struct anti_builder *b,
+                             const unsigned char *bytes, int64_t len);
+
+/* Append to b the bytes of the JSON string that the len bytes at bytes
+   hold, with white space allowed around it. The string is read as
+   Object.deserialize reads one. Gives 1 when it was read and 0 when the
+   text is no JSON string, after the bytes read before the fault. Memory
+   that runs out ends the program, as for every append to b. */
+int32_t anti_rt_json_unquote(struct anti_builder *b,
+                             const unsigned char *bytes, int64_t len);
 
 #endif

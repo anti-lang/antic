@@ -2,8 +2,8 @@
    compiler builds a descriptor and a table for every class. It lays both
    out with the C rules, so these declarations mirror what it writes. */
 
-#ifndef ANTI_OBJECT_H
-#define ANTI_OBJECT_H
+#ifndef ANTI_RT_OBJECT_H
+#define ANTI_RT_OBJECT_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -215,7 +215,7 @@ enum anti_entry {
     ANTI_ENTRY_EQUALS,
     ANTI_ENTRY_HASH,
     ANTI_ENTRY_SERIALIZE,
-    ANTI_ENTRY_DROP,
+    ANTI_ENTRY_DESTRUCT,
     ANTI_ENTRY_COPY,
     ANTI_ENTRY_HOOK     /* the first of the nine hooks */
 };
@@ -353,21 +353,6 @@ int anti_rt_arg_is_str(const struct anti_field *arg);
 void anti_rt_element_serialize(void *out, void *bytes,
                                const struct anti_field *arg);
 
-/* Append the len bytes at bytes to b as a JSON string, with the escapes
-   that JSON requires. Every other byte goes out as it is, so the text
-   keeps the bytes of a str. serialize and json.write_text write every
-   string through it. */
-void anti_rt_json_write_text(struct anti_builder *b,
-                             const unsigned char *bytes, int64_t len);
-
-/* Append to b the bytes of the JSON string that the len bytes at bytes
-   hold, with white space allowed around it. The string is read as
-   Object.deserialize reads one. Gives 1 when it was read and 0 when the
-   text is no JSON string, after the bytes read before the fault. Memory
-   that runs out ends the program, as for every append to b. */
-int32_t anti_rt_json_unquote(struct anti_builder *b,
-                             const unsigned char *bytes, int64_t len);
-
 /* Append the element at bytes to out as `to_text` of a collection writes
    it, a class through its own `to_text`. */
 void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg);
@@ -376,27 +361,6 @@ void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg);
    none. Memory that runs out ends the program through
    anti_rt_out_of_memory. The caller frees it with free. */
 void *anti_rt_copy_buffer(const void *from, int64_t bytes);
-
-/* A snapshot on the heap of size bytes, the size in its first eight.
-   It aborts when the memory is not there. The owner of the snapshot, the
-   `own fn` that holds it, frees it with anti_rt_snapshot_free. */
-void *anti_rt_snapshot_new(int64_t size);
-
-/* Copy length bytes of a captured str into the snapshot at offset at,
-   and a NUL after them. */
-void anti_rt_snapshot_text(void *snapshot, int64_t at,
-                           const unsigned char *bytes, int64_t length);
-
-/* Free a snapshot. NULL, the snapshot of a function that captures
-   nothing, frees nothing. */
-void anti_rt_snapshot_free(void *snapshot);
-
-/* A copy of a snapshot, byte for byte, or NULL for NULL. The copy is the
-   caller's, and anti_rt_snapshot_free frees it. */
-void *anti_rt_snapshot_dup(const void *snapshot);
-
-/* The count of the snapshots on the heap that are not freed. */
-int64_t anti_rt_snapshots_alive(void);
 
 /* The descriptor of the root and its one ancestor, which every module
    of a program shares. */

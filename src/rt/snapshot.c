@@ -7,7 +7,7 @@
 
 #include "atomic.h"
 #include "fail.h"
-#include "object.h"
+#include "snapshot.h"
 
 /* DESIGN: a snapshot on the heap is one block that starts with its size
    in bytes, so freeing it and copying it need nothing of the closure

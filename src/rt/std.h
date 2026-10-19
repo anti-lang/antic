@@ -2,8 +2,8 @@
    anti.mem and anti.fs of the standard library, with the layout of a
    Builder and the value of errno for an `extern fn`. */
 
-#ifndef ANTI_STD_H
-#define ANTI_STD_H
+#ifndef ANTI_RT_STD_H
+#define ANTI_RT_STD_H
 
 #include <stddef.h>
 #include <stdint.h>

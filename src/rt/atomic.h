@@ -1,8 +1,8 @@
 /* The atomic operations of the language. Every one is sequentially
    consistent, and the width of the value comes with its address. */
 
-#ifndef ANTI_ATOMIC_H
-#define ANTI_ATOMIC_H
+#ifndef ANTI_RT_ATOMIC_H
+#define ANTI_RT_ATOMIC_H
 
 #include <stdint.h>
 

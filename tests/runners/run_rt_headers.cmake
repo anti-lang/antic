@@ -3,8 +3,11 @@
 # with the comment of its purpose and declares every function and every
 # object with an anti_rt_ name that the file defines outside a `static`.
 # No other header of src/rt declares one of them. `struct anti_text`, the
-# layout of a str, stands in str.h alone. Run with cmake -P and ROOT, the
-# root of the repository.
+# layout of a str, stands in str.h alone. Every header of src/rt has the
+# guard ANTI_RT_<NAME>_H, from its file name, and rt.h has ANTI_RT_H. A
+# function of a prefix below stands in the header of the prefix, wherever
+# it is defined. Run
+# with cmake -P and ROOT, the root of the repository.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -13,7 +16,7 @@ set(src "${ROOT}/src/rt")
 set(pairs
     "platform_posix.c=platform.h" "platform_windows.c=platform.h"
     "assert.c=fail.h" "check.c=fail.h" "cast.c=fail.h"
-    "hash.c=hash.h" "init.c=rt.h")
+    "hash.c=hash.h" "init.c=rt.h" "json.c=json.h" "snapshot.c=snapshot.h")
 set(failures "")
 
 # The names a header declares: a name before `(` or `;` on a line that
@@ -94,6 +97,38 @@ endforeach()
 if(NOT EXISTS "${src}/str.h")
     string(APPEND failures "\nsrc/rt/str.h: missing")
 endif()
+
+# Each prefix and the header that declares every function of it.
+set(prefixes "anti_rt_json_=json.h" "anti_rt_snapshot_=snapshot.h")
+foreach(pair IN LISTS prefixes)
+    string(REPLACE "=" ";" parts "${pair}")
+    list(GET parts 0 prefix)
+    list(GET parts 1 home)
+    foreach(header IN LISTS headers)
+        if(header STREQUAL home)
+            continue()
+        endif()
+        foreach(name IN LISTS "names_${header}")
+            if(name MATCHES "^${prefix}")
+                string(APPEND failures
+                    "\nsrc/rt/${header}: declares ${name}, which ${home} holds")
+            endif()
+        endforeach()
+    endforeach()
+endforeach()
+
+foreach(header IN LISTS headers)
+    string(REGEX REPLACE "[.]h$" "" stem "${header}")
+    string(TOUPPER "ANTI_RT_${stem}_H" guard)
+    if(header STREQUAL "rt.h")
+        set(guard "ANTI_RT_H")
+    endif()
+    file(STRINGS "${src}/${header}" lines REGEX "^#ifndef ")
+    list(GET lines 0 first)
+    if(NOT first STREQUAL "#ifndef ${guard}")
+        string(APPEND failures "\nsrc/rt/${header}: the guard is not ${guard}")
+    endif()
+endforeach()
 
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "a header of the runtime out of its place:${failures}")

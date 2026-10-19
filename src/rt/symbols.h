@@ -4,8 +4,8 @@
    the system, so one test reads the tables of every target on one
    host. */
 
-#ifndef ANTI_SYMBOLS_H
-#define ANTI_SYMBOLS_H
+#ifndef ANTI_RT_SYMBOLS_H
+#define ANTI_RT_SYMBOLS_H
 
 #include <stdbool.h>
 #include <stddef.h>

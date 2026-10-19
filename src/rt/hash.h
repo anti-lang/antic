@@ -7,8 +7,8 @@
    value of parts starts at the offset basis of FNV-1a. It takes each part
    as the mix of the hash so far xor the hash of the part. */
 
-#ifndef ANTI_HASH_H
-#define ANTI_HASH_H
+#ifndef ANTI_RT_HASH_H
+#define ANTI_RT_HASH_H
 
 #include <stdint.h>
 

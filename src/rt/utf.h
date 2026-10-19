@@ -6,8 +6,8 @@
    compiles src/rt/utf.c for it. They use no platform functions, so the
    unit tests check them on any host. */
 
-#ifndef ANTI_UTF_H
-#define ANTI_UTF_H
+#ifndef ANTI_RT_UTF_H
+#define ANTI_RT_UTF_H
 
 #include <stddef.h>
 #include <stdint.h>

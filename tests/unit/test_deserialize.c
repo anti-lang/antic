@@ -507,7 +507,7 @@ static void make_tables(void)
         tables[i][ANTI_ENTRY_DESCRIPTOR] = classes[i].descriptor;
         tables[i][ANTI_ENTRY_SERIALIZE] =
             anti_rt_body_entry((anti_rt_body)anti_lang_Object_serialize);
-        tables[i][ANTI_ENTRY_DROP] =
+        tables[i][ANTI_ENTRY_DESTRUCT] =
             anti_rt_body_entry((anti_rt_body)teardown);
     }
 }

@@ -1,8 +1,8 @@
 /* The nine hooks of anti.lang.Object and the one anti.lang.TraceHandler
    that anti.lang.Trace.install stores. */
 
-#ifndef ANTI_HOOKS_H
-#define ANTI_HOOKS_H
+#ifndef ANTI_RT_HOOKS_H
+#define ANTI_RT_HOOKS_H
 
 #include <stdint.h>
 

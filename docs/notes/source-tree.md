@@ -335,6 +335,7 @@ reads as well says so in its row.
 | `src/rt/signal.c` | The functions a program registers for signals, and their delivery. |
 | `src/rt/signals.h` | The two console signals and the two calls of `signal.c`. |
 | `src/rt/snapshot.c` | The heap snapshots of `snapshot fn` and their count. |
+| `src/rt/snapshot.h` | The calls of `snapshot.c`. |
 | `src/rt/start.c` | The C `main`: the processor check, init, the arguments, the option pass, the program and its status. |
 | `src/rt/std.h` | The C functions behind `anti.io`, `anti.text`, `anti.license`, `anti.mem` and `anti.fs`, with `struct anti_text` and the value of `errno`. |
 | `src/rt/str.h` | The layout of a `str` as a function of the runtime takes and gives it: the bytes and their count. |

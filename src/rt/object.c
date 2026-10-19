@@ -1091,7 +1091,7 @@ void anti_rt_destroy_from(void *object, const struct anti_descriptor *type,
     void *start = checked_object(object, type);
     void (*teardown)(struct anti_object *, struct anti_object *) =
         (void (*)(struct anti_object *, struct anti_object *))
-            anti_rt_entry_body(start, ANTI_ENTRY_DROP);
+            anti_rt_entry_body(start, ANTI_ENTRY_DESTRUCT);
 
     if (teardown != NULL) {
         teardown(start, from);

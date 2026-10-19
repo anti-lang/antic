@@ -30,6 +30,7 @@
 #include "registry.h"
 #include "rt.h"
 #include "rt_abi.h"
+#include "snapshot.h"
 #include "sync.h"
 #include "target.h"
 #include "threads.h"
