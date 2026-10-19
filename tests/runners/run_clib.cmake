@@ -41,6 +41,9 @@ if("${TARGET}" MATCHES "^windows-")
     set(STATIC_SUFFIX ".lib")
     set(HOST_SHARED_SUFFIX ".dll")
     set(EXE ".exe")
+    # DRIVER is the word the link line of link_line in src/antic/linker.c
+    # starts with, which the cases compare. The C programs of the cases
+    # compile with the pinned clang, as the DESIGN below says.
     set(DRIVER cl)
 elseif(APPLE)
     set(HOST_SHARED_SUFFIX ".dylib")

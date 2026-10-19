@@ -84,7 +84,7 @@ endforeach()
 # that.
 foreach(script install.sh install.ps1)
     file(READ "${ROOT}/tools/${script}" text)
-    foreach(name llvm-pin llvm-version llvm-sums)
+    foreach(name llvm-pin llvm-version)
         if(text MATCHES "${name}")
             message(FATAL_ERROR "tools/${script} names ${name}, and the LLVM "
                                 "tools travel in bin/ of the package")

@@ -186,6 +186,11 @@ foreach(pair "windows-x86_64;x86_64;x64;arm64;coff-x86-64"
                                 "header")
         endif()
     endforeach()
+    # The tree keeps nothing of the layout of the source, the template
+    # _mingw.h.in and the directory crt/ of the headers, and no sdk/, the
+    # directory where a sysroot of Microsoft's CRT and SDK held the SDK.
+    # A step that copied either would leave headers include/ does not
+    # name.
     foreach(path include/_mingw.h.in crt sdk)
         if(EXISTS "${tree}/${path}")
             message(FATAL_ERROR "${tree} holds ${path}")
