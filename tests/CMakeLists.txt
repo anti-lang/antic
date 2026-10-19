@@ -1,5 +1,8 @@
-# Unit tests link the compiler's code directly. Program tests in
-# tests/programs compile .anti files with antic and run the result.
+# The tests of the suite, in sections by kind. Each section opens with a
+# comment that names what it holds: the helpers every section uses, the
+# unit tests, the programs, the modules, the messages of antic, the back
+# end, the commands of anti, the runtime archive and the release, the
+# checks of the sources, and the guards over the whole suite.
 
 # ANTIC_LLVM_MC and ANTIC_LLVM_AR, the llvm-mc and the llvm-ar of the
 # pinned release, stand in tools/pinned-compiler.cmake, which runs before
@@ -27,152 +30,6 @@ function(antic_rt_sources out)
     set(${out} ${paths} PARENT_SCOPE)
 endfunction()
 
-# The unit tests link anti_core, every file of anti but its main, and the
-# files of the runtime they test.
-antic_rt_sources(unit_rt_sources assert atomic cpu f16 fs mem platform_posix
-    platform_windows text)
-add_executable(antic_unit_tests
-    unit/test_main.c
-    unit/pipeline.c
-    unit/test_target.c
-    unit/test_cpu.c
-    unit/test_llvm_target.c
-    unit/test_abi.c
-    unit/test_llvm_emit.c
-    unit/test_text.c
-    unit/test_lexer.c
-    unit/test_parser.c
-    unit/test_types.c
-    unit/test_sema.c
-    unit/test_nullable.c
-    unit/test_variant.c
-    unit/test_sync.c
-    unit/test_ir.c
-    unit/test_layout.c
-    unit/test_lower.c
-    unit/test_modules.c
-    unit/test_header.c
-    unit/test_optimize.c
-    unit/test_link.c
-    unit/test_userdirs.c
-    unit/test_utf.c
-    unit/test_whole.c
-    unit/test_sha256.c
-    unit/test_arith.c
-    unit/test_f16.c
-    unit/test_symbols.c
-    unit/test_float_read.c
-    unit/test_coff.c
-    unit/test_toml.c
-    unit/test_rt_bounds.c
-    unit/test_fs.c
-    unit/test_json.c
-    unit/test_regex.c
-    unit/test_pattern.c
-    unit/test_bind.c
-    unit/test_deps.c
-    unit/test_zip.c
-    unit/test_syms.c
-    unit/test_fmt.c
-    unit/test_files.c
-    unit/test_tool_platform.c
-    unit/test_interface.c
-    unit/test_contract.c
-    ${unit_rt_sources})
-target_link_libraries(antic_unit_tests PRIVATE anti_core ${CMAKE_DL_LIBS})
-# test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
-# CRT of Windows hold it themselves.
-if(ANTIC_HOST_OS STREQUAL "linux")
-    target_link_libraries(antic_unit_tests PRIVATE m)
-endif()
-target_include_directories(antic_unit_tests PRIVATE ../src/rt ../src/anti)
-# ANTI_DEV_CPU lets test_cpu.c stand a level in for the processor, so the
-# refusal of a lower machine is checked on this one. The runtime of the
-# archive is compiled without it. ANTI_CPU_LEVEL_ID is the level of a
-# runtime, which every build of src/rt/cpu.c names.
-antic_cpu_level(unit_level "${ANTIC_HOST_TARGET}")
-target_compile_definitions(antic_unit_tests PRIVATE
-    ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}" ANTI_DEV_CPU
-    ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
-# One test per file of the unit tests, unit_<name> for test_<name>.c, each
-# in a directory of its own for the files it writes.
-get_target_property(unit_sources antic_unit_tests SOURCES)
-foreach(source IN LISTS unit_sources)
-    if(source MATCHES "^unit/test_(.+)\\.c$" AND
-       NOT CMAKE_MATCH_1 STREQUAL "main")
-        set(group "${CMAKE_MATCH_1}")
-        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
-        add_test(NAME unit_${group} COMMAND antic_unit_tests ${group}
-            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
-    endif()
-endforeach()
-# The messages two groups write to the standard error, which the group
-# itself does not read: the zip reader and writer, and the build id of a
-# program.
-foreach(group zip syms)
-    add_test(NAME unit_${group}_messages
-        COMMAND "${CMAKE_COMMAND}"
-            "-DPROGRAM=$<TARGET_FILE:antic_unit_tests>"
-            "-DGROUP=${group}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/unit/${group}.err"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unit-messages/${group}"
-            -P "${ANTIC_RUNNERS}/run_unit_messages.cmake")
-endforeach()
-
-# The allocation helpers of anti when the memory is refused, in a program
-# of its own, since each ends the process.
-add_executable(files_oom_tests unit/test_files_oom.c)
-target_link_libraries(files_oom_tests PRIVATE anti_core)
-target_include_directories(files_oom_tests PRIVATE ../src/anti)
-add_test(NAME unit_files_oom
-    COMMAND "${CMAKE_COMMAND}"
-        "-DPROGRAM=$<TARGET_FILE:files_oom_tests>"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/files-oom"
-        -P "${ANTIC_RUNNERS}/run_files_oom.cmake")
-
-# The allocation helpers of antic when the memory is refused or a size
-# overflows, in a program of its own, since each ends the process.
-add_executable(alloc_oom_tests unit/test_alloc_oom.c)
-target_link_libraries(alloc_oom_tests PRIVATE antic_core)
-add_test(NAME unit_alloc_oom
-    COMMAND "${CMAKE_COMMAND}"
-        "-DPROGRAM=$<TARGET_FILE:alloc_oom_tests>"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/alloc-oom"
-        -P "${ANTIC_RUNNERS}/run_alloc_oom.cmake")
-
-antic_coverage(antic_unit_tests files_oom_tests alloc_oom_tests)
-
-# Every host branch of antic, anti and the runtime stands in their
-# platform layers, src/antic/platform.c and src/anti/platform.c with their
-# headers and src/rt/platform.h with its two files.
-add_test(NAME platform_layer
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_platform_layer.cmake")
-
-# Every compiler extension of the runtime stands in its platform layer or
-# in src/rt/atomic.c.
-add_test(NAME rt_extensions
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_rt_extensions.cmake")
-
-# Each file of the runtime that M321 of docs/audit/summary.md named has
-# one header that declares what it defines, and str.h holds the layout of
-# a str.
-add_test(NAME rt_headers
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_rt_headers.cmake")
-
-# The runtime calls the UTF-16 entry points of Windows alone.
-add_test(NAME rt_wide_text
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_rt_wide_text.cmake")
-
-# anti reaches antic through driver.h, antic.h and the shared helpers
-# alone, M02 of the second audit.
-add_test(NAME anti_interface
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_anti_interface.cmake")
-
 # The suffix antic gives an object of the host target, the one that
 # src/antic/target.c names: .obj on Windows and .o elsewhere. Every dev
 # object a test links is named with it.
@@ -181,35 +38,6 @@ if(ANTIC_HOST_OS STREQUAL "windows")
 else()
     set(anti_object ".o")
 endif()
-
-# DESIGN: the dev objects of the standard library are compiled once per
-# suite, each by the test dev_object_<name> into anti_<name>_dev of this
-# directory with the fixture <name>_dev_object. A test that links one names
-# the module alone, by its path under std/anti/ such as lang or
-# collection/list. antic_dev_object registers the test of a module, and
-# antic_dev_inputs gives the objects and the fixtures of the modules that
-# have one, so the two cannot disagree.
-function(antic_dev_object module)
-    string(REPLACE "/" "_" name "${module}")
-    if(TEST dev_object_${name})
-        return()
-    endif()
-    add_test(NAME dev_object_${name}
-        COMMAND antic --dev
-                --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
-                -I "${ANTIC_RUNTIME_DIR}/std"
-                -o "${CMAKE_CURRENT_BINARY_DIR}/anti_${name}_dev"
-                "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
-    set_tests_properties(dev_object_${name} PROPERTIES
-        FIXTURES_SETUP ${name}_dev_object)
-endfunction()
-foreach(module lang regex mem text reflect runtime collection
-        collection/pool collection/tree collection/queue collection/list
-        collection/deque collection/ring collection/grid collection/sorted
-        collection/map collection/set collection/concurrent
-        collection/synchronized)
-    antic_dev_object(${module})
-endforeach()
 
 # Set objects to the dev objects of the modules after the two names, and
 # fixtures to the fixtures that compile them.
@@ -237,9 +65,7 @@ endfunction()
 # A test whose options hold one that --lto refuses keeps them alone.
 set(ANTIC_TEST_LTO "" CACHE STRING
     "full or thin: build the program tests of release mode with --lto")
-if(NOT ANTIC_TEST_LTO MATCHES "^(|full|thin)$")
-    message(FATAL_ERROR "ANTIC_TEST_LTO is full, thin or empty, not ${ANTIC_TEST_LTO}")
-endif()
+
 # Set out to the options after it, with --lto of ANTIC_TEST_LTO added. An
 # option may stand in a word of options joined by commas.
 function(antic_test_lto out)
@@ -406,6 +232,275 @@ set(ANTIC_RUNTIME_OBJDUMP
 set(ANTIC_RUNTIME_READOBJ
     "${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}")
 
+# add_expect_test(<name> STATUS <status> [DIRECTORY <dir>]
+#                 [TIMEOUT <seconds>]
+#                 EXPECTED <file> | PATTERN <regex>
+#                 COMMAND <program> <arguments>...)
+# registers a test of run_expect.cmake, which checks the exit status of
+# the program beside its output. Every test of a refusal or of a warning
+# goes through it, and none sets PASS_REGULAR_EXPRESSION, under which
+# ctest ignores the status. The command line of the test carries no `;`,
+# no `,` inside an argument and no line break, so a pattern holds neither
+# and a test that needs one compares a file with EXPECTED.
+function(add_expect_test name)
+    cmake_parse_arguments(PARSE_ARGV 1 arg ""
+                          "STATUS;DIRECTORY;TIMEOUT;EXPECTED;PATTERN"
+                          "COMMAND")
+    foreach(argument IN LISTS arg_COMMAND)
+        if(argument MATCHES ",")
+            message(FATAL_ERROR "${name}: the argument `${argument}` holds a `,`")
+        endif()
+    endforeach()
+    if(arg_PATTERN MATCHES "[;\n]")
+        message(FATAL_ERROR "${name}: the pattern holds a `;` or a line break")
+    endif()
+    list(JOIN arg_COMMAND "," command)
+    set(values "-DCOMMAND=${command}" "-DSTATUS=${arg_STATUS}")
+    if(DEFINED arg_DIRECTORY)
+        list(APPEND values "-DDIRECTORY=${arg_DIRECTORY}")
+    endif()
+    if(DEFINED arg_EXPECTED)
+        list(APPEND values "-DEXPECTED=${arg_EXPECTED}")
+    endif()
+    if(DEFINED arg_PATTERN)
+        list(APPEND values "-DPATTERN=${arg_PATTERN}")
+    endif()
+    if(DEFINED arg_TIMEOUT)
+        list(APPEND values "-DTIMEOUT=${arg_TIMEOUT}")
+    endif()
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}" ${values}
+                -P "${ANTIC_RUNNERS}/run_expect.cmake")
+endfunction()
+
+# A command line that a tool refuses with its usage: 2, nothing on the
+# standard output and the bytes of `--help` on the standard error. antic
+# names an option it does not know and a second input before the usage.
+# The name of a case is its test, and the words after it are the arguments.
+function(add_usage_test tool name)
+    cmake_parse_arguments(PARSE_ARGV 2 arg "" "FIRST" "ARGS")
+    list(JOIN arg_ARGS "," words)
+    set(values "-DCOMMAND=$<TARGET_FILE:${tool}>,${words}" -DNAME=${tool}
+        -DREFUSED=ON)
+    if(DEFINED arg_FIRST)
+        list(APPEND values "-DFIRST=${arg_FIRST}")
+    endif()
+    add_test(NAME ${tool}_usage_${name}
+        COMMAND "${CMAKE_COMMAND}" ${values}
+                -P "${ANTIC_RUNNERS}/run_usage.cmake")
+endfunction()
+
+# DESIGN: a test that compiles C or C++ beside Anti takes the compiler of
+# the build, so a build with the pinned clang runs no compiler of the
+# machine. The pinned clang reads the SDK of macOS from -isysroot and
+# compiles C++ in the driver mode of g++. A reader's build takes c++.
+#
+# DESIGN: antic never fuses a multiply and an add, so the C that a test
+# compiles as the reference of an Anti result fuses none either. Otherwise
+# the test compares two arithmetics. clang fuses by default on arm64 Linux.
+# MSVC fuses nothing by default and knows no such option.
+set(ANTIC_REFERENCE_C_FLAGS "")
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    set(ANTIC_REFERENCE_C_FLAGS -ffp-contract=off)
+endif()
+set(ANTIC_TEST_CC "${CMAKE_C_COMPILER}" ${ANTIC_REFERENCE_C_FLAGS})
+if(ANTIC_HOST_OS STREQUAL "macos")
+    list(APPEND ANTIC_TEST_CC -isysroot "${ANTIC_MACOS_SDK}")
+endif()
+if(ANTIC_SYSTEM_COMPILER)
+    set(ANTIC_TEST_CXX c++ ${ANTIC_REFERENCE_C_FLAGS})
+else()
+    set(ANTIC_TEST_CXX ${ANTIC_TEST_CC} --driver-mode=g++)
+endif()
+
+# DESIGN: every arm64 host runs the x86_64 programs of its own system under
+# emulation, so the Mac and the two VMs of docs/vm-setup.md run the
+# programs of all six targets between them. Anti runs no CI and no machine
+# here has an x86_64 processor. macos-arm64 runs macos-x86_64 under
+# Rosetta, linux-arm64 runs linux-x86_64 under qemu-x86_64 and
+# windows-arm64 runs windows-x86_64 under the x64 emulation of Windows.
+# Rosetta has no AVX2, so the programs of macos-x86_64 take --cpu v1 and
+# link the v1 runtime of the archive, as any --cpu v1 build does. qemu and
+# Windows emulate x86-64-v3, and their programs take the default level. A
+# linux-arm64 host without qemu-x86_64 runs no linux-x86_64 program. Each
+# include directory is one joined argument, since CMake drops a repeated
+# -isystem from the options of a target.
+set(ANTIC_EMULATED_TARGET "")
+set(ANTIC_EMULATOR "")
+set(emulated_c_flags "")
+if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
+    set(ANTIC_EMULATED_TARGET macos-x86_64)
+    set(ANTIC_X86_64_OPTIONS "--target,macos-x86_64,--cpu,v1")
+    set(emulated_c_flags -arch x86_64 -mmacosx-version-min=11.0)
+elseif(ANTIC_HOST_TARGET STREQUAL "linux-arm64")
+    find_program(ANTIC_QEMU_X86_64 qemu-x86_64)
+    if(ANTIC_QEMU_X86_64)
+        set(ANTIC_EMULATED_TARGET linux-x86_64)
+        set(ANTIC_EMULATOR "${ANTIC_QEMU_X86_64}")
+    else()
+        message(STATUS "No qemu-x86_64: the suite runs no linux-x86_64 program")
+    endif()
+    set(ANTIC_X86_64_OPTIONS "--target,linux-x86_64")
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        antic_target_triple(triple linux-x86_64)
+        antic_target_c_options(emulated_c_flags linux-x86_64
+            "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64"
+            "${ANTIC_CLANG_RESOURCE_DIR}")
+        list(PREPEND emulated_c_flags "--target=${triple}")
+    endif()
+elseif(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    set(ANTIC_EMULATED_TARGET windows-x86_64)
+    set(ANTIC_X86_64_OPTIONS "--target,windows-x86_64")
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        antic_target_triple(triple windows-x86_64)
+        antic_target_c_options(emulated_c_flags windows-x86_64
+            "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64"
+            "${ANTIC_CLANG_RESOURCE_DIR}")
+        list(PREPEND emulated_c_flags "--target=${triple}")
+    endif()
+endif()
+
+# Library files. scale.antl.hex lists the bytes that every host writes for
+# scale.anti. main.ir is the whole program after loading two libraries,
+# which the search root supplies, beside the build directory's copies.
+set(MODULES "${CMAKE_CURRENT_SOURCE_DIR}/modules")
+set(LIBS "${CMAKE_CURRENT_BINARY_DIR}/modules")
+
+# The suffix of a shared library and of a program of the host, which
+# the tests of plugins and of a library for C name.
+set(plugin_suffix ".dylib")
+set(plugin_exe "")
+if(ANTIC_HOST_OS STREQUAL "linux")
+    set(plugin_suffix ".so")
+elseif(ANTIC_HOST_OS STREQUAL "windows")
+    set(plugin_suffix ".dll")
+    set(plugin_exe ".exe")
+endif()
+
+set(MATRIX "${CMAKE_CURRENT_SOURCE_DIR}/matrix")
+
+# The unit tests of tests/unit/: antic_unit_tests, one test per file,
+# and the programs of the runtime that a file of its own builds.
+
+# The unit tests link anti_core, every file of anti but its main, and the
+# files of the runtime they test.
+antic_rt_sources(unit_rt_sources assert atomic cpu f16 fs mem platform_posix
+    platform_windows text)
+add_executable(antic_unit_tests
+    unit/test_main.c
+    unit/pipeline.c
+    unit/test_target.c
+    unit/test_cpu.c
+    unit/test_llvm_target.c
+    unit/test_abi.c
+    unit/test_llvm_emit.c
+    unit/test_text.c
+    unit/test_lexer.c
+    unit/test_parser.c
+    unit/test_types.c
+    unit/test_sema.c
+    unit/test_nullable.c
+    unit/test_variant.c
+    unit/test_sync.c
+    unit/test_ir.c
+    unit/test_layout.c
+    unit/test_lower.c
+    unit/test_modules.c
+    unit/test_header.c
+    unit/test_optimize.c
+    unit/test_link.c
+    unit/test_userdirs.c
+    unit/test_utf.c
+    unit/test_whole.c
+    unit/test_sha256.c
+    unit/test_arith.c
+    unit/test_f16.c
+    unit/test_symbols.c
+    unit/test_float_read.c
+    unit/test_coff.c
+    unit/test_toml.c
+    unit/test_rt_bounds.c
+    unit/test_fs.c
+    unit/test_json.c
+    unit/test_regex.c
+    unit/test_pattern.c
+    unit/test_bind.c
+    unit/test_deps.c
+    unit/test_zip.c
+    unit/test_syms.c
+    unit/test_fmt.c
+    unit/test_files.c
+    unit/test_tool_platform.c
+    unit/test_interface.c
+    unit/test_contract.c
+    ${unit_rt_sources})
+target_link_libraries(antic_unit_tests PRIVATE anti_core ${CMAKE_DL_LIBS})
+# test_f16.c calls nextafterf, which glibc keeps in libm. libSystem and the
+# CRT of Windows hold it themselves.
+if(ANTIC_HOST_OS STREQUAL "linux")
+    target_link_libraries(antic_unit_tests PRIVATE m)
+endif()
+target_include_directories(antic_unit_tests PRIVATE ../src/rt ../src/anti)
+# ANTI_DEV_CPU lets test_cpu.c stand a level in for the processor, so the
+# refusal of a lower machine is checked on this one. The runtime of the
+# archive is compiled without it. ANTI_CPU_LEVEL_ID is the level of a
+# runtime, which every build of src/rt/cpu.c names.
+antic_cpu_level(unit_level "${ANTIC_HOST_TARGET}")
+target_compile_definitions(antic_unit_tests PRIVATE
+    ANTIC_SOURCE_DIR="${PROJECT_SOURCE_DIR}" ANTI_DEV_CPU
+    ANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${unit_level}})
+# One test per file of the unit tests, unit_<name> for test_<name>.c, each
+# in a directory of its own for the files it writes.
+get_target_property(unit_sources antic_unit_tests SOURCES)
+foreach(source IN LISTS unit_sources)
+    if(source MATCHES "^unit/test_(.+)\\.c$" AND
+       NOT CMAKE_MATCH_1 STREQUAL "main")
+        set(group "${CMAKE_MATCH_1}")
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
+        add_test(NAME unit_${group} COMMAND antic_unit_tests ${group}
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
+    endif()
+endforeach()
+# The messages two groups write to the standard error, which the group
+# itself does not read: the zip reader and writer, and the build id of a
+# program.
+foreach(group zip syms)
+    add_test(NAME unit_${group}_messages
+        COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:antic_unit_tests>"
+            "-DGROUP=${group}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/unit/${group}.err"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unit-messages/${group}"
+            -P "${ANTIC_RUNNERS}/run_unit_messages.cmake")
+endforeach()
+
+# The allocation helpers of anti when the memory is refused, in a program
+# of its own, since each ends the process.
+add_executable(files_oom_tests unit/test_files_oom.c)
+target_link_libraries(files_oom_tests PRIVATE anti_core)
+target_include_directories(files_oom_tests PRIVATE ../src/anti)
+add_test(NAME unit_files_oom
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROGRAM=$<TARGET_FILE:files_oom_tests>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/files-oom"
+        -P "${ANTIC_RUNNERS}/run_files_oom.cmake")
+
+# The allocation helpers of antic when the memory is refused or a size
+# overflows, in a program of its own, since each ends the process.
+add_executable(alloc_oom_tests unit/test_alloc_oom.c)
+target_link_libraries(alloc_oom_tests PRIVATE antic_core)
+add_test(NAME unit_alloc_oom
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROGRAM=$<TARGET_FILE:alloc_oom_tests>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/alloc-oom"
+        -P "${ANTIC_RUNNERS}/run_alloc_oom.cmake")
+
+antic_coverage(antic_unit_tests files_oom_tests alloc_oom_tests)
+
+if(NOT ANTIC_TEST_LTO MATCHES "^(|full|thin)$")
+    message(FATAL_ERROR "ANTIC_TEST_LTO is full, thin or empty, not ${ANTIC_TEST_LTO}")
+endif()
+
 # The signal table of the runtime, in a program of its own. The test
 # starts threads, and so does the reader of the platform layer.
 find_package(Threads REQUIRED)
@@ -550,961 +645,39 @@ antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
     rt_platform_tests rt_plugin_table_tests rt_oom_runtime rt_oom_tests
     rt_hash_draw_runtime rt_hash_draw_tests)
 
-# add_expect_test(<name> STATUS <status> [DIRECTORY <dir>]
-#                 [TIMEOUT <seconds>]
-#                 EXPECTED <file> | PATTERN <regex>
-#                 COMMAND <program> <arguments>...)
-# registers a test of run_expect.cmake, which checks the exit status of
-# the program beside its output. Every test of a refusal or of a warning
-# goes through it, and none sets PASS_REGULAR_EXPRESSION, under which
-# ctest ignores the status. The command line of the test carries no `;`,
-# no `,` inside an argument and no line break, so a pattern holds neither
-# and a test that needs one compares a file with EXPECTED.
-function(add_expect_test name)
-    cmake_parse_arguments(PARSE_ARGV 1 arg ""
-                          "STATUS;DIRECTORY;TIMEOUT;EXPECTED;PATTERN"
-                          "COMMAND")
-    foreach(argument IN LISTS arg_COMMAND)
-        if(argument MATCHES ",")
-            message(FATAL_ERROR "${name}: the argument `${argument}` holds a `,`")
-        endif()
-    endforeach()
-    if(arg_PATTERN MATCHES "[;\n]")
-        message(FATAL_ERROR "${name}: the pattern holds a `;` or a line break")
+# Programs that antic builds and runs: tests/programs/, tests/std/, the
+# dev objects of the standard library, the checks of a dev build, the
+# traps, the runtime configuration, injection, plugins, traces, libraries
+# for C, the benchmarks and the matrix.
+
+# DESIGN: the dev objects of the standard library are compiled once per
+# suite, each by the test dev_object_<name> into anti_<name>_dev of this
+# directory with the fixture <name>_dev_object. A test that links one names
+# the module alone, by its path under std/anti/ such as lang or
+# collection/list. antic_dev_object registers the test of a module, and
+# antic_dev_inputs gives the objects and the fixtures of the modules that
+# have one, so the two cannot disagree.
+function(antic_dev_object module)
+    string(REPLACE "/" "_" name "${module}")
+    if(TEST dev_object_${name})
+        return()
     endif()
-    list(JOIN arg_COMMAND "," command)
-    set(values "-DCOMMAND=${command}" "-DSTATUS=${arg_STATUS}")
-    if(DEFINED arg_DIRECTORY)
-        list(APPEND values "-DDIRECTORY=${arg_DIRECTORY}")
-    endif()
-    if(DEFINED arg_EXPECTED)
-        list(APPEND values "-DEXPECTED=${arg_EXPECTED}")
-    endif()
-    if(DEFINED arg_PATTERN)
-        list(APPEND values "-DPATTERN=${arg_PATTERN}")
-    endif()
-    if(DEFINED arg_TIMEOUT)
-        list(APPEND values "-DTIMEOUT=${arg_TIMEOUT}")
-    endif()
-    add_test(NAME ${name}
-        COMMAND "${CMAKE_COMMAND}" ${values}
-                -P "${ANTIC_RUNNERS}/run_expect.cmake")
+    add_test(NAME dev_object_${name}
+        COMMAND antic --dev
+                --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+                -I "${ANTIC_RUNTIME_DIR}/std"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/anti_${name}_dev"
+                "${ANTIC_RUNTIME_DIR}/std/anti/${module}.antl")
+    set_tests_properties(dev_object_${name} PROPERTIES
+        FIXTURES_SETUP ${name}_dev_object)
 endfunction()
-
-# run_expect.cmake refuses a program that prints the message of a refusal
-# and exits 0, which a pattern of ctest lets pass, and no CMake file of
-# the repository sets such a pattern.
-add_test(NAME expect_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DEXPECT=${ANTIC_RUNNERS}/run_expect.cmake"
-        "-DROOT=${CMAKE_SOURCE_DIR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/expect-runner"
-        -P "${ANTIC_RUNNERS}/run_expect_self.cmake")
-
-# expect_same_bytes names the first line where two texts differ, and the
-# runners that compare with an expected file fail through it.
-add_test(NAME compare_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DROOT=${CMAKE_SOURCE_DIR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/compare-runner"
-        -P "${ANTIC_RUNNERS}/run_compare_self.cmake")
-
-# A runner runs antic through antic_run or antic_build alone.
-add_test(NAME antic_calls
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_antic_calls.cmake")
-
-# The runtime archive holds the licence text of every component.
-add_expect_test(runtime_licenses STATUS 0
-    PATTERN "^BSD Zero Clause License"
-    COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")
-# Beside the texts, licenses/sources.txt records the upstream source of
-# every pinned component: name, version and the URL of the exact source
-# package, written from the pins.
-add_test(NAME runtime_sources
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DSOURCES=${ANTIC_RUNTIME_DIR}/licenses/sources.txt"
-            -P "${ANTIC_RUNNERS}/run_upstream_sources.cmake")
-
-# The processor levels. src/antic/cpu.c holds the table for antic and
-# tools/cpu-levels holds it for the build, so the two are compared.
-add_test(NAME cpu_levels_pin
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLEVELS=${PROJECT_SOURCE_DIR}/tools/cpu-levels"
-        -P "${ANTIC_RUNNERS}/run_cpu_pin.cmake")
-
-# The data layout of every target and the CPU attributes of every level that
-# the LLVM back end writes are the ones the pinned clang writes.
-add_test(NAME llvm_datalayout_pin
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCLANG=${ANTIC_CLANG_DIR}/bin/clang"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_datalayout_pin"
-        -P "${ANTIC_RUNNERS}/run_llvm_datalayout_pin.cmake")
-
-# The text of the LLVM back end passes the verifier of opt for every program
-# of tests/dump and tests/programs, in release and dev mode, one test per
-# target. From the step emit-wide on the translator takes every operation
-# of the IR, so a program it refuses fails the test.
-# DESIGN: one test per target, since each runs antic twice per program. As
-# one test the twelve runs per program took over nine minutes under ASan,
-# whose start alone costs a fifth of a second.
-foreach(target IN LISTS ANTIC_TARGETS)
-    add_test(NAME llvm_verify_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DOPT=${ANTIC_OPT}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/programs"
-            "-DTARGETS=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
-            -P "${ANTIC_RUNNERS}/run_llvm_verify.cmake")
+foreach(module lang regex mem text reflect runtime collection
+        collection/pool collection/tree collection/queue collection/list
+        collection/deque collection/ring collection/grid collection/sorted
+        collection/map collection/set collection/concurrent
+        collection/synchronized)
+    antic_dev_object(${module})
 endforeach()
-# run_llvm_verify.cmake fails for an antic that a signal ends, and for a
-# refused file that its list of the files that are no program lacks.
-add_test(NAME llvm_verify_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_llvm_verify.cmake"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPT=${ANTIC_OPT}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DTARGET=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify_runner"
-        -P "${ANTIC_RUNNERS}/run_llvm_verify_self.cmake")
-
-# The tool run of the LLVM back end: --keep-llvm, the bitcode of release
-# mode alone and -S. A failed opt or llc prints its own message and then
-# the line of antic. --opt and --llc name the tool, here one that refuses
-# the options antic passes: llc for opt, and llvm-mc for llc, since opt
-# takes the options of llc. Every host runs them.
-add_test(NAME llvm_run
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_run"
-        -P "${ANTIC_RUNNERS}/run_llvm_run.cmake")
-add_expect_test(llvm_opt_failed STATUS 1
-    PATTERN "llc(\\.exe)?: error: -passes is for .mir file only.*antic: opt failed"
-    COMMAND $<TARGET_FILE:antic>
-            --runtime "${ANTIC_RUNTIME_DIR}" --opt "${ANTIC_LLC}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_opt_failed"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-add_expect_test(llvm_llc_failed STATUS 1
-    PATTERN "llvm-mc(\\.exe)?: Unknown command line argument .*antic: llc failed"
-    COMMAND $<TARGET_FILE:antic> --dev
-            --runtime "${ANTIC_RUNTIME_DIR}" --llc "${ANTIC_LLVM_MC}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_llc_failed"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-
-# The test llvm_inline_lines: a release build with -g inlines a small
-# callee, and the line table names the line of the callee in the code of
-# its caller.
-add_test(NAME llvm_inline_lines
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/llvm_inline_lines.anti"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-inline-lines"
-        -P "${ANTIC_RUNNERS}/run_llvm_inline_lines.cmake")
-
-# The test of the step tables of docs/work-order-llvm-optimization.md: a
-# release build calls the function of an object of a known class
-# directly after opt, across the call of the `created` hook. Every host
-# builds for every target, so each spelling of the name is read on every
-# host. The Windows VM found the COFF one missing.
-foreach(target IN LISTS ANTIC_TARGETS)
-    add_test(NAME direct_calls_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DOPT=${ANTIC_OPT}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/table_hook.anti"
-            "-DFUNCTION=table_hook.main"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-calls/${target}"
-            -P "${ANTIC_RUNNERS}/run_direct_calls.cmake")
-    set_tests_properties(direct_calls_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# A COFF host of plugins exports every name its plugin imports, and the
-# plugin lists as many places as its table counts. The VM run runs both.
-foreach(target windows-x86_64 windows-arm64)
-    add_test(NAME llvm_coff_plugin_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/${target}"
-            -P "${ANTIC_RUNNERS}/run_llvm_coff_plugin.cmake")
-    set_tests_properties(llvm_coff_plugin_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-# A library that keeps an `f16` converts it through two functions of the
-# runtime below x86-64-v3, and takes them from its host as it takes every
-# other one.
-add_test(NAME llvm_coff_plugin_f16
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DTARGET=windows-x86_64"
-        "-DCPU=v2"
-        "-DLIBRARY=halves"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/f16"
-        -P "${ANTIC_RUNNERS}/run_llvm_coff_plugin.cmake")
-set_tests_properties(llvm_coff_plugin_f16 PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The archive holds a runtime per level, so that a program built with --cpu
-# below its target's default links a runtime of that level.
-add_test(NAME cpu_archive_levels
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLEVELS=${PROJECT_SOURCE_DIR}/tools/cpu-levels"
-        "-DTARGETS=linux-x86_64|linux-arm64|macos-x86_64|macos-arm64|windows-x86_64|windows-arm64"
-        -P "${ANTIC_RUNNERS}/run_cpu_archive.cmake")
-set_tests_properties(cpu_archive_levels PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# One test per x86_64 level: v3 writes the VEX forms of AVX and the two
-# levels below it write the SSE forms. v2 adds no instruction that llc
-# writes for the program, so it differs from v1 in the runtime alone.
-set(cpu_sse "\taddsd\t|\taddss\t|\tmulss\t|\tucomisd\t|\tcvtss2sd\t|\tmovsd\t")
-set(cpu_avx "\tvaddsd\t|\tvaddss\t|\tvmulss\t|\tvucomisd\t|\tvcvtss2sd\t|\tvmovsd\t")
-foreach(case "v1,${cpu_sse},${cpu_avx}" "v2,${cpu_sse},${cpu_avx}"
-        "v3,${cpu_avx},${cpu_sse}")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 level)
-    list(GET parts 1 uses)
-    list(GET parts 2 avoids)
-    add_test(NAME cpu_level_${level}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DTARGET=linux-x86_64"
-            "-DLEVEL=${level}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/floats.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpu-level"
-            "-DUSES=${uses}"
-            "-DAVOIDS=${avoids}"
-            -P "${ANTIC_RUNNERS}/run_cpu_level.cmake")
-endforeach()
-
-# One test per ARM64 level, through the target that defaults to it. The
-# level's instructions are the atomics: one instruction at armv8.2 and
-# above, a load-store exclusive loop below.
-set(cpu_lse "casal|ldaddal|swpal")
-set(cpu_exclusive "ldaxr|stlxr")
-foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
-        "windows-arm64,armv8.2,${cpu_lse},${cpu_exclusive}"
-        "macos-arm64,armv8.5,${cpu_lse},${cpu_exclusive}")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 target)
-    list(GET parts 1 level)
-    list(GET parts 2 uses)
-    list(GET parts 3 avoids)
-    antic_static_library(library_name anti_rt "${target}")
-    set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/${library_name}")
-    add_test(NAME cpu_level_${level}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DLIBRARY=${library}"
-            "-DTARGET=${target}"
-            "-DLEVEL=${level}"
-            "-DUSES=${uses}"
-            "-DAVOIDS=${avoids}"
-            -P "${ANTIC_RUNNERS}/run_cpu_runtime.cmake")
-    set_tests_properties(cpu_level_${level} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# The runtime keeps the frame record of every function that calls another
-# on Linux and macOS, so a trace walks through its frames.
-add_test(NAME runtime_frames
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/runtime-frames.txt"
-        -P "${ANTIC_RUNNERS}/run_runtime_frames.cmake")
-set_tests_properties(runtime_frames PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The runtime of linux-arm64 is the same on every host: neither its
-# objects nor its bitcode take the outline atomics that the GCC of a Linux
-# host brought.
-add_test(NAME runtime_hosts
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_AR=${ANTIC_LLVM_AR}"
-        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/runtime-hosts"
-        -P "${ANTIC_RUNNERS}/run_runtime_hosts.cmake")
-set_tests_properties(runtime_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The native libraries of linux-arm64 call no outline atomics on any host,
-# without the option that keeps them out of the runtime.
-add_test(NAME native_hosts
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-hosts.txt"
-        -P "${ANTIC_RUNNERS}/run_native_hosts.cmake")
-set_tests_properties(native_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The atomic operations of a program are LLVM atomic instructions on every
-# target, and each target and level writes the instructions its runtime
-# holds: one instruction with LSE, a load-store exclusive loop on armv8.0,
-# and the lock prefix on x86_64. No call of the runtime remains.
-add_test(NAME llvm_atomics
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-atomics"
-        -P "${ANTIC_RUNNERS}/run_llvm_atomics.cmake")
-set(atomic_lse "\tcasal\t|\tldaddal\t|\tswpal\t|\tcasalb\t|\tcasalh\t")
-set(atomic_exclusive "\tldaxr\t|\tstlxr\t|\tldaxrb\t|\tstlxrh\t")
-set(atomic_x86 "\tlock\t\t|xadd|cmpxchg|\txchg")
-set(atomic_calls "anti_rt_atomic|__aarch64_")
-foreach(case "linux-arm64,armv8.0,${atomic_exclusive},${atomic_lse}"
-        "linux-arm64,armv8.2,${atomic_lse},${atomic_exclusive}"
-        "linux-arm64,armv8.5,${atomic_lse},${atomic_exclusive}"
-        "windows-arm64,armv8.2,${atomic_lse},${atomic_exclusive}"
-        "macos-arm64,armv8.5,${atomic_lse},${atomic_exclusive}"
-        "linux-x86_64,v1,${atomic_x86},"
-        "linux-x86_64,v3,${atomic_x86},"
-        "macos-x86_64,v3,${atomic_x86},"
-        "windows-x86_64,v3,${atomic_x86},")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 target)
-    list(GET parts 1 level)
-    list(GET parts 2 uses)
-    list(GET parts 3 avoids)
-    if(avoids STREQUAL "")
-        set(avoids "${atomic_calls}")
-    else()
-        set(avoids "${avoids}|${atomic_calls}")
-    endif()
-    add_test(NAME atomics_${target}_${level}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DTARGET=${target}"
-            "-DLEVEL=${level}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/atomics-level"
-            "-DUSES=${uses}"
-            "-DAVOIDS=${avoids}"
-            -P "${ANTIC_RUNNERS}/run_cpu_level.cmake")
-endforeach()
-
-# An atomic load of the runtime is sequentially consistent on every ARM64
-# target and level, as src/rt/atomic.c promises. Windows compiled it through
-# `volatile` once, which is a plain load there.
-foreach(target linux-arm64 macos-arm64 windows-arm64)
-    foreach(level armv8.0 armv8.2 armv8.5)
-        antic_static_library(library_name anti_rt "${target}")
-        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/${library_name}")
-        add_test(NAME atomic_load_${target}_${level}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                "-DLIBRARY=${library}"
-                "-DTARGET=${target}"
-                -P "${ANTIC_RUNNERS}/run_atomic_load.cmake")
-        set_tests_properties(atomic_load_${target}_${level} PROPERTIES
-            SKIP_REGULAR_EXPRESSION "SKIP: ")
-    endforeach()
-endforeach()
-
-# The two conversions of f16. ARM64 and x86-64-v3 have one instruction
-# for each, and v1 and v2, which lack F16C, call the runtime. No call
-# reaches the conversions of compiler-rt.
-set(f16_call "anti_rt_f16_to_f32|anti_rt_f32_to_f16")
-set(f16_f16c "\tvcvtph2ps\t|\tvcvtps2ph\t")
-set(f16_fcvt "\tfcvt\ts|\tfcvt\th")
-set(f16_rt "__extendhfsf2|__truncsfhf2")
-foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
-        "linux-x86_64,v2,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
-        "linux-x86_64,v3,${f16_f16c},${f16_call}|${f16_rt}"
-        "windows-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
-        "windows-x86_64,v3,${f16_f16c},${f16_call}|${f16_rt}"
-        "linux-arm64,armv8.0,${f16_fcvt},${f16_call}|${f16_rt}"
-        "macos-arm64,armv8.5,${f16_fcvt},${f16_call}|${f16_rt}")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 target)
-    list(GET parts 1 level)
-    list(GET parts 2 uses)
-    list(GET parts 3 avoids)
-    add_test(NAME f16_${target}_${level}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DTARGET=${target}"
-            "-DLEVEL=${level}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/f16"
-            "-DUSES=${uses}"
-            "-DAVOIDS=${avoids}"
-            -P "${ANTIC_RUNNERS}/run_cpu_level.cmake")
-endforeach()
-
-# The native width of a simd operation: one instruction on the registers
-# of 32 bytes at x86-64-v3, and two on the 16 bytes of every other level
-# and of ARM64.
-foreach(case "linux-x86_64,v3,vaddps[^\n]*%ymm,1"
-        "linux-x86_64,v1,addps[^\n]*%xmm,2"
-        "linux-x86_64,v2,addps[^\n]*%xmm,2"
-        "macos-arm64,armv8.5,fadd.4s\tv,2"
-        "linux-arm64,armv8.0,fadd\tv[0-9]+.4s,2")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 target)
-    list(GET parts 1 level)
-    list(GET parts 2 pattern)
-    list(GET parts 3 count)
-    add_test(NAME simd_width_${target}_${level}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DTARGET=${target}"
-            "-DLEVEL=${level}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_wide.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/simd"
-            "-DPATTERN=${pattern}"
-            "-DCOUNT=${count}"
-            -P "${ANTIC_RUNNERS}/run_simd_width.cmake")
-endforeach()
-
-# DESIGN: the start-up check on a real machine below the level. Rosetta
-# runs a macos-x86_64 program on a macos-arm64 host and has no AVX2, so a
-# program of the default level x86-64-v3 refuses there with the message of
-# the section. Every other host runs the check in the unit tests, where
-# ANTI_DEV_CPU stands a level in for the processor.
-if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
-    add_test(NAME cpu_check_refuses
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DTARGET=macos-x86_64"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpu-check"
-            "-DNEEDS=AVX2 .x86-64-v3, 2013 or later."
-            -P "${ANTIC_RUNNERS}/run_cpu_check.cmake")
-    set_tests_properties(cpu_check_refuses PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endif()
-
-# Every script of `cmake -P` names the minimum version of CMake, so CMake 3
-# sets the policies CMake 4 takes for granted.
-add_test(NAME script_policies
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_script_policies.cmake")
-add_test(NAME script_policies_runner
-    COMMAND "${CMAKE_COMMAND}"
-            "-DRUNNER=${ANTIC_RUNNERS}/run_script_policies.cmake"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/script-policies"
-            -P "${ANTIC_RUNNERS}/run_script_policies_self.cmake")
-# Anti runs no CI, so no file stands under .github/workflows/.
-add_test(NAME no_workflows
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_no_workflows.cmake")
-# The tool that fetched the CRT and SDK of Microsoft is named nowhere but in
-# the history of docs/decisions.md and docs/reports/, and no file of the
-# code names the variable of the installers that went with it.
-add_test(NAME no_sdk_fetcher
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_no_sdk_fetcher.cmake")
-# One function downloads for the whole build.
-add_test(NAME downloads_once
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_downloads_once.cmake")
-
-# bin/ of the runtime archive is built by the root CMakeLists.txt from
-# the directory of the pinned LLVM tools, and by no file of tests/.
-add_test(NAME llvm_tools_root
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_llvm_tools_root.cmake")
-
-# The LLVM tools stand in one list, and tools/check-llvm.cmake checks
-# them through the one check.
-add_test(NAME llvm_tool_list
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_llvm_tool_list.cmake")
-
-# The copy into bin/ of the runtime archive takes every tool of the list,
-# refuses a directory that lacks one and leaves out the tools no package
-# carries.
-add_test(NAME llvm_tools_copy
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-tools-copy"
-        -P "${ANTIC_RUNNERS}/run_llvm_tools_copy.cmake")
-
-# The triple of the C of a target stands in tools/target-compile.cmake
-# alone.
-add_test(NAME target_triples
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_target_triples.cmake")
-
-# The link of a Linux program of a release stands in
-# tools/host-compile.cmake alone.
-add_test(NAME linux_link_recipe
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_linux_link_recipe.cmake")
-
-# A message at a position has one printer in antic, and the platform
-# layer names the tool that runs.
-add_test(NAME message_forms
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_message_forms.cmake")
-
-# The warning flags of the build stand in tools/warnings.cmake and
-# src/native/warnings.cmake alone, as docs/c-guidelines.md requires.
-add_test(NAME warning_set
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_warning_set.cmake")
-add_test(NAME warning_set_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_warning_set.cmake"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/warning-set"
-        -P "${ANTIC_RUNNERS}/run_warning_set_self.cmake")
-
-# No header of ours hides a header of the C library on an include path.
-add_test(NAME header_names
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_header_names.cmake")
-
-# Rule 25: every symbol a runtime library of the archive defines starts
-# with anti_rt_, on every target and level.
-add_test(NAME rt_names
-    COMMAND "${CMAKE_COMMAND}"
-        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        -P "${ANTIC_RUNNERS}/run_rt_names.cmake")
-set_tests_properties(rt_names PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-add_test(NAME rt_names_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_rt_names.cmake"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-names"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}" "-DLLVM_AR=${ANTIC_LLVM_AR}"
-        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        -P "${ANTIC_RUNNERS}/run_rt_names_self.cmake")
-
-# Each declaration of antl_io.h, driver_parts.h, parser_parser.h,
-# sema_checker.h, lower_lowerer.h and whole_parts.h stands under the file
-# that defines it, and the comment of each header names every file.
-add_test(NAME header_sections
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_header_sections.cmake")
-
-# Each file of antic and of the runtime opens with the comment of its
-# purpose, and each function a public header of them declares has a
-# comment of its own. Step 29 of the fix steps of docs/audit/summary.md
-# adds the other parts of the tree.
-add_test(NAME file_headers
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_file_headers.cmake")
-add_test(NAME file_headers_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_file_headers.cmake"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/file-headers"
-        -P "${ANTIC_RUNNERS}/run_file_headers_self.cmake")
-
-# No file of antic, of the runtime or of anti calls a function that rule 9
-# of docs/c-guidelines.md bans. Rule 10 names the test.
-add_test(NAME banned_calls
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_banned_calls.cmake")
-
-# No comment of antic gives a reason of the native back end, and the IR
-# keeps no field that only its register allocator read (M365).
-add_test(NAME native_back_end_gone
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_native_back_end_gone.cmake")
-
-# docs/notes/source-tree.md holds one row per file of the root, src/,
-# tests/unit/, tools/ and tests/runners/, per file and script of tests/
-# and per directory of tests/, and no row of anything else.
-add_test(NAME source_tree
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_source_tree.cmake")
-add_test(NAME source_tree_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_source_tree.cmake"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-tree"
-        -P "${ANTIC_RUNNERS}/run_source_tree_self.cmake")
-
-# Every claim of docs/notes/ and docs/decisions.md that a function stands
-# in a C file holds, the script of docs/audit/structure.md that found ten
-# that moved with the splits.
-add_test(NAME note_claims
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_note_claims.cmake")
-add_test(NAME note_claims_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_note_claims.cmake"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/note-claims"
-        -P "${ANTIC_RUNNERS}/run_note_claims_self.cmake")
-
-# A name that the tools and the runtime both spell, the markers of the
-# notice, the index of plugins, the suffix of a symbols archive and the
-# sysroot directory, stands in one header.
-add_test(NAME names_once
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_names_once.cmake")
-
-# The layout rule of "Repository layout" in CLAUDE.md, over git ls-files.
-add_test(NAME repo_layout
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_repo_layout.cmake")
-add_test(NAME repo_layout_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_repo_layout.cmake"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/repo-layout"
-        -P "${ANTIC_RUNNERS}/run_repo_layout_self.cmake")
-
-# The pre-commit hook refuses staged .md files that fail the docs-style
-# checker, and the configure step installed it in this checkout.
-add_test(NAME pre_commit_hook
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
-        "-DHOOKS=${ANTIC_HOOKS_DIR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pre-commit"
-        -P "${ANTIC_RUNNERS}/run_pre_commit.cmake")
-set_tests_properties(pre_commit_hook PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The version stands in tools/version alone, and both programs print
-# that one. Step 10 of the release reads them from a fresh install.
-# Each prints its line and nothing else, which the files below hold.
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_version"
-     "antic ${PROJECT_VERSION}\n")
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
-     "anti ${PROJECT_VERSION}\n")
-add_expect_test(antic_version STATUS 0
-    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_version"
-    COMMAND "$<TARGET_FILE:antic>" --version)
-add_expect_test(anti_version STATUS 0
-    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
-    COMMAND "$<TARGET_FILE:anti>" --version)
-
-# The usage. `--help`, and `-h` of anti, print it on the standard output
-# and end with 0, and the tool without an argument prints the same bytes
-# on the standard error and ends with 2.
-add_test(NAME antic_help
-    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:antic>,--help"
-            -DNAME=antic -P "${ANTIC_RUNNERS}/run_usage.cmake")
-add_test(NAME anti_help
-    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,--help"
-            -DNAME=anti -P "${ANTIC_RUNNERS}/run_usage.cmake")
-add_test(NAME anti_help_short
-    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,-h"
-            -DNAME=anti -P "${ANTIC_RUNNERS}/run_usage.cmake")
-# R155 of "Rules of 2026-10-13" in docs/decisions.md: `--help` of anti
-# with a second word prints the usage and ends with 0.
-add_test(NAME anti_help_and_a_word
-    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,--help,extra"
-            -DNAME=anti -P "${ANTIC_RUNNERS}/run_usage.cmake")
-
-# A command line that a tool refuses with its usage: 2, nothing on the
-# standard output and the bytes of `--help` on the standard error. antic
-# names an option it does not know and a second input before the usage.
-# The name of a case is its test, and the words after it are the arguments.
-function(add_usage_test tool name)
-    cmake_parse_arguments(PARSE_ARGV 2 arg "" "FIRST" "ARGS")
-    list(JOIN arg_ARGS "," words)
-    set(values "-DCOMMAND=$<TARGET_FILE:${tool}>,${words}" -DNAME=${tool}
-        -DREFUSED=ON)
-    if(DEFINED arg_FIRST)
-        list(APPEND values "-DFIRST=${arg_FIRST}")
-    endif()
-    add_test(NAME ${tool}_usage_${name}
-        COMMAND "${CMAKE_COMMAND}" ${values}
-                -P "${ANTIC_RUNNERS}/run_usage.cmake")
-endfunction()
-set(usage_source "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-add_usage_test(antic option_unknown FIRST "antic: unknown option --bogus"
-    ARGS --bogus "${usage_source}")
-add_usage_test(antic second_input FIRST "antic: one input file only"
-    ARGS "${usage_source}" "${usage_source}")
-add_usage_test(antic options_without_an_input ARGS -S --dev)
-# Decision 2 of "Decisions of 2026-10-11" in docs/decisions.md: the option
-# --llvm-mc is gone, so antic refuses it as an option it does not know.
-add_usage_test(antic llvm_mc_gone FIRST "antic: unknown option --llvm-mc"
-    ARGS --llvm-mc llvm-mc "${usage_source}")
-# R141 of "Rules of 2026-10-13" in docs/decisions.md: the usage of antic
-# lists the options of the modes, the checks and the hooks.
-add_test(NAME antic_usage_lists_options
-    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:antic>,--help"
-            "-DLISTS=--help|--no-reflect|--asserts|--no-asserts|--checks|--no-checks|--no-hooks|--trace|--no-trace"
-            -DNAME=antic -P "${ANTIC_RUNNERS}/run_usage.cmake")
-# R142 of "Rules of 2026-10-13" in docs/decisions.md: `--help` of antic
-# among other arguments prints the usage and ends with 0, and antic
-# compiles nothing.
-add_test(NAME antic_help_among_arguments
-    COMMAND "${CMAKE_COMMAND}"
-            "-DCOMMAND=$<TARGET_FILE:antic>,-S,--dev,--help,${usage_source}"
-            -DNAME=antic -P "${ANTIC_RUNNERS}/run_usage.cmake")
-foreach(case
-        "command_unknown|bogus"
-        "option_unknown|--bogus"
-        "version_and_a_word|--version|extra"
-        "new_without_a_name|new"
-        "new_with_two_names|new|com.example.one|com.example.two"
-        "new_with_an_option|new|--bogus"
-        "build_option_unknown|build|--bogus"
-        "build_word|build|extra"
-        "build_lib_kind|build|--lib|bundled"
-        "build_llvm_mc_gone|build|--llvm-mc|llvm-mc"
-        "run_llvm_mc_gone|run|--llvm-mc|llvm-mc"
-        "test_llvm_mc_gone|test|--llvm-mc|llvm-mc"
-        "check_option_unknown|check|--bogus"
-        "check_targets_value|check|--targets|some"
-        "doc_option_unknown|doc|--bogus"
-        "fmt_option_unknown|fmt|--bogus"
-        "test_option_unknown|test|--bogus"
-        "bind_without_an_input|bind"
-        "bind_option_unknown|bind|--bogus|api.json"
-        "bind_two_inputs|bind|api.json|other.json"
-        "bind_header_and_an_input|bind|--header|api.antl|api.json"
-        "symbols_without_a_command|symbols"
-        "symbols_command_unknown|symbols|bogus|--conf|app.toml"
-        "symbols_option_unknown|symbols|check|--conf|app.toml|--bogus"
-        "symbols_inventory_without_conf|symbols|inventory"
-        "symbols_inventory_with_symbols|symbols|inventory|--conf|app.toml|--symbols|symbols.zip"
-        "symbols_check_with_from|symbols|check|--conf|app.toml|--from|archives"
-        "symbols_check_with_a_trace|symbols|check|--conf|app.toml|trace.txt"
-        "symbols_resolve_with_from|symbols|resolve|trace.txt|--symbols|symbols.zip|--from|archives"
-        "symbols_resolve_with_conf|symbols|resolve|trace.txt|--symbols|symbols.zip|--conf|app.toml"
-        "symbols_resolve_without_symbols|symbols|resolve|trace.txt"
-        "symbols_resolve_two_traces|symbols|resolve|trace.txt|other.txt|--symbols|symbols.zip"
-        "sdk_without_a_command|sdk"
-        "sdk_command_unknown|sdk|bogus"
-        "sdk_export_option_unknown|sdk|export|--bogus"
-        "sdk_import_without_a_bundle|sdk|import"
-        "license_option_unknown|license|--bogus")
-    string(REPLACE "|" ";" parts "${case}")
-    list(POP_FRONT parts name)
-    add_usage_test(anti ${name} ARGS ${parts})
-endforeach()
-# An option of anti that takes a value, as the last word. By R155 of
-# "Rules of 2026-10-13" in docs/decisions.md anti writes one line that
-# names the option and ends with 2, as antic does.
-foreach(case
-        "build|--target" "build|--cpu" "build|--lto" "build|--lib"
-        "build|--profile-use" "build|--runtime" "build|--llvm-ar"
-        "check|--targets" "check|--work" "check|--runtime" "check|-I"
-        "doc|-o" "doc|--work" "doc|--runtime" "doc|-I"
-        "test|--work" "test|--runtime" "test|-I"
-        "bind|--header" "bind|--clang" "bind|-o" "bind|--runtime"
-        "bind|--module" "bind|--target" "bind|-I" "bind|-D"
-        "symbols|--conf" "symbols|--from" "symbols|--out" "symbols|--symbols"
-        "sdk_export|--sdk" "sdk_export|-o" "sdk_import|--sysroot"
-        "license|--from" "license|--from-archive" "license|--runtime")
-    string(REPLACE "|" ";" parts "${case}")
-    list(GET parts 0 command)
-    list(GET parts 1 option)
-    string(REGEX REPLACE "^-+" "" word "${option}")
-    string(REPLACE "-" "_" word "${word}")
-    if(option STREQUAL "-o")
-        set(word "output")
-    elseif(option STREQUAL "-I")
-        set(word "root")
-    elseif(option STREQUAL "-D")
-        set(word "define")
-    endif()
-    set(words ${command})
-    if(command STREQUAL "symbols")
-        set(words symbols inventory)
-    elseif(command STREQUAL "sdk_export")
-        set(words sdk export)
-    elseif(command STREQUAL "sdk_import")
-        set(words sdk import bundle.tar.xz)
-    endif()
-    set(line "anti: ${option} needs a value")
-    file(WRITE
-         "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
-         "${line}\n")
-    add_expect_test(anti_option_${command}_${word}_without_a_value STATUS 2
-        EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
-        COMMAND "$<TARGET_FILE:anti>" ${words} ${option})
-endforeach()
-
-# A wrong value of an option of antic, and an option that takes a value as
-# the last word. antic writes one line and ends with 2.
-function(add_antic_refusal name line)
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_option_${name}"
-         "${line}\n")
-    add_expect_test(antic_option_${name} STATUS 2
-        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/programs"
-        EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_option_${name}"
-        COMMAND "$<TARGET_FILE:antic>" ${ARGN})
-endfunction()
-add_antic_refusal(linker_value "antic: --linker takes lld or platform"
-    --linker gold return42.anti)
-add_antic_refusal(inject_value
-    "antic: --inject takes an interface and its provider, as --inject Interface=Provider, found Logger"
-    --inject Logger return42.anti)
-add_antic_refusal(target_value "antic: unknown target plan9"
-    --runtime "${ANTIC_RUNTIME_DIR}" --target plan9 return42.anti)
-add_antic_refusal(input_suffix "antic: return42.expected: expected a .anti file"
-    --runtime "${ANTIC_RUNTIME_DIR}" return42.expected)
-add_antic_refusal(lto_memory_checks_macos
-    "antic: --lto links no macOS program of --memory-checks"
-    --runtime "${ANTIC_RUNTIME_DIR}" --target macos-arm64 --lto full
-    --memory-checks -o "${CMAKE_CURRENT_BINARY_DIR}/lto_memory_checks"
-    return42.anti)
-foreach(option --lib --linker --lto --framework --linux-lib --inject
-        --dependency --attribution -I --llvm-ar --profile-use
-        --package-name --package-version --license --license-text -o
-        --target --cpu --opt --llc --runtime)
-    string(REGEX REPLACE "^-+" "" word "${option}")
-    string(REPLACE "-" "_" word "${word}")
-    if(option STREQUAL "-o")
-        set(word "output")
-    elseif(option STREQUAL "-I")
-        set(word "root")
-    endif()
-    add_antic_refusal(${word}_without_a_value
-        "antic: ${option} needs a value" return42.anti ${option})
-endforeach()
-
-# Options of antic that the driver reads together, one test per case of
-# tests/runners/run_antic_options.cmake, whose header names what each shows.
-set(antic_option_cases checks_by_mode checks_last_decides asserts_by_mode
-    asserts_text_dropped
-    warn_undocumented
-    strict_library strict_front_end strict_dev bundle_static bundle_shared
-    output_assembly output_library output_program keep_llvm
-    output_static output_shared output_dev_library output_plugin
-    output_native_library output_native_plugin linker_lld)
-if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
-    list(APPEND antic_option_cases soname_linux)
-endif()
-if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
-    list(APPEND antic_option_cases windows_library_reproducible)
-endif()
-foreach(case IN LISTS antic_option_cases)
-    add_test(NAME antic_option_${case}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            -DCASE=${case}
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_AR=${ANTIC_LLVM_AR}"
-            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}"
-            "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-options/${case}"
-            -P "${ANTIC_RUNNERS}/run_antic_options.cmake")
-endforeach()
-# --cpu beside --target, for each target: its three levels, its default
-# and the three levels of the other architecture, which it refuses.
-foreach(target IN LISTS ANTIC_TARGETS)
-    add_test(NAME antic_option_target_cpu_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            -DCASE=target_cpu
-            -DTARGET=${target}
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-options/target_cpu_${target}"
-            -P "${ANTIC_RUNNERS}/run_antic_options.cmake")
-endforeach()
-
-# The host target name has two spellings: ANTIC_HOST_TARGET here and the
-# detection in src/antic/target.c. This test fails when they disagree.
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
-     "${ANTIC_HOST_TARGET}\n")
-add_expect_test(antic_host_target STATUS 0
-    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
-    COMMAND "$<TARGET_FILE:antic>" --print-host-target)
-
-# DESIGN: a test that compiles C or C++ beside Anti takes the compiler of
-# the build, so a build with the pinned clang runs no compiler of the
-# machine. The pinned clang reads the SDK of macOS from -isysroot and
-# compiles C++ in the driver mode of g++. A reader's build takes c++.
-#
-# DESIGN: antic never fuses a multiply and an add, so the C that a test
-# compiles as the reference of an Anti result fuses none either. Otherwise
-# the test compares two arithmetics. clang fuses by default on arm64 Linux.
-# MSVC fuses nothing by default and knows no such option.
-set(ANTIC_REFERENCE_C_FLAGS "")
-if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-    set(ANTIC_REFERENCE_C_FLAGS -ffp-contract=off)
-endif()
-set(ANTIC_TEST_CC "${CMAKE_C_COMPILER}" ${ANTIC_REFERENCE_C_FLAGS})
-if(ANTIC_HOST_OS STREQUAL "macos")
-    list(APPEND ANTIC_TEST_CC -isysroot "${ANTIC_MACOS_SDK}")
-endif()
-if(ANTIC_SYSTEM_COMPILER)
-    set(ANTIC_TEST_CXX c++ ${ANTIC_REFERENCE_C_FLAGS})
-else()
-    set(ANTIC_TEST_CXX ${ANTIC_TEST_CC} --driver-mode=g++)
-endif()
-
-# Every function of the runtime that formats like printf carries the
-# format attribute, by rule 1 of docs/c-guidelines.md.
-add_test(NAME rt_format_attribute
-    COMMAND "${CMAKE_COMMAND}"
-        "-DCC=${ANTIC_TEST_CC}"
-        "-DFLAGS=${ANTIC_C_WARNINGS};${ANTIC_FORMAT_ATTRIBUTE_WARNINGS}"
-        "-DPCRE2=${ANTIC_PCRE2_INCLUDE}"
-        "-DSOURCES=${PROJECT_SOURCE_DIR}/src/rt"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-format"
-        -P "${ANTIC_RUNNERS}/run_rt_format.cmake")
-
-# The LLVM tools in bin/ of the runtime archive, which the target
-# llvm_tools of the root CMakeLists.txt copies there, are those of LLVM
-# tools/llvm-version. The directory holds no llvm-cov, which toolchain_pin
-# refuses there.
-add_test(NAME toolchain_pin
-    COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_RUNTIME_DIR}/bin"
-        -DRUNTIME_ARCHIVE=ON
-        -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
-
-# A module that writes no function writes no empty CodeView subsection of
-# symbols, which lld-link warns of. codeview_empty_refuses_<target> feeds
-# the check an object with an empty one, which it must refuse.
-foreach(target windows-x86_64 windows-arm64)
-    add_test(NAME codeview_empty_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-            "-DSTD=${ANTIC_RUNTIME_DIR}/std"
-            "-DSOURCE=${ANTIC_RUNTIME_DIR}/std/anti/collection/tree.antl"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/codeview-empty"
-            -P "${ANTIC_RUNNERS}/run_codeview_empty.cmake")
-    add_test(NAME codeview_empty_refuses_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DCLANG=${CMAKE_C_COMPILER}"
-            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/codeview-empty"
-            -P "${ANTIC_RUNNERS}/run_codeview_empty.cmake")
-endforeach()
-
-# Every tool a build of this tree runs comes from the pinned release, and
-# antic and anti were linked by the pinned lld. A reader's build takes the
-# tools of the machine on purpose.
-if(NOT ANTIC_SYSTEM_COMPILER)
-    add_test(NAME pinned_tools
-        COMMAND "${CMAKE_COMMAND}"
-            "-DCHECK=${PROJECT_SOURCE_DIR}/tools/pinned-tools.cmake"
-            "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
-            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
-            "-DLLVM_DIR=${ANTIC_LLVM_DIR}"
-            "-DOS=${ANTIC_HOST_OS}"
-            "-DPROGRAMS=$<TARGET_FILE:antic>,$<TARGET_FILE:anti>"
-            -P "${ANTIC_RUNNERS}/run_pinned_tools.cmake")
-
-    # antic and anti compile for every Linux and Windows host with the
-    # options of a package and the warning set.
-    foreach(host linux-x86_64 linux-arm64 windows-x86_64 windows-arm64)
-        add_test(NAME host_sources_${host}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DROOT=${PROJECT_SOURCE_DIR}"
-                "-DHOST=${host}"
-                "-DCLANG=${CMAKE_C_COMPILER}"
-                "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
-                "-DPCRE2_INCLUDE=${ANTIC_PCRE2_INCLUDE}"
-                "-DVERSION=${PROJECT_VERSION}"
-                -P "${ANTIC_RUNNERS}/run_host_sources.cmake")
-    endforeach()
-endif()
 
 file(GLOB program_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/programs/*.anti")
@@ -1747,53 +920,6 @@ int abi_wchar_type;" ANTIC_WCHAR_${type}${suffix})
     endforeach()
     message(FATAL_ERROR "wchar_t of ${CMAKE_C_COMPILER} is none of i32, u32 and u16")
 endfunction()
-
-# DESIGN: every arm64 host runs the x86_64 programs of its own system under
-# emulation, so the Mac and the two VMs of docs/vm-setup.md run the
-# programs of all six targets between them. Anti runs no CI and no machine
-# here has an x86_64 processor. macos-arm64 runs macos-x86_64 under
-# Rosetta, linux-arm64 runs linux-x86_64 under qemu-x86_64 and
-# windows-arm64 runs windows-x86_64 under the x64 emulation of Windows.
-# Rosetta has no AVX2, so the programs of macos-x86_64 take --cpu v1 and
-# link the v1 runtime of the archive, as any --cpu v1 build does. qemu and
-# Windows emulate x86-64-v3, and their programs take the default level. A
-# linux-arm64 host without qemu-x86_64 runs no linux-x86_64 program. Each
-# include directory is one joined argument, since CMake drops a repeated
-# -isystem from the options of a target.
-set(ANTIC_EMULATED_TARGET "")
-set(ANTIC_EMULATOR "")
-set(emulated_c_flags "")
-if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
-    set(ANTIC_EMULATED_TARGET macos-x86_64)
-    set(ANTIC_X86_64_OPTIONS "--target,macos-x86_64,--cpu,v1")
-    set(emulated_c_flags -arch x86_64 -mmacosx-version-min=11.0)
-elseif(ANTIC_HOST_TARGET STREQUAL "linux-arm64")
-    find_program(ANTIC_QEMU_X86_64 qemu-x86_64)
-    if(ANTIC_QEMU_X86_64)
-        set(ANTIC_EMULATED_TARGET linux-x86_64)
-        set(ANTIC_EMULATOR "${ANTIC_QEMU_X86_64}")
-    else()
-        message(STATUS "No qemu-x86_64: the suite runs no linux-x86_64 program")
-    endif()
-    set(ANTIC_X86_64_OPTIONS "--target,linux-x86_64")
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-        antic_target_triple(triple linux-x86_64)
-        antic_target_c_options(emulated_c_flags linux-x86_64
-            "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64"
-            "${ANTIC_CLANG_RESOURCE_DIR}")
-        list(PREPEND emulated_c_flags "--target=${triple}")
-    endif()
-elseif(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
-    set(ANTIC_EMULATED_TARGET windows-x86_64)
-    set(ANTIC_X86_64_OPTIONS "--target,windows-x86_64")
-    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-        antic_target_triple(triple windows-x86_64)
-        antic_target_c_options(emulated_c_flags windows-x86_64
-            "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64"
-            "${ANTIC_CLANG_RESOURCE_DIR}")
-        list(PREPEND emulated_c_flags "--target=${triple}")
-    endif()
-endif()
 
 # The same C files compiled for the emulated target, which its ABI
 # programs link. The host runs them, so antic meets clang on the rules of
@@ -2128,31 +1254,6 @@ foreach(kind IN ITEMS list map set pool)
 endforeach()
 set_tests_properties(std_sync_equal std_sync_equal_dev PROPERTIES TIMEOUT 120)
 
-# Every failing function of src/std/ is written with `may fail`, apart from
-# a binding, which refuses it.
-add_test(NAME std_may_fail_only
-    COMMAND "${CMAKE_COMMAND}"
-        "-DROOT=${ANTIC_STD_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_may_fail_only.cmake")
-
-# M330. Every `alloc(T, n)` of src/std/ stops the program when the memory
-# runs out, and no module fails for it.
-add_test(NAME std_out_of_memory
-    COMMAND "${CMAKE_COMMAND}"
-        "-DROOT=${ANTIC_STD_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_std_out_of_memory.cmake")
-
-# So is every failing function of the test programs. The functions the
-# listing skips write the form on purpose: construct_forms refuses it on
-# a `construct`, failing and error_values check that a function written
-# so is ordinary, whose error is a value, and catch_exits returns the
-# error of a handler as one, and catch_moves a wrap of it.
-add_test(NAME tests_may_fail_only
-    COMMAND "${CMAKE_COMMAND}"
-        "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
-        "-DSKIP=errors/construct_forms.anti:construct,errors/failing.anti:by_hand,errors/failing.anti:fail_by_hand,programs/error_values.anti:stored,programs/error_values.anti:maybe,programs/error_values.anti:caught,programs/catch_exits.anti:passed,programs/catch_moves.anti:by_return"
-        -P "${ANTIC_RUNNERS}/run_may_fail_only.cmake")
-
 # The three directory functions of anti.os fail when the
 # environment names no home, and the message names the variable that is
 # absent. The same program runs a second time without those variables,
@@ -2268,824 +1369,6 @@ antic_program_test(program_abi_ctypes_memory_checks
     OPTIONS --memory-checks
     OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_ctypes>,,>"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-memory-checks")
-if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
-    set_tests_properties(program_abi_ctypes_memory_checks PROPERTIES
-        DISABLED TRUE)
-endif()
-
-# A user receives these files. None of them may name a directory of the
-# machine that built it.
-# An ordinary build maps its paths away with -ffile-prefix-map. A
-# sanitizer writes the path of the module into its own metadata, which no
-# flag maps, so the test runs on a build without one.
-string(FIND "${CMAKE_C_FLAGS}" "-fsanitize" antic_sanitized)
-if(antic_sanitized EQUAL -1)
-    add_test(NAME no_paths
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-                -P "${ANTIC_RUNNERS}/run_no_paths.cmake")
-endif()
-
-add_test(NAME release_pins
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_release_pins.cmake")
-add_test(NAME pinned_compiler
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
-            -P "${ANTIC_RUNNERS}/run_pinned_compiler.cmake")
-# A pin of tools/ is read through tools/pins.cmake alone, and
-# tools/cpu-levels through tools/cpu-levels.cmake.
-add_test(NAME pin_readers
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_pin_readers.cmake")
-# The host of the machine is worked out in tools/host.cmake alone.
-add_test(NAME host_names
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_host_names.cmake")
-# The six targets are listed once, in tools/cpu-levels.
-add_test(NAME target_lists
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_target_lists.cmake")
-add_test(NAME release_key
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_release_key.cmake")
-# The permissions of the text step 9 publishes on anti-lang.com.
-add_test(NAME release_site
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_release_site.cmake")
-# The Windows sysroot of mingw-w64: the headers, the import libraries
-# that llvm-dlltool writes from the .def files for the processor of each
-# target, the builtins of the pinned clang and the licence, laid out from
-# a stand-in source release by the pinned clang and the pinned llvm-ar.
-if(NOT ANTIC_SYSTEM_COMPILER)
-    add_test(NAME windows_sysroot
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/windows_sysroot"
-                "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
-                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                -P "${ANTIC_RUNNERS}/run_windows_sysroot.cmake")
-endif()
-
-# A configure with -DANTI_DEPS_DIR reads the pinned downloads of another
-# directory, and a copy of the sources builds against this tree's.
-add_test(NAME deps_dir
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/deps_dir"
-            "-DDEPS=${ANTIC_DEPS_DIR}" "-DGENERATOR=${CMAKE_GENERATOR}"
-            "-DCLANG=${ANTIC_CLANG_DIR}" "-DLLVM=${ANTIC_LLVM_DIR}"
-            "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
-            -P "${ANTIC_RUNNERS}/run_deps_dir.cmake")
-
-# The configure of a fresh checkout installs the sysroots and raylib from
-# their archives, as decision 3 of "Decisions of 2026-10-11" asks.
-if(NOT ANTIC_SYSTEM_COMPILER)
-    add_test(NAME first_build
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DTREE=${CMAKE_BINARY_DIR}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/first_build"
-                "-DGENERATOR=${CMAKE_GENERATOR}"
-                -P "${ANTIC_RUNNERS}/run_first_build.cmake")
-endif()
-
-# A configure leaves the names of lld alone while the suite runs them.
-add_test(NAME llvm_names
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DLLVM=${ANTIC_LLVM_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-names"
-            -P "${ANTIC_RUNNERS}/run_llvm_names.cmake")
-
-# llvm-cov and llvm-mc stay out of every directory the packer copies into
-# a package, no_llvm_cov_packed and no_llvm_mc_packed.
-foreach(tool llvm-cov llvm-mc)
-    string(REPLACE "-" "_" word "${tool}")
-    add_test(NAME no_${word}_packed
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DTOOL=${tool}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/no-${tool}-packed"
-                -P "${ANTIC_RUNNERS}/run_no_tool_packed.cmake")
-endforeach()
-
-# The report of the coverage measurement: tools/coverage-report.cmake
-# merges the profiles of two runs of a small program and writes the
-# summary and the annotated sources of the three directories it measures.
-# The program takes the flags of tools/coverage.cmake, as a coverage tree
-# gives them to antic.
-# DESIGN: the test stands on a Mac alone. The measurement runs on the
-# development Mac, and the script that links a program of the host here,
-# as release_dry_run does, names the Apple SDK.
-if(ANTIC_HOST_OS STREQUAL "macos")
-    set(coverage_work "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
-    antic_coverage_compile_flags(coverage_flags "${coverage_work}/root")
-    add_test(NAME coverage_report
-        COMMAND "${CMAKE_COMMAND}"
-                "-DCC=${CMAKE_C_COMPILER}"
-                "-DSDK=${ANTIC_MACOS_SDK}"
-                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-                "-DCOMPILE_FLAGS=${coverage_flags}"
-                "-DLINK_FLAGS=${ANTIC_COVERAGE_LINK_FLAGS}"
-                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                "-DSCRIPT=${CMAKE_SOURCE_DIR}/tools/coverage-report.cmake"
-                "-DWORK=${coverage_work}"
-                -P "${ANTIC_RUNNERS}/run_coverage_report.cmake")
-endif()
-
-# A Linux program of a release names no glibc symbol above the pinned
-# 2.35, which tools/pack-anti.cmake reads before it writes a package
-add_test(NAME linux_libc
-    COMMAND "${CMAKE_COMMAND}"
-        "-DCLANG=${CMAKE_C_COMPILER}"
-        "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-        "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
-        "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-libc.cmake"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-libc"
-        -P "${ANTIC_RUNNERS}/run_linux_libc.cmake")
-set_tests_properties(linux_libc PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-add_executable(raw_bytes_c raw/raw_bytes.c)
-add_test(NAME raw_output
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            ${ANTIC_AND_RUNTIME}
-            "-DC_PROGRAM=$<TARGET_FILE:raw_bytes_c>"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/raw"
-            -P "${ANTIC_RUNNERS}/run_raw_output.cmake")
-# The `tests` and `fixtures` blocks, the runner of `anti test` and the
-# proof that every other build drops both blocks.
-add_test(NAME anti_test
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        ${ANTIC_AND_RUNTIME}
-        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
-        -P "${ANTIC_RUNNERS}/run_anti_test.cmake")
-
-# The constructs of the flow area in a `tests` block and in a `fixtures`
-# block, which no program of tests/matrix reaches: every build but
-# `anti test` drops both blocks. docs/notes/test-matrix.md names the cells.
-add_test(NAME anti_test_flow
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
-        "-DMODULE=com/example/flow"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-flow"
-        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
-
-# The constructs of the values area in a `tests` block and in a `fixtures`
-# block, as anti_test_flow holds those of the flow area.
-add_test(NAME anti_test_values
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
-        "-DMODULE=com/example/values"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-values"
-        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
-
-# The constructs of the ownership area in a `tests` block and in a
-# `fixtures` block, as anti_test_flow holds those of the flow area.
-add_test(NAME anti_test_ownership
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
-        "-DMODULE=com/example/ownership"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-ownership"
-        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
-
-# The constructs of the errors area in a `tests` block and in a `fixtures`
-# block, as anti_test_flow holds those of the flow area. A test takes no
-# `may fail`, which error_tests_may_fail holds.
-add_test(NAME anti_test_errors
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
-        "-DMODULE=com/example/errors"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-errors"
-        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
-
-# The constructs of the threads area in a `tests` block and in a `fixtures`
-# block, as anti_test_flow holds those of the flow area. The workers stand
-# at module level.
-add_test(NAME anti_test_threads
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
-        "-DMODULE=com/example/threads"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-threads"
-        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
-
-# The constructs of the classes area in a `tests` block and in a
-# `fixtures` block, as anti_test_flow holds those of the flow area. The
-# classes stand at module level, since a block holds functions alone.
-add_test(NAME anti_test_classes
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
-        "-DMODULE=com/example/classes"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-classes"
-        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
-
-# `anti run --memory-checks` and `anti test --memory-checks` put the report
-# of each memory error through Anti's symbolizer, and the dev cache keeps
-# the objects with and without the checks apart.
-add_test(NAME anti_memory_checks
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
-        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_tests.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-checks"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        -P "${ANTIC_RUNNERS}/run_anti_memory_checks.cmake")
-set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# A Windows program of `anti build --memory-checks` has the DLL of
-# AddressSanitizer beside it in dist/.
-add_test(NAME anti_memory_dll
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-dll"
-        -P "${ANTIC_RUNNERS}/run_anti_memory_dll.cmake")
-set_tests_properties(anti_memory_dll PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# `anti build`, `anti run` and `anti new` over a two-module project: the
-# dev cache, release mode, the -g rule, --target, --cpu and the lock file.
-if(ANTIC_HOST_CPU STREQUAL "arm64")
-    set(anti_build_cpu "armv8.0")
-else()
-    set(anti_build_cpu "v1")
-endif()
-if(ANTIC_HOST_TARGET STREQUAL "linux-x86_64")
-    set(anti_build_other "macos-arm64")
-else()
-    set(anti_build_other "linux-x86_64")
-endif()
-add_test(NAME anti_build
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DOTHER=${anti_build_other}"
-        "-DCPU=${anti_build_cpu}"
-        "-DCHECK_PDB=${PROJECT_SOURCE_DIR}/tools/check-pdb.cmake"
-        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
-        "-DOBJECT=${anti_object}"
-        -P "${ANTIC_RUNNERS}/run_anti_build.cmake")
-
-# The package name of the manifest reaches every compile of `anti check`,
-# `anti build` in both modes, `anti test` and `anti doc`, so a module that
-# uses an internal item of another module of its package passes all four.
-add_test(NAME anti_internal
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-internal"
-        -P "${ANTIC_RUNNERS}/run_anti_internal.cmake")
-
-# `anti symbols` over a deployment of a release program, with a plugin
-# on a macOS host. It takes the inventory, the check of present, stale
-# and missing symbols and a release trace resolved into names and lines. A
-# Windows program keeps its functions in the PDB, which only DbgHelp
-# reads, so the test runs on the other hosts.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    if(ANTIC_HOST_OS STREQUAL "macos")
-        set(anti_symbols_plugin "-DSUFFIX=.dylib")
-    else()
-        set(anti_symbols_plugin "-DSUFFIX=")
-    endif()
-    add_test(NAME anti_symbols
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            ${ANTIC_AND_RUNTIME}
-            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
-            "-DPLUGIN=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-            "${anti_symbols_plugin}"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols"
-            -P "${ANTIC_RUNNERS}/run_anti_symbols.cmake")
-endif()
-
-# The link of the symbols archive lays an ELF program out as the release
-# link does. Under LTO the debug CFI of an Anti function moved into
-# .eh_frame when the runtime brought unwind tables, and every address
-# after it shifted.
-foreach(target linux-x86_64 linux-arm64)
-    add_test(NAME symbols_layout_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-layout-${target}"
-            -P "${ANTIC_RUNNERS}/run_symbols_layout.cmake")
-    set_tests_properties(symbols_layout_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# `anti symbols resolve` refuses a line of a map or a trace whose number
-# does not fit 64 bits. The archive is written here, so every host runs it.
-add_test(NAME anti_symbols_input
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols-input"
-        -P "${ANTIC_RUNNERS}/run_anti_symbols_input.cmake")
-
-# A binding names its framework with `link framework`, and `anti build`
-# passes it to antic. A Mac takes the SDK from the Command Line Tools.
-if(ANTIC_HOST_OS STREQUAL "macos")
-    add_test(NAME anti_build_framework
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-framework"
-            -P "${ANTIC_RUNNERS}/run_anti_build_framework.cmake")
-endif()
-
-# A binding names its Linux libraries with `link linux`, and `anti build`
-# passes them to antic. The program that reaches them links dynamically
-# against glibc, and one that does not links statically against musl.
-add_test(NAME linux_modes
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-modes"
-        -P "${ANTIC_RUNNERS}/run_linux_modes.cmake")
-
-# A program of musl names musl and mimalloc in its notice, and a program
-# of glibc or of macOS names neither. `anti license --from` prints the
-# notice and NOTICE.txt of `anti build` holds the same.
-add_test(NAME license_notice
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
-        "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-notice"
-        -P "${ANTIC_RUNNERS}/run_license_notice.cmake")
-set_tests_properties(license_notice PROPERTIES TIMEOUT 120
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The four forms of `anti license` beside --from, one test each: the
-# plain form over licenses/ of the runtime archive, --project over a
-# project that links two packages, --project --notice and the NOTICE.txt
-# of `anti build`, and --from-archive over a static archive of `--lib
-# static`.
-foreach(form plain project notice archive)
-    set(name "license_${form}")
-    if(form STREQUAL "notice")
-        set(name license_project_notice)
-    elseif(form STREQUAL "archive")
-        set(name license_from_archive)
-    endif()
-    add_test(NAME ${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DFORM=${form}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_AR=${ANTIC_LLVM_AR}"
-            "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DVERSION=${PROJECT_VERSION}"
-            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
-            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-form-${form}"
-            -P "${ANTIC_RUNNERS}/run_license_forms.cmake")
-    set_tests_properties(${name} PROPERTIES TIMEOUT 180
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# The two shapes of a dependency, the repository layout over `file://`
-# and the two libraries for C.
-add_test(NAME anti_build_deps
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_AR=${ANTIC_LLVM_AR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-deps"
-        -P "${ANTIC_RUNNERS}/run_anti_build_deps.cmake")
-# A walk whose pick of a package changes drops the requirements of the
-# old pick, and the packages only it needed.
-add_test(NAME anti_build_resolve
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-resolve"
-        -P "${ANTIC_RUNNERS}/run_anti_build_resolve.cmake")
-# A malformed index.toml and anti.lock: names, versions, module paths and
-# digests that are not the grammar of their kind are refused before they
-# reach a path in the cache, a comparison or the lock file.
-add_test(NAME anti_build_inputs
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-inputs"
-        -P "${ANTIC_RUNNERS}/run_anti_build_inputs.cmake")
-# What `anti build` delivers and caches, one test per case of
-# tests/runners/run_anti_build_cases.cmake, whose header names what each shows. A
-# Windows library links from every host whose runtime archive holds the
-# sysroot. The curl of the redirect cases is a shell script.
-set(anti_build_cases path_target path_target_cpu lock_dropped
-    cache_strip_docs cache_version cache_license cache_license_text
-    cache_attribution cache_dependency cache_import_checked
-    cache_import_layout)
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    list(APPEND anti_build_cases redirect_to_http redirect_followed
-         redirect_loop)
-endif()
-if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
-    list(APPEND anti_build_cases windows_import_library)
-endif()
-foreach(case IN LISTS anti_build_cases)
-    add_test(NAME anti_build_${case}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            -DCASE=${case}
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DOTHER=${anti_build_other}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-cases/${case}"
-            -P "${ANTIC_RUNNERS}/run_anti_build_cases.cmake")
-endforeach()
-
-# The messages of anti, one test per message. A table of the directory of
-# its command holds the cases of each, and anti_messages.cmake those of
-# `anti new`, `anti license` and `anti sdk`, which have no directory.
-# antic_messages.cmake holds the messages of the driver of antic that
-# stand at no position of a source, as `antic_message_<case>`.
-# run_anti_messages.cmake states the form of a case and prints the names
-# of a table, so a case is registered by standing in its table.
-foreach(pair "anti_build|anti-build/messages.cmake"
-             "anti_test|anti-test/messages.cmake"
-             "anti_symbols|anti-symbols/messages.cmake"
-             "anti_check|check/messages.cmake"
-             "anti_fmt|fmt/messages.cmake"
-             "anti_doc|doc/messages.cmake"
-             "anti_bind|bind/messages.cmake"
-             "anti|anti_messages.cmake"
-             "antic|antic_messages.cmake")
-    string(REPLACE "|" ";" pair "${pair}")
-    list(GET pair 0 command)
-    list(GET pair 1 table)
-    # The table of antic runs antic, and every other one anti.
-    set(tool anti)
-    if(command STREQUAL "antic")
-        set(tool antic)
-    endif()
-    set(table "${CMAKE_CURRENT_SOURCE_DIR}/${table}")
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${table}"
-                 "${ANTIC_RUNNERS}/run_anti_messages.cmake")
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -DLIST=ON "-DTABLE=${table}"
-                -P "${ANTIC_RUNNERS}/run_anti_messages.cmake"
-        RESULT_VARIABLE status
-        OUTPUT_VARIABLE names
-        ERROR_VARIABLE errors)
-    if(NOT status EQUAL 0)
-        message(FATAL_ERROR "${table} gives no names:\n${errors}")
-    endif()
-    string(STRIP "${names}" names)
-    string(REPLACE "\n" ";" names "${names}")
-    foreach(name IN LISTS names)
-        # DESIGN: antic keeps the text of --license-text when it refuses
-        # the file for a NUL byte, and LeakSanitizer reports the block. A
-        # line of tests/known-failures.txt names a test that fails in
-        # every tree, and this one fails under AddressSanitizer alone. The
-        # case therefore runs in a tree without it, and the report
-        # docs/reports/2026-10-13-tests-coverage-rest.md holds the defect.
-        string(FIND "${CMAKE_C_FLAGS}" "-fsanitize=address" with_asan)
-        if(command STREQUAL "antic" AND
-           name STREQUAL "license_text_with_a_nul_byte" AND
-           NOT with_asan EQUAL -1)
-            continue()
-        endif()
-        add_test(NAME ${command}_message_${name}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTI=$<TARGET_FILE:${tool}>"
-                "-DTABLE=${table}"
-                "-DCASE=${name}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/messages/${command}-${name}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DHOST=${ANTIC_HOST_TARGET}"
-                "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
-                "-DVERSION=${PROJECT_VERSION}"
-                "-DCLANG_VERSION=${ANTI_CLANG_VERSION}"
-                "-DCLANG_TAG=${ANTI_CLANG_TAG}"
-                "-DCLANG_PAGE=${ANTI_CLANG_PAGE}"
-                "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
-                -P "${ANTIC_RUNNERS}/run_anti_messages.cmake")
-    endforeach()
-endforeach()
-
-# An option of anti beside the run without it, one test per case of
-# tests/runners/run_anti_options.cmake, whose header names what each shows.
-# --soname writes the version of a library of macOS and of Linux and
-# changes nothing of one of Windows. A Mac alone links for macOS, and the
-# other two link from every host whose runtime archive holds the sysroot.
-set(anti_option_cases strip_docs check_root_library check_root_source
-    bind_define_name bind_define_value bind_define_shim release_path
-    library_root)
-if(ANTIC_HOST_OS STREQUAL "macos")
-    list(APPEND anti_option_cases soname_macos)
-endif()
-if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
-    list(APPEND anti_option_cases soname_linux soname_linux_dist)
-endif()
-if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
-    list(APPEND anti_option_cases soname_windows)
-endif()
-# --target all links a program for each of the six targets.
-set(anti_option_six ON)
-foreach(target IN LISTS ANTIC_TARGETS)
-    if(NOT EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
-        set(anti_option_six OFF)
-    endif()
-endforeach()
-if(anti_option_six)
-    list(APPEND anti_option_cases target_all target_all_cpu targets_default
-         symbols_target bind_target)
-endif()
-# The inventory finds a program by the notice of its file, which
-# anti_symbols reads on the hosts other than Windows.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    list(APPEND anti_option_cases symbols_from)
-endif()
-foreach(case IN LISTS anti_option_cases)
-    add_test(NAME anti_option_${case}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            -DCASE=${case}
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_AR=${ANTIC_LLVM_AR}"
-            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
-            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-options/${case}"
-            -P "${ANTIC_RUNNERS}/run_anti_options.cmake")
-endforeach()
-
-# A program run from dist/ and built again at once, fifteen times. Windows
-# maps a program that just ran for a moment, and the copy into dist/
-# failed there. A turn takes about two seconds on the Windows VM.
-if(ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME anti_build_rerun
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-rerun"
-            "-DTURNS=15"
-            -P "${ANTIC_RUNNERS}/run_anti_build_rerun.cmake")
-endif()
-
-# A program that runs from dist/ while `anti build` builds it again. The
-# build replaces it, the running program ends as it began, and the new
-# program runs. Linux refuses a write into a running program.
-add_test(NAME anti_build_running
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-running"
-        -P "${ANTIC_RUNNERS}/run_anti_build_running.cmake")
-
-# The rules of the canonical form on one file, the format stability of
-# docs/tooling.md and `--check`, which writes nothing.
-add_test(NAME anti_fmt
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/fmt"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt"
-        -P "${ANTIC_RUNNERS}/run_anti_fmt.cmake")
-# A failed write of `anti fmt` leaves the source as it was. The limit on
-# the size of a written file is a POSIX one, and Windows has none.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME anti_fmt_write
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-fmt-write"
-            -P "${ANTIC_RUNNERS}/run_anti_fmt_write.cmake")
-endif()
-
-# antic runs its passes on a stack of its own size, whatever stack the
-# main thread has. The limit of the main thread is a POSIX one too.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME antic_stack
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DOPT=${ANTIC_OPT}"
-            "-DLLC=${ANTIC_LLC}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-stack"
-            -P "${ANTIC_RUNNERS}/run_antic_stack.cmake")
-endif()
-
-# A variant of 65536 cases takes a tag of 32 bits. The runner writes the
-# source and runs the program.
-add_test(NAME variant_wide_tag
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variant-wide-tag"
-        -P "${ANTIC_RUNNERS}/run_variant_wide_tag.cmake")
-
-# A `type` alias of a function type leaves the functions after it as they
-# stand. The source is in the canonical form, so fmt_canonical passes over
-# it until `anti fmt` agrees: finding T025 of docs/audit/tests-findings.md.
-add_expect_test(fmt_alias_of_function STATUS 0
-    PATTERN "^$"
-    COMMAND "$<TARGET_FILE:anti>" fmt --check
-            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/alias_of_function.anti")
-
-# Every source of the standard library and of the tests stands in the
-# canonical form, so that `anti fmt` over the checkout writes nothing.
-add_test(NAME fmt_canonical
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
-        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_fmt_canonical.cmake")
-# run_fmt_canonical.cmake fails for an anti that ends by a signal and
-# prints nothing.
-add_test(NAME fmt_canonical_runner
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNNER=${ANTIC_RUNNERS}/run_fmt_canonical.cmake"
-        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
-        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt-canonical-runner"
-        -P "${ANTIC_RUNNERS}/run_fmt_canonical_self.cmake")
-set_tests_properties(fmt_canonical_runner PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# Every class of `anti check`: the front end on every source of a project,
-# the `anti` blocks of the doc comments, the doc warnings and the formatting
-# rules.
-add_test(NAME anti_check
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DPROJECTS=${CMAKE_CURRENT_SOURCE_DIR}/check"
-        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/check"
-        -P "${ANTIC_RUNNERS}/run_anti_check.cmake")
-
-# The documentation generator: the pages of the fixture, the doc
-# equivalence of docs/tooling.md, the two forms and the two options that
-# need the source.
-add_executable(antl_rename doc/antl_rename.c)
-target_link_libraries(antl_rename PRIVATE antic_core)
-add_test(NAME anti_doc
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRENAME=$<TARGET_FILE:antl_rename>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/doc"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc"
-        -P "${ANTIC_RUNNERS}/run_anti_doc.cmake")
-
-# The page of a module that holds one item per form the fixture above
-# lacks: the constants of each kind, the modifiers of a struct and of a
-# class, the fields of a class and the signatures of a function. Its doc
-# text holds the names anti doc links and the ones it leaves as text. The
-# user docs are HTML, and --private shows the fields that are not `pub`.
-foreach(pair "html||com.example.forms.html|forms.expected.html"
-             "private|--markdown\\|--private|com.example.forms.md|forms.private.expected.md")
-    string(REPLACE "\\|" "!" pair "${pair}")
-    string(REPLACE "|" ";" pair "${pair}")
-    list(GET pair 0 case)
-    list(GET pair 1 options)
-    list(GET pair 2 page)
-    list(GET pair 3 expected)
-    string(REPLACE "!" "|" options "${options}")
-    add_test(NAME anti_doc_forms_${case}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/forms.anti|${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/limits.anti"
-            "-DPAGE=${page}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/doc/${expected}"
-            "-DOPTIONS=${options}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc-forms-${case}"
-            -P "${ANTIC_RUNNERS}/run_anti_doc_page.cmake")
-endforeach()
-
-# The pages of two modules of doc text. prose holds the forms of the doc
-# subset that no other page holds: an item of a list in two lines, an
-# empty code span, a bracket that starts no link, a link whose scheme
-# stands in capitals, a link to a page beside this one and a code block
-# that never closes. Its developer's page in Markdown holds the note of the
-# module and the note of an item. wrapped holds a link that anti fmt
-# breaks after a word of its text.
-foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
-             "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
-             "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html")
-    string(REPLACE "\\|" "!" pair "${pair}")
-    string(REPLACE "|" ";" pair "${pair}")
-    list(GET pair 0 case)
-    list(GET pair 1 options)
-    list(GET pair 2 module)
-    list(GET pair 3 page)
-    list(GET pair 4 expected)
-    string(REPLACE "!" "|" options "${options}")
-    # The code block of prose never closes, which R179 of "Rules of
-    # 2026-10-13" warns of.
-    set(warning "")
-    if(module STREQUAL "prose")
-        set(warning "-DWARNING=the doc comment of `add` holds a fence that nothing closes")
-    endif()
-    add_test(NAME anti_doc_${case}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/${module}.anti"
-            ${warning}
-            "-DPAGE=${page}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/doc/${expected}"
-            "-DOPTIONS=${options}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc-${case}"
-            -P "${ANTIC_RUNNERS}/run_anti_doc_page.cmake")
-endforeach()
-
-# anti bind --header writes the header that antic --lib writes for the
-# same module, from the library file alone. The other cases bind
-# tests/bind/layout.h and raymath through clang and a part of
-# raylib_api.json, and check the refusals. forms binds tests/bind/forms.h
-# and values the macros of tests/bind/values.h. functions binds the
-# functions of tests/bind/functions.h, and huge_enum and nested_enum each
-# bind a header of one enum. api_parts, api_callbacks, api_literals,
-# api_types and api_words each bind a description of tests/bind in the
-# format of rlparser. words binds the names of tests/bind/words.h that are
-# words of Anti, unsigned_bitfield the bitfield of tests/bind/bits.h and
-# fixed_enum the enums of tests/bind/fixed.h.
-# api_typedef_chain and clang_typedef_chain each bind a chain of aliases
-# that names every link three times. clang_of_the_tree runs a copy of anti in a tree whose deps/clang is the
-# pinned clang, with no clang on PATH.
-set(anti_bind_cc ${ANTIC_TEST_CC})
-if(ANTIC_HOST_OS STREQUAL "macos")
-    list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
-endif()
-set(anti_bind_cases header clang escaped_path raymath raylib api
-    api_malformed clang_malformed forms values functions huge_enum
-    nested_enum api_parts api_callbacks api_literals api_types
-    api_words words unsigned_bitfield fixed_enum api_typedef_chain
-    clang_of_the_tree)
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    # The cases refusals, ast_malformed and clang_typedef_chain stand a
-    # shell script in for clang.
-    list(APPEND anti_bind_cases refusals ast_malformed clang_typedef_chain)
-endif()
-foreach(case IN LISTS anti_bind_cases)
-    add_test(NAME anti_bind_${case}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTI=$<TARGET_FILE:anti>"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
-            "-DBIND=${CMAKE_CURRENT_SOURCE_DIR}/bind"
-            "-DABI=${CMAKE_CURRENT_SOURCE_DIR}/abi"
-            "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
-            "-DCC=${anti_bind_cc}"
-            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
-            "-DCLANG_VERSION=${ANTI_CLANG_VERSION}"
-            "-DCLANG_TAG=${ANTI_CLANG_TAG}"
-            "-DCLANG_PAGE=${ANTI_CLANG_PAGE}"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-${case}"
-            -DCASE=${case}
-            -P "${ANTIC_RUNNERS}/run_anti_bind.cmake")
-endforeach()
 
 # The `tests` block of a module of the standard library. The module
 # imports other modules, so the dev run links an object of each.
@@ -3098,251 +1381,10 @@ add_test(NAME std_tests_trace
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-tests-trace"
         -P "${ANTIC_RUNNERS}/run_std_tests.cmake")
 
-add_test(NAME anti_sdk
-    COMMAND "${CMAKE_COMMAND}" "-DANTI=$<TARGET_FILE:anti>"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti_sdk"
-            -P "${ANTIC_RUNNERS}/run_anti_sdk.cmake")
-add_test(NAME macos_sysroot
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macos_sysroot"
-            -P "${ANTIC_RUNNERS}/run_macos_sysroot.cmake")
-add_test(NAME glibc_sysroot
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/glibc_sysroot"
-            "-DLLVM_AR=${ANTIC_LLVM_AR}"
-            -P "${ANTIC_RUNNERS}/run_glibc_sysroot.cmake")
-add_test(NAME sysroot_links
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_links"
-            -P "${ANTIC_RUNNERS}/run_sysroot_links.cmake")
-# The package of this host, packed from the antic of this build. It needs
-# the sysroots of every target, which every package carries.
-# package_pack packs and unpacks it in package/, the tests package_* read
-# it there, each in a directory of its own, and package_clean removes it.
-set(package_missing "")
-foreach(dir IN LISTS ANTIC_TARGETS ITEMS licenses)
-    if(NOT EXISTS "${ANTIC_SYSROOT_DIR}/${dir}")
-        list(APPEND package_missing "${dir}")
-    endif()
-endforeach()
-set(package_dir "${CMAKE_CURRENT_BINARY_DIR}/package")
-if(package_missing)
-    # Fail rather than skip, so a missing sysroot cannot pass unnoticed.
-    list(JOIN package_missing " " package_missing)
-    add_test(NAME package_pack
-        COMMAND "${CMAKE_COMMAND}" -E echo
-            "sysroots not found in ${ANTIC_SYSROOT_DIR}: ${package_missing}: run tools/get-sysroot.cmake")
-    set_tests_properties(package_pack PROPERTIES
-        FAIL_REGULAR_EXPRESSION "sysroots not found")
-else()
-    add_test(NAME package_pack
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
-                "-DHOST=${ANTIC_HOST_TARGET}"
-                "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DCLANG=${CMAKE_C_COMPILER}"
-                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                "-DWORK=${package_dir}"
-                -P "${ANTIC_RUNNERS}/run_package.cmake")
-    # PERF DECISION: the package carries the LLVM tools, and xz compresses
-    # its 530 MB of them in about three minutes. ctest runs the tests of
-    # a fresh tree in the order of their declaration, which put this one
-    # last and alone at the end of the suite. The cost puts it first, so
-    # the rest of the suite runs beside it.
-    set_tests_properties(package_pack PROPERTIES COST 300
-        FIXTURES_SETUP package)
-    add_test(NAME package_clean
-        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${package_dir}")
-    set_tests_properties(package_clean PROPERTIES FIXTURES_CLEANUP package)
-    # package_<part> runs run_package_<part>.cmake over the package, with
-    # the values of the cache that the part names after its name.
-    function(antic_package_test part)
-        set(values "")
-        foreach(value IN LISTS ARGN)
-            if(value STREQUAL "ANTIC")
-                list(APPEND values "-DANTIC=$<TARGET_FILE:antic>")
-            elseif(value STREQUAL "ANTI")
-                list(APPEND values "-DANTI=$<TARGET_FILE:anti>")
-            elseif(value STREQUAL "RUNTIME")
-                list(APPEND values "-DRUNTIME=${ANTIC_RUNTIME_DIR}")
-            elseif(value STREQUAL "CLANG")
-                list(APPEND values "-DCLANG=${CMAKE_C_COMPILER}")
-            elseif(value STREQUAL "LLVM_BIN")
-                list(APPEND values "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin")
-            elseif(value STREQUAL "RAYLIB")
-                list(APPEND values "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}")
-            else()
-                message(FATAL_ERROR "antic_package_test names no value ${value}")
-            endif()
-        endforeach()
-        add_test(NAME package_${part}
-            COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                    "-DHOST=${ANTIC_HOST_TARGET}" ${values}
-                    "-DPACKAGE=${package_dir}"
-                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-${part}"
-                    -P "${ANTIC_RUNNERS}/run_package_${part}.cmake")
-        set_tests_properties(package_${part} PROPERTIES
-            FIXTURES_REQUIRED package)
-    endfunction()
-    antic_package_test(keys)
-    antic_package_test(contents RUNTIME)
-    antic_package_test(version)
-    antic_package_test(bind ANTI RUNTIME CLANG RAYLIB)
-    antic_package_test(targets)
-    antic_package_test(license)
-    antic_package_test(glibc)
-    antic_package_test(build)
-    antic_package_test(offline)
-    # The record of the upstream sources travels beside the licence texts,
-    # with a line for glibc and one for the kernel headers whose URL names
-    # the version of tools/sysroot-pins.
-    add_test(NAME package_sources
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DSOURCES=${package_dir}/unpacked/anti/licenses/sources.txt"
-                -P "${ANTIC_RUNNERS}/run_upstream_sources.cmake")
-    set_tests_properties(package_sources PROPERTIES FIXTURES_REQUIRED package)
-    # A host that is not Linux packs linux-arm64 as well. It packs a
-    # package of its own beside package_pack, which xz takes two minutes
-    # for, so its cost starts it early too.
-    if(NOT ANTIC_HOST_OS STREQUAL "linux")
-        add_test(NAME package_cross
-            COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                    "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                    "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
-                    "-DCLANG=${CMAKE_C_COMPILER}"
-                    "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-cross"
-                    -P "${ANTIC_RUNNERS}/run_package_cross.cmake")
-        set_tests_properties(package_cross PROPERTIES COST 120)
-    endif()
-    # The packer refuses a build with the compiler of the machine, before
-    # it packs anything.
-    add_test(NAME package_system_compiler
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DANTIC=$<TARGET_FILE:antic>" "-DHOST=${ANTIC_HOST_TARGET}"
-                "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-system-compiler"
-                -P "${ANTIC_RUNNERS}/run_package_system_compiler.cmake")
-endif()
-add_test(NAME package_sdk_pin
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_package_sdk_pin.cmake")
-# The release script names the directory of the raylib download, never the
-# version of the pin.
-add_test(NAME raylib_pin
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=raylib
-            -DSCRIPT=src/native/get-source.cmake
-            -DCALLER=src/native/raylib-source.cmake
-            -DFILES=src/native/raylib.cmake,tools/release.sh
-            -DHASH=SHA256 -DPARTS=2
-            -P "${ANTIC_RUNNERS}/run_native_pin.cmake")
-# The check of the pins refuses a copy of a version or a digest and passes
-# a text one dot short of the version.
-add_test(NAME native_pin_self
-    COMMAND "${CMAKE_COMMAND}"
-            "-DPIN=${ANTIC_RUNNERS}/run_native_pin.cmake"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-pin-self"
-            -P "${ANTIC_RUNNERS}/run_native_pin_self.cmake")
-# antic takes its tools, its libraries and its sysroots from the runtime
-# archive alone, and refuses what the archive lacks by its path rather
-# than taking it from the search path or from LIB.
-add_test(NAME own_tools
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DANTIC=$<TARGET_FILE:antic>" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DOPT=${ANTIC_OPT}" "-DLLC=${ANTIC_LLC}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/own_tools"
-            -P "${ANTIC_RUNNERS}/run_own_tools.cmake")
-add_test(NAME line_endings
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_line_endings.cmake")
-
-# A variable of find_program is empty above the call in a fresh build
-# directory, and right in one that a run already filled.
-add_test(NAME find_order
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_find_order.cmake")
-add_test(NAME installer_options
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_installer_options.cmake")
-
-# The binaries of a release are assets of its GitHub release, and the
-# installers take them from there and from nowhere else.
-add_test(NAME installer_github
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/installer-github"
-            -P "${ANTIC_RUNNERS}/run_installer_github.cmake")
-set_tests_properties(installer_github PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The installers download the package alone: no CMake, no sysroot step
-# and no script of the package, and the check of an install is the
-# --version of its two programs.
-add_test(NAME installer_alone
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/installer-alone"
-            -P "${ANTIC_RUNNERS}/run_installer_alone.cmake")
-set_tests_properties(installer_alone PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The installer trusts no line of SHA256SUMS before it has checked
-# SHA256SUMS.sig against the key it carries.
-add_test(NAME manifest_signature
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/manifest-signature"
-            -P "${ANTIC_RUNNERS}/run_manifest_signature.cmake")
-set_tests_properties(manifest_signature PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# The checks of tools/check-release.cmake over the directory of a
-# release.
-add_test(NAME release_manifest
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-manifest"
-            -P "${ANTIC_RUNNERS}/run_release_manifest.cmake")
-set_tests_properties(release_manifest PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# ./r on a copy of the tree, with the build, the packer and the two VMs
-# stood in for on the PATH. tests/release_copy.cmake makes the copy and
-# runs ./r --dry-run on it once for each test. release_dry_run checks
-# the order of the steps and the output of each, and the other four what
-# a rerun of the script does: on a failure of step 5, with each form of
-# the signing key, on a version that is a tag and in the preflight. A
-# release is made on the development Mac, so they skip elsewhere.
-foreach(name dry_run vm_failures signing_key tags preflight)
-    add_test(NAME release_${name}
-        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-                "-DCC=${CMAKE_C_COMPILER}"
-                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-                "-DSDK=${ANTIC_MACOS_SDK}"
-                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-${name}"
-                -P "${ANTIC_RUNNERS}/run_release_${name}.cmake")
-    set_tests_properties(release_${name} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-# The network commands of tools/release.sh against docs/vm-setup.md, and
-# tools/check-cpu.cmake over a tree of empty runtimes, on every host.
-add_test(NAME release_vm_commands
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_release_vm_commands.cmake")
 add_test(NAME check_cpu
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/check-cpu"
             -P "${ANTIC_RUNNERS}/run_check_cpu.cmake")
-# run_release_dry_run.cmake fails with the output of a fixture that does
-# not compile or link, where it reported the whole test skipped.
-add_test(NAME release_dry_run_runner
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DRUNNER=${ANTIC_RUNNERS}/run_release_dry_run.cmake"
-            "-DCC=${CMAKE_C_COMPILER}"
-            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-            "-DSDK=${ANTIC_MACOS_SDK}"
-            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-runner"
-            -P "${ANTIC_RUNNERS}/run_release_dry_run_self.cmake")
-set_tests_properties(release_dry_run_runner PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # A small raylib binding: the raymath functions of the pinned raylib
 # release, which src/native/raylib-source.cmake fetches.
@@ -3376,14 +1418,1524 @@ else()
         FAIL_REGULAR_EXPRESSION "raylib not found")
 endif()
 
-# Diagnostics. A refusal of a program exits with 1, and its messages
-# equal the .err file beside it.
-add_expect_test(error_missing_semicolon STATUS 1
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/missing_semicolon.err"
-    COMMAND "$<TARGET_FILE:antic>" -S
-            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/missing_semicolon.s"
-            missing_semicolon.anti)
+# The platform linker of the host links return42.anti.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    antic_program_test(program_platform_linker
+        "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        OPTIONS "--linker,platform"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/platform")
+endif()
+
+# The line a static library for C prints names what a C program links
+# beside the archive. A module that imports `anti.regex` needs its glue
+# and PCRE2 after it, as the link of a program of Anti takes them, by
+# "Static library" of docs/libraries-for-c.md (T146).
+add_expect_test(clib_regex_link_line STATUS 0
+    PATTERN "^c[cl] main\\.c .*libmatcher\\.a .*anti_rt_regex\\.(a|lib) .*pcre2-8\\.(a|lib)"
+    COMMAND "$<TARGET_FILE:antic>" --lib static
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/libmatcher.a"
+            "${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/matcher.anti")
+
+# The five behaviours of `assert`: a release build without it, a forced
+# build with it, dev mode keeping it and --no-asserts dropping it.
+add_test(NAME asserts
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/asserts.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asserts"
+        -P "${ANTIC_RUNNERS}/run_asserts.cmake")
+
+# Every dev-mode check: bounds, overflow, a narrowing `as`, division,
+# shifts and a walk of a collection that changes, one test per program in
+# a build that keeps the check and a build that drops it. A program whose
+# operation traps by itself without the check is built in release mode and
+# not run, which runs gives as OFF. DEV names the modules whose dev objects
+# the dev build links. checks_override runs the options that decide
+# instead of the mode.
+function(antic_check_test name phrase pattern runs)
+    cmake_parse_arguments(PARSE_ARGV 4 arg "" "" "DEV")
+    antic_dev_inputs(objects fixtures ${arg_DEV})
+    list(JOIN objects "," objects)
+    add_test(NAME check_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
+            "-DPHRASE=${phrase}"
+            "-DPATTERN=${pattern}"
+            "-DRUNS=${runs}"
+            "-DOBJECTS=${objects}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks"
+            -P "${ANTIC_RUNNERS}/run_check.cmake")
+    if(fixtures)
+        set_property(TEST check_${name} PROPERTY FIXTURES_REQUIRED ${fixtures})
+    endif()
+endfunction()
+antic_check_test(bounds_array "index out of bounds"
+    "bounds_array\\.anti:[0-9]+: index out of bounds: index 5, length 4"
+    ON)
+antic_check_test(bounds_slice "index out of bounds"
+    "bounds_slice\\.anti:[0-9]+: index out of bounds: index 4, length 2"
+    ON)
+antic_check_test(bounds_simd "index out of bounds"
+    "bounds_simd\\.anti:[0-9]+: index out of bounds: index 7, length 6"
+    ON)
+antic_check_test(bounds_str "index out of bounds"
+    "bounds_str\\.anti:[0-9]+: index out of bounds: index 7, length 3"
+    ON)
+antic_check_test(overflow_add "overflow in"
+    "overflow_add\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
+    ON)
+antic_check_test(overflow_sub "overflow in"
+    "overflow_sub\\.anti:[0-9]+: overflow in -: left -9223372036854775807, right 2"
+    ON)
+antic_check_test(overflow_mul "overflow in"
+    "overflow_mul\\.anti:[0-9]+: overflow in \\*: left 4000000000, right 4000000000"
+    ON)
+antic_check_test(overflow_mul32 "overflow in"
+    "overflow_mul32\\.anti:[0-9]+: overflow in \\*: left 100000, right 100000"
+    ON)
+antic_check_test(overflow_carry "overflow in"
+    "overflow_carry\\.anti:[0-9]+: overflow in \\+: left 9223372036854775806, right 1"
+    ON)
+antic_check_test(narrow "out of range"
+    "narrow\\.anti:[0-9]+: value out of range for i8: value 300"
+    ON)
+antic_check_test(narrow_sign "out of range"
+    "narrow_sign\\.anti:[0-9]+: value out of range for u64: value -1"
+    ON)
+antic_check_test(narrow_char "out of range"
+    "narrow_char\\.anti:[0-9]+: value out of range for char: value 1114112"
+    ON)
+antic_check_test(narrow_surrogate "out of range"
+    "narrow_surrogate\\.anti:[0-9]+: value out of range for char: value 55296"
+    ON)
+antic_check_test(narrow_enum "not declared by"
+    "narrow_enum\\.anti:[0-9]+: value not declared by Kind: value 7"
+    ON)
+antic_check_test(divide "division by zero"
+    "divide\\.anti:[0-9]+: division by zero in /: left 10"
+    OFF)
+antic_check_test(remainder "division by zero"
+    "remainder\\.anti:[0-9]+: division by zero in %: left 10"
+    OFF)
+antic_check_test(shift_wide "shift count out of range"
+    "shift_wide\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
+    ON)
+antic_check_test(shift_negative "shift count out of range"
+    "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64"
+    ON)
+# R087 of "Rules of 2026-10-13": a count of chunks below zero.
+antic_check_test(parallel_count_below_zero "count of chunks below zero"
+    "parallel_count_below_zero\\.anti:[0-9]+: count of chunks below zero: value -3"
+    ON)
+# The checks on the narrow types, in a compound assignment and in a copy
+# of a generic function. docs/notes/test-matrix.md names them under
+# "Values".
+antic_check_test(overflow_add_i8 "overflow in"
+    "overflow_add_i8\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
+    ON)
+antic_check_test(overflow_sub_i16 "overflow in"
+    "overflow_sub_i16\\.anti:[0-9]+: overflow in -: left -32768, right 1"
+    ON)
+antic_check_test(overflow_mul_i8 "overflow in"
+    "overflow_mul_i8\\.anti:[0-9]+: overflow in \\*: left 100, right 2"
+    ON)
+antic_check_test(overflow_compound "overflow in"
+    "overflow_compound\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
+    ON)
+antic_check_test(overflow_generic "overflow in"
+    "overflow_generic\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
+    ON)
+antic_check_test(narrow_unsigned "out of range"
+    "narrow_unsigned\\.anti:[0-9]+: value out of range for i8: value 200"
+    ON)
+antic_check_test(narrow_u64 "out of range"
+    "narrow_u64\\.anti:[0-9]+: value out of range for int: value 9223372036854775808"
+    ON)
+antic_check_test(narrow_to_byte "out of range"
+    "narrow_to_byte\\.anti:[0-9]+: value out of range for byte: value -1"
+    ON)
+antic_check_test(divide_byte "division by zero"
+    "divide_byte\\.anti:[0-9]+: division by zero in /: left 200"
+    ON)
+antic_check_test(remainder_i8 "division by zero"
+    "remainder_i8\\.anti:[0-9]+: division by zero in %: left -7"
+    ON)
+antic_check_test(divide_compound "division by zero"
+    "divide_compound\\.anti:[0-9]+: division by zero in /: left 10"
+    ON)
+antic_check_test(shift_wide_byte "shift count out of range"
+    "shift_wide_byte\\.anti:[0-9]+: shift count out of range for <<: count 8, width 8"
+    ON)
+antic_check_test(shift_right_wide_i16 "shift count out of range"
+    "shift_right_wide_i16\\.anti:[0-9]+: shift count out of range for >>: count 16, width 16"
+    ON)
+antic_check_test(shift_compound "shift count out of range"
+    "shift_compound\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
+    ON)
+# R031 of "Rules of 2026-10-13": the least value divided by -1, its
+# remainder by -1 and unary `-` of it stop a dev build with the
+# overflow check.
+antic_check_test(overflow_divide_least "overflow in"
+    "overflow_divide_least\\.anti:[0-9]+: overflow in /: left -9223372036854775808, right -1"
+    ON)
+antic_check_test(overflow_remainder_least_i8 "overflow in"
+    "overflow_remainder_least_i8\\.anti:[0-9]+: overflow in %: left -128, right -1"
+    ON)
+antic_check_test(overflow_divide_least_compound "overflow in"
+    "overflow_divide_least_compound\\.anti:[0-9]+: overflow in /: left -32768, right -1"
+    ON)
+antic_check_test(overflow_negate_least "overflow in"
+    "overflow_negate_least\\.anti:[0-9]+: overflow in -: value -9223372036854775808"
+    ON)
+antic_check_test(overflow_negate_least_i8 "overflow in"
+    "overflow_negate_least_i8\\.anti:[0-9]+: overflow in -: value -128"
+    ON)
+# R032: `<<%` by a count below zero stops a dev build. A count at or
+# above the width gives 0 and is no failure.
+antic_check_test(shift_wrap_negative "shift count out of range"
+    "shift_wrap_negative\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 64"
+    ON)
+antic_check_test(shift_wrap_negative_compound "shift count out of range"
+    "shift_wrap_negative_compound\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 8"
+    ON)
+# R048: a value that does not fit the width of a bitfield stops a dev
+# build where it is stored, in a write, a compound assignment and a
+# literal.
+antic_check_test(bitfield_write "out of range"
+    "bitfield_write\\.anti:[0-9]+: value out of range for the 3 bits of a: value 13"
+    ON)
+antic_check_test(bitfield_write_signed "out of range"
+    "bitfield_write_signed\\.anti:[0-9]+: value out of range for the 3 bits of b: value -5"
+    ON)
+antic_check_test(bitfield_compound "out of range"
+    "bitfield_compound\\.anti:[0-9]+: value out of range for the 3 bits of a: value 8"
+    ON)
+antic_check_test(bitfield_literal "out of range"
+    "bitfield_literal\\.anti:[0-9]+: value out of range for the 20 bits of b: value 524288"
+    ON)
+antic_check_test(bitfield_class "out of range"
+    "bitfield_class\\.anti:[0-9]+: value out of range for the 9 bits of kind: value 512"
+    ON)
+# Decision 24 of "Decisions of 2026-10-11": a dev build checks the
+# bounds of `xs[lo..hi]` as it checks an index.
+antic_check_test(slice_range "out of bounds"
+    "slice_range\\.anti:[0-9]+: .*out of bounds.*length 3"
+    ON)
+# The same check on a slice of a slice, against the length of the
+# slice, and on bounds that give no slice: the low one above the high
+# one, and the low one below zero.
+antic_check_test(slice_of_slice_range "out of bounds"
+    "slice_of_slice_range\\.anti:[0-9]+: .*out of bounds.*length 2"
+    ON)
+antic_check_test(slice_range_reversed "out of bounds"
+    "slice_range_reversed\\.anti:[0-9]+: .*out of bounds"
+    ON)
+antic_check_test(slice_range_negative "out of bounds"
+    "slice_range_negative\\.anti:[0-9]+: .*out of bounds"
+    ON)
+antic_check_test(walk_changed "was changed while"
+    "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
+    ON DEV lang)
+antic_check_test(collection_changed "was changed while"
+    "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
+    ON DEV lang mem text collection)
+antic_check_test(list_changed "was changed while"
+    "list_changed\\.anti:12: `people` was changed while `for` walked it: changed at list_changed\\.anti:14"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(list_bounds "index out of bounds"
+    "\\.anti:[0-9]+: index out of bounds: index 5, length 4"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(grid_bounds "index out of bounds"
+    "\\.anti:[0-9]+: index out of bounds: index 3, length 3"
+    ON DEV lang mem text collection collection/grid)
+antic_check_test(sorted_changed "was changed while"
+    "sorted_changed\\.anti:13: `ages` was changed while `for` walked it: changed at sorted_changed\\.anti:15"
+    ON DEV lang mem text collection reflect collection/sorted)
+antic_check_test(map_changed "was changed while"
+    "map_changed\\.anti:12: `ages` was changed while `for` walked it: changed at map_changed\\.anti:14"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(set_changed "was changed while"
+    "set_changed\\.anti:12: `seen` was changed while `for` walked it: changed at set_changed\\.anti:13"
+    ON DEV lang mem text collection collection/map collection/set)
+# M304: `reserve` and `shrink` move the room a walk holds, and each
+# counts the move as a change of the collection.
+antic_check_test(list_reserve_changed "was changed while"
+    "list_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(list_shrink_changed "was changed while"
+    "list_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/list)
+antic_check_test(deque_reserve_changed "was changed while"
+    "deque_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/deque)
+antic_check_test(deque_shrink_changed "was changed while"
+    "deque_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/deque)
+antic_check_test(map_reserve_changed "was changed while"
+    "map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(map_shrink_changed "was changed while"
+    "map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(hash_map_reserve_changed "was changed while"
+    "hash_map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(hash_map_shrink_changed "was changed while"
+    "hash_map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map)
+antic_check_test(bitset_reserve_changed "was changed while"
+    "bitset_reserve_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map collection/set)
+antic_check_test(bitset_shrink_changed "was changed while"
+    "bitset_shrink_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection collection/map collection/set)
+antic_check_test(sorted_reserve_changed "was changed while"
+    "sorted_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_reserve_changed\\.anti:16"
+    ON DEV lang mem text collection reflect collection/sorted)
+antic_check_test(sorted_shrink_changed "was changed while"
+    "sorted_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_shrink_changed\\.anti:16"
+    ON DEV lang mem text collection reflect collection/sorted)
+add_test(NAME checks_override
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/traps"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks-override"
+        -P "${ANTIC_RUNNERS}/run_checks.cmake")
+
+# The debug information of -g, read by the debugger of the host: lldb on
+# macOS and gdb on Linux. A breakpoint by file and line in an imported
+# module and a backtrace of Anti function names.
+# A Windows link writes CodeView, which neither reads, so a Windows host
+# runs no test of them even where a gdb stands on its path. A host without
+# a debugger reports the test skipped and names the reason.
+find_program(ANTIC_LLDB NAMES lldb DOC "the debugger of macOS")
+find_program(ANTIC_GDB NAMES gdb DOC "the debugger of Linux")
+if(NOT ANTIC_HOST_OS STREQUAL "windows" AND NOT ANTIC_LLDB AND NOT ANTIC_GDB)
+    add_test(NAME debug_info
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "SKIP: neither lldb nor gdb is on the path")
+    set_tests_properties(debug_info PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+elseif(NOT ANTIC_HOST_OS STREQUAL "windows")
+    if(ANTIC_HOST_OS STREQUAL "macos" AND ANTIC_LLDB)
+        set(debugger "${ANTIC_LLDB}")
+        set(debugger_kind lldb)
+    elseif(ANTIC_GDB)
+        set(debugger "${ANTIC_GDB}")
+        set(debugger_kind gdb)
+    else()
+        set(debugger "${ANTIC_LLDB}")
+        set(debugger_kind lldb)
+    endif()
+    add_test(NAME debug_info
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/debug"
+            "-DDEBUGGER=${debugger}"
+            "-DKIND=${debugger_kind}"
+            "-DOBJECT=${anti_object}"
+            -P "${ANTIC_RUNNERS}/run_debug.cmake")
+endif()
+
+# A zero table traps with the name of the class.
+add_test(NAME trap_table
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/table.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${ANTIC_RUNNERS}/run_trap_table.cmake")
+
+# The programs of tests/traps that stop with the message of <name>.err.
+# parallel_size: the results of `parallel` take one value per chunk, and
+# a count of them that no size holds stops the program before a worker
+# runs. alloc_literal, alloc_construct and singleton_memory: out of memory
+# is fatal for `alloc T { }`, `alloc T(args)` and the first `get` of a
+# singleton, which stop with the failure routine instead of writing
+# through a null pointer. pattern_limit: a search with a pattern literal
+# that reaches the match limit stops with the pattern and the line.
+# pattern_group_count: a match whose `count` the program raised reads no
+# group past those of its pattern, and stops with the count of the
+# pattern. pattern_patch_into: a `patch` whose computed `into` names no
+# group of its pattern literal stops with the count of the pattern and the
+# `into`. chan_capacity: a channel made for no value stops the program.
+# send_closed and send_closed_waiting: a `send` on a closed channel stops
+# it, one that waits on a full channel included. take_in_refused,
+# error_text_refused and trace_names_refused: the text that `take_in`
+# makes, the text of an error and the names of a trace stop the program
+# when they find no memory, by decision 4 of "Decisions of 2026-10-11".
+# The room_ programs: a collection asked for room whose size no `int`
+# holds stops the program as memory that runs out, finding S316, in a
+# product, a sum, a doubling and a shift of the room of each collection.
+foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
+        singleton_memory pattern_limit pattern_group_count pattern_patch_into
+        chan_capacity
+        send_closed send_closed_waiting take_in_refused error_text_refused
+        trace_names_refused room_list room_list_reserve room_deque_reserve
+        room_grid room_map room_map_reserve room_hash_map room_sorted
+        room_pool room_pool_shift room_bitset)
+    add_test(NAME trap_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+            -P "${ANTIC_RUNNERS}/run_trap.cmake")
+endforeach()
+# The place_ programs: a place function of a collection given a place
+# that holds no element stops the program with `Error.fatal`, finding
+# S315, one program for each class that fills the functions.
+foreach(name IN ITEMS place_list place_list_next place_grid place_queue
+        place_map place_map_next place_hash_map place_bitset place_pool
+        place_tree place_sorted place_sorted_set)
+    add_test(NAME trap_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
+            "-DSTATUS=1"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+            -P "${ANTIC_RUNNERS}/run_trap.cmake")
+endforeach()
+# fatal_none: `catch fatal` on a `none` pointer runs the function of
+# `error.on_fatal`, prints the error and exits with 1, in release mode,
+# where the guard calls `Error.fatal` directly and ends with unreachable.
+add_test(NAME trap_fatal_none
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/fatal_none.anti"
+        "-DSTATUS=1"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${ANTIC_RUNNERS}/run_trap.cmake")
+
+# The size of a Mutex per target: four bytes on Linux and macOS, eight on
+# Windows.
+add_test(NAME mutex_size
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DOPT=${ANTIC_OPT}"
+        "-DLLC=${ANTIC_LLC}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/mutex_size.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mutex_size"
+        -P "${ANTIC_RUNNERS}/run_mutex_size.cmake")
+
+# Two threads that take two locks in opposite orders: a dev build reports
+# the conflict with its four sites, and a release build says nothing.
+add_test(NAME lock_order
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/lock_order.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        -P "${ANTIC_RUNNERS}/run_lock_order.cmake")
+set_tests_properties(lock_order PROPERTIES TIMEOUT 120)
+
+# The lock orders of one thread: lock_orders holds a pair in opposite
+# orders, a ring of three locks, a lock that `destroy` ended and the hidden
+# lock of an object that its thread takes again. lock_order_once holds the
+# two orders of a pair more than once, which a dev build reports once.
+# check_join_twice: a second `join` of one job that the checker cannot see
+# traps in a dev build, by decision 23 of "Decisions of 2026-10-11".
+# DESIGN: run_dev_report.cmake stops a program after ANTIC_REPORT_SECONDS,
+# so a program that hangs fails its test as an ordinary failure, which
+# WILL_FAIL of tests/known-failures.txt expects.
+set(ANTIC_REPORT_SECONDS 20)
+foreach(name IN ITEMS lock_orders lock_order_once)
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+            "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
+            -P "${ANTIC_RUNNERS}/run_dev_report.cmake")
+    set_tests_properties(${name} PROPERTIES TIMEOUT 120)
+endforeach()
+add_test(NAME check_join_twice
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/join_twice.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
+        "-DPATTERN=join_twice\\.anti:[0-9]+: .*join"
+        -P "${ANTIC_RUNNERS}/run_dev_report.cmake")
+set_tests_properties(check_join_twice PROPERTIES TIMEOUT 120)
+# check_sync_held: a `sync` on a Mutex that its thread holds already, which
+# the checker cannot see, traps in a dev build, by R093 of "Rules of
+# 2026-10-13". The release build waits for itself and is not run.
+add_test(NAME check_sync_held
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/sync_held.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
+        "-DPATTERN=anti: sync_held\\.anti:7 takes a Mutex that its thread holds since sync_held\\.anti:16"
+        -P "${ANTIC_RUNNERS}/run_dev_report.cmake")
+set_tests_properties(check_sync_held PROPERTIES TIMEOUT 120)
+
+# --memory-checks reports a read after free, a double free, a write past a
+# heap block and a leak on every host but windows-arm64, which has no
+# runtime of AddressSanitizer. Every host checks that windows-arm64
+# refuses the option.
+add_test(NAME memory_checks
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${ANTIC_RUNNERS}/run_memory_checks.cmake")
+set_tests_properties(memory_checks PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+# --memory-checks finds a pointer into a List kept across a push that grows
+# the list, as a read after free.
+add_test(NAME memory_checks_list
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${ANTIC_RUNNERS}/run_memory_checks_list.cmake")
+set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+# --memory-checks finds a read of a bitfield after free, as it finds the
+# read of a plain field.
+add_test(NAME memory_checks_bitfield
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_bitfield.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${ANTIC_RUNNERS}/run_memory_checks_bitfield.cmake")
+set_tests_properties(memory_checks_bitfield PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+# text.Builder appends in place while its room holds the bytes and the NUL.
+# Under --memory-checks a fresh block holds no zeros, so a missing NUL or a
+# write past the room fails here where a plain run passes by chance.
+if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    add_test(NAME std_builder_room_memory_checks
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/builder_room.anti"
+            "-DOPTIONS=--memory-checks"
+            "-DOBJECTS="
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
+            -P "${ANTIC_RUNNERS}/run_program.cmake")
+    set_tests_properties(std_builder_room_memory_checks PROPERTIES TIMEOUT 120)
+endif()
+# DESIGN: the runtime of AddressSanitizer for x86_64 stops under
+# qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
+# where it cannot intercept the heap functions. Rosetta runs it, and the
+# block of the emulated target registers the programs of macos-x86_64. On
+# linux-arm64 and windows-arm64 the three programs of --memory-checks are
+# therefore linked for the emulated target and not run, and each test
+# reports itself skipped with the reason. The runtimes of x86_64 last ran
+# on real x86_64 hardware on 2026-10-08, as
+# docs/reports/2026-10-08-llvm-closed.md reports.
+if(ANTIC_EMULATED_TARGET MATCHES "^(linux|windows)-x86_64$")
+    foreach(case "memory_checks,traps/memory_checks.anti"
+            "memory_checks_list,traps/memory_checks_list.anti"
+            "std_builder_room_memory_checks,std/builder_room.anti")
+        string(REPLACE "," ";" parts "${case}")
+        list(GET parts 0 name)
+        list(GET parts 1 source)
+        antic_program_test(${name}_${ANTIC_EMULATED_TARGET}
+            "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
+            OPTIONS "${ANTIC_X86_64_OPTIONS},--memory-checks"
+            SKIP_RUN "the AddressSanitizer runtime of x86_64 stops under emulation"
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/memory-checks-x86_64")
+        set_tests_properties(${name}_${ANTIC_EMULATED_TARGET} PROPERTIES
+            TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+endif()
+
+# A program of musl links mimalloc of the runtime archive as its C
+# allocator in every mode, and a program of --memory-checks does not.
+foreach(target linux-x86_64 linux-arm64)
+    add_test(NAME musl_allocator_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
+            "-DTARGET=${target}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/musl-allocator/${target}"
+            -P "${ANTIC_RUNNERS}/run_musl_allocator.cmake")
+    set_tests_properties(musl_allocator_${target} PROPERTIES TIMEOUT 120
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# A program of musl reads no MIMALLOC_* variable: run with two of them,
+# it prints what it prints without them. A Linux host runs the program of
+# its own target, and linux-arm64 the one of linux-x86_64 under qemu.
+foreach(target linux-x86_64 linux-arm64)
+    set(emulator "")
+    if(target STREQUAL ANTIC_EMULATED_TARGET)
+        set(emulator "${ANTIC_EMULATOR}")
+    endif()
+    add_test(NAME mimalloc_environment_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
+            "-DTARGET=${target}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DEMULATOR=${emulator}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mimalloc-environment/${target}"
+            -P "${ANTIC_RUNNERS}/run_mimalloc_environment.cmake")
+    set_tests_properties(mimalloc_environment_${target} PROPERTIES
+        TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# The ABI probe compares the layouts of C and antic on the host.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME abi_probe
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe"
+            "-DCC=${ANTIC_TEST_CC}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            -P "${ANTIC_RUNNERS}/run_probe.cmake")
+endif()
+
+# The same probe over the types of the area types of
+# docs/notes/test-matrix.md: packed and aligned types with fields at odd
+# offsets, unions, the tag and the union of a variant, an enum, an array
+# of arrays, an optional value, a tuple and a slice.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME abi_probe_types
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
+            "-DNAME=probe_types"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-types"
+            "-DCC=${ANTIC_TEST_CC}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            -P "${ANTIC_RUNNERS}/run_probe.cmake")
+    # run_probe.cmake reads the exit status of both probes.
+    add_test(NAME abi_probe_runner
+        COMMAND "${CMAKE_COMMAND}"
+            "-DRUNNER=${ANTIC_RUNNERS}/run_probe.cmake"
+            ${ANTIC_AND_RUNTIME}
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-runner"
+            "-DCC=${ANTIC_TEST_CC}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            -P "${ANTIC_RUNNERS}/run_probe_self.cmake")
+endif()
+
+# A linked program holds the licence notice of its packages.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME program_licenses
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/licenses.notice"
+            -P "${ANTIC_RUNNERS}/run_licenses.cmake")
+endif()
+
+# Stack traces and the origin of an error. A trace holds addresses that
+# differ from run to run, so run_trace.cmake matches the output against
+# patterns. Each case is a name, the source in tests/trace, the options of
+# antic and the arguments of the program. The pattern files of the output
+# and of the error output follow, then the exit status. A dev build links
+# the dev object of anti.lang. Release mode inlines small functions, as
+# the entry on inlined frames in docs/decisions.md says, so a release case
+# takes NAME.release.pattern where its trace names other frames than the
+# one of dev mode.
+set(TRACE "${CMAKE_CURRENT_SOURCE_DIR}/trace")
+foreach(case
+        "stack|stack_trace|||stack_trace.release.pattern||0"
+        "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
+        "stack_dev|stack_trace|--dev||stack_trace.pattern||0"
+        "forged|forged|||forged.pattern||0"
+        "copies|copies|||copies.release.pattern||0"
+        "copies_g|copies|-g||copies.release.pattern||0"
+        "copies_dev|copies|--dev||copies.pattern||0"
+        "origin|origin|||origin.pattern||0"
+        "origin_dev|origin|--dev||origin.trace.pattern||0"
+        "origin_option|origin||--anti.backtrace|origin.trace.pattern||0"
+        "origin_dev_off|origin|--dev|--anti.backtrace=false|origin.pattern||0"
+        "options|options||--anti.backtrace,plain,--anti.backtrace=false,last|options.pattern||0"
+        "options_unknown|options||--anti.nonsense|options.empty.pattern|options.unknown.pattern|70"
+        "options_value|options||--anti.backtrace=maybe|options.empty.pattern|options.value.pattern|70"
+        "handlers|handler_reports|--trace,--trace,writes||handler_reports.pattern|handler_reports.errors.pattern|0"
+        "start|start|--trace|--anti.trace=calls|start.pattern|start.errors.pattern|0"
+        "start_none|start|--trace||start.none.pattern||0")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 source)
+    list(GET parts 2 options)
+    list(GET parts 3 arguments)
+    list(GET parts 4 expected)
+    list(GET parts 5 errors)
+    list(GET parts 6 status)
+    set(error_patterns "")
+    if(NOT errors STREQUAL "")
+        set(error_patterns "-DERRORS=${TRACE}/${errors}")
+    endif()
+    set(std "")
+    if(options MATCHES "--dev")
+        set(std lang)
+    endif()
+    antic_dev_inputs(std_objects std_fixtures ${std})
+    list(JOIN std_objects "," std_objects)
+    add_test(NAME trace_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${TRACE}/${source}.anti"
+            "-DOPTIONS=${options}"
+            "-DARGS=${arguments}"
+            "-DEXPECTED=${TRACE}/${expected}"
+            ${error_patterns}
+            "-DSTD_OBJECTS=${std_objects}"
+            "-DSTATUS=${status}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/trace-${name}"
+            -P "${ANTIC_RUNNERS}/run_trace.cmake")
+    if(std_fixtures)
+        set_property(TEST trace_${name} PROPERTY
+            FIXTURES_REQUIRED ${std_fixtures})
+    endif()
+endforeach()
+
+# The runtime configuration: the options under --anti., the file that
+# --anti.conf, ANTI_CONF or rt.configure names, the includes of that file
+# and the file of the logger that the key `logger` names. A case is a name, the source in tests/conf, the options of antic
+# and the arguments of the program, then the pattern files of the output
+# and of the error output and the exit status. A pattern file NAME.pattern
+# has NAME.win32.pattern beside it where a Windows program prints `;`,
+# the separator of a list of directories there. The runner is the one of
+# the trace tests, because the layer of a key names an absolute path
+# that a comparison cannot hold.
+set(CONF "${CMAKE_CURRENT_SOURCE_DIR}/conf")
+foreach(case
+        "inspect_build|report||--anti.inspect|inspect.build.pattern||0"
+        "inspect_options|report||--anti.backtrace,--anti.hash_seed=42,--anti.logger=log.toml,--anti.plugins=a:b,--anti.threads=4,--anti.trace=leaks,--anti.inspect|inspect.options.pattern||0"
+        "inspect_file|report||--anti.conf=${CONF}/basic.toml,--anti.inspect|inspect.file.pattern||0"
+        "precedence|report||--anti.conf=${CONF}/basic.toml,--anti.threads=9,--anti.inspect|inspect.precedence.pattern||0"
+        "include|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
+        "array|report||--anti.conf=${CONF}/array.toml,--anti.inspect|inspect.array.pattern||0"
+        "environment|report||--anti.inspect|inspect.file.pattern||0"
+        "environment_option|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
+        "environment_long|report||--anti.inspect|empty.pattern|missing.pattern|70"
+        "environment_utf8|report||--anti.inspect|inspect.file.pattern||0"
+        "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"
+        "exit_status|status||4294967299|empty.pattern||3"
+        "help|report||--anti.help|help.pattern||0"
+        "help_value|report||--anti.help=x|empty.pattern|help-value.pattern|70"
+        "inspect_value|report||--anti.inspect=x|empty.pattern|inspect-value.pattern|70"
+        "configure|configure||${CONF}/backtrace.toml|configure.pattern||0"
+        "configure_dev|configure|--dev|${CONF}/no-backtrace.toml|configure.plain.pattern||0"
+        "configure_missing|configure||${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
+        "configure_nul|configure_nul||${CONF}/basic.toml|empty.pattern|configure-nul.pattern|70"
+        "configure_injections|configure||${CONF}/injection.toml|empty.pattern|configure-injections.pattern|70"
+        "configure_injections_include|configure||${CONF}/include-injection.toml|empty.pattern|configure-injections.pattern|70"
+        "file_missing|report||--anti.conf=${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
+        "include_missing|report||--anti.conf=${CONF}/missing.toml|empty.pattern|missing.pattern|70"
+        "include_cycle|report||--anti.conf=${CONF}/cycle.toml|empty.pattern|cycle.pattern|70"
+        "unknown_option|report||--anti.nonsense|empty.pattern|unknown-option.pattern|70"
+        "unknown_key|report||--anti.conf=${CONF}/unknown-key.toml|empty.pattern|unknown-key.pattern|70"
+        "bad_value|report||--anti.conf=${CONF}/bad-value.toml|empty.pattern|bad-value.pattern|70"
+        "nul_value|report||--anti.conf=${CONF}/nul-value.toml|empty.pattern|nul-value.pattern|70"
+        "not_toml|report||--anti.conf=${CONF}/not-toml.toml|empty.pattern|not-toml.pattern|70"
+        "cut_string|report||--anti.conf=${CONF}/cut.toml|empty.pattern|cut.pattern|70"
+        "open_table|report||--anti.conf=${CONF}/open-table.toml|empty.pattern|open-table.pattern|70"
+        "no_value|report||--anti.conf=${CONF}/no-value.toml|empty.pattern|no-value.pattern|70"
+        "include_not_toml|report||--anti.conf=${CONF}/include-not-toml.toml|empty.pattern|not-toml.pattern|70"
+        "configure_not_toml|configure||${CONF}/not-toml.toml|empty.pattern|not-toml.pattern|70"
+        "threads_range|report||--anti.conf=${CONF}/threads-range.toml|empty.pattern|threads-range.pattern|70"
+        "threads_option|report||--anti.threads=99999999999|empty.pattern|threads-option.pattern|70"
+        "threads_zero|report||--anti.threads=0|empty.pattern|threads-zero.pattern|70"
+        "injection|report||--anti.conf=${CONF}/injection.toml|empty.pattern|injection.pattern|70"
+        "inject_option|report||--anti.inject=anti.log.Logger=lib/x.so|empty.pattern|inject-option.pattern|70"
+        "hash_seed_option|seed||--anti.hash_seed=42|seed.fixed.pattern||0"
+        "hash_seed_file|seed||--anti.conf=${CONF}/seed.toml|seed.file.pattern||0"
+        "hash_seed_configure|seed||${CONF}/seed.toml|seed.configure.pattern||0"
+        "hash_seed_range|report||--anti.hash_seed=18446744073709551616|empty.pattern|seed-range.pattern|70"
+        "hash_seed_text|report||--anti.conf=${CONF}/seed-text.toml|empty.pattern|seed-text.pattern|70"
+        "logger_unknown_kind|logger||--anti.logger=${CONF}/logger-unknown.toml|logger-done.pattern|logger-unknown.pattern|0"
+        "logger_register|logger||--anti.logger=${CONF}/logger-first.toml,register|logger-first.pattern||0"
+        "logger_sinks|logger||--anti.logger=${CONF}/logger-sinks.toml,register|logger-sinks.pattern||0"
+        "logger_ninth_sink|logger||--anti.logger=${CONF}/logger-ninth.toml,register|logger-first.pattern|logger-ninth.errors.pattern|0"
+        "logger_unopened|logger||--anti.logger=${CONF}/logger-unopened.toml|logger-done.pattern|logger-unopened.pattern|0")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 source)
+    list(GET parts 2 options)
+    list(GET parts 3 arguments)
+    list(GET parts 4 expected)
+    list(GET parts 5 errors)
+    list(GET parts 6 status)
+    string(REGEX REPLACE "[.]pattern$" ".win32.pattern" win32 "${expected}")
+    if(ANTIC_HOST_OS STREQUAL "windows" AND EXISTS "${CONF}/${win32}")
+        set(expected "${win32}")
+    endif()
+    set(error_patterns "")
+    if(NOT errors STREQUAL "")
+        set(error_patterns "-DERRORS=${CONF}/${errors}")
+    endif()
+    # A dev build links the objects of the modules the program imports.
+    set(std "")
+    if(options MATCHES "--dev")
+        set(std lang runtime)
+    endif()
+    antic_dev_inputs(std_objects std_fixtures ${std})
+    list(JOIN std_objects "," std_objects)
+    add_test(NAME conf_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CONF}/${source}.anti"
+            "-DOPTIONS=${options}"
+            "-DARGS=${arguments}"
+            "-DEXPECTED=${CONF}/${expected}"
+            ${error_patterns}
+            "-DSTD_OBJECTS=${std_objects}"
+            "-DSTATUS=${status}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-${name}"
+            -P "${ANTIC_RUNNERS}/run_trace.cmake")
+    if(std_fixtures)
+        set_property(TEST conf_${name} PROPERTY
+            FIXTURES_REQUIRED ${std_fixtures})
+    endif()
+endforeach()
+
+# The runtime and `anti symbols` stop a chain of includes at one depth,
+# with one message.
+add_test(NAME conf_include_depth
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CONF}/report.anti"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-include-depth"
+        -P "${ANTIC_RUNNERS}/run_conf_include_depth.cmake")
+
+# The seed of the hashing collections without a fixed one: two runs of one
+# program choose two seeds.
+add_test(NAME conf_hash_seed_random
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CONF}/seed.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-hash_seed_random"
+        -P "${ANTIC_RUNNERS}/run_hash_seed.cmake")
+
+# Injection. The program of tests/inject names three interfaces and takes
+# a provider of each from --inject: the `get` of a singleton that
+# implements the interface, a module function, and the name of a
+# singleton that inherits the interface, whose `get` the provider is.
+# One field is called `alloc`, which the
+# example of the overview writes. `inject final` then refuses a
+# replacement at start, and --anti.inspect lists what it injects. The
+# program imports nothing, and the case plugin shows that its start opens
+# the library that --anti.inject names through the loader of the runtime,
+# which every program links, S328 of docs/audit/summary.md. The runner
+# is the one of the configuration tests, because a pattern file holds the
+# output of each.
+set(INJECT "${CMAKE_CURRENT_SOURCE_DIR}/inject")
+set(INJECT_OPTIONS "--inject,service.Logger=service.Console.get,--inject,service.Clock=service.the_clock,--inject,service.Allocator=service.Memory")
+foreach(case
+        "service|${INJECT_OPTIONS}||service.pattern||0"
+        "inspect|${INJECT_OPTIONS}|--anti.inspect|inspect.pattern||0"
+        "final|${INJECT_OPTIONS}|--anti.inject=service.Clock=lib/x.so|empty.pattern|final.pattern|70"
+        "unknown|${INJECT_OPTIONS}|--anti.inject=other.Thing=lib/x.so|empty.pattern|unknown.pattern|70"
+        "plugin|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so|empty.pattern|plugin.pattern|70")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 options)
+    list(GET parts 2 arguments)
+    list(GET parts 3 expected)
+    list(GET parts 4 errors)
+    list(GET parts 5 status)
+    set(error_patterns "")
+    if(NOT errors STREQUAL "")
+        set(error_patterns "-DERRORS=${INJECT}/${errors}")
+    endif()
+    add_test(NAME inject_${name}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${INJECT}/service.anti"
+            "-DOPTIONS=${options}"
+            "-DARGS=${arguments}"
+            "-DEXPECTED=${INJECT}/${expected}"
+            ${error_patterns}
+            "-DSTATUS=${status}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-${name}"
+            -P "${ANTIC_RUNNERS}/run_trace.cmake")
+endforeach()
+
+# The `[inject]` and `[inject.test]` tables of a manifest. `anti test`
+# runs in the project root, reads both and lays the test table over the
+# plain one, per interface. The one test of the module adds the label of
+# its logger to the reading of its clock. The test table names the
+# first provider and the plain table the second, so the sum says which
+# provider filled each field.
+foreach(mode dev release)
+    set(extra "")
+    if(mode STREQUAL "release")
+        set(extra --release)
+    endif()
+    add_expect_test(inject_manifest_${mode} STATUS 0
+        DIRECTORY "${INJECT}/project"
+        PATTERN "1 tests in 1 modules, 0 modules failed"
+        COMMAND "$<TARGET_FILE:anti>" test ${extra}
+                --work "${CMAKE_CURRENT_BINARY_DIR}/inject-manifest-${mode}"
+                -I src --runtime "${ANTIC_RUNTIME_DIR}"
+ src/com/example/app.anti)
+endforeach()
+
+# The six standard interfaces under `anti test`. The project names no
+# provider for the build, so the link takes the default of each, and
+# `[inject.test]` lays a fake over every one of them. The one test asks
+# each interface for a value no default gives.
+foreach(mode dev release)
+    set(extra "")
+    if(mode STREQUAL "release")
+        set(extra --release)
+    endif()
+    add_expect_test(inject_standard_${mode} STATUS 0
+        DIRECTORY "${INJECT}/standard"
+        PATTERN "1 tests in 1 modules, 0 modules failed"
+        COMMAND "$<TARGET_FILE:anti>" test ${extra}
+                --work "${CMAKE_CURRENT_BINARY_DIR}/inject-standard-${mode}"
+                -I src --runtime "${ANTIC_RUNTIME_DIR}"
+ src/com/example/standard.anti)
+endforeach()
+
+# Plugins. The library of tests/plugin is built with --lib shared
+# --no-runtime, so it carries no runtime and is bound against the host
+# that loads it. The host asks it for the interface, counts what it made
+# and closes it, and two programs take the provider of an injected field
+# from it, one by path and one through the index of its directory.
+#
+# DESIGN: a Linux host links dynamically against glibc, because it can
+# host a plugin, and a Windows plugin links against the import library of
+# its host. The test runs on all three systems.
+add_test(NAME plugin_host
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
+        "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin.cmake")
+
+# A plugin whose interface takes and gives every kind of value: the host
+# calls each function through the table of the interface, hands the
+# library a closure and an object of its own, and ends an object the
+# library made.
+add_test(NAME plugin_kinds
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-kinds"
+        "-DHOST=kinds_host"
+        "-DLIBRARY=busy"
+        "-DINTERFACE=kinds"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/kinds_host.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+
+# The objects of a library that `live` counts and `unload` waits for: a
+# local object of a class of the library is gone when its function
+# returns, with a `destruct` and without one. T092 of
+# docs/audit/tests-findings.md.
+add_test(NAME plugin_locals
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-locals"
+        "-DHOST=locals_host"
+        "-DLIBRARY=locals"
+        "-DINTERFACE=tasks"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/locals_host.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+
+# An unload while another thread runs the code of the library: while
+# `reflect.new` runs the `construct` of a class of the library, and while
+# `delete` runs the `destruct` of an object of it. Each is refused. S307
+# and S308 of docs/audit/summary.md.
+add_test(NAME plugin_stages
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-stages"
+        "-DHOST=stages_host"
+        "-DLIBRARY=stalls"
+        "-DINTERFACE=stages"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stages_host.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+
+# A trace whose innermost frame lies in a library, read again after the
+# unload of the library: its build id, the name of its function and the
+# text of the trace. S306 of docs/audit/summary.md.
+add_test(NAME plugin_trace
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-trace"
+        "-DHOST=trace_host"
+        "-DLIBRARY=tracer"
+        "-DINTERFACE=traced"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/trace_host.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+
+# A library that uses two modules of the standard library which its host
+# imports and does not use itself. The library resolves them against the
+# host. T093 of docs/audit/tests-findings.md.
+add_test(NAME plugin_unused
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-unused"
+        "-DHOST=stdlib_host"
+        "-DLIBRARY=stdlib"
+        "-DINTERFACE=tasks"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stdlib_host.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+# R133 of "Rules of 2026-10-13" in docs/decisions.md: a library that uses
+# two modules of the standard library which its host does not import fails
+# to load, and the host handles the failure. A Windows plugin links against
+# the import library of its host, where the same lack stops the link of
+# the library, so the test runs on the other hosts.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME plugin_module_not_imported
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-module-not-imported"
+            "-DHOST=bare_host"
+            "-DLIBRARY=stdlib"
+            "-DINTERFACE=tasks"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/bare_host.expected"
+            -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+endif()
+# R133 of "Rules of 2026-10-13": the message of such a load names the
+# module the host lacks. The library uses `anti.time` alone, which imports
+# nothing, so one module is missing on every host.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME plugin_module_named
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-module-named"
+            "-DHOST=named_host"
+            "-DLIBRARY=clock"
+            "-DINTERFACE=tasks"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/named_host.expected"
+            -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+endif()
+# A provided class that the loader cannot build without arguments: one
+# whose `construct` takes one, and one that holds such a class in a field
+# no default fills. `instance` gives `none` for each, and the link of the
+# library succeeds.
+foreach(library needy holder)
+    add_test(NAME plugin_refused_${library}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-refused-${library}"
+            "-DHOST=refused_host"
+            "-DLIBRARY=${library}"
+            "-DINTERFACE=tasks"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/refused_host.expected"
+            -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+endforeach()
+# The three checks of "Versions": the chain of the interface, the
+# fields it declares and the slots the program reaches through it.
+add_test(NAME plugin_versions
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions"
+        -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
+
+# ANTI_CONF names the file when the command line names none, and the
+# command line wins when both name one. It is the one environment
+# variable the runtime reads.
+set_tests_properties(conf_environment conf_environment_option PROPERTIES
+    ENVIRONMENT "ANTI_CONF=${CONF}/basic.toml")
+
+# A value past 1023 bytes, and a path outside ASCII, reach the runtime
+# whole on every system. The long one names a file that is not there, and
+# the other a copy of basic.toml in a directory whose name is not ASCII.
+string(REPEAT "long/" 220 conf_long)
+set_tests_properties(conf_environment_long PROPERTIES
+    ENVIRONMENT "ANTI_CONF=${CONF}/${conf_long}nowhere.toml")
+set(conf_utf8 "${CMAKE_CURRENT_BINARY_DIR}/conf-ü€")
+add_test(NAME conf_environment_utf8_file
+    COMMAND "${CMAKE_COMMAND}" -E copy "${CONF}/basic.toml"
+        "${conf_utf8}/basic.toml")
+set_tests_properties(conf_environment_utf8_file PROPERTIES
+    FIXTURES_SETUP conf_utf8)
+set_tests_properties(conf_environment_utf8 PROPERTIES
+    ENVIRONMENT "ANTI_CONF=${conf_utf8}/basic.toml"
+    FIXTURES_REQUIRED conf_utf8)
+
+# The readers of the symbol table and the line table, on the binaries
+# that this host links for the other targets.
+antic_rt_sources(probe_sources symbols)
+add_executable(symbols_probe unit/symbols_probe.c ${probe_sources})
+target_link_libraries(symbols_probe PRIVATE antic_core)
+target_include_directories(symbols_probe PRIVATE ../src/rt)
+antic_coverage(symbols_probe)
+foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
+    add_test(NAME trace_symbols_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DPROBE=$<TARGET_FILE:symbols_probe>"
+            "-DSOURCE=${TRACE}/symbols.anti"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-${target}"
+            -P "${ANTIC_RUNNERS}/run_symbols.cmake")
+    set_tests_properties(trace_symbols_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# read_build_id of tests/build_id.cmake refuses a file with no build line,
+# with two, or with an id that is not 64 digits.
+add_test(NAME build_id_reader
+    COMMAND "${CMAKE_COMMAND}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id-reader"
+        -P "${ANTIC_RUNNERS}/run_build_id_reader.cmake")
+# The build id in the notice is the digest of the code. Two builds of one
+# program carry the same id, and another program carries another. An
+# object that opens and fails to read is refused.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME program_build_id
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+            "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/args.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id"
+            -P "${ANTIC_RUNNERS}/run_build_id.cmake")
+endif()
+
+# A program that imports a standard library module carries the package of
+# the library, which is the reserved root anti.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME program_licenses_std
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/io.anti"
+            "-DWANTED=ANTI_LICENSES_BEGIN|build [0-9a-f]+|package anti.rt [0-9.]+ 0BSD|package anti [0-9.]+ 0BSD|package com.example.hello 2.0.0 MIT"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses-std"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
+            -P "${ANTIC_RUNNERS}/run_licenses.cmake")
+endif()
+
+# Libraries for C, built with antic --lib and used from C programs on the
+# host. Windows compiles the programs with the pinned clang against the
+# mingw-w64 sysroot of the runtime archive and links them with lld-link.
+
+# The text of a float takes no digit from the C library in any runtime of
+# the archive. std/float_text.anti holds the text itself.
+add_test(NAME float_digits
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/float_digits"
+        -P "${ANTIC_RUNNERS}/run_float_digits.cmake")
+foreach(case static shared exports two loader header bundle classes
+        failing tuples flags variants nested simd names handlers ledger
+        generics optional forms views never never_cpp ctypes
+        ctypes_shared ctypes_bundle tight tight_aligned)
+    # The C program of ledger starts its threads with pthreads.
+    if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
+        continue()
+    endif()
+    add_test(NAME clib_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib"
+            "-DCASE=${case}"
+            "-DCC=${ANTIC_TEST_CC}"
+            "-DCXX=${ANTIC_TEST_CXX}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            "-DTARGET=${ANTIC_HOST_TARGET}"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            -P "${ANTIC_RUNNERS}/run_clib.cmake")
+    set_tests_properties(clib_${case} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+# Two bundled libraries of each Windows target on every host. The pinned
+# clang compiles the C program for the target and lld-link links it, and
+# nothing runs.
+if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+    foreach(target windows-x86_64 windows-arm64)
+        if(target STREQUAL ANTIC_HOST_TARGET)
+            continue()
+        endif()
+        add_test(NAME clib_bundle_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_AR=${ANTIC_LLVM_AR}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+                "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
+                "-DCASE=bundle"
+                "-DCC=${CMAKE_C_COMPILER}"
+                "-DCXX=${CMAKE_C_COMPILER}"
+                "-DTARGET=${target}"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                -DCROSS=ON
+                -P "${ANTIC_RUNNERS}/run_clib.cmake")
+        set_tests_properties(clib_bundle_${target} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+endif()
+
+# A bundled library of each macOS target on every host. The pinned clang
+# compiles the C programs against the sysroot of the runtime archive and
+# ld64.lld links them, as antic links an Anti program. A Mac runs them,
+# the ones of macos-x86_64 under Rosetta at v1, and every other host
+# links them alone. clib_bundle_twice_<target> links two bundled libraries
+# into one program and expects the duplicate symbol of their markers.
+if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+    foreach(target macos-arm64 macos-x86_64)
+        set(cross ON)
+        set(options "")
+        if(target STREQUAL ANTIC_HOST_TARGET)
+            set(cross OFF)
+        elseif(target STREQUAL ANTIC_EMULATED_TARGET)
+            set(cross OFF)
+            set(options "--cpu|v1")
+        endif()
+        foreach(case bundle twice)
+            set(name clib_bundle_${target})
+            if(case STREQUAL "twice")
+                set(name clib_bundle_twice_${target})
+            endif()
+            add_test(NAME ${name}
+                COMMAND "${CMAKE_COMMAND}"
+                    "-DANTIC=$<TARGET_FILE:antic>"
+                    "-DLLVM_AR=${ANTIC_LLVM_AR}"
+                    "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                    "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+                    "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
+                    "-DCASE=${case}"
+                    "-DCC=${CMAKE_C_COMPILER}"
+                    "-DCXX=${CMAKE_C_COMPILER}"
+                    "-DTARGET=${target}"
+                    "-DOPTIONS=${options}"
+                    "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                    -DSYSROOT=ON
+                    -DCROSS=${cross}
+                    -P "${ANTIC_RUNNERS}/run_clib.cmake")
+            set_tests_properties(${name} PROPERTIES
+                SKIP_REGULAR_EXPRESSION "SKIP: ")
+        endforeach()
+    endforeach()
+endif()
+
+# The benchmarks of tests/bench: five Anti programs, each with a C twin
+# that the pinned clang compiles at -O2. They take seconds and their times
+# vary with the machine, so they stand outside the suite and outside the
+# default build. `cmake --build build/host --target bench` builds the C
+# twins, then run_bench.cmake compiles and runs every program and prints
+# the table into build/host/tests/bench.md as well.
+set(bench_programs scalar_loop objects builder simd_loop map_work)
+set(bench_executables "")
+foreach(name IN LISTS bench_programs)
+    add_executable(bench_${name} EXCLUDE_FROM_ALL bench/${name}.c)
+    if(MSVC)
+        target_compile_options(bench_${name} PRIVATE /O2)
+    else()
+        target_compile_options(bench_${name} PRIVATE -O2)
+    endif()
+    list(APPEND bench_executables bench_${name})
+endforeach()
+# The twin of map_work that reads its seed at run time, which run C of
+# tests/bench/ablate/run.py times beside the twin.
+add_executable(bench_map_work_rtseed EXCLUDE_FROM_ALL bench/map_work_rtseed.c)
+if(MSVC)
+    target_compile_options(bench_map_work_rtseed PRIVATE /O2)
+else()
+    target_compile_options(bench_map_work_rtseed PRIVATE -O2)
+endif()
+list(APPEND bench_executables bench_map_work_rtseed)
+# mixed_work of tests/bench/ablate, the program of condition C1 in
+# docs/work-order-llvm-optimization.md, has no C twin. run.py holds every
+# build to the line of its baseline, and this test holds the baseline to
+# the right line in release mode, so a fact that changes it fails the
+# suite and not only a measurement.
+antic_program_test(program_mixed_work
+    "${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate")
+# The same program through the LTO of lld in each mode of --lto, the step
+# runtime-lto of the work order. It imports six modules of the standard
+# library, so the runtime and the program meet in many places.
+foreach(mode full thin)
+    antic_program_test(program_mixed_work_lto_${mode}
+        "${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
+        OPTIONS --lto ${mode}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate_lto_${mode}")
+endforeach()
+# The same program built with --profile-generate, run, merged by
+# llvm-profdata and built again with --profile-use, the step pgo of the
+# work order. Each build takes the default LTO of a release build and
+# passes the test of the program.
+add_test(NAME profile_guided
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile_guided"
+        "-DREFUSALS=ON"
+        -P "${ANTIC_RUNNERS}/run_profile.cmake")
+set_tests_properties(profile_guided PROPERTIES TIMEOUT 300)
+# A program with a profile of its own run in each link of a release
+# build, for the host and for the target it emulates.
+set(profile_targets "${ANTIC_HOST_TARGET}")
+if(ANTIC_EMULATED_TARGET)
+    list(APPEND profile_targets "${ANTIC_EMULATED_TARGET}")
+endif()
+foreach(target IN LISTS profile_targets)
+    set(options "")
+    set(emulator "")
+    if(target STREQUAL ANTIC_EMULATED_TARGET)
+        set(options "${ANTIC_X86_64_OPTIONS}")
+        set(emulator "${ANTIC_EMULATOR}")
+    endif()
+    foreach(lto full thin none)
+        set(mode "${lto}")
+        if(lto STREQUAL "full")
+            set(mode "")
+        endif()
+        add_test(NAME profile_lto_${lto}_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                ${ANTIC_AND_RUNTIME}
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/loops.anti"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile-lto/${lto}-${target}"
+                "-DOPTIONS=${options}"
+                "-DEMULATOR=${emulator}"
+                "-DLTO=${mode}"
+                -P "${ANTIC_RUNNERS}/run_profile.cmake")
+        set_tests_properties(profile_lto_${lto}_${target} PROPERTIES
+            TIMEOUT 300)
+    endforeach()
+endforeach()
+add_custom_target(bench
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DOPT=${ANTIC_OPT}"
+        "-DLLC=${ANTIC_LLC}"
+        "-DBENCH=${CMAKE_CURRENT_SOURCE_DIR}/bench"
+        "-DC_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bench"
+        "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/bench.md"
+        -P "${ANTIC_RUNNERS}/run_bench.cmake"
+    DEPENDS antic anti_std ${bench_executables}
+    USES_TERMINAL
+    VERBATIM)
+
+# The matrix of constructs and contexts in tests/matrix, by decision 28 of
+# "Decisions of 2026-10-11" in docs/decisions.md. A file there registers
+# its tests by its name, and no list of this file names it.
+#   <name>.anti with <name>.expected is a program. It runs in dev mode, in
+#   release mode and with --memory-checks, as matrix_<name>_dev,
+#   matrix_<name>_release and matrix_<name>_memory_checks. Each compares
+#   the whole output with the one expected file, so the three agree.
+#   <name>.anti with <name>.err is a refusal, matrix_<name>_refused,
+#   through the runner of tests/errors: antic exits with 1 and prints the
+#   bytes of the .err file.
+# A <name>.args beside a program holds its arguments, as run_program.cmake
+# reads them. The test matrix_files refuses every other file.
+#
+# DESIGN: ctest counts a test that its own time limit stops as failed
+# whatever WILL_FAIL says, and a test that its runner fails as one that
+# WILL_FAIL expects. A matrix test may show a defect that keeps antic or
+# the program running, and tests/known-failures.txt must be able to list
+# it. The runner therefore stops antic and the program after
+# ANTIC_MATRIX_SECONDS each, and the limit of ctest stands above the two.
+set(ANTIC_MATRIX_SECONDS 60)
+math(EXPR matrix_program_limit "2 * ${ANTIC_MATRIX_SECONDS} + 30")
+math(EXPR matrix_refusal_limit "${ANTIC_MATRIX_SECONDS} + 30")
+
+set(MATRIX_WORK "${CMAKE_CURRENT_BINARY_DIR}/matrix")
+file(MAKE_DIRECTORY "${MATRIX_WORK}/refused")
+
+# Set out to the modules of the standard library whose dev objects a dev
+# build of source links: every module under `anti.` that source imports and
+# every module those import, each by its path under std/anti/.
+function(antic_dev_imports out source)
+    set(modules "")
+    set(pending "${source}")
+    while(pending)
+        list(POP_FRONT pending file)
+        file(STRINGS "${file}" imports REGEX "^import anti\\.")
+        foreach(line IN LISTS imports)
+            string(REGEX MATCH "^import anti((\\.[a-z0-9_]+)+)" found "${line}")
+            string(SUBSTRING "${CMAKE_MATCH_1}" 1 -1 module)
+            string(REPLACE "." "/" module "${module}")
+            if(module IN_LIST modules)
+                continue()
+            endif()
+            set(module_source "${PROJECT_SOURCE_DIR}/src/std/anti/${module}.anti")
+            if(NOT EXISTS "${module_source}")
+                message(FATAL_ERROR "${file} imports `${found}`, and "
+                                    "${module_source} does not exist")
+            endif()
+            list(APPEND modules "${module}")
+            list(APPEND pending "${module_source}")
+        endforeach()
+    endwhile()
+    set(${out} "${modules}" PARENT_SCOPE)
+endfunction()
+
+# The three tests of the program tests/matrix/<name>.anti.
+# DESIGN: the dev build links the dev object of every module of the
+# standard library the program imports, which antic_dev_imports reads from
+# the source when the tree is configured. The source is therefore an input
+# of the configure step, and a new import configures the tree again.
+function(antic_matrix_program name)
+    set(source "${MATRIX}/${name}.anti")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
+    antic_dev_imports(modules "${source}")
+    foreach(module IN LISTS modules)
+        antic_dev_object(${module})
+    endforeach()
+    antic_program_test(matrix_${name}_dev "${source}"
+        OPTIONS --dev
+        DEV ${modules}
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        WORK "${MATRIX_WORK}/dev")
+    antic_program_test(matrix_${name}_release "${source}"
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        WORK "${MATRIX_WORK}/release")
+    antic_program_test(matrix_${name}_memory_checks "${source}"
+        OPTIONS --memory-checks
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        WORK "${MATRIX_WORK}/memory-checks")
+    set_tests_properties(matrix_${name}_dev matrix_${name}_release
+        matrix_${name}_memory_checks PROPERTIES TIMEOUT ${matrix_program_limit})
+    # windows-arm64 has no runtime of AddressSanitizer and refuses the
+    # option, which the test memory_checks holds. The test stays
+    # registered there, so a line of tests/known-failures.txt names a test
+    # on every host.
+    if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+        set_tests_properties(matrix_${name}_memory_checks PROPERTIES
+            DISABLED TRUE)
+    endif()
+endfunction()
+
+# The refusal of tests/matrix/<name>.anti. A message names the file alone,
+# so antic runs in the directory of the program, and it runs the whole
+# build, so a refusal of any pass counts.
+function(antic_matrix_refusal name)
+    add_expect_test(matrix_${name}_refused STATUS 1
+        TIMEOUT ${ANTIC_MATRIX_SECONDS}
+        DIRECTORY "${MATRIX}"
+        EXPECTED "${MATRIX}/${name}.err"
+        COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${MATRIX_WORK}/refused/${name}" "${name}.anti")
+    set_tests_properties(matrix_${name}_refused PROPERTIES
+        TIMEOUT ${matrix_refusal_limit})
+endfunction()
+
+file(GLOB matrix_sources CONFIGURE_DEPENDS "${MATRIX}/*.anti")
+# The expected files decide what a source registers, so a new one
+# configures the tree again as a new source does.
+file(GLOB matrix_results CONFIGURE_DEPENDS "${MATRIX}/*.expected"
+     "${MATRIX}/*.err")
+foreach(source IN LISTS matrix_sources)
+    get_filename_component(name "${source}" NAME_WE)
+    set(expected "${MATRIX}/${name}.expected")
+    set(refused "${MATRIX}/${name}.err")
+    if(expected IN_LIST matrix_results AND NOT refused IN_LIST matrix_results)
+        antic_matrix_program(${name})
+    elseif(refused IN_LIST matrix_results AND NOT expected IN_LIST matrix_results)
+        antic_matrix_refusal(${name})
+    endif()
+endforeach()
+# R050 of "Rules of 2026-10-13": the Universal C Runtime has no memory above
+# the alignment of malloc that `free` releases, so `alloc(T, n)` of a type
+# aligned above 16 stands at 16 on a Windows host. The entry on R050 under
+# "What the rules run added" in docs/decisions.md holds it. The tests stay
+# registered there, as the tests of --memory-checks do on windows-arm64.
+if(ANTIC_HOST_OS STREQUAL "windows")
+    set_tests_properties(matrix_types_alloc_of_a_type_aligned_above_16_dev
+        matrix_types_alloc_of_a_type_aligned_above_16_release
+        matrix_types_alloc_of_a_type_aligned_above_16_memory_checks
+        PROPERTIES DISABLED TRUE)
+endif()
+# Programs of the classes area once more under an option that takes a part
+# of the class away. --no-reflect drops the field lists, and the default
+# `equals` and `hash`, `is`, `as` and `dup` give what they give with them.
+# --no-hooks drops the hook sites, and `construct` and `destruct` run as
+# they run with them. Each takes the expected output of its matrix tests.
+foreach(name equality field_kinds conversions copies
+        call_through_a_function_field)
+    antic_program_test(matrix_classes_${name}_no_reflect
+        "${MATRIX}/classes_${name}.anti"
+        OPTIONS "--no-reflect"
+        WORK "${MATRIX_WORK}/no-reflect")
+endforeach()
+foreach(name objects construct_order)
+    antic_program_test(matrix_classes_${name}_no_hooks
+        "${MATRIX}/classes_${name}.anti"
+        OPTIONS "--no-hooks"
+        WORK "${MATRIX_WORK}/no-hooks")
+endforeach()
+# The `changed` hook of the first and the second field of a class and of
+# its base, under --trace writes. The matrix runs the program without the
+# option, where it prints no line of the hook, so this case has an expected
+# file of its own beside those of hook_trace.
+antic_program_test(matrix_classes_changed_hook_of_the_second_field_trace_writes
+    "${MATRIX}/classes_changed_hook_of_the_second_field.anti"
+    OPTIONS "--trace,--trace,writes"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_fields.writes.expected"
+    WORK "${MATRIX_WORK}/trace-writes")
+# A write to a bitfield of a traced class calls `changed` with the record
+# of the bitfield under --trace writes. T114 of
+# docs/audit/tests-findings.md.
+antic_program_test(matrix_classes_changed_hook_of_a_bitfield_trace_writes
+    "${MATRIX}/classes_changed_hook_of_a_bitfield.anti"
+    OPTIONS "--trace,--trace,writes"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_bitfield.writes.expected"
+    WORK "${MATRIX_WORK}/trace-writes-bitfield")
+# A write to a `transient` field of a traced class calls no `changed`,
+# since the field list of its descriptor holds no record of the field. The
+# write to the field before it calls the hook.
+antic_program_test(matrix_classes_changed_hook_of_a_transient_field_trace_writes
+    "${MATRIX}/classes_changed_hook_of_a_transient_field.anti"
+    OPTIONS "--trace,--trace,writes"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_transient.writes.expected"
+    WORK "${MATRIX_WORK}/trace-writes-transient")
+# `join` of a job without a result and `join_all` call the runtime without
+# the `joined` hook under --no-hooks.
+antic_program_test(matrix_threads_jobs_no_hooks
+    "${MATRIX}/threads_jobs.anti"
+    OPTIONS "--no-hooks"
+    WORK "${MATRIX_WORK}/no-hooks")
+
+# Programs of more than one module, the library files and the refusals
+# at the boundary of a module.
 
 # The runtime's module path belongs to no compilation, the anti root needs
 # --anti-internal for a library, and a library path of one segment warns.
@@ -3421,778 +2973,7 @@ add_expect_test(error_regex_damaged STATUS 1
             -I "${CMAKE_CURRENT_BINARY_DIR}/damaged" regex_damaged.anti)
 set_tests_properties(error_regex_damaged PROPERTIES
     FIXTURES_REQUIRED regex_damaged)
-# A call the checker writes against a library of the language that lacks
-# what the call names, as an older library file would. A test without a
-# tree reads the library of regex_damaged, and every other one the library
-# of its own tree under tests/modules.
-#   <program>|<tree>|<module>
-foreach(case
-        "lang_error_maker|lang_code_alone|lang"
-        "lang_error_origin|lang_no_origin|lang"
-        "lang_trace_capture|lang_no_capture|lang"
-        "regex_find_all_damaged||"
-        "regex_group_older||"
-        "regex_older||"
-        "regex_patch_bytes_older||"
-        "regex_patch_older||"
-        "regex_split_damaged||"
-        "text_builder_older|text_older|text"
-        "text_equal_older|text_older|text"
-        "text_to_bytes_older|text_older|text")
-    string(REPLACE "|" ";" parts "${case}")
-    list(GET parts 0 name)
-    list(GET parts 1 tree)
-    list(GET parts 2 module)
-    set(root "${CMAKE_CURRENT_BINARY_DIR}/damaged")
-    set(fixture regex_damaged)
-    if(tree)
-        set(root "${CMAKE_CURRENT_BINARY_DIR}/older/${tree}")
-        set(fixture ${tree}_antl)
-        if(NOT TEST antl_${tree})
-            file(MAKE_DIRECTORY "${root}/anti")
-            add_test(NAME antl_${tree}
-                COMMAND antic -c --anti-internal
-                        -I "${CMAKE_CURRENT_SOURCE_DIR}/modules/${tree}"
-                        -o "${root}/anti/${module}.antl"
-                        "${CMAKE_CURRENT_SOURCE_DIR}/modules/${tree}/anti/${module}.anti")
-            set_tests_properties(antl_${tree} PROPERTIES
-                FIXTURES_SETUP ${fixture})
-        endif()
-    endif()
-    add_expect_test(error_${name} STATUS 1
-        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
-        COMMAND "$<TARGET_FILE:antic>" --front-end
-                --runtime "${ANTIC_RUNTIME_DIR}" -I "${root}" ${name}.anti)
-    set_tests_properties(error_${name} PROPERTIES
-        FIXTURES_REQUIRED ${fixture})
-endforeach()
-# A group of `patch` is compared as the u64 its literal holds.
-add_expect_test(error_patch_group_wide STATUS 1
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/patch_group_wide.err"
-    COMMAND "$<TARGET_FILE:antic>" --front-end --runtime "${ANTIC_RUNTIME_DIR}"
-            patch_group_wide.anti)
 
-# A `may fail` function without a `fail` and without a `try` is a warning,
-# not an error, because an interface function may fail in one
-# implementation and not in another. A dev build prints it and carries on.
-add_expect_test(warning_never_fails STATUS 0
-    PATTERN "never_fails.anti:3:21: warning: `close_it` may fail and never does \\[never-fails\\]"
-    COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}" --dev -S
-            -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.anti")
-
-# A release build accepts no warning, and --warnings-as-errors gives a dev
-# build the same behaviour. The warning is then an error with its name.
-foreach(mode "release|-S" "strict|--dev,--warnings-as-errors,-S")
-    string(REPLACE "|" ";" parts "${mode}")
-    list(GET parts 0 name)
-    list(GET parts 1 flags)
-    string(REPLACE "," ";" flags "${flags}")
-    add_expect_test(error_never_fails_${name} STATUS 1
-        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.err"
-        COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}" ${flags}
-                -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails_${name}.s"
-                never_fails.anti)
-endforeach()
-
-# `allow` at every level silences its warning, so a release build and a
-# build of the `tests` block both accept the program without a word.
-foreach(mode "release|-S" "tests|--tests,--dev,-S")
-    string(REPLACE "|" ";" parts "${mode}")
-    list(GET parts 0 name)
-    list(GET parts 1 flags)
-    string(REPLACE "," ";" flags "${flags}")
-    add_test(NAME silent_allow_levels_${name}
-        COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" ${flags}
-                -o "${CMAKE_CURRENT_BINARY_DIR}/allow_levels_${name}.s"
-                "${CMAKE_CURRENT_SOURCE_DIR}/errors/allow_levels.anti")
-    set_tests_properties(silent_allow_levels_${name} PROPERTIES
-        FAIL_REGULAR_EXPRESSION "warning|error")
-endforeach()
-
-# The warnings antic prints for a program of tests/errors/ it accepts,
-# through run_warnings.cmake. command holds the arguments of antic,
-# separated by commas. needles holds the messages it must print, and the
-# optional fourth argument those it must not, each separated by
-# semicolons. Without the fourth, ABSENT is empty.
-#   antic_warnings_test(<name> <command> <needles> [<absent>])
-function(antic_warnings_test name command needles)
-    set(absent "")
-    if(ARGC GREATER 3)
-        set(absent "${ARGV3}")
-    endif()
-    add_test(NAME ${name}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-            "-DCOMMAND=${command}"
-            "-DNEEDLES=${needles}"
-            "-DABSENT=${absent}"
-            -P "${ANTIC_RUNNERS}/run_warnings.cmake")
-endfunction()
-
-# A clause that silences nothing is a warning, which a dev build prints and
-# carries on. The listing `allow_unused` holds the release build, which
-# refuses each. A clause of a doc warning waits for --doc-warnings.
-antic_warnings_test(warning_unused_clauses
-    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused.s,allow_unused.anti"
-    "allow_unused.anti:8:1: warning: `allow(assert-call)` silences nothing [unused-allow];allow_unused.anti:16:19: warning: `unchecked(unguarded-field)` overrules nothing [unused-unchecked];allow_unused.anti:34:2: warning: `allow(shadowed-catch)` silences nothing [unused-allow]"
-    "allow(undocumented)")
-antic_warnings_test(warning_unused_doc_clause
-    "--runtime,${ANTIC_RUNTIME_DIR},--dev,--doc-warnings,--warn-undocumented,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_doc.s,allow_unused.anti"
-    "allow_unused.anti:10:1: warning: `allow(undocumented)` silences nothing [unused-allow]")
-
-# Every name of the compiler's table stands in docs/notes/warnings.md with
-# its meaning and its fix, and the note names nothing else.
-add_test(NAME warning_names
-    COMMAND "${CMAKE_COMMAND}"
-        "-DTABLE=${CMAKE_SOURCE_DIR}/src/antic/warnings.c"
-        "-DNOTE=${CMAKE_SOURCE_DIR}/docs/notes/warnings.md"
-        -P "${ANTIC_RUNNERS}/run_warning_names.cmake")
-
-# Doc warnings come only with --doc-warnings, which anti check passes.
-add_expect_test(warning_note STATUS 0
-    PATTERN "note.anti:2:8: warning: the pub item `warm` has a `//#` note and no `///` comment"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S
-            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/note.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
-add_test(NAME silent_note
-    COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/note_silent.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
-set_tests_properties(silent_note PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
-
-add_expect_test(warning_dropped STATUS 0
-    PATTERN "dropped.anti:3:2: warning: the `/\\*\\*` comment is dropped, because no item or field follows it"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S
-            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/dropped.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
-# A `//#!` note that stands in a function is dropped like a doc comment.
-add_expect_test(warning_dropped_module_note STATUS 0
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped_module_note.err"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
-            dropped_module_note.anti)
-# The note of a variant case and the comments of the fields of a case are
-# checked as every other comment is.
-add_expect_test(warning_variant_case_comments STATUS 0
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/variant_case_comments.err"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
-            variant_case_comments.anti)
-add_test(NAME silent_dropped
-    COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/dropped_silent.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
-set_tests_properties(silent_dropped PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
-
-# A doc comment names each type the compiler declares in `anti.lang`
-# without a warning.
-add_test(NAME silent_doc_declared
-    COMMAND antic --doc-warnings -S
-            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_declared.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_declared.anti")
-set_tests_properties(silent_doc_declared PROPERTIES
-    FAIL_REGULAR_EXPRESSION "warning")
-
-# A doc comment names an alias, a module path, a case and a field of a case
-# without a warning, and a star or a `<` that opens no markup gets none.
-add_expect_test(silent_doc_names STATUS 0
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    PATTERN "^$"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
-            --runtime "${ANTIC_RUNTIME_DIR}" doc_names.anti)
-# The whole path of the one module a file imports. No other import stands
-# before it whose first part answers for the name.
-add_expect_test(silent_doc_whole_path STATUS 0
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    PATTERN "^$"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
-            --runtime "${ANTIC_RUNTIME_DIR}" doc_whole_path.anti)
-add_expect_test(silent_doc_plain_marks STATUS 0
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    PATTERN "^$"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
-            doc_plain_marks.anti)
-# Emphasis before each character that may follow it, and the two forms of
-# an HTML tag that hold a `/`.
-add_expect_test(warning_doc_emphasis_closers STATUS 0
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_emphasis_closers.err"
-    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
-            doc_emphasis_closers.anti)
-
-# A doc comment inside `{ }` of `f"..."` is dropped with a warning, as one
-# inside any other expression is.
-antic_warnings_test(warning_format_doc
-    "--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/format_doc.s,format_doc.anti"
-    "format_doc.anti:10:15: warning: the `///` comment is dropped, because no item or field follows it [doc-dropped];format_doc.anti:12:13: warning: the `/**` comment is dropped, because no item or field follows it [doc-dropped]")
-
-# A doc comment names the functions of a class of a library without a
-# warning, as it names those of a struct.
-add_test(NAME silent_doc_library_class
-    COMMAND antic --doc-warnings --runtime "${ANTIC_RUNTIME_DIR}" -S
-            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_library_class.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_library_class.anti")
-set_tests_properties(silent_doc_library_class PROPERTIES
-    FAIL_REGULAR_EXPRESSION "warning")
-
-# `catch e` shadowing a name of an outer scope is a warning. The three
-# forms that bind a name each report it, and a handler whose name is free
-# reports nothing.
-antic_warnings_test(warning_catch_shadow
-    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/catch_shadow.s,catch_shadow.anti"
-    "catch_shadow.anti:22:25: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:26:21: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:31:10: warning: `e` shadows the outer `e` [shadowed-catch]")
-add_test(NAME silent_catch_no_shadow
-    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
-            -o "${CMAKE_CURRENT_BINARY_DIR}/catch_exits.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/catch_exits.anti")
-set_tests_properties(silent_catch_no_shadow PROPERTIES
-    FAIL_REGULAR_EXPRESSION "shadows")
-
-# Markup outside the doc subset, a backtick name that resolves nowhere
-# and, with --warn-undocumented, a `pub` item without a `///` comment.
-# Every one of them comes with --doc-warnings and with nothing else.
-set(MARKUP "the doc comment")
-antic_warnings_test(warning_doc_markup
-    "--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_markup.s,doc_markup.anti"
-    "doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:6:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:27:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
-    "${MARKUP} of `plus` holds;in ${MARKUP} of `plus` resolves;has no `///` comment")
-antic_warnings_test(warning_undocumented
-    "--doc-warnings,--warn-undocumented,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_undocumented.s,doc_markup.anti"
-    "warning: the pub item `undocumented` has no `///` comment"
-    "the pub item `plus` has no;the pub item `heads` has no")
-add_test(NAME silent_doc_markup
-    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
-            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_markup_silent.s"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_markup.anti")
-set_tests_properties(silent_doc_markup PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
-
-# The front end alone, which `anti check` runs on every source. It writes
-# no assembly, no object and no library file.
-add_test(NAME front_end_only
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DGOOD=${CMAKE_CURRENT_SOURCE_DIR}/programs/catch_exits.anti"
-        "-DBAD=${CMAKE_CURRENT_SOURCE_DIR}/errors/errors.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/front-end"
-        -P "${ANTIC_RUNNERS}/run_front_end.cmake")
-
-# Every example of the syntax overview passes the front end, apart from a
-# block marked as not built.
-add_test(NAME overview_examples
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/anti-syntax-overview.md"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/overview"
-        -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
-
-# Every page of the developer's guide, through the same runner and its
-# marks: every `anti` block compiles, a program prints its `text output`
-# block, a `refused` block fails with the error it names, and an `llvm`
-# or `asm` excerpt stands in what antic writes for the block it names.
-add_test(NAME guide_examples
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/site/developers-guide"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/guide"
-        "-DLLVM_OPT=${ANTIC_OPT}"
-        "-DLLVM_MC=${ANTIC_LLVM_MC}"
-        "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
-
-# The site page of the build tool names the commands of anti and the
-# options of anti and antic as their usage gives them (M363).
-add_test(NAME build_tool_page
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DPAGE=${PROJECT_SOURCE_DIR}/docs/site/build-tool/index.md"
-        -P "${ANTIC_RUNNERS}/run_build_tool_page.cmake")
-
-add_expect_test(warning_one_segment STATUS 0
-    PATTERN "geometry.anti:1:1: warning: the module path `geometry` has one segment, which is for a program's own files \\[single-segment-path\\]"
-    COMMAND "$<TARGET_FILE:antic>" -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"
-            "${CMAKE_CURRENT_SOURCE_DIR}/errors/geometry.anti")
-
-add_expect_test(error_no_main STATUS 1
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/no_main.err"
-    COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/no_main" no_main.anti)
-
-# lld links a program for every target on this host. The test of a
-# target without a sysroot in the runtime archive is skipped. The second
-# program holds an aggregate constant with an address in it, which lands
-# in the section each format keeps for data the loader writes.
-foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
-        "macos-x86_64|mach-o 64-bit x86-64" "macos-arm64|mach-o arm64"
-        "windows-x86_64|coff-x86-64" "windows-arm64|coff-arm64")
-    string(REPLACE "|" ";" parts "${case}")
-    list(GET parts 0 target)
-    list(GET parts 1 format)
-    foreach(program return42 const_data)
-        set(suffix "")
-        if(NOT program STREQUAL "return42")
-            set(suffix "_${program}")
-        endif()
-        add_test(NAME cross_link_${target}${suffix}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${program}.anti"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cross"
-                "-DTARGET=${target}"
-                "-DFORMAT=${format}"
-                -P "${ANTIC_RUNNERS}/run_cross_link.cmake")
-        set_tests_properties(cross_link_${target}${suffix} PROPERTIES
-            SKIP_REGULAR_EXPRESSION "SKIP: ")
-    endforeach()
-    # The step runtime-lto of docs/work-order-llvm-optimization.md: lld
-    # links the bitcode of the program with the runtime as bitcode of
-    # each mode for every target.
-    foreach(mode full thin)
-        add_test(NAME cross_link_lto_${mode}_${target}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cross-lto-${mode}"
-                "-DTARGET=${target}"
-                "-DFORMAT=${format}"
-                "-DOPTIONS=--lto,${mode}"
-                -P "${ANTIC_RUNNERS}/run_cross_link.cmake")
-        set_tests_properties(cross_link_lto_${mode}_${target} PROPERTIES
-            SKIP_REGULAR_EXPRESSION "SKIP: ")
-    endforeach()
-endforeach()
-
-# Every link drops the code a program never calls. A hello-world program
-# calls anti_rt_write of src/rt/io.c and never anti_rt_exit of the same
-# file, so the second must be gone from the executable of every target.
-foreach(target IN LISTS ANTIC_TARGETS)
-    add_test(NAME dead_code_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dead-code"
-            "-DTARGET=${target}"
-            "-DKEPT=anti_rt_write"
-            "-DDROPPED=anti_rt_exit"
-            -P "${ANTIC_RUNNERS}/run_dead_code.cmake")
-    set_tests_properties(dead_code_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# Two functions and two descriptors whose contents could be folded keep
-# addresses of their own in a release program of every target, in the
-# default LTO link and in the object link of --lto none.
-set(distinct_source "${CMAKE_CURRENT_SOURCE_DIR}/link-identity/distinct.anti")
-foreach(target IN LISTS ANTIC_TARGETS)
-    foreach(lto full none)
-        if(lto STREQUAL "full")
-            set(name distinct_addresses_${target})
-        else()
-            set(name distinct_addresses_lto_${lto}_${target})
-        endif()
-        add_test(NAME ${name}
-            COMMAND "${CMAKE_COMMAND}"
-                ${ANTIC_AND_RUNTIME}
-                "-DSOURCE=${distinct_source}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/distinct-addresses/${lto}"
-                "-DTARGET=${target}"
-                "-DLTO=${lto}"
-                "-DROOT=${CMAKE_SOURCE_DIR}"
-                -P "${ANTIC_RUNNERS}/run_distinct_addresses.cmake")
-        set_tests_properties(${name} PROPERTIES
-            SKIP_REGULAR_EXPRESSION "SKIP: ")
-    endforeach()
-endforeach()
-
-# Every object of a program and of its runtime carries the
-# address-significance table that the safe folding of lld reads.
-foreach(target IN LISTS ANTIC_TARGETS)
-    add_test(NAME address_tables_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DSOURCE=${distinct_source}"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/address-tables/${target}"
-            -P "${ANTIC_RUNNERS}/run_address_tables.cmake")
-    set_tests_properties(address_tables_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# A windows-x86_64 program holds no 32-bit absolute address, and runs on a
-# Windows host.
-add_test(NAME windows_addresses
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/windows-addresses"
-        "-DROOT=${CMAKE_SOURCE_DIR}"
-        -P "${ANTIC_RUNNERS}/run_windows_addresses.cmake")
-set_tests_properties(windows_addresses PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# A release build links the runtime as bitcode through full LTO unless it
-# is told otherwise or cannot.
-add_test(NAME lto_default
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-        "-DHOSTING=${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/lto-default"
-        -P "${ANTIC_RUNNERS}/run_lto_default.cmake")
-
-# --lto takes one of its two modes, and links a program in release mode
-# alone. A runtime archive without the runtime as bitcode of the mode is
-# refused before anything compiles.
-add_expect_test(lto_mode STATUS 2
-    PATTERN "^antic: --lto takes full, thin or none, not fast"
-    COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
-            --lto fast -o "${CMAKE_CURRENT_BINARY_DIR}/lto_mode"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-foreach(case "dev|--dev" "assembly|-S" "library|-c" "lib|--lib|static"
-        "platform|--linker|platform")
-    string(REPLACE "|" ";" parts "${case}")
-    list(POP_FRONT parts what)
-    add_expect_test(lto_refused_${what} STATUS 2
-        PATTERN "^antic: --lto links a program in release mode, without --dev, -S, -c, --lib or --linker platform"
-        COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
-                --lto full ${parts}
-                -o "${CMAKE_CURRENT_BINARY_DIR}/lto_refused_${what}"
-                "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-endforeach()
-# The .def file of a Windows program that hosts plugins lists the COFF
-# symbols of its object, which --lto makes bitcode.
-if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
-    add_expect_test(lto_refused_windows_host STATUS 1
-        PATTERN "^antic: --lto links no Windows program that hosts plugins"
-        COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
-                --target windows-x86_64 --lto full
-                -o "${CMAKE_CURRENT_BINARY_DIR}/lto_refused_windows_host.exe"
-                "${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti")
-endif()
-# `anti build` and `anti run` pass --lto to the one antic call of release
-# mode, so the option needs --release and a program.
-add_expect_test(anti_lto_word STATUS 2
-    PATTERN "^anti: --lto takes full, thin or none, not fast"
-    COMMAND $<TARGET_FILE:anti> build --release --lto fast)
-add_expect_test(anti_lto_dev STATUS 2
-    PATTERN "^anti: --lto builds a program with --release, without --lib"
-    COMMAND $<TARGET_FILE:anti> run --lto none)
-add_expect_test(lto_no_bitcode STATUS 2
-    PATTERN "^antic: --lto thin needs .*/lib/${ANTIC_HOST_TARGET}/[^/]+/bitcode/thin/[^/]+, the runtime as bitcode"
-    COMMAND $<TARGET_FILE:antic> --runtime "${CMAKE_CURRENT_BINARY_DIR}"
-            --lto thin -o "${CMAKE_CURRENT_BINARY_DIR}/lto_no_bitcode"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-
-# A release links its macOS binaries against the pinned Apple SDK, and an
-# SDK that changed under that name is refused.
-add_test(NAME macos_sdk
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DCLANG=${ANTIC_CLANG_DIR}/bin/clang"
-            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macossdk"
-            -P "${ANTIC_RUNNERS}/run_macos_sdk.cmake")
-set_tests_properties(macos_sdk PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
-# run_macos_sdk.cmake skips for a missing SDK alone, and fails for one
-# that changed under the pinned name.
-add_test(NAME macos_sdk_runner
-    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DRUNNER=${ANTIC_RUNNERS}/run_macos_sdk.cmake"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macossdk-runner"
-            -P "${ANTIC_RUNNERS}/run_macos_sdk_self.cmake")
-set_tests_properties(macos_sdk_runner PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# Without --runtime, antic takes the runtime archive of the user's data
-# directory, which is where an install puts it.
-add_test(NAME runtime_from_data_dir
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/datadir"
-        -P "${ANTIC_RUNNERS}/run_runtime_from_data_dir.cmake")
-
-# Paths outside ASCII on the command line, in the place of antic, in the
-# data directory of the user and in a project of anti. Windows reads each
-# through UTF-16.
-add_test(NAME unicode_paths
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DANTI=$<TARGET_FILE:anti>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unicode-paths"
-        -P "${ANTIC_RUNNERS}/run_unicode_paths.cmake")
-
-# A Windows executable carries the CodeView record of the PDB that
-# lld-link wrote beside it. It holds no path of the machine that linked it
-# either, because the link passes /PDBALTPATH:%_PDB%.
-foreach(target windows-x86_64 windows-arm64)
-    add_test(NAME pdb_guid_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-            "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-pdb.cmake"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb"
-            "-DTARGET=${target}"
-            -P "${ANTIC_RUNNERS}/run_pdb_guid.cmake")
-    set_tests_properties(pdb_guid_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# The PDB of a Windows program names every function of it, in a release
-# build and in one with -g, and holds no path of the build. Release mode
-# inlines inner, outer and put, which then have no record of their own, as
-# the entry on inlined frames in docs/decisions.md says. skipped keeps its
-# frame for the skip it passes.
-set(pdb_names "stack_trace.skipped;stack_trace.main")
-foreach(target windows-x86_64 windows-arm64)
-    add_test(NAME pdb_names_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
-            "-DNAMES=${pdb_names}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb-names"
-            "-DTARGET=${target}"
-            "-DROOT=${CMAKE_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_pdb_names.cmake")
-    set_tests_properties(pdb_names_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# antic writes the same LLVM text for every test program on every host.
-add_test(NAME emit_identity
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DPROGRAMS=${CMAKE_CURRENT_SOURCE_DIR}/programs"
-        "-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/emit-identity/programs.sha256"
-        "-DVERSION=${PROJECT_VERSION}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity"
-        "-DPINNED=${CMAKE_CURRENT_BINARY_DIR}/emit-identity-pinned"
-        -P "${ANTIC_RUNNERS}/run_emit_identity.cmake")
-
-# The runner keeps the texts of its manifest and names the first line that
-# moved in each text that differs. It writes a manifest on the Mac alone.
-if(ANTIC_HOST_OS STREQUAL "macos")
-    add_test(NAME emit_identity_texts
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DVERSION=${PROJECT_VERSION}"
-            "-DRUNNER=${ANTIC_RUNNERS}/run_emit_identity.cmake"
-            "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity-texts"
-            -P "${ANTIC_RUNNERS}/run_emit_identity_self.cmake")
-endif()
-
-# One object links to the same bytes for macos-arm64 on every host.
-add_test(NAME link_identity_macos-arm64
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/return42.macos-arm64.sha256"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/link-identity"
-        -P "${ANTIC_RUNNERS}/run_link_identity.cmake")
-set_tests_properties(link_identity_macos-arm64 PROPERTIES
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-
-# A program that names a framework links against Apple's SDK. The
-# macos-x86_64 program runs under Rosetta, which has no AVX2, so it takes
-# the v1 level and the v1 runtime of the archive.
-foreach(target macos-arm64 macos-x86_64)
-    set(framework_options "")
-    if(target STREQUAL "macos-x86_64")
-        set(framework_options "--cpu,v1")
-    endif()
-    add_test(NAME framework_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DOPTIONS=${framework_options}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/framework/core_foundation.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/framework"
-            "-DTARGET=${target}"
-            -P "${ANTIC_RUNNERS}/run_framework.cmake")
-    set_tests_properties(framework_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# A shared library takes the frameworks, the `link linux` libraries, the
-# glibc mode and the memory checks of a program of its module.
-add_test(NAME shared_inputs
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
-        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-inputs"
-        -P "${ANTIC_RUNNERS}/run_shared_inputs.cmake")
-
-# The platform linker of the host links return42.anti.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    antic_program_test(program_platform_linker
-        "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-        OPTIONS "--linker,platform"
-        WORK "${CMAKE_CURRENT_BINARY_DIR}/platform")
-endif()
-
-# The platform linker links only for the operating system it runs on.
-if(ANTIC_HOST_OS STREQUAL "linux")
-    set(foreign_target macos-arm64)
-else()
-    set(foreign_target linux-x86_64)
-endif()
-add_expect_test(error_foreign_link STATUS 2
-    PATTERN "^antic: linking for ${foreign_target} with the platform linker needs a host with the same operating system"
-    COMMAND "$<TARGET_FILE:antic>" --target ${foreign_target} --linker platform
-            --runtime "${ANTIC_RUNTIME_DIR}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-
-# The back end folds an array length from size_of and names the target.
-add_expect_test(error_array_length STATUS 1
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/zero_length.err"
-    COMMAND "$<TARGET_FILE:antic>" -S --target linux-x86_64
-            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/zero_length.s"
-            zero_length.anti)
-
-add_expect_test(error_missing_runtime STATUS 2
-    PATTERN "^antic: linking needs --runtime"
-    COMMAND "$<TARGET_FILE:antic>" -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
-            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
-
-# Dumps of compiler stages, compared with expected files in tests/dump.
-# scale.tokens is the token listing that antic prints for scale.anti.
-antic_dump_test(tokens scale
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.tokens"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
-
-# A doc comment is one token, printed with its first source line.
-antic_dump_test(tokens docs
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.tokens"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.anti")
-
-# The groups of a float literal, a character literal, a pattern literal and
-# a reserved word.
-antic_dump_test(tokens kinds
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/kinds.tokens"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/kinds.anti")
-
-add_expect_test(error_lexical STATUS 1
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/lexical.err"
-    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/lexical.s"
-            lexical.anti)
-
-# A source of 64 MiB passes the front end, and one a byte longer is
-# refused when it is read, before the lexer sees it.
-add_test(NAME error_source_cap
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-cap"
-        -P "${ANTIC_RUNNERS}/run_source_cap.cmake")
-
-# The lexer refuses a NUL byte outside a literal, wherever it stands
-# among the blocks the reader takes, and takes one inside a bytes
-# literal.
-add_test(NAME error_source_nul
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DNUL=${CMAKE_CURRENT_SOURCE_DIR}/errors/nul_byte.bin"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-nul"
-        -P "${ANTIC_RUNNERS}/run_source_nul.cmake")
-
-# scale.ast is the syntax tree listing that antic prints for scale.anti.
-antic_dump_test(ast scale
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.ast"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
-
-# `fallthrough;` is a statement of its own in the tree of an arm.
-antic_dump_test(ast switch_fallthrough
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.ast"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.anti")
-
-# Type parameters and type arguments in the tree: `>>` closes two lists,
-# and `<` in an expression opens a list by the rule of C#.
-antic_dump_test(ast generics_syntax
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.ast"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.anti")
-
-# An `f"..."` is one node, with the value of each `{expr}` below it.
-antic_dump_test(ast format
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.anti")
-
-# R153 of "Rules of 2026-10-13" in docs/decisions.md: under --tests the
-# tree holds the functions of the `tests` and the `fixtures` block.
-antic_dump_test(ast test_blocks
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/test_blocks.ast"
-    ARGS --tests "${CMAKE_CURRENT_SOURCE_DIR}/dump/test_blocks.anti")
-
-# The nodes of the parsed tree that no other dump holds. The checker would
-# refuse nodes.anti, which the parser takes.
-antic_dump_test(ast nodes
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.ast"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.anti")
-
-# The nodes the checker writes into the tree: an atomic read and write,
-# `p?.x`, `to_slice`, the built-ins of a simd struct, `mul_high`, a call
-# whose error the `catch` of its block takes and the bound names of the
-# arms of a `switch` and of a `select`.
-antic_dump_test(types checked_nodes
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/checked_nodes.types"
-    ARGS -I "${ANTIC_RUNTIME_DIR}/std"
-         "${CMAKE_CURRENT_SOURCE_DIR}/dump/checked_nodes.anti")
-
-# `alloc T { }` holds its literal alone and `for 0..3` binds no name, in
-# the tree and in the typed tree.
-foreach(stage ast types)
-    antic_dump_test(${stage} alloc_loops
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.${stage}"
-        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.anti")
-endforeach()
-# Two mistakes produce exactly two messages.
-add_expect_test(error_syntax STATUS 1
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/syntax.err"
-    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/syntax.s"
-            syntax.anti)
-
-# scale.types is the typed tree listing that antic prints for scale.anti.
-antic_dump_test(types scale
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.types"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
-
-# main.ir is the IR listing that antic prints for main.anti.
-antic_dump_test(ir main
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.ir"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
-
-# Library files. scale.antl.hex lists the bytes that every host writes for
-# scale.anti. main.ir is the whole program after loading two libraries,
-# which the search root supplies, beside the build directory's copies.
-set(MODULES "${CMAKE_CURRENT_SOURCE_DIR}/modules")
-set(LIBS "${CMAKE_CURRENT_BINARY_DIR}/modules")
 file(MAKE_DIRECTORY "${LIBS}/com/example")
 
 add_test(NAME antl_scale
@@ -4907,16 +3688,7 @@ add_expect_test(error_modules_library_exports_nothing STATUS 1
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_exports_nothing.a"
             modules_library_exports_nothing.anti)
-# The line a static library for C prints names what a C program links
-# beside the archive. A module that imports `anti.regex` needs its glue
-# and PCRE2 after it, as the link of a program of Anti takes them, by
-# "Static library" of docs/libraries-for-c.md (T146).
-add_expect_test(clib_regex_link_line STATUS 0
-    PATTERN "^c[cl] main\\.c .*libmatcher\\.a .*anti_rt_regex\\.(a|lib) .*pcre2-8\\.(a|lib)"
-    COMMAND "$<TARGET_FILE:antic>" --lib static
-            --runtime "${ANTIC_RUNTIME_DIR}"
-            -o "${CMAKE_CURRENT_BINARY_DIR}/libmatcher.a"
-            "${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/matcher.anti")
+
 add_expect_test(error_modules_library_kind STATUS 2
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
     PATTERN "--lib takes static or shared[^a-z]+not bundled"
@@ -4967,11 +3739,6 @@ add_test(NAME internal_package
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/internal"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/internal"
         -P "${ANTIC_RUNNERS}/run_internal.cmake")
-
-antic_dump_test(ir modules
-    "${MODULES}/main.ir"
-    ARGS -I "${LIBS}" "${MODULES}/main.anti")
-set_tests_properties(dump_ir_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 
 # Dev mode: one object per module, linked into the same program.
 add_test(NAME dev_modules
@@ -5141,1358 +3908,505 @@ add_expect_test(error_duplicate_library STATUS 1
 set_tests_properties(error_duplicate_library PROPERTIES
     FIXTURES_REQUIRED scale_antl)
 
-# The five behaviours of `assert`: a release build without it, a forced
-# build with it, dev mode keeping it and --no-asserts dropping it.
-add_test(NAME asserts
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/asserts.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asserts"
-        -P "${ANTIC_RUNNERS}/run_asserts.cmake")
+# The messages of antic: its refusals, its warnings, its usage and its
+# options.
 
-# Every dev-mode check: bounds, overflow, a narrowing `as`, division,
-# shifts and a walk of a collection that changes, one test per program in
-# a build that keeps the check and a build that drops it. A program whose
-# operation traps by itself without the check is built in release mode and
-# not run, which runs gives as OFF. DEV names the modules whose dev objects
-# the dev build links. checks_override runs the options that decide
-# instead of the mode.
-function(antic_check_test name phrase pattern runs)
-    cmake_parse_arguments(PARSE_ARGV 4 arg "" "" "DEV")
-    antic_dev_inputs(objects fixtures ${arg_DEV})
-    list(JOIN objects "," objects)
-    add_test(NAME check_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
-            "-DPHRASE=${phrase}"
-            "-DPATTERN=${pattern}"
-            "-DRUNS=${runs}"
-            "-DOBJECTS=${objects}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks"
-            -P "${ANTIC_RUNNERS}/run_check.cmake")
-    if(fixtures)
-        set_property(TEST check_${name} PROPERTY FIXTURES_REQUIRED ${fixtures})
-    endif()
+# The version stands in tools/version alone, and both programs print
+# that one. Step 10 of the release reads them from a fresh install.
+# Each prints its line and nothing else, which the files below hold.
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_version"
+     "antic ${PROJECT_VERSION}\n")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
+     "anti ${PROJECT_VERSION}\n")
+add_expect_test(antic_version STATUS 0
+    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_version"
+    COMMAND "$<TARGET_FILE:antic>" --version)
+
+# The usage. `--help`, and `-h` of anti, print it on the standard output
+# and end with 0, and the tool without an argument prints the same bytes
+# on the standard error and ends with 2.
+add_test(NAME antic_help
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:antic>,--help"
+            -DNAME=antic -P "${ANTIC_RUNNERS}/run_usage.cmake")
+
+set(usage_source "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+add_usage_test(antic option_unknown FIRST "antic: unknown option --bogus"
+    ARGS --bogus "${usage_source}")
+add_usage_test(antic second_input FIRST "antic: one input file only"
+    ARGS "${usage_source}" "${usage_source}")
+add_usage_test(antic options_without_an_input ARGS -S --dev)
+# Decision 2 of "Decisions of 2026-10-11" in docs/decisions.md: the option
+# --llvm-mc is gone, so antic refuses it as an option it does not know.
+add_usage_test(antic llvm_mc_gone FIRST "antic: unknown option --llvm-mc"
+    ARGS --llvm-mc llvm-mc "${usage_source}")
+# R141 of "Rules of 2026-10-13" in docs/decisions.md: the usage of antic
+# lists the options of the modes, the checks and the hooks.
+add_test(NAME antic_usage_lists_options
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:antic>,--help"
+            "-DLISTS=--help|--no-reflect|--asserts|--no-asserts|--checks|--no-checks|--no-hooks|--trace|--no-trace"
+            -DNAME=antic -P "${ANTIC_RUNNERS}/run_usage.cmake")
+# R142 of "Rules of 2026-10-13" in docs/decisions.md: `--help` of antic
+# among other arguments prints the usage and ends with 0, and antic
+# compiles nothing.
+add_test(NAME antic_help_among_arguments
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCOMMAND=$<TARGET_FILE:antic>,-S,--dev,--help,${usage_source}"
+            -DNAME=antic -P "${ANTIC_RUNNERS}/run_usage.cmake")
+
+# A wrong value of an option of antic, and an option that takes a value as
+# the last word. antic writes one line and ends with 2.
+function(add_antic_refusal name line)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_option_${name}"
+         "${line}\n")
+    add_expect_test(antic_option_${name} STATUS 2
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/programs"
+        EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_option_${name}"
+        COMMAND "$<TARGET_FILE:antic>" ${ARGN})
 endfunction()
-antic_check_test(bounds_array "index out of bounds"
-    "bounds_array\\.anti:[0-9]+: index out of bounds: index 5, length 4"
-    ON)
-antic_check_test(bounds_slice "index out of bounds"
-    "bounds_slice\\.anti:[0-9]+: index out of bounds: index 4, length 2"
-    ON)
-antic_check_test(bounds_simd "index out of bounds"
-    "bounds_simd\\.anti:[0-9]+: index out of bounds: index 7, length 6"
-    ON)
-antic_check_test(bounds_str "index out of bounds"
-    "bounds_str\\.anti:[0-9]+: index out of bounds: index 7, length 3"
-    ON)
-antic_check_test(overflow_add "overflow in"
-    "overflow_add\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
-    ON)
-antic_check_test(overflow_sub "overflow in"
-    "overflow_sub\\.anti:[0-9]+: overflow in -: left -9223372036854775807, right 2"
-    ON)
-antic_check_test(overflow_mul "overflow in"
-    "overflow_mul\\.anti:[0-9]+: overflow in \\*: left 4000000000, right 4000000000"
-    ON)
-antic_check_test(overflow_mul32 "overflow in"
-    "overflow_mul32\\.anti:[0-9]+: overflow in \\*: left 100000, right 100000"
-    ON)
-antic_check_test(overflow_carry "overflow in"
-    "overflow_carry\\.anti:[0-9]+: overflow in \\+: left 9223372036854775806, right 1"
-    ON)
-antic_check_test(narrow "out of range"
-    "narrow\\.anti:[0-9]+: value out of range for i8: value 300"
-    ON)
-antic_check_test(narrow_sign "out of range"
-    "narrow_sign\\.anti:[0-9]+: value out of range for u64: value -1"
-    ON)
-antic_check_test(narrow_char "out of range"
-    "narrow_char\\.anti:[0-9]+: value out of range for char: value 1114112"
-    ON)
-antic_check_test(narrow_surrogate "out of range"
-    "narrow_surrogate\\.anti:[0-9]+: value out of range for char: value 55296"
-    ON)
-antic_check_test(narrow_enum "not declared by"
-    "narrow_enum\\.anti:[0-9]+: value not declared by Kind: value 7"
-    ON)
-antic_check_test(divide "division by zero"
-    "divide\\.anti:[0-9]+: division by zero in /: left 10"
-    OFF)
-antic_check_test(remainder "division by zero"
-    "remainder\\.anti:[0-9]+: division by zero in %: left 10"
-    OFF)
-antic_check_test(shift_wide "shift count out of range"
-    "shift_wide\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
-    ON)
-antic_check_test(shift_negative "shift count out of range"
-    "shift_negative\\.anti:[0-9]+: shift count out of range for >>: count -1, width 64"
-    ON)
-# R087 of "Rules of 2026-10-13": a count of chunks below zero.
-antic_check_test(parallel_count_below_zero "count of chunks below zero"
-    "parallel_count_below_zero\\.anti:[0-9]+: count of chunks below zero: value -3"
-    ON)
-# The checks on the narrow types, in a compound assignment and in a copy
-# of a generic function. docs/notes/test-matrix.md names them under
-# "Values".
-antic_check_test(overflow_add_i8 "overflow in"
-    "overflow_add_i8\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
-    ON)
-antic_check_test(overflow_sub_i16 "overflow in"
-    "overflow_sub_i16\\.anti:[0-9]+: overflow in -: left -32768, right 1"
-    ON)
-antic_check_test(overflow_mul_i8 "overflow in"
-    "overflow_mul_i8\\.anti:[0-9]+: overflow in \\*: left 100, right 2"
-    ON)
-antic_check_test(overflow_compound "overflow in"
-    "overflow_compound\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
-    ON)
-antic_check_test(overflow_generic "overflow in"
-    "overflow_generic\\.anti:[0-9]+: overflow in \\+: left 127, right 1"
-    ON)
-antic_check_test(narrow_unsigned "out of range"
-    "narrow_unsigned\\.anti:[0-9]+: value out of range for i8: value 200"
-    ON)
-antic_check_test(narrow_u64 "out of range"
-    "narrow_u64\\.anti:[0-9]+: value out of range for int: value 9223372036854775808"
-    ON)
-antic_check_test(narrow_to_byte "out of range"
-    "narrow_to_byte\\.anti:[0-9]+: value out of range for byte: value -1"
-    ON)
-antic_check_test(divide_byte "division by zero"
-    "divide_byte\\.anti:[0-9]+: division by zero in /: left 200"
-    ON)
-antic_check_test(remainder_i8 "division by zero"
-    "remainder_i8\\.anti:[0-9]+: division by zero in %: left -7"
-    ON)
-antic_check_test(divide_compound "division by zero"
-    "divide_compound\\.anti:[0-9]+: division by zero in /: left 10"
-    ON)
-antic_check_test(shift_wide_byte "shift count out of range"
-    "shift_wide_byte\\.anti:[0-9]+: shift count out of range for <<: count 8, width 8"
-    ON)
-antic_check_test(shift_right_wide_i16 "shift count out of range"
-    "shift_right_wide_i16\\.anti:[0-9]+: shift count out of range for >>: count 16, width 16"
-    ON)
-antic_check_test(shift_compound "shift count out of range"
-    "shift_compound\\.anti:[0-9]+: shift count out of range for <<: count 64, width 64"
-    ON)
-# R031 of "Rules of 2026-10-13": the least value divided by -1, its
-# remainder by -1 and unary `-` of it stop a dev build with the
-# overflow check.
-antic_check_test(overflow_divide_least "overflow in"
-    "overflow_divide_least\\.anti:[0-9]+: overflow in /: left -9223372036854775808, right -1"
-    ON)
-antic_check_test(overflow_remainder_least_i8 "overflow in"
-    "overflow_remainder_least_i8\\.anti:[0-9]+: overflow in %: left -128, right -1"
-    ON)
-antic_check_test(overflow_divide_least_compound "overflow in"
-    "overflow_divide_least_compound\\.anti:[0-9]+: overflow in /: left -32768, right -1"
-    ON)
-antic_check_test(overflow_negate_least "overflow in"
-    "overflow_negate_least\\.anti:[0-9]+: overflow in -: value -9223372036854775808"
-    ON)
-antic_check_test(overflow_negate_least_i8 "overflow in"
-    "overflow_negate_least_i8\\.anti:[0-9]+: overflow in -: value -128"
-    ON)
-# R032: `<<%` by a count below zero stops a dev build. A count at or
-# above the width gives 0 and is no failure.
-antic_check_test(shift_wrap_negative "shift count out of range"
-    "shift_wrap_negative\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 64"
-    ON)
-antic_check_test(shift_wrap_negative_compound "shift count out of range"
-    "shift_wrap_negative_compound\\.anti:[0-9]+: shift count out of range for <<%: count -1, width 8"
-    ON)
-# R048: a value that does not fit the width of a bitfield stops a dev
-# build where it is stored, in a write, a compound assignment and a
-# literal.
-antic_check_test(bitfield_write "out of range"
-    "bitfield_write\\.anti:[0-9]+: value out of range for the 3 bits of a: value 13"
-    ON)
-antic_check_test(bitfield_write_signed "out of range"
-    "bitfield_write_signed\\.anti:[0-9]+: value out of range for the 3 bits of b: value -5"
-    ON)
-antic_check_test(bitfield_compound "out of range"
-    "bitfield_compound\\.anti:[0-9]+: value out of range for the 3 bits of a: value 8"
-    ON)
-antic_check_test(bitfield_literal "out of range"
-    "bitfield_literal\\.anti:[0-9]+: value out of range for the 20 bits of b: value 524288"
-    ON)
-antic_check_test(bitfield_class "out of range"
-    "bitfield_class\\.anti:[0-9]+: value out of range for the 9 bits of kind: value 512"
-    ON)
-# Decision 24 of "Decisions of 2026-10-11": a dev build checks the
-# bounds of `xs[lo..hi]` as it checks an index.
-antic_check_test(slice_range "out of bounds"
-    "slice_range\\.anti:[0-9]+: .*out of bounds.*length 3"
-    ON)
-# The same check on a slice of a slice, against the length of the
-# slice, and on bounds that give no slice: the low one above the high
-# one, and the low one below zero.
-antic_check_test(slice_of_slice_range "out of bounds"
-    "slice_of_slice_range\\.anti:[0-9]+: .*out of bounds.*length 2"
-    ON)
-antic_check_test(slice_range_reversed "out of bounds"
-    "slice_range_reversed\\.anti:[0-9]+: .*out of bounds"
-    ON)
-antic_check_test(slice_range_negative "out of bounds"
-    "slice_range_negative\\.anti:[0-9]+: .*out of bounds"
-    ON)
-antic_check_test(walk_changed "was changed while"
-    "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
-    ON DEV lang)
-antic_check_test(collection_changed "was changed while"
-    "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
-    ON DEV lang mem text collection)
-antic_check_test(list_changed "was changed while"
-    "list_changed\\.anti:12: `people` was changed while `for` walked it: changed at list_changed\\.anti:14"
-    ON DEV lang mem text collection collection/list)
-antic_check_test(list_bounds "index out of bounds"
-    "\\.anti:[0-9]+: index out of bounds: index 5, length 4"
-    ON DEV lang mem text collection collection/list)
-antic_check_test(grid_bounds "index out of bounds"
-    "\\.anti:[0-9]+: index out of bounds: index 3, length 3"
-    ON DEV lang mem text collection collection/grid)
-antic_check_test(sorted_changed "was changed while"
-    "sorted_changed\\.anti:13: `ages` was changed while `for` walked it: changed at sorted_changed\\.anti:15"
-    ON DEV lang mem text collection reflect collection/sorted)
-antic_check_test(map_changed "was changed while"
-    "map_changed\\.anti:12: `ages` was changed while `for` walked it: changed at map_changed\\.anti:14"
-    ON DEV lang mem text collection collection/map)
-antic_check_test(set_changed "was changed while"
-    "set_changed\\.anti:12: `seen` was changed while `for` walked it: changed at set_changed\\.anti:13"
-    ON DEV lang mem text collection collection/map collection/set)
-# M304: `reserve` and `shrink` move the room a walk holds, and each
-# counts the move as a change of the collection.
-antic_check_test(list_reserve_changed "was changed while"
-    "list_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_reserve_changed\\.anti:16"
-    ON DEV lang mem text collection collection/list)
-antic_check_test(list_shrink_changed "was changed while"
-    "list_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at list_shrink_changed\\.anti:16"
-    ON DEV lang mem text collection collection/list)
-antic_check_test(deque_reserve_changed "was changed while"
-    "deque_reserve_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_reserve_changed\\.anti:16"
-    ON DEV lang mem text collection collection/deque)
-antic_check_test(deque_shrink_changed "was changed while"
-    "deque_shrink_changed\\.anti:14: `xs` was changed while `for` walked it: changed at deque_shrink_changed\\.anti:16"
-    ON DEV lang mem text collection collection/deque)
-antic_check_test(map_reserve_changed "was changed while"
-    "map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_reserve_changed\\.anti:16"
-    ON DEV lang mem text collection collection/map)
-antic_check_test(map_shrink_changed "was changed while"
-    "map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at map_shrink_changed\\.anti:16"
-    ON DEV lang mem text collection collection/map)
-antic_check_test(hash_map_reserve_changed "was changed while"
-    "hash_map_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_reserve_changed\\.anti:16"
-    ON DEV lang mem text collection collection/map)
-antic_check_test(hash_map_shrink_changed "was changed while"
-    "hash_map_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at hash_map_shrink_changed\\.anti:16"
-    ON DEV lang mem text collection collection/map)
-antic_check_test(bitset_reserve_changed "was changed while"
-    "bitset_reserve_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_reserve_changed\\.anti:16"
-    ON DEV lang mem text collection collection/map collection/set)
-antic_check_test(bitset_shrink_changed "was changed while"
-    "bitset_shrink_changed\\.anti:14: `seen` was changed while `for` walked it: changed at bitset_shrink_changed\\.anti:16"
-    ON DEV lang mem text collection collection/map collection/set)
-antic_check_test(sorted_reserve_changed "was changed while"
-    "sorted_reserve_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_reserve_changed\\.anti:16"
-    ON DEV lang mem text collection reflect collection/sorted)
-antic_check_test(sorted_shrink_changed "was changed while"
-    "sorted_shrink_changed\\.anti:14: `ages` was changed while `for` walked it: changed at sorted_shrink_changed\\.anti:16"
-    ON DEV lang mem text collection reflect collection/sorted)
-add_test(NAME checks_override
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/traps"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks-override"
-        -P "${ANTIC_RUNNERS}/run_checks.cmake")
-
-# The debug information of -g, read by the debugger of the host: lldb on
-# macOS and gdb on Linux. A breakpoint by file and line in an imported
-# module and a backtrace of Anti function names.
-# A Windows link writes CodeView, which neither reads, so a Windows host
-# runs no test of them even where a gdb stands on its path. A host without
-# a debugger reports the test skipped and names the reason.
-find_program(ANTIC_LLDB NAMES lldb DOC "the debugger of macOS")
-find_program(ANTIC_GDB NAMES gdb DOC "the debugger of Linux")
-if(NOT ANTIC_HOST_OS STREQUAL "windows" AND NOT ANTIC_LLDB AND NOT ANTIC_GDB)
-    add_test(NAME debug_info
-        COMMAND "${CMAKE_COMMAND}" -E echo
-            "SKIP: neither lldb nor gdb is on the path")
-    set_tests_properties(debug_info PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-elseif(NOT ANTIC_HOST_OS STREQUAL "windows")
-    if(ANTIC_HOST_OS STREQUAL "macos" AND ANTIC_LLDB)
-        set(debugger "${ANTIC_LLDB}")
-        set(debugger_kind lldb)
-    elseif(ANTIC_GDB)
-        set(debugger "${ANTIC_GDB}")
-        set(debugger_kind gdb)
-    else()
-        set(debugger "${ANTIC_LLDB}")
-        set(debugger_kind lldb)
+add_antic_refusal(linker_value "antic: --linker takes lld or platform"
+    --linker gold return42.anti)
+add_antic_refusal(inject_value
+    "antic: --inject takes an interface and its provider, as --inject Interface=Provider, found Logger"
+    --inject Logger return42.anti)
+add_antic_refusal(target_value "antic: unknown target plan9"
+    --runtime "${ANTIC_RUNTIME_DIR}" --target plan9 return42.anti)
+add_antic_refusal(input_suffix "antic: return42.expected: expected a .anti file"
+    --runtime "${ANTIC_RUNTIME_DIR}" return42.expected)
+add_antic_refusal(lto_memory_checks_macos
+    "antic: --lto links no macOS program of --memory-checks"
+    --runtime "${ANTIC_RUNTIME_DIR}" --target macos-arm64 --lto full
+    --memory-checks -o "${CMAKE_CURRENT_BINARY_DIR}/lto_memory_checks"
+    return42.anti)
+foreach(option --lib --linker --lto --framework --linux-lib --inject
+        --dependency --attribution -I --llvm-ar --profile-use
+        --package-name --package-version --license --license-text -o
+        --target --cpu --opt --llc --runtime)
+    string(REGEX REPLACE "^-+" "" word "${option}")
+    string(REPLACE "-" "_" word "${word}")
+    if(option STREQUAL "-o")
+        set(word "output")
+    elseif(option STREQUAL "-I")
+        set(word "root")
     endif()
-    add_test(NAME debug_info
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/debug"
-            "-DDEBUGGER=${debugger}"
-            "-DKIND=${debugger_kind}"
-            "-DOBJECT=${anti_object}"
-            -P "${ANTIC_RUNNERS}/run_debug.cmake")
+    add_antic_refusal(${word}_without_a_value
+        "antic: ${option} needs a value" return42.anti ${option})
+endforeach()
+
+# Options of antic that the driver reads together, one test per case of
+# tests/runners/run_antic_options.cmake, whose header names what each shows.
+set(antic_option_cases checks_by_mode checks_last_decides asserts_by_mode
+    asserts_text_dropped
+    warn_undocumented
+    strict_library strict_front_end strict_dev bundle_static bundle_shared
+    output_assembly output_library output_program keep_llvm
+    output_static output_shared output_dev_library output_plugin
+    output_native_library output_native_plugin linker_lld)
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
+    list(APPEND antic_option_cases soname_linux)
 endif()
-
-# A zero table traps with the name of the class.
-add_test(NAME trap_table
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/table.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${ANTIC_RUNNERS}/run_trap_table.cmake")
-
-# The programs of tests/traps that stop with the message of <name>.err.
-# parallel_size: the results of `parallel` take one value per chunk, and
-# a count of them that no size holds stops the program before a worker
-# runs. alloc_literal, alloc_construct and singleton_memory: out of memory
-# is fatal for `alloc T { }`, `alloc T(args)` and the first `get` of a
-# singleton, which stop with the failure routine instead of writing
-# through a null pointer. pattern_limit: a search with a pattern literal
-# that reaches the match limit stops with the pattern and the line.
-# pattern_group_count: a match whose `count` the program raised reads no
-# group past those of its pattern, and stops with the count of the
-# pattern. pattern_patch_into: a `patch` whose computed `into` names no
-# group of its pattern literal stops with the count of the pattern and the
-# `into`. chan_capacity: a channel made for no value stops the program.
-# send_closed and send_closed_waiting: a `send` on a closed channel stops
-# it, one that waits on a full channel included. take_in_refused,
-# error_text_refused and trace_names_refused: the text that `take_in`
-# makes, the text of an error and the names of a trace stop the program
-# when they find no memory, by decision 4 of "Decisions of 2026-10-11".
-# The room_ programs: a collection asked for room whose size no `int`
-# holds stops the program as memory that runs out, finding S316, in a
-# product, a sum, a doubling and a shift of the room of each collection.
-foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
-        singleton_memory pattern_limit pattern_group_count pattern_patch_into
-        chan_capacity
-        send_closed send_closed_waiting take_in_refused error_text_refused
-        trace_names_refused room_list room_list_reserve room_deque_reserve
-        room_grid room_map room_map_reserve room_hash_map room_sorted
-        room_pool room_pool_shift room_bitset)
-    add_test(NAME trap_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-            -P "${ANTIC_RUNNERS}/run_trap.cmake")
-endforeach()
-# The place_ programs: a place function of a collection given a place
-# that holds no element stops the program with `Error.fatal`, finding
-# S315, one program for each class that fills the functions.
-foreach(name IN ITEMS place_list place_list_next place_grid place_queue
-        place_map place_map_next place_hash_map place_bitset place_pool
-        place_tree place_sorted place_sorted_set)
-    add_test(NAME trap_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
-            "-DSTATUS=1"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-            -P "${ANTIC_RUNNERS}/run_trap.cmake")
-endforeach()
-# fatal_none: `catch fatal` on a `none` pointer runs the function of
-# `error.on_fatal`, prints the error and exits with 1, in release mode,
-# where the guard calls `Error.fatal` directly and ends with unreachable.
-add_test(NAME trap_fatal_none
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/fatal_none.anti"
-        "-DSTATUS=1"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${ANTIC_RUNNERS}/run_trap.cmake")
-
-# The size of a Mutex per target: four bytes on Linux and macOS, eight on
-# Windows.
-add_test(NAME mutex_size
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DOPT=${ANTIC_OPT}"
-        "-DLLC=${ANTIC_LLC}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/mutex_size.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mutex_size"
-        -P "${ANTIC_RUNNERS}/run_mutex_size.cmake")
-
-# Two threads that take two locks in opposite orders: a dev build reports
-# the conflict with its four sites, and a release build says nothing.
-add_test(NAME lock_order
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/lock_order.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        -P "${ANTIC_RUNNERS}/run_lock_order.cmake")
-set_tests_properties(lock_order PROPERTIES TIMEOUT 120)
-
-# The lock orders of one thread: lock_orders holds a pair in opposite
-# orders, a ring of three locks, a lock that `destroy` ended and the hidden
-# lock of an object that its thread takes again. lock_order_once holds the
-# two orders of a pair more than once, which a dev build reports once.
-# check_join_twice: a second `join` of one job that the checker cannot see
-# traps in a dev build, by decision 23 of "Decisions of 2026-10-11".
-# DESIGN: run_dev_report.cmake stops a program after ANTIC_REPORT_SECONDS,
-# so a program that hangs fails its test as an ordinary failure, which
-# WILL_FAIL of tests/known-failures.txt expects.
-set(ANTIC_REPORT_SECONDS 20)
-foreach(name IN ITEMS lock_orders lock_order_once)
-    add_test(NAME ${name}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-            "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
-            -P "${ANTIC_RUNNERS}/run_dev_report.cmake")
-    set_tests_properties(${name} PROPERTIES TIMEOUT 120)
-endforeach()
-add_test(NAME check_join_twice
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/join_twice.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
-        "-DPATTERN=join_twice\\.anti:[0-9]+: .*join"
-        -P "${ANTIC_RUNNERS}/run_dev_report.cmake")
-set_tests_properties(check_join_twice PROPERTIES TIMEOUT 120)
-# check_sync_held: a `sync` on a Mutex that its thread holds already, which
-# the checker cannot see, traps in a dev build, by R093 of "Rules of
-# 2026-10-13". The release build waits for itself and is not run.
-add_test(NAME check_sync_held
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/sync_held.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
-        "-DPATTERN=anti: sync_held\\.anti:7 takes a Mutex that its thread holds since sync_held\\.anti:16"
-        -P "${ANTIC_RUNNERS}/run_dev_report.cmake")
-set_tests_properties(check_sync_held PROPERTIES TIMEOUT 120)
-
-# --memory-checks reports a read after free, a double free, a write past a
-# heap block and a leak on every host but windows-arm64, which has no
-# runtime of AddressSanitizer. Every host checks that windows-arm64
-# refuses the option.
-add_test(NAME memory_checks
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        -P "${ANTIC_RUNNERS}/run_memory_checks.cmake")
-set_tests_properties(memory_checks PROPERTIES TIMEOUT 120
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-# --memory-checks finds a pointer into a List kept across a push that grows
-# the list, as a read after free.
-add_test(NAME memory_checks_list
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        -P "${ANTIC_RUNNERS}/run_memory_checks_list.cmake")
-set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-# --memory-checks finds a read of a bitfield after free, as it finds the
-# read of a plain field.
-add_test(NAME memory_checks_bitfield
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_bitfield.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        -P "${ANTIC_RUNNERS}/run_memory_checks_bitfield.cmake")
-set_tests_properties(memory_checks_bitfield PROPERTIES TIMEOUT 120
-    SKIP_REGULAR_EXPRESSION "SKIP: ")
-# text.Builder appends in place while its room holds the bytes and the NUL.
-# Under --memory-checks a fresh block holds no zeros, so a missing NUL or a
-# write past the room fails here where a plain run passes by chance.
-if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
-    add_test(NAME std_builder_room_memory_checks
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/builder_room.anti"
-            "-DOPTIONS=--memory-checks"
-            "-DOBJECTS="
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
-            -P "${ANTIC_RUNNERS}/run_program.cmake")
-    set_tests_properties(std_builder_room_memory_checks PROPERTIES TIMEOUT 120)
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    list(APPEND antic_option_cases windows_library_reproducible)
 endif()
-# DESIGN: the runtime of AddressSanitizer for x86_64 stops under
-# qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
-# where it cannot intercept the heap functions. Rosetta runs it, and the
-# block of the emulated target registers the programs of macos-x86_64. On
-# linux-arm64 and windows-arm64 the three programs of --memory-checks are
-# therefore linked for the emulated target and not run, and each test
-# reports itself skipped with the reason. The runtimes of x86_64 last ran
-# on real x86_64 hardware on 2026-10-08, as
-# docs/reports/2026-10-08-llvm-closed.md reports.
-if(ANTIC_EMULATED_TARGET MATCHES "^(linux|windows)-x86_64$")
-    foreach(case "memory_checks,traps/memory_checks.anti"
-            "memory_checks_list,traps/memory_checks_list.anti"
-            "std_builder_room_memory_checks,std/builder_room.anti")
-        string(REPLACE "," ";" parts "${case}")
-        list(GET parts 0 name)
-        list(GET parts 1 source)
-        antic_program_test(${name}_${ANTIC_EMULATED_TARGET}
-            "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
-            OPTIONS "${ANTIC_X86_64_OPTIONS},--memory-checks"
-            SKIP_RUN "the AddressSanitizer runtime of x86_64 stops under emulation"
-            WORK "${CMAKE_CURRENT_BINARY_DIR}/memory-checks-x86_64")
-        set_tests_properties(${name}_${ANTIC_EMULATED_TARGET} PROPERTIES
-            TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
-    endforeach()
-endif()
-
-# A program of musl links mimalloc of the runtime archive as its C
-# allocator in every mode, and a program of --memory-checks does not.
-foreach(target linux-x86_64 linux-arm64)
-    add_test(NAME musl_allocator_${target}
+foreach(case IN LISTS antic_option_cases)
+    add_test(NAME antic_option_${case}
         COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
-            "-DTARGET=${target}"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/musl-allocator/${target}"
-            -P "${ANTIC_RUNNERS}/run_musl_allocator.cmake")
-    set_tests_properties(musl_allocator_${target} PROPERTIES TIMEOUT 120
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# A program of musl reads no MIMALLOC_* variable: run with two of them,
-# it prints what it prints without them. A Linux host runs the program of
-# its own target, and linux-arm64 the one of linux-x86_64 under qemu.
-foreach(target linux-x86_64 linux-arm64)
-    set(emulator "")
-    if(target STREQUAL ANTIC_EMULATED_TARGET)
-        set(emulator "${ANTIC_EMULATOR}")
-    endif()
-    add_test(NAME mimalloc_environment_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
-            "-DTARGET=${target}"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DEMULATOR=${emulator}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mimalloc-environment/${target}"
-            -P "${ANTIC_RUNNERS}/run_mimalloc_environment.cmake")
-    set_tests_properties(mimalloc_environment_${target} PROPERTIES
-        TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# Under --lto none every function of an ARM64 program and of its runtime
-# starts on a 16-byte boundary.
-foreach(target macos-arm64 linux-arm64 windows-arm64)
-    add_test(NAME function_alignment_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
+            "-DANTIC=$<TARGET_FILE:antic>"
+            -DCASE=${case}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/devirtualise.anti"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/function-alignment/${target}"
-            -P "${ANTIC_RUNNERS}/run_function_alignment.cmake")
-    set_tests_properties(function_alignment_${target} PROPERTIES
-        TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-options/${case}"
+            -P "${ANTIC_RUNNERS}/run_antic_options.cmake")
+endforeach()
+# --cpu beside --target, for each target: its three levels, its default
+# and the three levels of the other architecture, which it refuses.
+foreach(target IN LISTS ANTIC_TARGETS)
+    add_test(NAME antic_option_target_cpu_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            -DCASE=target_cpu
+            -DTARGET=${target}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-options/target_cpu_${target}"
+            -P "${ANTIC_RUNNERS}/run_antic_options.cmake")
 endforeach()
 
-# The ABI probe compares the layouts of C and antic on the host.
+# The host target name has two spellings: ANTIC_HOST_TARGET here and the
+# detection in src/antic/target.c. This test fails when they disagree.
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
+     "${ANTIC_HOST_TARGET}\n")
+add_expect_test(antic_host_target STATUS 0
+    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/antic_host_target"
+    COMMAND "$<TARGET_FILE:antic>" --print-host-target)
+
+# antic runs its passes on a stack of its own size, whatever stack the
+# main thread has. The limit of the main thread is a POSIX one too.
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME abi_probe
+    add_test(NAME antic_stack
         COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe"
-            "-DCC=${ANTIC_TEST_CC}"
-            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-            -P "${ANTIC_RUNNERS}/run_probe.cmake")
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DOPT=${ANTIC_OPT}"
+            "-DLLC=${ANTIC_LLC}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/antic-stack"
+            -P "${ANTIC_RUNNERS}/run_antic_stack.cmake")
 endif()
 
-# The same probe over the types of the area types of
-# docs/notes/test-matrix.md: packed and aligned types with fields at odd
-# offsets, unions, the tag and the union of a variant, an enum, an array
-# of arrays, an optional value, a tuple and a slice.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME abi_probe_types
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
-            "-DNAME=probe_types"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-types"
-            "-DCC=${ANTIC_TEST_CC}"
-            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-            -P "${ANTIC_RUNNERS}/run_probe.cmake")
-    # run_probe.cmake reads the exit status of both probes.
-    add_test(NAME abi_probe_runner
-        COMMAND "${CMAKE_COMMAND}"
-            "-DRUNNER=${ANTIC_RUNNERS}/run_probe.cmake"
-            ${ANTIC_AND_RUNTIME}
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-runner"
-            "-DCC=${ANTIC_TEST_CC}"
-            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-            -P "${ANTIC_RUNNERS}/run_probe_self.cmake")
-endif()
+# Diagnostics. A refusal of a program exits with 1, and its messages
+# equal the .err file beside it.
+add_expect_test(error_missing_semicolon STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/missing_semicolon.err"
+    COMMAND "$<TARGET_FILE:antic>" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/missing_semicolon.s"
+            missing_semicolon.anti)
 
-# A linked program holds the licence notice of its packages.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME program_licenses
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
-            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/licenses.notice"
-            -P "${ANTIC_RUNNERS}/run_licenses.cmake")
-endif()
-
-# Stack traces and the origin of an error. A trace holds addresses that
-# differ from run to run, so run_trace.cmake matches the output against
-# patterns. Each case is a name, the source in tests/trace, the options of
-# antic and the arguments of the program. The pattern files of the output
-# and of the error output follow, then the exit status. A dev build links
-# the dev object of anti.lang. Release mode inlines small functions, as
-# the entry on inlined frames in docs/decisions.md says, so a release case
-# takes NAME.release.pattern where its trace names other frames than the
-# one of dev mode.
-set(TRACE "${CMAKE_CURRENT_SOURCE_DIR}/trace")
+# A call the checker writes against a library of the language that lacks
+# what the call names, as an older library file would. A test without a
+# tree reads the library of regex_damaged, and every other one the library
+# of its own tree under tests/modules.
+#   <program>|<tree>|<module>
 foreach(case
-        "stack|stack_trace|||stack_trace.release.pattern||0"
-        "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
-        "stack_dev|stack_trace|--dev||stack_trace.pattern||0"
-        "forged|forged|||forged.pattern||0"
-        "copies|copies|||copies.release.pattern||0"
-        "copies_g|copies|-g||copies.release.pattern||0"
-        "copies_dev|copies|--dev||copies.pattern||0"
-        "origin|origin|||origin.pattern||0"
-        "origin_dev|origin|--dev||origin.trace.pattern||0"
-        "origin_option|origin||--anti.backtrace|origin.trace.pattern||0"
-        "origin_dev_off|origin|--dev|--anti.backtrace=false|origin.pattern||0"
-        "options|options||--anti.backtrace,plain,--anti.backtrace=false,last|options.pattern||0"
-        "options_unknown|options||--anti.nonsense|options.empty.pattern|options.unknown.pattern|70"
-        "options_value|options||--anti.backtrace=maybe|options.empty.pattern|options.value.pattern|70"
-        "handlers|handler_reports|--trace,--trace,writes||handler_reports.pattern|handler_reports.errors.pattern|0"
-        "start|start|--trace|--anti.trace=calls|start.pattern|start.errors.pattern|0"
-        "start_none|start|--trace||start.none.pattern||0")
+        "lang_error_maker|lang_code_alone|lang"
+        "lang_error_origin|lang_no_origin|lang"
+        "lang_trace_capture|lang_no_capture|lang"
+        "regex_find_all_damaged||"
+        "regex_group_older||"
+        "regex_older||"
+        "regex_patch_bytes_older||"
+        "regex_patch_older||"
+        "regex_split_damaged||"
+        "text_builder_older|text_older|text"
+        "text_equal_older|text_older|text"
+        "text_to_bytes_older|text_older|text")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
-    list(GET parts 1 source)
-    list(GET parts 2 options)
-    list(GET parts 3 arguments)
-    list(GET parts 4 expected)
-    list(GET parts 5 errors)
-    list(GET parts 6 status)
-    set(error_patterns "")
-    if(NOT errors STREQUAL "")
-        set(error_patterns "-DERRORS=${TRACE}/${errors}")
+    list(GET parts 1 tree)
+    list(GET parts 2 module)
+    set(root "${CMAKE_CURRENT_BINARY_DIR}/damaged")
+    set(fixture regex_damaged)
+    if(tree)
+        set(root "${CMAKE_CURRENT_BINARY_DIR}/older/${tree}")
+        set(fixture ${tree}_antl)
+        if(NOT TEST antl_${tree})
+            file(MAKE_DIRECTORY "${root}/anti")
+            add_test(NAME antl_${tree}
+                COMMAND antic -c --anti-internal
+                        -I "${CMAKE_CURRENT_SOURCE_DIR}/modules/${tree}"
+                        -o "${root}/anti/${module}.antl"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/modules/${tree}/anti/${module}.anti")
+            set_tests_properties(antl_${tree} PROPERTIES
+                FIXTURES_SETUP ${fixture})
+        endif()
     endif()
-    set(std "")
-    if(options MATCHES "--dev")
-        set(std lang)
-    endif()
-    antic_dev_inputs(std_objects std_fixtures ${std})
-    list(JOIN std_objects "," std_objects)
-    add_test(NAME trace_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${TRACE}/${source}.anti"
-            "-DOPTIONS=${options}"
-            "-DARGS=${arguments}"
-            "-DEXPECTED=${TRACE}/${expected}"
-            ${error_patterns}
-            "-DSTD_OBJECTS=${std_objects}"
-            "-DSTATUS=${status}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/trace-${name}"
-            -P "${ANTIC_RUNNERS}/run_trace.cmake")
-    if(std_fixtures)
-        set_property(TEST trace_${name} PROPERTY
-            FIXTURES_REQUIRED ${std_fixtures})
-    endif()
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/${name}.err"
+        COMMAND "$<TARGET_FILE:antic>" --front-end
+                --runtime "${ANTIC_RUNTIME_DIR}" -I "${root}" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED ${fixture})
 endforeach()
+# A group of `patch` is compared as the u64 its literal holds.
+add_expect_test(error_patch_group_wide STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/patch_group_wide.err"
+    COMMAND "$<TARGET_FILE:antic>" --front-end --runtime "${ANTIC_RUNTIME_DIR}"
+            patch_group_wide.anti)
 
-# The runtime configuration: the options under --anti., the file that
-# --anti.conf, ANTI_CONF or rt.configure names, the includes of that file
-# and the file of the logger that the key `logger` names. A case is a name, the source in tests/conf, the options of antic
-# and the arguments of the program, then the pattern files of the output
-# and of the error output and the exit status. A pattern file NAME.pattern
-# has NAME.win32.pattern beside it where a Windows program prints `;`,
-# the separator of a list of directories there. The runner is the one of
-# the trace tests, because the layer of a key names an absolute path
-# that a comparison cannot hold.
-set(CONF "${CMAKE_CURRENT_SOURCE_DIR}/conf")
-foreach(case
-        "inspect_build|report||--anti.inspect|inspect.build.pattern||0"
-        "inspect_options|report||--anti.backtrace,--anti.hash_seed=42,--anti.logger=log.toml,--anti.plugins=a:b,--anti.threads=4,--anti.trace=leaks,--anti.inspect|inspect.options.pattern||0"
-        "inspect_file|report||--anti.conf=${CONF}/basic.toml,--anti.inspect|inspect.file.pattern||0"
-        "precedence|report||--anti.conf=${CONF}/basic.toml,--anti.threads=9,--anti.inspect|inspect.precedence.pattern||0"
-        "include|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
-        "array|report||--anti.conf=${CONF}/array.toml,--anti.inspect|inspect.array.pattern||0"
-        "environment|report||--anti.inspect|inspect.file.pattern||0"
-        "environment_option|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
-        "environment_long|report||--anti.inspect|empty.pattern|missing.pattern|70"
-        "environment_utf8|report||--anti.inspect|inspect.file.pattern||0"
-        "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"
-        "exit_status|status||4294967299|empty.pattern||3"
-        "help|report||--anti.help|help.pattern||0"
-        "help_value|report||--anti.help=x|empty.pattern|help-value.pattern|70"
-        "inspect_value|report||--anti.inspect=x|empty.pattern|inspect-value.pattern|70"
-        "configure|configure||${CONF}/backtrace.toml|configure.pattern||0"
-        "configure_dev|configure|--dev|${CONF}/no-backtrace.toml|configure.plain.pattern||0"
-        "configure_missing|configure||${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
-        "configure_nul|configure_nul||${CONF}/basic.toml|empty.pattern|configure-nul.pattern|70"
-        "configure_injections|configure||${CONF}/injection.toml|empty.pattern|configure-injections.pattern|70"
-        "configure_injections_include|configure||${CONF}/include-injection.toml|empty.pattern|configure-injections.pattern|70"
-        "file_missing|report||--anti.conf=${CONF}/nowhere.toml|empty.pattern|missing.pattern|70"
-        "include_missing|report||--anti.conf=${CONF}/missing.toml|empty.pattern|missing.pattern|70"
-        "include_cycle|report||--anti.conf=${CONF}/cycle.toml|empty.pattern|cycle.pattern|70"
-        "unknown_option|report||--anti.nonsense|empty.pattern|unknown-option.pattern|70"
-        "unknown_key|report||--anti.conf=${CONF}/unknown-key.toml|empty.pattern|unknown-key.pattern|70"
-        "bad_value|report||--anti.conf=${CONF}/bad-value.toml|empty.pattern|bad-value.pattern|70"
-        "nul_value|report||--anti.conf=${CONF}/nul-value.toml|empty.pattern|nul-value.pattern|70"
-        "not_toml|report||--anti.conf=${CONF}/not-toml.toml|empty.pattern|not-toml.pattern|70"
-        "cut_string|report||--anti.conf=${CONF}/cut.toml|empty.pattern|cut.pattern|70"
-        "open_table|report||--anti.conf=${CONF}/open-table.toml|empty.pattern|open-table.pattern|70"
-        "no_value|report||--anti.conf=${CONF}/no-value.toml|empty.pattern|no-value.pattern|70"
-        "include_not_toml|report||--anti.conf=${CONF}/include-not-toml.toml|empty.pattern|not-toml.pattern|70"
-        "configure_not_toml|configure||${CONF}/not-toml.toml|empty.pattern|not-toml.pattern|70"
-        "threads_range|report||--anti.conf=${CONF}/threads-range.toml|empty.pattern|threads-range.pattern|70"
-        "threads_option|report||--anti.threads=99999999999|empty.pattern|threads-option.pattern|70"
-        "threads_zero|report||--anti.threads=0|empty.pattern|threads-zero.pattern|70"
-        "injection|report||--anti.conf=${CONF}/injection.toml|empty.pattern|injection.pattern|70"
-        "inject_option|report||--anti.inject=anti.log.Logger=lib/x.so|empty.pattern|inject-option.pattern|70"
-        "hash_seed_option|seed||--anti.hash_seed=42|seed.fixed.pattern||0"
-        "hash_seed_file|seed||--anti.conf=${CONF}/seed.toml|seed.file.pattern||0"
-        "hash_seed_configure|seed||${CONF}/seed.toml|seed.configure.pattern||0"
-        "hash_seed_range|report||--anti.hash_seed=18446744073709551616|empty.pattern|seed-range.pattern|70"
-        "hash_seed_text|report||--anti.conf=${CONF}/seed-text.toml|empty.pattern|seed-text.pattern|70"
-        "logger_unknown_kind|logger||--anti.logger=${CONF}/logger-unknown.toml|logger-done.pattern|logger-unknown.pattern|0"
-        "logger_register|logger||--anti.logger=${CONF}/logger-first.toml,register|logger-first.pattern||0"
-        "logger_sinks|logger||--anti.logger=${CONF}/logger-sinks.toml,register|logger-sinks.pattern||0"
-        "logger_ninth_sink|logger||--anti.logger=${CONF}/logger-ninth.toml,register|logger-first.pattern|logger-ninth.errors.pattern|0"
-        "logger_unopened|logger||--anti.logger=${CONF}/logger-unopened.toml|logger-done.pattern|logger-unopened.pattern|0")
-    string(REPLACE "|" ";" parts "${case}")
+# A `may fail` function without a `fail` and without a `try` is a warning,
+# not an error, because an interface function may fail in one
+# implementation and not in another. A dev build prints it and carries on.
+add_expect_test(warning_never_fails STATUS 0
+    PATTERN "never_fails.anti:3:21: warning: `close_it` may fail and never does \\[never-fails\\]"
+    COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}" --dev -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.anti")
+
+# A release build accepts no warning, and --warnings-as-errors gives a dev
+# build the same behaviour. The warning is then an error with its name.
+foreach(mode "release|-S" "strict|--dev,--warnings-as-errors,-S")
+    string(REPLACE "|" ";" parts "${mode}")
     list(GET parts 0 name)
-    list(GET parts 1 source)
-    list(GET parts 2 options)
-    list(GET parts 3 arguments)
-    list(GET parts 4 expected)
-    list(GET parts 5 errors)
-    list(GET parts 6 status)
-    string(REGEX REPLACE "[.]pattern$" ".win32.pattern" win32 "${expected}")
-    if(ANTIC_HOST_OS STREQUAL "windows" AND EXISTS "${CONF}/${win32}")
-        set(expected "${win32}")
-    endif()
-    set(error_patterns "")
-    if(NOT errors STREQUAL "")
-        set(error_patterns "-DERRORS=${CONF}/${errors}")
-    endif()
-    # A dev build links the objects of the modules the program imports.
-    set(std "")
-    if(options MATCHES "--dev")
-        set(std lang runtime)
-    endif()
-    antic_dev_inputs(std_objects std_fixtures ${std})
-    list(JOIN std_objects "," std_objects)
-    add_test(NAME conf_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CONF}/${source}.anti"
-            "-DOPTIONS=${options}"
-            "-DARGS=${arguments}"
-            "-DEXPECTED=${CONF}/${expected}"
-            ${error_patterns}
-            "-DSTD_OBJECTS=${std_objects}"
-            "-DSTATUS=${status}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-${name}"
-            -P "${ANTIC_RUNNERS}/run_trace.cmake")
-    if(std_fixtures)
-        set_property(TEST conf_${name} PROPERTY
-            FIXTURES_REQUIRED ${std_fixtures})
-    endif()
+    list(GET parts 1 flags)
+    string(REPLACE "," ";" flags "${flags}")
+    add_expect_test(error_never_fails_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/never_fails.err"
+        COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}" ${flags}
+                -o "${CMAKE_CURRENT_BINARY_DIR}/never_fails_${name}.s"
+                never_fails.anti)
 endforeach()
 
-# The runtime and `anti symbols` stop a chain of includes at one depth,
-# with one message.
-add_test(NAME conf_include_depth
+# `allow` at every level silences its warning, so a release build and a
+# build of the `tests` block both accept the program without a word.
+foreach(mode "release|-S" "tests|--tests,--dev,-S")
+    string(REPLACE "|" ";" parts "${mode}")
+    list(GET parts 0 name)
+    list(GET parts 1 flags)
+    string(REPLACE "," ";" flags "${flags}")
+    add_test(NAME silent_allow_levels_${name}
+        COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" ${flags}
+                -o "${CMAKE_CURRENT_BINARY_DIR}/allow_levels_${name}.s"
+                "${CMAKE_CURRENT_SOURCE_DIR}/errors/allow_levels.anti")
+    set_tests_properties(silent_allow_levels_${name} PROPERTIES
+        FAIL_REGULAR_EXPRESSION "warning|error")
+endforeach()
+
+# The warnings antic prints for a program of tests/errors/ it accepts,
+# through run_warnings.cmake. command holds the arguments of antic,
+# separated by commas. needles holds the messages it must print, and the
+# optional fourth argument those it must not, each separated by
+# semicolons. Without the fourth, ABSENT is empty.
+#   antic_warnings_test(<name> <command> <needles> [<absent>])
+function(antic_warnings_test name command needles)
+    set(absent "")
+    if(ARGC GREATER 3)
+        set(absent "${ARGV3}")
+    endif()
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+            "-DCOMMAND=${command}"
+            "-DNEEDLES=${needles}"
+            "-DABSENT=${absent}"
+            -P "${ANTIC_RUNNERS}/run_warnings.cmake")
+endfunction()
+
+# A clause that silences nothing is a warning, which a dev build prints and
+# carries on. The listing `allow_unused` holds the release build, which
+# refuses each. A clause of a doc warning waits for --doc-warnings.
+antic_warnings_test(warning_unused_clauses
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused.s,allow_unused.anti"
+    "allow_unused.anti:8:1: warning: `allow(assert-call)` silences nothing [unused-allow];allow_unused.anti:16:19: warning: `unchecked(unguarded-field)` overrules nothing [unused-unchecked];allow_unused.anti:34:2: warning: `allow(shadowed-catch)` silences nothing [unused-allow]"
+    "allow(undocumented)")
+antic_warnings_test(warning_unused_doc_clause
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,--doc-warnings,--warn-undocumented,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_doc.s,allow_unused.anti"
+    "allow_unused.anti:10:1: warning: `allow(undocumented)` silences nothing [unused-allow]")
+
+# Doc warnings come only with --doc-warnings, which anti check passes.
+add_expect_test(warning_note STATUS 0
+    PATTERN "note.anti:2:8: warning: the pub item `warm` has a `//#` note and no `///` comment"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S
+            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/note.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
+add_test(NAME silent_note
+    COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/note_silent.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/note.anti")
+set_tests_properties(silent_note PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
+
+add_expect_test(warning_dropped STATUS 0
+    PATTERN "dropped.anti:3:2: warning: the `/\\*\\*` comment is dropped, because no item or field follows it"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings -S
+            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/dropped.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
+# A `//#!` note that stands in a function is dropped like a doc comment.
+add_expect_test(warning_dropped_module_note STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped_module_note.err"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            dropped_module_note.anti)
+# The note of a variant case and the comments of the fields of a case are
+# checked as every other comment is.
+add_expect_test(warning_variant_case_comments STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/variant_case_comments.err"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            variant_case_comments.anti)
+add_test(NAME silent_dropped
+    COMMAND antic -S --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/dropped_silent.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/dropped.anti")
+set_tests_properties(silent_dropped PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
+
+# A doc comment names each type the compiler declares in `anti.lang`
+# without a warning.
+add_test(NAME silent_doc_declared
+    COMMAND antic --doc-warnings -S
+            --opt "${ANTIC_OPT}" --llc "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_declared.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_declared.anti")
+set_tests_properties(silent_doc_declared PROPERTIES
+    FAIL_REGULAR_EXPRESSION "warning")
+
+# A doc comment names an alias, a module path, a case and a field of a case
+# without a warning, and a star or a `<` that opens no markup gets none.
+add_expect_test(silent_doc_names STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            --runtime "${ANTIC_RUNTIME_DIR}" doc_names.anti)
+# The whole path of the one module a file imports. No other import stands
+# before it whose first part answers for the name.
+add_expect_test(silent_doc_whole_path STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            --runtime "${ANTIC_RUNTIME_DIR}" doc_whole_path.anti)
+add_expect_test(silent_doc_plain_marks STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            doc_plain_marks.anti)
+# Emphasis before each character that may follow it, and the two forms of
+# an HTML tag that hold a `/`.
+add_expect_test(warning_doc_emphasis_closers STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_emphasis_closers.err"
+    COMMAND "$<TARGET_FILE:antic>" --doc-warnings --front-end
+            doc_emphasis_closers.anti)
+
+# A doc comment inside `{ }` of `f"..."` is dropped with a warning, as one
+# inside any other expression is.
+antic_warnings_test(warning_format_doc
+    "--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/format_doc.s,format_doc.anti"
+    "format_doc.anti:10:15: warning: the `///` comment is dropped, because no item or field follows it [doc-dropped];format_doc.anti:12:13: warning: the `/**` comment is dropped, because no item or field follows it [doc-dropped]")
+
+# A doc comment names the functions of a class of a library without a
+# warning, as it names those of a struct.
+add_test(NAME silent_doc_library_class
+    COMMAND antic --doc-warnings --runtime "${ANTIC_RUNTIME_DIR}" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_library_class.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_library_class.anti")
+set_tests_properties(silent_doc_library_class PROPERTIES
+    FAIL_REGULAR_EXPRESSION "warning")
+
+# `catch e` shadowing a name of an outer scope is a warning. The three
+# forms that bind a name each report it, and a handler whose name is free
+# reports nothing.
+antic_warnings_test(warning_catch_shadow
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/catch_shadow.s,catch_shadow.anti"
+    "catch_shadow.anti:22:25: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:26:21: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:31:10: warning: `e` shadows the outer `e` [shadowed-catch]")
+add_test(NAME silent_catch_no_shadow
+    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/catch_exits.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/catch_exits.anti")
+set_tests_properties(silent_catch_no_shadow PROPERTIES
+    FAIL_REGULAR_EXPRESSION "shadows")
+
+# Markup outside the doc subset, a backtick name that resolves nowhere
+# and, with --warn-undocumented, a `pub` item without a `///` comment.
+# Every one of them comes with --doc-warnings and with nothing else.
+set(MARKUP "the doc comment")
+antic_warnings_test(warning_doc_markup
+    "--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_markup.s,doc_markup.anti"
+    "doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:6:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:27:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
+    "${MARKUP} of `plus` holds;in ${MARKUP} of `plus` resolves;has no `///` comment")
+antic_warnings_test(warning_undocumented
+    "--doc-warnings,--warn-undocumented,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_undocumented.s,doc_markup.anti"
+    "warning: the pub item `undocumented` has no `///` comment"
+    "the pub item `plus` has no;the pub item `heads` has no")
+add_test(NAME silent_doc_markup
+    COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
+            -o "${CMAKE_CURRENT_BINARY_DIR}/doc_markup_silent.s"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/doc_markup.anti")
+set_tests_properties(silent_doc_markup PROPERTIES FAIL_REGULAR_EXPRESSION "warning")
+
+# The front end alone, which `anti check` runs on every source. It writes
+# no assembly, no object and no library file.
+add_test(NAME front_end_only
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DGOOD=${CMAKE_CURRENT_SOURCE_DIR}/programs/catch_exits.anti"
+        "-DBAD=${CMAKE_CURRENT_SOURCE_DIR}/errors/errors.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/front-end"
+        -P "${ANTIC_RUNNERS}/run_front_end.cmake")
+
+add_expect_test(warning_one_segment STATUS 0
+    PATTERN "geometry.anti:1:1: warning: the module path `geometry` has one segment, which is for a program's own files \\[single-segment-path\\]"
+    COMMAND "$<TARGET_FILE:antic>" -c -o "${CMAKE_CURRENT_BINARY_DIR}/geometry.antl"
+            "${CMAKE_CURRENT_SOURCE_DIR}/errors/geometry.anti")
+
+add_expect_test(error_no_main STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/no_main.err"
+    COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/no_main" no_main.anti)
+
+# Without --runtime, antic takes the runtime archive of the user's data
+# directory, which is where an install puts it.
+add_test(NAME runtime_from_data_dir
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/datadir"
+        -P "${ANTIC_RUNNERS}/run_runtime_from_data_dir.cmake")
+
+# Paths outside ASCII on the command line, in the place of antic, in the
+# data directory of the user and in a project of anti. Windows reads each
+# through UTF-16.
+add_test(NAME unicode_paths
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DANTI=$<TARGET_FILE:anti>"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DSOURCE=${CONF}/report.anti"
-        "-DHOST=${ANTIC_HOST_TARGET}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-include-depth"
-        -P "${ANTIC_RUNNERS}/run_conf_include_depth.cmake")
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unicode-paths"
+        -P "${ANTIC_RUNNERS}/run_unicode_paths.cmake")
 
-# The seed of the hashing collections without a fixed one: two runs of one
-# program choose two seeds.
-add_test(NAME conf_hash_seed_random
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CONF}/seed.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-hash_seed_random"
-        -P "${ANTIC_RUNNERS}/run_hash_seed.cmake")
-
-# Injection. The program of tests/inject names three interfaces and takes
-# a provider of each from --inject: the `get` of a singleton that
-# implements the interface, a module function, and the name of a
-# singleton that inherits the interface, whose `get` the provider is.
-# One field is called `alloc`, which the
-# example of the overview writes. `inject final` then refuses a
-# replacement at start, and --anti.inspect lists what it injects. The
-# program imports nothing, and the case plugin shows that its start opens
-# the library that --anti.inject names through the loader of the runtime,
-# which every program links, S328 of docs/audit/summary.md. The runner
-# is the one of the configuration tests, because a pattern file holds the
-# output of each.
-set(INJECT "${CMAKE_CURRENT_SOURCE_DIR}/inject")
-set(INJECT_OPTIONS "--inject,service.Logger=service.Console.get,--inject,service.Clock=service.the_clock,--inject,service.Allocator=service.Memory")
-foreach(case
-        "service|${INJECT_OPTIONS}||service.pattern||0"
-        "inspect|${INJECT_OPTIONS}|--anti.inspect|inspect.pattern||0"
-        "final|${INJECT_OPTIONS}|--anti.inject=service.Clock=lib/x.so|empty.pattern|final.pattern|70"
-        "unknown|${INJECT_OPTIONS}|--anti.inject=other.Thing=lib/x.so|empty.pattern|unknown.pattern|70"
-        "plugin|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so|empty.pattern|plugin.pattern|70")
-    string(REPLACE "|" ";" parts "${case}")
-    list(GET parts 0 name)
-    list(GET parts 1 options)
-    list(GET parts 2 arguments)
-    list(GET parts 3 expected)
-    list(GET parts 4 errors)
-    list(GET parts 5 status)
-    set(error_patterns "")
-    if(NOT errors STREQUAL "")
-        set(error_patterns "-DERRORS=${INJECT}/${errors}")
-    endif()
-    add_test(NAME inject_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${INJECT}/service.anti"
-            "-DOPTIONS=${options}"
-            "-DARGS=${arguments}"
-            "-DEXPECTED=${INJECT}/${expected}"
-            ${error_patterns}
-            "-DSTATUS=${status}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-${name}"
-            -P "${ANTIC_RUNNERS}/run_trace.cmake")
-endforeach()
-
-# The `[inject]` and `[inject.test]` tables of a manifest. `anti test`
-# runs in the project root, reads both and lays the test table over the
-# plain one, per interface. The one test of the module adds the label of
-# its logger to the reading of its clock. The test table names the
-# first provider and the plain table the second, so the sum says which
-# provider filled each field.
-foreach(mode dev release)
-    set(extra "")
-    if(mode STREQUAL "release")
-        set(extra --release)
-    endif()
-    add_expect_test(inject_manifest_${mode} STATUS 0
-        DIRECTORY "${INJECT}/project"
-        PATTERN "1 tests in 1 modules, 0 modules failed"
-        COMMAND "$<TARGET_FILE:anti>" test ${extra}
-                --work "${CMAKE_CURRENT_BINARY_DIR}/inject-manifest-${mode}"
-                -I src --runtime "${ANTIC_RUNTIME_DIR}"
- src/com/example/app.anti)
-endforeach()
-
-# The six standard interfaces under `anti test`. The project names no
-# provider for the build, so the link takes the default of each, and
-# `[inject.test]` lays a fake over every one of them. The one test asks
-# each interface for a value no default gives.
-foreach(mode dev release)
-    set(extra "")
-    if(mode STREQUAL "release")
-        set(extra --release)
-    endif()
-    add_expect_test(inject_standard_${mode} STATUS 0
-        DIRECTORY "${INJECT}/standard"
-        PATTERN "1 tests in 1 modules, 0 modules failed"
-        COMMAND "$<TARGET_FILE:anti>" test ${extra}
-                --work "${CMAKE_CURRENT_BINARY_DIR}/inject-standard-${mode}"
-                -I src --runtime "${ANTIC_RUNTIME_DIR}"
- src/com/example/standard.anti)
-endforeach()
-
-# Plugins. The library of tests/plugin is built with --lib shared
-# --no-runtime, so it carries no runtime and is bound against the host
-# that loads it. The host asks it for the interface, counts what it made
-# and closes it, and two programs take the provider of an injected field
-# from it, one by path and one through the index of its directory.
-#
-# DESIGN: a Linux host links dynamically against glibc, because it can
-# host a plugin, and a Windows plugin links against the import library of
-# its host. The test runs on all three systems.
-set(plugin_suffix ".dylib")
-set(plugin_exe "")
+# The platform linker links only for the operating system it runs on.
 if(ANTIC_HOST_OS STREQUAL "linux")
-    set(plugin_suffix ".so")
-elseif(ANTIC_HOST_OS STREQUAL "windows")
-    set(plugin_suffix ".dll")
-    set(plugin_exe ".exe")
+    set(foreign_target macos-arm64)
+else()
+    set(foreign_target linux-x86_64)
 endif()
-add_test(NAME plugin_host
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DSUFFIX=${plugin_suffix}"
-        "-DEXE=${plugin_exe}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
-        "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
-        -P "${ANTIC_RUNNERS}/run_plugin.cmake")
+add_expect_test(error_foreign_link STATUS 2
+    PATTERN "^antic: linking for ${foreign_target} with the platform linker needs a host with the same operating system"
+    COMMAND "$<TARGET_FILE:antic>" --target ${foreign_target} --linker platform
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
-# A plugin whose interface takes and gives every kind of value: the host
-# calls each function through the table of the interface, hands the
-# library a closure and an object of its own, and ends an object the
-# library made.
-add_test(NAME plugin_kinds
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DSUFFIX=${plugin_suffix}"
-        "-DEXE=${plugin_exe}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-kinds"
-        "-DHOST=kinds_host"
-        "-DLIBRARY=busy"
-        "-DINTERFACE=kinds"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/kinds_host.expected"
-        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+# The back end folds an array length from size_of and names the target.
+add_expect_test(error_array_length STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/zero_length.err"
+    COMMAND "$<TARGET_FILE:antic>" -S --target linux-x86_64
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/zero_length.s"
+            zero_length.anti)
 
-# The objects of a library that `live` counts and `unload` waits for: a
-# local object of a class of the library is gone when its function
-# returns, with a `destruct` and without one. T092 of
-# docs/audit/tests-findings.md.
-add_test(NAME plugin_locals
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DSUFFIX=${plugin_suffix}"
-        "-DEXE=${plugin_exe}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-locals"
-        "-DHOST=locals_host"
-        "-DLIBRARY=locals"
-        "-DINTERFACE=tasks"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/locals_host.expected"
-        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+add_expect_test(error_missing_runtime STATUS 2
+    PATTERN "^antic: linking needs --runtime"
+    COMMAND "$<TARGET_FILE:antic>" -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
-# An unload while another thread runs the code of the library: while
-# `reflect.new` runs the `construct` of a class of the library, and while
-# `delete` runs the `destruct` of an object of it. Each is refused. S307
-# and S308 of docs/audit/summary.md.
-add_test(NAME plugin_stages
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DSUFFIX=${plugin_suffix}"
-        "-DEXE=${plugin_exe}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-stages"
-        "-DHOST=stages_host"
-        "-DLIBRARY=stalls"
-        "-DINTERFACE=stages"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stages_host.expected"
-        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+add_expect_test(error_lexical STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/lexical.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/lexical.s"
+            lexical.anti)
 
-# A trace whose innermost frame lies in a library, read again after the
-# unload of the library: its build id, the name of its function and the
-# text of the trace. S306 of docs/audit/summary.md.
-add_test(NAME plugin_trace
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DSUFFIX=${plugin_suffix}"
-        "-DEXE=${plugin_exe}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-trace"
-        "-DHOST=trace_host"
-        "-DLIBRARY=tracer"
-        "-DINTERFACE=traced"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/trace_host.expected"
-        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
-
-# A library that uses two modules of the standard library which its host
-# imports and does not use itself. The library resolves them against the
-# host. T093 of docs/audit/tests-findings.md.
-add_test(NAME plugin_unused
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DSUFFIX=${plugin_suffix}"
-        "-DEXE=${plugin_exe}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-unused"
-        "-DHOST=stdlib_host"
-        "-DLIBRARY=stdlib"
-        "-DINTERFACE=tasks"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/stdlib_host.expected"
-        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
-# R133 of "Rules of 2026-10-13" in docs/decisions.md: a library that uses
-# two modules of the standard library which its host does not import fails
-# to load, and the host handles the failure. A Windows plugin links against
-# the import library of its host, where the same lack stops the link of
-# the library, so the test runs on the other hosts.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME plugin_module_not_imported
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-            "-DSUFFIX=${plugin_suffix}"
-            "-DEXE=${plugin_exe}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-module-not-imported"
-            "-DHOST=bare_host"
-            "-DLIBRARY=stdlib"
-            "-DINTERFACE=tasks"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/bare_host.expected"
-            -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
-endif()
-# R133 of "Rules of 2026-10-13": the message of such a load names the
-# module the host lacks. The library uses `anti.time` alone, which imports
-# nothing, so one module is missing on every host.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME plugin_module_named
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-            "-DSUFFIX=${plugin_suffix}"
-            "-DEXE=${plugin_exe}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-module-named"
-            "-DHOST=named_host"
-            "-DLIBRARY=clock"
-            "-DINTERFACE=tasks"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/named_host.expected"
-            -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
-endif()
-# A provided class that the loader cannot build without arguments: one
-# whose `construct` takes one, and one that holds such a class in a field
-# no default fills. `instance` gives `none` for each, and the link of the
-# library succeeds.
-foreach(library needy holder)
-    add_test(NAME plugin_refused_${library}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-            "-DSUFFIX=${plugin_suffix}"
-            "-DEXE=${plugin_exe}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-refused-${library}"
-            "-DHOST=refused_host"
-            "-DLIBRARY=${library}"
-            "-DINTERFACE=tasks"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/refused_host.expected"
-            -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
-endforeach()
-# The three checks of "Versions": the chain of the interface, the
-# fields it declares and the slots the program reaches through it.
-add_test(NAME plugin_versions
-    COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
-        "-DSUFFIX=${plugin_suffix}"
-        "-DEXE=${plugin_exe}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions"
-        -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
-
-# ANTI_CONF names the file when the command line names none, and the
-# command line wins when both name one. It is the one environment
-# variable the runtime reads.
-set_tests_properties(conf_environment conf_environment_option PROPERTIES
-    ENVIRONMENT "ANTI_CONF=${CONF}/basic.toml")
-
-# A value past 1023 bytes, and a path outside ASCII, reach the runtime
-# whole on every system. The long one names a file that is not there, and
-# the other a copy of basic.toml in a directory whose name is not ASCII.
-string(REPEAT "long/" 220 conf_long)
-set_tests_properties(conf_environment_long PROPERTIES
-    ENVIRONMENT "ANTI_CONF=${CONF}/${conf_long}nowhere.toml")
-set(conf_utf8 "${CMAKE_CURRENT_BINARY_DIR}/conf-ü€")
-add_test(NAME conf_environment_utf8_file
-    COMMAND "${CMAKE_COMMAND}" -E copy "${CONF}/basic.toml"
-        "${conf_utf8}/basic.toml")
-set_tests_properties(conf_environment_utf8_file PROPERTIES
-    FIXTURES_SETUP conf_utf8)
-set_tests_properties(conf_environment_utf8 PROPERTIES
-    ENVIRONMENT "ANTI_CONF=${conf_utf8}/basic.toml"
-    FIXTURES_REQUIRED conf_utf8)
-
-# The readers of the symbol table and the line table, on the binaries
-# that this host links for the other targets.
-antic_rt_sources(probe_sources symbols)
-add_executable(symbols_probe unit/symbols_probe.c ${probe_sources})
-target_link_libraries(symbols_probe PRIVATE antic_core)
-target_include_directories(symbols_probe PRIVATE ../src/rt)
-antic_coverage(symbols_probe)
-foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
-    add_test(NAME trace_symbols_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DPROBE=$<TARGET_FILE:symbols_probe>"
-            "-DSOURCE=${TRACE}/symbols.anti"
-            "-DTARGET=${target}"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-${target}"
-            -P "${ANTIC_RUNNERS}/run_symbols.cmake")
-    set_tests_properties(trace_symbols_${target} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-
-# read_build_id of tests/build_id.cmake refuses a file with no build line,
-# with two, or with an id that is not 64 digits.
-add_test(NAME build_id_reader
-    COMMAND "${CMAKE_COMMAND}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id-reader"
-        -P "${ANTIC_RUNNERS}/run_build_id_reader.cmake")
-# The build id in the notice is the digest of the code. Two builds of one
-# program carry the same id, and another program carries another. An
-# object that opens and fails to read is refused.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME program_build_id
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-            "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/args.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id"
-            -P "${ANTIC_RUNNERS}/run_build_id.cmake")
-endif()
-
-# The test llvm_build_id of docs/work-order-llvm-back-end.md: under the
-# LLVM back end a -g build and a plain build of one program give one build
-# id, since the digest leaves out every span of the text that -g added.
-# The program has several functions, so -g adds a subprogram and lines to
-# each. COFF writes subprograms in the plain build too.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    foreach(target ${ANTIC_HOST_TARGET} windows-x86_64)
-        add_test(NAME llvm_build_id_${target}
-            COMMAND "${CMAKE_COMMAND}"
-                ${ANTIC_AND_RUNTIME}
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
-                "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
-                "-DOPTIONS=--target|${target}"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-build-id/${target}"
-                -P "${ANTIC_RUNNERS}/run_build_id.cmake")
-    endforeach()
-endif()
-
-# A program that imports a standard library module carries the package of
-# the library, which is the reserved root anti.
-if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    add_test(NAME program_licenses_std
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/io.anti"
-            "-DWANTED=ANTI_LICENSES_BEGIN|build [0-9a-f]+|package anti.rt [0-9.]+ 0BSD|package anti [0-9.]+ 0BSD|package com.example.hello 2.0.0 MIT"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses-std"
-            "-DHOST=${ANTIC_HOST_TARGET}"
-            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
-            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
-            -P "${ANTIC_RUNNERS}/run_licenses.cmake")
-endif()
-
-# Libraries for C, built with antic --lib and used from C programs on the
-# host. Windows compiles the programs with the pinned clang against the
-# mingw-w64 sysroot of the runtime archive and links them with lld-link.
-
-# The text of a float takes no digit from the C library in any runtime of
-# the archive. std/float_text.anti holds the text itself.
-add_test(NAME float_digits
-    COMMAND "${CMAKE_COMMAND}"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-        "-DLLVM_AR=${ANTIC_LLVM_AR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/float_digits"
-        -P "${ANTIC_RUNNERS}/run_float_digits.cmake")
-foreach(case static shared exports two loader header bundle classes
-        failing tuples flags variants nested simd names handlers ledger
-        generics optional forms views never never_cpp ctypes
-        ctypes_shared ctypes_bundle tight tight_aligned)
-    # The C program of ledger starts its threads with pthreads.
-    if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
-        continue()
-    endif()
-    add_test(NAME clib_${case}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DLLVM_AR=${ANTIC_LLVM_AR}"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib"
-            "-DCASE=${case}"
-            "-DCC=${ANTIC_TEST_CC}"
-            "-DCXX=${ANTIC_TEST_CXX}"
-            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
-            "-DTARGET=${ANTIC_HOST_TARGET}"
-            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-            -P "${ANTIC_RUNNERS}/run_clib.cmake")
-    set_tests_properties(clib_${case} PROPERTIES
-        SKIP_REGULAR_EXPRESSION "SKIP: ")
-endforeach()
-# Two bundled libraries of each Windows target on every host. The pinned
-# clang compiles the C program for the target and lld-link links it, and
-# nothing runs.
-if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
-    foreach(target windows-x86_64 windows-arm64)
-        if(target STREQUAL ANTIC_HOST_TARGET)
-            continue()
-        endif()
-        add_test(NAME clib_bundle_${target}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DLLVM_AR=${ANTIC_LLVM_AR}"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-                "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
-                "-DCASE=bundle"
-                "-DCC=${CMAKE_C_COMPILER}"
-                "-DCXX=${CMAKE_C_COMPILER}"
-                "-DTARGET=${target}"
-                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                -DCROSS=ON
-                -P "${ANTIC_RUNNERS}/run_clib.cmake")
-        set_tests_properties(clib_bundle_${target} PROPERTIES
-            SKIP_REGULAR_EXPRESSION "SKIP: ")
-    endforeach()
-endif()
-
-# A bundled library of each macOS target on every host. The pinned clang
-# compiles the C programs against the sysroot of the runtime archive and
-# ld64.lld links them, as antic links an Anti program. A Mac runs them,
-# the ones of macos-x86_64 under Rosetta at v1, and every other host
-# links them alone. clib_bundle_twice_<target> links two bundled libraries
-# into one program and expects the duplicate symbol of their markers.
-if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
-    foreach(target macos-arm64 macos-x86_64)
-        set(cross ON)
-        set(options "")
-        if(target STREQUAL ANTIC_HOST_TARGET)
-            set(cross OFF)
-        elseif(target STREQUAL ANTIC_EMULATED_TARGET)
-            set(cross OFF)
-            set(options "--cpu|v1")
-        endif()
-        foreach(case bundle twice)
-            set(name clib_bundle_${target})
-            if(case STREQUAL "twice")
-                set(name clib_bundle_twice_${target})
-            endif()
-            add_test(NAME ${name}
-                COMMAND "${CMAKE_COMMAND}"
-                    "-DANTIC=$<TARGET_FILE:antic>"
-                    "-DLLVM_AR=${ANTIC_LLVM_AR}"
-                    "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                    "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-                    "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
-                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
-                    "-DCASE=${case}"
-                    "-DCC=${CMAKE_C_COMPILER}"
-                    "-DCXX=${CMAKE_C_COMPILER}"
-                    "-DTARGET=${target}"
-                    "-DOPTIONS=${options}"
-                    "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
-                    -DSYSROOT=ON
-                    -DCROSS=${cross}
-                    -P "${ANTIC_RUNNERS}/run_clib.cmake")
-            set_tests_properties(${name} PROPERTIES
-                SKIP_REGULAR_EXPRESSION "SKIP: ")
-        endforeach()
-    endforeach()
-endif()
-
-# A function that may fail and returns a tuple takes one out pointer, the
-# last parameter, and not one per element. The header of clib_tuples
-# pins the same signature on the C side.
-add_test(NAME ir_tuple_out
+# A source of 64 MiB passes the front end, and one a byte longer is
+# refused when it is read, before the lexer sees it.
+add_test(NAME error_source_cap
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/tuples.anti"
-        "-DLINE=export fn com.example.tuples.tuples_divide(%0: i64, %1: i64, %2: ptr nonnull deref(size_of (int, int))) -> ptr {"
-        -P "${ANTIC_RUNNERS}/run_ir_line.cmake")
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-cap"
+        -P "${ANTIC_RUNNERS}/run_source_cap.cmake")
 
-# The Windows unwind data of unwind.anti, decoded by llvm-readobj from the
-# object that llvm-mc writes.
-foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
-        "windows-arm64,aarch64-pc-windows-msvc")
-    string(REPLACE "," ";" parts "${target_triple}")
-    list(GET parts 0 target)
-    list(GET parts 1 triple)
-    add_test(NAME unwind_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            ${ANTIC_AND_RUNTIME}
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
-            "-DTARGET=${target}"
-            "-DTRIPLE=${triple}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unwind"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.${target}.unwind"
-            -P "${ANTIC_RUNNERS}/run_unwind.cmake")
-endforeach()
-
-# targets.txt is the target matrix that antic --print-targets prints.
-add_test(NAME print_targets
+# The lexer refuses a NUL byte outside a literal, wherever it stands
+# among the blocks the reader takes, and takes one inside a bytes
+# literal.
+add_test(NAME error_source_nul
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
-        "-DCOMMAND=--print-targets"
-        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/targets.txt"
-        -P "${ANTIC_RUNNERS}/run_dump.cmake")
+        "-DNUL=${CMAKE_CURRENT_SOURCE_DIR}/errors/nul_byte.bin"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-nul"
+        -P "${ANTIC_RUNNERS}/run_source_nul.cmake")
 
-# The LLVM text of a program of control flow alone: one target of each
-# object format, a release build and two objects of one module.
-antic_dump_test(llvm control_flow
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.macos-arm64.ll"
-    TARGET macos-arm64
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
-foreach(target linux-x86_64 windows-x86_64)
-    antic_dump_test(llvm control_flow
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.${target}.ll"
-        TARGET ${target}
-        ARGS --dev "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
-endforeach()
-
-# main.opt is the optimized IR listing that antic prints for main.anti.
-antic_dump_test(opt main
-    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
-
-# The LLVM text of programs of tests/dump, one golden per program and
-# target, for the pairs of a program and a target whose machine code had a
-# golden before antic wrote LLVM text.
-foreach(case "main,macos-arm64" "main,macos-x86_64" "main,linux-x86_64"
-        "main,linux-arm64" "main,windows-x86_64" "main,windows-arm64"
-        "twice,macos-arm64" "cell,macos-arm64" "spill12,macos-arm64"
-        "spill7,linux-x86_64" "sum,linux-x86_64" "sum,macos-arm64"
-        "args,linux-x86_64" "args,windows-x86_64" "args,macos-arm64"
-        "args,linux-arm64" "x86,linux-x86_64" "x86,linux-arm64"
-        "arm64,macos-arm64" "arm64,linux-arm64"
-        "floatcalls,linux-x86_64" "floatcalls,windows-x86_64"
-        "floatcalls,macos-arm64" "floatcalls,windows-arm64"
-        "floatcalls,linux-arm64" "floats,linux-x86_64" "floats,macos-arm64"
-        "structs,linux-x86_64" "structs,windows-x86_64" "structs,macos-arm64"
-        "structs,linux-arm64" "structs,windows-arm64"
-        "fnptr,linux-x86_64" "fnptr,linux-arm64" "fnptr,macos-arm64"
-        "loop,linux-arm64" "loop,macos-x86_64"
-        "spillweight,linux-x86_64" "measure,linux-arm64"
-        "strings,linux-x86_64" "strings,macos-arm64" "strings,windows-x86_64")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 source)
-    list(GET parts 1 target)
-    antic_dump_test(llvm ${source}
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.ll"
-        TARGET ${target}
-        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti")
-endforeach()
-foreach(case "sizes,linux-x86_64" "bitfields,linux-x86_64"
-        "bitfields,windows-x86_64" "letters,macos-arm64" "letters,linux-x86_64")
-    string(REPLACE "," ";" parts "${case}")
-    list(GET parts 0 source)
-    list(GET parts 1 target)
-    antic_dump_test(llvm ${source}
-        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.ll"
-        TARGET ${target}
-        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/programs/${source}.anti")
-endforeach()
+# Two mistakes produce exactly two messages.
+add_expect_test(error_syntax STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/syntax.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/syntax.s"
+            syntax.anti)
 
 # The refusals of the programs of tests/errors, error_<name>. A message
 # names the file alone, so each runs in the directory of its program.
@@ -6690,10 +4604,881 @@ add_expect_test(error_if_at_the_depth_limit STATUS 1
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
     EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/if_at_the_depth_limit.err"
     COMMAND "$<TARGET_FILE:antic>" --front-end if_at_the_depth_limit.anti)
-# A program of tests/errors that no test reads is refused.
-add_test(NAME errors_registered
-    COMMAND "${CMAKE_COMMAND}" "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
-            -P "${ANTIC_RUNNERS}/run_errors_registered.cmake")
+
+# Semantic analysis reports every error it finds.
+add_expect_test(error_types STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/types.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/types.s"
+            types.anti)
+
+# The back end and the targets: the IR, the LLVM text, the dumps, the
+# assembly, the processor levels, the links and the pinned bytes of the
+# output.
+
+# The processor levels. src/antic/cpu.c holds the table for antic and
+# tools/cpu-levels holds it for the build, so the two are compared.
+add_test(NAME cpu_levels_pin
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLEVELS=${PROJECT_SOURCE_DIR}/tools/cpu-levels"
+        -P "${ANTIC_RUNNERS}/run_cpu_pin.cmake")
+
+# The data layout of every target and the CPU attributes of every level that
+# the LLVM back end writes are the ones the pinned clang writes.
+add_test(NAME llvm_datalayout_pin
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DCLANG=${ANTIC_CLANG_DIR}/bin/clang"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_datalayout_pin"
+        -P "${ANTIC_RUNNERS}/run_llvm_datalayout_pin.cmake")
+
+# The text of the LLVM back end passes the verifier of opt for every program
+# of tests/dump and tests/programs, in release and dev mode, one test per
+# target. From the step emit-wide on the translator takes every operation
+# of the IR, so a program it refuses fails the test.
+# DESIGN: one test per target, since each runs antic twice per program. As
+# one test the twelve runs per program took over nine minutes under ASan,
+# whose start alone costs a fifth of a second.
+foreach(target IN LISTS ANTIC_TARGETS)
+    add_test(NAME llvm_verify_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DOPT=${ANTIC_OPT}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/programs"
+            "-DTARGETS=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
+            -P "${ANTIC_RUNNERS}/run_llvm_verify.cmake")
+endforeach()
+# run_llvm_verify.cmake fails for an antic that a signal ends, and for a
+# refused file that its list of the files that are no program lacks.
+add_test(NAME llvm_verify_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_llvm_verify.cmake"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DOPT=${ANTIC_OPT}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DTARGET=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify_runner"
+        -P "${ANTIC_RUNNERS}/run_llvm_verify_self.cmake")
+
+# The tool run of the LLVM back end: --keep-llvm, the bitcode of release
+# mode alone and -S. A failed opt or llc prints its own message and then
+# the line of antic. --opt and --llc name the tool, here one that refuses
+# the options antic passes: llc for opt, and llvm-mc for llc, since opt
+# takes the options of llc. Every host runs them.
+add_test(NAME llvm_run
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_run"
+        -P "${ANTIC_RUNNERS}/run_llvm_run.cmake")
+add_expect_test(llvm_opt_failed STATUS 1
+    PATTERN "llc(\\.exe)?: error: -passes is for .mir file only.*antic: opt failed"
+    COMMAND $<TARGET_FILE:antic>
+            --runtime "${ANTIC_RUNTIME_DIR}" --opt "${ANTIC_LLC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_opt_failed"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+add_expect_test(llvm_llc_failed STATUS 1
+    PATTERN "llvm-mc(\\.exe)?: Unknown command line argument .*antic: llc failed"
+    COMMAND $<TARGET_FILE:antic> --dev
+            --runtime "${ANTIC_RUNTIME_DIR}" --llc "${ANTIC_LLVM_MC}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/llvm_llc_failed"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+
+# The test llvm_inline_lines: a release build with -g inlines a small
+# callee, and the line table names the line of the callee in the code of
+# its caller.
+add_test(NAME llvm_inline_lines
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/llvm_inline_lines.anti"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-inline-lines"
+        -P "${ANTIC_RUNNERS}/run_llvm_inline_lines.cmake")
+
+# The test of the step tables of docs/work-order-llvm-optimization.md: a
+# release build calls the function of an object of a known class
+# directly after opt, across the call of the `created` hook. Every host
+# builds for every target, so each spelling of the name is read on every
+# host. The Windows VM found the COFF one missing.
+foreach(target IN LISTS ANTIC_TARGETS)
+    add_test(NAME direct_calls_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DOPT=${ANTIC_OPT}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/table_hook.anti"
+            "-DFUNCTION=table_hook.main"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/direct-calls/${target}"
+            -P "${ANTIC_RUNNERS}/run_direct_calls.cmake")
+    set_tests_properties(direct_calls_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# A COFF host of plugins exports every name its plugin imports, and the
+# plugin lists as many places as its table counts. The VM run runs both.
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME llvm_coff_plugin_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/${target}"
+            -P "${ANTIC_RUNNERS}/run_llvm_coff_plugin.cmake")
+    set_tests_properties(llvm_coff_plugin_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+# A library that keeps an `f16` converts it through two functions of the
+# runtime below x86-64-v3, and takes them from its host as it takes every
+# other one.
+add_test(NAME llvm_coff_plugin_f16
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DTARGET=windows-x86_64"
+        "-DCPU=v2"
+        "-DLIBRARY=halves"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-coff-plugin/f16"
+        -P "${ANTIC_RUNNERS}/run_llvm_coff_plugin.cmake")
+set_tests_properties(llvm_coff_plugin_f16 PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The archive holds a runtime per level, so that a program built with --cpu
+# below its target's default links a runtime of that level.
+add_test(NAME cpu_archive_levels
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLEVELS=${PROJECT_SOURCE_DIR}/tools/cpu-levels"
+        "-DTARGETS=linux-x86_64|linux-arm64|macos-x86_64|macos-arm64|windows-x86_64|windows-arm64"
+        -P "${ANTIC_RUNNERS}/run_cpu_archive.cmake")
+set_tests_properties(cpu_archive_levels PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# One test per x86_64 level: v3 writes the VEX forms of AVX and the two
+# levels below it write the SSE forms. v2 adds no instruction that llc
+# writes for the program, so it differs from v1 in the runtime alone.
+set(cpu_sse "\taddsd\t|\taddss\t|\tmulss\t|\tucomisd\t|\tcvtss2sd\t|\tmovsd\t")
+set(cpu_avx "\tvaddsd\t|\tvaddss\t|\tvmulss\t|\tvucomisd\t|\tvcvtss2sd\t|\tvmovsd\t")
+foreach(case "v1,${cpu_sse},${cpu_avx}" "v2,${cpu_sse},${cpu_avx}"
+        "v3,${cpu_avx},${cpu_sse}")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 level)
+    list(GET parts 1 uses)
+    list(GET parts 2 avoids)
+    add_test(NAME cpu_level_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DTARGET=linux-x86_64"
+            "-DLEVEL=${level}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/floats.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpu-level"
+            "-DUSES=${uses}"
+            "-DAVOIDS=${avoids}"
+            -P "${ANTIC_RUNNERS}/run_cpu_level.cmake")
+endforeach()
+
+# One test per ARM64 level, through the target that defaults to it. The
+# level's instructions are the atomics: one instruction at armv8.2 and
+# above, a load-store exclusive loop below.
+set(cpu_lse "casal|ldaddal|swpal")
+set(cpu_exclusive "ldaxr|stlxr")
+foreach(case "linux-arm64,armv8.0,${cpu_exclusive},${cpu_lse}"
+        "windows-arm64,armv8.2,${cpu_lse},${cpu_exclusive}"
+        "macos-arm64,armv8.5,${cpu_lse},${cpu_exclusive}")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 level)
+    list(GET parts 2 uses)
+    list(GET parts 3 avoids)
+    antic_static_library(library_name anti_rt "${target}")
+    set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/${library_name}")
+    add_test(NAME cpu_level_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DLIBRARY=${library}"
+            "-DTARGET=${target}"
+            "-DLEVEL=${level}"
+            "-DUSES=${uses}"
+            "-DAVOIDS=${avoids}"
+            -P "${ANTIC_RUNNERS}/run_cpu_runtime.cmake")
+    set_tests_properties(cpu_level_${level} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# The atomic operations of a program are LLVM atomic instructions on every
+# target, and each target and level writes the instructions its runtime
+# holds: one instruction with LSE, a load-store exclusive loop on armv8.0,
+# and the lock prefix on x86_64. No call of the runtime remains.
+add_test(NAME llvm_atomics
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-atomics"
+        -P "${ANTIC_RUNNERS}/run_llvm_atomics.cmake")
+set(atomic_lse "\tcasal\t|\tldaddal\t|\tswpal\t|\tcasalb\t|\tcasalh\t")
+set(atomic_exclusive "\tldaxr\t|\tstlxr\t|\tldaxrb\t|\tstlxrh\t")
+set(atomic_x86 "\tlock\t\t|xadd|cmpxchg|\txchg")
+set(atomic_calls "anti_rt_atomic|__aarch64_")
+foreach(case "linux-arm64,armv8.0,${atomic_exclusive},${atomic_lse}"
+        "linux-arm64,armv8.2,${atomic_lse},${atomic_exclusive}"
+        "linux-arm64,armv8.5,${atomic_lse},${atomic_exclusive}"
+        "windows-arm64,armv8.2,${atomic_lse},${atomic_exclusive}"
+        "macos-arm64,armv8.5,${atomic_lse},${atomic_exclusive}"
+        "linux-x86_64,v1,${atomic_x86},"
+        "linux-x86_64,v3,${atomic_x86},"
+        "macos-x86_64,v3,${atomic_x86},"
+        "windows-x86_64,v3,${atomic_x86},")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 level)
+    list(GET parts 2 uses)
+    list(GET parts 3 avoids)
+    if(avoids STREQUAL "")
+        set(avoids "${atomic_calls}")
+    else()
+        set(avoids "${avoids}|${atomic_calls}")
+    endif()
+    add_test(NAME atomics_${target}_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DTARGET=${target}"
+            "-DLEVEL=${level}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/atomics-level"
+            "-DUSES=${uses}"
+            "-DAVOIDS=${avoids}"
+            -P "${ANTIC_RUNNERS}/run_cpu_level.cmake")
+endforeach()
+
+# An atomic load of the runtime is sequentially consistent on every ARM64
+# target and level, as src/rt/atomic.c promises. Windows compiled it through
+# `volatile` once, which is a plain load there.
+foreach(target linux-arm64 macos-arm64 windows-arm64)
+    foreach(level armv8.0 armv8.2 armv8.5)
+        antic_static_library(library_name anti_rt "${target}")
+        set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/${library_name}")
+        add_test(NAME atomic_load_${target}_${level}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                "-DLIBRARY=${library}"
+                "-DTARGET=${target}"
+                -P "${ANTIC_RUNNERS}/run_atomic_load.cmake")
+        set_tests_properties(atomic_load_${target}_${level} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+endforeach()
+
+# The two conversions of f16. ARM64 and x86-64-v3 have one instruction
+# for each, and v1 and v2, which lack F16C, call the runtime. No call
+# reaches the conversions of compiler-rt.
+set(f16_call "anti_rt_f16_to_f32|anti_rt_f32_to_f16")
+set(f16_f16c "\tvcvtph2ps\t|\tvcvtps2ph\t")
+set(f16_fcvt "\tfcvt\ts|\tfcvt\th")
+set(f16_rt "__extendhfsf2|__truncsfhf2")
+foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
+        "linux-x86_64,v2,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
+        "linux-x86_64,v3,${f16_f16c},${f16_call}|${f16_rt}"
+        "windows-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
+        "windows-x86_64,v3,${f16_f16c},${f16_call}|${f16_rt}"
+        "linux-arm64,armv8.0,${f16_fcvt},${f16_call}|${f16_rt}"
+        "macos-arm64,armv8.5,${f16_fcvt},${f16_call}|${f16_rt}")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 level)
+    list(GET parts 2 uses)
+    list(GET parts 3 avoids)
+    add_test(NAME f16_${target}_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DTARGET=${target}"
+            "-DLEVEL=${level}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/f16"
+            "-DUSES=${uses}"
+            "-DAVOIDS=${avoids}"
+            -P "${ANTIC_RUNNERS}/run_cpu_level.cmake")
+endforeach()
+
+# The native width of a simd operation: one instruction on the registers
+# of 32 bytes at x86-64-v3, and two on the 16 bytes of every other level
+# and of ARM64.
+foreach(case "linux-x86_64,v3,vaddps[^\n]*%ymm,1"
+        "linux-x86_64,v1,addps[^\n]*%xmm,2"
+        "linux-x86_64,v2,addps[^\n]*%xmm,2"
+        "macos-arm64,armv8.5,fadd.4s\tv,2"
+        "linux-arm64,armv8.0,fadd\tv[0-9]+.4s,2")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 level)
+    list(GET parts 2 pattern)
+    list(GET parts 3 count)
+    add_test(NAME simd_width_${target}_${level}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DTARGET=${target}"
+            "-DLEVEL=${level}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_wide.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/simd"
+            "-DPATTERN=${pattern}"
+            "-DCOUNT=${count}"
+            -P "${ANTIC_RUNNERS}/run_simd_width.cmake")
+endforeach()
+
+# DESIGN: the start-up check on a real machine below the level. Rosetta
+# runs a macos-x86_64 program on a macos-arm64 host and has no AVX2, so a
+# program of the default level x86-64-v3 refuses there with the message of
+# the section. Every other host runs the check in the unit tests, where
+# ANTI_DEV_CPU stands a level in for the processor.
+if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
+    add_test(NAME cpu_check_refuses
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DTARGET=macos-x86_64"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpu-check"
+            "-DNEEDS=AVX2 .x86-64-v3, 2013 or later."
+            -P "${ANTIC_RUNNERS}/run_cpu_check.cmake")
+    set_tests_properties(cpu_check_refuses PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endif()
+
+# A module that writes no function writes no empty CodeView subsection of
+# symbols, which lld-link warns of. codeview_empty_refuses_<target> feeds
+# the check an object with an empty one, which it must refuse.
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME codeview_empty_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DSTD=${ANTIC_RUNTIME_DIR}/std"
+            "-DSOURCE=${ANTIC_RUNTIME_DIR}/std/anti/collection/tree.antl"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/codeview-empty"
+            -P "${ANTIC_RUNNERS}/run_codeview_empty.cmake")
+    add_test(NAME codeview_empty_refuses_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCLANG=${CMAKE_C_COMPILER}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/codeview-empty"
+            -P "${ANTIC_RUNNERS}/run_codeview_empty.cmake")
+endforeach()
+
+# A variant of 65536 cases takes a tag of 32 bits. The runner writes the
+# source and runs the program.
+add_test(NAME variant_wide_tag
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variant-wide-tag"
+        -P "${ANTIC_RUNNERS}/run_variant_wide_tag.cmake")
+
+# lld links a program for every target on this host. The test of a
+# target without a sysroot in the runtime archive is skipped. The second
+# program holds an aggregate constant with an address in it, which lands
+# in the section each format keeps for data the loader writes.
+foreach(case "linux-x86_64|elf64-x86-64" "linux-arm64|elf64-littleaarch64"
+        "macos-x86_64|mach-o 64-bit x86-64" "macos-arm64|mach-o arm64"
+        "windows-x86_64|coff-x86-64" "windows-arm64|coff-arm64")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 target)
+    list(GET parts 1 format)
+    foreach(program return42 const_data)
+        set(suffix "")
+        if(NOT program STREQUAL "return42")
+            set(suffix "_${program}")
+        endif()
+        add_test(NAME cross_link_${target}${suffix}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/${program}.anti"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cross"
+                "-DTARGET=${target}"
+                "-DFORMAT=${format}"
+                -P "${ANTIC_RUNNERS}/run_cross_link.cmake")
+        set_tests_properties(cross_link_${target}${suffix} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+    # The step runtime-lto of docs/work-order-llvm-optimization.md: lld
+    # links the bitcode of the program with the runtime as bitcode of
+    # each mode for every target.
+    foreach(mode full thin)
+        add_test(NAME cross_link_lto_${mode}_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cross-lto-${mode}"
+                "-DTARGET=${target}"
+                "-DFORMAT=${format}"
+                "-DOPTIONS=--lto,${mode}"
+                -P "${ANTIC_RUNNERS}/run_cross_link.cmake")
+        set_tests_properties(cross_link_lto_${mode}_${target} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+endforeach()
+
+# Every link drops the code a program never calls. A hello-world program
+# calls anti_rt_write of src/rt/io.c and never anti_rt_exit of the same
+# file, so the second must be gone from the executable of every target.
+foreach(target IN LISTS ANTIC_TARGETS)
+    add_test(NAME dead_code_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dead-code"
+            "-DTARGET=${target}"
+            "-DKEPT=anti_rt_write"
+            "-DDROPPED=anti_rt_exit"
+            -P "${ANTIC_RUNNERS}/run_dead_code.cmake")
+    set_tests_properties(dead_code_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# Two functions and two descriptors whose contents could be folded keep
+# addresses of their own in a release program of every target, in the
+# default LTO link and in the object link of --lto none.
+set(distinct_source "${CMAKE_CURRENT_SOURCE_DIR}/link-identity/distinct.anti")
+foreach(target IN LISTS ANTIC_TARGETS)
+    foreach(lto full none)
+        if(lto STREQUAL "full")
+            set(name distinct_addresses_${target})
+        else()
+            set(name distinct_addresses_lto_${lto}_${target})
+        endif()
+        add_test(NAME ${name}
+            COMMAND "${CMAKE_COMMAND}"
+                ${ANTIC_AND_RUNTIME}
+                "-DSOURCE=${distinct_source}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/distinct-addresses/${lto}"
+                "-DTARGET=${target}"
+                "-DLTO=${lto}"
+                "-DROOT=${CMAKE_SOURCE_DIR}"
+                -P "${ANTIC_RUNNERS}/run_distinct_addresses.cmake")
+        set_tests_properties(${name} PROPERTIES
+            SKIP_REGULAR_EXPRESSION "SKIP: ")
+    endforeach()
+endforeach()
+
+# Every object of a program and of its runtime carries the
+# address-significance table that the safe folding of lld reads.
+foreach(target IN LISTS ANTIC_TARGETS)
+    add_test(NAME address_tables_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DSOURCE=${distinct_source}"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/address-tables/${target}"
+            -P "${ANTIC_RUNNERS}/run_address_tables.cmake")
+    set_tests_properties(address_tables_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# A windows-x86_64 program holds no 32-bit absolute address, and runs on a
+# Windows host.
+add_test(NAME windows_addresses
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/hello.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/windows-addresses"
+        "-DROOT=${CMAKE_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_windows_addresses.cmake")
+set_tests_properties(windows_addresses PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# A release build links the runtime as bitcode through full LTO unless it
+# is told otherwise or cannot.
+add_test(NAME lto_default
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DHOSTING=${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/lto-default"
+        -P "${ANTIC_RUNNERS}/run_lto_default.cmake")
+
+# --lto takes one of its two modes, and links a program in release mode
+# alone. A runtime archive without the runtime as bitcode of the mode is
+# refused before anything compiles.
+add_expect_test(lto_mode STATUS 2
+    PATTERN "^antic: --lto takes full, thin or none, not fast"
+    COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
+            --lto fast -o "${CMAKE_CURRENT_BINARY_DIR}/lto_mode"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+foreach(case "dev|--dev" "assembly|-S" "library|-c" "lib|--lib|static"
+        "platform|--linker|platform")
+    string(REPLACE "|" ";" parts "${case}")
+    list(POP_FRONT parts what)
+    add_expect_test(lto_refused_${what} STATUS 2
+        PATTERN "^antic: --lto links a program in release mode, without --dev, -S, -c, --lib or --linker platform"
+        COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
+                --lto full ${parts}
+                -o "${CMAKE_CURRENT_BINARY_DIR}/lto_refused_${what}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+endforeach()
+# The .def file of a Windows program that hosts plugins lists the COFF
+# symbols of its object, which --lto makes bitcode.
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    add_expect_test(lto_refused_windows_host STATUS 1
+        PATTERN "^antic: --lto links no Windows program that hosts plugins"
+        COMMAND $<TARGET_FILE:antic> --runtime "${ANTIC_RUNTIME_DIR}"
+                --target windows-x86_64 --lto full
+                -o "${CMAKE_CURRENT_BINARY_DIR}/lto_refused_windows_host.exe"
+                "${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti")
+endif()
+
+add_expect_test(lto_no_bitcode STATUS 2
+    PATTERN "^antic: --lto thin needs .*/lib/${ANTIC_HOST_TARGET}/[^/]+/bitcode/thin/[^/]+, the runtime as bitcode"
+    COMMAND $<TARGET_FILE:antic> --runtime "${CMAKE_CURRENT_BINARY_DIR}"
+            --lto thin -o "${CMAKE_CURRENT_BINARY_DIR}/lto_no_bitcode"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+
+# A release links its macOS binaries against the pinned Apple SDK, and an
+# SDK that changed under that name is refused.
+add_test(NAME macos_sdk
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DCLANG=${ANTIC_CLANG_DIR}/bin/clang"
+            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macossdk"
+            -P "${ANTIC_RUNNERS}/run_macos_sdk.cmake")
+set_tests_properties(macos_sdk PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+# run_macos_sdk.cmake skips for a missing SDK alone, and fails for one
+# that changed under the pinned name.
+add_test(NAME macos_sdk_runner
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DRUNNER=${ANTIC_RUNNERS}/run_macos_sdk.cmake"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macossdk-runner"
+            -P "${ANTIC_RUNNERS}/run_macos_sdk_self.cmake")
+set_tests_properties(macos_sdk_runner PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# A Windows executable carries the CodeView record of the PDB that
+# lld-link wrote beside it. It holds no path of the machine that linked it
+# either, because the link passes /PDBALTPATH:%_PDB%.
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME pdb_guid_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-pdb.cmake"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb"
+            "-DTARGET=${target}"
+            -P "${ANTIC_RUNNERS}/run_pdb_guid.cmake")
+    set_tests_properties(pdb_guid_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# The PDB of a Windows program names every function of it, in a release
+# build and in one with -g, and holds no path of the build. Release mode
+# inlines inner, outer and put, which then have no record of their own, as
+# the entry on inlined frames in docs/decisions.md says. skipped keeps its
+# frame for the skip it passes.
+set(pdb_names "stack_trace.skipped;stack_trace.main")
+foreach(target windows-x86_64 windows-arm64)
+    add_test(NAME pdb_names_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
+            "-DNAMES=${pdb_names}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb-names"
+            "-DTARGET=${target}"
+            "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_pdb_names.cmake")
+    set_tests_properties(pdb_names_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# antic writes the same LLVM text for every test program on every host.
+add_test(NAME emit_identity
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DPROGRAMS=${CMAKE_CURRENT_SOURCE_DIR}/programs"
+        "-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/emit-identity/programs.sha256"
+        "-DVERSION=${PROJECT_VERSION}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity"
+        "-DPINNED=${CMAKE_CURRENT_BINARY_DIR}/emit-identity-pinned"
+        -P "${ANTIC_RUNNERS}/run_emit_identity.cmake")
+
+# The runner keeps the texts of its manifest and names the first line that
+# moved in each text that differs. It writes a manifest on the Mac alone.
+if(ANTIC_HOST_OS STREQUAL "macos")
+    add_test(NAME emit_identity_texts
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DVERSION=${PROJECT_VERSION}"
+            "-DRUNNER=${ANTIC_RUNNERS}/run_emit_identity.cmake"
+            "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/emit-identity-texts"
+            -P "${ANTIC_RUNNERS}/run_emit_identity_self.cmake")
+endif()
+
+# One object links to the same bytes for macos-arm64 on every host.
+add_test(NAME link_identity_macos-arm64
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/return42.macos-arm64.sha256"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/link-identity"
+        -P "${ANTIC_RUNNERS}/run_link_identity.cmake")
+set_tests_properties(link_identity_macos-arm64 PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# A program that names a framework links against Apple's SDK. The
+# macos-x86_64 program runs under Rosetta, which has no AVX2, so it takes
+# the v1 level and the v1 runtime of the archive.
+foreach(target macos-arm64 macos-x86_64)
+    set(framework_options "")
+    if(target STREQUAL "macos-x86_64")
+        set(framework_options "--cpu,v1")
+    endif()
+    add_test(NAME framework_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOPTIONS=${framework_options}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/framework/core_foundation.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/framework"
+            "-DTARGET=${target}"
+            -P "${ANTIC_RUNNERS}/run_framework.cmake")
+    set_tests_properties(framework_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# A shared library takes the frameworks, the `link linux` libraries, the
+# glibc mode and the memory checks of a program of its module.
+add_test(NAME shared_inputs
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/shared-inputs"
+        -P "${ANTIC_RUNNERS}/run_shared_inputs.cmake")
+
+# Dumps of compiler stages, compared with expected files in tests/dump.
+# scale.tokens is the token listing that antic prints for scale.anti.
+antic_dump_test(tokens scale
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.tokens"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
+
+# A doc comment is one token, printed with its first source line.
+antic_dump_test(tokens docs
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.tokens"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/docs.anti")
+
+# The groups of a float literal, a character literal, a pattern literal and
+# a reserved word.
+antic_dump_test(tokens kinds
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/kinds.tokens"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/kinds.anti")
+
+# scale.ast is the syntax tree listing that antic prints for scale.anti.
+antic_dump_test(ast scale
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
+
+# `fallthrough;` is a statement of its own in the tree of an arm.
+antic_dump_test(ast switch_fallthrough
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/switch_fallthrough.anti")
+
+# Type parameters and type arguments in the tree: `>>` closes two lists,
+# and `<` in an expression opens a list by the rule of C#.
+antic_dump_test(ast generics_syntax
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/generics_syntax.anti")
+
+# An `f"..."` is one node, with the value of each `{expr}` below it.
+antic_dump_test(ast format
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/format.anti")
+
+# R153 of "Rules of 2026-10-13" in docs/decisions.md: under --tests the
+# tree holds the functions of the `tests` and the `fixtures` block.
+antic_dump_test(ast test_blocks
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/test_blocks.ast"
+    ARGS --tests "${CMAKE_CURRENT_SOURCE_DIR}/dump/test_blocks.anti")
+
+# The nodes of the parsed tree that no other dump holds. The checker would
+# refuse nodes.anti, which the parser takes.
+antic_dump_test(ast nodes
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.anti")
+
+# The nodes the checker writes into the tree: an atomic read and write,
+# `p?.x`, `to_slice`, the built-ins of a simd struct, `mul_high`, a call
+# whose error the `catch` of its block takes and the bound names of the
+# arms of a `switch` and of a `select`.
+antic_dump_test(types checked_nodes
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/checked_nodes.types"
+    ARGS -I "${ANTIC_RUNTIME_DIR}/std"
+         "${CMAKE_CURRENT_SOURCE_DIR}/dump/checked_nodes.anti")
+
+# `alloc T { }` holds its literal alone and `for 0..3` binds no name, in
+# the tree and in the typed tree.
+foreach(stage ast types)
+    antic_dump_test(${stage} alloc_loops
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.${stage}"
+        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/alloc_loops.anti")
+endforeach()
+
+# scale.types is the typed tree listing that antic prints for scale.anti.
+antic_dump_test(types scale
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.types"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
+
+# main.ir is the IR listing that antic prints for main.anti.
+antic_dump_test(ir main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.ir"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
+
+antic_dump_test(ir modules
+    "${MODULES}/main.ir"
+    ARGS -I "${LIBS}" "${MODULES}/main.anti")
+set_tests_properties(dump_ir_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
+
+# Under --lto none every function of an ARM64 program and of its runtime
+# starts on a 16-byte boundary.
+foreach(target macos-arm64 linux-arm64 windows-arm64)
+    add_test(NAME function_alignment_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/devirtualise.anti"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/function-alignment/${target}"
+            -P "${ANTIC_RUNNERS}/run_function_alignment.cmake")
+    set_tests_properties(function_alignment_${target} PROPERTIES
+        TIMEOUT 120 SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# The test llvm_build_id of docs/work-order-llvm-back-end.md: under the
+# LLVM back end a -g build and a plain build of one program give one build
+# id, since the digest leaves out every span of the text that -g added.
+# The program has several functions, so -g adds a subprogram and lines to
+# each. COFF writes subprograms in the plain build too.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    foreach(target ${ANTIC_HOST_TARGET} windows-x86_64)
+        add_test(NAME llvm_build_id_${target}
+            COMMAND "${CMAKE_COMMAND}"
+                ${ANTIC_AND_RUNTIME}
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
+                "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
+                "-DOPTIONS=--target|${target}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-build-id/${target}"
+                -P "${ANTIC_RUNNERS}/run_build_id.cmake")
+    endforeach()
+endif()
+
+# A function that may fail and returns a tuple takes one out pointer, the
+# last parameter, and not one per element. The header of clib_tuples
+# pins the same signature on the C side.
+add_test(NAME ir_tuple_out
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},-I,${CMAKE_CURRENT_SOURCE_DIR}/clib,${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/tuples.anti"
+        "-DLINE=export fn com.example.tuples.tuples_divide(%0: i64, %1: i64, %2: ptr nonnull deref(size_of (int, int))) -> ptr {"
+        -P "${ANTIC_RUNNERS}/run_ir_line.cmake")
+
+# The Windows unwind data of unwind.anti, decoded by llvm-readobj from the
+# object that llvm-mc writes.
+foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
+        "windows-arm64,aarch64-pc-windows-msvc")
+    string(REPLACE "," ";" parts "${target_triple}")
+    list(GET parts 0 target)
+    list(GET parts 1 triple)
+    add_test(NAME unwind_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DTARGET=${target}"
+            "-DTRIPLE=${triple}"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.anti"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unwind"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.${target}.unwind"
+            -P "${ANTIC_RUNNERS}/run_unwind.cmake")
+endforeach()
+
+# targets.txt is the target matrix that antic --print-targets prints.
+add_test(NAME print_targets
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DCOMMAND=--print-targets"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/targets.txt"
+        -P "${ANTIC_RUNNERS}/run_dump.cmake")
+
+# The LLVM text of a program of control flow alone: one target of each
+# object format, a release build and two objects of one module.
+antic_dump_test(llvm control_flow
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.macos-arm64.ll"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
+foreach(target linux-x86_64 windows-x86_64)
+    antic_dump_test(llvm control_flow
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.${target}.ll"
+        TARGET ${target}
+        ARGS --dev "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
+endforeach()
+
+# main.opt is the optimized IR listing that antic prints for main.anti.
+antic_dump_test(opt main
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.anti")
+
+# The LLVM text of programs of tests/dump, one golden per program and
+# target, for the pairs of a program and a target whose machine code had a
+# golden before antic wrote LLVM text.
+foreach(case "main,macos-arm64" "main,macos-x86_64" "main,linux-x86_64"
+        "main,linux-arm64" "main,windows-x86_64" "main,windows-arm64"
+        "twice,macos-arm64" "cell,macos-arm64" "spill12,macos-arm64"
+        "spill7,linux-x86_64" "sum,linux-x86_64" "sum,macos-arm64"
+        "args,linux-x86_64" "args,windows-x86_64" "args,macos-arm64"
+        "args,linux-arm64" "x86,linux-x86_64" "x86,linux-arm64"
+        "arm64,macos-arm64" "arm64,linux-arm64"
+        "floatcalls,linux-x86_64" "floatcalls,windows-x86_64"
+        "floatcalls,macos-arm64" "floatcalls,windows-arm64"
+        "floatcalls,linux-arm64" "floats,linux-x86_64" "floats,macos-arm64"
+        "structs,linux-x86_64" "structs,windows-x86_64" "structs,macos-arm64"
+        "structs,linux-arm64" "structs,windows-arm64"
+        "fnptr,linux-x86_64" "fnptr,linux-arm64" "fnptr,macos-arm64"
+        "loop,linux-arm64" "loop,macos-x86_64"
+        "spillweight,linux-x86_64" "measure,linux-arm64"
+        "strings,linux-x86_64" "strings,macos-arm64" "strings,windows-x86_64")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 source)
+    list(GET parts 1 target)
+    antic_dump_test(llvm ${source}
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.ll"
+        TARGET ${target}
+        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti")
+endforeach()
+foreach(case "sizes,linux-x86_64" "bitfields,linux-x86_64"
+        "bitfields,windows-x86_64" "letters,macos-arm64" "letters,linux-x86_64")
+    string(REPLACE "," ";" parts "${case}")
+    list(GET parts 0 source)
+    list(GET parts 1 target)
+    antic_dump_test(llvm ${source}
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.${target}.ll"
+        TARGET ${target}
+        ARGS "${CMAKE_CURRENT_SOURCE_DIR}/programs/${source}.anti")
+endforeach()
+
 set(DUMP "${CMAKE_CURRENT_SOURCE_DIR}/dump")
 # Each case is the stage, the subject, the target or nothing, the expected
 # file under tests/dump and the other arguments of antic.
@@ -6874,293 +5659,1565 @@ foreach(source ${opt_sources})
     antic_dump_test(opt ${name} "${dir}/${name}.opt" ARGS "${source}")
 endforeach()
 
-# Semantic analysis reports every error it finds.
-add_expect_test(error_types STATUS 1
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/types.err"
-    COMMAND "$<TARGET_FILE:antic>" -S -o "${CMAKE_CURRENT_BINARY_DIR}/errors/types.s"
-            types.anti)
+# The commands of anti.
 
+add_expect_test(anti_version STATUS 0
+    EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
+    COMMAND "$<TARGET_FILE:anti>" --version)
 
-# The benchmarks of tests/bench: five Anti programs, each with a C twin
-# that the pinned clang compiles at -O2. They take seconds and their times
-# vary with the machine, so they stand outside the suite and outside the
-# default build. `cmake --build build/host --target bench` builds the C
-# twins, then run_bench.cmake compiles and runs every program and prints
-# the table into build/host/tests/bench.md as well.
-set(bench_programs scalar_loop objects builder simd_loop map_work)
-set(bench_executables "")
-foreach(name IN LISTS bench_programs)
-    add_executable(bench_${name} EXCLUDE_FROM_ALL bench/${name}.c)
-    if(MSVC)
-        target_compile_options(bench_${name} PRIVATE /O2)
-    else()
-        target_compile_options(bench_${name} PRIVATE -O2)
-    endif()
-    list(APPEND bench_executables bench_${name})
+add_test(NAME anti_help
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,--help"
+            -DNAME=anti -P "${ANTIC_RUNNERS}/run_usage.cmake")
+add_test(NAME anti_help_short
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,-h"
+            -DNAME=anti -P "${ANTIC_RUNNERS}/run_usage.cmake")
+# R155 of "Rules of 2026-10-13" in docs/decisions.md: `--help` of anti
+# with a second word prints the usage and ends with 0.
+add_test(NAME anti_help_and_a_word
+    COMMAND "${CMAKE_COMMAND}" "-DCOMMAND=$<TARGET_FILE:anti>,--help,extra"
+            -DNAME=anti -P "${ANTIC_RUNNERS}/run_usage.cmake")
+
+foreach(case
+        "command_unknown|bogus"
+        "option_unknown|--bogus"
+        "version_and_a_word|--version|extra"
+        "new_without_a_name|new"
+        "new_with_two_names|new|com.example.one|com.example.two"
+        "new_with_an_option|new|--bogus"
+        "build_option_unknown|build|--bogus"
+        "build_word|build|extra"
+        "build_lib_kind|build|--lib|bundled"
+        "build_llvm_mc_gone|build|--llvm-mc|llvm-mc"
+        "run_llvm_mc_gone|run|--llvm-mc|llvm-mc"
+        "test_llvm_mc_gone|test|--llvm-mc|llvm-mc"
+        "check_option_unknown|check|--bogus"
+        "check_targets_value|check|--targets|some"
+        "doc_option_unknown|doc|--bogus"
+        "fmt_option_unknown|fmt|--bogus"
+        "test_option_unknown|test|--bogus"
+        "bind_without_an_input|bind"
+        "bind_option_unknown|bind|--bogus|api.json"
+        "bind_two_inputs|bind|api.json|other.json"
+        "bind_header_and_an_input|bind|--header|api.antl|api.json"
+        "symbols_without_a_command|symbols"
+        "symbols_command_unknown|symbols|bogus|--conf|app.toml"
+        "symbols_option_unknown|symbols|check|--conf|app.toml|--bogus"
+        "symbols_inventory_without_conf|symbols|inventory"
+        "symbols_inventory_with_symbols|symbols|inventory|--conf|app.toml|--symbols|symbols.zip"
+        "symbols_check_with_from|symbols|check|--conf|app.toml|--from|archives"
+        "symbols_check_with_a_trace|symbols|check|--conf|app.toml|trace.txt"
+        "symbols_resolve_with_from|symbols|resolve|trace.txt|--symbols|symbols.zip|--from|archives"
+        "symbols_resolve_with_conf|symbols|resolve|trace.txt|--symbols|symbols.zip|--conf|app.toml"
+        "symbols_resolve_without_symbols|symbols|resolve|trace.txt"
+        "symbols_resolve_two_traces|symbols|resolve|trace.txt|other.txt|--symbols|symbols.zip"
+        "sdk_without_a_command|sdk"
+        "sdk_command_unknown|sdk|bogus"
+        "sdk_export_option_unknown|sdk|export|--bogus"
+        "sdk_import_without_a_bundle|sdk|import"
+        "license_option_unknown|license|--bogus")
+    string(REPLACE "|" ";" parts "${case}")
+    list(POP_FRONT parts name)
+    add_usage_test(anti ${name} ARGS ${parts})
 endforeach()
-# The twin of map_work that reads its seed at run time, which run C of
-# tests/bench/ablate/run.py times beside the twin.
-add_executable(bench_map_work_rtseed EXCLUDE_FROM_ALL bench/map_work_rtseed.c)
-if(MSVC)
-    target_compile_options(bench_map_work_rtseed PRIVATE /O2)
+# An option of anti that takes a value, as the last word. By R155 of
+# "Rules of 2026-10-13" in docs/decisions.md anti writes one line that
+# names the option and ends with 2, as antic does.
+foreach(case
+        "build|--target" "build|--cpu" "build|--lto" "build|--lib"
+        "build|--profile-use" "build|--runtime" "build|--llvm-ar"
+        "check|--targets" "check|--work" "check|--runtime" "check|-I"
+        "doc|-o" "doc|--work" "doc|--runtime" "doc|-I"
+        "test|--work" "test|--runtime" "test|-I"
+        "bind|--header" "bind|--clang" "bind|-o" "bind|--runtime"
+        "bind|--module" "bind|--target" "bind|-I" "bind|-D"
+        "symbols|--conf" "symbols|--from" "symbols|--out" "symbols|--symbols"
+        "sdk_export|--sdk" "sdk_export|-o" "sdk_import|--sysroot"
+        "license|--from" "license|--from-archive" "license|--runtime")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 command)
+    list(GET parts 1 option)
+    string(REGEX REPLACE "^-+" "" word "${option}")
+    string(REPLACE "-" "_" word "${word}")
+    if(option STREQUAL "-o")
+        set(word "output")
+    elseif(option STREQUAL "-I")
+        set(word "root")
+    elseif(option STREQUAL "-D")
+        set(word "define")
+    endif()
+    set(words ${command})
+    if(command STREQUAL "symbols")
+        set(words symbols inventory)
+    elseif(command STREQUAL "sdk_export")
+        set(words sdk export)
+    elseif(command STREQUAL "sdk_import")
+        set(words sdk import bundle.tar.xz)
+    endif()
+    set(line "anti: ${option} needs a value")
+    file(WRITE
+         "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
+         "${line}\n")
+    add_expect_test(anti_option_${command}_${word}_without_a_value STATUS 2
+        EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_option_${command}_${word}_without_a_value"
+        COMMAND "$<TARGET_FILE:anti>" ${words} ${option})
+endforeach()
+
+# The `tests` and `fixtures` blocks, the runner of `anti test` and the
+# proof that every other build drops both blocks.
+add_test(NAME anti_test
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        ${ANTIC_AND_RUNTIME}
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
+        -P "${ANTIC_RUNNERS}/run_anti_test.cmake")
+
+# The constructs of the flow area in a `tests` block and in a `fixtures`
+# block, which no program of tests/matrix reaches: every build but
+# `anti test` drops both blocks. docs/notes/test-matrix.md names the cells.
+add_test(NAME anti_test_flow
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/flow"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-flow"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
+# The constructs of the values area in a `tests` block and in a `fixtures`
+# block, as anti_test_flow holds those of the flow area.
+add_test(NAME anti_test_values
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/values"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-values"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
+# The constructs of the ownership area in a `tests` block and in a
+# `fixtures` block, as anti_test_flow holds those of the flow area.
+add_test(NAME anti_test_ownership
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/ownership"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-ownership"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
+# The constructs of the errors area in a `tests` block and in a `fixtures`
+# block, as anti_test_flow holds those of the flow area. A test takes no
+# `may fail`, which error_tests_may_fail holds.
+add_test(NAME anti_test_errors
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/errors"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-errors"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
+# The constructs of the threads area in a `tests` block and in a `fixtures`
+# block, as anti_test_flow holds those of the flow area. The workers stand
+# at module level.
+add_test(NAME anti_test_threads
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/threads"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-threads"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
+# The constructs of the classes area in a `tests` block and in a
+# `fixtures` block, as anti_test_flow holds those of the flow area. The
+# classes stand at module level, since a block holds functions alone.
+add_test(NAME anti_test_classes
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/classes"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-classes"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
+# `anti run --memory-checks` and `anti test --memory-checks` put the report
+# of each memory error through Anti's symbolizer, and the dev cache keeps
+# the objects with and without the checks apart.
+add_test(NAME anti_memory_checks
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
+        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_tests.anti"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-checks"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        -P "${ANTIC_RUNNERS}/run_anti_memory_checks.cmake")
+set_tests_properties(anti_memory_checks PROPERTIES TIMEOUT 300
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# A Windows program of `anti build --memory-checks` has the DLL of
+# AddressSanitizer beside it in dist/.
+add_test(NAME anti_memory_dll
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-memory-dll"
+        -P "${ANTIC_RUNNERS}/run_anti_memory_dll.cmake")
+set_tests_properties(anti_memory_dll PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# `anti build`, `anti run` and `anti new` over a two-module project: the
+# dev cache, release mode, the -g rule, --target, --cpu and the lock file.
+if(ANTIC_HOST_CPU STREQUAL "arm64")
+    set(anti_build_cpu "armv8.0")
 else()
-    target_compile_options(bench_map_work_rtseed PRIVATE -O2)
+    set(anti_build_cpu "v1")
 endif()
-list(APPEND bench_executables bench_map_work_rtseed)
-# mixed_work of tests/bench/ablate, the program of condition C1 in
-# docs/work-order-llvm-optimization.md, has no C twin. run.py holds every
-# build to the line of its baseline, and this test holds the baseline to
-# the right line in release mode, so a fact that changes it fails the
-# suite and not only a measurement.
-antic_program_test(program_mixed_work
-    "${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
-    WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate")
-# The same program through the LTO of lld in each mode of --lto, the step
-# runtime-lto of the work order. It imports six modules of the standard
-# library, so the runtime and the program meet in many places.
-foreach(mode full thin)
-    antic_program_test(program_mixed_work_lto_${mode}
-        "${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
-        OPTIONS --lto ${mode}
-        WORK "${CMAKE_CURRENT_BINARY_DIR}/bench_ablate_lto_${mode}")
-endforeach()
-# The same program built with --profile-generate, run, merged by
-# llvm-profdata and built again with --profile-use, the step pgo of the
-# work order. Each build takes the default LTO of a release build and
-# passes the test of the program.
-add_test(NAME profile_guided
+if(ANTIC_HOST_TARGET STREQUAL "linux-x86_64")
+    set(anti_build_other "macos-arm64")
+else()
+    set(anti_build_other "linux-x86_64")
+endif()
+add_test(NAME anti_build
     COMMAND "${CMAKE_COMMAND}"
-        ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile_guided"
-        "-DREFUSALS=ON"
-        -P "${ANTIC_RUNNERS}/run_profile.cmake")
-set_tests_properties(profile_guided PROPERTIES TIMEOUT 300)
-# A program with a profile of its own run in each link of a release
-# build, for the host and for the target it emulates.
-set(profile_targets "${ANTIC_HOST_TARGET}")
-if(ANTIC_EMULATED_TARGET)
-    list(APPEND profile_targets "${ANTIC_EMULATED_TARGET}")
-endif()
-foreach(target IN LISTS profile_targets)
-    set(options "")
-    set(emulator "")
-    if(target STREQUAL ANTIC_EMULATED_TARGET)
-        set(options "${ANTIC_X86_64_OPTIONS}")
-        set(emulator "${ANTIC_EMULATOR}")
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DOTHER=${anti_build_other}"
+        "-DCPU=${anti_build_cpu}"
+        "-DCHECK_PDB=${PROJECT_SOURCE_DIR}/tools/check-pdb.cmake"
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build"
+        "-DOBJECT=${anti_object}"
+        -P "${ANTIC_RUNNERS}/run_anti_build.cmake")
+
+# The package name of the manifest reaches every compile of `anti check`,
+# `anti build` in both modes, `anti test` and `anti doc`, so a module that
+# uses an internal item of another module of its package passes all four.
+add_test(NAME anti_internal
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-internal"
+        -P "${ANTIC_RUNNERS}/run_anti_internal.cmake")
+
+# `anti symbols` over a deployment of a release program, with a plugin
+# on a macOS host. It takes the inventory, the check of present, stale
+# and missing symbols and a release trace resolved into names and lines. A
+# Windows program keeps its functions in the PDB, which only DbgHelp
+# reads, so the test runs on the other hosts.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    if(ANTIC_HOST_OS STREQUAL "macos")
+        set(anti_symbols_plugin "-DSUFFIX=.dylib")
+    else()
+        set(anti_symbols_plugin "-DSUFFIX=")
     endif()
-    foreach(lto full thin none)
-        set(mode "${lto}")
-        if(lto STREQUAL "full")
-            set(mode "")
+    add_test(NAME anti_symbols
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            ${ANTIC_AND_RUNTIME}
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DPLUGIN=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "${anti_symbols_plugin}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols"
+            -P "${ANTIC_RUNNERS}/run_anti_symbols.cmake")
+endif()
+
+# The link of the symbols archive lays an ELF program out as the release
+# link does. Under LTO the debug CFI of an Anti function moved into
+# .eh_frame when the runtime brought unwind tables, and every address
+# after it shifted.
+foreach(target linux-x86_64 linux-arm64)
+    add_test(NAME symbols_layout_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-layout-${target}"
+            -P "${ANTIC_RUNNERS}/run_symbols_layout.cmake")
+    set_tests_properties(symbols_layout_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# `anti symbols resolve` refuses a line of a map or a trace whose number
+# does not fit 64 bits. The archive is written here, so every host runs it.
+add_test(NAME anti_symbols_input
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-symbols-input"
+        -P "${ANTIC_RUNNERS}/run_anti_symbols_input.cmake")
+
+# A binding names its framework with `link framework`, and `anti build`
+# passes it to antic. A Mac takes the SDK from the Command Line Tools.
+if(ANTIC_HOST_OS STREQUAL "macos")
+    add_test(NAME anti_build_framework
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-framework"
+            -P "${ANTIC_RUNNERS}/run_anti_build_framework.cmake")
+endif()
+
+# A binding names its Linux libraries with `link linux`, and `anti build`
+# passes them to antic. The program that reaches them links dynamically
+# against glibc, and one that does not links statically against musl.
+add_test(NAME linux_modes
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-modes"
+        -P "${ANTIC_RUNNERS}/run_linux_modes.cmake")
+
+# A program of musl names musl and mimalloc in its notice, and a program
+# of glibc or of macOS names neither. `anti license --from` prints the
+# notice and NOTICE.txt of `anti build` holds the same.
+add_test(NAME license_notice
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+        "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-notice"
+        -P "${ANTIC_RUNNERS}/run_license_notice.cmake")
+set_tests_properties(license_notice PROPERTIES TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The four forms of `anti license` beside --from, one test each: the
+# plain form over licenses/ of the runtime archive, --project over a
+# project that links two packages, --project --notice and the NOTICE.txt
+# of `anti build`, and --from-archive over a static archive of `--lib
+# static`.
+foreach(form plain project notice archive)
+    set(name "license_${form}")
+    if(form STREQUAL "notice")
+        set(name license_project_notice)
+    elseif(form STREQUAL "archive")
+        set(name license_from_archive)
+    endif()
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DFORM=${form}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DVERSION=${PROJECT_VERSION}"
+            "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
+            "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-form-${form}"
+            -P "${ANTIC_RUNNERS}/run_license_forms.cmake")
+    set_tests_properties(${name} PROPERTIES TIMEOUT 180
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
+# The two shapes of a dependency, the repository layout over `file://`
+# and the two libraries for C.
+add_test(NAME anti_build_deps
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-deps"
+        -P "${ANTIC_RUNNERS}/run_anti_build_deps.cmake")
+# A walk whose pick of a package changes drops the requirements of the
+# old pick, and the packages only it needed.
+add_test(NAME anti_build_resolve
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-resolve"
+        -P "${ANTIC_RUNNERS}/run_anti_build_resolve.cmake")
+# A malformed index.toml and anti.lock: names, versions, module paths and
+# digests that are not the grammar of their kind are refused before they
+# reach a path in the cache, a comparison or the lock file.
+add_test(NAME anti_build_inputs
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-inputs"
+        -P "${ANTIC_RUNNERS}/run_anti_build_inputs.cmake")
+# What `anti build` delivers and caches, one test per case of
+# tests/runners/run_anti_build_cases.cmake, whose header names what each shows. A
+# Windows library links from every host whose runtime archive holds the
+# sysroot. The curl of the redirect cases is a shell script.
+set(anti_build_cases path_target path_target_cpu lock_dropped
+    cache_strip_docs cache_version cache_license cache_license_text
+    cache_attribution cache_dependency cache_import_checked
+    cache_import_layout)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    list(APPEND anti_build_cases redirect_to_http redirect_followed
+         redirect_loop)
+endif()
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    list(APPEND anti_build_cases windows_import_library)
+endif()
+foreach(case IN LISTS anti_build_cases)
+    add_test(NAME anti_build_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            -DCASE=${case}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DOTHER=${anti_build_other}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-cases/${case}"
+            -P "${ANTIC_RUNNERS}/run_anti_build_cases.cmake")
+endforeach()
+
+# The messages of anti, one test per message. A table of the directory of
+# its command holds the cases of each, and anti_messages.cmake those of
+# `anti new`, `anti license` and `anti sdk`, which have no directory.
+# antic_messages.cmake holds the messages of the driver of antic that
+# stand at no position of a source, as `antic_message_<case>`.
+# run_anti_messages.cmake states the form of a case and prints the names
+# of a table, so a case is registered by standing in its table.
+foreach(pair "anti_build|anti-build/messages.cmake"
+             "anti_test|anti-test/messages.cmake"
+             "anti_symbols|anti-symbols/messages.cmake"
+             "anti_check|check/messages.cmake"
+             "anti_fmt|fmt/messages.cmake"
+             "anti_doc|doc/messages.cmake"
+             "anti_bind|bind/messages.cmake"
+             "anti|anti_messages.cmake"
+             "antic|antic_messages.cmake")
+    string(REPLACE "|" ";" pair "${pair}")
+    list(GET pair 0 command)
+    list(GET pair 1 table)
+    # The table of antic runs antic, and every other one anti.
+    set(tool anti)
+    if(command STREQUAL "antic")
+        set(tool antic)
+    endif()
+    set(table "${CMAKE_CURRENT_SOURCE_DIR}/${table}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${table}"
+                 "${ANTIC_RUNNERS}/run_anti_messages.cmake")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -DLIST=ON "-DTABLE=${table}"
+                -P "${ANTIC_RUNNERS}/run_anti_messages.cmake"
+        RESULT_VARIABLE status
+        OUTPUT_VARIABLE names
+        ERROR_VARIABLE errors)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "${table} gives no names:\n${errors}")
+    endif()
+    string(STRIP "${names}" names)
+    string(REPLACE "\n" ";" names "${names}")
+    foreach(name IN LISTS names)
+        # DESIGN: antic keeps the text of --license-text when it refuses
+        # the file for a NUL byte, and LeakSanitizer reports the block. A
+        # line of tests/known-failures.txt names a test that fails in
+        # every tree, and this one fails under AddressSanitizer alone. The
+        # case therefore runs in a tree without it, and the report
+        # docs/reports/2026-10-13-tests-coverage-rest.md holds the defect.
+        string(FIND "${CMAKE_C_FLAGS}" "-fsanitize=address" with_asan)
+        if(command STREQUAL "antic" AND
+           name STREQUAL "license_text_with_a_nul_byte" AND
+           NOT with_asan EQUAL -1)
+            continue()
         endif()
-        add_test(NAME profile_lto_${lto}_${target}
+        add_test(NAME ${command}_message_${name}
             COMMAND "${CMAKE_COMMAND}"
-                ${ANTIC_AND_RUNTIME}
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/loops.anti"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile-lto/${lto}-${target}"
-                "-DOPTIONS=${options}"
-                "-DEMULATOR=${emulator}"
-                "-DLTO=${mode}"
-                -P "${ANTIC_RUNNERS}/run_profile.cmake")
-        set_tests_properties(profile_lto_${lto}_${target} PROPERTIES
-            TIMEOUT 300)
+                "-DANTI=$<TARGET_FILE:${tool}>"
+                "-DTABLE=${table}"
+                "-DCASE=${name}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/messages/${command}-${name}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DHOST=${ANTIC_HOST_TARGET}"
+                "-DEXE=${CMAKE_EXECUTABLE_SUFFIX}"
+                "-DVERSION=${PROJECT_VERSION}"
+                "-DCLANG_VERSION=${ANTI_CLANG_VERSION}"
+                "-DCLANG_TAG=${ANTI_CLANG_TAG}"
+                "-DCLANG_PAGE=${ANTI_CLANG_PAGE}"
+                "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+                -P "${ANTIC_RUNNERS}/run_anti_messages.cmake")
     endforeach()
 endforeach()
-add_custom_target(bench
+
+# An option of anti beside the run without it, one test per case of
+# tests/runners/run_anti_options.cmake, whose header names what each shows.
+# --soname writes the version of a library of macOS and of Linux and
+# changes nothing of one of Windows. A Mac alone links for macOS, and the
+# other two link from every host whose runtime archive holds the sysroot.
+set(anti_option_cases strip_docs check_root_library check_root_source
+    bind_define_name bind_define_value bind_define_shim release_path
+    library_root)
+if(ANTIC_HOST_OS STREQUAL "macos")
+    list(APPEND anti_option_cases soname_macos)
+endif()
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
+    list(APPEND anti_option_cases soname_linux soname_linux_dist)
+endif()
+if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
+    list(APPEND anti_option_cases soname_windows)
+endif()
+# --target all links a program for each of the six targets.
+set(anti_option_six ON)
+foreach(target IN LISTS ANTIC_TARGETS)
+    if(NOT EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
+        set(anti_option_six OFF)
+    endif()
+endforeach()
+if(anti_option_six)
+    list(APPEND anti_option_cases target_all target_all_cpu targets_default
+         symbols_target bind_target)
+endif()
+# The inventory finds a program by the notice of its file, which
+# anti_symbols reads on the hosts other than Windows.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    list(APPEND anti_option_cases symbols_from)
+endif()
+foreach(case IN LISTS anti_option_cases)
+    add_test(NAME anti_option_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            -DCASE=${case}
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-options/${case}"
+            -P "${ANTIC_RUNNERS}/run_anti_options.cmake")
+endforeach()
+
+# A program run from dist/ and built again at once, fifteen times. Windows
+# maps a program that just ran for a moment, and the copy into dist/
+# failed there. A turn takes about two seconds on the Windows VM.
+if(ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME anti_build_rerun
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-rerun"
+            "-DTURNS=15"
+            -P "${ANTIC_RUNNERS}/run_anti_build_rerun.cmake")
+endif()
+
+# A program that runs from dist/ while `anti build` builds it again. The
+# build replaces it, the running program ends as it began, and the new
+# program runs. Linux refuses a write into a running program.
+add_test(NAME anti_build_running
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-running"
+        -P "${ANTIC_RUNNERS}/run_anti_build_running.cmake")
+
+# The rules of the canonical form on one file, the format stability of
+# docs/tooling.md and `--check`, which writes nothing.
+add_test(NAME anti_fmt
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/fmt"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt"
+        -P "${ANTIC_RUNNERS}/run_anti_fmt.cmake")
+# A failed write of `anti fmt` leaves the source as it was. The limit on
+# the size of a written file is a POSIX one, and Windows has none.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME anti_fmt_write
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-fmt-write"
+            -P "${ANTIC_RUNNERS}/run_anti_fmt_write.cmake")
+endif()
+
+# A `type` alias of a function type leaves the functions after it as they
+# stand. The source is in the canonical form, so fmt_canonical passes over
+# it until `anti fmt` agrees: finding T025 of docs/audit/tests-findings.md.
+add_expect_test(fmt_alias_of_function STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/alias_of_function.anti")
+
+# Every source of the standard library and of the tests stands in the
+# canonical form, so that `anti fmt` over the checkout writes nothing.
+add_test(NAME fmt_canonical
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
+        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_fmt_canonical.cmake")
+# run_fmt_canonical.cmake fails for an anti that ends by a signal and
+# prints nothing.
+add_test(NAME fmt_canonical_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_fmt_canonical.cmake"
+        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
+        "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt-canonical-runner"
+        -P "${ANTIC_RUNNERS}/run_fmt_canonical_self.cmake")
+set_tests_properties(fmt_canonical_runner PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# Every class of `anti check`: the front end on every source of a project,
+# the `anti` blocks of the doc comments, the doc warnings and the formatting
+# rules.
+add_test(NAME anti_check
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DPROJECTS=${CMAKE_CURRENT_SOURCE_DIR}/check"
+        "-DSTD=${CMAKE_SOURCE_DIR}/src/std"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/check"
+        -P "${ANTIC_RUNNERS}/run_anti_check.cmake")
+
+# The documentation generator: the pages of the fixture, the doc
+# equivalence of docs/tooling.md, the two forms and the two options that
+# need the source.
+add_executable(antl_rename doc/antl_rename.c)
+target_link_libraries(antl_rename PRIVATE antic_core)
+add_test(NAME anti_doc
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DRENAME=$<TARGET_FILE:antl_rename>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/doc"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc"
+        -P "${ANTIC_RUNNERS}/run_anti_doc.cmake")
+
+# The page of a module that holds one item per form the fixture above
+# lacks: the constants of each kind, the modifiers of a struct and of a
+# class, the fields of a class and the signatures of a function. Its doc
+# text holds the names anti doc links and the ones it leaves as text. The
+# user docs are HTML, and --private shows the fields that are not `pub`.
+foreach(pair "html||com.example.forms.html|forms.expected.html"
+             "private|--markdown\\|--private|com.example.forms.md|forms.private.expected.md")
+    string(REPLACE "\\|" "!" pair "${pair}")
+    string(REPLACE "|" ";" pair "${pair}")
+    list(GET pair 0 case)
+    list(GET pair 1 options)
+    list(GET pair 2 page)
+    list(GET pair 3 expected)
+    string(REPLACE "!" "|" options "${options}")
+    add_test(NAME anti_doc_forms_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/forms.anti|${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/limits.anti"
+            "-DPAGE=${page}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/doc/${expected}"
+            "-DOPTIONS=${options}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc-forms-${case}"
+            -P "${ANTIC_RUNNERS}/run_anti_doc_page.cmake")
+endforeach()
+
+# The pages of two modules of doc text. prose holds the forms of the doc
+# subset that no other page holds: an item of a list in two lines, an
+# empty code span, a bracket that starts no link, a link whose scheme
+# stands in capitals, a link to a page beside this one and a code block
+# that never closes. Its developer's page in Markdown holds the note of the
+# module and the note of an item. wrapped holds a link that anti fmt
+# breaks after a word of its text.
+foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
+             "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
+             "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html")
+    string(REPLACE "\\|" "!" pair "${pair}")
+    string(REPLACE "|" ";" pair "${pair}")
+    list(GET pair 0 case)
+    list(GET pair 1 options)
+    list(GET pair 2 module)
+    list(GET pair 3 page)
+    list(GET pair 4 expected)
+    string(REPLACE "!" "|" options "${options}")
+    # The code block of prose never closes, which R179 of "Rules of
+    # 2026-10-13" warns of.
+    set(warning "")
+    if(module STREQUAL "prose")
+        set(warning "-DWARNING=the doc comment of `add` holds a fence that nothing closes")
+    endif()
+    add_test(NAME anti_doc_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/doc/src/com/example/${module}.anti"
+            ${warning}
+            "-DPAGE=${page}"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/doc/${expected}"
+            "-DOPTIONS=${options}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/doc-${case}"
+            -P "${ANTIC_RUNNERS}/run_anti_doc_page.cmake")
+endforeach()
+
+# anti bind --header writes the header that antic --lib writes for the
+# same module, from the library file alone. The other cases bind
+# tests/bind/layout.h and raymath through clang and a part of
+# raylib_api.json, and check the refusals. forms binds tests/bind/forms.h
+# and values the macros of tests/bind/values.h. functions binds the
+# functions of tests/bind/functions.h, and huge_enum and nested_enum each
+# bind a header of one enum. api_parts, api_callbacks, api_literals,
+# api_types and api_words each bind a description of tests/bind in the
+# format of rlparser. words binds the names of tests/bind/words.h that are
+# words of Anti, unsigned_bitfield the bitfield of tests/bind/bits.h and
+# fixed_enum the enums of tests/bind/fixed.h.
+# api_typedef_chain and clang_typedef_chain each bind a chain of aliases
+# that names every link three times. clang_of_the_tree runs a copy of anti in a tree whose deps/clang is the
+# pinned clang, with no clang on PATH.
+set(anti_bind_cc ${ANTIC_TEST_CC})
+if(ANTIC_HOST_OS STREQUAL "macos")
+    list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
+endif()
+set(anti_bind_cases header clang escaped_path raymath raylib api
+    api_malformed clang_malformed forms values functions huge_enum
+    nested_enum api_parts api_callbacks api_literals api_types
+    api_words words unsigned_bitfield fixed_enum api_typedef_chain
+    clang_of_the_tree)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    # The cases refusals, ast_malformed and clang_typedef_chain stand a
+    # shell script in for clang.
+    list(APPEND anti_bind_cases refusals ast_malformed clang_typedef_chain)
+endif()
+foreach(case IN LISTS anti_bind_cases)
+    add_test(NAME anti_bind_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
+            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+            "-DBIND=${CMAKE_CURRENT_SOURCE_DIR}/bind"
+            "-DABI=${CMAKE_CURRENT_SOURCE_DIR}/abi"
+            "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
+            "-DCC=${anti_bind_cc}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+            "-DCLANG_VERSION=${ANTI_CLANG_VERSION}"
+            "-DCLANG_TAG=${ANTI_CLANG_TAG}"
+            "-DCLANG_PAGE=${ANTI_CLANG_PAGE}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bind-${case}"
+            -DCASE=${case}
+            -P "${ANTIC_RUNNERS}/run_anti_bind.cmake")
+endforeach()
+
+add_test(NAME anti_sdk
+    COMMAND "${CMAKE_COMMAND}" "-DANTI=$<TARGET_FILE:anti>"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti_sdk"
+            -P "${ANTIC_RUNNERS}/run_anti_sdk.cmake")
+
+# `anti build` and `anti run` pass --lto to the one antic call of release
+# mode, so the option needs --release and a program.
+add_expect_test(anti_lto_word STATUS 2
+    PATTERN "^anti: --lto takes full, thin or none, not fast"
+    COMMAND $<TARGET_FILE:anti> build --release --lto fast)
+add_expect_test(anti_lto_dev STATUS 2
+    PATTERN "^anti: --lto builds a program with --release, without --lib"
+    COMMAND $<TARGET_FILE:anti> run --lto none)
+
+# The runtime archive, the pins, the packages and the release.
+
+# The runtime archive holds the licence text of every component.
+add_expect_test(runtime_licenses STATUS 0
+    PATTERN "^BSD Zero Clause License"
+    COMMAND "${CMAKE_COMMAND}" -E cat "${ANTIC_RUNTIME_DIR}/licenses/anti_rt.txt")
+# Beside the texts, licenses/sources.txt records the upstream source of
+# every pinned component: name, version and the URL of the exact source
+# package, written from the pins.
+add_test(NAME runtime_sources
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DSOURCES=${ANTIC_RUNTIME_DIR}/licenses/sources.txt"
+            -P "${ANTIC_RUNNERS}/run_upstream_sources.cmake")
+
+# The runtime keeps the frame record of every function that calls another
+# on Linux and macOS, so a trace walks through its frames.
+add_test(NAME runtime_frames
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/runtime-frames.txt"
+        -P "${ANTIC_RUNNERS}/run_runtime_frames.cmake")
+set_tests_properties(runtime_frames PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The runtime of linux-arm64 is the same on every host: neither its
+# objects nor its bitcode take the outline atomics that the GCC of a Linux
+# host brought.
+add_test(NAME runtime_hosts
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/runtime-hosts"
+        -P "${ANTIC_RUNNERS}/run_runtime_hosts.cmake")
+set_tests_properties(runtime_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The native libraries of linux-arm64 call no outline atomics on any host,
+# without the option that keeps them out of the runtime.
+add_test(NAME native_hosts
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-hosts.txt"
+        -P "${ANTIC_RUNNERS}/run_native_hosts.cmake")
+set_tests_properties(native_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# bin/ of the runtime archive is built by the root CMakeLists.txt from
+# the directory of the pinned LLVM tools, and by no file of tests/.
+add_test(NAME llvm_tools_root
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_llvm_tools_root.cmake")
+
+# The copy into bin/ of the runtime archive takes every tool of the list,
+# refuses a directory that lacks one and leaves out the tools no package
+# carries.
+add_test(NAME llvm_tools_copy
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-tools-copy"
+        -P "${ANTIC_RUNNERS}/run_llvm_tools_copy.cmake")
+
+# The triple of the C of a target stands in tools/target-compile.cmake
+# alone.
+add_test(NAME target_triples
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_target_triples.cmake")
+
+# The link of a Linux program of a release stands in
+# tools/host-compile.cmake alone.
+add_test(NAME linux_link_recipe
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_linux_link_recipe.cmake")
+
+# The LLVM tools in bin/ of the runtime archive, which the target
+# llvm_tools of the root CMakeLists.txt copies there, are those of LLVM
+# tools/llvm-version. The directory holds no llvm-cov, which toolchain_pin
+# refuses there.
+add_test(NAME toolchain_pin
+    COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${ANTIC_RUNTIME_DIR}/bin"
+        -DRUNTIME_ARCHIVE=ON
+        -P "${PROJECT_SOURCE_DIR}/tools/check-llvm.cmake")
+
+# Every tool a build of this tree runs comes from the pinned release, and
+# antic and anti were linked by the pinned lld. A reader's build takes the
+# tools of the machine on purpose.
+if(NOT ANTIC_SYSTEM_COMPILER)
+    add_test(NAME pinned_tools
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCHECK=${PROJECT_SOURCE_DIR}/tools/pinned-tools.cmake"
+            "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
+            "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+            "-DLLVM_DIR=${ANTIC_LLVM_DIR}"
+            "-DOS=${ANTIC_HOST_OS}"
+            "-DPROGRAMS=$<TARGET_FILE:antic>,$<TARGET_FILE:anti>"
+            -P "${ANTIC_RUNNERS}/run_pinned_tools.cmake")
+
+    # antic and anti compile for every Linux and Windows host with the
+    # options of a package and the warning set.
+    foreach(host linux-x86_64 linux-arm64 windows-x86_64 windows-arm64)
+        add_test(NAME host_sources_${host}
+            COMMAND "${CMAKE_COMMAND}"
+                "-DROOT=${PROJECT_SOURCE_DIR}"
+                "-DHOST=${host}"
+                "-DCLANG=${CMAKE_C_COMPILER}"
+                "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+                "-DPCRE2_INCLUDE=${ANTIC_PCRE2_INCLUDE}"
+                "-DVERSION=${PROJECT_VERSION}"
+                -P "${ANTIC_RUNNERS}/run_host_sources.cmake")
+    endforeach()
+endif()
+
+if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    set_tests_properties(program_abi_ctypes_memory_checks PROPERTIES
+        DISABLED TRUE)
+endif()
+
+# A user receives these files. None of them may name a directory of the
+# machine that built it.
+# An ordinary build maps its paths away with -ffile-prefix-map. A
+# sanitizer writes the path of the module into its own metadata, which no
+# flag maps, so the test runs on a build without one.
+string(FIND "${CMAKE_C_FLAGS}" "-fsanitize" antic_sanitized)
+if(antic_sanitized EQUAL -1)
+    add_test(NAME no_paths
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DANTIC=$<TARGET_FILE:antic>"
+                "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
+                -P "${ANTIC_RUNNERS}/run_no_paths.cmake")
+endif()
+
+add_test(NAME release_pins
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_release_pins.cmake")
+add_test(NAME pinned_compiler
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
+            -P "${ANTIC_RUNNERS}/run_pinned_compiler.cmake")
+
+add_test(NAME release_key
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_release_key.cmake")
+# The permissions of the text step 9 publishes on anti-lang.com.
+add_test(NAME release_site
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_release_site.cmake")
+# The Windows sysroot of mingw-w64: the headers, the import libraries
+# that llvm-dlltool writes from the .def files for the processor of each
+# target, the builtins of the pinned clang and the licence, laid out from
+# a stand-in source release by the pinned clang and the pinned llvm-ar.
+if(NOT ANTIC_SYSTEM_COMPILER)
+    add_test(NAME windows_sysroot
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/windows_sysroot"
+                "-DCLANG_DIR=${ANTIC_CLANG_DIR}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+                -P "${ANTIC_RUNNERS}/run_windows_sysroot.cmake")
+endif()
+
+# The configure of a fresh checkout installs the sysroots and raylib from
+# their archives, as decision 3 of "Decisions of 2026-10-11" asks.
+if(NOT ANTIC_SYSTEM_COMPILER)
+    add_test(NAME first_build
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DTREE=${CMAKE_BINARY_DIR}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/first_build"
+                "-DGENERATOR=${CMAKE_GENERATOR}"
+                -P "${ANTIC_RUNNERS}/run_first_build.cmake")
+endif()
+
+# A configure leaves the names of lld alone while the suite runs them.
+add_test(NAME llvm_names
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DLLVM=${ANTIC_LLVM_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-names"
+            -P "${ANTIC_RUNNERS}/run_llvm_names.cmake")
+
+# llvm-cov and llvm-mc stay out of every directory the packer copies into
+# a package, no_llvm_cov_packed and no_llvm_mc_packed.
+foreach(tool llvm-cov llvm-mc)
+    string(REPLACE "-" "_" word "${tool}")
+    add_test(NAME no_${word}_packed
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DTOOL=${tool}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/no-${tool}-packed"
+                -P "${ANTIC_RUNNERS}/run_no_tool_packed.cmake")
+endforeach()
+
+# The report of the coverage measurement: tools/coverage-report.cmake
+# merges the profiles of two runs of a small program and writes the
+# summary and the annotated sources of the three directories it measures.
+# The program takes the flags of tools/coverage.cmake, as a coverage tree
+# gives them to antic.
+# DESIGN: the test stands on a Mac alone. The measurement runs on the
+# development Mac, and the script that links a program of the host here,
+# as release_dry_run does, names the Apple SDK.
+if(ANTIC_HOST_OS STREQUAL "macos")
+    set(coverage_work "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
+    antic_coverage_compile_flags(coverage_flags "${coverage_work}/root")
+    add_test(NAME coverage_report
+        COMMAND "${CMAKE_COMMAND}"
+                "-DCC=${CMAKE_C_COMPILER}"
+                "-DSDK=${ANTIC_MACOS_SDK}"
+                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+                "-DCOMPILE_FLAGS=${coverage_flags}"
+                "-DLINK_FLAGS=${ANTIC_COVERAGE_LINK_FLAGS}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DSCRIPT=${CMAKE_SOURCE_DIR}/tools/coverage-report.cmake"
+                "-DWORK=${coverage_work}"
+                -P "${ANTIC_RUNNERS}/run_coverage_report.cmake")
+endif()
+
+# A Linux program of a release names no glibc symbol above the pinned
+# 2.35, which tools/pack-anti.cmake reads before it writes a package
+add_test(NAME linux_libc
+    COMMAND "${CMAKE_COMMAND}"
+        "-DCLANG=${CMAKE_C_COMPILER}"
+        "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+        "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+        "-DCHECK=${CMAKE_SOURCE_DIR}/tools/check-libc.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/linux-libc"
+        -P "${ANTIC_RUNNERS}/run_linux_libc.cmake")
+set_tests_properties(linux_libc PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+add_executable(raw_bytes_c raw/raw_bytes.c)
+add_test(NAME raw_output
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            ${ANTIC_AND_RUNTIME}
+            "-DC_PROGRAM=$<TARGET_FILE:raw_bytes_c>"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/raw"
+            -P "${ANTIC_RUNNERS}/run_raw_output.cmake")
+
+add_test(NAME macos_sysroot
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/macos_sysroot"
+            -P "${ANTIC_RUNNERS}/run_macos_sysroot.cmake")
+add_test(NAME glibc_sysroot
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/glibc_sysroot"
+            "-DLLVM_AR=${ANTIC_LLVM_AR}"
+            -P "${ANTIC_RUNNERS}/run_glibc_sysroot.cmake")
+add_test(NAME sysroot_links
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/sysroot_links"
+            -P "${ANTIC_RUNNERS}/run_sysroot_links.cmake")
+# The package of this host, packed from the antic of this build. It needs
+# the sysroots of every target, which every package carries.
+# package_pack packs and unpacks it in package/, the tests package_* read
+# it there, each in a directory of its own, and package_clean removes it.
+set(package_missing "")
+foreach(dir IN LISTS ANTIC_TARGETS ITEMS licenses)
+    if(NOT EXISTS "${ANTIC_SYSROOT_DIR}/${dir}")
+        list(APPEND package_missing "${dir}")
+    endif()
+endforeach()
+set(package_dir "${CMAKE_CURRENT_BINARY_DIR}/package")
+if(package_missing)
+    # Fail rather than skip, so a missing sysroot cannot pass unnoticed.
+    list(JOIN package_missing " " package_missing)
+    add_test(NAME package_pack
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "sysroots not found in ${ANTIC_SYSROOT_DIR}: ${package_missing}: run tools/get-sysroot.cmake")
+    set_tests_properties(package_pack PROPERTIES
+        FAIL_REGULAR_EXPRESSION "sysroots not found")
+else()
+    add_test(NAME package_pack
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
+                "-DHOST=${ANTIC_HOST_TARGET}"
+                "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DCLANG=${CMAKE_C_COMPILER}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DWORK=${package_dir}"
+                -P "${ANTIC_RUNNERS}/run_package.cmake")
+    # PERF DECISION: the package carries the LLVM tools, and xz compresses
+    # its 530 MB of them in about three minutes. ctest runs the tests of
+    # a fresh tree in the order of their declaration, which put this one
+    # last and alone at the end of the suite. The cost puts it first, so
+    # the rest of the suite runs beside it.
+    set_tests_properties(package_pack PROPERTIES COST 300
+        FIXTURES_SETUP package)
+    add_test(NAME package_clean
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${package_dir}")
+    set_tests_properties(package_clean PROPERTIES FIXTURES_CLEANUP package)
+    # package_<part> runs run_package_<part>.cmake over the package, with
+    # the values of the cache that the part names after its name.
+    function(antic_package_test part)
+        set(values "")
+        foreach(value IN LISTS ARGN)
+            if(value STREQUAL "ANTIC")
+                list(APPEND values "-DANTIC=$<TARGET_FILE:antic>")
+            elseif(value STREQUAL "ANTI")
+                list(APPEND values "-DANTI=$<TARGET_FILE:anti>")
+            elseif(value STREQUAL "RUNTIME")
+                list(APPEND values "-DRUNTIME=${ANTIC_RUNTIME_DIR}")
+            elseif(value STREQUAL "CLANG")
+                list(APPEND values "-DCLANG=${CMAKE_C_COMPILER}")
+            elseif(value STREQUAL "LLVM_BIN")
+                list(APPEND values "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin")
+            elseif(value STREQUAL "RAYLIB")
+                list(APPEND values "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}")
+            else()
+                message(FATAL_ERROR "antic_package_test names no value ${value}")
+            endif()
+        endforeach()
+        add_test(NAME package_${part}
+            COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                    "-DHOST=${ANTIC_HOST_TARGET}" ${values}
+                    "-DPACKAGE=${package_dir}"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-${part}"
+                    -P "${ANTIC_RUNNERS}/run_package_${part}.cmake")
+        set_tests_properties(package_${part} PROPERTIES
+            FIXTURES_REQUIRED package)
+    endfunction()
+    antic_package_test(keys)
+    antic_package_test(contents RUNTIME)
+    antic_package_test(version)
+    antic_package_test(bind ANTI RUNTIME CLANG RAYLIB)
+    antic_package_test(targets)
+    antic_package_test(license)
+    antic_package_test(glibc)
+    antic_package_test(build)
+    antic_package_test(offline)
+    # The record of the upstream sources travels beside the licence texts,
+    # with a line for glibc and one for the kernel headers whose URL names
+    # the version of tools/sysroot-pins.
+    add_test(NAME package_sources
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DSOURCES=${package_dir}/unpacked/anti/licenses/sources.txt"
+                -P "${ANTIC_RUNNERS}/run_upstream_sources.cmake")
+    set_tests_properties(package_sources PROPERTIES FIXTURES_REQUIRED package)
+    # A host that is not Linux packs linux-arm64 as well. It packs a
+    # package of its own beside package_pack, which xz takes two minutes
+    # for, so its cost starts it early too.
+    if(NOT ANTIC_HOST_OS STREQUAL "linux")
+        add_test(NAME package_cross
+            COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                    "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                    "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+                    "-DCLANG=${CMAKE_C_COMPILER}"
+                    "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-cross"
+                    -P "${ANTIC_RUNNERS}/run_package_cross.cmake")
+        set_tests_properties(package_cross PROPERTIES COST 120)
+    endif()
+    # The packer refuses a build with the compiler of the machine, before
+    # it packs anything.
+    add_test(NAME package_system_compiler
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DANTIC=$<TARGET_FILE:antic>" "-DHOST=${ANTIC_HOST_TARGET}"
+                "-DSYSROOT=${ANTIC_SYSROOT_DIR}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/package-system-compiler"
+                -P "${ANTIC_RUNNERS}/run_package_system_compiler.cmake")
+endif()
+add_test(NAME package_sdk_pin
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_package_sdk_pin.cmake")
+# The release script names the directory of the raylib download, never the
+# version of the pin.
+add_test(NAME raylib_pin
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}" -DNAME=raylib
+            -DSCRIPT=src/native/get-source.cmake
+            -DCALLER=src/native/raylib-source.cmake
+            -DFILES=src/native/raylib.cmake,tools/release.sh
+            -DHASH=SHA256 -DPARTS=2
+            -P "${ANTIC_RUNNERS}/run_native_pin.cmake")
+# The check of the pins refuses a copy of a version or a digest and passes
+# a text one dot short of the version.
+add_test(NAME native_pin_self
+    COMMAND "${CMAKE_COMMAND}"
+            "-DPIN=${ANTIC_RUNNERS}/run_native_pin.cmake"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-pin-self"
+            -P "${ANTIC_RUNNERS}/run_native_pin_self.cmake")
+# antic takes its tools, its libraries and its sysroots from the runtime
+# archive alone, and refuses what the archive lacks by its path rather
+# than taking it from the search path or from LIB.
+add_test(NAME own_tools
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DANTIC=$<TARGET_FILE:antic>" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOPT=${ANTIC_OPT}" "-DLLC=${ANTIC_LLC}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/own_tools"
+            -P "${ANTIC_RUNNERS}/run_own_tools.cmake")
+
+# The binaries of a release are assets of its GitHub release, and the
+# installers take them from there and from nowhere else.
+add_test(NAME installer_github
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/installer-github"
+            -P "${ANTIC_RUNNERS}/run_installer_github.cmake")
+set_tests_properties(installer_github PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The installers download the package alone: no CMake, no sysroot step
+# and no script of the package, and the check of an install is the
+# --version of its two programs.
+add_test(NAME installer_alone
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/installer-alone"
+            -P "${ANTIC_RUNNERS}/run_installer_alone.cmake")
+set_tests_properties(installer_alone PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The installer trusts no line of SHA256SUMS before it has checked
+# SHA256SUMS.sig against the key it carries.
+add_test(NAME manifest_signature
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/manifest-signature"
+            -P "${ANTIC_RUNNERS}/run_manifest_signature.cmake")
+set_tests_properties(manifest_signature PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# The checks of tools/check-release.cmake over the directory of a
+# release.
+add_test(NAME release_manifest
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-manifest"
+            -P "${ANTIC_RUNNERS}/run_release_manifest.cmake")
+set_tests_properties(release_manifest PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# ./r on a copy of the tree, with the build, the packer and the two VMs
+# stood in for on the PATH. tests/release_copy.cmake makes the copy and
+# runs ./r --dry-run on it once for each test. release_dry_run checks
+# the order of the steps and the output of each, and the other four what
+# a rerun of the script does: on a failure of step 5, with each form of
+# the signing key, on a version that is a tag and in the preflight. A
+# release is made on the development Mac, so they skip elsewhere.
+foreach(name dry_run vm_failures signing_key tags preflight)
+    add_test(NAME release_${name}
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+                "-DCC=${CMAKE_C_COMPILER}"
+                "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+                "-DSDK=${ANTIC_MACOS_SDK}"
+                "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-${name}"
+                -P "${ANTIC_RUNNERS}/run_release_${name}.cmake")
+    set_tests_properties(release_${name} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+# The network commands of tools/release.sh against docs/vm-setup.md, and
+# tools/check-cpu.cmake over a tree of empty runtimes, on every host.
+add_test(NAME release_vm_commands
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_release_vm_commands.cmake")
+
+# run_release_dry_run.cmake fails with the output of a fixture that does
+# not compile or link, where it reported the whole test skipped.
+add_test(NAME release_dry_run_runner
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DRUNNER=${ANTIC_RUNNERS}/run_release_dry_run.cmake"
+            "-DCC=${CMAKE_C_COMPILER}"
+            "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
+            "-DSDK=${ANTIC_MACOS_SDK}"
+            "-DLLVM_BIN=${ANTIC_LLVM_DIR}/bin"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/release-runner"
+            -P "${ANTIC_RUNNERS}/run_release_dry_run_self.cmake")
+set_tests_properties(release_dry_run_runner PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# Checks that read the sources, the documents and the runners.
+
+# Every host branch of antic, anti and the runtime stands in their
+# platform layers, src/antic/platform.c and src/anti/platform.c with their
+# headers and src/rt/platform.h with its two files.
+add_test(NAME platform_layer
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_platform_layer.cmake")
+
+# Every compiler extension of the runtime stands in its platform layer or
+# in src/rt/atomic.c.
+add_test(NAME rt_extensions
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_rt_extensions.cmake")
+
+# Each file of the runtime that M321 of docs/audit/summary.md named has
+# one header that declares what it defines, and str.h holds the layout of
+# a str.
+add_test(NAME rt_headers
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_rt_headers.cmake")
+
+# The runtime calls the UTF-16 entry points of Windows alone.
+add_test(NAME rt_wide_text
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_rt_wide_text.cmake")
+
+# anti reaches antic through driver.h, antic.h and the shared helpers
+# alone, M02 of the second audit.
+add_test(NAME anti_interface
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_anti_interface.cmake")
+
+# run_expect.cmake refuses a program that prints the message of a refusal
+# and exits 0, which a pattern of ctest lets pass, and no CMake file of
+# the repository sets such a pattern.
+add_test(NAME expect_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DEXPECT=${ANTIC_RUNNERS}/run_expect.cmake"
+        "-DROOT=${CMAKE_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/expect-runner"
+        -P "${ANTIC_RUNNERS}/run_expect_self.cmake")
+
+# expect_same_bytes names the first line where two texts differ, and the
+# runners that compare with an expected file fail through it.
+add_test(NAME compare_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DROOT=${CMAKE_SOURCE_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/compare-runner"
+        -P "${ANTIC_RUNNERS}/run_compare_self.cmake")
+
+# A runner runs antic through antic_run or antic_build alone.
+add_test(NAME antic_calls
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_antic_calls.cmake")
+
+# Every script of `cmake -P` names the minimum version of CMake, so CMake 3
+# sets the policies CMake 4 takes for granted.
+add_test(NAME script_policies
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_script_policies.cmake")
+add_test(NAME script_policies_runner
+    COMMAND "${CMAKE_COMMAND}"
+            "-DRUNNER=${ANTIC_RUNNERS}/run_script_policies.cmake"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/script-policies"
+            -P "${ANTIC_RUNNERS}/run_script_policies_self.cmake")
+# Anti runs no CI, so no file stands under .github/workflows/.
+add_test(NAME no_workflows
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_no_workflows.cmake")
+# The tool that fetched the CRT and SDK of Microsoft is named nowhere but in
+# the history of docs/decisions.md and docs/reports/, and no file of the
+# code names the variable of the installers that went with it.
+add_test(NAME no_sdk_fetcher
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_no_sdk_fetcher.cmake")
+# One function downloads for the whole build.
+add_test(NAME downloads_once
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_downloads_once.cmake")
+
+# The LLVM tools stand in one list, and tools/check-llvm.cmake checks
+# them through the one check.
+add_test(NAME llvm_tool_list
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_llvm_tool_list.cmake")
+
+# A message at a position has one printer in antic, and the platform
+# layer names the tool that runs.
+add_test(NAME message_forms
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_message_forms.cmake")
+
+# The warning flags of the build stand in tools/warnings.cmake and
+# src/native/warnings.cmake alone, as docs/c-guidelines.md requires.
+add_test(NAME warning_set
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_warning_set.cmake")
+add_test(NAME warning_set_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_warning_set.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/warning-set"
+        -P "${ANTIC_RUNNERS}/run_warning_set_self.cmake")
+
+# No header of ours hides a header of the C library on an include path.
+add_test(NAME header_names
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_header_names.cmake")
+
+# Rule 25: every symbol a runtime library of the archive defines starts
+# with anti_rt_, on every target and level.
+add_test(NAME rt_names
+    COMMAND "${CMAKE_COMMAND}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        -P "${ANTIC_RUNNERS}/run_rt_names.cmake")
+set_tests_properties(rt_names PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+add_test(NAME rt_names_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_rt_names.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-names"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}" "-DLLVM_AR=${ANTIC_LLVM_AR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        -P "${ANTIC_RUNNERS}/run_rt_names_self.cmake")
+
+# Each declaration of antl_io.h, driver_parts.h, parser_parser.h,
+# sema_checker.h, lower_lowerer.h and whole_parts.h stands under the file
+# that defines it, and the comment of each header names every file.
+add_test(NAME header_sections
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_header_sections.cmake")
+
+# Each file of antic and of the runtime opens with the comment of its
+# purpose, and each function a public header of them declares has a
+# comment of its own. Step 29 of the fix steps of docs/audit/summary.md
+# adds the other parts of the tree.
+add_test(NAME file_headers
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_file_headers.cmake")
+add_test(NAME file_headers_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_file_headers.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/file-headers"
+        -P "${ANTIC_RUNNERS}/run_file_headers_self.cmake")
+
+# No file of antic, of the runtime or of anti calls a function that rule 9
+# of docs/c-guidelines.md bans. Rule 10 names the test.
+add_test(NAME banned_calls
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_banned_calls.cmake")
+
+# No comment of antic gives a reason of the native back end, and the IR
+# keeps no field that only its register allocator read (M365).
+add_test(NAME native_back_end_gone
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_native_back_end_gone.cmake")
+
+# docs/notes/source-tree.md holds one row per file of the root, src/,
+# tests/unit/, tools/ and tests/runners/, per file and script of tests/
+# and per directory of tests/, and no row of anything else.
+add_test(NAME source_tree
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_source_tree.cmake")
+add_test(NAME source_tree_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_source_tree.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/source-tree"
+        -P "${ANTIC_RUNNERS}/run_source_tree_self.cmake")
+
+# Every claim of docs/notes/ and docs/decisions.md that a function stands
+# in a C file holds, the script of docs/audit/structure.md that found ten
+# that moved with the splits.
+add_test(NAME note_claims
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_note_claims.cmake")
+add_test(NAME note_claims_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_note_claims.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/note-claims"
+        -P "${ANTIC_RUNNERS}/run_note_claims_self.cmake")
+
+# A name that the tools and the runtime both spell, the markers of the
+# notice, the index of plugins, the suffix of a symbols archive and the
+# sysroot directory, stands in one header.
+add_test(NAME names_once
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_names_once.cmake")
+
+# The layout rule of "Repository layout" in CLAUDE.md, over git ls-files.
+add_test(NAME repo_layout
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_repo_layout.cmake")
+add_test(NAME repo_layout_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_repo_layout.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/repo-layout"
+        -P "${ANTIC_RUNNERS}/run_repo_layout_self.cmake")
+
+# The pre-commit hook refuses staged .md files that fail the docs-style
+# checker, and the configure step installed it in this checkout.
+add_test(NAME pre_commit_hook
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DHOOKS=${ANTIC_HOOKS_DIR}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pre-commit"
+        -P "${ANTIC_RUNNERS}/run_pre_commit.cmake")
+set_tests_properties(pre_commit_hook PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# Every function of the runtime that formats like printf carries the
+# format attribute, by rule 1 of docs/c-guidelines.md.
+add_test(NAME rt_format_attribute
+    COMMAND "${CMAKE_COMMAND}"
+        "-DCC=${ANTIC_TEST_CC}"
+        "-DFLAGS=${ANTIC_C_WARNINGS};${ANTIC_FORMAT_ATTRIBUTE_WARNINGS}"
+        "-DPCRE2=${ANTIC_PCRE2_INCLUDE}"
+        "-DSOURCES=${PROJECT_SOURCE_DIR}/src/rt"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-format"
+        -P "${ANTIC_RUNNERS}/run_rt_format.cmake")
+
+# Every failing function of src/std/ is written with `may fail`, apart from
+# a binding, which refuses it.
+add_test(NAME std_may_fail_only
+    COMMAND "${CMAKE_COMMAND}"
+        "-DROOT=${ANTIC_STD_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_may_fail_only.cmake")
+
+# M330. Every `alloc(T, n)` of src/std/ stops the program when the memory
+# runs out, and no module fails for it.
+add_test(NAME std_out_of_memory
+    COMMAND "${CMAKE_COMMAND}"
+        "-DROOT=${ANTIC_STD_SOURCE_DIR}"
+        -P "${ANTIC_RUNNERS}/run_std_out_of_memory.cmake")
+
+# So is every failing function of the test programs. The functions the
+# listing skips write the form on purpose: construct_forms refuses it on
+# a `construct`, failing and error_values check that a function written
+# so is ordinary, whose error is a value, and catch_exits returns the
+# error of a handler as one, and catch_moves a wrap of it.
+add_test(NAME tests_may_fail_only
+    COMMAND "${CMAKE_COMMAND}"
+        "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DSKIP=errors/construct_forms.anti:construct,errors/failing.anti:by_hand,errors/failing.anti:fail_by_hand,programs/error_values.anti:stored,programs/error_values.anti:maybe,programs/error_values.anti:caught,programs/catch_exits.anti:passed,programs/catch_moves.anti:by_return"
+        -P "${ANTIC_RUNNERS}/run_may_fail_only.cmake")
+
+# A pin of tools/ is read through tools/pins.cmake alone, and
+# tools/cpu-levels through tools/cpu-levels.cmake.
+add_test(NAME pin_readers
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_pin_readers.cmake")
+# The host of the machine is worked out in tools/host.cmake alone.
+add_test(NAME host_names
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_host_names.cmake")
+# The six targets are listed once, in tools/cpu-levels.
+add_test(NAME target_lists
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_target_lists.cmake")
+
+# A configure with -DANTI_DEPS_DIR reads the pinned downloads of another
+# directory, and a copy of the sources builds against this tree's.
+add_test(NAME deps_dir
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/deps_dir"
+            "-DDEPS=${ANTIC_DEPS_DIR}" "-DGENERATOR=${CMAKE_GENERATOR}"
+            "-DCLANG=${ANTIC_CLANG_DIR}" "-DLLVM=${ANTIC_LLVM_DIR}"
+            "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
+            -P "${ANTIC_RUNNERS}/run_deps_dir.cmake")
+
+add_test(NAME line_endings
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_line_endings.cmake")
+
+# A variable of find_program is empty above the call in a fresh build
+# directory, and right in one that a run already filled.
+add_test(NAME find_order
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_find_order.cmake")
+add_test(NAME installer_options
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_installer_options.cmake")
+
+# Every name of the compiler's table stands in docs/notes/warnings.md with
+# its meaning and its fix, and the note names nothing else.
+add_test(NAME warning_names
+    COMMAND "${CMAKE_COMMAND}"
+        "-DTABLE=${CMAKE_SOURCE_DIR}/src/antic/warnings.c"
+        "-DNOTE=${CMAKE_SOURCE_DIR}/docs/notes/warnings.md"
+        -P "${ANTIC_RUNNERS}/run_warning_names.cmake")
+
+# Every example of the syntax overview passes the front end, apart from a
+# block marked as not built.
+add_test(NAME overview_examples
     COMMAND "${CMAKE_COMMAND}"
         ${ANTIC_AND_RUNTIME}
-        "-DOPT=${ANTIC_OPT}"
-        "-DLLC=${ANTIC_LLC}"
-        "-DBENCH=${CMAKE_CURRENT_SOURCE_DIR}/bench"
-        "-DC_DIR=${CMAKE_CURRENT_BINARY_DIR}"
-        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/bench"
-        "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/bench.md"
-        -P "${ANTIC_RUNNERS}/run_bench.cmake"
-    DEPENDS antic anti_std ${bench_executables}
-    USES_TERMINAL
-    VERBATIM)
+        "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/anti-syntax-overview.md"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/overview"
+        -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
 
-# The matrix of constructs and contexts in tests/matrix, by decision 28 of
-# "Decisions of 2026-10-11" in docs/decisions.md. A file there registers
-# its tests by its name, and no list of this file names it.
-#   <name>.anti with <name>.expected is a program. It runs in dev mode, in
-#   release mode and with --memory-checks, as matrix_<name>_dev,
-#   matrix_<name>_release and matrix_<name>_memory_checks. Each compares
-#   the whole output with the one expected file, so the three agree.
-#   <name>.anti with <name>.err is a refusal, matrix_<name>_refused,
-#   through the runner of tests/errors: antic exits with 1 and prints the
-#   bytes of the .err file.
-# A <name>.args beside a program holds its arguments, as run_program.cmake
-# reads them. The test matrix_files refuses every other file.
-#
-# DESIGN: ctest counts a test that its own time limit stops as failed
-# whatever WILL_FAIL says, and a test that its runner fails as one that
-# WILL_FAIL expects. A matrix test may show a defect that keeps antic or
-# the program running, and tests/known-failures.txt must be able to list
-# it. The runner therefore stops antic and the program after
-# ANTIC_MATRIX_SECONDS each, and the limit of ctest stands above the two.
-set(ANTIC_MATRIX_SECONDS 60)
-math(EXPR matrix_program_limit "2 * ${ANTIC_MATRIX_SECONDS} + 30")
-math(EXPR matrix_refusal_limit "${ANTIC_MATRIX_SECONDS} + 30")
-set(MATRIX "${CMAKE_CURRENT_SOURCE_DIR}/matrix")
-set(MATRIX_WORK "${CMAKE_CURRENT_BINARY_DIR}/matrix")
-file(MAKE_DIRECTORY "${MATRIX_WORK}/refused")
+# Every page of the developer's guide, through the same runner and its
+# marks: every `anti` block compiles, a program prints its `text output`
+# block, a `refused` block fails with the error it names, and an `llvm`
+# or `asm` excerpt stands in what antic writes for the block it names.
+add_test(NAME guide_examples
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/site/developers-guide"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/guide"
+        "-DLLVM_OPT=${ANTIC_OPT}"
+        "-DLLVM_MC=${ANTIC_LLVM_MC}"
+        "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
 
-# Set out to the modules of the standard library whose dev objects a dev
-# build of source links: every module under `anti.` that source imports and
-# every module those import, each by its path under std/anti/.
-function(antic_dev_imports out source)
-    set(modules "")
-    set(pending "${source}")
-    while(pending)
-        list(POP_FRONT pending file)
-        file(STRINGS "${file}" imports REGEX "^import anti\\.")
-        foreach(line IN LISTS imports)
-            string(REGEX MATCH "^import anti((\\.[a-z0-9_]+)+)" found "${line}")
-            string(SUBSTRING "${CMAKE_MATCH_1}" 1 -1 module)
-            string(REPLACE "." "/" module "${module}")
-            if(module IN_LIST modules)
-                continue()
-            endif()
-            set(module_source "${PROJECT_SOURCE_DIR}/src/std/anti/${module}.anti")
-            if(NOT EXISTS "${module_source}")
-                message(FATAL_ERROR "${file} imports `${found}`, and "
-                                    "${module_source} does not exist")
-            endif()
-            list(APPEND modules "${module}")
-            list(APPEND pending "${module_source}")
-        endforeach()
-    endwhile()
-    set(${out} "${modules}" PARENT_SCOPE)
-endfunction()
+# The site page of the build tool names the commands of anti and the
+# options of anti and antic as their usage gives them (M363).
+add_test(NAME build_tool_page
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DPAGE=${PROJECT_SOURCE_DIR}/docs/site/build-tool/index.md"
+        -P "${ANTIC_RUNNERS}/run_build_tool_page.cmake")
 
-# The three tests of the program tests/matrix/<name>.anti.
-# DESIGN: the dev build links the dev object of every module of the
-# standard library the program imports, which antic_dev_imports reads from
-# the source when the tree is configured. The source is therefore an input
-# of the configure step, and a new import configures the tree again.
-function(antic_matrix_program name)
-    set(source "${MATRIX}/${name}.anti")
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
-    antic_dev_imports(modules "${source}")
-    foreach(module IN LISTS modules)
-        antic_dev_object(${module})
-    endforeach()
-    antic_program_test(matrix_${name}_dev "${source}"
-        OPTIONS --dev
-        DEV ${modules}
-        TIMEOUT ${ANTIC_MATRIX_SECONDS}
-        WORK "${MATRIX_WORK}/dev")
-    antic_program_test(matrix_${name}_release "${source}"
-        TIMEOUT ${ANTIC_MATRIX_SECONDS}
-        WORK "${MATRIX_WORK}/release")
-    antic_program_test(matrix_${name}_memory_checks "${source}"
-        OPTIONS --memory-checks
-        TIMEOUT ${ANTIC_MATRIX_SECONDS}
-        WORK "${MATRIX_WORK}/memory-checks")
-    set_tests_properties(matrix_${name}_dev matrix_${name}_release
-        matrix_${name}_memory_checks PROPERTIES TIMEOUT ${matrix_program_limit})
-    # windows-arm64 has no runtime of AddressSanitizer and refuses the
-    # option, which the test memory_checks holds. The test stays
-    # registered there, so a line of tests/known-failures.txt names a test
-    # on every host.
-    if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
-        set_tests_properties(matrix_${name}_memory_checks PROPERTIES
-            DISABLED TRUE)
-    endif()
-endfunction()
+# Guards over the whole suite. They read what every section above
+# registered, so they stand last.
 
-# The refusal of tests/matrix/<name>.anti. A message names the file alone,
-# so antic runs in the directory of the program, and it runs the whole
-# build, so a refusal of any pass counts.
-function(antic_matrix_refusal name)
-    add_expect_test(matrix_${name}_refused STATUS 1
-        TIMEOUT ${ANTIC_MATRIX_SECONDS}
-        DIRECTORY "${MATRIX}"
-        EXPECTED "${MATRIX}/${name}.err"
-        COMMAND "$<TARGET_FILE:antic>" --runtime "${ANTIC_RUNTIME_DIR}"
-                -o "${MATRIX_WORK}/refused/${name}" "${name}.anti")
-    set_tests_properties(matrix_${name}_refused PROPERTIES
-        TIMEOUT ${matrix_refusal_limit})
-endfunction()
-
-file(GLOB matrix_sources CONFIGURE_DEPENDS "${MATRIX}/*.anti")
-# The expected files decide what a source registers, so a new one
-# configures the tree again as a new source does.
-file(GLOB matrix_results CONFIGURE_DEPENDS "${MATRIX}/*.expected"
-     "${MATRIX}/*.err")
-foreach(source IN LISTS matrix_sources)
-    get_filename_component(name "${source}" NAME_WE)
-    set(expected "${MATRIX}/${name}.expected")
-    set(refused "${MATRIX}/${name}.err")
-    if(expected IN_LIST matrix_results AND NOT refused IN_LIST matrix_results)
-        antic_matrix_program(${name})
-    elseif(refused IN_LIST matrix_results AND NOT expected IN_LIST matrix_results)
-        antic_matrix_refusal(${name})
-    endif()
-endforeach()
-# R050 of "Rules of 2026-10-13": the Universal C Runtime has no memory above
-# the alignment of malloc that `free` releases, so `alloc(T, n)` of a type
-# aligned above 16 stands at 16 on a Windows host. The entry on R050 under
-# "What the rules run added" in docs/decisions.md holds it. The tests stay
-# registered there, as the tests of --memory-checks do on windows-arm64.
-if(ANTIC_HOST_OS STREQUAL "windows")
-    set_tests_properties(matrix_types_alloc_of_a_type_aligned_above_16_dev
-        matrix_types_alloc_of_a_type_aligned_above_16_release
-        matrix_types_alloc_of_a_type_aligned_above_16_memory_checks
-        PROPERTIES DISABLED TRUE)
-endif()
-# Programs of the classes area once more under an option that takes a part
-# of the class away. --no-reflect drops the field lists, and the default
-# `equals` and `hash`, `is`, `as` and `dup` give what they give with them.
-# --no-hooks drops the hook sites, and `construct` and `destruct` run as
-# they run with them. Each takes the expected output of its matrix tests.
-foreach(name equality field_kinds conversions copies
-        call_through_a_function_field)
-    antic_program_test(matrix_classes_${name}_no_reflect
-        "${MATRIX}/classes_${name}.anti"
-        OPTIONS "--no-reflect"
-        WORK "${MATRIX_WORK}/no-reflect")
-endforeach()
-foreach(name objects construct_order)
-    antic_program_test(matrix_classes_${name}_no_hooks
-        "${MATRIX}/classes_${name}.anti"
-        OPTIONS "--no-hooks"
-        WORK "${MATRIX_WORK}/no-hooks")
-endforeach()
-# The `changed` hook of the first and the second field of a class and of
-# its base, under --trace writes. The matrix runs the program without the
-# option, where it prints no line of the hook, so this case has an expected
-# file of its own beside those of hook_trace.
-antic_program_test(matrix_classes_changed_hook_of_the_second_field_trace_writes
-    "${MATRIX}/classes_changed_hook_of_the_second_field.anti"
-    OPTIONS "--trace,--trace,writes"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_fields.writes.expected"
-    WORK "${MATRIX_WORK}/trace-writes")
-# A write to a bitfield of a traced class calls `changed` with the record
-# of the bitfield under --trace writes. T114 of
-# docs/audit/tests-findings.md.
-antic_program_test(matrix_classes_changed_hook_of_a_bitfield_trace_writes
-    "${MATRIX}/classes_changed_hook_of_a_bitfield.anti"
-    OPTIONS "--trace,--trace,writes"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_bitfield.writes.expected"
-    WORK "${MATRIX_WORK}/trace-writes-bitfield")
-# A write to a `transient` field of a traced class calls no `changed`,
-# since the field list of its descriptor holds no record of the field. The
-# write to the field before it calls the hook.
-antic_program_test(matrix_classes_changed_hook_of_a_transient_field_trace_writes
-    "${MATRIX}/classes_changed_hook_of_a_transient_field.anti"
-    OPTIONS "--trace,--trace,writes"
-    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_transient.writes.expected"
-    WORK "${MATRIX_WORK}/trace-writes-transient")
-# `join` of a job without a result and `join_all` call the runtime without
-# the `joined` hook under --no-hooks.
-antic_program_test(matrix_threads_jobs_no_hooks
-    "${MATRIX}/threads_jobs.anti"
-    OPTIONS "--no-hooks"
-    WORK "${MATRIX_WORK}/no-hooks")
+# A program of tests/errors that no test reads is refused.
+add_test(NAME errors_registered
+    COMMAND "${CMAKE_COMMAND}" "-DTESTS=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_errors_registered.cmake")
 
 # A source with neither file, or with both, registers nothing above.
 add_test(NAME matrix_files
