@@ -160,6 +160,7 @@ endfunction()
 # DESIGN: the sources of the compiler take its include directories alone.
 # Those of anti take anti's as well. The CMake build compiles antic_core
 # and anti the same way.
+include("${tools_dir}/pins.cmake")
 include("${tools_dir}/sources.cmake")
 include("${tools_dir}/warnings.cmake")
 
@@ -176,8 +177,7 @@ if(NOT DEFINED ANTIC)
     file(STRINGS "${build_dir}/CMakeCache.txt" pcre2_dir
          REGEX "^ANTIC_PCRE2_DIR:[A-Z]+=")
     string(REGEX REPLACE "^ANTIC_PCRE2_DIR:[A-Z]+=" "" pcre2_dir "${pcre2_dir}")
-    file(STRINGS "${tools_dir}/pcre2-pin" pcre2_version REGEX "^PCRE2_VERSION=")
-    string(REGEX REPLACE "^PCRE2_VERSION=" "" pcre2_version "${pcre2_version}")
+    antic_pin_value(pcre2_version "${tools_dir}/pcre2-pin" PCRE2_VERSION)
     set(pcre2_source "${pcre2_dir}/pcre2-${pcre2_version}")
     if(pcre2_dir STREQUAL "" OR NOT EXISTS "${pcre2_source}/src")
         message(FATAL_ERROR "${build_dir} names no PCRE2 source, which antic "

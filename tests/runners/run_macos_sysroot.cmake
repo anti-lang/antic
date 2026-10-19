@@ -17,12 +17,12 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-file(STRINGS "${ROOT}/tools/zig-stubs-pin" pins REGEX "^[A-Z]")
-foreach(line IN LISTS pins)
-    string(REGEX REPLACE "^([^=]+)=(.*)$" "\\1;\\2" pair "${line}")
-    list(GET pair 0 key)
-    list(GET pair 1 value)
-    set("real_${key}" "${value}")
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
+# The rows of the pin of the checkout, as real_<KEY>, beside the pin the
+# cases below write.
+foreach(key ZIG_TAG ZIG_URL APSL_URL ZIG_DIGEST APSL_DIGEST)
+    antic_pin_value("real_${key}" "${ROOT}/tools/zig-stubs-pin" "${key}")
 endforeach()
 if(NOT real_ZIG_TAG MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
     message(FATAL_ERROR "ZIG_TAG is '${real_ZIG_TAG}'")
@@ -62,6 +62,7 @@ foreach(name target-compile.cmake windows-compile.cmake)
     file(COPY_FILE "${ROOT}/tools/${name}" "${WORK}/tools/${name}")
 endforeach()
 file(COPY_FILE "${ROOT}/tools/deps-dir.cmake" "${WORK}/tools/deps-dir.cmake")
+file(COPY_FILE "${ROOT}/tools/pins.cmake" "${WORK}/tools/pins.cmake")
 file(COPY_FILE "${ROOT}/tools/sysroot-pins" "${WORK}/tools/sysroot-pins")
 function(write_pin zig_digest)
     file(SHA256 "${WORK}/apsl.txt" apsl_digest)

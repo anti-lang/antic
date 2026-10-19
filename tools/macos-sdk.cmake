@@ -19,26 +19,17 @@
 # which docs/toolchain-later.md holds.
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/pins.cmake")
+
 # The default directory of the SDKs. The Command Line Tools keep every
 # SDK they have installed, while the SDKs directory of Xcode holds the
 # newest alone.
 set(MACOS_SDK_ROOT "/Library/Developer/CommandLineTools/SDKs")
 
 function(pinned_macos_sdk pin sdks out)
-    file(STRINGS "${pin}" rows REGEX "^MACOS_SDK_")
-    foreach(row IN LISTS rows)
-        if(row MATCHES "^MACOS_SDK_VERSION=(.*)$")
-            set(version "${CMAKE_MATCH_1}")
-        elseif(row MATCHES "^MACOS_SDK_NAME=(.*)$")
-            set(name "${CMAKE_MATCH_1}")
-        elseif(row MATCHES "^MACOS_SDK_DIGEST=(.*)$")
-            set(want "${CMAKE_MATCH_1}")
-        endif()
-    endforeach()
-    if(NOT DEFINED version OR NOT DEFINED name OR NOT DEFINED want)
-        message(FATAL_ERROR "${pin} names no version, name and digest of the "
-                            "Apple SDK")
-    endif()
+    antic_pin_value(version "${pin}" MACOS_SDK_VERSION)
+    antic_pin_value(name "${pin}" MACOS_SDK_NAME)
+    antic_pin_value(want "${pin}" MACOS_SDK_DIGEST)
     if(sdks STREQUAL "")
         set(sdks "${MACOS_SDK_ROOT}")
     endif()

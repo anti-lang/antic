@@ -27,6 +27,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
 string(TOUPPER "${NAME}" key)
 set(pin "${ROOT}/tools/${NAME}-pin")
 set(script "${ROOT}/${SCRIPT}")
@@ -39,15 +41,10 @@ foreach(file "${pin}" "${script}" "${caller}" ${others})
     endif()
 endforeach()
 
-# Set <out> to the value of <key>_<field> in the pin.
-function(read_pin out field)
-    file(STRINGS "${pin}" line REGEX "^${key}_${field}=")
-    string(REGEX REPLACE "^${key}_${field}=" "" value "${line}")
-    set(${out} "${value}" PARENT_SCOPE)
-endfunction()
-
-read_pin(version VERSION)
-read_pin(digest DIGEST)
+# A row that is missing reads as empty, and the refusals below name the
+# value they expected.
+antic_pin_value(version "${pin}" "${key}_VERSION" OPTIONAL)
+antic_pin_value(digest "${pin}" "${key}_DIGEST" OPTIONAL)
 set(form "[0-9]+")
 foreach(part RANGE 2 ${PARTS})
     string(APPEND form "\\.[0-9]+")
@@ -60,12 +57,12 @@ string(LENGTH "${digest}" length)
 if(NOT digest MATCHES "^[0-9a-f]+$" OR NOT length EQUAL 64)
     message(FATAL_ERROR "${key}_DIGEST is `${digest}`, expected 64 hex digits")
 endif()
-read_pin(url URL)
+antic_pin_value(url "${pin}" "${key}_URL" OPTIONAL)
 if(NOT url MATCHES "^https://[^ ]+$")
     message(FATAL_ERROR "${key}_URL is `${url}`, which is not HTTPS")
 endif()
 if(YEAR)
-    read_pin(year YEAR)
+    antic_pin_value(year "${pin}" "${key}_YEAR" OPTIONAL)
     if(NOT year MATCHES "^20[0-9][0-9]$")
         message(FATAL_ERROR "${key}_YEAR is `${year}`, expected a year")
     endif()

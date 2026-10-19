@@ -2316,6 +2316,10 @@ add_test(NAME pinned_compiler
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             "-DCACHE=${CMAKE_BINARY_DIR}/CMakeCache.txt"
             -P "${ANTIC_RUNNERS}/run_pinned_compiler.cmake")
+# A pin of tools/ is read through tools/pins.cmake alone.
+add_test(NAME pin_readers
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
+            -P "${ANTIC_RUNNERS}/run_pin_readers.cmake")
 add_test(NAME release_key
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${ANTIC_RUNNERS}/run_release_key.cmake")

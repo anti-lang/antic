@@ -11,6 +11,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
 set(hosts linux-x86_64 linux-arm64 macos-arm64 macos-x86_64 windows-x86_64
           windows-arm64)
 file(READ "${ROOT}/tools/llvm-version" version)
@@ -19,29 +21,19 @@ if(NOT version MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
     message(FATAL_ERROR "tools/llvm-version is `${version}`")
 endif()
 
-# Set <out> to the value of the row <key> of the pin <name>, which must
-# exist.
-function(row name key out)
-    file(STRINGS "${ROOT}/tools/${name}-pin" line REGEX "^${key}=")
-    if(line STREQUAL "")
-        message(FATAL_ERROR "tools/${name}-pin has no row ${key}")
-    endif()
-    string(REGEX REPLACE "^${key}=" "" value "${line}")
-    set(${out} "${value}" PARENT_SCOPE)
-endfunction()
 
 foreach(name llvm clang)
-    row(${name} tag tag)
+    antic_pin_value(tag "${ROOT}/tools/${name}-pin" tag)
     if(NOT tag MATCHES "^@VERSION@-anti\\.[1-9][0-9]*$")
         message(FATAL_ERROR "the tag of tools/${name}-pin is `${tag}`, not "
                             "@VERSION@-anti.<build>")
     endif()
     set(${name}_tag "${tag}")
-    row(${name} release release)
+    antic_pin_value(release "${ROOT}/tools/${name}-pin" release)
     if(NOT release STREQUAL "https://github.com/anti-lang/llvm-tools/releases/download/@TAG@")
         message(FATAL_ERROR "tools/${name}-pin lies at `${release}`")
     endif()
-    row(${name} file file)
+    antic_pin_value(file "${ROOT}/tools/${name}-pin" file)
     set(prefix llvm-tools)
     if(name STREQUAL "clang")
         set(prefix clang)
@@ -50,7 +42,7 @@ foreach(name llvm clang)
         message(FATAL_ERROR "the asset of tools/${name}-pin is `${file}`")
     endif()
     foreach(host IN LISTS hosts)
-        row(${name} "${host}-digest" digest)
+        antic_pin_value(digest "${ROOT}/tools/${name}-pin" "${host}-digest")
         string(LENGTH "${digest}" length)
         if(NOT digest MATCHES "^[0-9a-f]+$" OR NOT length EQUAL 64)
             message(FATAL_ERROR "${host} in tools/${name}-pin has the digest "

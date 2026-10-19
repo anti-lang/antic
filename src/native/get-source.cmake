@@ -22,7 +22,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/../../tools/download.cmake")
 
 function(antic_get_source out name dest algorithm marker)
     set(tools "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../tools")
-    include("${tools}/upstream-sources.cmake")
+    include("${tools}/pins.cmake")
     string(TOUPPER "${name}" key)
     antic_read_pins("${tools}/${name}-pin")
     if("${${key}_DIGEST}" STREQUAL "")

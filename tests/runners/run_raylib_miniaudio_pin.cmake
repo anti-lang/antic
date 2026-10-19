@@ -9,16 +9,17 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-function(read_pin out file key)
-    file(STRINGS "${file}" line REGEX "^${key}=")
-    string(REGEX REPLACE "^${key}=" "" value "${line}")
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
+function(pin_version out file key)
+    antic_pin_value(value "${file}" "${key}")
     if(NOT value MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
         message(FATAL_ERROR "${key} of ${file} is `${value}`, expected a version")
     endif()
     set(${out} "${value}" PARENT_SCOPE)
 endfunction()
-read_pin(bundled "${ROOT}/tools/raylib-pin" RAYLIB_MINIAUDIO_VERSION)
-read_pin(pinned "${ROOT}/tools/miniaudio-pin" MINIAUDIO_VERSION)
+pin_version(bundled "${ROOT}/tools/raylib-pin" RAYLIB_MINIAUDIO_VERSION)
+pin_version(pinned "${ROOT}/tools/miniaudio-pin" MINIAUDIO_VERSION)
 if(NOT bundled STREQUAL pinned)
     message(FATAL_ERROR "tools/raylib-pin names miniaudio ${bundled}, and "
                         "tools/miniaudio-pin names ${pinned}")

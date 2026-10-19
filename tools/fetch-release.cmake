@@ -18,6 +18,7 @@ cmake_minimum_required(VERSION 3.21)
 
 set(fetch_release_root "${CMAKE_CURRENT_LIST_DIR}/..")
 include("${CMAKE_CURRENT_LIST_DIR}/download.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/pins.cmake")
 
 # Set <out> to the name of this machine among the six hosts of antic. The
 # host is named as the six targets of antic are, so one spelling serves
@@ -51,11 +52,15 @@ function(fetch_release pin dest)
     set(fetched_version "${version}" PARENT_SCOPE)
 
     # Read the row <key> of the pin, with the tag, the version and the host
-    # in place of their markers.
+    # in place of their markers. The digest of a host may be missing, and
+    # the message below names the reason.
     set(tag "")
     foreach(key tag release file "${host}-digest")
-        file(STRINGS "${pin}" line REGEX "^${key}=")
-        string(REGEX REPLACE "^${key}=" "" value "${line}")
+        set(optional "")
+        if(key STREQUAL "${host}-digest")
+            set(optional OPTIONAL)
+        endif()
+        antic_pin_value(value "${pin}" "${key}" ${optional})
         string(REPLACE "@TAG@" "${tag}" value "${value}")
         string(REPLACE "@VERSION@" "${version}" value "${value}")
         string(REPLACE "@HOST@" "${host}" value "${value}")

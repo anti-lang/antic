@@ -18,6 +18,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
 if(NOT EXISTS "${SOURCES}")
     message(FATAL_ERROR "${SOURCES} is missing")
 endif()
@@ -51,15 +53,6 @@ foreach(line IN LISTS lines)
     set("line_${name}" "${line}")
 endforeach()
 
-# Set <out> to the value of <key> in tools/<pin>.
-function(read_pin out pin key)
-    file(STRINGS "${ROOT}/tools/${pin}" line REGEX "^${key}=")
-    string(REGEX REPLACE "^${key}=" "" value "${line}")
-    if(value STREQUAL "")
-        message(FATAL_ERROR "tools/${pin} has no ${key}")
-    endif()
-    set(${out} "${value}" PARENT_SCOPE)
-endfunction()
 
 # The line of <name> holds <version> as its version and, when <in_url> is
 # ON, in its URL.
@@ -84,7 +77,7 @@ endfunction()
 # The version of an Ubuntu package is the second field of its file name,
 # libc6_2.35-0ubuntu3_amd64.deb.
 function(deb_version out key)
-    read_pin(deb sysroot-pins "${key}")
+    antic_pin_value(deb "${ROOT}/tools/sysroot-pins" "${key}")
     if(NOT deb MATCHES "^.*/[^_/]+_([^_/]+)_[^_/]+\\.deb$")
         message(FATAL_ERROR "${key} of tools/sysroot-pins is `${deb}`, not "
                             "the file name of a package")
@@ -96,14 +89,14 @@ deb_version(glibc GLIBC_X86_64_LIBC)
 expect(glibc "${glibc}" ON)
 deb_version(headers GLIBC_X86_64_HEADERS)
 expect(linux-headers "${headers}" ON)
-read_pin(musl sysroot-pins MUSL_VERSION)
+antic_pin_value(musl "${ROOT}/tools/sysroot-pins" MUSL_VERSION)
 expect(musl "${musl}" ON)
-read_pin(zig zig-stubs-pin ZIG_TAG)
+antic_pin_value(zig "${ROOT}/tools/zig-stubs-pin" ZIG_TAG)
 expect(zig "${zig}" ON)
-read_pin(mingw sysroot-pins MINGW_VERSION)
+antic_pin_value(mingw "${ROOT}/tools/sysroot-pins" MINGW_VERSION)
 expect(mingw-w64 "${mingw}" ON)
 foreach(name pcre2 sqlite mbedtls miniaudio raylib mimalloc)
     string(TOUPPER "${name}" key)
-    read_pin(version "${name}-pin" "${key}_VERSION")
+    antic_pin_value(version "${ROOT}/tools/${name}-pin" "${key}_VERSION")
     expect("${name}" "${version}" OFF)
 endforeach()

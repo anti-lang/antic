@@ -12,6 +12,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
 if(NOT APPLE)
     message("SKIP: the Apple SDK is pinned on the Mac that packs a release")
     return()
@@ -32,8 +34,7 @@ execute_process(COMMAND "${CMAKE_COMMAND}" "-DPIN=${pin}" ${sdks}
                 OUTPUT_VARIABLE sdk ERROR_VARIABLE err
                 RESULT_VARIABLE failed
                 OUTPUT_STRIP_TRAILING_WHITESPACE ENCODING NONE)
-file(STRINGS "${pin}" row REGEX "^MACOS_SDK_VERSION=")
-string(REPLACE "MACOS_SDK_VERSION=" "" version "${row}")
+antic_pin_value(version "${pin}" MACOS_SDK_VERSION)
 if(NOT failed EQUAL 0)
     if(err MATCHES "is on no path of this")
         message("SKIP: macOS SDK ${version} is not installed here\n${err}")
@@ -45,8 +46,7 @@ if(NOT IS_DIRECTORY "${sdk}")
     message(FATAL_ERROR "the pinned SDK is `${sdk}`, which is no directory")
 endif()
 # The path names the pinned version and not another one.
-file(STRINGS "${pin}" row REGEX "^MACOS_SDK_NAME=")
-string(REPLACE "MACOS_SDK_NAME=" "" name "${row}")
+antic_pin_value(name "${pin}" MACOS_SDK_NAME)
 get_filename_component(found "${sdk}" NAME)
 if(NOT found STREQUAL "${name}")
     message(FATAL_ERROR "the pinned SDK is ${found} and ${pin} names ${name}")

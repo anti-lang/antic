@@ -734,7 +734,8 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_package_version.cmake` | Checks that antic and `anti` of the package print the version of `tools/version`. |
 | `tests/runners/run_pdb_guid.cmake` | Runs `check-pdb.cmake` on a linked Windows program. |
 | `tests/runners/run_pdb_names.cmake` | Checks the names in a PDB and that it holds no build path. |
-| `tests/runners/run_pinned_compiler.cmake` | Checks that the cache names the pinned clang and no runner a host compiler. |
+| `tests/runners/run_pin_readers.cmake` | Refuses a pin read outside `tools/pins.cmake`. |
+| `tests/runners/run_pinned_compiler.cmake` | Checks that the cache names the pinned clang and no runner a compiler or a binary tool of the host. |
 | `tests/runners/run_pinned_tools.cmake` | Runs the tool check of the configure step on the cache and on changed copies. |
 | `tests/runners/run_platform_layer.cmake` | Refuses a host `#if` outside the platform files. |
 | `tests/runners/run_plugin.cmake` | Builds a plugin and its hosts and checks loading and injection. |
@@ -843,13 +844,14 @@ the data the scripts read.
 | `tools/pack-anti.cmake` | Compiles antic and `anti` for each named host, and writes its package and the manifest. |
 | `tools/pinned-compiler.cmake` | Fetches the pinned tools and sets the compiler, the archiver and the linker of a build. |
 | `tools/pinned-tools.cmake` | Holds the list of the LLVM tools and the checks that refuse a tool of the host. |
+| `tools/pins.cmake` | Reads the pins of `tools/` and builds the URL of a pinned source. |
 | `tools/release.sh` | Makes a release in ten steps, from the preflight to the report. |
 | `tools/sources.cmake` | Lists the C sources of antic and `anti` for the build and the packer. |
 | `tools/std-modules.cmake` | Orders the collection modules of the standard library by their imports. |
 | `tools/target-compile.cmake` | The compile of C for every target: the triple clang compiles it for and the headers of its sysroot. |
 | `tools/uninstall.ps1` | Removes an install of Windows that carries the marker, with the two executables the installer put on the path. |
 | `tools/uninstall.sh` | Removes an install that carries the marker, with its executables and its profile line. |
-| `tools/upstream-sources.cmake` | Reads pins, builds the URL of a pinned source and writes `licenses/sources.txt`. |
+| `tools/upstream-sources.cmake` | Writes `licenses/sources.txt` from the pins. |
 | `tools/warnings.cmake` | Holds the warning set of our own C. |
 | `tools/windows-compile.cmake` | Holds the triples, the compile options and the link options of a Windows target. |
 

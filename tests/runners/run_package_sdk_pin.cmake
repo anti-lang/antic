@@ -14,6 +14,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
 file(READ "${ROOT}/tools/pack-anti.cmake" packer_text)
 if(NOT packer_text MATCHES "pinned_macos_sdk\\(\"\\$\\{tools_dir\\}/macos-sdk-pin\"")
     message(FATAL_ERROR "tools/pack-anti.cmake takes the SDK of macOS from "
@@ -39,8 +41,5 @@ foreach(script IN LISTS scripts)
     endforeach()
 endforeach()
 foreach(name MACOS_SDK_VERSION MACOS_SDK_NAME MACOS_SDK_DIGEST)
-    file(STRINGS "${ROOT}/tools/macos-sdk-pin" row REGEX "^${name}=.")
-    if(row STREQUAL "")
-        message(FATAL_ERROR "tools/macos-sdk-pin names no ${name}")
-    endif()
+    antic_pin_value(value "${ROOT}/tools/macos-sdk-pin" "${name}")
 endforeach()

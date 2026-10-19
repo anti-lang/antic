@@ -9,6 +9,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
 if(NOT APPLE)
     message("SKIP: the Apple SDK is pinned on the Mac that packs a release")
     return()
@@ -16,8 +18,7 @@ endif()
 
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}/none")
-file(STRINGS "${ROOT}/tools/macos-sdk-pin" row REGEX "^MACOS_SDK_NAME=")
-string(REPLACE "MACOS_SDK_NAME=" "" name "${row}")
+antic_pin_value(name "${ROOT}/tools/macos-sdk-pin" MACOS_SDK_NAME)
 file(MAKE_DIRECTORY "${WORK}/changed/${name}/usr/lib")
 file(WRITE "${WORK}/changed/${name}/usr/lib/libSystem.tbd" "# changed\n")
 

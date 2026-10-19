@@ -5,17 +5,13 @@
 # names the source directory of mimalloc after its version, the test
 # license_notice expects both, and tools/pack-anti.cmake compiles them
 # into the antic of a package.
+include("${CMAKE_CURRENT_LIST_DIR}/pins.cmake")
+
 function(antic_libc_versions musl_out mimalloc_out)
-    file(STRINGS "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/sysroot-pins" musl
-         REGEX "^MUSL_VERSION=")
-    file(STRINGS "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/mimalloc-pin" mimalloc
-         REGEX "^MIMALLOC_VERSION=")
-    string(REGEX REPLACE "^MUSL_VERSION=" "" musl "${musl}")
-    string(REGEX REPLACE "^MIMALLOC_VERSION=" "" mimalloc "${mimalloc}")
-    if(musl STREQUAL "" OR mimalloc STREQUAL "")
-        message(FATAL_ERROR "tools/sysroot-pins or tools/mimalloc-pin names "
-                            "no version")
-    endif()
+    antic_pin_value(musl "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/sysroot-pins"
+                    MUSL_VERSION)
+    antic_pin_value(mimalloc "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/mimalloc-pin"
+                    MIMALLOC_VERSION)
     set(${musl_out} "${musl}" PARENT_SCOPE)
     set(${mimalloc_out} "${mimalloc}" PARENT_SCOPE)
 endfunction()

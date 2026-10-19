@@ -19,6 +19,8 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+
 file(REMOVE_RECURSE "${WORK}")
 
 # The directory of another host. One Windows host stands for both, since
@@ -28,11 +30,7 @@ foreach(host linux-arm64 windows-x86_64)
     if(host MATCHES "^windows-")
         set(exe ".exe")
     endif()
-    file(STRINGS "${ROOT}/tools/llvm-pin" row REGEX "^${host}-digest=")
-    string(REGEX REPLACE "^${host}-digest=" "" digest "${row}")
-    if(digest STREQUAL "")
-        message(FATAL_ERROR "tools/llvm-pin names no digest for ${host}")
-    endif()
+    antic_pin_value(digest "${ROOT}/tools/llvm-pin" "${host}-digest")
     set(dest "${WORK}/${host}")
     file(MAKE_DIRECTORY "${dest}/bin")
     file(WRITE "${dest}/.installed" "${digest}\n")
