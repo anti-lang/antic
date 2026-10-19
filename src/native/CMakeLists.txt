@@ -54,6 +54,29 @@ function(antic_native_target out_triple out_flags target)
     set(${out_flags} "${flags}" PARENT_SCOPE)
 endfunction()
 
+# The two tests of a native library on <target>. <link>_<target> links
+# SOURCE with OBJECTS for the target through antic, and on the host the
+# test <run> also runs the program. Both work below WORK, and OPTIONS,
+# separated by commas, go to antic.
+function(antic_native_tests run link target)
+    cmake_parse_arguments(PARSE_ARGV 3 arg "" "SOURCE;WORK;OPTIONS" "OBJECTS")
+    list(JOIN arg_OBJECTS "," objects)
+    set(common "-DANTIC=$<TARGET_FILE:antic>" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${arg_SOURCE}" "-DOBJECTS=${objects}")
+    if(NOT "${arg_OPTIONS}" STREQUAL "")
+        list(APPEND common "-DOPTIONS=${arg_OPTIONS}")
+    endif()
+    if(target STREQUAL ANTIC_HOST_TARGET)
+        add_test(NAME ${run}
+            COMMAND "${CMAKE_COMMAND}" ${common} "-DWORK=${arg_WORK}/run"
+                -P "${ANTIC_RUNNERS}/run_program.cmake")
+    endif()
+    add_test(NAME ${link}_${target}
+        COMMAND "${CMAKE_COMMAND}" ${common} "-DWORK=${arg_WORK}/link"
+            "-DTARGET=${target}"
+            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
+endfunction()
+
 # Copy the licence text <source> of the native library <name> to
 # licenses/<name>.txt of the runtime tree, which the packer and anti
 # license read, and note the name for the test native_licenses.

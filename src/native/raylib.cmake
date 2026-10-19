@@ -148,27 +148,11 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         endforeach()
         string(SUBSTRING "${options}" 1 -1 options)
     endif()
-    if(target STREQUAL ANTIC_HOST_TARGET)
-        add_test(NAME raylib_run
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${source}"
-                "-DOBJECTS=${probe},${library},${miniaudio}"
-                "-DWORK=${ANTIC_RAYLIB_WORK}/run"
-                "-DOPTIONS=${options}"
-                -P "${ANTIC_RUNNERS}/run_program.cmake")
-    endif()
-    add_test(NAME raylib_link_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${source}"
-            "-DOBJECTS=${probe},${library},${miniaudio}"
-            "-DWORK=${ANTIC_RAYLIB_WORK}/link"
-            "-DTARGET=${target}"
-            "-DOPTIONS=${options}"
-            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
+    antic_native_tests(raylib_run raylib_link "${target}"
+        SOURCE "${source}"
+        OBJECTS "${probe}" "${library}" "${miniaudio}"
+        WORK "${ANTIC_RAYLIB_WORK}"
+        OPTIONS "${options}")
 endforeach()
 
 # A program that calls raylib's audio and miniaudio of its own links both
@@ -219,27 +203,11 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         string(SUBSTRING "${options}" 1 -1 options)
     endif()
     list(JOIN libraries "," libraries)
-    if(target STREQUAL ANTIC_HOST_TARGET)
-        add_test(NAME media_audio_run
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${source}"
-                "-DOBJECTS=${probe},${libraries}"
-                "-DWORK=${ANTIC_RAYLIB_WORK}/media_audio_run"
-                "-DOPTIONS=${options}"
-                -P "${ANTIC_RUNNERS}/run_program.cmake")
-    endif()
-    add_test(NAME media_audio_link_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${source}"
-            "-DOBJECTS=${probe},${libraries}"
-            "-DWORK=${ANTIC_RAYLIB_WORK}/media_audio_link"
-            "-DTARGET=${target}"
-            "-DOPTIONS=${options}"
-            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
+    antic_native_tests(media_audio_run media_audio_link "${target}"
+        SOURCE "${source}"
+        OBJECTS "${probe}" "${libraries}"
+        WORK "${ANTIC_RAYLIB_WORK}/media_audio"
+        OPTIONS "${options}")
 endforeach()
 
 add_test(NAME raylib_miniaudio_pin

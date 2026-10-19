@@ -82,25 +82,10 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
     # The library links for every other target through antic, and on the
     # host the program runs.
     set(source "${PROJECT_SOURCE_DIR}/tests/abi/miniaudio_link.anti")
-    if(target STREQUAL ANTIC_HOST_TARGET)
-        add_test(NAME miniaudio_run
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${source}"
-                "-DOBJECTS=${probe},${library}"
-                "-DWORK=${ANTIC_MINIAUDIO_WORK}/run"
-                -P "${ANTIC_RUNNERS}/run_program.cmake")
-    endif()
-    add_test(NAME miniaudio_link_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${source}"
-            "-DOBJECTS=${probe},${library}"
-            "-DWORK=${ANTIC_MINIAUDIO_WORK}/link"
-            "-DTARGET=${target}"
-            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
+    antic_native_tests(miniaudio_run miniaudio_link "${target}"
+        SOURCE "${source}"
+        OBJECTS "${probe}" "${library}"
+        WORK "${ANTIC_MINIAUDIO_WORK}")
 endforeach()
 
 add_test(NAME miniaudio_pin

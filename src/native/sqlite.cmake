@@ -85,25 +85,10 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
 
     # The library links for every target, and on the host the program runs.
     set(source "${PROJECT_SOURCE_DIR}/tests/abi/sqlite_link.anti")
-    if(target STREQUAL ANTIC_HOST_TARGET)
-        add_test(NAME sqlite_run
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${source}"
-                "-DOBJECTS=${probe},${library}"
-                "-DWORK=${ANTIC_SQLITE_WORK}/run"
-                -P "${ANTIC_RUNNERS}/run_program.cmake")
-    endif()
-    add_test(NAME sqlite_link_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${source}"
-            "-DOBJECTS=${probe},${library}"
-            "-DWORK=${ANTIC_SQLITE_WORK}/link"
-            "-DTARGET=${target}"
-            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
+    antic_native_tests(sqlite_run sqlite_link "${target}"
+        SOURCE "${source}"
+        OBJECTS "${probe}" "${library}"
+        WORK "${ANTIC_SQLITE_WORK}")
 endforeach()
 
 add_test(NAME sqlite_pin

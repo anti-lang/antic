@@ -93,25 +93,10 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         DEPENDS "${library}" "${probe}" "${glue}")
 
     # The library links for every target, and on the host the program runs.
-    if(target STREQUAL ANTIC_HOST_TARGET)
-        add_test(NAME pcre2_match
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/abi/pcre2_match.anti"
-                "-DOBJECTS=${probe},${library}"
-                "-DWORK=${ANTIC_PCRE2_WORK}/run"
-                -P "${ANTIC_RUNNERS}/run_program.cmake")
-    endif()
-    add_test(NAME pcre2_link_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/abi/pcre2_match.anti"
-            "-DOBJECTS=${probe},${library}"
-            "-DWORK=${ANTIC_PCRE2_WORK}/link"
-            "-DTARGET=${target}"
-            -P "${ANTIC_RUNNERS}/run_native_link.cmake")
+    antic_native_tests(pcre2_match pcre2_link "${target}"
+        SOURCE "${PROJECT_SOURCE_DIR}/tests/abi/pcre2_match.anti"
+        OBJECTS "${probe}" "${library}"
+        WORK "${ANTIC_PCRE2_WORK}")
 endforeach()
 
 # JIT stays off: the definitions of the build never name SUPPORT_JIT.
