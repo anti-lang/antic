@@ -17,16 +17,38 @@
 #
 # It also shows the refusal, on a listing of a program that needs a glibc
 # of its own machine. No program of this tree needs one, so the listing is
-# written here.
+# written here. The highest version the check allows is the glibc of
+# tools/sysroot-pins, which a copy of the check beside a pin of an older
+# glibc shows.
 
 cmake_minimum_required(VERSION 3.21)
+
+file(REMOVE_RECURSE "${WORK}")
+get_filename_component(check_dir "${CHECK}" DIRECTORY)
+file(MAKE_DIRECTORY "${WORK}/older/tools")
+file(COPY_FILE "${CHECK}" "${WORK}/older/tools/check-libc.cmake")
+file(COPY_FILE "${check_dir}/pins.cmake" "${WORK}/older/tools/pins.cmake")
+file(WRITE "${WORK}/older/tools/sysroot-pins"
+     "GLIBC_X86_64_LIBC=g/glibc/libc6_2.31-0ubuntu9_amd64.deb\n")
+file(WRITE "${WORK}/older/listing.txt"
+     "  Version symbols {\n"
+     "    Name: pthread_attr_getguardsize@GLIBC_2.34\n"
+     "  }\n")
+execute_process(COMMAND "${CMAKE_COMMAND}"
+                        "-DLISTING=${WORK}/older/listing.txt"
+                        -P "${WORK}/older/tools/check-libc.cmake"
+                RESULT_VARIABLE refused OUTPUT_VARIABLE out
+                ERROR_VARIABLE err ENCODING NONE)
+if(refused EQUAL 0 OR NOT "${out}${err}" MATCHES "GLIBC_2\\.34")
+    message(FATAL_ERROR "beside a pin of glibc 2.31, a program that needs "
+                        "GLIBC_2.34 was not refused\n${out}${err}")
+endif()
 
 if(NOT EXISTS "${SYSROOT}/linux-arm64/usr/lib/libc.a")
     message("SKIP: no Linux sysroot in ${SYSROOT}")
     return()
 endif()
 
-file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 get_filename_component(root "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 include("${root}/tools/warnings.cmake")

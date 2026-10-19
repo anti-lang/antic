@@ -21,11 +21,11 @@ foreach(name crt1.o crti.o crtn.o rcrt1.o Scrt1.o libc.a)
 endforeach()
 file(MAKE_DIRECTORY "${WORK}/packages/x86_64")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E tar czf
-                        "${WORK}/packages/x86_64/musl-dev-1.apk" -- usr
+                        "${WORK}/packages/x86_64/musl-dev-1-r1.apk" -- usr
                 WORKING_DIRECTORY "${stage}/apk" COMMAND_ERROR_IS_FATAL ANY)
 file(WRITE "${stage}/source/musl-1/COPYRIGHT" "musl\n")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E tar czf
-                        "${WORK}/packages/musl.tar.gz" -- musl-1
+                        "${WORK}/packages/musl-1.tar.gz" -- musl-1
                 WORKING_DIRECTORY "${stage}/source" COMMAND_ERROR_IS_FATAL ANY)
 set(clang "${WORK}/clang")
 include("${ROOT}/tools/target-compile.cmake")
@@ -42,14 +42,14 @@ foreach(name target-compile.cmake windows-compile.cmake pins.cmake)
     file(COPY_FILE "${ROOT}/tools/${name}" "${WORK}/tools/${name}")
 endforeach()
 file(COPY_FILE "${ROOT}/tools/zig-stubs-pin" "${WORK}/tools/zig-stubs-pin")
-file(SHA256 "${WORK}/packages/x86_64/musl-dev-1.apk" apk_digest)
-file(SHA256 "${WORK}/packages/musl.tar.gz" source_digest)
+file(SHA256 "${WORK}/packages/x86_64/musl-dev-1-r1.apk" apk_digest)
+file(SHA256 "${WORK}/packages/musl-1.tar.gz" source_digest)
 file(WRITE "${WORK}/tools/sysroot-pins"
      "ALPINE_URL=file://${WORK}/packages\n"
      "MUSL_VERSION=1\n"
-     "MUSL_APK=1\n"
+     "MUSL_APK_RELEASE=r1\n"
      "MUSL_DEV_X86_64=${apk_digest}\n"
-     "MUSL_SOURCE_URL=file://${WORK}/packages/musl.tar.gz\n"
+     "MUSL_SOURCE_URL=file://${WORK}/packages/musl-@VERSION@.tar.gz\n"
      "MUSL_SOURCE_DIGEST=${source_digest}\n")
 
 execute_process(COMMAND "${CMAKE_COMMAND}" "-DDEST=${WORK}/sysroot"

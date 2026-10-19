@@ -1,11 +1,14 @@
 # The pinned components of the sysroots that tools/get-sysroot.cmake installs,
 # with the SHA-256 digest of each file at its first download.
 ALPINE_URL=https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+# MUSL_VERSION is the one spelling of the version of musl. The package of
+# Alpine is musl-dev-<version>-<MUSL_APK_RELEASE>.apk, and the URL of the
+# source fills in @VERSION@.
 MUSL_VERSION=1.2.6
-MUSL_APK=1.2.6-r2
+MUSL_APK_RELEASE=r2
 MUSL_DEV_X86_64=6831e8b9e4821dae2c9121f0641f81e543f4ac27c03144c4876980ee84e6988f
 MUSL_DEV_AARCH64=ca72b84f4eb3c36bbbec04d919eb10159d414c7a43413cc2253841d301fa9486
-MUSL_SOURCE_URL=https://musl.libc.org/releases/musl-1.2.6.tar.gz
+MUSL_SOURCE_URL=https://musl.libc.org/releases/musl-@VERSION@.tar.gz
 MUSL_SOURCE_DIGEST=d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a
 # glibc 2.35 of Ubuntu 22.04 with the kernel headers, the sysroot of the
 # Linux link mode against glibc, and the X11 and OpenGL libraries of the

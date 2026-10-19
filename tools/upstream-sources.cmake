@@ -36,7 +36,8 @@ function(antic_write_sources path)
         "# name of its licence text in this directory, its version and the\n"
         "# URL of the exact source package. tools/upstream-sources.cmake\n"
         "# writes it from the pins.\n")
-    string(APPEND record "musl ${MUSL_VERSION} ${MUSL_SOURCE_URL}\n")
+    string(REPLACE "@VERSION@" "${MUSL_VERSION}" musl_url "${MUSL_SOURCE_URL}")
+    string(APPEND record "musl ${MUSL_VERSION} ${musl_url}\n")
     # One line per package of the glibc sysroots, under the name of its
     # licence text: glibc for the C library, linux-headers for the kernel
     # headers and the name of the binary package for the rest. The two

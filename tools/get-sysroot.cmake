@@ -203,7 +203,8 @@ function(linux_sysroot target arch musl_digest)
     set(root "${DEST}/${target}")
     set(work "${DEST}/.download/${target}")
     file(MAKE_DIRECTORY "${work}" "${root}/usr/lib")
-    antic_download("${ALPINE_URL}/${arch}/musl-dev-${MUSL_APK}.apk"
+    set(apk "musl-dev-${MUSL_VERSION}-${MUSL_APK_RELEASE}.apk")
+    antic_download("${ALPINE_URL}/${arch}/${apk}"
                    "${work}/musl-dev.apk" SHA256 "${musl_digest}")
     file(REMOVE_RECURSE "${work}/usr" "${root}/usr/include")
     file(ARCHIVE_EXTRACT INPUT "${work}/musl-dev.apk" DESTINATION "${work}"
@@ -222,7 +223,8 @@ function(linux_sysroot target arch musl_digest)
                             "Run tools/get-clang.cmake first.")
     endif()
     file(COPY_FILE "${builtins}" "${root}/usr/lib/libclang_rt.builtins.a")
-    antic_download("${MUSL_SOURCE_URL}" "${DEST}/.download/musl.tar.gz"
+    string(REPLACE "@VERSION@" "${MUSL_VERSION}" musl_source "${MUSL_SOURCE_URL}")
+    antic_download("${musl_source}" "${DEST}/.download/musl.tar.gz"
                    SHA256 "${MUSL_SOURCE_DIGEST}")
     file(ARCHIVE_EXTRACT INPUT "${DEST}/.download/musl.tar.gz"
          DESTINATION "${DEST}/.download"
