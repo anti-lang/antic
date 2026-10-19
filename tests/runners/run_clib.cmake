@@ -483,8 +483,11 @@ elseif(CASE STREQUAL "shared")
     expect_output("${dir}/roundtrip${EXE}" "${SOURCES}/roundtrip.expected")
 elseif(CASE STREQUAL "exports")
     library(geo shared "${dir}")
+    # The names a library exports, read with the LLVM tools of the runtime
+    # archive. A dylib lists them in its exports trie, one per line after
+    # its address.
     if(APPLE)
-        tool_run("" nm -gU "${library_file}")
+        tool_run("" "${LLVM_OBJDUMP}" --macho --exports-trie "${library_file}")
     elseif(CMAKE_HOST_WIN32)
         tool_run("" "${RUNTIME}/bin/llvm-readobj" --coff-exports "${library_file}")
         string(REGEX MATCHALL "Name: [A-Za-z_][A-Za-z0-9_.]*" names
@@ -492,7 +495,16 @@ elseif(CASE STREQUAL "exports")
         string(REPLACE "Name: " "" tool_stdout "${names}")
         string(REPLACE ";" "\n" tool_stdout "${tool_stdout}\n")
     else()
-        tool_run("" nm -D --defined-only "${library_file}")
+        # A global or a weak name of the dynamic symbol table that is not
+        # undefined is an export of a shared object.
+        tool_run("" "${LLVM_OBJDUMP}" --dynamic-syms "${library_file}")
+        string(REGEX MATCHALL "[^\n]*\n" lines "${tool_stdout}")
+        set(tool_stdout "")
+        foreach(line IN LISTS lines)
+            if(line MATCHES "^[0-9a-f]+ (g | w)" AND NOT line MATCHES "\\*UND\\*")
+                string(APPEND tool_stdout "${line}")
+            endif()
+        endforeach()
     endif()
     string(REGEX MATCHALL "[A-Za-z_][A-Za-z0-9_.]*\n" symbols "${tool_stdout}")
     set(names "")

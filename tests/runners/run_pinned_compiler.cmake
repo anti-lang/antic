@@ -1,6 +1,6 @@
 # Every build of antic that is not a reader's compiles with the clang of the
 # pinned release. The cache of the build names the compiler, and no test
-# script calls a C compiler of the machine by name.
+# script calls a C compiler or a binary tool of the machine by name.
 #
 #   cmake -DROOT=<repository> -DCACHE=<CMakeCache.txt> -P tests/runners/run_pinned_compiler.cmake
 
@@ -44,5 +44,15 @@ foreach(script IN LISTS scripts)
          REGEX "(COMMAND|run\\()[ \t]+(cc|c\\+\\+|gcc|g\\+\\+|clang|clang\\+\\+)[ \t)]")
     if(lines)
         message(FATAL_ERROR "${script} calls a compiler of the machine: ${lines}")
+    endif()
+endforeach()
+
+# A test reads an object with the LLVM tools of the pinned release, and
+# never with the nm, objdump, readelf, otool or ar of the machine.
+foreach(script IN LISTS scripts)
+    file(STRINGS "${ROOT}/${script}" lines
+         REGEX "(COMMAND|run\\(|tool_run\\(\"[^\"]*\")[ \t]+(nm|objdump|readelf|otool|ar|as|ld|strip|ranlib|lipo|dumpbin)[ \t)]")
+    if(lines)
+        message(FATAL_ERROR "${script} calls a binary tool of the machine: ${lines}")
     endif()
 endforeach()
