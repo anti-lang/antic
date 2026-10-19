@@ -388,6 +388,9 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
 {
     struct text directory = {0};
     struct text given = {0};
+    struct text name = {0};
+    struct text version = {0};
+    struct text module = {0};
     struct files_list files = {0};
     size_t i;
     size_t found = 0;
@@ -403,16 +406,11 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
     if (!files_list_tree(text_cstr(&directory), ANTL_SUFFIX, &files)) {
         goto done;
     }
+    /* library_header empties name, version and module before each file. */
     for (i = 0; i < files.count; i++) {
-        struct text name = {0};
-        struct text version = {0};
-        struct text module = {0};
         const char *file = text_cstr(&files.items[i]);
         char hex[65];
         if (!library_header(file, &name, &version, &module, NULL, NULL)) {
-            text_free(&name);
-            text_free(&version);
-            text_free(&module);
             goto done;
         }
         if (strcmp(text_cstr(&name), text_cstr(&req->name)) == 0) {
@@ -425,17 +423,11 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                 text_append(&out->path, text_cstr(&directory));
                 if (!library_header(file, &name, &version, &module, r,
                                     text_cstr(&req->name))) {
-                    text_free(&name);
-                    text_free(&version);
-                    text_free(&module);
                     goto done;
                 }
             }
             if (!sha256_file(file, hex)) {
                 fprintf(stderr, "anti: cannot read %s\n", file);
-                text_free(&name);
-                text_free(&version);
-                text_free(&module);
                 goto done;
             }
             {
@@ -447,9 +439,6 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                     fprintf(stderr, "anti: %s and %s both hold the module "
                                     "%s\n", text_cstr(&m->file), file,
                             text_cstr(&module));
-                    text_free(&name);
-                    text_free(&version);
-                    text_free(&module);
                     goto done;
                 }
                 m->digest.length = 0;
@@ -459,9 +448,6 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
             }
             found++;
         }
-        text_free(&name);
-        text_free(&version);
-        text_free(&module);
     }
     if (found == 0) {
         fprintf(stderr, "anti: %s holds no library file of the package %s\n",
@@ -479,6 +465,9 @@ done:
     files_list_free(&files);
     text_free(&directory);
     text_free(&given);
+    text_free(&name);
+    text_free(&version);
+    text_free(&module);
     return ok;
 }
 

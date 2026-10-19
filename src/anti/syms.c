@@ -595,17 +595,15 @@ static bool load_archive(const char *path, struct symbol_units *out)
     size_t i;
     bool ok = true;
 
+    /* A failed read leaves z empty, which holds nothing to free. */
     if (!zip_read(path, &z)) {
-        zip_archive_free(&z);
         return false;
     }
     for (i = 0; i < z.count; i++) {
         if (strcmp(text_cstr(&z.items[i].name), INDEX_NAME) == 0) {
             ok = zip_unpack(&z, i, &index) &&
                  load_deployment(&z, path, &index, out);
-            text_free(&index);
-            zip_archive_free(&z);
-            return ok;
+            goto done;
         }
     }
     u = symbol_units_add(out);
@@ -616,9 +614,8 @@ static bool load_archive(const char *path, struct symbol_units *out)
         bytes = texts_add(&u->bytes, "", 0);
         ok = zip_unpack(&z, i, bytes);
     }
-    zip_archive_free(&z);
     if (!ok) {
-        return false;
+        goto done;
     }
     twin = symbol_unit_entry(u, SYMS_DEBUG_SUFFIX);
     map = symbol_unit_entry(u, SYMS_MAP_SUFFIX);
@@ -626,7 +623,8 @@ static bool load_archive(const char *path, struct symbol_units *out)
         u->id.length = 0;
         if (map == NULL || !map_id(map, &u->id)) {
             fprintf(stderr, "anti: %s holds no build id\n", path);
-            return false;
+            ok = false;
+            goto done;
         }
     }
     /* The module is the name of the archive without its suffix, which
@@ -636,7 +634,10 @@ static bool load_archive(const char *path, struct symbol_units *out)
         u->module.length -= sizeof SYMS_ARCHIVE_SUFFIX - 1;
         u->module.data[u->module.length] = '\0';
     }
-    return true;
+done:
+    text_free(&index);
+    zip_archive_free(&z);
+    return ok;
 }
 
 /* The unit of id, or NULL. */

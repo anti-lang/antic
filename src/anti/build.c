@@ -1223,20 +1223,18 @@ static bool path_dependency(void *context, const char *directory,
     enum target host;
     bool ok = false;
 
+    /* A failed manifest_read leaves m empty, so done frees it on every
+       path. */
+    memset(&m, 0, sizeof m);
     text_appendf(&manifest_path, "%s/%s", directory, MANIFEST_FILE);
     if (!files_exists(text_cstr(&manifest_path))) {
         text_append(out, directory);
-        text_free(&manifest_path);
-        return true;
+        ok = true;
+        goto done;
     }
-    if (path_cycle(c, directory)) {
-        text_free(&manifest_path);
-        return false;
-    }
-    if (!target_host(&host) || !manifest_read(text_cstr(&manifest_path), false,
-                                              &m)) {
-        text_free(&manifest_path);
-        return false;
+    if (path_cycle(c, directory) || !target_host(&host) ||
+        !manifest_read(text_cstr(&manifest_path), false, &m)) {
+        goto done;
     }
     sub = *c->r;
     sub.root = directory;
@@ -1256,6 +1254,7 @@ static bool path_dependency(void *context, const char *directory,
         target_dir(directory, &m.dist, host, c->r->release, out);
         ok = true;
     }
+done:
     manifest_free(&m);
     text_free(&manifest_path);
     return ok;

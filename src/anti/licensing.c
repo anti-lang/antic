@@ -647,14 +647,14 @@ int licensing_from_archive(const char *archive)
     size_t magic = sizeof AR_MAGIC - 1;
     size_t offset = magic;
     bool found = false;
+    int status = 1;
 
     if (!files_read_reported(archive, &bytes)) {
-        return 1;
+        goto done;
     }
     if (bytes.length < magic || memcmp(bytes.data, AR_MAGIC, magic) != 0) {
         fprintf(stderr, "anti: %s is no archive\n", archive);
-        text_free(&bytes);
-        return 1;
+        goto done;
     }
     while (!found && offset < bytes.length) {
         struct ar_member m;
@@ -664,9 +664,7 @@ int licensing_from_archive(const char *archive)
             if (size_without_digit(&bytes, offset)) {
                 fprintf(stderr, "anti: %s is damaged at byte %zu\n",
                         archive, offset);
-                text_free(&bytes);
-                arena_free(&arena);
-                return 1;
+                goto done;
             }
             break;
         }
@@ -683,12 +681,14 @@ int licensing_from_archive(const char *archive)
         list[0] = &package;
         antic_notice_lines(&notice, list, 1);
         fputs(text_cstr(&notice), stdout);
+        status = 0;
     } else {
         fprintf(stderr, "anti: %s carries no package header, so it is no "
                         "static library of `--lib static`\n", archive);
     }
+done:
     text_free(&bytes);
     text_free(&notice);
     arena_free(&arena);
-    return found ? 0 : 1;
+    return status;
 }

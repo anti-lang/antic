@@ -204,20 +204,23 @@ static bool read_stream(FILE *f, struct text *out)
 {
     char buffer[65536];
     size_t start = out->length;
+    bool had_memory = out->data != NULL;
     size_t n;
     bool ok;
 
     while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
         text_append_bytes(out, buffer, n);
     }
-    /* fread gives 0 at the end of the file and on a read error alike. */
+    /* fread gives 0 at the end of the file and on a read error alike. A
+       text without memory before the read is given back without it, so a
+       caller that returns on the failure frees nothing. */
     ok = !ferror(f);
     fclose(f);
-    if (!ok) {
+    if (!ok && !had_memory) {
+        text_free(out);
+    } else if (!ok) {
         out->length = start;
-        if (out->data != NULL) {
-            out->data[start] = '\0';
-        }
+        out->data[start] = '\0';
     }
     return ok;
 }

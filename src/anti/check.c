@@ -250,36 +250,29 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
     struct text source = {0};
     struct text flat = {0};
     struct text name = {0};
+    struct text directory = {0};
+    struct text original = {0};
     bool ok = false;
 
     unit_flat_path(text_cstr(&u->path), &flat);
     if (one->dev) {
-        struct text directory = {0};
-        struct text original = {0};
         text_appendf(&directory, "%s/%s", work, CHECK_DEV_DIR);
         if (!files_read_reported(u->source, &original) ||
             !unit_file(text_cstr(&directory), text_cstr(&u->path),
                          SOURCE_SUFFIX, &path)) {
-            text_free(&directory);
-            text_free(&original);
             goto done;
         }
-        text_free(&directory);
         text_append(&source, text_cstr(&original));
         text_append(&source, "\n");
-        text_free(&original);
         text_appendf(&flat, "_block_%zu", index);
         wrap_block(one, text_cstr(&flat), &source);
     } else {
-        struct text directory = {0};
         text_appendf(&directory, "%s/%s", work, CHECK_DOCS_DIR);
         if (!files_make_dirs(text_cstr(&directory))) {
-            text_free(&directory);
             goto done;
         }
         text_appendf(&path, "%s/%s_%zu%s", text_cstr(&directory),
                      text_cstr(&flat), index, SOURCE_SUFFIX);
-        text_free(&directory);
         /* The import of the documented module is implied. A block that
            writes it itself takes its own line, because two imports of one
            module are a redeclaration. */
@@ -306,6 +299,8 @@ done:
     text_free(&source);
     text_free(&flat);
     text_free(&name);
+    text_free(&directory);
+    text_free(&original);
     return ok;
 }
 

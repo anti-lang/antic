@@ -1951,40 +1951,37 @@ done:
 
 int fmt_run(const char *const *paths, size_t count, bool check)
 {
+    struct text source = {0};
+    struct text formed = {0};
     size_t changed = 0;
     int status = 0;
     size_t i;
 
+    /* Both texts serve every file and are freed once after the last. */
     for (i = 0; i < count; i++) {
-        struct text source = {0};
-        struct text formed = {0};
+        source.length = 0;
+        formed.length = 0;
         if (!files_read_reported(paths[i], &source)) {
-            text_free(&source);
             status = 1;
-            continue;
-        }
-        /* A source the lexer refuses is the front end's to report, and
-           the canonical form of it is unknown, so it stays as it is. */
-        if (!fmt_source(text_cstr(&source), source.length, &formed)) {
+        } else if (!fmt_source(text_cstr(&source), source.length, &formed)) {
+            /* A source the lexer refuses is the front end's to report,
+               and the canonical form of it is unknown, so it stays as it
+               is. */
             fprintf(stderr, "anti: %s does not lex and stays as it is\n",
                     paths[i]);
-            text_free(&source);
-            text_free(&formed);
             status = 1;
-            continue;
-        }
-        if (formed.length != source.length ||
-            memcmp(text_cstr(&formed), text_cstr(&source), formed.length) !=
-                0) {
+        } else if (formed.length != source.length ||
+                   memcmp(text_cstr(&formed), text_cstr(&source),
+                          formed.length) != 0) {
             changed++;
             printf("%s\n", paths[i]);
             if (!check && !files_replace(paths[i], &formed)) {
                 status = 1;
             }
         }
-        text_free(&source);
-        text_free(&formed);
     }
+    text_free(&source);
+    text_free(&formed);
     if (check && changed > 0) {
         status = 1;
     }

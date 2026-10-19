@@ -333,6 +333,7 @@ int test_run(const struct test_request *r)
     size_t total = 0;
     size_t failed = 0;
     size_t i;
+    int status = 1;
 
     if (r->source_count == 0) {
         fputs("anti: test takes one or more .anti files\n", stderr);
@@ -352,9 +353,8 @@ int test_run(const struct test_request *r)
     }
     if (!base_options(&base, r->package, r->runtime, search,
                       r->root_count + 1, r->memory_checks)) {
-        free(units);
-        free(search);
-        return 2;
+        status = 2;
+        goto done;
     }
     /* DESIGN: `[inject.test]` of the manifest lies over `[inject]`, so a
        test run takes the fake of an interface where the manifest names
@@ -364,7 +364,6 @@ int test_run(const struct test_request *r)
     for (i = 0; i < r->source_count; i++) {
         if (!read_unit(r->sources[i], r->roots, r->root_count, r->work,
                        &units[i])) {
-            failed = r->source_count;
             goto done;
         }
         total += units[i].unit.test_count;
@@ -374,7 +373,6 @@ int test_run(const struct test_request *r)
     for (i = 0; i < r->source_count; i++) {
         if (!compile_library(&units[i], &base) ||
             (!r->release && !compile_object(&units[i], &base, r->work))) {
-            failed = r->source_count;
             goto done;
         }
     }
@@ -388,6 +386,7 @@ int test_run(const struct test_request *r)
     }
     printf("anti test: %zu tests in %zu modules, %zu module%s failed\n",
            total, r->source_count, failed, failed == 1 ? "" : "s");
+    status = failed == 0 ? 0 : 1;
 done:
     for (i = 0; i < r->source_count; i++) {
         unit_free(&units[i].unit);
@@ -395,5 +394,5 @@ done:
     }
     free(units);
     free(search);
-    return failed == 0 ? 0 : 1;
+    return status;
 }

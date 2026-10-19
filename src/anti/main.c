@@ -198,8 +198,8 @@ static int symbols_command(int argc, char **argv)
         } else if (argv[i][0] != '-' && trace == NULL) {
             trace = argv[i];
         } else {
-            free((void *)symbols);
-            return usage(stderr);
+            status = usage(stderr);
+            goto done;
         }
     }
     if (strcmp(argv[2], "inventory") == 0 && conf != NULL && trace == NULL &&
@@ -214,6 +214,7 @@ static int symbols_command(int argc, char **argv)
     } else {
         status = usage(stderr);
     }
+done:
     free((void *)symbols);
     return status;
 }
@@ -462,8 +463,7 @@ static int license_command(int argc, char **argv)
     }
     if (project) {
         status = license_project(count, rest, written);
-        free(rest);
-        return status;
+        goto done;
     }
     for (i = 0; i < count && !bad; i++) {
         if (strcmp(rest[i], "--from") == 0 && i + 1 < count &&
@@ -479,14 +479,14 @@ static int license_command(int argc, char **argv)
             bad = true;
         }
     }
-    free(rest);
     if (bad || written || (binary != NULL && archive != NULL) ||
         (archive != NULL && runtime.length > 0)) {
-        text_free(&runtime);
-        return usage(stderr);
+        status = usage(stderr);
+        goto done;
     }
     if (archive != NULL) {
-        return licensing_from_archive(archive);
+        status = licensing_from_archive(archive);
+        goto done;
     }
     if (runtime.length == 0 && !user_runtime_archive(&runtime)) {
         fputs("anti: the system does not say where the runtime archive is, "
@@ -498,6 +498,8 @@ static int license_command(int argc, char **argv)
         fputs(text_cstr(&notice), stdout);
         status = 0;
     }
+done:
+    free(rest);
     text_free(&notice);
     text_free(&runtime);
     return status;
