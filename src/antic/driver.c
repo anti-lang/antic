@@ -1454,12 +1454,13 @@ done:
    docs/tooling.md measures the library file and not the renderer. Dev
    docs need the private items and the `//#` notes, which live in the
    syntax tree alone. tree is filled for a source input and left NULL for
-   a library file. */
-const struct interface *driver_interface(const struct options *o,
-                                         struct arena *arena,
-                                         struct types *types,
-                                         struct ir_module *program,
-                                         struct module **tree)
+   a library file. What the interface points at lives in arena, types and
+   program. */
+static const struct interface *interface_of(const struct options *o,
+                                            struct arena *arena,
+                                            struct types *types,
+                                            struct ir_module *program,
+                                            struct module **tree)
 {
     struct diagnostics diags = {0};
     struct token_list tokens = {0};
@@ -1569,6 +1570,25 @@ done:
     text_free(&source);
     text_free(&module);
     return iface;
+}
+
+bool driver_interface(const struct options *options, driver_interface_use use,
+                      void *data)
+{
+    struct arena arena = {0};
+    struct types types;
+    struct ir_module program;
+    struct module *tree = NULL;
+    const struct interface *iface;
+
+    ir_module_init(&program, &arena, "");
+    iface = interface_of(options, &arena, &types, &program, &tree);
+    if (iface != NULL) {
+        use(iface, tree, data);
+    }
+    ir_module_free(&program);
+    arena_free(&arena);
+    return iface != NULL;
 }
 
 bool driver_library_header(const struct options *o, struct text *out)

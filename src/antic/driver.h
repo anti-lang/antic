@@ -210,26 +210,25 @@ bool driver_linux_libraries(const char *const *paths, size_t count,
                             size_t *name_count);
 
 struct interface;
-struct ir_module;
 struct module;
-struct types;
 
-/* The public interface of options->input, which is a source file or a
-   library file. antic_doc_page of docpage.c builds the page of `anti doc`
-   from it, the same structure whichever of the two it was given. The
-   doc-equivalence test of docs/tooling.md then measures the library file.
-   anti calls antic_doc_page and never this function, whose result is a
-   structure of the checker. What the interface points at lives in the
-   memory pool, the type table and the IR module. The caller frees the
-   three after it. tree takes the syntax tree of a source input and NULL
-   for a library file. Dev docs read it for the private items and the
-   `//#` notes. Returns NULL when the module cannot be read or does not
-   check. */
-const struct interface *driver_interface(const struct options *options,
-                                         struct arena *arena,
-                                         struct types *types,
-                                         struct ir_module *program,
-                                         struct module **tree);
+/* The use of the public interface of a module: the interface, the syntax
+   tree of a source input or NULL for a library file, and the data of the
+   caller. Both live until the function returns. */
+typedef void (*driver_interface_use)(const struct interface *iface,
+                                     struct module *tree, void *data);
+
+/* Hand the public interface of options->input, which is a source file or
+   a library file, to use with data. antic_doc_page of docpage.c builds
+   the page of `anti doc` from it, the same structure whichever of the two
+   it was given. The doc-equivalence test of docs/tooling.md then measures
+   the library file. anti calls antic_doc_page and never this function,
+   whose interface is a structure of the checker. The memory, the types
+   and the IR the interface points at stay inside the call. Dev docs read
+   the tree for the private items and the `//#` notes. Returns false, and
+   does not call use, when the module cannot be read or does not check. */
+bool driver_interface(const struct options *options, driver_interface_use use,
+                      void *data);
 
 struct text;
 

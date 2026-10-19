@@ -11,7 +11,6 @@
 #include "alloc.h"
 #include "ast.h"
 #include "driver.h"
-#include "ir.h"
 #include "sema.h"
 #include "types.h"
 
@@ -742,38 +741,45 @@ static void link_tables(struct doc_page *p, const struct interface *iface)
     p->import_count = iface->import_count;
 }
 
+/* The page being built and the items it holds. */
+struct page_build {
+    struct doc_page *out;
+    enum doc_items items;
+};
+
+/* Write the page of iface, or of tree for the private items. */
+static void build_page(const struct interface *iface, struct module *tree,
+                       void *data)
+{
+    const struct page_build *b = data;
+    struct doc_page *out = b->out;
+    size_t i;
+
+    text_append(&out->module, iface->module);
+    link_tables(out, iface);
+    if (tree != NULL && b->items != DOC_ITEMS_PUBLIC) {
+        doc_copy(&out->doc, &tree->doc);
+        if (b->items == DOC_ITEMS_DEV) {
+            doc_copy(&out->note, &tree->note);
+        }
+        tree_items(out, tree, b->items == DOC_ITEMS_DEV);
+    } else {
+        if (iface->doc != NULL) {
+            text_append(&out->doc, iface->doc);
+        }
+        for (i = 0; i < iface->item_count; i++) {
+            interface_item(out, iface->items[i]);
+        }
+    }
+}
+
 bool antic_doc_page(const struct options *options, enum doc_items items,
                     struct doc_page *out)
 {
-    struct arena arena = {0};
-    struct types types;
-    struct ir_module program;
-    struct module *tree = NULL;
-    const struct interface *iface;
-    size_t i;
+    struct page_build build;
 
     memset(out, 0, sizeof *out);
-    ir_module_init(&program, &arena, "");
-    iface = driver_interface(options, &arena, &types, &program, &tree);
-    if (iface != NULL) {
-        text_append(&out->module, iface->module);
-        link_tables(out, iface);
-        if (tree != NULL && items != DOC_ITEMS_PUBLIC) {
-            doc_copy(&out->doc, &tree->doc);
-            if (items == DOC_ITEMS_DEV) {
-                doc_copy(&out->note, &tree->note);
-            }
-            tree_items(out, tree, items == DOC_ITEMS_DEV);
-        } else {
-            if (iface->doc != NULL) {
-                text_append(&out->doc, iface->doc);
-            }
-            for (i = 0; i < iface->item_count; i++) {
-                interface_item(out, iface->items[i]);
-            }
-        }
-    }
-    ir_module_free(&program);
-    arena_free(&arena);
-    return iface != NULL;
+    build.out = out;
+    build.items = items;
+    return driver_interface(options, build_page, &build);
 }

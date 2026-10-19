@@ -8,7 +8,7 @@ generator" in `docs/tooling.md` with "Doc comment forms" and "Doc markup" in
 ## One structure, two inputs
 
 `driver_interface` of `src/antic/driver.c` reads a source file or a library file and
-gives back one `struct interface`. A source is lexed, parsed and checked, and
+hands one `struct interface` to a function of its caller. A source is lexed, parsed and checked, and
 `sema_interface` builds the interface of the check. A library file is loaded
 with its imports and the interface it carries is taken. The renderer sees the
 same structure whichever of the two it was given, so the doc-equivalence test
@@ -16,7 +16,9 @@ of `docs/tooling.md` measures the library file and not the renderer.
 
 The names of an interface built from a source point into the source bytes, so
 `driver_interface` copies them into the memory pool before the lexer runs. The
-pool outlives the call and the buffer does not.
+pool outlives the reading and the buffer does not. The pool, the type table and
+the IR module the interface points at belong to the call, which frees them after
+the function returns.
 
 Dev docs and `--private` need the private items and the `//#` notes, which the
 interface never carries. They read the syntax tree that the same call gives
@@ -32,8 +34,8 @@ signature is built once per entry.
 
 The collectors stand in `src/antic/docpage.c` and the renderers in
 `src/anti/doc.c`. `antic_doc_page` of `src/antic/antic.h` calls
-`driver_interface`, fills a `struct doc_page` with copies of every text and
-frees the module before it returns. The page also holds the names of the items
+`driver_interface`, whose call of `build_page` fills a `struct doc_page` with
+copies of every text before the module is freed. The page also holds the names of the items
 of the interface and the paths of its imports, which a backtick name resolves
 against. `anti` then reads nothing of the checker, which the test
 `anti_interface` holds.
