@@ -1956,11 +1956,442 @@ static struct type *check_optional(struct checker *c, struct expr *e)
                                     : types_with_none(c->types, result);
 }
 
+/* A name that stands as a value. */
+static struct type *check_name(struct checker *c, struct expr *e)
+{
+    struct symbol *sym;
+
+    sym = sema_lookup(c, &e->as.name);
+    e->symbol = sym;
+    if (sym == NULL) {
+        sema_error_at(c, e->pos, "unknown name `%.*s`",
+                      (int)e->as.name.length,
+                      e->as.name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sym->kind == SYMBOL_STRUCT) {
+        sema_error_at(c, e->pos, "`%.*s` is a type, not a value",
+                      (int)e->as.name.length, e->as.name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sym->kind == SYMBOL_MODULE) {
+        sema_error_at(c, e->pos, "`%.*s` is a module, not a value",
+                      (int)e->as.name.length, e->as.name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sym->kind == SYMBOL_CONSTRAINT) {
+        sema_error_at(c, e->pos, "`%.*s` is a constraint, not a value",
+                      (int)e->as.name.length, e->as.name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* DESIGN: a generic function names a copy where it is called,
+       since the arguments of the call give its type arguments. A
+       name of one anywhere else names no function. */
+    if (sym->kind == SYMBOL_FN && sym->item != NULL &&
+        sym->item->type_param_count > 0 && c->callee != e) {
+        sema_error_at(c, e->pos, "`%.*s` is generic, and names a function "
+                      "where it is called", (int)e->as.name.length,
+                      e->as.name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (e->type_arg_count > 0 && c->callee != e) {
+        sema_refuse_type_args(c, e, &e->as.name);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A local of another frame is a variable an anonymous function
+       captures. */
+    if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
+        sym->frame != NULL && sym->frame != c->ctx.function) {
+        sema_capture(c, sym);
+    }
+    if (sym->kind == SYMBOL_EXTERN_FN && sym->variadic) {
+        sema_error_at(c, e->pos,
+                      "a variadic function has no function pointer "
+                      "type");
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sym->caught && sym->moved_into != NULL) {
+        sema_error_at(c, e->pos, "`%.*s` has moved into `%.*s` and is not "
+                      "named after it", (int)e->as.name.length,
+                      e->as.name.text, (int)sym->moved_into->name.length,
+                      sym->moved_into->name.text);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sym->moved) {
+        sema_refuse_moved(c, e, sym);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
+        c->deferring > 0) {
+        sym->deferred = true;
+    }
+    /* An atomic local is read and written by its own calls alone,
+       as an atomic field is. */
+    if (sym->atomic && !c->atomic_place) {
+        sema_refuse_atomic(c, e->pos, &e->as.name);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    sema_check_guarded_pointer(c, e, sym);
+    if (sym->snapshot_moved) {
+        sema_error_at(c, e->pos, "`%.*s` has moved into an owner on line "
+                      "%u and is not named after it",
+                      (int)e->as.name.length, e->as.name.text,
+                      (unsigned)sym->moved_at.line);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A Flags value that is not the base of a field is read whole. */
+    if (types_is_flags(sym->type) && c->field_base != e) {
+        sym->flags_read = FLAGS_READ_ALL;
+    }
+    if (sym->kind == SYMBOL_CONST && sym->type == NULL) {
+        struct const_value v;
+        if (!sema_eval_const(c, e, &v)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
+    }
+    /* A closure may run after the variable has changed, so a
+       captured variable keeps its declared type. The name of an
+       `if let` that its block never assigns holds its value
+       wherever the block reaches. */
+    if (sym->type != NULL && types_is_nullable(sym->type) &&
+        (sym->frame == c->ctx.function || sym->steady)) {
+        struct type *proved = sema_narrowed_type(c, sym);
+        if (proved != NULL) {
+            return proved;
+        }
+    }
+    return sym->type != NULL ? sym->type : sema_builtin(c, TYPE_ERROR);
+}
+
+/* `e[i]`, through the `index` hook or into an array, a slice, a
+   pointer or a `str`. */
+static struct type *check_index(struct checker *c, struct expr *e,
+                               struct type *expected)
+{
+    struct type *t;
+
+    t = sema_check_expr(c, e->as.index.base, NULL);
+    /* DESIGN: `e[i]` on a type with the `index` hook is the call
+       `e.index(i)`, and the index takes the type the hook names.
+       `e[x, y]` is `e.index(x, y)`. The checker writes the call, so
+       lowering and the later passes see an ordinary call and no
+       second form of an index. */
+    if (!sema_is_error(t) && sema_hook(c, t, LANG_HOOK_INDEX) != NULL) {
+        struct expr *index = e->as.index.index;
+        *e = e->as.index.several
+                 ? *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX,
+                                   index->as.tuple.elements,
+                                   index->as.tuple.count)
+                 : *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX,
+                                   &index, 1);
+        return sema_check_expr(c, e, expected);
+    }
+    if (!sema_is_error(t) && t->kind == TYPE_PARAM) {
+        return sema_param_index(c, e, t, false);
+    }
+    if (!sema_is_error(t) && e->as.index.several) {
+        sema_error_at(c, e->pos, "`%s` has no `operator fn index`, which "
+                      "`e[x, y]` calls", sema_tn(t));
+        sema_check_expr(c, e->as.index.index, NULL);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (!sema_require(c, e->as.index.index,
+                      sema_check_expr(c, e->as.index.index,
+                                      sema_builtin(c, TYPE_I64)),
+                      sema_builtin(c, TYPE_I64)) || sema_is_error(t)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    switch (t->kind) {
+    case TYPE_ARRAY:
+        if (sema_index_outside(c, e->as.index.index, t)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        return t->element;
+    case TYPE_SLICE:
+        return t->element;
+    case TYPE_POINTER:
+        return sema_usable_pointer(c, e->as.index.base, t)->element;
+    case TYPE_STR:
+        return sema_builtin(c, TYPE_U8);
+    default:
+        sema_error_at(c, e->pos, "cannot index `%s`", sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+}
+
+/* `T { ... }`, of a struct, a union, a class or a case of a variant. */
+static struct type *check_struct_lit(struct checker *c, struct expr *e,
+                                    struct type *expected)
+{
+    struct type *t;
+    struct symbol *sym;
+    struct name *name = &e->as.struct_lit.name;
+    const struct symbol *named;
+    /* A literal the checker wrote from `Shape.Empty` is complete. */
+    if (e->as.struct_lit.variant_case != 0 && e->type != NULL) {
+        return e->type;
+    }
+    /* `geo.Shape.Circle { }` and `Shape.Circle { }` name a case. */
+    if (e->as.struct_lit.member.length > 0) {
+        t = sema_imported_struct(c, &e->as.struct_lit.module, name, e->pos);
+        if (sema_is_error(t)) {
+            return t;
+        }
+        if (t->kind != TYPE_VARIANT) {
+            sema_error_at(c, e->pos, "`%s` is not a variant", sema_tn(t));
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        /* A generic variant of another module takes its arguments as
+           one of the module does, `geo.Result<int, str>.Ok { }`. */
+        t = sema_generic_named(c, e, t, name, expected);
+        if (sema_is_error(t)) {
+            return t;
+        }
+        return sema_variant_literal(c, e, t, &e->as.struct_lit.member);
+    }
+    if (e->as.struct_lit.module.length > 0 &&
+        (named = sema_lookup(c, &e->as.struct_lit.module)) != NULL &&
+        named->kind == SYMBOL_STRUCT && named->type != NULL &&
+        named->type->kind == TYPE_VARIANT) {
+        t = sema_generic_named(c, e, named->type,
+                               &e->as.struct_lit.module, expected);
+        if (sema_is_error(t)) {
+            return t;
+        }
+        return sema_variant_literal(c, e, t, name);
+    }
+    if (e->as.struct_lit.module.length > 0) {
+        t = sema_imported_struct(c, &e->as.struct_lit.module, name, e->pos);
+        if (sema_is_error(t)) {
+            return t;
+        }
+    } else {
+        sym = sema_module_find(c, name);
+        if (sym == NULL &&
+            (t = types_declared(c->types, name, true)) != NULL) {
+            /* A type the compiler declares. */
+        } else if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
+            sema_error_at(c, e->pos, "unknown struct `%.*s`",
+                          (int)name->length, name->text);
+            return sema_builtin(c, TYPE_ERROR);
+        } else {
+            t = sym->item != NULL && sym->item->kind == ITEM_TYPE
+                    ? sema_alias_type(c, sym)
+                    : sym->type;
+        }
+    }
+    t = sema_generic_named(c, e, t, name, expected);
+    if (sema_is_error(t)) {
+        return t;
+    }
+    /* A type parameter is stored, copied, passed on and measured
+       alone, and its fields are those of each argument, so no body
+       writes a literal of it, by T080 of
+       docs/audit/tests-findings.md. */
+    if (t->kind == TYPE_PARAM) {
+        sema_error_at(c, e->pos, "`%s` is a type parameter, and a "
+                      "literal names a type the body knows", sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (t->kind == TYPE_VARIANT) {
+        sema_error_at(c, e->pos,
+                      "a literal of variant `%s` names one of its "
+                      "cases", sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sema_singleton_type(t) && sema_checking_class(c) != t) {
+        sema_error_at(c, e->pos,
+                      "`%s` is a singleton, and `%s.get()` gives "
+                      "its one instance", sema_tn(t), sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (sema_refuse_abstract_value(c, e->pos, "a literal", t)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A copy that a refused chain of copies left unfilled has no
+       fields, and the refusal is the one message, by T096 of
+       docs/audit/tests-findings.md. */
+    if (t->generic != NULL && t->unfilled && c->copy_refused) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (t->is_union && e->as.struct_lit.field_count != 1) {
+        sema_error_at(c, e->pos,
+                      "a literal of union `%s` names exactly one "
+                      "field", sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (t->kind == TYPE_CLASS) {
+        struct struct_field *flat;
+        size_t count = sema_chain_fields(t, NULL);
+        flat = types_alloc_array(c->arena, count + 1, sizeof *flat);
+        sema_chain_fields(t, flat);
+        return sema_check_field_inits(c, e, e->as.struct_lit.fields,
+                                      e->as.struct_lit.field_count, flat,
+                                      count, sema_tn(t), false)
+                   ? t
+                   : sema_builtin(c, TYPE_ERROR);
+    }
+    return sema_check_field_inits(c, e, e->as.struct_lit.fields,
+                                  e->as.struct_lit.field_count, t->fields,
+                                  t->field_count, sema_tn(t), t->is_union)
+               ? t
+               : sema_builtin(c, TYPE_ERROR);
+}
+
+/* DESIGN: `dup` of a class pointer copies an object of its concrete
+   class and gives a pointer of the static type back, since it reads
+   the table of the object. `delete` runs the destruct chain and frees
+   the object. `destroy` runs the chain without the free, for an
+   object that is not on a heap of its own. The other operands each
+   of them takes have a DESIGN of their own below: a value of a type
+   parameter, a class value, a struct, a tuple and a variant for
+   `dup`, and a pointer to any type for `destroy`. */
+static struct type *check_object(struct checker *c, struct expr *e)
+{
+    struct type *t;
+    const char *what = e->as.object.op == TOKEN_DUP      ? "dup"
+                       : e->as.object.op == TOKEN_DELETE ? "delete"
+                                                         : "destroy";
+    bool was = c->ending_object;
+    c->ending_object = e->as.object.op != TOKEN_DUP &&
+                       e->as.object.operand->kind == EXPR_UNARY &&
+                       e->as.object.operand->as.unary.op == TOKEN_AMP;
+    t = sema_check_expr(c, e->as.object.operand, NULL);
+    c->ending_object = was;
+    if (sema_is_error(t)) {
+        return t;
+    }
+    if (e->as.object.from != NULL &&
+        (e->as.object.op == TOKEN_DUP || types_is_chan(t))) {
+        sema_error_at(c, e->as.object.from->pos, "`%s` takes 1 argument, "
+                      "found 2", what);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (e->as.object.from != NULL && !sema_check_object_from(c, e, what)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* DESIGN: `delete(c)` ends a channel and frees what the runtime
+       holds for it, as `delete` frees an object on the heap. */
+    if (e->as.object.op == TOKEN_DELETE && types_is_chan(t)) {
+        struct expr *operand = e->as.object.operand;
+        e->kind = EXPR_SYNC_OP;
+        memset(&e->as, 0, sizeof e->as);
+        e->as.sync_op.op = SYNC_CHAN_DELETE;
+        e->as.sync_op.target = operand;
+        return sema_builtin(c, TYPE_VOID);
+    }
+    /* DESIGN: `dup` of an `own fn` copies its snapshot, and the
+       copy goes to an owner, which the conversion checks. */
+    if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_FN && t->owned) {
+        return t;
+    }
+    if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_FN &&
+        !t->bound) {
+        sema_error_at(c, e->as.object.operand->pos,
+                      "`dup` copies an `own fn`, and this is `%s`",
+                      sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* DESIGN: `dup(x)` of a value of a type parameter copies the
+       value. A copy of the generic copies a class value with its
+       copy, an owning struct part by part and a pointer by its
+       address. The mark keeps that meaning in every copy. */
+    if (e->as.object.op == TOKEN_DUP &&
+        (t->kind == TYPE_PARAM || e->as.object.value)) {
+        e->as.object.value = true;
+        return t;
+    }
+    /* DESIGN: `dup` gives the kind it is given. `dup(x)` of a class
+       value gives a value, copied as a class value part is copied,
+       and `dup(p)` of a pointer gives a new object and a pointer. */
+    if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_CLASS) {
+        e->as.object.value = true;
+        return t;
+    }
+    /* DESIGN: `dup` of a struct, a tuple, a variant or a fixed array
+       value gives a copy of it, in which every part that owns
+       something is copied as `dup` copies it. A variant copies the
+       fields of the case its tag names, and an array each element.
+       A struct, a tuple or a variant that owns nothing gives its
+       bytes. An array that owns nothing is copied by `=`, and R070
+       of "Rules of 2026-10-13" refuses its `dup`. */
+    if (e->as.object.op == TOKEN_DUP &&
+        (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE ||
+         t->kind == TYPE_VARIANT ||
+         (t->kind == TYPE_ARRAY && sema_type_owns(t))) &&
+        !t->is_union && !types_is_chan(t) && !types_is_mutex(t) &&
+        !types_is_object_lock(t) && !types_is_job(t)) {
+        return t;
+    }
+    if (e->as.object.op == TOKEN_DESTROY &&
+        !destroy_of_local(c, e->as.object.operand)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* All three read the table of the object, so all three need a
+       pointer the program has checked. `dup(p)` then gives the type
+       of `p`, which is the `*T` this leaves behind. A `?T` of a value
+       that may be `none` has had its one message. */
+    if (types_is_nullable(t) && t->kind == TYPE_OPTIONAL) {
+        sema_error_may_be_none(c, e->as.object.operand, t);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    t = sema_usable_pointer(c, e->as.object.operand, t);
+    if (e->as.object.op == TOKEN_DELETE && t->kind == TYPE_POINTER &&
+        sema_singleton_type(t->element)) {
+        sema_error_at(c, e->pos, "`%s` is a singleton and outlives the "
+                      "program", sema_tn(t->element));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* R110 of "Rules of 2026-10-13": a singleton has one instance,
+       and a copy would be a second. */
+    if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_POINTER &&
+        sema_singleton_type(t->element)) {
+        sema_error_at(c, e->pos, "`%s` is a singleton and is never "
+                      "copied", sema_tn(t->element));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* DESIGN: `destroy(p)` tears down the value that p points at in
+       place, of any type. A class value runs its teardown, an owning
+       struct or tuple goes part by part, and a value that owns
+       nothing is left alone. A generic reaches the teardown of each
+       argument so. */
+    if (e->as.object.op == TOKEN_DESTROY && t->kind == TYPE_POINTER &&
+        t->element->kind != TYPE_CLASS) {
+        if (types_is_lent(t)) {
+            sema_error_at(c, e->as.object.operand->pos, "the object is "
+                          "lent for the call and stays with its owner, "
+                          "so `%s` does not take it", what);
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        return sema_builtin(c, TYPE_VOID);
+    }
+    if (e->as.object.op == TOKEN_DESTROY && t->kind != TYPE_POINTER) {
+        sema_error_at(c, e->as.object.operand->pos,
+                      "`destroy` takes a pointer, found `%s`", sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (t->kind != TYPE_POINTER || t->element->kind != TYPE_CLASS) {
+        sema_error_at(c, e->as.object.operand->pos,
+                      "`%s` needs a class pointer, found `%s`", what,
+                      sema_tn(t));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A lent object stays with its owner, and `dup` makes one that
+       belongs to no one yet. */
+    if (e->as.object.op != TOKEN_DUP && types_is_lent(t)) {
+        sema_error_at(c, e->as.object.operand->pos, "the object is lent "
+                      "for the call and stays with its owner, so `%s` "
+                      "does not take it", what);
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return e->as.object.op == TOKEN_DUP ? types_unlent(c->types, t)
+                                        : sema_builtin(c, TYPE_VOID);
+}
+
 static struct type *check_expr_inner(struct checker *c, struct expr *e,
                                      struct type *expected)
 {
     struct type *t;
-    struct symbol *sym;
     size_t i;
 
     switch (e->kind) {
@@ -2007,106 +2438,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         }
         return sema_builtin(c, TYPE_ERROR);
     case EXPR_NAME:
-        sym = sema_lookup(c, &e->as.name);
-        e->symbol = sym;
-        if (sym == NULL) {
-            sema_error_at(c, e->pos, "unknown name `%.*s`",
-                          (int)e->as.name.length,
-                          e->as.name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sym->kind == SYMBOL_STRUCT) {
-            sema_error_at(c, e->pos, "`%.*s` is a type, not a value",
-                          (int)e->as.name.length, e->as.name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sym->kind == SYMBOL_MODULE) {
-            sema_error_at(c, e->pos, "`%.*s` is a module, not a value",
-                          (int)e->as.name.length, e->as.name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sym->kind == SYMBOL_CONSTRAINT) {
-            sema_error_at(c, e->pos, "`%.*s` is a constraint, not a value",
-                          (int)e->as.name.length, e->as.name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* DESIGN: a generic function names a copy where it is called,
-           since the arguments of the call give its type arguments. A
-           name of one anywhere else names no function. */
-        if (sym->kind == SYMBOL_FN && sym->item != NULL &&
-            sym->item->type_param_count > 0 && c->callee != e) {
-            sema_error_at(c, e->pos, "`%.*s` is generic, and names a function "
-                          "where it is called", (int)e->as.name.length,
-                          e->as.name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (e->type_arg_count > 0 && c->callee != e) {
-            sema_refuse_type_args(c, e, &e->as.name);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* A local of another frame is a variable an anonymous function
-           captures. */
-        if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
-            sym->frame != NULL && sym->frame != c->ctx.function) {
-            sema_capture(c, sym);
-        }
-        if (sym->kind == SYMBOL_EXTERN_FN && sym->variadic) {
-            sema_error_at(c, e->pos,
-                          "a variadic function has no function pointer "
-                          "type");
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sym->caught && sym->moved_into != NULL) {
-            sema_error_at(c, e->pos, "`%.*s` has moved into `%.*s` and is not "
-                          "named after it", (int)e->as.name.length,
-                          e->as.name.text, (int)sym->moved_into->name.length,
-                          sym->moved_into->name.text);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sym->moved) {
-            sema_refuse_moved(c, e, sym);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
-            c->deferring > 0) {
-            sym->deferred = true;
-        }
-        /* An atomic local is read and written by its own calls alone,
-           as an atomic field is. */
-        if (sym->atomic && !c->atomic_place) {
-            sema_refuse_atomic(c, e->pos, &e->as.name);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        sema_check_guarded_pointer(c, e, sym);
-        if (sym->snapshot_moved) {
-            sema_error_at(c, e->pos, "`%.*s` has moved into an owner on line "
-                          "%u and is not named after it",
-                          (int)e->as.name.length, e->as.name.text,
-                          (unsigned)sym->moved_at.line);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* A Flags value that is not the base of a field is read whole. */
-        if (types_is_flags(sym->type) && c->field_base != e) {
-            sym->flags_read = FLAGS_READ_ALL;
-        }
-        if (sym->kind == SYMBOL_CONST && sym->type == NULL) {
-            struct const_value v;
-            if (!sema_eval_const(c, e, &v)) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-        }
-        /* A closure may run after the variable has changed, so a
-           captured variable keeps its declared type. The name of an
-           `if let` that its block never assigns holds its value
-           wherever the block reaches. */
-        if (sym->type != NULL && types_is_nullable(sym->type) &&
-            (sym->frame == c->ctx.function || sym->steady)) {
-            struct type *proved = sema_narrowed_type(c, sym);
-            if (proved != NULL) {
-                return proved;
-            }
-        }
-        return sym->type != NULL ? sym->type : sema_builtin(c, TYPE_ERROR);
+        return check_name(c, e);
     case EXPR_UNARY:
         return check_unary(c, e, expected);
     case EXPR_FN:
@@ -2150,53 +2482,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_IN:
         return sema_check_in(c, e);
     case EXPR_INDEX:
-        t = sema_check_expr(c, e->as.index.base, NULL);
-        /* DESIGN: `e[i]` on a type with the `index` hook is the call
-           `e.index(i)`, and the index takes the type the hook names.
-           `e[x, y]` is `e.index(x, y)`. The checker writes the call, so
-           lowering and the later passes see an ordinary call and no
-           second form of an index. */
-        if (!sema_is_error(t) && sema_hook(c, t, LANG_HOOK_INDEX) != NULL) {
-            struct expr *index = e->as.index.index;
-            *e = e->as.index.several
-                     ? *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX,
-                                       index->as.tuple.elements,
-                                       index->as.tuple.count)
-                     : *sema_hook_call(c, e->as.index.base, LANG_HOOK_INDEX,
-                                       &index, 1);
-            return sema_check_expr(c, e, expected);
-        }
-        if (!sema_is_error(t) && t->kind == TYPE_PARAM) {
-            return sema_param_index(c, e, t, false);
-        }
-        if (!sema_is_error(t) && e->as.index.several) {
-            sema_error_at(c, e->pos, "`%s` has no `operator fn index`, which "
-                          "`e[x, y]` calls", sema_tn(t));
-            sema_check_expr(c, e->as.index.index, NULL);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (!sema_require(c, e->as.index.index,
-                          sema_check_expr(c, e->as.index.index,
-                                          sema_builtin(c, TYPE_I64)),
-                          sema_builtin(c, TYPE_I64)) || sema_is_error(t)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        switch (t->kind) {
-        case TYPE_ARRAY:
-            if (sema_index_outside(c, e->as.index.index, t)) {
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            return t->element;
-        case TYPE_SLICE:
-            return t->element;
-        case TYPE_POINTER:
-            return sema_usable_pointer(c, e->as.index.base, t)->element;
-        case TYPE_STR:
-            return sema_builtin(c, TYPE_U8);
-        default:
-            sema_error_at(c, e->pos, "cannot index `%s`", sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
+        return check_index(c, e, expected);
     case EXPR_SLICE: {
         struct type *index = sema_builtin(c, TYPE_I64);
         bool ok;
@@ -2235,119 +2521,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return sema_check_field(c, e);
     case EXPR_OPTIONAL:
         return e->type;
-    case EXPR_STRUCT_LIT: {
-        struct name *name = &e->as.struct_lit.name;
-        const struct symbol *named;
-        /* A literal the checker wrote from `Shape.Empty` is complete. */
-        if (e->as.struct_lit.variant_case != 0 && e->type != NULL) {
-            return e->type;
-        }
-        /* `geo.Shape.Circle { }` and `Shape.Circle { }` name a case. */
-        if (e->as.struct_lit.member.length > 0) {
-            t = sema_imported_struct(c, &e->as.struct_lit.module, name, e->pos);
-            if (sema_is_error(t)) {
-                return t;
-            }
-            if (t->kind != TYPE_VARIANT) {
-                sema_error_at(c, e->pos, "`%s` is not a variant", sema_tn(t));
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            /* A generic variant of another module takes its arguments as
-               one of the module does, `geo.Result<int, str>.Ok { }`. */
-            t = sema_generic_named(c, e, t, name, expected);
-            if (sema_is_error(t)) {
-                return t;
-            }
-            return sema_variant_literal(c, e, t, &e->as.struct_lit.member);
-        }
-        if (e->as.struct_lit.module.length > 0 &&
-            (named = sema_lookup(c, &e->as.struct_lit.module)) != NULL &&
-            named->kind == SYMBOL_STRUCT && named->type != NULL &&
-            named->type->kind == TYPE_VARIANT) {
-            t = sema_generic_named(c, e, named->type,
-                                   &e->as.struct_lit.module, expected);
-            if (sema_is_error(t)) {
-                return t;
-            }
-            return sema_variant_literal(c, e, t, name);
-        }
-        if (e->as.struct_lit.module.length > 0) {
-            t = sema_imported_struct(c, &e->as.struct_lit.module, name, e->pos);
-            if (sema_is_error(t)) {
-                return t;
-            }
-        } else {
-            sym = sema_module_find(c, name);
-            if (sym == NULL &&
-                (t = types_declared(c->types, name, true)) != NULL) {
-                /* A type the compiler declares. */
-            } else if (sym == NULL || sym->kind != SYMBOL_STRUCT) {
-                sema_error_at(c, e->pos, "unknown struct `%.*s`",
-                              (int)name->length, name->text);
-                return sema_builtin(c, TYPE_ERROR);
-            } else {
-                t = sym->item != NULL && sym->item->kind == ITEM_TYPE
-                        ? sema_alias_type(c, sym)
-                        : sym->type;
-            }
-        }
-        t = sema_generic_named(c, e, t, name, expected);
-        if (sema_is_error(t)) {
-            return t;
-        }
-        /* A type parameter is stored, copied, passed on and measured
-           alone, and its fields are those of each argument, so no body
-           writes a literal of it, by T080 of
-           docs/audit/tests-findings.md. */
-        if (t->kind == TYPE_PARAM) {
-            sema_error_at(c, e->pos, "`%s` is a type parameter, and a "
-                          "literal names a type the body knows", sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (t->kind == TYPE_VARIANT) {
-            sema_error_at(c, e->pos,
-                          "a literal of variant `%s` names one of its "
-                          "cases", sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sema_singleton_type(t) && sema_checking_class(c) != t) {
-            sema_error_at(c, e->pos,
-                          "`%s` is a singleton, and `%s.get()` gives "
-                          "its one instance", sema_tn(t), sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (sema_refuse_abstract_value(c, e->pos, "a literal", t)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* A copy that a refused chain of copies left unfilled has no
-           fields, and the refusal is the one message, by T096 of
-           docs/audit/tests-findings.md. */
-        if (t->generic != NULL && t->unfilled && c->copy_refused) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (t->is_union && e->as.struct_lit.field_count != 1) {
-            sema_error_at(c, e->pos,
-                          "a literal of union `%s` names exactly one "
-                          "field", sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (t->kind == TYPE_CLASS) {
-            struct struct_field *flat;
-            size_t count = sema_chain_fields(t, NULL);
-            flat = types_alloc_array(c->arena, count + 1, sizeof *flat);
-            sema_chain_fields(t, flat);
-            return sema_check_field_inits(c, e, e->as.struct_lit.fields,
-                                          e->as.struct_lit.field_count, flat,
-                                          count, sema_tn(t), false)
-                       ? t
-                       : sema_builtin(c, TYPE_ERROR);
-        }
-        return sema_check_field_inits(c, e, e->as.struct_lit.fields,
-                                      e->as.struct_lit.field_count, t->fields,
-                                      t->field_count, sema_tn(t), t->is_union)
-                   ? t
-                   : sema_builtin(c, TYPE_ERROR);
-    }
+    case EXPR_STRUCT_LIT:
+        return check_struct_lit(c, e, expected);
     case EXPR_SLICE_LIT: {
         struct struct_field fields[2];
         struct type *element = sema_resolve_type(c, e->as.slice_lit.element);
@@ -2525,153 +2700,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         return sema_check_sync_op(c, e);
     case EXPR_SIMD:
         return e->type;
-    /* DESIGN: `dup` of a class pointer copies an object of its concrete
-       class and gives a pointer of the static type back, since it reads
-       the table of the object. `delete` runs the destruct chain and frees
-       the object. `destroy` runs the chain without the free, for an
-       object that is not on a heap of its own. The other operands each
-       of them takes have a DESIGN of their own below: a value of a type
-       parameter, a class value, a struct, a tuple and a variant for
-       `dup`, and a pointer to any type for `destroy`. */
-    case EXPR_OBJECT: {
-        const char *what = e->as.object.op == TOKEN_DUP      ? "dup"
-                           : e->as.object.op == TOKEN_DELETE ? "delete"
-                                                             : "destroy";
-        bool was = c->ending_object;
-        c->ending_object = e->as.object.op != TOKEN_DUP &&
-                           e->as.object.operand->kind == EXPR_UNARY &&
-                           e->as.object.operand->as.unary.op == TOKEN_AMP;
-        t = sema_check_expr(c, e->as.object.operand, NULL);
-        c->ending_object = was;
-        if (sema_is_error(t)) {
-            return t;
-        }
-        if (e->as.object.from != NULL &&
-            (e->as.object.op == TOKEN_DUP || types_is_chan(t))) {
-            sema_error_at(c, e->as.object.from->pos, "`%s` takes 1 argument, "
-                          "found 2", what);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (e->as.object.from != NULL && !sema_check_object_from(c, e, what)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* DESIGN: `delete(c)` ends a channel and frees what the runtime
-           holds for it, as `delete` frees an object on the heap. */
-        if (e->as.object.op == TOKEN_DELETE && types_is_chan(t)) {
-            struct expr *operand = e->as.object.operand;
-            e->kind = EXPR_SYNC_OP;
-            memset(&e->as, 0, sizeof e->as);
-            e->as.sync_op.op = SYNC_CHAN_DELETE;
-            e->as.sync_op.target = operand;
-            return sema_builtin(c, TYPE_VOID);
-        }
-        /* DESIGN: `dup` of an `own fn` copies its snapshot, and the
-           copy goes to an owner, which the conversion checks. */
-        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_FN && t->owned) {
-            return t;
-        }
-        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_FN &&
-            !t->bound) {
-            sema_error_at(c, e->as.object.operand->pos,
-                          "`dup` copies an `own fn`, and this is `%s`",
-                          sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* DESIGN: `dup(x)` of a value of a type parameter copies the
-           value. A copy of the generic copies a class value with its
-           copy, an owning struct part by part and a pointer by its
-           address. The mark keeps that meaning in every copy. */
-        if (e->as.object.op == TOKEN_DUP &&
-            (t->kind == TYPE_PARAM || e->as.object.value)) {
-            e->as.object.value = true;
-            return t;
-        }
-        /* DESIGN: `dup` gives the kind it is given. `dup(x)` of a class
-           value gives a value, copied as a class value part is copied,
-           and `dup(p)` of a pointer gives a new object and a pointer. */
-        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_CLASS) {
-            e->as.object.value = true;
-            return t;
-        }
-        /* DESIGN: `dup` of a struct, a tuple, a variant or a fixed array
-           value gives a copy of it, in which every part that owns
-           something is copied as `dup` copies it. A variant copies the
-           fields of the case its tag names, and an array each element.
-           A struct, a tuple or a variant that owns nothing gives its
-           bytes. An array that owns nothing is copied by `=`, and R070
-           of "Rules of 2026-10-13" refuses its `dup`. */
-        if (e->as.object.op == TOKEN_DUP &&
-            (t->kind == TYPE_STRUCT || t->kind == TYPE_TUPLE ||
-             t->kind == TYPE_VARIANT ||
-             (t->kind == TYPE_ARRAY && sema_type_owns(t))) &&
-            !t->is_union && !types_is_chan(t) && !types_is_mutex(t) &&
-            !types_is_object_lock(t) && !types_is_job(t)) {
-            return t;
-        }
-        if (e->as.object.op == TOKEN_DESTROY &&
-            !destroy_of_local(c, e->as.object.operand)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* All three read the table of the object, so all three need a
-           pointer the program has checked. `dup(p)` then gives the type
-           of `p`, which is the `*T` this leaves behind. A `?T` of a value
-           that may be `none` has had its one message. */
-        if (types_is_nullable(t) && t->kind == TYPE_OPTIONAL) {
-            sema_error_may_be_none(c, e->as.object.operand, t);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        t = sema_usable_pointer(c, e->as.object.operand, t);
-        if (e->as.object.op == TOKEN_DELETE && t->kind == TYPE_POINTER &&
-            sema_singleton_type(t->element)) {
-            sema_error_at(c, e->pos, "`%s` is a singleton and outlives the "
-                          "program", sema_tn(t->element));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* R110 of "Rules of 2026-10-13": a singleton has one instance,
-           and a copy would be a second. */
-        if (e->as.object.op == TOKEN_DUP && t->kind == TYPE_POINTER &&
-            sema_singleton_type(t->element)) {
-            sema_error_at(c, e->pos, "`%s` is a singleton and is never "
-                          "copied", sema_tn(t->element));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* DESIGN: `destroy(p)` tears down the value that p points at in
-           place, of any type. A class value runs its teardown, an owning
-           struct or tuple goes part by part, and a value that owns
-           nothing is left alone. A generic reaches the teardown of each
-           argument so. */
-        if (e->as.object.op == TOKEN_DESTROY && t->kind == TYPE_POINTER &&
-            t->element->kind != TYPE_CLASS) {
-            if (types_is_lent(t)) {
-                sema_error_at(c, e->as.object.operand->pos, "the object is "
-                              "lent for the call and stays with its owner, "
-                              "so `%s` does not take it", what);
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            return sema_builtin(c, TYPE_VOID);
-        }
-        if (e->as.object.op == TOKEN_DESTROY && t->kind != TYPE_POINTER) {
-            sema_error_at(c, e->as.object.operand->pos,
-                          "`destroy` takes a pointer, found `%s`", sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (t->kind != TYPE_POINTER || t->element->kind != TYPE_CLASS) {
-            sema_error_at(c, e->as.object.operand->pos,
-                          "`%s` needs a class pointer, found `%s`", what,
-                          sema_tn(t));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* A lent object stays with its owner, and `dup` makes one that
-           belongs to no one yet. */
-        if (e->as.object.op != TOKEN_DUP && types_is_lent(t)) {
-            sema_error_at(c, e->as.object.operand->pos, "the object is lent "
-                          "for the call and stays with its owner, so `%s` "
-                          "does not take it", what);
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return e->as.object.op == TOKEN_DUP ? types_unlent(c->types, t)
-                                            : sema_builtin(c, TYPE_VOID);
-    }
+    case EXPR_OBJECT:
+        return check_object(c, e);
     case EXPR_SIZE_OF:
         t = sema_resolve_type(c, e->as.size_of);
         return sema_is_error(t) ? t : sema_builtin(c, TYPE_I64);
