@@ -988,6 +988,16 @@ static void mark(struct expr *e)
     }
 }
 
+/* Read the open node n again over its operands a and b, which the copy
+   made and which keep the types it gave them. b may be NULL. */
+static struct type *reread(struct clone *cl, struct expr *n, struct expr *a,
+                           struct expr *b)
+{
+    mark(a);
+    mark(b);
+    return recheck(cl, n);
+}
+
 static bool is_param(const struct type *t)
 {
     return t != NULL && t->kind == TYPE_PARAM;
@@ -1056,10 +1066,75 @@ static bool open_node(const struct expr *e)
     }
 }
 
+/* The call e in its copy n: the callee, the arguments, the receiver of
+   a function of an interface and the default hash. */
+static void xcall(struct clone *cl, struct expr *n, const struct expr *e)
+{
+    struct symbol *copy;
+
+    cl->callee = e->as.call.callee->kind == EXPR_NAME;
+    n->as.call.callee = xe(cl, e->as.call.callee);
+    cl->callee = false;
+    n->as.call.args = xlist(cl, e->as.call.args, e->as.call.arg_count);
+    if (e->as.call.arg_count > 0 && e->as.call.args[0]->param_type != NULL &&
+        cl->fresh) {
+        n->as.call.args[0] = receiver(cl, n->as.call.args[0],
+                                      e->as.call.args[0]);
+    }
+    n->as.call.dispatch =
+        ty(cl, e->as.call.dispatch, e->pos);
+    xh(cl, &n->as.call.handler, &e->as.call.handler);
+    n->as.call.out = e->as.call.out == e ? n : xe(cl, e->as.call.out);
+    n->as.call.builds = ty(cl, e->as.call.builds, e->pos);
+    if (direct_callee(n->as.call.callee) &&
+        (copy = callee_copy(cl, e, n->as.call.callee->symbol)) != NULL) {
+        n->as.call.callee->symbol = copy;
+    }
+    if (cl->fresh) {
+        n->as.call.copy_args = NULL;
+        n->as.call.copy_values = NULL;
+        n->as.call.copy_count = 0;
+    }
+    /* The default hash of a type that names a parameter is read
+       again, and finds the functions of the types of the argument. */
+    if (cl->fresh && open_node(e)) {
+        n->as.call.hashes = false;
+        n->as.call.hash_calls = NULL;
+        n->as.call.hash_count = 0;
+        reread(cl, n, n->as.call.callee->as.field.base, NULL);
+    } else {
+        n->as.call.hash_calls =
+            xlist(cl, e->as.call.hash_calls, e->as.call.hash_count);
+    }
+}
+
+/* The parts of the text f"..." e in its copy n. */
+static void xformat(struct clone *cl, struct expr *n, const struct expr *e)
+{
+    size_t i;
+
+    if (cl->fresh) {
+        n->as.format.parts = types_alloc_array(
+            cl->k->c->arena, e->as.format.count + 1,
+            sizeof *n->as.format.parts);
+        memcpy(n->as.format.parts, e->as.format.parts,
+               e->as.format.count * sizeof *n->as.format.parts);
+    }
+    for (i = 0; i < e->as.format.count; i++) {
+        const struct format_part *p = &e->as.format.parts[i];
+        n->as.format.parts[i].value = xe(cl, p->value);
+        n->as.format.parts[i].bound = xsym(cl, p->bound);
+        n->as.format.parts[i].text_call = xe(cl, p->text_call);
+        n->as.format.parts[i].value_call = xe(cl, p->value_call);
+    }
+    n->as.format.builder = xsym(cl, e->as.format.builder);
+    n->as.format.start = xe(cl, e->as.format.start);
+    n->as.format.take = xe(cl, e->as.format.take);
+}
+
 static struct expr *xe(struct clone *cl, struct expr *e)
 {
     struct expr *n;
-    size_t i;
 
     if (e == NULL) {
         return NULL;
@@ -1094,8 +1169,7 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     case EXPR_UNARY:
         n->as.unary.operand = xe(cl, e->as.unary.operand);
         if (cl->fresh && open_node(e)) {
-            mark(n->as.unary.operand);
-            recheck(cl, n);
+            reread(cl, n, n->as.unary.operand, NULL);
         }
         break;
     case EXPR_BINARY:
@@ -1104,12 +1178,10 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         /* The default `==` of a type that names a parameter is read
            again, and finds the functions of the types of the argument. */
         if (cl->fresh && open_node(e)) {
-            mark(n->as.binary.left);
-            mark(n->as.binary.right);
             n->as.binary.equals = false;
             n->as.binary.eq_calls = NULL;
             n->as.binary.eq_count = 0;
-            recheck(cl, n);
+            reread(cl, n, n->as.binary.left, n->as.binary.right);
         } else {
             n->as.binary.eq_calls =
                 xlist(cl, e->as.binary.eq_calls, e->as.binary.eq_count);
@@ -1121,54 +1193,15 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         n->as.cast.target =
             ty(cl, e->as.cast.target, e->pos);
         break;
-    case EXPR_CALL: {
-        struct symbol *copy;
-        cl->callee = e->as.call.callee->kind == EXPR_NAME;
-        n->as.call.callee = xe(cl, e->as.call.callee);
-        cl->callee = false;
-        n->as.call.args = xlist(cl, e->as.call.args, e->as.call.arg_count);
-        if (e->as.call.arg_count > 0 && e->as.call.args[0]->param_type != NULL &&
-            cl->fresh) {
-            n->as.call.args[0] = receiver(cl, n->as.call.args[0],
-                                          e->as.call.args[0]);
-        }
-        n->as.call.dispatch =
-            ty(cl, e->as.call.dispatch, e->pos);
-        xh(cl, &n->as.call.handler, &e->as.call.handler);
-        n->as.call.out = e->as.call.out == e ? n : xe(cl, e->as.call.out);
-        n->as.call.builds = ty(cl, e->as.call.builds, e->pos);
-        if (direct_callee(n->as.call.callee) &&
-            (copy = callee_copy(cl, e, n->as.call.callee->symbol)) != NULL) {
-            n->as.call.callee->symbol = copy;
-        }
-        if (cl->fresh) {
-            n->as.call.copy_args = NULL;
-            n->as.call.copy_values = NULL;
-            n->as.call.copy_count = 0;
-        }
-        /* The default hash of a type that names a parameter is read
-           again, and finds the functions of the types of the argument. */
-        if (cl->fresh && open_node(e)) {
-            mark(n->as.call.callee->as.field.base);
-            n->as.call.hashes = false;
-            n->as.call.hash_calls = NULL;
-            n->as.call.hash_count = 0;
-            recheck(cl, n);
-        } else {
-            n->as.call.hash_calls =
-                xlist(cl, e->as.call.hash_calls, e->as.call.hash_count);
-        }
+    case EXPR_CALL:
+        xcall(cl, n, e);
         break;
-    }
     case EXPR_INDEX:
         n->as.index.base = xe(cl, e->as.index.base);
         n->as.index.index = xe(cl, e->as.index.index);
         if (cl->fresh && open_node(e)) {
-            struct type *t;
-            mark(n->as.index.base);
-            mark(n->as.index.index);
-            t = recheck(cl, n);
-            map_add(cl, e->as.index.base->type->indexed, t);
+            map_add(cl, e->as.index.base->type->indexed,
+                    reread(cl, n, n->as.index.base, n->as.index.index));
         }
         break;
     case EXPR_SLICE:
@@ -1237,23 +1270,7 @@ static struct expr *xe(struct clone *cl, struct expr *e)
         n->as.join.job = xe(cl, e->as.join.job);
         break;
     case EXPR_FORMAT:
-        if (cl->fresh) {
-            n->as.format.parts = types_alloc_array(
-                cl->k->c->arena, e->as.format.count + 1,
-                sizeof *n->as.format.parts);
-            memcpy(n->as.format.parts, e->as.format.parts,
-                   e->as.format.count * sizeof *n->as.format.parts);
-        }
-        for (i = 0; i < e->as.format.count; i++) {
-            const struct format_part *p = &e->as.format.parts[i];
-            n->as.format.parts[i].value = xe(cl, p->value);
-            n->as.format.parts[i].bound = xsym(cl, p->bound);
-            n->as.format.parts[i].text_call = xe(cl, p->text_call);
-            n->as.format.parts[i].value_call = xe(cl, p->value_call);
-        }
-        n->as.format.builder = xsym(cl, e->as.format.builder);
-        n->as.format.start = xe(cl, e->as.format.start);
-        n->as.format.take = xe(cl, e->as.format.take);
+        xformat(cl, n, e);
         break;
     case EXPR_IN:
         n->as.in.value = xe(cl, e->as.in.value);
@@ -1300,6 +1317,110 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     return n;
 }
 
+/* The assignment s in its copy n. */
+static void xassign(struct clone *cl, struct stmt *n, const struct stmt *s)
+{
+    struct expr *target = s->as.assign.target;
+
+    if (target->kind == EXPR_INDEX && cl->fresh && open_node(target)) {
+        /* `e[i] = v` writes through `set_index`, so the target is
+           not read as `e[i]` is. */
+        struct expr *t = arena_alloc(cl->k->c->arena, sizeof *t);
+        *t = *target;
+        t->type = NULL;
+        t->as.index.base = xe(cl, target->as.index.base);
+        t->as.index.index = xe(cl, target->as.index.index);
+        n->as.assign.target = t;
+    } else {
+        n->as.assign.target = xe(cl, target);
+    }
+    n->as.assign.value = xe(cl, s->as.assign.value);
+    if (target->kind == EXPR_INDEX && cl->fresh && open_node(target)) {
+        struct expr *t = n->as.assign.target;
+        mark(t->as.index.base);
+        mark(t->as.index.index);
+        mark(n->as.assign.value);
+        if (sema_set_index(cl->k->c, n)) {
+            if (n->kind == STMT_EXPR) {
+                redirect(cl, n->as.expr);
+            }
+        } else {
+            t->prechecked = false;
+            recheck(cl, t);
+        }
+    }
+}
+
+/* The calls of the hooks of the walk it that the checker wrote when it
+   read the loop again. */
+static void redirect_iter(struct clone *cl, const struct iteration *it)
+{
+    redirect(cl, it->start);
+    redirect(cl, it->advance);
+    redirect(cl, it->current);
+    redirect(cl, it->place);
+    redirect(cl, it->changed);
+    redirect(cl, it->change_file);
+    redirect(cl, it->change_file_length);
+    redirect(cl, it->change_line);
+}
+
+/* The loop s in its copy n. A `for` over a value of a type parameter
+   takes the element and the hooks of the argument. */
+static void xfor(struct clone *cl, struct stmt *n, const struct stmt *s)
+{
+    struct expr *over = s->as.for_loop.over;
+
+    n->as.for_loop.low = xe(cl, s->as.for_loop.low);
+    n->as.for_loop.high = xe(cl, s->as.for_loop.high);
+    n->as.for_loop.over = xe(cl, over);
+    n->as.for_loop.step = xe(cl, s->as.for_loop.step);
+    if (over != NULL && walked_param(over->type) != NULL && cl->fresh) {
+        struct scope scope;
+        struct type *element = NULL;
+        struct type *t = n->as.for_loop.over->type;
+        mark(n->as.for_loop.over);
+        memset(&n->as.for_loop.hooks, 0, sizeof n->as.for_loop.hooks);
+        sema_enter_scope(cl->k->c, &scope);
+        if (t->kind == TYPE_SLICE || t->kind == TYPE_ARRAY) {
+            element = t->element;
+        } else if (!sema_iterate(cl->k->c, n->as.for_loop.over, t,
+                                 &n->as.for_loop.hooks, &element)) {
+            cl->k->failed = true;
+        }
+        sema_leave_scope(cl->k->c, &scope);
+        redirect_iter(cl, &n->as.for_loop.hooks);
+        map_add(cl, walked_param(over->type)->walked, element);
+    } else {
+        xiter(cl, &n->as.for_loop.hooks, &s->as.for_loop.hooks);
+    }
+    n->as.for_loop.names =
+        xbind(cl, s->as.for_loop.names, s->as.for_loop.name_count);
+    n->as.for_loop.element = xsym(cl, s->as.for_loop.element);
+    n->as.for_loop.body = xb(cl, s->as.for_loop.body);
+}
+
+/* The arms of a `switch` or a `select`. */
+static struct switch_arm *xarms(struct clone *cl, struct switch_arm *list,
+                                size_t count)
+{
+    struct switch_arm *n = list;
+    size_t i;
+
+    if (cl->fresh) {
+        n = types_alloc_array(cl->k->c->arena, count + 1, sizeof *n);
+        memcpy(n, list, count * sizeof *n);
+    }
+    for (i = 0; i < count; i++) {
+        const struct switch_arm *a = &list[i];
+        n[i].value = xe(cl, a->value);
+        n[i].bound = xsym(cl, a->bound);
+        n[i].test = xe(cl, a->test);
+        n[i].body = xs(cl, a->body);
+    }
+    return n;
+}
+
 static struct stmt *xs(struct clone *cl, struct stmt *s)
 {
     struct stmt *n;
@@ -1327,37 +1448,9 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
     case STMT_EXPR:
         n->as.expr = xe(cl, s->as.expr);
         break;
-    case STMT_ASSIGN: {
-        struct expr *target = s->as.assign.target;
-        if (target->kind == EXPR_INDEX && cl->fresh && open_node(target)) {
-            /* `e[i] = v` writes through `set_index`, so the target is
-               not read as `e[i]` is. */
-            struct expr *t = arena_alloc(cl->k->c->arena, sizeof *t);
-            *t = *target;
-            t->type = NULL;
-            t->as.index.base = xe(cl, target->as.index.base);
-            t->as.index.index = xe(cl, target->as.index.index);
-            n->as.assign.target = t;
-        } else {
-            n->as.assign.target = xe(cl, target);
-        }
-        n->as.assign.value = xe(cl, s->as.assign.value);
-        if (target->kind == EXPR_INDEX && cl->fresh && open_node(target)) {
-            struct expr *t = n->as.assign.target;
-            mark(t->as.index.base);
-            mark(t->as.index.index);
-            mark(n->as.assign.value);
-            if (sema_set_index(cl->k->c, n)) {
-                if (n->kind == STMT_EXPR) {
-                    redirect(cl, n->as.expr);
-                }
-            } else {
-                t->prechecked = false;
-                recheck(cl, t);
-            }
-        }
+    case STMT_ASSIGN:
+        xassign(cl, n, s);
         break;
-    }
     case STMT_IF:
         if (cl->fresh) {
             n->as.if_chain.branches = types_alloc_array(
@@ -1377,44 +1470,9 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
         n->as.loop.cond = xe(cl, s->as.loop.cond);
         n->as.loop.body = xb(cl, s->as.loop.body);
         break;
-    case STMT_FOR: {
-        struct expr *over = s->as.for_loop.over;
-        n->as.for_loop.low = xe(cl, s->as.for_loop.low);
-        n->as.for_loop.high = xe(cl, s->as.for_loop.high);
-        n->as.for_loop.over = xe(cl, over);
-        n->as.for_loop.step = xe(cl, s->as.for_loop.step);
-        if (over != NULL && walked_param(over->type) != NULL && cl->fresh) {
-            struct scope scope;
-            struct type *element = NULL;
-            struct type *t = n->as.for_loop.over->type;
-            mark(n->as.for_loop.over);
-            memset(&n->as.for_loop.hooks, 0, sizeof n->as.for_loop.hooks);
-            sema_enter_scope(cl->k->c, &scope);
-            if (t->kind == TYPE_SLICE || t->kind == TYPE_ARRAY) {
-                element = t->element;
-            } else if (!sema_iterate(cl->k->c, n->as.for_loop.over, t,
-                                     &n->as.for_loop.hooks, &element)) {
-                cl->k->failed = true;
-            }
-            sema_leave_scope(cl->k->c, &scope);
-            redirect(cl, n->as.for_loop.hooks.start);
-            redirect(cl, n->as.for_loop.hooks.advance);
-            redirect(cl, n->as.for_loop.hooks.current);
-            redirect(cl, n->as.for_loop.hooks.place);
-            redirect(cl, n->as.for_loop.hooks.changed);
-            redirect(cl, n->as.for_loop.hooks.change_file);
-            redirect(cl, n->as.for_loop.hooks.change_file_length);
-            redirect(cl, n->as.for_loop.hooks.change_line);
-            map_add(cl, walked_param(over->type)->walked, element);
-        } else {
-            xiter(cl, &n->as.for_loop.hooks, &s->as.for_loop.hooks);
-        }
-        n->as.for_loop.names =
-            xbind(cl, s->as.for_loop.names, s->as.for_loop.name_count);
-        n->as.for_loop.element = xsym(cl, s->as.for_loop.element);
-        n->as.for_loop.body = xb(cl, s->as.for_loop.body);
+    case STMT_FOR:
+        xfor(cl, n, s);
         break;
-    }
     case STMT_DEFER:
     case STMT_UNDO:
         n->as.deferred = xs(cl, s->as.deferred);
@@ -1424,20 +1482,8 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
         break;
     case STMT_SWITCH:
         n->as.switch_stmt.value = xe(cl, s->as.switch_stmt.value);
-        if (cl->fresh) {
-            n->as.switch_stmt.arms = types_alloc_array(
-                cl->k->c->arena, s->as.switch_stmt.count + 1,
-                sizeof *n->as.switch_stmt.arms);
-            memcpy(n->as.switch_stmt.arms, s->as.switch_stmt.arms,
-                   s->as.switch_stmt.count * sizeof *n->as.switch_stmt.arms);
-        }
-        for (i = 0; i < s->as.switch_stmt.count; i++) {
-            const struct switch_arm *a = &s->as.switch_stmt.arms[i];
-            n->as.switch_stmt.arms[i].value = xe(cl, a->value);
-            n->as.switch_stmt.arms[i].bound = xsym(cl, a->bound);
-            n->as.switch_stmt.arms[i].test = xe(cl, a->test);
-            n->as.switch_stmt.arms[i].body = xs(cl, a->body);
-        }
+        n->as.switch_stmt.arms =
+            xarms(cl, s->as.switch_stmt.arms, s->as.switch_stmt.count);
         n->as.switch_stmt.otherwise = xs(cl, s->as.switch_stmt.otherwise);
         n->as.switch_stmt.bound = xsym(cl, s->as.switch_stmt.bound);
         break;
@@ -1463,20 +1509,7 @@ static struct stmt *xs(struct clone *cl, struct stmt *s)
         n->as.sync.body = xb(cl, s->as.sync.body);
         break;
     case STMT_SELECT:
-        if (cl->fresh) {
-            n->as.select.arms = types_alloc_array(
-                cl->k->c->arena, s->as.select.count + 1,
-                sizeof *n->as.select.arms);
-            memcpy(n->as.select.arms, s->as.select.arms,
-                   s->as.select.count * sizeof *n->as.select.arms);
-        }
-        for (i = 0; i < s->as.select.count; i++) {
-            const struct switch_arm *a = &s->as.select.arms[i];
-            n->as.select.arms[i].value = xe(cl, a->value);
-            n->as.select.arms[i].bound = xsym(cl, a->bound);
-            n->as.select.arms[i].test = xe(cl, a->test);
-            n->as.select.arms[i].body = xs(cl, a->body);
-        }
+        n->as.select.arms = xarms(cl, s->as.select.arms, s->as.select.count);
         break;
     case STMT_BREAK:
     case STMT_CONTINUE:
