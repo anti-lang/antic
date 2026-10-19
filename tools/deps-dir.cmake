@@ -10,6 +10,15 @@
 # reads those of the main checkout instead of fetching its own. The
 # configure step takes it as a cache variable, and a script run with -P as
 # the variable -DANTI_DEPS_DIR gives it. Unset or empty, it is build/deps.
+# ANTIC_DEPS_DIR is the directory this file arrives at, which the build
+# reads, and ANTI_DEPS_DIR the option a person gives.
+#
+# Two finer ways move one download each, and both follow ANTIC_DEPS_DIR by
+# default. ANTIC_CLANG_DIR and ANTIC_LLVM_DIR of
+# tools/pinned-compiler.cmake are cache paths, which the release script and
+# docs/vm-setup.md give for the VMs. The sysroots, raylib and the native
+# sources are antic_shared_path of CMakeLists.txt, which also takes a path
+# the cache of build/host recorded, so a sanitizer tree finds them there.
 if(NOT CMAKE_SCRIPT_MODE_FILE)
     set(ANTI_DEPS_DIR "" CACHE PATH
         "the directory of the pinned downloads, empty for build/deps")
