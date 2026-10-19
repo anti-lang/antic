@@ -578,7 +578,7 @@ directory are in `src/antic/`.
 | 16 | 1 | Counters of `int`, `parser.c:349` (front-end), fixed `489cb0c8`. |
 | 17 | 1 | The fields of the zip format in `unsigned long`, `src/anti/zip.c:43` (anti-tool), fixed `290a02bc`. |
 | 18 | 1 | 142 functions past a threshold, 32 of them new, against 163. Still open. Judged in tool-pass, front-end, middle, back-end, library-file and rt. |
-| 19 | 1 | Two files past 3000 lines. `sema_stmt.c` with 3089 returned, and `llvm_emit.c` with 4102 is new (tool-pass, front-end, back-end). |
+| 19 | 1 | Two files past 3000 lines. `sema_stmt.c` with 3089 returned, and `llvm_emit.c` with 4102 is new (tool-pass, front-end, back-end). `sema_stmt.c`, at 3511, fixed `1c09e047`. `sema.c` has passed 3000 since, with 3134, and stays open with `llvm_emit.c`. |
 | 20 | 1 | Two functions used in one file are exported, `sema_checker.h:392` (front-end), fixed `76afc209`. |
 | 21 | 1 | Five includes that contribute nothing, `linker.c:9` (structure), fixed `d0e1f47c`. Two of them are used: `coff.c` since `a5a84de2` and `ir_verify.c` since before the audit. |
 | 22 | 1 | The walk of Windows stops at 64 frames, `src/rt/platform_windows.c:591` (rt), fixed `556f9c07`. |
