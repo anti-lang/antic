@@ -48,9 +48,9 @@ struct llvm_emit_options {
 };
 
 /* Append the LLVM IR text of m, laid out for the target by l, to out.
-   An operation, an operand or a signature that no step built so far
-   translates is refused: the function returns false and writes to error
-   a message that names it and the step of the work order that adds it. */
+   An operation, an operand or a signature the text has no translation of
+   is refused: the function returns false and writes to error a message
+   that names the form and the function that holds it. */
 bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
                       const struct ir_module *m, struct layouts *l,
                       char *error, size_t error_size);

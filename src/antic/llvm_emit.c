@@ -24,15 +24,8 @@
    for every local clang writes. Each block of the IR is one LLVM block
    named b<index>, and the entry block of the IR is the entry of the
    function. The section "Instruction mapping" of
-   docs/work-order-llvm-back-end.md gives the form of each operation.
-
-   The step emit-core translates copy, jump, branch and ret, and the
-   signatures of scalars. The step emit-arith adds the scalar operations
-   and the entry of the runtime. The step emit-memory adds the operations
-   on memory, the calls, the globals, the sections and the constructors.
-   The step emit-wide adds overflow, flags, saturation, the upper half of
-   a product and the simd operations, so every operation of the IR has
-   its form. */
+   docs/work-order-llvm-back-end.md gives the form of each operation, and
+   every operation of the IR has one. */
 
 /* The classification of the parameters and the result of a function. */
 struct classified {
@@ -147,8 +140,8 @@ static const char *scalar_type(enum ir_type type)
 }
 
 /* Fail with a message that names what the IR holds and the function,
-   for a form that no step of the work order translates, since the
-   lowering never writes it. */
+   for a form the text has no translation of, since the lowering never
+   writes it. */
 static void unexpected(struct emitter *e, const char *what)
 {
     struct text name = {0};
@@ -1335,9 +1328,7 @@ static void vector_of(struct emitter *e, const struct ir_inst *inst,
 
 /* DESIGN: a simd operation loads whole vectors at the alignment of the
    simd struct, works on <N x T> and stores the result, as "Instruction
-   mapping" in docs/work-order-llvm-back-end.md gives it. vsplat and
-   vbinary come with the step emit-memory, since the simd structs that
-   tests/abi passes to C need them. A comparison stores its mask as i8
+   mapping" in docs/work-order-llvm-back-end.md gives it. A comparison stores its mask as i8
    lanes at alignment 1, since the instruction names the aggregate of
    its operands and not the one of the mask. A shift takes each count
    modulo the width of a lane, as a scalar shift does. The verifier of
