@@ -91,26 +91,33 @@ struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which)
 struct anti_rt_monitor *anti_rt_monitor_new(void)
 {
     struct anti_rt_monitor *m = malloc(sizeof *m);
+    int made = 0;
 
     if (m == NULL) {
         return NULL;
     }
     if (pthread_mutex_init(&m->lock, NULL) != 0) {
-        free(m);
-        return NULL;
+        goto fail;
     }
+    made = 1;
     if (pthread_cond_init(&m->conditions[0], NULL) != 0) {
-        pthread_mutex_destroy(&m->lock);
-        free(m);
-        return NULL;
+        goto fail;
     }
+    made = 2;
     if (pthread_cond_init(&m->conditions[1], NULL) != 0) {
-        pthread_cond_destroy(&m->conditions[0]);
-        pthread_mutex_destroy(&m->lock);
-        free(m);
-        return NULL;
+        goto fail;
     }
     return m;
+
+fail:
+    if (made >= 2) {
+        pthread_cond_destroy(&m->conditions[0]);
+    }
+    if (made >= 1) {
+        pthread_mutex_destroy(&m->lock);
+    }
+    free(m);
+    return NULL;
 }
 
 void anti_rt_monitor_free(struct anti_rt_monitor *m)

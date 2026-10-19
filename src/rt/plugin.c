@@ -1312,14 +1312,14 @@ static int discover_in(const char *dir, size_t dir_length,
             !anti_rt_same_bytes((const unsigned char *)hex, 64, digest.ptr,
                         digest.len)) {
             fail("%s does not match the digest of %s", library, index);
-            anti_rt_toml_free(doc);
-            return -1;
+            found = -1;
+            break;
         }
         if (found) {
             fail("%s and %s both provide `%.*s`", out, library, (int)length,
                  path);
-            anti_rt_toml_free(doc);
-            return -1;
+            found = -1;
+            break;
         }
         memcpy(out, library, strlen(library) + 1);
         found = 1;

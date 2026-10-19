@@ -280,6 +280,7 @@ int anti_rt_getenv(const char *name, char **value)
     DWORD size = 0;
     DWORD length;
     int bytes;
+    int status = 0;
 
     *value = NULL;
     if (wide_name == NULL) {
@@ -288,9 +289,7 @@ int anti_rt_getenv(const char *name, char **value)
     for (;;) {
         length = GetEnvironmentVariableW(wide_name, wide, size);
         if (length == 0) {
-            free(wide);
-            free(wide_name);
-            return 0;
+            goto done;
         }
         if (length < size) {
             break;
@@ -299,26 +298,27 @@ int anti_rt_getenv(const char *name, char **value)
         size = length;
         wide = malloc((size_t)size * sizeof *wide);
         if (wide == NULL) {
-            free(wide_name);
-            return -1;
+            status = -1;
+            goto done;
         }
     }
-    free(wide_name);
     bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide,
                                 (int)length + 1, NULL, 0, NULL, NULL);
     if (bytes <= 0) {
-        free(wide);
-        return 0;
+        goto done;
     }
     *value = malloc((size_t)bytes);
     if (*value == NULL) {
-        free(wide);
-        return -1;
+        status = -1;
+        goto done;
     }
     WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide, (int)length + 1,
                         *value, bytes, NULL, NULL);
+
+done:
     free(wide);
-    return 0;
+    free(wide_name);
+    return status;
 }
 
 int anti_rt_path_is_absolute(const char *path)
