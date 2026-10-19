@@ -17,6 +17,7 @@
 #include "antic.h"
 #include "files.h"
 #include "licensing.h"
+#include "say.h"
 #include "symbols.h"
 
 /* One function of the map. */
@@ -160,7 +161,7 @@ bool symmap_build_id(const char *program, struct text *out)
     text_free(&bytes);
     text_free(&version);
     if (!found) {
-        fprintf(stderr, "anti: %s carries no build id\n", program);
+        say_anti("%s carries no build id\n", program);
     }
     return found;
 }

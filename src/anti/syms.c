@@ -25,6 +25,7 @@
 #include "license.h"
 #include "licensing.h"
 #include "plugin_index.h"
+#include "say.h"
 #include "symbols.h"
 #include "symmap.h"
 #include "text.h"
@@ -240,24 +241,24 @@ static bool read_configuration(struct configuration *c, const char *path,
         }
     }
     if (on != NULL || depth > ANTI_CONF_INCLUDE_DEPTH) {
-        fprintf(stderr, "anti: " ANTI_CONF_INCLUDE_CYCLE "\n", path);
+        say_anti(ANTI_CONF_INCLUDE_CYCLE "\n", path);
         return false;
     }
     if (c->files == ANTI_CONF_INCLUDE_FILES) {
-        fprintf(stderr, "anti: " ANTI_CONF_INCLUDE_MANY "\n",
-                ANTI_CONF_INCLUDE_FILES, path);
+        say_anti(ANTI_CONF_INCLUDE_MANY "\n",
+                 ANTI_CONF_INCLUDE_FILES, path);
         return false;
     }
     c->files++;
     if (!files_read_file(path, &bytes)) {
-        fprintf(stderr, "anti: cannot read %s\n", path);
+        say_anti("cannot read %s\n", path);
         return false;
     }
     doc = anti_rt_toml_read((const unsigned char *)bytes.data,
                             (int64_t)bytes.length);
     text_free(&bytes);
     if (doc == NULL) {
-        fprintf(stderr, "anti: %s is no runtime configuration\n", path);
+        say_anti("%s is no runtime configuration\n", path);
         return false;
     }
     here.path = path;
@@ -520,7 +521,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
     size_t i;
 
     if (doc == NULL) {
-        fprintf(stderr, "anti: %s holds a broken %s\n", path, INDEX_NAME);
+        say_anti("%s holds a broken %s\n", path, INDEX_NAME);
         return false;
     }
     for (n = 0; n < anti_rt_toml_count(doc); n++) {
@@ -532,8 +533,8 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
            table, and one outside them names nothing an index knows. */
         if (strncmp(key, "module.", 7) != 0 || field == NULL ||
             field == key + 6) {
-            fprintf(stderr, "anti: %s holds the key %s in %s outside a module "
-                            "table\n", path, key, INDEX_NAME);
+            say_anti("%s holds the key %s in %s outside a module "
+                     "table\n", path, key, INDEX_NAME);
             anti_rt_toml_free(doc);
             return false;
         }
@@ -622,7 +623,7 @@ static bool load_archive(const char *path, struct symbol_units *out)
     if (twin == NULL || !licensing_notice(twin, &u->id, &u->version)) {
         u->id.length = 0;
         if (map == NULL || !map_id(map, &u->id)) {
-            fprintf(stderr, "anti: %s holds no build id\n", path);
+            say_anti("%s holds no build id\n", path);
             ok = false;
             goto done;
         }
@@ -1106,7 +1107,7 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
         }
     }
     if (!files_read(trace, &input)) {
-        fprintf(stderr, "anti: cannot read %s\n", trace);
+        say_anti("cannot read %s\n", trace);
         goto done;
     }
     line = text_cstr(&input);

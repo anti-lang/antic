@@ -23,6 +23,7 @@
 #include "files.h"
 #include "modpath.h"
 #include "repo.h"
+#include "say.h"
 #include "sha256.h"
 #include "text.h"
 #include "toml.h"
@@ -427,7 +428,7 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                 }
             }
             if (!sha256_file(file, hex)) {
-                fprintf(stderr, "anti: cannot read %s\n", file);
+                say_anti("cannot read %s\n", file);
                 goto done;
             }
             {
@@ -436,9 +437,9 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                    a file already came from another file of the directory,
                    and a build would take one of the two. */
                 if (m->file.length > 0) {
-                    fprintf(stderr, "anti: %s and %s both hold the module "
-                                    "%s\n", text_cstr(&m->file), file,
-                            text_cstr(&module));
+                    say_anti("%s and %s both hold the module "
+                             "%s\n", text_cstr(&m->file), file,
+                             text_cstr(&module));
                     goto done;
                 }
                 m->digest.length = 0;
@@ -450,14 +451,14 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
         }
     }
     if (found == 0) {
-        fprintf(stderr, "anti: %s holds no library file of the package %s\n",
-                text_cstr(&directory), text_cstr(&req->name));
+        say_anti("%s holds no library file of the package %s\n",
+                 text_cstr(&directory), text_cstr(&req->name));
         goto done;
     }
     if (!satisfies_all(r, text_cstr(&req->name), text_cstr(&out->version))) {
-        fprintf(stderr, "anti: %s holds %s %s, which no constraint on the "
-                        "package takes\n", text_cstr(&directory),
-                text_cstr(&req->name), text_cstr(&out->version));
+        say_anti("%s holds %s %s, which no constraint on the "
+                 "package takes\n", text_cstr(&directory),
+                 text_cstr(&req->name), text_cstr(&out->version));
         goto done;
     }
     ok = true;
@@ -505,9 +506,9 @@ static bool best_version(const struct resolver *r,
         /* S40, S45 and M13: a version reaches the comparison, a path of
            the cache and the lock file. */
         if (!manifest_version_valid(version)) {
-            fprintf(stderr, "anti: %s names the version %s of %s, which is "
-                            "no version\n", file, version,
-                    text_cstr(&req->name));
+            say_anti("%s names the version %s of %s, which is "
+                     "no version\n", file, version,
+                     text_cstr(&req->name));
             return false;
         }
         if (yanked != NULL && strcmp(yanked, "true") == 0) {
@@ -548,13 +549,13 @@ static bool index_modules(const struct anti_toml *doc, const char *file,
             break;
         }
         if (!manifest_name_valid(module)) {
-            fprintf(stderr, "anti: %s names the module %s, which is no "
-                            "module path\n", file, module);
+            say_anti("%s names the module %s, which is no "
+                     "module path\n", file, module);
             return false;
         }
         if (!manifest_digest_valid(digest)) {
-            fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
-                            "SHA-256 digest\n", file, digest, module);
+            say_anti("%s names the digest %s of %s, which is no "
+                     "SHA-256 digest\n", file, digest, module);
             return false;
         }
         m = package_module(out, module);
@@ -588,13 +589,13 @@ static bool index_dependencies(struct resolver *r,
             break;
         }
         if (!manifest_name_valid(name)) {
-            fprintf(stderr, "anti: %s names the dependency %s, which is no "
-                            "package name\n", file, name);
+            say_anti("%s names the dependency %s, which is no "
+                     "package name\n", file, name);
             return false;
         }
         if (constraint != NULL && !deps_constraint_valid(constraint)) {
-            fprintf(stderr, "anti: %s names the version %s of %s, which is "
-                            "no constraint\n", file, constraint, name);
+            say_anti("%s names the version %s of %s, which is "
+                     "no constraint\n", file, constraint, name);
             return false;
         }
         if (url != NULL && !repo_url_allowed(url)) {
@@ -633,14 +634,14 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
         goto done;
     }
     if (!files_read(text_cstr(&file), &bytes)) {
-        fprintf(stderr, "anti: cannot read %s\n", text_cstr(&file));
+        say_anti("cannot read %s\n", text_cstr(&file));
         goto done;
     }
     doc = anti_rt_toml_read((const unsigned char *)bytes.data,
                             (int64_t)bytes.length);
     if (doc == NULL) {
-        fprintf(stderr, "anti: %s is no index that anti reads\n",
-                text_cstr(&file));
+        say_anti("%s is no index that anti reads\n",
+                 text_cstr(&file));
         goto done;
     }
     if (!best_version(r, req, doc, text_cstr(&file), &best, &have_best)) {
@@ -662,9 +663,9 @@ static bool resolve_from_index(struct resolver *r, const struct requirement *req
         goto done;
     }
     if (out->module_count == 0) {
-        fprintf(stderr, "anti: %s names no module of %s %s\n",
-                text_cstr(&file), text_cstr(&req->name),
-                text_cstr(&out->version));
+        say_anti("%s names no module of %s %s\n",
+                 text_cstr(&file), text_cstr(&req->name),
+                 text_cstr(&out->version));
         goto done;
     }
     ok = index_dependencies(r, req, doc, text_cstr(&file), best);
@@ -688,9 +689,9 @@ static bool resolve_from_repo(struct resolver *r, const struct requirement *req,
 
     if (named[0] != '\0') {
         if (!resolve_from_index(r, req, named, out, &found) || !found) {
-            fprintf(stderr, "anti: %s has no version of %s that satisfies "
-                            "every constraint on it\n", named,
-                    text_cstr(&req->name));
+            say_anti("%s has no version of %s that satisfies "
+                     "every constraint on it\n", named,
+                     text_cstr(&req->name));
             return false;
         }
         return true;
@@ -707,18 +708,18 @@ static bool resolve_from_repo(struct resolver *r, const struct requirement *req,
         /* A repository that gives no answer may hold the package, so
            which one does stays unknown. */
         if (!resolve_from_index(r, req, prefix, &one, &here)) {
-            fprintf(stderr, "anti: %s gave no index of %s that anti reads, "
-                            "so the build cannot tell which repository "
-                            "holds it\n",
-                    prefix, text_cstr(&req->name));
+            say_anti("%s gave no index of %s that anti reads, "
+                     "so the build cannot tell which repository "
+                     "holds it\n",
+                     prefix, text_cstr(&req->name));
             package_free(&one);
             goto done;
         }
         if (here) {
             if (winner.length > 0) {
-                fprintf(stderr, "anti: %s and %s both hold %s, so the "
-                                "dependency names which one\n",
-                        text_cstr(&winner), prefix, text_cstr(&req->name));
+                say_anti("%s and %s both hold %s, so the "
+                         "dependency names which one\n",
+                         text_cstr(&winner), prefix, text_cstr(&req->name));
                 package_free(&one);
                 goto done;
             }
@@ -736,9 +737,9 @@ static bool resolve_from_repo(struct resolver *r, const struct requirement *req,
         package_free(&one);
     }
     if (winner.length == 0) {
-        fprintf(stderr, "anti: no repository of the manifest has a version of "
-                        "%s that satisfies every constraint on it\n",
-                text_cstr(&req->name));
+        say_anti("no repository of the manifest has a version of "
+                 "%s that satisfies every constraint on it\n",
+                 text_cstr(&req->name));
         goto done;
     }
     ok = true;
@@ -885,8 +886,8 @@ static bool lock_package_valid(const char *path, const char *name,
         what = repo;
     }
     if (kind != NULL) {
-        fprintf(stderr, "anti: %s names %s, which is no %s, so %s is not "
-                        "read\n", path, what, kind, path);
+        say_anti("%s names %s, which is no %s, so %s is not "
+                 "read\n", path, what, kind, path);
         return false;
     }
     return true;
@@ -896,13 +897,13 @@ static bool lock_module_valid(const char *path, const char *module,
                               const char *digest)
 {
     if (!manifest_name_valid(module)) {
-        fprintf(stderr, "anti: %s names %s, which is no module path, so %s "
-                        "is not read\n", path, module, path);
+        say_anti("%s names %s, which is no module path, so %s "
+                 "is not read\n", path, module, path);
         return false;
     }
     if (!manifest_digest_valid(digest)) {
-        fprintf(stderr, "anti: %s names %s, which is no SHA-256 digest, so "
-                        "%s is not read\n", path, digest, path);
+        say_anti("%s names %s, which is no SHA-256 digest, so "
+                 "%s is not read\n", path, digest, path);
         return false;
     }
     return true;
@@ -929,7 +930,7 @@ static bool lock_read(const char *path, struct dep_graph *out)
                             (int64_t)bytes.length);
     text_free(&bytes);
     if (doc == NULL) {
-        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
+        say_anti("%s is no TOML that anti reads\n", path);
         return false;
     }
     for (i = 0;; i++) {
@@ -981,8 +982,8 @@ static bool lock_read(const char *path, struct dep_graph *out)
                 break;
             }
             if (!manifest_name_valid(need)) {
-                fprintf(stderr, "anti: %s names %s, which is no package "
-                                "name, so %s is not read\n", path, need, path);
+                say_anti("%s names %s, which is no package "
+                         "name, so %s is not read\n", path, need, path);
                 valid = false;
                 break;
             }
@@ -1010,9 +1011,9 @@ static bool lock_string(struct text *out, const char *key, const char *value,
 
     for (p = value; *p != '\0'; p++) {
         if (*p == '"' || (unsigned char)*p < 0x20 || *p == 0x7f) {
-            fprintf(stderr, "anti: %s cannot hold the %s %s, which holds a "
-                            "double quote or a control byte\n", path, key,
-                    value);
+            say_anti("%s cannot hold the %s %s, which holds a "
+                     "double quote or a control byte\n", path, key,
+                     value);
             return false;
         }
     }
@@ -1180,9 +1181,9 @@ static bool fetch_all(struct dep_graph *g, bool offline)
                 continue;
             }
             if (p->repo.length == 0) {
-                fprintf(stderr, "anti: the lock file names %s of %s with no "
-                                "repository and no path\n",
-                        text_cstr(&m->path), text_cstr(&p->name));
+                say_anti("the lock file names %s of %s with no "
+                         "repository and no path\n",
+                         text_cstr(&m->path), text_cstr(&p->name));
                 return false;
             }
             if (!repo_module(text_cstr(&p->repo), text_cstr(&p->name),
@@ -1268,8 +1269,8 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
        answer a dependency of a repository says so. One whose project has
        a path dependency is read again on every build, which is no news. */
     if (locked.count > 0 && !lock_answers(m, &locked, false)) {
-        fprintf(stderr, "anti: %s no longer answers the manifest, so the "
-                        "build writes it again\n", text_cstr(&lock_path));
+        say_anti("%s no longer answers the manifest, so the "
+                 "build writes it again\n", text_cstr(&lock_path));
     }
     for (i = 0; i < m->dependency_count; i++) {
         const struct manifest_dependency *d = &m->dependencies[i];
@@ -1289,8 +1290,8 @@ bool deps_resolve(const struct manifest *m, const char *root, bool offline,
         }
     }
     if (round == DEPS_ROUNDS) {
-        fputs("anti: the dependencies of this project do not settle on one "
-              "version each\n", stderr);
+        say_anti("the dependencies of this project do not settle on one "
+                 "version each\n");
         goto done;
     }
     record_needs(&r);

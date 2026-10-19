@@ -8,6 +8,7 @@
 #include "antic.h"
 #include "bindmodel.h"
 #include "files.h"
+#include "say.h"
 
 void bind_list_add(struct bind_list *list, void *item)
 {
@@ -34,7 +35,7 @@ void bind_warn(struct bind_module *b, const char *format, ...)
 {
     va_list args;
 
-    fprintf(stderr, "anti: %s: warning: ", b->source);
+    say_anti("%s: warning: ", b->source);
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
@@ -71,8 +72,8 @@ bool bind_named(const struct bind_module *b, const char *kind,
     if (is_c_identifier(name)) {
         return true;
     }
-    fprintf(stderr, "anti: %s names the %s `%s`, which is no C identifier\n",
-            b->source, kind, name);
+    say_anti("%s names the %s `%s`, which is no C identifier\n",
+             b->source, kind, name);
     return false;
 }
 

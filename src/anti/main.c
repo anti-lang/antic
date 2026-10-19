@@ -17,6 +17,7 @@
 #include "licensing.h"
 #include "manifest.h"
 #include "modpath.h"
+#include "say.h"
 #include "sdk.h"
 #include "platform.h"
 #include "project.h"
@@ -315,8 +316,8 @@ static int build_options(int argc, char **argv, int from,
                               : request.llvm_ar != NULL  ? "--llvm-ar"
                                                          : NULL;
         if (refused != NULL) {
-            fprintf(stderr, "anti: run builds a program for this machine, so "
-                            "it takes no %s\n", refused);
+            say_anti("run builds a program for this machine, so "
+                     "it takes no %s\n", refused);
             return 2;
         }
     }
@@ -324,33 +325,30 @@ static int build_options(int argc, char **argv, int from,
        a library for C or the objects of dev mode would leave it out. */
     if ((request.profile_generate || request.profile_use != NULL) &&
         (!request.release || request.lib != BUILD_PROGRAM)) {
-        fputs("anti: --profile-generate and --profile-use build a program "
-              "with --release, without --lib\n",
-              stderr);
+        say_anti("--profile-generate and --profile-use build a program "
+                 "with --release, without --lib\n");
         return 2;
     }
     /* DESIGN: --lto acts on the one antic call of release mode, as a
        profile does, and antic takes both together. */
     if (request.lto != NULL && !link_lto_from_name(request.lto, &lto)) {
-        fprintf(stderr, "anti: --lto takes full, thin or none, not %s\n",
-                request.lto);
+        say_anti("--lto takes full, thin or none, not %s\n",
+                 request.lto);
         return 2;
     }
     if (request.lto != NULL &&
         (!request.release || request.lib != BUILD_PROGRAM)) {
-        fputs("anti: --lto builds a program with --release, without --lib\n",
-              stderr);
+        say_anti("--lto builds a program with --release, without --lib\n");
         return 2;
     }
     /* R157 of "Rules of 2026-10-13": both options shape a library for C,
        and a program would pass them by. */
     if (request.soname && request.lib == BUILD_PROGRAM) {
-        fputs("anti: --soname builds a library, with --lib\n", stderr);
+        say_anti("--soname builds a library, with --lib\n");
         return 2;
     }
     if (request.bundle_runtime && request.lib == BUILD_PROGRAM) {
-        fputs("anti: --bundle-runtime builds a library, with --lib\n",
-              stderr);
+        say_anti("--bundle-runtime builds a library, with --lib\n");
         return 2;
     }
     *out = request;
@@ -409,20 +407,20 @@ static int license_project(int count, char **rest, bool notice)
     }
     if (!notice) {
         if (request.target != NULL && strcmp(request.target, "all") == 0) {
-            fputs("anti: license --project prints the notice of one target, "
-                  "so it takes --target <os>-<cpu> and not all\n", stderr);
+            say_anti("license --project prints the notice of one target, "
+                     "so it takes --target <os>-<cpu> and not all\n");
             return 2;
         }
         if (request.lib == BUILD_LIB_STATIC) {
-            fputs("anti: the build of a static library prints the line that "
-                  "links it, so license --project --lib static takes "
-                  "--notice\n", stderr);
+            say_anti("the build of a static library prints the line that "
+                     "links it, so license --project --lib static takes "
+                     "--notice\n");
             return 2;
         }
         if (request.target == NULL) {
             if (!target_host(&host)) {
-                fputs("anti: this host is no target of Anti, so license "
-                      "--project needs --target\n", stderr);
+                say_anti("this host is no target of Anti, so license "
+                         "--project needs --target\n");
                 return 1;
             }
             request.target = target_name(host);
@@ -489,8 +487,8 @@ static int license_command(int argc, char **argv)
         goto done;
     }
     if (runtime.length == 0 && !user_runtime_archive(&runtime)) {
-        fputs("anti: the system does not say where the runtime archive is, "
-              "so license needs --runtime\n", stderr);
+        say_anti("the system does not say where the runtime archive is, "
+                 "so license needs --runtime\n");
     } else if (binary == NULL) {
         status = licensing_plain(text_cstr(&runtime));
     } else if (licensing_text_of(binary, &notice) &&
@@ -878,8 +876,8 @@ static int sdk_command(int argc, char **argv)
         }
     }
     if (sysroot.length == 0 && !default_sysroot(&sysroot)) {
-        fputs("anti: the system does not say where anti is, so pass "
-              "--sysroot\n", stderr);
+        say_anti("the system does not say where anti is, so pass "
+                 "--sysroot\n");
         status = 1;
         goto done;
     }
@@ -947,7 +945,7 @@ static bool lacks_value(int argc, char **argv)
             continue;
         }
         if (i + 1 == argc) {
-            fprintf(stderr, "anti: %s needs a value\n", argv[i]);
+            say_anti("%s needs a value\n", argv[i]);
             return true;
         }
         i++;

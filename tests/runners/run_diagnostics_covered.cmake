@@ -36,9 +36,11 @@
 cmake_minimum_required(VERSION 3.21)
 
 # The functions that take the text of a message:
-#   <function>:<file or nothing>:<position of the text>:<position of the stream>
+#   <function>:<file or nothing>:<position of the text>:<position of the stream>[:<prefix>]
 # A file limits the row to that file of the directory. The stream, where a
-# row has one, must be `stderr`. Positions count from 0.
+# row has one, must be `stderr`. Positions count from 0. A prefix is the
+# text the function writes before every message, which the message then
+# holds as the C source of an fprintf would write it.
 set(TEXTS_ANTIC
     "diagnostics_add::3:"
     "diagnostics_warn::4:"
@@ -52,6 +54,7 @@ set(TEXTS_ANTIC
     "number_error:lexer.c:4:"
     "arm_body:parser_stmt.c:1:")
 set(TEXTS_ANTI
+    "say_anti::0::anti: "
     "fprintf::1:0"
     "vfprintf::1:0"
     "fputs::0:1"
@@ -296,7 +299,7 @@ function(read_messages tool directory)
         set(shown "${directory}/${name}")
         set(functions "")
         foreach(row IN LISTS ARGN)
-            if(NOT row MATCHES "^([^:]*):([^:]*):([0-9]+):([0-9]*)$")
+            if(NOT row MATCHES "^([^:]*):([^:]*):([0-9]+):([0-9]*)(:(.*))?$")
                 message(FATAL_ERROR "the row `${row}` of TEXTS has another form")
             endif()
             # DESIGN: a group that matched nothing leaves its
@@ -307,6 +310,7 @@ function(read_messages tool directory)
                 list(APPEND functions "${CMAKE_MATCH_1}")
                 set(text_at_${CMAKE_MATCH_1} "${CMAKE_MATCH_3}")
                 set(stream_at_${CMAKE_MATCH_1} "${CMAKE_MATCH_4}")
+                set(prefix_of_${CMAKE_MATCH_1} "${CMAKE_MATCH_6}")
             endif()
         endforeach()
         list(JOIN functions "|" names)
@@ -379,7 +383,8 @@ function(read_messages tool directory)
                                    "\"${literal}\", which TEXTS_INDIRECT "
                                    "names\n")
                         else()
-                            add_message("${literal}" "${shown}" ${tool})
+                            add_message("${prefix_of_${function}}${literal}"
+                                        "${shown}" ${tool})
                         endif()
                         set(found ON)
                     endif()
@@ -392,7 +397,8 @@ function(read_messages tool directory)
                 endif()
             endif()
             foreach(text IN LISTS texts)
-                add_message("${text}" "${shown}" ${tool})
+                add_message("${prefix_of_${function}}${text}" "${shown}"
+                            ${tool})
             endforeach()
         endwhile()
     endforeach()

@@ -20,6 +20,7 @@
 #include "driver.h"
 #include "files.h"
 #include "license.h"
+#include "say.h"
 #include "units.h"
 
 /* The licence of antic and anti, which docs/distribution.md gives under
@@ -134,7 +135,7 @@ bool licensing_text_of(const char *binary, struct text *out)
     found = licensing_text(&bytes, out);
     text_free(&bytes);
     if (!found) {
-        fprintf(stderr, "anti: %s carries no licence notice\n", binary);
+        say_anti("%s carries no licence notice\n", binary);
     }
     return found;
 }
@@ -338,8 +339,8 @@ int licensing_plain(const char *runtime)
     text_appendf(&dir, "%s/%s", runtime, RUNTIME_LICENSES_DIR);
     ok = files_list_dir(text_cstr(&dir), &found);
     if (ok && found.count == 0) {
-        fprintf(stderr, "anti: %s holds no licence text, so %s is no runtime "
-                        "archive\n", text_cstr(&dir), runtime);
+        say_anti("%s holds no licence text, so %s is no runtime "
+                 "archive\n", text_cstr(&dir), runtime);
         ok = false;
     }
     if (ok) {
@@ -653,7 +654,7 @@ int licensing_from_archive(const char *archive)
         goto done;
     }
     if (bytes.length < magic || memcmp(bytes.data, AR_MAGIC, magic) != 0) {
-        fprintf(stderr, "anti: %s is no archive\n", archive);
+        say_anti("%s is no archive\n", archive);
         goto done;
     }
     while (!found && offset < bytes.length) {
@@ -662,8 +663,8 @@ int licensing_from_archive(const char *archive)
             /* R187 of "Rules of 2026-10-13": a member whose size holds
                no digit makes the archive damaged. */
             if (size_without_digit(&bytes, offset)) {
-                fprintf(stderr, "anti: %s is damaged at byte %zu\n",
-                        archive, offset);
+                say_anti("%s is damaged at byte %zu\n",
+                         archive, offset);
                 goto done;
             }
             break;
@@ -683,8 +684,8 @@ int licensing_from_archive(const char *archive)
         fputs(text_cstr(&notice), stdout);
         status = 0;
     } else {
-        fprintf(stderr, "anti: %s carries no package header, so it is no "
-                        "static library of `--lib static`\n", archive);
+        say_anti("%s carries no package header, so it is no "
+                 "static library of `--lib static`\n", archive);
     }
 done:
     text_free(&bytes);

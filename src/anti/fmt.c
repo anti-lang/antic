@@ -26,6 +26,7 @@
 #include "antic.h"
 #include "arena.h"
 #include "files.h"
+#include "say.h"
 #include "text.h"
 
 /* The width a doc comment is re-wrapped to, and the columns of one tab.
@@ -1967,8 +1968,8 @@ int fmt_run(const char *const *paths, size_t count, bool check)
             /* A source the lexer refuses is the front end's to report,
                and the canonical form of it is unknown, so it stays as it
                is. */
-            fprintf(stderr, "anti: %s does not lex and stays as it is\n",
-                    paths[i]);
+            say_anti("%s does not lex and stays as it is\n",
+                     paths[i]);
             status = 1;
         } else if (formed.length != source.length ||
                    memcmp(text_cstr(&formed), text_cstr(&source),

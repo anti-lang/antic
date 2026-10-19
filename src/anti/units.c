@@ -17,6 +17,7 @@
 #include "arena.h"
 #include "files.h"
 #include "modpath.h"
+#include "say.h"
 #include "text.h"
 
 void unit_options(struct options *o, const char *package, const char *runtime,
@@ -35,7 +36,7 @@ void unit_options(struct options *o, const char *package, const char *runtime,
 bool unit_host(enum target *target, enum cpu_level *cpu)
 {
     if (!target_host(target)) {
-        fputs("anti: unknown host target\n", stderr);
+        say_anti("unknown host target\n");
         return false;
     }
     *cpu = cpu_default(*target);
@@ -50,11 +51,11 @@ bool unit_library_header(const char *file, struct arena *arena,
     bool ok = false;
 
     if (!files_read(file, &bytes)) {
-        fprintf(stderr, "anti: cannot read %s\n", file);
+        say_anti("cannot read %s\n", file);
     } else if (!antic_library_header((const uint8_t *)bytes.data,
                                      bytes.length, arena, package, module,
                                      message, sizeof message)) {
-        fprintf(stderr, "anti: %s: %s\n", file, message);
+        say_anti("%s: %s\n", file, message);
     } else {
         ok = true;
     }
@@ -139,7 +140,7 @@ bool unit_read(const char *source, const char *const *roots,
     }
     if (!modpath_of_source(source, roots, root_count, &out->path, message,
                                sizeof message)) {
-        fprintf(stderr, "anti: %s\n", message);
+        say_anti("%s\n", message);
         goto done;
     }
     if (work != NULL && !unit_file(work, text_cstr(&out->path), ANTL_SUFFIX,
@@ -238,7 +239,7 @@ static void unit_report_cycle(const struct unit *units, size_t count,
         text_appendf(&cycle, "%s -> ", text_cstr(&units[step[i]].path));
     }
     text_append(&cycle, text_cstr(&units[current].path));
-    fprintf(stderr, "anti: the imports form a cycle: %s\n", text_cstr(&cycle));
+    say_anti("the imports form a cycle: %s\n", text_cstr(&cycle));
     text_free(&cycle);
     free(seen);
     free(step);

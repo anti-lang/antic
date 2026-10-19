@@ -27,6 +27,7 @@
 #include "memreport.h"
 #include "modpath.h"
 #include "platform.h"
+#include "say.h"
 #include "syms.h"
 #include "sha256.h"
 #include "symmap.h"
@@ -202,7 +203,7 @@ static bool options_key(const struct options *o, struct text *out)
     if (o->license_text != NULL) {
         char hex[65];
         if (!sha256_file(o->license_text, hex)) {
-            fprintf(stderr, "anti: cannot read %s\n", o->license_text);
+            say_anti("cannot read %s\n", o->license_text);
             return false;
         }
         text_appendf(out, "license-text %s\n", hex);
@@ -330,7 +331,7 @@ static bool imports_key(const struct build *b, enum target t,
         }
         ok = sha256_file(closure[i], hex);
         if (!ok) {
-            fprintf(stderr, "anti: cannot read %s\n", closure[i]);
+            say_anti("cannot read %s\n", closure[i]);
         } else {
             text_appendf(out, "import %s %s\n", closure[i], hex);
         }
@@ -501,7 +502,7 @@ static bool copy_into(const char *from, const char *to, const char *name)
     text_appendf(&path, "%s/%s", to, name);
     ok = files_make_dirs(to) && files_copy_program(from, text_cstr(&path));
     if (!ok) {
-        fprintf(stderr, "anti: cannot write %s\n", text_cstr(&path));
+        say_anti("cannot write %s\n", text_cstr(&path));
     }
     text_free(&path);
     return ok;
@@ -535,7 +536,7 @@ static bool deliver_soname(const struct build *b, const char *deliverable)
     ok = copy_into(text_cstr(&from), text_cstr(&b->dist_dir),
                    text_cstr(&versioned));
     if (ok && !platform_symlink(text_cstr(&versioned), text_cstr(&link))) {
-        fprintf(stderr, "anti: cannot write %s\n", text_cstr(&link));
+        say_anti("cannot write %s\n", text_cstr(&link));
         ok = false;
     }
     text_free(&versioned);
@@ -875,8 +876,8 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
         text_appendf(&pdb_name, "%s" SYMS_PDB_SUFFIX, text_cstr(&stem));
         link_pdb_path(&pdb_path, text_cstr(&b->name));
         if (!files_exists(text_cstr(&pdb_path))) {
-            fprintf(stderr, "anti: the link of %s wrote no %s\n",
-                    text_cstr(&b->name), text_cstr(&pdb_path));
+            say_anti("the link of %s wrote no %s\n",
+                     text_cstr(&b->name), text_cstr(&pdb_path));
             goto done;
         }
         entries[count].name = text_cstr(&pdb_name);
@@ -1025,7 +1026,7 @@ static bool write_library_files(const struct build *b,
                       ANTL_SUFFIX, &out) &&
             files_copy(text_cstr(&files[i]), text_cstr(&out));
         if (!written) {
-            fprintf(stderr, "anti: cannot write %s\n", text_cstr(&out));
+            say_anti("cannot write %s\n", text_cstr(&out));
         }
         text_free(&out);
         if (!written) {
@@ -1204,8 +1205,8 @@ static bool path_cycle(const struct path_context *c, const char *directory)
     for (i = 0; i < count; i++) {
         text_appendf(&line, "%s -> ", names[i]);
     }
-    fprintf(stderr, "anti: the path dependencies form a cycle: %s%s\n",
-            text_cstr(&line), first->name);
+    say_anti("the path dependencies form a cycle: %s%s\n",
+             text_cstr(&line), first->name);
     text_free(&line);
     free((void *)names);
     return true;
@@ -1272,7 +1273,7 @@ static bool build_targets(const struct build *b, enum target *list,
     *count = 0;
     if (b->r->target != NULL && strcmp(b->r->target, "all") != 0) {
         if (!target_from_name(b->r->target, &list[0])) {
-            fprintf(stderr, "anti: %s is no target of Anti\n", b->r->target);
+            say_anti("%s is no target of Anti\n", b->r->target);
             return false;
         }
         *count = 1;
@@ -1293,8 +1294,8 @@ static bool build_targets(const struct build *b, enum target *list,
         named = b->m.default_target_count;
         if (named == 0) {
             if (!target_host(&list[0])) {
-                fputs("anti: this host is no target of Anti, so the build "
-                      "needs --target\n", stderr);
+                say_anti("this host is no target of Anti, so the build "
+                         "needs --target\n");
                 return false;
             }
             *count = 1;
@@ -1302,14 +1303,14 @@ static bool build_targets(const struct build *b, enum target *list,
         }
     }
     if (named > TARGET_COUNT) {
-        fprintf(stderr, "anti: %s: [targets] names more than the six targets "
-                        "of Anti\n", MANIFEST_FILE);
+        say_anti("%s: [targets] names more than the six targets "
+                 "of Anti\n", MANIFEST_FILE);
         return false;
     }
     for (i = 0; i < named; i++) {
         if (!target_from_name(text_cstr(&names[i]), &list[i])) {
-            fprintf(stderr, "anti: %s: [targets] names %s, which is no target "
-                            "of Anti\n", MANIFEST_FILE, text_cstr(&names[i]));
+            say_anti("%s: [targets] names %s, which is no target "
+                     "of Anti\n", MANIFEST_FILE, text_cstr(&names[i]));
             return false;
         }
     }
@@ -1327,8 +1328,8 @@ static bool read_units(struct build *b)
         return false;
     }
     if (b->sources.count == 0) {
-        fprintf(stderr, "anti: %s holds no %s file, so this project has no "
-                        "module\n", text_cstr(&b->src), SOURCE_SUFFIX);
+        say_anti("%s holds no %s file, so this project has no "
+                 "module\n", text_cstr(&b->src), SOURCE_SUFFIX);
         return false;
     }
     b->units = files_array(b->sources.count, sizeof *b->units);
@@ -1384,15 +1385,15 @@ static int run_built(const struct build *b)
     int status;
 
     if (!target_host(&host)) {
-        fputs("anti: this host is no target of Anti\n", stderr);
+        say_anti("this host is no target of Anti\n");
         return 1;
     }
     target_dir(r->root, &b->m.dist, host, r->release, &program);
     text_append(&program, "/");
     program_name(&b->m, host, &program);
     if (!files_exists(text_cstr(&program))) {
-        fprintf(stderr, "anti: %s was not built, so there is nothing "
-                        "to run\n", text_cstr(&program));
+        say_anti("%s was not built, so there is nothing "
+                 "to run\n", text_cstr(&program));
         status = 1;
     } else {
         argv[0] = text_cstr(&program);
@@ -1427,24 +1428,24 @@ static int build_project(const struct build_request *r,
        of another form satisfies nothing, as one of an index does, and
        the comparison read `v0.3` as 0.0.0, which every compiler passed. */
     if (b.m.antic.length > 0 && !manifest_version_valid(text_cstr(&b.m.antic))) {
-        fprintf(stderr, "anti: %s: [package] antic `%s` is no version of one "
-                        "to three parts of digits, as `%s`\n",
-                text_cstr(&manifest_path), text_cstr(&b.m.antic),
-                ANTIC_VERSION);
+        say_anti("%s: [package] antic `%s` is no version of one "
+                 "to three parts of digits, as `%s`\n",
+                 text_cstr(&manifest_path), text_cstr(&b.m.antic),
+                 ANTIC_VERSION);
         goto done;
     }
     if (b.m.antic.length > 0 &&
         deps_version_compare(ANTIC_VERSION, text_cstr(&b.m.antic)) < 0) {
-        fprintf(stderr, "anti: %s asks for antic %s and this one is %s\n",
-                text_cstr(&manifest_path), text_cstr(&b.m.antic),
-                ANTIC_VERSION);
+        say_anti("%s asks for antic %s and this one is %s\n",
+                 text_cstr(&manifest_path), text_cstr(&b.m.antic),
+                 ANTIC_VERSION);
         goto done;
     }
     if (r->runtime != NULL) {
         text_append(&b.runtime, r->runtime);
     } else if (!user_runtime_archive(&b.runtime)) {
-        fputs("anti: the system does not say where the runtime archive is, so "
-              "the build needs --runtime\n", stderr);
+        say_anti("the system does not say where the runtime archive is, so "
+                 "the build needs --runtime\n");
         goto done;
     }
     if (b.m.license_text.length > 0) {
@@ -1460,8 +1461,8 @@ static int build_project(const struct build_request *r,
     for (i = 0; i < target_count; i++) {
         cpus[i] = cpu_default(targets[i]);
         if (r->cpu != NULL && !cpu_from_name(r->cpu, targets[i], &cpus[i])) {
-            fprintf(stderr, "anti: %s is no processor level of %s\n", r->cpu,
-                    target_name(targets[i]));
+            say_anti("%s is no processor level of %s\n", r->cpu,
+                     target_name(targets[i]));
             goto done;
         }
     }
@@ -1496,15 +1497,15 @@ static int build_project(const struct build_request *r,
        last module of the order, which a user may not expect. */
     if (linking_module(&b) == b.unit_count &&
         !has_module(&b, text_cstr(&b.m.name))) {
-        fprintf(stderr, "anti: %s: warning: the library project %s has no "
-                        "module %s\n", text_cstr(&manifest_path),
-                text_cstr(&b.m.name), text_cstr(&b.m.name));
+        say_anti("%s: warning: the library project %s has no "
+                 "module %s\n", text_cstr(&manifest_path),
+                 text_cstr(&b.m.name), text_cstr(&b.m.name));
     }
     /* R160 of "Rules of 2026-10-13": run of a library project is a wrong
        use of the command, refused before anything builds. */
     if (r->run && linking_module(&b) == b.unit_count) {
-        fprintf(stderr, "anti: %s is a library project, which has no `main` "
-                        "to run\n", text_cstr(&b.m.name));
+        say_anti("%s is a library project, which has no `main` "
+                 "to run\n", text_cstr(&b.m.name));
         status = 2;
         goto done;
     }

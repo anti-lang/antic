@@ -8,11 +8,12 @@
 #include <string.h>
 
 #include "platform.h"
+#include "say.h"
 #include "text.h"
 
 void files_out_of_memory(void)
 {
-    fputs("anti: out of memory\n", stderr);
+    say_anti("out of memory\n");
     exit(70);
 }
 
@@ -126,14 +127,14 @@ bool files_make_dirs_or_say(const char *path)
         separator = p[i];
         p[i] = '\0';
         if (platform_kind(p, true) == PLATFORM_FILE) {
-            fprintf(stderr, "anti: %s is a file where a directory belongs\n",
-                    p);
+            say_anti("%s is a file where a directory belongs\n",
+                     p);
             text_free(&t);
             return false;
         }
         p[i] = separator;
     }
-    fprintf(stderr, "anti: cannot make %s\n", path);
+    say_anti("cannot make %s\n", path);
     text_free(&t);
     return false;
 }
@@ -195,7 +196,7 @@ bool files_copy(const char *from, const char *to)
 
 static void cannot_read(const char *path)
 {
-    fprintf(stderr, "anti: cannot read %s\n", path);
+    say_anti("cannot read %s\n", path);
 }
 
 /* Append what is left of f to out and close it, or leave out as it was
@@ -254,13 +255,13 @@ bool files_write(const char *path, const struct text *bytes)
     bool ok;
 
     if (f == NULL) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
+        say_anti("cannot write %s\n", path);
         return false;
     }
     ok = bytes->length == 0 ||
          fwrite(bytes->data, 1, bytes->length, f) == bytes->length;
     if (fclose(f) != 0 || !ok) {
-        fprintf(stderr, "anti: cannot write %s\n", path);
+        say_anti("cannot write %s\n", path);
         return false;
     }
     return true;
@@ -278,7 +279,7 @@ bool files_replace(const char *path, const struct text *bytes)
     ok = files_write(text_cstr(&temporary), bytes);
     if (ok && (!platform_copy_permissions(path, text_cstr(&temporary)) ||
                !platform_replace(text_cstr(&temporary), path))) {
-        fprintf(stderr, "anti: cannot replace %s\n", path);
+        say_anti("cannot replace %s\n", path);
         ok = false;
     }
     if (!ok) {

@@ -11,6 +11,7 @@
 #include "files.h"
 #include "jsontree.h"
 #include "platform.h"
+#include "say.h"
 #include "sha256.h"
 #include "target.h"
 #include "text.h"
@@ -142,32 +143,32 @@ int sdk_export(const char *sdk, const char *out)
     enum target host;
 
     if (!target_host(&host) || target_info(host)->os != OS_MACOS) {
-        fputs("anti: sdk export runs on a Mac, which holds Apple's SDK. Run it "
-              "on a Mac you own and anti sdk import here.\n", stderr);
+        say_anti("sdk export runs on a Mac, which holds Apple's SDK. Run it "
+                 "on a Mac you own and anti sdk import here.\n");
         goto done;
     }
     if (sdk != NULL) {
         text_append(&path, sdk);
         if (!sdk_version(sdk, &version)) {
-            fprintf(stderr, "anti: %s holds no SDKSettings.json with a Version, "
-                            "so it is no MacOSX.sdk\n", sdk);
+            say_anti("%s holds no SDKSettings.json with a Version, "
+                     "so it is no MacOSX.sdk\n", sdk);
             goto done;
         }
     } else if (!apple_clt_sdk(&path, &version)) {
-        fputs("anti: " APPLE_CLT_SDKS " holds no SDK. Run xcode-select "
-              "--install, or name one with --sdk\n", stderr);
+        say_anti(APPLE_CLT_SDKS " holds no SDK. Run xcode-select "
+                 "--install, or name one with --sdk\n");
         goto done;
     }
     if (!sdk_version_valid(text_cstr(&version))) {
-        fprintf(stderr, "anti: %s names the Version %s, which is no version\n",
-                text_cstr(&path), text_cstr(&version));
+        say_anti("%s names the Version %s, which is no version\n",
+                 text_cstr(&path), text_cstr(&version));
         goto done;
     }
     text_appendf(&stage, "%s/.apple-sdk-%s", out, text_cstr(&version));
     text_appendf(&bundle, "%s/apple-sdk-%s.tar.xz", out, text_cstr(&version));
     files_remove_tree(text_cstr(&stage));
     if (!files_make_dirs(text_cstr(&stage))) {
-        fprintf(stderr, "anti: cannot make %s\n", text_cstr(&stage));
+        say_anti("cannot make %s\n", text_cstr(&stage));
         goto done;
     }
     for (i = 0; i < sizeof dirs / sizeof dirs[0]; i++) {
@@ -177,8 +178,8 @@ int sdk_export(const char *sdk, const char *out)
         ok = copy_stubs(text_cstr(&dir), dirs[i], text_cstr(&stage));
         text_free(&dir);
         if (!ok) {
-            fprintf(stderr, "anti: cannot copy the stubs of %s/%s\n",
-                    text_cstr(&path), dirs[i]);
+            say_anti("cannot copy the stubs of %s/%s\n",
+                     text_cstr(&path), dirs[i]);
             goto done;
         }
     }
@@ -191,7 +192,7 @@ int sdk_export(const char *sdk, const char *out)
         const char *argv[] = {"tar", "-cJf", text_cstr(&bundle), "-C",
                               text_cstr(&stage), ".", NULL};
         if (platform_run(argv) != 0) {
-            fprintf(stderr, "anti: tar could not write %s\n", text_cstr(&bundle));
+            say_anti("tar could not write %s\n", text_cstr(&bundle));
             goto done;
         }
     }
@@ -224,24 +225,24 @@ static bool unpack(const char *bundle, const char *dir, const char *digest)
     text_appendf(&marker, "%s/%s", text_cstr(&part), SYSROOT_SDK_VERSION);
     files_remove_tree(text_cstr(&part));
     if (!files_make_dirs(text_cstr(&part))) {
-        fprintf(stderr, "anti: cannot make %s\n", text_cstr(&part));
+        say_anti("cannot make %s\n", text_cstr(&part));
         goto done;
     }
     {
         const char *argv[] = {"tar", "-xJf", bundle, "-C", text_cstr(&part), NULL};
         if (platform_run(argv) != 0) {
-            fprintf(stderr, "anti: tar could not unpack %s\n", bundle);
+            say_anti("tar could not unpack %s\n", bundle);
             goto done;
         }
     }
     if (!files_exists(text_cstr(&marker))) {
-        fprintf(stderr, "anti: %s holds no %s, so anti sdk export did not "
-                        "write it\n", bundle, SYSROOT_SDK_VERSION);
+        say_anti("%s holds no %s, so anti sdk export did not "
+                 "write it\n", bundle, SYSROOT_SDK_VERSION);
         goto done;
     }
     if (!files_remove_tree(text_cstr(&final)) ||
         !platform_rename(text_cstr(&part), text_cstr(&final))) {
-        fprintf(stderr, "anti: cannot replace %s\n", text_cstr(&final));
+        say_anti("cannot replace %s\n", text_cstr(&final));
         goto done;
     }
     marker.length = 0;
@@ -263,7 +264,7 @@ int sdk_import(const char *bundle, const char *sysroot)
     size_t i;
 
     if (!sha256_file(bundle, digest)) {
-        fprintf(stderr, "anti: cannot read %s\n", bundle);
+        say_anti("cannot read %s\n", bundle);
         return 1;
     }
     for (i = 0; i < sizeof macos_targets / sizeof macos_targets[0]; i++) {

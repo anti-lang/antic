@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "files.h"
+#include "say.h"
 #include "text.h"
 #include "toml.h"
 
@@ -102,7 +103,7 @@ static enum opened open_manifest(const char *path, struct anti_toml **doc)
                              (int64_t)bytes.length);
     text_free(&bytes);
     if (*doc == NULL) {
-        fprintf(stderr, "anti: %s is no TOML that anti reads\n", path);
+        say_anti("%s is no TOML that anti reads\n", path);
         return OPENED_NO_TOML;
     }
     return OPENED;
@@ -362,8 +363,8 @@ static bool read_tables(const char *path, const struct anti_toml *doc,
             const char *field = last_segment(entry);
             struct manifest_dependency *d;
             if (field == entry) {
-                fprintf(stderr, "anti: %s: the dependency %s needs a table, "
-                                "as { version = \"1.0.0\" }\n", path, entry);
+                say_anti("%s: the dependency %s needs a table, "
+                         "as { version = \"1.0.0\" }\n", path, entry);
                 return false;
             }
             d = dependency_of(m, entry, (size_t)(field - entry - 1));
@@ -374,8 +375,8 @@ static bool read_tables(const char *path, const struct anti_toml *doc,
             } else if (strcmp(field, "path") == 0) {
                 text_append(&d->path, (const char *)value.ptr);
             } else {
-                fprintf(stderr, "anti: %s: a dependency has no %s field\n",
-                        path, field);
+                say_anti("%s: a dependency has no %s field\n",
+                         path, field);
                 return false;
             }
         }
@@ -396,8 +397,8 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     text_append(&out->dist, MANIFEST_DIST_DIR);
     opened = open_manifest(path, &doc);
     if (opened == OPENED_MISSING) {
-        fprintf(stderr, "anti: %s: no manifest here, so there is no project. "
-                        "`anti new <name>` writes one\n", path);
+        say_anti("%s: no manifest here, so there is no project. "
+                 "`anti new <name>` writes one\n", path);
     }
     if (opened != OPENED) {
         goto done;
@@ -421,8 +422,8 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
         goto done;
     }
     if (out->name.length == 0) {
-        fprintf(stderr, "anti: %s: [package] names no `name`, the root module "
-                        "path of the package\n", path);
+        say_anti("%s: [package] names no `name`, the root module "
+                 "path of the package\n", path);
         goto done;
     }
     /* The version goes into every class descriptor, where the loader of a
@@ -430,9 +431,9 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
        read it alike only in the form the resolver takes. */
     if (out->version.length > 0 &&
         !manifest_version_valid(text_cstr(&out->version))) {
-        fprintf(stderr, "anti: %s: [package] version `%s` is no version of "
-                        "one to three parts of digits, as `1.2.0`\n",
-                path, text_cstr(&out->version));
+        say_anti("%s: [package] version `%s` is no version of "
+                 "one to three parts of digits, as `1.2.0`\n",
+                 path, text_cstr(&out->version));
         goto done;
     }
     /* Every dependency names one source. A table with both a repository
@@ -443,8 +444,8 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
            the cache and of the lock file, so the reader refuses it here,
            before anything is fetched or built. */
         if (!manifest_name_valid(text_cstr(&d->name))) {
-            fprintf(stderr, "anti: %s: the dependency %s is no package name\n",
-                    path, text_cstr(&d->name));
+            say_anti("%s: the dependency %s is no package name\n",
+                     path, text_cstr(&d->name));
             goto done;
         }
         /* R166 of "Rules of 2026-10-13": the path goes into the lock file,
@@ -453,27 +454,27 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
         for (j = 0; j < d->path.length; j++) {
             unsigned char byte = (unsigned char)d->path.data[j];
             if (byte < 0x20 || byte == 0x7f) {
-                fprintf(stderr, "anti: %s: the path %s of the dependency %s "
-                                "holds a control byte\n", path,
-                        text_cstr(&d->path), text_cstr(&d->name));
+                say_anti("%s: the path %s of the dependency %s "
+                         "holds a control byte\n", path,
+                         text_cstr(&d->path), text_cstr(&d->name));
                 goto done;
             }
         }
         if (d->path.length > 0 && d->repo.length > 0) {
-            fprintf(stderr, "anti: %s: the dependency %s names a repository "
-                            "and a path\n", path, text_cstr(&d->name));
+            say_anti("%s: the dependency %s names a repository "
+                     "and a path\n", path, text_cstr(&d->name));
             goto done;
         }
         if (d->path.length == 0 && d->version.length == 0) {
-            fprintf(stderr, "anti: %s: the dependency %s names no version\n",
-                    path, text_cstr(&d->name));
+            say_anti("%s: the dependency %s names no version\n",
+                     path, text_cstr(&d->name));
             goto done;
         }
         if (d->repo.length > 0 &&
             manifest_repository_url(out, text_cstr(&d->repo)) == NULL) {
-            fprintf(stderr, "anti: %s: the dependency %s names the repository "
-                            "%s, which [repositories] does not\n", path,
-                    text_cstr(&d->name), text_cstr(&d->repo));
+            say_anti("%s: the dependency %s names the repository "
+                     "%s, which [repositories] does not\n", path,
+                     text_cstr(&d->name), text_cstr(&d->repo));
             goto done;
         }
     }

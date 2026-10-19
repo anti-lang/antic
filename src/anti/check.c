@@ -24,6 +24,7 @@
 #include "manifest.h"
 #include "modpath.h"
 #include "project.h"
+#include "say.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -288,11 +289,10 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
     o.input = text_cstr(&path);
     ok = driver_run(&o) == 0;
     if (!ok) {
-        fprintf(stderr,
-                "anti: the `anti` block of `%s` at %s:%d failed, and its "
-                "module is %s\n",
-                text_cstr(&one->owner), u->source, one->line,
-                text_cstr(&path));
+        say_anti("the `anti` block of `%s` at %s:%d failed, and its module "
+                 "is %s\n",
+                 text_cstr(&one->owner), u->source, one->line,
+                 text_cstr(&path));
     }
 done:
     text_free(&path);

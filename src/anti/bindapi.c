@@ -9,6 +9,7 @@
 #include "bindexpr.h"
 #include "bindmodel.h"
 #include "jsontree.h"
+#include "say.h"
 
 struct api {
     struct bind_module *b;
@@ -274,8 +275,8 @@ static bool read_structs(struct api *a)
             return false;
         }
         if (record_of(a, name) != NULL) {
-            fprintf(stderr, "anti: %s names the struct `%s` twice\n",
-                    a->b->source, name);
+            say_anti("%s names the struct `%s` twice\n",
+                     a->b->source, name);
             return false;
         }
         r = arena_alloc(&a->b->arena, sizeof *r);
@@ -306,9 +307,9 @@ static bool read_structs(struct api *a)
                           name);
             }
             if (fname == NULL || ftype == NULL) {
-                fprintf(stderr, "anti: %s: the struct `%s` lost a field, so "
-                                "its layout would differ from that of C\n",
-                        a->b->source, name);
+                say_anti("%s: the struct `%s` lost a field, so "
+                         "its layout would differ from that of C\n",
+                         a->b->source, name);
                 return false;
             }
             if (!bind_named(a->b, "field", fname)) {
@@ -587,7 +588,7 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
     bool ok;
 
     if (!json_read(bytes, length, &tree, error, sizeof error)) {
-        fprintf(stderr, "anti: %s is not JSON: %s\n", b->source, error);
+        say_anti("%s is not JSON: %s\n", b->source, error);
         return false;
     }
     a.b = b;
@@ -598,8 +599,8 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
     ok = tree.root->kind == JSON_OBJECT &&
          json_get(tree.root, "functions") != NULL;
     if (!ok) {
-        fprintf(stderr, "anti: %s holds no API description of rlparser\n",
-                b->source);
+        say_anti("%s holds no API description of rlparser\n",
+                 b->source);
     }
     /* The structs come first, since the fields and the functions name
        them. */

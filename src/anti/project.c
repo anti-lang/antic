@@ -8,6 +8,7 @@
 #include "files.h"
 #include "manifest.h"
 #include "modpath.h"
+#include "say.h"
 #include "text.h"
 #include "units.h"
 
@@ -34,10 +35,10 @@ bool project_sources(const char *src, const char *test,
         return true;
     }
     if (test != NULL) {
-        fprintf(stderr, "anti: no %s file under %s or %s\n", SOURCE_SUFFIX,
-                src, test);
+        say_anti("no %s file under %s or %s\n", SOURCE_SUFFIX,
+                 src, test);
     } else {
-        fprintf(stderr, "anti: no %s file under %s\n", SOURCE_SUFFIX, src);
+        say_anti("no %s file under %s\n", SOURCE_SUFFIX, src);
     }
     return false;
 }
@@ -53,24 +54,24 @@ int project_new(const char *name)
     int status = 1;
 
     if (modpath_segments(name) < 2) {
-        fprintf(stderr, "anti: `%s` is one segment, and a package name is a "
-                        "module path of at least two, as com.example.%s\n",
-                name, name);
+        say_anti("`%s` is one segment, and a package name is a "
+                 "module path of at least two, as com.example.%s\n",
+                 name, name);
         goto done;
     }
     /* The name is the module path of the starter and the directory of the
        project, so it takes the form an index and the manifest take, and a
        path inside it writes nowhere. Defect 7 of the anti-tool audit. */
     if (!manifest_name_valid(name)) {
-        fprintf(stderr, "anti: `%s` is no package name, which is lowercase "
-                        "segments of letters, digits and `_` joined by dots, "
-                        "as com.example.app\n",
-                name);
+        say_anti("`%s` is no package name, which is lowercase "
+                 "segments of letters, digits and `_` joined by dots, "
+                 "as com.example.app\n",
+                 name);
         goto done;
     }
     text_append(&directory, last);
     if (files_exists(text_cstr(&directory))) {
-        fprintf(stderr, "anti: %s is there already\n", text_cstr(&directory));
+        say_anti("%s is there already\n", text_cstr(&directory));
         goto done;
     }
     text_appendf(&manifest, "[package]\nname = \"%s\"\nversion = \"0.1.0\"\n",

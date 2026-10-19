@@ -206,6 +206,8 @@ The library file, and the code that every part of antic and `anti` uses.
 | `src/antic/ptrset.c` | A set of pointers, a map from a pointer to a pointer and one to an index, over one table. |
 | `src/antic/ptrset.h` | The interface of `ptrset.c`. |
 | `src/antic/shared.h` | The names and the records that more than one part of antic shares, and `anti` through `antic.h`: the suffixes of its files, the layout of the runtime archive, the linker, the mode of LTO, the package record and the paths of the modules the compiler names. |
+| `src/antic/say.c` | The one writer per tool of a message about a file, a tool or an option, with the name of the tool before it. |
+| `src/antic/say.h` | The interface of `say.c`. |
 | `src/antic/sha256.c` | The SHA-256 digest of a file, by the hash of the runtime. |
 | `src/antic/sha256.h` | The interface of `sha256.c`. |
 | `src/antic/text.c` | A byte buffer that grows and stays NUL-terminated, and the formatting of a message into a fixed buffer. |

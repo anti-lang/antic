@@ -14,6 +14,7 @@
 #include "files.h"
 #include "fmt.h"
 #include "modpath.h"
+#include "say.h"
 #include "text.h"
 #include "units.h"
 
@@ -99,7 +100,7 @@ static bool write_formatted(const char *dir, const char *name,
 
     if (!fmt_source(bytes->data != NULL ? bytes->data : "", bytes->length,
                     &formatted)) {
-        fprintf(stderr, "anti: bind wrote %s, and it does not lex\n", name);
+        say_anti("bind wrote %s, and it does not lex\n", name);
         text_free(&formatted);
         return false;
     }

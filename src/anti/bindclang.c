@@ -17,6 +17,7 @@
 #include "files.h"
 #include "jsontree.h"
 #include "platform.h"
+#include "say.h"
 #include "target.h"
 
 /* DESIGN: anti bind accepts the major version of clang it was tested
@@ -118,7 +119,7 @@ static bool check_version(const char *clang)
     int major;
 
     if (status != 0) {
-        fprintf(stderr, "anti: `%s --version` failed. ", clang);
+        say_anti("`%s --version` failed. ", clang);
         where_to_get(needed);
         text_free(&out);
         return false;
@@ -128,7 +129,7 @@ static bool check_version(const char *clang)
     if (major == needed) {
         return true;
     }
-    fprintf(stderr, "anti: %s is clang %d, and ", clang, major);
+    say_anti("%s is clang %d, and ", clang, major);
     where_to_get(needed);
     return false;
 }
@@ -163,8 +164,8 @@ static bool target_options(const char *clang, enum target t,
     text_appendf(&sysroot, "%s/%s/%s", runtime != NULL ? runtime : ".",
                  RUNTIME_SYSROOT_DIR, name);
     if (runtime == NULL || !platform_directory_exists(text_cstr(&sysroot))) {
-        fprintf(stderr, "anti: the runtime archive holds no sysroot for %s, "
-                "whose headers clang reads. Pass --runtime.\n", name);
+        say_anti("the runtime archive holds no sysroot for %s, "
+                 "whose headers clang reads. Pass --runtime.\n", name);
         text_free(&sysroot);
         return false;
     }
@@ -191,7 +192,7 @@ static bool target_options(const char *clang, enum target t,
         bool linux = strncmp(name, "linux-", 6) == 0;
 
         if (platform_capture(argv, &resource) != 0) {
-            fprintf(stderr, "anti: %s -print-resource-dir failed\n", clang);
+            say_anti("%s -print-resource-dir failed\n", clang);
             ok = false;
         }
         while (resource.length > 0 &&
@@ -314,7 +315,7 @@ static void refuse(struct reader *r, const char *format, ...)
 {
     va_list args;
 
-    fprintf(stderr, "anti: %s: ", r->b->source);
+    say_anti("%s: ", r->b->source);
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
@@ -1452,7 +1453,7 @@ static bool run(const struct arg_list *args, struct text *out,
     int status = platform_capture(args->items, out);
 
     if (status != 0) {
-        fprintf(stderr, "anti: clang could not %s, status %d\n", what, status);
+        say_anti("clang could not %s, status %d\n", what, status);
         return false;
     }
     return true;
@@ -1549,8 +1550,8 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     r.b = b;
     r.header = q->header;
     if (q->target != NULL ? !target_from_name(q->target, &t) : !target_host(&t)) {
-        fprintf(stderr, "anti: unknown target %s\n",
-                q->target != NULL ? q->target : "of this host");
+        say_anti("unknown target %s\n",
+                 q->target != NULL ? q->target : "of this host");
         return false;
     }
     r.int_enums = target_info(t)->os == OS_WINDOWS;
@@ -1573,7 +1574,7 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     }
     if (!json_read((const unsigned char *)json.data, json.length, &tree, error,
                    sizeof error)) {
-        fprintf(stderr, "anti: the AST of clang is not JSON: %s\n", error);
+        say_anti("the AST of clang is not JSON: %s\n", error);
         goto done;
     }
     inner = json_get(tree.root, "inner");

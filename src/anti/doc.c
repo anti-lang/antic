@@ -23,6 +23,7 @@
 #include "files.h"
 #include "manifest.h"
 #include "modpath.h"
+#include "say.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -498,12 +499,12 @@ static void warn_open_fence(const char *source, const struct text *doc,
         return;
     }
     if (name == NULL) {
-        fprintf(stderr, "anti: %s: warning: the doc comment of the module "
-                        "holds a fence that nothing closes\n", source);
+        say_anti("%s: warning: the doc comment of the module "
+                 "holds a fence that nothing closes\n", source);
     } else {
-        fprintf(stderr, "anti: %s: warning: the doc comment of `%s` holds a "
-                        "fence that nothing closes\n", source,
-                text_cstr(name));
+        say_anti("%s: warning: the doc comment of `%s` holds a "
+                 "fence that nothing closes\n", source,
+                 text_cstr(name));
     }
 }
 
@@ -867,8 +868,8 @@ int doc_run(const struct doc_request *r)
                                                   : DOC_ITEMS_PUBLIC;
         o.input = r->sources[i];
         if ((r->dev || r->private_items) && is_library(r->sources[i])) {
-            fprintf(stderr, "anti: %s: %s needs the source\n", r->sources[i],
-                    r->dev ? "--dev" : "--private");
+            say_anti("%s: %s needs the source\n", r->sources[i],
+                     r->dev ? "--dev" : "--private");
             status = 1;
             goto done;
         }
@@ -884,9 +885,9 @@ int doc_run(const struct doc_request *r)
         /* M14: the module path of a library file names the file of its
            page, and a library file may come from a repository. */
         if (!manifest_name_valid(text_cstr(&pages[i].module))) {
-            fprintf(stderr, "anti: %s names the module %s, which is no module "
-                            "path\n", r->sources[i],
-                    text_cstr(&pages[i].module));
+            say_anti("%s names the module %s, which is no module "
+                     "path\n", r->sources[i],
+                     text_cstr(&pages[i].module));
             status = 1;
             goto done;
         }

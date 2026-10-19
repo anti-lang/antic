@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "files.h"
+#include "say.h"
 #include "text.h"
 
 /* The four signatures of the format, and the version that a stored entry
@@ -85,8 +86,8 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
     bool ok = count <= ZIP_MAX16;
 
     if (!ok) {
-        fprintf(stderr, "anti: %s: %zu entries are more than a zip archive "
-                        "holds\n", path, count);
+        say_anti("%s: %zu entries are more than a zip archive "
+                 "holds\n", path, count);
     }
     for (i = 0; ok && i < count; i++) {
         struct text bytes = {0};
@@ -99,8 +100,8 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         }
         if (ok && (name_length > ZIP_MAX16 || bytes.length > ZIP_MAX32 ||
                    out.length > ZIP_MAX32)) {
-            fprintf(stderr, "anti: %s: entry %zu is too large for a zip "
-                            "archive\n", path, i);
+            say_anti("%s: entry %zu is too large for a zip "
+                     "archive\n", path, i);
             ok = false;
         }
         if (!ok) {
@@ -146,8 +147,8 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         text_free(&bytes);
     }
     if (ok && (out.length > ZIP_MAX32 || directory.length > ZIP_MAX32)) {
-        fprintf(stderr, "anti: %s: the entries are too large for a zip "
-                        "archive\n", path);
+        say_anti("%s: the entries are too large for a zip "
+                 "archive\n", path);
         ok = false;
     }
     if (ok) {
@@ -231,8 +232,8 @@ static bool check_spans(const char *path, struct zip_span *spans,
     qsort(spans, count, sizeof *spans, span_order);
     for (i = 1; i < count; i++) {
         if (spans[i].from < spans[i - 1].to) {
-            fprintf(stderr, "anti: %s has entries whose data overlap\n",
-                    path);
+            say_anti("%s has entries whose data overlap\n",
+                     path);
             return false;
         }
     }
@@ -252,7 +253,7 @@ static bool read_entries(const char *path, struct zip_archive *out,
     size_t i;
 
     if (!find_end(&out->bytes, &end)) {
-        fprintf(stderr, "anti: %s is no zip archive\n", path);
+        say_anti("%s is no zip archive\n", path);
         return false;
     }
     count = get16(p + end + 10);
@@ -265,8 +266,8 @@ static bool read_entries(const char *path, struct zip_archive *out,
         size_t name_length;
         size_t local;
         if (at + 46 > end || get32(p + at) != ZIP_CENTRAL) {
-            fprintf(stderr, "anti: %s has a broken central directory\n",
-                    path);
+            say_anti("%s has a broken central directory\n",
+                     path);
             return false;
         }
         name_length = get16(p + at + 28);
@@ -277,19 +278,19 @@ static bool read_entries(const char *path, struct zip_archive *out,
         local = get32(p + at + 42);
         if (at + 46 + name_length > end || local + 30 > at ||
             get32(p + local) != ZIP_LOCAL) {
-            fprintf(stderr, "anti: %s has a broken entry\n", path);
+            say_anti("%s has a broken entry\n", path);
             return false;
         }
         item->offset = local + 30 + get16(p + local + 26) +
                        get16(p + local + 28);
         if (item->offset + item->packed > at) {
-            fprintf(stderr, "anti: %s: the data of %.*s runs past its end\n",
-                    path, (int)name_length, (const char *)p + at + 46);
+            say_anti("%s: the data of %.*s runs past its end\n",
+                     path, (int)name_length, (const char *)p + at + 46);
             return false;
         }
         if (item->size > ZIP_MAX32 - total) {
-            fprintf(stderr, "anti: %s unpacks to more than one archive "
-                            "holds\n", path);
+            say_anti("%s unpacks to more than one archive "
+                     "holds\n", path);
             return false;
         }
         total += item->size;
@@ -668,9 +669,9 @@ bool zip_unpack(const struct zip_archive *a, size_t index, struct text *out)
         ok = inflate(data, item->packed, item->size, out) &&
              out->length - from == item->size;
     } else {
-        fprintf(stderr, "anti: %s is packed with method %u, and the reader "
-                        "takes stored and deflate\n",
-                text_cstr(&item->name), (unsigned)item->method);
+        say_anti("%s is packed with method %u, and the reader "
+                 "takes stored and deflate\n",
+                 text_cstr(&item->name), (unsigned)item->method);
         return false;
     }
     /* An entry of no bytes inflated into an empty text leaves out->data
@@ -680,8 +681,8 @@ bool zip_unpack(const struct zip_archive *a, size_t index, struct text *out)
         ok = false;
     }
     if (!ok) {
-        fprintf(stderr, "anti: the data of %s is broken\n",
-                text_cstr(&item->name));
+        say_anti("the data of %s is broken\n",
+                 text_cstr(&item->name));
     }
     return ok;
 }

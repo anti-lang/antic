@@ -19,6 +19,7 @@
 #include "memreport.h"
 #include "modpath.h"
 #include "platform.h"
+#include "say.h"
 #include "target.h"
 #include "text.h"
 #include "units.h"
@@ -336,7 +337,7 @@ int test_run(const struct test_request *r)
     int status = 1;
 
     if (r->source_count == 0) {
-        fputs("anti: test takes one or more .anti files\n", stderr);
+        say_anti("test takes one or more .anti files\n");
         return 2;
     }
     if (!files_make_dirs(r->work)) {

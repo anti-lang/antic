@@ -21,6 +21,7 @@
 #include "files.h"
 #include "manifest.h"
 #include "platform.h"
+#include "say.h"
 #include "sha256.h"
 #include "text.h"
 #include "userdirs.h"
@@ -40,8 +41,8 @@ enum { REPO_INDEX_SECONDS = 3600 };
 static bool repo_cache_dir(struct text *out)
 {
     if (!user_dir(out, USER_DIR_CACHE, USER_DIR_APP)) {
-        fputs("anti: the environment does not say where the cache of the user "
-              "is\n", stderr);
+        say_anti("the environment does not say where the cache of the user "
+                 "is\n");
         return false;
     }
     return true;
@@ -96,11 +97,11 @@ bool repo_url_allowed(const char *url)
         if (is_loopback(url + sizeof http - 1)) {
             return true;
         }
-        fprintf(stderr, "anti: %s: http:// names a repository of 127.0.0.1 or "
-                        "localhost alone\n", url);
+        say_anti("%s: http:// names a repository of 127.0.0.1 or "
+                 "localhost alone\n", url);
         return false;
     }
-    fprintf(stderr, "anti: %s: a repository URL is https:// or file://\n", url);
+    say_anti("%s: a repository URL is https:// or file://\n", url);
     return false;
 }
 
@@ -114,8 +115,8 @@ static bool file_url_path(const char *url, struct text *out)
         rest += 9;
     }
     if (*rest != '/') {
-        fprintf(stderr, "anti: %s: a file:// URL names an absolute path\n",
-                url);
+        say_anti("%s: a file:// URL names an absolute path\n",
+                 url);
         return false;
     }
     /* A Windows path stands as file:///C:/dir, whose leading slash is no
@@ -151,9 +152,9 @@ static bool redirect_allowed(const char *from, const char *to)
          is_loopback(to + sizeof http - 1))) {
         return true;
     }
-    fprintf(stderr, "anti: %s: the server redirects to %s, which is no "
-                    "https:// URL and no http:// URL of 127.0.0.1 or "
-                    "localhost\n", from, to);
+    say_anti("%s: the server redirects to %s, which is no "
+             "https:// URL and no http:// URL of 127.0.0.1 or "
+             "localhost\n", from, to);
     return false;
 }
 
@@ -219,8 +220,8 @@ static bool fetch_http(const char *url, const char *temporary,
             break;
         }
         if (hops == REPO_REDIRECTS) {
-            fprintf(stderr, "anti: %s: the server redirects more than %d "
-                            "times\n", url, REPO_REDIRECTS);
+            say_anti("%s: the server redirects more than %d "
+                     "times\n", url, REPO_REDIRECTS);
             ok = false;
             goto done;
         }
@@ -238,8 +239,8 @@ static bool fetch_http(const char *url, const char *temporary,
     if (!ok && http_absent(code)) {
         *absent = true;
     } else if (!ok) {
-        fprintf(stderr, "anti: %s: curl fetched nothing\n",
-                text_cstr(&current));
+        say_anti("%s: curl fetched nothing\n",
+                 text_cstr(&current));
     }
 done:
     text_free(&current);
@@ -272,8 +273,8 @@ static enum repo_answer fetch(const char *url, const char *destination,
             } else {
                 ok = files_copy(text_cstr(&source), text_cstr(&temporary));
                 if (!ok) {
-                    fprintf(stderr, "anti: %s: cannot read %s\n", url,
-                            text_cstr(&source));
+                    say_anti("%s: cannot read %s\n", url,
+                             text_cstr(&source));
                 }
             }
         }
@@ -343,8 +344,8 @@ static bool index_dir(const char *prefix, const char *name, struct text *out)
     char hex[65];
 
     if (!manifest_name_valid(name)) {
-        fprintf(stderr, "anti: %s names the package %s, which is no package "
-                        "name\n", prefix, name);
+        say_anti("%s names the package %s, which is no package "
+                 "name\n", prefix, name);
         return false;
     }
     if (!repo_cache_dir(out)) {
@@ -378,8 +379,8 @@ enum repo_answer repo_index(const char *prefix, const char *name,
         goto done;
     }
     if (offline) {
-        fprintf(stderr, "anti: --offline and no cached index of %s from %s\n",
-                name, prefix);
+        say_anti("--offline and no cached index of %s from %s\n",
+                 name, prefix);
         goto done;
     }
     text_appendf(&url, "%s/%s/%s", prefix, name, REPO_INDEX_FILE);
@@ -409,23 +410,23 @@ bool repo_module(const char *prefix, const char *name, const char *version,
        check after the fetch. Each may come from a downloaded index or a
        cloned lock file. */
     if (!manifest_name_valid(name)) {
-        fprintf(stderr, "anti: %s names the package %s, which is no package "
-                        "name\n", prefix, name);
+        say_anti("%s names the package %s, which is no package "
+                 "name\n", prefix, name);
         goto done;
     }
     if (!manifest_version_valid(version)) {
-        fprintf(stderr, "anti: %s names %s %s, which is no version\n", prefix,
-                name, version);
+        say_anti("%s names %s %s, which is no version\n", prefix,
+                 name, version);
         goto done;
     }
     if (!manifest_name_valid(module)) {
-        fprintf(stderr, "anti: %s names the module %s of %s, which is no "
-                        "module path\n", prefix, module, name);
+        say_anti("%s names the module %s of %s, which is no "
+                 "module path\n", prefix, module, name);
         goto done;
     }
     if (!manifest_digest_valid(digest)) {
-        fprintf(stderr, "anti: %s names the digest %s of %s, which is no "
-                        "SHA-256 digest\n", prefix, digest, module);
+        say_anti("%s names the digest %s of %s, which is no "
+                 "SHA-256 digest\n", prefix, digest, module);
         goto done;
     }
     if (!repo_cache_dir(&directory)) {
@@ -440,16 +441,16 @@ bool repo_module(const char *prefix, const char *name, const char *version,
        and carries its digest is fetched no second time. */
     if (!files_exists(text_cstr(out))) {
         if (offline) {
-            fprintf(stderr, "anti: --offline and no cached %s of %s %s\n",
-                    module, name, version);
+            say_anti("--offline and no cached %s of %s %s\n",
+                     module, name, version);
             goto done;
         }
         text_appendf(&url, "%s/%s/%s/%s%s", prefix, name, version, module,
                      ANTL_SUFFIX);
         answer = fetch(text_cstr(&url), text_cstr(out), NULL);
         if (answer == REPO_ABSENT) {
-            fprintf(stderr, "anti: %s: the repository holds no such file\n",
-                    text_cstr(&url));
+            say_anti("%s: the repository holds no such file\n",
+                     text_cstr(&url));
         }
         if (answer != REPO_HELD) {
             goto done;
@@ -458,12 +459,12 @@ bool repo_module(const char *prefix, const char *name, const char *version,
     /* The digest of the index is checked at download time and again
        before every build. */
     if (!sha256_file(text_cstr(out), hex)) {
-        fprintf(stderr, "anti: cannot read %s\n", text_cstr(out));
+        say_anti("cannot read %s\n", text_cstr(out));
         goto done;
     }
     if (strcmp(hex, digest) != 0) {
-        fprintf(stderr, "anti: %s of %s %s has the digest %s and the index "
-                        "names %s\n", module, name, version, hex, digest);
+        say_anti("%s of %s %s has the digest %s and the index "
+                 "names %s\n", module, name, version, hex, digest);
         /* A cached file is fetched no second time, so one that fails its
            digest leaves the cache and the next build fetches it again. */
         platform_remove(text_cstr(out));
