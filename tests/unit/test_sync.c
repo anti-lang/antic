@@ -290,7 +290,7 @@ void test_sync(void)
     rejects("export fn f(c: chan int) { }\n", 1, 13,
             "the parameter `c` of export fn `f` has type `chan int`, which "
             "C cannot represent");
-    rejects("worker fn w(chunk: []int, c: chan int) -> int {\n"
+    rejects("worker fn w(chunk: []int, own c: chan int) -> int {\n"
             "    delete(c);\n"
             "    return 0;\n"
             "}\n",
