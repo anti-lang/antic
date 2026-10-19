@@ -2,7 +2,8 @@
    an owned buffer stop the program through anti_rt_out_of_memory when
    the C library refuses their memory, as decision 4 of "Decisions of
    2026-10-11" says, and never come back with a literal or NULL. The
-   listing of anti.fs does the same, which T139 holds.
+   listing of anti.fs does the same, which T139 holds. The memory of the
+   start of a program ends it with status 70, as a refusal at start does.
 
    The files of the runtime this program links are compiled with malloc
    and realloc named refused_malloc and refused_realloc, which give NULL
@@ -16,6 +17,7 @@
 #include <string.h>
 
 #include "../binary_stdio.h"
+#include "fail.h"
 #include "object.h"
 #include "plugin.h"
 #include "std.h"
@@ -84,6 +86,10 @@ int main(int argc, char **argv)
     } else if (strcmp(name, "fill_count") == 0) {
         anti_rt_builder_append(&b, (const unsigned char *)"four", 4);
         anti_rt_builder_fill(&b, 0, ' ', INT64_MAX);
+    } else if (strcmp(name, "start") == 0) {
+        /* The start of a program ends with status 70 and one line. */
+        refusing = 1;
+        made = anti_rt_start_alloc(16);
     } else if (strcmp(name, "copy_buffer") == 0) {
         refusing = 1;
         made = anti_rt_copy_buffer("three", 3);

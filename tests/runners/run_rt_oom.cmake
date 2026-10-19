@@ -2,7 +2,8 @@
 # an owned buffer stop the program through anti_rt_out_of_memory when the
 # C library refuses their memory, and never come back with a literal or
 # NULL. Each case aborts with the message of the failure routine, which
-# names the bytes asked for. Run with cmake -P and these values:
+# names the bytes asked for. The case start ends with status 70 and the
+# line of the memory of the start of a program. Run with cmake -P and these values:
 #   PROGRAM  rt_oom_tests, built from tests/unit/test_rt_oom.c
 #   CASES    the cases, separated by commas
 #   WORK     a directory this run writes into
@@ -35,6 +36,11 @@ foreach(case IN LISTS cases)
     set(ends ABORTS)
     if(CMAKE_HOST_WIN32)
         set(ends STATUS 3)
+    endif()
+    # The start of a program exits as a refusal at start does.
+    if(case STREQUAL "start")
+        set(message ERR "anti: out of memory at program start\n")
+        set(ends STATUS 70)
     endif()
     program_expect("rt_oom_${case}" COMMAND "${PROGRAM}" ${case} ${ends}
                    ${message})

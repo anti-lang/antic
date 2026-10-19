@@ -129,10 +129,7 @@ ANTI_RT_PRINTF(1, 2) static char *format_text(const char *format, ...)
     if (n < 0) {
         startup_error("a message of the configuration cannot be written");
     }
-    out = malloc((size_t)n + 1);
-    if (out == NULL) {
-        startup_error("out of memory at program start");
-    }
+    out = anti_rt_start_alloc((size_t)n + 1);
     va_start(rest, format);
     if (vsnprintf(out, (size_t)n + 1, format, rest) != n) {
         startup_error("a message of the configuration cannot be written");
@@ -160,11 +157,8 @@ static char *list_text(const char *const *names, size_t count,
 
 static char *copy(const char *text, size_t length)
 {
-    char *out = malloc(length + 1);
+    char *out = anti_rt_start_alloc(length + 1);
 
-    if (out == NULL) {
-        startup_error("out of memory at program start");
-    }
     memcpy(out, text, length);
     out[length] = '\0';
     return out;
@@ -258,10 +252,7 @@ static void set_key(struct key *k, const char *value, size_t length,
         }
     }
     kept = copy(value, length);
-    old = malloc(sizeof *old);
-    if (old == NULL) {
-        startup_error("out of memory at program start");
-    }
+    old = anti_rt_start_alloc(sizeof *old);
     /* A value this call does not take, and a node it does not use, are
        freed after the lock. */
     hold();
@@ -372,10 +363,7 @@ static char *resolve(const char *base, const char *path)
         return copy(path, strlen(path));
     }
     directory = (size_t)(last - base) + 1;
-    out = malloc(directory + strlen(path) + 1);
-    if (out == NULL) {
-        startup_error("out of memory at program start");
-    }
+    out = anti_rt_start_alloc(directory + strlen(path) + 1);
     memcpy(out, base, directory);
     memcpy(out + directory, path, strlen(path) + 1);
     return out;
@@ -511,10 +499,7 @@ static char *join_elements(const struct anti_toml *doc, int64_t from,
         }
         value = value_text(doc, i, path);
         value_length = strlen(value);
-        grown = malloc(held + value_length + 2);
-        if (grown == NULL) {
-            startup_error("out of memory at program start");
-        }
+        grown = anti_rt_start_alloc(held + value_length + 2);
         memcpy(grown, out, held);
         if (held > 0) {
             grown[held++] = anti_rt_path_list_separator();
@@ -644,7 +629,7 @@ static void read_file(char *path, const struct including *from, int *files,
     errno = 0;
     bytes = anti_rt_fs_read(path, &length);
     if (bytes == NULL && errno == ENOMEM) {
-        startup_error("out of memory at program start");
+        anti_rt_start_out_of_memory();
     }
     if (bytes == NULL) {
         startup_error("cannot read the configuration file %s", path);
@@ -653,10 +638,7 @@ static void read_file(char *path, const struct including *from, int *files,
     if (doc == NULL) {
         startup_error("%s is not the TOML subset", path);
     }
-    kept = malloc(sizeof *kept);
-    if (kept == NULL) {
-        startup_error("out of memory at program start");
-    }
+    kept = anti_rt_start_alloc(sizeof *kept);
     kept->value = path;
     hold();
     kept->next = paths;
@@ -679,7 +661,7 @@ static char *environment_path(void)
     char *text;
 
     if (anti_rt_getenv("ANTI_CONF", &text) != 0) {
-        startup_error("out of memory at program start");
+        anti_rt_start_out_of_memory();
     }
     return text;
 }

@@ -64,16 +64,6 @@ static void runtime_options(struct anti_slice *args)
     anti_rt_conf_start();
 }
 
-static void *allocate(size_t size)
-{
-    void *p = malloc(size == 0 ? 1 : size);
-
-    if (p == NULL) {
-        anti_rt_fail_exit(70, "anti: out of memory at program start");
-    }
-    return p;
-}
-
 /* DESIGN: the arguments and the environment live until exit, and no
    pointer to them outlives main. The leak check of a program of
    --memory-checks would report them, so the start marks each block of
@@ -97,9 +87,9 @@ static struct anti_slice slice_of(char **list, size_t count)
     size_t i;
 
     if (list == NULL) {
-        anti_rt_fail_exit(70, "anti: out of memory at program start");
+        anti_rt_start_out_of_memory();
     }
-    slice.ptr = allocate(count * sizeof *slice.ptr);
+    slice.ptr = anti_rt_start_alloc(count * sizeof *slice.ptr);
     slice.len = (int64_t)count;
     for (i = 0; i < count; i++) {
         slice.ptr[i].ptr = (const unsigned char *)list[i];

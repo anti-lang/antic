@@ -516,7 +516,7 @@ target_link_libraries(rt_oom_tests PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 add_test(NAME rt_oom
     COMMAND "${CMAKE_COMMAND}"
         "-DPROGRAM=$<TARGET_FILE:rt_oom_tests>"
-        "-DCASES=take,append,fill,append_count,fill_count,copy_buffer,dup"
+        "-DCASES=take,append,fill,append_count,fill_count,copy_buffer,dup,start"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-oom"
         -P "${ANTIC_RUNNERS}/run_rt_oom.cmake")
 # T139. The listing of anti.fs when the C library refuses its memory.

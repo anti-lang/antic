@@ -39,11 +39,8 @@ static size_t injection_count;
 
 static char *copy(const char *text, size_t length)
 {
-    char *out = malloc(length + 1);
+    char *out = anti_rt_start_alloc(length + 1);
 
-    if (out == NULL) {
-        startup_error("out of memory at program start");
-    }
     memcpy(out, text, length);
     out[length] = '\0';
     return out;
@@ -91,10 +88,7 @@ static char *list_injectable(void)
         length += strlen(separator(i, count)) +
                   strlen((const char *)anti_rt_injectable.interfaces[i].name);
     }
-    out = malloc(length + 1);
-    if (out == NULL) {
-        startup_error("out of memory at program start");
-    }
+    out = anti_rt_start_alloc(length + 1);
     for (i = 0; i < count; i++) {
         const char *before = separator(i, count);
         const char *name = (const char *)anti_rt_injectable.interfaces[i].name;

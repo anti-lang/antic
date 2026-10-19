@@ -6,6 +6,7 @@
 #define ANTI_RT_FAIL_H
 
 #include <limits.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "platform.h"
@@ -35,6 +36,17 @@ static inline int anti_rt_print_width(int64_t length)
 /* The same form for a line that reports and goes on, as a library that
    discovery passes over. */
 ANTI_RT_PRINTF(1, 2) void anti_rt_note(const char *format, ...);
+
+/* A block of size bytes of the C library for the start of a program,
+   and of one byte for a size of 0. Memory that runs out ends the
+   program with status 70 and the line "anti: out of memory at program
+   start", as anti_rt_start_out_of_memory does. The caller frees the
+   block with free. */
+void *anti_rt_start_alloc(size_t size);
+
+/* End the program because the memory of its start ran out, with status
+   70 and the one line of anti_rt_start_alloc. */
+_Noreturn void anti_rt_start_out_of_memory(void);
 
 /* Print the text of a failed assertion to standard error and abort. The
    compiler built the text, so this adds only a newline. */

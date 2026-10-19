@@ -45,6 +45,21 @@ void anti_rt_note(const char *format, ...)
     va_end(rest);
 }
 
+_Noreturn void anti_rt_start_out_of_memory(void)
+{
+    anti_rt_fail_exit(70, "anti: out of memory at program start");
+}
+
+void *anti_rt_start_alloc(size_t size)
+{
+    void *p = malloc(size == 0 ? 1 : size);
+
+    if (p == NULL) {
+        anti_rt_start_out_of_memory();
+    }
+    return p;
+}
+
 /* DESIGN: `anti test` names the test it is about to run, so a failed
    assertion reports which one failed before it prints the position the
    compiler built. Nothing else sets a name, and the report line is then
