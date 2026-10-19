@@ -202,6 +202,8 @@ static const struct bind_type *typedef_named(void *context, const char *name)
     return type;
 }
 
+/* A description lists structs alone, so a tag names the same record after
+   struct and after union. is_union is the interface of bind_names. */
 static struct bind_record *record_named(void *context, const char *tag,
                                         bool is_union)
 {
