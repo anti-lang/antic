@@ -17,6 +17,13 @@
 /* The lock file, beside the manifest. `anti build` writes it. */
 #define LOCK_FILE "anti.lock"
 
+/* The build and the dist directory of the default layout of
+   docs/tooling.md, which `[layout]` replaces for `anti build`. The work
+   directories of `anti check`, `anti doc` and `anti test` stand in the
+   first, as docs/decisions.md gives them. */
+#define MANIFEST_BUILD_DIR "build"
+#define MANIFEST_DIST_DIR "dist"
+
 /* Whether name is a module path: lowercase ASCII identifiers joined by
    single dots. A package name and the module path of a library file both
    take this form, and a string that does not stands in no path. */

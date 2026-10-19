@@ -509,7 +509,7 @@ static int check_command(int argc, char **argv)
     struct check_request request = {0};
     const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **roots = files_array((size_t)argc, sizeof *roots);
-    const char *work = "build/check";
+    const char *work = MANIFEST_BUILD_DIR "/check";
     const char *runtime = NULL;
     struct text home = {0};
     size_t count = 0;
@@ -571,8 +571,8 @@ static int doc_command(int argc, char **argv)
     struct text test = {0};
     struct text package = {0};
     struct text home = {0};
-    const char *out = "build/doc";
-    const char *work = "build/doc-work";
+    const char *out = MANIFEST_BUILD_DIR "/doc";
+    const char *work = MANIFEST_BUILD_DIR "/doc-work";
     const char *runtime = NULL;
     size_t count = 0;
     size_t root_count = 0;
@@ -709,7 +709,7 @@ static int test_command(int argc, char **argv)
     struct test_request request = {0};
     const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **roots = files_array((size_t)argc, sizeof *roots);
-    const char *work = "build/tests";
+    const char *work = MANIFEST_BUILD_DIR "/tests";
     const char *runtime = NULL;
     struct manifest_inject inject = {0};
     struct text src = {0};

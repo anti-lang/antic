@@ -392,8 +392,8 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     bool ok = false;
 
     memset(out, 0, sizeof *out);
-    text_append(&out->build, "build");
-    text_append(&out->dist, "dist");
+    text_append(&out->build, MANIFEST_BUILD_DIR);
+    text_append(&out->dist, MANIFEST_DIST_DIR);
     opened = open_manifest(path, &doc);
     if (opened == OPENED_MISSING) {
         fprintf(stderr, "anti: %s: no manifest here, so there is no project. "
