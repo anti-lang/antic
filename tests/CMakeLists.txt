@@ -6,6 +6,11 @@
 # the first test reads either. llvm-mc assembles the output of `antic -S`
 # for the tests of the assembly, and no package carries it.
 
+# The first two values of a runner that runs antic: antic, and the runtime
+# archive it builds against.
+set(ANTIC_AND_RUNTIME "-DANTIC=$<TARGET_FILE:antic>"
+    "-DRUNTIME=${ANTIC_RUNTIME_DIR}")
+
 # The files of src/rt/ a test program compiles, by the names
 # ANTIC_RUNTIME_SOURCES of CMakeLists.txt gives them. A name the runtime does
 # not build stops the configure step, so no test compiles a file the
@@ -288,8 +293,7 @@ function(antic_program_test name source)
     endif()
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${source}"
             "-DOPTIONS=${options}"
             "-DOBJECTS=${objects}"
@@ -333,8 +337,7 @@ function(antic_modules_test name)
         list(JOIN options "," options)
         add_test(NAME modules_${name}_${mode}
             COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                ${ANTIC_AND_RUNTIME}
                 "-DROOT=${arg_ROOT}"
                 "-DLIBRARIES=${libraries}"
                 "-DLIB_OPTIONS=${lib_options}"
@@ -677,8 +680,7 @@ add_test(NAME llvm_verify_runner
 # takes the options of llc. Every host runs them.
 add_test(NAME llvm_run
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_run"
         -P "${ANTIC_RUNNERS}/run_llvm_run.cmake")
@@ -700,8 +702,7 @@ add_expect_test(llvm_llc_failed STATUS 1
 # its caller.
 add_test(NAME llvm_inline_lines
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/llvm_inline_lines.anti"
         "-DHOST=${ANTIC_HOST_TARGET}"
@@ -716,8 +717,7 @@ add_test(NAME llvm_inline_lines
 foreach(target IN LISTS ANTIC_TARGETS)
     add_test(NAME direct_calls_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DOPT=${ANTIC_OPT}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/table_hook.anti"
             "-DFUNCTION=table_hook.main"
@@ -733,8 +733,7 @@ endforeach()
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME llvm_coff_plugin_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "-DTARGET=${target}"
@@ -748,8 +747,7 @@ endforeach()
 # other one.
 add_test(NAME llvm_coff_plugin_f16
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DTARGET=windows-x86_64"
@@ -784,8 +782,7 @@ foreach(case "v1,${cpu_sse},${cpu_avx}" "v2,${cpu_sse},${cpu_avx}"
     list(GET parts 2 avoids)
     add_test(NAME cpu_level_${level}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DTARGET=linux-x86_64"
             "-DLEVEL=${level}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/floats.anti"
@@ -861,8 +858,7 @@ set_tests_properties(native_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 # and the lock prefix on x86_64. No call of the runtime remains.
 add_test(NAME llvm_atomics
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-atomics"
         -P "${ANTIC_RUNNERS}/run_llvm_atomics.cmake")
@@ -891,8 +887,7 @@ foreach(case "linux-arm64,armv8.0,${atomic_exclusive},${atomic_lse}"
     endif()
     add_test(NAME atomics_${target}_${level}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
@@ -941,8 +936,7 @@ foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
     list(GET parts 3 avoids)
     add_test(NAME f16_${target}_${level}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
@@ -967,8 +961,7 @@ foreach(case "linux-x86_64,v3,vaddps[^\n]*%ymm,1"
     list(GET parts 3 count)
     add_test(NAME simd_width_${target}_${level}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_wide.anti"
@@ -986,8 +979,7 @@ endforeach()
 if(ANTIC_HOST_TARGET STREQUAL "macos-arm64")
     add_test(NAME cpu_check_refuses
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DTARGET=macos-x86_64"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cpu-check"
@@ -1469,8 +1461,7 @@ add_test(NAME toolchain_pin
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME codeview_empty_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DSTD=${ANTIC_RUNTIME_DIR}/std"
             "-DSOURCE=${ANTIC_RUNTIME_DIR}/std/anti/collection/tree.antl"
@@ -1909,8 +1900,7 @@ if(ANTIC_EMULATED_TARGET)
     if(emulated STREQUAL "macos-x86_64")
         add_test(NAME memory_checks_list_${emulated}
             COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                ${ANTIC_AND_RUNTIME}
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
                 "-DOPTIONS=${ANTIC_X86_64_OPTIONS}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/memory-checks-x86_64"
@@ -2416,8 +2406,7 @@ set_tests_properties(linux_libc PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 add_executable(raw_bytes_c raw/raw_bytes.c)
 add_test(NAME raw_output
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DC_PROGRAM=$<TARGET_FILE:raw_bytes_c>"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/raw"
             -P "${ANTIC_RUNNERS}/run_raw_output.cmake")
@@ -2426,8 +2415,7 @@ add_test(NAME raw_output
 add_test(NAME anti_test
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${ANTIC_RUNNERS}/run_anti_test.cmake")
@@ -2580,8 +2568,7 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME anti_symbols
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
             "-DPLUGIN=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "${anti_symbols_plugin}"
@@ -2926,8 +2913,7 @@ endif()
 # source and runs the program.
 add_test(NAME variant_wide_tag
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/variant-wide-tag"
         -P "${ANTIC_RUNNERS}/run_variant_wide_tag.cmake")
 
@@ -3083,8 +3069,7 @@ foreach(case IN LISTS anti_bind_cases)
     add_test(NAME anti_bind_${case}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
             "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
             "-DBIND=${CMAKE_CURRENT_SOURCE_DIR}/bind"
@@ -3528,24 +3513,37 @@ foreach(mode "release|-S" "tests|--tests,--dev,-S")
         FAIL_REGULAR_EXPRESSION "warning|error")
 endforeach()
 
+# The warnings antic prints for a program of tests/errors/ it accepts,
+# through run_warnings.cmake. command holds the arguments of antic,
+# separated by commas. needles holds the messages it must print, and the
+# optional fourth argument those it must not, each separated by
+# semicolons. Without the fourth, ABSENT is empty.
+#   antic_warnings_test(<name> <command> <needles> [<absent>])
+function(antic_warnings_test name command needles)
+    set(absent "")
+    if(ARGC GREATER 3)
+        set(absent "${ARGV3}")
+    endif()
+    add_test(NAME ${name}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTIC=$<TARGET_FILE:antic>"
+            "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
+            "-DCOMMAND=${command}"
+            "-DNEEDLES=${needles}"
+            "-DABSENT=${absent}"
+            -P "${ANTIC_RUNNERS}/run_warnings.cmake")
+endfunction()
+
 # A clause that silences nothing is a warning, which a dev build prints and
 # carries on. The listing `allow_unused` holds the release build, which
 # refuses each. A clause of a doc warning waits for --doc-warnings.
-add_test(NAME warning_unused_clauses
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused.s,allow_unused.anti"
-        "-DNEEDLES=allow_unused.anti:8:1: warning: `allow(assert-call)` silences nothing [unused-allow];allow_unused.anti:16:19: warning: `unchecked(unguarded-field)` overrules nothing [unused-unchecked];allow_unused.anti:34:2: warning: `allow(shadowed-catch)` silences nothing [unused-allow]"
-        "-DABSENT=allow(undocumented)"
-        -P "${ANTIC_RUNNERS}/run_warnings.cmake")
-add_test(NAME warning_unused_doc_clause
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},--dev,--doc-warnings,--warn-undocumented,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_doc.s,allow_unused.anti"
-        "-DNEEDLES=allow_unused.anti:10:1: warning: `allow(undocumented)` silences nothing [unused-allow]"
-        -P "${ANTIC_RUNNERS}/run_warnings.cmake")
+antic_warnings_test(warning_unused_clauses
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused.s,allow_unused.anti"
+    "allow_unused.anti:8:1: warning: `allow(assert-call)` silences nothing [unused-allow];allow_unused.anti:16:19: warning: `unchecked(unguarded-field)` overrules nothing [unused-unchecked];allow_unused.anti:34:2: warning: `allow(shadowed-catch)` silences nothing [unused-allow]"
+    "allow(undocumented)")
+antic_warnings_test(warning_unused_doc_clause
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,--doc-warnings,--warn-undocumented,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_doc.s,allow_unused.anti"
+    "allow_unused.anti:10:1: warning: `allow(undocumented)` silences nothing [unused-allow]")
 
 # Every name of the compiler's table stands in docs/notes/warnings.md with
 # its meaning and its fix, and the note names nothing else.
@@ -3632,13 +3630,9 @@ add_expect_test(warning_doc_emphasis_closers STATUS 0
 
 # A doc comment inside `{ }` of `f"..."` is dropped with a warning, as one
 # inside any other expression is.
-add_test(NAME warning_format_doc
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/format_doc.s,format_doc.anti"
-        "-DNEEDLES=format_doc.anti:10:15: warning: the `///` comment is dropped, because no item or field follows it [doc-dropped];format_doc.anti:12:13: warning: the `/**` comment is dropped, because no item or field follows it [doc-dropped]"
-        -P "${ANTIC_RUNNERS}/run_warnings.cmake")
+antic_warnings_test(warning_format_doc
+    "--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/format_doc.s,format_doc.anti"
+    "format_doc.anti:10:15: warning: the `///` comment is dropped, because no item or field follows it [doc-dropped];format_doc.anti:12:13: warning: the `/**` comment is dropped, because no item or field follows it [doc-dropped]")
 
 # A doc comment names the functions of a class of a library without a
 # warning, as it names those of a struct.
@@ -3652,13 +3646,9 @@ set_tests_properties(silent_doc_library_class PROPERTIES
 # `catch e` shadowing a name of an outer scope is a warning. The three
 # forms that bind a name each report it, and a handler whose name is free
 # reports nothing.
-add_test(NAME warning_catch_shadow
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/catch_shadow.s,catch_shadow.anti"
-        "-DNEEDLES=catch_shadow.anti:22:25: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:26:21: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:31:10: warning: `e` shadows the outer `e` [shadowed-catch]"
-        -P "${ANTIC_RUNNERS}/run_warnings.cmake")
+antic_warnings_test(warning_catch_shadow
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/catch_shadow.s,catch_shadow.anti"
+    "catch_shadow.anti:22:25: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:26:21: warning: `e` shadows the outer `e` [shadowed-catch];catch_shadow.anti:31:10: warning: `e` shadows the outer `e` [shadowed-catch]")
 add_test(NAME silent_catch_no_shadow
     COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
             -o "${CMAKE_CURRENT_BINARY_DIR}/catch_exits.s"
@@ -3670,22 +3660,14 @@ set_tests_properties(silent_catch_no_shadow PROPERTIES
 # and, with --warn-undocumented, a `pub` item without a `///` comment.
 # Every one of them comes with --doc-warnings and with nothing else.
 set(MARKUP "the doc comment")
-add_test(NAME warning_doc_markup
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_markup.s,doc_markup.anti"
-        "-DNEEDLES=doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:6:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:27:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
-        "-DABSENT=${MARKUP} of `plus` holds;in ${MARKUP} of `plus` resolves;has no `///` comment"
-        -P "${ANTIC_RUNNERS}/run_warnings.cmake")
-add_test(NAME warning_undocumented
-    COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/errors"
-        "-DCOMMAND=--doc-warnings,--warn-undocumented,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_undocumented.s,doc_markup.anti"
-        "-DNEEDLES=warning: the pub item `undocumented` has no `///` comment"
-        "-DABSENT=the pub item `plus` has no;the pub item `heads` has no"
-        -P "${ANTIC_RUNNERS}/run_warnings.cmake")
+antic_warnings_test(warning_doc_markup
+    "--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_markup.s,doc_markup.anti"
+    "doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:6:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:27:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
+    "${MARKUP} of `plus` holds;in ${MARKUP} of `plus` resolves;has no `///` comment")
+antic_warnings_test(warning_undocumented
+    "--doc-warnings,--warn-undocumented,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_undocumented.s,doc_markup.anti"
+    "warning: the pub item `undocumented` has no `///` comment"
+    "the pub item `plus` has no;the pub item `heads` has no")
 add_test(NAME silent_doc_markup
     COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
             -o "${CMAKE_CURRENT_BINARY_DIR}/doc_markup_silent.s"
@@ -3696,8 +3678,7 @@ set_tests_properties(silent_doc_markup PROPERTIES FAIL_REGULAR_EXPRESSION "warni
 # no assembly, no object and no library file.
 add_test(NAME front_end_only
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DGOOD=${CMAKE_CURRENT_SOURCE_DIR}/programs/catch_exits.anti"
         "-DBAD=${CMAKE_CURRENT_SOURCE_DIR}/errors/errors.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/front-end"
@@ -3707,8 +3688,7 @@ add_test(NAME front_end_only
 # block marked as not built.
 add_test(NAME overview_examples
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/anti-syntax-overview.md"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/overview"
         -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
@@ -3719,8 +3699,7 @@ add_test(NAME overview_examples
 # or `asm` excerpt stands in what antic writes for the block it names.
 add_test(NAME guide_examples
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DDOCUMENTS=${PROJECT_SOURCE_DIR}/docs/site/developers-guide"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/guide"
         "-DLLVM_OPT=${ANTIC_OPT}"
@@ -3828,8 +3807,7 @@ foreach(target IN LISTS ANTIC_TARGETS)
         endif()
         add_test(NAME ${name}
             COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                ${ANTIC_AND_RUNTIME}
                 "-DSOURCE=${distinct_source}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/distinct-addresses/${lto}"
                 "-DTARGET=${target}"
@@ -3846,8 +3824,7 @@ endforeach()
 foreach(target IN LISTS ANTIC_TARGETS)
     add_test(NAME address_tables_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DSOURCE=${distinct_source}"
             "-DTARGET=${target}"
@@ -3875,8 +3852,7 @@ set_tests_properties(windows_addresses PROPERTIES
 # is told otherwise or cannot.
 add_test(NAME lto_default
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         "-DHOSTING=${CMAKE_CURRENT_SOURCE_DIR}/programs/inject_default.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/lto-default"
@@ -3992,8 +3968,7 @@ set(pdb_names "stack_trace.skipped;stack_trace.main")
 foreach(target windows-x86_64 windows-arm64)
     add_test(NAME pdb_names_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
             "-DNAMES=${pdb_names}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/pdb-names"
@@ -4007,8 +3982,7 @@ endforeach()
 # antic writes the same LLVM text for every test program on every host.
 add_test(NAME emit_identity
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DPROGRAMS=${CMAKE_CURRENT_SOURCE_DIR}/programs"
         "-DMANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/emit-identity/programs.sha256"
         "-DVERSION=${PROJECT_VERSION}"
@@ -4021,8 +3995,7 @@ add_test(NAME emit_identity
 if(ANTIC_HOST_OS STREQUAL "macos")
     add_test(NAME emit_identity_texts
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DVERSION=${PROJECT_VERSION}"
             "-DRUNNER=${ANTIC_RUNNERS}/run_emit_identity.cmake"
             "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -4033,8 +4006,7 @@ endif()
 # One object links to the same bytes for macos-arm64 on every host.
 add_test(NAME link_identity_macos-arm64
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/link-identity/return42.macos-arm64.sha256"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/link-identity"
@@ -4275,8 +4247,7 @@ set_tests_properties(antl_twice PROPERTIES
 # the public functions of its body.
 add_test(NAME classlib
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}/modules/classlib"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/classlib"
         -P "${ANTIC_RUNNERS}/run_classlib.cmake")
@@ -5005,8 +4976,7 @@ set_tests_properties(dump_ir_modules PROPERTIES FIXTURES_REQUIRED twice_antl)
 # Dev mode: one object per module, linked into the same program.
 add_test(NAME dev_modules
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DMODULES=${MODULES}"
         "-DLIBS=${LIBS}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/dev"
@@ -5175,8 +5145,7 @@ set_tests_properties(error_duplicate_library PROPERTIES
 # build with it, dev mode keeping it and --no-asserts dropping it.
 add_test(NAME asserts
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/asserts.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asserts"
         -P "${ANTIC_RUNNERS}/run_asserts.cmake")
@@ -5194,8 +5163,7 @@ function(antic_check_test name phrase pattern runs)
     list(JOIN objects "," objects)
     add_test(NAME check_${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DPHRASE=${phrase}"
             "-DPATTERN=${pattern}"
@@ -5435,8 +5403,7 @@ antic_check_test(sorted_shrink_changed "was changed while"
     ON DEV lang mem text collection reflect collection/sorted)
 add_test(NAME checks_override
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/traps"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/checks-override"
         -P "${ANTIC_RUNNERS}/run_checks.cmake")
@@ -5468,8 +5435,7 @@ elseif(NOT ANTIC_HOST_OS STREQUAL "windows")
     endif()
     add_test(NAME debug_info
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/debug"
             "-DDEBUGGER=${debugger}"
             "-DKIND=${debugger_kind}"
@@ -5480,8 +5446,7 @@ endif()
 # A zero table traps with the name of the class.
 add_test(NAME trap_table
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/table.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${ANTIC_RUNNERS}/run_trap_table.cmake")
@@ -5516,8 +5481,7 @@ foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         room_pool room_pool_shift room_bitset)
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
             -P "${ANTIC_RUNNERS}/run_trap.cmake")
@@ -5530,8 +5494,7 @@ foreach(name IN ITEMS place_list place_list_next place_grid place_queue
         place_tree place_sorted place_sorted_set)
     add_test(NAME trap_${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DSTATUS=1"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5542,8 +5505,7 @@ endforeach()
 # where the guard calls `Error.fatal` directly and ends with unreachable.
 add_test(NAME trap_fatal_none
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/fatal_none.anti"
         "-DSTATUS=1"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
@@ -5564,8 +5526,7 @@ add_test(NAME mutex_size
 # the conflict with its four sites, and a release build says nothing.
 add_test(NAME lock_order
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/lock_order.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         -P "${ANTIC_RUNNERS}/run_lock_order.cmake")
@@ -5584,8 +5545,7 @@ set(ANTIC_REPORT_SECONDS 20)
 foreach(name IN ITEMS lock_orders lock_order_once)
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/${name}.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
             "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
@@ -5594,8 +5554,7 @@ foreach(name IN ITEMS lock_orders lock_order_once)
 endforeach()
 add_test(NAME check_join_twice
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/join_twice.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
@@ -5607,8 +5566,7 @@ set_tests_properties(check_join_twice PROPERTIES TIMEOUT 120)
 # 2026-10-13". The release build waits for itself and is not run.
 add_test(NAME check_sync_held
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/sync_held.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DTIMEOUT=${ANTIC_REPORT_SECONDS}"
@@ -5622,8 +5580,7 @@ set_tests_properties(check_sync_held PROPERTIES TIMEOUT 120)
 # refuses the option.
 add_test(NAME memory_checks
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
@@ -5634,8 +5591,7 @@ set_tests_properties(memory_checks PROPERTIES TIMEOUT 120
 # the list, as a read after free.
 add_test(NAME memory_checks_list
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_list.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
@@ -5646,8 +5602,7 @@ set_tests_properties(memory_checks_list PROPERTIES TIMEOUT 120
 # read of a plain field.
 add_test(NAME memory_checks_bitfield
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/traps/memory_checks_bitfield.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/traps"
         "-DHOST=${ANTIC_HOST_TARGET}"
@@ -5660,8 +5615,7 @@ set_tests_properties(memory_checks_bitfield PROPERTIES TIMEOUT 120
 if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
     add_test(NAME std_builder_room_memory_checks
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/builder_room.anti"
             "-DOPTIONS=--memory-checks"
             "-DOBJECTS="
@@ -5700,8 +5654,7 @@ endif()
 foreach(target linux-x86_64 linux-arm64)
     add_test(NAME musl_allocator_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
             "-DTARGET=${target}"
@@ -5722,8 +5675,7 @@ foreach(target linux-x86_64 linux-arm64)
     endif()
     add_test(NAME mimalloc_environment_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/abi/c_allocator.anti"
             "-DTARGET=${target}"
             "-DHOST=${ANTIC_HOST_TARGET}"
@@ -5739,8 +5691,7 @@ endforeach()
 foreach(target macos-arm64 linux-arm64 windows-arm64)
     add_test(NAME function_alignment_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/devirtualise.anti"
@@ -5755,8 +5706,7 @@ endforeach()
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME abi_probe
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe"
             "-DCC=${ANTIC_TEST_CC}"
@@ -5771,8 +5721,7 @@ endif()
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME abi_probe_types
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DNAME=probe_types"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-types"
@@ -5783,8 +5732,7 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME abi_probe_runner
         COMMAND "${CMAKE_COMMAND}"
             "-DRUNNER=${ANTIC_RUNNERS}/run_probe.cmake"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/probe-runner"
             "-DCC=${ANTIC_TEST_CC}"
             "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
@@ -5795,8 +5743,7 @@ endif()
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME program_licenses
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses"
             "-DHOST=${ANTIC_HOST_TARGET}"
@@ -5854,8 +5801,7 @@ foreach(case
     list(JOIN std_objects "," std_objects)
     add_test(NAME trace_${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${TRACE}/${source}.anti"
             "-DOPTIONS=${options}"
             "-DARGS=${arguments}"
@@ -5956,8 +5902,7 @@ foreach(case
     list(JOIN std_objects "," std_objects)
     add_test(NAME conf_${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CONF}/${source}.anti"
             "-DOPTIONS=${options}"
             "-DARGS=${arguments}"
@@ -5989,8 +5934,7 @@ add_test(NAME conf_include_depth
 # program choose two seeds.
 add_test(NAME conf_hash_seed_random
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CONF}/seed.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-hash_seed_random"
         -P "${ANTIC_RUNNERS}/run_hash_seed.cmake")
@@ -6028,8 +5972,7 @@ foreach(case
     endif()
     add_test(NAME inject_${name}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${INJECT}/service.anti"
             "-DOPTIONS=${options}"
             "-DARGS=${arguments}"
@@ -6097,8 +6040,7 @@ elseif(ANTIC_HOST_OS STREQUAL "windows")
 endif()
 add_test(NAME plugin_host
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
         "-DEXE=${plugin_exe}"
@@ -6113,8 +6055,7 @@ add_test(NAME plugin_host
 # library made.
 add_test(NAME plugin_kinds
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
         "-DEXE=${plugin_exe}"
@@ -6131,8 +6072,7 @@ add_test(NAME plugin_kinds
 # docs/audit/tests-findings.md.
 add_test(NAME plugin_locals
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
         "-DEXE=${plugin_exe}"
@@ -6149,8 +6089,7 @@ add_test(NAME plugin_locals
 # and S308 of docs/audit/summary.md.
 add_test(NAME plugin_stages
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
         "-DEXE=${plugin_exe}"
@@ -6166,8 +6105,7 @@ add_test(NAME plugin_stages
 # text of the trace. S306 of docs/audit/summary.md.
 add_test(NAME plugin_trace
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
         "-DEXE=${plugin_exe}"
@@ -6183,8 +6121,7 @@ add_test(NAME plugin_trace
 # host. T093 of docs/audit/tests-findings.md.
 add_test(NAME plugin_unused
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
         "-DEXE=${plugin_exe}"
@@ -6202,8 +6139,7 @@ add_test(NAME plugin_unused
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME plugin_module_not_imported
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "-DSUFFIX=${plugin_suffix}"
             "-DEXE=${plugin_exe}"
@@ -6220,8 +6156,7 @@ endif()
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME plugin_module_named
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "-DSUFFIX=${plugin_suffix}"
             "-DEXE=${plugin_exe}"
@@ -6239,8 +6174,7 @@ endif()
 foreach(library needy holder)
     add_test(NAME plugin_refused_${library}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
             "-DSUFFIX=${plugin_suffix}"
             "-DEXE=${plugin_exe}"
@@ -6255,8 +6189,7 @@ endforeach()
 # fields it declares and the slots the program reaches through it.
 add_test(NAME plugin_versions
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
         "-DSUFFIX=${plugin_suffix}"
         "-DEXE=${plugin_exe}"
@@ -6295,8 +6228,7 @@ antic_coverage(symbols_probe)
 foreach(target linux-x86_64 linux-arm64 macos-x86_64 macos-arm64)
     add_test(NAME trace_symbols_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DPROBE=$<TARGET_FILE:symbols_probe>"
             "-DSOURCE=${TRACE}/symbols.anti"
             "-DTARGET=${target}"
@@ -6318,8 +6250,7 @@ add_test(NAME build_id_reader
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME program_build_id
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
             "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/args.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/build-id"
@@ -6335,8 +6266,7 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
     foreach(target ${ANTIC_HOST_TARGET} windows-x86_64)
         add_test(NAME llvm_build_id_${target}
             COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                ${ANTIC_AND_RUNTIME}
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/trace/stack_trace.anti"
                 "-DOTHER=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
                 "-DOPTIONS=--target|${target}"
@@ -6350,8 +6280,7 @@ endif()
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME program_licenses_std
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/io.anti"
             "-DWANTED=ANTI_LICENSES_BEGIN|build [0-9a-f]+|package anti.rt [0-9.]+ 0BSD|package anti [0-9.]+ 0BSD|package com.example.hello 2.0.0 MIT"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/licenses-std"
@@ -6490,8 +6419,7 @@ foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
     list(GET parts 1 triple)
     add_test(NAME unwind_${target}
         COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${ANTIC_AND_RUNTIME}
             "-DLLVM_MC=${ANTIC_LLVM_MC}"
             "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DTARGET=${target}"
@@ -6843,6 +6771,32 @@ antic_dump_test(opt arm64
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.opt"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/arm64.anti")
 
+# The assembly that antic -S writes for ${target}, which llvm-mc
+# assembles for ${triple}, through run_asm.cmake: asm_<name>_${target}.
+# OPTIONS and HOLDS are the values of the runner, separated by |.
+#   antic_asm_test(<name> <source> <work> [OPTIONS <options>]
+#                  [HOLDS <lines>])
+function(antic_asm_test name source work)
+    cmake_parse_arguments(PARSE_ARGV 3 arg "" "OPTIONS;HOLDS" "")
+    set(values "")
+    if(DEFINED arg_OPTIONS)
+        list(APPEND values "-DOPTIONS=${arg_OPTIONS}")
+    endif()
+    if(DEFINED arg_HOLDS)
+        list(APPEND values "-DHOLDS=${arg_HOLDS}")
+    endif()
+    add_test(NAME asm_${name}_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DLLVM_MC=${ANTIC_LLVM_MC}"
+            "-DTARGET=${target}"
+            "-DTRIPLE=${triple}"
+            ${values}
+            "-DSOURCE=${source}"
+            "-DWORK=${work}"
+            -P "${ANTIC_RUNNERS}/run_asm.cmake")
+endfunction()
+
 # Every instruction that antic writes assembles with llvm-mc.
 foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
         "windows-x86_64,x86_64-pc-windows-msvc"
@@ -6854,46 +6808,25 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     list(GET parts 1 triple)
     foreach(source main loop twice cell spill7 sum args x86 arm64 floatcalls
             floats structs strings fnptr half)
-        add_test(NAME asm_${source}_${target}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DTARGET=${target}"
-                "-DTRIPLE=${triple}"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm"
-                -P "${ANTIC_RUNNERS}/run_asm.cmake")
+        antic_asm_test(${source}
+            "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti"
+            "${CMAKE_CURRENT_BINARY_DIR}/asm")
     endforeach()
     # Sizes, C types, unions, bitfields, packed and aligned structs and
     # export, from the program and ABI tests.
     foreach(source programs/sizes programs/c_types programs/bitfields
             abi/abi_structs abi/probe)
         get_filename_component(name "${source}" NAME)
-        add_test(NAME asm_${name}_${target}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DTARGET=${target}"
-                "-DTRIPLE=${triple}"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/${source}.anti"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm"
-                -P "${ANTIC_RUNNERS}/run_asm.cmake")
+        antic_asm_test(${name}
+            "${CMAKE_CURRENT_SOURCE_DIR}/${source}.anti"
+            "${CMAKE_CURRENT_BINARY_DIR}/asm")
     endforeach()
     # The directives of the debug information, for the DWARF of ELF and
     # Mach-O and the CodeView of COFF.
-    add_test(NAME asm_debug_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DTARGET=${target}"
-            "-DTRIPLE=${triple}"
-            "-DOPTIONS=-g"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-debug"
-            -P "${ANTIC_RUNNERS}/run_asm.cmake")
+    antic_asm_test(debug
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/structs.anti"
+        "${CMAKE_CURRENT_BINARY_DIR}/asm-debug"
+        OPTIONS "-g")
     # A copy of a generic in dev mode is link-once: a weak definition on
     # ELF and Mach-O and a COMDAT section on COFF.
     if(target MATCHES "^linux")
@@ -6903,59 +6836,31 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     else()
         set(once ".text,\"xr\",discard,_A12copies_merge_pick$3c$2acopies_merge.Person$3e")
     endif()
-    add_test(NAME asm_copies_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DTARGET=${target}"
-            "-DTRIPLE=${triple}"
-            "-DOPTIONS=--dev"
-            "-DHOLDS=${once}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-copies"
-            -P "${ANTIC_RUNNERS}/run_asm.cmake")
+    antic_asm_test(copies
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
+        "${CMAKE_CURRENT_BINARY_DIR}/asm-copies"
+        OPTIONS "--dev"
+        HOLDS "${once}")
     # The debug information names a copy as a person reads it, the DWARF
     # entry on ELF and Mach-O and the CodeView record on COFF, and the
     # symbol keeps the escaped name. Release mode inlines the copy, so the
     # build is a dev build.
-    add_test(NAME asm_debug_copies_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DTARGET=${target}"
-            "-DTRIPLE=${triple}"
-            "-DOPTIONS=--dev|-g"
-            "-DHOLDS=.asciz\t\"copies_merge.pick<int>\"|pick$3cint$3e:"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-debug-copies"
-            -P "${ANTIC_RUNNERS}/run_asm.cmake")
+    antic_asm_test(debug_copies
+        "${CMAKE_CURRENT_SOURCE_DIR}/dump/copies_merge.anti"
+        "${CMAKE_CURRENT_BINARY_DIR}/asm-debug-copies"
+        OPTIONS "--dev|-g"
+        HOLDS ".asciz\t\"copies_merge.pick<int>\"|pick$3cint$3e:")
     # A shared library for C, with the constructor section of the target.
-    add_test(NAME asm_clib_${target}
-        COMMAND "${CMAKE_COMMAND}"
-            "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DLLVM_MC=${ANTIC_LLVM_MC}"
-            "-DTARGET=${target}"
-            "-DTRIPLE=${triple}"
-            "-DOPTIONS=--lib|shared|-I|${CMAKE_CURRENT_SOURCE_DIR}/clib"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/geo.anti"
-            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm"
-            -P "${ANTIC_RUNNERS}/run_asm.cmake")
+    antic_asm_test(clib
+        "${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/geo.anti"
+        "${CMAKE_CURRENT_BINARY_DIR}/asm"
+        OPTIONS "--lib|shared|-I|${CMAKE_CURRENT_SOURCE_DIR}/clib")
     # The calls of the runtime that convert f16 below x86-64-v3.
     if(target MATCHES "x86_64$")
-        add_test(NAME asm_half_v1_${target}
-            COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-                "-DLLVM_MC=${ANTIC_LLVM_MC}"
-                "-DTARGET=${target}"
-                "-DTRIPLE=${triple}"
-                "-DOPTIONS=--cpu|v1"
-                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
-                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/asm-v1"
-                -P "${ANTIC_RUNNERS}/run_asm.cmake")
+        antic_asm_test(half_v1
+            "${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
+            "${CMAKE_CURRENT_BINARY_DIR}/asm-v1"
+            OPTIONS "--cpu|v1")
     endif()
 endforeach()
 
@@ -7026,8 +6931,7 @@ endforeach()
 # passes the test of the program.
 add_test(NAME profile_guided
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/bench/ablate/mixed_work.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile_guided"
         "-DREFUSALS=ON"
@@ -7053,8 +6957,7 @@ foreach(target IN LISTS profile_targets)
         endif()
         add_test(NAME profile_lto_${lto}_${target}
             COMMAND "${CMAKE_COMMAND}"
-                "-DANTIC=$<TARGET_FILE:antic>"
-                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                ${ANTIC_AND_RUNTIME}
                 "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/loops.anti"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/profile-lto/${lto}-${target}"
                 "-DOPTIONS=${options}"
@@ -7067,8 +6970,7 @@ foreach(target IN LISTS profile_targets)
 endforeach()
 add_custom_target(bench
     COMMAND "${CMAKE_COMMAND}"
-        "-DANTIC=$<TARGET_FILE:antic>"
-        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        ${ANTIC_AND_RUNTIME}
         "-DOPT=${ANTIC_OPT}"
         "-DLLC=${ANTIC_LLC}"
         "-DBENCH=${CMAKE_CURRENT_SOURCE_DIR}/bench"
