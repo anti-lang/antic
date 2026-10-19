@@ -3,7 +3,9 @@
 # declarations under a comment that names a file, as /* sema_call.c */.
 # Every function declared under such a comment is defined in that file,
 # and the comment at the top of the header names every file of its
-# family. Run with cmake -P and ROOT, the root of the repository.
+# family. No file outside the family includes the header, since it holds
+# the inside of one part. Run with cmake -P and ROOT, the root of the
+# repository.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -64,6 +66,22 @@ function(check_header header family)
     if(count EQUAL 0)
         string(APPEND failures "\n${header}: no declaration under a section")
     endif()
+
+    file(GLOB_RECURSE sources RELATIVE "${ROOT}" "${ROOT}/src/*.[ch]"
+        "${ROOT}/tests/*.[ch]")
+    foreach(source IN LISTS sources)
+        get_filename_component(base "${source}" NAME_WE)
+        if(source MATCHES "^src/antic/" AND
+           (base STREQUAL family OR base MATCHES "^${family}_"))
+            continue()
+        endif()
+        file(STRINGS "${ROOT}/${source}" included
+            REGEX "^#include \"${header}\"")
+        if(included)
+            string(APPEND failures
+                "\n${source} includes ${header}, the inside of ${family}")
+        endif()
+    endforeach()
     set(failures "${failures}" PARENT_SCOPE)
 endfunction()
 

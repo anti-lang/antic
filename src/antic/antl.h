@@ -2,7 +2,7 @@
 #define ANTIC_ANTL_H
 
 /* The public face of the library file: its version, the depth limit of a
-   tree and the four entry points. */
+   tree and the five entry points. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -36,6 +36,11 @@ bool antl_write(struct text *out, const struct interface *iface,
    text, which antl_header reads. A static library for C holds it as the
    copy of its package header. Returns false as antl_write does. */
 bool antl_write_header(struct text *out, const struct interface *iface);
+
+/* Whether the size bytes at data start as a library file does, with its
+   magic. The version is not read, so a file of another version starts
+   as well, and antl_header names it. */
+bool antl_starts(const uint8_t *data, size_t size);
 
 /* Read the package header, the module name, the imports and the module's
    doc text of a library file into out, with no items. Returns false and writes a message to error when the file is

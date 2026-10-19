@@ -50,12 +50,17 @@ const struct interface *antl_library(const struct reader *r,
     return NULL;
 }
 
+bool antl_starts(const uint8_t *data, size_t size)
+{
+    return size >= sizeof antl_magic &&
+           memcmp(data, antl_magic, sizeof antl_magic) == 0;
+}
+
 static bool read_magic(struct reader *r)
 {
     uint32_t version;
 
-    if (r->size < sizeof antl_magic ||
-        memcmp(r->data, antl_magic, sizeof antl_magic) != 0) {
+    if (!antl_starts(r->data, r->size)) {
         antl_fail(r, "is not a library file");
         return false;
     }

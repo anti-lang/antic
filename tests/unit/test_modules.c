@@ -400,6 +400,11 @@ static void writes_format(void)
             break;
         }
     }
+    /* A file starts with the magic, and a shorter or other start is no
+       library file. */
+    CHECK(antl_starts((const uint8_t *)bytes.data, bytes.length));
+    CHECK(!antl_starts((const uint8_t *)bytes.data, 3));
+    CHECK(!antl_starts((const uint8_t *)"ANTX", 4));
     text_free(&bytes);
     close_session(&s);
 }

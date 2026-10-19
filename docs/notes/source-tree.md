@@ -193,7 +193,7 @@ The library file, and the code that every part of antic and `anti` uses.
 | `src/antic/alloc.c` | The checked allocation of antic, which ends the run on a failure or an overflow. |
 | `src/antic/alloc.h` | The interface of `alloc.c`. |
 | `src/antic/antl.c` | The magic, the checks of the enums the tables store, two shared helpers and the top of the reader, `antl_header` and `antl_read`. |
-| `src/antic/antl.h` | The public face of the library file: its version, the depth limit of a tree and the four entry points. |
+| `src/antic/antl.h` | The public face of the library file: its version, the depth limit of a tree and the five entry points. |
 | `src/antic/antl_io.c` | The primitives that write and read an integer, a count, a name and a C string, each with its check. |
 | `src/antic/antl_io.h` | The inside of the library file: the writer, the reader and the functions its files share, each under the file that defines it. |
 | `src/antic/antl_read.c` | The reader of the type table, the constants and the items, with the checks of each record. |
@@ -655,7 +655,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_glibc_sysroot.cmake` | Checks the glibc pins and runs the sysroot script on stand-in packages. |
 | `tests/runners/run_hash_seed.cmake` | Runs a program twice and expects two seeds. |
 | `tests/runners/run_header_names.cmake` | Refuses one of our headers included with angle brackets. |
-| `tests/runners/run_header_sections.cmake` | Checks that each function under a section of a shared header is defined in that file. |
+| `tests/runners/run_header_sections.cmake` | Checks that each function under a section of a shared header is defined in that file, and that no file outside its family includes the header. |
 | `tests/runners/run_host_sources.cmake` | Compiles every source of antic and anti for one host under the warning set. |
 | `tests/runners/run_installer_alone.cmake` | Runs the installer with a failing cmake on the path and refuses words of removed steps. |
 | `tests/runners/run_installer_github.cmake` | Pins the addresses in both installers and runs one against a fake release. |

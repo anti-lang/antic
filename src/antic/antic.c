@@ -10,7 +10,6 @@
 
 #include "alloc.h"
 #include "antl.h"
-#include "antl_io.h"
 #include "ast.h"
 #include "diagnostic.h"
 #include "notice.h"
@@ -51,8 +50,7 @@ void antic_component_license(const char *component, struct text *out)
 
 bool antic_library_starts(const uint8_t *data, size_t size)
 {
-    return size >= sizeof antl_magic &&
-           memcmp(data, antl_magic, sizeof antl_magic) == 0;
+    return antl_starts(data, size);
 }
 
 bool antic_tokens(const char *source, size_t length, struct arena *arena,
