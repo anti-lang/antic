@@ -8,7 +8,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "antic.h"
 #include "arena.h"
 #include "ir.h"
 #include "sema.h"

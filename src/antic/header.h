@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "antic.h"
 #include "sema.h"
 #include "text.h"
 
