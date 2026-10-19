@@ -161,6 +161,13 @@ if(CMAKE_HOST_APPLE)
         FILES MacOSX.sdk/SDKSettings.json "{\"Version\": \"15_2\"}\n"
         ARGS sdk export --sdk MacOSX.sdk -o out
         ERR "anti: MacOSX.sdk names the Version 15_2, which is no version")
+    # The Version of the top object names the SDK, and a member of the
+    # same name in a nested object that stands first does not.
+    anti_message(sdk_export_version_of_the_top_object
+        FILES MacOSX.sdk/SDKSettings.json
+              "{\"DefaultProperties\": {\"Version\": \"../1\"}, \"Version\": \"14.0\"}\n"
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
     anti_message(sdk_export_out_is_a_file
         FILES MacOSX.sdk/SDKSettings.json "${settings}"
               out "A file where the directory of the bundle belongs.\n"

@@ -9,6 +9,7 @@
 #include "antic.h"
 #include "applesdk.h"
 #include "files.h"
+#include "jsontree.h"
 #include "platform.h"
 #include "sha256.h"
 #include "target.h"
@@ -29,25 +30,28 @@ static bool write_line(const char *path, const char *line)
     return ok;
 }
 
-/* Append the value of "Version" in the SDKSettings.json of sdk to out. */
+/* Append the value of "Version" of the top object of the
+   SDKSettings.json of sdk to out. jsontree.c reads the file, so a member
+   of the same name in a nested object answers nothing. */
 static bool sdk_version(const char *sdk, struct text *out)
 {
     struct text path = {0};
     struct text json = {0};
-    const char *key;
-    const char *start;
-    const char *end;
+    struct json_tree tree;
+    char error[256];
+    const char *version;
     bool ok = false;
 
     text_appendf(&path, "%s/SDKSettings.json", sdk);
-    if (files_read(text_cstr(&path), &json)) {
-        key = strstr(text_cstr(&json), "\"Version\"");
-        start = key != NULL ? strchr(key + strlen("\"Version\""), '"') : NULL;
-        end = start != NULL ? strchr(start + 1, '"') : NULL;
-        if (end != NULL) {
-            text_append_bytes(out, start + 1, (size_t)(end - start - 1));
+    if (files_read(text_cstr(&path), &json) &&
+        json_read((const unsigned char *)json.data, json.length, &tree, error,
+                  sizeof error)) {
+        version = json_member_string(tree.root, "Version");
+        if (version != NULL) {
+            text_append(out, version);
             ok = out->length > 0;
         }
+        json_free(&tree);
     }
     text_free(&path);
     text_free(&json);
