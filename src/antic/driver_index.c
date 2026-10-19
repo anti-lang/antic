@@ -15,7 +15,9 @@
    the directory. Each entry holds the interfaces, the runtime version
    it was built against and the digest of its bytes. Discovery reads it
    and opens no library to find out what is inside one. antic writes the
-   file, because `anti build` is not built. It reads the file with
+   file, since the build that writes a library knows what it provides, as
+   the entry of the index under "Plugins" in docs/decisions.md records.
+   It reads the file with
    src/rt/toml.c, the reader the runtime loads it with, so the two agree
    on every line end and every quote. It keeps the entries of the other
    libraries and writes them back in its own form. A file that reader
