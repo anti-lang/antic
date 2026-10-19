@@ -1,0 +1,1 @@
+classes_private_field_of_a_nested_class_from_outside.anti:18:10: error: `secret` is private to `Outer`

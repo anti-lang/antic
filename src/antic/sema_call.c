@@ -378,10 +378,53 @@ static bool from_module_operator(const struct checker *c,
     return types_same_name(&t->module, &c->module_name);
 }
 
+/* The item of the module that declares the class t, a copy of a
+   generic read as the generic, or NULL for a class of another module. */
+static const struct item *class_item(const struct checker *c,
+                                     const struct type *t)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    if (t->generic != NULL) {
+        t = t->generic;
+    }
+    for (i = 0; module != NULL && i < module->item_count; i++) {
+        const struct item *it = module->items[i];
+        if (it->symbol != NULL && it->symbol->type == t) {
+            return it;
+        }
+    }
+    return NULL;
+}
+
+/* Whether the classes a and b stand inside one class of the module, each
+   being that class or nested in it at any depth. */
+static bool one_family(const struct checker *c, const struct type *a,
+                       const struct type *b)
+{
+    const struct item *x = class_item(c, a);
+    const struct item *y = class_item(c, b);
+
+    if (x == NULL || y == NULL) {
+        return false;
+    }
+    while (x->outer != NULL) {
+        x = x->outer;
+    }
+    while (y->outer != NULL) {
+        y = y->outer;
+    }
+    return x == y;
+}
+
 /* DESIGN: the four levels of the object model document. A public member
    is visible everywhere. A protected one reaches the class that declares
    it and every class below it. A private one reaches its own class
-   alone. Every level is decided here and costs nothing at run time. */
+   alone. Every level is decided here and costs nothing at run time.
+   R100 of "Answers of 2026-10-18": a class and the classes nested in it
+   reach the private and the protected members of each other, in both
+   directions, as Java gives the classes inside one class. */
 static bool level_allows(const struct checker *c, enum visibility vis,
                          const struct type *declared_in, const struct type *t)
 {
@@ -402,11 +445,11 @@ static bool level_allows(const struct checker *c, enum visibility vis,
     }
     /* A generic class below a generic base inherits a copy of it, whose
        members are those of the generic. */
-    if (vis == VIS_PROTECTED) {
-        return sema_descends_from(from, declared_in) ||
-               descends_or_copies(from, declared_in);
+    if (vis == VIS_PROTECTED && (sema_descends_from(from, declared_in) ||
+                                 descends_or_copies(from, declared_in))) {
+        return true;
     }
-    return from == declared_in;
+    return from == declared_in || one_family(c, from, declared_in);
 }
 
 void sema_refuse_hidden(struct checker *c, struct pos pos,

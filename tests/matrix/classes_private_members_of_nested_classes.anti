@@ -1,0 +1,113 @@
+//! A class and the classes nested in it reach the private members of each
+//! other, in both directions, by R100 of "Answers of 2026-10-18": the class
+//! around reads a private field and calls a private function of a nested class,
+//! a nested class those of the class around, two nested classes those of each
+//! other, a class nested two levels deep those of the outermost, and a generic
+//! class those of the class nested in it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Outer
+{
+	secret: int = 40,
+
+	class Inner
+	{
+		hidden: int = 5,
+
+		fn twice(self) -> int
+		{
+			return self.hidden * 2;
+		}
+
+		pub fn reach(self, o: *Outer) -> int
+		{
+			return o.secret + o.half();
+		}
+
+		class Deep
+		{
+			pub fn reach(self, o: *Outer) -> int
+			{
+				return o.secret + 1;
+			}
+		}
+
+		pub fn deep(self, o: *Outer) -> int
+		{
+			let d = Deep { };
+			return d.reach(o);
+		}
+	}
+
+	class Sibling
+	{
+		pub fn reach(self, i: *Inner) -> int
+		{
+			return i.hidden + i.twice();
+		}
+	}
+
+	fn half(self) -> int
+	{
+		return self.secret / 2;
+	}
+
+	pub fn run(self) -> int
+	{
+		let i = Inner { };
+		return i.hidden + i.twice();
+	}
+
+	pub fn inner(self) -> int
+	{
+		let i = Inner { };
+		return i.reach(self);
+	}
+
+	pub fn sibling(self) -> int
+	{
+		let i = Inner { hidden: 7 };
+		let s = Sibling { };
+		return s.reach(&i);
+	}
+
+	pub fn deep(self) -> int
+	{
+		let i = Inner { };
+		return i.deep(self);
+	}
+}
+
+class Holder<T>
+{
+	kept: int = 3,
+
+	class Node
+	{
+		value: int = 9,
+
+		fn doubled(self) -> int
+		{
+			return self.value * 2;
+		}
+	}
+
+	pub fn run(self) -> int
+	{
+		let n = Node { };
+		return self.kept + n.value + n.doubled();
+	}
+}
+
+fn main() -> int
+{
+	let o = Outer { };
+	printf("outer %d\n".ptr, o.run() as c_int);
+	printf("inner %d\n".ptr, o.inner() as c_int);
+	printf("sibling %d\n".ptr, o.sibling() as c_int);
+	printf("deep %d\n".ptr, o.deep() as c_int);
+	let h = Holder<int> { };
+	printf("generic %d\n".ptr, h.run() as c_int);
+	return 0;
+}

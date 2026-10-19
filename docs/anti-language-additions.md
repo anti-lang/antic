@@ -909,6 +909,7 @@ A class may declare a `struct`, `enum` or `class` inside its body. The nested ty
 
 - Only the enclosing class can name the type. Code outside can neither create one nor receive one. A public signature of the enclosing class that names it is a compile error.
 - Its full name is the enclosing class's name followed by its own, `PeopleList.Node`, which the symbols and the C header use.
+- A class and the classes nested in it reach the private and the protected members of each other. That holds in both directions and at any depth, as in Java. Two classes nested in the same class reach each other's as well. By R100 of "Answers of 2026-10-18".
 - A nested type suits what belongs to one class alone, such as the node of a list. A type that users work with directly stays at module level.
 - In a thread-safe class, a nested type can never leave the class, so a node can never leak by construction.
 

@@ -1,0 +1,6 @@
+exit 0
+outer 15
+inner 60
+sibling 21
+deep 41
+generic 30

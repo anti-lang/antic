@@ -1,1 +1,0 @@
-classes_private_field_of_the_enclosing_class.anti:12:11: error: `secret` is private to `Outer`

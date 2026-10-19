@@ -730,7 +730,7 @@ c.move(1.0, 1.0);
 - `dup(p)` is a deep copy through ownership. `=` that copies an existing value with owned fields is refused. A fresh value on the right, a literal, `T(args)` or the result of `dup`, moves, and `=` destroys the value it replaces first.
 - `p is *T`, `p as *T` checked, `p as? *T` gives `none` on a mismatch. `==` on class pointers is object identity.
 
-A class may declare a `struct`, `enum` or `class` inside its body. The nested type is private: only the enclosing class names it, and a public signature that names it is a compile error. Its full name is `PeopleList.Node` in the symbols and `PeopleList_Node` in the header, where one that the layout of an `export class` reaches stands before the class with its layout alone. A type that users work with directly stays at module level.
+A class may declare a `struct`, `enum` or `class` inside its body. The nested type is private: only the enclosing class names it, and a public signature that names it is a compile error. Its full name is `PeopleList.Node` in the symbols and `PeopleList_Node` in the header, where one that the layout of an `export class` reaches stands before the class with its layout alone. A class and the classes nested in it reach the private members of each other, in both directions. A type that users work with directly stays at module level.
 
 <!-- overview: context, docs-style:ignore
 ```anti

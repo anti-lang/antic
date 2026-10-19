@@ -698,7 +698,7 @@ A field takes a default, `pub r: f32 = 1.0`, a constant expression that every li
 
 `v.f(args)` looks in the class, then up its chain, then in its `use` fields, then in the module. `use part: T,` is a field whose `pub` members are reachable on the class, so `car.start()` is `car.engine.start()`. The class does not convert to `*T`.
 
-A class body may declare a `struct`, an `enum` or a `class`. Only the class names the nested type, and a public signature that names it is refused.
+A class body may declare a `struct`, an `enum` or a `class`. Only the class names the nested type, and a public signature that names it is refused. The class and the classes nested in it reach the private and the protected members of each other. Java gives the classes inside one class the same.
 
 ```anti
 class Engine

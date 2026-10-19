@@ -1,0 +1,25 @@
+//! A class that is no nested class of `Outer`, and does not hold one, does not
+//! reach a private member of `Outer`, by R100 of "Answers of 2026-10-18".
+
+class Outer
+{
+	secret: int = 40,
+
+	class Inner
+	{
+		hidden: int = 5,
+	}
+}
+
+class Other
+{
+	pub fn run(self, o: *Outer) -> int
+	{
+		return o.secret;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
