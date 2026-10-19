@@ -28,8 +28,9 @@
 #include "files.h"
 #include "text.h"
 
-/* The width a doc comment is re-wrapped to, and the columns of one tab,
-   which `anti html` and `anti tex` render as four spaces. */
+/* The width a doc comment is re-wrapped to, and the columns of one tab.
+   A tab counts four, the four spaces `docs/tooling.md` gives the
+   highlighters `anti html` and `anti tex`, which are not built. */
 #define WRAP_COLUMNS 80
 #define TAB_COLUMNS 4
 
@@ -1138,7 +1139,7 @@ static enum brace_kind classify(const struct emitter *e)
 }
 
 /* The columns n bytes cover. A byte of a character past the first counts
-   none, and a tab counts what `anti html` renders. */
+   none, and a tab counts TAB_COLUMNS. */
 static size_t columns_of(const char *s, size_t n)
 {
     size_t columns = 0;
