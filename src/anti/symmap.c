@@ -34,14 +34,22 @@ struct map {
     size_t capacity;
 };
 
+void symmap_readable_name(struct text *out, const char *name, size_t length)
+{
+    char *readable = files_array(length, 1);
+    size_t unescaped = anti_rt_symbol_unescape(name, length, readable, length);
+
+    text_append_bytes(out, unescaped > 0 ? readable : name,
+                      unescaped > 0 ? unescaped : length);
+    free(readable);
+}
+
 static bool add_function(void *context, const char *name, uint64_t vaddr,
                          uint64_t size)
 {
     struct map *m = context;
     struct entry *e;
     size_t length = strlen(name);
-    char *readable;
-    size_t unescaped;
 
     if (m->count == m->capacity) {
         m->items = files_grow(m->items, &m->capacity, sizeof *m->items);
@@ -50,13 +58,7 @@ static bool add_function(void *context, const char *name, uint64_t vaddr,
     memset(e, 0, sizeof *e);
     /* The map names a function as a trace of the program would, with
        the escapes of its symbol read back. */
-    readable = malloc(length + 1);
-    unescaped = readable != NULL
-                    ? anti_rt_symbol_unescape(name, length, readable, length)
-                    : 0;
-    text_append_bytes(&e->name, unescaped > 0 ? readable : name,
-                      unescaped > 0 ? unescaped : length);
-    free(readable);
+    symmap_readable_name(&e->name, name, length);
     e->vaddr = vaddr;
     e->size = size;
     return false;

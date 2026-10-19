@@ -2,7 +2,8 @@
    calloc and realloc, and files_grow wrote through it. Each helper now
    exits through files_out_of_memory, as files.h says. The program asks
    one helper, named by its argument, for more memory than any host
-   gives, and tests/runners/run_files_oom.cmake checks the exit. A helper that
+   gives, and tests/runners/run_files_oom.cmake checks the exit. name
+   asks symmap_readable_name, whose room comes from files_array. A helper that
    comes back prints what it returned and ends with status 0. */
 
 #include <stdint.h>
@@ -12,6 +13,8 @@
 
 #include "../binary_stdio.h"
 #include "files.h"
+#include "symmap.h"
+#include "text.h"
 
 /* AddressSanitizer stops the program at an allocation it cannot give,
    unless this option tells it to answer NULL as the C library does. The
@@ -31,7 +34,7 @@ int main(int argc, char **argv)
     void *items = NULL;
 
     if (argc != 2) {
-        fputs("usage: files_oom_tests array|resize|grow\n", stderr);
+        fputs("usage: files_oom_tests array|resize|grow|name\n", stderr);
         return 2;
     }
     if (strcmp(argv[1], "array") == 0) {
@@ -42,6 +45,12 @@ int main(int argc, char **argv)
         /* The room doubles to TOO_MANY. */
         size_t room = TOO_MANY / 2;
         items = files_grow(NULL, &room, 1);
+    } else if (strcmp(argv[1], "name") == 0) {
+        /* The room of the name read back is asked for before any byte
+           of the name is read. */
+        struct text name = {0};
+        symmap_readable_name(&name, "", TOO_MANY);
+        text_free(&name);
     } else {
         fprintf(stderr, "files_oom_tests: no helper %s\n", argv[1]);
         return 2;

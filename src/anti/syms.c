@@ -866,18 +866,6 @@ static bool is_location(const char *s, size_t n)
     return digits > 0 && digits + 1 < n && s[n - 1 - digits] == ':';
 }
 
-/* Append the name a person reads for the n bytes of a symbol at s. */
-static void append_name(struct text *out, const char *s, size_t n)
-{
-    char *readable = malloc(n + 1);
-    size_t length = readable != NULL
-                        ? anti_rt_symbol_unescape(s, n, readable, n)
-                        : 0;
-
-    text_append_bytes(out, length > 0 ? readable : s, length > 0 ? length : n);
-    free(readable);
-}
-
 /* One entry of a map: the range of a function, its name and where the
    debug information gave them, its file and line. */
 struct mapped {
@@ -932,7 +920,7 @@ bool syms_map_lookup(const char *map, uint64_t vaddr, struct text *function,
                 where_length = 0;
             }
             name_length = (size_t)(stop_at - name);
-            append_name(function, name, name_length);
+            symmap_readable_name(function, name, name_length);
             if (where_length > 0) {
                 text_append_bytes(where_out, where, where_length);
             }
@@ -966,8 +954,8 @@ bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
     memset(&found, 0, sizeof found);
     if (binary->length >= 4 && memcmp(bytes, "\177ELF", 4) == 0) {
         if (anti_rt_elf_function(bytes, binary->length, vaddr, &found)) {
-            append_name(function, found.function,
-                        found.function_length);
+            symmap_readable_name(function, found.function,
+                                 found.function_length);
         }
         if (anti_rt_elf_line(bytes, binary->length, vaddr, &found) &&
             found.file != NULL) {
@@ -981,8 +969,8 @@ bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
     }
     if (anti_rt_macho_table(bytes, binary->length, false, 0, &t)) {
         if (anti_rt_macho_function(&t, vaddr, &found)) {
-            append_name(function, found.function,
-                        found.function_length);
+            symmap_readable_name(function, found.function,
+                                 found.function_length);
         }
         /* The link of Mach-O leaves the line table in the objects that
            its debug map names, which stand where it was built. The

@@ -7,6 +7,7 @@
    information gives them, the file and the line follow. */
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "target.h"
 #include "text.h"
@@ -20,6 +21,11 @@
    alone then answers a frame, by R183 of "Rules of 2026-10-13". A map
    without the line counts from address 0, as ELF does. */
 #define SYMMAP_TEXT_LINE "# text "
+
+/* Append to out the name a trace of the program gives a function: the
+   Anti name that the symbol name of length bytes escapes, or the symbol
+   name as it stands when it escapes none. */
+void symmap_readable_name(struct text *out, const char *name, size_t length);
 
 /* The build id of the program at the path, through licensing_notice.
    Returns false when the program carries none. */
