@@ -20,7 +20,8 @@ foreach(file IN LISTS files)
             -I "${SOURCES}" -isystem "${PCRE2}" "${file}"
         RESULT_VARIABLE status
         ERROR_VARIABLE errors
-        OUTPUT_QUIET)
+        OUTPUT_QUIET
+        ENCODING NONE)
     if(NOT status EQUAL 0 OR NOT errors STREQUAL "")
         string(APPEND failures "${errors}")
     endif()
