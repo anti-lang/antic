@@ -1,0 +1,1 @@
+lang_error_text_maker.anti:8:2: error: `fail` with a text calls `anti.lang.Error.of_copy`, which takes the text

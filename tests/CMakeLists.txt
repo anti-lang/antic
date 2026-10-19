@@ -4100,6 +4100,7 @@ add_expect_test(error_missing_semicolon STATUS 1
 #   <program>|<tree>|<module>
 foreach(case
         "lang_error_maker|lang_code_alone|lang"
+        "lang_error_text_maker|lang_code_alone|lang"
         "lang_error_origin|lang_no_origin|lang"
         "lang_trace_capture|lang_no_capture|lang"
         "regex_find_all_damaged||"
