@@ -12,9 +12,10 @@
    The walks run inside antic and hand back plain records, so a change of
    the syntax tree, the checker or the library reader changes this file or
    nothing of anti. The shared helpers beside it, text.h, arena.h,
-   target.h, cpu.h, modpath.h, platform.h, userdirs.h, sha256.h and
-   applesdk.h, serve every part alike. The test anti_interface refuses
-   any other header of src/antic/ in a file of src/anti/. */
+   attributes.h, target.h, cpu.h, modpath.h, platform.h, userdirs.h,
+   sha256.h and applesdk.h, serve every part alike. The test
+   anti_interface refuses any other header of src/antic/ in a file of
+   src/anti/. */
 
 #include <stdbool.h>
 #include <stddef.h>
