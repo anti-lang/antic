@@ -51,7 +51,7 @@ static const char *fitted(char *out, size_t size, int written)
 }
 
 /* Keep the reason the last call gave, which a caller may print. */
-static void fail(const char *format, ...)
+ANTI_RT_PRINTF(1, 2) static void fail(const char *format, ...)
 {
     va_list args;
     int written;

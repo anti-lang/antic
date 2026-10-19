@@ -757,6 +757,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_release_vm_failures.cmake` | Checks that step 5 of `./r --dry-run` stops when the offline check of a VM fails or its network does not come back. |
 | `tests/runners/run_repo_layout.cmake` | Checks every tracked path against the allowed entries. |
 | `tests/runners/run_rt_extensions.cmake` | Refuses a compiler extension in the runtime outside the files that exist to hold one. |
+| `tests/runners/run_rt_format.cmake` | Compiles every file of the runtime with the warning of a missing format attribute and refuses a warning. |
 | `tests/runners/run_rt_headers.cmake` | Checks that each header of the runtime with one interface opens with its purpose and alone declares what its file defines. |
 | `tests/runners/run_rt_names.cmake` | Refuses an exported name of the runtime outside its prefixes. |
 | `tests/runners/run_rt_oom.cmake` | Runs each case of `test_rt_oom.c` and expects the stop through `anti_rt_out_of_memory`. |

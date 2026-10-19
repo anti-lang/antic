@@ -7,7 +7,8 @@
 #include "fail.h"
 
 /* The one form of every line the runtime writes to standard error. */
-static void write_line(const char *format, va_list rest)
+ANTI_RT_PRINTF(1, 0) static void write_line(const char *format,
+                                           va_list rest)
 {
     fflush(stdout);
     vfprintf(stderr, format, rest);

@@ -117,7 +117,7 @@ static struct retired *paths;
 
 /* The text the format and its values give, in memory of its own that
    the caller frees. */
-static char *format_text(const char *format, ...)
+ANTI_RT_PRINTF(1, 2) static char *format_text(const char *format, ...)
 {
     va_list rest;
     char *out;

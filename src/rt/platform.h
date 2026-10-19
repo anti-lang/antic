@@ -99,6 +99,12 @@ void anti_rt_memory_kept(const void *p);
    memory. */
 #define ANTI_RT_NOINLINE __attribute__((noinline))
 
+/* DESIGN: a function of the runtime that formats like printf, whose
+   format is parameter f and whose arguments start at parameter a, or 0
+   for a va_list. clang then checks the arguments of every call, and the
+   test rt_format_attribute refuses such a function without it. */
+#define ANTI_RT_PRINTF(f, a) __attribute__((format(printf, f, a)))
+
 /* DESIGN: the C main of src/rt/start.c takes the arguments and the
    environment of the process from the layer, as strings of valid UTF-8
    ended by a NUL. macOS and Linux give bytes, argv and the environment of

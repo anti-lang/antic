@@ -25,3 +25,9 @@ set(ANTIC_MSVC_WARNINGS /W4 /WX)
 # triple, and writes it again for the msvc triple: clang warns that the
 # triple of the module is overridden, which is the purpose of the step.
 set(ANTIC_OVERRIDE_MODULE_WARNINGS -Wno-override-module)
+
+# The one warning of the test rt_format_attribute, which compiles every
+# file of src/rt with the set above and this flag: a function of the
+# runtime that formats like printf carries the format attribute, so clang
+# checks every call of it. The build does not read it.
+set(ANTIC_FORMAT_ATTRIBUTE_WARNINGS -Wmissing-format-attribute)

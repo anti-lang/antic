@@ -7,18 +7,22 @@
 
 #include <stdint.h>
 
+#include "platform.h"
+
 /* DESIGN: the failure routine of the runtime, in src/rt/assert.c. Every
    failure the runtime reports goes through it, so each has one form. It
    flushes standard output, writes the formatted text and a newline to
    standard error, and ends the program. anti_rt_fail_exit ends it with
    the status, as a refusal at start does with 70. anti_rt_fail_abort
    aborts, for a state the program cannot go on from. */
-_Noreturn void anti_rt_fail_exit(int status, const char *format, ...);
-_Noreturn void anti_rt_fail_abort(const char *format, ...);
+ANTI_RT_PRINTF(2, 3) _Noreturn void anti_rt_fail_exit(int status,
+                                                const char *format, ...);
+ANTI_RT_PRINTF(1, 2) _Noreturn void anti_rt_fail_abort(const char *format,
+                                                 ...);
 
 /* The same form for a line that reports and goes on, as a library that
    discovery passes over. */
-void anti_rt_note(const char *format, ...);
+ANTI_RT_PRINTF(1, 2) void anti_rt_note(const char *format, ...);
 
 /* Print the text of a failed assertion to standard error and abort. The
    compiler built the text, so this adds only a newline. */

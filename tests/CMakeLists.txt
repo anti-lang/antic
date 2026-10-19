@@ -1419,6 +1419,17 @@ else()
     set(ANTIC_TEST_CXX ${ANTIC_TEST_CC} --driver-mode=g++)
 endif()
 
+# Every function of the runtime that formats like printf carries the
+# format attribute, by rule 1 of docs/c-guidelines.md.
+add_test(NAME rt_format_attribute
+    COMMAND "${CMAKE_COMMAND}"
+        "-DCC=${ANTIC_TEST_CC}"
+        "-DFLAGS=${ANTIC_C_WARNINGS};${ANTIC_FORMAT_ATTRIBUTE_WARNINGS}"
+        "-DPCRE2=${ANTIC_PCRE2_INCLUDE}"
+        "-DSOURCES=${PROJECT_SOURCE_DIR}/src/rt"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/rt-format"
+        -P "${ANTIC_RUNNERS}/run_rt_format.cmake")
+
 # The LLVM tools in bin/ of the runtime archive, which the target
 # llvm_tools of the root CMakeLists.txt copies there, are those of LLVM
 # tools/llvm-version. The directory holds no llvm-cov, which toolchain_pin
