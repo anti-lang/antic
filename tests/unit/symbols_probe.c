@@ -68,7 +68,8 @@ int main(int argc, char **argv)
         if (anti_rt_elf_symbol(file, size, argv[3], &vaddr) &&
             anti_rt_elf_function(file, size, vaddr + offset, &found)) {
             printf("%.*s", (int)found.function_length, found.function);
-            if (anti_rt_elf_line(file, size, vaddr + offset, &found)) {
+            if (anti_rt_elf_line(file, size, vaddr + offset, &found) &&
+                found.file != NULL) {
                 printf(" %.*s:%lld", (int)found.file_length, found.file,
                        (long long)found.line);
             }
@@ -77,7 +78,8 @@ int main(int argc, char **argv)
         }
     } else if (strcmp(argv[1], "macho") == 0) {
         anti_rt_macho_relocate(file, size);
-        if (anti_rt_macho_object_line(file, size, argv[3], offset, &found)) {
+        if (anti_rt_macho_object_line(file, size, argv[3], offset, &found) &&
+            found.file != NULL) {
             printf("%.*s:%lld\n", (int)found.file_length, found.file,
                    (long long)found.line);
             status = 0;

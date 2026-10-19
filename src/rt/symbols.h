@@ -63,7 +63,9 @@ bool anti_rt_elf_functions(const uint8_t *file, size_t size,
 /* The function of an ELF file that holds vaddr, from its symbol table. */
 bool anti_rt_elf_function(const uint8_t *file, size_t size, uint64_t vaddr,
                           struct anti_found *out);
-/* The file and the line of vaddr, from the line table of an ELF file. */
+/* The file and the line of vaddr, from the line table of an ELF file.
+   It gives true with the file NULL when the table names no file for the
+   line, so a caller tests the file as well. */
 bool anti_rt_elf_line(const uint8_t *file, size_t size, uint64_t vaddr,
                       struct anti_found *out);
 /* The address of the symbol name in an ELF file. */
@@ -116,7 +118,10 @@ bool anti_rt_macho_debug_map(const struct anti_macho_table *t, uint64_t vaddr,
    place, so it holds the addresses of the object. */
 void anti_rt_macho_relocate(uint8_t *file, size_t size);
 /* The file and the line of offset bytes into the function symbol, from
-   the line table of a Mach-O object file. */
+   the line table of a Mach-O object file. symbol is the name of the
+   symbol table, with the `_` that Mach-O adds. It gives true with the
+   file NULL when the table names no file for the line, as
+   anti_rt_elf_line does. */
 bool anti_rt_macho_object_line(const uint8_t *file, size_t size,
                                const char *symbol, uint64_t offset,
                                struct anti_found *out);
