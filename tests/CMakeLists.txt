@@ -1786,22 +1786,20 @@ elseif(ANTIC_HOST_TARGET STREQUAL "linux-arm64")
     endif()
     set(ANTIC_X86_64_OPTIONS "--target,linux-x86_64")
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-        execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
-            OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
         antic_target_triple(triple linux-x86_64)
         antic_target_c_options(emulated_c_flags linux-x86_64
-            "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64" "${resource}")
+            "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64"
+            "${ANTIC_CLANG_RESOURCE_DIR}")
         list(PREPEND emulated_c_flags "--target=${triple}")
     endif()
 elseif(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
     set(ANTIC_EMULATED_TARGET windows-x86_64)
     set(ANTIC_X86_64_OPTIONS "--target,windows-x86_64")
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-        execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
-            OUTPUT_VARIABLE resource OUTPUT_STRIP_TRAILING_WHITESPACE)
         antic_target_triple(triple windows-x86_64)
         antic_target_c_options(emulated_c_flags windows-x86_64
-            "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64" "${resource}")
+            "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64"
+            "${ANTIC_CLANG_RESOURCE_DIR}")
         list(PREPEND emulated_c_flags "--target=${triple}")
     endif()
 endif()

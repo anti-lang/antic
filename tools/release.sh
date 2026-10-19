@@ -138,6 +138,14 @@ digest_of() {
     shasum -a 256 "$1" | cut -d ' ' -f 1
 }
 
+# Succeed when the file $2 signs the file $1 under the public key $3. The
+# digest of $1 goes to $4, the file openssl pkeyutl signs and checks.
+signature_verifies() {
+    openssl dgst -sha256 -binary -out "$4" "$1" &&
+        openssl pkeyutl -verify -pubin -inkey "$3" -in "$4" -sigfile "$2" \
+            > /dev/null 2>&1
+}
+
 # Prove that git sees nothing of the signing key, and read which form it
 # holds. It sets key_form to plaintext or encrypted.
 #
@@ -972,10 +980,8 @@ digests() {
     # A signature made by hand, after an earlier run stopped without the
     # key, is taken when it verifies against the manifest of this run.
     if [ -f "$packages/SHA256SUMS.sig" ]; then
-        openssl dgst -sha256 -binary -out "$hashed" "$manifest"
-        if openssl pkeyutl -verify -pubin -inkey "$root/tools/keys/release.pem" \
-            -in "$hashed" -sigfile "$packages/SHA256SUMS.sig" \
-            > /dev/null 2>&1; then
+        if signature_verifies "$manifest" "$packages/SHA256SUMS.sig" \
+            "$root/tools/keys/release.pem" "$hashed"; then
             say "the signature beside the manifest verifies against tools/keys/release.pem"
             check_area
             finished 06 digests
@@ -1003,9 +1009,8 @@ digests() {
     openssl pkeyutl -sign -inkey "$release_key" -in "$hashed" \
         -out "$packages/SHA256SUMS.sig" || die "step 6: openssl signed nothing"
     # A signature that fails the check never reaches a release.
-    openssl pkeyutl -verify -pubin -inkey "$root/tools/keys/release.pem" \
-        -in "$hashed" -sigfile "$packages/SHA256SUMS.sig" \
-        > /dev/null 2>&1 ||
+    signature_verifies "$manifest" "$packages/SHA256SUMS.sig" \
+        "$root/tools/keys/release.pem" "$hashed" ||
         die "step 6: the signature does not verify against tools/keys/release.pem"
     say "the signature verifies against tools/keys/release.pem"
     check_area
@@ -1218,11 +1223,8 @@ site() {
         die "step 9: $signature_url answered nothing"
     cmp -s "$work/site-signature.sig" "$signature" ||
         die "step 9: the signature at $signature_url is not the one of this release"
-    openssl dgst -sha256 -binary -out "$work/SHA256SUMS.sha256" \
-        "$packages/SHA256SUMS"
-    openssl pkeyutl -verify -pubin -inkey "$work/site-key.pem" \
-        -in "$work/SHA256SUMS.sha256" -sigfile "$work/site-signature.sig" \
-        > /dev/null 2>&1 ||
+    signature_verifies "$packages/SHA256SUMS" "$work/site-signature.sig" \
+        "$work/site-key.pem" "$work/SHA256SUMS.sha256" ||
         die "step 9: the signature of the site does not cover the manifest of the release"
     say "the signature of the site covers SHA256SUMS of the GitHub release"
     finished 09 site

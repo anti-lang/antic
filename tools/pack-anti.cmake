@@ -67,9 +67,9 @@ if(system)
     message(FATAL_ERROR "${build_dir} was configured with "
                         "ANTIC_SYSTEM_COMPILER=ON. A release takes the pinned clang.")
 endif()
+file(READ "${CMAKE_CURRENT_LIST_DIR}/llvm-version" llvm_version)
+string(STRIP "${llvm_version}" llvm_version)
 if(DEFINED CLANG)
-    file(READ "${CMAKE_CURRENT_LIST_DIR}/llvm-version" llvm_version)
-    string(STRIP "${llvm_version}" llvm_version)
     execute_process(COMMAND "${CLANG}" --version OUTPUT_VARIABLE out)
     if(NOT out MATCHES "^clang version ${llvm_version}[ \n]")
         message(FATAL_ERROR "${CLANG} is not the pinned clang ${llvm_version}: ${out}")
@@ -91,8 +91,6 @@ string(STRIP "${version}" version)
 # name the pin, so a directory of an earlier release is refused as well.
 include("${tools_dir}/host.cmake")
 antic_machine_host(machine)
-file(READ "${tools_dir}/llvm-version" llvm_version)
-string(STRIP "${llvm_version}" llvm_version)
 foreach(host IN LISTS HOSTS)
     if(host STREQUAL machine)
         set(dir "${RUNTIME}/bin")
@@ -134,6 +132,7 @@ endif()
 include("${tools_dir}/macos-sdk.cmake")
 
 include("${tools_dir}/host-compile.cmake")
+include("${tools_dir}/pinned-tools.cmake")
 
 # DESIGN: a Linux program of a release links the pinned sysroot and never
 # the libc of the machine that packed it, so it starts on any Linux from
@@ -220,7 +219,8 @@ function(build_program host output program)
                                "${resource}" "${macos_sdk}" "${version}")
     set(link "")
     if(host MATCHES "^macos-")
-        set(link --ld-path=${LLVM_BIN}/ld64.lld)
+        get_filename_component(llvm_root "${LLVM_BIN}" DIRECTORY)
+        antic_pinned_link_options(link "${llvm_root}" macos)
     elseif(host MATCHES "^windows-")
         # DESIGN: a Windows program carries no symbol table, so what names
         # a frame of a report from a user is the PDB that lld-link writes
@@ -321,10 +321,7 @@ function(build_program host output program)
     if(failed)
         message(FATAL_ERROR "${host}: ${program} did not link")
     endif()
-    # DESIGN: a Linux program of a release links the pinned sysroot and
-    # never the libc of the machine that packed it, so it starts on any
-    # Linux from Ubuntu 22.04 on. Only the binary says which libc it
-    # reached, so it is read here, before the package is written.
+    # The DESIGN above check_libc says why a Linux program is read here.
     if(host MATCHES "^linux-")
         check_libc("${host}" "${output}" "${program}")
     endif()

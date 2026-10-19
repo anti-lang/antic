@@ -11,6 +11,9 @@
 #   CMAKE_SYSTEM_PROCESSOR, and a test of ANTIC_HOST_TARGET against the
 #   name of a system. The build files ask ANTIC_HOST_OS, and the scripts
 #   antic_machine_host.
+# - In the build files, a second question to the C compiler for its
+#   resource directory, which CMakeLists.txt asks once as
+#   ANTIC_CLANG_RESOURCE_DIR.
 #
 # A comment may name any of them.
 
@@ -59,6 +62,17 @@ check("a variable of CMake that names the system" "${system}"
 check("ANTIC_HOST_TARGET tested for a system"
       "ANTIC_HOST_TARGET[ \t]+MATCHES[ \t]+\"\\^(windows|linux|macos)"
       ${build} ${tools})
+set(asked "")
+foreach(path IN LISTS build)
+    file(STRINGS "${ROOT}/${path}" lines REGEX "-print-resource-dir")
+    foreach(line IN LISTS lines)
+        list(APPEND asked "${path}")
+    endforeach()
+endforeach()
+if(NOT asked STREQUAL "CMakeLists.txt")
+    string(APPEND failures "\nthe resource directory of the C compiler asked "
+                           "in ${asked}")
+endif()
 if(NOT failures STREQUAL "")
     message(FATAL_ERROR "the host worked out again:${failures}")
 endif()

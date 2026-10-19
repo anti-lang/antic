@@ -550,9 +550,18 @@ function(antic_cross_runtime target triple)
     endforeach()
 endfunction()
 
-if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
+# The resource directory of the C compiler, with its builtins and its
+# sanitizer runtimes. The cross builds of the runtime and of the native
+# libraries and the tests read it, and the test host_names refuses a
+# second question for it.
+set(ANTIC_CLANG_RESOURCE_DIR "")
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
-        OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
+        OUTPUT_VARIABLE ANTIC_CLANG_RESOURCE_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
         if(NOT EXISTS "${sysroot}")
@@ -584,7 +593,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND ANTIC_LLVM_AR)
         endif()
         antic_target_triple(triple "${target}")
         antic_target_c_options(c_options "${target}" "${sysroot}"
-            "${clang_resource}")
+            "${ANTIC_CLANG_RESOURCE_DIR}")
         antic_cross_runtime(${target} ${triple} ${c_options} ${code_options})
     endforeach()
 endif()
@@ -598,8 +607,6 @@ endif()
 # for windows-arm64, and musl has no AddressSanitizer. The MEMCHECK_ names
 # of src/antic/linker.h spell the same files.
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-    execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
-        OUTPUT_VARIABLE clang_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(asan_macos-arm64 darwin libclang_rt.asan_osx_dynamic.dylib)
     set(asan_macos-x86_64 darwin libclang_rt.asan_osx_dynamic.dylib)
     foreach(target linux-x86_64-glibc linux-arm64-glibc)
@@ -613,8 +620,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
             linux-arm64-glibc windows-x86_64)
         list(POP_FRONT asan_${target} dir)
         foreach(file IN LISTS asan_${target})
-            if(EXISTS "${clang_resource}/lib/${dir}/${file}")
-                file(COPY "${clang_resource}/lib/${dir}/${file}"
+            if(EXISTS "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${file}")
+                file(COPY "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${file}"
                     DESTINATION "${ANTIC_RUNTIME_DIR}/lib/${target}")
             endif()
         endforeach()
@@ -638,8 +645,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(profile ${profile_${target}})
         list(POP_FRONT profile dir)
-        if(EXISTS "${clang_resource}/lib/${dir}/${profile}")
-            file(COPY "${clang_resource}/lib/${dir}/${profile}"
+        if(EXISTS "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${profile}")
+            file(COPY "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${profile}"
                 DESTINATION "${ANTIC_RUNTIME_DIR}/lib/${target}")
         endif()
     endforeach()

@@ -24,8 +24,6 @@ if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang" OR NOT ANTIC_LLVM_AR)
     return()
 endif()
 
-execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
-    OUTPUT_VARIABLE antic_native_resource OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 # The target triple and the flags of a compile for <target>, with the
 # headers of its sysroot in the runtime tree: those of antic_target_triple
@@ -48,7 +46,7 @@ execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
 function(antic_native_target out_triple out_flags target)
     antic_target_triple(triple "${target}")
     antic_target_c_options(flags "${target}"
-        "${ANTIC_RUNTIME_DIR}/sysroot/${target}" "${antic_native_resource}")
+        "${ANTIC_RUNTIME_DIR}/sysroot/${target}" "${ANTIC_CLANG_RESOURCE_DIR}")
     antic_cpu_level(level "${target}")
     antic_cpu_march(march "${level}")
     list(APPEND flags "${march}")
