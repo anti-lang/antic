@@ -1,9 +1,9 @@
 //! A `switch` on a `char` without an `else`, by R009 of "Answers of
-//! 2026-10-18", in each of these places: switch arm, if let, defer, undo,
-//! catch handler, closure, dispatch or parallel, sync block, select arm,
-//! nested type. Each place is a function of its own, and the program prints
-//! one line per place and input. `kinds` takes the escapes, the largest
-//! scalar value and `fallthrough`.
+//! 2026-10-18", in each of these places: switch arm, if let, defer, undo, catch
+//! handler, closure, dispatch or parallel, sync block, select arm, nested type.
+//! Each place is a function of its own, and the program prints one line per
+//! place and input. `kinds` takes the escapes, the largest scalar value and
+//! `fallthrough`.
 
 import anti.lang;
 

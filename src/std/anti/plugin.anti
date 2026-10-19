@@ -60,10 +60,10 @@ pub class Library
 
 	/// The object of the class the library provides for the interface.
 	///
-	/// It fails when the loader cannot build one: the library provides no
-	/// class for the interface, the class takes arguments the host has none of,
-	/// or the library is not open. The message of the error is the reason, a
-	/// copy that the error owns, and the code is 0.
+	/// It fails when the loader cannot build one: the library provides no class
+	/// for the interface, the class takes arguments the host has none of, or
+	/// the library is not open. The message of the error is the reason, a copy
+	/// that the error owns, and the code is 0.
 	///
 	/// The compiler writes this call for `lib.instance(Interface)` and gives it
 	/// the type `*Interface`.

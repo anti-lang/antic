@@ -352,8 +352,8 @@ pub class Error
 	}
 
 	/// Take a copy of `message` that this error owns, ended by a NUL as the
-	/// text of a literal is. When the memory for it runs out, the program
-	/// stops with a message.
+	/// text of a literal is. When the memory for it runs out, the program stops
+	/// with a message.
 	fn keep(self, message: str)
 	{
 		let room = alloc(byte, message.len +| 1) else {

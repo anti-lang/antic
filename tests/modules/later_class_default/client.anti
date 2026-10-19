@@ -1,5 +1,5 @@
-//! The client of the later library. It reads the default of a field whose
-//! class the library declares after the class of the field.
+//! The client of the later library. It reads the default of a field whose class
+//! the library declares after the class of the field.
 
 import com.example.later;
 

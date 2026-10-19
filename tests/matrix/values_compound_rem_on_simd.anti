@@ -1,5 +1,5 @@
-//! `%=` on a simd struct is refused, as `%` is: R037 of "Answers of
-//! 2026-10-18" gives a compound assignment where its operator applies.
+//! `%=` on a simd struct is refused, as `%` is: R037 of "Answers of 2026-10-18"
+//! gives a compound assignment where its operator applies.
 
 simd struct I32x4
 {

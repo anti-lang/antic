@@ -334,11 +334,6 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
                             const char *duplicate_message);
 void sema_warn_catch_shadow(struct checker *c, const struct name *name,
                             struct pos pos);
-bool sema_later_enum_value(struct checker *c, const struct expr *e);
-bool sema_generic_open(struct checker *c, const struct expr *e,
-                       const struct type *t, struct type *expected);
-struct type *sema_infer_literal(struct checker *c, struct expr *e,
-                                struct type *t, struct type ***given);
 void sema_enter_scope(struct checker *c, struct scope *s);
 void sema_leave_scope(struct checker *c, struct scope *s);
 /* The only writers of c->ctx. sema_enter makes next the context and
@@ -396,6 +391,7 @@ bool sema_check_object_from(struct checker *c, struct expr *e,
 struct type *sema_function_type(struct checker *c, struct item *it);
 
 /* sema_declare.c */
+bool sema_later_enum_value(struct checker *c, const struct expr *e);
 
 /* The passes of sema_check that declare the items, in the order it runs
    them. */
@@ -811,6 +807,10 @@ bool sema_thread_safe(const struct type *t);
 bool sema_thread_safe_symbol(const struct symbol *sym);
 
 /* sema_generic.c */
+bool sema_generic_open(struct checker *c, const struct expr *e,
+                       const struct type *t, struct type *expected);
+struct type *sema_infer_literal(struct checker *c, struct expr *e,
+                                struct type *t, struct type ***given);
 /* The end of a refusal of the hook named hook on type t: what a struct
    or a class without `lt` declares, and "" for any other. */
 const char *sema_no_order(const struct type *t, const char *hook);

@@ -1,5 +1,5 @@
-//! A value of an enum names the values before it in its constant expression,
-//! by R054 of "Answers of 2026-10-18": `All = Read | Write`. Each name is the
+//! A value of an enum names the values before it in its constant expression, by
+//! R054 of "Answers of 2026-10-18": `All = Read | Write`. Each name is the
 //! number of that value in the base of the enum, and a value without `=` after
 //! it follows it. The values serve a `switch`, `as` and a field of a struct.
 

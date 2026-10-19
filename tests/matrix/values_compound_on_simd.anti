@@ -1,9 +1,9 @@
-//! The compound assignments on a simd struct, lane by lane, by R037 of
-//! "Answers of 2026-10-18": `+= -= *= /=` on lanes of `i32`, `f32` and `f16`,
-//! and `&= |= ^= <<= >>=` on lanes of `i32`. Each stands on a local, a field, an
-//! element of an array, a place through a pointer, a captured local of a
-//! closure and a field of `self`. The place is read before the value, as a
-//! compound assignment of a number reads it.
+//! The compound assignments on a simd struct, lane by lane, by R037 of "Answers
+//! of 2026-10-18": `+= -= *= /=` on lanes of `i32`, `f32` and `f16`, and `&= |=
+//! ^= <<= >>=` on lanes of `i32`. Each stands on a local, a field, an element
+//! of an array, a place through a pointer, a captured local of a closure and a
+//! field of `self`. The place is read before the value, as a compound
+//! assignment of a number reads it.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

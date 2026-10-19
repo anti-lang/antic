@@ -1,5 +1,5 @@
-//! `align(4096)`, the largest alignment by R051 of "Answers of 2026-10-18", on a
-//! struct, a class and a union. Each line gives the size and how far a local,
+//! `align(4096)`, the largest alignment by R051 of "Answers of 2026-10-18", on
+//! a struct, a class and a union. Each line gives the size and how far a local,
 //! a field and an element of `alloc(T, n)` stand from a multiple of 4096.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
