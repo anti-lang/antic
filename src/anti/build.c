@@ -19,6 +19,7 @@
 #include "arena.h"
 #include "cpu.h"
 #include "deps.h"
+#include "digest.h"
 #include "driver.h"
 #include "files.h"
 #include "licensing.h"

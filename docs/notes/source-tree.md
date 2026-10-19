@@ -328,7 +328,7 @@ reads as well says so in its row.
 | `src/rt/reflect.c` | The walks of a descriptor behind `anti.reflect`, with `get` and `set` of a field. |
 | `src/rt/reflect.h` | The layout of `Value`, the reasons, the calls of `reflect.c` and the trampoline table. |
 | `src/rt/regex.c` | The compile of a text and a byte pattern with PCRE2, the rewrite of a byte pattern, and the groups and template pieces. |
-| `src/rt/regex.h` | What `regex.c` and `patterns.c` share with antic: the compile, the groups, the template pieces and the layout of `Match`. |
+| `src/rt/regex.h` | What `regex.c` and `patterns.c` share with antic: the compile, the groups, the template pieces, the literals, the layouts of `Match` and of `anti.regex` and the codes of a search, each group under the file that defines it. |
 | `src/rt/registry.c` | `reflect.new` and `Object.deserialize` over the registry of classes. |
 | `src/rt/registry.h` | The records of the registry and its two calls. |
 | `src/rt/rt.h` | The start of the runtime in `init.c`, and the option of the backtrace that the configuration sets. |

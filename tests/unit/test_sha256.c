@@ -5,7 +5,7 @@
 
 #include "../binary_stdio.h"
 #include "check.h"
-#include "sha256.h"
+#include "digest.h"
 
 /* The digest of the bytes given in pieces of step, as 64 digits. */
 static void digest_of(const char *bytes, size_t length, size_t step,

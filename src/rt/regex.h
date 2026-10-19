@@ -1,6 +1,8 @@
 /* What src/rt/regex.c and src/rt/patterns.c share with antic: the
-   compile of a pattern with PCRE2, the groups, the pieces of a template
-   and the layout of Match.
+   compile of a pattern with PCRE2, the groups and the pieces of a
+   template, which regex.c defines, and the literals, which patterns.c
+   defines. Then the layouts of anti.lang.Match and of the records of
+   anti.regex that patterns.c reads, and the codes of a search.
 
    DESIGN: one definition read from both sides. antic checks every pattern
    literal with it, and the program compiles the same literal with it at
@@ -27,6 +29,8 @@ struct anti_pattern {
 };
 
 #define ANTI_PATTERN_CODE(p) (((const struct anti_pattern *)(p))->code)
+
+/* src/rt/regex.c, which antic compiles into its own program as well. */
 
 /* The compiled form of the pattern of length bytes at bytes, or NULL when
    it does not compile. Then *code holds the error number of PCRE2 and
@@ -99,6 +103,8 @@ struct anti_rt_piece {
 int anti_rt_regex_piece(const unsigned char *bytes, int64_t length,
                         int64_t *offset, struct anti_rt_piece *piece);
 
+/* src/rt/patterns.c, which a program links and antic does not. */
+
 /* The pattern literal of length bytes at bytes, compiled before main by
    the constructor of the module that holds it. A literal that does not
    compile stops the program. */
@@ -108,6 +114,9 @@ void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length);
    anti_rt_regex_literal compiles a pattern of text. */
 void *anti_rt_regex_literal_bytes(const unsigned char *bytes,
                                   int64_t length);
+
+/* The layouts of the records of Anti that patterns.c reads, and the
+   codes of a search. */
 
 /* The layout of anti.lang.Match, which match_form of src/antic/types.c
    declares in this order, and the unit test match_layout compares the

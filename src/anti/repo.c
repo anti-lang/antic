@@ -18,6 +18,7 @@
 #include <time.h>
 
 #include "antic.h"
+#include "digest.h"
 #include "files.h"
 #include "platform.h"
 #include "sha256.h"

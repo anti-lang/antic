@@ -29,12 +29,14 @@
 #include "optimize.h"
 #include "whole.h"
 #include "rt_abi.h"
-#include "sha256.h"
 #include "parser.h"
 #include "sema.h"
 #include "types.h"
 #include "text.h"
 #include "warnings.h"
+
+/* The hash of the runtime, which digests the inputs of a module. */
+#include "../rt/digest.h"
 
 static void extras_free(struct extras *e)
 {

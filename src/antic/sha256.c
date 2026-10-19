@@ -6,6 +6,9 @@
 
 #include "platform.h"
 
+/* The hash is the one of the runtime, which antic and anti compile in. */
+#include "../rt/digest.h"
+
 bool sha256_file(const char *path, char hex[65])
 {
     FILE *f = platform_open(path, false);
