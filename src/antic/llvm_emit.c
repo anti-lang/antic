@@ -3438,16 +3438,6 @@ static bool global_once(const struct emitter *e, const struct ir_global *g)
     return e->o->one_module && ir_is_copy_name(g->name);
 }
 
-/* DESIGN: a global is a packed struct, so its size and its offsets are
-   the ones layout_data computed, whatever the data layout string says.
-   The section "Globals, sections and constructors" of
-   docs/work-order-llvm-back-end.md gives the form. The bytes between two
-   addresses are one member of [N x i8], and each address a member of ptr
-   that names the global or the function. A global the program writes is
-   a global, every other one a constant, which llc puts in the read-only
-   section of each format, or in the one the loader writes once where it
-   holds an address. The linkage follows the one of a function. A global
-   the runtime defines is a declaration of its bytes. */
 /* Whether the text is a COFF plugin, which reaches the names of its
    host through the __imp_ entries of the import library of the host. */
 static bool imports(const struct emitter *e)
@@ -3583,6 +3573,16 @@ static void plugin_modules(struct emitter *e, const struct ir_module *m)
     free(list);
 }
 
+/* DESIGN: a global is a packed struct, so its size and its offsets are
+   the ones layout_data computed, whatever the data layout string says.
+   The section "Globals, sections and constructors" of
+   docs/work-order-llvm-back-end.md gives the form. The bytes between two
+   addresses are one member of [N x i8], and each address a member of ptr
+   that names the global or the function. A global the program writes is
+   a global, every other one a constant, which llc puts in the read-only
+   section of each format, or in the one the loader writes once where it
+   holds an address. The linkage follows the one of a function. A global
+   the runtime defines is a declaration of its bytes. */
 static void global(struct emitter *e, const struct ir_global *g, bool twin)
 {
     enum target t = e->o->target;

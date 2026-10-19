@@ -120,7 +120,6 @@ static int usage(FILE *out)
     return out == stderr ? 2 : 0;
 }
 
-/* Take the value of an option such as -o, or report that it is missing. */
 /* One line per target: object format, calling convention and triple. */
 static int print_targets(void)
 {
@@ -193,6 +192,7 @@ static bool ends_with(const char *s, const char *suffix)
     return n >= m && strcmp(s + n - m, suffix) == 0;
 }
 
+/* Take the value of an option such as -o, or report that it is missing. */
 static const char *value_of(int argc, char **argv, int *i)
 {
     if (*i + 1 >= argc) {

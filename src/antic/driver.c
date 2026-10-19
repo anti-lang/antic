@@ -55,7 +55,6 @@ static bool ends_with(const char *s, const char *suffix)
     return n >= m && strcmp(s + n - m, suffix) == 0;
 }
 
-/* Read the whole of a binary file. */
 /* Read the whole file into out. A source stops at LEX_SOURCE_MAX, and a
    larger one is refused before more of it is read. */
 static bool read_file(const char *path, struct text *out, bool source)
@@ -154,10 +153,6 @@ bool driver_write_file(const char *path, const struct text *content)
     return ok;
 }
 
-/* The module path of the input, from its path under the search roots.
-   DESIGN: antic -c refuses a library under the anti root without
-   --anti-internal. It warns on a path of one segment, which is for a
-   program's own files. No compilation may define the runtime's module. */
 /* DESIGN: the two blocks are compiled only by `anti test`. Their functions
    are ordinary module functions by now, each carrying its own block, so
    dropping them here is one pass over the item list. Every pass
@@ -199,6 +194,11 @@ static void drop_test_blocks(struct module *tree, bool keep)
     tree->clause_count = j;
 }
 
+/* The module path of the input, from its path under the search roots.
+   DESIGN: a library whose module path is reserved for the language's own
+   libraries is refused without --anti-internal. A library with a path of
+   one segment gets a warning, since such a path is for a program's own
+   files. No compilation may define the runtime's module. */
 static bool module_name(const struct options *o, struct text *out,
                         struct diagnostics *diags)
 {
