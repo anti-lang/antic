@@ -43,8 +43,7 @@ static bool is_local_struct(const struct writer *w, const struct type *t)
        reader can make it when no module read before has. */
     return types_has_fields(t) &&
            (t->generic != NULL ||
-            (t->module.length == strlen(module) &&
-             memcmp(t->module.text, module, t->module.length) == 0));
+            antl_name_equals(&t->module, module));
 }
 
 /* DESIGN: a class carries its public and protected functions, and its

@@ -1373,16 +1373,6 @@ static void put_extern(struct writer *w, struct io *io,
     }
 }
 
-static bool same_name(const struct name *a, const struct name *b)
-{
-    return a->length == b->length && memcmp(a->text, b->text, a->length) == 0;
-}
-
-static bool name_is(const struct name *n, const char *s)
-{
-    return n->length == strlen(s) && memcmp(n->text, s, n->length) == 0;
-}
-
 /* The generic function or type named name among the generics of iface. */
 static struct item *generic_named(const struct interface *iface,
                                   const struct name *name, bool fn)
@@ -1391,7 +1381,7 @@ static struct item *generic_named(const struct interface *iface,
 
     for (i = 0; iface != NULL && i < iface->generic_count; i++) {
         struct item *it = iface->generics[i];
-        if ((it->kind == ITEM_FN) == fn && same_name(&it->name, name)) {
+        if ((it->kind == ITEM_FN) == fn && types_same_name(&it->name, name)) {
             return it;
         }
     }
@@ -1435,8 +1425,8 @@ static struct symbol *read_extern(struct reader *r)
     sym->worker = (marks >> 3 & 1) != 0;
     sym->internal = (marks >> 4 & 1) != 0;
     sym->state = EVAL_DONE;
-    lib = name_is(&home, r->iface->module) ? r->iface
-                                           : antl_library(r, &home);
+    lib = antl_name_equals(&home, r->iface->module) ? r->iface
+                                                    : antl_library(r, &home);
     if (lib == NULL && !r->failed) {
         antl_fail(r, "needs module of `%.*s.%.*s`", (int)home.length,
                   home.text, (int)sym->name.length, sym->name.text);
@@ -1485,7 +1475,8 @@ static struct symbol *read_extern(struct reader *r)
     if (lookup == LOOK_MEMBER) {
         for (i = 0; i < owner->member_count; i++) {
             const struct item *m = owner->members[i];
-            if (m->symbol != NULL && same_name(&m->symbol->name, &sym->name)) {
+            if (m->symbol != NULL &&
+                types_same_name(&m->symbol->name, &sym->name)) {
                 return m->symbol;
             }
         }
@@ -1502,7 +1493,7 @@ static struct symbol *read_extern(struct reader *r)
     }
     for (i = 0; lib != r->iface && i < lib->item_count; i++) {
         struct symbol *s = lib->items[i];
-        if (s->kind == sym->kind && same_name(&s->name, &sym->name)) {
+        if (s->kind == sym->kind && types_same_name(&s->name, &sym->name)) {
             return s;
         }
     }
@@ -1597,7 +1588,8 @@ static struct symbol *listed(struct reader *r, const struct name *name,
 
     for (i = 0; i < r->iface->item_count; i++) {
         struct symbol *sym = r->iface->items[i];
-        if (sym->kind == kind && !sym->alias && same_name(&sym->name, name)) {
+        if (sym->kind == kind && !sym->alias &&
+            types_same_name(&sym->name, name)) {
             return sym;
         }
     }

@@ -57,12 +57,6 @@ struct type *antl_type_or_none(struct reader *r)
     return read_type_index(r, r->table_count, true);
 }
 
-static bool name_equals_name(const struct name *a, const struct name *b)
-{
-    return a->length == b->length &&
-           memcmp(a->text, b->text, a->length) == 0;
-}
-
 /* A struct of another module is the struct that module's library file
    declared. */
 static struct type *foreign_struct(struct reader *r, const struct name *module,
@@ -79,8 +73,7 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
     for (i = 0; i < lib->item_count; i++) {
         const struct symbol *sym = lib->items[i];
         if (sym->kind == SYMBOL_STRUCT && !sym->alias &&
-            sym->name.length == name->length &&
-            memcmp(sym->name.text, name->text, name->length) == 0) {
+            types_same_name(&sym->name, name)) {
             return sym->type;
         }
     }
@@ -88,7 +81,7 @@ static struct type *foreign_struct(struct reader *r, const struct name *module,
        section of the generics of that module declares. */
     for (i = 0; i < lib->generic_count; i++) {
         const struct item *it = lib->generics[i];
-        if (it->kind != ITEM_FN && name_equals_name(&it->name, name)) {
+        if (it->kind != ITEM_FN && types_same_name(&it->name, name)) {
             return it->symbol->type;
         }
     }
@@ -1239,7 +1232,7 @@ void antl_read_fn_defaults(struct reader *r)
         for (j = 0; j < r->iface->item_count && found == NULL; j++) {
             struct symbol *sym = r->iface->items[j];
             if (sym->kind == SYMBOL_FN &&
-                name_equals_name(&sym->name, &r->fn_defaults[i].name)) {
+                types_same_name(&sym->name, &r->fn_defaults[i].name)) {
                 found = sym;
             }
         }
