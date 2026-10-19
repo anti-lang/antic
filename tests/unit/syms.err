@@ -1,1 +1,3 @@
 anti: test_syms-program carries no build id
+anti: cannot read test_syms-conf/fifo
+    #0 0x1 (test_syms-fifo+0x10)
