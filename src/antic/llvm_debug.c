@@ -149,7 +149,7 @@ void llvm_debug_free(struct llvm_debug *d)
 static void reader_name(struct text *out, const struct ir_function *f)
 {
     if (f->module == NULL || f->exported) {
-        target_c_symbol(out, TARGET_LINUX_X86_64, f->name);
+        target_c_name(out, f->name);
     } else {
         text_appendf(out, "%s.%s", f->module, f->name);
     }

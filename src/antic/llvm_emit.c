@@ -231,24 +231,30 @@ static void llvm_name(struct text *out, char sigil, const char *name)
 /* DESIGN: a function takes the symbol of target_c_symbol or
    target_mangle, which the runtime, the C headers and the symbolizer
    read. llc applies the mangling of the triple, so the text drops the
-   leading _ of Mach-O, which llc writes again. */
+   leading _ of Mach-O, which llc writes again. Append symbol, the symbol
+   of target t, as the text names it, and free it. */
+static void text_symbol(struct text *out, enum target t, struct text *symbol)
+{
+    const char *name = text_cstr(symbol);
+
+    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
+        name++;
+    }
+    text_append(out, name);
+    text_free(symbol);
+}
+
 static void function_symbol(struct text *out, enum target t,
                             const struct ir_function *f)
 {
     struct text symbol = {0};
-    const char *name;
 
     if (f->module == NULL || f->exported) {
         target_c_symbol(&symbol, t, f->name);
     } else {
         target_mangle(&symbol, t, f->module, f->name);
     }
-    name = text_cstr(&symbol);
-    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
-        name++;
-    }
-    text_append(out, name);
-    text_free(&symbol);
+    text_symbol(out, t, &symbol);
 }
 
 static void function_name(struct text *out, enum target t,
@@ -3356,25 +3362,18 @@ static void definition(struct emitter *e, const struct ir_function *f)
     e->signature.params = NULL;
 }
 
-/* The symbol of a global after sigil, without the _ of Mach-O, which llc
-   writes. */
+/* The symbol of a global as the text names it. */
 static void global_name(struct text *out, enum target t,
                         const struct ir_global *g)
 {
     struct text symbol = {0};
-    const char *name;
 
     if (g->exported) {
         target_c_symbol(&symbol, t, g->name);
     } else {
         target_mangle(&symbol, t, g->module, g->name);
     }
-    name = text_cstr(&symbol);
-    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
-        name++;
-    }
-    text_append(out, name);
-    text_free(&symbol);
+    text_symbol(out, t, &symbol);
 }
 
 static void global_sigil(struct text *out, char sigil, enum target t,
@@ -3680,7 +3679,7 @@ static void global(struct emitter *e, const struct ir_global *g, bool twin)
 static void entry(struct emitter *e, const struct ir_module *m)
 {
     struct text symbol = {0};
-    const char *name;
+    struct text name = {0};
     size_t i;
 
     for (i = 0; i < m->function_count; i++) {
@@ -3689,16 +3688,12 @@ static void entry(struct emitter *e, const struct ir_module *m)
             continue;
         }
         target_mangle(&symbol, e->o->target, RUNTIME_MODULE, RUNTIME_ENTRY);
-        name = text_cstr(&symbol);
-        if (target_info(e->o->target)->format == FORMAT_MACHO &&
-            name[0] == '_') {
-            name++;
-        }
-        llvm_name(e->out, '@', name);
+        text_symbol(&name, e->o->target, &symbol);
+        llvm_name(e->out, '@', text_cstr(&name));
         text_appendf(e->out, " = alias %s, ptr ", text_cstr(&e->entry));
         function_name(e->out, e->o->target, f);
         text_append(e->out, "\n\n");
-        text_free(&symbol);
+        text_free(&name);
         return;
     }
 }
@@ -3744,13 +3739,33 @@ static void attributes(struct emitter *e)
     text_append(e->out, "attributes #1 = { nounwind }\n\n");
 }
 
+static bool position_independent(enum target t)
+{
+    return strcmp(llvm_relocation_model(t), "pic") == 0;
+}
+
+static bool on_windows(enum target t)
+{
+    return target_info(t)->os == OS_WINDOWS;
+}
+
+/* The module flags after wchar_size, each written for the targets its
+   test takes, in the order of their ids. */
+static const struct {
+    bool (*wanted)(enum target t);
+    const char *node;
+} module_flags[] = {
+    {position_independent, "!{i32 8, !\"PIC Level\", i32 2}"},
+    {on_windows, "!{i32 7, !\"uwtable\", i32 2}"},
+};
+
 /* The module flags, the identification and the weights of the cold
    branches, in the ids the branches named. */
 static void metadata(struct emitter *e, uint32_t flag_count)
 {
-    const struct target_info *info = target_info(e->o->target);
     uint32_t i;
     uint32_t id = 0;
+    size_t k;
 
     text_append(e->out, "!llvm.module.flags = !{");
     for (i = 0; i < flag_count; i++) {
@@ -3761,14 +3776,11 @@ static void metadata(struct emitter *e, uint32_t flag_count)
     text_appendf(e->out, "!%" PRIu32 " = !{i32 1, !\"wchar_size\", i32 %"
                          PRIu64 "}\n",
                  id++, layout_size(e->l, ir_scalar(IR_CWCHAR)));
-    if (strcmp(llvm_relocation_model(e->o->target), "pic") == 0) {
-        text_appendf(e->out, "!%" PRIu32 " = !{i32 8, !\"PIC Level\", "
-                             "i32 2}\n",
-                     id++);
-    }
-    if (info->os == OS_WINDOWS) {
-        text_appendf(e->out, "!%" PRIu32 " = !{i32 7, !\"uwtable\", i32 2}\n",
-                     id++);
+    for (k = 0; k < sizeof module_flags / sizeof module_flags[0]; k++) {
+        if (module_flags[k].wanted(e->o->target)) {
+            text_appendf(e->out, "!%" PRIu32 " = %s\n", id++,
+                         module_flags[k].node);
+        }
     }
     text_appendf(e->out, "!%" PRIu32 " = !{!\"antic %s\"}\n", id,
                  ANTIC_VERSION);
@@ -3801,10 +3813,17 @@ static void metadata(struct emitter *e, uint32_t flag_count)
 /* The number of module flags of the target: the size of wchar_t, the
    level of position-independent code where the relocation model is pic,
    and the unwind tables of Windows. */
+/* The count of the module flags of target t, wchar_size and those of
+   module_flags it takes. */
 static uint32_t flag_count(enum target t)
 {
-    return 1 + (strcmp(llvm_relocation_model(t), "pic") == 0) +
-           (target_info(t)->os == OS_WINDOWS);
+    uint32_t count = 1;
+    size_t i;
+
+    for (i = 0; i < sizeof module_flags / sizeof module_flags[0]; i++) {
+        count += module_flags[i].wanted(t);
+    }
+    return count;
 }
 
 /* DESIGN: two globals of the IR may name one symbol, as every module
@@ -3825,20 +3844,13 @@ static bool declared_elsewhere(const struct ir_module *m,
     return false;
 }
 
-/* The name of the notice anti_licenses in the text, without the leading
-   _ of Mach-O, which llc writes again. */
+/* The name of the notice anti_licenses in the text. */
 static void notice_symbol(struct text *out, enum target t)
 {
     struct text symbol = {0};
-    const char *name;
 
     target_c_symbol(&symbol, t, "anti_licenses");
-    name = text_cstr(&symbol);
-    if (target_info(t)->format == FORMAT_MACHO && name[0] == '_') {
-        name++;
-    }
-    text_append(out, name);
-    text_free(&symbol);
+    text_symbol(out, t, &symbol);
 }
 
 /* DESIGN: main keeps its own frame and its own name in the program, as
@@ -3963,13 +3975,11 @@ static void constructors(struct emitter *e, const struct ir_module *m)
     }
     if (e->o->constructor != NULL) {
         struct text symbol = {0};
+        struct text symbol_name = {0};
         const char *name;
         target_c_symbol(&symbol, e->o->target, e->o->constructor);
-        name = text_cstr(&symbol);
-        if (target_info(e->o->target)->format == FORMAT_MACHO &&
-            name[0] == '_') {
-            name++;
-        }
+        text_symbol(&symbol_name, e->o->target, &symbol);
+        name = text_cstr(&symbol_name);
         text_appendf(&entries, "%s{ i32, ptr, ptr } { i32 65535, ptr ",
                      count++ > 0 ? ", " : "");
         llvm_name(&entries, '@', name);
@@ -3979,7 +3989,7 @@ static void constructors(struct emitter *e, const struct ir_module *m)
             llvm_name(&e->intrinsics, '@', name);
             text_append(&e->intrinsics, "() #1\n");
         }
-        text_free(&symbol);
+        text_free(&symbol_name);
     }
     if (count > 0) {
         text_appendf(e->out, "@llvm.global_ctors = appending global [%zu x "

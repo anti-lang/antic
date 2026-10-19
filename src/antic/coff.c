@@ -201,22 +201,24 @@ static int16_t section_number(const unsigned char *s)
 }
 
 /* The name of a symbol, from its field or from the string table. */
-static bool symbol_name(const struct object *o, uint32_t index,
-                        const char **name, size_t *length)
+/* The name of the symbol record s, from its eight bytes or from the
+   string table strings of strings_size bytes. Returns false for an offset
+   outside the table or a name without its NUL. */
+static bool record_name(const unsigned char *s, const char *strings,
+                        size_t strings_size, const char **name,
+                        size_t *length)
 {
-    const unsigned char *s = symbol_at(o, index);
-
     if (get(s, 4) == 0) {
         uint32_t offset = get(s + 4, 4);
         const char *end;
-        if (offset < 4 || offset >= o->strings_size) {
+        if (offset < 4 || offset >= strings_size) {
             return false;
         }
-        end = memchr(o->strings + offset, '\0', o->strings_size - offset);
+        end = memchr(strings + offset, '\0', strings_size - offset);
         if (end == NULL) {
             return false;
         }
-        *name = o->strings + offset;
+        *name = strings + offset;
         *length = (size_t)(end - *name);
         return true;
     }
@@ -226,6 +228,13 @@ static bool symbol_name(const struct object *o, uint32_t index,
         (*length)++;
     }
     return true;
+}
+
+static bool symbol_name(const struct object *o, uint32_t index,
+                        const char **name, size_t *length)
+{
+    return record_name(symbol_at(o, index), o->strings, o->strings_size, name,
+                       length);
 }
 
 static bool is_named(const char *name, size_t length, const char *wanted)
@@ -1135,30 +1144,16 @@ static bool object_symbols(const unsigned char *data, size_t size,
     for (i = 0; i < count; i++) {
         const unsigned char *sym = data + symbols_at + (size_t)SYMBOL_SIZE * i;
         uint32_t section = get(sym + 12, 2);
-        const char *name = (const char *)sym;
-        size_t length = 0;
+        const char *name;
+        size_t length;
         if (section > SECTION_MAX && section < SECTION_DEBUG) {
             return false;
         }
         if (sym[16] == CLASS_EXTERNAL &&
             (defined ? section > 0 && section <= SECTION_MAX
                      : section == 0 && get(sym + 8, 4) == 0)) {
-            if (get(sym, 4) == 0) {
-                uint32_t offset = get(sym + 4, 4);
-                const char *nul;
-                if (offset < 4 || offset >= strings_size) {
-                    return false;
-                }
-                name = strings + offset;
-                nul = memchr(name, '\0', strings_size - offset);
-                if (nul == NULL) {
-                    return false;
-                }
-                length = (size_t)(nul - name);
-            } else {
-                while (length < 8 && name[length] != '\0') {
-                    length++;
-                }
+            if (!record_name(sym, strings, strings_size, &name, &length)) {
+                return false;
             }
             if (!listed(out, name, length)) {
                 text_appendf(out, "%.*s\n", (int)length, name);

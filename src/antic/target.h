@@ -78,8 +78,13 @@ bool target_from_name(const char *name, enum target *t);
 void target_mangle(struct text *out, enum target t, const char *module,
                    const char *name);
 
+/* Append the C name of the function name, with each . written as _, as
+   every target spells it before the prefix of its format. */
+void target_c_name(struct text *out, const char *name);
+
 /* Append the symbol of the C function name as a C compiler for target t
-   writes it. Mach-O adds a leading _, and ELF and COFF keep the name. */
+   writes it. Mach-O adds a leading _ to the C name, and ELF and COFF keep
+   it. */
 void target_c_symbol(struct text *out, enum target t, const char *name);
 
 #endif

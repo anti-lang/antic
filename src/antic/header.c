@@ -674,6 +674,7 @@ static void variant_view(struct text *out, const struct symbol *sym,
    f16 crosses as its sixteen bits. */
 static void vector_typedef(struct text *out, const struct type *t)
 {
+    struct name name = types_c_name(t);
     const struct type *lane = types_simd_lane(t);
     const char *neon;
     const char *sse = "__m128i";
@@ -700,8 +701,8 @@ static void vector_typedef(struct text *out, const struct type *t)
                       "#else\n"
                       "typedef %s %.*s;\n"
                       "#endif\n\n",
-                 neon, (int)t->name.length, t->name.text, sse,
-                 (int)t->name.length, t->name.text);
+                 neon, (int)name.length, name.text, sse, (int)name.length,
+                 name.text);
 }
 
 /* An integer as a C literal that fits its type. The least int64_t has

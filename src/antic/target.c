@@ -138,14 +138,19 @@ void target_mangle(struct text *out, enum target t, const char *module,
 /* DESIGN: a C symbol is the name of the item, with the `_` that Mach-O
    puts in front. A function of a class carries the name `T.f`, and a dot
    is no C identifier, so the symbol of an exported one is `T_f`. */
-void target_c_symbol(struct text *out, enum target t, const char *name)
+void target_c_name(struct text *out, const char *name)
 {
     size_t i;
 
-    if (infos[t].format == FORMAT_MACHO) {
-        text_append(out, "_");
-    }
     for (i = 0; name[i] != '\0'; i++) {
         text_appendf(out, "%c", name[i] == '.' ? '_' : name[i]);
     }
+}
+
+void target_c_symbol(struct text *out, enum target t, const char *name)
+{
+    if (infos[t].format == FORMAT_MACHO) {
+        text_append(out, "_");
+    }
+    target_c_name(out, name);
 }
