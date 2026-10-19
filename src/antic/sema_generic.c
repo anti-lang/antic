@@ -2014,6 +2014,128 @@ static struct type *record_copy(struct checker *c, struct expr *call,
     return subst(c, fn, map);
 }
 
+/* Lay out map for the outer_count parameters of the class outer and the
+   own parameters of the generic it after them, with no argument yet. */
+static void open_map(struct checker *c, struct generic_map *map,
+                     const struct type *outer, size_t outer_count,
+                     const struct item *it, size_t own)
+{
+    struct type **params = types_alloc_array(c->arena, outer_count + own + 1,
+                                             sizeof *params);
+    size_t i;
+
+    memset(map, 0, sizeof *map);
+    map->types = c->types;
+    map->count = outer_count + own;
+    map->params = params;
+    map->args = types_alloc_array(c->arena, map->count + 1,
+                                  sizeof *map->args);
+    map->values = types_alloc_array(c->arena, map->count + 1,
+                                    sizeof *map->values);
+    for (i = 0; i < outer_count; i++) {
+        params[i] = outer->type_params[i];
+    }
+    for (i = 0; i < own; i++) {
+        params[outer_count + i] = it->type_params[i].type;
+    }
+}
+
+/* The class of the call gives its own parameters: the copy that
+   `List<int>.new()` names, or the copy the receiver is. A receiver of the
+   generic itself is `self` in its body, whose parameters stand as they
+   are. `List.new()` leaves them to inference. Fills the first
+   outer_count arguments of map and gives the class the call names, outer
+   itself for `self`, or NULL when inference gives them. */
+static struct type *class_args(struct generic_map *map, struct type *outer,
+                               size_t outer_count, size_t fixed,
+                               const struct generic_call *g)
+{
+    struct type *copy =
+        g->owner != NULL ? sema_copy_in_chain(g->owner, outer) : NULL;
+    size_t i;
+
+    if (copy == outer && fixed == 0) {
+        copy = NULL;
+    }
+    if (copy != NULL && copy != outer) {
+        for (i = 0; i < outer_count; i++) {
+            map->args[i] = copy->args[i];
+            map->values[i] = copy->values[i];
+        }
+        map->from = outer;
+        map->to = copy;
+    } else if (copy == outer) {
+        for (i = 0; i < outer_count; i++) {
+            struct type *p = outer->type_params[i];
+            map->args[i] = p->param->constant ? NULL : p;
+            map->values[i] = p->param->constant ? param_value(p) : NULL;
+        }
+    }
+    return copy;
+}
+
+/* DESIGN: inference reads the arguments of the call, in order, and never
+   the body or a later use of the result. An argument whose parameter
+   names an unbound parameter is checked without a type expected, and its
+   type binds what stands in the same place. The receiver of a generic
+   function called as `v.f(args)` is its first argument. by_receiver is
+   false for a function of a generic class, whose class gives its own
+   parameters. Gives the type of an argument that failed its check, or
+   NULL. */
+static struct type *infer(struct checker *c, struct expr *e,
+                          const struct type *fn, size_t fixed,
+                          bool by_receiver, const struct generic_map *map,
+                          const struct generic_call *g)
+{
+    size_t i;
+
+    for (i = 0; by_receiver && i < fixed && i < fn->param_count; i++) {
+        unify(fn->params[i], e->as.call.args[i]->type, map);
+    }
+    for (i = fixed; i < e->as.call.arg_count && i < fn->param_count; i++) {
+        struct type *p = subst(c, fn->params[i], map);
+        struct type *t;
+        size_t k;
+        bool open = false;
+        for (k = 0; k < map->count; k++) {
+            if (map->args[k] == NULL && map->values[k] == NULL &&
+                p != NULL && sema_has_params(p)) {
+                open = true;
+            }
+        }
+        if (!open) {
+            continue;
+        }
+        t = sema_check_expr(c, e->as.call.args[i], NULL);
+        g->prechecked[i] = t;
+        if (sema_is_error(t)) {
+            return t;
+        }
+        unify(p, t, map);
+    }
+    return NULL;
+}
+
+/* A copy of the class outer that inference completed replaces the class
+   in the signature, `List.new()` of `*List<T>` among them. */
+static void complete_class(struct checker *c, struct generic_map *map,
+                           struct type *outer, size_t outer_count,
+                           struct pos pos)
+{
+    struct type **args =
+        types_alloc_array(c->arena, outer_count + 1, sizeof *args);
+    const struct symbolic **values =
+        types_alloc_array(c->arena, outer_count + 1, sizeof *values);
+    size_t i;
+
+    for (i = 0; i < outer_count; i++) {
+        args[i] = map->args[i];
+        values[i] = map->values[i];
+    }
+    map->from = outer;
+    map->to = make_copy(c, outer, args, values, pos);
+}
+
 struct type *sema_generic_call(struct checker *c, struct expr *e,
                                struct type *fn, const struct symbol *sym,
                                size_t fixed, const struct generic_call *g)
@@ -2027,7 +2149,7 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
     size_t own = it != NULL ? it->type_param_count : 0;
     size_t outer_count = outer != NULL ? outer->type_param_count : 0;
     struct type *copy = NULL;
-    struct type **params;
+    struct type *failed;
     struct generic_map map;
     const struct name *name;
     size_t i;
@@ -2047,85 +2169,24 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
                       own == 1 ? "" : "s", g->count);
         return sema_builtin(c, TYPE_ERROR);
     }
-    params = types_alloc_array(c->arena, outer_count + own + 1,
-                               sizeof *params);
-    memset(&map, 0, sizeof map);
-    map.types = c->types;
-    map.count = outer_count + own;
-    map.params = params;
-    map.args = types_alloc_array(c->arena, map.count + 1, sizeof *map.args);
-    map.values = types_alloc_array(c->arena, map.count + 1,
-                                   sizeof *map.values);
-    for (i = 0; i < outer_count; i++) {
-        params[i] = outer->type_params[i];
-    }
-    for (i = 0; i < own; i++) {
-        params[outer_count + i] = it->type_params[i].type;
-    }
-    /* The class of the call gives its own parameters: the copy that
-       `List<int>.new()` names, or the copy the receiver is. A receiver
-       of the generic itself is `self` in its body, whose parameters stand
-       as they are. `List.new()` leaves them to inference. */
+    open_map(c, &map, outer, outer_count, it, own);
     if (outer != NULL) {
-        copy = g->owner != NULL ? sema_copy_in_chain(g->owner, outer) : NULL;
-        if (copy == outer && fixed == 0) {
-            copy = NULL;
-        }
-        if (copy != NULL && copy != outer) {
-            for (i = 0; i < outer_count; i++) {
-                map.args[i] = copy->args[i];
-                map.values[i] = copy->values[i];
-            }
-            map.from = outer;
-            map.to = copy;
-        } else if (copy == outer) {
-            for (i = 0; i < outer_count; i++) {
-                struct type *p = outer->type_params[i];
-                map.args[i] = p->param->constant ? NULL : p;
-                map.values[i] = p->param->constant ? param_value(p) : NULL;
-            }
-        }
+        copy = class_args(&map, outer, outer_count, fixed, g);
     }
     for (i = 0; i < g->count; i++) {
-        if (!resolve_arg(c, name, params[outer_count + i], g->written[i],
+        if (!resolve_arg(c, name, map.params[outer_count + i], g->written[i],
                          &map.args[outer_count + i],
                          &map.values[outer_count + i])) {
             return sema_builtin(c, TYPE_ERROR);
         }
     }
-    /* DESIGN: inference reads the arguments of the call, in order, and
-       never the body or a later use of the result. An argument whose
-       parameter names an unbound parameter is checked without a type
-       expected, and its type binds what stands in the same place. The
-       receiver of a generic function called as `v.f(args)` is its first
-       argument. */
-    for (i = 0; outer == NULL && i < fixed && i < fn->param_count; i++) {
-        unify(fn->params[i], e->as.call.args[i]->type, &map);
-    }
-    for (i = fixed; i < e->as.call.arg_count && i < fn->param_count; i++) {
-        struct type *p = subst(c, fn->params[i], &map);
-        struct type *t;
-        size_t k;
-        bool open = false;
-        for (k = 0; k < map.count; k++) {
-            if (map.args[k] == NULL && map.values[k] == NULL &&
-                p != NULL && sema_has_params(p)) {
-                open = true;
-            }
-        }
-        if (!open) {
-            continue;
-        }
-        t = sema_check_expr(c, e->as.call.args[i], NULL);
-        g->prechecked[i] = t;
-        if (sema_is_error(t)) {
-            return t;
-        }
-        unify(p, t, &map);
+    failed = infer(c, e, fn, fixed, outer == NULL, &map, g);
+    if (failed != NULL) {
+        return failed;
     }
     for (i = 0; i < map.count; i++) {
         if (map.args[i] == NULL && map.values[i] == NULL) {
-            const struct type *p = params[i];
+            const struct type *p = map.params[i];
             if (i < outer_count && copy == outer) {
                 continue;
             }
@@ -2141,19 +2202,8 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
     }
     meets_all(c, &map, outer_count, outer != NULL ? &outer->name : NULL, name,
               e->pos);
-    /* A copy of the class that inference completed replaces the class in
-       the signature, `List.new()` of `*List<T>` among them. */
     if (outer != NULL && map.to == NULL && copy != outer) {
-        struct type **args =
-            types_alloc_array(c->arena, outer_count + 1, sizeof *args);
-        const struct symbolic **values =
-            types_alloc_array(c->arena, outer_count + 1, sizeof *values);
-        for (i = 0; i < outer_count; i++) {
-            args[i] = map.args[i];
-            values[i] = map.values[i];
-        }
-        map.from = outer;
-        map.to = make_copy(c, outer, args, values, e->pos);
+        complete_class(c, &map, outer, outer_count, e->pos);
     }
     return record_copy(c, e, fn, &map);
 }
