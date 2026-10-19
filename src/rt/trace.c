@@ -140,51 +140,54 @@ static struct anti_text notice_id(const char *notice, size_t room)
 
 /* DESIGN: the files a symbol lookup reads stay in memory for the life of
    the program. They are the binaries of the modules on Linux and the
-   objects of the debug map on macOS, a few of each. A second trace would
-   read them again for nothing. ANTI_RT_LOCK_TRACE_FILES guards them and
-   the build ids of the Mach-O images below. */
+   objects of the debug map on macOS, where a dev build has one object
+   per module. A second trace would read them again for nothing. The list
+   has no bound, since a file past one would never be read and its frames
+   would lose their lines. ANTI_RT_LOCK_TRACE_FILES guards it and the
+   build ids of the Mach-O images below. */
 struct loaded {
+    struct loaded *next;
     char *path;
     uint8_t *bytes;
     size_t size;
 };
 
-enum { LOADED_MAX = 32 };
-
-static struct loaded files[LOADED_MAX];
-static size_t file_count;
+static struct loaded *files;
 
 /* The bytes of the file at path, read whole, or NULL. The relocations of
    a Mach-O object are resolved once, as it is read. */
 static const struct loaded *load(const char *path, bool object)
 {
     const struct loaded *found = NULL;
-    size_t i;
+    struct loaded *l;
 
     anti_rt_lock_hold(ANTI_RT_LOCK_TRACE_FILES);
-    for (i = 0; i < file_count; i++) {
-        if (strcmp(files[i].path, path) == 0) {
-            found = files[i].bytes != NULL ? &files[i] : NULL;
+    for (l = files; l != NULL; l = l->next) {
+        if (strcmp(l->path, path) == 0) {
+            found = l->bytes != NULL ? l : NULL;
             anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
             return found;
         }
     }
-    if (file_count < LOADED_MAX) {
-        struct loaded *l = &files[file_count];
+    l = malloc(sizeof *l);
+    if (l != NULL) {
         int64_t size = 0;
         l->path = malloc(strlen(path) + 1);
-        if (l->path != NULL) {
+        if (l->path == NULL) {
+            free(l);
+        } else {
             memcpy(l->path, path, strlen(path) + 1);
-            file_count++;
             /* A file that cannot be read whole leaves the entry without
                bytes, so it is not tried again. */
             l->bytes = anti_rt_fs_read(path, &size);
             l->size = l->bytes != NULL ? (size_t)size : 0;
+            if (l->bytes != NULL && object) {
+                anti_rt_macho_relocate(l->bytes, l->size);
+            }
+            l->next = files;
+            files = l;
+            found = l->bytes != NULL ? l : NULL;
         }
-        if (l->bytes != NULL && object) {
-            anti_rt_macho_relocate(l->bytes, l->size);
-        }
-        found = l->path != NULL && l->bytes != NULL ? l : NULL;
     }
     anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
     return found;
@@ -205,16 +208,14 @@ static intptr_t image_slide(const uint8_t *header)
 
 /* The build ids the capture found, by the header of each image, so the
    symbol table of an image is read once. Each id is a kept copy, which
-   outlives the image. */
+   outlives the image. The list has no bound, as the list of files. */
 struct known_id {
+    struct known_id *next;
     const uint8_t *header;
     struct anti_text id;
 };
 
-enum { KNOWN_MAX = 32 };
-
-static struct known_id known[KNOWN_MAX];
-static size_t known_count;
+static struct known_id *known;
 
 /* The build id of the Mach-O image at header, read by the symbol
    `anti_licenses`, which only an Anti binary has. An image of the system
@@ -226,12 +227,12 @@ static struct anti_text macho_id(const uint8_t *header)
     uint32_t flags;
     uint64_t vaddr;
     intptr_t slide;
-    size_t i;
+    struct known_id *k;
 
     anti_rt_lock_hold(ANTI_RT_LOCK_TRACE_FILES);
-    for (i = 0; i < known_count; i++) {
-        if (known[i].header == header) {
-            id = known[i].id;
+    for (k = known; k != NULL; k = k->next) {
+        if (k->header == header) {
+            id = k->id;
             anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
             return id;
         }
@@ -245,10 +246,14 @@ static struct anti_text macho_id(const uint8_t *header)
                        SIZE_MAX);
         id = keep_in(&kept_paths, (const char *)id.ptr, (size_t)id.len);
     }
-    if (known_count < KNOWN_MAX) {
-        known[known_count].header = header;
-        known[known_count].id = id;
-        known_count++;
+    /* An id without room for its entry is read again by the next
+       capture. */
+    k = malloc(sizeof *k);
+    if (k != NULL) {
+        k->header = header;
+        k->id = id;
+        k->next = known;
+        known = k;
     }
     anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
     return id;

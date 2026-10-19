@@ -63,7 +63,7 @@ of a frame points into an image.
 
 The build id comes from the notice of the module. macOS reads the symbol
 `anti_licenses` from the symbol table of the image in memory and keeps the
-answer per image, for the first 32 images. An image of the system cache is never read. Linux takes the
+answer per image. An image of the system cache is never read. Linux takes the
 notice of its own image through a weak reference, and the one of another
 image from the symbol table of its file. Windows takes its own through
 `/alternatename`, which names an empty default when nothing defines the
@@ -82,8 +82,8 @@ and on its line.
   function by its `N_FUN` entries, and the line table of the object at the
   same offset into the function. The object is read whole once and kept, and
   its relocations of `__debug_line` are resolved in place. The traces of a
-  program keep at most 32 such files, the binaries of Linux among them, and a
-  file past them is not read, so its frames get no line.
+  program keep every such file they read, the binaries of Linux among them,
+  for the life of the program.
 - ELF. The function is the nearest symbol of an executable section, and the
   line comes from `.debug_line`. Both are read from the file of the module.
   Every build keeps its symbol table there, and a `-g` build its line table.
