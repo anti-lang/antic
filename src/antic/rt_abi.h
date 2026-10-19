@@ -363,7 +363,8 @@ const char *rt_name(enum rt_function f);
     F(RT_FUNCTION_NAME_LENGTH, name_length, I64)                           \
     F(RT_FUNCTION_SLOT, slot, I64)                                         \
     F(RT_FUNCTION_PARAM_COUNT, param_count, I64)                           \
-    F(RT_FUNCTION_SIGNATURE, signature, PTR)
+    F(RT_FUNCTION_SIGNATURE, signature, PTR)                               \
+    F(RT_FUNCTION_SIGNATURE_LENGTH, signature_length, I64)
 
 /* struct anti_versions of src/rt/object.h, the chain and the floor of an
    abstract class. */
@@ -393,6 +394,7 @@ const char *rt_name(enum rt_function f);
 /* struct anti_trampoline of src/rt/reflect.h. */
 #define RT_TRAMPOLINE_RECORD(F)                                            \
     F(RT_TRAMPOLINE_SIGNATURE, signature, PTR)                             \
+    F(RT_TRAMPOLINE_SIGNATURE_LENGTH, signature_length, I64)               \
     F(RT_TRAMPOLINE_CALL, call, PTR)
 
 /* struct anti_trampolines of src/rt/reflect.h. */

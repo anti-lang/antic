@@ -1,8 +1,7 @@
 /* reflect.call, which reads the trampolines of a program. */
 
-#include <string.h>
-
 #include "reflect.h"
+#include "std.h"
 
 /* DESIGN: the reasons come in the order of the checks. The index and
    the entry come first, then a signature with a type that no Value
@@ -35,8 +34,8 @@ int64_t anti_rt_reflect_call(void *object, int64_t index, const void *args,
     }
     for (i = 0; i < anti_rt_trampolines.count; i++) {
         const struct anti_trampoline *t = &anti_rt_trampolines.items[i];
-        if (strcmp((const char *)t->signature,
-                   (const char *)f->signature) == 0) {
+        if (anti_rt_same_bytes(t->signature, t->signature_length,
+                               f->signature, f->signature_length)) {
             return t->call(entry, o, args, count, result)
                        ? ANTI_REFLECT_DONE
                        : ANTI_REFLECT_WRONG_KIND;

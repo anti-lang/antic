@@ -349,6 +349,10 @@ static void damaged_lists(void)
     REFUSED();
     functions->slot = -1;
     REFUSED();
+    functions->signature_length = -1;
+    REFUSED();
+    functions->signature_length = 3;
+    REFUSED();
     fields->name = NULL;
     REFUSED();
     fields->offset = 4096;

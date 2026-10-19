@@ -1294,7 +1294,8 @@ static void runtime_types(void)
         "type anti.rt.Field = struct { name: ptr, name_length: i64, "
         "offset: i64, type: i64, owned: i64, descriptor: ptr }\n",
         "type anti.rt.Function = struct { name: ptr, name_length: i64, "
-        "slot: i64, param_count: i64, signature: ptr }\n",
+        "slot: i64, param_count: i64, signature: ptr, "
+        "signature_length: i64 }\n",
     };
     struct lowered l;
     struct text out = {0};

@@ -114,6 +114,7 @@ int64_t anti_rt_reflect_set(void *object, const struct anti_descriptor *d,
    gives 0 when the values do not fit. */
 struct anti_trampoline {
     const unsigned char *signature;
+    int64_t signature_length;
     int8_t (*call)(const void *entry, void *object, const void *args,
                    int64_t count, void *result);
 };

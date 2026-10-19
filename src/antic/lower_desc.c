@@ -979,12 +979,18 @@ static struct ir_global *class_functions(struct lowerer *l,
                 ? fn->symbol->type->param_count
                 : 1;
         item->items[RT_FUNCTION_SIGNATURE].scalar = IR_PTR;
+        item->items[RT_FUNCTION_SIGNATURE_LENGTH].kind = IR_CONST_INT;
+        item->items[RT_FUNCTION_SIGNATURE_LENGTH].scalar = IR_I64;
         if (signature != NULL) {
             item->items[RT_FUNCTION_SIGNATURE].kind = IR_CONST_ADDR;
             item->items[RT_FUNCTION_SIGNATURE].global = signature->index;
+            /* The text without the NUL that ends it for antic. */
+            item->items[RT_FUNCTION_SIGNATURE_LENGTH].integer =
+                signature->size - 1;
         } else {
             item->items[RT_FUNCTION_SIGNATURE].kind = IR_CONST_INT;
             item->items[RT_FUNCTION_SIGNATURE].integer = 0;
+            item->items[RT_FUNCTION_SIGNATURE_LENGTH].integer = 0;
         }
         value->items[i] = *item;
     }

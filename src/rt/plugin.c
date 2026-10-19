@@ -718,6 +718,7 @@ static int descriptor_sound(const struct anti_descriptor *d,
         const struct anti_function *f = &d->functions[i];
         if (!text_sound(f->name, f->name_length) || f->slot < 0 ||
             f->param_count < 0 ||
+            !text_sound(f->signature, f->signature_length) ||
             (f->signature != NULL &&
              anti_rt_plugin_image(f->signature) == NULL)) {
             return 0;

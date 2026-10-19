@@ -29,7 +29,7 @@ static const int64_t chain[1] = {1};
 /* One public function and one field of the class, which the test damages
    as it damages the table. */
 EXPORTED struct anti_function anti_bad_functions[1] = {
-    {(const unsigned char *)"words", 5, 8, 0, NULL}
+    {(const unsigned char *)"words", 5, 8, 0, NULL, 0}
 };
 
 EXPORTED struct anti_field anti_bad_fields[1] = {

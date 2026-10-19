@@ -2039,12 +2039,12 @@ type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, siz
 ...
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 ...
-type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr }
+type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr, signature_length: i64 }
 ```
 
 - A descriptor has 17 words, 136 bytes. `depth` and `ancestors` serve `is` and `as`. `offset` is the distance from an interface part to its object. `version` and `versions` serve the plugin loader of [chapter 15]({{% relref "15-hooks" %}}).
 - A field record has 6 words, 48 bytes: the name, the offset, a type id and the `own` mark. For an inline struct or class it also holds the descriptor of that type.
-- A function record has 5 words, 40 bytes: the name, the slot in the table, the count of parameters and the text of the signature.
+- A function record has 6 words, 48 bytes: the name, the slot in the table, the count of parameters and the signature with its length.
 
 `get` and `set` read a field record and copy the bytes at its offset, by the type id. `call` needs code, since it must pass a `[]Value` as the arguments of a real call. The whole-program pass writes one trampoline per distinct signature of the program.
 

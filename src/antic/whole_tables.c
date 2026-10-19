@@ -520,6 +520,8 @@ void whole_write_trampolines(struct ir_module *m, bool full)
         item = ir_const_agg(m, ir_aggregate(item_agg),
                             RT_TRAMPOLINE_ITEM_COUNT);
         const_addr(&item->items[RT_TRAMPOLINE_SIGNATURE], text);
+        const_int(&item->items[RT_TRAMPOLINE_SIGNATURE_LENGTH], IR_I64,
+                  strlen(seen[i]));
         item->items[RT_TRAMPOLINE_CALL].kind = IR_CONST_FUNC;
         item->items[RT_TRAMPOLINE_CALL].scalar = IR_PTR;
         item->items[RT_TRAMPOLINE_CALL].global = function;
