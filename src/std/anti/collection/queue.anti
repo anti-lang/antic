@@ -72,7 +72,7 @@ pub class PriorityQueue<T: Ordered> inherits collection.Indexed<T>
 
 	operator fn iter(self) -> QueueWalk<T>
 	{
-		return QueueWalk<T> { watch: self.watch(), queue: self };
+		return QueueWalk<T>.over(self, self.watch());
 	}
 
 	/// Lend the element at `at` to `f` and move it to where its new value
@@ -256,12 +256,19 @@ pub operator fn hash<T: Ordered + hash>(a: PriorityQueue<T>) -> u64
 /// the order of the array. The loop tears each copy down.
 pub class QueueWalk<T: Ordered>
 {
-	/// The watch that traps a change of the queue while the loop walks it.
-	pub watch: lang.Watch,
-	/// The queue the loop walks.
-	pub queue: *PriorityQueue<T>,
+	/* DESIGN: the fields are private, and `over` alone sets them, as for
+	   `IndexedWalk` and `SlotsWalk`. */
+	watch: lang.Watch,
+	queue: *PriorityQueue<T>,
 	/// The position of the element of this turn, -1 before the first.
-	pub at: int = -1,
+	at: int = -1,
+
+	/// A walk of the elements of `queue` in the order of its array, which
+	/// `watch` guards.
+	pub fn over(queue: *PriorityQueue<T>, watch: lang.Watch) -> QueueWalk<T>
+	{
+		return QueueWalk<T> { watch: watch, queue: queue };
+	}
 
 	operator fn next(self) -> bool
 	{

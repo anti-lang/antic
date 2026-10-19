@@ -1,0 +1,13 @@
+//! The fields of the walk of a priority queue are private to `QueueWalk<T>`, as
+//! those of the walk of a pool are. A program that wrote `at` would read a
+//! place the walk never reached.
+
+import anti.collection.queue.{PriorityQueue};
+
+fn main() -> int
+{
+	let xs = PriorityQueue<int>.new();
+	let w = xs.iter();
+	w.at = 1000;
+	return 0;
+}

@@ -1,0 +1,1 @@
+modules_walk_of_a_queue_moved_outside.anti:11:2: error: `at` is private to `QueueWalk<int>`
