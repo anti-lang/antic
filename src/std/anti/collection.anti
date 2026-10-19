@@ -610,7 +610,9 @@ pub abstract class Collection<T>
 	}
 
 	/// Tear down the element at `p`, which the collection then forgets.
-	protected fn destroy_element(self, p: *T)
+	///
+	/// The collection hands the element over with the call, so `p` is `own`.
+	protected fn destroy_element(self, own p: *T)
 	{
 		destroy(p);
 	}

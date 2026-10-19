@@ -98,7 +98,7 @@ export fn radius(c: *Circle) -> f32
 	return c.r;
 }
 
-export fn drop(c: *Circle)
+export fn drop(own c: *Circle)
 {
 	delete(c);
 }
@@ -442,7 +442,7 @@ export fn meter(start: int) -> *Meter
 	return alloc Meter(start);
 }
 
-export fn end(m: *Meter)
+export fn end(own m: *Meter)
 {
 	delete(m);
 }
@@ -604,7 +604,7 @@ b0:
     call void @anti_rt_hook(%1, 256)
     ret ptr %1
 }
-export fn build.end(%0: ptr nonnull deref(size_of build.Meter)) {
+export fn build.end(%0: ptr nonnull deref(size_of build.Meter) own) {
 b0:
     %1 = addr @build.anti_Meter_descriptor
     call void @anti_rt_delete(%0, %1)

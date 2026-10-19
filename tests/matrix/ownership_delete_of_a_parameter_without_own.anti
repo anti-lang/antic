@@ -1,0 +1,20 @@
+//! `delete` of a parameter without `own`, by R083 of "Answers of 2026-10-18".
+//! The object belongs to the caller, and a function deletes only what it
+//! received as `own`.
+
+class Key
+{
+	pub n: int = 0,
+}
+
+fn drop(k: *Key)
+{
+	delete(k);
+}
+
+fn main() -> int
+{
+	let k = alloc Key { n: 1 };
+	drop(k);
+	return 0;
+}

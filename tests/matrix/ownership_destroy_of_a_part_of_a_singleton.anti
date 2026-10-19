@@ -1,5 +1,5 @@
-//! `destroy(&x.part)` of a part of a local is refused, and a part of a
-//! singleton is no part of a local. The `destruct` of the part runs.
+//! `destroy` of a part of a singleton, by R083 of "Answers of 2026-10-18". The
+//! singleton outlives the program, and so do its parts.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

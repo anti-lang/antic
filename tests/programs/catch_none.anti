@@ -52,7 +52,7 @@ fn make(n: int) -> *Box may fail
 }
 
 /// Print what the call gave and how many errors are alive.
-fn report(name: str, b: ?*Box)
+fn report(name: str, own b: ?*Box)
 {
 	if b != none {
 		printf("%s box %d live %d\n".ptr, name.ptr, b.n as c_int,

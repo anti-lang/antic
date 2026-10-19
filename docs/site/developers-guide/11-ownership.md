@@ -106,7 +106,7 @@ fn each(s: *Sprite, f: fn(lent *Sprite))
 	}
 }
 
-fn drop(s: *Sprite)
+fn drop(own s: *Sprite)
 {
 	delete(s);
 }
@@ -305,10 +305,10 @@ define hidden void @owners.brighten(ptr noundef nonnull dereferenceable(56) %p0,
 ...
 define hidden noundef i64 @owners.sum(i64 %p0.0, i64 %p0.1) #0 {
 ...
-define hidden void @owners.drop(ptr noundef nonnull dereferenceable(56) %p0) #0 {
+define hidden void @owners.drop(ptr noalias noundef nonnull dereferenceable(56) %p0) #0 {
 ```
 
-`brighten` takes a `lent *Sprite` and `drop` a plain `*Sprite`. Both parameters are the same `ptr` with the same attributes. The `lent []byte` of `sum` is the two words of every slice, the address in `%p0.0` and the length in `%p0.1`.
+`brighten` takes a `lent *Sprite` and `drop` an `own *Sprite`, since a function deletes only what it received as `own`. Both parameters are the same `ptr`. The `own` of `drop` adds `noalias`, since the function took the object over and no other pointer of it reaches the object. The `lent []byte` of `sum` is the two words of every slice, the address in `%p0.0` and the length in `%p0.1`.
 
 `own` reaches the code through two functions that antic writes for every class: a teardown named `<Class>.destroy` and a copy named `<Class>.copy`. The table of the class holds both. `delete(s)` is one call, `anti_rt_delete(s, descriptor)`. The runtime reads the teardown from the table of the object and calls it, then frees the object.
 
@@ -1307,12 +1307,14 @@ The word before a parameter says who owns the argument after the call. No word m
 | Parameter | What the call passes | Who tears the value down | What the function may do with it |
 |---|---|---|---|
 | `b: Box` | the bytes of the value | the caller | read it, change its own bytes, pass it to a parameter of the same kind, copy it with `dup(b)` |
-| `p: *Box` | the address | no one, at this call | read and change the object, store the pointer, return it |
+| `p: *Box` | the address | no one, at this call | read and change the object, store the pointer, return it, but neither `delete` nor `destroy` it |
 | `lent p: *Box` | the address | no one, at this call | read and change the object, pass the pointer to a `lent` parameter |
 | `own b: Box` | the value itself, by a move | the function, at every exit | everything a local allows: bind it, store it, return it, pass it on |
 | `own p: *Box` | the address, and the caller's name is dead | no one by itself | everything, and `delete(p)` is the function's to write |
 
 A parameter without `own` **belongs to the caller**. Where its value owns something, the function gets the bytes, and the ownership stays with the caller. The checker refuses every way that would give the value a second owner. Those are `let`, `=`, a tuple, struct, class or variant literal, an `own` argument and `return`. The message names the two fixes, `own` on the parameter and `dup(b)`. In generic code the same holds for a parameter whose type is a type parameter, since the `T` of a copy may own something.
+
+A function deletes or destroys only what it received as `own`. `delete(p)` and `destroy(p)` of a parameter without `own` are refused, and so is `destroy(&b)`, with a message that names `own`. A part of a singleton lives as long as the program, so `delete` and `destroy` refuse it too. `free` stays for memory from C.
 
 A write to a field of such a parameter changes the bytes the function received. The caller's value keeps its field. What the value owns is shared for the length of the call, so a write through an `own` pointer of the parameter reaches the caller's memory.
 

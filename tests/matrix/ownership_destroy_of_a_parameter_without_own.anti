@@ -1,0 +1,24 @@
+//! `destroy` of a parameter without `own`, by R083 of "Answers of 2026-10-18".
+//! The value belongs to the caller, and a function destroys only what it
+//! received as `own`.
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn end(k: *Key)
+{
+	destroy(k);
+}
+
+fn main() -> int
+{
+	let k = Key { n: 1 };
+	end(&k);
+	return 0;
+}

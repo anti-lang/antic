@@ -1,0 +1,20 @@
+//! `destroy(&v)` of a value parameter without `own`, by R083 of "Answers of
+//! 2026-10-18". The value owns nothing, so no copy of it is at stake, and the
+//! function still destroys only what it received as `own`.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn end(p: Point)
+{
+	destroy(&p);
+}
+
+fn main() -> int
+{
+	end(Point { x: 1, y: 2 });
+	return 0;
+}

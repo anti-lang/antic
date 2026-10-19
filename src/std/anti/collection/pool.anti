@@ -381,8 +381,8 @@ pub abstract class Slots<T> inherits collection.Collection<T>
 	/// Replace the element of the slot `i` with `x` and count a change of it.
 	fn replace(self, i: int, own x: T)
 	{
+		self.destroy_element(self.element(i));
 		let p = self.element(i);
-		self.destroy_element(p);
 		memset(p as ?*byte, 0, size_of(T) as c_size_t);
 		*p = x;
 		self.bump(i);

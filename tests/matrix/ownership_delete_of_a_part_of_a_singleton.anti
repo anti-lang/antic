@@ -1,0 +1,23 @@
+//! `delete` of an `own` field of a singleton, by R083 of "Answers of
+//! 2026-10-18". The singleton outlives the program, and so do its parts.
+
+class Part
+{
+	pub n: int = 4,
+}
+
+singleton class Config
+{
+	pub own part: *Part,
+
+	fn construct(self)
+	{
+		self.part = alloc Part { };
+	}
+}
+
+fn main() -> int
+{
+	delete(Config.get().part);
+	return 0;
+}

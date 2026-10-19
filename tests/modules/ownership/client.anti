@@ -27,7 +27,6 @@ fn plain()
 	printf("?? %d\n".ptr, ownership.run_none_or(p, copy) as c_int);
 	printf("p?.x %d\n".ptr, ownership.run_chain(p) as c_int);
 	printf("destroy %d\n".ptr, ownership.run_destroy(copy) as c_int);
-	free(copy);
 	printf("delete %d\n".ptr, ownership.run_delete(p) as c_int);
 	printf("&x and *p %d\n".ptr, ownership.run_address_and_read(4) as c_int);
 	let all = ownership.run_to_slice(5);

@@ -2238,6 +2238,52 @@ static struct type *check_struct_lit(struct checker *c, struct expr *e,
                : sema_builtin(c, TYPE_ERROR);
 }
 
+/* DESIGN: R083 of "Answers of 2026-10-18". A function deletes or
+   destroys only what it received as `own`. A parameter without `own`
+   belongs to the caller, as `p` and as `&p`, and a part of a singleton
+   lives as long as the singleton, which outlives the program. A lent
+   parameter keeps the message of a lent pointer. A part of
+   any other value is the business of its owner, whose `own` fields the
+   program may end. Returns whether the operand of e is refused. */
+static bool refuse_ending(struct checker *c, const struct expr *e,
+                          const char *what)
+{
+    const struct expr *place = e->as.object.operand;
+    const struct expr *root;
+
+    if (place->kind == EXPR_UNARY && place->as.unary.op == TOKEN_AMP) {
+        place = place->as.unary.operand;
+    }
+    if (place->kind == EXPR_NAME && place->symbol != NULL &&
+        place->symbol->kind == SYMBOL_PARAM && !place->symbol->own_param &&
+        !types_is_lent(place->type)) {
+        sema_error_at(c, place->pos, "`%.*s` belongs to the caller, so `%s` "
+                      "does not take it. Mark it `own` to take it over",
+                      (int)place->symbol->name.length,
+                      place->symbol->name.text, what);
+        return true;
+    }
+    for (root = place;
+         (root->kind == EXPR_FIELD && root->symbol == NULL) ||
+         root->kind == EXPR_INDEX;) {
+        const struct expr *base = root->kind == EXPR_FIELD
+                                      ? root->as.field.base
+                                      : root->as.index.base;
+        const struct type *t = base->type;
+        if (t != NULL && t->kind == TYPE_POINTER) {
+            t = t->element;
+        }
+        if (sema_singleton_type(t)) {
+            sema_error_at(c, place->pos, "a part of the singleton `%s` lives "
+                          "as long as the program, so `%s` does not take it",
+                          sema_tn(t), what);
+            return true;
+        }
+        root = base;
+    }
+    return false;
+}
+
 /* DESIGN: `dup` of a class pointer copies an object of its concrete
    class and gives a pointer of the static type back, since it reads
    the table of the object. `delete` runs the destruct chain and frees
@@ -2274,6 +2320,9 @@ static struct type *check_object(struct checker *c, struct expr *e)
        holds for it, as `delete` frees an object on the heap. */
     if (e->as.object.op == TOKEN_DELETE && types_is_chan(t)) {
         struct expr *operand = e->as.object.operand;
+        if (refuse_ending(c, e, what)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
         e->kind = EXPR_SYNC_OP;
         memset(&e->as, 0, sizeof e->as);
         e->as.sync_op.op = SYNC_CHAN_DELETE;
@@ -2363,7 +2412,8 @@ static struct type *check_object(struct checker *c, struct expr *e)
                           "so `%s` does not take it", what);
             return sema_builtin(c, TYPE_ERROR);
         }
-        return sema_builtin(c, TYPE_VOID);
+        return refuse_ending(c, e, what) ? sema_builtin(c, TYPE_ERROR)
+                                         : sema_builtin(c, TYPE_VOID);
     }
     if (e->as.object.op == TOKEN_DESTROY && t->kind != TYPE_POINTER) {
         sema_error_at(c, e->as.object.operand->pos,
@@ -2384,8 +2434,11 @@ static struct type *check_object(struct checker *c, struct expr *e)
                       "does not take it", what);
         return sema_builtin(c, TYPE_ERROR);
     }
-    return e->as.object.op == TOKEN_DUP ? types_unlent(c->types, t)
-                                        : sema_builtin(c, TYPE_VOID);
+    if (e->as.object.op == TOKEN_DUP) {
+        return types_unlent(c->types, t);
+    }
+    return refuse_ending(c, e, what) ? sema_builtin(c, TYPE_ERROR)
+                                     : sema_builtin(c, TYPE_VOID);
 }
 
 static struct type *check_expr_inner(struct checker *c, struct expr *e,

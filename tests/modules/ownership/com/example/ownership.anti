@@ -160,15 +160,18 @@ pub fn gen_delete<T>(own p: *Slot<T>) -> int
 	return Node.alive();
 }
 
-/// The nodes alive after the `destroy`. The memory stays with the caller.
-pub fn run_destroy(p: *Node) -> int
+/// The nodes alive after the `destroy`, which takes `p` over. The memory goes
+/// back to the C library after it.
+pub fn run_destroy(own p: *Node) -> int
 {
 	destroy(p);
-	return Node.live.load();
+	let live = Node.live.load();
+	free(p);
+	return live;
 }
 
 /// The nodes alive after the `destroy` of the value at `p`.
-pub fn gen_destroy<T>(p: *T) -> int
+pub fn gen_destroy<T>(own p: *T) -> int
 {
 	destroy(p);
 	return Node.alive();

@@ -65,8 +65,8 @@ pub class Grid<T> inherits collection.Indexed<T>
 	/// now owns. The element it replaces is torn down.
 	operator fn set_index(self, x: int, y: int, own v: T)
 	{
+		self.destroy_element(self.cell(x, y));
 		let p = self.cell(x, y);
-		self.destroy_element(p);
 		memset(p as ?*byte, 0, size_of(T) as c_size_t);
 		let items = self.items catch fatal;
 		items[y * self.width + x] = v;

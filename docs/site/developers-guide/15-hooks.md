@@ -101,7 +101,7 @@ export fn make(id: int) -> *Plain
 	return alloc Plain { id: id };
 }
 
-export fn drop(p: *Plain)
+export fn drop(own p: *Plain)
 {
 	delete(p);
 }

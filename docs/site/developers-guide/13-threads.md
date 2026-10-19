@@ -276,7 +276,7 @@ fn run(c: *Cell)
 //! error: `finish` is a `worker fn` and cannot `delete` an object another one may hold
 class Cell { pub n: int = 0, }
 
-fn end(c: *Cell) { delete(c); }
+fn end(own c: *Cell) { delete(c); }
 
 worker fn finish(c: *Cell) { end(c); }
 
@@ -952,7 +952,7 @@ fn run(a: chan int, n: int)
 //! error: `finish` is a `worker fn` and cannot `delete` an object another one may hold
 class Cell { pub n: int = 0, }
 
-worker fn finish(c: *Cell, out: chan int) { delete(out); }
+worker fn finish(c: *Cell, own out: chan int) { delete(out); }
 
 fn run(c: *Cell)
 {

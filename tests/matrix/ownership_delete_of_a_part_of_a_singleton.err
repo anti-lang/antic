@@ -1,0 +1,1 @@
+ownership_delete_of_a_part_of_a_singleton.anti:21:9: error: a part of the singleton `Config` lives as long as the program, so `delete` does not take it

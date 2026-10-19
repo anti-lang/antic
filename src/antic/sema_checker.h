@@ -157,10 +157,9 @@ struct checker {
     const struct stmt *loops_open[LOOPS_OPEN_MAX];
     struct stmt *fallthrough;   /* the one that ends the arm checked now */
     bool atomic_place;          /* the place of an atomic operation */
-    /* The operand of `delete` or `destroy`. `destroy(&Config.get().part)`
-       of a part of a singleton stays as it is until Eddie decides R083
-       of "Rules of 2026-10-13", so the address of a singleton field
-       there is taken. */
+    /* The operand of `delete` or `destroy`, whose address a field of a
+       singleton gives there. R083 of "Answers of 2026-10-18" then refuses
+       the part of the singleton with a message of its own. */
     bool ending_object;
     bool program;               /* the build writes a program, not a library */
     struct handler_state handler;   /* the handler under check */

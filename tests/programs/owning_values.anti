@@ -110,7 +110,7 @@ fn copy_of<T>(p: *T) -> T
 }
 
 /// Tear down the value at `p` in place.
-fn clear<T>(p: *T)
+fn clear<T>(own p: *T)
 {
 	destroy(p);
 }

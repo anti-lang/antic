@@ -97,8 +97,8 @@ pub class List<T> inherits collection.Indexed<T>
 	/// element it replaces is torn down.
 	operator fn set_index(self, i: int, own x: T)
 	{
+		self.destroy_element(self.element(i));
 		let p = self.element(i);
-		self.destroy_element(p);
 		memset(p as ?*byte, 0, size_of(T) as c_size_t);
 		let items = self.items catch fatal;
 		items[i] = x;
