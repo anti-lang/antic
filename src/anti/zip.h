@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "text.h"
 
@@ -38,14 +39,15 @@ struct zip_archive {
 };
 
 /* One entry of the central directory. The data of the entry stands at
-   offset in bytes, packed as method says. */
+   offset in bytes, packed as method says. crc and method keep the widths
+   of their fields in the format. */
 struct zip_item {
     struct text name;
     size_t offset;
     size_t packed;
     size_t size;
-    unsigned long crc;
-    unsigned method;
+    uint32_t crc;
+    uint16_t method;
 };
 
 /* Read the archive at path. The reader takes the stored entries of a

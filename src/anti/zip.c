@@ -34,7 +34,7 @@ enum { ZIP_DATE = 0x0021, ZIP_TIME = 0 };
    attributes, as a Unix writer puts it there. */
 enum { ZIP_MODE_FILE = 0100644, ZIP_MODE_PROGRAM = 0100755 };
 
-static void put16(struct text *out, unsigned value)
+static void put16(struct text *out, uint16_t value)
 {
     char bytes[2];
 
@@ -43,7 +43,7 @@ static void put16(struct text *out, unsigned value)
     text_append_bytes(out, bytes, sizeof bytes);
 }
 
-static void put32(struct text *out, unsigned long value)
+static void put32(struct text *out, uint32_t value)
 {
     char bytes[4];
 
@@ -55,19 +55,19 @@ static void put32(struct text *out, unsigned long value)
 }
 
 /* The CRC-32 of the zip format, which is the one of IEEE 802.3. */
-static unsigned long crc32_of(const char *bytes, size_t length)
+static uint32_t crc32_of(const char *bytes, size_t length)
 {
-    unsigned long crc = 0xffffffffUL;
+    uint32_t crc = 0xffffffffu;
     size_t i;
     int bit;
 
     for (i = 0; i < length; i++) {
         crc ^= (unsigned char)bytes[i];
         for (bit = 0; bit < 8; bit++) {
-            crc = (crc >> 1) ^ (0xedb88320UL & (unsigned long)(-(long)(crc & 1)));
+            crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
         }
     }
-    return crc ^ 0xffffffffUL;
+    return crc ^ 0xffffffffu;
 }
 
 /* The largest count and the largest size the 16-bit and the 32-bit
@@ -80,7 +80,7 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
 {
     struct text out = {0};
     struct text directory = {0};
-    unsigned long *offsets = files_array(count + 1, sizeof *offsets);
+    uint32_t *offsets = files_array(count + 1, sizeof *offsets);
     size_t i;
     bool ok = count <= ZIP_MAX16;
 
@@ -90,7 +90,7 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
     }
     for (i = 0; ok && i < count; i++) {
         struct text bytes = {0};
-        unsigned long crc;
+        uint32_t crc;
         size_t name_length = strlen(entries[i].name);
         if (entries[i].file != NULL) {
             ok = files_read_reported(entries[i].file, &bytes);
@@ -108,7 +108,7 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
             break;
         }
         crc = crc32_of(bytes.data, bytes.length);
-        offsets[i] = (unsigned long)out.length;
+        offsets[i] = (uint32_t)out.length;
         put32(&out, ZIP_LOCAL);
         put16(&out, ZIP_VERSION);
         put16(&out, 0);
@@ -116,9 +116,9 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         put16(&out, ZIP_TIME);
         put16(&out, ZIP_DATE);
         put32(&out, crc);
-        put32(&out, (unsigned long)bytes.length);
-        put32(&out, (unsigned long)bytes.length);
-        put16(&out, (unsigned)name_length);
+        put32(&out, (uint32_t)bytes.length);
+        put32(&out, (uint32_t)bytes.length);
+        put16(&out, (uint16_t)name_length);
         put16(&out, 0);
         text_append_bytes(&out, entries[i].name, name_length);
         text_append_bytes(&out, bytes.data, bytes.length);
@@ -130,16 +130,16 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         put16(&directory, ZIP_TIME);
         put16(&directory, ZIP_DATE);
         put32(&directory, crc);
-        put32(&directory, (unsigned long)bytes.length);
-        put32(&directory, (unsigned long)bytes.length);
-        put16(&directory, (unsigned)name_length);
+        put32(&directory, (uint32_t)bytes.length);
+        put32(&directory, (uint32_t)bytes.length);
+        put16(&directory, (uint16_t)name_length);
         put16(&directory, 0);
         put16(&directory, 0);
         put16(&directory, 0);
         put16(&directory, 0);
-        put32(&directory, (unsigned long)(entries[i].executable
-                                              ? ZIP_MODE_PROGRAM
-                                              : ZIP_MODE_FILE)
+        put32(&directory, (uint32_t)(entries[i].executable
+                                         ? ZIP_MODE_PROGRAM
+                                         : ZIP_MODE_FILE)
                               << 16);
         put32(&directory, offsets[i]);
         text_append_bytes(&directory, entries[i].name, name_length);
@@ -151,14 +151,14 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
         ok = false;
     }
     if (ok) {
-        unsigned long start = (unsigned long)out.length;
+        uint32_t start = (uint32_t)out.length;
         text_append_bytes(&out, directory.data, directory.length);
         put32(&out, ZIP_END);
         put16(&out, 0);
         put16(&out, 0);
-        put16(&out, (unsigned)count);
-        put16(&out, (unsigned)count);
-        put32(&out, (unsigned long)directory.length);
+        put16(&out, (uint16_t)count);
+        put16(&out, (uint16_t)count);
+        put32(&out, (uint32_t)directory.length);
         put32(&out, start);
         put16(&out, 0);
         ok = files_write(path, &out);
@@ -169,15 +169,15 @@ bool zip_write(const char *path, const struct zip_entry *entries, size_t count)
     return ok;
 }
 
-static unsigned get16(const unsigned char *p)
+static uint16_t get16(const unsigned char *p)
 {
-    return (unsigned)p[0] | (unsigned)p[1] << 8;
+    return (uint16_t)(p[0] | p[1] << 8);
 }
 
-static unsigned long get32(const unsigned char *p)
+static uint32_t get32(const unsigned char *p)
 {
-    return (unsigned long)p[0] | (unsigned long)p[1] << 8 |
-           (unsigned long)p[2] << 16 | (unsigned long)p[3] << 24;
+    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 |
+           (uint32_t)p[3] << 24;
 }
 
 /* The end record of the central directory, found from the end of the
@@ -612,7 +612,7 @@ static bool stored(struct inflate *s)
         return false;
     }
     length = get16(s->in + s->at);
-    if (length != (~get16(s->in + s->at + 2) & 0xffffu)) {
+    if (length != (uint16_t)~(uint32_t)get16(s->in + s->at + 2)) {
         return false;
     }
     s->at += 4;
@@ -670,7 +670,7 @@ bool zip_unpack(const struct zip_archive *a, size_t index, struct text *out)
     } else {
         fprintf(stderr, "anti: %s is packed with method %u, and the reader "
                         "takes stored and deflate\n",
-                text_cstr(&item->name), item->method);
+                text_cstr(&item->name), (unsigned)item->method);
         return false;
     }
     /* An entry of no bytes inflated into an empty text leaves out->data
