@@ -287,6 +287,193 @@ static struct expr *literal_fields(struct parser *p, struct expr *e)
     return p->panic ? NULL : e;
 }
 
+/* A name, or the literal or the generic it opens, at the token t:
+   `p { }`, `geo.Pair { }`, `geo.Shape.Circle { }` and the forms
+   with type arguments. */
+static struct expr *name_or_literal(struct parser *p, const struct token *t)
+{
+    struct expr *e;
+    bool qualified;
+    bool member;
+    size_t end;
+
+    /* `snapshot fn(...) { }` is an anonymous function that copies
+       what it captures. `snapshot` is a contextual word. */
+    if (parser_is_word(p, t, "snapshot") &&
+        parser_peek_at(p, 1)->kind == TOKEN_FN) {
+        parser_next(p);
+        e = anonymous_fn(p, parser_peek(p));
+        if (e != NULL) {
+            e->pos = parser_pos_of(t);
+            e->as.fn->snapshot = true;
+        }
+        return e;
+    }
+    /* `Pair<int, str> { }`, `max<int>(a, b)` and `List<int>.new()`
+       name a generic with its type arguments, by the rule of C#. A
+       variant's case follows its arguments,
+       `Result<int, str>.Ok { }`. */
+    end = parser_generic_end(p, 1);
+    if (end > 0) {
+        if (!p->no_struct_literal &&
+            (parser_peek_at(p, end)->kind == TOKEN_LBRACE ||
+             (parser_peek_at(p, end)->kind == TOKEN_DOT &&
+              parser_peek_at(p, end + 1)->kind == TOKEN_IDENT &&
+              parser_peek_at(p, end + 2)->kind == TOKEN_LBRACE))) {
+            bool case_of = parser_peek_at(p, end)->kind == TOKEN_DOT;
+            e = parser_new_expr(p, EXPR_STRUCT_LIT, t);
+            parser_expect_name(p, &e->as.struct_lit.name);
+            if (!literal_type_args(p, e)) {
+                return NULL;
+            }
+            if (case_of) {
+                e->as.struct_lit.module = e->as.struct_lit.name;
+                parser_next(p);
+                parser_expect_name(p, &e->as.struct_lit.name);
+            }
+            return literal_fields(p, e);
+        }
+        e = parser_new_expr(p, EXPR_NAME, t);
+        parser_expect_name(p, &e->as.name);
+        e->type_args_pos = parser_pos_of(parser_peek(p));
+        e->type_args = parser_type_args(p, &e->type_arg_count);
+        return e->type_args == NULL ? NULL : e;
+    }
+    /* `geo.Pair<int, str> { }` names a generic of another module,
+       and `geo.Result<int, str>.Ok { }` the case of one. */
+    if (!p->no_struct_literal && parser_peek_at(p, 1)->kind == TOKEN_DOT &&
+        parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
+        (end = parser_generic_end(p, 3)) > 0 &&
+        (parser_peek_at(p, end)->kind == TOKEN_LBRACE ||
+         (parser_peek_at(p, end)->kind == TOKEN_DOT &&
+          parser_peek_at(p, end + 1)->kind == TOKEN_IDENT &&
+          parser_peek_at(p, end + 2)->kind == TOKEN_LBRACE))) {
+        bool case_of = parser_peek_at(p, end)->kind == TOKEN_DOT;
+        e = parser_new_expr(p, EXPR_STRUCT_LIT, t);
+        parser_expect_name(p, &e->as.struct_lit.module);
+        parser_next(p);
+        parser_expect_name(p, &e->as.struct_lit.name);
+        if (!literal_type_args(p, e)) {
+            return NULL;
+        }
+        if (case_of) {
+            parser_next(p);
+            parser_expect_name(p, &e->as.struct_lit.member);
+        }
+        return literal_fields(p, e);
+    }
+    qualified = parser_peek_at(p, 1)->kind == TOKEN_DOT &&
+                parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
+                parser_peek_at(p, 3)->kind == TOKEN_LBRACE;
+    /* `geo.Shape.Circle { }` names the case of a variant of another
+       module. */
+    member = parser_peek_at(p, 1)->kind == TOKEN_DOT &&
+             parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
+             parser_peek_at(p, 3)->kind == TOKEN_DOT &&
+             parser_peek_at(p, 4)->kind == TOKEN_IDENT &&
+             parser_peek_at(p, 5)->kind == TOKEN_LBRACE;
+    if (!p->no_struct_literal &&
+        (qualified || member ||
+         parser_peek_at(p, 1)->kind == TOKEN_LBRACE)) {
+        e = parser_new_expr(p, EXPR_STRUCT_LIT, t);
+        parser_expect_name(p, &e->as.struct_lit.name);
+        if (qualified || member) {
+            e->as.struct_lit.module = e->as.struct_lit.name;
+            parser_next(p);
+            parser_expect_name(p, &e->as.struct_lit.name);
+        }
+        if (member) {
+            parser_next(p);
+            parser_expect_name(p, &e->as.struct_lit.member);
+        }
+        return literal_fields(p, e);
+    }
+    e = parser_new_expr(p, EXPR_NAME, t);
+    parser_expect_name(p, &e->as.name);
+    return e;
+}
+
+/* `(a)` groups and `(a, b)` builds a tuple, at the token t of the
+   `(`. */
+static struct expr *group_or_tuple(struct parser *p, const struct token *t)
+{
+    bool saved = p->no_struct_literal;
+    struct expr *first;
+    struct expr *e;
+
+    parser_next(p);
+    p->no_struct_literal = false;
+    first = parser_expression(p);
+    if (first != NULL && parser_check(p, TOKEN_COMMA)) {
+        struct list elements = {NULL, 0, 0, sizeof(struct expr *)};
+        e = parser_new_expr(p, EXPR_TUPLE, t);
+        parser_list_push(&elements, &first);
+        while (parser_accept(p, TOKEN_COMMA)) {
+            struct expr *element = parser_expression(p);
+            if (element == NULL) {
+                free(elements.data);
+                return NULL;
+            }
+            parser_list_push(&elements, &element);
+        }
+        e->as.tuple.elements =
+            parser_list_finish(p, &elements, &e->as.tuple.count);
+        p->no_struct_literal = saved;
+        return parser_expect(p, TOKEN_RPAREN) ? e : NULL;
+    }
+    p->no_struct_literal = saved;
+    return first != NULL && parser_expect(p, TOKEN_RPAREN) ? first : NULL;
+}
+
+/* The slice literal `[]T { }`, the array `[v; n]` and the array
+   `[a, b]`, at the token t of the `[`. */
+static struct expr *bracket_literal(struct parser *p, const struct token *t)
+{
+    struct list items = {NULL, 0, 0, sizeof(struct expr *)};
+    struct expr *first;
+    struct expr *e;
+
+    if (parser_peek_at(p, 1)->kind == TOKEN_RBRACKET) {
+        e = parser_new_expr(p, EXPR_SLICE_LIT, t);
+        parser_next(p);
+        parser_next(p);
+        if ((e->as.slice_lit.element = parser_type(p)) == NULL ||
+            !parser_expect(p, TOKEN_LBRACE)) {
+            return NULL;
+        }
+        e->as.slice_lit.fields =
+            field_inits(p, &e->as.slice_lit.field_count);
+        return p->panic ? NULL : e;
+    }
+    parser_next(p);
+    first = parser_expression(p);
+    if (first == NULL) {
+        return NULL;
+    }
+    if (parser_accept(p, TOKEN_SEMICOLON)) {
+        e = parser_new_expr(p, EXPR_ARRAY_REPEAT, t);
+        e->as.array_repeat.value = first;
+        if ((e->as.array_repeat.count = parser_expression(p)) == NULL ||
+            !parser_expect(p, TOKEN_RBRACKET)) {
+            return NULL;
+        }
+        return e;
+    }
+    e = parser_new_expr(p, EXPR_ARRAY_LIT, t);
+    parser_list_push(&items, &first);
+    while (parser_accept(p, TOKEN_COMMA) && !parser_check(p, TOKEN_RBRACKET)) {
+        struct expr *item = parser_expression(p);
+        if (item == NULL) {
+            free(items.data);
+            return NULL;
+        }
+        parser_list_push(&items, &item);
+    }
+    e->as.array_lit.elements =
+        parser_list_finish(p, &items, &e->as.array_lit.count);
+    return parser_expect(p, TOKEN_RBRACKET) ? e : NULL;
+}
+
 static struct expr *primary(struct parser *p)
 {
     const struct token *t = parser_peek(p);
@@ -342,181 +529,17 @@ static struct expr *primary(struct parser *p)
         e->as.name.text = p->source + t->offset;
         e->as.name.length = t->length;
         return e;
-    case TOKEN_IDENT: {
-        bool qualified;
-        bool member;
-        size_t end;
-        /* `snapshot fn(...) { }` is an anonymous function that copies
-           what it captures. `snapshot` is a contextual word. */
-        if (parser_is_word(p, t, "snapshot") &&
-            parser_peek_at(p, 1)->kind == TOKEN_FN) {
-            parser_next(p);
-            e = anonymous_fn(p, parser_peek(p));
-            if (e != NULL) {
-                e->pos = parser_pos_of(t);
-                e->as.fn->snapshot = true;
-            }
-            return e;
-        }
-        /* `Pair<int, str> { }`, `max<int>(a, b)` and `List<int>.new()`
-           name a generic with its type arguments, by the rule of C#. A
-           variant's case follows its arguments,
-           `Result<int, str>.Ok { }`. */
-        end = parser_generic_end(p, 1);
-        if (end > 0) {
-            if (!p->no_struct_literal &&
-                (parser_peek_at(p, end)->kind == TOKEN_LBRACE ||
-                 (parser_peek_at(p, end)->kind == TOKEN_DOT &&
-                  parser_peek_at(p, end + 1)->kind == TOKEN_IDENT &&
-                  parser_peek_at(p, end + 2)->kind == TOKEN_LBRACE))) {
-                bool case_of = parser_peek_at(p, end)->kind == TOKEN_DOT;
-                e = parser_new_expr(p, EXPR_STRUCT_LIT, t);
-                parser_expect_name(p, &e->as.struct_lit.name);
-                if (!literal_type_args(p, e)) {
-                    return NULL;
-                }
-                if (case_of) {
-                    e->as.struct_lit.module = e->as.struct_lit.name;
-                    parser_next(p);
-                    parser_expect_name(p, &e->as.struct_lit.name);
-                }
-                return literal_fields(p, e);
-            }
-            e = parser_new_expr(p, EXPR_NAME, t);
-            parser_expect_name(p, &e->as.name);
-            e->type_args_pos = parser_pos_of(parser_peek(p));
-            e->type_args = parser_type_args(p, &e->type_arg_count);
-            return e->type_args == NULL ? NULL : e;
-        }
-        /* `geo.Pair<int, str> { }` names a generic of another module,
-           and `geo.Result<int, str>.Ok { }` the case of one. */
-        if (!p->no_struct_literal && parser_peek_at(p, 1)->kind == TOKEN_DOT &&
-            parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
-            (end = parser_generic_end(p, 3)) > 0 &&
-            (parser_peek_at(p, end)->kind == TOKEN_LBRACE ||
-             (parser_peek_at(p, end)->kind == TOKEN_DOT &&
-              parser_peek_at(p, end + 1)->kind == TOKEN_IDENT &&
-              parser_peek_at(p, end + 2)->kind == TOKEN_LBRACE))) {
-            bool case_of = parser_peek_at(p, end)->kind == TOKEN_DOT;
-            e = parser_new_expr(p, EXPR_STRUCT_LIT, t);
-            parser_expect_name(p, &e->as.struct_lit.module);
-            parser_next(p);
-            parser_expect_name(p, &e->as.struct_lit.name);
-            if (!literal_type_args(p, e)) {
-                return NULL;
-            }
-            if (case_of) {
-                parser_next(p);
-                parser_expect_name(p, &e->as.struct_lit.member);
-            }
-            return literal_fields(p, e);
-        }
-        qualified = parser_peek_at(p, 1)->kind == TOKEN_DOT &&
-                    parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
-                    parser_peek_at(p, 3)->kind == TOKEN_LBRACE;
-        /* `geo.Shape.Circle { }` names the case of a variant of another
-           module. */
-        member = parser_peek_at(p, 1)->kind == TOKEN_DOT &&
-                 parser_peek_at(p, 2)->kind == TOKEN_IDENT &&
-                 parser_peek_at(p, 3)->kind == TOKEN_DOT &&
-                 parser_peek_at(p, 4)->kind == TOKEN_IDENT &&
-                 parser_peek_at(p, 5)->kind == TOKEN_LBRACE;
-        if (!p->no_struct_literal &&
-            (qualified || member ||
-             parser_peek_at(p, 1)->kind == TOKEN_LBRACE)) {
-            e = parser_new_expr(p, EXPR_STRUCT_LIT, t);
-            parser_expect_name(p, &e->as.struct_lit.name);
-            if (qualified || member) {
-                e->as.struct_lit.module = e->as.struct_lit.name;
-                parser_next(p);
-                parser_expect_name(p, &e->as.struct_lit.name);
-            }
-            if (member) {
-                parser_next(p);
-                parser_expect_name(p, &e->as.struct_lit.member);
-            }
-            return literal_fields(p, e);
-        }
-        e = parser_new_expr(p, EXPR_NAME, t);
-        parser_expect_name(p, &e->as.name);
-        return e;
-    }
-    case TOKEN_LPAREN: {
-        bool saved = p->no_struct_literal;
-        struct expr *first;
-        parser_next(p);
-        p->no_struct_literal = false;
-        first = parser_expression(p);
-        /* `(a)` groups and `(a, b)` builds a tuple. */
-        if (first != NULL && parser_check(p, TOKEN_COMMA)) {
-            struct list elements = {NULL, 0, 0, sizeof(struct expr *)};
-            e = parser_new_expr(p, EXPR_TUPLE, t);
-            parser_list_push(&elements, &first);
-            while (parser_accept(p, TOKEN_COMMA)) {
-                struct expr *element = parser_expression(p);
-                if (element == NULL) {
-                    free(elements.data);
-                    return NULL;
-                }
-                parser_list_push(&elements, &element);
-            }
-            e->as.tuple.elements =
-                parser_list_finish(p, &elements, &e->as.tuple.count);
-            p->no_struct_literal = saved;
-            return parser_expect(p, TOKEN_RPAREN) ? e : NULL;
-        }
-        p->no_struct_literal = saved;
-        return first != NULL && parser_expect(p, TOKEN_RPAREN) ? first : NULL;
-    }
+    case TOKEN_IDENT:
+        return name_or_literal(p, t);
+    case TOKEN_LPAREN:
+        return group_or_tuple(p, t);
     case TOKEN_LBRACKET:
-        if (parser_peek_at(p, 1)->kind == TOKEN_RBRACKET) {
-            if (p->no_struct_literal) {
-                break;
-            }
-            e = parser_new_expr(p, EXPR_SLICE_LIT, t);
-            parser_next(p);
-            parser_next(p);
-            if ((e->as.slice_lit.element = parser_type(p)) == NULL ||
-                !parser_expect(p, TOKEN_LBRACE)) {
-                return NULL;
-            }
-            e->as.slice_lit.fields =
-                field_inits(p, &e->as.slice_lit.field_count);
-            return p->panic ? NULL : e;
+        /* A condition takes no slice literal `[]T { }`. */
+        if (parser_peek_at(p, 1)->kind == TOKEN_RBRACKET &&
+            p->no_struct_literal) {
+            break;
         }
-        parser_next(p);
-        {
-            struct expr *first = parser_expression(p);
-            if (first == NULL) {
-                return NULL;
-            }
-            if (parser_accept(p, TOKEN_SEMICOLON)) {
-                e = parser_new_expr(p, EXPR_ARRAY_REPEAT, t);
-                e->as.array_repeat.value = first;
-                if ((e->as.array_repeat.count = parser_expression(p)) == NULL ||
-                    !parser_expect(p, TOKEN_RBRACKET)) {
-                    return NULL;
-                }
-                return e;
-            }
-            e = parser_new_expr(p, EXPR_ARRAY_LIT, t);
-            {
-                struct list items = {NULL, 0, 0, sizeof(struct expr *)};
-                parser_list_push(&items, &first);
-                while (parser_accept(p, TOKEN_COMMA) &&
-                       !parser_check(p, TOKEN_RBRACKET)) {
-                    struct expr *item = parser_expression(p);
-                    if (item == NULL) {
-                        free(items.data);
-                        return NULL;
-                    }
-                    parser_list_push(&items, &item);
-                }
-                e->as.array_lit.elements =
-                    parser_list_finish(p, &items, &e->as.array_lit.count);
-            }
-            return parser_expect(p, TOKEN_RBRACKET) ? e : NULL;
-        }
+        return bracket_literal(p, t);
     case TOKEN_ALLOC:
         parser_next(p);
         e = parser_new_expr(p, EXPR_ALLOC, t);
@@ -680,6 +703,95 @@ static bool element_name(struct parser *p, struct name *out)
     return true;
 }
 
+/* The link `[i]`, `[a..b]` or `[x, y]` after e, at the token t of
+   the `[` read before. NULL after an error. */
+static struct expr *index_link(struct parser *p, struct expr *e,
+                               const struct token *t)
+{
+    bool saved = p->no_struct_literal;
+    struct expr *first;
+    struct expr *outer;
+
+    p->no_struct_literal = false;
+    first = parser_expression(p);
+    if (first != NULL && parser_accept(p, TOKEN_DOT_DOT)) {
+        outer = parser_new_expr(p, EXPR_SLICE, t);
+        outer->as.slice.base = e;
+        outer->as.slice.low = first;
+        outer->as.slice.high = parser_expression(p);
+    } else {
+        outer = parser_new_expr(p, EXPR_INDEX, t);
+        outer->as.index.base = e;
+        outer->as.index.index = first;
+        /* `g[x, y]` gives the hooks every index. */
+        if (first != NULL && parser_check(p, TOKEN_COMMA)) {
+            struct list indices = {NULL, 0, 0, sizeof(struct expr *)};
+            struct expr *all = parser_new_expr(p, EXPR_TUPLE, t);
+            all->pos = first->pos;
+            parser_list_push(&indices, &first);
+            while (parser_accept(p, TOKEN_COMMA)) {
+                struct expr *index = parser_expression(p);
+                if (index == NULL) {
+                    free(indices.data);
+                    return NULL;
+                }
+                parser_list_push(&indices, &index);
+            }
+            all->as.tuple.elements =
+                parser_list_finish(p, &indices, &all->as.tuple.count);
+            outer->as.index.index = all;
+            outer->as.index.several = true;
+        }
+    }
+    p->no_struct_literal = saved;
+    outer->pos = e->pos;
+    if (p->panic || !parser_expect(p, TOKEN_RBRACKET)) {
+        return NULL;
+    }
+    return outer;
+}
+
+/* The link `.name`, `?.name` or `.0` after e, at the token t of the
+   `.` or `?.` read before. NULL after an error. */
+static struct expr *field_link(struct parser *p, struct expr *e,
+                               const struct token *t)
+{
+    struct expr *outer = parser_new_expr(p, EXPR_FIELD, t);
+
+    outer->pos = e->pos;
+    outer->as.field.base = e;
+    outer->as.field.optional = t->kind == TOKEN_QUESTION_DOT;
+    /* An element of a tuple is its number, and the field it names is
+       `_0` upwards. */
+    if (parser_check(p, TOKEN_INT)) {
+        outer->as.field.element = true;
+        if (!element_name(p, &outer->as.field.name)) {
+            return NULL;
+        }
+    } else if (parser_check(p, TOKEN_SUPER) ||
+               parser_check(p, TOKEN_DESTROY) ||
+               parser_check(p, TOKEN_SELECT)) {
+        /* `self.super` names the base, `m.destroy()` the function that
+           releases a Mutex and `simd.select` the choice of `anti.simd`.
+           The built-in `destroy` and the statement `select` never follow
+           `.`. */
+        outer->as.field.name.text = p->source + parser_peek(p)->offset;
+        outer->as.field.name.length = parser_peek(p)->length;
+        parser_next(p);
+    } else if (!parser_expect_function_name(p, &outer->as.field.name)) {
+        return NULL;
+    }
+    /* `geo.max<int>(a, b)` and `geo.List<int>.new()`. */
+    if (!outer->as.field.element && parser_generic_end(p, 0) > 0) {
+        outer->type_args_pos = parser_pos_of(parser_peek(p));
+        outer->type_args = parser_type_args(p, &outer->type_arg_count);
+        if (outer->type_args == NULL) {
+            return NULL;
+        }
+    }
+    return outer;
+}
+
 static struct expr *postfix_links(struct parser *p)
 {
     struct expr *e = primary(p);
@@ -702,83 +814,14 @@ static struct expr *postfix_links(struct parser *p)
                 return NULL;
             }
         } else if (parser_accept(p, TOKEN_LBRACKET)) {
-            bool saved = p->no_struct_literal;
-            struct expr *first;
-            p->no_struct_literal = false;
-            first = parser_expression(p);
-            if (first != NULL && parser_accept(p, TOKEN_DOT_DOT)) {
-                outer = parser_new_expr(p, EXPR_SLICE, t);
-                outer->as.slice.base = e;
-                outer->as.slice.low = first;
-                outer->as.slice.high = parser_expression(p);
-            } else {
-                outer = parser_new_expr(p, EXPR_INDEX, t);
-                outer->as.index.base = e;
-                outer->as.index.index = first;
-                /* `g[x, y]` gives the hooks every index. */
-                if (first != NULL && parser_check(p, TOKEN_COMMA)) {
-                    struct list indices = {NULL, 0, 0,
-                                           sizeof(struct expr *)};
-                    struct expr *all = parser_new_expr(p, EXPR_TUPLE, t);
-                    all->pos = first->pos;
-                    parser_list_push(&indices, &first);
-                    while (parser_accept(p, TOKEN_COMMA)) {
-                        struct expr *index = parser_expression(p);
-                        if (index == NULL) {
-                            free(indices.data);
-                            return NULL;
-                        }
-                        parser_list_push(&indices, &index);
-                    }
-                    all->as.tuple.elements =
-                        parser_list_finish(p, &indices, &all->as.tuple.count);
-                    outer->as.index.index = all;
-                    outer->as.index.several = true;
-                }
-            }
-            p->no_struct_literal = saved;
-            outer->pos = e->pos;
-            if (p->panic || !parser_expect(p, TOKEN_RBRACKET)) {
-                return NULL;
-            }
+            outer = index_link(p, e, t);
         } else if (parser_accept(p, TOKEN_DOT) ||
                    parser_accept(p, TOKEN_QUESTION_DOT)) {
-            outer = parser_new_expr(p, EXPR_FIELD, t);
-            outer->pos = e->pos;
-            outer->as.field.base = e;
-            outer->as.field.optional = t->kind == TOKEN_QUESTION_DOT;
-            /* An element of a tuple is its number, and the field it
-               names is `_0` upwards. */
-            if (parser_check(p, TOKEN_INT)) {
-                outer->as.field.element = true;
-                if (!element_name(p, &outer->as.field.name)) {
-                    return NULL;
-                }
-            } else if (parser_check(p, TOKEN_SUPER) ||
-                       parser_check(p, TOKEN_DESTROY) ||
-                       parser_check(p, TOKEN_SELECT)) {
-                /* `self.super` names the base, `m.destroy()` the
-                   function that releases a Mutex and `simd.select` the
-                   choice of `anti.simd`. The built-in `destroy` and the
-                   statement `select` never follow `.`. */
-                outer->as.field.name.text = p->source + parser_peek(p)->offset;
-                outer->as.field.name.length = parser_peek(p)->length;
-                parser_next(p);
-            } else if (!parser_expect_function_name(p, &outer->as.field.name)) {
-                return NULL;
-            }
-            /* `geo.max<int>(a, b)` and `geo.List<int>.new()`. */
-            if (!outer->as.field.element && parser_generic_end(p, 0) > 0) {
-                outer->type_args_pos = parser_pos_of(parser_peek(p));
-                outer->type_args = parser_type_args(p, &outer->type_arg_count);
-                if (outer->type_args == NULL) {
-                    return NULL;
-                }
-            }
+            outer = field_link(p, e, t);
         } else {
             return e;
         }
-        if (!parser_chain_link(p)) {
+        if (outer == NULL || !parser_chain_link(p)) {
             return NULL;
         }
         e = outer;
