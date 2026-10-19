@@ -239,6 +239,31 @@ static void key_length(void)
     anti_rt_toml_free(doc);
 }
 
+/* A string stands in double or in single quotes on one line, and the
+   reader decodes no escape, so a value holds the bytes between its
+   quotes. A key may stand in either quote as well. */
+static void string_forms(void)
+{
+    static const char text[] =
+        "double = \"a b\"\n"
+        "single = 'c d'\n"
+        "escape = \"x\\ty\"\n"
+        "'quoted.key' = 'v'\n";
+    struct anti_toml *doc = read_toml(text);
+
+    CHECK(doc != NULL);
+    if (doc == NULL) {
+        return;
+    }
+    CHECK_STR(value_of(doc, "double"), "a b");
+    CHECK_STR(value_of(doc, "single"), "c d");
+    CHECK_STR(value_of(doc, "escape"), "x\\ty");
+    CHECK_STR(value_of(doc, "quoted.key"), "v");
+    anti_rt_toml_free(doc);
+    CHECK(read_toml("open = \"a\nb\"\n") == NULL);
+    CHECK(read_toml("mixed = \"a'\n") == NULL);
+}
+
 void test_toml(void)
 {
     inline_table();
@@ -248,4 +273,5 @@ void test_toml(void)
     table_repeat_limit();
     table_repeat_cost();
     key_length();
+    string_forms();
 }

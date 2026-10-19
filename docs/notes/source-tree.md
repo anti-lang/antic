@@ -346,7 +346,7 @@ reads as well says so in its row.
 | `src/rt/threads.c` | The worker pool behind `parallel`, `dispatch` and `join`. |
 | `src/rt/threads.h` | The calls of `parallel`, `dispatch` and `join`. |
 | `src/rt/toml.c` | One pass over a subset of TOML that gives a flat list of dotted keys. |
-| `src/rt/toml.h` | A read of the TOML subset the library, the logger and the configuration share. |
+| `src/rt/toml.h` | A read of the TOML subset every TOML file of Anti needs. |
 | `src/rt/trace.c` | The module and the build id of a frame, the text of a trace and the choice of a symbol reader. |
 | `src/rt/trace.h` | The layouts and the calls behind `anti.lang.StackTrace`. |
 | `src/rt/utf.c` | UTF-8 and UTF-16 conversion and the split of a Windows command line. |

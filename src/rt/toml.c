@@ -1,9 +1,13 @@
-/* The TOML subset that anti.toml reads and the logger configures itself
-   from. It is one pass over the text that writes a flat list of keys.
+/* The TOML subset of every TOML file of Anti. It is one pass over the
+   text that writes a flat list of keys.
 
-   DESIGN: the runtime holds the parser because the logger reads its file
-   before `main` runs, where no Anti code has started. One parser then
-   serves both, and anti.toml is a face over this list. */
+   DESIGN: the runtime holds the parser because it reads the runtime
+   configuration in conf.c and the plugin index in plugin.c before `main`
+   runs, where no Anti code has started. One parser then serves every
+   reader: the runtime, the module anti.toml, which is a face over this
+   list and which anti.log reads its file with, antic for the plugin
+   index, and anti for the manifest, the lock file, the index of a
+   repository and the files `anti symbols` reads. */
 
 #include <stdint.h>
 #include <stdio.h>
