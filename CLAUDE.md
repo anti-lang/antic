@@ -315,15 +315,19 @@ Debug build in which the pinned clang compiles antic, anti, the C unit
 tests and the runtime with `-fprofile-instr-generate -fcoverage-mapping`.
 The runtime is that of the targets of the host's system and the glue of
 `anti.regex`, and its library carries the members of the profile runtime,
-so every program of the suite writes its counts as well. The archive of
+so every program of the suite writes its counts as well. So does the
+runtime of the fault tests, and the seam of `src/rt/fault.h` has one shape
+with and without `ANTI_FAULTS` there, so the counts of the fault tests
+merge with the others. The archive of
 every other tree stays as it is. Each compile names where its profile
 goes, so the suite leaves raw profiles in `build/coverage/profiles/`.
 llvm-profdata merges them, and llvm-cov writes `build/coverage/summary.txt`
 and the annotated sources in `build/coverage/html/`. The summary holds one
 row per file of `src/antic/`, `src/anti/` and `src/rt/`, with its lines,
-functions, regions and branches. A program that ends through a trap or an
-abort writes no profile, and the tests that read the bytes of the runtime
-as a package ships it are disabled in that tree alone.
+functions, regions and branches. A program that ends through a trap
+writes no profile, and one that the runtime aborts writes its counts
+first. The tests that read the bytes of the runtime as a package ships
+it are disabled in that tree alone.
 
 - `./c coverage part 1/3` runs one part of the suite per call, for a
   session whose command ends after ten minutes. The first part removes the

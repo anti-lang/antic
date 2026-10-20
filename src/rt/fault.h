@@ -116,6 +116,24 @@ unsigned long anti_rt_fault_system_error(void);
 #define ANTI_FFLUSH anti_rt_fault_fflush
 #define ANTI_FCLOSE anti_rt_fault_fclose
 
+#elif defined(ANTI_COVERAGE)
+
+/* DESIGN: a coverage tree, see tools/coverage.cmake, builds antic, anti
+   and the runtime both without the seam and with it, and llvm-cov keeps
+   the counts of one of the two for a function. Counts merge when the
+   function has the same shape in both, so the seam keeps its choice
+   here and the failed value is never taken. The paths behind a failed
+   call then count the runs of the fault tests as well. The shape counts
+   no comparison, which the hash of a function counts and a call does
+   not, so the condition is a mask of zero. */
+#define ANTI_FAULT(kind, failed, call) \
+    ((ANTI_RT_FAULT_##kind & 0) ? (failed) : (call))
+#define ANTI_FREAD fread
+#define ANTI_FWRITE fwrite
+#define ANTI_FERROR ferror
+#define ANTI_FFLUSH fflush
+#define ANTI_FCLOSE fclose
+
 #else
 
 #define ANTI_FAULT(kind, failed, call) (call)
@@ -130,10 +148,16 @@ unsigned long anti_rt_fault_system_error(void);
 /* ANTI_FAULT for a call of Windows: a call of the seam that fails sets the
    error that GetLastError then gives, from errno. A build without
    ANTI_FAULTS drops the failed value and with it the call of
-   anti_rt_fault_system_error, so the call stands alone. */
+   anti_rt_fault_system_error, so the call stands alone. The shape of a
+   coverage tree keeps the failed value but sets no error, since a build
+   without the seam has no anti_rt_fault_system_error. */
+#if defined(ANTI_COVERAGE) && !defined(ANTI_FAULTS)
+#define ANTI_FAULT_SYSTEM(kind, failed, call) ANTI_FAULT(kind, (failed), call)
+#else
 #define ANTI_FAULT_SYSTEM(kind, failed, call)                                  \
     ANTI_FAULT(kind,                                                           \
                (SetLastError((DWORD)anti_rt_fault_system_error()), (failed)), \
                call)
+#endif
 
 #endif

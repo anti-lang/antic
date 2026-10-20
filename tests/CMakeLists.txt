@@ -7571,10 +7571,17 @@ file(WRITE "${KNOWN_FAILURES_WORK}/marked.txt" "${known_marked}\n")
 # of the machine. The counters, the members of the profile runtime and
 # the patterns of the profiles change each of them, so a coverage tree
 # does not run them. Every other tree runs them, the three trees of the
-# gates among them.
+# gates among them. The two cases of anti build that make the map and the
+# symbols archive fail count the writes before them, and anti copies the
+# program in writes of 64 KiB, so the counters, which make the program
+# larger, move the write a case names.
 if(ANTIC_COVERAGE)
     get_property(coverage_tests DIRECTORY PROPERTY TESTS)
     set(coverage_bytes no_paths rt_names)
+    if(ANTIC_FAULTS)
+        list(APPEND coverage_bytes anti_build_message_fault_map_not_written
+             anti_build_message_fault_symbols_not_written)
+    endif()
     foreach(target IN LISTS ANTIC_TARGETS)
         if(NOT target MATCHES "^${ANTIC_HOST_OS}-")
             continue()

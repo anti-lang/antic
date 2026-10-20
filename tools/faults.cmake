@@ -99,6 +99,11 @@ function(antic_faults_runtime target triple)
         set(align -falign-functions=16)
     endif()
     antic_static_library(library_name anti_rt "${target}")
+    # A coverage tree measures this runtime as it measures runtime/, with
+    # the flags and the members of the profile runtime of
+    # tools/coverage.cmake, so the fault tests count in the report.
+    antic_coverage_runtime(coverage_flags coverage_members "${target}"
+        "${ANTIC_PROFILE_RUNTIME_${target}}")
     set(sources ${ANTIC_RUNTIME_SOURCES} fault)
     if(NOT target MATCHES "^windows")
         list(REMOVE_ITEM sources ${ANTIC_RUNTIME_WINDOWS_OBJECTS})
@@ -113,7 +118,7 @@ function(antic_faults_runtime target triple)
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 -DANTI_FAULTS=1
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                -MMD -MF "${object}.d"
+                ${coverage_flags} -MMD -MF "${object}.d"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
             DEPFILE "${object}.d"
@@ -125,7 +130,8 @@ function(antic_faults_runtime target triple)
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${CMAKE_COMMAND}" -E rm -f "${library}"
         COMMAND "${ANTIC_LLVM_AR}" rcs "${library}" ${objects}
-        DEPENDS ${objects}
+            ${coverage_members}
+        DEPENDS ${objects} ${coverage_members}
         VERBATIM)
     # The links to runtime/ follow the build of every part of it, the
     # library of the runtime at each level and the native libraries among

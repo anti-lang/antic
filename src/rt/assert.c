@@ -17,6 +17,25 @@ ANTI_RT_PRINTF(1, 0) static void write_line(const char *format,
     fflush(stderr);
 }
 
+#if defined(ANTI_COVERAGE)
+/* The profile runtime of clang, which a program of a coverage tree links. */
+int __llvm_profile_write_file(void);
+#endif
+
+/* End the program with abort.
+
+   DESIGN: a program of a coverage tree writes its counts at exit, which
+   abort skips. The counts are written first there, so the paths that end
+   in a failure count in the measurement, see tools/coverage.cmake. Every
+   other build aborts at once. */
+_Noreturn static void end_aborted(void)
+{
+#if defined(ANTI_COVERAGE)
+    __llvm_profile_write_file();
+#endif
+    abort();
+}
+
 void anti_rt_fail_exit(int status, const char *format, ...)
 {
     va_list rest;
@@ -34,7 +53,7 @@ void anti_rt_fail_abort(const char *format, ...)
     va_start(rest, format);
     write_line(format, rest);
     va_end(rest);
-    abort();
+    end_aborted();
 }
 
 void anti_rt_fail_memory(const char *format, ...)
@@ -46,7 +65,7 @@ void anti_rt_fail_memory(const char *format, ...)
     va_start(rest, format);
     write_line(format, rest);
     va_end(rest);
-    abort();
+    end_aborted();
 }
 
 void anti_rt_note(const char *format, ...)

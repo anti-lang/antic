@@ -18,6 +18,14 @@ set(ANTIC_COVERAGE_LINK_FLAGS -fprofile-instr-generate)
 
 # The flags of a compile under the measurement, for sources under root.
 #
+# A compile under the measurement defines ANTI_COVERAGE as well. The seam
+# of src/rt/fault.h then has the same shape without ANTI_FAULTS as with
+# it, so the counts of antic and antic_faults, and of the runtime and the
+# runtime of the fault tests, merge into one record per function. llvm-cov
+# reads one record of a function, and the counts of the fault tests were
+# lost before. src/rt/assert.c writes the counts of a program before it
+# aborts.
+#
 # DESIGN: the coverage mapping names each file from the directory of its
 # compile, which is the build tree and differs per directory of the build.
 # The build maps the repository to a dot as well, so llvm-cov read
@@ -29,7 +37,7 @@ set(ANTIC_COVERAGE_LINK_FLAGS -fprofile-instr-generate)
 function(antic_coverage_compile_flags out root)
     set(${out} -fprofile-instr-generate -fcoverage-mapping
         "-fcoverage-compilation-dir=${root}" "-ffile-prefix-map=${root}=."
-        PARENT_SCOPE)
+        -DANTI_COVERAGE=1 PARENT_SCOPE)
 endfunction()
 
 # Where the tests of a coverage tree leave their raw profiles, and the
