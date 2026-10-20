@@ -270,3 +270,43 @@ anti_message(fault_sdk_import_digest_not_written
     FAULT open:2:EACCES
     ARGS sdk import bundle.tar.xz --sysroot sysroot
     ERR "anti: cannot write sysroot/macos-arm64/sdk/digest")
+# anti sdk export of an SDK with one stub in usr/lib, sdk.c. The run opens
+# SDKSettings.json, the directory usr/lib, the stub, its copy and the
+# directory System/Library/Frameworks, and writes the copy and then
+# sdk-version. The third stat reads the kind of the stub.
+if(CMAKE_HOST_APPLE)
+    set(sdk_files MacOSX.sdk/SDKSettings.json "{\"Version\": \"14.0\"}\n"
+                  MacOSX.sdk/usr/lib/libSystem.tbd "A stub.\n")
+    anti_message(fault_sdk_export_stub_unread
+        FILES ${sdk_files}
+        DIRECTORIES MacOSX.sdk/System/Library/Frameworks
+        FAULT open:3:EACCES
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
+    anti_message(fault_sdk_export_stub_not_written
+        FILES ${sdk_files}
+        DIRECTORIES MacOSX.sdk/System/Library/Frameworks
+        FAULT write:1:ENOSPC
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
+    anti_message(fault_sdk_export_frameworks_unread
+        FILES ${sdk_files}
+        DIRECTORIES MacOSX.sdk/System/Library/Frameworks
+        FAULT open:5:EACCES
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot copy the stubs of MacOSX.sdk/System/Library/Frameworks")
+    anti_message(fault_sdk_export_version_not_written
+        FILES ${sdk_files}
+        DIRECTORIES MacOSX.sdk/System/Library/Frameworks
+        FAULT write:2:ENOSPC
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot write out/.apple-sdk-14.0/sdk-version")
+    # T155: a stub whose kind the system refuses to give, which copy_stubs
+    # leaves out of the bundle.
+    anti_message(fault_sdk_export_stub_kind_unread
+        FILES ${sdk_files}
+        DIRECTORIES MacOSX.sdk/System/Library/Frameworks
+        FAULT stat:3:EACCES
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
+endif()
