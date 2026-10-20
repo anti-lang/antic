@@ -246,3 +246,177 @@ if(NOT CMAKE_HOST_WIN32)
              "${plugins}/net/example/fancy.anti"
         ERR "antic: anti-plugins.toml cannot hold a name with both quotes or a line break: we\"ir'd.so")
 endif()
+
+# Fault injection: each case makes one call of the system fail in
+# antic_faults, through the variable ANTI_FAULT of src/rt/fault.h. A count
+# names the call among those of its kind in the run, so a case names the
+# run it counts in.
+
+# text as a regular expression that matches the text alone.
+function(literal_pattern out text)
+    string(REGEX REPLACE "([][+.*()^$?|\\\\])" "\\\\\\1" text "${text}")
+    set(${out} "${text}" PARENT_SCOPE)
+endfunction()
+
+# Memory that runs out ends antic with status 70, alloc.c.
+anti_message(fault_out_of_memory
+    FILES main.anti "${program}"
+    FAULT alloc:1:ENOMEM
+    STATUS 70
+    ARGS ${tools} main.anti
+    ERR "antic: out of memory")
+# A source that opens and does not read, read_file of driver.c.
+anti_message(fault_source_unread
+    FILES main.anti "${program}"
+    FAULT read:1:EIO
+    ARGS ${tools} main.anti
+    ERR "antic: cannot read main.anti")
+# The library file of -c, whose open is the second, after the source, and
+# whose write and close are the first of the run, driver_write_file of
+# driver.c.
+anti_message(fault_output_not_created
+    FILES com/example/lib.anti "${library}"
+    FAULT open:2:EACCES
+    ARGS ${tools} -c -I "${PROJECT}" -o lib.antl
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: cannot create lib.antl")
+anti_message(fault_output_not_written
+    FILES com/example/lib.anti "${library}"
+    FAULT write:1:ENOSPC
+    ARGS ${tools} -c -I "${PROJECT}" -o lib.antl
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: cannot write lib.antl")
+anti_message(fault_output_not_closed
+    FILES com/example/lib.anti "${library}"
+    FAULT close:2:ENOSPC
+    ARGS ${tools} -c -I "${PROJECT}" -o lib.antl
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: cannot write lib.antl")
+# The thread of the work, platform_run_on_stack of platform.c. Its join
+# is the first wait of a run, and the thread is not waited for, so the
+# case compiles a library, which starts no other program.
+anti_message(fault_work_not_started
+    FILES main.anti "${program}"
+    FAULT thread:1:EACCES
+    ARGS ${tools} main.anti
+    ERR "antic: cannot start the thread of the work: Permission denied")
+anti_message(fault_work_not_waited
+    FILES com/example/lib.anti "${library}"
+    FAULT wait:1:EINVAL
+    ARGS ${tools} -c -I "${PROJECT}" -o lib.antl
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: cannot wait for the thread of the work: Invalid argument")
+# The run of opt, the first program a release build starts, spawn and
+# wait_for of platform.c and run_opt of llvm_run.c. A wait that fails
+# leaves opt running, and opt then writes a message of its own once antic
+# removed its input, so the case matches the two lines of antic first.
+anti_message(fault_opt_not_started
+    FILES main.anti "${program}"
+    FAULT run:1:EACCES
+    ARGS ${tools} main.anti
+    ERR "antic: cannot run ${RUNTIME}/bin/opt: Permission denied"
+        "antic: opt failed")
+literal_pattern(opt_pattern "${RUNTIME}/bin/opt")
+anti_message(fault_opt_not_waited
+    FILES main.anti "${program}"
+    FAULT wait:2:ECHILD
+    ARGS ${tools} main.anti
+    ERR_MATCH "antic: waiting for ${opt_pattern}: No child processes\nantic: opt failed\n.*")
+# llc of --lto none writes into a directory of its own, so it runs in that
+# directory by absolute paths, run_llc of llvm_run.c and platform_run_in
+# of platform.c. The second program of the run is llc. The third and
+# fourth stat make the absolute path of llc, realpath of the file and of
+# its directory, and the fourth and fifth that of its input once the
+# third gave the first.
+file(REAL_PATH "${RUNTIME}/bin/llc" real_llc)
+anti_message(fault_llc_not_forked
+    FILES main.anti "${program}"
+    DIRECTORIES out
+    FAULT run:2:EACCES
+    ARGS ${tools} --lto none -o out/main main.anti
+    ERR "antic: cannot run ${real_llc}: Permission denied"
+        "antic: llc failed")
+anti_message(fault_llc_path
+    FILES main.anti "${program}"
+    DIRECTORIES out
+    FAULT stat:3:EACCES,stat:4:EACCES
+    ARGS ${tools} --lto none -o out/main main.anti
+    ERR "antic: llc failed")
+anti_message(fault_llc_input_path
+    FILES main.anti "${program}"
+    DIRECTORIES out
+    FAULT stat:4:EACCES,stat:5:EACCES
+    ARGS ${tools} --lto none -o out/main main.anti
+    ERR "antic: llc failed")
+# The soname of a library of Linux is a link beside it, platform_symlink of
+# platform.c. Its unlink is the third remove of the run and the link the
+# twelfth open.
+anti_message(fault_soname_not_unlinked
+    FILES exp.anti "${exporting}"
+    FAULT remove:3:EACCES
+    ARGS ${tools} --target linux-x86_64 --lib shared --soname
+         --package-version 1.2.3 -o libexp.so exp.anti
+    ERR "antic: cannot write libexp.so")
+anti_message(fault_soname_not_linked
+    FILES exp.anti "${exporting}"
+    FAULT open:12:EACCES
+    ARGS ${tools} --target linux-x86_64 --lib shared --soname
+         --package-version 1.2.3 -o libexp.so exp.anti
+    ERR "antic: cannot write libexp.so")
+# The digest of a plugin for its index, driver_write_plugin_index of
+# driver_index.c, which opens the library as the sixteenth file.
+if(NOT CMAKE_HOST_WIN32)
+    anti_message(fault_plugin_unread
+        DIRECTORIES net/example
+        SETUP compile_the_interface
+        FAULT open:16:EACCES
+        ARGS ${tools} --lib shared --no-runtime -I "${plugins}"
+             -I "${PROJECT}" -o libfancy.dylib
+             "${plugins}/net/example/fancy.anti"
+        ERR "antic: cannot read libfancy.dylib")
+endif()
+# The linker of the Mac, which xcrun names, platform_capture of
+# platform.c and xcrun of driver_link.c. opt and llc run first.
+if(CMAKE_HOST_APPLE)
+    anti_message(fault_xcrun_no_pipe
+        FILES main.anti "${program}"
+        FAULT run:3:EACCES
+        ARGS ${tools} --linker platform main.anti
+        ERR "antic: pipe: Permission denied"
+            "antic: xcrun --show-sdk-path failed")
+    anti_message(fault_xcrun_not_started
+        FILES main.anti "${program}"
+        FAULT run:4:EACCES
+        ARGS ${tools} --linker platform main.anti
+        ERR "antic: cannot run xcrun: Permission denied"
+            "antic: xcrun --show-sdk-path failed")
+endif()
+# --bundle-runtime of a static library of the Mac lists the members of
+# the runtime with llvm-ar, platform_capture of platform.c and
+# extract_runtime of driver_library.c. opt and llc run twice before it.
+if(CMAKE_HOST_APPLE)
+    include("${CMAKE_CURRENT_LIST_DIR}/../tools/cpu-levels.cmake")
+    antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../tools/cpu-levels")
+    set(bundled "${RUNTIME}/lib/${HOST}/${ANTIC_CPU_LEVEL_${HOST}}/libanti_rt.a")
+    anti_message(fault_bundle_no_pipe
+        FILES exp.anti "${exporting}"
+        FAULT run:5:EACCES
+        ARGS ${tools} --lib static --bundle-runtime -o libexp.a exp.anti
+        ERR "antic: pipe: Permission denied"
+            "antic: cannot bundle ${bundled}")
+    anti_message(fault_bundle_not_started
+        FILES exp.anti "${exporting}"
+        FAULT run:6:EACCES
+        ARGS ${tools} --lib static --bundle-runtime -o libexp.a exp.anti
+        ERR "antic: cannot run ${RUNTIME}/bin/llvm-ar: Permission denied"
+            "antic: cannot bundle ${bundled}")
+endif()
+# The licence text of the runtime, which the notice of every program
+# holds, archive_package of driver.c. The open of the text is the fourth
+# of a release build. T151: antic says it cannot open the text and links
+# the program all the same, with a notice that lacks it.
+anti_message(fault_runtime_license_unread
+    FILES main.anti "${program}"
+    FAULT open:4:EACCES
+    ARGS ${tools} main.anti
+    ERR "antic: cannot open ${RUNTIME}/licenses/anti_rt.txt")

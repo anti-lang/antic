@@ -31,3 +31,4 @@ modules_later_class_default_dev T149 A field default that names a class declared
 matrix_types_alloc_of_an_object_aligned_above_16_dev T150 alloc C { } of a class aligned above 16 gives an object at a multiple of 16 alone.
 matrix_types_alloc_of_an_object_aligned_above_16_release T150 alloc C { } of a class aligned above 16 gives an object at a multiple of 16 alone.
 matrix_types_alloc_of_an_object_aligned_above_16_memory_checks T150 alloc C { } of a class aligned above 16 gives an object at a multiple of 16 alone.
+antic_message_fault_runtime_license_unread T151 antic links a binary whose notice lacks a licence text it could not read, and ends with status 0.
