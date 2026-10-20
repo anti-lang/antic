@@ -577,197 +577,232 @@ static struct type *param_binary(struct checker *c, struct expr *e,
     }
 }
 
-struct type *sema_check_binary(struct checker *c, struct expr *e,
-                               struct type *expected)
+/* The checks a comparison and an arithmetic operator share: an operand
+   of a type parameter, of a simd struct, or of a type with an operator
+   function. Gives false where none of them applies, and the checked type
+   in *out otherwise. */
+static bool shared_binary(struct checker *c, struct expr *e,
+                          const char *called, struct type *left,
+                          struct type *right, struct type **out)
+{
+    if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
+        *out = param_binary(c, e, called, left, right);
+        return true;
+    }
+    if (types_is_simd(left) || types_is_simd(right)) {
+        *out = sema_check_simd_binary(c, e, left, right);
+        return true;
+    }
+    if (called != NULL) {
+        struct symbol *fn = sema_operator_symbol(c, left, called);
+        if (fn != NULL) {
+            *out = check_operator(c, e, right, fn);
+            return true;
+        }
+    }
+    return false;
+}
+
+static struct type *check_logical(struct checker *c, struct expr *e)
+{
+    enum token_kind op = e->as.binary.op;
+    char spelling[OP_TEXT];
+    /* The right operand runs only where the left one decided it, so it
+       sees the names the left proved. `p != none && p.n > 0` and
+       `p == none || p.n > 0` both read `p` as checked. */
+    struct symbol *proved[PROVED_MAX];
+    size_t count;
+    struct scope narrowed;
+    size_t i;
+    struct type *left = sema_check_test(c, e->as.binary.left);
+    struct type *right;
+
+    count = sema_proved_names(e->as.binary.left, op == TOKEN_AND_AND,
+                              proved, 0);
+    sema_enter_scope(c, &narrowed);
+    for (i = 0; i < count; i++) {
+        sema_narrow(c, proved[i], sema_proved_type(c, proved[i]));
+    }
+    right = sema_check_test(c, e->as.binary.right);
+    sema_leave_scope(c, &narrowed);
+    if (sema_is_error(left) || sema_is_error(right)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (left->kind != TYPE_BOOL || right->kind != TYPE_BOOL) {
+        sema_error_at(c, e->pos, "`%s` needs `bool` operands, found `%s`",
+                      sema_op_text(op, spelling),
+                      sema_tn(left->kind != TYPE_BOOL ? left : right));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return left;
+}
+
+/* `==` and `!=` without an operator function, on a type of parts. Gives
+   bool where the default compares the parts, and names what is missing
+   otherwise. */
+static struct type *default_equality(struct checker *c, struct expr *e,
+                                     struct type *left, const char *o)
+{
+    const struct struct_field *gap;
+
+    if (sema_equals(c, e, left)) {
+        return sema_builtin(c, TYPE_BOOL);
+    }
+    gap = left->kind == TYPE_STRUCT && !left->is_union ? sema_eq_gap(c, left)
+          : left->kind == TYPE_CLASS                   ? sema_class_gap(c, left)
+                                                       : NULL;
+    if (sema_concurrent_lacks(c, left, LANG_HOOK_EQ)) {
+        sema_error_at(c, e->pos, "`%s` is not defined on `%s`. "
+                      "A concurrent class has no default `==` "
+                      "and declares `concrete fn equals` or "
+                      "`operator fn eq` of its own", o, sema_tn(left));
+    } else if (gap != NULL) {
+        sema_error_at(c, e->pos, "`%s` is not defined on `%s`, "
+                      "whose field `%.*s` has no `eq`", o, sema_tn(left),
+                      (int)gap->name.length, gap->name.text);
+    } else {
+        sema_error_at(c, e->pos, "`%s` is not defined on `%s`", o,
+                      sema_tn(left));
+    }
+    return sema_builtin(c, TYPE_ERROR);
+}
+
+static struct type *check_comparison(struct checker *c, struct expr *e)
+{
+    enum token_kind op = e->as.binary.op;
+    bool equality = op == TOKEN_EQ || op == TOKEN_NE;
+    struct type *left;
+    struct type *right;
+    struct type *shared;
+    char spelling[OP_TEXT];
+    const char *o = sema_op_text(op, spelling);
+
+    if (!binary_operands(c, e, NULL, &left, &right)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* A `?T` of a value compares with `none` alone, which reads its
+       flag. */
+    if (equality &&
+        (e->as.binary.left->kind == EXPR_NONE ||
+         e->as.binary.right->kind == EXPR_NONE) &&
+        (left->kind == TYPE_OPTIONAL || right->kind == TYPE_OPTIONAL)) {
+        return sema_builtin(c, TYPE_BOOL);
+    }
+    if (shared_binary(c, e, operator_name(op), left, right, &shared)) {
+        return shared;
+    }
+    if (left != right && !(equality && comparable_pointers(left, right))) {
+        sema_error_at(c, e->pos,
+                      "the operands of `%s` have the types `%s` and "
+                      "`%s`", o, sema_tn(left), sema_tn(right));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (equality && unrelated_pointers(left, right)) {
+        sema_error_at(c, e->pos,
+                      "`%s` compares pointers of one chain, and `%s` and "
+                      "`%s` share none", o, sema_tn(left), sema_tn(right));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* DESIGN: a `str` has the hooks `eq` and `lt`. `==` compares the text
+       and `<` its bytes as unsigned numbers, which is the order of the
+       code points for UTF-8. */
+    if (equality) {
+        if (types_has_fields(left) || left->kind == TYPE_ARRAY ||
+            left->kind == TYPE_SLICE) {
+            return default_equality(c, e, left, o);
+        }
+    } else if (left->kind == TYPE_STRUCT || left->kind == TYPE_CLASS) {
+        sema_error_at(c, e->pos, "`%s` is not defined on `%s`%s", o,
+                      sema_tn(left), sema_no_order(left, LANG_HOOK_LT));
+        return sema_builtin(c, TYPE_ERROR);
+    } else if (!types_is_numeric(left) && left->kind != TYPE_CHAR &&
+               left->kind != TYPE_STR) {
+        sema_error_at(c, e->pos,
+                      "`%s` needs numeric, `char` or `str` operands, "
+                      "found `%s`", o, sema_tn(left));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return sema_builtin(c, TYPE_BOOL);
+}
+
+static struct type *check_arithmetic(struct checker *c, struct expr *e,
+                                     struct type *expected)
 {
     enum token_kind op = e->as.binary.op;
     struct type *left;
     struct type *right;
+    struct type *shared;
     char spelling[OP_TEXT];
     const char *o = sema_op_text(op, spelling);
-    const char *called = operator_name(op);
 
-    switch (op) {
+    if (!binary_operands(c, e, expected, &left, &right)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (shared_binary(c, e, operator_name(op), left, right, &shared)) {
+        return shared;
+    }
+    /* DESIGN: `a + f.carry` and `a - f.carry` take the `carry` of a Flags
+       value as a carry or a borrow into the operation. The field is a
+       bool, and the operation keeps the type of a. */
+    if ((op == TOKEN_PLUS || op == TOKEN_MINUS) &&
+        names_carry(e->as.binary.right) &&
+        types_is_flags(
+            sema_struct_of(e->as.binary.right->as.field.base->type))) {
+        if (!types_is_integer(left)) {
+            sema_error_at(c, e->pos,
+                          "a carry goes into an integer, found `%s`",
+                          sema_tn(left));
+            return sema_builtin(c, TYPE_ERROR);
+        }
+        e->as.binary.carry = true;
+        return left;
+    }
+    if (left != right) {
+        sema_error_at(c, e->pos,
+                      "the operands of `%s` have the types `%s` and "
+                      "`%s`", o, sema_tn(left), sema_tn(right));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if (op == TOKEN_PLUS || op == TOKEN_MINUS || op == TOKEN_STAR ||
+        op == TOKEN_SLASH) {
+        if (!types_is_numeric(left)) {
+            sema_error_at(c, e->pos,
+                          "`%s` needs numeric operands, found `%s`", o,
+                          sema_tn(left));
+            return sema_builtin(c, TYPE_ERROR);
+        }
+    } else if (!types_is_integer(left)) {
+        sema_error_at(c, e->pos, "`%s` needs integer operands, found `%s`",
+                      o, sema_tn(left));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    if ((op == TOKEN_SLASH || op == TOKEN_PERCENT || op == TOKEN_SHL ||
+         op == TOKEN_SHR || op == TOKEN_SHL_WRAP || op == TOKEN_PLUS ||
+         op == TOKEN_MINUS || op == TOKEN_STAR) &&
+        types_is_integer(left) && sema_undefined_on_constants(c, e, left)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    return left;
+}
+
+struct type *sema_check_binary(struct checker *c, struct expr *e,
+                               struct type *expected)
+{
+    switch (e->as.binary.op) {
     case TOKEN_QUESTION_QUESTION:
         return check_coalesce(c, e, expected);
     case TOKEN_AND_AND:
-    case TOKEN_OR_OR: {
-        /* The right operand runs only where the left one decided it,
-           so it sees the names the left proved. `p != none && p.n > 0`
-           and `p == none || p.n > 0` both read `p` as checked. */
-        struct symbol *proved[PROVED_MAX];
-        size_t count;
-        struct scope narrowed;
-        size_t i;
-        left = sema_check_test(c, e->as.binary.left);
-        count = sema_proved_names(e->as.binary.left, op == TOKEN_AND_AND,
-                                  proved,
-                                  0);
-        sema_enter_scope(c, &narrowed);
-        for (i = 0; i < count; i++) {
-            sema_narrow(c, proved[i], sema_proved_type(c, proved[i]));
-        }
-        right = sema_check_test(c, e->as.binary.right);
-        sema_leave_scope(c, &narrowed);
-        if (sema_is_error(left) || sema_is_error(right)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (left->kind != TYPE_BOOL || right->kind != TYPE_BOOL) {
-            sema_error_at(c, e->pos, "`%s` needs `bool` operands, found `%s`",
-                          o,
-                          sema_tn(left->kind != TYPE_BOOL ? left : right));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return left;
-    }
+    case TOKEN_OR_OR:
+        return check_logical(c, e);
     case TOKEN_EQ:
     case TOKEN_NE:
     case TOKEN_LT:
     case TOKEN_LE:
     case TOKEN_GT:
     case TOKEN_GE:
-        if (!binary_operands(c, e, NULL, &left, &right)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* A `?T` of a value compares with `none` alone, which reads its
-           flag. */
-        if ((op == TOKEN_EQ || op == TOKEN_NE) &&
-            (e->as.binary.left->kind == EXPR_NONE ||
-             e->as.binary.right->kind == EXPR_NONE) &&
-            (left->kind == TYPE_OPTIONAL || right->kind == TYPE_OPTIONAL)) {
-            return sema_builtin(c, TYPE_BOOL);
-        }
-        if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
-            return param_binary(c, e, called, left, right);
-        }
-        if (types_is_simd(left) || types_is_simd(right)) {
-            return sema_check_simd_binary(c, e, left, right);
-        }
-        if (called != NULL) {
-            struct symbol *fn = sema_operator_symbol(c, left, called);
-            if (fn != NULL) {
-                return check_operator(c, e, right, fn);
-            }
-        }
-        if (left != right &&
-            !((op == TOKEN_EQ || op == TOKEN_NE) &&
-              comparable_pointers(left, right))) {
-            sema_error_at(c, e->pos,
-                          "the operands of `%s` have the types `%s` and "
-                          "`%s`", o, sema_tn(left), sema_tn(right));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if ((op == TOKEN_EQ || op == TOKEN_NE) &&
-            unrelated_pointers(left, right)) {
-            sema_error_at(c, e->pos,
-                          "`%s` compares pointers of one chain, and `%s` and "
-                          "`%s` share none", o, sema_tn(left),
-                          sema_tn(right));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        /* DESIGN: a `str` has the hooks `eq` and `lt`. `==` compares
-           the text and `<` its bytes as unsigned numbers, which is the
-           order of the code points for UTF-8. */
-        if (op == TOKEN_EQ || op == TOKEN_NE) {
-            if (types_has_fields(left) || left->kind == TYPE_ARRAY ||
-                left->kind == TYPE_SLICE) {
-                const struct struct_field *gap;
-                if (sema_equals(c, e, left)) {
-                    return sema_builtin(c, TYPE_BOOL);
-                }
-                gap = left->kind == TYPE_STRUCT && !left->is_union
-                          ? sema_eq_gap(c, left)
-                      : left->kind == TYPE_CLASS ? sema_class_gap(c, left)
-                                                 : NULL;
-                if (sema_concurrent_lacks(c, left, LANG_HOOK_EQ)) {
-                    sema_error_at(c, e->pos, "`%s` is not defined on `%s`. "
-                                  "A concurrent class has no default `==` "
-                                  "and declares `concrete fn equals` or "
-                                  "`operator fn eq` of its own", o,
-                                  sema_tn(left));
-                } else if (gap != NULL) {
-                    sema_error_at(c, e->pos, "`%s` is not defined on `%s`, "
-                                  "whose field `%.*s` has no `eq`", o,
-                                  sema_tn(left), (int)gap->name.length,
-                                  gap->name.text);
-                } else {
-                    sema_error_at(c, e->pos, "`%s` is not defined on `%s`",
-                                  o, sema_tn(left));
-                }
-                return sema_builtin(c, TYPE_ERROR);
-            }
-        } else if (left->kind == TYPE_STRUCT || left->kind == TYPE_CLASS) {
-            sema_error_at(c, e->pos, "`%s` is not defined on `%s`%s", o,
-                          sema_tn(left), sema_no_order(left, LANG_HOOK_LT));
-            return sema_builtin(c, TYPE_ERROR);
-        } else if (!types_is_numeric(left) && left->kind != TYPE_CHAR &&
-                   left->kind != TYPE_STR) {
-            sema_error_at(c, e->pos,
-                          "`%s` needs numeric, `char` or `str` operands, "
-                          "found `%s`", o, sema_tn(left));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return sema_builtin(c, TYPE_BOOL);
+        return check_comparison(c, e);
     default:
-        if (!binary_operands(c, e, expected, &left, &right)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (left->kind == TYPE_PARAM || right->kind == TYPE_PARAM) {
-            return param_binary(c, e, called, left, right);
-        }
-        if (types_is_simd(left) || types_is_simd(right)) {
-            return sema_check_simd_binary(c, e, left, right);
-        }
-        if (called != NULL) {
-            struct symbol *fn = sema_operator_symbol(c, left, called);
-            if (fn != NULL) {
-                return check_operator(c, e, right, fn);
-            }
-        }
-        /* DESIGN: `a + f.carry` and `a - f.carry` take the `carry` of a
-           Flags value as a carry or a borrow into the operation. The
-           field is a bool, and the operation keeps the type of a. */
-        if ((op == TOKEN_PLUS || op == TOKEN_MINUS) &&
-            names_carry(e->as.binary.right) &&
-            types_is_flags(sema_struct_of(
-                e->as.binary.right->as.field.base->type))) {
-            if (!types_is_integer(left)) {
-                sema_error_at(c, e->pos,
-                              "a carry goes into an integer, found `%s`",
-                              sema_tn(left));
-                return sema_builtin(c, TYPE_ERROR);
-            }
-            e->as.binary.carry = true;
-            return left;
-        }
-        if (left != right) {
-            sema_error_at(c, e->pos,
-                          "the operands of `%s` have the types `%s` and "
-                          "`%s`", o, sema_tn(left), sema_tn(right));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if (op == TOKEN_PLUS || op == TOKEN_MINUS || op == TOKEN_STAR ||
-            op == TOKEN_SLASH) {
-            if (!types_is_numeric(left)) {
-                sema_error_at(c, e->pos,
-                              "`%s` needs numeric operands, found `%s`",
-                              o, sema_tn(left));
-                return sema_builtin(c, TYPE_ERROR);
-            }
-        } else if (!types_is_integer(left)) {
-            sema_error_at(c, e->pos, "`%s` needs integer operands, found `%s`",
-                          o,
-                          sema_tn(left));
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        if ((op == TOKEN_SLASH || op == TOKEN_PERCENT || op == TOKEN_SHL ||
-             op == TOKEN_SHR || op == TOKEN_SHL_WRAP || op == TOKEN_PLUS ||
-             op == TOKEN_MINUS || op == TOKEN_STAR) &&
-            types_is_integer(left) &&
-            sema_undefined_on_constants(c, e, left)) {
-            return sema_builtin(c, TYPE_ERROR);
-        }
-        return left;
+        return check_arithmetic(c, e, expected);
     }
 }
 
