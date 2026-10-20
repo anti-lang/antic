@@ -1,0 +1,6 @@
+exit 0
+field "" offset -1 type 0 owned 0
+function "" slot -1 params 0
+function ""
+get kind 0
+tiny kind 1 value -3

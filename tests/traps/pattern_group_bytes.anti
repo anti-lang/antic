@@ -1,0 +1,16 @@
+//! A group of a byte match past the one group of its pattern stops the program
+//! with the count of the pattern.
+
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let data = b"key=value";
+	let m = data.matches(re"key=(\w+)") else {
+		return 1;
+	};
+	let n = text.parse_int("2") catch fatal;
+	let g = m.group(n);
+	return g.len as int;
+}

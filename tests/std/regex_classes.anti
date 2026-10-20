@@ -1,0 +1,50 @@
+//! Classes of byte patterns that `regex.compile_bytes` takes apart: a property
+//! with and without braces, the POSIX forms with `.` and `=`, a negated class
+//! and a range with a character outside ASCII, and letters quoted with `\Q`.
+//! A pattern of text takes CRLF as its newline, and a pattern of two groups of
+//! one name gives the first that took part. Each line prints what came of the
+//! pattern.
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Compile `pattern` for bytes and print whether `data` matches it, or the
+/// message of the refusal.
+fn try_bytes(pattern: str, data: str)
+{
+	let r = regex.compile_bytes(pattern) catch e {
+		printf("%.*s: %.*s\n".ptr, pattern.len as c_int, pattern.ptr,
+			e.message.len as c_int, e.message.ptr);
+		return;
+	};
+	let bytes = []byte { ptr: data.ptr, len: data.len };
+	let hit = regex.bytes_matched(bytes, r) catch fatal;
+	printf("%.*s: %d\n".ptr, pattern.len as c_int, pattern.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	try_bytes("[\\pL]", "a");
+	try_bytes("[\\p{L}]", "a");
+	try_bytes("[[:alpha:]]", "a");
+	try_bytes("[[.a.]]", "a");
+	try_bytes("[[=a=]]", "a");
+	try_bytes("[\\Qab\\E]", "b");
+	try_bytes("[^\\Q\u{e9}\\E]", "a");
+	try_bytes("[a-\u{e9}]", "a");
+	let lines = regex.compile("(*CRLF)x*") catch fatal;
+	let found = regex.find_all("a\r\nb", lines) catch fatal;
+	let all = found.to_slice();
+	let count = all.len;
+	free(all.ptr);
+	printf("crlf %d\n".ptr, count as c_int);
+	let named = regex.compile("(?J)(?<n>a)|(?<n>b)") catch fatal;
+	let m = regex.matches("b", named) catch fatal else {
+		return 1;
+	};
+	let g = m.group("n");
+	printf("named %.*s\n".ptr, g.len as c_int, g.ptr);
+	return 0;
+}

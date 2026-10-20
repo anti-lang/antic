@@ -1,0 +1,30 @@
+//! `p as *T` on an object of no class below `T` stops the program with the
+//! name of `T`, in every mode, where `p as? *T` would give `none`.
+
+class Shape
+{
+	pub side: int = 1,
+}
+
+class Circle inherits Shape
+{
+}
+
+class Square inherits Shape
+{
+}
+
+fn pick(square: bool) -> *Shape
+{
+	if square {
+		return alloc Square { };
+	}
+	return alloc Circle { };
+}
+
+fn main() -> int
+{
+	let s = pick(true);
+	let c = s as *Circle;
+	return c.side;
+}

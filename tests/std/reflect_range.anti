@@ -1,0 +1,39 @@
+//! `anti.reflect` at an index out of range, and the field of the one integer
+//! type the other tests read no `Value` of. A field and a function out of
+//! range have no name, a field none of its offset or type, and `get` gives a
+//! value of kind `None` for them.
+import anti.reflect;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Small
+{
+	pub tiny: i8 = -3,
+
+	pub fn twice(self) -> int
+	{
+		return self.tiny as int * 2;
+	}
+}
+
+fn main() -> int
+{
+	let s = alloc Small { };
+	let d = reflect.describe(s as *byte) else {
+		return 1;
+	};
+	let f = reflect.field(d, 99);
+	printf("field \"%.*s\" offset %d type %d owned %d\n".ptr, f.name.len as c_int,
+		f.name.ptr, f.offset as c_int, f.type_id as c_int, f.owned as c_int);
+	let g = reflect.function(d, 99);
+	printf("function \"%.*s\" slot %d params %d\n".ptr, g.name.len as c_int,
+		g.name.ptr, g.slot as c_int, g.param_count as c_int);
+	let below = reflect.function(d, -1);
+	printf("function \"%.*s\"\n".ptr, below.name.len as c_int, below.name.ptr);
+	let none_value = reflect.get(s as *byte, d, 99);
+	printf("get kind %d\n".ptr, none_value.kind as c_int);
+	let v = reflect.get(s as *byte, d, 0);
+	printf("tiny kind %d value %d\n".ptr, v.kind as c_int, v.data.i as c_int);
+	delete(s);
+	return 0;
+}

@@ -1,0 +1,11 @@
+exit 0
+[\pL]: 1
+[\p{L}]: 1
+[[:alpha:]]: 1
+[[.a.]]: POSIX collating elements are not supported
+[[=a=]]: POSIX collating elements are not supported
+[\Qab\E]: 1
+[^\Qé\E]: a byte pattern cannot negate a class that holds a character outside ASCII, which text mode can
+[a-é]: a range of a byte pattern cannot reach beyond ASCII, which text mode can
+crlf 4
+named b

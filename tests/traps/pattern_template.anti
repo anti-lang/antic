@@ -1,0 +1,13 @@
+//! A template computed at run time that names a group the pattern literal
+//! lacks stops `replace` with the template and the pattern.
+
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	b.append("${day}");
+	let s = "2026-09".replace(re"(?<year>\d+)-(?<month>\d+)", b.text());
+	return s.len as int;
+}

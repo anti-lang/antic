@@ -10,6 +10,10 @@ import anti.toml;
 
 const SOURCE: str = "name = \"faults\"\n[table]\nkey = 1\nother = [1, 2]\ninline = { a = 1, b = 2 }\n";
 
+/// A second document, read after the first, whose second `[[item]]` indexes
+/// the paths of the keys before it in a table of names of their own.
+const TABLES: str = "[[item]]\na = 1\n[[item]]\nb = 2\n";
+
 fn main() -> int
 {
 	let doc = toml.Document.read(SOURCE) catch e {
@@ -19,6 +23,14 @@ fn main() -> int
 	let b = text.Builder.new();
 	b.append("pairs ");
 	json.write_int(doc.len(), &b);
+	io.println(b.text());
+	let tables = toml.Document.read(TABLES) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	b.clear();
+	b.append("tables ");
+	json.write_int(tables.len(), &b);
 	io.println(b.text());
 	return 0;
 }

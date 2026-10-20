@@ -1,0 +1,14 @@
+//! `rt.configure` reads the first file it is given, and a second call reads
+//! nothing, since the configuration of a run is read once.
+import anti.runtime as rt;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	rt.configure(args[1]);
+	rt.configure(args[2]);
+	let backtrace = rt.get("backtrace") ?? "none";
+	printf("backtrace %.*s\n".ptr, backtrace.len as c_int, backtrace.ptr);
+	return 0;
+}

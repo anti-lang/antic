@@ -1,0 +1,71 @@
+//! Calls of the standard library at the edges the runtime checks itself: a
+//! path that holds a NUL byte, which every function of `anti.fs` refuses with
+//! `EINVAL`, a signal number outside the table, which `os.on_signal` passes
+//! over, and a sleep of no time, which returns at once.
+import anti.fs;
+import anti.lang;
+import anti.os;
+import anti.text;
+import anti.time;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn heard(sig: int)
+{
+	printf("signal %d\n".ptr, sig as c_int);
+}
+
+/// Print `label` and the code of `e`.
+fn failed(label: str, e: *lang.Error)
+{
+	printf("%.*s: code %d\n".ptr, label.len as c_int, label.ptr, e.code as c_int);
+}
+
+/// Open path and close it again.
+fn opened(path: str)
+{
+	let f = fs.open(path) catch e {
+		failed("open", e);
+		return;
+	};
+	fs.close(f) catch fatal;
+}
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	b.append("edges");
+	b.append_byte(0);
+	b.append(".txt");
+	let path = b.text();
+	let bytes = []byte { ptr: "x".ptr, len: 1 };
+	fs.write_file(path, bytes) catch e {
+		failed("write_file", e);
+	};
+	let read = fs.read_file(path) catch e {
+		failed("read_file", e);
+		yield []byte { ptr: none, len: 0 };
+	};
+	opened(path);
+	let names = fs.list(path) catch e {
+		failed("list", e);
+		yield []str { ptr: none, len: 0 };
+	};
+	fs.remove(path) catch e {
+		failed("remove", e);
+	};
+	fs.rename(path, "edges.txt") catch e {
+		failed("rename", e);
+	};
+	fs.rename("edges.txt", path) catch e {
+		failed("rename to", e);
+	};
+	os.on_signal(0, heard);
+	os.on_signal(100000, heard);
+	printf("pending %d\n".ptr, os.signal_pending() as c_int);
+	let before = time.now();
+	time.sleep(time.nanoseconds(0));
+	time.sleep(time.nanoseconds(-5));
+	printf("slept %d\n".ptr, (time.now() - before < 1000000000) as c_int);
+	return read.len as int + names.len as int;
+}

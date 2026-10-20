@@ -2,7 +2,9 @@
 # tests/CMakeLists.txt. alloc counts the memory of the runtime after the
 # start, which the reader takes from the fifth on: the document, the
 # copies of the keys and the values, the list of pairs and the names of the
-# tables, in the order of the text.
+# tables, in the order of the text. The second document takes the 20th to
+# the 26th, and its second `[[item]]` header the table of the names of the
+# paths with the 24th.
 memory_5 alloc:5:ENOMEM
 memory_6 alloc:6:ENOMEM
 memory_7 alloc:7:ENOMEM
@@ -11,3 +13,4 @@ memory_9 alloc:9:ENOMEM
 memory_10 alloc:10:ENOMEM
 memory_11 alloc:11:ENOMEM
 memory_12 alloc:12:ENOMEM
+names_memory alloc:24:ENOMEM

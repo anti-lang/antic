@@ -1,0 +1,16 @@
+//! A group name that a pattern literal lacks, computed at run time, stops the
+//! program with the name, since the compiler checks a written name alone.
+
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let m = "2026-09".matches(re"(?<year>\d+)-(?<month>\d+)") else {
+		return 1;
+	};
+	let b = text.Builder.new();
+	b.append("day");
+	let g = m.group(b.text());
+	return g.len as int;
+}

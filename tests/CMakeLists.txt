@@ -1908,6 +1908,11 @@ add_test(NAME trap_table
 # pattern. pattern_patch_into: a `patch` whose computed `into` names no
 # group of its pattern literal stops with the count of the pattern and the
 # `into`. chan_capacity: a channel made for no value stops the program.
+# cast_failed: `p as *T` on an object of no class below T stops it with
+# the name of T. pattern_group_name and pattern_template: a group name and
+# a template computed at run time that the pattern literal lacks stop the
+# program with the name or the template. pattern_group_bytes: a group of a
+# byte match past those of its pattern stops it with their count.
 # send_closed and send_closed_waiting: a `send` on a closed channel stops
 # it, one that waits on a full channel included. take_in_refused,
 # error_text_refused and trace_names_refused: the text that `take_in`
@@ -1918,7 +1923,8 @@ add_test(NAME trap_table
 # product, a sum, a doubling and a shift of the room of each collection.
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         singleton_memory pattern_limit pattern_group_count pattern_patch_into
-        chan_capacity
+        chan_capacity cast_failed pattern_group_name pattern_template
+        pattern_group_bytes
         send_closed send_closed_waiting take_in_refused error_text_refused
         trace_names_refused room_list room_list_reserve room_deque_reserve
         room_grid room_map room_map_reserve room_hash_map room_sorted
@@ -2281,6 +2287,11 @@ foreach(case
         "include_missing|report||--anti.conf=${CONF}/missing.toml|empty.pattern|missing.pattern|70"
         "include_cycle|report||--anti.conf=${CONF}/cycle.toml|empty.pattern|cycle.pattern|70"
         "unknown_option|report||--anti.nonsense|empty.pattern|unknown-option.pattern|70"
+        "long_option|report||--anti.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|empty.pattern|long-option.pattern|70"
+        "inject_no_value|report||--anti.inject|empty.pattern|inject-no-value.pattern|70"
+        "hash_seed_empty|report||--anti.hash_seed=|empty.pattern|seed-empty.pattern|70"
+        "element_key|report||--anti.conf=${CONF}/element-key.toml|empty.pattern|element-key.pattern|70"
+        "configure_twice|configure_twice||${CONF}/backtrace.toml,${CONF}/no-backtrace.toml|configure-twice.pattern||0"
         "unknown_key|report||--anti.conf=${CONF}/unknown-key.toml|empty.pattern|unknown-key.pattern|70"
         "bad_value|report||--anti.conf=${CONF}/bad-value.toml|empty.pattern|bad-value.pattern|70"
         "nul_value|report||--anti.conf=${CONF}/nul-value.toml|empty.pattern|nul-value.pattern|70"
@@ -2376,7 +2387,9 @@ add_test(NAME conf_hash_seed_random
 # replacement at start, and --anti.inspect lists what it injects. The
 # program imports nothing, and the case plugin shows that its start opens
 # the library that --anti.inject names through the loader of the runtime,
-# which every program links, S328 of docs/audit/summary.md. The runner
+# which every program links, S328 of docs/audit/summary.md. The case
+# layers names the library of the second of two lines of the command
+# line, over the line of a file for the same interface. The runner
 # is the one of the configuration tests, because a pattern file holds the
 # output of each.
 set(INJECT "${CMAKE_CURRENT_SOURCE_DIR}/inject")
@@ -2386,7 +2399,8 @@ foreach(case
         "inspect|${INJECT_OPTIONS}|--anti.inspect|inspect.pattern||0"
         "final|${INJECT_OPTIONS}|--anti.inject=service.Clock=lib/x.so|empty.pattern|final.pattern|70"
         "unknown|${INJECT_OPTIONS}|--anti.inject=other.Thing=lib/x.so|empty.pattern|unknown.pattern|70"
-        "plugin|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so|empty.pattern|plugin.pattern|70")
+        "plugin|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so|empty.pattern|plugin.pattern|70"
+        "layers|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so,--anti.inject=service.Logger=lib/y.so,--anti.conf=${INJECT}/logger.toml|empty.pattern|layers.pattern|70")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 options)
@@ -6788,6 +6802,27 @@ add_test(NAME faults_not_shipped
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             ${faults_copies}
             -P "${ANTIC_RUNNERS}/run_faults_not_shipped.cmake")
+
+# A malformed value of ANTI_FAULT ends the process with status 125 and the
+# reason, at the first call of a seam, here the open of the source that
+# antic_faults reads. A case names the value and the reason.
+if(ANTIC_FAULTS)
+    foreach(case "no_entry|open|an entry is not <kind>:<n>:<error>"
+            "no_kind|nope:1:EIO|an entry names no kind of fault\\.h"
+            "count_zero|open:0:EIO|an entry counts from 1"
+            "count_long|open:1234567890:EIO|an entry counts from 1"
+            "count_text|open:1x:EIO|an entry counts from 1"
+            "no_error|open:1:ENOPE|an entry names no error of fault\\.c")
+        string(REPLACE "|" ";" parts "${case}")
+        list(GET parts 0 name)
+        list(GET parts 1 value)
+        list(GET parts 2 reason)
+        add_expect_test(faults_variable_${name} STATUS 125
+            COMMAND "${CMAKE_COMMAND}" -E env "ANTI_FAULT=${value}"
+                    $<TARGET_FILE:antic_faults> nowhere.anti
+            PATTERN "^ANTI_FAULT=${value}: ${reason}")
+    endforeach()
+endif()
 
 add_test(NAME release_pins
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"

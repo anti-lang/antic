@@ -1,0 +1,1 @@
+pattern_template.anti:11: the template `${day}` names a group the pattern `(?<year>\d+)-(?<month>\d+)` lacks

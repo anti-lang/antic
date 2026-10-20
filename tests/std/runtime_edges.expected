@@ -1,0 +1,10 @@
+exit 0
+write_file: code 22
+read_file: code 22
+open: code 22
+list: code 22
+remove: code 22
+rename: code 22
+rename to: code 22
+pending 0
+slept 1

@@ -1,0 +1,1 @@
+anti: --anti\.inject takes an interface and the path of a library, as --anti\.inject=Interface=path

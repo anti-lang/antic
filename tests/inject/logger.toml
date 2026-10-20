@@ -1,0 +1,4 @@
+# A provider of a library for the logger of service.anti, which an
+# injection of the command line for the same interface overrides.
+[injections]
+'service.Logger' = 'lib/z.so'
