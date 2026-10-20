@@ -1,0 +1,84 @@
+//! `Object.deserialize` of the parts of an object that a text can get wrong: a
+//! `char`, an `own` slice and the elements in it, an `own` pointer to a value,
+//! a tuple and its parts, a struct written as `{}`, a name before `type` whose
+//! value is no JSON, an unknown member and a chain of objects deeper than the
+//! reader goes. Each line prints what came back, or `refused`.
+import anti.io;
+import anti.mem;
+import anti.text;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Parts
+{
+	pub c: char = 'a',
+	pub own items: []int,
+	pub own p: ?*int = none,
+	pub t: (int, int) = (0, 0),
+	pub at: Point = Point { x: 1, y: 2 },
+}
+
+class Node
+{
+	pub own next: ?*Node = none,
+}
+
+/// Read input and print the text of the object it gives, or `refused`.
+fn read(c: *text.Builder, input: str)
+{
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(input, &arena);
+	if back == none {
+		io.println("refused");
+		arena.free_all();
+		return;
+	}
+	c.clear();
+	back.serialize(c);
+	io.println(c.text());
+	arena.free_all();
+}
+
+/// The text of a chain of n objects of `Node`, each holding the next.
+fn chain(n: int) -> str
+{
+	let b = text.Builder.new();
+	let i = 0;
+	while i < n do {
+		b.append("{\"type\":\"Node\",\"next\":");
+		i += 1;
+	}
+	b.append("null");
+	i = 0;
+	while i < n do {
+		b.append("}");
+		i += 1;
+	}
+	return b.take();
+}
+
+fn main() -> int
+{
+	let c = text.Builder.new();
+	read(&c, "{\"type\":\"Parts\",\"c\":\"q\",\"items\":[1,2],\"p\":3,\"t\":[4,5]}");
+	read(&c, "{\"type\":\"Parts\",\"c\":5}");
+	read(&c, "{\"type\":\"Parts\",\"items\":5}");
+	read(&c, "{\"type\":\"Parts\",\"items\":[1,\"x\"]}");
+	read(&c, "{\"type\":\"Parts\",\"p\":\"x\"}");
+	read(&c, "{\"type\":\"Parts\",\"t\":5}");
+	read(&c, "{\"type\":\"Parts\",\"t\":[1,\"x\"]}");
+	read(&c, "{\"type\":\"Parts\",\"at\":{}}");
+	read(&c, "{\"c\":@,\"type\":\"Parts\"}");
+	read(&c, "{\"type\":\"Parts\",\"unknown\":1}");
+	let short = chain(3);
+	read(&c, short);
+	free(short.ptr);
+	let deep = chain(70);
+	read(&c, deep);
+	free(deep.ptr);
+	return 0;
+}

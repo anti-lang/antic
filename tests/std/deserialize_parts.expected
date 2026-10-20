@@ -1,0 +1,13 @@
+exit 0
+{"type":"Parts","c":"q","items":[1,2],"p":3,"t":[4,5],"at":{"x":1,"y":2}}
+refused
+refused
+refused
+refused
+refused
+refused
+{"type":"Parts","c":"a","items":null,"p":null,"t":[0,0],"at":{"x":1,"y":2}}
+refused
+{"type":"Parts","c":"a","items":null,"p":null,"t":[0,0],"at":{"x":1,"y":2}}
+{"type":"Node","next":{"type":"Node","next":{"type":"Node","next":null}}}
+refused

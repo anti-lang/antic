@@ -1,0 +1,88 @@
+//! A class that replaces each hook of `Object` and calls the hook of the root
+//! through `self.super` before it prints. The root's hooks do nothing, so the
+//! lines are those of the class alone.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+trace class Watched
+{
+	pub n: int = 0,
+
+	concrete fn created(self)
+	{
+		self.super.created();
+		printf("created\n".ptr);
+	}
+
+	concrete fn destroyed(self)
+	{
+		self.super.destroyed();
+		printf("destroyed\n".ptr);
+	}
+
+	concrete fn dispatched(self)
+	{
+		self.super.dispatched();
+		printf("dispatched\n".ptr);
+	}
+
+	concrete fn joined(self)
+	{
+		self.super.joined();
+		printf("joined\n".ptr);
+	}
+
+	concrete fn enter(self, name: str)
+	{
+		self.super.enter(name);
+		printf("enter %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn leave(self, name: str)
+	{
+		self.super.leave(name);
+		printf("leave %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn failed(self, name: str, e: *lang.Error)
+	{
+		self.super.failed(name, e);
+		printf("failed %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn changed(self, field: *FieldDescriptor)
+	{
+		self.super.changed(field);
+		printf("changed\n".ptr);
+	}
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+
+	pub fn refuse(self) may fail
+	{
+		fail "no";
+	}
+}
+
+worker fn work(w: *Watched) -> int
+{
+	return w.n;
+}
+
+fn main() -> int
+{
+	let w = alloc Watched { };
+	w.bump();
+	w.refuse() catch e {
+		printf("caught\n".ptr);
+	};
+	let j = dispatch w -> work();
+	printf("got %d\n".ptr, join(j) as c_int);
+	delete(w);
+	return 0;
+}

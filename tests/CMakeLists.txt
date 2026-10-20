@@ -884,6 +884,9 @@ endforeach()
 # which is release mode. The five always-on hooks fire there and the call
 # hooks do not, so each case below names an expected file of its own.
 #
+# hooks_super.anti calls the hook of the root from each hook of a class,
+# which the call hooks and `changed` reach under --trace writes alone.
+#
 # The option --no-hooks drops every hook site, the always-on ones as
 # well. Bare --trace turns the code marked `trace` on. The value writes
 # adds the `changed` hook after a write. A pattern reaches a class that
@@ -898,7 +901,8 @@ foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
         "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected"
         "hook_trace|trace_no_hooks|--trace,--no-hooks|hook_trace.expected"
         "hook_trace|module|--trace,hook_trace|hook_trace.module.expected"
-        "trace_handlers|traced|--trace,--trace,writes|trace_handlers.traced.expected")
+        "trace_handlers|traced|--trace,--trace,writes|trace_handlers.traced.expected"
+        "hooks_super|writes|--trace,--trace,writes|hooks_super.writes.expected")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 source)
     list(GET parts 1 case_name)

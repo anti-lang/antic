@@ -80,3 +80,4 @@ std_faults_registry_fault_blocks_memory T139 The registry gives none where memor
 std_faults_registry_fault_fields_memory T139 The registry gives none where memory that runs out stops the program.
 anti_build_message_fault_fetch_index_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_build_message_fault_fetch_package_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
+std_collection_text_array_field T158 An array field of a struct element stands as ? in the text of a collection.

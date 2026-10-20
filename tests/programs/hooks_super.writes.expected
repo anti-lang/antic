@@ -1,0 +1,13 @@
+exit 0
+created
+enter hooks_super.Watched.bump
+changed
+leave hooks_super.Watched.bump
+enter hooks_super.Watched.refuse
+failed hooks_super.Watched.refuse
+leave hooks_super.Watched.refuse
+caught
+dispatched
+joined
+got 1
+destroyed

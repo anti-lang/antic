@@ -1,0 +1,42 @@
+//! The fields of the C types and of `char` through the default `serialize`
+//! and `Object.deserialize`: `c_long`, `c_ulong`, `c_wchar` and `char` come
+//! back with the value they were written with, and so does a bitfield of
+//! `char` size beside them.
+import anti.io;
+import anti.mem;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+class Wide
+{
+	pub l: c_long = 0,
+	pub u: c_ulong = 0,
+	pub w: c_wchar = 0,
+	pub c: char = 'a',
+	pub h: i16 = 0,
+}
+
+fn show(k: *Wide)
+{
+	printf("l %ld u %lu w %d c %d h %d\n".ptr, k.l, k.u, k.w as c_int,
+		k.c as u32 as c_int, k.h as c_int);
+}
+
+fn main() -> int
+{
+	let k = alloc Wide { l: -5, u: 7, w: 66, c: 'q', h: -300 };
+	show(k);
+	let b = text.Builder.new();
+	k.serialize(&b);
+	io.println(b.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(b.text(), &arena);
+	if back == none || !(back is *Wide) {
+		return 2;
+	}
+	show(back as *Wide);
+	arena.free_all();
+	delete(k);
+	return 0;
+}

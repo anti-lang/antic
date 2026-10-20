@@ -1,0 +1,127 @@
+//! The text and the JSON of the elements of a collection, for each kind of
+//! element that `to_text` and `serialize` of `collection.Collection<T>` reach
+//! through the runtime: a pointer, a function, a slice, an array and a struct
+//! that holds them.
+
+import anti.collection.list.{List};
+import anti.lang;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Point {
+	x: int,
+	y: int,
+}
+
+/// A struct whose fields the text walks one level down.
+struct Holder {
+	at: *Point,
+	none_at: ?*Point,
+	run: fn(int) -> int,
+	items: []int,
+}
+
+class Shape {
+	pub side: int = 0,
+
+	concrete fn to_text(self) -> str
+	{
+		return "shape";
+	}
+}
+
+class Plain {
+	pub n: int = 0,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+/// Print `s` and free it.
+fn show(s: str)
+{
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+}
+
+fn pointers()
+{
+	let p = Point { x: 1, y: 2 };
+	let points = List<*Point>.new();
+	points.push(&p);
+	show(points.to_text());
+	let maybe = List<?*Point>.new();
+	maybe.push(&p);
+	maybe.push(none);
+	show(maybe.to_text());
+	let s = Shape { side: 3 };
+	let shapes = List<*Shape>.new();
+	shapes.push(&s);
+	show(shapes.to_text());
+	let n = 7;
+	let ints = List<*int>.new();
+	ints.push(&n);
+	show(ints.to_text());
+}
+
+fn functions()
+{
+	let runs = List<fn(int) -> int>.new();
+	runs.push(twice);
+	show(runs.to_text());
+}
+
+fn slices()
+{
+	let a = [1, 2, 3];
+	let rows = List<[]int>.new();
+	rows.push(a[0..3]);
+	rows.push(a[0..0]);
+	show(rows.to_text());
+	let p = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+	let points = List<[]Point>.new();
+	points.push(p[0..2]);
+	show(points.to_text());
+	let out = text.Builder.new();
+	rows.serialize(&out);
+	show(out.take());
+}
+
+fn arrays()
+{
+	let rows = List<[3]int>.new();
+	rows.push([1, 2, 3]);
+	rows.push([4, 5, 6]);
+	show(rows.to_text());
+	let out = text.Builder.new();
+	rows.serialize(&out);
+	show(out.take());
+	let plains = List<[2]Plain>.new();
+	plains.push([Plain { n: 1 }, Plain { n: 2 }]);
+	let more = text.Builder.new();
+	plains.serialize(&more);
+	show(more.take());
+	show(plains.to_text());
+}
+
+fn holders()
+{
+	let p = Point { x: 5, y: 6 };
+	let a = [7, 8];
+	let holders = List<Holder>.new();
+	holders.push(Holder { at: &p, none_at: none, run: twice, items: a[0..2] });
+	show(holders.to_text());
+}
+
+fn main() -> int
+{
+	pointers();
+	functions();
+	slices();
+	arrays();
+	holders();
+	return 0;
+}

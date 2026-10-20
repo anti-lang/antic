@@ -1,0 +1,20 @@
+//! The text of a collection whose element is a struct with an array field.
+//! The array stands as `[1, 2]`, as an array element does.
+
+import anti.collection.list.{List};
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Row {
+	cells: [2]int,
+}
+
+fn main() -> int
+{
+	let rows = List<Row>.new();
+	rows.push(Row { cells: [9, 10] });
+	let s = rows.to_text();
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	free(s.ptr);
+	return 0;
+}
