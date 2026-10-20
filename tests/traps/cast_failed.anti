@@ -1,5 +1,5 @@
-//! `p as *T` on an object of no class below `T` stops the program with the
-//! name of `T`, in every mode, where `p as? *T` would give `none`.
+//! `p as *T` on an object of no class below `T` stops the program with the name
+//! of `T`, in every mode, where `p as? *T` would give `none`.
 
 class Shape
 {

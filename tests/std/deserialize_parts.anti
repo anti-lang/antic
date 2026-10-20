@@ -1,8 +1,9 @@
 //! `Object.deserialize` of the parts of an object that a text can get wrong: a
-//! `char`, one of five escaped characters among them, an `own` slice and the elements in it, an `own` pointer to a value,
-//! a tuple and its parts, a struct written as `{}`, a name before `type` whose
-//! value is no JSON, an unknown member and a chain of objects deeper than the
-//! reader goes. Each line prints what came back, or `refused`.
+//! `char`, one of five escaped characters among them, an `own` slice and the
+//! elements in it, an `own` pointer to a value, a tuple and its parts, a struct
+//! written as `{}`, a name before `type` whose value is no JSON, an unknown
+//! member and a chain of objects deeper than the reader goes. Each line prints
+//! what came back, or `refused`.
 import anti.io;
 import anti.mem;
 import anti.text;

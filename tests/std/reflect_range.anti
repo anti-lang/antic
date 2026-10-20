@@ -1,7 +1,7 @@
 //! `anti.reflect` at an index out of range, and the field of the one integer
-//! type the other tests read no `Value` of. A field and a function out of
-//! range have no name, a field none of its offset or type, and `get` gives a
-//! value of kind `None` for them.
+//! type the other tests read no `Value` of. A field and a function out of range
+//! have no name, a field none of its offset or type, and `get` gives a value of
+//! kind `None` for them.
 import anti.reflect;
 
 extern fn printf(format: ?*byte, ...) -> c_int;

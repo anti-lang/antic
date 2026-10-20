@@ -1,5 +1,5 @@
-//! Calls of the standard library at the edges the runtime checks itself: a
-//! path that holds a NUL byte, which every function of `anti.fs` refuses with
+//! Calls of the standard library at the edges the runtime checks itself: a path
+//! that holds a NUL byte, which every function of `anti.fs` refuses with
 //! `EINVAL`, a signal number outside the table, which `os.on_signal` passes
 //! over, and a sleep of no time, which returns at once.
 import anti.fs;

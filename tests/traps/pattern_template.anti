@@ -1,5 +1,5 @@
-//! A template computed at run time that names a group the pattern literal
-//! lacks stops `replace` with the template and the pattern.
+//! A template computed at run time that names a group the pattern literal lacks
+//! stops `replace` with the template and the pattern.
 
 import anti.regex;
 import anti.text;

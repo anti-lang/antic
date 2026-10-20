@@ -1,7 +1,7 @@
 //! Classes of byte patterns that `regex.compile_bytes` takes apart: a property
 //! with and without braces, the POSIX forms with `.` and `=`, a negated class
-//! and a range with a character outside ASCII, and letters quoted with `\Q`.
-//! A pattern of text takes CRLF as its newline, and a pattern of two groups of
+//! and a range with a character outside ASCII, and letters quoted with `\Q`. A
+//! pattern of text takes CRLF as its newline, and a pattern of two groups of
 //! one name gives the first that took part. Each line prints what came of the
 //! pattern.
 import anti.lang;

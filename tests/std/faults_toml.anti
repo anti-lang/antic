@@ -10,8 +10,8 @@ import anti.toml;
 
 const SOURCE: str = "name = \"faults\"\n[table]\nkey = 1\nother = [1, 2]\ninline = { a = 1, b = 2 }\n";
 
-/// A second document, read after the first, whose second `[[item]]` indexes
-/// the paths of the keys before it in a table of names of their own.
+/// A second document, read after the first, whose second `[[item]]` indexes the
+/// paths of the keys before it in a table of names of their own.
 const TABLES: str = "[[item]]\na = 1\n[[item]]\nb = 2\n";
 
 fn main() -> int

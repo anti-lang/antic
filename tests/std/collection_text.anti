@@ -9,20 +9,23 @@ import anti.text;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-struct Point {
+struct Point
+{
 	x: int,
 	y: int,
 }
 
 /// A struct whose fields the text walks one level down.
-struct Holder {
+struct Holder
+{
 	at: *Point,
 	none_at: ?*Point,
 	run: fn(int) -> int,
 	items: []int,
 }
 
-class Shape {
+class Shape
+{
 	pub side: int = 0,
 
 	concrete fn to_text(self) -> str
@@ -31,7 +34,8 @@ class Shape {
 	}
 }
 
-class Plain {
+class Plain
+{
 	pub n: int = 0,
 }
 

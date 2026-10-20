@@ -1,7 +1,7 @@
-//! The fields of the C types and of `char` through the default `serialize`
-//! and `Object.deserialize`: `c_long`, `c_ulong`, `c_wchar` and `char` come
-//! back with the value they were written with, and so does a bitfield of
-//! `char` size beside them.
+//! The fields of the C types and of `char` through the default `serialize` and
+//! `Object.deserialize`: `c_long`, `c_ulong`, `c_wchar` and `char` come back
+//! with the value they were written with, and so does a bitfield of `char` size
+//! beside them.
 import anti.io;
 import anti.mem;
 import anti.text;
