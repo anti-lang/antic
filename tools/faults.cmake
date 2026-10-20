@@ -139,9 +139,49 @@ function(antic_faults_runtime target triple)
         VERBATIM)
 endfunction()
 
+# The glue of anti.regex for the runtime of the seam, which
+# src/native/pcre2.cmake calls for every target with its triple and the
+# flags of its compile. Each source compiles as the glue of runtime/ does,
+# with ANTI_FAULTS, into lib/<target>/ of ANTIC_FAULTS_RUNTIME_DIR, where
+# the links of anti_rt_faults leave it in place.
+function(antic_faults_glue target triple)
+    if(NOT ANTIC_FAULTS OR NOT target STREQUAL ANTIC_HOST_TARGET)
+        return()
+    endif()
+    set(work "${CMAKE_BINARY_DIR}/cross/${target}-glue-faults")
+    antic_static_library(glue_name anti_rt_regex "${target}")
+    set(glue "${ANTIC_FAULTS_RUNTIME_DIR}/lib/${target}/${glue_name}")
+    antic_runtime_sections(sections "${target}")
+    set(objects "")
+    foreach(source regex patterns)
+        set(object "${work}/rt_${source}.o")
+        add_custom_command(OUTPUT "${object}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
+            COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+                ${ANTIC_C_WARNINGS} ${ARGN} ${sections} -DANTI_FAULTS=1
+                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+                -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
+                -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
+            DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
+                "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
+            DEPFILE "${object}.d"
+            VERBATIM)
+        list(APPEND objects "${object}")
+    endforeach()
+    add_custom_command(OUTPUT "${glue}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory
+            "${ANTIC_FAULTS_RUNTIME_DIR}/lib/${target}"
+        COMMAND "${CMAKE_COMMAND}" -E rm -f "${glue}"
+        COMMAND "${ANTIC_LLVM_AR}" rcs "${glue}" ${objects}
+        DEPENDS ${objects}
+        VERBATIM)
+    add_custom_target(anti_rt_regex_faults ALL DEPENDS "${glue}")
+endfunction()
+
 # The order of the build: the links of runtime-faults/ come after every
 # part of runtime/, the runtime of each level, the LLVM tools, the
-# standard library and the native libraries of src/native. CMakeLists.txt
+# standard library and the native libraries of src/native, and after the
+# glue of the seam, which stands in place of its link. CMakeLists.txt
 # calls this after the last directory that writes into runtime/.
 function(antic_faults_finish)
     if(NOT ANTIC_FAULTS)

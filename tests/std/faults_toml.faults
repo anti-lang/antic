@@ -1,0 +1,13 @@
+# The cases of faults_toml.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. alloc counts the memory of the runtime after the
+# start, which the reader takes from the fifth on: the document, the
+# copies of the keys and the values, the list of pairs and the names of the
+# tables, in the order of the text.
+memory_5 alloc:5:ENOMEM
+memory_6 alloc:6:ENOMEM
+memory_7 alloc:7:ENOMEM
+memory_8 alloc:8:ENOMEM
+memory_9 alloc:9:ENOMEM
+memory_10 alloc:10:ENOMEM
+memory_11 alloc:11:ENOMEM
+memory_12 alloc:12:ENOMEM

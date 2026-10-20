@@ -1,0 +1,45 @@
+//! The pool of workers when the system refuses a call. `parallel` splits a
+//! slice over the pool and `dispatch` hands an object to it. A thread of the
+//! pool that does not start leaves the work to the threads that did and to
+//! the caller, and memory that runs out for the results or for a job stops
+//! the program. A case of `faults_threads.faults` refuses one call, through
+//! the variable `ANTI_FAULT` of `src/rt/fault.h`. The program runs with
+//! --anti.threads=4, so the pool starts three threads.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn total(chunk: []int) -> int
+{
+	let sum = 0;
+	for x in chunk {
+		sum += x;
+	}
+	return sum;
+}
+
+worker fn tally(c: *Counter, add: int) -> int
+{
+	return c.n + add;
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
+	let parts = parallel numbers[0..8] by 4 -> total;
+	let sum = 0;
+	for part in parts {
+		sum += part;
+	}
+	free(parts.ptr);
+	printf("parallel %d\n".ptr, sum as c_int);
+	let c = alloc Counter { n: 10 };
+	let job = dispatch c -> tally(1);
+	printf("dispatch %d\n".ptr, join(job) as c_int);
+	free(c);
+	return 0;
+}

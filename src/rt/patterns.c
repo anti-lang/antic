@@ -171,9 +171,11 @@ static int64_t failure(int rc)
 
 static pcre2_match_data *match_data(const void *pattern, int full)
 {
-    pcre2_match_data *md = full ? pcre2_match_data_create_from_pattern(
-                                      ANTI_PATTERN_CODE(pattern), NULL)
-                                : pcre2_match_data_create(1, NULL);
+    pcre2_match_data *md =
+        full ? ANTI_FAULT(ALLOC, NULL,
+                          pcre2_match_data_create_from_pattern(
+                              ANTI_PATTERN_CODE(pattern), NULL))
+             : ANTI_FAULT(ALLOC, NULL, pcre2_match_data_create(1, NULL));
 
     if (md == NULL) {
         out_of_memory();

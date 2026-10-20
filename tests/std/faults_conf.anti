@@ -1,0 +1,26 @@
+//! The runtime configuration when the system refuses a call. `rt.configure`
+//! reads a file the program wrote, and a file that cannot be read ends the
+//! program with status 70 and a message that names it. A case of
+//! `faults_conf.faults` refuses one call, through the variable `ANTI_FAULT` of
+//! `src/rt/fault.h`.
+import anti.fs;
+import anti.io;
+import anti.runtime;
+
+const PATH: str = "faults-conf.toml";
+const TEXT: str = "[runtime]\nlogger = \"stderr\"\n";
+
+fn main() -> int
+{
+	fs.write_file(PATH, []byte { ptr: TEXT.ptr, len: TEXT.len }) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	runtime.configure(PATH);
+	let value = runtime.get("logger") ?? "none";
+	io.println(value);
+	fs.remove(PATH) catch e {
+		io.println(e.message);
+	};
+	return 0;
+}

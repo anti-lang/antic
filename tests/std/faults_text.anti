@@ -1,0 +1,27 @@
+//! Texts when memory runs out. The message of a system error is a text the
+//! runtime keeps, `to_bytes` copies a text, a builder grows as it appends, and
+//! the text of an empty builder takes one byte. Each stops the program when
+//! the C library gives no memory, by decision 4 of "Decisions of 2026-10-11".
+//! A case of `faults_text.faults` refuses one allocation, through the variable
+//! `ANTI_FAULT` of `src/rt/fault.h`.
+import anti.fs;
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	fs.remove("faults-text-missing.txt") catch e {
+		io.println(e.message);
+	};
+	let bytes = "copied".to_bytes();
+	io.println("copied");
+	free(bytes.ptr);
+	let b = text.Builder.new();
+	b.append("built");
+	io.println(b.text());
+	let empty = text.Builder.new();
+	let taken = empty.take();
+	io.println("taken");
+	free(taken.ptr);
+	return 0;
+}

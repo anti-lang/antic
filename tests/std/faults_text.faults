@@ -1,0 +1,10 @@
+# The cases of faults_text.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. alloc counts the memory of the runtime after the
+# start: the path of remove is the fifth, the kept message of its error
+# the sixth, the copy of to_bytes the seventh, the room of the builder the
+# eighth and the byte of the empty builder the ninth.
+path_memory alloc:5:ENOMEM
+kept_memory alloc:6:ENOMEM
+copy_memory alloc:7:ENOMEM
+builder_memory alloc:8:ENOMEM
+take_memory alloc:9:ENOMEM

@@ -1,0 +1,9 @@
+# The cases of faults_channels.anti: a name and the value of ANTI_FAULT,
+# see tests/CMakeLists.txt. alloc counts the memory of the runtime after
+# the start: the ring of the channel is the fifth and its monitor the
+# sixth. lock counts the mutex and the two conditions of the monitor.
+ring_memory alloc:5:ENOMEM
+monitor_memory alloc:6:ENOMEM
+mutex_refused lock:1:EAGAIN
+first_condition_refused lock:2:EAGAIN
+second_condition_refused lock:3:EAGAIN

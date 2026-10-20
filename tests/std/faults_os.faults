@@ -1,0 +1,8 @@
+# The cases of faults_os.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. The first registration takes the first pipe, the
+# first thread and the fifth memory of the runtime after the start, which
+# holds the body of that thread.
+sleep_cut sleep:1:EINTR
+pipe_refused run:1:EMFILE
+reader_not_started thread:1:EAGAIN
+reader_memory alloc:5:ENOMEM

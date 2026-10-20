@@ -49,3 +49,15 @@ std_faults_fs_fault_list_block T139 The C of anti.fs gives ENOMEM where memory t
 std_faults_fs_fault_rename_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
 std_faults_fs_fault_rename_second_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
 std_faults_fs_fault_remove_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_conf_fault_toml_memory T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_regex_fault_compile_memory T139 The compile of a pattern fails where memory that runs out stops the program.
+std_faults_regex_fault_compile_text_memory T139 The compile of a pattern fails where memory that runs out stops the program.
+std_faults_text_fault_path_memory T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_toml_fault_memory_5 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_toml_fault_memory_6 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_toml_fault_memory_7 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_toml_fault_memory_8 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_toml_fault_memory_9 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_toml_fault_memory_10 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_toml_fault_memory_11 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_toml_fault_memory_12 T139 The reader of TOML takes memory that runs out for a text outside the subset.

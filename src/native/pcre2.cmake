@@ -96,6 +96,9 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         VERBATIM)
     add_custom_target(pcre2_${target} ALL
         DEPENDS "${library}" "${probe}" "${glue}")
+    # The glue of the fault tests, in a tree of ANTIC_FAULTS alone. See
+    # tools/faults.cmake.
+    antic_faults_glue("${target}" "${triple}" ${flags})
     antic_coverage_runtime_objects("${target}" "${ANTIC_CPU_LEVEL_${target}}"
         pcre2_${target} ${glue_objects})
 

@@ -1,0 +1,14 @@
+# The cases of faults_threads.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. alloc counts the memory of the runtime after the
+# start: the option --anti.threads takes the fifth to the eighth, the
+# results of parallel the ninth, the three threads of the pool the tenth
+# to the twelfth, and the job of dispatch with its arguments and its
+# result the thirteenth to the fifteenth.
+option_memory alloc:5:ENOMEM
+option_value_memory alloc:8:ENOMEM
+results_memory alloc:9:ENOMEM
+thread_memory alloc:10:ENOMEM
+thread_not_started thread:1:EAGAIN
+job_memory alloc:13:ENOMEM
+arguments_memory alloc:14:ENOMEM
+result_memory alloc:15:ENOMEM

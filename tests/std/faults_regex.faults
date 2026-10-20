@@ -1,0 +1,12 @@
+# The cases of faults_regex.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. alloc counts the memory of the runtime after the
+# start: the compile keeps the pattern and its text with the fifth and the
+# sixth, and each search takes match data and room from the seventh on.
+compile_memory alloc:5:ENOMEM
+compile_text_memory alloc:6:ENOMEM
+match_memory alloc:7:ENOMEM
+replace_data_memory alloc:8:ENOMEM
+replace_room_memory alloc:9:ENOMEM
+replace_grown_memory alloc:10:ENOMEM
+find_all_memory alloc:12:ENOMEM
+split_memory alloc:17:ENOMEM

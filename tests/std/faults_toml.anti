@@ -1,0 +1,24 @@
+//! A TOML document when memory runs out. The reader copies each key and value,
+//! grows its list of pairs and its table of names, and memory that runs out
+//! for any of them stops the program, by decision 4 of "Decisions of
+//! 2026-10-11". A case of `faults_toml.faults` refuses one allocation, through
+//! the variable `ANTI_FAULT` of `src/rt/fault.h`.
+import anti.io;
+import anti.json;
+import anti.text;
+import anti.toml;
+
+const SOURCE: str = "name = \"faults\"\n[table]\nkey = 1\nother = [1, 2]\ninline = { a = 1, b = 2 }\n";
+
+fn main() -> int
+{
+	let doc = toml.Document.read(SOURCE) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let b = text.Builder.new();
+	b.append("pairs ");
+	json.write_int(doc.len(), &b);
+	io.println(b.text());
+	return 0;
+}
