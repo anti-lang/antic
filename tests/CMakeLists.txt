@@ -57,6 +57,34 @@ function(antic_dev_inputs objects fixtures)
     set(${fixtures} ${found_fixtures} PARENT_SCOPE)
 endfunction()
 
+# Set out to the modules of the standard library whose dev objects a dev
+# build of source links: every module under `anti.` that source imports and
+# every module those import, each by its path under std/anti/.
+function(antic_dev_imports out source)
+    set(modules "")
+    set(pending "${source}")
+    while(pending)
+        list(POP_FRONT pending file)
+        file(STRINGS "${file}" imports REGEX "^import anti\\.")
+        foreach(line IN LISTS imports)
+            string(REGEX MATCH "^import anti((\\.[a-z0-9_]+)+)" found "${line}")
+            string(SUBSTRING "${CMAKE_MATCH_1}" 1 -1 module)
+            string(REPLACE "." "/" module "${module}")
+            if(module IN_LIST modules)
+                continue()
+            endif()
+            set(module_source "${PROJECT_SOURCE_DIR}/src/std/anti/${module}.anti")
+            if(NOT EXISTS "${module_source}")
+                message(FATAL_ERROR "${file} imports `${found}`, and "
+                                    "${module_source} does not exist")
+            endif()
+            list(APPEND modules "${module}")
+            list(APPEND pending "${module_source}")
+        endforeach()
+    endwhile()
+    set(${out} "${modules}" PARENT_SCOPE)
+endfunction()
+
 # DESIGN: ANTIC_TEST_LTO runs the suite behind --lto, as the step
 # runtime-lto of docs/work-order-llvm-optimization.md asks. Empty by
 # default, so the suite builds as a user does. Set to full or thin, it
@@ -1136,7 +1164,12 @@ endforeach()
 # <name>.<case>.err, which a case whose program writes nothing there
 # leaves out. A tree of ANTIC_FAULTS alone builds the runtime, see
 # tools/faults.cmake. The program builds with --lto none, since the
-# runtime of runtime-faults/ is no bitcode.
+# runtime of runtime-faults/ is no bitcode. A line that ends in ` dev`
+# builds the program in dev mode instead, linked with the dev objects of
+# the modules of the standard library it imports, as a program of
+# tests/matrix is:
+#
+#   order_memory alloc:5:ENOMEM dev
 if(ANTIC_FAULTS)
     foreach(kind programs std)
         set(prefix ${kind})
@@ -1150,12 +1183,28 @@ if(ANTIC_FAULTS)
             file(STRINGS "${list}" cases REGEX "^[^#]")
             foreach(line IN LISTS cases)
                 set(entry "[a-z]+:[0-9]+:[A-Z]+")
-                if(NOT line MATCHES "^([a-z0-9_]+) (${entry}(,${entry})*)$")
+                if(NOT line MATCHES
+                   "^([a-z0-9_]+) (${entry}(,${entry})*)( dev)?$")
                     message(FATAL_ERROR "${list}: `${line}` is no "
                                         "<case> <kind>:<n>:<error>")
                 endif()
                 set(case "${CMAKE_MATCH_1}")
                 set(fault "${CMAKE_MATCH_2}")
+                set(options "--lto,none")
+                set(objects "")
+                set(fixtures "")
+                if(CMAKE_MATCH_4)
+                    set(source "${CMAKE_CURRENT_SOURCE_DIR}/${kind}/${name}.anti")
+                    set_property(DIRECTORY APPEND PROPERTY
+                                 CMAKE_CONFIGURE_DEPENDS "${source}")
+                    antic_dev_imports(modules "${source}")
+                    foreach(module IN LISTS modules)
+                        antic_dev_object(${module})
+                    endforeach()
+                    antic_dev_inputs(objects fixtures ${modules})
+                    list(JOIN objects "," objects)
+                    set(options "--dev")
+                endif()
                 set(base "${CMAKE_CURRENT_SOURCE_DIR}/${kind}/${name}.${case}")
                 set(errors "")
                 if(EXISTS "${base}.err")
@@ -1166,13 +1215,17 @@ if(ANTIC_FAULTS)
                         "-DANTIC=$<TARGET_FILE:antic>"
                         "-DRUNTIME=${ANTIC_FAULTS_RUNTIME_DIR}"
                         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/${kind}/${name}.anti"
-                        "-DOPTIONS=--lto,none"
-                        "-DOBJECTS="
+                        "-DOPTIONS=${options}"
+                        "-DOBJECTS=${objects}"
                         "-DEXPECTED=${base}.expected"
                         "-DFAULT=${fault}"
                         ${errors}
                         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/faults/${name}-${case}"
                         -P "${ANTIC_RUNNERS}/run_program.cmake")
+                if(fixtures)
+                    set_tests_properties(${prefix}_${name}_fault_${case}
+                        PROPERTIES FIXTURES_REQUIRED "${fixtures}")
+                endif()
             endforeach()
         endforeach()
     endforeach()
@@ -2904,34 +2957,6 @@ math(EXPR matrix_refusal_limit "${ANTIC_MATRIX_SECONDS} + 30")
 
 set(MATRIX_WORK "${CMAKE_CURRENT_BINARY_DIR}/matrix")
 file(MAKE_DIRECTORY "${MATRIX_WORK}/refused")
-
-# Set out to the modules of the standard library whose dev objects a dev
-# build of source links: every module under `anti.` that source imports and
-# every module those import, each by its path under std/anti/.
-function(antic_dev_imports out source)
-    set(modules "")
-    set(pending "${source}")
-    while(pending)
-        list(POP_FRONT pending file)
-        file(STRINGS "${file}" imports REGEX "^import anti\\.")
-        foreach(line IN LISTS imports)
-            string(REGEX MATCH "^import anti((\\.[a-z0-9_]+)+)" found "${line}")
-            string(SUBSTRING "${CMAKE_MATCH_1}" 1 -1 module)
-            string(REPLACE "." "/" module "${module}")
-            if(module IN_LIST modules)
-                continue()
-            endif()
-            set(module_source "${PROJECT_SOURCE_DIR}/src/std/anti/${module}.anti")
-            if(NOT EXISTS "${module_source}")
-                message(FATAL_ERROR "${file} imports `${found}`, and "
-                                    "${module_source} does not exist")
-            endif()
-            list(APPEND modules "${module}")
-            list(APPEND pending "${module_source}")
-        endforeach()
-    endwhile()
-    set(${out} "${modules}" PARENT_SCOPE)
-endfunction()
 
 # The three tests of the program tests/matrix/<name>.anti.
 # DESIGN: the dev build links the dev object of every module of the

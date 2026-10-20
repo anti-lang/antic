@@ -1,0 +1,5 @@
+# The case of faults_locks.anti: a name, the value of ANTI_FAULT and dev,
+# see tests/CMakeLists.txt. The runtime takes the first four allocations
+# at the start of the program, and the table of the order of the locks
+# the fifth, when the program takes b while it holds a.
+order_memory alloc:5:ENOMEM dev

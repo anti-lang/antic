@@ -1,0 +1,20 @@
+//! The order of the locks of a dev build when memory runs out. A dev build
+//! records each pair of locks that a thread holds together, in a table that
+//! grows as the pairs come. Its growth stops the program when the C library
+//! gives no memory, by decision 4 of "Decisions of 2026-10-11". A case of
+//! `faults_locks.faults` refuses one allocation, through the variable
+//! `ANTI_FAULT` of `src/rt/fault.h`, in a dev build.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let a = Mutex.new();
+	let b = Mutex.new();
+	sync a {
+		sync b {
+			printf("nested\n".ptr);
+		}
+	}
+	return 0;
+}
