@@ -451,6 +451,22 @@ if(CMAKE_HOST_APPLE)
         ERR "antic: cannot run ${RUNTIME}/bin/llvm-ar: Permission denied"
             "antic: cannot bundle ${bundled}")
 endif()
+# The build id of a program digests the runtime library it links,
+# build_id and digest_file of driver.c, with the fifth open and read of a
+# release build. A library that does not open adds nothing to the digest,
+# and the link that needs it reports it, so a link that then opens it
+# succeeds. A library that opens and does not read stops the build.
+if(CMAKE_HOST_APPLE)
+    anti_message(fault_runtime_unopened_for_id STATUS 0
+        FILES main.anti "${program}"
+        FAULT open:5:EACCES
+        ARGS ${tools} main.anti)
+    anti_message(fault_runtime_unread_for_id
+        FILES main.anti "${program}"
+        FAULT read:5:EIO
+        ARGS ${tools} main.anti
+        ERR "antic: cannot read ${bundled}")
+endif()
 # The licence text of the runtime, which the notice of every program
 # holds, archive_package of driver.c. The open of the text is the fourth
 # of a release build. T151: antic says it cannot open the text and links

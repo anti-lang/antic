@@ -832,3 +832,44 @@ fetch_message(fault_fetch_index_directory_not_made mkdir:${index_mkdir}:EACCES
 fetch_message(fault_fetch_package_directory_not_made
     mkdir:${package_mkdir}:EACCES
     "anti: cannot make ${package_directory}")
+# A dependency of a path, units/lib in the project, whose build writes its
+# library file into its dist/ first, resolve_from_path of deps.c. The
+# build of the program then reads it for the key of each object,
+# imports_key of build.c, for the closure of the link, build_dev of
+# build.c, and in the link itself, link_names of driver_search.c and
+# libraries_interfaces of driver.c.
+set(path_dependent "${manifest_package}\n[dependencies]\n\"com.example\" = { path = \"units/lib\" }\n")
+set(path_program "//! A program of a dependency.\n\nimport com.example;\n\nfn main() -> int\n{\n\treturn example.one() - 1;\n}\n")
+set(path_library "./units/lib/dist/${HOST}/dev/com/example.antl")
+function(path_message name fault)
+    anti_message(${name}
+        FILES anti.toml "${path_dependent}" ${app_source} "${path_program}"
+              units/lib/anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n"
+              units/lib/src/com/example.anti "${library_text}"
+        FAULT ${fault}
+        ARGS build ${tools}
+        ERR ${ARGN})
+endfunction()
+path_message(fault_path_listing_unstated stat:17:EACCES
+    "anti: cannot read ./units/lib/dist/${HOST}/dev/com")
+path_message(fault_path_module_unread open:21:EACCES
+    "anti: cannot read ${path_library}")
+path_message(fault_path_module_digest_unread open:22:EACCES
+    "anti: cannot read ${path_library}")
+path_message(fault_path_key_unread open:36:EACCES
+    "anti: cannot read ${path_library}")
+path_message(fault_path_closure_unread open:46:EACCES
+    "anti: cannot read ${path_library}")
+path_message(fault_path_link_unopened open:48:EACCES
+    "antic: cannot open ${path_library}")
+path_message(fault_path_interface_unopened open:51:EACCES
+    "antic: cannot open ${path_library}")
+path_message(fault_path_interfaces_unopened open:52:EACCES
+    "antic: cannot open ${path_library}")
+# The library file of the program's own module, read for the closure of
+# the link, driver_libraries of driver_search.c and build_dev of build.c.
+anti_message(fault_closure_unopened
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:17:EACCES
+    ARGS build ${tools}
+    ERR "antic: cannot open ${dev_dir}/lib/com/example/app.antl")

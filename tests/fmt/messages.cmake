@@ -38,3 +38,24 @@ anti_message(fault_not_replaced
     FAULT rename:1:EACCES
     ARGS fmt a.anti
     ERR "anti: cannot replace a.anti")
+# Without a file the command reads every source under the source
+# directory, fmt_run of fmt.c, and lists the directory first,
+# project_sources of main.c.
+set(fmt_manifest "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n")
+set(formed "//! The smallest library.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+anti_message(fault_source_unread
+    FILES anti.toml "${fmt_manifest}" src/com/example/a.anti "${unformatted}"
+          src/com/example/one.anti "${formed}"
+    FAULT open:5:EACCES
+    ARGS fmt
+    ERR "anti: cannot read src/com/example/a.anti")
+anti_message(fault_listing_unread
+    FILES anti.toml "${fmt_manifest}" src/com/example/a.anti "${unformatted}"
+          src/com/example/one.anti "${formed}"
+    FAULT read:6:EIO
+    ARGS fmt
+    ERR "anti: cannot read src")
+anti_message(manifest_no_toml
+    FILES anti.toml "name = \n" src/com/example/a.anti "${unformatted}"
+    ARGS fmt
+    ERR "anti: anti.toml is no TOML that anti reads")

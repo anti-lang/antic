@@ -94,3 +94,39 @@ anti_message(fault_library_read_partway
     FAULT read:4:EACCES
     ARGS doc -o pages --runtime "${RUNTIME}" dist/${HOST}/dev/com/example/one.antl
     ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
+# The listing of the source directory fails after it found the module,
+# project_sources of main.c.
+anti_message(fault_listing_unread
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT read:6:EIO
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "anti: cannot read src")
+# T153: the directory of the library file of the module under the work
+# directory, unit_file of units.c, which anti doc leaves without a
+# message.
+anti_message(fault_library_directory_not_made
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT mkdir:6:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "anti: cannot make build/doc-work/com/example")
+# The source read by the compile of the library file, read_file of
+# driver.c.
+anti_message(fault_source_unopened
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT open:8:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "antic: cannot open src/com/example/one.anti")
+
+# The manifest, which names the source directory.
+anti_message(manifest_no_toml
+    FILES anti.toml "name = \n" src/com/example/one.anti "${fault_library}"
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "anti: anti.toml is no TOML that anti reads")
+# Without --runtime the pages take the runtime archive of the user's data
+# directory, whose lib/ tells it from any other directory.
+anti_message(runtime_of_the_data_directory STATUS 0
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    DIRECTORIES data/anti/lib
+    ENV "XDG_DATA_HOME=${PROJECT}/data" "LOCALAPPDATA=${PROJECT}/data"
+    OUT "doc: 1 module into pages"
+    ARGS doc -o pages)

@@ -145,6 +145,15 @@ anti_message(sdk_import_no_version
     SETUP pack_bundle
     ARGS sdk import bundle.tar.xz --sysroot sysroot
     ERR "anti: bundle.tar.xz holds no sdk-version, so anti sdk export did not write it")
+# Without --sysroot the import takes the sysroot of the runtime archive of
+# the user's data directory, default_sysroot of main.c.
+anti_message(sdk_import_sysroot_of_the_data_directory
+    FILES stubs/notes.txt "No stub and no version.\n"
+    DIRECTORIES data/anti/lib
+    ENV "XDG_DATA_HOME=${PROJECT}/data" "LOCALAPPDATA=${PROJECT}/data"
+    SETUP pack_bundle
+    ARGS sdk import bundle.tar.xz
+    ERR "anti: bundle.tar.xz holds no sdk-version, so anti sdk export did not write it")
 
 # anti sdk export, which reads the SDK of a Mac.
 if(CMAKE_HOST_APPLE)

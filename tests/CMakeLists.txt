@@ -5926,7 +5926,9 @@ foreach(case
         "sdk_command_unknown|sdk|bogus"
         "sdk_export_option_unknown|sdk|export|--bogus"
         "sdk_import_without_a_bundle|sdk|import"
-        "license_option_unknown|license|--bogus")
+        "sdk_import_option_unknown|sdk|import|bundle.tar.xz|--bogus"
+        "license_option_unknown|license|--bogus"
+        "license_project_option_unknown|license|--project|--bogus")
     string(REPLACE "|" ";" parts "${case}")
     list(POP_FRONT parts name)
     add_usage_test(anti ${name} ARGS ${parts})

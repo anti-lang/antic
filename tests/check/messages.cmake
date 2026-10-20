@@ -123,3 +123,47 @@ anti_message(fault_work_not_made
     FAULT mkdir:2:EACCES
     ARGS check --work ../check --runtime "${RUNTIME}"
     ERR "anti: cannot make ../check")
+# The source read again for the doc blocks, unit_blocks of check.c, and
+# for the formatting, format_class of check.c.
+anti_message(fault_block_source_unread
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT open:8:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot read src/com/example/one.anti")
+anti_message(fault_format_source_unread
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT open:9:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file, 1 finding"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot read src/com/example/one.anti")
+# T153: the directory of the library file of the module under the work
+# directory, unit_file of units.c, which front_end_class of check.c
+# leaves without a message.
+anti_message(fault_library_directory_not_made
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT mkdir:5:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot make ../check/com/example")
+
+# The manifest, which names the source directory.
+anti_message(manifest_no_toml
+    FILES anti.toml "name = \n" src/com/example/one.anti "${fault_library}"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: anti.toml is no TOML that anti reads")
+# Without --runtime the check takes the runtime archive of the user's data
+# directory, whose lib/ tells it from any other directory.
+anti_message(runtime_of_the_data_directory STATUS 0
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    DIRECTORIES data/anti/lib
+    ENV "XDG_DATA_HOME=${PROJECT}/data" "LOCALAPPDATA=${PROJECT}/data"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work ../check)
