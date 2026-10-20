@@ -1,0 +1,43 @@
+//! The type parameter of a generic operator named by an operand through the
+//! parameter of a function type and through its result, which each use gives. A
+//! channel of the parameter names it as well, so R067 of "Rules of 2026-10-13"
+//! takes the operator `-`, which no line uses.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Key<T>
+{
+	k: T,
+}
+
+operator fn add<T>(a: Key<int>, f: fn(T) -> int) -> int
+{
+	return size_of(T);
+}
+
+operator fn mul<T>(a: Key<int>, f: fn() -> T) -> int
+{
+	return size_of(T) * 10;
+}
+
+operator fn sub<T>(a: Key<int>, c: chan T) -> int
+{
+	return size_of(T) * 100;
+}
+
+fn take(x: u8) -> int
+{
+	return 0;
+}
+
+fn give() -> i16
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let a = Key<int> { k: 1 };
+	printf("%lld %lld\n".ptr, a + take, a * give);
+	return 0;
+}

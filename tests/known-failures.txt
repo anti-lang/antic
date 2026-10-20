@@ -92,3 +92,6 @@ matrix_types_generic_length_of_a_comparison_dev T160 A cast of a folded comparis
 matrix_types_generic_length_of_a_comparison_release T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
 matrix_types_generic_length_of_a_comparison_memory_checks T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
 matrix_flow_for_over_an_iter_of_an_unknown_type_refused T161 A loop over an iter of an unknown type says the class has no iter.
+matrix_types_generic_inferred_through_a_channel_dev T162 A chan of the argument gives no type argument to a generic call.
+matrix_types_generic_inferred_through_a_channel_release T162 A chan of the argument gives no type argument to a generic call.
+matrix_types_generic_inferred_through_a_channel_memory_checks T162 A chan of the argument gives no type argument to a generic call.

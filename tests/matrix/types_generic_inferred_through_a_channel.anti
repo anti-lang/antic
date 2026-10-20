@@ -1,0 +1,18 @@
+//! A generic function whose parameter is a channel of its type parameter. The
+//! channel of the argument gives the type argument, as inference reads the
+//! arguments of a call.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn width<T>(c: chan T) -> int
+{
+	return size_of(T);
+}
+
+fn main() -> int
+{
+	let c = chan i16(1);
+	printf("%lld\n".ptr, width(c));
+	delete(c);
+	return 0;
+}
