@@ -1392,6 +1392,74 @@ static struct item *generic_named(const struct interface *iface,
     return NULL;
 }
 
+/* The function record of an extern symbol: its name, its qualifier, its
+   marks and its visibility. runtime is its C symbol, empty for one that
+   is not of the root. */
+static void read_extern_fn(struct reader *r, struct symbol *sym,
+                           const char *runtime)
+{
+    struct item *it = antl_allocate(r, 1, sizeof *it);
+    uint8_t flags;
+
+    it->kind = ITEM_FN;
+    it->name = antl_get_name(r);
+    it->qualifier = antl_get_name(r);
+    flags = antl_get_u8(r);
+    it->contract = (enum fn_contract)(flags & 3);
+    it->is_final = (flags >> 2 & 1) != 0;
+    it->is_operator = (flags >> 3 & 1) != 0;
+    it->has_self = (flags >> 4 & 1) != 0;
+    it->may_fail = (flags >> 5 & 1) != 0;
+    it->is_abstract = (flags >> 6 & 1) != 0;
+    it->never = (flags >> 7 & 1) != 0;
+    it->vis = (enum visibility)antl_get_u8(r);
+    it->pub = it->vis == VIS_PUB;
+    if ((flags & 3) > FN_CONCRETE || it->vis > VIS_PUB) {
+        antl_damaged(r);
+    }
+    if (runtime[0] != '\0') {
+        it->runtime = runtime;
+    }
+    it->symbol = sym;
+    sym->item = it;
+}
+
+/* The library's own symbol for the extern sym of lib, where it carries
+   one, found as lookup says: a member of owner, a generic or an item. */
+static struct symbol *library_symbol(struct reader *r, struct symbol *sym,
+                                     const struct interface *lib,
+                                     uint8_t lookup, const struct type *owner)
+{
+    size_t i;
+
+    if (lookup == LOOK_MEMBER) {
+        for (i = 0; i < owner->member_count; i++) {
+            const struct item *m = owner->members[i];
+            if (m->symbol != NULL &&
+                types_same_name(&m->symbol->name, &sym->name)) {
+                return m->symbol;
+            }
+        }
+        return sym;
+    }
+    if (lookup == LOOK_GENERIC) {
+        struct item *g = generic_named(lib, &sym->name, true);
+        if (g == NULL) {
+            antl_fail(r, "needs generic `%s.%.*s`", lib->module,
+                      (int)sym->name.length, sym->name.text);
+            return NULL;
+        }
+        return g->symbol;
+    }
+    for (i = 0; lib != r->iface && i < lib->item_count; i++) {
+        struct symbol *s = lib->items[i];
+        if (s->kind == sym->kind && types_same_name(&s->name, &sym->name)) {
+            return s;
+        }
+    }
+    return sym;
+}
+
 static struct symbol *read_extern(struct reader *r)
 {
     struct symbol *sym = antl_allocate(r, 1, sizeof *sym);
@@ -1403,7 +1471,6 @@ static struct symbol *read_extern(struct reader *r)
     const char *runtime;
     const struct interface *lib;
     struct type *owner = NULL;
-    size_t i;
 
     sym->name = antl_get_name(r);
     type_index = antl_get_u32(r);
@@ -1438,29 +1505,7 @@ static struct symbol *read_extern(struct reader *r)
     }
     sym->home = lib;
     if (antl_get_flag(r)) {
-        struct item *it = antl_allocate(r, 1, sizeof *it);
-        uint8_t flags;
-        it->kind = ITEM_FN;
-        it->name = antl_get_name(r);
-        it->qualifier = antl_get_name(r);
-        flags = antl_get_u8(r);
-        it->contract = (enum fn_contract)(flags & 3);
-        it->is_final = (flags >> 2 & 1) != 0;
-        it->is_operator = (flags >> 3 & 1) != 0;
-        it->has_self = (flags >> 4 & 1) != 0;
-        it->may_fail = (flags >> 5 & 1) != 0;
-        it->is_abstract = (flags >> 6 & 1) != 0;
-        it->never = (flags >> 7 & 1) != 0;
-        it->vis = (enum visibility)antl_get_u8(r);
-        it->pub = it->vis == VIS_PUB;
-        if ((flags & 3) > FN_CONCRETE || it->vis > VIS_PUB) {
-            antl_damaged(r);
-        }
-        if (runtime[0] != '\0') {
-            it->runtime = runtime;
-        }
-        it->symbol = sym;
-        sym->item = it;
+        read_extern_fn(r, sym, runtime);
     }
     if (antl_get_flag(r)) {
         struct const_value *value = antl_allocate(r, 1, sizeof *value);
@@ -1475,33 +1520,7 @@ static struct symbol *read_extern(struct reader *r)
     if (r->failed) {
         return NULL;
     }
-    /* The library's own symbol, where it carries one. */
-    if (lookup == LOOK_MEMBER) {
-        for (i = 0; i < owner->member_count; i++) {
-            const struct item *m = owner->members[i];
-            if (m->symbol != NULL &&
-                types_same_name(&m->symbol->name, &sym->name)) {
-                return m->symbol;
-            }
-        }
-        return sym;
-    }
-    if (lookup == LOOK_GENERIC) {
-        struct item *g = generic_named(lib, &sym->name, true);
-        if (g == NULL) {
-            antl_fail(r, "needs generic `%s.%.*s`", lib->module,
-                      (int)sym->name.length, sym->name.text);
-            return NULL;
-        }
-        return g->symbol;
-    }
-    for (i = 0; lib != r->iface && i < lib->item_count; i++) {
-        struct symbol *s = lib->items[i];
-        if (s->kind == sym->kind && types_same_name(&s->name, &sym->name)) {
-            return s;
-        }
-    }
-    return sym;
+    return library_symbol(r, sym, lib, lookup, owner);
 }
 
 /* The declarations of the generics */
@@ -1600,14 +1619,132 @@ static struct symbol *listed(struct reader *r, const struct name *name,
     return NULL;
 }
 
+/* The symbol of the declaration it of type: the one the items section
+   listed for a public or an internal generic, or a new one. NULL when the
+   listed symbol has another type. */
+static struct symbol *declared_symbol(struct reader *r, struct item *it,
+                                      struct type *type)
+{
+    enum symbol_kind kind = it->kind == ITEM_FN ? SYMBOL_FN : SYMBOL_STRUCT;
+    /* The items section lists a public and an internal generic, and the
+       declaration joins the symbol listed there. */
+    struct symbol *sym = listed(r, &it->name, kind);
+
+    if (it->vis == VIS_PRIVATE || sym == NULL) {
+        sym = antl_allocate(r, 1, sizeof *sym);
+        sym->kind = kind;
+        sym->name = it->name;
+        sym->type = type;
+        sym->home = r->iface;
+        sym->state = EVAL_DONE;
+    } else if (sym->type != type) {
+        antl_damaged(r);
+        return NULL;
+    }
+    sym->item = it;
+    it->symbol = sym;
+    return sym;
+}
+
+/* The function half of a declaration: its marks, the names, defaults and
+   ownership of its parameters and its type parameters. False when the
+   record does not describe a function of type. */
+static bool read_fn_declaration(struct reader *r, struct item *it,
+                                struct symbol *sym, const struct type *type)
+{
+    uint8_t marks = antl_get_u8(r);
+    uint32_t n;
+    struct type **params;
+    size_t i;
+
+    it->may_fail = (marks & 1) != 0;
+    it->worker = (marks >> 1 & 1) != 0;
+    it->is_operator = (marks >> 2 & 1) != 0;
+    it->never = (marks >> 3 & 1) != 0;
+    sym->may_fail = it->may_fail;
+    sym->worker = it->worker;
+    sym->is_operator = it->is_operator;
+    n = antl_get_count(r, 4);
+    it->params = antl_allocate(r, n, sizeof *it->params);
+    for (i = 0; i < n && !r->failed; i++) {
+        it->params[i].name = antl_get_name(r);
+    }
+    it->param_count = n;
+    if (type->kind != TYPE_FN || marks > 15) {
+        antl_damaged(r);
+        return false;
+    }
+    if (sym->params == NULL) {
+        struct name *names = antl_allocate(r, type->param_count,
+                                           sizeof *names);
+        for (i = 0; i < n && i < type->param_count; i++) {
+            names[i] = it->params[i].name;
+        }
+        for (; i < type->param_count; i++) {
+            names[i].text = "out";
+            names[i].length = 3;
+        }
+        sym->params = names;
+    }
+    antl_read_param_defaults(r, sym);
+    antl_read_param_owned(r, sym);
+    n = antl_get_count(r, 4);
+    params = antl_allocate(r, n, sizeof *params);
+    for (i = 0; i < n && !r->failed; i++) {
+        params[i] = antl_type_ref(r, r->table_count);
+        if (!r->failed && (params[i]->kind != TYPE_PARAM ||
+                           params[i]->param == NULL)) {
+            antl_damaged(r);
+        }
+    }
+    if (n == 0) {
+        antl_damaged(r);
+    }
+    if (!r->failed) {
+        own_params(r, it, params, n);
+    }
+    return true;
+}
+
+/* The type half of a declaration: the marks of a struct, a class or a
+   variant, which takes the parameters and the members of type. False
+   when type is no generic of that kind. */
+static bool read_type_declaration(struct reader *r, struct item *it,
+                                  struct type *type)
+{
+    uint8_t marks = antl_get_u8(r);
+    size_t i;
+
+    it->is_abstract = (marks & 1) != 0;
+    it->is_final = (marks >> 1 & 1) != 0;
+    it->is_singleton = (marks >> 2 & 1) != 0;
+    it->synchronized = (marks >> 3 & 1) != 0;
+    it->concurrent = (marks >> 4 & 1) != 0;
+    it->trace = (marks >> 5 & 1) != 0;
+    it->packed = (marks >> 6 & 1) != 0;
+    if (type->type_param_count == 0 || (int)type->kind !=
+        (it->kind == ITEM_STRUCT ? TYPE_STRUCT
+         : it->kind == ITEM_CLASS ? TYPE_CLASS
+                                  : TYPE_VARIANT)) {
+        antl_damaged(r);
+        return false;
+    }
+    own_params(r, it, type->type_params, type->type_param_count);
+    it->members = type->members;
+    it->member_count = type->member_count;
+    for (i = 0; i < it->member_count; i++) {
+        it->members[i]->owner = it;
+    }
+    return true;
+}
+
 static struct item *read_declaration(struct reader *r)
 {
     struct item *it = antl_allocate(r, 1, sizeof *it);
     struct symbol *sym;
     uint8_t kind = antl_get_u8(r);
     struct type *type;
-    uint8_t marks;
-    size_t i;
+    bool read;
 
     it->name = antl_get_name(r);
     it->pos.line = antl_get_int(r);
@@ -1623,94 +1760,14 @@ static struct item *read_declaration(struct reader *r)
     }
     it->kind = (enum item_kind)kind;
     it->pub = it->vis == VIS_PUB;
-    /* The items section lists a public and an internal generic, and the
-       declaration joins the symbol listed there. */
-    sym = listed(r, &it->name, kind == ITEM_FN ? SYMBOL_FN : SYMBOL_STRUCT);
-    if (it->vis == VIS_PRIVATE || sym == NULL) {
-        sym = antl_allocate(r, 1, sizeof *sym);
-        sym->kind = kind == ITEM_FN ? SYMBOL_FN : SYMBOL_STRUCT;
-        sym->name = it->name;
-        sym->type = type;
-        sym->home = r->iface;
-        sym->state = EVAL_DONE;
-    } else if (sym->type != type) {
-        antl_damaged(r);
+    sym = declared_symbol(r, it, type);
+    if (sym == NULL) {
         return NULL;
     }
-    sym->item = it;
-    it->symbol = sym;
-    if (kind == ITEM_FN) {
-        uint32_t n;
-        struct type **params;
-        marks = antl_get_u8(r);
-        it->may_fail = (marks & 1) != 0;
-        it->worker = (marks >> 1 & 1) != 0;
-        it->is_operator = (marks >> 2 & 1) != 0;
-        it->never = (marks >> 3 & 1) != 0;
-        sym->may_fail = it->may_fail;
-        sym->worker = it->worker;
-        sym->is_operator = it->is_operator;
-        n = antl_get_count(r, 4);
-        it->params = antl_allocate(r, n, sizeof *it->params);
-        for (i = 0; i < n && !r->failed; i++) {
-            it->params[i].name = antl_get_name(r);
-        }
-        it->param_count = n;
-        if (type->kind != TYPE_FN || marks > 15) {
-            antl_damaged(r);
-            return NULL;
-        }
-        if (sym->params == NULL) {
-            struct name *names = antl_allocate(r, type->param_count,
-                                               sizeof *names);
-            for (i = 0; i < n && i < type->param_count; i++) {
-                names[i] = it->params[i].name;
-            }
-            for (; i < type->param_count; i++) {
-                names[i].text = "out";
-                names[i].length = 3;
-            }
-            sym->params = names;
-        }
-        antl_read_param_defaults(r, sym);
-        antl_read_param_owned(r, sym);
-        n = antl_get_count(r, 4);
-        params = antl_allocate(r, n, sizeof *params);
-        for (i = 0; i < n && !r->failed; i++) {
-            params[i] = antl_type_ref(r, r->table_count);
-            if (!r->failed && (params[i]->kind != TYPE_PARAM ||
-                               params[i]->param == NULL)) {
-                antl_damaged(r);
-            }
-        }
-        if (n == 0) {
-            antl_damaged(r);
-        }
-        if (!r->failed) {
-            own_params(r, it, params, n);
-        }
-    } else {
-        marks = antl_get_u8(r);
-        it->is_abstract = (marks & 1) != 0;
-        it->is_final = (marks >> 1 & 1) != 0;
-        it->is_singleton = (marks >> 2 & 1) != 0;
-        it->synchronized = (marks >> 3 & 1) != 0;
-        it->concurrent = (marks >> 4 & 1) != 0;
-        it->trace = (marks >> 5 & 1) != 0;
-        it->packed = (marks >> 6 & 1) != 0;
-        if (type->type_param_count == 0 || (int)type->kind !=
-            (kind == ITEM_STRUCT ? TYPE_STRUCT
-             : kind == ITEM_CLASS ? TYPE_CLASS
-                                  : TYPE_VARIANT)) {
-            antl_damaged(r);
-            return NULL;
-        }
-        own_params(r, it, type->type_params, type->type_param_count);
-        it->members = type->members;
-        it->member_count = type->member_count;
-        for (i = 0; i < it->member_count; i++) {
-            it->members[i]->owner = it;
-        }
+    read = kind == ITEM_FN ? read_fn_declaration(r, it, sym, type)
+                           : read_type_declaration(r, it, type);
+    if (!read) {
+        return NULL;
     }
     {
         struct name doc = antl_get_name(r);
