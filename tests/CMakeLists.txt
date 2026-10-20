@@ -7370,3 +7370,28 @@ list(JOIN known_tests "\n" known_tests)
 list(JOIN known_marked "\n" known_marked)
 file(WRITE "${KNOWN_FAILURES_WORK}/tests.txt" "${known_tests}\n")
 file(WRITE "${KNOWN_FAILURES_WORK}/marked.txt" "${known_marked}\n")
+
+# DESIGN: a coverage tree instruments antic and the runtime of the targets
+# of the host's system on purpose, see tools/coverage.cmake. The tests
+# below read the bytes that a package ships of either: the code of an
+# atomic load, the address-significance tables, the alignment of the
+# functions, the digest of a link, the names of the runtime and the paths
+# of the machine. The counters, the members of the profile runtime and
+# the patterns of the profiles change each of them, so a coverage tree
+# does not run them. Every other tree runs them, the three trees of the
+# gates among them.
+if(ANTIC_COVERAGE)
+    get_property(coverage_tests DIRECTORY PROPERTY TESTS)
+    set(coverage_bytes no_paths rt_names)
+    foreach(target IN LISTS ANTIC_TARGETS)
+        if(NOT target MATCHES "^${ANTIC_HOST_OS}-")
+            continue()
+        endif()
+        foreach(name IN LISTS coverage_tests)
+            if(name MATCHES "^(atomic_load|address_tables|link_identity|function_alignment)_${target}(_|$)")
+                list(APPEND coverage_bytes ${name})
+            endif()
+        endforeach()
+    endforeach()
+    set_tests_properties(${coverage_bytes} PROPERTIES DISABLED TRUE)
+endif()

@@ -311,15 +311,19 @@ and `ubsan`, and `coverage`. The suite runs in every tree. The three builds
 a step of a driver proves are `host`, `asan` and `ubsan`.
 
 `./c coverage` measures what the suite reaches. The preset `coverage` is a
-Debug build in which the pinned clang compiles antic, anti and the C unit
-tests with `-fprofile-instr-generate -fcoverage-mapping`. Every test of
-that tree runs with `LLVM_PROFILE_FILE` set, so its suite leaves raw
-profiles in `build/coverage/profiles/`. llvm-profdata merges them, and
-llvm-cov writes `build/coverage/summary.txt` and the annotated sources in
-`build/coverage/html/`. The summary holds one row per file of `src/antic/`,
-`src/anti/` and `src/rt/`, with its lines, functions, regions and branches.
-Of `src/rt/` it holds the files that antic, anti and the unit tests
-compile. The runtime inside an Anti program is not instrumented.
+Debug build in which the pinned clang compiles antic, anti, the C unit
+tests and the runtime with `-fprofile-instr-generate -fcoverage-mapping`.
+The runtime is that of the targets of the host's system and the glue of
+`anti.regex`, and its library carries the members of the profile runtime,
+so every program of the suite writes its counts as well. The archive of
+every other tree stays as it is. Each compile names where its profile
+goes, so the suite leaves raw profiles in `build/coverage/profiles/`.
+llvm-profdata merges them, and llvm-cov writes `build/coverage/summary.txt`
+and the annotated sources in `build/coverage/html/`. The summary holds one
+row per file of `src/antic/`, `src/anti/` and `src/rt/`, with its lines,
+functions, regions and branches. A program that ends through a trap or an
+abort writes no profile, and the tests that read the bytes of the runtime
+as a package ships it are disabled in that tree alone.
 
 - `./c coverage part 1/3` runs one part of the suite per call, for a
   session whose command ends after ten minutes. The first part removes the

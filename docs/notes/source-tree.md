@@ -837,7 +837,7 @@ the data the scripts read.
 | `tools/compile.sh` | `./c`: configures, builds and tests one of the five presets, and runs the coverage measurement. |
 | `tools/copy-llvm.cmake` | Lays out `bin/` of the runtime archive: the tools `antic_llvm_archive_tools` names, with `llvm-version` beside them. |
 | `tools/coverage-report.cmake` | Merges the raw profiles of a coverage tree and writes its summary and its annotated sources. |
-| `tools/coverage.cmake` | The flags of the coverage measurement and the directory of its raw profiles. |
+| `tools/coverage.cmake` | The flags of the coverage measurement, the directory of its raw profiles and the instrumented runtime of a coverage tree. |
 | `tools/deps-dir.cmake` | Names the directory of the pinned downloads. |
 | `tools/docs-style/banned-terms.md` | Lists the banned terms for a reader. |
 | `tools/docs-style/check_docs.py` | Checks `.md` files against the docs-style rules. |

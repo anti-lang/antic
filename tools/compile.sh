@@ -17,12 +17,13 @@
 #   ./c coverage report      write the report again from the profiles on
 #                            disk, and run no test
 #
-# The coverage build instruments antic, anti and the unit tests. Its suite
-# leaves raw profiles in build/coverage/profiles, and the report is
-# build/coverage/summary.txt, one row per file of src/antic, src/anti and
-# src/rt, with the annotated sources in build/coverage/html. The status
-# is that of the suite, and the report is written after a failing test as
-# well. tools/coverage.cmake holds the flags and the directory.
+# The coverage build instruments antic, anti, the unit tests and the
+# runtime its programs link. Its suite leaves raw profiles in
+# build/coverage/profiles, and the report is build/coverage/summary.txt,
+# one row per file of src/antic, src/anti and src/rt, with the annotated
+# sources in build/coverage/html. The status is that of the suite, and
+# the report is written after a failing test as well.
+# tools/coverage.cmake holds the flags and the directory.
 #
 # Each configuration is a preset of CMakePresets.json and builds in
 # build/<preset>. host is the Debug build that CMakeLists.txt gives a tree
@@ -55,7 +56,7 @@ for arg in "$@"; do
         fresh) fresh=1 ;;
         part) after=part ;;
         report) report=1 ;;
-        -h|--help) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "c: unknown argument $arg" >&2; exit 64 ;;
     esac
 done

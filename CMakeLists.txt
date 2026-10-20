@@ -390,6 +390,10 @@ function(antic_cross_runtime_at target triple level root)
     endif()
     set(out "${root}/lib/${target}/${level}")
     antic_static_library(library_name anti_rt "${target}")
+    # The flags and the members of the profile runtime of a coverage tree,
+    # both empty in any other. See tools/coverage.cmake.
+    antic_coverage_runtime(coverage_flags coverage_members "${target}"
+        "${ANTIC_PROFILE_RUNTIME_${target}}")
     set(library "${out}/${library_name}")
     # The compiler names the headers each object includes in a dependency
     # file, so a change of any header rebuilds the objects that read it.
@@ -405,7 +409,7 @@ function(antic_cross_runtime_at target triple level root)
                 ${ANTIC_C_WARNINGS} ${sections} ${align}
                 "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                 "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                -MMD -MF "${object}.d"
+                ${coverage_flags} -MMD -MF "${object}.d"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
             DEPFILE "${object}.d"
@@ -431,7 +435,8 @@ function(antic_cross_runtime_at target triple level root)
     add_custom_command(OUTPUT "${library}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${ANTIC_LLVM_AR}" rcs "${library}" ${objects}
-        DEPENDS ${objects}
+            ${coverage_members}
+        DEPENDS ${objects} ${coverage_members}
         VERBATIM)
     # The same sources as bitcode, once per mode of --lto, with the flags
     # of the objects above. The stub stays an object. DESIGN: clang runs
@@ -521,7 +526,7 @@ function(antic_cross_runtime_at target triple level root)
                     ${ANTIC_C_WARNINGS}
                     "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
                     "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                    -MMD -MF "${object}.d"
+                    ${coverage_flags} -MMD -MF "${object}.d"
                     -c "src/rt/${source}.c" -o "${compiled}"
                 ${retriple_one}
                 WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
@@ -534,12 +539,15 @@ function(antic_cross_runtime_at target triple level root)
         add_custom_command(OUTPUT "${mode_library}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_out}"
             COMMAND "${ANTIC_LLVM_AR}" rcs "${mode_library}" ${mode_objects}
-            DEPENDS ${mode_objects}
+                ${coverage_members}
+            DEPENDS ${mode_objects} ${coverage_members}
             VERBATIM)
         list(APPEND bitcode_libraries "${mode_library}")
     endforeach()
     add_custom_target(anti_rt_${target}_${level} ALL
         DEPENDS "${library}" "${stub}" ${bitcode_libraries})
+    antic_coverage_runtime_objects("${target}" "${level}"
+        anti_rt_${target}_${level} ${objects})
 endfunction()
 
 function(antic_cross_runtime target triple)
@@ -559,6 +567,38 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     execute_process(COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
         OUTPUT_VARIABLE ANTIC_CLANG_RESOURCE_DIR
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    # DESIGN: --profile-generate links the profile runtime of the pinned
+    # clang, which the runtime archive carries in lib/<target>/ beside the
+    # runtime of AddressSanitizer. It is one file per target, for every
+    # level of the target: compiler-rt builds it for the triple alone. Each
+    # Linux target takes the build of its own C library, musl or glibc,
+    # and both macOS targets the one universal file. The PROFILE_RUNTIME_
+    # names of src/antic/linker.h spell the same files. The runtime of a
+    # coverage tree takes its members, so ANTIC_PROFILE_RUNTIME_<target>
+    # names the copy before the cross builds below.
+    set(profile_macos-arm64 darwin libclang_rt.profile_osx.a)
+    set(profile_macos-x86_64 darwin libclang_rt.profile_osx.a)
+    foreach(target linux-x86_64 linux-arm64 linux-x86_64-glibc
+            linux-arm64-glibc)
+        antic_target_triple(triple "${target}")
+        set(profile_${target} "${triple}" libclang_rt.profile.a)
+    endforeach()
+    set(profile_windows-x86_64 x86_64-pc-windows-msvc clang_rt.profile.lib)
+    set(profile_windows-arm64 aarch64-pc-windows-msvc clang_rt.profile.lib)
+    foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
+        set(profile ${profile_${target}})
+        list(POP_FRONT profile dir)
+        set(ANTIC_PROFILE_RUNTIME_${target} "")
+        if(EXISTS "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${profile}")
+            file(COPY "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${profile}"
+                DESTINATION "${ANTIC_RUNTIME_DIR}/lib/${target}")
+            set(ANTIC_PROFILE_RUNTIME_${target}
+                "${ANTIC_RUNTIME_DIR}/lib/${target}/${profile}")
+        endif()
+    endforeach()
 endif()
 
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
@@ -625,30 +665,6 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
                     DESTINATION "${ANTIC_RUNTIME_DIR}/lib/${target}")
             endif()
         endforeach()
-    endforeach()
-    # DESIGN: --profile-generate links the profile runtime of the pinned
-    # clang, which the runtime archive carries in lib/<target>/ beside the
-    # runtime of AddressSanitizer. It is one file per target, for every
-    # level of the target: compiler-rt builds it for the triple alone. Each
-    # Linux target takes the build of its own C library, musl or glibc,
-    # and both macOS targets the one universal file. The PROFILE_RUNTIME_
-    # names of src/antic/linker.h spell the same files.
-    set(profile_macos-arm64 darwin libclang_rt.profile_osx.a)
-    set(profile_macos-x86_64 darwin libclang_rt.profile_osx.a)
-    foreach(target linux-x86_64 linux-arm64 linux-x86_64-glibc
-            linux-arm64-glibc)
-        antic_target_triple(triple "${target}")
-        set(profile_${target} "${triple}" libclang_rt.profile.a)
-    endforeach()
-    set(profile_windows-x86_64 x86_64-pc-windows-msvc clang_rt.profile.lib)
-    set(profile_windows-arm64 aarch64-pc-windows-msvc clang_rt.profile.lib)
-    foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
-        set(profile ${profile_${target}})
-        list(POP_FRONT profile dir)
-        if(EXISTS "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${profile}")
-            file(COPY "${ANTIC_CLANG_RESOURCE_DIR}/lib/${dir}/${profile}"
-                DESTINATION "${ANTIC_RUNTIME_DIR}/lib/${target}")
-        endif()
     endforeach()
 endif()
 

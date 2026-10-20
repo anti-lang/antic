@@ -67,13 +67,18 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     set(glue "${ANTIC_RUNTIME_DIR}/lib/${target}/${glue_name}")
     set(glue_objects "")
     antic_runtime_sections(sections "${target}")
+    # The glue of a coverage tree is measured as anti_rt is, and the
+    # members of the profile runtime it calls stand in anti_rt, which
+    # every program links. See tools/coverage.cmake.
+    antic_coverage_runtime(coverage_flags coverage_members "${target}"
+        "${ANTIC_PROFILE_RUNTIME_${target}}")
     foreach(source regex patterns)
         set(object "${work}/rt_${source}.o")
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
                 ${ANTIC_C_WARNINGS} ${flags} ${sections}
-                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=." ${coverage_flags}
                 -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
@@ -91,6 +96,8 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         VERBATIM)
     add_custom_target(pcre2_${target} ALL
         DEPENDS "${library}" "${probe}" "${glue}")
+    antic_coverage_runtime_objects("${target}" "${ANTIC_CPU_LEVEL_${target}}"
+        pcre2_${target} ${glue_objects})
 
     # The library links for every target, and on the host the program runs.
     antic_native_tests(pcre2_match pcre2_link "${target}"
