@@ -118,6 +118,18 @@ static void odd_sources(void)
          "fn main()\n{\n\tf < fn int > (x);\n}\n"},
         /* A file that ends after a `<`. */
         {"fn main()\n{\n\tf<", "fn main()\n{\n\tf <\n"},
+        /* A comment in the module path of a direct import, which the
+           list follows all the same. */
+        {"import /* c */ a.b.{y, x};\n", "import /* c */ a.b.{x, y};\n"},
+        /* A list whose `}` the file never writes is no list, and its
+           names stay in their order. */
+        {"import a.b.{y, x", "import a.b.{\n\ty, x\n"},
+        /* An item of a doc comment with no text after its `- `. */
+        {"/// - \nfn main()\n{\n}\n", "/// - \nfn main()\n{\n}\n"},
+        /* An anonymous function opened on the continuation of a
+           statement takes the depth of the continuation. */
+        {"fn main()\n{\n\tlet x =\n\t\tf(fn() {\n\t\t\tg();\n\t\t});\n}\n",
+         "fn main()\n{\n\tlet x =\n\t\tf(fn() {\n\t\t\tg();\n\t\t});\n}\n"},
     };
     size_t i;
 
@@ -178,8 +190,35 @@ static void function_types(void)
     }
 }
 
+/* A doc comment at a depth whose tabs take the whole width of a line,
+   where the text has one column left, so each word stands on a line of
+   its own. */
+static void deep_doc(void)
+{
+    enum { LEVELS = 22 };
+    struct text src = {0};
+    struct text out = {0};
+    size_t i;
+
+    text_append(&src, "fn main()\n{\n");
+    for (i = 0; i < LEVELS; i++) {
+        text_append(&src, "\tif x {\n");
+    }
+    text_append(&src, "/// doc text here\nlet y = 1;\n");
+    for (i = 0; i <= LEVELS; i++) {
+        text_append(&src, "}\n");
+    }
+    CHECK(fmt_source(src.data, src.length, &out));
+    CHECK(strstr(text_cstr(&out), "\t/// doc\n") != NULL);
+    CHECK(strstr(text_cstr(&out), "\t/// text\n") != NULL);
+    CHECK(strstr(text_cstr(&out), "\t/// here\n") != NULL);
+    text_free(&src);
+    text_free(&out);
+}
+
 void test_fmt(void)
 {
+    deep_doc();
     deep_angles();
     open_anonymous();
     odd_sources();

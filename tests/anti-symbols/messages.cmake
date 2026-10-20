@@ -160,6 +160,78 @@ anti_message(archive_index_names_no_module
     ARGS ${resolve}
     OUT "${module}" "${frame}")
 
+# The address of the text holds the letters of base sixteen, and a frame
+# of macOS counts from it, map_text of syms.c.
+anti_message(archive_map_text_of_letters
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build ${id}\n# target macos-arm64\n# text 00000001000a0000\n00000001000a1000-00000001000a2000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+# A text line whose address holds a byte that is no digit of base sixteen
+# names no text, and the offset of a frame counts from address 0.
+anti_message(archive_map_text_not_hexadecimal
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build ${id}\n# target macos-arm64\n# text 000000010000000g\n0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+# The last line of a map lacks its newline and ends in blanks after the
+# location, syms_map_lookup of syms.c.
+anti_message(archive_map_last_line_unended
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build ${id}\n0000000000001000-0000000000002000 good src/good.anti:7  "
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+# A frame outside every line of the map stays as it came in.
+anti_message(archive_map_misses_the_frame
+    STATUS 0
+    FILES trace.txt "${module}\n0x0000000000005001 0+0x5001\n"
+          archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "0x0000000000005001 0+0x5001")
+# A debug link that is no program answers no frame, resolve_frame of
+# syms.c, so the frame stays as it came in.
+anti_message(archive_debug_link_no_program
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${map}"
+          archive/prog.debug "Not a program.\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame}")
+# `check` with an archive that holds another build reports the program
+# missing, state_of of syms.c.
+anti_message(check_archive_of_another_build
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+          prog "${notice_head}${notice_id}\npackage com.example.app 1.0\n"
+          archive/other.map "# The map of a symbols archive of Anti.\n# build 1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS symbols check --conf conf.toml --symbols symbols.zip
+    OUT "missing ./prog ${notice_id}")
+anti_message(check_archive_no_zip
+    FILES conf.toml "[runtime]\nthreads = 2\n" symbols.zip "A text where the archive belongs.\n"
+    ARGS symbols check --conf conf.toml --symbols symbols.zip
+    ERR "anti: symbols.zip is no zip archive")
+# A library of `[injections]` named by an absolute path, and one that is
+# no binary of Anti.
+anti_message(check_injection_absolute_and_no_binary
+    FILES conf.toml "[injections]\n\"app.Logger\" = \"${PROJECT}/none.plugin\"\n\"app.Clock\" = \"first.plugin\"\n"
+          first.plugin "A text where a library belongs.\n"
+    ARGS symbols check --conf conf.toml
+    OUT "missing the program: . holds no program of Anti"
+        "missing ${PROJECT}/none.plugin: no such file"
+        "missing ./first.plugin: it carries no build id of Anti")
+# Two files that include each other, named by the same path.
+anti_message(configuration_include_cycle
+    FILES conf.toml "include = [\"more.toml\"]\n" more.toml "include = [\"conf.toml\"]\n"
+    ARGS symbols inventory --conf ./conf.toml
+    ERR "anti: the configuration files include one another at ./conf.toml")
+
 # Fault injection: each case makes one call of the system fail in
 # anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. A count
 # names the call among those of its kind in the run. `inventory` and
