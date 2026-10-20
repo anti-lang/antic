@@ -37,6 +37,20 @@ struct stack_call {
     void *context;
 };
 
+/* DESIGN: a wait for the thread of the work that fails leaves the thread
+   running, on the struct stack_call of platform_run_on_stack and on the
+   memory of its caller. A return would let the caller free that memory
+   and end the process under the thread, which AddressSanitizer reported
+   as a use after free and the work as an illegal instruction, T157 of
+   docs/audit/tests-findings.md. The process therefore ends here, after
+   the message, with status 1, the status a failed run gives, and without
+   the handlers of exit, which would free or flush what the thread still
+   uses. */
+static _Noreturn void work_not_waited(void)
+{
+    _Exit(1);
+}
+
 /* The tool that names itself in every message of the layer, antic or
    anti, which serve both. R163 of "Rules of 2026-10-13" named the message
    of a program the layer cannot start. */
@@ -598,8 +612,7 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
         fprintf(stderr, "%s: cannot wait for the thread of the work: "
                         "error %lu\n",
                 tool, (unsigned long)GetLastError());
-        CloseHandle(thread);
-        return false;
+        work_not_waited();
     }
     CloseHandle(thread);
     return true;
@@ -1013,7 +1026,7 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
     if (error != 0) {
         fprintf(stderr, "%s: cannot wait for the thread of the work: %s\n",
                 tool, strerror(error));
-        return false;
+        work_not_waited();
     }
     return true;
 }

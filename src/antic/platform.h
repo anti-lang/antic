@@ -122,7 +122,9 @@ int platform_capture(const char *const argv[], struct text *out);
 
 /* Run work(context) on a new thread with a stack of PLATFORM_WORK_STACK
    bytes, and wait for it to end. Returns false, with a message on
-   standard error, when the thread cannot start or be waited for. */
+   standard error, when the thread cannot start. A wait that fails ends
+   the process with status 1 after its message, since the thread may
+   still run on the memory of the caller. */
 bool platform_run_on_stack(void (*work)(void *context), void *context);
 
 #if defined(_WIN32)
