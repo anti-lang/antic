@@ -8,6 +8,7 @@
 
 #include "f16.h"
 #include "fail.h"
+#include "fault.h"
 #include "hash.h"
 #include "json.h"
 #include "object.h"
@@ -1053,7 +1054,7 @@ void *anti_rt_dup(void *object, const struct anti_descriptor *type)
     if (d == NULL || copy == NULL) {
         return NULL;
     }
-    made = malloc((size_t)d->size);
+    made = ANTI_FAULT(ALLOC, NULL, malloc((size_t)d->size));
     if (made == NULL) {
         anti_rt_out_of_memory(d->size);
     }
@@ -1135,7 +1136,7 @@ void *anti_rt_copy_buffer(const void *from, int64_t bytes)
     if (from == NULL || bytes <= 0) {
         return NULL;
     }
-    made = malloc((size_t)bytes);
+    made = ANTI_FAULT(ALLOC, NULL, malloc((size_t)bytes));
     if (made == NULL) {
         anti_rt_out_of_memory(bytes);
     }

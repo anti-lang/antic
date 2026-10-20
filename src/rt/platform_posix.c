@@ -34,6 +34,7 @@
 #endif
 
 #include "cpu_level.h"
+#include "fault.h"
 #include "platform.h"
 #include "utf.h"
 
@@ -91,21 +92,23 @@ struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which)
 
 struct anti_rt_monitor *anti_rt_monitor_new(void)
 {
-    struct anti_rt_monitor *m = malloc(sizeof *m);
+    struct anti_rt_monitor *m = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *m));
     int made = 0;
 
     if (m == NULL) {
         return NULL;
     }
-    if (pthread_mutex_init(&m->lock, NULL) != 0) {
+    if (ANTI_FAULT(LOCK, errno, pthread_mutex_init(&m->lock, NULL)) != 0) {
         goto fail;
     }
     made = 1;
-    if (pthread_cond_init(&m->conditions[0], NULL) != 0) {
+    if (ANTI_FAULT(LOCK, errno,
+                   pthread_cond_init(&m->conditions[0], NULL)) != 0) {
         goto fail;
     }
     made = 2;
-    if (pthread_cond_init(&m->conditions[1], NULL) != 0) {
+    if (ANTI_FAULT(LOCK, errno,
+                   pthread_cond_init(&m->conditions[1], NULL)) != 0) {
         goto fail;
     }
     return m;
@@ -241,14 +244,15 @@ static void *thread_main(void *start)
 
 int anti_rt_thread_start(void (*body)(void))
 {
-    struct start *start = malloc(sizeof *start);
+    struct start *start = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *start));
     pthread_t thread;
 
     if (start == NULL) {
         return -1;
     }
     start->body = body;
-    if (pthread_create(&thread, NULL, thread_main, start) != 0) {
+    if (ANTI_FAULT(THREAD, errno,
+                   pthread_create(&thread, NULL, thread_main, start)) != 0) {
         free(start);
         return -1;
     }
@@ -273,7 +277,7 @@ int anti_rt_getenv(const char *name, char **value)
         return 0;
     }
     length = strlen(text);
-    *value = malloc(length + 1);
+    *value = ANTI_FAULT(ALLOC, NULL, malloc(length + 1));
     if (*value == NULL) {
         return -1;
     }
@@ -304,34 +308,39 @@ FILE *anti_rt_file_open(const char *path, int mode)
         errno = EINVAL;
         return NULL;
     }
-    return fopen(path, modes[mode]);
+    return ANTI_FAULT(OPEN, NULL, fopen(path, modes[mode]));
 }
 
 int64_t anti_rt_file_tell(FILE *file)
 {
-    return (int64_t)ftello(file);
+    return (int64_t)ANTI_FAULT(SEEK, -1, ftello(file));
 }
 
 int anti_rt_file_seek(FILE *file, int64_t offset, int whence)
 {
-    return fseeko(file, (off_t)offset, whence) == 0 ? 0 : -1;
+    int moved = ANTI_FAULT(SEEK, -1, fseeko(file, (off_t)offset, whence));
+
+    return moved == 0 ? 0 : -1;
 }
 
 int anti_rt_file_is_directory(FILE *file)
 {
     struct stat info;
 
-    return fstat(fileno(file), &info) == 0 && S_ISDIR(info.st_mode) ? 1 : 0;
+    if (ANTI_FAULT(STAT, -1, fstat(fileno(file), &info)) != 0) {
+        return 0;
+    }
+    return S_ISDIR(info.st_mode) ? 1 : 0;
 }
 
 int anti_rt_file_remove(const char *path)
 {
-    return remove(path) == 0 ? 0 : -1;
+    return ANTI_FAULT(REMOVE, -1, remove(path)) == 0 ? 0 : -1;
 }
 
 int anti_rt_file_rename(const char *from, const char *to)
 {
-    return rename(from, to) == 0 ? 0 : -1;
+    return ANTI_FAULT(RENAME, -1, rename(from, to)) == 0 ? 0 : -1;
 }
 
 int anti_rt_directory_list(const char *path,
@@ -340,7 +349,7 @@ int anti_rt_directory_list(const char *path,
                                        size_t length),
                            void *context)
 {
-    DIR *dir = opendir(path);
+    DIR *dir = ANTI_FAULT(OPEN, NULL, opendir(path));
     int status = 0;
     int saved;
 
@@ -352,7 +361,7 @@ int anti_rt_directory_list(const char *path,
         /* readdir gives NULL at the end and on a failure, and only a
            failure sets errno. */
         errno = 0;
-        entry = readdir(dir);
+        entry = ANTI_FAULT(READ, NULL, readdir(dir));
         if (entry == NULL) {
             status = errno != 0 ? -1 : 0;
             break;
@@ -371,7 +380,7 @@ int anti_rt_directory_list(const char *path,
 
 void *anti_rt_library_open(const char *path)
 {
-    return dlopen(path, RTLD_NOW | RTLD_LOCAL);
+    return ANTI_FAULT(OPEN, NULL, dlopen(path, RTLD_NOW | RTLD_LOCAL));
 }
 
 void anti_rt_library_close(void *handle)
@@ -662,7 +671,7 @@ int anti_rt_signal_route(int (*deliver)(int64_t sig))
     if (deliver_signal != NULL) {
         return 0;
     }
-    if (pipe(pipe_ends) != 0) {
+    if (ANTI_FAULT(RUN, -1, pipe(pipe_ends)) != 0) {
         return -1;
     }
     deliver_signal = deliver;
@@ -732,7 +741,7 @@ void anti_rt_sleep(int64_t nanoseconds)
     }
     wait.tv_sec = (time_t)(nanoseconds / 1000000000);
     wait.tv_nsec = (long)(nanoseconds % 1000000000);
-    while (nanosleep(&wait, &wait) != 0) {
+    while (ANTI_FAULT(SLEEP, -1, nanosleep(&wait, &wait)) != 0) {
         /* A signal interrupted the wait, and wait holds what is left. */
     }
 }
@@ -742,7 +751,7 @@ void anti_rt_sleep(int64_t nanoseconds)
    the call given back. */
 static char **utf8_list(char *const *list, size_t count)
 {
-    char **out = malloc((count + 1) * sizeof *out);
+    char **out = ANTI_FAULT(ALLOC, NULL, malloc((count + 1) * sizeof *out));
     size_t i;
 
     if (out == NULL) {
@@ -750,7 +759,7 @@ static char **utf8_list(char *const *list, size_t count)
     }
     for (i = 0; i < count; i++) {
         size_t n = strlen(list[i]);
-        unsigned char *bytes = malloc(3 * n + 1);
+        unsigned char *bytes = ANTI_FAULT(ALLOC, NULL, malloc(3 * n + 1));
         size_t written;
         if (bytes == NULL) {
             while (i > 0) {
@@ -817,7 +826,7 @@ void *anti_rt_aligned_alloc(size_t size, size_t align)
     if (align < sizeof(void *)) {
         align = sizeof(void *);
     }
-    if (posix_memalign(&p, align, size) != 0) {
+    if (ANTI_FAULT(ALLOC, ENOMEM, posix_memalign(&p, align, size)) != 0) {
         return NULL;
     }
     return p;

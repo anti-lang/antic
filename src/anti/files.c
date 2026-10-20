@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fault.h"
 #include "platform.h"
 #include "say.h"
 #include "text.h"
@@ -26,7 +27,8 @@ void *files_array(size_t count, size_t size)
     }
     /* calloc may answer NULL for no bytes, which is no failure, so the
        request is never for none. */
-    items = calloc(count == 0 ? 1 : count, size == 0 ? 1 : size);
+    items = ANTI_FAULT(ALLOC, NULL,
+                       calloc(count == 0 ? 1 : count, size == 0 ? 1 : size));
     if (items == NULL) {
         files_out_of_memory();
     }
@@ -40,7 +42,8 @@ void *files_resize(void *items, size_t count, size_t size)
     if (size != 0 && count > SIZE_MAX / size) {
         files_out_of_memory();
     }
-    grown = realloc(items, count * size == 0 ? 1 : count * size);
+    grown = ANTI_FAULT(ALLOC, NULL,
+                       realloc(items, count * size == 0 ? 1 : count * size));
     if (grown == NULL) {
         files_out_of_memory();
     }
@@ -180,18 +183,18 @@ bool files_copy(const char *from, const char *to)
     }
     out = platform_open(to, true);
     if (out == NULL) {
-        fclose(in);
+        ANTI_FCLOSE(in);
         return false;
     }
-    while ((n = fread(buffer, 1, sizeof buffer, in)) > 0) {
-        if (fwrite(buffer, 1, n, out) != n) {
+    while ((n = ANTI_FREAD(buffer, 1, sizeof buffer, in)) > 0) {
+        if (ANTI_FWRITE(buffer, 1, n, out) != n) {
             ok = false;
             break;
         }
     }
-    ok = ok && !ferror(in);
-    fclose(in);
-    return fclose(out) == 0 && ok;
+    ok = ok && !ANTI_FERROR(in);
+    ANTI_FCLOSE(in);
+    return ANTI_FCLOSE(out) == 0 && ok;
 }
 
 static void cannot_read(const char *path)
@@ -209,14 +212,14 @@ static bool read_stream(FILE *f, struct text *out)
     size_t n;
     bool ok;
 
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
+    while ((n = ANTI_FREAD(buffer, 1, sizeof buffer, f)) > 0) {
         text_append_bytes(out, buffer, n);
     }
     /* fread gives 0 at the end of the file and on a read error alike. A
        text without memory before the read is given back without it, so a
        caller that returns on the failure frees nothing. */
-    ok = !ferror(f);
-    fclose(f);
+    ok = !ANTI_FERROR(f);
+    ANTI_FCLOSE(f);
     if (!ok && !had_memory) {
         text_free(out);
     } else if (!ok) {
@@ -259,8 +262,8 @@ bool files_write(const char *path, const struct text *bytes)
         return false;
     }
     ok = bytes->length == 0 ||
-         fwrite(bytes->data, 1, bytes->length, f) == bytes->length;
-    if (fclose(f) != 0 || !ok) {
+         ANTI_FWRITE(bytes->data, 1, bytes->length, f) == bytes->length;
+    if (ANTI_FCLOSE(f) != 0 || !ok) {
         say_anti("cannot write %s\n", path);
         return false;
     }

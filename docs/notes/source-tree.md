@@ -304,6 +304,8 @@ reads as well says so in its row.
 | `src/rt/f16.c` | The two `f16` conversions a program calls where the processor has no instruction. |
 | `src/rt/f16.h` | The conversions between `f16` and `f32`, shared with antic. |
 | `src/rt/fail.h` | The failure routines: the one form of every failure the runtime reports, and the failed assertions, checks and casts of a program. |
+| `src/rt/fault.c` | The seam of fault injection, which the copies of `tools/faults.cmake` alone compile: the count of each kind of call and the error that `ANTI_FAULT` names. |
+| `src/rt/fault.h` | The seam through which a call of the system goes in the runtime, `anti` and antic, and the macros that compile to the call itself without `ANTI_FAULTS`. |
 | `src/rt/fs.c` | The C side of `anti.fs`: open, size, read whole, list, remove and rename. |
 | `src/rt/grow.h` | The one growth rule of a block of the C library. |
 | `src/rt/hash.c` | The hash of bytes and the seed of the hashing collections. |
@@ -655,6 +657,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_errors_registered.cmake` | Checks that every error program is named by a test. |
 | `tests/runners/run_expect.cmake` | Runs a command and checks its status and output. |
 | `tests/runners/run_expect_self.cmake` | Tests `run_expect.cmake` and refuses `PASS_REGULAR_EXPRESSION`. |
+| `tests/runners/run_faults_not_shipped.cmake` | Checks that antic, `anti` and the runtime libraries of `runtime/` hold no seam of fault injection, and that its copies do. |
 | `tests/runners/run_file_headers.cmake` | Refuses a file of antic or of the runtime that opens without the comment of its purpose, and a function of a public header without a comment of its own. |
 | `tests/runners/run_file_headers_self.cmake` | Tests `run_file_headers.cmake` on made-up trees. |
 | `tests/runners/run_files_oom.cmake` | Runs the file helpers out of memory and expects status 70. |
@@ -843,6 +846,8 @@ the data the scripts read.
 | `tools/docs-style/check_docs.py` | Checks `.md` files against the docs-style rules. |
 | `tools/docs-style/rules.md` | States the docs-style rules for a comment and a `.md` file. |
 | `tools/download.cmake` | `antic_download`, the one download of the build, with the check of its digest. |
+| `tools/faults-runtime.cmake` | Lays out `runtime-faults/`, the runtime archive of the fault tests, as links to `runtime/` beside the library of the seam. |
+| `tools/faults.cmake` | The option `ANTIC_FAULTS`, and the copies of antic, `anti` and the runtime with the seam of `src/rt/fault.h`. |
 | `tools/downloads.html.in` | The template of the downloads page that step 9 of a release fills. |
 | `tools/fetch-release.cmake` | Downloads one archive of the LLVM release and checks it against the pin, the manifest and the signature. |
 | `tools/get-clang.cmake` | Installs the pinned clang of the host. |

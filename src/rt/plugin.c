@@ -20,6 +20,7 @@
 #include "atomic.h"
 #include "digest.h"
 #include "fail.h"
+#include "fault.h"
 #include "platform.h"
 #include "plugin_index.h"
 #include "std.h"
@@ -328,8 +329,10 @@ static const void **stubs_of(const struct anti_provides *e)
     const void **table;
     int64_t i;
 
-    head = calloc(1, sizeof *head +
-                         (size_t)(d->function_count + 1) * sizeof(void *));
+    head = ANTI_FAULT(
+        ALLOC, NULL,
+        calloc(1, sizeof *head +
+                      (size_t)(d->function_count + 1) * sizeof(void *)));
     if (head == NULL) {
         return NULL;
     }
@@ -373,7 +376,7 @@ static void *build(const struct anti_plugin *p,
              "to give", (int)e->class_of->name_length, e->class_of->name);
         return NULL;
     }
-    object = calloc(1, (size_t)e->class_of->size);
+    object = ANTI_FAULT(ALLOC, NULL, calloc(1, (size_t)e->class_of->size));
     if (object == NULL) {
         fail("out of memory");
         return NULL;
@@ -475,7 +478,9 @@ static struct anti_plugin *claim(void *handle,
             continue;
         }
         if (p->stubbed == NULL) {
-            p->stubbed = calloc((size_t)table->count, sizeof *p->stubbed);
+            p->stubbed = ANTI_FAULT(
+                ALLOC, NULL,
+                calloc((size_t)table->count, sizeof *p->stubbed));
         }
         one = p->stubbed != NULL ? stubs_of(&table->entries[i]) : NULL;
         if (one == NULL) {
@@ -552,7 +557,8 @@ static int reach(struct anti_reached *r, const struct anti_descriptor *d)
     if (r->count == r->room) {
         int64_t room = r->room == 0 ? 16 : r->room * 2;
         const struct anti_descriptor **items =
-            realloc(r->items, (size_t)room * sizeof *items);
+            ANTI_FAULT(ALLOC, NULL,
+                       realloc(r->items, (size_t)room * sizeof *items));
         if (items == NULL) {
             r->short_of_memory = 1;
             return 0;
@@ -885,19 +891,19 @@ static unsigned char *file_bytes(const char *path, size_t *length)
                 break;
             }
             capacity = capacity == 0 ? 65536 : capacity * 2;
-            grown = realloc(bytes, capacity);
+            grown = ANTI_FAULT(ALLOC, NULL, realloc(bytes, capacity));
             if (grown == NULL) {
                 break;
             }
             bytes = grown;
         }
-        got = fread(bytes + count, 1, capacity - count, file);
+        got = ANTI_FREAD(bytes + count, 1, capacity - count, file);
         count += got;
         if (got == 0) {
             break;
         }
     }
-    fclose(file);
+    ANTI_FCLOSE(file);
     *length = count;
     return bytes;
 }
@@ -1200,7 +1206,7 @@ static int digest_file(const char *path, char hex[65])
         return 0;
     }
     ok = anti_rt_sha256_stream(f, hex);
-    fclose(f);
+    ANTI_FCLOSE(f);
     return ok;
 }
 

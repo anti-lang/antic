@@ -6,6 +6,7 @@
 #include "atomic.h"
 #include "cpu_level.h"
 #include "fail.h"
+#include "fault.h"
 #include "grow.h"
 #include "platform.h"
 #include "regex.h"
@@ -102,7 +103,7 @@ struct anti_text anti_rt_regex_message(int32_t code)
     have = (unsigned char *)(intptr_t)anti_rt_atomic_load(
         slot, (int64_t)sizeof(void *));
     if (have == NULL) {
-        made = malloc(ANTI_RT_REGEX_MESSAGE_ROOM);
+        made = ANTI_FAULT(ALLOC, NULL, malloc(ANTI_RT_REGEX_MESSAGE_ROOM));
         if (made == NULL) {
             return text;
         }

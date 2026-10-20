@@ -23,6 +23,11 @@
 #             may take. Either one is stopped after them and fails the
 #             test, where a time limit of ctest fails it whatever
 #             WILL_FAIL says
+#   FAULT     optional value of ANTI_FAULT for the run of the program, for
+#             a case of fault injection against the runtime of
+#             runtime-faults/, see src/rt/fault.h
+#   ERRORS    optional file of the whole standard error of the program,
+#             which is otherwise not compared
 #
 # The expected file starts with the line "exit N", the process exit code.
 # Every byte after that line is the expected standard output. An optional
@@ -81,15 +86,25 @@ set(program_args "")
 if(EXISTS "${dir}/${name}.args")
     file(STRINGS "${dir}/${name}.args" program_args ENCODING UTF-8)
 endif()
-set(runner "")
+set(runner "${CMAKE_COMMAND}" -E env)
 if(DEFINED UNSET AND NOT UNSET STREQUAL "")
     string(REPLACE "," ";" unset_names "${UNSET}")
-    set(runner "${CMAKE_COMMAND}" -E env)
     foreach(name IN LISTS unset_names)
         list(APPEND runner "--unset=${name}")
     endforeach()
 endif()
+if(DEFINED FAULT AND NOT FAULT STREQUAL "")
+    list(APPEND runner "ANTI_FAULT=${FAULT}")
+endif()
+if(runner STREQUAL "${CMAKE_COMMAND};-E;env")
+    set(runner "")
+endif()
 # The standard error of a test program is its own business: a program
-# that reports an error writes it there.
+# that reports an error writes it there. A case of fault injection names
+# what it holds.
+set(errors ANY_ERR)
+if(DEFINED ERRORS AND NOT ERRORS STREQUAL "")
+    set(errors ERR_FILE "${ERRORS}")
+endif()
 program_expect("${name}" COMMAND ${runner} ${EMULATOR} "${exe}" ${program_args}
-               EXPECTED "${expected_file}" ANY_ERR ${limit})
+               EXPECTED "${expected_file}" ${errors} ${limit})

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fault.h"
 #include "json.h"
 #include "jsontree.h"
 
@@ -90,12 +91,14 @@ static bool list_add(struct list *l, const char *key,
             return false;
         }
         room = l->room == 0 ? 8 : l->room * 2;
-        items = realloc((void *)l->items, room * sizeof *items);
+        items = ANTI_FAULT(ALLOC, NULL,
+                           realloc((void *)l->items, room * sizeof *items));
         if (items == NULL) {
             return false;
         }
         l->items = items;
-        keys = realloc((void *)l->keys, room * sizeof *keys);
+        keys = ANTI_FAULT(ALLOC, NULL,
+                          realloc((void *)l->keys, room * sizeof *keys));
         if (keys == NULL) {
             return false;
         }

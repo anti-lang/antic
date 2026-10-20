@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "fail.h"
+#include "fault.h"
 
 /* The one form of every line the runtime writes to standard error. */
 ANTI_RT_PRINTF(1, 0) static void write_line(const char *format,
@@ -64,7 +65,7 @@ _Noreturn void anti_rt_start_out_of_memory(void)
 
 void *anti_rt_start_alloc(size_t size)
 {
-    void *p = malloc(size == 0 ? 1 : size);
+    void *p = ANTI_FAULT(ALLOC, NULL, malloc(size == 0 ? 1 : size));
 
     if (p == NULL) {
         anti_rt_start_out_of_memory();

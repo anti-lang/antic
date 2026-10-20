@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fault.h"
 #include "grow.h"
 #include "platform.h"
 #include "std.h"
@@ -43,7 +44,7 @@ static char *native_path(const unsigned char *bytes, int64_t len)
         errno = EINVAL;
         return NULL;
     }
-    path = malloc((size_t)len + 1);
+    path = ANTI_FAULT(ALLOC, NULL, malloc((size_t)len + 1));
     if (path == NULL) {
         errno = ENOMEM;
         return NULL;
@@ -105,7 +106,7 @@ unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
        end lies at the largest offset, so the size below would ask for
        2^63 bytes. */
     if (anti_rt_file_is_directory(f)) {
-        fclose(f);
+        ANTI_FCLOSE(f);
         errno = EISDIR;
         return NULL;
     }
@@ -113,13 +114,13 @@ unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
     if (size >= 0 && (uint64_t)size >= SIZE_MAX) {
         errno = ENOMEM;
     } else if (size >= 0) {
-        bytes = malloc((size_t)size + 1);
+        bytes = ANTI_FAULT(ALLOC, NULL, malloc((size_t)size + 1));
         if (bytes == NULL) {
             errno = ENOMEM;
         }
     }
     if (bytes != NULL && size > 0 &&
-        fread(bytes, 1, (size_t)size, f) != (size_t)size) {
+        ANTI_FREAD(bytes, 1, (size_t)size, f) != (size_t)size) {
         /* A short read is no lack of memory, whatever errno held. */
         if (errno == 0 || errno == ENOMEM) {
             errno = EIO;
@@ -127,7 +128,7 @@ unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
         free(bytes);
         bytes = NULL;
     }
-    fclose(f);
+    ANTI_FCLOSE(f);
     if (bytes != NULL) {
         bytes[size] = '\0';
         *length = size;
@@ -179,7 +180,7 @@ static struct anti_text *finish(struct names *n, int64_t *count)
 {
     size_t head = (size_t)n->count * sizeof(struct anti_text);
     size_t length = (size_t)n->length;
-    unsigned char *block = malloc(head + length + 1);
+    unsigned char *block = ANTI_FAULT(ALLOC, NULL, malloc(head + length + 1));
     struct anti_text *texts = (struct anti_text *)(void *)block;
     const unsigned char *at;
     int64_t i;

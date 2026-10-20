@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "atomic.h"
+#include "fault.h"
 #include "grow.h"
 #include "json.h"
 #include "plugin.h"
@@ -124,7 +125,8 @@ static void given(struct anti_plugin *slot)
 /* A zeroed object of the class, prepared as a literal of it would be. */
 static void *build(const struct anti_class *c)
 {
-    void *object = calloc(1, (size_t)c->descriptor->size);
+    void *object =
+        ANTI_FAULT(ALLOC, NULL, calloc(1, (size_t)c->descriptor->size));
 
     if (object != NULL) {
         c->init(object);
@@ -837,7 +839,7 @@ static bool fill(struct reader *r, void *object,
         return true;
     }
     if (count > 0) {
-        seen = calloc((size_t)(count + 7) / 8, 1);
+        seen = ANTI_FAULT(ALLOC, NULL, calloc((size_t)(count + 7) / 8, 1));
         if (seen == NULL) {
             return false;
         }

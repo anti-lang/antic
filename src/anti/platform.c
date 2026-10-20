@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "fault.h"
+
 #if defined(_WIN32)
 
 #include <direct.h>
@@ -321,7 +323,8 @@ enum platform_kind platform_kind(const char *path, bool follow)
 {
     struct stat st;
 
-    if ((follow ? stat(path, &st) : lstat(path, &st)) != 0) {
+    if (ANTI_FAULT(STAT, -1, follow ? stat(path, &st) : lstat(path, &st)) !=
+        0) {
         return errno == ENOENT ? PLATFORM_MISSING : PLATFORM_UNREADABLE;
     }
     if (S_ISLNK(st.st_mode)) {
@@ -332,32 +335,33 @@ enum platform_kind platform_kind(const char *path, bool follow)
 
 bool platform_make_dir(const char *path)
 {
-    return mkdir(path, 0777) == 0 || errno == EEXIST;
+    return ANTI_FAULT(MKDIR, -1, mkdir(path, 0777)) == 0 || errno == EEXIST;
 }
 
 bool platform_remove_entry(const char *path)
 {
     struct stat st;
 
-    if (lstat(path, &st) != 0) {
+    if (ANTI_FAULT(STAT, -1, lstat(path, &st)) != 0) {
         return false;
     }
-    return (S_ISDIR(st.st_mode) ? rmdir(path) : unlink(path)) == 0;
+    return ANTI_FAULT(REMOVE, -1,
+                      S_ISDIR(st.st_mode) ? rmdir(path) : unlink(path)) == 0;
 }
 
 bool platform_rename(const char *from, const char *to)
 {
-    return rename(from, to) == 0;
+    return ANTI_FAULT(RENAME, -1, rename(from, to)) == 0;
 }
 
 bool platform_replace(const char *from, const char *to)
 {
-    return rename(from, to) == 0;
+    return ANTI_FAULT(RENAME, -1, rename(from, to)) == 0;
 }
 
 bool platform_replace_program(const char *from, const char *to)
 {
-    return rename(from, to) == 0;
+    return ANTI_FAULT(RENAME, -1, rename(from, to)) == 0;
 }
 
 /* O_NONBLOCK lets the open of a FIFO return at once rather than wait
@@ -366,7 +370,8 @@ bool platform_replace_program(const char *from, const char *to)
 FILE *platform_open_file(const char *path)
 {
     struct stat st;
-    int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    int fd =
+        ANTI_FAULT(OPEN, -1, open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC));
     int flags;
     FILE *f;
 
@@ -374,7 +379,8 @@ FILE *platform_open_file(const char *path)
         return NULL;
     }
     flags = fcntl(fd, F_GETFL);
-    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || flags == -1 ||
+    if (ANTI_FAULT(STAT, -1, fstat(fd, &st)) != 0 || !S_ISREG(st.st_mode) ||
+        flags == -1 ||
         fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) == -1) {
         close(fd);
         return NULL;
@@ -390,7 +396,8 @@ bool platform_copy_permissions(const char *from, const char *to)
 {
     struct stat st;
 
-    return stat(from, &st) == 0 && chmod(to, st.st_mode & 07777) == 0;
+    return ANTI_FAULT(STAT, -1, stat(from, &st)) == 0 &&
+           ANTI_FAULT(WRITE, -1, chmod(to, st.st_mode & 07777)) == 0;
 }
 
 int platform_run_symbolized(const char *const argv[], const char *name,

@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fault.h"
 #include "grow.h"
 #include "license.h"
 #include "platform.h"
@@ -74,7 +75,9 @@ static struct anti_text keep_in(struct kept **list, const char *s, size_t n)
         }
     }
     if (k == NULL) {
-        k = n < SIZE_MAX - sizeof *k ? malloc(sizeof *k + n + 1) : NULL;
+        k = n < SIZE_MAX - sizeof *k
+                ? ANTI_FAULT(ALLOC, NULL, malloc(sizeof *k + n + 1))
+                : NULL;
         if (k != NULL) {
             memcpy(k->bytes, s, n);
             k->bytes[n] = 0;
@@ -105,7 +108,7 @@ static struct anti_text function_name(const char *s, size_t n, bool stable)
     if (s == NULL || memchr(s, '$', n) == NULL) {
         return stable ? text_part(s, n) : keep(s, n);
     }
-    readable = malloc(n + 1);
+    readable = ANTI_FAULT(ALLOC, NULL, malloc(n + 1));
     if (readable == NULL) {
         return stable ? text_part(s, n) : keep(s, n);
     }
@@ -169,10 +172,10 @@ static const struct loaded *load(const char *path, bool object)
             return found;
         }
     }
-    l = malloc(sizeof *l);
+    l = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *l));
     if (l != NULL) {
         int64_t size = 0;
-        l->path = malloc(strlen(path) + 1);
+        l->path = ANTI_FAULT(ALLOC, NULL, malloc(strlen(path) + 1));
         if (l->path == NULL) {
             free(l);
         } else {
@@ -248,7 +251,7 @@ static struct anti_text macho_id(const uint8_t *header)
     }
     /* An id without room for its entry is read again by the next
        capture. */
-    k = malloc(sizeof *k);
+    k = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *k));
     if (k != NULL) {
         k->header = header;
         k->id = id;
@@ -518,7 +521,7 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
 
     g.room = 256;
     g.used = 0;
-    g.bytes = malloc((size_t)g.room);
+    g.bytes = ANTI_FAULT(ALLOC, NULL, malloc((size_t)g.room));
     if (g.bytes == NULL) {
         return NULL;
     }

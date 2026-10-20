@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "toml.h"
+#include "fault.h"
 
 /* The room of a dotted path, the table and the key, with its NUL. A key
    longer than that is refused where it is read, so its length also fits
@@ -107,7 +108,7 @@ static int is_bare(int c)
 
 static char *keep(const char *text, int64_t length)
 {
-    char *copy = malloc((size_t)length + 1);
+    char *copy = ANTI_FAULT(ALLOC, NULL, malloc((size_t)length + 1));
 
     if (copy == NULL) {
         return NULL;
@@ -132,7 +133,8 @@ static void add(struct anti_toml *doc, struct reader *r, const char *key,
             return;
         }
         capacity = doc->capacity == 0 ? 16 : doc->capacity * 2;
-        grown = realloc(doc->pairs, capacity * sizeof *grown);
+        grown = ANTI_FAULT(ALLOC, NULL,
+                           realloc(doc->pairs, capacity * sizeof *grown));
         if (grown == NULL) {
             r->failed = 1;
             return;
@@ -196,7 +198,8 @@ static int grow_names(struct anti_toml *doc)
         return 0;
     }
     doc->room = doc->room == 0 ? 64 : doc->room * 2;
-    doc->names = calloc(doc->room, sizeof *doc->names);
+    doc->names =
+        ANTI_FAULT(ALLOC, NULL, calloc(doc->room, sizeof *doc->names));
     if (doc->names == NULL) {
         doc->names = old;
         doc->room = old_room;
@@ -578,7 +581,7 @@ static void read_pair(struct reader *r, struct anti_toml *doc)
 
 struct anti_toml *anti_rt_toml_read(const unsigned char *bytes, int64_t len)
 {
-    struct anti_toml *doc = calloc(1, sizeof *doc);
+    struct anti_toml *doc = ANTI_FAULT(ALLOC, NULL, calloc(1, sizeof *doc));
     struct reader r;
 
     if (doc == NULL) {

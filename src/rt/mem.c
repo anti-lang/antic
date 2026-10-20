@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "fail.h"
+#include "fault.h"
 #include "platform.h"
 #include "std.h"
 
@@ -67,7 +68,8 @@ ANTI_RT_NOINLINE void *anti_rt_alloc_aligned(int64_t count, int64_t size,
         bytes = (size_t)align;
     }
     if (align <= ANTI_RT_MALLOC_ALIGN) {
-        return zeroed != 0 ? calloc(bytes, 1) : malloc(bytes);
+        return zeroed != 0 ? ANTI_FAULT(ALLOC, NULL, calloc(bytes, 1))
+                           : ANTI_FAULT(ALLOC, NULL, malloc(bytes));
     }
     p = anti_rt_malloc_aligned(bytes, (size_t)align);
     if (p != NULL && zeroed != 0) {
@@ -89,7 +91,10 @@ _Noreturn void anti_rt_out_of_memory(int64_t size)
    free the memory and give NULL for it. */
 void *anti_rt_grow(void *p, int64_t size)
 {
-    void *grown = size >= 0 ? realloc(p, size > 0 ? (size_t)size : 1) : NULL;
+    void *grown =
+        size >= 0
+            ? ANTI_FAULT(ALLOC, NULL, realloc(p, size > 0 ? (size_t)size : 1))
+            : NULL;
 
     if (grown == NULL) {
         anti_rt_out_of_memory(size);

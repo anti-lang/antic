@@ -12,6 +12,7 @@
 
 #include "atomic.h"
 #include "fail.h"
+#include "fault.h"
 #include "platform.h"
 #include "sync.h"
 
@@ -87,7 +88,8 @@ void *anti_rt_chan_new(int64_t size, int64_t capacity)
                            (long long)capacity);
     }
     if (size >= 0 && (size == 0 || capacity <= (INT64_MAX / 2) / size)) {
-        ch = malloc(sizeof *ch + (size_t)(size * capacity));
+        ch = ANTI_FAULT(ALLOC, NULL,
+                        malloc(sizeof *ch + (size_t)(size * capacity)));
     }
     if (ch == NULL) {
         anti_rt_fail_memory("for a channel of %lld values",

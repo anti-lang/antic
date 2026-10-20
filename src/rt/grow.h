@@ -16,6 +16,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "fault.h"
+
 /* The block at p, which malloc or realloc gave, or NULL, grown by realloc
    to hold used and then more bytes, with *room its size in bytes. The
    size doubles from *room, or from first when *room is 0, until it holds
@@ -41,7 +43,7 @@ static inline void *anti_rt_reserve(void *p, int64_t *room, int64_t used,
     while (size < need) {
         size = size > INT64_MAX / 2 ? need : size * 2;
     }
-    grown = realloc(p, (size_t)size);
+    grown = ANTI_FAULT(ALLOC, NULL, realloc(p, (size_t)size));
     if (grown == NULL) {
         return NULL;
     }
@@ -50,3 +52,4 @@ static inline void *anti_rt_reserve(void *p, int64_t *room, int64_t used,
 }
 
 #endif
+

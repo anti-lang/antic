@@ -14,6 +14,7 @@
 
 #include "conf.h"
 #include "fail.h"
+#include "fault.h"
 #include "hooks.h"
 #include "object.h"
 #include "platform.h"
@@ -246,7 +247,8 @@ void anti_rt_parallel(const void *base, int64_t count, int64_t element_size,
                                "bytes each do not fit in memory",
                                (long long)chunks, (long long)result_size);
         }
-        j.results = malloc((size_t)(chunks * result_size));
+        j.results =
+            ANTI_FAULT(ALLOC, NULL, malloc((size_t)(chunks * result_size)));
         if (j.results == NULL) {
             /* DESIGN: the language has no way to report this, and a
                program that cannot hold its results cannot go on. */
@@ -309,7 +311,7 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
                        anti_rt_dispatch_body *run, const void *context,
                        int64_t context_size)
 {
-    struct one *job = calloc(1, sizeof *job);
+    struct one *job = ANTI_FAULT(ALLOC, NULL, calloc(1, sizeof *job));
     struct one *at;
 
     if (job == NULL) {
@@ -318,14 +320,14 @@ void *anti_rt_dispatch(void *object, int64_t result_size,
     job->run = run;
     job->object = object;
     if (context_size > 0) {
-        job->context = malloc((size_t)context_size);
+        job->context = ANTI_FAULT(ALLOC, NULL, malloc((size_t)context_size));
         if (job->context == NULL) {
             anti_rt_fail_memory("for the arguments of a job");
         }
         memcpy(job->context, context, (size_t)context_size);
     }
     if (result_size > 0) {
-        job->result = malloc((size_t)result_size);
+        job->result = ANTI_FAULT(ALLOC, NULL, malloc((size_t)result_size));
         if (job->result == NULL) {
             anti_rt_fail_memory("for the result of a job");
         }

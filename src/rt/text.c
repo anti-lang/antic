@@ -9,6 +9,7 @@
 
 #include "atomic.h"
 #include "fail.h"
+#include "fault.h"
 #include "grow.h"
 #include "platform.h"
 #include "std.h"
@@ -54,7 +55,7 @@ struct anti_text anti_rt_text_kept(const unsigned char *bytes)
         k = k->next;
     }
     if (k == NULL) {
-        k = malloc(sizeof *k + length + 1);
+        k = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *k + length + 1));
         if (k == NULL) {
             anti_rt_out_of_memory((int64_t)(sizeof *k + length + 1));
         }
@@ -91,7 +92,8 @@ struct anti_text anti_rt_text_slice(const unsigned char *bytes, int64_t len)
 struct anti_text anti_rt_text_copy(const unsigned char *bytes, int64_t len)
 {
     struct anti_text text;
-    unsigned char *copy = malloc(len > 0 ? (size_t)len : 1);
+    unsigned char *copy =
+        ANTI_FAULT(ALLOC, NULL, malloc(len > 0 ? (size_t)len : 1));
 
     if (copy == NULL) {
         anti_rt_fail_memory("in a copy of %lld bytes", (long long)len);
@@ -209,7 +211,7 @@ struct anti_text anti_rt_builder_take(struct anti_builder *b)
     unsigned char *room = b->room;
 
     if (room == NULL) {
-        room = malloc(1);
+        room = ANTI_FAULT(ALLOC, NULL, malloc(1));
         if (room == NULL) {
             anti_rt_out_of_memory(1);
         }

@@ -139,6 +139,9 @@ target_link_libraries(anti PRIVATE anti_core)
 # A coverage tree instruments the four. See tools/coverage.cmake.
 include(tools/coverage.cmake)
 antic_coverage(antic_core antic anti_core anti)
+# A tree of ANTIC_FAULTS builds copies of the four and of the runtime with
+# the seam of src/rt/fault.h. See tools/faults.cmake.
+include(tools/faults.cmake)
 
 target_compile_definitions(antic PRIVATE
     ANTIC_VERSION="${PROJECT_VERSION}")
@@ -167,6 +170,7 @@ target_compile_definitions(anti_core PRIVATE
     ANTI_CLANG_VERSION="${ANTI_CLANG_VERSION}"
     ANTI_CLANG_TAG="${ANTI_CLANG_TAG}"
     ANTI_CLANG_PAGE="${ANTI_CLANG_PAGE}")
+antic_faults_tools()
 
 # DESIGN: the levels of tools/cpu-levels are the table src/antic/cpu.c holds, and
 # the test cpu_levels_pin compares the two. The build reads the file rather
@@ -556,6 +560,7 @@ function(antic_cross_runtime target triple)
         antic_cross_runtime_at("${target}" "${triple}" "${level}"
             "${ANTIC_RUNTIME_DIR}" ${ARGN})
     endforeach()
+    antic_faults_runtime("${target}" "${triple}" ${ARGN})
 endfunction()
 
 # The resource directory of the C compiler, with its builtins and its
@@ -731,3 +736,6 @@ add_subdirectory(src/native)
 # The targets and the test environment of a coverage tree, after the last
 # directory that instruments a program.
 antic_coverage_finish()
+# The runtime archive of the fault tests, after every target that writes
+# into runtime/.
+antic_faults_finish()

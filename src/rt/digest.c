@@ -4,6 +4,8 @@
 
 #include <string.h>
 
+#include "fault.h"
+
 /* The round constants and the initial hash of FIPS 180-4, section 4.2.2
    and 5.3.3. */
 static const uint32_t rounds[64] = {
@@ -132,10 +134,10 @@ bool anti_rt_sha256_stream(FILE *f, char hex[65])
     size_t n;
 
     anti_rt_sha256_init(&s);
-    while ((n = fread(bytes, 1, sizeof bytes, f)) > 0) {
+    while ((n = ANTI_FREAD(bytes, 1, sizeof bytes, f)) > 0) {
         anti_rt_sha256_update(&s, bytes, n);
     }
-    if (ferror(f)) {
+    if (ANTI_FERROR(f)) {
         return false;
     }
     anti_rt_sha256_hex(&s, hex);

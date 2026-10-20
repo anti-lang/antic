@@ -3,6 +3,7 @@
    template. */
 
 #include "regex.h"
+#include "fault.h"
 #include "grow.h"
 
 #include <stdlib.h>
@@ -34,9 +35,10 @@ static void *keep(pcre2_code *compiled, const unsigned char *bytes,
     if (compiled == NULL) {
         return NULL;
     }
-    p = malloc(sizeof *p);
+    p = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *p));
     if (p != NULL) {
-        p->text = malloc(length > 0 ? (size_t)length : 1);
+        p->text =
+            ANTI_FAULT(ALLOC, NULL, malloc(length > 0 ? (size_t)length : 1));
     }
     if (p == NULL || p->text == NULL) {
         free(p);

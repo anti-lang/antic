@@ -10,6 +10,7 @@
 #include "platform.h"
 #include "say.h"
 #include "sha256.h"
+#include "../rt/fault.h"
 #include "../rt/toml.h"
 
 /* DESIGN: `anti-plugins.toml` beside a plugin lists every library of
@@ -184,7 +185,7 @@ static bool index_others(struct text *out, const char *path, const char *name)
     if (f == NULL) {
         return true;
     }
-    fclose(f);
+    ANTI_FCLOSE(f);
     if (driver_read_bytes(path, &file)) {
         doc = anti_rt_toml_read((const unsigned char *)file.data,
                                 (int64_t)file.length);

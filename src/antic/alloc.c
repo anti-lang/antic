@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "say.h"
+#include "../rt/fault.h"
 
 void alloc_out_of_memory(void)
 {
@@ -38,7 +39,8 @@ void *alloc_zeroed(size_t count, size_t size)
     if (count == 0) {
         count = 1;
     }
-    items = calloc(1, alloc_product(count, size == 0 ? 1 : size));
+    items = ANTI_FAULT(ALLOC, NULL,
+                       calloc(1, alloc_product(count, size == 0 ? 1 : size)));
     if (items == NULL) {
         alloc_out_of_memory();
     }
@@ -48,7 +50,8 @@ void *alloc_zeroed(size_t count, size_t size)
 void *alloc_resize(void *items, size_t count, size_t size)
 {
     size_t bytes = alloc_product(count, size);
-    void *resized = realloc(items, bytes == 0 ? 1 : bytes);
+    void *resized =
+        ANTI_FAULT(ALLOC, NULL, realloc(items, bytes == 0 ? 1 : bytes));
 
     if (resized == NULL) {
         alloc_out_of_memory();

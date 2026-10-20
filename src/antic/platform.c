@@ -28,6 +28,7 @@
 
 #include "alloc.h"
 #include "target.h"
+#include "../rt/fault.h"
 
 /* The work and its context, handed to the thread of
    platform_run_on_stack. */
@@ -606,20 +607,20 @@ extern char **environ;
 
 FILE *platform_open(const char *path, bool writing)
 {
-    return fopen(path, writing ? "wb" : "rb");
+    return ANTI_FAULT(OPEN, NULL, fopen(path, writing ? "wb" : "rb"));
 }
 
 bool platform_remove(const char *path)
 {
-    return remove(path) == 0;
+    return ANTI_FAULT(REMOVE, -1, remove(path)) == 0;
 }
 
 bool platform_symlink(const char *target, const char *path)
 {
-    if (unlink(path) != 0 && errno != ENOENT) {
+    if (ANTI_FAULT(REMOVE, -1, unlink(path)) != 0 && errno != ENOENT) {
         return false;
     }
-    return symlink(target, path) == 0;
+    return ANTI_FAULT(OPEN, -1, symlink(target, path)) == 0;
 }
 
 const char *platform_getenv(const char *name)
@@ -653,14 +654,15 @@ bool platform_directory_exists(const char *path)
 {
     struct stat info;
 
-    return stat(path, &info) == 0 && S_ISDIR(info.st_mode);
+    return ANTI_FAULT(STAT, -1, stat(path, &info)) == 0 &&
+           S_ISDIR(info.st_mode);
 }
 
 bool platform_list_directory(const char *path,
                              void (*each)(void *context, const char *name),
                              void *context)
 {
-    DIR *dir = opendir(path);
+    DIR *dir = ANTI_FAULT(OPEN, NULL, opendir(path));
     struct dirent *entry;
     bool complete;
 
@@ -672,7 +674,7 @@ bool platform_list_directory(const char *path,
        every call. */
     for (;;) {
         errno = 0;
-        entry = readdir(dir);
+        entry = ANTI_FAULT(READ, NULL, readdir(dir));
         if (entry == NULL) {
             complete = errno == 0;
             break;
@@ -702,7 +704,7 @@ static bool self_path(struct text *out)
         return false;
     }
     path = alloc_zeroed(size, 1);
-    if (_NSGetExecutablePath(path, &size) != 0) {
+    if (ANTI_FAULT(STAT, -1, _NSGetExecutablePath(path, &size)) != 0) {
         free(path);
         return false;
     }
@@ -716,7 +718,8 @@ static bool self_path(struct text *out)
 static bool self_path(struct text *out)
 {
     char path[PATH_MAX];
-    ssize_t length = readlink("/proc/self/exe", path, sizeof path - 1);
+    ssize_t length = ANTI_FAULT(
+        STAT, -1, readlink("/proc/self/exe", path, sizeof path - 1));
 
     if (length <= 0) {
         return false;
@@ -730,7 +733,7 @@ static bool self_path(struct text *out)
 
 bool platform_absolute_path(const char *path, struct text *out)
 {
-    char *real = realpath(path, NULL);
+    char *real = ANTI_FAULT(STAT, NULL, realpath(path, NULL));
     const char *slash;
     struct text directory = {0};
 
@@ -747,7 +750,7 @@ bool platform_absolute_path(const char *path, struct text *out)
     } else {
         text_appendf(&directory, "%.*s", (int)(slash - path), path);
     }
-    real = realpath(text_cstr(&directory), NULL);
+    real = ANTI_FAULT(STAT, NULL, realpath(text_cstr(&directory), NULL));
     text_free(&directory);
     if (real == NULL) {
         return false;
@@ -762,7 +765,7 @@ static int wait_for(pid_t pid, const char *name)
 {
     int status;
 
-    while (waitpid(pid, &status, 0) < 0) {
+    while (ANTI_FAULT(WAIT, -1, waitpid(pid, &status, 0)) < 0) {
         if (errno != EINTR) {
             fprintf(stderr, "%s: waiting for %s: %s\n", tool, name,
                     strerror(errno));
@@ -782,8 +785,9 @@ static int wait_for(pid_t pid, const char *name)
 static int spawn(const char *const argv[], posix_spawn_file_actions_t *actions,
                  pid_t *pid)
 {
-    int err = posix_spawnp(pid, argv[0], actions, NULL,
-                           (char *const *)argv, environ);
+    int err = ANTI_FAULT(RUN, errno,
+                         posix_spawnp(pid, argv[0], actions, NULL,
+                                      (char *const *)argv, environ));
     if (err != 0) {
         fprintf(stderr, "%s: cannot run %s: %s\n", tool, argv[0],
                 strerror(err));
@@ -812,7 +816,7 @@ int platform_run_in(const char *directory, const char *const argv[])
     if (directory == NULL) {
         return platform_run(argv);
     }
-    pid = fork();
+    pid = ANTI_FAULT(RUN, -1, fork());
     if (pid < 0) {
         fprintf(stderr, "%s: cannot run %s: %s\n", tool, argv[0],
                 strerror(errno));
@@ -841,7 +845,7 @@ int platform_capture(const char *const argv[], struct text *out)
     ssize_t n;
     int started;
 
-    if (pipe(fds) != 0) {
+    if (ANTI_FAULT(RUN, -1, pipe(fds)) != 0) {
         fprintf(stderr, "%s: pipe: %s\n", tool, strerror(errno));
         return -1;
     }
@@ -856,7 +860,8 @@ int platform_capture(const char *const argv[], struct text *out)
         close(fds[0]);
         return -1;
     }
-    while ((n = read(fds[0], buffer, sizeof buffer - 1)) > 0) {
+    while ((n = ANTI_FAULT(READ, -1, read(fds[0], buffer, sizeof buffer - 1))) >
+           0) {
         buffer[n] = '\0';
         text_append(out, buffer);
     }
@@ -909,7 +914,7 @@ int platform_run_lines(const char *const argv[], const char *name,
     int err;
 
     env = environment_with(name, value, &entry);
-    if (pipe(fds) != 0) {
+    if (ANTI_FAULT(RUN, -1, pipe(fds)) != 0) {
         fprintf(stderr, "%s: pipe: %s\n", tool, strerror(errno));
         free(env);
         text_free(&entry);
@@ -919,8 +924,9 @@ int platform_run_lines(const char *const argv[], const char *name,
     posix_spawn_file_actions_adddup2(&actions, fds[1], STDERR_FILENO);
     posix_spawn_file_actions_addclose(&actions, fds[0]);
     posix_spawn_file_actions_addclose(&actions, fds[1]);
-    err = posix_spawnp(&pid, argv[0], &actions, NULL, (char *const *)argv,
-                       env);
+    err = ANTI_FAULT(RUN, errno,
+                     posix_spawnp(&pid, argv[0], &actions, NULL,
+                                  (char *const *)argv, env));
     posix_spawn_file_actions_destroy(&actions);
     close(fds[1]);
     free(env);
@@ -931,7 +937,8 @@ int platform_run_lines(const char *const argv[], const char *name,
         close(fds[0]);
         return -1;
     }
-    while ((n = read(fds[0], buffer, sizeof buffer)) > 0) {
+    while ((n = ANTI_FAULT(READ, -1, read(fds[0], buffer, sizeof buffer))) >
+           0) {
         size_t start = 0;
         size_t i;
         for (i = 0; i < (size_t)n; i++) {
@@ -974,7 +981,9 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
     if (error == 0) {
         error = pthread_attr_setstacksize(&attributes, PLATFORM_WORK_STACK);
         if (error == 0) {
-            error = pthread_create(&thread, &attributes, stack_start, &call);
+            error = ANTI_FAULT(
+                THREAD, errno,
+                pthread_create(&thread, &attributes, stack_start, &call));
         }
         pthread_attr_destroy(&attributes);
     }
@@ -983,7 +992,7 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
                 tool, strerror(error));
         return false;
     }
-    error = pthread_join(thread, NULL);
+    error = ANTI_FAULT(WAIT, errno, pthread_join(thread, NULL));
     if (error != 0) {
         fprintf(stderr, "%s: cannot wait for the thread of the work: %s\n",
                 tool, strerror(error));

@@ -1123,6 +1123,61 @@ foreach(source IN LISTS std_sources)
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std")
 endforeach()
 
+# The cases of fault injection of tests/programs/ and tests/std/. A file
+# <name>.faults beside <name>.anti holds one case per line, its name and
+# the value of ANTI_FAULT, which makes a call of the system fail in the
+# runtime of runtime-faults/, see src/rt/fault.h:
+#
+#   open_refused open:1:EACCES
+#
+# The case runs the program against that runtime as
+# <kind>_<name>_fault_<case>, and compares its status and its standard
+# output with <name>.<case>.expected and its whole standard error with
+# <name>.<case>.err, which a case whose program writes nothing there
+# leaves out. A tree of ANTIC_FAULTS alone builds the runtime, see
+# tools/faults.cmake. The program builds with --lto none, since the
+# runtime of runtime-faults/ is no bitcode.
+if(ANTIC_FAULTS)
+    foreach(kind programs std)
+        set(prefix ${kind})
+        if(kind STREQUAL "programs")
+            set(prefix program)
+        endif()
+        file(GLOB fault_lists CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/${kind}/*.faults")
+        foreach(list IN LISTS fault_lists)
+            get_filename_component(name "${list}" NAME_WE)
+            file(STRINGS "${list}" cases REGEX "^[^#]")
+            foreach(line IN LISTS cases)
+                set(entry "[a-z]+:[0-9]+:[A-Z]+")
+                if(NOT line MATCHES "^([a-z0-9_]+) (${entry}(,${entry})*)$")
+                    message(FATAL_ERROR "${list}: `${line}` is no "
+                                        "<case> <kind>:<n>:<error>")
+                endif()
+                set(case "${CMAKE_MATCH_1}")
+                set(fault "${CMAKE_MATCH_2}")
+                set(base "${CMAKE_CURRENT_SOURCE_DIR}/${kind}/${name}.${case}")
+                set(errors "")
+                if(EXISTS "${base}.err")
+                    set(errors "-DERRORS=${base}.err")
+                endif()
+                add_test(NAME ${prefix}_${name}_fault_${case}
+                    COMMAND "${CMAKE_COMMAND}"
+                        "-DANTIC=$<TARGET_FILE:antic>"
+                        "-DRUNTIME=${ANTIC_FAULTS_RUNTIME_DIR}"
+                        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/${kind}/${name}.anti"
+                        "-DOPTIONS=--lto,none"
+                        "-DOBJECTS="
+                        "-DEXPECTED=${base}.expected"
+                        "-DFAULT=${fault}"
+                        ${errors}
+                        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/faults/${name}-${case}"
+                        -P "${ANTIC_RUNNERS}/run_program.cmake")
+            endforeach()
+        endforeach()
+    endforeach()
+endif()
+
 # Every .anti file under src/std/anti/collection/ is a module the build
 # compiles by itself, after the modules it imports.
 add_test(NAME std_collection_modules
@@ -6155,6 +6210,17 @@ foreach(pair "anti_build|anti-build/messages.cmake"
     string(STRIP "${names}" names)
     string(REPLACE "\n" ";" names "${names}")
     foreach(name IN LISTS names)
+        # A case of fault injection runs the copy of the tool that holds
+        # the seam of src/rt/fault.h, which a tree of ANTIC_FAULTS alone
+        # builds. See tools/faults.cmake.
+        set(case_tool ${tool})
+        if(name MATCHES "^([a-z0-9_]+) fault$")
+            set(name "${CMAKE_MATCH_1}")
+            if(NOT ANTIC_FAULTS)
+                continue()
+            endif()
+            set(case_tool ${tool}_faults)
+        endif()
         # DESIGN: antic keeps the text of --license-text when it refuses
         # the file for a NUL byte, and LeakSanitizer reports the block. A
         # line of tests/known-failures.txt names a test that fails in
@@ -6169,7 +6235,7 @@ foreach(pair "anti_build|anti-build/messages.cmake"
         endif()
         add_test(NAME ${command}_message_${name}
             COMMAND "${CMAKE_COMMAND}"
-                "-DANTI=$<TARGET_FILE:${tool}>"
+                "-DANTI=$<TARGET_FILE:${case_tool}>"
                 "-DTABLE=${table}"
                 "-DCASE=${name}"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/messages/${command}-${name}"
@@ -6593,6 +6659,25 @@ if(antic_sanitized EQUAL -1)
                 "-DREADOBJ=${ANTIC_RUNTIME_READOBJ}"
                 -P "${ANTIC_RUNNERS}/run_no_paths.cmake")
 endif()
+
+# antic, anti and the runtime of runtime/, which a package carries, hold
+# no seam of fault injection, and in a tree of ANTIC_FAULTS the copies of
+# tools/faults.cmake hold it. See src/rt/fault.h.
+set(faults_copies "")
+if(ANTIC_FAULTS)
+    antic_static_library(faults_library anti_rt "${ANTIC_HOST_TARGET}")
+    string(JOIN "/" faults_library "${ANTIC_FAULTS_RUNTIME_DIR}/lib"
+           "${ANTIC_HOST_TARGET}" "${ANTIC_CPU_LEVEL_${ANTIC_HOST_TARGET}}"
+           "${faults_library}")
+    string(JOIN "," faults_copies "-DWITH=$<TARGET_FILE:antic_faults>"
+           "$<TARGET_FILE:anti_faults>" "${faults_library}")
+endif()
+add_test(NAME faults_not_shipped
+    COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAMS=$<TARGET_FILE:antic>,$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            ${faults_copies}
+            -P "${ANTIC_RUNNERS}/run_faults_not_shipped.cmake")
 
 add_test(NAME release_pins
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -7347,6 +7432,7 @@ add_test(NAME known_failures
         "-DTESTS=${KNOWN_FAILURES_WORK}/tests.txt"
         "-DMARKED=${KNOWN_FAILURES_WORK}/marked.txt"
         "-DSYSTEM=${ANTIC_HOST_OS}"
+        "-DFAULTS=${ANTIC_FAULTS}"
         -P "${ANTIC_RUNNERS}/run_known_failures.cmake")
 # run_known_failures.cmake refuses every list that disagrees with the
 # table or with the tree.

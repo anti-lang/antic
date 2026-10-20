@@ -38,6 +38,7 @@
 
 /* The hash of the runtime, which digests the inputs of a module. */
 #include "../rt/digest.h"
+#include "../rt/fault.h"
 
 static void extras_free(struct extras *e)
 {
@@ -73,7 +74,7 @@ static bool read_file(const char *path, struct text *out, bool source)
         say_antic("cannot open %s\n", path);
         return false;
     }
-    while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {
+    while ((n = ANTI_FREAD(buffer, 1, sizeof buffer, f)) > 0) {
         if (n > limit - total) {
             say_antic("%s is larger than " LEX_SOURCE_MAX_TEXT "\n",
                       path);
@@ -83,11 +84,11 @@ static bool read_file(const char *path, struct text *out, bool source)
         total += n;
         text_append_bytes(out, buffer, n);
     }
-    if (ferror(f)) {
+    if (ANTI_FERROR(f)) {
         say_antic("cannot read %s\n", path);
         ok = false;
     }
-    fclose(f);
+    ANTI_FCLOSE(f);
     return ok;
 }
 
@@ -147,8 +148,9 @@ bool driver_write_file(const char *path, const struct text *content)
         cannot_create(path);
         return false;
     }
-    ok = fwrite(text_cstr(content), 1, content->length, f) == content->length;
-    ok = fclose(f) == 0 && ok;
+    ok = ANTI_FWRITE(text_cstr(content), 1, content->length, f) ==
+         content->length;
+    ok = ANTI_FCLOSE(f) == 0 && ok;
     if (!ok) {
         say_antic("cannot write %s\n", path);
     }
@@ -357,8 +359,8 @@ static bool indexed_profile_file(const char *path)
         say_antic("cannot read %s\n", path);
         return false;
     }
-    got = fread(head, 1, sizeof head, f);
-    fclose(f);
+    got = ANTI_FREAD(head, 1, sizeof head, f);
+    ANTI_FCLOSE(f);
     if (got == sizeof head &&
         memcmp(head, indexed_profile, sizeof head) == 0) {
         return true;
@@ -415,7 +417,7 @@ bool driver_file_exists(const char *path)
     FILE *f = platform_open(path, false);
 
     if (f != NULL) {
-        fclose(f);
+        ANTI_FCLOSE(f);
     }
     return f != NULL;
 }
@@ -724,11 +726,11 @@ static bool digest_file(struct anti_sha256 *s, const char *path)
     if (f == NULL) {
         return true;
     }
-    while ((n = fread(bytes, 1, sizeof bytes, f)) > 0) {
+    while ((n = ANTI_FREAD(bytes, 1, sizeof bytes, f)) > 0) {
         anti_rt_sha256_update(s, bytes, n);
     }
-    ok = !ferror(f);
-    fclose(f);
+    ok = !ANTI_FERROR(f);
+    ANTI_FCLOSE(f);
     return ok;
 }
 

@@ -7,6 +7,7 @@
 
 #include "atomic.h"
 #include "fail.h"
+#include "fault.h"
 #include "snapshot.h"
 
 /* DESIGN: a snapshot on the heap is one block that starts with its size
@@ -17,7 +18,7 @@ static int64_t snapshots_alive;
 
 void *anti_rt_snapshot_new(int64_t size)
 {
-    void *made = malloc((size_t)size);
+    void *made = ANTI_FAULT(ALLOC, NULL, malloc((size_t)size));
 
     if (made == NULL) {
         anti_rt_fail_memory("for a snapshot of %lld bytes", (long long)size);

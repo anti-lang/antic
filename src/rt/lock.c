@@ -11,6 +11,7 @@
 
 #include "atomic.h"
 #include "fail.h"
+#include "fault.h"
 #include "platform.h"
 #include "sync.h"
 
@@ -92,7 +93,7 @@ static void orders_grow(void)
     size_t capacity = old_capacity == 0 ? 64 : old_capacity * 2;
     size_t i;
 
-    orders = calloc(capacity, sizeof *orders);
+    orders = ANTI_FAULT(ALLOC, NULL, calloc(capacity, sizeof *orders));
     if (orders == NULL) {
         anti_rt_fail_memory("for the order of the locks");
     }

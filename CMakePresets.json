@@ -6,7 +6,10 @@
             "name": "host",
             "displayName": "Host build",
             "description": "Warnings are errors, the host target, the full test suite",
-            "binaryDir": "${sourceDir}/build/${presetName}"
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "ANTIC_FAULTS": "ON"
+            }
         },
         {
             "name": "release",
@@ -24,7 +27,8 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_FLAGS": "-fsanitize=address -g"
+                "CMAKE_C_FLAGS": "-fsanitize=address -g",
+                "ANTIC_FAULTS": "ON"
             }
         },
         {
@@ -34,7 +38,8 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all"
+                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all",
+                "ANTIC_FAULTS": "ON"
             }
         },
         {
@@ -44,7 +49,8 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "ANTIC_COVERAGE": "ON"
+                "ANTIC_COVERAGE": "ON",
+                "ANTIC_FAULTS": "ON"
             }
         }
     ],

@@ -22,6 +22,11 @@
 #       [SETUP <function>]        a function of the table, called after the
 #                                 files are written
 #       [ENV <name>=<value>...]   variables of the environment of anti
+#       [FAULT <kind>:<n>:<error>] the value of ANTI_FAULT, which makes a
+#                                 call of the system fail, see
+#                                 src/rt/fault.h. Such a case runs
+#                                 antic_faults or anti_faults and stands
+#                                 in a tree of ANTIC_FAULTS alone
 #       [ANY_OUT]                 the standard output is not compared
 #       [COPY]                    run a copy of anti in WORK/bin, which has
 #                                 no pinned clang beside its tree and takes
@@ -44,6 +49,8 @@
 # DESIGN: the name of a case stands in its table alone. With LIST set
 # and TABLE, the script runs no case and prints the name of each, one per
 # line, and tests/CMakeLists.txt registers one test per name from that.
+# The name of a case with FAULT is followed by ` fault`, so the case runs
+# the copy of the tool that holds the seam.
 # Both runs read the table with the functions and the values below, so a
 # table is written once.
 
@@ -100,21 +107,27 @@ set_property(GLOBAL PROPERTY anti_message_names "")
 function(anti_message name)
     if(LIST)
         get_property(names GLOBAL PROPERTY anti_message_names)
-        if(name IN_LIST names)
+        if(name IN_LIST names OR "${name} fault" IN_LIST names)
             message(FATAL_ERROR "${TABLE} holds the case ${name} twice")
         endif()
         if(NOT name MATCHES "^[a-z0-9_]+$")
             message(FATAL_ERROR "${TABLE}: the name `${name}` holds more "
                                 "than small letters, digits and `_`")
         endif()
-        set_property(GLOBAL APPEND PROPERTY anti_message_names "${name}")
+        cmake_parse_arguments(PARSE_ARGV 1 listed "" "FAULT" "")
+        if(DEFINED listed_FAULT)
+            set_property(GLOBAL APPEND PROPERTY anti_message_names
+                         "${name} fault")
+        else()
+            set_property(GLOBAL APPEND PROPERTY anti_message_names "${name}")
+        endif()
         return()
     endif()
     if(NOT name STREQUAL CASE)
         return()
     endif()
     cmake_parse_arguments(PARSE_ARGV 1 arg "ANY_OUT;COPY"
-                          "STATUS;SETUP;ERR_MATCH"
+                          "STATUS;SETUP;ERR_MATCH;FAULT"
                           "FILES;DIRECTORIES;ENV;OUT;ARGS;ERR")
     if(DEFINED arg_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "${name}: `${arg_UNPARSED_ARGUMENTS}` follows "
@@ -151,6 +164,9 @@ function(anti_message name)
         file(CHMOD "${anti}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
     endif()
     set(ANTI "${anti}")
+    if(DEFINED arg_FAULT)
+        list(APPEND arg_ENV "ANTI_FAULT=${arg_FAULT}")
+    endif()
     anti_run(status out err "${PROJECT}" ENV ${arg_ENV} COMMAND ${arg_ARGS})
     # What anti wrote stays beside the project, for the reader of a failure.
     file(WRITE "${WORK}/stdout" "${out}")

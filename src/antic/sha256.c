@@ -8,6 +8,7 @@
 
 /* The hash is the one of the runtime, which antic and anti compile in. */
 #include "../rt/digest.h"
+#include "../rt/fault.h"
 
 bool sha256_file(const char *path, char hex[65])
 {
@@ -18,6 +19,6 @@ bool sha256_file(const char *path, char hex[65])
         return false;
     }
     ok = anti_rt_sha256_stream(f, hex);
-    fclose(f);
+    ANTI_FCLOSE(f);
     return ok;
 }
