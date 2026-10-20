@@ -408,6 +408,27 @@ static void callees_of(const struct ir_function *f, uint32_t *callees)
     }
 }
 
+/* Whether f holds a call that skips its own frame, by the functions kept
+   so far. */
+static bool calls_frame_keeper(const struct ir_module *m, const bool *kept,
+                               const struct ir_function *f)
+{
+    uint32_t *callees = alloc_zeroed(f->temp_count + 1, sizeof *callees);
+    bool found = false;
+    size_t b;
+
+    callees_of(f, callees);
+    for (b = 0; !found && b < f->block_count; b++) {
+        const struct ir_block *block = f->blocks[b];
+        size_t k;
+        for (k = 0; !found && k < block->count; k++) {
+            found = skips_own_frame(m, kept, &block->insts[k], callees);
+        }
+    }
+    free(callees);
+    return found;
+}
+
 /* DESIGN: StackTrace.capture skips its own frame by count, `skip + 1`,
    and debug.backtrace and a caller of capture(1) count their own the same
    way. Inlined into its caller, or left by a tail call, such a function
@@ -434,24 +455,13 @@ void llvm_emit_frames_kept(const struct ir_module *m, bool *kept)
         changed = false;
         for (i = 0; i < m->function_count; i++) {
             const struct ir_function *f = m->functions[i];
-            uint32_t *callees;
-            size_t b;
             if (kept[i] || f->is_extern) {
                 continue;
             }
-            callees = alloc_zeroed(f->temp_count + 1, sizeof *callees);
-            callees_of(f, callees);
-            for (b = 0; !kept[i] && b < f->block_count; b++) {
-                const struct ir_block *block = f->blocks[b];
-                size_t k;
-                for (k = 0; !kept[i] && k < block->count; k++) {
-                    if (skips_own_frame(m, kept, &block->insts[k], callees)) {
-                        kept[i] = true;
-                        changed = true;
-                    }
-                }
+            if (calls_frame_keeper(m, kept, f)) {
+                kept[i] = true;
+                changed = true;
             }
-            free(callees);
         }
     }
 }
