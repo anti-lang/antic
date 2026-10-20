@@ -1,0 +1,14 @@
+//! The length of a copy of a generic shifts by a constant parameter below
+//! zero, which the copy leaves as it stands and the back end refuses.
+
+const MINUS: int = -1;
+
+struct S<N: int, Z: int>
+{
+	a: [N << Z]int,
+}
+
+fn main() -> int
+{
+	return size_of(S<3, MINUS>) as int;
+}

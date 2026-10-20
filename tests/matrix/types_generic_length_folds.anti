@@ -1,0 +1,36 @@
+//! Array lengths of generic structs that fold their constant parameters
+//! in each copy: each operator of an integer, a cast between two integer
+//! types, and the comparisons and the logic of `bool` under a cast.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Ops<N: int>
+{
+	a: [N * 2 - 1]int,
+	b: [N / 2 + N % 2]int,
+	c: [(N << 1) >> 1]int,
+	d: [~(~N)]int,
+	e: [(N as u8) as int]int,
+	f: [N <<% 1]int,
+}
+
+struct Truth<N: int, Z: int>
+{
+	a: [(!(N > 2) || N < Z && N >= 1) as int + 1]int,
+}
+
+fn main() -> int
+{
+	let o = Ops<3> {
+		a: [0; 5],
+		b: [0; 2],
+		c: [0; 3],
+		d: [0; 3],
+		e: [0; 3],
+		f: [0; 6],
+	};
+	printf("ops %d %d %d %d %d %d\n".ptr, o.a.len as c_int, o.b.len as c_int,
+		o.c.len as c_int, o.d.len as c_int, o.e.len as c_int, o.f.len as c_int);
+	printf("truth %d\n".ptr, size_of(Truth<3, 5>) as c_int);
+	return 0;
+}

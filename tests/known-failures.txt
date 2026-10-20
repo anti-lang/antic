@@ -88,3 +88,6 @@ anti_check_message_fault_library_directory_not_made T153 anti ends with 1 and no
 anti_doc_message_fault_library_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 std_collection_text_array_field T158 An array field of a struct element stands as ? in the text of a collection.
 anti_bind_api_alias_chain_long T159 A chain of 40 aliases is refused as an alias that names itself.
+matrix_types_generic_length_of_a_comparison_dev T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
+matrix_types_generic_length_of_a_comparison_release T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
+matrix_types_generic_length_of_a_comparison_memory_checks T160 A cast of a folded comparison stays unfolded in the length of a generic copy.

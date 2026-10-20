@@ -1,0 +1,19 @@
+//! An array length of a generic struct that casts a comparison of its
+//! constant parameter to `int`, which each copy computes, as the same
+//! length outside a generic is.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pick<N: int>
+{
+	cells: [(N > 2) as int]int,
+}
+
+fn main() -> int
+{
+	let p = Pick<3> { cells: [5] };
+	let q: [(3 > 2) as int]int = [5];
+	printf("%d %d %d\n".ptr, p.cells.len as c_int, p.cells[0] as c_int,
+		q[0] as c_int);
+	return 0;
+}
