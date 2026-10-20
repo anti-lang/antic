@@ -815,3 +815,20 @@ fetch_message(fault_fetch_module_not_cached write:5:ENOSPC
     "anti: cannot write ${fetched_module}")
 fetch_message(fault_fetch_module_copy_unread read:15:EIO
     "anti: cannot read ${fetched_module}.new")
+# T153: a directory of the cache that the system refuses, where
+# files_make_dirs makes each directory of the path in turn, one call of
+# mkdir for each `/` of it. The directory of the index comes first, then
+# the one of the package, and the case refuses the last call of each.
+set(index_directory "${USER_CACHE}/index/${repo_digest}/com.example.units")
+set(package_directory "${USER_CACHE}/pkg/com.example.units/1.2.0")
+string(REGEX MATCHALL "/" index_slashes "${index_directory}")
+string(REGEX MATCHALL "/" package_slashes "${package_directory}")
+list(LENGTH index_slashes index_mkdir)
+list(LENGTH package_slashes package_mkdir)
+math(EXPR package_mkdir "${index_mkdir} + ${package_mkdir}")
+fetch_message(fault_fetch_index_directory_not_made mkdir:${index_mkdir}:EACCES
+    "anti: cannot make ${index_directory}"
+    "${no_version}")
+fetch_message(fault_fetch_package_directory_not_made
+    mkdir:${package_mkdir}:EACCES
+    "anti: cannot make ${package_directory}")
