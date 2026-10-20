@@ -2291,6 +2291,7 @@ foreach(case
         "unknown_option|report||--anti.nonsense|empty.pattern|unknown-option.pattern|70"
         "long_option|report||--anti.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|empty.pattern|long-option.pattern|70"
         "inject_no_value|report||--anti.inject|empty.pattern|inject-no-value.pattern|70"
+        "threads_no_value|report||--anti.threads|empty.pattern|threads-no-value.pattern|70"
         "hash_seed_empty|report||--anti.hash_seed=|empty.pattern|seed-empty.pattern|70"
         "element_key|report||--anti.conf=${CONF}/element-key.toml|empty.pattern|element-key.pattern|70"
         "configure_twice|configure_twice||${CONF}/backtrace.toml,${CONF}/no-backtrace.toml|configure-twice.pattern||0"

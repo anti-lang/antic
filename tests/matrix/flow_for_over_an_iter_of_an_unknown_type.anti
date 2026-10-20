@@ -1,0 +1,18 @@
+//! A `for` over a class whose `operator fn iter` names a type that is not
+//! there. The type is the one mistake, and the loop names nothing else.
+
+class Bag
+{
+	operator fn iter(self) -> Nope
+	{
+		return none;
+	}
+}
+
+fn main() -> int
+{
+	let b = Bag { };
+	for x in b {
+	}
+	return 0;
+}

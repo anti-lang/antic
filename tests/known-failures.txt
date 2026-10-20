@@ -91,3 +91,4 @@ anti_bind_api_alias_chain_long T159 A chain of 40 aliases is refused as an alias
 matrix_types_generic_length_of_a_comparison_dev T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
 matrix_types_generic_length_of_a_comparison_release T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
 matrix_types_generic_length_of_a_comparison_memory_checks T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
+matrix_flow_for_over_an_iter_of_an_unknown_type_refused T161 A loop over an iter of an unknown type says the class has no iter.

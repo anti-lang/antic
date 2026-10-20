@@ -1,6 +1,6 @@
-//! A named float constant with a fraction, converted to an integer type
-//! that does not hold it, by R026 of "Rules of 2026-10-13". The message
-//! writes the float as a literal.
+//! A named float constant with a fraction, converted to an integer type that
+//! does not hold it, by R026 of "Rules of 2026-10-13". The message writes the
+//! float as a literal.
 
 const F: f64 = 300.5;
 const B: u8 = F as u8;

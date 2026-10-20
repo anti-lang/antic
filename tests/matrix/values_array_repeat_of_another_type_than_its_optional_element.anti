@@ -1,0 +1,8 @@
+//! The value of an array repeat takes the element type of its context, so a
+//! `bool` where the element is a `?int` is refused at the value.
+
+fn main() -> int
+{
+	let a: [3] ?int = [true; 3];
+	return 0;
+}
