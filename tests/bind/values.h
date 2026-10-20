@@ -1,7 +1,9 @@
 /* The values of macros that tests/bind/layout.h does not hold, for
    `anti bind --clang`: casts to the short types, the suffixes of long,
    the escapes of a text, the operators over floats and over unsigned
-   integers, and after them the values the evaluator skips. */
+   integers, a text with control bytes, and after them the values the
+   evaluator skips: a shift too far right, `&&`, a cast of a text and a
+   name too long. */
 #ifndef VALUES_H
 #define VALUES_H
 
@@ -21,6 +23,8 @@
 #define VALUES_UNSIGNED_QUOTIENT (4000000000u / 3u)
 #define VALUES_UNSIGNED_REST (4000000000u % 7u)
 #define VALUES_SHIFT_OF_NEGATIVE (-16 >> 2)
+#define VALUES_SHIFT_RIGHT (16 >> 2)
+#define VALUES_CONTROL "start"
 
 #define VALUES_NOT_ZERO (!0)
 #define VALUES_FLOAT_TOO_LARGE 1e39f
@@ -30,5 +34,9 @@
 #define VALUES_SHIFT_TOO_FAR (1 << 64)
 #define VALUES_TEXT_NEGATED (-"text")
 #define VALUES_TEXT_IN_SUM ("text" + 1)
+#define VALUES_SHIFT_RIGHT_TOO_FAR (1 >> 64)
+#define VALUES_LOGICAL_AND (1 && 2)
+#define VALUES_TEXT_CAST ((int)"text")
+#define VALUES_NAME_TOO_LONG (VALUES_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA)
 
 #endif

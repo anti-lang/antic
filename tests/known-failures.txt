@@ -87,3 +87,4 @@ anti_test_message_fault_imports_directory_not_made T153 anti ends with 1 and no 
 anti_check_message_fault_library_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_doc_message_fault_library_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 std_collection_text_array_field T158 An array field of a struct element stands as ? in the text of a collection.
+anti_bind_api_alias_chain_long T159 A chain of 40 aliases is refused as an alias that names itself.

@@ -378,7 +378,7 @@ elseif(CASE STREQUAL "api")
     expect_refusal("raylib_api.json is not JSON: .* at line 4699, column 115"
         "${ANTI}" bind "${RAYLIB}/tools/rlparser/output/raylib_api.json"
         -o "${WORK}/pinned")
-elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words)$")
+elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words|aliases)$")
     # Four descriptions in the format of rlparser. api_parts holds
     # entries that lack a part: a function without its name, its result
     # or its parameters, a struct without its name or its list of fields,
@@ -391,14 +391,26 @@ elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words)$")
     # holds the forms of a struct literal that a define may have. api_types
     # holds one function per spelling of a C type: the words of an integer
     # in the orders no other description has, a qualifier after a name, an
-    # empty parameter list and nine spellings that do not parse. The
-    # module and the warnings of each are fixed, and the module compiles.
+    # empty parameter list and nine spellings that do not parse. api_aliases
+    # holds an alias without its type, a pointer alias whose type does not
+    # parse, a name no part declares, a struct and an enum named by their
+    # tags, a length in hexadecimal, a callback that takes an array and two
+    # spellings of words that do not parse. The module and the warnings of each
+    # are fixed, and the module compiles.
     tool_run("" "${ANTI}" bind "${BIND}/${CASE}.json" --module bindtest.${CASE}
                 -o "${WORK}/out")
     file(WRITE "${WORK}/warnings" "${tool_stderr}")
     expect_file("${WORK}/out/${CASE}.anti" "${BIND}/${CASE}.anti.expected")
     expect_file("${WORK}/warnings" "${BIND}/${CASE}.warnings")
     compile_binding(${CASE} bindtest.${CASE})
+elseif(CASE STREQUAL "miniaudio")
+    # A module whose last segment is miniaudio, a bundled library, names
+    # the frameworks of macOS and the libraries of Linux that the library
+    # links, bind_frameworks and bind_linux_libraries of bindmodel.c.
+    tool_run("" "${ANTI}" bind "${BIND}/miniaudio.json" --module bindtest.miniaudio
+                -o "${WORK}/out")
+    expect_file("${WORK}/out/miniaudio.anti" "${BIND}/miniaudio.anti.expected")
+    compile_binding(miniaudio bindtest.miniaudio)
 elseif(CASE STREQUAL "refusals")
     # A pack of two bytes, C++ and a clang of a version the tool was not
     # tested against are refused. The copy of anti stands outside the
@@ -635,6 +647,26 @@ elseif(CASE STREQUAL "api_typedef_chain")
     expect_bound_in_time("`k` is left out: Anti has no form for the type of a parameter"
         "${ANTI}" bind "${WORK}/chain.json" --module bindtest.chain
         -o "${WORK}/out")
+elseif(CASE STREQUAL "api_alias_chain_long")
+    # T159: forty aliases, each of which names the one before it once, and
+    # the first is int. The chain names no alias twice, so the parameter
+    # is a c_int. The reader stops at a depth of 32 and says that the
+    # alias it stopped at names itself.
+    set(aliases "{\"name\": \"G0\", \"type\": \"int\"}")
+    foreach(i RANGE 1 40)
+        math(EXPR before "${i} - 1")
+        string(APPEND aliases ",\n{\"name\": \"G${i}\", \"type\": \"G${before}\"}")
+    endforeach()
+    file(WRITE "${WORK}/chain.json" "{\"functions\": [{\"name\": \"deep\",
+        \"returnType\": \"void\", \"params\": [{\"name\": \"g\", \"type\": \"G40\"}]}],
+        \"aliases\": [${aliases}]}")
+    tool_run("" "${ANTI}" bind "${WORK}/chain.json" --module bindtest.chain
+                -o "${WORK}/out")
+    expect_same_text("the warnings of the chain" "" "${tool_stderr}")
+    file(READ "${WORK}/out/chain.anti" bound)
+    if(NOT bound MATCHES "pub extern fn deep\\(g: c_int\\);")
+        message(FATAL_ERROR "the chain bound no `deep`:\n${bound}")
+    endif()
 elseif(CASE STREQUAL "clang_typedef_chain")
     # M312. Forty typedefs, each of which names the one before it three
     # times. A real clang nests the whole chain in the dump of every

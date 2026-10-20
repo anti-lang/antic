@@ -8,3 +8,7 @@ anti: values.h: warning: the macro `VALUES_INFINITE` is no constant and is skipp
 anti: values.h: warning: the macro `VALUES_SHIFT_TOO_FAR` is no constant and is skipped
 anti: values.h: warning: the macro `VALUES_TEXT_NEGATED` is no constant and is skipped
 anti: values.h: warning: the macro `VALUES_TEXT_IN_SUM` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_SHIFT_RIGHT_TOO_FAR` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_LOGICAL_AND` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_TEXT_CAST` is no constant and is skipped
+anti: values.h: warning: the macro `VALUES_NAME_TOO_LONG` is no constant and is skipped

@@ -1,0 +1,11 @@
+//! The binding of miniaudio, which `anti bind` wrote from `miniaudio.json`.
+//! Nothing in it is written by hand. Run `anti bind` again to change it.
+
+link framework "AudioToolbox";
+link framework "CoreAudio";
+link framework "CoreFoundation";
+link linux "dl";
+link linux "pthread";
+link linux "m";
+
+pub extern fn ma_version() -> c_int;

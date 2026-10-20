@@ -1,0 +1,12 @@
+{"functions": [{"name": "a_untyped", "returnType": "void", "params": [{"name": "p", "type": "Untyped"}]},
+               {"name": "a_pose", "returnType": "void", "params": [{"name": "p", "type": "Pose"}]},
+               {"name": "a_missing", "returnType": "void", "params": [{"name": "p", "type": "Missing"}]},
+               {"name": "a_struct", "returnType": "void", "params": [{"name": "p", "type": "struct Vec *"}]},
+               {"name": "a_enum", "returnType": "void", "params": [{"name": "p", "type": "enum Mode"}]},
+               {"name": "a_hex", "returnType": "void", "params": [{"name": "p", "type": "int [0xAB]"}]},
+               {"name": "a_array_param", "returnType": "void", "params": [{"name": "p", "type": "void (*)(int [2])"}]},
+               {"name": "a_long3", "returnType": "void", "params": [{"name": "p", "type": "long long long"}]},
+               {"name": "a_count_unsigned", "returnType": "void", "params": [{"name": "p", "type": "Count unsigned"}]}],
+ "structs": [{"name": "Vec", "fields": [{"name": "x", "type": "float"}]}],
+ "aliases": [{"name": "Untyped"}, {"name": "Count", "type": "int"}, {"name": "*Pose", "type": "int ."}],
+ "enums": [{"name": "Mode", "values": [{"name": "MODE_A", "value": 0}]}]}

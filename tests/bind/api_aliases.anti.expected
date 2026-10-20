@@ -1,0 +1,20 @@
+//! The binding of api_aliases, which `anti bind` wrote from `api_aliases.json`.
+//! Nothing in it is written by hand. Run `anti bind` again to change it.
+
+pub enum Mode
+{
+	MODE_A = 0,
+}
+
+pub struct Vec
+{
+	x: c_float,
+}
+
+pub extern fn a_struct(p: ?*Vec);
+
+pub extern fn a_enum(p: Mode);
+
+pub extern fn a_hex(p: ?*c_int);
+
+pub extern fn a_array_param(p: ?fn(?*c_int));

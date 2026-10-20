@@ -1,0 +1,5 @@
+anti: api_aliases.json: warning: `a_pose` is left out: the type `int .` does not parse
+anti: api_aliases.json: warning: `a_long3` is left out: the type `long long long` does not parse
+anti: api_aliases.json: warning: `a_count_unsigned` is left out: the type `Count unsigned` does not parse
+anti: api_aliases.json: warning: `a_untyped` is left out: Anti has no form for the type of a parameter
+anti: api_aliases.json: warning: `a_missing` is left out: Anti has no form for the type of a parameter

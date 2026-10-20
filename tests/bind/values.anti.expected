@@ -30,3 +30,7 @@ pub const VALUES_UNSIGNED_QUOTIENT: c_uint = 1333333333;
 pub const VALUES_UNSIGNED_REST: c_uint = 3;
 
 pub const VALUES_SHIFT_OF_NEGATIVE: c_int = -4;
+
+pub const VALUES_SHIFT_RIGHT: c_int = 4;
+
+pub const VALUES_CONTROL: str = "start\x01\x7F";
