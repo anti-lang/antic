@@ -1,6 +1,7 @@
 /* Integer bounds of the runtime: the growth of a block, the places of a
-   text builder, atomic subtraction at the minimum of each width and the
-   precision a text of the failure routine prints with. */
+   text builder, atomic subtraction at the minimum of each width, the
+   masks and the compare-and-swap of each width and the precision a text
+   of the failure routine prints with. */
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -81,6 +82,36 @@ static void atomic_sub_minimum(void)
     CHECK(i32 == -2);
 }
 
+/* `and` and `or` give the value before and keep the bits of the width
+   alone, and a compare-and-swap of one byte swaps on the expected value
+   and on it alone. C calls them, and an Anti program writes the LLVM
+   instruction instead. */
+static void atomic_masks(void)
+{
+    int8_t i8 = 0x0F;
+    int16_t i16 = 0x0F0F;
+    int32_t i32 = 0x0F0F0F0F;
+    int64_t i64 = 0x0F0F0F0F0F0F0F0F;
+
+    CHECK(anti_rt_atomic_and(&i8, 1, 0x3C) == 0x0F && i8 == 0x0C);
+    CHECK(anti_rt_atomic_or(&i8, 1, 0x30) == 0x0C && i8 == 0x3C);
+    CHECK(anti_rt_atomic_and(&i16, 2, 0x3C3C) == 0x0F0F && i16 == 0x0C0C);
+    CHECK(anti_rt_atomic_or(&i16, 2, 0x3030) == 0x0C0C && i16 == 0x3C3C);
+    CHECK(anti_rt_atomic_and(&i32, 4, 0x3C3C3C3C) == 0x0F0F0F0F &&
+          i32 == 0x0C0C0C0C);
+    CHECK(anti_rt_atomic_or(&i32, 4, 0x30303030) == 0x0C0C0C0C &&
+          i32 == 0x3C3C3C3C);
+    CHECK(anti_rt_atomic_and(&i64, 8, 0x3C3C3C3C3C3C3C3C) ==
+              0x0F0F0F0F0F0F0F0F &&
+          i64 == 0x0C0C0C0C0C0C0C0C);
+    CHECK(anti_rt_atomic_or(&i64, 8, 0x3030303030303030) ==
+              0x0C0C0C0C0C0C0C0C &&
+          i64 == 0x3C3C3C3C3C3C3C3C);
+    i8 = 7;
+    CHECK(anti_rt_atomic_compare_swap(&i8, 1, 6, 9) == 0 && i8 == 7);
+    CHECK(anti_rt_atomic_compare_swap(&i8, 1, 7, 9) == 1 && i8 == 9);
+}
+
 /* The precision of `%.*s` for a text of an Anti length: the length, or
    INT_MAX for one that no int holds, which once kept the low 32 bits
    alone. */
@@ -100,5 +131,6 @@ void test_rt_bounds(void)
     block_growth();
     builder_bounds();
     atomic_sub_minimum();
+    atomic_masks();
     print_width();
 }

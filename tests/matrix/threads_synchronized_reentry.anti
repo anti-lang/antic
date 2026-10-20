@@ -1,0 +1,41 @@
+//! A public function of a synchronized class that calls another public function
+//! of the same object, inside a `sync` block on a Mutex. The thread takes the
+//! hidden lock it holds again without waiting, and a dev build records the
+//! order of the Mutex and the hidden lock once.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Counter
+{
+	n: int = 0,
+
+	pub fn add(self, k: int)
+	{
+		self.n += k;
+	}
+
+	pub fn add_twice(self, k: int)
+	{
+		self.add(k);
+		self.add(k);
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	let c = alloc Counter { };
+	sync m {
+		c.add_twice(3);
+	}
+	printf("count %d\n".ptr, c.get() as c_int);
+	delete(c);
+	return 0;
+}

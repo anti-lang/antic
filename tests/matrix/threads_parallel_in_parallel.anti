@@ -1,0 +1,32 @@
+//! `parallel` in a worker that a `parallel` runs. The inner call finds the pool
+//! busy and runs its chunks in the thread of the outer chunk, so the sums are
+//! those of a call alone.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+worker fn count(chunk: []int) -> int
+{
+	return chunk.len;
+}
+
+worker fn outer(chunk: []int) -> int
+{
+	let lengths = parallel chunk by 1 -> count;
+	let total = 0;
+	for length in lengths {
+		total += length;
+	}
+	free(lengths.ptr);
+	return total * 10 + lengths.len;
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
+	let parts = parallel numbers[0..8] by 4 -> outer;
+	for part in parts {
+		printf("part %d\n".ptr, part as c_int);
+	}
+	free(parts.ptr);
+	return 0;
+}
