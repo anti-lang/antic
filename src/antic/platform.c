@@ -169,11 +169,11 @@ FILE *platform_open(const char *path, bool writing)
         errno = EINVAL;
         return NULL;
     }
-    f = _wfsopen(wide, mode, _SH_DENYNO);
+    f = ANTI_FAULT(OPEN, NULL, _wfsopen(wide, mode, _SH_DENYNO));
     while (f == NULL && writing && errno == EACCES &&
            tries < OPEN_WRITE_TRIES) {
         Sleep(OPEN_WRITE_STEP_MS);
-        f = _wfsopen(wide, mode, _SH_DENYNO);
+        f = ANTI_FAULT(OPEN, NULL, _wfsopen(wide, mode, _SH_DENYNO));
         tries++;
     }
     free(wide);
@@ -183,7 +183,7 @@ FILE *platform_open(const char *path, bool writing)
 bool platform_remove(const char *path)
 {
     wchar_t *wide = platform_widen(path);
-    bool removed = wide != NULL && _wremove(wide) == 0;
+    bool removed = wide != NULL && ANTI_FAULT(REMOVE, -1, _wremove(wide)) == 0;
 
     free(wide);
     return removed;
@@ -199,9 +199,11 @@ bool platform_symlink(const char *target, const char *path)
 
     if (wide_target != NULL && wide_path != NULL) {
         DeleteFileW(wide_path);
-        made = CreateSymbolicLinkW(
-                   wide_path, wide_target,
-                   SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE) != 0;
+        made = ANTI_FAULT_SYSTEM(
+                   OPEN, 0,
+                   CreateSymbolicLinkW(
+                       wide_path, wide_target,
+                       SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE)) != 0;
     }
     free(wide_target);
     free(wide_path);
@@ -283,8 +285,10 @@ char platform_separator(void)
 bool platform_directory_exists(const char *path)
 {
     wchar_t *wide = platform_widen(path);
-    DWORD attributes = wide != NULL ? GetFileAttributesW(wide)
-                                    : INVALID_FILE_ATTRIBUTES;
+    DWORD attributes = wide != NULL
+                           ? ANTI_FAULT_SYSTEM(STAT, INVALID_FILE_ATTRIBUTES,
+                                               GetFileAttributesW(wide))
+                           : INVALID_FILE_ATTRIBUTES;
 
     free(wide);
     return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -307,7 +311,8 @@ bool platform_list_directory(const char *path,
     if (wide == NULL) {
         return false;
     }
-    find = FindFirstFileW(wide, &entry);
+    find = ANTI_FAULT_SYSTEM(OPEN, INVALID_HANDLE_VALUE,
+                                    FindFirstFileW(wide, &entry));
     free(wide);
     if (find == INVALID_HANDLE_VALUE) {
         /* The root of a drive has no `.`, so an empty one matches no
@@ -325,7 +330,7 @@ bool platform_list_directory(const char *path,
             each(context, name);
             free(name);
         }
-    } while (FindNextFileW(find, &entry));
+    } while (ANTI_FAULT_SYSTEM(READ, FALSE, FindNextFileW(find, &entry)));
     /* Read before FindClose, which may set the error again. */
     complete = GetLastError() == ERROR_NO_MORE_FILES;
     FindClose(find);
@@ -335,7 +340,8 @@ bool platform_list_directory(const char *path,
 static bool self_path(struct text *out)
 {
     wchar_t wide[MAX_PATH];
-    DWORD length = GetModuleFileNameW(NULL, wide, MAX_PATH);
+    DWORD length =
+        ANTI_FAULT_SYSTEM(STAT, 0, GetModuleFileNameW(NULL, wide, MAX_PATH));
 
     if (length == 0 || length >= MAX_PATH) {
         return false;
@@ -355,7 +361,7 @@ bool platform_absolute_path(const char *path, struct text *out)
     if (wide == NULL) {
         return false;
     }
-    length = GetFullPathNameW(wide, 0, NULL, NULL);
+    length = ANTI_FAULT_SYSTEM(STAT, 0, GetFullPathNameW(wide, 0, NULL, NULL));
     if (length > 0) {
         full = alloc_zeroed(length, sizeof *full);
         ok = GetFullPathNameW(wide, length, full, NULL) > 0 &&
@@ -412,7 +418,9 @@ static int wait_for(HANDLE process, const char *name)
 {
     DWORD code = 0;
 
-    if (WaitForSingleObject(process, INFINITE) != WAIT_OBJECT_0 ||
+    if (ANTI_FAULT_SYSTEM(WAIT, WAIT_FAILED,
+                                 WaitForSingleObject(process, INFINITE)) !=
+            WAIT_OBJECT_0 ||
         !GetExitCodeProcess(process, &code)) {
         fprintf(stderr, "%s: waiting for %s: error %lu\n", tool, name,
                 (unsigned long)GetLastError());
@@ -482,8 +490,10 @@ static int start(const char *directory, const char *const argv[],
         startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     }
     application = program_in(directory, argv[0]);
-    started = CreateProcessW(application, wide, NULL, NULL, output != NULL, 0,
-                             NULL, wide_directory, &startup, info);
+    started = ANTI_FAULT_SYSTEM(
+        RUN, FALSE,
+        CreateProcessW(application, wide, NULL, NULL, output != NULL, 0, NULL,
+                       wide_directory, &startup, info));
     free(wide);
     free(wide_directory);
     free(application);
@@ -527,7 +537,8 @@ int platform_capture(const char *const argv[], struct text *out)
     memset(&attributes, 0, sizeof attributes);
     attributes.nLength = sizeof attributes;
     attributes.bInheritHandle = TRUE;
-    if (!CreatePipe(&reader, &writer, &attributes, 0)) {
+    if (!ANTI_FAULT_SYSTEM(RUN, FALSE,
+                           CreatePipe(&reader, &writer, &attributes, 0))) {
         fprintf(stderr, "%s: pipe: error %lu\n", tool,
                 (unsigned long)GetLastError());
         return -1;
@@ -540,7 +551,9 @@ int platform_capture(const char *const argv[], struct text *out)
         return -1;
     }
     CloseHandle(writer);
-    while (ReadFile(reader, buffer, sizeof buffer - 1, &read_bytes, NULL) &&
+    while (ANTI_FAULT_SYSTEM(READ, FALSE,
+                             ReadFile(reader, buffer, sizeof buffer - 1,
+                                      &read_bytes, NULL)) &&
            read_bytes > 0) {
         buffer[read_bytes] = '\0';
         text_append(out, buffer);
@@ -569,15 +582,19 @@ bool platform_run_on_stack(void (*work)(void *context), void *context)
     call.context = context;
     /* The size reserves the stack, and Windows commits its pages as the
        thread reaches them. */
-    thread = CreateThread(NULL, PLATFORM_WORK_STACK, stack_start, &call,
-                          STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
+    thread = ANTI_FAULT_SYSTEM(
+        THREAD, NULL,
+        CreateThread(NULL, PLATFORM_WORK_STACK, stack_start, &call,
+                     STACK_SIZE_PARAM_IS_A_RESERVATION, NULL));
     if (thread == NULL) {
         fprintf(stderr, "%s: cannot start the thread of the work: "
                         "error %lu\n",
                 tool, (unsigned long)GetLastError());
         return false;
     }
-    if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0) {
+    if (ANTI_FAULT_SYSTEM(WAIT, WAIT_FAILED,
+                                 WaitForSingleObject(thread, INFINITE)) !=
+        WAIT_OBJECT_0) {
         fprintf(stderr, "%s: cannot wait for the thread of the work: "
                         "error %lu\n",
                 tool, (unsigned long)GetLastError());

@@ -21,9 +21,11 @@
 
    ANTI_FAULT(kind, failed, call) stands where call stood. kind is one of
    the names after ANTI_RT_FAULT_ below, failed the value of a failed
-   call, NULL, -1 or errno for a call that gives its error. A stream of C
-   goes through the five ANTI_F macros, since a failed read or write sets
-   the error flag of the stream, which ANTI_FERROR then reads. */
+   call, NULL, -1 or errno for a call that gives its error. A call of
+   Windows that reports its error through GetLastError goes through
+   ANTI_FAULT_SYSTEM, which sets that error as well. A stream of C goes
+   through the five ANTI_F macros, since a failed read or write sets the
+   error flag of the stream, which ANTI_FERROR then reads. */
 
 #ifndef ANTI_RT_FAULT_H
 #define ANTI_RT_FAULT_H
@@ -102,6 +104,10 @@ int anti_rt_fault_fflush(FILE *f);
    fclose does, and gives EOF. */
 int anti_rt_fault_fclose(FILE *f);
 
+/* The number of the error of Windows that matches errno after a call of
+   the seam failed. */
+unsigned long anti_rt_fault_system_error(void);
+
 #define ANTI_FAULT(kind, failed, call) \
     (anti_rt_fault(ANTI_RT_FAULT_##kind) ? (failed) : (call))
 #define ANTI_FREAD anti_rt_fault_fread
@@ -120,5 +126,14 @@ int anti_rt_fault_fclose(FILE *f);
 #define ANTI_FCLOSE fclose
 
 #endif
+
+/* ANTI_FAULT for a call of Windows: a call of the seam that fails sets the
+   error that GetLastError then gives, from errno. A build without
+   ANTI_FAULTS drops the failed value and with it the call of
+   anti_rt_fault_system_error, so the call stands alone. */
+#define ANTI_FAULT_SYSTEM(kind, failed, call)                                  \
+    ANTI_FAULT(kind,                                                           \
+               (SetLastError((DWORD)anti_rt_fault_system_error()), (failed)), \
+               call)
 
 #endif

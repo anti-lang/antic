@@ -64,7 +64,8 @@ enum platform_kind platform_kind(const char *path, bool follow)
     if (wide == NULL) {
         return PLATFORM_MISSING;
     }
-    attributes = GetFileAttributesW(wide);
+    attributes = ANTI_FAULT_SYSTEM(STAT, INVALID_FILE_ATTRIBUTES,
+                                   GetFileAttributesW(wide));
     if (attributes != INVALID_FILE_ATTRIBUTES &&
         (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
         if (!follow) {
@@ -85,7 +86,8 @@ enum platform_kind platform_kind(const char *path, bool follow)
 bool platform_make_dir(const char *path)
 {
     wchar_t *wide = platform_widen(path);
-    bool made = wide != NULL && (_wmkdir(wide) == 0 || errno == EEXIST);
+    bool made = wide != NULL &&
+                (ANTI_FAULT(MKDIR, -1, _wmkdir(wide)) == 0 || errno == EEXIST);
 
     free(wide);
     return made;
@@ -100,15 +102,17 @@ bool platform_remove_entry(const char *path)
     if (wide == NULL) {
         return false;
     }
-    attributes = GetFileAttributesW(wide);
+    attributes = ANTI_FAULT_SYSTEM(STAT, INVALID_FILE_ATTRIBUTES,
+                                   GetFileAttributesW(wide));
     if (attributes != INVALID_FILE_ATTRIBUTES) {
         if ((attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
             /* A link to a directory is removed as a directory, which
                leaves what it leads to. */
-            removed = RemoveDirectoryW(wide) != 0;
+            removed =
+                ANTI_FAULT_SYSTEM(REMOVE, FALSE, RemoveDirectoryW(wide)) != 0;
         } else {
             SetFileAttributesW(wide, FILE_ATTRIBUTE_NORMAL);
-            removed = DeleteFileW(wide) != 0;
+            removed = ANTI_FAULT_SYSTEM(REMOVE, FALSE, DeleteFileW(wide)) != 0;
         }
     }
     free(wide);
@@ -122,7 +126,9 @@ bool platform_rename(const char *from, const char *to)
     /* The flags of rename of the C runtime, which moves a file to
        another volume as a copy and refuses a to that exists. */
     bool renamed = wide_from != NULL && wide_to != NULL &&
-                   MoveFileExW(wide_from, wide_to, MOVEFILE_COPY_ALLOWED) != 0;
+                   ANTI_FAULT_SYSTEM(RENAME, FALSE,
+                                     MoveFileExW(wide_from, wide_to,
+                                                 MOVEFILE_COPY_ALLOWED)) != 0;
 
     free(wide_from);
     free(wide_to);
@@ -145,7 +151,7 @@ static DWORD rename_posix(const wchar_t *from, const wchar_t *to)
     }
     /* FILE_RENAME_INFO holds the first character of the name. */
     size = (DWORD)sizeof *info + room * (DWORD)sizeof(wchar_t);
-    info = calloc(1, size);
+    info = ANTI_FAULT(ALLOC, NULL, calloc(1, size));
     if (info == NULL) {
         return ERROR_NOT_ENOUGH_MEMORY;
     }
@@ -164,7 +170,9 @@ static DWORD rename_posix(const wchar_t *from, const wchar_t *to)
     if (file == INVALID_HANDLE_VALUE) {
         error = GetLastError();
     } else {
-        if (!SetFileInformationByHandle(file, FileRenameInfoEx, info, size)) {
+        if (!ANTI_FAULT_SYSTEM(RENAME, FALSE,
+                               SetFileInformationByHandle(
+                                   file, FileRenameInfoEx, info, size))) {
             error = GetLastError();
         }
         CloseHandle(file);
@@ -177,10 +185,12 @@ bool platform_replace(const char *from, const char *to)
 {
     wchar_t *wide_from = platform_widen(from);
     wchar_t *wide_to = platform_widen(to);
-    bool replaced = wide_from != NULL && wide_to != NULL &&
-                    MoveFileExW(wide_from, wide_to,
-                                MOVEFILE_REPLACE_EXISTING |
-                                    MOVEFILE_WRITE_THROUGH) != 0;
+    bool replaced =
+        wide_from != NULL && wide_to != NULL &&
+        ANTI_FAULT_SYSTEM(RENAME, FALSE,
+                          MoveFileExW(wide_from, wide_to,
+                                      MOVEFILE_REPLACE_EXISTING |
+                                          MOVEFILE_WRITE_THROUGH)) != 0;
 
     free(wide_from);
     free(wide_to);
@@ -264,9 +274,11 @@ FILE *platform_open_file(const char *path)
     if (wide == NULL) {
         return NULL;
     }
-    handle = CreateFileW(wide, GENERIC_READ,
-                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                         NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    handle = ANTI_FAULT_SYSTEM(
+        OPEN, INVALID_HANDLE_VALUE,
+        CreateFileW(wide, GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
     free(wide);
     if (handle == INVALID_HANDLE_VALUE) {
         return NULL;

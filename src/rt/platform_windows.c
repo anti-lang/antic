@@ -28,6 +28,7 @@
 
 #include "cpu_level.h"
 #include "fail.h"
+#include "fault.h"
 #include "platform.h"
 #include "signals.h"
 #include "utf.h"
@@ -104,7 +105,7 @@ struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which)
 
 struct anti_rt_monitor *anti_rt_monitor_new(void)
 {
-    struct anti_rt_monitor *m = malloc(sizeof *m);
+    struct anti_rt_monitor *m = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *m));
 
     if (m == NULL) {
         return NULL;
@@ -177,14 +178,15 @@ static DWORD WINAPI thread_main(LPVOID start)
 
 int anti_rt_thread_start(void (*body)(void))
 {
-    struct start *start = malloc(sizeof *start);
+    struct start *start = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *start));
     HANDLE thread;
 
     if (start == NULL) {
         return -1;
     }
     start->body = body;
-    thread = CreateThread(NULL, 0, thread_main, start, 0, NULL);
+    thread = ANTI_FAULT_SYSTEM(
+        THREAD, NULL, CreateThread(NULL, 0, thread_main, start, 0, NULL));
     if (thread == NULL) {
         free(start);
         return -1;
@@ -231,7 +233,7 @@ static wchar_t *wide_of(const char *text, size_t extra)
         errno = ENOMEM;
         return NULL;
     }
-    wide = malloc((length + 1 + extra) * sizeof *wide);
+    wide = ANTI_FAULT(ALLOC, NULL, malloc((length + 1 + extra) * sizeof *wide));
     if (wide == NULL) {
         errno = ENOMEM;
         return NULL;
@@ -297,7 +299,7 @@ int anti_rt_getenv(const char *name, char **value)
         }
         free(wide);
         size = length;
-        wide = malloc((size_t)size * sizeof *wide);
+        wide = ANTI_FAULT(ALLOC, NULL, malloc((size_t)size * sizeof *wide));
         if (wide == NULL) {
             status = -1;
             goto done;
@@ -308,7 +310,7 @@ int anti_rt_getenv(const char *name, char **value)
     if (bytes <= 0) {
         goto done;
     }
-    *value = malloc((size_t)bytes);
+    *value = ANTI_FAULT(ALLOC, NULL, malloc((size_t)bytes));
     if (*value == NULL) {
         status = -1;
         goto done;
@@ -411,26 +413,26 @@ FILE *anti_rt_file_open(const char *path, int mode)
     /* _wfopen is _wfsopen without a lock on the file, which is what fopen
        gives on the other systems. The C runtime deprecates the first and
        not the second. */
-    file = _wfsopen(name, modes[mode], _SH_DENYNO);
+    file = ANTI_FAULT(OPEN, NULL, _wfsopen(name, modes[mode], _SH_DENYNO));
     release(name);
     return file;
 }
 
 int64_t anti_rt_file_tell(FILE *file)
 {
-    return _ftelli64(file);
+    return ANTI_FAULT(SEEK, -1, _ftelli64(file));
 }
 
 int anti_rt_file_seek(FILE *file, int64_t offset, int whence)
 {
-    return _fseeki64(file, offset, whence) == 0 ? 0 : -1;
+    return ANTI_FAULT(SEEK, -1, _fseeki64(file, offset, whence)) == 0 ? 0 : -1;
 }
 
 int anti_rt_file_is_directory(FILE *file)
 {
     struct _stat64 info;
 
-    return _fstat64(_fileno(file), &info) == 0 &&
+    return ANTI_FAULT(STAT, -1, _fstat64(_fileno(file), &info)) == 0 &&
                    (info.st_mode & _S_IFMT) == _S_IFDIR
                ? 1
                : 0;
@@ -444,7 +446,7 @@ int anti_rt_file_remove(const char *path)
     if (name == NULL) {
         return -1;
     }
-    status = _wremove(name);
+    status = ANTI_FAULT(REMOVE, -1, _wremove(name));
     release(name);
     return status == 0 ? 0 : -1;
 }
@@ -456,7 +458,7 @@ int anti_rt_file_rename(const char *from, const char *to)
     int status = -1;
 
     if (new_name != NULL) {
-        status = _wrename(old_name, new_name);
+        status = ANTI_FAULT(RENAME, -1, _wrename(old_name, new_name));
     }
     release(old_name);
     release(new_name);
@@ -524,13 +526,14 @@ static int find_next(struct find_walk *walk, char *out, size_t room,
         return 0;
     }
     if (walk->state == 0) {
-        walk->handle = _wfindfirst64(walk->pattern, &found);
+        walk->handle =
+            ANTI_FAULT(OPEN, -1, _wfindfirst64(walk->pattern, &found));
         walk->state = 1;
         if (walk->handle == -1) {
             walk->state = -1;
             return -1;
         }
-    } else if (_wfindnext64(walk->handle, &found) != 0) {
+    } else if (ANTI_FAULT(READ, -1, _wfindnext64(walk->handle, &found)) != 0) {
         /* The search ends with ENOENT when no entry is left. */
         int end = errno == ENOENT;
         walk->state = -1;
@@ -597,7 +600,7 @@ void *anti_rt_library_open(const char *path)
         SetLastError(ERROR_INVALID_NAME);
         return NULL;
     }
-    handle = LoadLibraryW(wide);
+    handle = ANTI_FAULT_SYSTEM(OPEN, NULL, LoadLibraryW(wide));
     free(wide);
     if (handle != NULL && !fill_imports(handle)) {
         DWORD error = GetLastError();
@@ -1051,11 +1054,20 @@ void anti_rt_sleep(int64_t nanoseconds)
     }
 }
 
-/* The n UTF-16 units at units as UTF-8 ended by a NUL, in a block of its
-   own, or NULL when memory runs out. One unit gives at most 3 bytes. */
-static char *utf8_block(const uint16_t *units, size_t n)
+/* Memory of size bytes for the lists below, which the seam of
+   src/rt/fault.h counts as env for the copy of the environment. */
+static void *list_alloc(size_t size, int environment)
 {
-    unsigned char *bytes = malloc(3 * n + 1);
+    return environment ? ANTI_FAULT(ENV, NULL, malloc(size))
+                       : ANTI_FAULT(ALLOC, NULL, malloc(size));
+}
+
+/* The n UTF-16 units at units as UTF-8 ended by a NUL, in a block of its
+   own, or NULL when memory runs out. One unit gives at most 3 bytes.
+   environment is 1 for the copy of the environment. */
+static char *utf8_block(const uint16_t *units, size_t n, int environment)
+{
+    unsigned char *bytes = list_alloc(3 * n + 1, environment);
     size_t written;
 
     if (bytes == NULL) {
@@ -1068,10 +1080,10 @@ static char *utf8_block(const uint16_t *units, size_t n)
 
 /* The n units at s and the 0 unit after them as uint16_t, which the
    wchar_t of Windows holds but may not be read as, in memory the caller
-   frees, or NULL. */
-static uint16_t *units_of(const wchar_t *s, size_t n)
+   frees, or NULL. environment is 1 for the copy of the environment. */
+static uint16_t *units_of(const wchar_t *s, size_t n, int environment)
 {
-    uint16_t *units = malloc((n + 1) * sizeof *units);
+    uint16_t *units = list_alloc((n + 1) * sizeof *units, environment);
     size_t i;
 
     if (units == NULL) {
@@ -1085,10 +1097,10 @@ static uint16_t *units_of(const wchar_t *s, size_t n)
 
 /* The count strings at p, each ended by a 0 unit, as a list of UTF-8
    blocks. NULL when memory runs out, with every block of the call given
-   back. */
-static char **utf8_list(const uint16_t *p, size_t count)
+   back. environment is 1 for the copy of the environment. */
+static char **utf8_list(const uint16_t *p, size_t count, int environment)
 {
-    char **out = malloc((count + 1) * sizeof *out);
+    char **out = list_alloc((count + 1) * sizeof *out, environment);
     size_t i;
 
     if (out == NULL) {
@@ -1099,7 +1111,7 @@ static char **utf8_list(const uint16_t *p, size_t count)
         while (p[n] != 0) {
             n++;
         }
-        out[i] = utf8_block(p, n);
+        out[i] = utf8_block(p, n, environment);
         if (out[i] == NULL) {
             while (i > 0) {
                 free(out[--i]);
@@ -1117,8 +1129,8 @@ char **anti_rt_process_arguments(int argc, char **argv, size_t *count)
 {
     const wchar_t *line = GetCommandLineW();
     size_t n = wcslen(line);
-    uint16_t *units = units_of(line, n);
-    uint16_t *split = malloc((2 * n + 2) * sizeof *split);
+    uint16_t *units = units_of(line, n, 0);
+    uint16_t *split = list_alloc((2 * n + 2) * sizeof *split, 0);
     char **list = NULL;
 
     /* The argv of the C runtime is in the ANSI code page, which platform.h
@@ -1128,7 +1140,7 @@ char **anti_rt_process_arguments(int argc, char **argv, size_t *count)
     *count = 0;
     if (units != NULL && split != NULL) {
         *count = anti_rt_split_command_line(units, split);
-        list = utf8_list(split, *count);
+        list = utf8_list(split, *count, 0);
     }
     free(units);
     free(split);
@@ -1145,16 +1157,16 @@ char **anti_rt_process_environment(size_t *count)
 
     *count = 0;
     if (block == NULL) {
-        return utf8_list(NULL, 0);
+        return utf8_list(NULL, 0, 1);
     }
     while (*p != 0) {
         n++;
         p += wcslen(p) + 1;
     }
-    units = units_of(block, (size_t)(p - block));
+    units = units_of(block, (size_t)(p - block), 1);
     if (units != NULL) {
         *count = n;
-        list = utf8_list(units, n);
+        list = utf8_list(units, n, 1);
         free(units);
     }
     FreeEnvironmentStringsW(block);
@@ -1174,7 +1186,7 @@ void anti_rt_streams_binary(void)
    _aligned_free releases. */
 void *anti_rt_aligned_alloc(size_t size, size_t align)
 {
-    return _aligned_malloc(size, align);
+    return ANTI_FAULT(ALLOC, NULL, _aligned_malloc(size, align));
 }
 
 void anti_rt_aligned_free(void *p)
@@ -1192,7 +1204,7 @@ void *anti_rt_malloc_aligned(size_t size, size_t align)
 {
     /* The alignment is one Windows cannot give, see above. */
     (void)align;
-    return malloc(size);
+    return ANTI_FAULT(ALLOC, NULL, malloc(size));
 }
 
 /* See platform.h. Windows has no leak check in its runtime of

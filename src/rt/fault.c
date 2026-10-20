@@ -19,20 +19,47 @@ static const char *const kind_names[ANTI_RT_FAULT_KINDS] = {
 };
 
 /* The errno values a test may name. Each stands in the errno.h of every
-   system Anti runs on. */
+   system Anti runs on.
+
+   DESIGN: a call of Windows reports its error through GetLastError,
+   which the Windows halves of the platform layers print and test, so a
+   failed call of the seam sets that error as well, through
+   ANTI_FAULT_SYSTEM of fault.h. windows is the number of the error of
+   Windows that a refused call of the same kind gives, written as a
+   number since this file branches on no host, by rule 22 of
+   docs/c-guidelines.md. The comment beside each names it. */
 static const struct {
     const char *name;
     int code;
+    unsigned long windows;
 } errors[] = {
-    {"EPERM", EPERM},     {"ENOENT", ENOENT}, {"EINTR", EINTR},
-    {"EIO", EIO},         {"EBADF", EBADF},   {"ECHILD", ECHILD},
-    {"EAGAIN", EAGAIN},   {"ENOMEM", ENOMEM}, {"EACCES", EACCES},
-    {"EBUSY", EBUSY},     {"EEXIST", EEXIST}, {"EXDEV", EXDEV},
-    {"ENOTDIR", ENOTDIR}, {"EISDIR", EISDIR}, {"EINVAL", EINVAL},
-    {"ENFILE", ENFILE},   {"EMFILE", EMFILE}, {"EFBIG", EFBIG},
-    {"ENOSPC", ENOSPC},   {"EROFS", EROFS},   {"EPIPE", EPIPE},
-    {"ENAMETOOLONG", ENAMETOOLONG},           {"ELOOP", ELOOP},
+    {"EPERM", EPERM, 5},            /* ERROR_ACCESS_DENIED */
+    {"ENOENT", ENOENT, 2},          /* ERROR_FILE_NOT_FOUND */
+    {"EINTR", EINTR, 31},           /* ERROR_GEN_FAILURE */
+    {"EIO", EIO, 31},               /* ERROR_GEN_FAILURE */
+    {"EBADF", EBADF, 6},            /* ERROR_INVALID_HANDLE */
+    {"ECHILD", ECHILD, 31},         /* ERROR_GEN_FAILURE */
+    {"EAGAIN", EAGAIN, 170},        /* ERROR_BUSY */
+    {"ENOMEM", ENOMEM, 8},          /* ERROR_NOT_ENOUGH_MEMORY */
+    {"EACCES", EACCES, 5},          /* ERROR_ACCESS_DENIED */
+    {"EBUSY", EBUSY, 170},          /* ERROR_BUSY */
+    {"EEXIST", EEXIST, 183},        /* ERROR_ALREADY_EXISTS */
+    {"EXDEV", EXDEV, 17},           /* ERROR_NOT_SAME_DEVICE */
+    {"ENOTDIR", ENOTDIR, 267},      /* ERROR_DIRECTORY */
+    {"EISDIR", EISDIR, 5},          /* ERROR_ACCESS_DENIED */
+    {"EINVAL", EINVAL, 87},         /* ERROR_INVALID_PARAMETER */
+    {"ENFILE", ENFILE, 4},          /* ERROR_TOO_MANY_OPEN_FILES */
+    {"EMFILE", EMFILE, 4},          /* ERROR_TOO_MANY_OPEN_FILES */
+    {"EFBIG", EFBIG, 112},          /* ERROR_DISK_FULL */
+    {"ENOSPC", ENOSPC, 112},        /* ERROR_DISK_FULL */
+    {"EROFS", EROFS, 19},           /* ERROR_WRITE_PROTECT */
+    {"EPIPE", EPIPE, 109},          /* ERROR_BROKEN_PIPE */
+    {"ENAMETOOLONG", ENAMETOOLONG, 206}, /* ERROR_FILENAME_EXCED_RANGE */
+    {"ELOOP", ELOOP, 1921},         /* ERROR_CANT_RESOLVE_FILENAME */
 };
+
+/* ERROR_GEN_FAILURE, for an errno value the table does not hold. */
+#define WINDOWS_GENERAL_FAILURE 31
 
 /* The entries a variable may hold. */
 #define FAULTS_MAX 8
@@ -288,4 +315,17 @@ int anti_rt_fault_fclose(FILE *f)
         return EOF;
     }
     return closed;
+}
+
+unsigned long anti_rt_fault_system_error(void)
+{
+    int code = errno;
+    size_t i;
+
+    for (i = 0; i < sizeof errors / sizeof errors[0]; i++) {
+        if (errors[i].code == code) {
+            return errors[i].windows;
+        }
+    }
+    return WINDOWS_GENERAL_FAILURE;
 }
