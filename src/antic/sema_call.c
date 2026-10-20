@@ -2468,8 +2468,7 @@ struct type *sema_variant_literal(struct checker *c, struct expr *e,
     text_format(written, sizeof written, "%s.%.*s", sema_tn(v),
                 (int)name->length,
                 name->text);
-    return sema_check_field_inits(c, e, e->as.struct_lit.fields,
-                                  e->as.struct_lit.field_count,
+    return sema_check_field_inits(c, e,
                                   payload != NULL ? payload->fields : NULL,
                                   payload != NULL ? payload->field_count : 0,
                                   written, false)
@@ -2835,14 +2834,13 @@ size_t sema_chain_fields(const struct type *t, struct struct_field *out)
     return count;
 }
 
-/* The fields of a struct or slice literal against the fields of type s.
-   Every field appears exactly once, and a union literal names one field,
-   which skip_missing allows. */
+/* The fields of the struct or slice literal e against the fields of its
+   type. Every field appears exactly once, and a union literal names one
+   field, which skip_missing allows. */
 /* DESIGN: a literal outside the class names its public fields alone. A
    private or protected field then takes its default, so the value is
    still complete. A literal inside the class may name any field. */
 bool sema_check_field_inits(struct checker *c, struct expr *e,
-                            struct field_init *inits, size_t count,
                             const struct struct_field *fields,
                             size_t field_count, const char *literal_name,
                             bool skip_missing)
@@ -2851,6 +2849,11 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
        in this one take again, so the function keeps a copy of its own. */
     char type_name[160];
     struct type **given = c->field_given;
+    struct field_init *inits = e->kind == EXPR_SLICE_LIT
+                                   ? e->as.slice_lit.fields
+                                   : e->as.struct_lit.fields;
+    size_t count = e->kind == EXPR_SLICE_LIT ? e->as.slice_lit.field_count
+                                             : e->as.struct_lit.field_count;
     bool ok = true;
     size_t i;
     size_t j;

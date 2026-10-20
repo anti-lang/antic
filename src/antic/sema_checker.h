@@ -565,7 +565,6 @@ struct type *sema_variant_literal(struct checker *c, struct expr *e,
 struct type *sema_check_field(struct checker *c, struct expr *e);
 size_t sema_chain_fields(const struct type *t, struct struct_field *out);
 bool sema_check_field_inits(struct checker *c, struct expr *e,
-                            struct field_init *inits, size_t count,
                             const struct struct_field *fields,
                             size_t field_count, const char *literal_name,
                             bool skip_missing);

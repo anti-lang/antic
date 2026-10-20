@@ -2237,16 +2237,13 @@ static struct type *check_struct_lit(struct checker *c, struct expr *e,
         size_t count = sema_chain_fields(t, NULL);
         flat = types_alloc_array(c->arena, count + 1, sizeof *flat);
         sema_chain_fields(t, flat);
-        return sema_check_field_inits(c, e, e->as.struct_lit.fields,
-                                      e->as.struct_lit.field_count, flat,
-                                      count, sema_tn(t), false)
+        return sema_check_field_inits(c, e, flat, count, sema_tn(t), false)
                    ? t
                    : sema_builtin(c, TYPE_ERROR);
     }
     c->field_given = given;
-    return sema_check_field_inits(c, e, e->as.struct_lit.fields,
-                                  e->as.struct_lit.field_count, t->fields,
-                                  t->field_count, sema_tn(t), t->is_union)
+    return sema_check_field_inits(c, e, t->fields, t->field_count,
+                                  sema_tn(t), t->is_union)
                ? t
                : sema_builtin(c, TYPE_ERROR);
 }
@@ -2606,10 +2603,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         fields[1].name.text = "len";
         fields[1].name.length = 3;
         fields[1].type = sema_builtin(c, TYPE_I64);
-        return sema_check_field_inits(c, e, e->as.slice_lit.fields,
-                                      e->as.slice_lit.field_count, fields, 2,
-                                      sema_tn(t),
-                                      false)
+        return sema_check_field_inits(c, e, fields, 2, sema_tn(t), false)
                    ? t
                    : sema_builtin(c, TYPE_ERROR);
     }
