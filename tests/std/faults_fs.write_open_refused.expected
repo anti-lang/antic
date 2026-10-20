@@ -1,0 +1,7 @@
+exit 0
+write: failed 13 Permission denied
+read: failed 2 No such file or directory
+read: 0
+rename: failed 2 No such file or directory
+remove: failed 2 No such file or directory
+remove the first: failed 2 No such file or directory

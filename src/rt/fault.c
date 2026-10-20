@@ -14,7 +14,7 @@
 /* The names of the kinds in the variable, in the order of the enum. */
 static const char *const kind_names[ANTI_RT_FAULT_KINDS] = {
     "alloc", "open", "read",  "write", "close", "remove", "rename", "mkdir",
-    "stat",  "seek", "run",   "wait",  "thread", "lock",  "sleep",
+    "stat",  "seek", "run",   "wait",  "thread", "lock",  "sleep", "env",
 };
 
 /* The errno values a test may name. Each stands in the errno.h of every

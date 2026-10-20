@@ -434,28 +434,38 @@ endfunction()
 #   OUT_MATCH <re>   a pattern the standard output matches
 #   ANY_OUT          the caller reads the standard output itself
 #   EXPECTED <file>  an expected file: the line "exit N" with the status,
-#                    then every byte of the standard output
+#                    or the line "abort" for ABORTS, then every byte of the
+#                    standard output
 #   ERR, ERR_FILE, ERR_MATCH and ANY_ERR the same for the standard error
 #   TIMEOUT <s>      the seconds the program may run. One that runs longer
 #                    is stopped, and its status is then no number
+#   IN <dir>         the directory the program runs in
 function(program_expect label)
     cmake_parse_arguments(PARSE_ARGV 1 arg "ABORTS;ANY_OUT;ANY_ERR"
-        "STATUS;OUT;OUT_FILE;OUT_MATCH;ERR;ERR_FILE;ERR_MATCH;EXPECTED;TIMEOUT"
+        "STATUS;OUT;OUT_FILE;OUT_MATCH;ERR;ERR_FILE;ERR_MATCH;EXPECTED;TIMEOUT;IN"
         "COMMAND")
     set(limit "")
     if(DEFINED arg_TIMEOUT)
         set(limit TIMEOUT "${arg_TIMEOUT}")
     endif()
+    if(DEFINED arg_IN)
+        list(APPEND limit WORKING_DIRECTORY "${arg_IN}")
+    endif()
     set(skip_OUT 0)
     set(skip_ERR 0)
     if(DEFINED arg_EXPECTED)
         file(READ "${arg_EXPECTED}" expected)
-        if(NOT expected MATCHES "^exit ([0-9]+)\n")
-            message(FATAL_ERROR "${arg_EXPECTED} does not start with 'exit N'")
+        if(expected MATCHES "^abort\n")
+            set(arg_ABORTS TRUE)
+            string(LENGTH "abort\n" skip_OUT)
+        elseif(expected MATCHES "^exit ([0-9]+)\n")
+            set(arg_STATUS "${CMAKE_MATCH_1}")
+            string(LENGTH "exit ${arg_STATUS}\n" skip_OUT)
+        else()
+            message(FATAL_ERROR "${arg_EXPECTED} does not start with "
+                                "'exit N' or 'abort'")
         endif()
-        set(arg_STATUS "${CMAKE_MATCH_1}")
         set(arg_OUT_FILE "${arg_EXPECTED}")
-        string(LENGTH "exit ${arg_STATUS}\n" skip_OUT)
     endif()
     string(MAKE_C_IDENTIFIER "${label}" name)
     set(base "${WORK}/${name}")

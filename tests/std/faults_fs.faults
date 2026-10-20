@@ -1,0 +1,29 @@
+# The cases of faults_fs.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. The counts follow the calls of the program in its
+# order: write_file opens the file, read_file opens it and measures it with
+# four seeks, list opens and reads the directory, rename and remove follow.
+# alloc counts the memory of the runtime after the start, the arguments,
+# the list of them and the two slices, and env the copy of the environment.
+start_arguments alloc:1:ENOMEM
+start_argument alloc:2:ENOMEM
+start_slice alloc:3:ENOMEM
+start_environment env:1:ENOMEM
+start_variable env:2:ENOMEM
+write_open_refused open:1:EACCES
+read_open_refused open:2:EACCES
+list_open_refused open:3:EACCES
+size_tell_refused seek:1:EINVAL
+size_end_refused seek:2:EINVAL
+size_back_refused seek:4:EINVAL
+list_unread read:1:EACCES
+rename_refused rename:1:EACCES
+remove_refused remove:1:EACCES
+read_room alloc:7:ENOMEM
+write_path alloc:5:ENOMEM
+read_path alloc:6:ENOMEM
+list_path alloc:9:ENOMEM
+list_names alloc:10:ENOMEM
+list_block alloc:11:ENOMEM
+rename_path alloc:12:ENOMEM
+rename_second_path alloc:13:ENOMEM
+remove_path alloc:14:ENOMEM

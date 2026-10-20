@@ -25,12 +25,15 @@
 #             WILL_FAIL says
 #   FAULT     optional value of ANTI_FAULT for the run of the program, for
 #             a case of fault injection against the runtime of
-#             runtime-faults/, see src/rt/fault.h
+#             runtime-faults/, see src/rt/fault.h. The program then runs
+#             in WORK, which no other case shares
 #   ERRORS    optional file of the whole standard error of the program,
 #             which is otherwise not compared
 #
-# The expected file starts with the line "exit N", the process exit code.
-# Every byte after that line is the expected standard output. An optional
+# The expected file starts with the line "exit N", the process exit code,
+# or the line "abort" for a program that the failure routine of the
+# runtime ends with abort, as memory that runs out does. Every byte after
+# that line is the expected standard output. An optional
 # NAME.args file beside the source holds one command-line argument per line.
 
 cmake_minimum_required(VERSION 3.21)
@@ -93,8 +96,14 @@ if(DEFINED UNSET AND NOT UNSET STREQUAL "")
         list(APPEND runner "--unset=${name}")
     endforeach()
 endif()
+# DESIGN: the variable of a fault reaches the program from the
+# environment of this script, set after the build. `cmake -E env` would
+# report an abort of the program as a status of its own, 1, and a case of
+# memory that runs out expects the abort.
+set(directory "")
 if(DEFINED FAULT AND NOT FAULT STREQUAL "")
-    list(APPEND runner "ANTI_FAULT=${FAULT}")
+    set(ENV{ANTI_FAULT} "${FAULT}")
+    set(directory IN "${WORK}")
 endif()
 if(runner STREQUAL "${CMAKE_COMMAND};-E;env")
     set(runner "")
@@ -107,4 +116,4 @@ if(DEFINED ERRORS AND NOT ERRORS STREQUAL "")
     set(errors ERR_FILE "${ERRORS}")
 endif()
 program_expect("${name}" COMMAND ${runner} ${EMULATOR} "${exe}" ${program_args}
-               EXPECTED "${expected_file}" ${errors} ${limit})
+               EXPECTED "${expected_file}" ${errors} ${limit} ${directory})

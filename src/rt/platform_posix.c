@@ -746,12 +746,21 @@ void anti_rt_sleep(int64_t nanoseconds)
     }
 }
 
+/* Memory of size bytes for utf8_list, which the seam of src/rt/fault.h
+   counts as env for the copy of the environment. */
+static void *list_alloc(size_t size, int environment)
+{
+    return environment ? ANTI_FAULT(ENV, NULL, malloc(size))
+                       : ANTI_FAULT(ALLOC, NULL, malloc(size));
+}
+
 /* The count strings of list as valid UTF-8, each in a block of its own,
    in a list of one block. NULL when memory runs out, with every block of
-   the call given back. */
-static char **utf8_list(char *const *list, size_t count)
+   the call given back. environment is 1 for the copy of the
+   environment. */
+static char **utf8_list(char *const *list, size_t count, int environment)
 {
-    char **out = ANTI_FAULT(ALLOC, NULL, malloc((count + 1) * sizeof *out));
+    char **out = list_alloc((count + 1) * sizeof *out, environment);
     size_t i;
 
     if (out == NULL) {
@@ -759,7 +768,7 @@ static char **utf8_list(char *const *list, size_t count)
     }
     for (i = 0; i < count; i++) {
         size_t n = strlen(list[i]);
-        unsigned char *bytes = ANTI_FAULT(ALLOC, NULL, malloc(3 * n + 1));
+        unsigned char *bytes = list_alloc(3 * n + 1, environment);
         size_t written;
         if (bytes == NULL) {
             while (i > 0) {
@@ -779,7 +788,7 @@ static char **utf8_list(char *const *list, size_t count)
 char **anti_rt_process_arguments(int argc, char **argv, size_t *count)
 {
     *count = argc > 0 ? (size_t)argc : 0;
-    return utf8_list(argv, *count);
+    return utf8_list(argv, *count, 0);
 }
 
 #if defined(__APPLE__)
@@ -809,7 +818,7 @@ char **anti_rt_process_environment(size_t *count)
         n++;
     }
     *count = n;
-    return utf8_list(list, n);
+    return utf8_list(list, n, 1);
 }
 
 void anti_rt_streams_binary(void)

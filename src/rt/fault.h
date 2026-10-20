@@ -65,6 +65,10 @@ enum anti_rt_fault_kind {
     ANTI_RT_FAULT_LOCK,
     /* A sleep. */
     ANTI_RT_FAULT_SLEEP,
+    /* The memory of the copy of the environment at the start of a
+       program, apart from alloc, so that a count of alloc does not follow
+       the size of the environment. */
+    ANTI_RT_FAULT_ENV,
     ANTI_RT_FAULT_KINDS
 };
 

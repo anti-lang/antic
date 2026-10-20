@@ -1,0 +1,81 @@
+//! Files and directories when the system refuses a call. A file is written,
+//! read back whole, found in the listing of its directory, renamed and
+//! removed, and each step prints what it got. A run of the suite refuses no
+//! call, and a case of `faults_fs.faults` refuses one, through the variable
+//! `ANTI_FAULT` of `src/rt/fault.h`, and holds what each step prints then.
+//!
+//! The program runs in a directory of its own in a case, and leaves nothing in
+//! the build directory of the suite when it passes there.
+import anti.fs;
+import anti.io;
+import anti.json;
+import anti.lang;
+import anti.text;
+
+const FIRST: str = "faults-fs-first.txt";
+const SECOND: str = "faults-fs-second.txt";
+const TEXT: str = "hello, file\n";
+
+/// Print `label` and the code and the message of `e` on one line.
+fn failed(label: str, e: *lang.Error)
+{
+	let b = text.Builder.new();
+	b.append(label);
+	b.append(": failed ");
+	json.write_int(e.code, &b);
+	b.append(" ");
+	b.append(e.message);
+	io.println(b.text());
+}
+
+/// Print `label` and `n` on one line.
+fn number(label: str, n: int)
+{
+	let b = text.Builder.new();
+	b.append(label);
+	b.append(": ");
+	json.write_int(n, &b);
+	io.println(b.text());
+}
+
+/// Whether `names` holds `name`.
+fn holds(names: []str, name: str) -> bool
+{
+	for n in names {
+		if text.equal(n, name) {
+			return true;
+		}
+	}
+	return false;
+}
+
+fn main() -> int
+{
+	fs.write_file(FIRST, []byte { ptr: TEXT.ptr, len: TEXT.len }) catch e {
+		failed("write", e);
+	};
+	let bytes = fs.read_file(FIRST) catch e {
+		failed("read", e);
+		yield []byte { ptr: none, len: 0 };
+	};
+	number("read", bytes.len);
+	free(bytes.ptr);
+	let names = fs.list(".") catch e {
+		failed("list", e);
+		yield []str { ptr: none, len: 0 };
+	};
+	if holds(names, FIRST) {
+		io.println("list: found");
+	}
+	free(names.ptr);
+	fs.rename(FIRST, SECOND) catch e {
+		failed("rename", e);
+	};
+	fs.remove(SECOND) catch e {
+		failed("remove", e);
+	};
+	fs.remove(FIRST) catch e {
+		failed("remove the first", e);
+	};
+	return 0;
+}

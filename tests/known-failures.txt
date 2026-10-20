@@ -41,3 +41,11 @@ anti_check_message_fault_work_not_made T153 anti ends with 1 and no message when
 anti_doc_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_bind_message_fault_out_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_message_fault_new_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
+std_faults_fs_fault_write_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_fs_fault_read_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_fs_fault_list_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_fs_fault_list_names T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_fs_fault_list_block T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_fs_fault_rename_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_fs_fault_rename_second_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
+std_faults_fs_fault_remove_path T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.

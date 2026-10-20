@@ -1,0 +1,4 @@
+exit 0
+read: 12
+list: found
+remove the first: failed 2 No such file or directory
