@@ -723,6 +723,60 @@ static int read_flags(struct reader *r)
     return peek(r, 0);
 }
 
+/* A group that starts `(*`, from the `*`: a named group such as
+   `(*atomic:` or a verb such as `(*FAIL)`, which matches no text. */
+static struct node *verb_group(struct reader *r, struct node *group)
+{
+    size_t name = r->pos + 1;
+    size_t end = name;
+
+    while (end < r->n && r->s[end] != ':' && r->s[end] != ')') {
+        end++;
+    }
+    if (end < r->n && r->s[end] == ':') {
+        group->atomic = end - name == 6 &&
+                        memcmp(r->s + name, "atomic", 6) == 0;
+        group->zero_width = lookaround_name(r->s + name, end - name);
+        r->pos = end + 1;
+        return group_body(r, group);
+    }
+    r->pos = end;
+    skip_past(r, ')');
+    group->kind = NODE_EMPTY;
+    group->span.end = r->pos;
+    return group;
+}
+
+/* The rest of a group after `(?` that no letter of parse_group takes, from
+   the byte `c`: a recursion or a call, which this reader does not follow,
+   or flags. Returns NULL for flags that apply to the rest of the enclosing
+   group. */
+static struct node *flag_group(struct reader *r, size_t start,
+                               struct node *group, int c)
+{
+    bool caseless = r->caseless;
+    bool extended = r->extended;
+
+    if (c == 'R' || c == '&' || (c >= 0 && is_digit((unsigned)c)) ||
+        ((c == '+' || c == '-') && peek(r, 1) >= 0 &&
+         is_digit((unsigned)peek(r, 1)))) {
+        skip_past(r, ')');
+        group = opaque(r, start);
+        group->unknown = true;
+        return group;
+    }
+    if (read_flags(r) == ')') {
+        /* The flags hold to the end of the enclosing group. */
+        r->pos++;
+        return NULL;
+    }
+    r->pos++;
+    group_body(r, group);
+    r->caseless = caseless;
+    r->extended = extended;
+    return group;
+}
+
 /* A group, from the byte after its `(`. Returns NULL for a comment and
    for flags that apply to the rest of the enclosing group. */
 static struct node *parse_group(struct reader *r, size_t start)
@@ -731,23 +785,7 @@ static struct node *parse_group(struct reader *r, size_t start)
     int c = peek(r, 0);
 
     if (c == '*') {
-        size_t name = r->pos + 1;
-        size_t end = name;
-        while (end < r->n && r->s[end] != ':' && r->s[end] != ')') {
-            end++;
-        }
-        if (end < r->n && r->s[end] == ':') {
-            group->atomic = end - name == 6 &&
-                            memcmp(r->s + name, "atomic", 6) == 0;
-            group->zero_width = lookaround_name(r->s + name, end - name);
-            r->pos = end + 1;
-            return group_body(r, group);
-        }
-        r->pos = end;
-        skip_past(r, ')');
-        group->kind = NODE_EMPTY;
-        group->span.end = r->pos;
-        return group;
+        return verb_group(r, group);
     }
     if (c != '?') {
         group->capture = ++r->groups;
@@ -832,28 +870,7 @@ static struct node *parse_group(struct reader *r, size_t start)
     default:
         break;
     }
-    if (c == 'R' || c == '&' || (c >= 0 && is_digit((unsigned)c)) ||
-        ((c == '+' || c == '-') && peek(r, 1) >= 0 &&
-         is_digit((unsigned)peek(r, 1)))) {
-        skip_past(r, ')');
-        group = opaque(r, start);
-        group->unknown = true;
-        return group;
-    }
-    {
-        bool caseless = r->caseless;
-        bool extended = r->extended;
-        if (read_flags(r) == ')') {
-            /* The flags hold to the end of the enclosing group. */
-            r->pos++;
-            return NULL;
-        }
-        r->pos++;
-        group_body(r, group);
-        r->caseless = caseless;
-        r->extended = extended;
-        return group;
-    }
+    return flag_group(r, start, group, c);
 }
 
 static struct node *parse_atom(struct reader *r)
