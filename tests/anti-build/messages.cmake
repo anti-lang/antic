@@ -326,6 +326,22 @@ anti_message(repository_refuses
           ${app_source} "${app_text}"
     ARGS build ${tools}
     ERR_MATCH "curl: [^\n]*\n${refusing_pattern}\n")
+# Fault injection: curl of the fetch does not start, through the variable
+# ANTI_FAULT of src/rt/fault.h. The pipe of its output is the first
+# program of the run and the start of curl the second.
+foreach(case "pipe|run:1:EACCES|anti: pipe: Permission denied"
+             "start|run:2:EACCES|anti: cannot run curl: Permission denied")
+    string(REPLACE "|" ";" case "${case}")
+    list(GET case 0 name)
+    list(GET case 1 fault)
+    list(GET case 2 line)
+    anti_message(fault_fetch_curl_${name}
+        FILES anti.toml "${manifest_package}\n[repositories]\nlocal = \"${refusing_url}\"\n\n[dependencies]\n\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n"
+              ${app_source} "${app_text}"
+        FAULT ${fault}
+        ARGS build ${tools}
+        ERR "${line}" ${refusing_lines})
+endforeach()
 anti_message(cache_unknown
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
     ENV --unset=HOME --unset=XDG_CACHE_HOME --unset=LOCALAPPDATA
