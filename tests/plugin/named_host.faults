@@ -1,0 +1,6 @@
+# The cases of named_host.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. The load of the library fails for the module
+# anti.time, and the loader then reads the library for the name of the
+# module, with the sixth allocation of the program. T139: memory that runs
+# out there gives the reason of the system, where the program must stop.
+name_memory alloc:6:ENOMEM

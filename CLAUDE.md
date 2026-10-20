@@ -466,6 +466,8 @@ Where a test goes:
   <kind>:<n>:<error>` runs `antic_faults` or `anti_faults`, and
   `<name>.faults` beside a program of `tests/programs/` or `tests/std/`
   holds its cases against `runtime-faults/`, as `<kind>_<name>_fault_<case>`.
+  `<host>.faults` of `tests/plugin/` does the same for a host and its
+  library, as `plugin_<host>_fault_<case>`.
   `src/rt/fault.h` holds the seam and `tools/faults.cmake` the option
   `ANTIC_FAULTS`, on in the presets `host`, `asan`, `ubsan` and `coverage`.
 

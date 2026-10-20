@@ -1,0 +1,42 @@
+//! A host that loads the library its first argument names, asks it for a
+//! `Tasks` and unloads it, each step through the seam of fault injection. A
+//! case of `faults_host.faults` makes a call of the loader fail, through the
+//! variable `ANTI_FAULT` of `src/rt/fault.h`, and the host prints the reason of
+//! each failure without the path of the library.
+
+import anti.lang;
+import anti.plugin;
+import anti.time;
+import net.example.tasks;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// The part of message after the path of the library, or all of it.
+fn reason(message: str, path: str) -> []byte
+{
+	if message.len > path.len {
+		return message[path.len..message.len];
+	}
+	return message[0..message.len];
+}
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch e {
+		let why = reason(e.message, args[1]);
+		printf("the load failed: %.*s\n".ptr, why.len as c_int, why.ptr);
+		return 0;
+	};
+	let t = lib.instance(tasks.Tasks) catch e {
+		printf("no object: %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		delete(lib);
+		return 0;
+	};
+	printf("loaded %lld\n".ptr, t.squares(4));
+	delete(t);
+	lib.unload() catch e {
+		printf("no unload: %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+	};
+	delete(lib);
+	return 0;
+}

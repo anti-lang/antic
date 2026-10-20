@@ -71,3 +71,6 @@ anti_build_message_fault_fetch_index_copy_not_written T156 The fetch of a depend
 anti_build_message_fault_fetch_index_not_cached T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_module_not_cached T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_module_copy_unread T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
+plugin_faults_host_fault_slot_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
+plugin_faults_host_fault_object_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
+plugin_named_host_fault_name_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux

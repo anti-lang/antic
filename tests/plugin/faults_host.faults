@@ -1,0 +1,9 @@
+# The cases of faults_host.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. The runtime takes the first five allocations at
+# the start of the program. The load opens the library with the first
+# open and takes the sixth allocation for its slot, and instance the
+# seventh for the object. T139: memory that runs out in the loader is a
+# failure of the load and of instance, where the program must stop.
+open_refused open:1:EACCES
+slot_memory alloc:6:ENOMEM
+object_memory alloc:7:ENOMEM

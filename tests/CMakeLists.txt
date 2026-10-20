@@ -2506,6 +2506,63 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/named_host.expected"
             -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
 endif()
+# The loader when a call of the system fails. A file <host>.faults of
+# tests/plugin holds one case per line, its name and the value of
+# ANTI_FAULT, as the files of tests/programs do, and the case runs the
+# host with the library clock, which uses anti.time, as
+# plugin_<host>_fault_<case>. faults_host imports anti.time and runs
+# without a fault as plugin_faults_host. named_host does not import it, so
+# the loader reads the library for the name of the module. A Windows
+# plugin that lacks a module of its host does not link, as above.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME plugin_faults_host
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-faults-host"
+            "-DHOST=faults_host"
+            "-DLIBRARY=clock"
+            "-DINTERFACE=tasks"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/faults_host.expected"
+            -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+endif()
+if(ANTIC_FAULTS AND NOT ANTIC_HOST_OS STREQUAL "windows")
+    foreach(host faults_host named_host)
+        set(list "${CMAKE_CURRENT_SOURCE_DIR}/plugin/${host}.faults")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+                     "${list}")
+        file(STRINGS "${list}" cases REGEX "^[^#]")
+        foreach(line IN LISTS cases)
+            if(NOT line MATCHES "^([a-z0-9_]+) ([a-z]+:[0-9]+:[A-Z]+)$")
+                message(FATAL_ERROR "${list}: `${line}` is no "
+                                    "<case> <kind>:<n>:<error>")
+            endif()
+            set(case "${CMAKE_MATCH_1}")
+            set(base "${CMAKE_CURRENT_SOURCE_DIR}/plugin/${host}.${case}")
+            set(errors "")
+            if(EXISTS "${base}.err")
+                set(errors "-DERRORS=${base}.err")
+            endif()
+            add_test(NAME plugin_${host}_fault_${case}
+                COMMAND "${CMAKE_COMMAND}"
+                    "-DANTIC=$<TARGET_FILE:antic>"
+                    "-DRUNTIME=${ANTIC_FAULTS_RUNTIME_DIR}"
+                    "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+                    "-DSUFFIX=${plugin_suffix}"
+                    "-DEXE=${plugin_exe}"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-faults/${host}-${case}"
+                    "-DHOST=${host}"
+                    "-DLIBRARY=clock"
+                    "-DINTERFACE=tasks"
+                    "-DEXPECTED=${base}.expected"
+                    "-DFAULT=${CMAKE_MATCH_2}"
+                    ${errors}
+                    -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+        endforeach()
+    endforeach()
+endif()
 # A provided class that the loader cannot build without arguments: one
 # whose `construct` takes one, and one that holds such a class in a field
 # no default fills. `instance` fails for each with the reason of the
