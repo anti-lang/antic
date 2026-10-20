@@ -685,51 +685,74 @@ static void merge_effects(struct ir_function *f, uint8_t effects)
     f->guarantees = (uint8_t)(f->guarantees & effects >> 2);
 }
 
-/* A function signature, mapped to a function of the program. A C function
-   and a declaration share an existing entry of the same name. */
-static uint32_t read_signature(struct reader *r, struct ir_module *program,
-                               struct ir_maps *maps, bool *has_body,
-                               bool *skip)
+/* The fields of a signature record before its parameters. */
+struct signature {
+    uint8_t flags;
+    uint8_t effects;
+    const char *module;             /* NULL for a function of C */
+    const char *name;
+    uint8_t result;
+    uint32_t result_agg;
+    uint8_t result_ext;
+    uint64_t low;                   /* the range of the result, flag 128 */
+    uint64_t high;
+    uint32_t file;
+    uint32_t decl_line;
+    uint32_t param_count;
+};
+
+/* Reads the fields of a signature before its parameters into s. Returns
+   false when the file is damaged or cut short. */
+static bool read_signature_head(struct reader *r, struct ir_module *program,
+                                struct ir_maps *maps, struct signature *s)
 {
-    uint8_t flags = antl_get_u8(r);
-    uint8_t effects = antl_get_u8(r);
-    const char *module = antl_get_cstr(r);
-    const char *name = antl_get_cstr(r);
-    uint8_t result = antl_get_u8(r);
-    uint32_t result_agg = read_agg_ref(r, program, maps, result);
-    uint8_t result_ext = antl_get_u8(r);
-    uint64_t low = (flags & 128) != 0 ? antl_get_u64(r) : 0;
-    uint64_t high = (flags & 128) != 0 ? antl_get_u64(r) : 0;
-    uint32_t file = antl_get_u32(r);
-    uint32_t decl_line = antl_get_u32(r);
-    uint32_t param_count = antl_get_count(r, 11);
+    s->flags = antl_get_u8(r);
+    s->effects = antl_get_u8(r);
+    s->module = antl_get_cstr(r);
+    s->name = antl_get_cstr(r);
+    s->result = antl_get_u8(r);
+    s->result_agg = read_agg_ref(r, program, maps, s->result);
+    s->result_ext = antl_get_u8(r);
+    s->low = (s->flags & 128) != 0 ? antl_get_u64(r) : 0;
+    s->high = (s->flags & 128) != 0 ? antl_get_u64(r) : 0;
+    s->file = antl_get_u32(r);
+    s->decl_line = antl_get_u32(r);
+    s->param_count = antl_get_count(r, 11);
+    if (r->failed) {
+        return false;
+    }
+    if (!valid_type(s->result) || s->effects >> 2 > IR_GUARANTEES ||
+        ((s->flags & 128) != 0 &&
+         (s->result < IR_I8 || s->result > IR_I64 ||
+          ir_int_op((enum ir_type)s->result, s->low).as.integer != s->low ||
+          ir_int_op((enum ir_type)s->result, s->high).as.integer !=
+              s->high ||
+          s->low == s->high)) ||
+        s->result_ext > IR_EXT_ZERO ||
+        (s->result_ext != IR_EXT_NONE && s->result != IR_I8 &&
+         s->result != IR_I16) ||
+        ((s->flags & 64) != 0 &&
+         (s->module[0] != '\0' || s->result != IR_PTR)) ||
+        ((s->flags & 1) == 0 && s->module[0] == '\0') ||
+        (s->module[0] != '\0' && (s->flags & 2) != 0) ||
+        (s->module[0] == '\0' && (s->flags & 4) != 0)) {
+        antl_damaged(r);
+        return false;
+    }
+    if (s->module[0] == '\0') {
+        s->module = NULL;
+    }
+    return true;
+}
+
+/* The function of the program with this module and name, the last of
+   them, or NULL. module is NULL for a function of C. */
+static struct ir_function *find_function(const struct ir_module *program,
+                                         const char *module, const char *name)
+{
     struct ir_function *f = NULL;
     size_t i;
 
-    *has_body = false;
-    *skip = false;
-    if (r->failed) {
-        return 0;
-    }
-    if (!valid_type(result) || effects >> 2 > IR_GUARANTEES ||
-        ((flags & 128) != 0 &&
-         (result < IR_I8 || result > IR_I64 ||
-          ir_int_op((enum ir_type)result, low).as.integer !=
-              low ||
-          ir_int_op((enum ir_type)result, high).as.integer != high ||
-          low == high)) ||
-        result_ext > IR_EXT_ZERO ||
-        (result_ext != IR_EXT_NONE && result != IR_I8 && result != IR_I16) ||
-        ((flags & 64) != 0 && (module[0] != '\0' || result != IR_PTR)) ||
-        ((flags & 1) == 0 && module[0] == '\0') ||
-        (module[0] != '\0' && (flags & 2) != 0) ||
-        (module[0] == '\0' && (flags & 4) != 0)) {
-        antl_damaged(r);
-        return 0;
-    }
-    if (module[0] == '\0') {
-        module = NULL;
-    }
     for (i = 0; i < program->function_count; i++) {
         struct ir_function *g = program->functions[i];
         bool same_module = module == NULL
@@ -740,126 +763,182 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
             f = g;
         }
     }
+    return f;
+}
+
+/* DESIGN: a C function that two modules declare is one function of the
+   program, and it never returns only where both say so. A call of a
+   module that does not say so goes on after it, which the verifier
+   refuses for a function that never returns. */
+static void merge_declaration(struct ir_function *f, const struct signature *s)
+{
+    f->never_returns = f->never_returns && (s->flags & 16) != 0;
+    f->allocates = f->allocates && (s->flags & 64) != 0;
+    if (f->result_ext != (enum ir_ext)s->result_ext) {
+        f->result_ext = IR_EXT_NONE;
+    }
+    if (!f->result_range || (s->flags & 128) == 0 || f->result_low != s->low ||
+        f->result_high != s->high) {
+        f->result_range = false;
+    }
+    merge_effects(f, s->effects);
+    f->writes_tables = f->writes_tables || (s->flags & 32) != 0;
+}
+
+/* The function of signature s, which the program does not have yet:
+   a definition, which sets *has_body, a C function or a declaration. */
+static struct ir_function *new_function(struct reader *r,
+                                        struct ir_module *program,
+                                        const struct ir_maps *maps,
+                                        const struct signature *s,
+                                        bool *has_body)
+{
+    struct ir_function *f;
+
+    if ((s->flags & 1) == 0) {
+        f = ir_function_add(program, s->module, s->name,
+                            (enum ir_type)s->result, s->result_agg);
+        *has_body = true;
+        /* A copy of a generic of another module belongs to the object of
+           the module whose file defines it. */
+        if (s->module != NULL && strcmp(s->module, r->iface->module) != 0) {
+            f->unit = r->iface->module;
+        }
+    } else if (s->module == NULL) {
+        f = ir_extern_add(program, s->name, (enum ir_type)s->result,
+                          s->flags & 2);
+        f->result_agg = s->result_agg;
+    } else {
+        f = ir_declare_add(program, s->module, s->name,
+                           (enum ir_type)s->result, s->result_agg);
+    }
+    f->never_returns = (s->flags & 16) != 0;
+    f->writes_tables = (s->flags & 32) != 0;
+    f->allocates = (s->flags & 64) != 0;
+    f->result_ext = (enum ir_ext)s->result_ext;
+    f->result_range = (s->flags & 128) != 0;
+    f->result_low = s->low;
+    f->result_high = s->high;
+    f->effects = (enum ir_effects)(s->effects & 3);
+    f->guarantees = (uint8_t)(s->effects >> 2);
+    f->exported = (s->flags & 4) != 0;
+    f->worker = (s->flags & 8) != 0;
+    f->file = s->file == IR_NO_INDEX ? IR_NO_INDEX : maps->files[s->file];
+    f->decl_line = s->decl_line;
+    return f;
+}
+
+/* The count parameters of the new function f. */
+static void read_params(struct reader *r, struct ir_module *program,
+                        struct ir_maps *maps, struct ir_function *f,
+                        uint32_t count)
+{
+    uint32_t i;
+
+    for (i = 0; i < count && !r->failed; i++) {
+        uint8_t type = antl_get_u8(r);
+        uint8_t ext = antl_get_u8(r);
+        uint32_t agg = read_agg_ref(r, program, maps, type);
+        uint8_t facts = antl_get_u8(r);
+        uint32_t deref = antl_get_u32(r);
+        bool narrow = type == IR_I8 || type == IR_I16;
+        struct ir_param *p;
+        if (!valid_type(type) || type == IR_VOID || ext > IR_EXT_ZERO ||
+            (ext != IR_EXT_NONE) != narrow || facts > 3 ||
+            (facts != 0 && type != IR_PTR) ||
+            (deref != IR_NO_INDEX && (facts & 1) == 0)) {
+            antl_damaged(r);
+            continue;
+        }
+        ir_param_add(f, (enum ir_type)type, agg);
+        p = &f->params[f->param_count - 1];
+        p->ext = (enum ir_ext)ext;
+        p->nonnull = (facts & 1) != 0;
+        p->own = (facts & 2) != 0;
+        if (deref != IR_NO_INDEX) {
+            p->deref_size = map_sym(r, program, maps, deref);
+        }
+    }
+}
+
+/* DESIGN: one C function has one signature in a program, by R127 of
+   "Rules of 2026-10-13". A second declaration with another result, other
+   parameters or another variadic mark is refused, compared as C passes
+   them: the IR type and the aggregate of each. Reads the parameters of
+   s past and returns whether they and the result match f, which a
+   function of a module always does. */
+static bool same_signature(struct reader *r, struct ir_module *program,
+                           struct ir_maps *maps, const struct ir_function *f,
+                           const struct signature *s)
+{
+    bool same = s->module != NULL ||
+                (f->result == (enum ir_type)s->result &&
+                 f->result_agg == s->result_agg &&
+                 f->variadic == ((s->flags & 2) != 0) &&
+                 f->param_count == s->param_count);
+    uint32_t i;
+
+    for (i = 0; i < s->param_count && !r->failed; i++) {
+        uint8_t type = antl_get_u8(r);
+        uint32_t agg;
+        antl_get_u8(r);
+        agg = read_agg_ref(r, program, maps, type);
+        antl_get_u8(r);
+        antl_get_u32(r);
+        same = same && (s->module != NULL ||
+                        (f->params[i].type == (enum ir_type)type &&
+                         f->params[i].agg == agg));
+    }
+    return same;
+}
+
+/* A function signature, mapped to a function of the program. A C function
+   and a declaration share an existing entry of the same name. */
+static uint32_t read_signature(struct reader *r, struct ir_module *program,
+                               struct ir_maps *maps, bool *has_body,
+                               bool *skip)
+{
+    struct signature s;
+    struct ir_function *f;
+
+    *has_body = false;
+    *skip = false;
+    if (!read_signature_head(r, program, maps, &s)) {
+        return 0;
+    }
+    f = find_function(program, s.module, s.name);
     /* DESIGN: each module that uses a copy of a generic defines it, so
        two library files may both define one. The program keeps the
        first, and the second stands for it. The copies are made from one
        tree with the same arguments, so they are the same code. */
-    if (f != NULL && (flags & 1) == 0 && module != NULL &&
-        ir_is_copy_name(name)) {
+    if (f != NULL && (s.flags & 1) == 0 && s.module != NULL &&
+        ir_is_copy_name(s.name)) {
         if (f->is_extern) {
             f->is_extern = false;
             *has_body = true;
         } else {
             *skip = true;
         }
-    } else if (f != NULL && (flags & 1) == 0) {
+    } else if (f != NULL && (s.flags & 1) == 0) {
         antl_fail(r, "defines `%s.%s`, which another library defines",
-                  module, name);
+                  s.module, s.name);
         return 0;
     }
-    if (file != IR_NO_INDEX && file >= maps->file_count) {
+    if (s.file != IR_NO_INDEX && s.file >= maps->file_count) {
         antl_damaged(r);
         return 0;
     }
-    /* DESIGN: a C function that two modules declare is one function of
-       the program, and it never returns only where both say so. A call
-       of a module that does not say so goes on after it, which the
-       verifier refuses for a function that never returns. */
-    if (f != NULL) {
-        f->never_returns = f->never_returns && (flags & 16) != 0;
-        f->allocates = f->allocates && (flags & 64) != 0;
-        if (f->result_ext != (enum ir_ext)result_ext) {
-            f->result_ext = IR_EXT_NONE;
-        }
-        if (!f->result_range || (flags & 128) == 0 || f->result_low != low ||
-            f->result_high != high) {
-            f->result_range = false;
-        }
-        merge_effects(f, effects);
-        f->writes_tables = f->writes_tables || (flags & 32) != 0;
-    }
     if (f == NULL) {
-        if ((flags & 1) == 0) {
-            f = ir_function_add(program, module, name, (enum ir_type)result,
-                                result_agg);
-            *has_body = true;
-            /* A copy of a generic of another module belongs to the object
-               of the module whose file defines it. */
-            if (module != NULL && strcmp(module, r->iface->module) != 0) {
-                f->unit = r->iface->module;
-            }
-        } else if (module == NULL) {
-            f = ir_extern_add(program, name, (enum ir_type)result, flags & 2);
-            f->result_agg = result_agg;
-        } else {
-            f = ir_declare_add(program, module, name, (enum ir_type)result,
-                               result_agg);
-        }
-        f->never_returns = (flags & 16) != 0;
-        f->writes_tables = (flags & 32) != 0;
-        f->allocates = (flags & 64) != 0;
-        f->result_ext = (enum ir_ext)result_ext;
-        f->result_range = (flags & 128) != 0;
-        f->result_low = low;
-        f->result_high = high;
-        f->effects = (enum ir_effects)(effects & 3);
-        f->guarantees = (uint8_t)(effects >> 2);
-        f->exported = (flags & 4) != 0;
-        f->worker = (flags & 8) != 0;
-        f->file = file == IR_NO_INDEX ? IR_NO_INDEX : maps->files[file];
-        f->decl_line = decl_line;
-        for (i = 0; i < param_count && !r->failed; i++) {
-            uint8_t type = antl_get_u8(r);
-            uint8_t ext = antl_get_u8(r);
-            uint32_t agg = read_agg_ref(r, program, maps, type);
-            uint8_t facts = antl_get_u8(r);
-            uint32_t deref = antl_get_u32(r);
-            bool narrow = type == IR_I8 || type == IR_I16;
-            if (!valid_type(type) || type == IR_VOID || ext > IR_EXT_ZERO ||
-                (ext != IR_EXT_NONE) != narrow || facts > 3 ||
-                (facts != 0 && type != IR_PTR) ||
-                (deref != IR_NO_INDEX && (facts & 1) == 0)) {
-                antl_damaged(r);
-            } else {
-                struct ir_param *p;
-                ir_param_add(f, (enum ir_type)type, agg);
-                p = &f->params[f->param_count - 1];
-                p->ext = (enum ir_ext)ext;
-                p->nonnull = (facts & 1) != 0;
-                p->own = (facts & 2) != 0;
-                if (deref != IR_NO_INDEX) {
-                    p->deref_size = map_sym(r, program, maps, deref);
-                }
-            }
-        }
-    } else {
-        /* DESIGN: one C function has one signature in a program, by R127
-           of "Rules of 2026-10-13". A second declaration with another
-           result, other parameters or another variadic mark is refused,
-           compared as C passes them: the IR type and the aggregate of
-           each. */
-        bool same = module != NULL ||
-                    (f->result == (enum ir_type)result &&
-                     f->result_agg == result_agg &&
-                     f->variadic == ((flags & 2) != 0) &&
-                     f->param_count == param_count);
-        for (i = 0; i < param_count && !r->failed; i++) {
-            uint8_t type = antl_get_u8(r);
-            uint32_t agg;
-            antl_get_u8(r);
-            agg = read_agg_ref(r, program, maps, type);
-            antl_get_u8(r);
-            antl_get_u32(r);
-            same = same && (module != NULL ||
-                            (f->params[i].type == (enum ir_type)type &&
-                             f->params[i].agg == agg));
-        }
-        if (!same && !r->failed) {
-            antl_fail(r, "declares `extern fn %s` with another signature "
-                         "than a library before it",
-                      name);
-            return 0;
-        }
+        f = new_function(r, program, maps, &s, has_body);
+        read_params(r, program, maps, f, s.param_count);
+        return f->index;
+    }
+    merge_declaration(f, &s);
+    if (!same_signature(r, program, maps, f, &s) && !r->failed) {
+        antl_fail(r, "declares `extern fn %s` with another signature "
+                     "than a library before it",
+                  s.name);
+        return 0;
     }
     return f->index;
 }
@@ -1083,15 +1162,153 @@ static bool addresses_apart(const uint64_t *offsets, uint32_t count)
     return apart;
 }
 
+/* The addresses of a global of size bytes into rel. */
+static void read_relocs(struct reader *r, struct relocs *rel, uint64_t size)
+{
+    uint32_t j;
+
+    rel->count = antl_get_count(r, 13);
+    rel->offsets = antl_allocate(r, rel->count, sizeof(uint64_t));
+    rel->targets = antl_allocate(r, rel->count, sizeof(uint32_t));
+    rel->functions = antl_allocate(r, rel->count, sizeof(uint8_t));
+    for (j = 0; j < rel->count && !r->failed; j++) {
+        rel->offsets[j] = antl_get_u64(r);
+        rel->targets[j] = antl_get_u32(r);
+        rel->functions[j] = antl_get_flag(r) ? 1 : 0;
+        if (rel->offsets[j] > size || size - rel->offsets[j] < 8) {
+            antl_damaged(r);
+        }
+    }
+    if (!r->failed && !addresses_apart(rel->offsets, rel->count)) {
+        antl_damaged(r);
+    }
+}
+
+/* Global i of the file, with its addresses into rel and whether it is the
+   twin of a copy the program has into *twin. */
+static void read_global(struct reader *r, struct ir_module *program,
+                        struct ir_maps *maps, uint32_t i, struct relocs *rel,
+                        bool *twin)
+{
+    const char *module = antl_get_cstr(r);
+    const char *name = antl_get_cstr(r);
+    uint64_t size = antl_get_u64(r);
+    uint64_t align = antl_get_u64(r);
+    struct ir_global *g;
+    uint8_t marks;
+
+    /* A global of the runtime has no module, and an empty name is how the
+       file spells that. */
+    if (module != NULL && module[0] == '\0') {
+        module = NULL;
+    }
+    /* The back end writes the alignment as a power of two. */
+    if ((align & (align - 1)) != 0) {
+        antl_damaged(r);
+    }
+    if (!antl_take(r, size)) {
+        return;
+    }
+    g = ir_global_add(program, module, name, r->data + r->pos, size, align);
+    r->pos += size;
+    maps->globals[i] = g->index;
+    read_relocs(r, rel, size);
+    marks = antl_get_u8(r);
+    g->exported = (marks & 2) != 0;
+    g->is_extern = (marks & 4) != 0;
+    g->mutable = (marks & 8) != 0;
+    if (marks > 15) {
+        antl_damaged(r);
+    }
+    if ((marks & 1) != 0 && !r->failed) {
+        g->value = read_const(r, program, maps, 0);
+    }
+    if (!g->is_extern && module != NULL && !r->failed) {
+        if (ir_is_copy_name(name)) {
+            *twin = merge_copy_global(program, g, &maps->globals[i]);
+            g = program->globals[maps->globals[i]];
+        }
+        if (!*twin && strcmp(module, r->iface->module) != 0) {
+            g->unit = r->iface->module;
+        }
+    }
+}
+
+/* The addresses the globals hold, of a global or, with functions, of a
+   function. A pointer may name a global that the file lists later, and
+   the file lists the functions after the globals, so each kind waits
+   until the file has given all of its kind. */
+static void place_addresses(struct reader *r, struct ir_module *program,
+                            struct ir_maps *maps, const struct relocs *relocs,
+                            const bool *twins, bool functions)
+{
+    uint32_t count = functions ? maps->function_count : maps->global_count;
+    uint32_t i;
+    uint32_t j;
+
+    for (i = 0; i < maps->global_count && !r->failed; i++) {
+        struct ir_global *g = program->globals[maps->globals[i]];
+        if (twins[i]) {
+            continue;
+        }
+        if (g->value != NULL) {
+            remap_const(r, g->value, maps, functions);
+        }
+        for (j = 0; j < relocs[i].count; j++) {
+            uint32_t target = relocs[i].targets[j];
+            if ((relocs[i].functions[j] != 0) != functions) {
+                continue;
+            }
+            if (target >= count) {
+                antl_damaged(r);
+                break;
+            }
+            if (functions) {
+                ir_global_reloc_fn(program, g, relocs[i].offsets[j],
+                                   maps->functions[target]);
+            } else {
+                ir_global_reloc(program, g, relocs[i].offsets[j],
+                                maps->globals[target]);
+            }
+        }
+    }
+}
+
+/* The signatures of the functions, then their bodies. */
+static void read_functions(struct reader *r, struct ir_module *program,
+                           struct ir_maps *maps)
+{
+    struct ir_function **bodies;
+    bool *skips;
+    uint32_t i;
+
+    maps->function_count = antl_get_count(r, 15);
+    maps->functions =
+        antl_allocate(r, maps->function_count, sizeof *maps->functions);
+    bodies = antl_allocate(r, maps->function_count, sizeof *bodies);
+    skips = antl_allocate(r, maps->function_count, sizeof *skips);
+    for (i = 0; i < maps->function_count && !r->failed; i++) {
+        bool has_body;
+        maps->functions[i] =
+            read_signature(r, program, maps, &has_body, &skips[i]);
+        bodies[i] = has_body ? program->functions[maps->functions[i]] : NULL;
+    }
+    for (i = 0; i < maps->function_count && !r->failed; i++) {
+        if (bodies[i] != NULL) {
+            read_body(r, program, bodies[i], maps);
+        } else if (skips[i]) {
+            skip_body(r, program, program->functions[maps->functions[i]],
+                      maps);
+        }
+    }
+}
+
 void antl_read_ir(struct reader *r, struct ir_module *program)
 {
     struct ir_maps maps;
     struct relocs *relocs;
-    struct ir_function **bodies;
-    bool *skips;
     bool *twins;
     uint32_t i;
-    uint32_t j;
 
     memset(&maps, 0, sizeof maps);
     read_tables(r, program, &maps);
@@ -1100,128 +1317,13 @@ void antl_read_ir(struct reader *r, struct ir_module *program)
     relocs = antl_allocate(r, maps.global_count, sizeof *relocs);
     twins = antl_allocate(r, maps.global_count, sizeof *twins);
     for (i = 0; i < maps.global_count && !r->failed; i++) {
-        const char *module = antl_get_cstr(r);
-        const char *name = antl_get_cstr(r);
-        uint64_t size = antl_get_u64(r);
-        uint64_t align = antl_get_u64(r);
-        struct ir_global *g;
-        /* A global of the runtime has no module, and an empty name is
-           how the file spells that. */
-        if (module != NULL && module[0] == '\0') {
-            module = NULL;
-        }
-        /* The back end writes the alignment as a power of two. */
-        if ((align & (align - 1)) != 0) {
-            antl_damaged(r);
-        }
-        if (!antl_take(r, size)) {
-            break;
-        }
-        g = ir_global_add(program, module, name, r->data + r->pos, size, align);
-        r->pos += size;
-        maps.globals[i] = g->index;
-        relocs[i].count = antl_get_count(r, 13);
-        relocs[i].offsets = antl_allocate(r, relocs[i].count, sizeof(uint64_t));
-        relocs[i].targets = antl_allocate(r, relocs[i].count, sizeof(uint32_t));
-        relocs[i].functions =
-            antl_allocate(r, relocs[i].count, sizeof(uint8_t));
-        for (j = 0; j < relocs[i].count && !r->failed; j++) {
-            relocs[i].offsets[j] = antl_get_u64(r);
-            relocs[i].targets[j] = antl_get_u32(r);
-            relocs[i].functions[j] = antl_get_flag(r) ? 1 : 0;
-            if (relocs[i].offsets[j] > size ||
-                size - relocs[i].offsets[j] < 8) {
-                antl_damaged(r);
-            }
-        }
-        if (!r->failed &&
-            !addresses_apart(relocs[i].offsets, relocs[i].count)) {
-            antl_damaged(r);
-        }
-        {
-            uint8_t marks = antl_get_u8(r);
-            g->exported = (marks & 2) != 0;
-            g->is_extern = (marks & 4) != 0;
-            g->mutable = (marks & 8) != 0;
-            if (marks > 15) {
-                antl_damaged(r);
-            }
-            if ((marks & 1) != 0 && !r->failed) {
-                g->value = read_const(r, program, &maps, 0);
-            }
-        }
-        if (!g->is_extern && module != NULL && !r->failed) {
-            if (ir_is_copy_name(name)) {
-                twins[i] = merge_copy_global(program, g, &maps.globals[i]);
-                g = program->globals[maps.globals[i]];
-            }
-            if (!twins[i] && strcmp(module, r->iface->module) != 0) {
-                g->unit = r->iface->module;
-            }
-        }
+        read_global(r, program, &maps, i, &relocs[i], &twins[i]);
     }
-    /* A pointer may name a global that the file lists later. */
-    for (i = 0; i < maps.global_count && !r->failed; i++) {
-        struct ir_global *g = program->globals[maps.globals[i]];
-        if (twins[i]) {
-            continue;
-        }
-        if (g->value != NULL) {
-            remap_const(r, g->value, &maps, false);
-        }
-        for (j = 0; j < relocs[i].count; j++) {
-            if (relocs[i].functions[j]) {
-                continue;
-            }
-            if (relocs[i].targets[j] >= maps.global_count) {
-                antl_damaged(r);
-                break;
-            }
-            ir_global_reloc(program, g, relocs[i].offsets[j],
-                            maps.globals[relocs[i].targets[j]]);
-        }
-    }
-    maps.function_count = antl_get_count(r, 15);
-    maps.functions =
-        antl_allocate(r, maps.function_count, sizeof *maps.functions);
-    bodies = antl_allocate(r, maps.function_count, sizeof *bodies);
-    skips = antl_allocate(r, maps.function_count, sizeof *skips);
-    for (i = 0; i < maps.function_count && !r->failed; i++) {
-        bool has_body;
-        maps.functions[i] = read_signature(r, program, &maps, &has_body,
-                                           &skips[i]);
-        bodies[i] = has_body ? program->functions[maps.functions[i]] : NULL;
-    }
-    for (i = 0; i < maps.function_count && !r->failed; i++) {
-        if (bodies[i] != NULL) {
-            read_body(r, program, bodies[i], &maps);
-        } else if (skips[i]) {
-            skip_body(r, program, program->functions[maps.functions[i]],
-                      &maps);
-        }
-    }
+    place_addresses(r, program, &maps, relocs, twins, false);
+    read_functions(r, program, &maps);
     /* A table entry names a function, and the file lists the functions
        after the globals, so those addresses wait until here. */
-    for (i = 0; i < maps.global_count && !r->failed; i++) {
-        struct ir_global *g = program->globals[maps.globals[i]];
-        if (twins[i]) {
-            continue;
-        }
-        if (g->value != NULL) {
-            remap_const(r, g->value, &maps, true);
-        }
-        for (j = 0; j < relocs[i].count; j++) {
-            if (!relocs[i].functions[j]) {
-                continue;
-            }
-            if (relocs[i].targets[j] >= maps.function_count) {
-                antl_damaged(r);
-                break;
-            }
-            ir_global_reloc_fn(program, g, relocs[i].offsets[j],
-                               maps.functions[relocs[i].targets[j]]);
-        }
-    }
+    place_addresses(r, program, &maps, relocs, twins, true);
     if (!r->failed) {
         read_classes(r, program, &maps);
     }
