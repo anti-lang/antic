@@ -1452,6 +1452,63 @@ done:
     return status;
 }
 
+/* The interface of the library file o->input, which names its module in
+   its header. The other library files load beside it, so its types
+   resolve. NULL, with a message, when the file cannot be read or holds
+   no such module. */
+static const struct interface *library_interface(const struct options *o,
+                                                 struct arena *arena,
+                                                 struct types *types,
+                                                 struct ir_module *program)
+{
+    struct options with_input = *o;
+    const char **listed = driver_libraries_with_input(o);
+    const struct interface **libraries = NULL;
+    const struct interface *iface = NULL;
+    struct module empty;
+    struct interface header;
+    struct paths paths = {0};
+    struct text source = {0};
+    char error[200];
+    size_t i;
+
+    memset(&empty, 0, sizeof empty);
+    with_input.libraries = listed;
+    with_input.library_count = o->library_count + 1;
+    if (!driver_read_bytes(o->input, &source) ||
+        !antl_header((const uint8_t *)source.data, source.length, arena,
+                     &header, error, sizeof error)) {
+        if (source.length > 0) {
+            say_antic("%s %s\n", o->input, error);
+        }
+        goto done;
+    }
+    if (!driver_find_libraries(&with_input, &empty, arena, &paths)) {
+        goto done;
+    }
+    libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
+    if (!driver_load_libraries(&paths, "", NULL, NULL, arena, types,
+                               program, libraries)) {
+        goto done;
+    }
+    for (i = 0; i < paths.count; i++) {
+        if (strcmp(libraries[i]->module, header.module) == 0) {
+            iface = libraries[i];
+            break;
+        }
+    }
+    if (iface == NULL) {
+        say_antic("%s holds no module `%s`\n", o->input, header.module);
+    }
+
+done:
+    free(listed);
+    free((void *)libraries);
+    free((void *)paths.items);
+    text_free(&source);
+    return iface;
+}
+
 /* DESIGN: `anti doc` builds user docs from the public interface of one
    module and nothing else. The interface of a library file and the
    interface of its source are then the same structure. The command
@@ -1482,50 +1539,11 @@ static const struct interface *interface_of(const struct options *o,
     bool library_file = length > strlen(ANTL_SUFFIX) &&
                         strcmp(o->input + length - strlen(ANTL_SUFFIX),
                                ANTL_SUFFIX) == 0;
-    char error[200];
-    size_t i;
 
     *tree = NULL;
     types_init(types, arena);
     if (library_file) {
-        struct options with_input = *o;
-        const char **listed = driver_libraries_with_input(o);
-        struct module empty;
-        struct interface header;
-        memset(&empty, 0, sizeof empty);
-        with_input.libraries = listed;
-        with_input.library_count = o->library_count + 1;
-        if (!driver_read_bytes(o->input, &source) ||
-            !antl_header((const uint8_t *)source.data, source.length, arena,
-                         &header, error, sizeof error)) {
-            if (source.length > 0) {
-                say_antic("%s %s\n", o->input, error);
-            }
-            free(listed);
-            goto done;
-        }
-        text_append(&module, header.module);
-        if (!driver_find_libraries(&with_input, &empty, arena, &paths)) {
-            free(listed);
-            goto done;
-        }
-        free(listed);
-        libraries = alloc_zeroed(paths.count + 1, sizeof *libraries);
-        if (!driver_load_libraries(&paths, "", NULL, NULL, arena, types,
-                                   program, libraries)) {
-            goto done;
-        }
-        for (i = 0; i < paths.count; i++) {
-            if (strcmp(libraries[i]->module, text_cstr(&module)) == 0) {
-                iface = (struct interface *)libraries[i];
-                break;
-            }
-        }
-        if (iface == NULL) {
-            say_antic("%s holds no module `%s`\n", o->input,
-                      text_cstr(&module));
-        }
-        goto done;
+        return library_interface(o, arena, types, program);
     }
     if (!read_source(o->input, &source)) {
         goto done;
