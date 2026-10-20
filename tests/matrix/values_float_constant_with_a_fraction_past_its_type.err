@@ -1,0 +1,1 @@
+values_float_constant_with_a_fraction_past_its_type.anti:6:15: error: `300.5 as u8` does not fit `u8`

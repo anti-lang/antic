@@ -1,0 +1,1 @@
+types_bitfield_of_one_bit_past_its_width.anti:6:19: error: `2` does not fit the 1 bit of `on`

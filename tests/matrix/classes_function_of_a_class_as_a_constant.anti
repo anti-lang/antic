@@ -1,0 +1,14 @@
+class C
+{
+	pub fn make() -> int
+	{
+		return 1;
+	}
+}
+
+const X: fn() -> int = C.make;
+
+fn main() -> int
+{
+	return 0;
+}
