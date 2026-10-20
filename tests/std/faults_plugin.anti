@@ -1,0 +1,27 @@
+//! The load of a plugin when the system refuses to open the library. The
+//! message names the library and the reason the system gives, and a refusal
+//! that gives none reads `cannot open the file`. A case of
+//! `faults_plugin.faults` refuses the open, through the variable `ANTI_FAULT`
+//! of `src/rt/fault.h`, and a run of the suite opens a library that is not
+//! there.
+import anti.io;
+import anti.plugin;
+import anti.text;
+
+const PATH: str = "faults-plugin-none.plugin";
+
+fn main() -> int
+{
+	let lib = plugin.load(PATH) catch e {
+		if text.equal(e.message, "faults-plugin-none.plugin: cannot open the file") {
+			io.println("no reason");
+		} else {
+			io.println("a reason of the system");
+		}
+		return 0;
+	};
+	lib.unload() catch e {
+		io.println(e.message);
+	};
+	return 1;
+}

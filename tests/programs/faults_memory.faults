@@ -1,0 +1,10 @@
+# The cases of faults_memory.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. alloc counts the memory of the runtime after the
+# start: the aligned room is the fifth, the room of the slice the sixth,
+# the copy of dup and of its slice the seventh and the eighth, and the
+# snapshot the ninth.
+aligned_memory alloc:5:ENOMEM
+room_memory alloc:6:ENOMEM
+dup_memory alloc:7:ENOMEM
+slice_memory alloc:8:ENOMEM
+snapshot_memory alloc:9:ENOMEM

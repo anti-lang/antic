@@ -61,3 +61,7 @@ std_faults_toml_fault_memory_9 T139 The reader of TOML takes memory that runs ou
 std_faults_toml_fault_memory_10 T139 The reader of TOML takes memory that runs out for a text outside the subset.
 std_faults_toml_fault_memory_11 T139 The reader of TOML takes memory that runs out for a text outside the subset.
 std_faults_toml_fault_memory_12 T139 The reader of TOML takes memory that runs out for a text outside the subset.
+std_faults_trace_fault_module_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
+std_faults_trace_fault_name_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
+std_faults_trace_fault_text_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
+std_faults_trace_fault_text_room_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.

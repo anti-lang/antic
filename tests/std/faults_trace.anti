@@ -1,0 +1,27 @@
+//! A stack trace when memory runs out. The names of the frames and the text of
+//! the trace take memory of the runtime, and memory that runs out for either
+//! stops the program, by decision 4 of "Decisions of 2026-10-11". A case of
+//! `faults_trace.faults` refuses one allocation, through the variable
+//! `ANTI_FAULT` of `src/rt/fault.h`.
+import anti.debug;
+import anti.io;
+import anti.lang;
+
+/// The trace from inside a function, which is its first frame.
+fn inside() -> *lang.StackTrace
+{
+	return debug.backtrace();
+}
+
+fn main() -> int
+{
+	let t = inside();
+	defer delete(t);
+	let named = t.symbolize();
+	io.println(named[0].function);
+	let shown = t.text();
+	if shown.len > 0 {
+		io.println("text");
+	}
+	return 0;
+}

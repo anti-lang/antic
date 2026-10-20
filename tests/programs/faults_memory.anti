@@ -1,0 +1,58 @@
+//! Memory of the runtime that runs out where a program asks for it. `alloc(T,
+//! n)` of a type aligned above 16 gives `none`, which the program handles.
+//! `dup` of an object with an `own` slice and the snapshot of a `keep own`
+//! function stop the program, by decision 4 of "Decisions of 2026-10-11". A
+//! case of `faults_memory.faults` refuses one allocation, through the variable
+//! `ANTI_FAULT` of `src/rt/fault.h`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Wide align(64)
+{
+	a: u8,
+}
+
+class Holder
+{
+	pub own counts: []i32,
+}
+
+class Slot
+{
+	own f: fn(int) -> int,
+
+	fn construct(self, keep own f: fn(int) -> int)
+	{
+		self.f = f;
+	}
+
+	pub fn run(self, v: int) -> int
+	{
+		return self.f(v);
+	}
+}
+
+fn main() -> int
+{
+	let wide = alloc(Wide, 2) else {
+		printf("no wide room\n".ptr);
+		return 0;
+	};
+	printf("wide\n".ptr);
+	free(wide);
+	let room = alloc(i32, 2) else {
+		printf("no room\n".ptr);
+		return 0;
+	};
+	let h = alloc Holder { counts: []i32 { ptr: room, len: 2 } };
+	h.counts[0] = 4;
+	let c = dup(h);
+	printf("dup %d\n".ptr, c.counts[0] as c_int);
+	delete(c);
+	delete(h);
+	let k = 10;
+	let slot = alloc Slot(snapshot fn(x: int) -> int { return x + k; });
+	printf("snapshot %d\n".ptr, slot.run(5) as c_int);
+	delete(slot);
+	return 0;
+}

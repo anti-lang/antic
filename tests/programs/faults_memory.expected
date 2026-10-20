@@ -1,0 +1,4 @@
+exit 0
+wide
+dup 4
+snapshot 15

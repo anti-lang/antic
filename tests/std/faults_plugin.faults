@@ -1,0 +1,3 @@
+# The case of faults_plugin.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. The load opens the library with the first open.
+open_refused open:1:EACCES

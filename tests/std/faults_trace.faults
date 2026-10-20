@@ -1,0 +1,12 @@
+# The cases of faults_trace.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. alloc counts the memory of the runtime after the
+# start: capture takes the fifth for its frames and the sixth on for the
+# modules of each, symbolize the twelfth for its list and the thirteenth
+# for a name, and the text of the trace the sixteenth and the
+# seventeenth.
+frames_memory alloc:5:ENOMEM
+module_memory alloc:6:ENOMEM
+names_memory alloc:12:ENOMEM
+name_memory alloc:13:ENOMEM
+text_memory alloc:16:ENOMEM
+text_room_memory alloc:17:ENOMEM
