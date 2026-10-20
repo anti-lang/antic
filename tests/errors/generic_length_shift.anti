@@ -1,5 +1,5 @@
-//! The length of a copy of a generic shifts by a constant parameter below
-//! zero, which the copy leaves as it stands and the back end refuses.
+//! The length of a copy of a generic shifts by a constant parameter below zero,
+//! which the copy leaves as it stands and the back end refuses.
 
 const MINUS: int = -1;
 

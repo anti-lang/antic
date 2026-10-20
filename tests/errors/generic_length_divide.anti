@@ -1,5 +1,5 @@
-//! The length of a copy of a generic divides by a constant parameter that
-//! is zero, which the copy leaves as it stands and the back end refuses.
+//! The length of a copy of a generic divides by a constant parameter that is
+//! zero, which the copy leaves as it stands and the back end refuses.
 
 struct S<N: int, Z: int>
 {

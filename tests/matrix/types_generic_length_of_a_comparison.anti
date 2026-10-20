@@ -1,6 +1,6 @@
-//! An array length of a generic struct that casts a comparison of its
-//! constant parameter to `int`, which each copy computes, as the same
-//! length outside a generic is.
+//! An array length of a generic struct that casts a comparison of its constant
+//! parameter to `int`, which each copy computes, as the same length outside a
+//! generic is.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

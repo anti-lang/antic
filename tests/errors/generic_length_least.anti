@@ -1,5 +1,5 @@
-//! The length of a copy of a generic divides the least `i8` by -1, which
-//! the copy leaves as it stands and the back end refuses.
+//! The length of a copy of a generic divides the least `i8` by -1, which the
+//! copy leaves as it stands and the back end refuses.
 
 const LEAST: int = -128;
 const MINUS: int = -1;

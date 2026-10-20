@@ -1,6 +1,6 @@
-//! Array lengths of generic structs that fold their constant parameters
-//! in each copy: each operator of an integer, a cast between two integer
-//! types, and the comparisons and the logic of `bool` under a cast.
+//! Array lengths of generic structs that fold their constant parameters in each
+//! copy: each operator of an integer, a cast between two integer types, and the
+//! comparisons and the logic of `bool` under a cast.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
