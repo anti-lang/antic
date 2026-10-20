@@ -1770,6 +1770,62 @@ static void check_switch(struct checker *c, struct stmt *s)
     }
 }
 
+/* The marks on the local `sym` that the `let` s declares with the
+   type t: what it holds, where it points, and whether it needs a place
+   of its own. */
+static void mark_let_symbol(struct checker *c, struct stmt *s,
+                            struct symbol *sym, struct type *t)
+{
+    sym->type = t;
+    s->as.let.symbol = sym;
+    sym->holds = sema_held_deepest(s->as.let.value);
+    sym->into_fields = sema_points_into_fields(s->as.let.value,
+                                               c->ctx.function, t);
+    sema_note_guarded_pointer(c, sym, s->as.let.value);
+    /* DESIGN: an atomic local lives in memory, where the atomic
+       operations reach it through its address. It holds what
+       one operation of the runtime moves: an integer, a `bool`,
+       a `char` or a pointer. */
+    if (s->as.let.atomic) {
+        sym->atomic = true;
+        sym->address_taken = true;
+        if (!sema_is_error(t) && !types_is_integer(t) &&
+            t->kind != TYPE_BOOL && t->kind != TYPE_CHAR &&
+            t->kind != TYPE_POINTER) {
+            sema_error_at(c, s->as.let.name_pos, "an atomic local "
+                          "holds an integer, a `bool`, a `char` or "
+                          "a pointer, found `%s`", sema_tn(t));
+        }
+    }
+    if (s->as.let.value->kind == EXPR_FN) {
+        sym->closure = s->as.let.value->as.fn;
+    }
+    /* A failing call writes its result through a pointer, so
+       the local it writes to needs a place of its own. So does
+       the pointer of `alloc T(args)`, which a handler may
+       replace. */
+    if (s->as.let.value->kind == EXPR_CALL &&
+        s->as.let.value->as.call.out != NULL) {
+        sym->address_taken = true;
+    }
+    if (s->as.let.value->kind == EXPR_ALLOC &&
+        s->as.let.value->as.alloc.value != NULL &&
+        s->as.let.value->as.alloc.value->kind == EXPR_CALL &&
+        s->as.let.value->as.alloc.value->as.call.builds != NULL) {
+        sym->address_taken = true;
+    }
+    /* A `catch` handler may put another pointer in the binding
+       with `yield`, so the binding needs a place of its own. So
+       does the value `let ... else` takes out of a `?T`, which
+       the path where it is there writes. */
+    if (s->as.let.guard.kind != HANDLE_NONE ||
+        (s->as.let.otherwise != NULL &&
+         s->as.let.value->type != NULL &&
+         s->as.let.value->type->kind == TYPE_OPTIONAL)) {
+        sym->address_taken = true;
+    }
+}
+
 /* `let name = value;` and `let name: T = value;`. */
 static void check_let(struct checker *c, struct stmt *s)
 {
@@ -1871,55 +1927,67 @@ static void check_let(struct checker *c, struct stmt *s)
                        "`%.*s` is already declared in this block");
     sema_refuse_escaping_error(c, s->as.let.value);
     if (sym != NULL) {
-        sym->type = t;
-        s->as.let.symbol = sym;
-        sym->holds = sema_held_deepest(s->as.let.value);
-        sym->into_fields = sema_points_into_fields(s->as.let.value,
-                                                   c->ctx.function, t);
-        sema_note_guarded_pointer(c, sym, s->as.let.value);
-        /* DESIGN: an atomic local lives in memory, where the atomic
-           operations reach it through its address. It holds what
-           one operation of the runtime moves: an integer, a `bool`,
-           a `char` or a pointer. */
-        if (s->as.let.atomic) {
-            sym->atomic = true;
-            sym->address_taken = true;
-            if (!sema_is_error(t) && !types_is_integer(t) &&
-                t->kind != TYPE_BOOL && t->kind != TYPE_CHAR &&
-                t->kind != TYPE_POINTER) {
-                sema_error_at(c, s->as.let.name_pos, "an atomic local "
-                              "holds an integer, a `bool`, a `char` or "
-                              "a pointer, found `%s`", sema_tn(t));
-            }
-        }
-        if (s->as.let.value->kind == EXPR_FN) {
-            sym->closure = s->as.let.value->as.fn;
-        }
-        /* A failing call writes its result through a pointer, so
-           the local it writes to needs a place of its own. So does
-           the pointer of `alloc T(args)`, which a handler may
-           replace. */
-        if (s->as.let.value->kind == EXPR_CALL &&
-            s->as.let.value->as.call.out != NULL) {
-            sym->address_taken = true;
-        }
-        if (s->as.let.value->kind == EXPR_ALLOC &&
-            s->as.let.value->as.alloc.value != NULL &&
-            s->as.let.value->as.alloc.value->kind == EXPR_CALL &&
-            s->as.let.value->as.alloc.value->as.call.builds != NULL) {
-            sym->address_taken = true;
-        }
-        /* A `catch` handler may put another pointer in the binding
-           with `yield`, so the binding needs a place of its own. So
-           does the value `let ... else` takes out of a `?T`, which
-           the path where it is there writes. */
-        if (s->as.let.guard.kind != HANDLE_NONE ||
-            (s->as.let.otherwise != NULL &&
-             s->as.let.value->type != NULL &&
-             s->as.let.value->type->kind == TYPE_OPTIONAL)) {
-            sym->address_taken = true;
-        }
+        mark_let_symbol(c, s, sym, t);
     }
+}
+
+/* The element type of the `for` s over a sequence, a collection or
+   an iterator. */
+static struct type *for_over_element(struct checker *c, struct stmt *s)
+{
+    struct type *element = NULL;
+    struct type *over = sema_check_expr(c, s->as.for_loop.over, NULL);
+    /* A range without a name repeats its block. A slice has an
+       element to read, so it names one. */
+    if (s->as.for_loop.name_count == 0) {
+        sema_error_at(c, s->pos,
+                      "a `for` over a slice names its element");
+    }
+    if (!sema_is_error(over) && over->kind != TYPE_SLICE &&
+        over->kind != TYPE_ARRAY) {
+        if (!sema_iterate(c, s->as.for_loop.over, over,
+                          &s->as.for_loop.hooks, &element)) {
+            sema_error_at(c, s->as.for_loop.over->pos,
+                          "`for` walks a range, a slice, an array, a "
+                          "collection or an iterator, found `%s`",
+                          sema_tn(over));
+            element = sema_builtin(c, TYPE_ERROR);
+        } else if (s->as.for_loop.by_pointer &&
+                   s->as.for_loop.hooks.place != NULL) {
+            element = s->as.for_loop.hooks.place->type;
+        } else if (s->as.for_loop.by_pointer) {
+            const struct symbol *cursor = s->as.for_loop.hooks.cursor;
+            const struct type *walker =
+                cursor != NULL ? cursor->type : over;
+            if (walker->kind == TYPE_POINTER) {
+                walker = walker->element;
+            }
+            if (!sema_is_error(element)) {
+                sema_error_at(c, s->as.for_loop.over->pos,
+                              "`for x in &e` takes each element in "
+                              "place, and the `operator fn value` of "
+                              "`%s` gives a copy of `%s`",
+                              sema_tn(walker), sema_tn(element));
+            }
+            element = sema_builtin(c, TYPE_ERROR);
+        } else if (types_is_match(element) &&
+                   s->as.for_loop.over->kind == EXPR_CALL &&
+                   s->as.for_loop.over->as.call.pattern != NULL) {
+            /* The matches of a pattern literal know its
+               groups. */
+            element = types_match(c->types,
+                                  s->as.for_loop.over->as.call.pattern);
+        }
+    } else if (!sema_is_error(over)) {
+        element = over->element;
+        if (s->as.for_loop.by_pointer) {
+            element = types_lent(c->types,
+                                 types_pointer(c->types, element));
+        }
+    } else {
+        element = over;
+    }
+    return element;
 }
 
 /* `for` over a range, a sequence or an iterator. */
@@ -1932,57 +2000,7 @@ static void check_for(struct checker *c, struct stmt *s)
 
     sema_enter_scope(c, &for_scope);
     if (s->as.for_loop.over != NULL) {
-        struct type *over = sema_check_expr(c, s->as.for_loop.over, NULL);
-        /* A range without a name repeats its block. A slice has an
-           element to read, so it names one. */
-        if (names == 0) {
-            sema_error_at(c, s->pos,
-                          "a `for` over a slice names its element");
-        }
-        if (!sema_is_error(over) && over->kind != TYPE_SLICE &&
-            over->kind != TYPE_ARRAY) {
-            if (!sema_iterate(c, s->as.for_loop.over, over,
-                              &s->as.for_loop.hooks, &element)) {
-                sema_error_at(c, s->as.for_loop.over->pos,
-                              "`for` walks a range, a slice, an array, a "
-                              "collection or an iterator, found `%s`",
-                              sema_tn(over));
-                element = sema_builtin(c, TYPE_ERROR);
-            } else if (s->as.for_loop.by_pointer &&
-                       s->as.for_loop.hooks.place != NULL) {
-                element = s->as.for_loop.hooks.place->type;
-            } else if (s->as.for_loop.by_pointer) {
-                const struct symbol *cursor = s->as.for_loop.hooks.cursor;
-                const struct type *walker =
-                    cursor != NULL ? cursor->type : over;
-                if (walker->kind == TYPE_POINTER) {
-                    walker = walker->element;
-                }
-                if (!sema_is_error(element)) {
-                    sema_error_at(c, s->as.for_loop.over->pos,
-                                  "`for x in &e` takes each element in "
-                                  "place, and the `operator fn value` of "
-                                  "`%s` gives a copy of `%s`",
-                                  sema_tn(walker), sema_tn(element));
-                }
-                element = sema_builtin(c, TYPE_ERROR);
-            } else if (types_is_match(element) &&
-                       s->as.for_loop.over->kind == EXPR_CALL &&
-                       s->as.for_loop.over->as.call.pattern != NULL) {
-                /* The matches of a pattern literal know its
-                   groups. */
-                element = types_match(c->types,
-                                      s->as.for_loop.over->as.call.pattern);
-            }
-        } else if (!sema_is_error(over)) {
-            element = over->element;
-            if (s->as.for_loop.by_pointer) {
-                element = types_lent(c->types,
-                                     types_pointer(c->types, element));
-            }
-        } else {
-            element = over;
-        }
+        element = for_over_element(c, s);
     } else {
         struct type *low = sema_check_expr(c, s->as.for_loop.low, NULL);
         struct type *high =
