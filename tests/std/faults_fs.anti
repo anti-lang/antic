@@ -1,8 +1,8 @@
 //! Files and directories when the system refuses a call. A file is written,
-//! read back whole, found in the listing of its directory, renamed and
-//! removed, and each step prints what it got. A run of the suite refuses no
-//! call, and a case of `faults_fs.faults` refuses one, through the variable
-//! `ANTI_FAULT` of `src/rt/fault.h`, and holds what each step prints then.
+//! read back whole, found in the listing of its directory, renamed and removed,
+//! and each step prints what it got. A run of the suite refuses no call, and a
+//! case of `faults_fs.faults` refuses one, through the variable `ANTI_FAULT` of
+//! `src/rt/fault.h`, and holds what each step prints then.
 //!
 //! The program runs in a directory of its own in a case, and leaves nothing in
 //! the build directory of the suite when it passes there.

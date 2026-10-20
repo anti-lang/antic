@@ -462,6 +462,12 @@ Where a test goes:
 - `tests/runners/run_usage.cmake`: the usage, and a command line a tool refuses
   with it, `antic_usage_<case>` and `anti_usage_<case>`.
 - `tests/bench/`: the benchmarks, outside the suite.
+- Fault injection: a case of a table of messages with `FAULT
+  <kind>:<n>:<error>` runs `antic_faults` or `anti_faults`, and
+  `<name>.faults` beside a program of `tests/programs/` or `tests/std/`
+  holds its cases against `runtime-faults/`, as `<kind>_<name>_fault_<case>`.
+  `src/rt/fault.h` holds the seam and `tools/faults.cmake` the option
+  `ANTIC_FAULTS`, on in the presets `host`, `asan`, `ubsan` and `coverage`.
 
 The matrix, by decision 28 of "Decisions of 2026-10-11":
 

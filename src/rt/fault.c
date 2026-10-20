@@ -7,6 +7,7 @@
 #include "fault.h"
 
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,19 +45,20 @@ struct fault {
 
 /* DESIGN: the state of the seam is global, since a count runs over the
    whole process. Every thread of a program may reach a seam, so each
-   value is read and written with the atomic builtins. The variable is
+   value is an atomic of C11, which rule 1 of docs/c-guidelines.md lets
+   stand outside atomic.c, as no extension of the compiler. The variable is
    read once, by the first call: state goes from 0 to 1 while that call
    reads it and to 2 when the entries stand, and a call that finds 1
    waits for 2. The entries are written before state becomes 2 and never
    after. */
-static int state;
+static atomic_int state;
 static struct fault faults[FAULTS_MAX];
 static int fault_count;
-static int64_t counts[ANTI_RT_FAULT_KINDS];
+static _Atomic int64_t counts[ANTI_RT_FAULT_KINDS];
 
 /* The streams whose read or write failed, until fclose. */
 #define STREAMS_MAX 8
-static FILE *failed_streams[STREAMS_MAX];
+static _Atomic(FILE *) failed_streams[STREAMS_MAX];
 
 /* DESIGN: a malformed variable is a mistake of the test that sets it,
    and a seam that went on without it would let that test pass for the
@@ -167,16 +169,17 @@ static void ready(void)
 {
     int expected = 0;
 
-    if (__atomic_load_n(&state, __ATOMIC_ACQUIRE) == 2) {
+    if (atomic_load_explicit(&state, memory_order_acquire) == 2) {
         return;
     }
-    if (__atomic_compare_exchange_n(&state, &expected, 1, false,
-                                    __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+    if (atomic_compare_exchange_strong_explicit(&state, &expected, 1,
+                                                memory_order_acq_rel,
+                                                memory_order_acquire)) {
         read_variable();
-        __atomic_store_n(&state, 2, __ATOMIC_RELEASE);
+        atomic_store_explicit(&state, 2, memory_order_release);
         return;
     }
-    while (__atomic_load_n(&state, __ATOMIC_ACQUIRE) != 2) {
+    while (atomic_load_explicit(&state, memory_order_acquire) != 2) {
     }
 }
 
@@ -189,7 +192,7 @@ bool anti_rt_fault(enum anti_rt_fault_kind kind)
     if (fault_count == 0) {
         return false;
     }
-    n = __atomic_add_fetch(&counts[kind], 1, __ATOMIC_RELAXED);
+    n = atomic_fetch_add_explicit(&counts[kind], 1, memory_order_relaxed) + 1;
     for (i = 0; i < fault_count; i++) {
         if (faults[i].kind == kind && faults[i].at == n) {
             errno = faults[i].code;
@@ -207,8 +210,9 @@ static void mark(FILE *f)
 
     for (i = 0; i < STREAMS_MAX; i++) {
         FILE *empty = NULL;
-        if (__atomic_compare_exchange_n(&failed_streams[i], &empty, f, false,
-                                        __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+        if (atomic_compare_exchange_strong_explicit(
+                &failed_streams[i], &empty, f, memory_order_acq_rel,
+                memory_order_acquire)) {
             return;
         }
     }
@@ -222,13 +226,13 @@ static bool marked(FILE *f, bool forget)
     for (i = 0; i < STREAMS_MAX; i++) {
         FILE *held = f;
         if (forget) {
-            if (__atomic_compare_exchange_n(&failed_streams[i], &held, NULL,
-                                            false, __ATOMIC_ACQ_REL,
-                                            __ATOMIC_ACQUIRE)) {
+            if (atomic_compare_exchange_strong_explicit(
+                    &failed_streams[i], &held, NULL, memory_order_acq_rel,
+                    memory_order_acquire)) {
                 return true;
             }
-        } else if (__atomic_load_n(&failed_streams[i], __ATOMIC_ACQUIRE) ==
-                   f) {
+        } else if (atomic_load_explicit(&failed_streams[i],
+                                        memory_order_acquire) == f) {
             return true;
         }
     }

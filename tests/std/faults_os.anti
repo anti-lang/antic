@@ -1,7 +1,7 @@
 //! A sleep and the route of signals when the system refuses a call. A sleep
 //! that a signal cuts short sleeps the rest. A registration whose pipe or
-//! thread the system refuses catches nothing, and the next one starts the
-//! route afresh, so the signal raised after the second arrives. A case of
+//! thread the system refuses catches nothing, and the next one starts the route
+//! afresh, so the signal raised after the second arrives. A case of
 //! `faults_os.faults` refuses one call, through the variable `ANTI_FAULT` of
 //! `src/rt/fault.h`.
 import anti.io;

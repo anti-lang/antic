@@ -1,8 +1,8 @@
 //! A channel when the system refuses a call. The channel takes its ring and a
 //! monitor of a mutex and two conditions, and memory that runs out for either
 //! or a mutex the system refuses stops the program. A case of
-//! `faults_channels.faults` refuses one call, through the variable
-//! `ANTI_FAULT` of `src/rt/fault.h`.
+//! `faults_channels.faults` refuses one call, through the variable `ANTI_FAULT`
+//! of `src/rt/fault.h`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
