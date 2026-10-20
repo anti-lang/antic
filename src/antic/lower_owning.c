@@ -10,18 +10,39 @@
    memory that holds no value yet. */
 enum work { WORK_DESTROY, WORK_COPY, WORK_CLEAR, WORK_INIT };
 
+/* The work on every element or case, which reaches each of them
+   unchanged. from and made_only are those of lower_destroy_owned, and
+   the other kinds of work read neither. */
+struct owned_work {
+    enum work what;
+    struct ir_operand from;
+    bool made_only;
+};
+
+/* A copy, a clear or the clear of new memory, which read neither from
+   nor made_only. */
+static struct owned_work plain_work(enum work what)
+{
+    struct owned_work w;
+
+    w.what = what;
+    w.from = lower_none();
+    w.made_only = false;
+    return w;
+}
+
 static void work_on(struct lowerer *l, const struct type *t,
                     struct ir_operand at, struct ir_operand into,
-                    struct ir_operand from, bool made_only, enum work what)
+                    struct owned_work w)
 {
-    if (what == WORK_COPY) {
+    if (w.what == WORK_COPY) {
         lower_copy_owned(l, t, at, into);
-    } else if (what == WORK_CLEAR) {
+    } else if (w.what == WORK_CLEAR) {
         lower_clear_owned(l, t, at);
-    } else if (what == WORK_INIT) {
+    } else if (w.what == WORK_INIT) {
         lower_init_owned(l, t, at);
     } else {
-        lower_destroy_owned(l, t, at, from, made_only);
+        lower_destroy_owned(l, t, at, w.from, w.made_only);
     }
 }
 
@@ -58,8 +79,7 @@ struct ir_operand lower_array_count(struct lowerer *l, const struct type *t)
    at the same offsets. */
 static void each_element(struct lowerer *l, const struct type *element,
                          struct ir_operand count, struct ir_operand base,
-                         struct ir_operand into, struct ir_operand from,
-                         bool made_only, enum work what)
+                         struct ir_operand into, struct owned_work w)
 {
     struct ir_operand size = lower_size_operand(l, element);
     struct ir_block *test = lower_new_block(l);
@@ -85,10 +105,10 @@ static void each_element(struct lowerer *l, const struct type *element,
     offset = lower_temp(l, ir_binary(l->f, l->b, IR_MUL, IR_I64,
                                      lower_temp(l, index), size));
     at = lower_temp(l, ir_ptradd(l->f, l->b, base, offset));
-    if (what == WORK_COPY) {
+    if (w.what == WORK_COPY) {
         copy = lower_temp(l, ir_ptradd(l->f, l->b, into, offset));
     }
-    work_on(l, element, at, copy, from, made_only, what);
+    work_on(l, element, at, copy, w);
     ir_jump(l->f, l->b, test);
     l->b = done;
 }
@@ -96,12 +116,11 @@ static void each_element(struct lowerer *l, const struct type *element,
 /* The work on every element of the array t at at. */
 static void each_array_element(struct lowerer *l, const struct type *t,
                                struct ir_operand at, struct ir_operand into,
-                               struct ir_operand from, bool made_only,
-                               enum work what)
+                               struct owned_work w)
 {
     struct ir_operand count = lower_array_count(l, t);
 
-    each_element(l, innermost(t), count, at, into, from, made_only, what);
+    each_element(l, innermost(t), count, at, into, w);
 }
 
 static bool lower_copies_parts(const struct type *t);
@@ -113,7 +132,7 @@ static bool lower_copies_parts(const struct type *t);
    and bytes already. */
 static void each_case(struct lowerer *l, const struct type *t,
                       struct ir_operand at, struct ir_operand into,
-                      struct ir_operand from, bool made_only, enum work what)
+                      struct owned_work w)
 {
     struct ir_block *after = lower_new_block(l);
     struct ir_operand tag = lower_load_tag(l, t, at);
@@ -127,7 +146,7 @@ static void each_case(struct lowerer *l, const struct type *t,
         struct ir_operand fields;
         struct ir_operand copy = lower_none();
         if (payload == NULL ||
-            (what == WORK_COPY ? !lower_copies_parts(payload)
+            (w.what == WORK_COPY ? !lower_copies_parts(payload)
                                : !sema_needs_teardown(payload))) {
             continue;
         }
@@ -141,10 +160,10 @@ static void each_case(struct lowerer *l, const struct type *t,
                   held, next);
         l->b = held;
         fields = lower_case_address(l, t, at);
-        if (what == WORK_COPY) {
+        if (w.what == WORK_COPY) {
             copy = lower_case_address(l, t, into);
         }
-        work_on(l, payload, fields, copy, from, made_only, what);
+        work_on(l, payload, fields, copy, w);
         ir_jump(l->f, l->b, after);
         l->b = next;
     }
@@ -198,6 +217,7 @@ void lower_destroy_owned(struct lowerer *l, const struct type *t,
                          struct ir_operand at, struct ir_operand from,
                          bool made_only)
 {
+    struct owned_work w = {WORK_DESTROY, from, made_only};
     struct ir_operand args[2];
     struct ir_block *after;
     size_t i;
@@ -225,8 +245,7 @@ void lower_destroy_owned(struct lowerer *l, const struct type *t,
         join(l, after);
         return;
     case TYPE_ARRAY:
-        each_array_element(l, t, at, lower_none(), from, made_only,
-                           WORK_DESTROY);
+        each_array_element(l, t, at, lower_none(), w);
         return;
     case TYPE_FN:
         lower_free_snapshot(l, t, at);
@@ -247,7 +266,7 @@ void lower_destroy_owned(struct lowerer *l, const struct type *t,
         }
         return;
     case TYPE_VARIANT:
-        each_case(l, t, at, lower_none(), from, made_only, WORK_DESTROY);
+        each_case(l, t, at, lower_none(), w);
         return;
     default:
         return;
@@ -273,8 +292,7 @@ void lower_clear_owned(struct lowerer *l, const struct type *t,
         }
         return;
     case TYPE_ARRAY:
-        each_array_element(l, t, at, lower_none(), lower_none(), false,
-                           WORK_CLEAR);
+        each_array_element(l, t, at, lower_none(), plain_work(WORK_CLEAR));
         return;
     case TYPE_STRUCT:
     case TYPE_TUPLE:
@@ -290,7 +308,7 @@ void lower_clear_owned(struct lowerer *l, const struct type *t,
         }
         return;
     case TYPE_VARIANT:
-        each_case(l, t, at, lower_none(), lower_none(), false, WORK_CLEAR);
+        each_case(l, t, at, lower_none(), plain_work(WORK_CLEAR));
         return;
     default:
         return;
@@ -310,8 +328,7 @@ void lower_init_owned(struct lowerer *l, const struct type *t,
 
     switch (t->kind) {
     case TYPE_ARRAY:
-        each_array_element(l, t, at, lower_none(), lower_none(), false,
-                           WORK_INIT);
+        each_array_element(l, t, at, lower_none(), plain_work(WORK_INIT));
         return;
     case TYPE_STRUCT:
     case TYPE_TUPLE:
@@ -367,7 +384,7 @@ void lower_copy_owned(struct lowerer *l, const struct type *t,
         join(l, after);
         return;
     case TYPE_ARRAY:
-        each_array_element(l, t, from, into, lower_none(), false, WORK_COPY);
+        each_array_element(l, t, from, into, plain_work(WORK_COPY));
         return;
     case TYPE_FN:
         if (t->owned) {
@@ -394,7 +411,7 @@ void lower_copy_owned(struct lowerer *l, const struct type *t,
         }
         return;
     case TYPE_VARIANT:
-        each_case(l, t, from, into, lower_none(), false, WORK_COPY);
+        each_case(l, t, from, into, plain_work(WORK_COPY));
         return;
     default:
         return;
@@ -505,8 +522,8 @@ static void destroy_buffer(struct lowerer *l, const struct type *t,
             struct ir_operand count = t->kind == TYPE_SLICE
                                           ? lower_slice_length(l, at, t)
                                           : ir_int_op(IR_I64, 1);
-            each_element(l, element, count, v, lower_none(), from, false,
-                         WORK_DESTROY);
+            struct owned_work w = {WORK_DESTROY, from, false};
+            each_element(l, element, count, v, lower_none(), w);
             join(l, after);
         }
         args[0] = from;
@@ -581,8 +598,7 @@ static void copy_buffer(struct lowerer *l, const struct type *t,
         made = lower_rt_call(l, RT_FN_COPY_BUFFER, args);
         if (lower_copies_parts(element)) {
             struct ir_block *after = when_set(l, made);
-            each_element(l, element, count, v, made, lower_none(), false,
-                         WORK_COPY);
+            each_element(l, element, count, v, made, plain_work(WORK_COPY));
             join(l, after);
         }
     }
