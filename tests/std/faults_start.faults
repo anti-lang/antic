@@ -1,0 +1,10 @@
+# The cases of faults_start.anti: a name, the value of ANTI_FAULT and the
+# variable or the option of the case, see tests/CMakeLists.txt. The
+# runtime takes the first four allocations at the start of every program.
+# The copy of the path of ANTI_CONF takes the fifth. --anti.inject takes
+# the fifth for the name of the option, the sixth for the library and the
+# seventh for the copy of the name.
+conf_path_memory alloc:5:ENOMEM ANTI_CONF=faults-start.toml
+option_memory alloc:5:ENOMEM --anti.inject=anti.log.Logger=libnone
+library_memory alloc:6:ENOMEM --anti.inject=anti.log.Logger=libnone
+where_memory alloc:7:ENOMEM --anti.inject=anti.log.Logger=libnone

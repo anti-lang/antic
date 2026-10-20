@@ -1,0 +1,21 @@
+//! The start of a program when memory runs out. The runtime copies the path
+//! that `ANTI_CONF` names, the name of an option of the command line and the
+//! library of `--anti.inject`, each in memory of the start. Each stops the
+//! program before `main` when the C library gives no memory, by decision 4 of
+//! "Decisions of 2026-10-11". A case of `faults_start.faults` sets the variable
+//! or passes the option and refuses one allocation, through the variable
+//! `ANTI_FAULT` of `src/rt/fault.h`.
+import anti.io;
+import anti.log;
+
+class Holder
+{
+	inject sink: *log.Logger,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	io.println("started");
+	return 0;
+}

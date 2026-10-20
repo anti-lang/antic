@@ -29,6 +29,10 @@
 #             in WORK, which no other case shares
 #   ERRORS    optional file of the whole standard error of the program,
 #             which is otherwise not compared
+#   ENVIRONMENT optional variables NAME=value of the environment of the
+#             program, separated by commas, for a case of FAULT
+#   ARGUMENTS optional arguments of the program after those of the .args
+#             file, separated by commas, for a case of FAULT
 #
 # The expected file starts with the line "exit N", the process exit code,
 # or the line "abort" for a program that the failure routine of the
@@ -89,6 +93,10 @@ set(program_args "")
 if(EXISTS "${dir}/${name}.args")
     file(STRINGS "${dir}/${name}.args" program_args ENCODING UTF-8)
 endif()
+if(DEFINED ARGUMENTS AND NOT ARGUMENTS STREQUAL "")
+    string(REPLACE "," ";" arguments "${ARGUMENTS}")
+    list(APPEND program_args ${arguments})
+endif()
 set(runner "${CMAKE_COMMAND}" -E env)
 if(DEFINED UNSET AND NOT UNSET STREQUAL "")
     string(REPLACE "," ";" unset_names "${UNSET}")
@@ -96,14 +104,21 @@ if(DEFINED UNSET AND NOT UNSET STREQUAL "")
         list(APPEND runner "--unset=${name}")
     endforeach()
 endif()
-# DESIGN: the variable of a fault reaches the program from the
-# environment of this script, set after the build. `cmake -E env` would
+# DESIGN: the variable of a fault and the variables of its case reach the
+# program from the environment of this script, set after the build. `cmake -E env` would
 # report an abort of the program as a status of its own, 1, and a case of
 # memory that runs out expects the abort.
 set(directory "")
 if(DEFINED FAULT AND NOT FAULT STREQUAL "")
     set(ENV{ANTI_FAULT} "${FAULT}")
     set(directory IN "${WORK}")
+    if(DEFINED ENVIRONMENT AND NOT ENVIRONMENT STREQUAL "")
+        string(REPLACE "," ";" variables "${ENVIRONMENT}")
+        foreach(variable IN LISTS variables)
+            string(REGEX MATCH "^([^=]+)=(.*)$" matched "${variable}")
+            set(ENV{${CMAKE_MATCH_1}} "${CMAKE_MATCH_2}")
+        endforeach()
+    endif()
 endif()
 if(runner STREQUAL "${CMAKE_COMMAND};-E;env")
     set(runner "")

@@ -1164,12 +1164,16 @@ endforeach()
 # <name>.<case>.err, which a case whose program writes nothing there
 # leaves out. A tree of ANTIC_FAULTS alone builds the runtime, see
 # tools/faults.cmake. The program builds with --lto none, since the
-# runtime of runtime-faults/ is no bitcode. A line that ends in ` dev`
-# builds the program in dev mode instead, linked with the dev objects of
-# the modules of the standard library it imports, as a program of
-# tests/matrix is:
+# runtime of runtime-faults/ is no bitcode. The words after the value
+# change the run of a case. `dev` builds the program in dev mode instead,
+# linked with the dev objects of the modules of the standard library it
+# imports, as a program of tests/matrix is. A word NAME=value sets a
+# variable of the environment of the program, and a word that starts with
+# `--` is an argument of the program after those of <name>.args:
 #
 #   order_memory alloc:5:ENOMEM dev
+#   conf_path_memory alloc:5:ENOMEM ANTI_CONF=none.toml
+#   option_memory alloc:5:ENOMEM --anti.threads=2
 if(ANTIC_FAULTS)
     foreach(kind programs std)
         set(prefix ${kind})
@@ -1184,16 +1188,34 @@ if(ANTIC_FAULTS)
             foreach(line IN LISTS cases)
                 set(entry "[a-z]+:[0-9]+:[A-Z]+")
                 if(NOT line MATCHES
-                   "^([a-z0-9_]+) (${entry}(,${entry})*)( dev)?$")
+                   "^([a-z0-9_]+) (${entry}(,${entry})*)(( [^ ,]+)*)$")
                     message(FATAL_ERROR "${list}: `${line}` is no "
                                         "<case> <kind>:<n>:<error>")
                 endif()
                 set(case "${CMAKE_MATCH_1}")
                 set(fault "${CMAKE_MATCH_2}")
+                string(REGEX MATCHALL "[^ ]+" words "${CMAKE_MATCH_4}")
                 set(options "--lto,none")
                 set(objects "")
                 set(fixtures "")
-                if(CMAKE_MATCH_4)
+                set(dev OFF)
+                set(environment "")
+                set(arguments "")
+                foreach(word IN LISTS words)
+                    if(word STREQUAL "dev")
+                        set(dev ON)
+                    elseif(word MATCHES "^[A-Z_]+=")
+                        list(APPEND environment "${word}")
+                    elseif(word MATCHES "^--")
+                        list(APPEND arguments "${word}")
+                    else()
+                        message(FATAL_ERROR "${list}: `${word}` is no dev, "
+                                            "NAME=value or --argument")
+                    endif()
+                endforeach()
+                list(JOIN environment "," environment)
+                list(JOIN arguments "," arguments)
+                if(dev)
                     set(source "${CMAKE_CURRENT_SOURCE_DIR}/${kind}/${name}.anti")
                     set_property(DIRECTORY APPEND PROPERTY
                                  CMAKE_CONFIGURE_DEPENDS "${source}")
@@ -1219,6 +1241,8 @@ if(ANTIC_FAULTS)
                         "-DOBJECTS=${objects}"
                         "-DEXPECTED=${base}.expected"
                         "-DFAULT=${fault}"
+                        "-DENVIRONMENT=${environment}"
+                        "-DARGUMENTS=${arguments}"
                         ${errors}
                         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/faults/${name}-${case}"
                         -P "${ANTIC_RUNNERS}/run_program.cmake")
