@@ -1,5 +1,6 @@
 //! A host that loads the library its first argument names, asks it for a
-//! `Greeter` and closes it. A class of the host inherits the interface as well,
+//! `Greeter` and closes it, which it refuses while two objects of the library
+//! and then one are alive. A class of the host inherits the interface as well,
 //! so a release build sees one table of `Greeter` and must still call the
 //! library's function on the library's object.
 
@@ -51,6 +52,14 @@ fn main(args: []str) -> int
 	io.println(built);
 	free(built.ptr);
 	delete(made);
+	let second = lib.instance(greet.Greeter) catch fatal;
+	let both = f"{lib.live()} alive";
+	io.println(both);
+	free(both.ptr);
+	lib.unload() catch e {
+		io.println(e.message);
+	};
+	delete(second);
 	let alive = f"{lib.live()} alive";
 	io.println(alive);
 	free(alive.ptr);
