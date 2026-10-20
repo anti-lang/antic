@@ -49,18 +49,25 @@ bool antl_starts(const uint8_t *data, size_t size);
 bool antl_header(const uint8_t *data, size_t size, struct arena *arena,
                  struct interface *out, char *error, size_t error_size);
 
-/* Read a library file. Its types go into types, and its functions and
-   globals are appended to program. libraries holds the interfaces read
-   before, which include every import of the file. The interface, its
-   types and its names lie in the memory pool of the caller, which frees
-   them.
+/* What the read of a library file reads against and writes into.
+   libraries holds the interfaces read before, which include every import
+   of the file. The file's types go into types, and its functions and
+   globals are appended to program. The interface, its types and its
+   names lie in arena, the memory pool of the caller, which frees them. */
+struct antl_context {
+    const struct interface *const *libraries;
+    size_t library_count;
+    struct types *types;
+    struct arena *arena;
+    struct ir_module *program;
+};
+
+/* Read the size bytes at data, a library file, against in.
    Returns NULL and writes a message to error when the file cannot be
-   used. program may then hold records of the file read before the
-   failure, and the caller stops using it. */
+   used. The program of in may then hold records of the file read before
+   the failure, and the caller stops using it. */
 struct interface *antl_read(const uint8_t *data, size_t size,
-                            const struct interface *const *libraries,
-                            size_t library_count, struct types *types,
-                            struct arena *arena, struct ir_module *program,
-                            char *error, size_t error_size);
+                            const struct antl_context *in, char *error,
+                            size_t error_size);
 
 #endif

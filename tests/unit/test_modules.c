@@ -425,8 +425,8 @@ static void round_trip(void)
 
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "vec");
-    vec = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
-                    &b.types, &b.arena, &program, error, sizeof error);
+    vec = compilation_read(&b, (const uint8_t *)first.data, first.length,
+                           &program, error, sizeof error);
     CHECK_STR(error, "");
     CHECK(vec != NULL);
     if (vec != NULL) {
@@ -502,8 +502,8 @@ static void round_trip_class(void)
                   &first);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "boxes");
-    iface = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
-                      &b.types, &b.arena, &program, error, sizeof error);
+    iface = compilation_read(&b, (const uint8_t *)first.data, first.length,
+                             &program, error, sizeof error);
     CHECK_STR(error, "");
     CHECK(iface != NULL);
     if (iface != NULL) {
@@ -543,8 +543,8 @@ static void keeps_symbolic_sizes(void)
                   &first);
     compilation_open(&b);
     ir_module_init(&reread, &b.arena, "sized");
-    sized = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
-                      &b.types, &b.arena, &reread, error, sizeof error);
+    sized = compilation_read(&b, (const uint8_t *)first.data, first.length,
+                             &reread, error, sizeof error);
     CHECK_STR(error, "");
     if (sized != NULL) {
         antl_write(&second, sized, &reread, false);
@@ -623,8 +623,8 @@ static void unique_exports(void)
                   "module `geo`");
     }
     ir_module_init(&program, &a.arena, "main");
-    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &a.types, &a.arena, &program, error, sizeof error) != NULL);
+    CHECK(compilation_read(&a, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error) != NULL);
     CHECK(program.function_count == 1 && program.functions[0]->exported);
     ir_module_free(&program);
     text_free(&bytes);
@@ -865,8 +865,8 @@ static void package_and_docs(void)
     CHECK(header.package.attribution_count == 2);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    read = antl_read((const uint8_t *)lines.data, lines.length, NULL, 0,
-                     &b.types, &b.arena, &program, error, sizeof error);
+    read = compilation_read(&b, (const uint8_t *)lines.data, lines.length,
+                            &program, error, sizeof error);
     CHECK_STR(error, "");
     if (read != NULL) {
         CHECK_STR(read->doc, "Plane geometry.");
@@ -911,8 +911,8 @@ static void private_field_docs(void)
                NULL, false, &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                     &b.types, &b.arena, &program, error, sizeof error);
+    read = compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                            &program, error, sizeof error);
     CHECK_STR(error, "");
     CHECK(read != NULL && read->item_count == 1);
     if (read != NULL && read->item_count == 1) {
@@ -945,9 +945,8 @@ static void keeps_extensions(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "narrow");
-    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &b.types, &b.arena, &program, error,
-                    sizeof error) != NULL);
+    CHECK(compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error) != NULL);
     CHECK_STR(error, "");
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
@@ -1002,8 +1001,8 @@ static void keeps_access_types(void)
                   &first);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "geo");
-    read = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
-                     &b.types, &b.arena, &program, error, sizeof error);
+    read = compilation_read(&b, (const uint8_t *)first.data, first.length,
+                            &program, error, sizeof error);
     CHECK_STR(error, "");
     CHECK(read != NULL);
     if (read != NULL) {
@@ -1055,9 +1054,8 @@ static void keeps_effects(void)
                   &mine);
     compilation_open(&c);
     ir_module_init(&program, &c.arena, "main");
-    CHECK(antl_read((const uint8_t *)same.data, same.length, NULL, 0,
-                    &c.types, &c.arena, &program, error,
-                    sizeof error) != NULL);
+    CHECK(compilation_read(&c, (const uint8_t *)same.data, same.length,
+                           &program, error, sizeof error) != NULL);
     CHECK_STR(error, "");
     f = c_function(&program, "anti_rt_same_bytes");
     CHECK(f != NULL);
@@ -1069,9 +1067,8 @@ static void keeps_effects(void)
     CHECK(strstr(text_cstr(&ir),
                  "extern fn anti_rt_same_bytes(ptr, i64, ptr, i64) -> i32 "
                  "effects reads willreturn nosync nofree\n") != NULL);
-    CHECK(antl_read((const uint8_t *)mine.data, mine.length, NULL, 0,
-                    &c.types, &c.arena, &program, error,
-                    sizeof error) != NULL);
+    CHECK(compilation_read(&c, (const uint8_t *)mine.data, mine.length,
+                           &program, error, sizeof error) != NULL);
     CHECK_STR(error, "");
     f = c_function(&program, "anti_rt_same_bytes");
     CHECK(f != NULL);
@@ -1109,9 +1106,9 @@ static void keeps_literals(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    compilation_add(&b, antl_read((const uint8_t *)bytes.data, bytes.length,
-                                  NULL, 0, &b.types, &b.arena, &program, error,
-                                  sizeof error));
+    compilation_add(&b, compilation_read(&b, (const uint8_t *)bytes.data,
+                                         bytes.length, &program, error,
+                                         sizeof error));
     CHECK_STR(error, "");
     module = compilation_check(&b, "main",
                                "import words;\n"
@@ -1189,9 +1186,9 @@ static void keeps_constants(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    compilation_add(&b, antl_read((const uint8_t *)bytes.data, bytes.length,
-                                  NULL, 0, &b.types, &b.arena, &program, error,
-                                  sizeof error));
+    compilation_add(&b, compilation_read(&b, (const uint8_t *)bytes.data,
+                                         bytes.length, &program, error,
+                                         sizeof error));
     CHECK_STR(error, "");
     module = compilation_check(&b, "main",
                                "import pair;\n"
@@ -1233,9 +1230,9 @@ static void keeps_halves(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    compilation_add(&b, antl_read((const uint8_t *)bytes.data, bytes.length,
-                                  NULL, 0, &b.types, &b.arena, &program, error,
-                                  sizeof error));
+    compilation_add(&b, compilation_read(&b, (const uint8_t *)bytes.data,
+                                         bytes.length, &program, error,
+                                         sizeof error));
     CHECK_STR(error, "");
     module = compilation_check(&b, "main",
                                "import tone;\n"
@@ -1282,9 +1279,8 @@ static void keeps_extern_aggregates(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "wrap");
-    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &b.types, &b.arena, &program, error,
-                    sizeof error) != NULL);
+    CHECK(compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error) != NULL);
     CHECK_STR(error, "");
     CHECK(program.function_count == 2 &&
           program.functions[0]->result_agg != IR_NO_AGG);
@@ -1329,8 +1325,8 @@ static void keeps_context_signatures(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "calls");
-    lib = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &b.types, &b.arena, &program, error, sizeof error);
+    lib = compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error);
     CHECK(lib != NULL);
     CHECK_STR(error, "");
     if (lib != NULL && lib->item_count == 1 &&
@@ -1378,9 +1374,8 @@ static void keeps_signatures(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "calls");
-    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &b.types, &b.arena, &program, error,
-                    sizeof error) != NULL);
+    CHECK(compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error) != NULL);
     CHECK_STR(error, "");
     ir_print(&ir, &program);
     CHECK_STR(text_cstr(&ir),
@@ -1450,8 +1445,8 @@ static void keeps_generic_marks(void)
                   &bytes);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "marks");
-    lib = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &b.types, &b.arena, &program, error, sizeof error);
+    lib = compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error);
     CHECK(lib != NULL);
     CHECK_STR(error, "");
     eq = generic_of(lib, "eq");
@@ -1488,6 +1483,7 @@ static void dependencies(void)
     struct text ir = {0};
     struct ir_module program;
     const struct interface *libs[2];
+    struct antl_context with_vec;
     char error[160] = "";
 
     compilation_open(&a);
@@ -1496,17 +1492,21 @@ static void dependencies(void)
 
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "main");
-    CHECK(antl_read((const uint8_t *)shapes_bytes.data, shapes_bytes.length,
-                    NULL, 0, &b.types, &b.arena, &program, error,
-                    sizeof error) == NULL);
+    CHECK(compilation_read(&b, (const uint8_t *)shapes_bytes.data,
+                           shapes_bytes.length, &program, error,
+                           sizeof error) == NULL);
     CHECK_STR(error, "needs module `vec`");
-    libs[0] = antl_read((const uint8_t *)vec_bytes.data, vec_bytes.length,
-                        NULL, 0, &b.types, &b.arena, &program, error,
-                        sizeof error);
+    libs[0] = compilation_read(&b, (const uint8_t *)vec_bytes.data,
+                               vec_bytes.length, &program, error,
+                               sizeof error);
     CHECK(libs[0] != NULL);
+    with_vec.libraries = libs;
+    with_vec.library_count = 1;
+    with_vec.types = &b.types;
+    with_vec.arena = &b.arena;
+    with_vec.program = &program;
     libs[1] = antl_read((const uint8_t *)shapes_bytes.data,
-                        shapes_bytes.length, libs, 1, &b.types, &b.arena,
-                        &program, error, sizeof error);
+                        shapes_bytes.length, &with_vec, error, sizeof error);
     CHECK(libs[1] != NULL);
     if (libs[0] != NULL && libs[1] != NULL) {
         const struct type *v2 = libs[0]->items[0]->type;
@@ -1584,8 +1584,8 @@ static void refuses_file(const uint8_t *data, size_t size,
 
     compilation_open(&s);
     ir_module_init(&program, &s.arena, "main");
-    CHECK(antl_read(data, size, NULL, 0, &s.types, &s.arena, &program, error,
-                    sizeof error) == NULL);
+    CHECK(compilation_read(&s, data, size, &program, error,
+                           sizeof error) == NULL);
     if (expected != NULL) {
         CHECK_STR(error, expected);
     } else {
@@ -1761,8 +1761,8 @@ static bool reads_file(const struct text *bytes)
 
     compilation_open(&s);
     ir_module_init(&program, &s.arena, "main");
-    ok = antl_read((const uint8_t *)bytes->data, bytes->length, NULL, 0, &s.types, &s.arena,
-                   &program, error, sizeof error) != NULL;
+    ok = compilation_read(&s, (const uint8_t *)bytes->data, bytes->length,
+                          &program, error, sizeof error) != NULL;
     if (!ok) {
         fprintf(stderr, "  %s\n", error);
     }
@@ -1828,8 +1828,8 @@ static void class_literal_defaults(void)
     CHECK(at != SIZE_MAX);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "boxes");
-    iface = antl_read((const uint8_t *)first.data, first.length, NULL, 0,
-                      &b.types, &b.arena, &program, error, sizeof error);
+    iface = compilation_read(&b, (const uint8_t *)first.data, first.length,
+                             &program, error, sizeof error);
     CHECK_STR(error, "");
     CHECK(iface != NULL);
     if (iface != NULL) {
@@ -2014,8 +2014,8 @@ static bool verifies_file(const uint8_t *data, size_t size)
 
     compilation_open(&s);
     ir_module_init(&program, &s.arena, "main");
-    ok = antl_read(data, size, NULL, 0, &s.types, &s.arena, &program, error,
-                   sizeof error) != NULL &&
+    ok = compilation_read(&s, data, size, &program, error,
+                          sizeof error) != NULL &&
          ir_verify(&program, &errors);
     text_free(&errors);
     ir_module_free(&program);
@@ -2237,8 +2237,8 @@ static const struct type *field_type_of(const struct text *bytes,
     size_t j;
 
     ir_module_init(&program, &s->arena, "main");
-    iface = antl_read((const uint8_t *)bytes->data, bytes->length, NULL, 0,
-                      &s->types, &s->arena, &program, error, sizeof error);
+    iface = compilation_read(s, (const uint8_t *)bytes->data, bytes->length,
+                             &program, error, sizeof error);
     for (i = 0; iface != NULL && i < iface->item_count; i++) {
         const struct type *t = iface->items[i]->type;
         if (iface->items[i]->kind != SYMBOL_STRUCT ||
@@ -2321,9 +2321,8 @@ static void damaged_constants(void)
        aggregate. */
     compilation_open(&r);
     ir_module_init(&program, &r.arena, "main");
-    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &r.types, &r.arena, &program, error,
-                    sizeof error) != NULL);
+    CHECK(compilation_read(&r, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error) != NULL);
     g = valued_global(&program);
     CHECK(g != NULL);
     if (g != NULL) {
@@ -2527,8 +2526,8 @@ static void declared_types(void)
     }
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "decl");
-    read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                     &b.types, &b.arena, &program, error, sizeof error);
+    read = compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                            &program, error, sizeof error);
     CHECK_STR(error, "");
     every = item_of(read, "every");
     guarded = item_of(read, "Guarded");
@@ -2640,9 +2639,8 @@ static void keeps_classes(void)
           NULL);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "");
-    CHECK(antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                    &b.types, &b.arena, &program, error,
-                    sizeof error) != NULL);
+    CHECK(compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                           &program, error, sizeof error) != NULL);
     CHECK_STR(error, "");
     ir_print(&after, &program);
     CHECK_STR(text_cstr(&after), text_cstr(&before));
@@ -2999,8 +2997,8 @@ static void copy_depths(void)
     written = param_of(a.libraries[0], "deep");
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "boxes");
-    read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                     &b.types, &b.arena, &program, error, sizeof error);
+    read = compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,
+                            &program, error, sizeof error);
     CHECK_STR(error, "");
     got = param_of(read, "deep");
     CHECK(written != NULL && written->depth == 3);
@@ -3139,8 +3137,7 @@ static bool read_and_write(const uint8_t *bytes, size_t length,
 
     compilation_open(&s);
     ir_module_init(&program, &s.arena, name);
-    read = antl_read(bytes, length, NULL, 0, &s.types, &s.arena, &program,
-                     error, sizeof error);
+    read = compilation_read(&s, bytes, length, &program, error, sizeof error);
     out->length = 0;
     if (read != NULL) {
         antl_write(out, read, &program, false);
@@ -3665,8 +3662,8 @@ static void signed_numbers(void)
     compilation_open(&s);
     if (build_library(&s, "tt", tree_source, &bytes)) {
         ir_module_init(&program, &s.arena, "main");
-        read = antl_read((const uint8_t *)bytes.data, bytes.length, NULL, 0,
-                         &s.types, &s.arena, &program, error, sizeof error);
+        read = compilation_read(&s, (const uint8_t *)bytes.data, bytes.length,
+                                &program, error, sizeof error);
         CHECK(read != NULL);
         for (i = 0; read != NULL && i < read->generic_count; i++) {
             const struct item *it = read->generics[i];

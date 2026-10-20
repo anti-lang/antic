@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "antic.h"
+#include "antl.h"
 #include "check.h"
 #include "lower.h"
 #include "optimize.h"
@@ -260,6 +261,21 @@ void compilation_add(struct compilation *c, const struct interface *iface)
         return;
     }
     c->libraries[c->library_count++] = iface;
+}
+
+struct interface *compilation_read(struct compilation *c,
+                                   const uint8_t *data, size_t size,
+                                   struct ir_module *program, char *error,
+                                   size_t error_size)
+{
+    struct antl_context in;
+
+    in.libraries = NULL;
+    in.library_count = 0;
+    in.types = &c->types;
+    in.arena = &c->arena;
+    in.program = program;
+    return antl_read(data, size, &in, error, error_size);
 }
 
 /* Whether the call in calls the runtime with the text of a failed check,

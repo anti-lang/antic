@@ -67,6 +67,7 @@ static void load_library(struct program *p, const char *name,
     struct interface iface;
     struct text bytes = {0};
     struct module *module;
+    struct antl_context in;
     char error[160] = "";
 
     ir_module_init(&ir, &p->front.arena, name);
@@ -74,11 +75,14 @@ static void load_library(struct program *p, const char *name,
     if (module != NULL) {
         sema_interface(module, name, &p->front.arena, &iface);
         antl_write(&bytes, &iface, &ir, false);
+        in.libraries = p->front.libraries;
+        in.library_count = p->front.library_count;
+        in.types = &p->front.types;
+        in.arena = &p->front.arena;
+        in.program = &p->ir;
         compilation_add(&p->front,
                         antl_read((const uint8_t *)bytes.data, bytes.length,
-                                  p->front.libraries, p->front.library_count,
-                                  &p->front.types, &p->front.arena, &p->ir,
-                                  error, sizeof error));
+                                  &in, error, sizeof error));
         CHECK_STR(error, "");
     }
     text_free(&bytes);

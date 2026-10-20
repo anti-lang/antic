@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "arena.h"
 #include "ast.h"
@@ -150,6 +151,15 @@ struct module *compilation_check(struct compilation *c, const char *name,
 /* Add iface to the libraries of c. A library past COMPILATION_MODULES
    counts a failure and is dropped. */
 void compilation_add(struct compilation *c, const struct interface *iface);
+
+/* Read the library file of the size bytes at data with antl_read against
+   no library, into the types and the memory pool of c. Its functions and
+   globals are appended to program. Gives the interface, or NULL with the
+   message in error. */
+struct interface *compilation_read(struct compilation *c,
+                                   const uint8_t *data, size_t size,
+                                   struct ir_module *program, char *error,
+                                   size_t error_size);
 
 /* Append the IR of m to out as ir_print does, without the lines of the
    types the runtime declares, which start with "type anti.rt.", and

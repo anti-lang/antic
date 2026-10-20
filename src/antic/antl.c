@@ -139,10 +139,8 @@ bool antl_header(const uint8_t *data, size_t size, struct arena *arena,
 }
 
 struct interface *antl_read(const uint8_t *data, size_t size,
-                            const struct interface *const *libraries,
-                            size_t library_count, struct types *types,
-                            struct arena *arena, struct ir_module *program,
-                            char *error, size_t error_size)
+                            const struct antl_context *in, char *error,
+                            size_t error_size)
 {
     struct reader r;
     size_t i;
@@ -152,11 +150,11 @@ struct interface *antl_read(const uint8_t *data, size_t size,
     r.size = size;
     r.error = error;
     r.error_size = error_size;
-    r.arena = arena;
-    r.types = types;
-    r.libraries = libraries;
-    r.library_count = library_count;
-    r.iface = arena_alloc(arena, sizeof *r.iface);
+    r.arena = in->arena;
+    r.types = in->types;
+    r.libraries = in->libraries;
+    r.library_count = in->library_count;
+    r.iface = arena_alloc(in->arena, sizeof *r.iface);
     read_header(&r, r.iface);
     for (i = 0; i < r.iface->import_count && !r.failed; i++) {
         struct name imported;
@@ -177,7 +175,7 @@ struct interface *antl_read(const uint8_t *data, size_t size,
         antl_read_generics(&r);
     }
     if (!r.failed) {
-        antl_read_ir(&r, program);
+        antl_read_ir(&r, in->program);
     }
     if (!r.failed && r.pos != r.size) {
         antl_damaged(&r);

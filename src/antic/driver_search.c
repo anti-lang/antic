@@ -320,7 +320,12 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
     size_t k;
     char error[200];
     bool ok = true;
+    struct antl_context into;
 
+    into.libraries = out;
+    into.types = types;
+    into.arena = arena;
+    into.program = program;
     for (i = 0; i < n && ok; i++) {
         ok = driver_read_bytes(paths->items[i], &files[i]);
         if (ok && !antl_header((const uint8_t *)files[i].data,
@@ -358,9 +363,10 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
             if (!ready) {
                 continue;
             }
+            into.library_count = count;
             out[count] = antl_read((const uint8_t *)files[i].data,
-                                   files[i].length, out, count, types, arena,
-                                   program, error, sizeof error);
+                                   files[i].length, &into, error,
+                                   sizeof error);
             if (out[count] == NULL) {
                 say_antic("%s %s\n", paths->items[i], error);
                 ok = false;
