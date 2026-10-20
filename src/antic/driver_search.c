@@ -270,6 +270,37 @@ static void cycle(const struct module *tree, const char *input,
               path, module);
 }
 
+/* No file of paths could load in the last round. Report the first import
+   that no file provides, or else the cycle that blocks the files left. */
+static void report_blocked(const struct paths *paths,
+                           const struct interface *headers, const bool *loaded,
+                           const char *module, const struct module *tree,
+                           const char *input)
+{
+    size_t i;
+    size_t j;
+    size_t k;
+
+    for (i = 0; i < paths->count; i++) {
+        for (j = 0; j < headers[i].import_count && !loaded[i]; j++) {
+            const char *name = headers[i].imports[j];
+            bool provided = false;
+            if (strcmp(name, module) == 0) {
+                cycle(tree, input, paths->items[i], headers[i].module, module);
+                return;
+            }
+            for (k = 0; k < paths->count && !provided; k++) {
+                provided = strcmp(headers[k].module, name) == 0;
+            }
+            if (!provided) {
+                say_antic("%s needs module `%s`\n", paths->items[i], name);
+                return;
+            }
+        }
+    }
+    say_antic("the library files import each other in a cycle\n");
+}
+
 /* Read the library files and load each after the libraries it imports,
    whatever the order on the command line. The interfaces go to out in
    load order. */
@@ -339,34 +370,8 @@ bool driver_load_libraries(const struct paths *paths, const char *module,
             }
         }
         if (ok && count == before) {
-            /* Report the first import that no file provides, or else the
-               cycle that blocks the remaining files. */
-            for (i = 0; i < n && ok; i++) {
-                for (j = 0; j < headers[i].import_count && !loaded[i]; j++) {
-                    bool provided = false;
-                    if (strcmp(headers[i].imports[j], module) == 0) {
-                        cycle(tree, input, paths->items[i],
-                              headers[i].module, module);
-                        ok = false;
-                        break;
-                    }
-                    for (k = 0; k < n && !provided; k++) {
-                        provided = strcmp(headers[k].module,
-                                          headers[i].imports[j]) == 0;
-                    }
-                    if (!provided) {
-                        say_antic("%s needs module `%s`\n",
-                                  paths->items[i], headers[i].imports[j]);
-                        ok = false;
-                        break;
-                    }
-                }
-            }
-            if (ok) {
-                say_antic("the library files import each other in a "
-                          "cycle\n");
-                ok = false;
-            }
+            report_blocked(paths, headers, loaded, module, tree, input);
+            ok = false;
         }
     }
     for (i = 0; i < n; i++) {
