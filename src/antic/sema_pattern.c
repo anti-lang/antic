@@ -361,6 +361,205 @@ static int64_t patch_group(struct checker *c, const struct expr *literal,
     return group == 0 ? count : group;
 }
 
+/* The arguments of a `patch` call after their check. offset and limit
+   hold the default 0 when the call leaves them out. A text into stands in
+   name, and into is then absent. fixed says that with, find and offset
+   are all literals. */
+struct patch_args {
+    struct expr *find;
+    struct expr *with;
+    struct expr *into;
+    struct expr *name;
+    struct expr *offset;
+    struct expr *limit;
+    bool pattern;
+    bool fixed;
+};
+
+/* Checks the arguments of the `patch` call e into a. */
+static bool check_patch_args(struct checker *c, struct expr *e,
+                             struct patch_args *a)
+{
+    size_t given = e->as.call.arg_count;
+    struct type *bytes = types_slice(c->types, sema_builtin(c, TYPE_U8));
+    struct type *word = sema_builtin(c, TYPE_I64);
+    struct type *t;
+    bool ok = true;
+
+    a->find = e->as.call.args[0];
+    a->with = e->as.call.args[1];
+    a->into = given > 2 ? e->as.call.args[2] : NULL;
+    a->offset = given > 3 ? e->as.call.args[3] : int_literal(c, e->pos, 0);
+    a->limit = given > 4 ? e->as.call.args[4] : int_literal(c, e->pos, 0);
+    if (a->find->kind == EXPR_PATTERN) {
+        t = sema_check_expr(c, a->find, types_byte_regex(c->types));
+    } else {
+        t = sema_check_expr(c, a->find, NULL);
+    }
+    if (sema_is_error(t)) {
+        return false;
+    }
+    a->pattern = types_is_regex(t);
+    if (a->pattern &&
+        !sema_require(c, a->find, t, types_byte_regex(c->types))) {
+        return false;
+    }
+    if (!a->pattern && !is_byte_slice(t)) {
+        sema_error_at(c, a->find->pos, "`" METHOD_PATCH "` finds a `[]byte` "
+                      "or a `" LANG_BYTE_REGEX "`, found `%s`", sema_tn(t));
+        return false;
+    }
+    ok = check_arg(c, a->with, bytes);
+    a->name = text_literal(c, e->pos, "", 0);
+    if (a->into != NULL) {
+        t = sema_check_expr(c, a->into, word);
+        if (sema_is_error(t)) {
+            ok = false;
+        } else if (a->pattern && t->kind == TYPE_STR) {
+            a->name = a->into;
+            a->into = NULL;
+        } else if (!sema_require(c, a->into, t, word)) {
+            ok = false;
+        } else if (!a->pattern && (a->into->kind != EXPR_INT ||
+                                   a->into->as.integer != 0)) {
+            sema_error_at(c, a->into->pos, "`into` names a group of a "
+                          "pattern, and a byte sequence has none, so it is 0");
+            ok = false;
+        }
+    }
+    ok = check_arg(c, a->offset, word) && ok;
+    ok = check_arg(c, a->limit, word) && ok;
+    a->fixed = a->with->kind == EXPR_BYTES && a->offset->kind == EXPR_INT &&
+               (a->find->kind == EXPR_PATTERN || a->find->kind == EXPR_BYTES);
+    return ok;
+}
+
+/* The `patch` call e whose find is a `[]byte`, a call of `patch_bytes`
+   or, when every argument it checks is a literal and with fits, of
+   `patch_bytes_fixed`. */
+static bool patch_bytes_call(struct checker *c, struct expr *e,
+                             const struct patch_args *a)
+{
+    struct expr *field = e->as.call.callee;
+    struct expr **args;
+    struct symbol *f;
+
+    if (a->fixed && a->offset->as.integer + a->with->as.text.length >
+                        a->find->as.text.length) {
+        sema_error_at(c, a->with->pos, "`with` of %zu byte%s at offset %llu "
+                      "does not fit the %zu byte%s of `find`",
+                      a->with->as.text.length,
+                      a->with->as.text.length == 1 ? "" : "s",
+                      (unsigned long long)a->offset->as.integer,
+                      a->find->as.text.length,
+                      a->find->as.text.length == 1 ? "" : "s");
+        return false;
+    }
+    f = regex_function(c, field->pos, "data." METHOD_PATCH,
+                       a->fixed ? "patch_bytes_fixed" : "patch_bytes", 5);
+    if (f == NULL) {
+        return false;
+    }
+    args = types_alloc_array(c->arena, 5, sizeof *args);
+    args[0] = field->as.field.base;
+    args[1] = a->find;
+    args[2] = a->with;
+    args[3] = a->offset;
+    args[4] = a->limit;
+    return call_of(c, e, f, args, 5);
+}
+
+/* Writes the group of a pattern literal find into a when into is absent
+   or a literal, and checks that a literal with fits the fewest bytes the
+   group matches. fixed then stays set. False after an error. */
+static bool patch_literal_group(struct checker *c, struct expr *e,
+                                struct patch_args *a)
+{
+    bool known = a->name->kind == EXPR_STRING &&
+                 (a->into == NULL || a->into->kind == EXPR_INT);
+    int64_t group = -1;
+    int64_t least;
+
+    a->fixed = a->fixed && known;
+    if (known) {
+        group = patch_group(c, a->find, a->name->as.text.length > 0
+                                            ? a->name
+                                            : a->into,
+                            e->pos);
+        if (group < 0) {
+            return false;
+        }
+        a->into = int_literal(c, e->pos, (uint64_t)group);
+        a->name = text_literal(c, e->pos, "", 0);
+    }
+    if (!a->fixed) {
+        return true;
+    }
+    least = pattern_least_bytes(a->find->as.text.bytes,
+                                a->find->as.text.length, group);
+    if (a->offset->as.integer + a->with->as.text.length <= (uint64_t)least) {
+        return true;
+    }
+    if (group == 0) {
+        sema_error_at(c, a->with->pos, "`with` of %zu byte%s at offset %llu "
+                      "does not fit the match, which can be %lld byte%s long",
+                      a->with->as.text.length,
+                      a->with->as.text.length == 1 ? "" : "s",
+                      (unsigned long long)a->offset->as.integer,
+                      (long long)least, least == 1 ? "" : "s");
+    } else {
+        sema_error_at(c, a->with->pos, "`with` of %zu byte%s at offset %llu "
+                      "does not fit group %lld of the pattern, which can be "
+                      "%lld byte%s long",
+                      a->with->as.text.length,
+                      a->with->as.text.length == 1 ? "" : "s",
+                      (unsigned long long)a->offset->as.integer,
+                      (long long)group, (long long)least,
+                      least == 1 ? "" : "s");
+    }
+    return false;
+}
+
+/* The `patch` call e whose find is a `ByteRegex`, a call of `patch`, or
+   for a pattern literal of `patch_fixed` or `patch_literal`. */
+static bool patch_pattern_call(struct checker *c, struct expr *e,
+                               struct patch_args *a)
+{
+    struct expr *field = e->as.call.callee;
+    bool literal = a->find->kind == EXPR_PATTERN;
+    struct expr **args;
+    struct symbol *f;
+    size_t i = 0;
+
+    if (literal && !patch_literal_group(c, e, a)) {
+        return false;
+    }
+    if (a->into == NULL) {
+        a->into = int_literal(c, e->pos, 0);
+    }
+    f = regex_function(c, field->pos, "data." METHOD_PATCH,
+                       !literal   ? "patch"
+                       : a->fixed ? "patch_fixed"
+                                  : "patch_literal",
+                       literal ? 8 : 7);
+    if (f == NULL) {
+        return false;
+    }
+    args = types_alloc_array(c->arena, 8, sizeof *args);
+    args[i++] = field->as.field.base;
+    args[i++] = a->find;
+    if (literal) {
+        args[i++] = text_literal(c, a->find->pos, a->find->as.text.bytes,
+                                 a->find->as.text.length);
+    }
+    args[i++] = a->with;
+    args[i++] = a->into;
+    args[i++] = a->name;
+    args[i++] = a->offset;
+    args[i++] = a->limit;
+    return call_of(c, e, f, args, i);
+}
+
 /* DESIGN: `data.patch(find, with, into, at, limit)` is a call of a
    function of `anti.regex` with the data first, and every argument the
    call leaves out written as its default, 0. A `[]byte` find calls
@@ -374,169 +573,19 @@ static int64_t patch_group(struct checker *c, const struct expr *literal,
    and that is what with must fit. */
 static bool patch_call(struct checker *c, struct expr *e)
 {
-    struct expr *field = e->as.call.callee;
     size_t given = e->as.call.arg_count;
-    struct type *bytes = types_slice(c->types, sema_builtin(c, TYPE_U8));
-    struct type *word = sema_builtin(c, TYPE_I64);
-    struct expr *find;
-    struct expr *with;
-    struct expr *into;
-    struct expr *offset;
-    struct expr *limit;
-    struct expr *name;
-    struct expr **args;
-    struct type *t;
-    struct symbol *f;
-    bool fixed;
-    bool pattern;
-    size_t i;
-    bool ok = true;
+    struct patch_args a;
 
     if (given < 2 || given > 5) {
         sema_error_at(c, e->pos, "`" METHOD_PATCH "` takes 2 to 5 arguments, "
                       "found %zu", given);
         return false;
     }
-    find = e->as.call.args[0];
-    with = e->as.call.args[1];
-    into = given > 2 ? e->as.call.args[2] : NULL;
-    offset = given > 3 ? e->as.call.args[3] : int_literal(c, e->pos, 0);
-    limit = given > 4 ? e->as.call.args[4] : int_literal(c, e->pos, 0);
-    if (find->kind == EXPR_PATTERN) {
-        t = sema_check_expr(c, find, types_byte_regex(c->types));
-    } else {
-        t = sema_check_expr(c, find, NULL);
-    }
-    if (sema_is_error(t)) {
+    if (!check_patch_args(c, e, &a)) {
         return false;
     }
-    pattern = types_is_regex(t);
-    if (pattern && !sema_require(c, find, t, types_byte_regex(c->types))) {
-        return false;
-    }
-    if (!pattern && !is_byte_slice(t)) {
-        sema_error_at(c, find->pos, "`" METHOD_PATCH "` finds a `[]byte` or a "
-                      "`" LANG_BYTE_REGEX "`, found `%s`", sema_tn(t));
-        return false;
-    }
-    ok = check_arg(c, with, bytes);
-    name = text_literal(c, e->pos, "", 0);
-    if (into != NULL) {
-        t = sema_check_expr(c, into, word);
-        if (sema_is_error(t)) {
-            ok = false;
-        } else if (pattern && t->kind == TYPE_STR) {
-            name = into;
-            into = NULL;
-        } else if (!sema_require(c, into, t, word)) {
-            ok = false;
-        } else if (!pattern &&
-                   (into->kind != EXPR_INT || into->as.integer != 0)) {
-            sema_error_at(c, into->pos, "`into` names a group of a pattern, "
-                          "and a byte sequence has none, so it is 0");
-            ok = false;
-        }
-    }
-    ok = check_arg(c, offset, word) && ok;
-    ok = check_arg(c, limit, word) && ok;
-    if (!ok) {
-        return false;
-    }
-    fixed = with->kind == EXPR_BYTES && offset->kind == EXPR_INT &&
-            (find->kind == EXPR_PATTERN || find->kind == EXPR_BYTES);
-    if (!pattern) {
-        if (fixed && offset->as.integer + with->as.text.length >
-                         find->as.text.length) {
-            sema_error_at(c, with->pos, "`with` of %zu byte%s at offset %llu "
-                          "does not fit the %zu byte%s of `find`",
-                          with->as.text.length,
-                          with->as.text.length == 1 ? "" : "s",
-                          (unsigned long long)offset->as.integer,
-                          find->as.text.length,
-                          find->as.text.length == 1 ? "" : "s");
-            return false;
-        }
-        f = regex_function(c, field->pos, "data." METHOD_PATCH,
-                           fixed ? "patch_bytes_fixed" : "patch_bytes", 5);
-        if (f == NULL) {
-            return false;
-        }
-        args = types_alloc_array(c->arena, 5, sizeof *args);
-        args[0] = field->as.field.base;
-        args[1] = find;
-        args[2] = with;
-        args[3] = offset;
-        args[4] = limit;
-        return call_of(c, e, f, args, 5);
-    }
-    if (find->kind == EXPR_PATTERN) {
-        /* The group is known when into is absent or a literal. */
-        bool known = name->kind == EXPR_STRING &&
-                     (into == NULL || into->kind == EXPR_INT);
-        int64_t group = -1;
-        fixed = fixed && known;
-        if (known) {
-            group = patch_group(c, find, name->as.text.length > 0 ? name
-                                                                 : into,
-                                e->pos);
-            if (group < 0) {
-                return false;
-            }
-            into = int_literal(c, e->pos, (uint64_t)group);
-            name = text_literal(c, e->pos, "", 0);
-        }
-        if (fixed) {
-            int64_t least = pattern_least_bytes(find->as.text.bytes,
-                                             find->as.text.length, group);
-            if (offset->as.integer + with->as.text.length >
-                (uint64_t)least) {
-                if (group == 0) {
-                    sema_error_at(c, with->pos, "`with` of %zu byte%s at "
-                                  "offset %llu does not fit the match, which "
-                                  "can be %lld byte%s long",
-                                  with->as.text.length,
-                                  with->as.text.length == 1 ? "" : "s",
-                                  (unsigned long long)offset->as.integer,
-                                  (long long)least, least == 1 ? "" : "s");
-                } else {
-                    sema_error_at(c, with->pos, "`with` of %zu byte%s at "
-                                  "offset %llu does not fit group %lld of the "
-                                  "pattern, which can be %lld byte%s long",
-                                  with->as.text.length,
-                                  with->as.text.length == 1 ? "" : "s",
-                                  (unsigned long long)offset->as.integer,
-                                  (long long)group, (long long)least,
-                                  least == 1 ? "" : "s");
-                }
-                return false;
-            }
-        }
-    }
-    if (into == NULL) {
-        into = int_literal(c, e->pos, 0);
-    }
-    f = regex_function(c, field->pos, "data." METHOD_PATCH,
-                       find->kind != EXPR_PATTERN ? "patch"
-                       : fixed                    ? "patch_fixed"
-                                                  : "patch_literal",
-                       find->kind == EXPR_PATTERN ? 8 : 7);
-    if (f == NULL) {
-        return false;
-    }
-    args = types_alloc_array(c->arena, 8, sizeof *args);
-    i = 0;
-    args[i++] = field->as.field.base;
-    args[i++] = find;
-    if (find->kind == EXPR_PATTERN) {
-        args[i++] = text_literal(c, find->pos, find->as.text.bytes,
-                                 find->as.text.length);
-    }
-    args[i++] = with;
-    args[i++] = into;
-    args[i++] = name;
-    args[i++] = offset;
-    args[i++] = limit;
-    return call_of(c, e, f, args, i);
+    return a.pattern ? patch_pattern_call(c, e, &a)
+                     : patch_bytes_call(c, e, &a);
 }
 
 /* DESIGN: `s.to_bytes()` and `data.to_text()` are the calls `to_bytes(s)`
