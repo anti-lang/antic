@@ -748,3 +748,54 @@ if(CMAKE_HOST_APPLE)
         ARGS run --memory-checks ${tools}
         ERR "anti: cannot run ./dist/${HOST}/dev/app${EXE}: Permission denied")
 endif()
+# The fetch of a dependency from the repository of a file:// URL, fetch of
+# repo.c. Each file is copied from the repository to <file>.new in the
+# cache, read back and copied to its place. The index of the repository
+# takes the opens 3 to 7, the reads 3 to 8 and the writes 1 and 2. The
+# build then writes the stamp beside the index and reads the index, and
+# the module takes the opens 10 to 12, the reads 11 to 17 and the writes 4
+# and 5. The module of the repository is no library file, so a fetch that
+# succeeds ends at antic.
+set(fetched_text "Not a library file.\n")
+string(SHA256 fetched_digest "${fetched_text}")
+set(fetched_index "${index_head}version = \"1.2.0\"\nmodules = [{ path = \"com.example.units\", sha256 = \"${fetched_digest}\" }]\n")
+# A case of the fetch: its name, its fault and the lines of its standard
+# error. The text of the program holds a `;`, which a list of the files
+# would split.
+function(fetch_message name fault)
+    anti_message(${name}
+        FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+              ../repo/com.example.units/1.2.0/com.example.units.antl
+              "${fetched_text}"
+              ${units_index} "${fetched_index}"
+        FAULT ${fault}
+        ARGS build ${tools}
+        ERR ${ARGN})
+endfunction()
+set(fetched_module "${USER_CACHE}/pkg/com.example.units/1.2.0/com.example.units.antl")
+fetch_message(fault_fetch_index_unread open:3:EACCES
+    "anti: ${repo_url}/com.example.units/index.toml: cannot read ${WORK}/repo/com.example.units/index.toml"
+    "${no_version}")
+fetch_message(fault_fetch_cached_index_unread read:9:EIO
+    "anti: cannot read ${cached_index}"
+    "${no_version}")
+fetch_message(fault_fetch_stamp_not_written open:8:EACCES
+    "anti: cannot write ${cached_index}.checked"
+    "antic: ${fetched_module} is not a library file")
+fetch_message(fault_fetch_module_unread open:10:EACCES
+    "anti: ${repo_url}/com.example.units/1.2.0/com.example.units.antl: cannot read ${WORK}/repo/com.example.units/1.2.0/com.example.units.antl")
+fetch_message(fault_fetch_module_digest_unread read:17:EIO
+    "anti: cannot read ${fetched_module}")
+# T156: a file of the cache that the system does not take. The copy to
+# <file>.new names the file of the repository as unread, and the copy to
+# the place of the file names nothing.
+fetch_message(fault_fetch_index_copy_not_written write:1:ENOSPC
+    "anti: cannot write ${cached_index}.new"
+    "${no_version}")
+fetch_message(fault_fetch_index_not_cached write:2:ENOSPC
+    "anti: cannot write ${cached_index}"
+    "${no_version}")
+fetch_message(fault_fetch_module_not_cached write:5:ENOSPC
+    "anti: cannot write ${fetched_module}")
+fetch_message(fault_fetch_module_copy_unread read:15:EIO
+    "anti: cannot read ${fetched_module}.new")
