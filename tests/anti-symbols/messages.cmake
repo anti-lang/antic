@@ -159,3 +159,47 @@ anti_message(archive_index_names_no_module
     SETUP pack_archive
     ARGS ${resolve}
     OUT "${module}" "${frame}")
+
+# Fault injection: each case makes one call of the system fail in
+# anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. A count
+# names the call among those of its kind in the run. `inventory` and
+# `check` open the configuration, then the directory beside it, and
+# `resolve` reads the archive and then the trace.
+anti_message(fault_inventory_directory_unread
+    STATUS 0
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    FAULT open:2:EACCES
+    ARGS symbols inventory --conf conf.toml
+    ERR "anti: cannot read ."
+    OUT "missing the program: . holds no program of Anti"
+        "wrote symbols.zip with 0 of 1 modules")
+anti_message(fault_check_directory_unread
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    FAULT open:2:EACCES
+    ARGS symbols check --conf conf.toml
+    ERR "anti: cannot read ."
+    OUT "missing the program: . holds no program of Anti")
+anti_message(fault_inventory_archive_not_written
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    FAULT write:1:ENOSPC
+    ARGS symbols inventory --conf conf.toml
+    ERR "anti: cannot write symbols.zip"
+    OUT "missing the program: . holds no program of Anti")
+anti_message(fault_resolve_archive_unread
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${map}"
+    SETUP pack_archive
+    FAULT open:1:EACCES
+    ARGS ${resolve}
+    ERR "anti: cannot read symbols.zip")
+anti_message(fault_resolve_archive_read_partway
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${map}"
+    SETUP pack_archive
+    FAULT read:2:EIO
+    ARGS ${resolve}
+    ERR "anti: cannot read symbols.zip")
+anti_message(fault_resolve_trace_read_partway
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${map}"
+    SETUP pack_archive
+    FAULT read:3:EIO
+    ARGS ${resolve}
+    ERR "anti: cannot read trace.txt")
