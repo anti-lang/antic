@@ -292,3 +292,12 @@ anti_message(fault_header_read_partway
     FAULT read:4:EACCES
     ARGS bind --header dist/${HOST}/dev/com/example/one.antl -o ../out
     ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
+# The header of the library file, unit_library_header of units.c, whose
+# first read is the one that fails.
+anti_message(fault_header_unread
+    FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n"
+          src/com/example/one.anti "//! The smallest library.\n\n/// One.\nexport fn one() -> c_int\n{\n\treturn 1;\n}\n"
+    SETUP build_the_library
+    FAULT read:1:EACCES
+    ARGS bind --header dist/${HOST}/dev/com/example/one.antl -o ../out
+    ERR "anti: cannot read dist/${HOST}/dev/com/example/one.antl")

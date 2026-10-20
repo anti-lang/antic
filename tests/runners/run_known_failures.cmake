@@ -17,7 +17,9 @@
 #   - `host=` names a system that is none of the three, or one twice
 #   - a line names no test. A tree without ANTIC_FAULTS registers no test
 #     of fault injection, whose name holds `_fault_`, see
-#     tools/faults.cmake, and takes a line of one as a test it lacks
+#     tools/faults.cmake, and takes a line of one as a test it lacks. A
+#     line with `host=` names a test of those hosts, which another host
+#     may not register
 #   - the id of a line has no row in the table, or a row marked fixed or
 #     no defect
 #   - a row is open and no line names its id
@@ -93,7 +95,8 @@ foreach(name id systems IN ZIP_LISTS names ids hosts)
         list(APPEND expected "${name}")
     endif()
     list(APPEND listed_ids "${id}")
-    if(NOT name IN_LIST tests AND (FAULTS OR NOT name MATCHES "_fault_"))
+    if(NOT name IN_LIST tests AND (here OR systems STREQUAL "all") AND
+       (FAULTS OR NOT name MATCHES "_fault_"))
         string(APPEND faults "${list_name}: ${name} names no test\n")
     endif()
     if(NOT id IN_LIST row_ids)

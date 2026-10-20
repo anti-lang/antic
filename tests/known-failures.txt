@@ -65,3 +65,4 @@ std_faults_trace_fault_module_memory T139 A stack trace drops a name or its text
 std_faults_trace_fault_name_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
 std_faults_trace_fault_text_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
 std_faults_trace_fault_text_room_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
+anti_build_message_fault_debug_object_unread T154 anti writes the map of a release without the lines of an object it cannot read, and ends with status 0. host=macos

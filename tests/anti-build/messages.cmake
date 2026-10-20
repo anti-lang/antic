@@ -694,3 +694,39 @@ anti_message(fault_run_program_missing
     FAULT stat:22:EACCES
     ARGS run ${tools}
     ERR "anti: ./dist/${HOST}/dev/app${EXE} was not built, so there is nothing to run")
+# The symbols archive of a release build reads the program for its build
+# id, the program with debug information for the map of its sections,
+# and the map and that program again for the archive, symmap.c and zip.c,
+# with the forty-ninth to the fifty-fourth open of the build.
+anti_message(fault_program_unread_for_id
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:49:EACCES
+    ARGS build --release ${tools}
+    ERR "anti: cannot read ${release_dir}/app${EXE}")
+anti_message(fault_debug_program_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:50:EACCES
+    ARGS build --release ${tools}
+    ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
+anti_message(fault_archive_entry_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:53:EACCES
+    ARGS build --release ${tools}
+    ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
+anti_message(fault_archive_map_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:54:EACCES
+    ARGS build --release ${tools}
+    ERR "anti: cannot read ${release_dir}/app.map")
+# The map of a Mach-O program takes the lines of its functions from the
+# objects its debug map names, macho_lines of symmap.c. T154: anti says
+# it cannot read the object and writes the map without those lines, and
+# ends with status 0.
+if(CMAKE_HOST_APPLE)
+    string(REGEX REPLACE "^macos-" "" debug_arch "${HOST}")
+    anti_message(fault_debug_object_unread
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT open:51:EACCES
+        ARGS build --release ${tools}
+        ERR "anti: cannot read ${PROJECT}/${release_dir}/app.debug.lto/0.${debug_arch}.lto.o")
+endif()
