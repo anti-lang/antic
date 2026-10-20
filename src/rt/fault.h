@@ -37,7 +37,8 @@
 enum anti_rt_fault_kind {
     /* malloc, calloc, realloc and the aligned allocations. */
     ANTI_RT_FAULT_ALLOC,
-    /* fopen, open, opendir and the loading of a library. */
+    /* fopen, open, opendir, the loading of a library and the change of
+       directory of a process. */
     ANTI_RT_FAULT_OPEN,
     /* fread, read and readdir. */
     ANTI_RT_FAULT_READ,
@@ -55,7 +56,7 @@ enum anti_rt_fault_kind {
     ANTI_RT_FAULT_STAT,
     /* fseek, ftell and lseek. */
     ANTI_RT_FAULT_SEEK,
-    /* The start of a process: posix_spawn, fork and pipe. */
+    /* The start of a process: posix_spawn, fork, pipe and exec. */
     ANTI_RT_FAULT_RUN,
     /* The wait for a process or a thread. */
     ANTI_RT_FAULT_WAIT,

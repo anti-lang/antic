@@ -823,11 +823,11 @@ int platform_run_in(const char *directory, const char *const argv[])
         return -1;
     }
     if (pid == 0) {
-        if (chdir(directory) != 0) {
+        if (ANTI_FAULT(OPEN, -1, chdir(directory)) != 0) {
             fprintf(stderr, "%s: cannot enter %s: %s\n", tool, directory,
                     strerror(errno));
         } else {
-            execvp(argv[0], (char *const *)argv);
+            ANTI_FAULT(RUN, -1, execvp(argv[0], (char *const *)argv));
             fprintf(stderr, "%s: cannot run %s: %s\n", tool, argv[0],
                     strerror(errno));
         }

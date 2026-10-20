@@ -730,3 +730,21 @@ if(CMAKE_HOST_APPLE)
         ARGS build --release ${tools}
         ERR "anti: cannot read ${PROJECT}/${release_dir}/app.debug.lto/0.${debug_arch}.lto.o")
 endif()
+# anti run --memory-checks runs the program with its standard error on a
+# pipe, which anti reads for the report of AddressSanitizer,
+# platform_run_lines of the platform layer of antic. The pipe is the third
+# program of the run and the start of the program the fourth.
+if(CMAKE_HOST_APPLE)
+    anti_message(fault_checked_run_no_pipe
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT run:3:EACCES
+        STATUS 255
+        ARGS run --memory-checks ${tools}
+        ERR "anti: pipe: Permission denied")
+    anti_message(fault_checked_run_not_started
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT run:4:EACCES
+        STATUS 255
+        ARGS run --memory-checks ${tools}
+        ERR "anti: cannot run ./dist/${HOST}/dev/app${EXE}: Permission denied")
+endif()

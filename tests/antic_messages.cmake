@@ -336,6 +336,22 @@ anti_message(fault_llc_not_forked
     ARGS ${tools} --lto none -o out/main main.anti
     ERR "antic: cannot run ${real_llc}: Permission denied"
         "antic: llc failed")
+# The child of the fork enters the directory and runs llc, the seventh
+# open and the third program of the run, counted on in the child.
+anti_message(fault_llc_not_entered
+    FILES main.anti "${program}"
+    DIRECTORIES out
+    FAULT open:7:EACCES
+    ARGS ${tools} --lto none -o out/main main.anti
+    ERR "antic: cannot enter out/: Permission denied"
+        "antic: llc failed")
+anti_message(fault_llc_not_executed
+    FILES main.anti "${program}"
+    DIRECTORIES out
+    FAULT run:3:EACCES
+    ARGS ${tools} --lto none -o out/main main.anti
+    ERR "antic: cannot run ${real_llc}: Permission denied"
+        "antic: llc failed")
 anti_message(fault_llc_path
     FILES main.anti "${program}"
     DIRECTORIES out
@@ -348,6 +364,30 @@ anti_message(fault_llc_input_path
     FAULT stat:4:EACCES,stat:5:EACCES
     ARGS ${tools} --lto none -o out/main main.anti
     ERR "antic: llc failed")
+# Without --runtime antic takes the archive above the directory that holds
+# it, platform_self_directory of platform.c: a copy in WORK/bin beside
+# WORK/lib. The first stat asks the system for the path of antic and the
+# second makes it absolute. Either one refused leaves antic without an
+# archive.
+function(lib_beside_the_copy)
+    file(MAKE_DIRECTORY "${WORK}/lib")
+endfunction()
+anti_message(fault_self_path STATUS 2
+    FILES main.anti "${program}"
+    SETUP lib_beside_the_copy
+    COPY
+    ENV "XDG_DATA_HOME=${WORK}/data"
+    FAULT stat:1:EACCES
+    ARGS main.anti
+    ERR "antic: linking needs --runtime <dir>, the directory that holds lib/<target>/<level>/")
+anti_message(fault_self_directory STATUS 2
+    FILES main.anti "${program}"
+    SETUP lib_beside_the_copy
+    COPY
+    ENV "XDG_DATA_HOME=${WORK}/data"
+    FAULT stat:2:EACCES
+    ARGS main.anti
+    ERR "antic: linking needs --runtime <dir>, the directory that holds lib/<target>/<level>/")
 # The soname of a library of Linux is a link beside it, platform_symlink of
 # platform.c. Its unlink is the third remove of the run and the link the
 # twelfth open.
