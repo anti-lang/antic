@@ -52,3 +52,45 @@ anti_message(source_imports_no_module
     FILES one.anti "//! A module.\n\nimport com.example.gone;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti
     ERR "one.anti:3:8: error: cannot find module `com.example.gone`")
+
+# Fault injection: each case makes one call of the system fail in
+# anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. The
+# pages go to a relative directory, so the count of its directories is the
+# same on every machine.
+set(fault_manifest "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n")
+set(fault_library "//! The smallest library.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+anti_message(fault_page_not_written
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT open:9:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "anti: cannot write pages/com.example.one.html")
+anti_message(fault_index_not_written
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT open:10:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "anti: cannot write pages/index.html")
+# T153: the work directory beside the pages, which anti doc leaves without
+# a message.
+anti_message(fault_work_not_made
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT mkdir:2:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "anti: cannot make build/doc-work")
+# T152: a library file that stops part of the way, library_interface of
+# driver.c. The manifest takes the first two reads, and the fourth is the
+# one that meets the end of the file. A build of the project writes the
+# library file.
+function(build_the_library)
+    execute_process(COMMAND "${ANTI}" build --runtime "${RUNTIME}"
+                    WORKING_DIRECTORY "${PROJECT}" RESULT_VARIABLE status
+                    OUTPUT_QUIET ERROR_QUIET)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "anti build of the library ended with ${status}")
+    endif()
+endfunction()
+anti_message(fault_library_read_partway
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    SETUP build_the_library
+    FAULT read:4:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}" dist/${HOST}/dev/com/example/one.antl
+    ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")

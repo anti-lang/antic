@@ -577,3 +577,120 @@ anti_message(soname_without_lib STATUS 2
 anti_message(bundle_runtime_without_lib STATUS 2
     ARGS build --bundle-runtime
     ERR "anti: --bundle-runtime builds a library, with --lib")
+
+# Fault injection: each case makes one call of the system fail in
+# anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. A count
+# names the call among those of its kind in a dev build of the smallest
+# program, or in the run that the case names.
+set(dev_dir "./build/${HOST}/dev")
+anti_message(fault_out_of_memory
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT alloc:18:ENOMEM
+    STATUS 70
+    ARGS build ${tools}
+    ERR "anti: out of memory")
+anti_message(fault_lock_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:3:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ./anti.lock")
+anti_message(fault_source_directory_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:4:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot read ./src")
+anti_message(fault_source_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:7:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot read ./${app_source}")
+anti_message(fault_key_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:13:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ${dev_dir}/lib/com/example/app.antl.key")
+# files_copy_program of files.c: the open of the copy, and the rename that
+# puts it in place.
+anti_message(fault_program_not_copied
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:29:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
+anti_message(fault_program_not_replaced
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT rename:1:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
+anti_message(fault_sources_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:33:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot read ${RUNTIME}/licenses/sources.txt")
+anti_message(fault_notice_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:34:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/dev/NOTICE.txt")
+anti_message(fault_build_directory_not_made
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT mkdir:2:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot make ${dev_dir}")
+# T153: the directory of the object of a module, unit_file of units.c,
+# which build.c leaves without a message.
+anti_message(fault_object_directory_not_made
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT mkdir:13:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot make ${dev_dir}/obj/com/example")
+# T152: the library file of the module, which the link reads for its
+# module, stops part of the way, link_names of driver_search.c.
+anti_message(fault_library_read_partway
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT read:26:EACCES
+    ARGS build ${tools}
+    ERR "antic: cannot read ${dev_dir}/lib/com/example/app.antl")
+# The release build writes the map of the sections, the symbols archive
+# and the text of its link with debug information.
+set(release_dir "./build/${HOST}/release")
+anti_message(fault_map_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT write:10:ENOSPC
+    ARGS build --release ${tools}
+    ERR "anti: cannot write ${release_dir}/app.map")
+anti_message(fault_symbols_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT write:11:ENOSPC
+    ARGS build --release ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/release/app-symbols.zip")
+anti_message(fault_debug_text_not_created
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:43:EACCES
+    ARGS build --release ${tools}
+    ERR "antic: cannot create ${release_dir}/app.debug.ll")
+# A library project copies each library file into dist/, build.c.
+anti_message(fault_library_not_copied
+    FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n"
+          src/com/example.anti "${library_text}"
+    FAULT open:14:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/dev/com/example.antl")
+# anti run starts the program it built as the third program of the run,
+# and the third wait is the link before it.
+anti_message(fault_run_not_started
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT run:3:EACCES
+    STATUS 255
+    ARGS run ${tools}
+    ERR "anti: cannot run ./dist/${HOST}/dev/app${EXE}: Permission denied")
+anti_message(fault_run_not_waited
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT wait:4:EINVAL
+    STATUS 255
+    ARGS run ${tools}
+    ERR "anti: waiting for ./dist/${HOST}/dev/app${EXE}: Invalid argument")
+anti_message(fault_run_program_missing
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT stat:22:EACCES
+    ARGS run ${tools}
+    ERR "anti: ./dist/${HOST}/dev/app${EXE} was not built, so there is nothing to run")

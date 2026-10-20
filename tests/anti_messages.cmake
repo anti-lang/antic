@@ -192,3 +192,81 @@ else()
         ARGS sdk export -o out
         ERR "anti: sdk export runs on a Mac, which holds Apple's SDK. Run it on a Mac you own and anti sdk import here.")
 endif()
+
+# Fault injection: each case makes one call of the system fail in
+# anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. A count
+# names the call among those of its kind in the run.
+
+# anti new, project.c. T153: the directory of the project, which anti new
+# leaves without a message.
+anti_message(fault_new_directory_not_made
+    FAULT mkdir:1:EACCES
+    ARGS new com.example.app
+    ERR "anti: cannot make app")
+anti_message(fault_new_manifest_not_written
+    FAULT open:1:EACCES
+    ARGS new com.example.app
+    ERR "anti: cannot write app/anti.toml")
+anti_message(fault_new_module_not_written
+    FAULT open:2:EACCES
+    ARGS new com.example.app
+    ERR "anti: cannot write app/src/com/example/app.anti")
+# anti license of a runtime archive opens the listing of licenses/, the
+# record of the sources and the licence of antic and anti, in that order.
+anti_message(fault_license_listing_unread
+    FAULT open:1:EACCES
+    ARGS license --runtime "${RUNTIME}"
+    ERR "anti: cannot read ${RUNTIME}/licenses")
+anti_message(fault_license_text_unread
+    FAULT open:3:EACCES
+    ARGS license --runtime "${RUNTIME}"
+    ERR "anti: cannot read ${RUNTIME}/LICENSE")
+# anti sdk import of a bundle that holds sdk-version, sdk.c. The digest
+# reads the bundle first, and each target of the Mac takes a directory, a
+# part that tar unpacks into, the rename of the part and its digest.
+function(pack_versioned_bundle)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cJf
+                            "${PROJECT}/bundle.tar.xz" sdk-version
+                    WORKING_DIRECTORY "${PROJECT}/stubs"
+                    RESULT_VARIABLE status)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the bundle was not written")
+    endif()
+endfunction()
+anti_message(fault_sdk_import_unread
+    FILES stubs/sdk-version "14.0\n"
+    SETUP pack_versioned_bundle
+    FAULT open:1:EACCES
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: cannot read bundle.tar.xz")
+anti_message(fault_sdk_import_directory_not_made
+    FILES stubs/sdk-version "14.0\n"
+    SETUP pack_versioned_bundle
+    FAULT mkdir:1:EACCES
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: cannot make sysroot/macos-arm64")
+anti_message(fault_sdk_import_part_not_made
+    FILES stubs/sdk-version "14.0\n"
+    SETUP pack_versioned_bundle
+    FAULT mkdir:5:EACCES
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: cannot make sysroot/macos-arm64/sdk.part")
+anti_message(fault_sdk_import_tar_not_started
+    FILES stubs/sdk-version "14.0\n"
+    SETUP pack_versioned_bundle
+    FAULT run:1:EACCES
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: cannot run tar: Permission denied"
+        "anti: tar could not unpack bundle.tar.xz")
+anti_message(fault_sdk_import_not_replaced
+    FILES stubs/sdk-version "14.0\n"
+    SETUP pack_versioned_bundle
+    FAULT rename:1:EACCES
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: cannot replace sysroot/macos-arm64/sdk")
+anti_message(fault_sdk_import_digest_not_written
+    FILES stubs/sdk-version "14.0\n"
+    SETUP pack_versioned_bundle
+    FAULT open:2:EACCES
+    ARGS sdk import bundle.tar.xz --sysroot sysroot
+    ERR "anti: cannot write sysroot/macos-arm64/sdk/digest")

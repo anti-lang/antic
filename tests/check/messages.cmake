@@ -86,3 +86,40 @@ anti_message(module_fence_never_closed
         "anti check: formatting: 1 file"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/open.anti:1:1: warning: the doc comment of the module holds a fence that nothing closes [doc-markup]")
+
+# Fault injection: each case makes one call of the system fail in
+# anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. The
+# work directory is relative, so the count of its directories is the same
+# on every machine.
+set(fault_library "//! The smallest library.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+anti_message(fault_source_unread
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT open:5:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot read src/com/example/one.anti")
+# The listing of a directory fails part of the way, platform_list_directory
+# of the platform layer of antic.
+anti_message(fault_listing_unread
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT read:6:EACCES
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot read src")
+# The kind of an entry and of the test directory, walk_entry and walk of
+# files.c.
+anti_message(fault_entry_unstated STATUS 2
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT stat:6:EACCES
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot read src/com/example/one.anti")
+anti_message(fault_test_directory_unstated
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT stat:7:EACCES
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot read test")
+# T153: the work directory, which anti check leaves without a message.
+anti_message(fault_work_not_made
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_library}"
+    FAULT mkdir:2:EACCES
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot make ../check")

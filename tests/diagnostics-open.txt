@@ -114,11 +114,6 @@ anti: this host is no target of Anti\n
 # src/anti/doc.c
 
 # src/anti/files.c
-# Stays: no test reaches it. files_replace gives it when the file it has
-# just written cannot take the place of the one it read, and sdk.c when
-# the directory it has just unpacked cannot take its name. Both need a file
-# system that fails between two steps.
-anti: cannot replace %s\n
 
 # src/anti/fmt.c
 

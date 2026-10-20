@@ -247,3 +247,48 @@ anti_message(header_of_a_damaged_library
     FILES one.antl "A text where the library file belongs.\n"
     ARGS bind --header one.antl --runtime "${RUNTIME}"
     ERR "anti: one.antl: is not a library file")
+
+# Fault injection: each case makes one call of the system fail in
+# anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. The
+# output goes to a relative directory, so the count of its directories is
+# the same on every machine.
+set(fault_api "{\"functions\": [], \"structs\": [{\"name\": \"Vec\", \"fields\": [{\"name\": \"x\", \"type\": \"float\"}]}]}")
+anti_message(fault_module_not_written
+    FILES api.json "${fault_api}"
+    FAULT open:2:EACCES
+    ARGS bind api.json -o ../out
+    ERR "anti: cannot write ../out/api.anti")
+anti_message(fault_probe_c_not_written
+    FILES api.json "${fault_api}"
+    FAULT open:3:EACCES
+    ARGS bind api.json --probe -o ../out
+    ERR "anti: cannot write ../out/probe_api.c")
+anti_message(fault_probe_not_written
+    FILES api.json "${fault_api}"
+    FAULT open:4:EACCES
+    ARGS bind api.json --probe -o ../out
+    ERR "anti: cannot write ../out/probe_api.anti")
+# T153: the output directory, which anti bind leaves without a message.
+anti_message(fault_out_not_made
+    FILES api.json "${fault_api}"
+    FAULT mkdir:2:EACCES
+    ARGS bind api.json -o ../out
+    ERR "anti: cannot make ../out")
+# T152: the library file of anti bind --header stops part of the way,
+# driver_library_header of driver.c. The fourth read meets the end of
+# the file. A build of the project writes the library file.
+function(build_the_library)
+    execute_process(COMMAND "${ANTI}" build --runtime "${RUNTIME}"
+                    WORKING_DIRECTORY "${PROJECT}" RESULT_VARIABLE status
+                    OUTPUT_QUIET ERROR_QUIET)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "anti build of the library ended with ${status}")
+    endif()
+endfunction()
+anti_message(fault_header_read_partway
+    FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n"
+          src/com/example/one.anti "//! The smallest library.\n\n/// One.\nexport fn one() -> c_int\n{\n\treturn 1;\n}\n"
+    SETUP build_the_library
+    FAULT read:4:EACCES
+    ARGS bind --header dist/${HOST}/dev/com/example/one.antl -o ../out
+    ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
