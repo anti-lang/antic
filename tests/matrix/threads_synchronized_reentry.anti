@@ -1,7 +1,6 @@
 //! A public function of a synchronized class that calls another public function
 //! of the same object, inside a `sync` block on a Mutex. The thread takes the
-//! hidden lock it holds again without waiting, and a dev build records the
-//! order of the Mutex and the hidden lock once.
+//! hidden lock it holds again without waiting.
 
 import anti.lang;
 

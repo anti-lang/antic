@@ -1,0 +1,9 @@
+anti runtime [0-9]+\.[0-9]+\.[0-9]+
+backtrace =  \(build\)
+hash_seed =  \(build\)
+logger =  \(build\)
+plugins = a:b \(.*array-key\.toml\)
+threads = 2 \(.*array-key\.toml\)
+trace =  \(build\)
+injectable interfaces: none
+loaded plugins: none

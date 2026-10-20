@@ -83,9 +83,9 @@ static void atomic_sub_minimum(void)
 }
 
 /* `and` and `or` give the value before and keep the bits of the width
-   alone, and a compare-and-swap of one byte swaps on the expected value
-   and on it alone. C calls them, and an Anti program writes the LLVM
-   instruction instead. */
+   alone, and a compare-and-swap of one byte or of eight swaps on the
+   expected value and on it alone. C calls them, and an Anti program
+   writes the LLVM instruction instead. */
 static void atomic_masks(void)
 {
     int8_t i8 = 0x0F;
@@ -110,6 +110,9 @@ static void atomic_masks(void)
     i8 = 7;
     CHECK(anti_rt_atomic_compare_swap(&i8, 1, 6, 9) == 0 && i8 == 7);
     CHECK(anti_rt_atomic_compare_swap(&i8, 1, 7, 9) == 1 && i8 == 9);
+    CHECK(anti_rt_atomic_compare_swap(&i64, 8, 0, 9) == 0);
+    CHECK(anti_rt_atomic_compare_swap(&i64, 8, 0x3C3C3C3C3C3C3C3C, 9) == 1 &&
+          i64 == 9);
 }
 
 /* The precision of `%.*s` for a text of an Anti length: the length, or

@@ -1,0 +1,7 @@
+# An array value of a key, and a key of the same table after it.
+[runtime]
+plugins = [
+	'a',
+	'b',
+]
+threads = 2
