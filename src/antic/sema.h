@@ -220,18 +220,27 @@ struct interface {
     size_t linux_library_count;
 };
 
+/* The inputs of one compilation, which sema_check and sema_doc_warnings
+   share. A name resolves against the module, the libraries and the root
+   that types holds. */
+struct sema_inputs {
+    const char *module_name;        /* the module path */
+    const char *package;            /* NULL: the module path */
+    const struct interface *const *libraries;   /* every loaded library */
+    size_t library_count;
+    struct types *types;
+    struct arena *arena;
+    struct diagnostics *diags;
+};
+
 /* Check one module against the rules of the language: resolve every name,
    give every expression its type and compute every constant. The method
    syntax v.f(args) and qualified names are rewritten into plain names.
-   libraries holds the interface of every loaded library. program says
-   that the build writes a program and not a library, which decides the
-   report of an abstract class that nothing fills. Returns true when no
-   error occurred. */
-bool sema_check(struct module *module, const char *module_name,
-                const char *package,
-                const struct interface *const *libraries,
-                size_t library_count, struct types *types,
-                struct arena *arena, struct diagnostics *diags,
+   in names the module path, which sema_check needs. program says that
+   the build writes a program and not a library, which decides the report
+   of an abstract class that nothing fills. Returns true when no error
+   occurred. */
+bool sema_check(struct module *module, const struct sema_inputs *in,
                 bool program);
 
 /* Take the generics out of a checked module. That is every generic item,
@@ -315,14 +324,10 @@ bool sema_root_hook(const struct name *name);
 /* The doc warnings of `anti check`: markup outside the doc subset, a
    backtick name that resolves nowhere, a `pub` item with a `//#` note and
    no `///` comment, a doc comment that documents nothing and, with
-   undocumented set, every `pub` item without a `///` comment. module_name
-   is the module path of the compilation, libraries holds the interface of
-   every loaded library and types holds the root, so a name resolves
-   against all three. */
-void sema_doc_warnings(const struct module *module, const char *module_name,
-                       const struct interface *const *libraries,
-                       size_t library_count, struct types *types,
-                       bool undocumented, struct diagnostics *diags);
+   undocumented set, every `pub` item without a `///` comment. The
+   warnings take neither the package nor the arena of in. */
+void sema_doc_warnings(const struct module *module,
+                       const struct sema_inputs *in, bool undocumented);
 
 /* Fill out with the interface of a checked module. The items are new
    symbols whose home is out. */

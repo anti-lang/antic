@@ -491,24 +491,22 @@ static void doc_check_undocumented(const struct doc_scope *s,
 
 /* DESIGN: doc warnings belong to anti check, which passes --doc-warnings.
    Without that option antic says nothing about documentation. */
-void sema_doc_warnings(const struct module *module, const char *module_name,
-                       const struct interface *const *libraries,
-                       size_t library_count, struct types *types,
-                       bool undocumented, struct diagnostics *diags)
+void sema_doc_warnings(const struct module *module,
+                       const struct sema_inputs *in, bool undocumented)
 {
     struct doc_scope scope;
     size_t i;
 
     memset(&scope, 0, sizeof scope);
     scope.module = module;
-    if (module_name != NULL) {
-        scope.module_name.text = module_name;
-        scope.module_name.length = strlen(module_name);
+    if (in->module_name != NULL) {
+        scope.module_name.text = in->module_name;
+        scope.module_name.length = strlen(in->module_name);
     }
-    scope.libraries = libraries;
-    scope.library_count = library_count;
-    scope.types = types;
-    scope.diags = diags;
+    scope.libraries = in->libraries;
+    scope.library_count = in->library_count;
+    scope.types = in->types;
+    scope.diags = in->diags;
     doc_check_text(&scope, &module->doc, NULL);
     doc_check_text(&scope, &module->note, NULL);
     for (i = 0; i < module->item_count; i++) {
@@ -517,7 +515,7 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
         if (it->pub && it->note.length > 0 && it->doc.length == 0) {
-            diagnostics_doc(diags, NAME_DOC_NOTE_ONLY, it->name_pos.line,
+            diagnostics_doc(in->diags, NAME_DOC_NOTE_ONLY, it->name_pos.line,
                             it->name_pos.column, "the pub item `%.*s` has a `//#` note and no "
                             "`///` comment", (int)it->name.length,
                             it->name.text);
@@ -530,7 +528,7 @@ void sema_doc_warnings(const struct module *module, const char *module_name,
     }
     for (i = 0; i < module->dropped_count; i++) {
         const struct dropped_doc *d = &module->dropped[i];
-        diagnostics_doc(diags, NAME_DOC_DROPPED, d->pos.line, d->pos.column,
+        diagnostics_doc(in->diags, NAME_DOC_DROPPED, d->pos.line, d->pos.column,
                         d->module_form
                             ? "the `%.*s` comment is dropped, because it "
                               "stands after the first import or item"

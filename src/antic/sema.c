@@ -1423,11 +1423,7 @@ static void check_boundary(struct checker *c)
 /* DESIGN: sema_check runs its passes in order. Each walks
    `module->items` once, and a later pass reads what an earlier one
    declared. */
-bool sema_check(struct module *module, const char *module_name,
-                const char *package,
-                const struct interface *const *libraries,
-                size_t library_count, struct types *types,
-                struct arena *arena, struct diagnostics *diags,
+bool sema_check(struct module *module, const struct sema_inputs *in,
                 bool program)
 {
     struct checker c;
@@ -1436,16 +1432,16 @@ bool sema_check(struct module *module, const char *module_name,
     size_t i;
 
     memset(&c, 0, sizeof c);
-    c.types = types;
-    c.arena = arena;
-    c.diags = diags;
+    c.types = in->types;
+    c.arena = in->arena;
+    c.diags = in->diags;
     c.module = module;
     module_spelled = module->spelled;
-    c.module_name.text = module_name;
-    c.module_name.length = strlen(module_name);
-    c.package = package != NULL ? package : module_name;
-    c.libraries = libraries;
-    c.library_count = library_count;
+    c.module_name.text = in->module_name;
+    c.module_name.length = strlen(in->module_name);
+    c.package = in->package != NULL ? in->package : in->module_name;
+    c.libraries = in->libraries;
+    c.library_count = in->library_count;
     top = sema_declaration_context(&c, NULL);
     sema_enter(&c, &top, &outside);
     c.ok = true;

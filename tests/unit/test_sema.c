@@ -4,6 +4,8 @@
    generics and their bounds, the walks over the parts of a type and the
    members reached through a type. */
 
+#include <string.h>
+
 #include "../binary_stdio.h"
 #include "check.h"
 #include "pipeline.h"
@@ -59,18 +61,29 @@ static void typed(const char *source, const char *expected)
     checked_release(&c);
 }
 
+/* The inputs of the doc warnings for the module of c, named main. */
+static void doc_inputs(struct checked *c, struct sema_inputs *in)
+{
+    memset(in, 0, sizeof *in);
+    in->module_name = "main";
+    in->types = &c->types;
+    in->arena = &c->arena;
+    in->diags = &c->diags;
+}
+
 /* Check source and expect success without any message, then run the doc
    warnings with the undocumented option and expect one warning. */
 static void warns_option(const char *source, bool undocumented, int line,
                          int column, const char *message)
 {
     struct checked c;
+    struct sema_inputs in;
 
     checked_run(&c, source);
+    doc_inputs(&c, &in);
     CHECK(c.ok);
     CHECK(c.diags.count == 0);
-    sema_doc_warnings(c.module, "main", NULL, 0, &c.types, undocumented,
-                      &c.diags);
+    sema_doc_warnings(c.module, &in, undocumented);
     CHECK(c.diags.count == 1);
     if (c.diags.count == 1) {
         CHECK(c.diags.items[0].warning);
@@ -99,12 +112,13 @@ static void warns(const char *source, int line, int column,
 static void documented(const char *source)
 {
     struct checked c;
+    struct sema_inputs in;
     size_t i;
 
     checked_run(&c, source);
+    doc_inputs(&c, &in);
     CHECK(c.ok);
-    sema_doc_warnings(c.module, "main", NULL, 0, &c.types, false,
-                      &c.diags);
+    sema_doc_warnings(c.module, &in, false);
     if (c.diags.count != 0) {
         check_failures++;
         fprintf(stderr, "the doc warnings spoke about:\n%s\n", source);

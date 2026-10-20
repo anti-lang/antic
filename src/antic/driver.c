@@ -1273,6 +1273,7 @@ static int compile(const struct options *o, struct text *source,
     const struct interface **libraries = NULL;
     struct interface own;
     struct paths paths = {0};
+    struct sema_inputs in;
     int status = 1;
 
     ir_module_init(&program, &arena, "");
@@ -1322,9 +1323,15 @@ static int compile(const struct options *o, struct text *source,
        the tree the program wrote and keeps the copies out. */
     tree->compile_copies = o->library || !o->dump_types;
     tree->no_reflect = o->no_reflect;
-    if (!sema_check(tree, text_cstr(module), o->package_name, libraries,
-                    paths.count, &types, &arena, &diags,
-                    whole_program_check(o))) {
+    memset(&in, 0, sizeof in);
+    in.module_name = text_cstr(module);
+    in.package = o->package_name;
+    in.libraries = libraries;
+    in.library_count = paths.count;
+    in.types = &types;
+    in.arena = &arena;
+    in.diags = &diags;
+    if (!sema_check(tree, &in, whole_program_check(o))) {
         settle_diagnostics(o, tree, &diags, false);
         goto done;
     }
@@ -1339,8 +1346,7 @@ static int compile(const struct options *o, struct text *source,
                          "writes a library for C");
     }
     if (o->doc_warnings) {
-        sema_doc_warnings(tree, text_cstr(module), libraries, paths.count,
-                          &types, o->warn_undocumented, &diags);
+        sema_doc_warnings(tree, &in, o->warn_undocumented);
     }
     if (!settle_diagnostics(o, tree, &diags, true)) {
         goto done;
@@ -1469,6 +1475,7 @@ static const struct interface *interface_of(const struct options *o,
     struct paths paths = {0};
     struct text source = {0};
     struct text module = {0};
+    struct sema_inputs in;
     char *kept;
     char *kept_module;
     size_t length = strlen(o->input);
@@ -1548,8 +1555,15 @@ static const struct interface *interface_of(const struct options *o,
        the generic a copy names, so the path lives as long as they do. */
     kept_module = arena_alloc(arena, module.length + 1);
     memcpy(kept_module, text_cstr(&module), module.length + 1);
-    if (!sema_check(parsed, kept_module, o->package_name, libraries,
-                    paths.count, types, arena, &diags, false)) {
+    memset(&in, 0, sizeof in);
+    in.module_name = kept_module;
+    in.package = o->package_name;
+    in.libraries = libraries;
+    in.library_count = paths.count;
+    in.types = types;
+    in.arena = arena;
+    in.diags = &diags;
+    if (!sema_check(parsed, &in, false)) {
         warnings_apply(parsed, &diags, 0, false);
         report_diagnostics(o, &diags);
         goto done;
@@ -1605,6 +1619,7 @@ bool driver_library_header(const struct options *o, struct text *out)
     struct diagnostics diags = {0};
     const struct interface **libraries = NULL;
     const struct interface *own = NULL;
+    struct sema_inputs in;
     char error[200];
     size_t kept = 0;
     size_t i;
@@ -1635,8 +1650,14 @@ bool driver_library_header(const struct options *o, struct text *out)
     /* The checker declares the functions of anti.lang.Object, which the
        table of an export class writes. An empty module checks nothing
        else. */
-    if (!sema_check(&empty, "", NULL, libraries, paths.count, &types,
-                    &arena, &diags, false)) {
+    memset(&in, 0, sizeof in);
+    in.module_name = "";
+    in.libraries = libraries;
+    in.library_count = paths.count;
+    in.types = &types;
+    in.arena = &arena;
+    in.diags = &diags;
+    if (!sema_check(&empty, &in, false)) {
         report_diagnostics(o, &diags);
         goto done;
     }

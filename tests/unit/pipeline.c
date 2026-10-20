@@ -69,6 +69,8 @@ void checked_run(struct checked *c, const char *source)
 
 void checked_run_as(struct checked *c, const char *name, const char *source)
 {
+    struct sema_inputs in;
+
     memset(c, 0, sizeof *c);
     types_init(&c->types, &c->arena);
     c->parsed = lexer_lex(source, strlen(source), &c->arena, &c->diags,
@@ -81,8 +83,12 @@ void checked_run_as(struct checked *c, const char *name, const char *source)
         check_failures++;
         return;
     }
-    c->ok = sema_check(c->module, name, NULL, NULL, 0, &c->types, &c->arena,
-                       &c->diags, true);
+    memset(&in, 0, sizeof in);
+    in.module_name = name;
+    in.types = &c->types;
+    in.arena = &c->arena;
+    in.diags = &c->diags;
+    c->ok = sema_check(c->module, &in, true);
 }
 
 void checked_release(struct checked *c)
@@ -222,6 +228,7 @@ struct module *compilation_check(struct compilation *c, const char *name,
 {
     struct token_list *tokens;
     struct module *module = NULL;
+    struct sema_inputs in;
 
     *ok = false;
     if (c->token_lists == COMPILATION_MODULES) {
@@ -231,10 +238,16 @@ struct module *compilation_check(struct compilation *c, const char *name,
         return NULL;
     }
     tokens = &c->tokens[c->token_lists++];
+    memset(&in, 0, sizeof in);
+    in.module_name = name;
+    in.libraries = c->libraries;
+    in.library_count = c->library_count;
+    in.types = &c->types;
+    in.arena = &c->arena;
+    in.diags = &c->diags;
     *ok = lexer_lex(source, strlen(source), &c->arena, &c->diags, tokens) &&
           parser_parse(source, tokens, &c->arena, &c->diags, &module) &&
-          sema_check(module, name, NULL, c->libraries, c->library_count,
-                     &c->types, &c->arena, &c->diags, program);
+          sema_check(module, &in, program);
     return module;
 }
 
