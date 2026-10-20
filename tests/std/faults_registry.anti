@@ -1,0 +1,36 @@
+//! The registry when memory runs out. `reflect.new` takes the memory of its
+//! object from the C library, and `Object.deserialize` the list of the blocks
+//! and of the objects it made and the bits of the fields it read. Each stops
+//! the program when the C library gives no memory, by decision 4 of
+//! "Decisions of 2026-10-11". A case of `faults_registry.faults` refuses one
+//! allocation, through the variable `ANTI_FAULT` of `src/rt/fault.h`.
+import anti.io;
+import anti.lang;
+import anti.mem;
+import anti.reflect;
+
+class Point
+{
+	pub x: int = 1,
+	pub y: int = 2,
+}
+
+fn main() -> int
+{
+	let o = reflect.new("Point");
+	if o == none {
+		io.println("no object");
+		return 1;
+	}
+	io.println("made");
+	delete(o);
+	let back = Object.deserialize("{\"type\":\"Point\",\"x\":4}",
+		mem.LibcAllocator.get());
+	if back == none {
+		io.println("no object read");
+		return 1;
+	}
+	io.println("read");
+	delete(back);
+	return 0;
+}

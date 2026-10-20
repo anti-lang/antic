@@ -1,0 +1,13 @@
+# The cases of faults_registry.anti: a name and the value of ANTI_FAULT,
+# see tests/CMakeLists.txt. The runtime takes the first four allocations
+# at the start of the program, and reflect.new the fifth. deserialize
+# takes the list of its objects with the sixth, the list of its blocks
+# with the seventh, the object from LibcAllocator with the eighth and the
+# bits of the fields with the ninth. T139: memory that runs out in the
+# runtime there gives none, where the program must stop. An allocator
+# that gives none makes deserialize give none.
+object_memory alloc:5:ENOMEM
+objects_memory alloc:6:ENOMEM
+blocks_memory alloc:7:ENOMEM
+allocator_none alloc:8:ENOMEM
+fields_memory alloc:9:ENOMEM

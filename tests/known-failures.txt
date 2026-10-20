@@ -74,3 +74,7 @@ anti_build_message_fault_fetch_module_copy_unread T156 The fetch of a dependency
 plugin_faults_host_fault_slot_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
 plugin_faults_host_fault_object_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
 plugin_named_host_fault_name_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
+std_faults_registry_fault_object_memory T139 The registry gives none where memory that runs out stops the program.
+std_faults_registry_fault_objects_memory T139 The registry gives none where memory that runs out stops the program.
+std_faults_registry_fault_blocks_memory T139 The registry gives none where memory that runs out stops the program.
+std_faults_registry_fault_fields_memory T139 The registry gives none where memory that runs out stops the program.
