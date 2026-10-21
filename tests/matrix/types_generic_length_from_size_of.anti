@@ -1,0 +1,22 @@
+//! A generic function infers a constant parameter from the length of an array,
+//! and a length that `size_of` gives folds for every target.
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+fn count<T, N: int>(a: [N]T) -> int
+{
+	return N;
+}
+
+fn main() -> int
+{
+	let a: [size_of(Pair)]u8 = [0; size_of(Pair)];
+	printf("count %lld\n".ptr, count(a));
+	return 0;
+}
