@@ -1913,7 +1913,8 @@ add_test(NAME trap_table
 # group past those of its pattern, and stops with the count of the
 # pattern. pattern_patch_into: a `patch` whose computed `into` names no
 # group of its pattern literal stops with the count of the pattern and the
-# `into`. chan_capacity: a channel made for no value stops the program.
+# `into`, pattern_patch_into_two_groups with two groups. chan_capacity: a
+# channel made for no value stops the program.
 # cast_failed: `p as *T` on an object of no class below T stops it with
 # the name of T. pattern_group_name and pattern_template: a group name and
 # a template computed at run time that the pattern literal lacks stop the
@@ -1929,6 +1930,7 @@ add_test(NAME trap_table
 # product, a sum, a doubling and a shift of the room of each collection.
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         singleton_memory pattern_limit pattern_group_count pattern_patch_into
+        pattern_patch_into_two_groups
         chan_capacity cast_failed pattern_group_name pattern_template
         pattern_group_bytes
         send_closed send_closed_waiting take_in_refused error_text_refused

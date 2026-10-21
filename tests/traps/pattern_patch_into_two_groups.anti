@@ -1,0 +1,15 @@
+//! A `patch` with a pattern literal of two groups whose `into` is computed at
+//! run time, and names no group of the pattern, stops the program with the
+//! number of groups of the pattern and the `into` it was given.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let rows = "V=1".to_bytes();
+	let into = text.parse_int("5") catch fatal;
+	let n = rows.patch(re"(V)=(.)", b"8", into) catch fatal;
+	return n;
+}

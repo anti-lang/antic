@@ -1,0 +1,6 @@
+exit 0
+any 1 4
+anycrlf 1 4
+lf 2 4
+text 0 2 3
+bytes 0 1 2 3

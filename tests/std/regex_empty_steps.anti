@@ -1,0 +1,45 @@
+//! Steps past an empty match. A pattern whose newline is `(*ANY)` or
+//! `(*ANYCRLF)` steps over CR LF as one newline, as `(*CRLF)` does in
+//! `std/regex_classes`, so `$` of `(?m)` matches before it and not between its
+//! two bytes. Each line gives the offsets of the matches. A byte pattern steps
+//! one byte, since its data holds no characters, where a text pattern steps one
+//! character.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn count_text(label: str, pattern: str, s: str)
+{
+	let r = regex.compile(pattern) catch fatal;
+	let found = regex.find_all(s, r) catch fatal;
+	printf("%.*s".ptr, label.len as c_int, label.ptr);
+	let at = 0;
+	for m in found {
+		at = at + m.pre.len;
+		printf(" %d".ptr, at as c_int);
+		at = at + m.all.len;
+	}
+	printf("\n".ptr);
+}
+
+fn main() -> int
+{
+	count_text("any", "(*ANY)(?m)$", "a\r\nb");
+	count_text("anycrlf", "(*ANYCRLF)(?m)$", "a\r\nb");
+	count_text("lf", "(*LF)(?m)$", "a\r\nb");
+	count_text("text", "x*", "\u{e9}b");
+	let r = regex.compile_bytes("x*") catch fatal;
+	let found = regex.bytes_find_all("\u{e9}b".to_bytes(), r) catch fatal;
+	printf("bytes".ptr);
+	let at = 0;
+	for m in found {
+		at = at + m.pre.len;
+		printf(" %d".ptr, at as c_int);
+		at = at + m.all.len;
+	}
+	printf("\n".ptr);
+	return 0;
+}

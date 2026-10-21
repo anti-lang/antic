@@ -1,10 +1,12 @@
 //! The text and the JSON of the elements of a collection, for each kind of
 //! element that `to_text` and `serialize` of `collection.Collection<T>` reach
 //! through the runtime: a pointer, a function, a slice, an array and a struct
-//! that holds them.
+//! that holds them. A union and a compiled pattern have no text of their own,
+//! so a field of either is `?`.
 
 import anti.collection.list.{List};
 import anti.lang;
+import anti.regex;
 import anti.text;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
@@ -22,6 +24,19 @@ struct Holder
 	none_at: ?*Point,
 	run: fn(int) -> int,
 	items: []int,
+}
+
+union Bits
+{
+	i: int,
+	f: f64,
+}
+
+/// A struct of the two fields that have no text.
+struct Odd
+{
+	u: Bits,
+	r: Regex,
 }
 
 class Shape
@@ -120,6 +135,14 @@ fn holders()
 	show(holders.to_text());
 }
 
+fn odd_fields()
+{
+	let r = Regex.compile("a+") catch fatal;
+	let odd = List<Odd>.new();
+	odd.push(Odd { u: Bits { i: 3 }, r: r });
+	show(odd.to_text());
+}
+
 fn main() -> int
 {
 	pointers();
@@ -127,5 +150,6 @@ fn main() -> int
 	slices();
 	arrays();
 	holders();
+	odd_fields();
 	return 0;
 }

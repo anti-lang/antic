@@ -1,0 +1,86 @@
+//! The edges of `patch` that `programs/pattern_patch` leaves out: an empty byte
+//! sequence, which patches nothing, a limit from the end past every place, and
+//! a compiled pattern whose group `into` names by name, with a name the pattern
+//! has and one it lacks, which fails with `MissingGroup`. A name that two
+//! groups of `(?J)` share names the first of them, as `src/rt/regex.h` says, so
+//! the second place keeps its bytes.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, n: int, data: []byte)
+{
+	printf("%.*s %lld [".ptr, label.len as c_int, label.ptr, n);
+	for i in 0..data.len {
+		let b = data[i];
+		if b >= 0x20 && b < 0x7F {
+			printf("%c".ptr, b as c_int);
+		} else {
+			printf("\\x%02X".ptr, b as c_int);
+		}
+	}
+	printf("]\n".ptr);
+}
+
+fn fail_name(e: *lang.Error) -> str
+{
+	if e is *regex.LengthMismatch {
+		return "LengthMismatch";
+	}
+	if e is *regex.MissingGroup {
+		return "MissingGroup";
+	}
+	if e is *regex.TooExpensive {
+		return "TooExpensive";
+	}
+	return "other";
+}
+
+fn failed(label: str, e: *lang.Error)
+{
+	let name = fail_name(e);
+	printf("%.*s %.*s\n".ptr, label.len as c_int, label.ptr, name.len as c_int,
+		name.ptr);
+}
+
+fn sequences()
+{
+	let room: [5]byte = [0x41, 0x42, 0x00, 0x41, 0x42];
+	let bytes = room[0..5];
+	let n = bytes.patch(x"", x"");
+	show("empty find", n, bytes);
+	n = bytes.patch(x"41", x"61", 0, 0, -5);
+	show("from the end past every place", n, bytes);
+}
+
+fn compiled()
+{
+	let data = "k=1;v=2".to_bytes();
+	let r = ByteRegex.compile("(?<key>k)=(?<value>\\d)") catch fatal;
+	let n = data.patch(r, b"9", "value") catch fatal;
+	show("by name", n, data);
+	n = data.patch(r, b"9", "nothing") catch e {
+		failed("no such name", e);
+		yield -1;
+	};
+	show("unchanged", n, data);
+	let maybe = ByteRegex.compile("(x)?=") catch fatal;
+	n = data.patch(maybe, b"!", 1) catch fatal;
+	show("group took no part", n, data);
+	free(data.ptr);
+	let pairs = "k=a;k=b".to_bytes();
+	let shared = ByteRegex.compile("(?J)k=(?<v>a)|k=(?<v>b)") catch fatal;
+	n = pairs.patch(shared, b"X", "v") catch fatal;
+	show("a name of two groups", n, pairs);
+	free(pairs.ptr);
+}
+
+fn main() -> int
+{
+	sequences();
+	compiled();
+	return 0;
+}
