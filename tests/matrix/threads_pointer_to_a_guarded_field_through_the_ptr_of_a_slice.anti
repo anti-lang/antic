@@ -1,0 +1,28 @@
+//! The `ptr` of a slice of a guarded array, taken inside the `sync` on its
+//! lock, points at the field, so its use after the block is refused.
+
+concurrent class Tally
+{
+	lock: Mutex,
+	cells: [4]int = [0; 4] guarded by lock,
+
+	pub fn first(self) -> int
+	{
+		let other = 0;
+		let p: ?*int = &other;
+		sync self.lock {
+			p = self.cells[0..4].ptr;
+		}
+		return read(p);
+	}
+}
+
+fn read(p: ?*int) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}
