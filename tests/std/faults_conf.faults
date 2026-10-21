@@ -3,11 +3,12 @@
 # and configure reads it with the second, a seek of its size, the check
 # that it is no directory and a read. alloc counts the memory of the
 # runtime after the start: the path of the write is the fifth, the
-# configuration takes the sixth to the eighth and its reader of TOML the
-# ninth on.
+# configuration takes the sixth to the eighth, the last for the bytes of
+# the file, and its reader of TOML the ninth on.
 open_refused open:2:EACCES
 read_refused read:1:EIO
 size_refused seek:1:EINVAL
 kind_unstated stat:1:EACCES
 configuration_memory alloc:6:ENOMEM
+file_memory alloc:8:ENOMEM
 toml_memory alloc:9:ENOMEM
