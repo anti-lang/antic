@@ -29,6 +29,8 @@ pub extern fn fn_volatile(p: ?*c_int);
 
 pub extern fn fn_unnamed(p0: c_int, p1: c_float) -> c_int;
 
+pub extern fn fn_twice(first: c_int) -> c_int;
+
 pub extern fn fn_inline_none() -> c_int;
 
 pub extern fn fn_inline_void(x: c_int);
