@@ -1,0 +1,10 @@
+# An array value of the table runtime, then the table injections. The reader
+# of the array stops at the key of the other table, which names the provider
+# of a library for the logger of service.anti.
+[runtime]
+plugins = [
+	'a',
+	'b',
+]
+[injections]
+'service.Logger' = 'lib/z.so'

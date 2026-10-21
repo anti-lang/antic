@@ -1,0 +1,1 @@
+anti: .*array-logger\.toml:10: service\.Logger comes from a library: lib/z\.so: .*

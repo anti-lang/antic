@@ -2420,7 +2420,9 @@ add_test(NAME conf_hash_seed_random
 # the library that --anti.inject names through the loader of the runtime,
 # which every program links, S328 of docs/audit/summary.md. The case
 # layers names the library of the second of two lines of the command
-# line, over the line of a file for the same interface. The runner
+# line, over the line of a file for the same interface. The case
+# after_array reads the line of the table injections that follows an array
+# value of the table runtime. The runner
 # is the one of the configuration tests, because a pattern file holds the
 # output of each.
 set(INJECT "${CMAKE_CURRENT_SOURCE_DIR}/inject")
@@ -2431,7 +2433,8 @@ foreach(case
         "final|${INJECT_OPTIONS}|--anti.inject=service.Clock=lib/x.so|empty.pattern|final.pattern|70"
         "unknown|${INJECT_OPTIONS}|--anti.inject=other.Thing=lib/x.so|empty.pattern|unknown.pattern|70"
         "plugin|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so|empty.pattern|plugin.pattern|70"
-        "layers|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so,--anti.inject=service.Logger=lib/y.so,--anti.conf=${INJECT}/logger.toml|empty.pattern|layers.pattern|70")
+        "layers|${INJECT_OPTIONS}|--anti.inject=service.Logger=lib/x.so,--anti.inject=service.Logger=lib/y.so,--anti.conf=${INJECT}/logger.toml|empty.pattern|layers.pattern|70"
+        "after_array|${INJECT_OPTIONS}|--anti.conf=${INJECT}/array-logger.toml|empty.pattern|array-logger.pattern|70")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 options)
