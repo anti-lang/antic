@@ -36,6 +36,7 @@ anti_build_message_fault_library_read_partway T152 A library file read part of t
 anti_doc_message_fault_library_read_partway T152 A library file read part of the way gets a second line with the bytes of an error buffer nothing wrote.
 anti_bind_message_fault_header_read_partway T152 A library file read part of the way gets a second line with the bytes of an error buffer nothing wrote.
 anti_build_message_fault_object_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
+anti_build_message_fault_imported_object_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_test_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_check_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_doc_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.

@@ -152,6 +152,13 @@ anti_message(run_lines_of_a_trace_through_two_modules STATUS 0
     ARGS run ${tools}
     ERR "com.example.where.taken 8"
         "com.example.app.main 10")
+# A package without a version builds, and the key of its cached objects
+# names no version.
+anti_message(run_without_a_version STATUS 0
+    FILES anti.toml "[package]\nname = \"com.example.app\"\n"
+          ${app_source} "//! A program of a package without a version.\n\nimport anti.io;\n\nfn main() -> int\n{\n\tio.println(\"no version\");\n\treturn 0;\n}\n"
+    ARGS run ${tools}
+    OUT "no version")
 # R168 of "Rules of 2026-10-13" in docs/decisions.md: a library project
 # without the module whose path is the name of the package builds, with a
 # warning.
@@ -749,6 +756,15 @@ anti_message(fault_build_directory_not_made
 anti_message(fault_object_directory_not_made
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     FAULT mkdir:13:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot make ${dev_dir}/obj/com/example")
+# T153: the directory of the object of a module that the program imports,
+# module_object of build.c.
+anti_message(fault_imported_object_directory_not_made
+    FILES anti.toml "${manifest_package}"
+          ${app_source} "//! The program.\n\nimport com.example.one;\n\nfn main() -> int\n{\n\treturn one.one() - 1;\n}\n"
+          src/com/example/one.anti "${library_text}"
+    FAULT mkdir:27:EACCES
     ARGS build ${tools}
     ERR "anti: cannot make ${dev_dir}/obj/com/example")
 # T152: the library file of the module, which the link reads for its
