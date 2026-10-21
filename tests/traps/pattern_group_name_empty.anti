@@ -1,0 +1,15 @@
+//! An empty group name computed at run time stops the program as a name the
+//! pattern lacks, since no group of a pattern has an empty name.
+
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let m = "2026-09".matches(re"(?<year>\d+)-(?<month>\d+)") else {
+		return 1;
+	};
+	let b = text.Builder.new();
+	let g = m.group(b.text());
+	return g.len as int;
+}

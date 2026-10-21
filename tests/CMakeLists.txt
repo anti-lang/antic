@@ -1929,7 +1929,8 @@ add_test(NAME trap_table
 # cast_failed: `p as *T` on an object of no class below T stops it with
 # the name of T. pattern_group_name and pattern_template: a group name and
 # a template computed at run time that the pattern literal lacks stop the
-# program with the name or the template. pattern_group_bytes: a group of a
+# program with the name or the template, and pattern_group_name_empty an
+# empty name as well. pattern_group_bytes: a group of a
 # byte match past those of its pattern stops it with their count.
 # send_closed and send_closed_waiting: a `send` on a closed channel stops
 # it, one that waits on a full channel included. take_in_refused,
@@ -1942,8 +1943,8 @@ add_test(NAME trap_table
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         singleton_memory pattern_limit pattern_group_count pattern_patch_into
         pattern_patch_into_two_groups
-        chan_capacity cast_failed pattern_group_name pattern_template
-        pattern_group_bytes
+        chan_capacity cast_failed pattern_group_name pattern_group_name_empty
+        pattern_template pattern_group_bytes
         send_closed send_closed_waiting take_in_refused error_text_refused
         trace_names_refused room_list room_list_reserve room_deque_reserve
         room_grid room_map room_map_reserve room_hash_map room_sorted
