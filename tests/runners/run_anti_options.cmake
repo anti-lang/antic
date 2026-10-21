@@ -31,7 +31,9 @@
 #                      module path
 #   bind_define_name   `bind -D <name>` reaches clang
 #   bind_define_value  `bind -D <name>=<value>` reaches clang
-#   bind_define_shim   `bind -D` reaches the shim
+#   bind_define_shim   `bind -D <name>=<value>` reaches the shim
+#   bind_define_shim_name
+#                      `bind -D <name>` reaches the shim
 #   bind_target        `bind --target` reads the header as clang reads it
 #                      for Linux and for Windows
 #   symbols_from       `symbols inventory --from` reads the archives of
@@ -419,6 +421,17 @@ if(CASE STREQUAL "bind_define_shim")
     file(READ "${WORK}/option/shim_api.c" option)
     lacks("${plain}" "#define LIMIT" "the shim without -D")
     holds("${option}" "#define LIMIT 7\n" "the shim of -D LIMIT=7")
+    return()
+endif()
+
+if(CASE STREQUAL "bind_define_shim_name")
+    bind_plain("#ifdef WIDE\n#define LIMIT 7\n#else\n#define LIMIT 3\n#endif\nstatic inline int scaled(int a) { return a * LIMIT; }\n")
+    anti_passes("anti bind -D" "${WORK}" bind --clang api.h -o option
+                --runtime "${RUNTIME}" -D WIDE)
+    file(READ "${WORK}/plain/shim_api.c" plain)
+    file(READ "${WORK}/option/shim_api.c" option)
+    lacks("${plain}" "#define WIDE" "the shim without -D")
+    holds("${option}" "#define WIDE\n" "the shim of -D WIDE")
     return()
 endif()
 

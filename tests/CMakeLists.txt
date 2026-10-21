@@ -6429,7 +6429,8 @@ endforeach()
 # changes nothing of one of Windows. A Mac alone links for macOS, and the
 # other two link from every host whose runtime archive holds the sysroot.
 set(anti_option_cases strip_docs check_root_library check_root_source
-    bind_define_name bind_define_value bind_define_shim release_path
+    bind_define_name bind_define_value bind_define_shim
+    bind_define_shim_name release_path
     library_root)
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_option_cases soname_macos)
