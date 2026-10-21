@@ -8,6 +8,12 @@ anti_message(no_source STATUS 2
     FILES src/notes.txt "No module.\n"
     ARGS fmt
     ERR "anti: no .anti file under src or test")
+# A name that starts with a dot is hidden, and the walk of the source
+# directory takes no such file, walk of files.c.
+anti_message(no_source_hidden STATUS 2
+    FILES src/com/example/.draft.anti "fn main() -> int\n{\n\treturn 0;\n}\n"
+    ARGS fmt
+    ERR "anti: no .anti file under src or test")
 # The file ends inside a string, so the lexer refuses it.
 anti_message(does_not_lex
     FILES open.anti "fn main() -> int\n{\n\tlet s = \"open;\n\treturn 0;\n}\n"
