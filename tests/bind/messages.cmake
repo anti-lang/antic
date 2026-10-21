@@ -132,6 +132,13 @@ anti_message(clang_pack_pop_of_an_empty_stack STATUS 0
     FILES api.h "#pragma clang diagnostic ignored \"-Wignored-pragmas\"\n#pragma pack(pop)\nstruct Plain { char a; int b; };\nvoid take(struct Plain *p);\n"
     OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
     ARGS ${clang_bind})
+# An empty struct, a GNU extension of C, has no list of fields in the AST
+# of clang at all.
+anti_message(clang_struct_without_a_field STATUS 0
+    FILES api.h "struct Empty {};\nvoid take(struct Empty *e);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `Empty` has no field and is left out")
 anti_message(clang_aligned_without_a_value
     FILES api.h "struct __attribute__((aligned)) Most { int a; };\nvoid take(struct Most *m);\n"
     ARGS ${clang_bind}
