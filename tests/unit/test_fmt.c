@@ -81,6 +81,13 @@ static void open_anonymous(void)
 
 /* One rule per source, and the form it gives. The parser would refuse
    the last six, and the formatter writes each as far as its rules reach. */
+/* A space and 80 more before the text of a doc line, past the 80 bytes
+   that wrap_doc of fmt.c keeps for the indent of a line. */
+#define TEN_SPACES "          "
+#define DEEP_INDENT                                                        \
+    " " TEN_SPACES TEN_SPACES TEN_SPACES TEN_SPACES TEN_SPACES TEN_SPACES \
+        TEN_SPACES TEN_SPACES
+
 static void odd_sources(void)
 {
     static const char *const cases[][2] = {
@@ -130,6 +137,14 @@ static void odd_sources(void)
            statement takes the depth of the continuation. */
         {"fn main()\n{\n\tlet x =\n\t\tf(fn() {\n\t\t\tg();\n\t\t});\n}\n",
          "fn main()\n{\n\tlet x =\n\t\tf(fn() {\n\t\t\tg();\n\t\t});\n}\n"},
+        /* A line of a block comment that holds the `*` of the gutter
+           alone becomes an empty line. */
+        {"/**\n * a\n *\n * b\n */\nfn main()\n{\n}\n",
+         "/**\na\n\nb\n*/\nfn main()\n{\n}\n"},
+        /* A doc line indented past the room of the wrap stands as it
+           was written. */
+        {"/// a\n///" DEEP_INDENT "word\nfn main()\n{\n}\n",
+         "/// a\n///" DEEP_INDENT "word\nfn main()\n{\n}\n"},
     };
     size_t i;
 
