@@ -231,6 +231,60 @@ anti_message(clang_flexible_array STATUS 0
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `Buf` is left out: Anti has no form for the type of its field `data`")
 
+# A tag that a parameter declares first is known to that function alone.
+# A struct of that kind is opaque behind its pointer, and an enum has no
+# form. The pragma keeps the warning of clang out of the standard error.
+set(visible "#pragma clang diagnostic ignored \"-Wvisibility\"\n")
+anti_message(clang_struct_declared_in_a_parameter STATUS 0
+    FILES api.h "${visible}void take(struct Nope *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
+anti_message(clang_enum_declared_in_a_parameter STATUS 0
+    FILES api.h "${visible}void take(enum Nope e);\n"
+    OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `take` is left out: Anti has no form for the type of a parameter")
+# An enum without a tag is constants alone, so a field of that type has no
+# type of the binding.
+anti_message(clang_field_of_an_anonymous_enum STATUS 0
+    FILES api.h "struct S { enum { A1, B1 } e; };\nvoid take(struct S *s);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `S` is left out: Anti has no form for the type of its field `e`")
+# A function declared through a typedef of a function type, whose spelling
+# holds no parenthesis.
+anti_message(clang_function_through_a_typedef STATUS 0
+    FILES api.h "typedef int F(void);\nF f;\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
+# An enum without a tag whose value leaves int has a base of its own, which
+# its constant and a macro that names it take.
+anti_message(clang_wide_anonymous_enum_in_a_macro STATUS 0
+    FILES api.h "enum { BIG = 0x100000000 };\n#define M BIG\n"
+    OUT "bind: anti.api from api.h, 0 functions, 0 warnings"
+    ARGS ${clang_bind})
+# A packed enum holds an attribute among its enumerators.
+anti_message(clang_packed_enum STATUS 0
+    FILES api.h "enum __attribute__((packed)) E { A };\nvoid take(enum E e);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
+# A chain of typedefs deeper than the parser of a type goes has no form.
+set(chain "typedef int A0;\n")
+foreach(i RANGE 1 299)
+    math(EXPR before "${i} - 1")
+    string(APPEND chain "typedef A${before} A${i};\n")
+endforeach()
+anti_message(clang_typedef_chain_too_deep STATUS 0
+    FILES api.h "${chain}A299 f(void);\n"
+    OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `f` is left out: Anti has no form for its result")
+# The probe finds no value other than zero in an enum of one value 0.
+anti_message(clang_probe_of_an_enum_of_zero STATUS 0
+    FILES api.h "enum Zero { ZERO };\nstruct Z { enum Zero z; };\nstruct P { struct Z a; struct Z b; int x; };\nvoid take(struct P *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind} --probe)
+
 # A clang that anti was not tested against. The copy of anti takes the
 # first clang on PATH, which a shell script stands in for.
 if(NOT CMAKE_HOST_WIN32)
@@ -279,6 +333,87 @@ if(NOT CMAKE_HOST_WIN32)
         ENV "PATH=${WORK}/fake:$ENV{PATH}"
         ARGS ${clang_bind}
         ERR "anti: the AST of clang is not JSON: the end of the input where a value belongs at line 2, column 1")
+    # A clang that serves the AST of ast.json and the header after the
+    # preprocessor of pre.i, where the case writes one.
+    function(clang_serving_files)
+        write_clang("for a in \"$@\"; do\n    case \"$a\" in\n    --version) echo 'clang version ${CLANG_VERSION}'; exit 0 ;;\n    -print-resource-dir) echo /nowhere; exit 0 ;;\n    -E) if [ -f pre.i ]; then cat pre.i; fi; exit 0 ;;\n    esac\ndone\ncat ast.json\n")
+    endfunction()
+    # A variable without a name.
+    anti_message(clang_ast_variable_without_a_name COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": [{\"kind\": \"VarDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}}]}\n"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+        ARGS ${clang_bind}
+        ERR "anti: api.h: warning: the variable `` is skipped")
+    # Two typedefs that name each other resolve to no type.
+    anti_message(clang_ast_typedef_cycle COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": [{\"kind\": \"TypedefDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"A\", \"type\": {\"qualType\": \"B\"}}, {\"kind\": \"TypedefDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"B\", \"type\": {\"qualType\": \"A\"}}, {\"kind\": \"FunctionDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"f\", \"type\": {\"qualType\": \"A (void)\"}}]}\n"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+        ARGS ${clang_bind}
+        ERR "anti: api.h: warning: `f` is left out: Anti has no form for its result")
+    # An enum without a tag takes the name of its typedef, which `enum`
+    # then names.
+    anti_message(clang_ast_enum_named_by_its_typedef COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": [{\"kind\": \"EnumDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"id\": \"0x1\", \"inner\": [{\"kind\": \"EnumConstantDecl\", \"name\": \"X\"}]}, {\"kind\": \"TypedefDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"Mode\", \"type\": {\"qualType\": \"Mode\"}, \"inner\": [{\"decl\": {\"id\": \"0x1\", \"name\": \"\"}}]}, {\"kind\": \"FunctionDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"h\", \"type\": {\"qualType\": \"void (enum Mode)\"}}]}\n"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+        ARGS ${clang_bind})
+    # A value that is no number, and one below the least int64_t, count
+    # on from the enumerator before.
+    anti_message(clang_ast_enumerators_without_a_value COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": [{\"kind\": \"EnumDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"E\", \"inner\": [{\"kind\": \"EnumConstantDecl\", \"name\": \"A\", \"inner\": [{\"kind\": \"ConstantExpr\", \"value\": \"seven\"}]}, {\"kind\": \"EnumConstantDecl\", \"name\": \"B\", \"inner\": [{\"kind\": \"ConstantExpr\", \"value\": \"-99999999999999999999\"}]}]}]}\n"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 0 functions, 0 warnings"
+        ARGS ${clang_bind})
+    # A part without a kind and a field without a type are passed over, and
+    # an anonymous record with no field after it is named by its count.
+    anti_message(clang_ast_parts_of_a_record_without_a_type COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": [{\"kind\": \"RecordDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"S\", \"tagUsed\": \"struct\", \"completeDefinition\": true, \"inner\": [{\"name\": \"q\"}, {\"kind\": \"FieldDecl\", \"name\": \"t\"}, {\"kind\": \"FieldDecl\", \"name\": \"x\", \"type\": {\"qualType\": \"int\"}}, {\"kind\": \"RecordDecl\", \"tagUsed\": \"struct\", \"completeDefinition\": true, \"inner\": []}]}]}\n"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+        ARGS ${clang_bind}
+        ERR "anti: api.h: warning: `S_anon0` has no field and is left out")
+    # A function without a name or a type is passed over, and a parameter
+    # without a type is spelled `int` in C.
+    anti_message(clang_ast_functions_without_a_type COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": [{\"kind\": \"FunctionDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"type\": {\"qualType\": \"void (void)\"}}, {\"kind\": \"FunctionDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"n\"}, {\"kind\": \"FunctionDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"p\", \"type\": {\"qualType\": \"void (int)\"}, \"inner\": [{\"kind\": \"ParmVarDecl\", \"name\": \"a\"}]}]}\n"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+        ARGS ${clang_bind})
+    # The spelling of an anonymous record that does not close.
+    anti_message(clang_ast_anonymous_type_without_its_end COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": [{\"kind\": \"RecordDecl\", \"loc\": {\"file\": \"api.h\", \"line\": 1}, \"name\": \"S\", \"tagUsed\": \"struct\", \"completeDefinition\": true, \"inner\": [{\"kind\": \"RecordDecl\", \"tagUsed\": \"struct\", \"completeDefinition\": true, \"inner\": [{\"kind\": \"FieldDecl\", \"name\": \"a\", \"type\": {\"qualType\": \"int\"}}]}, {\"kind\": \"FieldDecl\", \"name\": \"x\", \"type\": {\"qualType\": \"struct (unnamed at api.h:1:1\"}}]}]}\n"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+        ARGS ${clang_bind}
+        ERR "anti: api.h: warning: `S` is left out: Anti has no form for the type of its field `x`")
+    # A line marker without a file keeps the file, and the last line of the
+    # header after the preprocessor ends without a newline.
+    anti_message(clang_ast_line_marker_without_a_file COPY STATUS 0
+        FILES api.h "int v;\n" ast.json "{\"kind\": \"TranslationUnitDecl\", \"inner\": []}\n" pre.i "# 1 \"api.h\"\n# 2\n#define X 1\n#define Y"
+        SETUP clang_serving_files
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+        ARGS ${clang_bind}
+        ERR "anti: api.h: warning: the macro `Y` has no value and is skipped")
+    # A first line that names no clang version, before the line that does.
+    function(clang_version_on_the_second_line)
+        write_clang("echo 'Another compiler'\necho 'clang version ${CLANG_VERSION}'\n")
+    endfunction()
+    anti_message(clang_version_on_the_second_line COPY
+        FILES api.h "int count(void);\n"
+        SETUP clang_version_on_the_second_line
+        ENV "PATH=${WORK}/fake:$ENV{PATH}"
+        ARGS ${clang_bind}
+        ERR "anti: clang is clang -1, and ${clang_where}")
 endif()
 
 # A macro of one float whose value %g writes with an exponent above zero,
