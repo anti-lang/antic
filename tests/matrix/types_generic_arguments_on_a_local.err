@@ -1,0 +1,1 @@
+types_generic_arguments_on_a_local.anti:8:11: error: `s` is not generic. Put the comparison in parentheses

@@ -1,0 +1,10 @@
+//! A local followed by type arguments and `.`, which the rule of C# reads as a
+//! generic name. The local is not generic, and the message names the comparison
+//! that the parentheses keep.
+
+fn main() -> int
+{
+	let s = "abc";
+	let n = s<int>.len;
+	return 0;
+}
