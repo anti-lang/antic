@@ -11,7 +11,7 @@
 #             simd, classes, failing, tuples, flags, ledger, variants,
 #             nested, names, handlers, generics, optional, forms, views,
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
-#             tight or tight_aligned
+#             tight, tight_aligned or callbacks
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -419,6 +419,17 @@ elseif(CASE STREQUAL "handlers")
             SOURCES "${SOURCES}/handlers.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/handlers${EXE}" "${SOURCES}/handlers.expected")
+elseif(CASE STREQUAL "callbacks")
+    # A callback whose parameters are a struct, a tuple, an enum and a
+    # function with its context, each written without a name.
+    library(callbacks static "${dir}")
+    expect_header("${dir}/callbacks.h" callbacks.h)
+    string(STRIP "${tool_stdout}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    program("${dir}/callbacks${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/callbacks.c"
+            INPUTS "${library_file}" "${runtime_library}")
+    expect_output("${dir}/callbacks${EXE}" "${SOURCES}/callbacks.expected")
 elseif(CASE STREQUAL "names")
     # The header gives two fields whose names share a long prefix one C
     # name each, writes a whole float constant as a float of its type, and

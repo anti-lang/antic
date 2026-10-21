@@ -2867,7 +2867,7 @@ add_test(NAME float_digits
 foreach(case static shared exports two loader header bundle classes
         failing tuples flags variants nested simd names handlers ledger
         generics optional forms views never never_cpp ctypes
-        ctypes_shared ctypes_bundle tight tight_aligned)
+        ctypes_shared ctypes_bundle tight tight_aligned callbacks)
     # The C program of ledger starts its threads with pthreads.
     if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
         continue()

@@ -1,0 +1,29 @@
+//! What the header of a library writes for a callback whose parameters
+//! carry no name: a struct, a tuple, an enum and a function with its
+//! context.
+
+/// A point that the callback of `apply` takes.
+export struct Point
+{
+	x: c_int,
+	y: c_int,
+}
+
+/// A color that the callback of `apply` takes.
+export enum Color
+{
+	Red,
+	Green,
+}
+
+/// Apply f to a point, a pair and a color.
+export fn apply(f: fn(Point, (c_int, c_int), Color) -> c_int) -> c_int
+{
+	return f(Point { x: 1, y: 2 }, (3, 4), Color.Green);
+}
+
+/// Call g with a function of the library that adds one.
+export fn nest(g: fn(fn(c_int) -> c_int) -> c_int) -> c_int
+{
+	return g(fn(n) { return n + 1; });
+}
