@@ -328,6 +328,22 @@ anti_message(fault_out_not_made
     FAULT mkdir:2:EACCES
     ARGS bind api.json -o ../out
     ERR "anti: cannot make ../out")
+# The list of the values of an array or an object of the JSON reader,
+# list_add of jsontree.c, whose values and names take memory of their own.
+# The array of `functions` takes the fifteenth and the sixteenth, and the
+# object around it the seventeenth and the eighteenth.
+foreach(case "array_values|15|17" "array_names|16|17"
+             "object_values|17|18" "object_names|18|18")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 count)
+    list(GET parts 2 column)
+    anti_message(fault_json_${name}_memory
+        FILES api.json "{\"functions\": [1]}"
+        FAULT alloc:${count}:ENOMEM
+        ARGS bind api.json -o ../out
+        ERR "anti: api.json is not JSON: out of memory at line 1, column ${column}")
+endforeach()
 # T152: the library file of anti bind --header stops part of the way,
 # driver_library_header of driver.c. The fourth read meets the end of
 # the file. A build of the project writes the library file.
