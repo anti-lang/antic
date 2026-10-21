@@ -1,7 +1,8 @@
 /* A C program that calls the functions of the library failing that may
    fail and the `construct` of its class. One of them takes a C function
-   in the ABI form. It takes the path that succeeds and the path that
-   reports an error. The error is a pointer C passes on and never reads. */
+   in the ABI form, and one that never fails takes such a function as
+   well. It takes the path that succeeds and the path that reports an
+   error. The error is a pointer C passes on and never reads. */
 #include "../binary_stdio.h"
 #include <stdio.h>
 
@@ -48,6 +49,7 @@ int main(void)
     e = failing_apply_in(halve_in, &one, 12, &half);
     printf("%d\n", e == NULL);
     printf("%d\n", failing_twice(21));
+    printf("%d %d\n", failing_or(halve, 12, -1), failing_or(halve, 5, -1));
     /* The helper writes the tables and the defaults, then runs
        `construct` with the arguments. */
     e = anti_Gauge_construct(&g, 5);

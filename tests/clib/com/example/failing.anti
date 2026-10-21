@@ -8,6 +8,16 @@ export struct Counter
 	n: c_int,
 }
 
+/// f of n, or d when f fails. C passes a function of the ABI form, and the
+/// signature names the error through it alone.
+export fn failing_or(keep f: fn(c_int) -> c_int may fail, n: c_int, d: c_int) -> c_int
+{
+	let v = f(n) catch e {
+		return d;
+	};
+	return v;
+}
+
 /// Halve n, or fail when it is odd.
 export fn failing_half(n: c_int) -> c_int may fail
 {

@@ -88,6 +88,11 @@ static inline Gauge *anti_Gauge_dup(Gauge *self)
 
 
 
+/**
+ * f of n, or d when f fails. C passes a function of the ABI form, and the
+ * signature names the error through it alone.
+ */
+int32_t failing_or(struct anti_Error *(*f)(int32_t, int32_t * /* non-null */), int32_t n, int32_t d);
 /** Halve n, or fail when it is odd. */
 /* May fail: NULL on success, an error otherwise. */
 struct anti_Error *failing_half(int32_t n, int32_t * /* non-null */ out);
