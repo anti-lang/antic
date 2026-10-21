@@ -2791,6 +2791,19 @@ add_test(NAME plugin_versions
         "-DEXE=${plugin_exe}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions"
         -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
+# The table of stubs of a load when memory runs out, as the cases of
+# <host>.faults above.
+if(ANTIC_FAULTS AND NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME plugin_versions_fault_stubs_memory
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DFAULT_RUNTIME=${ANTIC_FAULTS_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions-faults"
+            -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
+endif()
 
 # ANTI_CONF names the file when the command line names none, and the
 # command line wins when both name one. It is the one environment
