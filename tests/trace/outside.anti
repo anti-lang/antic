@@ -1,0 +1,34 @@
+//! A trace whose frames lie outside every module. `text` writes such a frame
+//! as its address and `-` and names no module for it, and `symbolize` names
+//! no function for it. A frame of the program between them keeps its module
+//! and its name, and the second frame of the same module names no module
+//! again.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let captured = lang.StackTrace.capture();
+	let real = captured.frames[0];
+	delete(captured);
+	let frames = alloc(lang.RawFrame, 4) else {
+		return 1;
+	};
+	frames[0] = lang.RawFrame { address: 16, module: "", build_id: "", base: 0 };
+	frames[1] = real;
+	frames[2] = lang.RawFrame { address: 0, module: "", build_id: "", base: 0 };
+	frames[3] = real;
+	let t = alloc lang.StackTrace {
+		frames: []lang.RawFrame { ptr: frames, len: 4 },
+	};
+	defer delete(t);
+	let s = t.text();
+	printf("%.*s\n".ptr, s.len as c_int, s.ptr);
+	for f in t.symbolize() {
+		printf("%llx [%.*s] %lld\n".ptr, f.address, f.function.len as c_int,
+			f.function.ptr, f.line);
+	}
+	return 0;
+}

@@ -2215,6 +2215,7 @@ foreach(case
         "stack_g|stack_trace|-g||stack_trace.g.pattern||0"
         "stack_dev|stack_trace|--dev||stack_trace.pattern||0"
         "forged|forged|||forged.pattern||0"
+        "outside|outside|||outside.pattern||0"
         "copies|copies|||copies.release.pattern||0"
         "copies_g|copies|-g||copies.release.pattern||0"
         "copies_dev|copies|--dev||copies.pattern||0"
