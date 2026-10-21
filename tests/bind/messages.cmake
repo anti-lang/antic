@@ -182,6 +182,12 @@ anti_message(clang_field_type STATUS 0
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `Odd` is left out: Anti has no form for the type of its field `z`")
+# A flexible array member has no length, so Anti has no form for it.
+anti_message(clang_flexible_array STATUS 0
+    FILES api.h "struct Buf { int n; int data[]; };\nvoid take(struct Buf *b);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `Buf` is left out: Anti has no form for the type of its field `data`")
 
 # A clang that anti was not tested against. The copy of anti takes the
 # first clang on PATH, which a shell script stands in for.
