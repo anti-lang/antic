@@ -1,0 +1,23 @@
+//! An operator of a generic class takes a type parameter of its own, which its
+//! second operand names through the class with that argument. R067 of "Rules of
+//! 2026-10-13" takes it, and each use gives the parameter.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub v: T,
+
+	operator fn add<U>(self, other: Box<U>) -> int
+	{
+		return size_of(T) * 10 + size_of(U);
+	}
+}
+
+fn main() -> int
+{
+	let a = Box<int> { v: 1 };
+	let b = Box<u8> { v: 2 };
+	printf("%lld %lld\n".ptr, a + b, b + a);
+	return 0;
+}
