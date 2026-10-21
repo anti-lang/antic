@@ -1,0 +1,23 @@
+//! `alloc(T, n)` of a class fills the memory with zeros, so an element not
+//! filled yet has a zero table. `type_name` dispatches nothing, and gives the
+//! empty text there, and the name of the class once the element holds a value.
+import anti.io;
+import anti.text;
+
+class Tag
+{
+	pub label: str = "t",
+}
+
+fn main() -> int
+{
+	let tags = alloc(Tag, 2) else {
+		return 1;
+	};
+	tags[1] = Tag { label: "two" };
+	let line = f"[{tags[0].type_name()}] [{tags[1].type_name()}]";
+	io.println(line);
+	free(line.ptr);
+	free(tags);
+	return 0;
+}
