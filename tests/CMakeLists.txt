@@ -797,6 +797,12 @@ antic_program_test(program_object_defaults_no_reflect
     "${CMAKE_CURRENT_SOURCE_DIR}/programs/object_defaults.anti"
     OPTIONS "--no-reflect"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-no-reflect")
+# The text of a collection of structs and of `?T` without the field
+# lists, which gives the text it gives with them.
+antic_program_test(std_collection_text_values_no_reflect
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/collection_text_values.anti"
+    OPTIONS "--no-reflect"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-no-reflect")
 # The default hash in dev mode, which writes it in each module apart, and
 # the patterns of `for`.
 foreach(name IN ITEMS hash_builtin hash_default for_patterns lent_derived

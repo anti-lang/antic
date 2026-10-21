@@ -1,0 +1,25 @@
+//! The text of a collection whose elements are values with parts, a struct and
+//! a `?T` that holds a number. `to_text` writes each part, in every build.
+//! `std_collection_text_values_no_reflect` runs the program under
+//! `--no-reflect`, which drops the field lists of the descriptors, and expects
+//! the same text.
+
+import anti.collection.list.{List};
+import anti.io;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn main() -> int
+{
+	let points = List<Point>.new();
+	points.push(Point { x: 1, y: 2 });
+	io.println(points.to_text());
+	let counts = List<?int>.new();
+	counts.push(4);
+	io.println(counts.to_text());
+	return 0;
+}
