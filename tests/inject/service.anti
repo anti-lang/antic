@@ -3,7 +3,8 @@
 //! it, the provider of `Clock` is a module function, and the one of `Allocator`
 //! is the name of a singleton that inherits it, whose `get` the provider is.
 //! `inject final` marks a field the run-time configuration may not replace, and
-//! a field of an interface may be called `alloc`.
+//! a field of an interface may be called `alloc`. The calls reach both slots of
+//! `Allocator`, so `--anti.inspect` counts two of them.
 extern fn printf(fmt: ?*byte, ...) -> c_int;
 
 abstract class Logger
@@ -19,6 +20,7 @@ abstract class Clock
 abstract class Allocator
 {
 	abstract fn room(self) -> int;
+	abstract fn spare(self) -> int;
 }
 
 singleton class Console
@@ -49,6 +51,11 @@ singleton class Memory inherits Allocator
 	{
 		return 3;
 	}
+
+	concrete fn spare(self) -> int
+	{
+		return 4;
+	}
 }
 
 fn the_clock() -> *Clock
@@ -74,7 +81,7 @@ class Service
 	pub fn report(self)
 	{
 		self.log.say(self.time.now());
-		self.log.say(self.alloc.room());
+		self.log.say(self.alloc.room() + self.alloc.spare());
 	}
 }
 

@@ -1,0 +1,1 @@
+anti: .*outside-key\.toml:1: colour is no key of the runtime configuration, which takes include, the table injections and the keys backtrace, hash_seed, logger, plugins, threads and trace of the table runtime

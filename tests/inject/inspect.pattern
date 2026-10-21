@@ -8,5 +8,5 @@ trace =  \(build\)
 injectable interfaces:
   service\.Logger \(service\.Service\.log\) version 0\.0\.0, 1 used slot
   service\.Clock \(service\.Service\.time, final\) version 0\.0\.0, 1 used slot
-  service\.Allocator \(service\.Service\.alloc\) version 0\.0\.0, 1 used slot
+  service\.Allocator \(service\.Service\.alloc\) version 0\.0\.0, 2 used slots
 loaded plugins: none

@@ -2304,6 +2304,7 @@ foreach(case
         "element_key|report||--anti.conf=${CONF}/element-key.toml|empty.pattern|element-key.pattern|70"
         "configure_twice|configure_twice||${CONF}/backtrace.toml,${CONF}/no-backtrace.toml|configure-twice.pattern||0"
         "unknown_key|report||--anti.conf=${CONF}/unknown-key.toml|empty.pattern|unknown-key.pattern|70"
+        "outside_key|report||--anti.conf=${CONF}/outside-key.toml|empty.pattern|outside-key.pattern|70"
         "bad_value|report||--anti.conf=${CONF}/bad-value.toml|empty.pattern|bad-value.pattern|70"
         "nul_value|report||--anti.conf=${CONF}/nul-value.toml|empty.pattern|nul-value.pattern|70"
         "not_toml|report||--anti.conf=${CONF}/not-toml.toml|empty.pattern|not-toml.pattern|70"
