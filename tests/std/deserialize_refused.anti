@@ -1,0 +1,90 @@
+//! `Object.deserialize` takes every block of the object it makes from the
+//! allocator it is given, and an allocator that refuses a block fails the text.
+//! `Budget` lends a fixed number of blocks and refuses the next. The program
+//! reads one text with every budget from none up to the one that is enough, so
+//! the refusal falls once on each block: the object, its string, the elements
+//! of its slice and the struct it owns. Each read that fails gives back every
+//! block it took. `delete` gives back what the object owns, and the string
+//! stays lent until the caller gives it back.
+import anti.mem;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+/// An allocator over the C library that lends `left` more blocks.
+class Budget inherits mem.Allocator
+{
+	pub left: int = 0,
+	pub live: int = 0,
+
+	concrete fn alloc(self, size: int, align: int) -> ?*byte
+	{
+		if self.left == 0 {
+			return none;
+		}
+		let p = mem.LibcAllocator.get().alloc(size, align) else {
+			return none;
+		};
+		self.left -= 1;
+		self.live += 1;
+		return p;
+	}
+
+	concrete fn free(self, p: ?*byte)
+	{
+		if p != none {
+			self.live -= 1;
+		}
+		mem.LibcAllocator.get().free(p);
+	}
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Record
+{
+	pub name: str = "",
+	pub own counts: []i32,
+	pub own at: ?*Point = none,
+}
+
+fn main() -> int
+{
+	let made = alloc Record {
+		name: "rec",
+		counts: []i32 { ptr: alloc(i32, 2), len: 2 },
+		at: alloc Point { x: 4, y: 5 },
+	};
+	made.counts[0] = 7;
+	made.counts[1] = -8;
+	let b = text.Builder.new();
+	made.serialize(&b);
+	delete(made);
+	let input = b.text();
+	let n = 0;
+	while n < 16 do {
+		let budget = Budget { left: n };
+		let back = Object.deserialize(input, &budget);
+		if back != none && back is *Record {
+			let r = back as *Record;
+			let at = r.at else { return 2; };
+			let name = r.name.ptr;
+			printf("budget %d: %.*s %d %d at %d %d\n".ptr, n as c_int,
+				r.name.len as c_int, r.name.ptr, r.counts[0] as c_int,
+				r.counts[1] as c_int, at.x as c_int, at.y as c_int);
+			delete(r, &budget);
+			printf("after delete: %d live\n".ptr, budget.live as c_int);
+			budget.free(name);
+			printf("after the string: %d live\n".ptr, budget.live as c_int);
+			return 0;
+		}
+		printf("budget %d: refused, %d live\n".ptr, n as c_int,
+			budget.live as c_int);
+		n += 1;
+	}
+	return 1;
+}

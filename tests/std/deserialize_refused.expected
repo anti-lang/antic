@@ -1,0 +1,8 @@
+exit 0
+budget 0: refused, 0 live
+budget 1: refused, 0 live
+budget 2: refused, 0 live
+budget 3: refused, 0 live
+budget 4: rec 7 -8 at 4 5
+after delete: 1 live
+after the string: 0 live
