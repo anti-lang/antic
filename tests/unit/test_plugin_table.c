@@ -866,6 +866,21 @@ static void second_directory(void)
     search_dirs = plugin_dir;
 }
 
+/* A directory whose index does not fit a path holds none, and the search
+   goes on to the next directory, the one of plugin_bad. */
+static void long_directory(void)
+{
+    static char dirs[4100 + 4096 + 2];
+
+    memset(dirs, 'x', 4100);
+    snprintf(dirs + 4100, sizeof dirs - 4100, "%c%s",
+             anti_rt_path_list_separator(), plugin_dir);
+    search_dirs = dirs;
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "['host.Service']"), NULL);
+    search_dirs = plugin_dir;
+}
+
 /* A path holds no NUL, which would name another file than the one the
    program gave. The bytes up to it name plugin_bad. */
 static void nul_in_path(void)
@@ -913,6 +928,7 @@ int main(void)
     damaged_indexes();
     empty_directory();
     second_directory();
+    long_directory();
     nul_in_path();
     good_table_loads();
     if (check_failures != 0) {
