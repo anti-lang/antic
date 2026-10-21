@@ -1,0 +1,25 @@
+//! The default `==` of a struct compares a `Regex` field by its text, and two
+//! fields that hold one compiled pattern are equal before the text is read.
+
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Rule
+{
+	name: int,
+	r: Regex,
+}
+
+fn main() -> int
+{
+	let r = Regex.compile("a+") catch fatal;
+	let again = Regex.compile("a+") catch fatal;
+	let a = Rule { name: 1, r: r };
+	let b = Rule { name: 1, r: r };
+	let c = Rule { name: 1, r: again };
+	printf("one pattern: %d\n".ptr, (a == b) as c_int);
+	printf("one text: %d\n".ptr, (a == c) as c_int);
+	printf("one hash: %d\n".ptr, (a.hash() == c.hash()) as c_int);
+	return 0;
+}

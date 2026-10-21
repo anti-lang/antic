@@ -14,6 +14,14 @@
 extern "C"
 #endif
 uint64_t anti_lang_Object_hash(anti_Object *self);
+#ifdef __cplusplus
+extern "C"
+#endif
+int8_t anti_lang_Object_equals(anti_Object *self, anti_Object *other);
+#ifdef __cplusplus
+extern "C"
+#endif
+void anti_lang_Object_destruct(anti_Object *self);
 
 int main(void)
 {
@@ -68,5 +76,14 @@ int main(void)
     b.side = 5;
     printf(" %d\n", anti_lang_Object_hash(&a.base.base) !=
                         anti_lang_Object_hash(&b.base.base));
+    /* An object equals itself without a call of its table, no object
+       equals NULL, and NULL hashes as 0. The destruct of the root frees
+       nothing. */
+    printf("%d %d %d %d\n", anti_lang_Object_equals(&a.base.base, &a.base.base),
+           anti_lang_Object_equals(&a.base.base, NULL),
+           anti_lang_Object_equals(NULL, &a.base.base),
+           anti_lang_Object_hash(NULL) == 0);
+    anti_lang_Object_destruct(&a.base.base);
+    printf("%d\n", a.side);
     return 0;
 }

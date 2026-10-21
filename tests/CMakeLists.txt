@@ -3272,6 +3272,14 @@ antic_modules_test(shared_class
     PROGRAM client
     STD lang mem text reflect
     WORK "${CMAKE_CURRENT_BINARY_DIR}/shared")
+# Two modules declare a class of one name, and `reflect.new` finds it by
+# its module path alone
+antic_modules_test(same_name
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/same_name"
+    LIBRARIES left right
+    PROGRAM pick
+    STD lang mem text reflect
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/same-name")
 # A chain of classes over three modules, each naming its base with the
 # module it comes from
 antic_modules_test(inherits
@@ -6278,7 +6286,8 @@ add_test(NAME anti_build_deps
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-deps"
         -P "${ANTIC_RUNNERS}/run_anti_build_deps.cmake")
 # A walk whose pick of a package changes drops the requirements of the
-# old pick, and the packages only it needed.
+# old pick, and the packages only it needed. Two packages that need a
+# third share it, and a lock file changed by hand is written again.
 add_test(NAME anti_build_resolve
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"

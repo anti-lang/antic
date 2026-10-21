@@ -6,3 +6,5 @@ no such name MissingGroup
 unchanged -1 [k=9;v=2]
 group took no part 0 [k=9;v=2]
 a name of two groups 1 [k=X;k=b]
+an offset below zero LengthMismatch
+unchanged -1 [k=X;k=b]

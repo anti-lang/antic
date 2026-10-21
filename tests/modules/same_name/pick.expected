@@ -1,0 +1,3 @@
+Thing: none
+com.example.left.Thing: left 1 right 0
+com.example.right.Thing: left 0 right 1

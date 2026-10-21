@@ -1,0 +1,30 @@
+//! Two modules declare a class `Thing`. `reflect.new` of the bare name finds
+//! none, since the name is in doubt, and the module path finds the class of
+//! each module.
+
+import anti.lang;
+import anti.reflect;
+import com.example.left;
+import com.example.right;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(name: str)
+{
+	let made = reflect.new(name);
+	if made == none {
+		printf("%.*s: none\n".ptr, name.len as c_int, name.ptr);
+		return;
+	}
+	printf("%.*s: left %d right %d\n".ptr, name.len as c_int, name.ptr,
+		(made is *left.Thing) as c_int, (made is *right.Thing) as c_int);
+	delete(made);
+}
+
+fn main() -> int
+{
+	show("Thing");
+	show("com.example.left.Thing");
+	show("com.example.right.Thing");
+	return 0;
+}

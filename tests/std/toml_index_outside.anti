@@ -1,0 +1,21 @@
+//! An index outside the keys of a document gives an empty key, an empty value
+//! and the line 0, below the first key and past the last alike.
+import anti.toml;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(doc: *toml.Document, index: int)
+{
+	let key = doc.key(index);
+	let value = doc.value(index);
+	printf("%d: key \"%.*s\" value \"%.*s\" line %d\n".ptr, index as c_int, key.len as c_int, key.ptr, value.len as c_int, value.ptr, doc.line(index) as c_int);
+}
+
+fn main() -> int
+{
+	let doc = toml.Document.read("name = \"antic\"\n") catch fatal;
+	show(&doc, 0);
+	show(&doc, -1);
+	show(&doc, doc.len());
+	return 0;
+}

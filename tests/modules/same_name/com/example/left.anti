@@ -1,0 +1,7 @@
+//! A module that declares a class `Thing`, as `com.example.right` does.
+
+/// The class of this module whose name the other module shares.
+pub class Thing
+{
+	pub n: int = 1,
+}

@@ -75,6 +75,11 @@ fn compiled()
 	let shared = ByteRegex.compile("(?J)k=(?<v>a)|k=(?<v>b)") catch fatal;
 	n = pairs.patch(shared, b"X", "v") catch fatal;
 	show("a name of two groups", n, pairs);
+	n = pairs.patch(shared, b"X", "v", -1) catch e {
+		failed("an offset below zero", e);
+		yield -1;
+	};
+	show("unchanged", n, pairs);
 	free(pairs.ptr);
 }
 

@@ -52,6 +52,21 @@ fn main(args: []str) -> int
 	io.println(built);
 	free(built.ptr);
 	delete(made);
+	/* The bare name of a class of the library finds it when the program
+	   declares none of that name, and the bare name of a class of the
+	   program finds it although the library holds none of it. */
+	let bare = reflect.new("Fancy") catch fatal;
+	let bare_d = reflect.describe(bare as *byte) catch fatal;
+	let bare_name = f"bare {reflect.name(bare_d)}";
+	io.println(bare_name);
+	free(bare_name.ptr);
+	delete(bare);
+	let own = reflect.new("Local") catch fatal;
+	let own_d = reflect.describe(own as *byte) catch fatal;
+	let own_name = f"own {reflect.name(own_d)}";
+	io.println(own_name);
+	free(own_name.ptr);
+	delete(own);
 	let second = lib.instance(greet.Greeter) catch fatal;
 	let both = f"{lib.live()} alive";
 	io.println(both);

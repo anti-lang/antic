@@ -1,0 +1,4 @@
+exit 0
+0: key "name" value "antic" line 1
+-1: key "" value "" line 0
+1: key "" value "" line 0
