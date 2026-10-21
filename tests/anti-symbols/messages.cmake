@@ -9,6 +9,10 @@ anti_message(configuration_no_toml
 anti_message(configuration_not_there
     ARGS symbols inventory --conf none.toml
     ERR "anti: cannot read none.toml")
+# The directory of a configuration in the root directory is `/`.
+anti_message(configuration_in_the_root_not_there
+    ARGS symbols check --conf /nowhere.toml
+    ERR "anti: cannot read /nowhere.toml")
 anti_message(configuration_include_not_there
     FILES conf.toml "include = [\"more.toml\"]\n"
     ARGS symbols inventory --conf conf.toml
