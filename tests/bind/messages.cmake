@@ -125,6 +125,13 @@ anti_message(clang_packed_to_two
     FILES api.h "#pragma pack(push, 2)\nstruct PackTwo { char a; int b; };\n#pragma pack(pop)\nvoid take(struct PackTwo *p);\n"
     ARGS ${clang_bind}
     ERR "anti: api.h: `PackTwo` is packed to more than one byte, which Anti has no form for")
+# A pop with nothing pushed leaves the packing of the target, so the struct
+# and the function that takes it are bound. The pragma before it keeps the
+# warning of clang on the empty stack out of the standard error.
+anti_message(clang_pack_pop_of_an_empty_stack STATUS 0
+    FILES api.h "#pragma clang diagnostic ignored \"-Wignored-pragmas\"\n#pragma pack(pop)\nstruct Plain { char a; int b; };\nvoid take(struct Plain *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
 anti_message(clang_aligned_without_a_value
     FILES api.h "struct __attribute__((aligned)) Most { int a; };\nvoid take(struct Most *m);\n"
     ARGS ${clang_bind}
