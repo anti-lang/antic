@@ -105,6 +105,14 @@ anti_message(module_path_under_an_absolute_root
     ARGS ${tools} -c -I . "${PROJECT}/com/example/lib.anti"
          com/example/lib.antl
     ERR "antic: com/example/lib.antl holds module `com.example.lib`, which this command compiles")
+# A root in the top directory of the file system that does not exist holds
+# no source, and the next root gives the module path.
+anti_message(module_path_beside_a_root_that_does_not_exist
+    FILES com/example/lib.anti "${library}"
+    SETUP compile_under_the_current_directory
+    ARGS ${tools} -c -I /no-such-root-of-anti -I . com/example/lib.anti
+         com/example/lib.antl
+    ERR "antic: com/example/lib.antl holds module `com.example.lib`, which this command compiles")
 # DESIGN: antic refuses the library file of the module it compiles, so no
 # two builds in one tree write a cycle. Each of the two trees below holds
 # one module that imports nothing and one that imports it, and `both`
