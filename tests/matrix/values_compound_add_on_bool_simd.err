@@ -1,0 +1,1 @@
+values_compound_add_on_bool_simd.anti:18:2: error: `+=` needs lanes of numbers, and `Bits` has `bool`
