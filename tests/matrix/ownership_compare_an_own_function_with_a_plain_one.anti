@@ -1,0 +1,26 @@
+//! An `own fn` field holds a snapshot on the heap and a plain function value
+//! holds its code and a context, so `==` between the two is refused. The
+//! message names the `own` of the field's type, since `?fn(int) -> int` and
+//! `fn(int) -> int` alone would compare.
+
+class Holder
+{
+	pub own f: ?fn(int) -> int,
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { f: none };
+	let g: fn(int) -> int = twice;
+	let same = h.f == g;
+	delete(h);
+	if same {
+		return 1;
+	}
+	return 0;
+}

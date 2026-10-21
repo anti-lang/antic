@@ -1,0 +1,1 @@
+ownership_compare_an_own_function_with_a_plain_one.anti:20:13: error: the operands of `==` have the types `own ?fn(int) -> int` and `fn(int) -> int`
