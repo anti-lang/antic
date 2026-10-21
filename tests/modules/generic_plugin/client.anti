@@ -1,0 +1,12 @@
+//! Calls a generic function of the library `com.example.hosts` that asks a
+//! library of plugins for an interface, without a library.
+
+import com.example.hosts;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("greets %d\n".ptr, hosts.greets<int>(none) as c_int);
+	return 0;
+}

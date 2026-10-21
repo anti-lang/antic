@@ -1,0 +1,22 @@
+//! A generic function of a library module that asks a library of plugins for
+//! an interface. The client compiles its copy from the library file, whose tree
+//! carries the descriptor of the interface in place of its name.
+
+import anti.plugin;
+
+/// A greeting.
+pub abstract class Greeter
+{
+	/// The words of the greeting.
+	pub abstract fn words(self) -> str;
+}
+
+/// Whether the library provides `words` of `Greeter`, and false without a
+/// library.
+pub fn greets<T>(lib: ?*plugin.Library) -> bool
+{
+	let l = lib else {
+		return false;
+	};
+	return l.supports(Greeter, "words");
+}

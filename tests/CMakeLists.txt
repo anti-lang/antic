@@ -3606,6 +3606,16 @@ antic_modules_test(generic_dispatch
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-dispatch-modules")
 
+# `supports` of a library of plugins in a generic function of a library
+# module, whose copy the client compiles. The checked tree in the library
+# file carries the descriptor of the interface the call names.
+antic_modules_test(generic_plugin
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_plugin"
+    LIBRARIES hosts
+    PROGRAM client
+    STD plugin lang
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-plugin-modules")
+
 # The origin of a `fail` and the position of a `here` in a generic function
 # of a library module, whose copy the client compiles. T043 of
 # docs/audit/tests-findings.md.
