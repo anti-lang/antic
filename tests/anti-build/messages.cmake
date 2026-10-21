@@ -587,6 +587,14 @@ if(NOT CMAKE_HOST_WIN32)
         ERR "anti: ./anti.lock cannot hold the path ./../un\"its/dist/${HOST}/dev, which holds a double quote or a control byte")
 endif()
 
+# A dependency of a version of the index names its repository by a URL
+# that names no repository.
+anti_message(index_dependency_url
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          ${units_index} "${index_head}version = \"1.2.0\"\nmodules = [${units_module}]\ndependencies = [{ name = \"com.example.other\", version = \"1.0.0\", repo = \"ftp://example.com/repo\" }]\n"
+    ARGS build ${tools}
+    ERR "anti: ftp://example.com/repo: a repository URL is https:// or file://"
+        "${no_version}")
 # The resolver. Each version of one package asks for the version of the
 # other that asks for the other version of it, so no round ends the walk.
 function(pair_index out package other first second)
