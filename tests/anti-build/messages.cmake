@@ -334,6 +334,13 @@ anti_message(repository_of_localhost
           ${units_index} "${index_head}version = \"1.1.0\"\nmodules = [${units_module}]\n"
     ARGS build ${tools}
     ERR "anti: ${localhost_url} has no version of com.example.units that satisfies every constraint on it")
+# `file:///C:/nowhere` names the path `C:/nowhere`, whose leading slash is
+# no part of it, on every system. No repository stands there.
+anti_message(repository_of_a_drive_letter
+    FILES anti.toml "${manifest_package}\n[repositories]\nlocal = \"file:///C:/nowhere\"\n\n[dependencies]\n\"com.example.units\" = { version = \"1.2.0\", repo = \"local\" }\n"
+          ${app_source} "${app_text}"
+    ARGS build ${tools}
+    ERR "anti: file:///C:/nowhere has no version of com.example.units that satisfies every constraint on it")
 anti_message(index_is_a_directory
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           ${units_index}/notes.txt "A directory where the index belongs.\n"
