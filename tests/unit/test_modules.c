@@ -3909,6 +3909,27 @@ static void flag_bytes(void)
     flags_refused("va", variadic_source);
 }
 
+/* A pattern literal across a carriage return and a line feed counts the
+   two as one line break, so the error stands at the byte PCRE2 names on
+   the second line, as in a file of line feeds alone. The literal asks
+   for `anti.regex`, which an empty library of that name stands for. */
+static void pattern_lines(void)
+{
+    static const char source[] = "import anti.regex;\r\n"
+                                 "fn f() {\r\n"
+                                 "\tlet p = re\"first\r\nsecond(?<\";\r\n"
+                                 "}\r\n";
+    struct compilation s;
+    bool ok;
+
+    compilation_open(&s);
+    library(&s, "anti.regex", "");
+    compilation_check(&s, "main", source, true, &ok);
+    expect_refused(ok, &s.diags, source, 4, 10,
+                   "malformed pattern: subpattern name expected");
+    compilation_close(&s);
+}
+
 void test_modules(void)
 {
     deep_types();
@@ -3958,4 +3979,5 @@ void test_modules(void)
     damaged_simd();
     damaged_constants();
     damaged_relocations();
+    pattern_lines();
 }
