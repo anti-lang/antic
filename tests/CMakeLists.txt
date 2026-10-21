@@ -2369,6 +2369,20 @@ foreach(case
     endif()
 endforeach()
 
+# A file named by a path without a directory, in the directory the
+# program runs in, names its includes as they stand: the program finds
+# them beside it.
+add_test(NAME conf_include_relative
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${CONF}/report.anti"
+        "-DARGS=--anti.conf=outer.toml,--anti.inspect"
+        "-DEXPECTED=${CONF}/inspect.include.pattern"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-include_relative"
+        -P "${ANTIC_RUNNERS}/run_trace.cmake")
+set_tests_properties(conf_include_relative PROPERTIES
+    WORKING_DIRECTORY "${CONF}")
+
 # The runtime and `anti symbols` stop a chain of includes at one depth,
 # with one message.
 add_test(NAME conf_include_depth
