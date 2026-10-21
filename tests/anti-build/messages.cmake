@@ -677,6 +677,13 @@ anti_message(fault_notice_not_written
     FAULT open:34:EACCES
     ARGS build ${tools}
     ERR "anti: cannot write ./dist/${HOST}/dev/NOTICE.txt")
+# deliver_soname of build.c: the link that dist/ of a Linux library of
+# --soname holds beside the file its soname names, by T099.
+anti_message(fault_soname_link_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${library_text}"
+    FAULT open:33:EACCES
+    ARGS build --lib shared --soname --target linux-x86_64 ${tools}
+    ERR "anti: cannot write ./dist/linux-x86_64/dev/libapp.so")
 anti_message(fault_build_directory_not_made
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     FAULT mkdir:2:EACCES
