@@ -339,6 +339,24 @@ anti_message(fault_header_read_partway
     FAULT read:4:EACCES
     ARGS bind --header dist/${HOST}/dev/com/example/one.antl -o ../out
     ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
+# The search for the imports of the library file reads it again,
+# driver_find_libraries of driver_search.c, and the fifth read fails.
+anti_message(fault_header_imports_unread
+    FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n"
+          src/com/example/one.anti "//! The smallest library.\n\n/// One.\nexport fn one() -> c_int\n{\n\treturn 1;\n}\n"
+    SETUP build_the_library
+    FAULT read:5:EACCES
+    ARGS bind --header dist/${HOST}/dev/com/example/one.antl -o ../out
+    ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
+# The load of the library file the search found, driver_load_libraries
+# of driver_search.c, whose first read is the seventh.
+anti_message(fault_header_library_unloaded
+    FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n"
+          src/com/example/one.anti "//! The smallest library.\n\n/// One.\nexport fn one() -> c_int\n{\n\treturn 1;\n}\n"
+    SETUP build_the_library
+    FAULT read:7:EACCES
+    ARGS bind --header dist/${HOST}/dev/com/example/one.antl -o ../out
+    ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
 # The header of the library file, unit_library_header of units.c, whose
 # first read is the one that fails.
 anti_message(fault_header_unread

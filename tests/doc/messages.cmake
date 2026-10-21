@@ -94,6 +94,22 @@ anti_message(fault_library_read_partway
     FAULT read:4:EACCES
     ARGS doc -o pages --runtime "${RUNTIME}" dist/${HOST}/dev/com/example/one.antl
     ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
+# The search for the imports of the library file reads it again,
+# driver_find_libraries of driver_search.c, and the fifth read fails.
+anti_message(fault_library_imports_unread
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    SETUP build_the_library
+    FAULT read:5:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}" dist/${HOST}/dev/com/example/one.antl
+    ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
+# The load of the library file the search found, driver_load_libraries
+# of driver_search.c, whose first read is the seventh.
+anti_message(fault_library_unloaded
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+    SETUP build_the_library
+    FAULT read:7:EACCES
+    ARGS doc -o pages --runtime "${RUNTIME}" dist/${HOST}/dev/com/example/one.antl
+    ERR "antic: cannot read dist/${HOST}/dev/com/example/one.antl")
 # The listing of the source directory fails after it found the module,
 # project_sources of main.c.
 anti_message(fault_listing_unread
