@@ -1,0 +1,13 @@
+//! A field of a class body is followed by a comma, by the brace that closes the
+//! body or by the start of the next member. A value after the type is none of
+//! them, so the parser expects the comma there.
+
+class Rows
+{
+	pub n: int 5
+}
+
+fn main() -> int
+{
+	return 0;
+}
