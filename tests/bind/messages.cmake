@@ -43,6 +43,12 @@ anti_message(api_part_is_null STATUS 0
     FILES api.json "{\"functions\": [], \"structs\": null}"
     OUT "bind: anti.api from api.json, 0 functions, 0 warnings"
     ARGS bind api.json -o "${WORK}/out")
+# A description whose file name has no suffix gives the module its whole
+# name.
+anti_message(api_without_a_suffix STATUS 0
+    FILES api "{\"functions\": [{\"name\": \"count\", \"returnType\": \"int\", \"params\": []}]}"
+    OUT "bind: anti.api from api, 1 functions, 0 warnings"
+    ARGS bind api -o "${WORK}/out")
 anti_message(api_enum_value STATUS 0
     FILES api.json "{\"functions\": [], \"enums\": [{\"name\": \"Mode\", \"values\": [{\"name\": \"MODE_A\", \"value\": \"first\"}, {\"name\": \"MODE_B\", \"value\": 1}]}]}"
     OUT "bind: anti.api from api.json, 0 functions, 1 warning"
