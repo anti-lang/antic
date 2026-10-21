@@ -245,9 +245,10 @@ anti_message(clang_enum_declared_in_a_parameter STATUS 0
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `take` is left out: Anti has no form for the type of a parameter")
 # An enum without a tag is constants alone, so a field of that type has no
-# type of the binding.
+# type of the binding, also after a field of an anonymous union, which binds
+# as `S_u`.
 anti_message(clang_field_of_an_anonymous_enum STATUS 0
-    FILES api.h "struct S { enum { A1, B1 } e; };\nvoid take(struct S *s);\n"
+    FILES api.h "struct S { union { int a; float b; } u; enum { A1, B1 } e; };\nvoid take(struct S *s);\n"
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `S` is left out: Anti has no form for the type of its field `e`")
