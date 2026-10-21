@@ -1,8 +1,7 @@
-//! A trace whose frames lie outside every module. `text` writes such a frame
-//! as its address and `-` and names no module for it, and `symbolize` names
-//! no function for it. A frame of the program between them keeps its module
-//! and its name, and the second frame of the same module names no module
-//! again.
+//! A trace whose frames lie outside every module. `text` writes such a frame as
+//! its address and `-` and names no module for it, and `symbolize` names no
+//! function for it. A frame of the program between them keeps its module and
+//! its name, and the second frame of the same module names no module again.
 
 import anti.lang;
 
