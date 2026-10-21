@@ -62,12 +62,15 @@ static void octal_escapes(void)
 /* `[:` opens a POSIX class only where `:]` follows before any `]`, as
    PCRE2 reads it. Otherwise `[` and `:` are characters of the class, so
    the class of `[[:a]b(c+)+` ends at its first `]` and the nested repeat
-   after it is seen. */
+   after it is seen. The scan skips `\]` and `\\` as one and reads any
+   other escape a byte at a time, so the class of `[[:x\d]` ends at its
+   `]` too. */
 static void posix_class_ends(void)
 {
     CHECK(nested("[[:a]b(c+)+"));
     CHECK(least_of("[[:a]b", 0) == 2);
     CHECK(!nested("[[:alpha:]]+"));
+    CHECK(nested("[[:x\\d]b(c+)+"));
 }
 
 void test_pattern(void)
