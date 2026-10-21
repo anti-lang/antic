@@ -1,0 +1,50 @@
+//! `if try s.matches(r)` tests a pattern compiled at run time without its
+//! groups, and fails with `TooExpensive` when the search reaches the match
+//! limit, for a text and for bytes.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+fn tested(text: str, r: Regex) -> int may fail
+{
+	if try text.matches(r) {
+		return 1;
+	}
+	return 0;
+}
+
+fn tested_bytes(data: []byte, r: ByteRegex) -> int may fail
+{
+	if try data.matches(r) {
+		return 1;
+	}
+	return 0;
+}
+
+fn report(label: str, e: *lang.Error)
+{
+	printf("%.*s expensive %d\n".ptr, label.len as c_int, label.ptr,
+		(e is *regex.TooExpensive) as c_int);
+}
+
+fn main() -> int
+{
+	let slow = Regex.compile(r"(*LIMIT_MATCH=1000)^(\w+\s?)*$") catch fatal;
+	let text = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
+	let found = tested(text, slow) catch e {
+		report("text", e);
+		yield -1;
+	};
+	let slow_bytes = ByteRegex.compile(r"(*LIMIT_MATCH=1000)^(\w+\s?)*$") catch fatal;
+	let data = text.to_bytes();
+	let found_bytes = tested_bytes(data, slow_bytes) catch e {
+		report("bytes", e);
+		yield -1;
+	};
+	printf("results %lld %lld\n".ptr, found, found_bytes);
+	free(data.ptr);
+	return 0;
+}

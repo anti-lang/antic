@@ -1,0 +1,4 @@
+exit 0
+text expensive 1
+bytes expensive 1
+results -1 -1
