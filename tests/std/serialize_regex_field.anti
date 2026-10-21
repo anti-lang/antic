@@ -1,0 +1,34 @@
+//! `serialize` passes over a `Regex` field and writes it as `null`, so the
+//! object `Object.deserialize` makes from the text holds no pattern there. The
+//! default `equals` then tells it from the object that holds one, and the hash
+//! of two such objects is the same.
+import anti.mem;
+import anti.regex;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Holder
+{
+	pub name: int = 0,
+	pub r: Regex,
+}
+
+fn main() -> int
+{
+	let r = Regex.compile("a+") catch fatal;
+	let k = alloc Holder { name: 1, r: r };
+	let b = text.Builder.new();
+	k.serialize(&b);
+	let written = b.text();
+	printf("%.*s\n".ptr, written.len as c_int, written.ptr);
+	let one = Object.deserialize(written, mem.LibcAllocator.get()) as *Holder;
+	let two = Object.deserialize(written, mem.LibcAllocator.get()) as *Holder;
+	printf("equals the original: %d\n".ptr, one.equals(k) as c_int);
+	printf("equals the other: %d\n".ptr, one.equals(two) as c_int);
+	printf("one hash: %d\n".ptr, (one.hash() == two.hash()) as c_int);
+	delete(one);
+	delete(two);
+	delete(k);
+	return 0;
+}
