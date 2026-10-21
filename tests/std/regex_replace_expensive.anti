@@ -1,0 +1,24 @@
+//! `s.replace(r, with)` with a template fails with `TooExpensive` when the
+//! search reaches the match limit of a pattern compiled at run time: from the
+//! start, where it fails part of the way, and with a limit from the end, which
+//! counts every match before it replaces one.
+import anti.regex;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let slow = Regex.compile(r"(*LIMIT_MATCH=1000)(\w+\s?)*$") catch fatal;
+	let text = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
+	let all = text.replace(slow, "x") catch e {
+		printf("template expensive %d\n".ptr, (e is *regex.TooExpensive) as c_int);
+		yield "";
+	};
+	let last = text.replace(slow, "x", -1) catch e {
+		printf("template from the end expensive %d\n".ptr,
+			(e is *regex.TooExpensive) as c_int);
+		yield "";
+	};
+	printf("lengths %d %d\n".ptr, all.len as c_int, last.len as c_int);
+	return 0;
+}

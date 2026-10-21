@@ -1,0 +1,4 @@
+exit 0
+template expensive 1
+template from the end expensive 1
+lengths 0 0
