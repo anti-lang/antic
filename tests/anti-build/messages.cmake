@@ -251,6 +251,18 @@ anti_message(path_chain_of_two_projects STATUS 0
     SETUP write_two_projects
     ARGS run ${tools}
     OUT "one")
+# T179: the same chain, where the package at its end names no version.
+function(write_two_projects_without_a_version)
+    write_two_projects()
+    file(WRITE "${PROJECT}/../p2/anti.toml"
+         "[package]\nname = \"com.example.p2\"\n")
+endfunction()
+anti_message(path_chain_to_a_package_without_a_version STATUS 0
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.p1\" = { path = \"../p1\" }\n"
+          ${app_source} "//! The program.\n\nimport anti.io;\nimport com.example.p1;\n\nfn main() -> int\n{\n\tif p1.one() == 1 {\n\t\tio.println(\"one\");\n\t}\n\treturn 0;\n}\n"
+    SETUP write_two_projects_without_a_version
+    ARGS run ${tools}
+    OUT "one")
 
 # The dependencies. The repository of a case is the directory WORK/repo,
 # named by its file:// URL, and the cache of the user is WORK/cache.
