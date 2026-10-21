@@ -1,0 +1,1 @@
+values_optional_unchecked_on_the_right.anti:15:16: error: `maybe` may be `none`, test it before reading it

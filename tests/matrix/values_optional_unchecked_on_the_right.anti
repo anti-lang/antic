@@ -1,0 +1,17 @@
+//! An optional value that no test has proved is refused on the right of an
+//! operator as well.
+
+fn pick(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let maybe = pick(1);
+	let sum = 1 + maybe;
+	return sum;
+}
