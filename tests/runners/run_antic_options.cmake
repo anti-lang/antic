@@ -30,6 +30,8 @@
 #   strict_front_end      --warnings-as-errors beside --front-end
 #   strict_dev            --warnings-as-errors beside --dev
 #   bundle_static         --bundle-runtime beside --lib static
+#   bundle_static_linux   --bundle-runtime beside --lib static, for
+#                         Linux: lld joins the runtime into one object
 #   bundle_shared         --bundle-runtime beside --lib shared, which
 #                         R132 of "Rules of 2026-10-13" refuses
 #   soname_linux          --soname beside --lib shared and
@@ -372,6 +374,28 @@ if(CASE STREQUAL "bundle_static")
     holds("${plain_said}" "${runtime_file}"
           "the line of the build without --bundle-runtime")
     lacks("${bundle_said}" "${runtime_file}"
+          "the line of the build with --bundle-runtime")
+    return()
+endif()
+
+# An ELF target joins the library object and the members of the runtime
+# into one object with ld.lld -r, join_bundle of driver_library.c, where
+# the Mac lists the members in the archive.
+if(CASE STREQUAL "bundle_static_linux")
+    antic_output(plain_said --lib static --target linux-x86_64 ${tools}
+                 -o "${WORK}/plain.a" "${library_source}")
+    antic_output(bundle_said --lib static --bundle-runtime
+                 --target linux-x86_64 ${tools}
+                 -o "${WORK}/bundle.a" "${library_source}")
+    defined_symbols(plain "${WORK}/plain.a")
+    defined_symbols(bundle "${WORK}/bundle.a")
+    lacks("${plain}" "\nanti_rt_check_failed\n"
+          "the archive without --bundle-runtime")
+    holds("${bundle}" "\nanti_rt_check_failed\n"
+          "the archive of --bundle-runtime")
+    holds("${plain_said}" "/lib/linux-x86_64/"
+          "the line of the build without --bundle-runtime")
+    lacks("${bundle_said}" "/lib/linux-x86_64/"
           "the line of the build with --bundle-runtime")
     return()
 endif()

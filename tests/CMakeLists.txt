@@ -4373,7 +4373,7 @@ set(antic_option_cases checks_by_mode checks_last_decides asserts_by_mode
     output_static output_shared output_dev_library output_plugin
     output_native_library output_native_plugin linker_lld)
 if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/linux-x86_64")
-    list(APPEND antic_option_cases soname_linux)
+    list(APPEND antic_option_cases soname_linux bundle_static_linux)
 endif()
 if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
     list(APPEND antic_option_cases windows_library_reproducible)
