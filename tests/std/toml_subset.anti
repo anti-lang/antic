@@ -1,10 +1,10 @@
 //! Texts the TOML reader refuses at the edges of its subset: a table name past
 //! its room, a key without a name, an inline table and an array that the text
 //! ends inside, an array of arrays, two strings without a comma between them,
-//! an inline table with a key without a name or without `=`, a table name and a
-//! key whose path does not fit, and an array whose path fits where the path of
-//! its first element does not. Each line prints the number of pairs of the
-//! document, or the message of the refusal.
+//! an array with an empty element, an inline table with a key without a name or
+//! without `=`, a table name and a key whose path does not fit, and an array
+//! whose path fits where the path of its first element does not. Each line
+//! prints the number of pairs of the document, or the message of the refusal.
 import anti.io;
 import anti.json;
 import anti.text;
@@ -54,6 +54,7 @@ fn main() -> int
 	read("a = [");
 	read("a = [[1]]\n");
 	read("a = [\"x\" \"y\"]\n");
+	read("a = [1, , 2]\n");
 	read("a = { = 1 }\n");
 	read("a = { b 1 }\n");
 	let key = run("k", 140);
