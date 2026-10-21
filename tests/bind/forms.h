@@ -65,6 +65,15 @@ typedef struct FormsCount
 #define FORMS_LONG FORMS_LITERAL(FormsCount){ 4, 5, 6 }
 #define FORMS_TEXT FORMS_LITERAL(FormsCount){ "four", 5 }
 #define FORMS_FLOAT_IN_INT FORMS_LITERAL(FormsCount){ 1.5, 5 }
+/* A macro whose body is its parameter bare expands as well, and the text
+   of its argument may start with a space. A body that is more than its
+   parameter does not expand, and neither does a call without its `)`. */
+#define FORMS_BARE(type) type
+#define FORMS_BARE_PAIR FORMS_BARE((FormsPair)){ 3.5f, 4 }
+#define FORMS_SPACED_PAIR FORMS_BARE( (FormsPair)){ 5.5f, 6 }
+#define FORMS_SCALED(type) ((type) * 2)
+#define FORMS_SCALED_PAIR FORMS_SCALED(FormsPair){ 1, 2 }
+#define FORMS_OPEN FORMS_LITERAL(FormsPair
 
 /* A pack without a number sets the default again, so the struct after it
    is not packed. */
@@ -76,6 +85,16 @@ struct FormsTight
 };
 #pragma pack()
 struct FormsLoose
+{
+    char c;
+    int i;
+};
+#pragma pack(pop)
+
+/* A push without a number keeps the pack, so the struct after it is not
+   packed. */
+#pragma pack(push)
+struct FormsKept
 {
     char c;
     int i;

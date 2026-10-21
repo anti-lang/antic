@@ -7,6 +7,10 @@
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
 #
+# A third part takes a graph in which two packages need a third, beside
+# a dependency of a path, and a lock file whose needs or digests the
+# graph no longer gives.
+#
 # The first part: the project needs a 1.x and b 1.x. The walk first picks a 1.1.0, which
 # needs c =2.0.0 and d 1.0.0. Then b 1.0.0 needs a =1.0.0, so a goes back
 # to 1.0.0, which needs c =1.0.0 and no d. The requirements of the first
@@ -200,3 +204,104 @@ endif()
 if(NOT text MATCHES "gave no index of com.example.c that anti reads")
     message(FATAL_ERROR "the build said\n${text}")
 endif()
+
+# The third part: e and f each need g, and the project needs e, f and
+# the project of c by its path. The lock file names g once, with the
+# needs of e and f. A path dependency means the lock file never answers
+# alone, so every build resolves again and compares the graph with the
+# lock file. A build after the lock file was changed by hand, in the
+# name of a need, in the number of needs or in the digest of a module,
+# writes the lock file of the graph again.
+foreach(package e f g)
+    set(project "${WORK}/${package}")
+    file(WRITE "${project}/anti.toml"
+         "[package]\n"
+         "name = \"com.example.${package}\"\n"
+         "version = \"1.0.0\"\n")
+    file(WRITE "${project}/src/com/example/${package}.anti"
+         "//! A package of the resolution test.\n"
+         "\n"
+         "/// One.\n"
+         "pub fn one() -> int\n"
+         "{\n"
+         "\treturn 1;\n"
+         "}\n")
+    run_anti("${project}" build)
+    set(library_${package}
+        "${project}/dist/${HOST}/dev/com/example/${package}.antl")
+    file(SHA256 "${library_${package}}" digest_${package})
+endforeach()
+set(e "")
+entry(e e 1.0.0 "{ name = \"com.example.g\", version = \"1.0.0\" }")
+publish(e "${e}" 1.0.0)
+set(f "")
+entry(f f 1.0.0 "{ name = \"com.example.g\", version = \"1.0.0\" }")
+publish(f "${f}" 1.0.0)
+set(g "")
+entry(g g 1.0.0 "")
+publish(g "${g}" 1.0.0)
+set(project "${WORK}/diamond")
+file(WRITE "${project}/anti.toml"
+     "[package]\n"
+     "name = \"com.example.diamond\"\n"
+     "version = \"0.1.0\"\n"
+     "\n"
+     "[repositories]\n"
+     "local = \"${repo_url}\"\n"
+     "\n"
+     "[dependencies]\n"
+     "\"com.example.e\" = { version = \"1.0.0\", repo = \"local\" }\n"
+     "\"com.example.f\" = { version = \"1.0.0\", repo = \"local\" }\n"
+     "\"com.example.c\" = { path = \"../c\" }\n")
+file(WRITE "${project}/src/com/example/diamond.anti"
+     "//! A program over e, f, the g they both need and c of a path.\n"
+     "\n"
+     "import com.example.c;\n"
+     "import com.example.e;\n"
+     "import com.example.f;\n"
+     "\n"
+     "fn main() -> int\n"
+     "{\n"
+     "\treturn c.one() + e.one() + f.one();\n"
+     "}\n")
+run_anti("${project}" build)
+program_expect("the diamond" COMMAND "${project}/dist/${HOST}/dev/diamond"
+               STATUS 3 OUT "")
+file(READ "${project}/anti.lock" written)
+string(REGEX MATCHALL "name = \"com.example.g\"" g_entries "${written}")
+string(REGEX MATCHALL "needs = \\[\"com.example.g\"\\]" g_needs "${written}")
+list(LENGTH g_entries g_count)
+list(LENGTH g_needs needs_count)
+if(NOT g_count EQUAL 1 OR NOT needs_count EQUAL 2)
+    message(FATAL_ERROR "the lock file of the diamond names g ${g_count} "
+                        "times and needs it ${needs_count} times:\n"
+                        "${written}")
+endif()
+# The second build finds the same graph, so the lock file stays as it was.
+run_anti("${project}" build)
+file(READ "${project}/anti.lock" again)
+if(NOT again STREQUAL written)
+    message(FATAL_ERROR "the second build changed the lock file:\n${again}")
+endif()
+# Each change by hand is undone by the next build.
+function(changed_lock what from to)
+    file(READ "${project}/anti.lock" lock)
+    string(FIND "${lock}" "${from}" at)
+    if(at LESS 0)
+        message(FATAL_ERROR "the lock file holds no ${from}:\n${lock}")
+    endif()
+    string(LENGTH "${from}" length)
+    string(SUBSTRING "${lock}" 0 ${at} head)
+    math(EXPR rest "${at} + ${length}")
+    string(SUBSTRING "${lock}" ${rest} -1 tail)
+    file(WRITE "${project}/anti.lock" "${head}${to}${tail}")
+    run_anti("${project}" build)
+    file(READ "${project}/anti.lock" lock)
+    if(NOT lock STREQUAL written)
+        message(FATAL_ERROR "the build after ${what} wrote\n${lock}")
+    endif()
+endfunction()
+changed_lock("a need of another name" "needs = [\"com.example.g\"]"
+             "needs = [\"com.example.c\"]")
+changed_lock("a need taken out" "needs = [\"com.example.g\"]" "needs = []")
+changed_lock("another digest" "${digest_g}" "${digest_e}")

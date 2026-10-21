@@ -15,6 +15,10 @@ pub const FORMS_COUNT: FormsCount = FormsCount { n: 5, flag: 1 };
 
 pub const FORMS_TRAILING: FormsCount = FormsCount { n: 4, flag: 5 };
 
+pub const FORMS_BARE_PAIR: FormsPair = FormsPair { x: 3.5, y: 4.0 };
+
+pub const FORMS_SPACED_PAIR: FormsPair = FormsPair { x: 5.5, y: 6.0 };
+
 pub enum FormsMode
 {
 	FORMS_MODE_A = 0,
@@ -63,6 +67,12 @@ pub packed struct FormsTight
 }
 
 pub struct FormsLoose
+{
+	c: c_char,
+	i: c_int,
+}
+
+pub struct FormsKept
 {
 	c: c_char,
 	i: c_int,
