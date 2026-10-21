@@ -28,6 +28,17 @@ anti_message(block_fails
     ERR "${WORK}/check/check/docs/com_example_hidden_0.anti:5:9: error: `hidden` has no public item `helper`"
         "anti: the `anti` block of `twice` at src/com/example/hidden.anti:3 failed, and its module is ${WORK}/check/check/docs/com_example_hidden_0.anti")
 
+# --targets all runs the front end of every target on the files that
+# parsed, so a file that does not parse fails once and is left out of
+# the rest.
+anti_message(front_end_all_targets_with_a_file_that_does_not_parse
+    FILES anti.toml "${check_manifest}"
+          src/com/example/broken.anti "//! A module.\n\n/// One.\npub fn one() -> int\n{\n\treturn );\n}\n"
+          src/com/example/fine.anti "//! A module.\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
+    OUT "anti check: front end: 2 files, 6 targets, 0 warnings, 1 failed"
+    ARGS check --targets all --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/broken.anti:6:9: error: expected an expression")
+
 # The formatting class. Two files that each hold a line `anti fmt` writes
 # otherwise are two findings.
 anti_message(format_two_files
