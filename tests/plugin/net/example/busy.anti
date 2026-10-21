@@ -39,6 +39,11 @@ pub class Holds
 	own parts: []Pair,
 	own rows: [][]i32,
 	own next: ?*Holds = none,
+	pairs: [2]Pair,
+	marks: [2]Mark,
+	maybes: [2] ?int,
+	duos: [2](int, i8),
+	blocks: [2][2]Pair,
 }
 
 /// The worker of the library, which counts its calls.
