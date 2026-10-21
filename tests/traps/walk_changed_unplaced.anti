@@ -1,0 +1,69 @@
+//! A collection that grows while a `for` walks it and counts the change without
+//! its place. The `at` of its `anti.lang.Changes` keeps line 0, so the loop of
+//! a dev build stops at the next turn and names the collection and the loop
+//! alone.
+
+import anti.lang;
+
+class Bag
+{
+	pub items: [8]int = [0; 8],
+	pub count: int = 0,
+	changes: lang.Changes = lang.Changes {
+		count: 0,
+		at: lang.SourceLocation {
+			file: "", line: 0, column: 0, function: "",
+			module: ""
+		},
+	},
+
+	pub fn push(self, n: int)
+	{
+		self.items[self.count] = n;
+		self.count += 1;
+		self.changes.count += 1;
+	}
+
+	operator fn iter(self) -> BagIter
+	{
+		return BagIter {
+			of: self,
+			at: -1,
+			watch: lang.Watch {
+				changes: &self.changes,
+				count: self.changes.count
+			},
+		};
+	}
+}
+
+class BagIter
+{
+	pub of: *Bag,
+	pub at: int,
+	pub watch: lang.Watch,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.of.count;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.of.items[self.at];
+	}
+}
+
+fn main() -> int
+{
+	let bag = Bag { };
+	bag.push(1);
+	bag.push(2);
+	for n in bag {
+		if n == 2 {
+			bag.push(3);
+		}
+	}
+	return 7;
+}

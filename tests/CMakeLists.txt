@@ -1793,6 +1793,10 @@ antic_check_test(slice_range_negative "out of bounds"
 antic_check_test(walk_changed "was changed while"
     "walk_changed\\.anti:68: `bag` was changed while `for` walked it: changed at walk_changed\\.anti:70"
     ON DEV lang)
+# A change whose place was never written names the loop alone.
+antic_check_test(walk_changed_unplaced "was changed while"
+    "walk_changed_unplaced\\.anti:63: `bag` was changed while `for` walked it\n"
+    ON DEV lang)
 antic_check_test(collection_changed "was changed while"
     "collection_changed\\.anti:82: `pair` was changed while `for` walked it: changed at collection_changed\\.anti:84"
     ON DEV lang mem text collection)
