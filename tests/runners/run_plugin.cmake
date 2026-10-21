@@ -172,7 +172,8 @@ program_expect("a broken digest"
 # whatever form of TOML the runtime reads in it: line ends of Windows, a
 # comment and strings in double quotes. The stale entry of the library
 # goes, a path that holds a quote of its own comes back in the other
-# quotes, and the runtime reads the result.
+# quotes, an empty string comes back as '', and the runtime reads the
+# result.
 set(kept "${WORK}/kept")
 file(MAKE_DIRECTORY "${kept}")
 set(zeros "0000000000000000000000000000000000000000000000000000000000000000")
@@ -184,7 +185,9 @@ file(WRITE "${kept}/anti-plugins.toml"
      "[[library]]\r\npath = \"libfancy${SUFFIX}\"\r\nruntime = \"0.0.1\"\r\n"
      "digest = \"${zeros}\"\r\ninterfaces = [\"${interface}\"]\r\n"
      "[[library]]\r\npath = \"lib'q${SUFFIX}\"\r\nruntime = \"0.0.1\"\r\n"
-     "digest = \"${other}\"\r\ninterfaces = [\"x.Q\"]\r\n")
+     "digest = \"${other}\"\r\ninterfaces = [\"x.Q\"]\r\n"
+     "[[library]]\r\npath = \"libempty${SUFFIX}\"\r\nruntime = \"\"\r\n"
+     "digest = \"${other}\"\r\ninterfaces = [\"x.E\"]\r\n")
 set(host "")
 if(SUFFIX STREQUAL ".dll")
     set(host "${WORK}/found.lib")
@@ -200,6 +203,7 @@ if(NOT index MATCHES "path = 'libother${SUFFIX}'" OR
    NOT index MATCHES "digest = '${other}'" OR
    NOT index MATCHES "interfaces = \\['x\\.Other', 'x\\.Y'\\]" OR
    NOT index MATCHES "path = \"lib'q${SUFFIX}\"" OR
+   NOT index MATCHES "path = 'libempty${SUFFIX}'\nruntime = ''\n" OR
    NOT index MATCHES "digest = '${digest}'" OR
    index MATCHES "${zeros}" OR NOT fancy_count EQUAL 1)
     message(FATAL_ERROR "the index lost or kept the wrong entries\n${index}")
