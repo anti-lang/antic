@@ -21,6 +21,9 @@
 #             file of tests/runners/run_program.cmake does
 #   ERRORS    optional file of the whole standard error of the host in a
 #             case of FAULT, which is otherwise not compared
+#   PATTERN   optional file of a pattern the whole standard output of the
+#             host matches in a case of FAULT that exits with 0, instead of
+#             EXPECTED, for an output that holds the path of the library
 #   PLAIN     optional, ON to build the library with its own runtime and
 #             without --no-runtime, which makes it a shared library that
 #             is no plugin
@@ -65,6 +68,13 @@ set(ENV{ANTI_FAULT} "${FAULT}")
 set(errors ANY_ERR)
 if(DEFINED ERRORS)
     set(errors ERR_FILE "${ERRORS}")
+endif()
+if(DEFINED PATTERN)
+    file(READ "${PATTERN}" pattern)
+    string(STRIP "${pattern}" pattern)
+    program_expect("the host" COMMAND "${WORK}/${HOST}${EXE}" "${library}"
+                   OUT_MATCH "${pattern}" ${errors})
+    return()
 endif()
 program_expect("the host" COMMAND "${WORK}/${HOST}${EXE}" "${library}"
                EXPECTED "${EXPECTED}" ${errors})

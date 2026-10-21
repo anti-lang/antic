@@ -4,3 +4,7 @@
 # module, with the sixth allocation of the program. T139: memory that runs
 # out there gives the reason of the system, where the program must stop.
 name_memory alloc:6:ENOMEM
+# The second open is the read of the library for the name of the module.
+# When it fails the message is the reason of the system, which names the
+# path of the library and the symbol it lacks.
+name_unopened open:2:EACCES

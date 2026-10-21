@@ -2691,7 +2691,9 @@ add_test(NAME plugin_no_plugin
 # plugin_<host>_fault_<case>. faults_host imports anti.time and runs
 # without a fault as plugin_faults_host. named_host does not import it, so
 # the loader reads the library for the name of the module. A Windows
-# plugin that lacks a module of its host does not link, as above.
+# plugin that lacks a module of its host does not link, as above. A file
+# <host>.<case>.pattern beside the list holds a pattern of the output of a
+# case that names the path of the library, in place of its expected file.
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     add_test(NAME plugin_faults_host
         COMMAND "${CMAKE_COMMAND}"
@@ -2722,6 +2724,9 @@ if(ANTIC_FAULTS AND NOT ANTIC_HOST_OS STREQUAL "windows")
             set(errors "")
             if(EXISTS "${base}.err")
                 set(errors "-DERRORS=${base}.err")
+            endif()
+            if(EXISTS "${base}.pattern")
+                list(APPEND errors "-DPATTERN=${base}.pattern")
             endif()
             add_test(NAME plugin_${host}_fault_${case}
                 COMMAND "${CMAKE_COMMAND}"
