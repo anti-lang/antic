@@ -141,6 +141,17 @@ anti_message(run_takes_the_injections_of_the_manifest STATUS 0
           ${app_source} "${inject_text}"
     ARGS run ${tools}
     OUT "hello")
+# The dev build of run writes an object per module with -g, and the debug
+# map of the program names each. A trace through two modules reads the
+# line of each frame from the object of its own module.
+set(where_text "//! Where a trace is taken.\n\nimport anti.lang;\n\n/// The trace of the caller.\npub fn taken() -> *lang.StackTrace\n{\n\treturn lang.StackTrace.capture();\n}\n")
+set(two_modules_text "//! The lines of a trace through two modules.\n\nimport anti.io;\nimport anti.lang;\nimport anti.text;\nimport com.example.where;\n\nfn main() -> int\n{\n\tlet t = where.taken();\n\tlet named = t.symbolize();\n\tio.eprintln(f\"{named[0].function} {named[0].line}\");\n\tio.eprintln(f\"{named[1].function} {named[1].line}\");\n\tdelete(t);\n\treturn 0;\n}\n")
+anti_message(run_lines_of_a_trace_through_two_modules STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${two_modules_text}"
+          src/com/example/where.anti "${where_text}"
+    ARGS run ${tools}
+    ERR "com.example.where.taken 8"
+        "com.example.app.main 10")
 # R168 of "Rules of 2026-10-13" in docs/decisions.md: a library project
 # without the module whose path is the name of the package builds, with a
 # warning.
