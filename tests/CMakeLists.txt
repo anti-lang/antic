@@ -2613,6 +2613,22 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/named_host.expected"
             -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
 endif()
+# A shared library built with its own runtime and without --no-runtime
+# carries no table of what it provides, and the load refuses it as no
+# plugin. The message follows the path of the library.
+add_test(NAME plugin_no_plugin
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-no-plugin"
+        "-DHOST=named_host"
+        "-DLIBRARY=clock"
+        "-DINTERFACE=tasks"
+        -DPLAIN=ON
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/named_host.plain.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
 # The loader when a call of the system fails. A file <host>.faults of
 # tests/plugin holds one case per line, its name and the value of
 # ANTI_FAULT, as the files of tests/programs do, and the case runs the

@@ -21,6 +21,9 @@
 #             file of tests/runners/run_program.cmake does
 #   ERRORS    optional file of the whole standard error of the host in a
 #             case of FAULT, which is otherwise not compared
+#   PLAIN     optional, ON to build the library with its own runtime and
+#             without --no-runtime, which makes it a shared library that
+#             is no plugin
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -39,11 +42,15 @@ endif()
 antic_build(--runtime "${RUNTIME}" ${options} -I "${SOURCES}"
             -I "${WORK}" -o "${WORK}/${HOST}${EXE}" "${SOURCES}/${HOST}.anti")
 set(import_library "")
-if(SUFFIX STREQUAL ".dll")
+if(SUFFIX STREQUAL ".dll" AND NOT PLAIN)
     set(import_library "${WORK}/${HOST}.lib")
 endif()
 set(library "${WORK}/lib/lib${LIBRARY}${SUFFIX}")
-antic_build(--lib shared --no-runtime --runtime "${RUNTIME}"
+set(plugin --no-runtime)
+if(PLAIN)
+    set(plugin "")
+endif()
+antic_build(--lib shared ${plugin} --runtime "${RUNTIME}"
             -I "${SOURCES}" -I "${WORK}" -o "${library}"
             "${SOURCES}/net/example/${LIBRARY}.anti" ${import_library})
 if(NOT DEFINED FAULT)
