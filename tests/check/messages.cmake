@@ -172,6 +172,49 @@ anti_message(fault_library_directory_not_made
     OUT "anti check: front end: 1 file, 1 target, 0 warnings, 1 failed"
     ARGS check --work ../check --runtime "${RUNTIME}"
     ERR "anti: cannot make ../check/com/example")
+# The module of each doc block, compile_block of check.c. A user block
+# stands in a file of its own under the directory docs of the work
+# directory. A dev block stands in a copy of its module under the
+# directory dev, which reads the source again.
+set(fault_user_block "//! A library with a block.\n\n/// One.\n///\n/// ```anti\n/// let n = one.one();\n/// ```\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+set(fault_dev_block "//! A library with a dev block.\n\n//# ```anti\n//# let n = helper();\n//# ```\nfn helper() -> int\n{\n\treturn 2;\n}\n\n/// Two.\npub fn two() -> int\n{\n\treturn helper();\n}\n")
+anti_message(fault_user_block_not_written
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_user_block}"
+    FAULT open:9:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 1 block, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot write ../check/check/docs/com_example_one_0.anti")
+# T153: the directory of the user blocks.
+anti_message(fault_user_block_directory_not_made
+    FILES anti.toml "${check_manifest}" src/com/example/one.anti "${fault_user_block}"
+    FAULT mkdir:10:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 1 block, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot make ../check/check/docs")
+anti_message(fault_dev_block_source_unread
+    FILES anti.toml "${check_manifest}" src/com/example/two.anti "${fault_dev_block}"
+    FAULT open:9:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 1 block, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot read src/com/example/two.anti")
+anti_message(fault_dev_block_not_written
+    FILES anti.toml "${check_manifest}" src/com/example/two.anti "${fault_dev_block}"
+    FAULT open:10:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 1 block, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot write ../check/check/dev/com/example/two.anti")
+# T153: the directory of the copy of the module of a dev block.
+anti_message(fault_dev_block_directory_not_made
+    FILES anti.toml "${check_manifest}" src/com/example/two.anti "${fault_dev_block}"
+    FAULT mkdir:12:EACCES
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 1 block, 1 failed"
+    ARGS check --work ../check --runtime "${RUNTIME}"
+    ERR "anti: cannot make ../check/check/dev/com/example")
 
 # The manifest, which names the source directory.
 anti_message(manifest_no_toml
