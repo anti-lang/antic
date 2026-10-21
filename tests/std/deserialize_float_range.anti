@@ -1,0 +1,35 @@
+//! `Object.deserialize` of numbers past the range of the float field they fill.
+//! The reader takes the exact value of the text and rounds it once to the width
+//! of the field, so `1e39` in an `f32` and `-1e309` in an `f64` are infinities
+//! of their signs, as rounding to nearest gives.
+
+import anti.io;
+import anti.lang;
+import anti.mem;
+
+class Floats
+{
+	pub f: f32 = 0.0,
+	pub d: f64 = 0.0,
+}
+
+fn main() -> int
+{
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize("{\"type\":\"Floats\",\"f\":1e39,\"d\":-1e309}",
+		&arena);
+	if back == none || !(back is *Floats) {
+		io.println("refused");
+		arena.free_all();
+		return 0;
+	}
+	let g = back as *Floats;
+	if g.f > 0.0 && g.f == g.f * 2.0 {
+		io.println("f32 above its range: infinity");
+	}
+	if g.d < 0.0 && g.d == g.d * 2.0 {
+		io.println("f64 below its range: minus infinity");
+	}
+	arena.free_all();
+	return 0;
+}
