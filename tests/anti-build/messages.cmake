@@ -126,6 +126,14 @@ anti_message(run_without_the_host
           ${app_source} "${app_text}"
     ARGS run ${tools}
     ERR "anti: ./dist/${HOST}/dev/app${EXE} was not built, so there is nothing to run")
+# The dev build of run passes the `[inject]` table of the manifest to
+# each compile, and the link takes the provider it names.
+set(inject_text "//! A field whose provider the manifest names.\n\nimport anti.io;\n\npub abstract class Greeter\n{\n\tpub abstract fn word(self) -> str;\n}\n\npub singleton class Hello\n{\n\timplements g: Greeter,\n\n\tpub concrete fn word(self) -> str\n\t{\n\t\treturn \"hello\";\n\t}\n}\n\nclass App\n{\n\tinject greeter: *Greeter,\n\n\tpub fn greet(self)\n\t{\n\t\tio.println(self.greeter.word());\n\t}\n}\n\nfn main() -> int\n{\n\tlet a = alloc App { };\n\ta.greet();\n\tdelete(a);\n\treturn 0;\n}\n")
+anti_message(run_takes_the_injections_of_the_manifest STATUS 0
+    FILES anti.toml "${manifest_package}\n[inject]\n\"com.example.app.Greeter\" = \"com.example.app.Hello.get\"\n"
+          ${app_source} "${inject_text}"
+    ARGS run ${tools}
+    OUT "hello")
 # R168 of "Rules of 2026-10-13" in docs/decisions.md: a library project
 # without the module whose path is the name of the package builds, with a
 # warning.
