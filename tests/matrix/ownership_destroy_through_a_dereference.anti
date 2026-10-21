@@ -1,0 +1,23 @@
+//! `destroy(&*p)` names no local, so the rules of locals leave it alone and the
+//! value on the heap is torn down as `destroy(p)` tears it down.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Leaf
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn main() -> int
+{
+	let p = alloc Leaf { n: 4 };
+	destroy(&*p);
+	printf("after destroy\n".ptr);
+	free(p);
+	return 0;
+}

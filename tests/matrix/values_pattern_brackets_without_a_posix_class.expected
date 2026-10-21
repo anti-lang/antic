@@ -1,0 +1,5 @@
+exit 0
+escaped_bracket 1
+escaped_bracket_no_b 0
+second_posix 1
+second_posix_no_digit 0

@@ -1,0 +1,48 @@
+//! A value the message cannot spell, an element here, is named by its type.
+
+abstract class Closable
+{
+	abstract fn close(self) -> int;
+}
+
+abstract class Serializable inherits Closable
+{
+	abstract fn write(self) -> int;
+}
+
+abstract class Writer inherits Closable
+{
+	abstract fn flush(self) -> int;
+}
+
+class C
+{
+	implements ser: Serializable,
+	implements w: Writer,
+
+	concrete fn close(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn write(self) -> int
+	{
+		return 2;
+	}
+
+	concrete fn flush(self) -> int
+	{
+		return 3;
+	}
+}
+
+fn first(cs: []C) -> int
+{
+	let p: *Closable = &cs[0];
+	return p.close();
+}
+
+fn main() -> int
+{
+	return 0;
+}

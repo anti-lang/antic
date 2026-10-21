@@ -1,0 +1,1 @@
+classes_conversion_with_two_paths_of_an_element.anti:41:21: error: `*C` converts to `*Closable` through `ser` and through `w`, name one

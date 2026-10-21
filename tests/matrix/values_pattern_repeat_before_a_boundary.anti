@@ -1,0 +1,20 @@
+//! A repeat of characters that are no word characters, before `\b`, is followed
+//! by a word character. The repeat and what follows it then take no character
+//! in common, so the checker passes the nested repeat.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	show("dashes_then_word", "--x".matches(re"^(?:-+\b)+x$") != none);
+	show("dashes_alone", "--".matches(re"^(?:-+\b)+x$") != none);
+	return 0;
+}

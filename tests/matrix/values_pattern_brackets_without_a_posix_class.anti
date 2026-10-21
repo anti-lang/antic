@@ -1,0 +1,23 @@
+//! A `[:` inside a class opens a POSIX class only when its `:]` comes before a
+//! `]` and before another `[:`. `\]` stands inside the name, so `[[:a\]]` is a
+//! class of `[`, `:`, `a` and `]`, and `[[:a[:alpha:]]` a class of `[`, `:`,
+//! `a` and the letters. A line names the form and whether the text matched.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	show("escaped_bracket", "[:a]".matches(re"^[[:a\]]+$") != none);
+	show("escaped_bracket_no_b", "b".matches(re"^[[:a\]]+$") != none);
+	show("second_posix", "[:ab".matches(re"^[[:a[:alpha:]]+$") != none);
+	show("second_posix_no_digit", "1".matches(re"^[[:a[:alpha:]]+$") != none);
+	return 0;
+}
