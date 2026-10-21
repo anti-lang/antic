@@ -8,8 +8,8 @@
 #   WORK     a directory this run writes into
 #
 # A third part takes a graph in which two packages need a third, beside
-# a dependency of a path, and a lock file whose needs or digests the
-# graph no longer gives.
+# a dependency of a path, and a lock file whose needs, modules, digests
+# or packages the graph no longer gives.
 #
 # The first part: the project needs a 1.x and b 1.x. The walk first picks a 1.1.0, which
 # needs c =2.0.0 and d 1.0.0. Then b 1.0.0 needs a =1.0.0, so a goes back
@@ -205,9 +205,11 @@ if(NOT text MATCHES "gave no index of com.example.c that anti reads")
     message(FATAL_ERROR "the build said\n${text}")
 endif()
 
-# The third part: e and f each need g, and the project needs e, f and
-# the project of c by its path. The lock file names g once, with the
-# needs of e and f. A path dependency means the lock file never answers
+# The third part: e and f each need g, f needs e as well, and the
+# project needs e, f and the project of c by its path. The lock file
+# names g once, with the needs of e and f. The index of f names g three
+# times, once without a version, and the lock file names each need of f
+# once. A path dependency means the lock file never answers
 # alone, so every build resolves again and compares the graph with the
 # lock file. A build after the lock file was changed by hand, in the
 # name of a need, in the number of needs or in the digest of a module,
@@ -235,7 +237,7 @@ set(e "")
 entry(e e 1.0.0 "{ name = \"com.example.g\", version = \"1.0.0\" }")
 publish(e "${e}" 1.0.0)
 set(f "")
-entry(f f 1.0.0 "{ name = \"com.example.g\", version = \"1.0.0\" }")
+entry(f f 1.0.0 "{ name = \"com.example.e\", version = \"1.0.0\" }, { name = \"com.example.g\", version = \"1.0.0\" }, { name = \"com.example.g\", version = \"1.0.0\" }, { name = \"com.example.g\" }")
 publish(f "${f}" 1.0.0)
 set(g "")
 entry(g g 1.0.0 "")
@@ -270,12 +272,16 @@ program_expect("the diamond" COMMAND "${project}/dist/${HOST}/dev/diamond"
 file(READ "${project}/anti.lock" written)
 string(REGEX MATCHALL "name = \"com.example.g\"" g_entries "${written}")
 string(REGEX MATCHALL "needs = \\[\"com.example.g\"\\]" g_needs "${written}")
+string(REGEX MATCHALL
+       "needs = \\[\"com.example.e\", \"com.example.g\"\\]\n"
+       f_needs "${written}")
 list(LENGTH g_entries g_count)
 list(LENGTH g_needs needs_count)
-if(NOT g_count EQUAL 1 OR NOT needs_count EQUAL 2)
+list(LENGTH f_needs f_count)
+if(NOT g_count EQUAL 1 OR NOT needs_count EQUAL 1 OR NOT f_count EQUAL 1)
     message(FATAL_ERROR "the lock file of the diamond names g ${g_count} "
-                        "times and needs it ${needs_count} times:\n"
-                        "${written}")
+                        "times, e alone needs it ${needs_count} times and "
+                        "f needs e and g ${f_count} times:\n${written}")
 endif()
 # The second build finds the same graph, so the lock file stays as it was.
 run_anti("${project}" build)
@@ -305,3 +311,11 @@ changed_lock("a need of another name" "needs = [\"com.example.g\"]"
              "needs = [\"com.example.c\"]")
 changed_lock("a need taken out" "needs = [\"com.example.g\"]" "needs = []")
 changed_lock("another digest" "${digest_g}" "${digest_e}")
+changed_lock("a need added" "needs = [\"com.example.g\"]"
+             "needs = [\"com.example.g\", \"com.example.c\"]")
+changed_lock("a module added"
+             "{ path = \"com.example.g\", sha256 = \"${digest_g}\" },"
+             "{ path = \"com.example.g\", sha256 = \"${digest_g}\" },\n    { path = \"com.example.h\", sha256 = \"${digest_g}\" },")
+changed_lock("a package named twice"
+             "[[package]]\nname = \"com.example.g\"\n"
+             "[[package]]\nname = \"com.example.g\"\nversion = \"1.0.0\"\n\n[[package]]\nname = \"com.example.g\"\n")
