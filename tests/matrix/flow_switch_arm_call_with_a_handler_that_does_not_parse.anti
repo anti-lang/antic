@@ -1,0 +1,16 @@
+//! An arm of a `switch` may be a call that can fail with its handler. A
+//! handler that names its error and holds no block after the name is refused
+//! where the block should start.
+
+fn f() may fail
+{
+}
+
+fn main() -> int
+{
+	switch 1 {
+		1 => f() catch e 5,
+		else => {}
+	}
+	return 0;
+}
