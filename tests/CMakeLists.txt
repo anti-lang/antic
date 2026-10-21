@@ -6314,6 +6314,19 @@ foreach(target linux-x86_64 linux-arm64)
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# `anti symbols resolve` reads the names and the lines of a Linux program
+# from its debug link, on every host, when the archive holds no map.
+add_test(NAME symbols_resolve_elf
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+        "-DTARGET=linux-arm64"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-resolve-elf"
+        -P "${ANTIC_RUNNERS}/run_symbols_resolve_elf.cmake")
+set_tests_properties(symbols_resolve_elf PROPERTIES
+    SKIP_REGULAR_EXPRESSION "SKIP: ")
+
 # `anti symbols resolve` refuses a line of a map or a trace whose number
 # does not fit 64 bits. The archive is written here, so every host runs it.
 add_test(NAME anti_symbols_input
