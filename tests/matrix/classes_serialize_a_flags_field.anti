@@ -1,0 +1,38 @@
+//! A field of type `Flags` is a struct without a descriptor. The default
+//! `serialize` writes it as `null`, and `Object.deserialize` passes over the
+//! `null` and leaves the field at its default.
+import anti.io;
+import anti.mem;
+import anti.text;
+
+class Carry
+{
+	pub n: int = 4,
+	pub fl: Flags,
+}
+
+fn two() -> int
+{
+	return 2;
+}
+
+fn main() -> int
+{
+	let (s, fl) = two() + 3;
+	let c = alloc Carry { n: s, fl: fl };
+	let b = text.Builder.new();
+	c.serialize(&b);
+	io.println(b.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(b.text(), &arena);
+	if back == none || !(back is *Carry) {
+		return 2;
+	}
+	let e = back as *Carry;
+	let line = f"n {e.n}";
+	io.println(line);
+	free(line.ptr);
+	arena.free_all();
+	delete(c);
+	return 0;
+}
