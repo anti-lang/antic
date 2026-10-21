@@ -1,0 +1,1 @@
+threads_pointer_into_fields_through_two_private_functions.anti:27:10: error: `view` of the thread-safe class `Box` gives out a pointer into its fields, return a copy

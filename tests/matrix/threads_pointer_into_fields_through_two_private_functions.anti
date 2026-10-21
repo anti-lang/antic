@@ -1,0 +1,34 @@
+//! A public function of a thread-safe class gives out no pointer into the
+//! fields of its object. A private function that returns what another private
+//! one gives out of the fields gives one out as well, and so does a private one
+//! that returns two such pointers, so the public function that returns either
+//! is refused.
+
+synchronized class Box
+{
+	n: int = 0,
+	m: int = 0,
+
+	fn either(self, first: bool) -> *int
+	{
+		if first {
+			return &self.n;
+		}
+		return &self.m;
+	}
+
+	fn middle(self) -> *int
+	{
+		return self.either(true);
+	}
+
+	pub fn view(self) -> *int
+	{
+		return self.middle();
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
