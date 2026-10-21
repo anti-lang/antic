@@ -12,6 +12,12 @@ export enum Level: u8
 	Loud,
 }
 
+/// An enum without values, which the header leaves out, since C refuses an enum
+/// without enumerators.
+export enum Unset: u8
+{
+}
+
 /// Two lanes of a float, eight bytes together.
 export simd struct F32x2 { a: f32, b: f32 }
 
