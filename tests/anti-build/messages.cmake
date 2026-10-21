@@ -184,6 +184,28 @@ anti_message(path_cycle_nine_deep
     ARGS build ${tools}
     ERR "anti: the path dependencies form a cycle: com.example.p8 -> com.example.p9 -> com.example.p8")
 
+# A chain of path projects without a cycle has no limit of depth, by the
+# entry of R165 in docs/decisions.md, and the headers of the library files
+# of a path dependency supply its dependencies, by "Dependencies" in
+# docs/tooling.md. The program names one, which names the other. T169 of
+# docs/audit/tests-findings.md.
+function(write_two_projects)
+    file(WRITE "${PROJECT}/../p1/anti.toml"
+         "[package]\nname = \"com.example.p1\"\nversion = \"0.1.0\"\n\n[dependencies]\n\"com.example.p2\" = { path = \"../p2\" }\n")
+    file(WRITE "${PROJECT}/../p1/src/com/example/p1.anti"
+         "//! One.\n\nimport com.example.p2;\n\n/// One.\npub fn one() -> int\n{\n\treturn p2.two() - 1;\n}\n")
+    file(WRITE "${PROJECT}/../p2/anti.toml"
+         "[package]\nname = \"com.example.p2\"\nversion = \"0.1.0\"\n")
+    file(WRITE "${PROJECT}/../p2/src/com/example/p2.anti"
+         "//! Two.\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n")
+endfunction()
+anti_message(path_chain_of_two_projects STATUS 0
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.p1\" = { path = \"../p1\" }\n"
+          ${app_source} "//! The program.\n\nimport anti.io;\nimport com.example.p1;\n\nfn main() -> int\n{\n\tif p1.one() == 1 {\n\t\tio.println(\"one\");\n\t}\n\treturn 0;\n}\n"
+    SETUP write_two_projects
+    ARGS run ${tools}
+    OUT "one")
+
 # The dependencies. The repository of a case is the directory WORK/repo,
 # named by its file:// URL, and the cache of the user is WORK/cache.
 file_url("${WORK}/repo" repo_url)
