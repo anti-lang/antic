@@ -1,7 +1,8 @@
 //! Patterns when memory runs out. A compiled pattern keeps its text, a search
 //! takes the match data of PCRE2, and `replace` grows the text it gives, as the
 //! walks of `find_all` and `split` take match data of their own. The compile of
-//! a byte pattern writes the pattern PCRE2 reads and a map of its bytes. Memory
+//! a byte pattern writes the pattern PCRE2 reads and a map of its bytes, and
+//! the first failure of a code of PCRE2 keeps the text of its message. Memory
 //! that runs out for any of them stops the program, by decision 4 of "Decisions
 //! of 2026-10-11". A case of `faults_regex.faults` refuses one allocation,
 //! through the variable `ANTI_FAULT` of `src/rt/fault.h`.
@@ -47,5 +48,9 @@ fn main() -> int
 		return 1;
 	};
 	io.println("compiled bytes");
-	return 0;
+	let bad = regex.compile("(") catch e {
+		io.println(e.message);
+		return 0;
+	};
+	return 1;
 }

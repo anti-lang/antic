@@ -54,6 +54,7 @@ std_faults_regex_fault_compile_memory T139 The compile of a pattern fails where 
 std_faults_regex_fault_compile_text_memory T139 The compile of a pattern fails where memory that runs out stops the program.
 std_faults_regex_fault_bytes_memory T139 The compile of a pattern fails where memory that runs out stops the program.
 std_faults_regex_fault_bytes_map_memory T139 The compile of a pattern fails where memory that runs out stops the program.
+std_faults_regex_fault_message_memory T139 The message of a pattern that does not compile is empty where memory that runs out stops the program.
 std_faults_text_fault_path_memory T139 The C of anti.fs gives ENOMEM where memory that runs out stops the program.
 std_faults_toml_fault_memory_5 T139 The reader of TOML takes memory that runs out for a text outside the subset.
 std_faults_toml_fault_memory_6 T139 The reader of TOML takes memory that runs out for a text outside the subset.
