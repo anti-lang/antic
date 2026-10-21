@@ -149,7 +149,10 @@ endfunction()
 # src/native/pcre2.cmake calls for every target with its triple and the
 # flags of its compile. Each source compiles as the glue of runtime/ does,
 # with ANTI_FAULTS, into lib/<target>/ of ANTIC_FAULTS_RUNTIME_DIR, where
-# the links of anti_rt_faults leave it in place.
+# the links of anti_rt_faults leave it in place. A coverage tree measures
+# it as it measures the glue of runtime/, so the fault cases of anti.regex
+# count in the report. The members of the profile runtime it calls stand
+# in anti_rt of the same directory.
 function(antic_faults_glue target triple)
     if(NOT ANTIC_FAULTS OR NOT target STREQUAL ANTIC_HOST_TARGET)
         return()
@@ -158,6 +161,8 @@ function(antic_faults_glue target triple)
     antic_static_library(glue_name anti_rt_regex "${target}")
     set(glue "${ANTIC_FAULTS_RUNTIME_DIR}/lib/${target}/${glue_name}")
     antic_runtime_sections(sections "${target}")
+    antic_coverage_runtime(coverage_flags coverage_members "${target}"
+        "${ANTIC_PROFILE_RUNTIME_${target}}")
     set(objects "")
     foreach(source regex patterns)
         set(object "${work}/rt_${source}.o")
@@ -165,7 +170,7 @@ function(antic_faults_glue target triple)
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
             COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
                 ${ANTIC_C_WARNINGS} ${ARGN} ${sections} -DANTI_FAULTS=1
-                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=." ${coverage_flags}
                 -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
                 -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
