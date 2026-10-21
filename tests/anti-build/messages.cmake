@@ -179,6 +179,27 @@ anti_message(path_cycle
           ../one/src/com/example/one.anti "${library_text}"
     ARGS build ${tools}
     ERR "anti: the path dependencies form a cycle: com.example.app -> com.example.one -> com.example.app")
+# platform_absolute_path of src/antic/platform.c calls realpath on the path
+# and then on its directory. When both fail for the root of the build,
+# that project keeps the path it was given, and the cycle is found one
+# project further down. When both fail for the dependency the cycle comes
+# back to, the cycle is found all the same.
+anti_message(fault_path_cycle_root_unresolved
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.one\" = { path = \"../one\" }\n"
+          ${app_source} "${app_text}"
+          ../one/anti.toml "[package]\nname = \"com.example.one\"\nversion = \"0.1.0\"\n\n[dependencies]\n\"com.example.app\" = { path = \"../project\" }\n"
+          ../one/src/com/example/one.anti "${library_text}"
+    FAULT stat:1:EACCES,stat:2:EACCES
+    ARGS build ${tools}
+    ERR "anti: the path dependencies form a cycle: com.example.one -> com.example.app -> com.example.one")
+anti_message(fault_path_cycle_dependency_unresolved
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.one\" = { path = \"../one\" }\n"
+          ${app_source} "${app_text}"
+          ../one/anti.toml "[package]\nname = \"com.example.one\"\nversion = \"0.1.0\"\n\n[dependencies]\n\"com.example.app\" = { path = \"../project\" }\n"
+          ../one/src/com/example/one.anti "${library_text}"
+    FAULT stat:3:EACCES,stat:4:EACCES
+    ARGS build ${tools}
+    ERR "anti: the path dependencies form a cycle: com.example.app -> com.example.one -> com.example.app")
 # R165 of "Rules of 2026-10-13" in docs/decisions.md: a cycle is refused at
 # any depth. Nine projects stand in a chain below this one, and the last
 # names the one before it, nine levels down.
