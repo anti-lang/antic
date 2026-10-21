@@ -1,0 +1,15 @@
+//! R131 of "Rules of 2026-10-13": a module whose one exported item is a
+//! function of a class exports something, so `--lib static` gives no warning
+//! `nothing-exported`.
+
+/// A gauge that C reads.
+class Gauge
+{
+	pub level: c_int = 0,
+
+	/// The level.
+	export fn read(self) -> c_int
+	{
+		return self.level;
+	}
+}

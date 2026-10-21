@@ -3925,6 +3925,16 @@ add_expect_test(error_modules_library_exports_nothing STATUS 1
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_exports_nothing.a"
             modules_library_exports_nothing.anti)
+# A function of a class that the module exports is enough, and the
+# library builds without the warning: antic prints the line of the link
+# alone.
+add_expect_test(modules_library_exports_a_member STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^c[cl] main\\.c [^ ]*modules_library_exports_a_member\\.a [^ ]*anti_rt\\.(a|lib)[^a-z]*$"
+    COMMAND "$<TARGET_FILE:antic>" --lib static
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_exports_a_member.a"
+            modules_library_exports_a_member.anti)
 
 add_expect_test(error_modules_library_kind STATUS 2
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
