@@ -58,6 +58,13 @@ anti_message(antic_version_form
           ${app_source} "${app_text}"
     ARGS build ${tools}
     ERR "anti: ./anti.toml: [package] antic `v0.3` is no version of one to three parts of digits, as `${VERSION}`")
+# The licence file the manifest names is read for the key of the cache of
+# each module, options_key of build.c, before any module is compiled.
+anti_message(license_text_missing
+    FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\nlicense_text = \"LICENSE\"\n"
+          ${app_source} "${app_text}"
+    ARGS build ${tools}
+    ERR "anti: cannot read ./LICENSE")
 anti_message(runtime_unknown
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     ENV "XDG_DATA_HOME=${WORK}/data"
@@ -685,6 +692,14 @@ anti_message(fault_notice_not_written
     FAULT open:34:EACCES
     ARGS build ${tools}
     ERR "anti: cannot write ./dist/${HOST}/dev/NOTICE.txt")
+# own_package of build.c reads the licence file again for the notice,
+# after the module compiled with its digest.
+anti_message(fault_license_text_unread_for_the_notice
+    FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\nlicense_text = \"LICENSE\"\n"
+          LICENSE "MIT\n" ${app_source} "${app_text}"
+    FAULT open:35:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot read ./LICENSE")
 # deliver_soname of build.c: the link that dist/ of a Linux library of
 # --soname holds beside the file its soname names, by T099.
 anti_message(fault_soname_link_not_written
