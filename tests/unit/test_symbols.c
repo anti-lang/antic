@@ -724,6 +724,264 @@ static void old_dwarf_lines(void)
     }
 }
 
+/* The header of a DWARF 5 line unit after its header length, with the
+   entry tables of the directories and the files as they are given. */
+static void v5_header(struct blob *h, const struct blob *dirs,
+                      const struct blob *files)
+{
+    static const uint8_t lengths[12] = {0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1};
+
+    add_int(h, 1, 1);           /* minimum instruction length */
+    add_int(h, 1, 1);           /* operations per instruction */
+    add_int(h, 1, 1);           /* default is_stmt */
+    add_int(h, (uint8_t)-5, 1); /* line base */
+    add_int(h, 14, 1);          /* line range */
+    add_int(h, 13, 1);          /* opcode base */
+    add(h, lengths, sizeof lengths);
+    add(h, dirs->bytes, dirs->size);
+    add(h, files->bytes, files->size);
+}
+
+/* An entry table of DWARF 5 that holds every form the reader takes, one
+   field each, with an entry per path. The path is the string, and the
+   other fields carry kinds of the vendor range. width is the size of an
+   offset into a string section, 4, or 8 in 64-bit DWARF. */
+static void all_forms(struct blob *t, const char *const *paths,
+                      uint64_t count, int width)
+{
+    static const uint64_t forms[] = {0x08, 0x0b, 0x05, 0x06, 0x07,
+                                     0x1e, 0x09, 0x0f, 0x0e, 0x1f};
+    size_t k;
+    uint64_t i;
+
+    add_int(t, sizeof forms / sizeof forms[0], 1);
+    for (k = 0; k < sizeof forms / sizeof forms[0]; k++) {
+        add_uleb(t, k == 0 ? 1 : 0x2000 + k);
+        add_uleb(t, forms[k]);
+    }
+    add_uleb(t, count);
+    for (i = 0; i < count; i++) {
+        add(t, paths[i], strlen(paths[i]) + 1);
+        add_int(t, 1, 1);
+        add_int(t, 2, 2);
+        add_int(t, 4, 4);
+        add_int(t, 8, 8);
+        add_int(t, 0, 8);       /* the 16 bytes of an MD5 */
+        add_int(t, 0, 8);
+        add_uleb(t, 3);         /* a block of three bytes */
+        add(t, "abc", 3);
+        add_uleb(t, 300);
+        add_int(t, 0, width);   /* an offset into .debug_str */
+        add_int(t, 0, width);   /* and into .debug_line_str */
+    }
+}
+
+/* A line unit of 64-bit DWARF: the escape 0xffffffff before a length of
+   8 bytes, and a header length of 8 bytes. */
+static void wide_unit(struct blob *out, int version, const struct blob *h,
+                      const struct blob *program)
+{
+    add_int(out, 0xffffffffu, 4);
+    add_int(out, 2 + (version >= 5 ? 2u : 0u) + 8 + h->size + program->size,
+            8);
+    add_int(out, (uint64_t)version, 2);
+    if (version >= 5) {
+        add_int(out, 8, 1);
+        add_int(out, 0, 1);
+    }
+    add_int(out, h->size, 8);
+    add(out, h->bytes, h->size);
+    add(out, program->bytes, program->size);
+}
+
+/* A table of DWARF 5 entries that the reader refuses: more than 16
+   formats, a form it does not know, and a block longer than the table. */
+static void bad_table(struct blob *t, int which)
+{
+    int k;
+
+    if (which == 0) {
+        add_int(t, 17, 1);
+        for (k = 0; k < 17; k++) {
+            add_uleb(t, 1);
+            add_uleb(t, 0x08);
+        }
+        add_uleb(t, 0);
+        return;
+    }
+    add_int(t, 1, 1);
+    add_uleb(t, which == 1 ? 1 : 0x2000);
+    add_uleb(t, which == 1 ? 0x99 : 0x09);
+    add_uleb(t, 1);
+    add_uleb(t, 200);
+}
+
+/* The entry tables of DWARF 5 in every form the reader takes, in 32-bit
+   and 64-bit DWARF. A table the reader refuses refuses the unit when it
+   holds the directories, and gives no file name when it holds the files.
+   So does a file index past the table. */
+static void dwarf5_forms(void)
+{
+    static const char *const dirs[] = {"d"};
+    static const char *const files[] = {"a.anti", "b.anti"};
+    struct anti_found found;
+    int width;
+    int which;
+
+    for (width = 4; width <= 8; width += 4) {
+        struct blob d = {{0}, 0};
+        struct blob f = {{0}, 0};
+        struct blob h = {{0}, 0};
+        struct blob p = {{0}, 0};
+        struct blob line = {{0}, 0};
+        all_forms(&d, dirs, 1, width);
+        all_forms(&f, files, 2, width);
+        v5_header(&h, &d, &f);
+        two_rows(&p, 6);
+        if (width == 4) {
+            line_unit(&line, 5, &h, &p);
+        } else {
+            wide_unit(&line, 5, &h, &p);
+        }
+        /* The file register starts at 1, and DWARF 5 counts from 0. */
+        CHECK(line_of(&line, 0x1004, &found));
+        CHECK(found.line == 7);
+        CHECK(found.file != NULL && strcmp(found.file, "b.anti") == 0);
+    }
+    for (which = 0; which < 3; which++) {
+        struct blob d = {{0}, 0};
+        struct blob f = {{0}, 0};
+        struct blob h = {{0}, 0};
+        struct blob p = {{0}, 0};
+        struct blob line = {{0}, 0};
+        bad_table(&d, which);
+        all_forms(&f, files, 2, 4);
+        v5_header(&h, &d, &f);
+        two_rows(&p, 6);
+        line_unit(&line, 5, &h, &p);
+        CHECK(!line_of(&line, 0x1004, &found));
+
+        d.size = 0;
+        f.size = 0;
+        h.size = 0;
+        line.size = 0;
+        all_forms(&d, dirs, 1, 4);
+        bad_table(&f, which);
+        v5_header(&h, &d, &f);
+        line_unit(&line, 5, &h, &p);
+        CHECK(line_of(&line, 0x1004, &found));
+        CHECK(found.line == 7 && found.file == NULL);
+    }
+    {
+        struct blob d = {{0}, 0};
+        struct blob f = {{0}, 0};
+        struct blob h = {{0}, 0};
+        struct blob p = {{0}, 0};
+        struct blob line = {{0}, 0};
+        all_forms(&d, dirs, 1, 4);
+        all_forms(&f, files, 2, 4);
+        v5_header(&h, &d, &f);
+        add_int(&p, 4, 1);      /* set_file */
+        add_uleb(&p, 5);
+        two_rows(&p, 6);
+        line_unit(&line, 5, &h, &p);
+        CHECK(line_of(&line, 0x1004, &found));
+        CHECK(found.line == 7 && found.file == NULL);
+    }
+}
+
+/* Line units the reader refuses or reads in part: a version outside 2 to
+   5, a header longer than its unit, a line range of 0, and a file table
+   of DWARF 4 cut inside an entry. A unit of 64-bit DWARF, an address of
+   4 bytes and DW_LNS_fixed_advance_pc are read. */
+static void line_unit_forms(void)
+{
+    static const int versions[] = {1, 6};
+    struct anti_found found;
+    size_t i;
+
+    for (i = 0; i < sizeof versions / sizeof versions[0]; i++) {
+        struct blob h = {{0}, 0};
+        struct blob p = {{0}, 0};
+        struct blob line = {{0}, 0};
+        line_header(&h, 4, 0, 0, 0, 0);
+        two_rows(&p, 6);
+        line_unit(&line, versions[i], &h, &p);
+        CHECK(!line_of(&line, 0x1004, &found));
+    }
+    {
+        struct blob line = {{0}, 0};
+        add_int(&line, 2 + 4, 4);
+        add_int(&line, 4, 2);
+        add_int(&line, 100, 4);
+        CHECK(!line_of(&line, 0x1004, &found));
+    }
+    {
+        struct blob h = {{0}, 0};
+        struct blob p = {{0}, 0};
+        struct blob line = {{0}, 0};
+        line_header(&h, 4, 0, 0, 0, 0);
+        h.bytes[4] = 0;         /* the line range */
+        two_rows(&p, 6);
+        line_unit(&line, 4, &h, &p);
+        CHECK(!line_of(&line, 0x1004, &found));
+
+        h.bytes[4] = 14;
+        line.size = 0;
+        wide_unit(&line, 4, &h, &p);
+        CHECK(line_of(&line, 0x1004, &found));
+        CHECK(found.line == 7);
+        CHECK(found.file != NULL && strcmp(found.file, "a.anti") == 0);
+    }
+    {
+        /* The header of line_header holds 18 bytes of fields, the empty
+           list of directories at 18, the name `a.anti` from 19 to 25 and
+           its three numbers from 26. The table of file 2 ends at the
+           numbers, after the end of the list, and the table of file 1 at
+           `a.an`, inside its name. */
+        static const struct {
+            uint64_t file;
+            size_t size;
+        } cuts[] = {{2, 30}, {2, 26}, {1, 23}};
+        size_t k;
+        for (k = 0; k < sizeof cuts / sizeof cuts[0]; k++) {
+            struct blob h = {{0}, 0};
+            struct blob p = {{0}, 0};
+            struct blob line = {{0}, 0};
+            line_header(&h, 4, 0, 0, 0, 0);
+            CHECK(h.size == 30);
+            h.size = cuts[k].size;
+            add_int(&p, 4, 1);
+            add_uleb(&p, cuts[k].file);
+            two_rows(&p, 6);
+            line_unit(&line, 4, &h, &p);
+            CHECK(line_of(&line, 0x1004, &found));
+            CHECK(found.line == 7 && found.file == NULL);
+        }
+    }
+    {
+        struct blob h = {{0}, 0};
+        struct blob p = {{0}, 0};
+        struct blob line = {{0}, 0};
+        line_header(&h, 4, 0, 0, 0, 0);
+        add_int(&p, 0, 1);      /* set_address of 4 bytes */
+        add_uleb(&p, 5);
+        add_int(&p, 2, 1);
+        add_int(&p, 0x1000, 4);
+        add_int(&p, 3, 1);
+        add_sleb(&p, 6);
+        add_int(&p, 1, 1);
+        add_int(&p, 9, 1);      /* fixed_advance_pc */
+        add_int(&p, 0x10, 2);
+        add_int(&p, 1, 1);
+        end_sequence(&p);
+        line_unit(&line, 4, &h, &p);
+        CHECK(line_of(&line, 0x1004, &found));
+        CHECK(found.line == 7);
+        CHECK(!line_of(&line, 0x1010, &found));
+    }
+}
+
 /* The address of __TEXT of a Mach-O header, which a trace and `anti
    symbols` both read. The header holds a __PAGEZERO segment and a
    __TEXT segment, each of 72 bytes. Every read stays inside the size
@@ -853,6 +1111,14 @@ static bool count_any(void *context, const char *name, uint64_t vaddr,
     return false;
 }
 
+/* Stops the walk at the first function, which it counts. */
+static bool count_first(void *context, const char *name, uint64_t vaddr,
+                        uint64_t size)
+{
+    count_any(context, name, vaddr, size);
+    return true;
+}
+
 /* The functions of the table, counted. */
 static int macho_count(const struct anti_macho_table *t)
 {
@@ -889,6 +1155,11 @@ static void macho_symbols(void)
     /* The whole file, read from its bytes and as a mapped image. */
     CHECK(anti_rt_macho_table(image, size, false, 0, &t));
     CHECK(t.count == 5 && macho_count(&t) == 2);
+    {
+        int first = 0;
+        CHECK(anti_rt_macho_functions(&t, count_first, &first));
+        CHECK(first == 1);
+    }
     memset(&found, 0, sizeof found);
     CHECK(anti_rt_macho_function(&t, 0x1010, &found));
     CHECK(found.function != NULL && strcmp(found.function, "f") == 0);
@@ -1172,6 +1443,8 @@ void test_symbols(void)
     demangles("_A4anti2rt", 128, "");
     demangles("_A4anti2rt_", 128, "");
     demangles("_A0_main", 128, "");
+    /* A length with more digits than the name has bytes. */
+    demangles("_A999_f", 128, "");
     /* A name that does not fit is none. */
     demangles("_A8geometry_length", 14, "");
     demangles("_A8geometry_length", 15, "geometry.length");
@@ -1186,6 +1459,8 @@ void test_symbols(void)
     elf_cut_short();
     elf_headers_outside();
     old_dwarf_lines();
+    dwarf5_forms();
+    line_unit_forms();
     macho_text();
     macho_symbols();
     macho_debug_map();
