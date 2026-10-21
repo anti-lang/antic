@@ -6470,14 +6470,14 @@ add_test(NAME anti_build_inputs
 # What `anti build` delivers and caches, one test per case of
 # tests/runners/run_anti_build_cases.cmake, whose header names what each shows. A
 # Windows library links from every host whose runtime archive holds the
-# sysroot. The curl of the redirect cases is a shell script.
+# sysroot. The curl of the redirect and index cases is a shell script.
 set(anti_build_cases path_target path_target_cpu lock_dropped
     cache_strip_docs cache_version cache_license cache_license_text
     cache_attribution cache_dependency cache_import_checked
     cache_import_layout)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     list(APPEND anti_build_cases redirect_to_http redirect_followed
-         redirect_loop)
+         redirect_loop index_unchanged index_absent)
 endif()
 if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/windows-x86_64")
     list(APPEND anti_build_cases windows_import_library)

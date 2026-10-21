@@ -22,6 +22,11 @@
 #   redirect_followed       and one to https:// is followed
 #   redirect_loop           and a server that redirects to itself is left
 #                           after ten redirects
+#   index_unchanged         an index checked again after the hour, which
+#                           the server answers as unchanged by its entity
+#                           tag, stays in the cache as it was
+#   index_absent            an index the server does not hold gives the
+#                           repository no version of the package
 #   lock_dropped            a package of the lock file that the manifest no
 #                           longer reaches leaves the graph, the lock file
 #                           and the notice, and is not fetched (defect 9)
@@ -165,18 +170,23 @@ endif()
 # the URL of FAKE_REDIRECT, and mirror.example serves the files under
 # FAKE_SERVED, with no regard to the scheme. It follows a redirect when
 # it is given -L, as curl does, and it writes each URL it is asked for
-# into FAKE_LOG. A shell script stands for it, so Windows runs neither
-# case.
+# into FAKE_LOG. It saves the checksum of a file it serves as its entity
+# tag, and answers 304 with no byte for a file whose tag the request
+# names. A shell script stands for it, so Windows runs none of these
+# cases.
 set(fake_curl [=[#!/bin/sh
 out=
 format=
 follow=no
 url=
+compare=
+save=
 while [ $# -gt 0 ]; do
     case "$1" in
     -o) out=$2; shift 2 ;;
     -w) format=$2; shift 2 ;;
-    --etag-compare|--etag-save) shift 2 ;;
+    --etag-compare) compare=$2; shift 2 ;;
+    --etag-save) save=$2; shift 2 ;;
     -*L*) follow=yes; shift ;;
     -*) shift ;;
     *) url=$1; shift ;;
@@ -192,8 +202,16 @@ while :; do
     *://mirror.example/*)
         file="$FAKE_SERVED/${url#*://mirror.example/}"
         if [ -f "$file" ]; then
-            code=200
-            cp "$file" "$out"
+            tag=$(cksum < "$file")
+            if [ -n "$compare" ] && [ -f "$compare" ] &&
+               [ "$(cat "$compare")" = "$tag" ]; then
+                code=304
+                : > "$out"
+            else
+                code=200
+                cp "$file" "$out"
+                [ -z "$save" ] || printf '%s' "$tag" > "$save"
+            fi
         else
             code=404
         fi ;;
@@ -298,6 +316,47 @@ if(CASE STREQUAL "redirect_followed")
     if(NOT asked MATCHES "https://mirror.example/com.example.units/1.0.0/")
         message(FATAL_ERROR "the build fetched no library file from the "
                             "target of the redirect:\n${asked}")
+    endif()
+    return()
+endif()
+
+# The second build of index_unchanged finds no lock file and a stamp of
+# its index from 1970, so it asks for the index again with the tag the
+# first build saved, and the server answers that nothing changed.
+if(CASE STREQUAL "index_unchanged")
+    redirect_project("https://mirror.example")
+    anti_passes("the first build" "${WORK}/app" build ${tools}
+                ENV ${redirect_env})
+    file(GLOB cached "${WORK}/cache/anti/index/*/com.example.units/index.toml")
+    if(cached STREQUAL "")
+        message(FATAL_ERROR "the first build cached no index")
+    endif()
+    file(READ "${cached}" before)
+    file(WRITE "${cached}.checked" "0\n")
+    file(REMOVE "${WORK}/app/anti.lock" "${WORK}/curl.log")
+    anti_passes("the second build" "${WORK}/app" build ${tools}
+                ENV ${redirect_env})
+    file(READ "${WORK}/curl.log" asked)
+    if(NOT asked MATCHES "https://mirror.example/com.example.units/index.toml")
+        message(FATAL_ERROR "the second build asked for no index:\n${asked}")
+    endif()
+    file(READ "${cached}" after)
+    if(NOT after STREQUAL before)
+        message(FATAL_ERROR "the cached index changed:\n${after}")
+    endif()
+    return()
+endif()
+
+# The server of index_absent holds no index of the package.
+if(CASE STREQUAL "index_absent")
+    redirect_project("https://mirror.example")
+    file(REMOVE "${WORK}/served/com.example.units/index.toml")
+    anti("${WORK}/app" status text build ${tools} ENV ${redirect_env})
+    set(expected "anti: https://repo.example has no version of com.example.units that satisfies every constraint on it\n")
+    if(NOT status STREQUAL "1" OR NOT text STREQUAL expected)
+        message(FATAL_ERROR "the build over an index the server lacks "
+                            "ended with ${status} and printed\n${text}\nand "
+                            "the case expects 1 and\n${expected}")
     endif()
     return()
 endif()
