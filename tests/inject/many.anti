@@ -1,0 +1,346 @@
+//! A program with seventeen injectable interfaces, each with the default
+//! provider its interface declares. The configuration at start takes at most
+//! sixteen of them from libraries, and a seventeenth is a startup error before
+//! any library loads.
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class One
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *One
+	{
+		return OneHere.get();
+	}
+}
+
+singleton class OneHere inherits One
+{
+	concrete fn n(self) -> int
+	{
+		return 1;
+	}
+}
+
+abstract class Two
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Two
+	{
+		return TwoHere.get();
+	}
+}
+
+singleton class TwoHere inherits Two
+{
+	concrete fn n(self) -> int
+	{
+		return 2;
+	}
+}
+
+abstract class Three
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Three
+	{
+		return ThreeHere.get();
+	}
+}
+
+singleton class ThreeHere inherits Three
+{
+	concrete fn n(self) -> int
+	{
+		return 3;
+	}
+}
+
+abstract class Four
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Four
+	{
+		return FourHere.get();
+	}
+}
+
+singleton class FourHere inherits Four
+{
+	concrete fn n(self) -> int
+	{
+		return 4;
+	}
+}
+
+abstract class Five
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Five
+	{
+		return FiveHere.get();
+	}
+}
+
+singleton class FiveHere inherits Five
+{
+	concrete fn n(self) -> int
+	{
+		return 5;
+	}
+}
+
+abstract class Six
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Six
+	{
+		return SixHere.get();
+	}
+}
+
+singleton class SixHere inherits Six
+{
+	concrete fn n(self) -> int
+	{
+		return 6;
+	}
+}
+
+abstract class Seven
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Seven
+	{
+		return SevenHere.get();
+	}
+}
+
+singleton class SevenHere inherits Seven
+{
+	concrete fn n(self) -> int
+	{
+		return 7;
+	}
+}
+
+abstract class Eight
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Eight
+	{
+		return EightHere.get();
+	}
+}
+
+singleton class EightHere inherits Eight
+{
+	concrete fn n(self) -> int
+	{
+		return 8;
+	}
+}
+
+abstract class Nine
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Nine
+	{
+		return NineHere.get();
+	}
+}
+
+singleton class NineHere inherits Nine
+{
+	concrete fn n(self) -> int
+	{
+		return 9;
+	}
+}
+
+abstract class Ten
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Ten
+	{
+		return TenHere.get();
+	}
+}
+
+singleton class TenHere inherits Ten
+{
+	concrete fn n(self) -> int
+	{
+		return 10;
+	}
+}
+
+abstract class Eleven
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Eleven
+	{
+		return ElevenHere.get();
+	}
+}
+
+singleton class ElevenHere inherits Eleven
+{
+	concrete fn n(self) -> int
+	{
+		return 11;
+	}
+}
+
+abstract class Twelve
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Twelve
+	{
+		return TwelveHere.get();
+	}
+}
+
+singleton class TwelveHere inherits Twelve
+{
+	concrete fn n(self) -> int
+	{
+		return 12;
+	}
+}
+
+abstract class Thirteen
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Thirteen
+	{
+		return ThirteenHere.get();
+	}
+}
+
+singleton class ThirteenHere inherits Thirteen
+{
+	concrete fn n(self) -> int
+	{
+		return 13;
+	}
+}
+
+abstract class Fourteen
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Fourteen
+	{
+		return FourteenHere.get();
+	}
+}
+
+singleton class FourteenHere inherits Fourteen
+{
+	concrete fn n(self) -> int
+	{
+		return 14;
+	}
+}
+
+abstract class Fifteen
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Fifteen
+	{
+		return FifteenHere.get();
+	}
+}
+
+singleton class FifteenHere inherits Fifteen
+{
+	concrete fn n(self) -> int
+	{
+		return 15;
+	}
+}
+
+abstract class Sixteen
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Sixteen
+	{
+		return SixteenHere.get();
+	}
+}
+
+singleton class SixteenHere inherits Sixteen
+{
+	concrete fn n(self) -> int
+	{
+		return 16;
+	}
+}
+
+abstract class Seventeen
+{
+	abstract fn n(self) -> int;
+
+	pub fn default() -> *Seventeen
+	{
+		return SeventeenHere.get();
+	}
+}
+
+singleton class SeventeenHere inherits Seventeen
+{
+	concrete fn n(self) -> int
+	{
+		return 17;
+	}
+}
+
+class Holder
+{
+	inject one: *One,
+	inject two: *Two,
+	inject three: *Three,
+	inject four: *Four,
+	inject five: *Five,
+	inject six: *Six,
+	inject seven: *Seven,
+	inject eight: *Eight,
+	inject nine: *Nine,
+	inject ten: *Ten,
+	inject eleven: *Eleven,
+	inject twelve: *Twelve,
+	inject thirteen: *Thirteen,
+	inject fourteen: *Fourteen,
+	inject fifteen: *Fifteen,
+	inject sixteen: *Sixteen,
+	inject seventeen: *Seventeen,
+
+	pub fn sum(self) -> int
+	{
+		return self.one.n() + self.two.n() + self.three.n() + self.four.n() + self.five.n() + self.six.n() + self.seven.n() + self.eight.n() + self.nine.n() + self.ten.n() + self.eleven.n() + self.twelve.n() + self.thirteen.n() + self.fourteen.n() + self.fifteen.n() + self.sixteen.n() + self.seventeen.n();
+	}
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { };
+	printf("sum %lld\n".ptr, h.sum());
+	delete(h);
+	return 0;
+}

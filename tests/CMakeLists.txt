@@ -2456,6 +2456,26 @@ foreach(case
             -P "${ANTIC_RUNNERS}/run_trace.cmake")
 endforeach()
 
+# The configuration at start takes at most sixteen interfaces from
+# libraries, and a seventeenth line is a startup error before any library
+# loads.
+set(many_args "")
+foreach(n One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve
+          Thirteen Fourteen Fifteen Sixteen Seventeen)
+    list(APPEND many_args "--anti.inject=many.${n}=lib/x.so")
+endforeach()
+list(JOIN many_args "," many_args)
+add_test(NAME inject_many
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${INJECT}/many.anti"
+        "-DARGS=${many_args}"
+        "-DEXPECTED=${INJECT}/empty.pattern"
+        "-DERRORS=${INJECT}/many.pattern"
+        "-DSTATUS=70"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-many"
+        -P "${ANTIC_RUNNERS}/run_trace.cmake")
+
 # The `[inject]` and `[inject.test]` tables of a manifest. `anti test`
 # runs in the project root, reads both and lays the test table over the
 # plain one, per interface. The one test of the module adds the label of
