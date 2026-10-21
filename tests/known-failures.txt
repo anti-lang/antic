@@ -105,3 +105,4 @@ error_layout_text_mul_high T163 The text of a size names a wrapping or saturatin
 std_serialize_infinite_float T164 serialize writes an infinite float as inf, which deserialize refuses.
 matrix_types_enum_internal_function_refused T165 An internal function of an enum body gives a second message at self.
 std_deserialize_regex_search T166 A search with a Regex field that deserialize left without a pattern crashes.
+anti_bind_message_clang_static_returns_a_function T167 anti bind writes a shim that returns a function from a void function.

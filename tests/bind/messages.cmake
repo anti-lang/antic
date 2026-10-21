@@ -182,6 +182,13 @@ anti_message(clang_field_type STATUS 0
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `Odd` is left out: Anti has no form for the type of its field `z`")
+# A static function whose result is a pointer to a function. The shim
+# cannot spell its result, so the function is left out (T167).
+anti_message(clang_static_returns_a_function STATUS 0
+    FILES api.h "static void (*pick(void))(int) { return 0; }\nint count(int n);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `pick` is left out: a shim cannot write a function that returns a function")
 # A flexible array member has no length, so Anti has no form for it.
 anti_message(clang_flexible_array STATUS 0
     FILES api.h "struct Buf { int n; int data[]; };\nvoid take(struct Buf *b);\n"
