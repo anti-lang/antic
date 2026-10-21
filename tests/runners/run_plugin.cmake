@@ -125,6 +125,13 @@ antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
 plugin(named)
 program_expect("the program with a named library"
                COMMAND "${WORK}/named${EXE}" OUT_FILE "${PROVIDED}")
+# --anti.inject replaces the provider with the library at start, and
+# --anti.inspect lists the library with the interface it fills.
+program_expect("the inspection of an injected library"
+               COMMAND "${WORK}/named${EXE}"
+                       "--anti.inject=${interface}=${dir}/libfancy${SUFFIX}"
+                       --anti.inspect
+               OUT_MATCH "\nloaded plugins:\n  [^\n]*libfancy${SUFFIX} for ${interface}\n$")
 antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" --inject "${interface}=discover" -o "${WORK}/found${EXE}"
             "${SOURCES}/user.anti")
