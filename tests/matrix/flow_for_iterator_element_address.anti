@@ -1,0 +1,46 @@
+//! A `for` over a collection with an iterator of its own, whose body takes the
+//! address of the element. The element is stored in a slot of its own each
+//! turn, and the function the address goes to reads that turn's value.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Count
+{
+	pub limit: int = 0,
+
+	operator fn iter(self) -> CountIter
+	{
+		return CountIter { limit: self.limit, at: -1 };
+	}
+}
+
+class CountIter
+{
+	pub limit: int,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.limit;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at * 10;
+	}
+}
+
+fn show(p: *int)
+{
+	printf("%d\n".ptr, *p as c_int);
+}
+
+fn main() -> int
+{
+	let c = Count { limit: 3 };
+	for x in c {
+		show(&x);
+	}
+	return 0;
+}
