@@ -1,0 +1,1 @@
+classes_call_in_an_inherited_field_of_a_default_parameter.anti:20:35: error: a call is not a constant expression

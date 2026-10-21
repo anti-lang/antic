@@ -1,0 +1,28 @@
+//! A default parameter value is a constant. A class literal there names an
+//! inherited field with a call, which is no constant, and the default is
+//! refused where it stands.
+
+class Base
+{
+	pub x: int,
+}
+
+class Derived inherits Base
+{
+	pub y: int,
+}
+
+fn one() -> int
+{
+	return 1;
+}
+
+fn show(d: Derived = Derived { x: one(), y: 2 }) -> int
+{
+	return d.y;
+}
+
+fn main() -> int
+{
+	return show(Derived { x: 3, y: 4 });
+}
