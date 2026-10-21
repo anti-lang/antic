@@ -1,0 +1,24 @@
+//! The name of a frame of a copy of a generic when memory runs out. The name a
+//! person reads, `inside<int>`, takes memory of its own. Without it the frame
+//! keeps the name of its symbol, whose brackets stay escaped, and the program
+//! goes on. A case of `faults_trace_copy.faults` refuses one allocation,
+//! through the variable `ANTI_FAULT` of `src/rt/fault.h`.
+import anti.debug;
+import anti.io;
+import anti.lang;
+
+/// The trace from inside a copy of a generic, which is its first frame in dev
+/// mode. Release mode inlines it into `main`.
+fn inside<T>(x: T) -> *lang.StackTrace
+{
+	return debug.backtrace();
+}
+
+fn main() -> int
+{
+	let t = inside<int>(1);
+	defer delete(t);
+	let named = t.symbolize();
+	io.println(named[0].function);
+	return 0;
+}
