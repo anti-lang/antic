@@ -6697,10 +6697,13 @@ endforeach()
 # stands in capitals, a link to a page beside this one and a code block
 # that never closes. Its developer's page in Markdown holds the note of the
 # module and the note of an item. wrapped holds a link that anti fmt
-# breaks after a word of its text.
+# breaks after a word of its text. operators holds two `operator fn eq`
+# that share their name, each headed by its name and its type.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
-             "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html")
+             "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
+             "operators_html||operators|com.example.operators.html|operators.expected.html"
+             "operators_private|--markdown\\|--private|operators|com.example.operators.md|operators.private.expected.md")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 case)

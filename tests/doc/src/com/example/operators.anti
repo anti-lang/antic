@@ -1,0 +1,26 @@
+//! Two operators that share the name `eq`, so each stands under its name and
+//! the type of its first parameter.
+
+/// A level.
+pub struct Level
+{
+	n: int,
+}
+
+/// A width.
+pub struct Width
+{
+	n: int,
+}
+
+/// Two levels are equal.
+pub operator fn eq(a: Level, b: Level) -> bool
+{
+	return a.n == b.n;
+}
+
+/// Two widths are equal.
+pub operator fn eq(a: Width, b: Width) -> bool
+{
+	return a.n == b.n;
+}
