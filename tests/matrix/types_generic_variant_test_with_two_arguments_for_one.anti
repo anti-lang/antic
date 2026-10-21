@@ -1,0 +1,17 @@
+//! `is` that names a case of a generic variant with more type arguments than
+//! the variant takes.
+
+variant Opt<T>
+{
+	Some { v: T },
+	Nothing,
+}
+
+fn main() -> int
+{
+	let o = Opt<int>.Some { v: 1 };
+	if o is Opt<int, int>.Some {
+		return 1;
+	}
+	return 0;
+}
