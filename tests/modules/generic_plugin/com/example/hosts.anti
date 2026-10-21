@@ -1,5 +1,5 @@
-//! A generic function of a library module that asks a library of plugins for
-//! an interface. The client compiles its copy from the library file, whose tree
+//! A generic function of a library module that asks a library of plugins for an
+//! interface. The client compiles its copy from the library file, whose tree
 //! carries the descriptor of the interface in place of its name.
 
 import anti.plugin;
