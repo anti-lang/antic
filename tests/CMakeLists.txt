@@ -4753,6 +4753,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "generic_length_shift|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_shift.s,generic_length_shift.anti"
         "generic_length_least|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_least.s,generic_length_least.anti"
         "generic_length_overflow|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_overflow.s,generic_length_overflow.anti"
+        "generic_length_minus_least|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_minus_least.s,generic_length_minus_least.anti"
         "layout_text_wrapping|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_text_wrapping.s,layout_text_wrapping.anti"
         "layout_text_saturating|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_text_saturating.s,layout_text_saturating.anti"
         "layout_text_mul_high|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_text_mul_high.s,layout_text_mul_high.anti"

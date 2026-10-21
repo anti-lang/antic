@@ -1,0 +1,14 @@
+//! The length of a copy of a generic negates the least `int`, which the copy
+//! leaves as it stands and the back end refuses.
+
+const LEAST: int = -9223372036854775807 - 1;
+
+struct Row<N: int>
+{
+	cells: [-(-N)]int,
+}
+
+fn main() -> int
+{
+	return size_of(Row<LEAST>) as int;
+}
