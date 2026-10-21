@@ -1,0 +1,16 @@
+//! A struct literal as the default value of a parameter.
+
+struct P
+{
+	x: int,
+}
+
+fn take(p: P = P { x: 1 }) -> int
+{
+	return p.x;
+}
+
+fn main() -> int
+{
+	return take();
+}
