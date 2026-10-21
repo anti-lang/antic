@@ -1,0 +1,24 @@
+//! A module-level operator belongs to the type of its first parameter. An
+//! `operator fn eq` of no parameters belongs to no type, so `==` on a struct
+//! of the module takes the default, which compares field by field.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct P
+{
+	x: int,
+}
+
+operator fn eq() -> bool
+{
+	return false;
+}
+
+fn main() -> int
+{
+	let a = P { x: 1 };
+	let b = P { x: 1 };
+	let c = P { x: 2 };
+	printf("%d %d\n".ptr, (a == b) as c_int, (a == c) as c_int);
+	return 0;
+}
