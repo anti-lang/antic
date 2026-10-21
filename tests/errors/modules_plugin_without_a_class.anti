@@ -1,0 +1,8 @@
+//! A plugin of a module that declares no class provides nothing, and the link
+//! of the library refuses it.
+
+/// The one item of the module.
+pub fn one() -> int
+{
+	return 1;
+}

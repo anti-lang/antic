@@ -3952,6 +3952,16 @@ add_expect_test(modules_library_exports_a_member STATUS 0
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_exports_a_member.a"
             modules_library_exports_a_member.anti)
 
+# A plugin needs a `provides` line, and a module without a class has
+# none to give.
+add_expect_test(error_modules_plugin_without_a_class STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "modules_plugin_without_a_class\\.anti: error: a plugin has at least one `provides` line"
+    COMMAND "$<TARGET_FILE:antic>" --lib shared --no-runtime
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_plugin_without_a_class${plugin_suffix}"
+            modules_plugin_without_a_class.anti)
+
 add_expect_test(error_modules_library_kind STATUS 2
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
     PATTERN "--lib takes static or shared[^a-z]+not bundled"
