@@ -3606,6 +3606,15 @@ antic_modules_test(generic_dispatch
     STD lang
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-dispatch-modules")
 
+# A range without a name and a walk through a pointer to a type parameter,
+# each in a generic function of a library module, whose copies the client
+# compiles from the library file.
+antic_modules_test(generic_loops
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_loops"
+    LIBRARIES loops
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-loops-modules")
+
 # `supports` of a library of plugins in a generic function of a library
 # module, whose copy the client compiles. The checked tree in the library
 # file carries the descriptor of the interface the call names.

@@ -1,0 +1,41 @@
+//! Calls two generic functions of the library `com.example.loops` whose loops
+//! the library file carries.
+
+import com.example.loops;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Count
+{
+	pub limit: int = 0,
+
+	operator fn iter(self) -> CountIter
+	{
+		return CountIter { limit: self.limit, at: -1 };
+	}
+}
+
+class CountIter
+{
+	pub limit: int,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.limit;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+fn main() -> int
+{
+	let c = Count { limit: 5 };
+	printf("turns %lld\n".ptr, loops.turns<i16>(1));
+	printf("total %lld\n".ptr, loops.total(&c));
+	return 0;
+}

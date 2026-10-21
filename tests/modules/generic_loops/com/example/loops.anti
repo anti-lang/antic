@@ -1,0 +1,23 @@
+//! Two loops of generic functions of a library module. The client compiles
+//! their copies from the library file: a range without a name, and a walk
+//! through a pointer to a type parameter.
+
+/// Counts three turns, each the size of `T`.
+pub fn turns<T>(x: T) -> int
+{
+	let n = 0;
+	for 0..3 {
+		n += size_of(T);
+	}
+	return n;
+}
+
+/// Counts the elements of a collection through a pointer to it.
+pub fn total<T: iter>(p: *T) -> int
+{
+	let n = 0;
+	for x in p {
+		n += 1;
+	}
+	return n;
+}
