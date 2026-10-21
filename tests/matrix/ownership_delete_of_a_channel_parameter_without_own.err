@@ -1,0 +1,1 @@
+ownership_delete_of_a_channel_parameter_without_own.anti:7:9: error: `c` belongs to the caller, so `delete` does not take it. Mark it `own` to take it over

@@ -1,0 +1,16 @@
+//! `delete` of a channel parameter without `own`, by R083 of "Answers of
+//! 2026-10-18". `delete(c)` ends a channel as it ends an object, and the
+//! channel belongs to the caller.
+
+fn finish(c: chan int)
+{
+	delete(c);
+}
+
+fn main() -> int
+{
+	let c = chan int(1);
+	finish(c);
+	delete(c);
+	return 0;
+}
