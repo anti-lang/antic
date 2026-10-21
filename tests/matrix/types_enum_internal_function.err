@@ -1,0 +1,1 @@
+types_enum_internal_function.anti:14:2: error: `internal` marks a module item, and a class member is `pub`, `protected` or neither

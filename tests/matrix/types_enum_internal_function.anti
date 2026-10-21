@@ -1,0 +1,23 @@
+//! `internal` marks a module item, so a function of an enum body is refused
+//! with it, as a function of a class body is, and with one message.
+
+enum Mode
+{
+	Fast,
+	Slow,
+
+	pub fn rank(self) -> int
+	{
+		return 0;
+	}
+
+	internal fn speed(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

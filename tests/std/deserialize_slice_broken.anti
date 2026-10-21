@@ -1,0 +1,34 @@
+//! `Object.deserialize` of an `own` slice field whose elements break off: an
+//! element missing after a comma and an array without its `]`. Each text is
+//! refused, and a whole one is read.
+
+import anti.io;
+import anti.lang;
+import anti.mem;
+
+class Bag
+{
+	pub own items: []int,
+}
+
+fn try_text(label: str, text: str, arena: *mem.ArenaAllocator)
+{
+	let back = Object.deserialize(text, arena);
+	if back == none {
+		io.print(label);
+		io.println(": refused");
+		return;
+	}
+	io.print(label);
+	io.println(": read");
+}
+
+fn main() -> int
+{
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	try_text("whole", "{\"type\":\"Bag\",\"items\":[1,2]}", &arena);
+	try_text("broken", "{\"type\":\"Bag\",\"items\":[1,}", &arena);
+	try_text("open", "{\"type\":\"Bag\",\"items\":[1", &arena);
+	arena.free_all();
+	return 0;
+}

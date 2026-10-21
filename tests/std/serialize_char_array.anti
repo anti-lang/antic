@@ -1,0 +1,29 @@
+//! `serialize` writes an array field of `char` as an array of JSON strings, and
+//! `Object.deserialize` reads it back to the same text.
+
+import anti.io;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+class Letters
+{
+	pub fixed: [2]char = ['a', 'b'],
+}
+
+fn main() -> int
+{
+	let l = Letters { };
+	let out = text.Builder.new();
+	l.serialize(&out);
+	io.println(out.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(out.text(), &arena);
+	if back != none {
+		let again = text.Builder.new();
+		back.serialize(&again);
+		io.println(again.text());
+	}
+	arena.free_all();
+	return 0;
+}

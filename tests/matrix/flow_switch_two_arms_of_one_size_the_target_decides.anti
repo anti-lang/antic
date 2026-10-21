@@ -1,0 +1,19 @@
+//! Two arms of a `switch` that both name `size_of(c_long)`. The target decides
+//! the size, yet the two arms are one value on every target, so the second is
+//! refused.
+
+fn kind(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		size_of(c_long) => k = 1,
+		size_of(c_long) => k = 2,
+		else => k = 3,
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	return kind(8);
+}

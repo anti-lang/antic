@@ -1,0 +1,4 @@
+exit 0
+whole: read
+broken: refused
+open: refused
