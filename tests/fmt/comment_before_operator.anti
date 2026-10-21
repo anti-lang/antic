@@ -1,0 +1,8 @@
+//! An ordinary comment between a value and a binary operator. The operator
+//! stays binary and keeps its spaces, since the token before it ends a value.
+
+fn main() -> int
+{
+	let x = 1;
+	return x /* one */ + 1;
+}

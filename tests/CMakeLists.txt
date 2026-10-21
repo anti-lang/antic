@@ -6637,6 +6637,14 @@ add_expect_test(fmt_alias_of_function STATUS 0
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/alias_of_function.anti")
 
+# An ordinary comment between a value and a binary operator. The source is
+# in the canonical form, and fmt_canonical passes over it until `anti fmt`
+# agrees: finding T174 of docs/audit/tests-findings.md.
+add_expect_test(fmt_comment_before_operator STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/comment_before_operator.anti")
+
 # Every source of the standard library and of the tests stands in the
 # canonical form, so that `anti fmt` over the checkout writes nothing.
 add_test(NAME fmt_canonical
