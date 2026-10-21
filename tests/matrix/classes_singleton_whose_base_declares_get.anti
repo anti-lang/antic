@@ -1,0 +1,21 @@
+//! A singleton class whose base declares `get` is refused at the singleton, by
+//! R112 of the rules of 2026-10-13. The `get` of the base would stand in place
+//! of the one the compiler writes.
+
+class Base
+{
+	pub fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+singleton class Config inherits Base
+{
+	pub level: int = 2,
+}
+
+fn main() -> int
+{
+	return 0;
+}

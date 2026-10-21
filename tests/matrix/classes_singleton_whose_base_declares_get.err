@@ -1,0 +1,1 @@
+classes_singleton_whose_base_declares_get.anti:13:17: error: `Config` is a singleton, and the compiler writes its `get`
