@@ -1,0 +1,16 @@
+//! `append_float` writes at most 100000000 digits after the point, whatever
+//! larger precision it is given.
+import anti.io;
+import anti.json;
+import anti.text;
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	b.append_float(0.5, 200000000);
+	let n = text.Builder.new();
+	json.write_int(b.text().len, &n);
+	io.println(n.text());
+	io.println(text.slice(b.text(), 0, 5));
+	return 0;
+}
