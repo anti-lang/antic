@@ -1,0 +1,1 @@
+threads_concurrent_class_writes_a_field_of_its_base.anti:7:2: error: `count` is not guarded, atomic or fixed [unguarded-field]

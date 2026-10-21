@@ -1,0 +1,21 @@
+//! A field of a concurrent class is guarded, atomic or fixed. A function of a
+//! concurrent class below it that writes a field of the base makes that field
+//! none of the three, as a function of the base itself does.
+
+concurrent class Base
+{
+	protected count: int = 0,
+}
+
+concurrent class Derived inherits Base
+{
+	pub fn bump(self)
+	{
+		self.count = 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
