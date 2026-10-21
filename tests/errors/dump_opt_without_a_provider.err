@@ -1,0 +1,1 @@
+dump_opt_without_a_provider.anti: error: `dump_opt_without_a_provider.Logger` has no provider, and `dump_opt_without_a_provider.Service` injects it as `log`. Name one under `[inject]` of the manifest, or give `dump_opt_without_a_provider.Logger` a static `default`

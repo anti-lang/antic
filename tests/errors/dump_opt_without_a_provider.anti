@@ -1,0 +1,29 @@
+//! `--dump-opt` runs the passes over the whole program before it prints the IR,
+//! so an interface with no provider stops it with the message of a link.
+abstract class Logger
+{
+	abstract fn say(self) -> int;
+}
+
+singleton class Console
+{
+	implements lg: Logger,
+
+	concrete fn say(self) -> int { return 0; }
+}
+
+class Service
+{
+	inject log: *Logger,
+
+	pub fn run(self) -> int
+	{
+		return self.log.say();
+	}
+}
+
+fn main() -> int
+{
+	let s = Service { };
+	return s.run();
+}

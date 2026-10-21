@@ -4878,6 +4878,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "inject_type|-S,-o,${LISTINGS}/inject_type.s,inject_type.anti"
         "inject_literal|-S,-o,${LISTINGS}/inject_literal.s,inject_literal.anti"
         "inject_missing|-S,-o,${LISTINGS}/inject_missing.s,inject_missing.anti"
+        "dump_opt_without_a_provider|--dump-opt,dump_opt_without_a_provider.anti"
         "inject_wrong|-S,--inject,inject_wrong.Clock=inject_wrong.Console.get,-o,${LISTINGS}/inject_wrong.s,inject_wrong.anti"
         "inject_provider|-S,--inject,inject_provider.Logger=inject_provider.nowhere,--inject,inject_provider.Clock=inject_provider.ticks,-o,${LISTINGS}/inject_provider.s,inject_provider.anti"
         "inject_cycle|-S,--inject,inject_cycle.Logger=inject_cycle.Console.get,--inject,inject_cycle.Clock=inject_cycle.Watch.get,-o,${LISTINGS}/inject_cycle.s,inject_cycle.anti"
