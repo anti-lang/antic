@@ -1,6 +1,5 @@
-//! What the header of a library writes for a callback whose parameters
-//! carry no name: a struct, a tuple, an enum and a function with its
-//! context.
+//! What the header of a library writes for a callback whose parameters carry no
+//! name: a struct, a tuple, an enum and a function with its context.
 
 /// A point that the callback of `apply` takes.
 export struct Point

@@ -1,5 +1,5 @@
-//! A call whose argument is no expression. The parser refuses the argument
-//! and gives up the call.
+//! A call whose argument is no expression. The parser refuses the argument and
+//! gives up the call.
 
 fn f(n: int) -> int
 {

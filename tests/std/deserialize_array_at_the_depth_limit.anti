@@ -1,8 +1,8 @@
-//! `Object.deserialize` of a chain of objects whose deepest one holds an
-//! array. The reader goes 64 levels deep, and the array is a level of its
-//! own: a chain of 63 objects comes back, and one of 64 is refused, since
-//! its array stands one level past the limit. Each line prints the length
-//! and what came back, or `refused`.
+//! `Object.deserialize` of a chain of objects whose deepest one holds an array.
+//! The reader goes 64 levels deep, and the array is a level of its own: a chain
+//! of 63 objects comes back, and one of 64 is refused, since its array stands
+//! one level past the limit. Each line prints the length and what came back, or
+//! `refused`.
 import anti.io;
 import anti.mem;
 import anti.text;
