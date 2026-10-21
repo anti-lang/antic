@@ -1,0 +1,1 @@
+types_generic_operator_with_a_tuple_of_functions_that_names_no_parameter.anti:11:17: error: no operand of `operator fn add` names `T`, which no use of the operator can give
