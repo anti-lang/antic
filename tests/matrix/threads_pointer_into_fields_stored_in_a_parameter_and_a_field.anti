@@ -1,0 +1,30 @@
+//! A public function of a thread-safe class may point a parameter of its own at
+//! a field, and a field at another field. Neither store leaves the object, so
+//! neither is refused.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Box
+{
+	n: int = 7,
+	p: ?*int = none,
+
+	pub fn keep(self, out: ?*int) -> int
+	{
+		out = &self.n;
+		self.p = &self.n;
+		if out == none || self.p == none {
+			return 0;
+		}
+		return *out;
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let x = 0;
+	printf("kept: %d\n".ptr, b.keep(&x) as c_int);
+	delete(b);
+	return 0;
+}
