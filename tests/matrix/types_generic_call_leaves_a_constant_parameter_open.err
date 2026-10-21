@@ -1,0 +1,1 @@
+types_generic_call_leaves_a_constant_parameter_open.anti:12:9: error: nothing in the arguments gives `N` of `width`, so the call writes it out after the name

@@ -1,0 +1,13 @@
+//! A generic call whose arguments give no value to a constant parameter.
+//! No argument has a shape to bind it from, so the message sends the reader
+//! to the type arguments after the name.
+
+fn width<N: int>(x: int) -> int
+{
+	return x + N;
+}
+
+fn main() -> int
+{
+	return width(1);
+}
