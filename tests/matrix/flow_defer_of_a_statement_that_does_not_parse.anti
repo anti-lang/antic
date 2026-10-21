@@ -1,0 +1,8 @@
+//! `defer` takes one statement, and a statement that does not parse after it
+//! is refused where it stops.
+
+fn main() -> int
+{
+	defer let;
+	return 0;
+}
