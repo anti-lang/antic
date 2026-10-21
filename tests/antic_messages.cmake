@@ -439,6 +439,19 @@ if(CMAKE_HOST_APPLE)
         ERR "antic: cannot run xcrun: Permission denied"
             "antic: xcrun --show-sdk-path failed")
 endif()
+# A program that names frameworks links against Apple's SDK. The sysroot
+# of the package holds none, and the listing of the SDKs of the Command
+# Line Tools is the fifteenth open, apple_sdk of driver_link.c and
+# apple_clt_sdk of applesdk.c. When it fails, the message names every
+# framework and where the SDK comes from.
+if(CMAKE_HOST_APPLE)
+    anti_message(fault_frameworks_without_an_sdk
+        FILES main.anti "${program}"
+        FAULT open:15:EACCES
+        ARGS ${tools} --framework CoreFoundation --framework Foundation
+             main.anti
+        ERR "antic: the frameworks CoreFoundation, Foundation link for ${HOST} against Apple's SDK, which no package holds and ${RUNTIME}/sysroot/${HOST}/sdk lacks. A Mac keeps the SDK in /Library/Developer/CommandLineTools/SDKs. Run anti sdk export on a Mac and anti sdk import here.")
+endif()
 # --bundle-runtime of a static library of the Mac lists the members of
 # the runtime with llvm-ar, platform_capture of platform.c and
 # extract_runtime of driver_library.c. opt and llc run twice before it.
