@@ -52,6 +52,17 @@ anti_message(format_empty_lines_at_the_end
         "anti check: formatting: 1 file, 1 finding"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/long.anti:8:1: error: the line is not the one `anti fmt` writes")
+# A file that stops before the text `anti fmt` writes, here without its
+# last newline: the finding names its last line.
+anti_message(format_last_newline_missing
+    FILES anti.toml "${check_manifest}"
+          src/com/example/short.anti "//! A module whose text ends without its last newline.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file, 1 finding"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/short.anti:7:1: error: the line is not the one `anti fmt` writes")
 
 # The fence of a block. A space after the tag `anti` belongs to no tag,
 # so the block compiles. A fence that no second one closes holds no block,
