@@ -1,6 +1,6 @@
-//! A literal as the second operand of a generic operator whose second
-//! parameter is its type parameter. The first operand gives `T`, so the
-//! literal takes `T`, as the call `add(a, 5)` would give it.
+//! A literal as the second operand of a generic operator whose second parameter
+//! is its type parameter. The first operand gives `T`, so the literal takes
+//! `T`, as the call `add(a, 5)` would give it.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
