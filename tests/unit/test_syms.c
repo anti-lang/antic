@@ -2,7 +2,8 @@
    deployment index with no id, and a program with no function. Each
    used to hand a null pointer to memcmp or qsort with a count of zero,
    which the sanitizer builds catch. The paths a configuration and a
-   report of --memory-checks name are read as regular files alone. */
+   report of --memory-checks name are read as regular files alone. An
+   entry whose data no longer matches its CRC refuses its archive. */
 
 #if !defined(_WIN32)
 /* mkfifo is POSIX, outside the C11 library. */
@@ -323,6 +324,66 @@ static void report_fifo(void)
 #endif
 }
 
+/* Write entries to the archive with the first byte of the bytes of the
+   last entry changed, so its data no longer matches its CRC. */
+static void write_broken(struct zip_entry *entries, size_t count)
+{
+    const struct zip_entry *last = &entries[count - 1];
+    struct text bytes = {0};
+    char *at = NULL;
+    size_t i;
+    FILE *f;
+
+    CHECK(zip_write(ARCHIVE, entries, count));
+    CHECK(files_read(ARCHIVE, &bytes));
+    for (i = 0; at == NULL && i + last->size <= bytes.length; i++) {
+        if (memcmp(bytes.data + i, last->bytes, last->size) == 0) {
+            at = bytes.data + i;
+        }
+    }
+    CHECK(at != NULL);
+    if (at != NULL) {
+        *at = (char)(*at ^ 1);
+        f = platform_open(ARCHIVE, true);
+        CHECK(f != NULL);
+        if (f != NULL) {
+            CHECK(fwrite(bytes.data, 1, bytes.length, f) == bytes.length);
+            fclose(f);
+        }
+    }
+    text_free(&bytes);
+}
+
+/* An entry whose data no longer matches its CRC refuses the archive, in
+   the directory of an id of a deployment archive and at the top of the
+   archive of one build. */
+static void broken_entries(void)
+{
+    static const char index[] =
+        "[module.a]\nmodule = \"prog\"\nid = \"0123456789abcdef\"\n";
+    static const char map[] = "# The map of a symbols archive of Anti.\n"
+                              "# build 0123456789abcdef\n";
+    struct zip_entry entries[2];
+    const char *symbols[1];
+
+    write_file(TRACE, "");
+    symbols[0] = ARCHIVE;
+    memset(entries, 0, sizeof entries);
+    entries[0].name = "index.toml";
+    entries[0].bytes = index;
+    entries[0].size = sizeof index - 1;
+    entries[1].name = "0123456789abcdef/prog.map";
+    entries[1].bytes = map;
+    entries[1].size = sizeof map - 1;
+    write_broken(entries, 2);
+    CHECK(syms_resolve(TRACE, symbols, 1) == 1);
+    entries[1].name = "prog.map";
+    write_broken(&entries[1], 1);
+    CHECK(syms_resolve(TRACE, symbols, 1) == 1);
+    remove(ARCHIVE);
+    remove(TRACE);
+}
+
 void test_syms(void)
 {
     unit_without_id();
@@ -332,4 +393,5 @@ void test_syms(void)
     object_no_file();
     configuration_fifo();
     report_fifo();
+    broken_entries();
 }
