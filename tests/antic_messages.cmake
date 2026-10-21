@@ -330,6 +330,21 @@ anti_message(fault_opt_not_waited
     FAULT wait:2:ECHILD
     ARGS ${tools} main.anti
     ERR_MATCH "antic: waiting for ${opt_pattern}: No child processes\nantic: opt failed\n.*")
+# -S runs opt and then llc for the assembly alone, llvm_run of
+# llvm_run.c, and ends with 1 when either does not start, driver_run of
+# driver.c.
+anti_message(fault_assembly_opt_not_started
+    FILES main.anti "${program}"
+    FAULT run:1:EACCES
+    ARGS ${tools} -S main.anti
+    ERR "antic: cannot run ${RUNTIME}/bin/opt: Permission denied"
+        "antic: opt failed")
+anti_message(fault_assembly_llc_not_started
+    FILES main.anti "${program}"
+    FAULT run:2:EACCES
+    ARGS ${tools} -S main.anti
+    ERR "antic: cannot run ${RUNTIME}/bin/llc: Permission denied"
+        "antic: llc failed")
 # llc of --lto none writes into a directory of its own, so it runs in that
 # directory by absolute paths, run_llc of llvm_run.c and platform_run_in
 # of platform.c. The second program of the run is llc. The third and
