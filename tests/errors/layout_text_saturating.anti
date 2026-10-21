@@ -1,0 +1,12 @@
+//! An array length that adds to the size of a `c_long` with `+|`. The message
+//! names the type of the field as the source writes it, with its operator.
+
+struct Row
+{
+	cells: [size_of(c_long) +| 9223372036854775807]int,
+}
+
+fn main() -> int
+{
+	return size_of(Row) as int;
+}

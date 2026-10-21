@@ -1,0 +1,12 @@
+//! An array length that is `mul_high` of the size of a `c_long`. The message
+//! names the length as the source writes it, with the call.
+
+struct Row
+{
+	cells: [mul_high(size_of(c_long), 2)]int,
+}
+
+fn main() -> int
+{
+	return size_of(Row) as int;
+}

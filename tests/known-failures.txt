@@ -95,3 +95,6 @@ matrix_flow_for_over_an_iter_of_an_unknown_type_refused T161 A loop over an iter
 matrix_types_generic_inferred_through_a_channel_dev T162 A chan of the argument gives no type argument to a generic call.
 matrix_types_generic_inferred_through_a_channel_release T162 A chan of the argument gives no type argument to a generic call.
 matrix_types_generic_inferred_through_a_channel_memory_checks T162 A chan of the argument gives no type argument to a generic call.
+error_layout_text_wrapping T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
+error_layout_text_saturating T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
+error_layout_text_mul_high T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.

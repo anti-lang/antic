@@ -1,0 +1,12 @@
+//! An array length that shifts the size of a `c_long` with `<<%`. The message
+//! names the length as the source writes it, with its operator.
+
+struct Row
+{
+	cells: [size_of(c_long) <<% 61]int,
+}
+
+fn main() -> int
+{
+	return size_of(Row) as int;
+}

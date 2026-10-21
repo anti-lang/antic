@@ -1,0 +1,1 @@
+antic: the array length `size_of(c_long) <<% 61` is 0 on linux-x86_64, and an array length is at least 1
