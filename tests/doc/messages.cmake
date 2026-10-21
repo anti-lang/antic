@@ -132,6 +132,23 @@ anti_message(fault_source_unopened
     FAULT open:8:EACCES
     ARGS doc -o pages --runtime "${RUNTIME}"
     ERR "antic: cannot open src/com/example/one.anti")
+# The page of a module that imports another reads the library file of the
+# import that the compile wrote before, interface_of of driver.c. The
+# search for it reads it with the thirty-second read, and the load with
+# the thirty-fourth.
+set(fault_importer "//! Two.\n\nimport com.example.one;\n\n/// Two.\npub fn two() -> int\n{\n\treturn one.one() + 1;\n}\n")
+anti_message(fault_page_import_unfound
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+          src/com/example/two.anti "${fault_importer}"
+    FAULT read:32:EIO
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "antic: cannot read build/doc-work/com/example/one.antl")
+anti_message(fault_page_import_unloaded
+    FILES anti.toml "${fault_manifest}" src/com/example/one.anti "${fault_library}"
+          src/com/example/two.anti "${fault_importer}"
+    FAULT read:34:EIO
+    ARGS doc -o pages --runtime "${RUNTIME}"
+    ERR "antic: cannot read build/doc-work/com/example/one.antl")
 
 # The manifest, which names the source directory.
 anti_message(manifest_no_toml
