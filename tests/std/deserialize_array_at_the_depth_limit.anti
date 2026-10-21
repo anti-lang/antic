@@ -1,0 +1,61 @@
+//! `Object.deserialize` of a chain of objects whose deepest one holds an
+//! array. The reader goes 64 levels deep, and the array is a level of its
+//! own: a chain of 63 objects comes back, and one of 64 is refused, since
+//! its array stands one level past the limit. Each line prints the length
+//! and what came back, or `refused`.
+import anti.io;
+import anti.mem;
+import anti.text;
+
+class Deep
+{
+	pub own next: ?*Deep = none,
+	pub xs: [2]int = [0, 0],
+}
+
+/// The text of a chain of n objects of `Deep`, the last with an array.
+fn chain(n: int) -> str
+{
+	let b = text.Builder.new();
+	let i = 0;
+	while i < n do {
+		b.append("{\"type\":\"Deep\",\"next\":");
+		i += 1;
+	}
+	b.append("null,\"xs\":[1,2]");
+	i = 0;
+	while i < n do {
+		b.append("}");
+		i += 1;
+	}
+	return b.take();
+}
+
+/// Read the chain of n objects and print the array of the deepest.
+fn read(n: int)
+{
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let input = chain(n);
+	let back = Object.deserialize(input, &arena);
+	free(input.ptr);
+	if back == none {
+		io.println(f"{n} refused");
+		arena.free_all();
+		return;
+	}
+	let at = back as ?*Deep;
+	while at != none && at.next != none do {
+		at = at.next;
+	}
+	if at != none {
+		io.println(f"{n} {at.xs[0]} {at.xs[1]}");
+	}
+	arena.free_all();
+}
+
+fn main() -> int
+{
+	read(63);
+	read(64);
+	return 0;
+}
