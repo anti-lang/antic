@@ -1,2 +1,2 @@
 exit 0
-faults_trace_copy.main
+faults_trace_copy.main 0

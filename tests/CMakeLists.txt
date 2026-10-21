@@ -1178,11 +1178,13 @@ endforeach()
 # runtime of runtime-faults/ is no bitcode. The words after the value
 # change the run of a case. `dev` builds the program in dev mode instead,
 # linked with the dev objects of the modules of the standard library it
-# imports, as a program of tests/matrix is. A word NAME=value sets a
+# imports, as a program of tests/matrix is. `g` builds it with -g, so a
+# trace reads its lines from the object. A word NAME=value sets a
 # variable of the environment of the program, and a word that starts with
 # `--` is an argument of the program after those of <name>.args:
 #
 #   order_memory alloc:5:ENOMEM dev
+#   object_memory alloc:17:ENOMEM dev g
 #   conf_path_memory alloc:5:ENOMEM ANTI_CONF=none.toml
 #   option_memory alloc:5:ENOMEM --anti.threads=2
 if(ANTIC_FAULTS)
@@ -1210,18 +1212,21 @@ if(ANTIC_FAULTS)
                 set(objects "")
                 set(fixtures "")
                 set(dev OFF)
+                set(debug OFF)
                 set(environment "")
                 set(arguments "")
                 foreach(word IN LISTS words)
                     if(word STREQUAL "dev")
                         set(dev ON)
+                    elseif(word STREQUAL "g")
+                        set(debug ON)
                     elseif(word MATCHES "^[A-Z_]+=")
                         list(APPEND environment "${word}")
                     elseif(word MATCHES "^--")
                         list(APPEND arguments "${word}")
                     else()
                         message(FATAL_ERROR "${list}: `${word}` is no dev, "
-                                            "NAME=value or --argument")
+                                            "g, NAME=value or --argument")
                     endif()
                 endforeach()
                 list(JOIN environment "," environment)
@@ -1237,6 +1242,9 @@ if(ANTIC_FAULTS)
                     antic_dev_inputs(objects fixtures ${modules})
                     list(JOIN objects "," objects)
                     set(options "--dev")
+                endif()
+                if(debug)
+                    string(APPEND options ",-g")
                 endif()
                 set(base "${CMAKE_CURRENT_SOURCE_DIR}/${kind}/${name}.${case}")
                 set(errors "")

@@ -1,5 +1,11 @@
 # The cases of faults_trace_copy.anti: a name and the value of ANTI_FAULT,
 # see tests/CMakeLists.txt. alloc counts the memory of the runtime after
 # the start. In dev mode the thirteenth is the readable name of the first
-# frame, which symbolize makes from the name of its symbol.
+# frame, which symbolize makes from the name of its symbol. With -g the
+# frame reads its line from the object of the program, whose path takes
+# the sixteenth and whose bytes take the seventeenth and the first open.
 name_memory alloc:13:ENOMEM dev
+name_memory_g alloc:13:ENOMEM dev g
+object_path_memory alloc:16:ENOMEM dev g
+object_memory alloc:17:ENOMEM dev g
+object_refused open:1:EACCES dev g
