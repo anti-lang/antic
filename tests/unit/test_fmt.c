@@ -80,7 +80,8 @@ static void open_anonymous(void)
 }
 
 /* One rule per source, and the form it gives. The parser would refuse
-   the last six, and the formatter writes each as far as its rules reach. */
+   several of them, and the formatter writes each as far as its rules
+   reach. */
 /* A space and 80 more before the text of a doc line, past the 80 bytes
    that wrap_doc of fmt.c keeps for the indent of a line. */
 #define TEN_SPACES "          "
@@ -131,6 +132,9 @@ static void odd_sources(void)
         /* A list whose `}` the file never writes is no list, and its
            names stay in their order. */
         {"import a.b.{y, x", "import a.b.{\n\ty, x\n"},
+        /* Nor is a list that neither `;` nor `as` follows. */
+        {"import a.b.{y, x}\nfn main()\n{\n}\n",
+         "import a.b.{ y, x }\n\tfn main()\n{\n}\n"},
         /* An item of a doc comment with no text after its `- `. */
         {"/// - \nfn main()\n{\n}\n", "/// - \nfn main()\n{\n}\n"},
         /* An anonymous function opened on the continuation of a
