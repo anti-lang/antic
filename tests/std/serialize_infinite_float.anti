@@ -1,0 +1,42 @@
+//! `serialize` of float fields that hold an infinity of each sign, read back
+//! with `Object.deserialize`. The entry on the floats of `serialize` under
+//! "Object model" in `docs/decisions.md` gives the reason of its form: a round
+//! trip gives the same text and the same value on every target. The object
+//! comes back with the same values and the same text.
+
+import anti.io;
+import anti.lang;
+import anti.mem;
+import anti.text;
+
+class Floats
+{
+	pub f: f32 = 0.0,
+	pub d: f64 = 0.0,
+}
+
+fn main() -> int
+{
+	let big: f64 = 1.0e300;
+	let x = alloc Floats { f: (big * 10.0) as f32, d: -(big * big) };
+	let first = text.Builder.new();
+	x.serialize(&first);
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(first.text(), &arena);
+	if back == none || !(back is *Floats) {
+		io.println("refused");
+		delete(x);
+		return 0;
+	}
+	let g = back as *Floats;
+	let again = text.Builder.new();
+	g.serialize(&again);
+	if g.f == x.f && g.d == x.d && text.equal(first.text(), again.text()) {
+		io.println("same");
+	} else {
+		io.println("differs");
+	}
+	arena.free_all();
+	delete(x);
+	return 0;
+}

@@ -98,3 +98,4 @@ matrix_types_generic_inferred_through_a_channel_memory_checks T162 A chan of the
 error_layout_text_wrapping T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
 error_layout_text_saturating T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
 error_layout_text_mul_high T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
+std_serialize_infinite_float T164 serialize writes an infinite float as inf, which deserialize refuses.
