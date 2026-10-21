@@ -1,0 +1,1 @@
+errors_try_before_the_operand_of_an_address.anti:9:16: error: `try` stands before a call

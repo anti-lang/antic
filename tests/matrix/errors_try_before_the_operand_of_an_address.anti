@@ -1,0 +1,19 @@
+//! `try` before a local that `&` takes the address of. The operand of `&` is
+//! checked as a place, and `try` there stands before no call.
+
+import anti.lang;
+
+fn read() -> int may fail
+{
+	let x = 1;
+	let p = &try x;
+	return *p;
+}
+
+fn main() -> int
+{
+	let n = read() catch {
+		return 1;
+	};
+	return n;
+}
