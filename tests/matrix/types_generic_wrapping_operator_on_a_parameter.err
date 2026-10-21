@@ -1,0 +1,1 @@
+types_generic_wrapping_operator_on_a_parameter.anti:7:9: error: `+%` is not defined on `T`

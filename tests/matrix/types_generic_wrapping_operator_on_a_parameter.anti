@@ -1,0 +1,13 @@
+//! The wrapping operators have no hook in the table of operators, so no
+//! constraint gives one, and `+%` on a value of a type parameter is refused
+//! even where `Number` gives `+`.
+
+fn wrap<T: Number>(a: T, b: T) -> T
+{
+	return a +% b;
+}
+
+fn main() -> int
+{
+	return wrap(1, 2);
+}
