@@ -1,0 +1,14 @@
+//! A literal of a generic struct infers its type argument from the value of a
+//! field, and a value that names nothing ends the inference with its own
+//! message.
+
+struct Box<T>
+{
+	v: T,
+}
+
+fn main() -> int
+{
+	let b = Box { v: nope };
+	return 0;
+}
