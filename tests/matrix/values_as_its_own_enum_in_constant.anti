@@ -1,0 +1,21 @@
+//! `as` to the enum a constant has already, in a constant, by R059 of
+//! "Rules of 2026-10-13". The conversion does nothing, so the constant
+//! holds its operand. `values_as_enum_in_constant` refuses a number.
+
+import anti.io;
+
+enum Kind
+{
+	Circle,
+	Square,
+}
+
+const LAST: Kind = Kind.Square as Kind;
+
+fn main() -> int
+{
+	if LAST == Kind.Square {
+		io.println("enum Square");
+	}
+	return 0;
+}

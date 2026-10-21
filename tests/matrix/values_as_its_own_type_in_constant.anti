@@ -1,0 +1,27 @@
+//! `as` to the type a constant has already, in a constant, by R059 of
+//! "Rules of 2026-10-13": a `bool`, a `str` and a struct. The conversion
+//! does nothing, so each constant holds its operand.
+
+import anti.io;
+
+struct Pt
+{
+	x: int,
+	y: int,
+}
+
+const ON: bool = true as bool;
+const NAME: str = "ab" as str;
+const ORIGIN: Pt = Pt { x: 3, y: 4 } as Pt;
+
+fn main() -> int
+{
+	if ON {
+		io.println("bool true");
+	}
+	io.println(NAME);
+	if ORIGIN.x == 3 && ORIGIN.y == 4 {
+		io.println("struct 3 4");
+	}
+	return 0;
+}
