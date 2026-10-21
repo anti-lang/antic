@@ -1,0 +1,29 @@
+//! A program with two injected interfaces: the greeting, whose provider the
+//! build takes from a library, and the logger of the standard library. A
+//! library named for the logger at start provides the greeting alone.
+
+import anti.io;
+import anti.log;
+import net.example.greet;
+
+/// A page that prints the greeting of whatever provides it and logs through
+/// whatever provides the logger.
+class Page
+{
+	inject g: *greet.Greeter,
+	inject log: *log.Logger,
+
+	/// Print the greeting.
+	pub fn show(self)
+	{
+		io.println(self.g.words());
+	}
+}
+
+fn main() -> int
+{
+	let p = alloc Page { };
+	p.show();
+	delete(p);
+	return 0;
+}

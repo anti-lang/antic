@@ -4,7 +4,8 @@
 # import library of its host, so each program there takes a library of
 # its own. Then a `--closed` program that cannot load it, the refusal of
 # `--no-hooks`, a provider of the manifest taken from the library by
-# `plugin:<path>` and by `discover`, and the index of plugins that antic
+# `plugin:<path>` and by `discover`, a library named at start for an
+# interface it does not provide, and the index of plugins that antic
 # writes beside a library and rewrites. Run with cmake -P and these
 # values:
 #   ANTIC     the antic executable
@@ -132,6 +133,18 @@ program_expect("the inspection of an injected library"
                        "--anti.inject=${interface}=${dir}/libfancy${SUFFIX}"
                        --anti.inspect
                OUT_MATCH "\nloaded plugins:\n  [^\n]*libfancy${SUFFIX} for ${interface}\n$")
+# A library named at start for an interface it does not provide is a
+# startup error that names the library and the interface.
+library_dir(two dir)
+antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
+            -I "${WORK}" --inject "${interface}=plugin:${dir}/libfancy${SUFFIX}"
+            -o "${WORK}/two${EXE}" "${SOURCES}/two_injections.anti")
+plugin(two)
+program_expect("a library that provides another interface"
+               COMMAND "${WORK}/two${EXE}"
+                       "--anti.inject=anti.log.Logger=${dir}/libfancy${SUFFIX}"
+               STATUS 70
+               ERR_MATCH "anti\\.log\\.Logger comes from a library: [^\n]*libfancy${SUFFIX} provides no `anti\\.log\\.Logger`")
 antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
             -I "${WORK}" --inject "${interface}=discover" -o "${WORK}/found${EXE}"
             "${SOURCES}/user.anti")
