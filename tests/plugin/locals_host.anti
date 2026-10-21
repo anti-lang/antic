@@ -1,13 +1,21 @@
 //! A host that calls two functions of a library, each of which holds a local
 //! object of a class of the library, and reads how many objects of the library
 //! are alive. After each call that is the one object the host holds, and after
-//! the host ended it the library unloads.
+//! the host ended it the library unloads. The host declares a class of the name
+//! of one of the library, which the bare name then finds in neither.
 
 import anti.lang;
 import anti.plugin;
+import anti.reflect;
 import net.example.tasks;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A class of the bare name of a class of the library.
+class Plain
+{
+	value: int = 0,
+}
 
 fn main(args: []str) -> int
 {
@@ -15,6 +23,8 @@ fn main(args: []str) -> int
 	let t = lib.instance(tasks.Tasks) catch fatal;
 	printf("a local with destruct gives %lld, alive %lld\n".ptr, t.local(true), lib.live());
 	printf("a local without destruct gives %lld, alive %lld\n".ptr, t.local(false), lib.live());
+	let two = reflect.new("Plain");
+	printf("Plain names two classes, found %d\n".ptr, (two != none) as c_int);
 	delete(t);
 	printf("after the delete %lld\n".ptr, lib.live());
 	lib.unload() catch fatal;
