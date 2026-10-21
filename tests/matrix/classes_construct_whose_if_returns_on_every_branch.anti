@@ -1,0 +1,29 @@
+//! A `construct` whose `if` ends each branch with `return;` after it sets the
+//! field. No path goes on past the `if`, and each path that returns has set the
+//! field, so the class compiles.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub v: int,
+
+	fn construct(self, n: int)
+	{
+		if n > 0 {
+			self.v = n;
+			return;
+		} else {
+			self.v = 0;
+			return;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let a = Box(5);
+	let b = Box(-1);
+	printf("boxes %lld %lld\n".ptr, a.v, b.v);
+	return 0;
+}
