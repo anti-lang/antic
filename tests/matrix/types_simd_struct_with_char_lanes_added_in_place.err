@@ -1,0 +1,1 @@
+types_simd_struct_with_char_lanes_added_in_place.anti:7:2: error: a lane of a `simd struct` is an integer of a fixed width, a float or `bool`, not `char`

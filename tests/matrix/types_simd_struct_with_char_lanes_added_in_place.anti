@@ -1,0 +1,18 @@
+//! A simd struct whose lanes are `char` is refused where it is declared, by
+//! R062 of "Rules of 2026-10-13", and that is the one message. A compound
+//! assignment on a value of it adds none.
+
+simd struct Text4
+{
+	a: char,
+	b: char,
+	c: char,
+	d: char,
+}
+
+fn main() -> int
+{
+	let v = Text4 { a: 'a', b: 'b', c: 'c', d: 'd' };
+	v += v;
+	return 0;
+}
