@@ -1,1 +1,1 @@
-types_alias_without_a_semicolon.anti:5:1: error: expected `;`
+types_alias_without_a_semicolon.anti:9:1: error: expected `;`
