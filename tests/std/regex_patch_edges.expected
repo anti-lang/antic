@@ -1,6 +1,7 @@
 exit 0
 empty find 0 [AB\x00AB]
 from the end past every place 2 [aB\x00aB]
+a limit from the start 1 [zB\x00aB]
 by name 1 [k=9;v=2]
 no such name MissingGroup
 unchanged -1 [k=9;v=2]

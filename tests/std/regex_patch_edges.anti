@@ -1,9 +1,10 @@
 //! The edges of `patch` that `programs/pattern_patch` leaves out: an empty byte
-//! sequence, which patches nothing, a limit from the end past every place, and
-//! a compiled pattern whose group `into` names by name, with a name the pattern
-//! has and one it lacks, which fails with `MissingGroup`. A name that two
-//! groups of `(?J)` share names the first of them, as `src/rt/regex.h` says, so
-//! the second place keeps its bytes.
+//! sequence, which patches nothing, a limit from the end past every place, a
+//! limit from the start below the count of places, and a compiled pattern whose
+//! group `into` names by name, with a name the pattern has and one it lacks,
+//! which fails with `MissingGroup`. A name that two groups of `(?J)` share
+//! names the first of them, as `src/rt/regex.h` says, so the second place keeps
+//! its bytes.
 
 import anti.lang;
 import anti.regex;
@@ -54,6 +55,8 @@ fn sequences()
 	show("empty find", n, bytes);
 	n = bytes.patch(x"41", x"61", 0, 0, -5);
 	show("from the end past every place", n, bytes);
+	n = bytes.patch(x"61", x"7A", 0, 0, 1);
+	show("a limit from the start", n, bytes);
 }
 
 fn compiled()
