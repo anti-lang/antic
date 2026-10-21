@@ -1,0 +1,1 @@
+modules_generic_variant_literal_with_two_arguments.anti:8:21: error: `Maybe` takes 1 type argument, found 2

@@ -1,0 +1,10 @@
+//! A literal of a case with fields of the generic variant `Maybe` of another
+//! module, named with two type arguments for its one parameter.
+
+import com.example.items;
+
+fn main() -> int
+{
+	let m = items.Maybe<int, int>.Some { value: 1 };
+	return 0;
+}

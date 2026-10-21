@@ -1,0 +1,10 @@
+//! The generic class `Stack` of another module built by a call that gives no
+//! type argument, where nothing else gives one.
+
+import com.example.items;
+
+fn main() -> int
+{
+	let s = items.Stack();
+	return 0;
+}
