@@ -137,6 +137,11 @@ anti_message(clang_no_sysroot
     FILES api.h "int count(void);\n" archive/notes.txt "No sysroot.\n"
     ARGS bind --clang api.h -o "${WORK}/out" --target linux-x86_64 --runtime archive
     ERR "anti: the runtime archive holds no sysroot for linux-x86_64, whose headers clang reads. Pass --runtime.")
+# No --runtime, and no runtime archive beside the anti of the tree.
+anti_message(clang_no_runtime
+    FILES api.h "int count(void);\n"
+    ARGS bind --clang api.h -o "${WORK}/out" --target linux-x86_64
+    ERR "anti: the runtime archive holds no sysroot for linux-x86_64, whose headers clang reads. Pass --runtime.")
 # clang writes its own lines on the header before the one of anti.
 anti_message(clang_refuses_the_header
     FILES api.h "int count(;\n"
@@ -189,6 +194,13 @@ anti_message(clang_static_returns_a_function STATUS 0
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `pick` is left out: a shim cannot write a function that returns a function")
+# A `va_list` is a pointer as a parameter alone, so a field of one has no
+# form.
+anti_message(clang_va_list_field STATUS 0
+    FILES api.h "#include <stdarg.h>\nstruct Args { va_list ap; };\nvoid take(struct Args *a);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `Args` is left out: Anti has no form for the type of its field `ap`")
 # A flexible array member has no length, so Anti has no form for it.
 anti_message(clang_flexible_array STATUS 0
     FILES api.h "struct Buf { int n; int data[]; };\nvoid take(struct Buf *b);\n"
