@@ -540,6 +540,15 @@ if(CMAKE_HOST_APPLE)
         ENV ASAN_OPTIONS=detect_leaks=1
         ARGS run --memory-checks ${tools}
         ERR ${frame_lines})
+    # A last line without a newline comes out as it went in, with no
+    # newline added. The pattern holds the bytes, which ERR would end with
+    # a newline.
+    anti_message(memory_checks_last_line_without_a_newline STATUS 0
+        FILES anti.toml "${manifest_package}"
+              ${app_source} "//! A program whose last line has no newline.\n\nimport anti.io;\n\nfn main() -> int\n{\n\tio.eprint(\"no newline\");\n\treturn 0;\n}\n"
+        ENV ASAN_OPTIONS=detect_leaks=1
+        ARGS run --memory-checks ${tools}
+        ERR_MATCH "no newline")
 endif()
 
 # The lock file. One that answers the manifest is read in place of the
