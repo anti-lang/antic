@@ -194,6 +194,15 @@ anti_message(clang_static_returns_a_function STATUS 0
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `pick` is left out: a shim cannot write a function that returns a function")
+# An enum with the fixed base `__int128`, whose values leave 64 bits. Anti
+# has no integer of 128 bits, so the enum and the function that takes it
+# are left out (T170).
+anti_message(clang_enum_of_128_bits STATUS 0
+    FILES api.h "enum Huge : __int128 { BIG = (__int128)1 << 70 };\nvoid take(enum Huge h);\nint count(void);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 2 warnings"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: `Huge` is left out: Anti has no form for its base `__int128`"
+        "anti: api.h: warning: `take` is left out: Anti has no form for the type of a parameter")
 # A `va_list` is a pointer as a parameter alone, so a field of one has no
 # form.
 anti_message(clang_va_list_field STATUS 0
