@@ -1,0 +1,23 @@
+//! A `concrete fn` without `self` takes the parameters of the function of the
+//! base it replaces. One that takes none in place of one is refused.
+
+class Shape
+{
+	fn grow(by: int) -> int
+	{
+		return by;
+	}
+}
+
+class Circle inherits Shape
+{
+	concrete fn grow() -> int
+	{
+		return 3;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

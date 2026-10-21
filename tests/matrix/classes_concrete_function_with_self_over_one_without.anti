@@ -1,0 +1,23 @@
+//! A `concrete fn` that takes `self` in place of a function of the base that
+//! does not. The two do not have one signature, so the replacement is refused.
+
+class Shape
+{
+	fn make() -> int
+	{
+		return 1;
+	}
+}
+
+class Circle inherits Shape
+{
+	concrete fn make(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

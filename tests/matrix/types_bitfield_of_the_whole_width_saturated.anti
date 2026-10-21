@@ -1,0 +1,19 @@
+//! `+|=` on a bitfield that takes every bit of its type saturates at the end of
+//! the type, by R049 of "Rules of 2026-10-13", as on a field of the type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Full
+{
+	a: u8 : 8,
+	b: i8 : 8,
+}
+
+fn main() -> int
+{
+	let f = Full { a: 250, b: -120 };
+	f.a +|= 10;
+	f.b -|= 10;
+	printf("%d %d\n".ptr, f.a as c_int, f.b as c_int);
+	return 0;
+}

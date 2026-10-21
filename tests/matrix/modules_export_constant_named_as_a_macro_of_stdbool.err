@@ -1,0 +1,1 @@
+modules_export_constant_named_as_a_macro_of_stdbool.anti:5:14: error: the exported name `__bool_true_false_are_defined` is defined by `<stdbool.h>`, which the header includes

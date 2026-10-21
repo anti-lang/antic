@@ -334,7 +334,8 @@ elseif(CASE STREQUAL "views")
     # optional result, types that name themselves, a field named as a
     # macro of <stdint.h>, vectors of 8 and of 32 bytes, a lent parameter,
     # the error in a signature, an interface of a base class, a protected
-    # field, a packed type of a class and a synchronized class. The
+    # field, a packed type of a class and a synchronized class with a
+    # construct and a destruct, which run without the lock note. The
     # header compiles as C++17 as well.
     library(views static "${dir}")
     expect_header("${dir}/views.h" views.h)

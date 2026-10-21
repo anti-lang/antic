@@ -99,6 +99,17 @@ export synchronized class Tally
 {
 	total: i32 = 0,
 
+	/// Start at zero.
+	pub fn construct(self)
+	{
+		self.total = 0;
+	}
+
+	/// Nothing to release.
+	pub fn destruct(self)
+	{
+	}
+
 	/// Add to the total.
 	pub fn add(self, n: i32)
 	{

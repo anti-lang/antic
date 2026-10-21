@@ -1,0 +1,14 @@
+//! Decision 27: a class with an `abstract fn` says `abstract` itself. The
+//! message names every open function of one that does not, three of them here.
+
+class Shape
+{
+	abstract fn area(self) -> int;
+	abstract fn draw(self);
+	abstract fn name(self) -> int;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,13 @@
+//! An array length of a generic struct that is `mul_high` of two `c_long`
+//! values. The width of the type is the target's, so no copy folds it, and the
+//! length is refused where the generic declares it.
+
+struct Row<N: int>
+{
+	cells: [mul_high(N as c_long, 2 as c_long) as int + 1]int,
+}
+
+fn main() -> int
+{
+	return size_of(Row<3>) as int;
+}

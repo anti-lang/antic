@@ -1,0 +1,1 @@
+classes_three_open_functions_without_abstract.anti:4:7: error: `Shape` has open functions `area`, `draw` and `name` and must be `abstract`

@@ -1,0 +1,19 @@
+//! A difference with a borrow in that leaves the range of int. The plain `-`
+//! keeps its check with a borrow in, over the whole difference.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let (low, f) = opaque(0) - opaque(1);
+	sink(low);
+	sink(opaque(-9223372036854775807) - opaque(1) - f.carry);
+	return 7;
+}

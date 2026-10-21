@@ -29,6 +29,11 @@
 <pre class="signature">pub const ON: bool = true</pre>
 <p>A flag.</p>
 </section>
+<section class="item" id="OFF">
+<h2>OFF</h2>
+<pre class="signature">pub const OFF: bool = false</pre>
+<p>A flag that is down.</p>
+</section>
 <section class="item" id="HALF">
 <h2>HALF</h2>
 <pre class="signature">pub const HALF: f64 = 0.5</pre>
@@ -188,6 +193,17 @@
 <h2>printf</h2>
 <pre class="signature">pub extern fn printf(format: ?*byte, ...) -&gt; c_int</pre>
 <p>A function of C with any number of arguments.</p>
+</section>
+<section class="item" id="Span">
+<h2>Span</h2>
+<pre class="signature">pub variant Span</pre>
+<p>A span of two ends, or none.</p>
+<ul class="fields">
+<li><code>Range { low: int, high: int }</code>
+</li>
+<li><code>Nothing</code>
+</li>
+</ul>
 </section>
 <section class="item" id="stop">
 <h2>stop</h2>

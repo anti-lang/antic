@@ -1,0 +1,19 @@
+//! A `switch` on an integer with the arm `size_of(f16)` before the arm `2`. The
+//! size of an `f16` is 2 on every target, so the two arms hold one value, and
+//! the second is refused, by R010 of the rules of 2026-10-13.
+
+fn kind(n: int) -> int
+{
+	let k = 0;
+	switch n {
+		size_of(f16) => k = 1,
+		2 => k = 2,
+		else => k = 3,
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	return kind(1);
+}

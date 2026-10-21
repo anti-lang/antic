@@ -1,0 +1,21 @@
+//! A `dispatch` takes the arguments of the worker and no more. One past the
+//! last parameter with a default is refused, and the message counts the most.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int, scale: int = 2) -> int
+{
+	return (t.n + k) * scale;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> add(1, 3, 4);
+	let got = join(job);
+	delete(t);
+	return got;
+}

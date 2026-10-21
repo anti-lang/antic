@@ -1646,6 +1646,9 @@ antic_check_test(overflow_mul32 "overflow in"
 antic_check_test(overflow_carry "overflow in"
     "overflow_carry\\.anti:[0-9]+: overflow in \\+: left 9223372036854775806, right 1"
     ON)
+antic_check_test(overflow_borrow "overflow in"
+    "overflow_borrow\\.anti:[0-9]+: overflow in -: left -9223372036854775807, right 1"
+    ON)
 antic_check_test(narrow "out of range"
     "narrow\\.anti:[0-9]+: value out of range for i8: value 300"
     ON)
@@ -1753,6 +1756,9 @@ antic_check_test(shift_wrap_negative_compound "shift count out of range"
 # literal.
 antic_check_test(bitfield_write "out of range"
     "bitfield_write\\.anti:[0-9]+: value out of range for the 3 bits of a: value 13"
+    ON)
+antic_check_test(bitfield_write_one_bit "out of range"
+    "bitfield_write_one_bit\\.anti:[0-9]+: value out of range for the 1 bit of a: value 2"
     ON)
 antic_check_test(bitfield_write_signed "out of range"
     "bitfield_write_signed\\.anti:[0-9]+: value out of range for the 3 bits of b: value -5"
@@ -3630,6 +3636,14 @@ antic_modules_test(default_lengths
     LIBRARIES rooms
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/default-lengths-modules")
+
+# A library file carries the lengths of a struct that shift and compare a
+# size the target decides, and a bitfield of a `u16` unit.
+antic_modules_test(symbolic_lengths
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/symbolic_lengths"
+    LIBRARIES sizes
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/symbolic-lengths-modules")
 
 # A `construct` that fails tears down the base whose `construct` finished,
 # by R114 and R025 of "Rules of 2026-10-13", where the base is a class of

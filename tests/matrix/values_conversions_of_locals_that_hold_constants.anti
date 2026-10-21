@@ -1,0 +1,17 @@
+//! Conversions of locals that hold constants, which the optimizer folds: an
+//! unsigned integer to `f32` and a float to an unsigned integer. Each gives the
+//! value of the conversion at run time.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let u: u32 = 4000000000;
+	let f = u as f32;
+	let d: f64 = 3000000000.5;
+	let v = d as u32;
+	let e: f32 = 2.5;
+	let w = e as u8;
+	printf("%.1f %u %u\n".ptr, f as f64, v as c_uint, w as c_uint);
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_concrete_function_without_self_and_one_parameter_too_few.anti:14:14: error: `concrete fn grow` takes no parameter, and `Shape.grow` takes 1

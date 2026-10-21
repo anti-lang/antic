@@ -1,0 +1,1 @@
+classes_concrete_function_with_self_over_one_without.anti:14:14: error: `concrete fn make` takes `self`, and `Shape.make` does not

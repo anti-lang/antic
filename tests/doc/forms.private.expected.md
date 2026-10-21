@@ -34,6 +34,14 @@ pub const ON: bool = true
 
 A flag.
 
+## OFF
+
+```anti
+pub const OFF: bool = false
+```
+
+A flag that is down.
+
 ## HALF
 
 ```anti
@@ -219,6 +227,17 @@ pub extern fn printf(format: ?*byte, ...) -> c_int
 ```
 
 A function of C with any number of arguments.
+
+## Span
+
+```anti
+pub variant Span
+```
+
+A span of two ends, or none.
+
+- `Range { low: int, high: int }`
+- `Nothing`
 
 ## stop
 

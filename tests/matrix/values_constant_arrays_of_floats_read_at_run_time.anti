@@ -1,0 +1,29 @@
+//! Constant arrays that hold floats, read by an index the program computes. The
+//! back end lays out their bytes per target, an `f32` in four bytes and an
+//! `f64` in eight, beside a `c_long` whose size the target decides.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Mix
+{
+	n: c_long,
+	f: f32,
+	d: f64,
+}
+
+const M: Mix = Mix { n: 3, f: 1.5, d: 2.25 };
+const T: [3]f32 = [0.5, 1.5, 2.5];
+const D: [2]Mix = [Mix { n: 1, f: 0.25, d: 0.125 }, Mix { n: 2, f: 4.0, d: 8.0 }];
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	let m = M;
+	let i = opaque(1);
+	printf("%ld %.2f %.2f %.2f %.3f\n".ptr, m.n, m.f as f64, m.d, T[i] as f64, D[i - 1].d);
+	return 0;
+}

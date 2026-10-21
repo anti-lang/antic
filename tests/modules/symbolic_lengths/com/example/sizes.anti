@@ -1,0 +1,15 @@
+//! Types whose layout the library file carries for its clients: the lengths of
+//! a struct that shift and compare the size of a `c_long`, which the target
+//! decides, and two bitfields of one `u16` unit.
+
+pub struct Wide
+{
+	cells: [size_of(c_long) << 1]int,
+	flags: [(size_of(c_long) >= 4) as int + 1]int,
+}
+
+pub struct Packed
+{
+	low: u16 : 9,
+	high: u16 : 7,
+}

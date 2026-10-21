@@ -1,0 +1,18 @@
+//! Array lengths of a generic struct that compute with its constant parameter
+//! as a `c_long`, whose width the target decides. A negation and a product of
+//! one fold in each copy, since the value fits the type on every target.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Row<N: int>
+{
+	a: [(-(N as c_long)) as int + 6]int,
+	b: [(N as c_long * 2) as int]int,
+}
+
+fn main() -> int
+{
+	let r = Row<3> { a: [0; 3], b: [0; 6] };
+	printf("%d %d\n".ptr, r.a.len as c_int, r.b.len as c_int);
+	return 0;
+}

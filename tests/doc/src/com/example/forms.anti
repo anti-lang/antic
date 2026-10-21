@@ -24,6 +24,9 @@ pub const TOP: u8 = 255;
 /// A flag.
 pub const ON: bool = true;
 
+/// A flag that is down.
+pub const OFF: bool = false;
+
 /// A half.
 pub const HALF: f64 = 0.5;
 
@@ -137,6 +140,13 @@ pub concurrent class Counted
 
 /// A function of C with any number of arguments.
 pub extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// A span of two ends, or none.
+pub variant Span
+{
+	Range { low: int, high: int },
+	Nothing,
+}
 
 /// Ends the program.
 pub fn stop() -> never

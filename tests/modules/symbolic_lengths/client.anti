@@ -1,0 +1,13 @@
+//! Reads the size of a struct of the library `com.example.sizes` whose lengths
+//! the target computes, and the two bitfields of its other struct.
+
+import com.example.sizes;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let p = sizes.Packed { low: 300, high: 100 };
+	printf("%d %d %d\n".ptr, size_of(sizes.Wide) as c_int, p.low as c_int, p.high as c_int);
+	return 0;
+}

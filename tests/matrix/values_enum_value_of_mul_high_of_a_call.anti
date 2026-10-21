@@ -1,0 +1,18 @@
+//! The value of an enum is read before the functions have their types, so
+//! `mul_high` of a call in one is refused there, as a constant must be.
+
+fn f() -> int
+{
+	return 1;
+}
+
+enum E
+{
+	A = mul_high(f(), 2),
+	B,
+}
+
+fn main() -> int
+{
+	return 0;
+}

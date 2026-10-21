@@ -332,7 +332,7 @@ typedef struct Tally_vtable {
     void *equals;
     void *hash;
     void *serialize;
-    void *destruct;
+    void (*destruct)(Tally *self);
     void *copy;
     void *created;
     void *destroyed;
@@ -343,6 +343,7 @@ typedef struct Tally_vtable {
     void *leave;
     void *failed;
     void *changed;
+    void (*construct)(Tally *self);
     void (*add)(Tally *self, int32_t n);
     int32_t (*sum)(Tally *self);
 } Tally_vtable;
@@ -378,6 +379,10 @@ static inline Tally *anti_Tally_dup(Tally *self)
     return (Tally *)anti_rt_dup(self, &anti_Tally_descriptor);
 }
 
+/** Nothing to release. */
+void Tally_destruct(Tally *self);
+/** Start at zero. */
+void Tally_construct(Tally *self);
 /** Add to the total. */
 /* Runs under the lock of its object. */
 void Tally_add(Tally *self, int32_t n);
@@ -385,6 +390,14 @@ void Tally_add(Tally *self, int32_t n);
 /* Runs under the lock of its object. */
 int32_t Tally_sum(Tally *self);
 
+static inline void anti_Tally_destruct(Tally *self)
+{
+     ((const Tally_vtable *)self->base.vtable)->destruct(self);
+}
+static inline void anti_Tally_construct_(Tally *self)
+{
+     ((const Tally_vtable *)self->base.vtable)->construct(self);
+}
 static inline void anti_Tally_add(Tally *self, int32_t n)
 {
      ((const Tally_vtable *)self->base.vtable)->add(self, n);
