@@ -6913,6 +6913,13 @@ if(ANTIC_FAULTS)
                     $<TARGET_FILE:antic_faults> nowhere.anti
             PATTERN "^ANTI_FAULT=${value}: ${reason}")
     endforeach()
+    # Nine entries, one more than the variable holds. A command line holds
+    # no `,`, so the value stands in the environment of the test.
+    add_expect_test(faults_variable_nine_entries STATUS 125
+        COMMAND $<TARGET_FILE:antic_faults> nowhere.anti
+        PATTERN "^ANTI_FAULT=open:1:EIO[^ ]*open:9:EIO: more than 8 entries")
+    set_tests_properties(faults_variable_nine_entries PROPERTIES ENVIRONMENT
+        "ANTI_FAULT=open:1:EIO,open:2:EIO,open:3:EIO,open:4:EIO,open:5:EIO,open:6:EIO,open:7:EIO,open:8:EIO,open:9:EIO")
 endif()
 
 add_test(NAME release_pins
