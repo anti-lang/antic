@@ -1,0 +1,17 @@
+//! `count` of a `List` written through a `use` field of a class. The field
+//! hands the list on as the place of `count`, which stays read-only outside the
+//! module of the list.
+
+import anti.collection.list;
+
+class Bag
+{
+	use items: list.List<int>,
+}
+
+fn main() -> int
+{
+	let b = Bag { items: list.List<int>.new() };
+	b.count = 4;
+	return 0;
+}
