@@ -830,10 +830,11 @@ foreach(name IN ITEMS generic_copies generic_constants generic_methods
 endforeach()
 # Locking and channels in dev mode, whose checks run inside every `sync`
 # block and every arm of a `select`. sync_exits fails with the errors of
-# anti.lang, so its dev link names the object of anti.lang.
+# anti.lang, so its dev link names the object of anti.lang. sync_deep
+# holds more locks than the order of a dev build records.
 foreach(name IN ITEMS sync_exits sync_workers channels select_two
         channel_workers synchronized concurrent sync_pairs sync_operators
-        lock_free_queue)
+        lock_free_queue sync_deep)
     set(dev "")
     if(name STREQUAL "sync_exits")
         set(dev lang)

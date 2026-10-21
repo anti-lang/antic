@@ -1,0 +1,31 @@
+//! A thread holds 40 locks at once, more than the 32 whose order a dev build
+//! records. The locks past the 32nd are counted and given back without a
+//! record, and the program reports no order.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Locks
+{
+	all: [40]Mutex,
+	depth: int,
+}
+
+fn nest(l: *Locks, i: int)
+{
+	if i == 40 {
+		l.depth = i;
+		return;
+	}
+	sync l.all[i] {
+		nest(l, i + 1);
+	}
+}
+
+fn main() -> int
+{
+	let l = Locks { all: [Mutex.new(); 40], depth: 0 };
+	nest(&l, 0);
+	nest(&l, 0);
+	printf("%d\n".ptr, l.depth as c_int);
+	return 0;
+}
