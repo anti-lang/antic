@@ -1919,6 +1919,12 @@ antic had two native back ends, x86_64 and ARM64, until the step `switch` of `do
   pass over it. A worker takes it as it takes a `str`. Reason: the specification names
   `Regex` beside `str` without a module, and `anti.lang` imports nothing, while the
   failures of a pattern are classes of `anti.regex`.
+- [provisional] A `Regex` that holds no pattern stops the program with a message at a
+  search, as memory that runs out does. `Object.deserialize` leaves such a `Regex` in a
+  field that the text gives as `null`, which `serialize` writes there, when the class
+  declares the field without a default. Reason: no document decided the search, and a stop
+  keeps the program defined and the same in dev and in release, where PCRE2 reads the
+  missing handle today. T166 of `docs/audit/tests-findings.md` holds it.
 - [provisional] A module that writes a pattern literal or `Regex.compile` imports
   `anti.regex`. Without the import the literal is refused with `` a pattern literal is
   compiled by `anti.regex`, so the module imports `anti.regex` `` and the call with ``

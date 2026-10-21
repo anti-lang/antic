@@ -1,0 +1,28 @@
+//! `Object.deserialize` leaves a `Regex` field that the text gives as `null`
+//! without a pattern, since `serialize` passes over a `Regex` and writes `null`
+//! there. A search with that field stops the program, as the provisional entry
+//! on a `Regex` without a pattern in `docs/decisions.md` says.
+import anti.io;
+import anti.mem;
+import anti.regex;
+
+class Holder
+{
+	pub name: int = 0,
+	pub r: Regex,
+}
+
+fn main() -> int
+{
+	let back = Object.deserialize("{\"type\":\"Holder\",\"name\":1,\"r\":null}",
+		mem.LibcAllocator.get());
+	let h = back as *Holder;
+	let found = regex.matched("aaa", h.r) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	if found {
+		io.println("found");
+	}
+	return 0;
+}
