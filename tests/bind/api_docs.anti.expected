@@ -1,0 +1,5 @@
+//! The binding of api_docs, which `anti bind` wrote from `api_docs.json`.
+//! Nothing in it is written by hand. Run `anti bind` again to change it.
+
+/// Turn the wheel. A second line follows the first.
+pub extern fn spin(turns: c_int);

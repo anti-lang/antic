@@ -380,7 +380,7 @@ elseif(CASE STREQUAL "api")
     expect_refusal("raylib_api.json is not JSON: .* at line 4699, column 115"
         "${ANTI}" bind "${RAYLIB}/tools/rlparser/output/raylib_api.json"
         -o "${WORK}/pinned")
-elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words|aliases)$")
+elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words|aliases|docs)$")
     # Four descriptions in the format of rlparser. api_parts holds
     # entries that lack a part: a function without its name, its result
     # or its parameters, a struct without its name or its list of fields,
@@ -397,8 +397,10 @@ elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words|aliases)$")
     # holds an alias without its type, a pointer alias whose type does not
     # parse, a name no part declares, a struct and an enum named by their
     # tags, a length in hexadecimal, a callback that takes an array and two
-    # spellings of words that do not parse. The module and the warnings of each
-    # are fixed, and the module compiles.
+    # spellings of words that do not parse. api_docs holds a description of
+    # two lines, which the binding writes as the doc comment of its
+    # function. The module and the warnings of each are fixed, and the
+    # module compiles.
     tool_run("" "${ANTI}" bind "${BIND}/${CASE}.json" --module bindtest.${CASE}
                 -o "${WORK}/out")
     file(WRITE "${WORK}/warnings" "${tool_stderr}")

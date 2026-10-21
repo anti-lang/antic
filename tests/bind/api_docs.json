@@ -1,0 +1,1 @@
+{"functions": [{"name": "spin", "returnType": "void", "description": "Turn the wheel.\nA second line follows the first.", "params": [{"name": "turns", "type": "int"}]}]}
