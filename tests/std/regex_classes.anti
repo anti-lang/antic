@@ -1,9 +1,10 @@
 //! Classes of byte patterns that `regex.compile_bytes` takes apart: a property
-//! with and without braces, the POSIX forms with `.` and `=`, a negated class
-//! and a range with a character outside ASCII, and letters quoted with `\Q`. A
-//! pattern of text takes CRLF as its newline, and a pattern of two groups of
-//! one name gives the first that took part. Each line prints what came of the
-//! pattern.
+//! with and without braces, a negated property, a property the class ends
+//! inside, a byte in hexadecimal with capital digits, the POSIX forms with `.`
+//! and `=`, a negated class and a range with a character outside ASCII, a range
+//! of two such characters, and letters quoted with `\Q`. A pattern of text
+//! takes CRLF as its newline, and a pattern of two groups of one name gives the
+//! first that took part. Each line prints what came of the pattern.
 import anti.lang;
 import anti.regex;
 import anti.text;
@@ -28,12 +29,16 @@ fn main() -> int
 {
 	try_bytes("[\\pL]", "a");
 	try_bytes("[\\p{L}]", "a");
+	try_bytes("[\\PL]", "a");
+	try_bytes("[\\p", "a");
+	try_bytes("[\\xAB]", "a");
 	try_bytes("[[:alpha:]]", "a");
 	try_bytes("[[.a.]]", "a");
 	try_bytes("[[=a=]]", "a");
 	try_bytes("[\\Qab\\E]", "b");
 	try_bytes("[^\\Q\u{e9}\\E]", "a");
 	try_bytes("[a-\u{e9}]", "a");
+	try_bytes("[\u{e9}-\u{ea}]", "a");
 	let lines = regex.compile("(*CRLF)x*") catch fatal;
 	let found = regex.find_all("a\r\nb", lines) catch fatal;
 	let all = found.to_slice();
