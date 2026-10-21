@@ -1,0 +1,26 @@
+//! One warning of the checker and no error.
+
+import anti.lang;
+
+/// Fails for a value below zero.
+pub fn close_it(n: int) may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+}
+
+/// Gives 1 when the call fails, and the outer value otherwise.
+pub fn handler() -> int
+{
+	let e = 1;
+	close_it(2) catch e {
+		return 1;
+	};
+	return e;
+}
+
+fn main() -> int
+{
+	return handler();
+}

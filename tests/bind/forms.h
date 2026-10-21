@@ -82,8 +82,12 @@ struct FormsLoose
 };
 #pragma pack(pop)
 
+/* A union that a typedef names without a tag. */
+typedef union { int i; float f; } FormsEither;
+
 extern int forms_counter;
 
 forms_unit forms_take(FormsMode m, struct FormsOuter *o, FormsPair p);
+int forms_either(FormsEither e);
 
 #endif

@@ -76,6 +76,14 @@ expect("${text}" "error: `e` shadows the outer `e` [shadowed-catch]" "the shadow
 expect("${text}" "front end: 1 file, 1 target, 2 warnings, 1 failed" "the two warnings")
 refuse("${text}" "doc warnings:" "the class below")
 
+# A project with one warning of the checker, which the count gives as one.
+run(one-warning "" status text)
+if(status EQUAL 0)
+    message(FATAL_ERROR "the one-warning project passed\n${text}")
+endif()
+expect("${text}" "error: `e` shadows the outer `e` [shadowed-catch]" "the shadowing")
+expect("${text}" "front end: 1 file, 1 target, 1 warning, 1 failed" "the one warning")
+
 # The same project with both warnings allowed. The doc warnings are counted
 # apart and the run ends with success, since the doc class fails nothing.
 run(allowed "" status text)

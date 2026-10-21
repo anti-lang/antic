@@ -134,6 +134,14 @@ anti_message(archive_map_alone
     SETUP pack_archive
     ARGS ${resolve}
     OUT "${module}" "${frame} good src/good.anti:7")
+# The hexadecimal digits of a frame read in either case.
+set(capital_frame "0x0000000000001A0F 0+0x1A0F")
+anti_message(archive_map_alone_with_capital_digits
+    STATUS 0
+    FILES trace.txt "${module}\n${capital_frame}\n" archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${capital_frame} good src/good.anti:7")
 # The offset of a frame of macOS counts from the text, whose address the
 # map of a Mach-O program names.
 set(macho_map "# The map of a symbols archive of Anti.\n# build ${id}\n# target macos-arm64\n# text 0000000100000000\n0000000100001000-0000000100002000 good src/good.anti:7\n")

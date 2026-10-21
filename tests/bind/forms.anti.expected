@@ -68,4 +68,12 @@ pub struct FormsLoose
 	i: c_int,
 }
 
+pub union FormsEither
+{
+	i: c_int,
+	f: c_float,
+}
+
 pub extern fn forms_take(m: FormsMode, o: ?*FormsOuter, p: FormsPair) -> c_int;
+
+pub extern fn forms_either(e: FormsEither) -> c_int;

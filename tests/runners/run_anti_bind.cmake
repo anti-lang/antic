@@ -212,7 +212,8 @@ elseif(CASE STREQUAL "clang")
     expect_calls(layout "${BIND}" "${BIND}/layout_calls.anti"
                  "${BIND}/layout_calls.expected")
 elseif(CASE STREQUAL "forms")
-    # tests/bind/forms.h holds the forms that layout.h leaves out. The
+    # tests/bind/forms.h holds the forms that layout.h leaves out, among
+    # them a union a typedef names alone. The
     # header it includes stands in a directory that `-I` names. The module
     # and the warnings are fixed, the module compiles and the two probes
     # agree.
@@ -250,8 +251,9 @@ elseif(CASE STREQUAL "functions")
     compile_binding(functions bindtest.functions)
     compare_probes(functions "${BIND}")
 elseif(CASE STREQUAL "huge_enum")
-    # An enum with a value above the range of a signed 64-bit integer, in
-    # a struct. The two probes agree on the layout of the struct. T117 of
+    # An enum with a value above the range of a signed 64-bit integer and
+    # one with values below zero and above INT_MAX, in a struct. The two
+    # probes agree on the layout of the struct. T117 of
     # docs/audit/tests-findings.md.
     tool_run("" "${ANTI}" bind --clang "${BIND}/huge.h" --module bindtest.huge
                 --probe -o "${WORK}/out" --runtime "${RUNTIME}")
