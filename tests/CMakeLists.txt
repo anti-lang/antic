@@ -2475,6 +2475,19 @@ add_test(NAME inject_many
         "-DSTATUS=70"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-many"
         -P "${ANTIC_RUNNERS}/run_trace.cmake")
+# A program built with `--closed` loads no library, so it has no place
+# for a provider that one would give.
+add_test(NAME inject_closed
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCE=${INJECT}/many.anti"
+        "-DOPTIONS=--closed"
+        "-DARGS=--anti.inject=many.One=lib/x.so"
+        "-DEXPECTED=${INJECT}/empty.pattern"
+        "-DERRORS=${INJECT}/closed.pattern"
+        "-DSTATUS=70"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-closed"
+        -P "${ANTIC_RUNNERS}/run_trace.cmake")
 
 # The `[inject]` and `[inject.test]` tables of a manifest. `anti test`
 # runs in the project root, reads both and lays the test table over the
