@@ -1,0 +1,4 @@
+# The case of faults_collect.anti: a name and the value of ANTI_FAULT, see
+# tests/CMakeLists.txt. alloc counts the memory of the runtime after the
+# start, and the room of to_slice is the fifth.
+room_memory alloc:5:ENOMEM

@@ -1,0 +1,33 @@
+//! The room of `to_slice` that runs out while it grows. The walk takes its room
+//! from `anti_rt_grow`, which stops the program when no memory is left, by
+//! decision 4 of "Decisions of 2026-10-11". A case of `faults_collect.faults`
+//! refuses one allocation, through the variable `ANTI_FAULT` of
+//! `src/rt/fault.h`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Counts down from left, so `to_slice` grows its room as the walk goes on.
+struct Countdown
+{
+	left: int,
+}
+
+operator fn next(c: *Countdown) -> bool
+{
+	c.left = c.left - 1;
+	return c.left >= 0;
+}
+
+operator fn value(c: *Countdown) -> int
+{
+	return c.left;
+}
+
+fn main() -> int
+{
+	let down = Countdown { left: 3 };
+	let left = down.to_slice();
+	printf("collected %d\n".ptr, left.len as c_int);
+	free(left.ptr);
+	return 0;
+}
