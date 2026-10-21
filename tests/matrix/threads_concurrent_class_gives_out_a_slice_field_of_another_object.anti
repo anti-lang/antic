@@ -1,0 +1,33 @@
+//! A public function of a concurrent class may give out a slice field of
+//! another object, which is no part of its own fields.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Holder
+{
+	items: []int,
+}
+
+concurrent class Reader
+{
+	lock: Mutex,
+	count: int = 0 guarded by lock,
+
+	pub fn items(self, h: *Holder) -> []int
+	{
+		return h.items;
+	}
+}
+
+fn main() -> int
+{
+	let cells = [1, 2, 3];
+	let h = Holder { items: cells[0..3] };
+	let r = alloc Reader { };
+	let got = r.items(&h);
+	printf("%lld\n".ptr, got.len);
+	delete(r);
+	return 0;
+}

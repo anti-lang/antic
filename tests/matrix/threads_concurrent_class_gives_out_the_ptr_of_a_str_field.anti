@@ -1,0 +1,27 @@
+//! A public function of a concurrent class may give out the `ptr` of a `str`
+//! field, which points at the bytes of the text and not into the object.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Named
+{
+	lock: Mutex,
+	name: str = "tally" guarded by lock,
+
+	pub fn bytes(self) -> ?*byte
+	{
+		sync self.lock {
+			return self.name.ptr;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let n = alloc Named { };
+	printf("%.5s\n".ptr, n.bytes());
+	delete(n);
+	return 0;
+}
