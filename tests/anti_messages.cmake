@@ -196,6 +196,13 @@ if(CMAKE_HOST_APPLE)
         ARGS sdk export --sdk MacOSX.sdk -o out
         ERR "anti: cannot run tar: No such file or directory"
             "anti: tar could not write out/apple-sdk-14.0.tar.xz")
+    # Without --sdk the export lists the SDKs of the Command Line Tools,
+    # apple_clt_sdk of src/antic/applesdk.c. The listing that fails is one
+    # that holds none.
+    anti_message(fault_sdk_export_listing_unread
+        FAULT open:1:EACCES
+        ARGS sdk export -o out
+        ERR "anti: /Library/Developer/CommandLineTools/SDKs holds no SDK. Run xcode-select --install, or name one with --sdk")
 else()
     anti_message(sdk_export_no_mac
         ARGS sdk export -o out
@@ -220,6 +227,12 @@ anti_message(fault_new_module_not_written
     FAULT open:2:EACCES
     ARGS new com.example.app
     ERR "anti: cannot write app/src/com/example/app.anti")
+# T153: the directory `test`, the fifth after the directory of the
+# project and the three of the module.
+anti_message(fault_new_test_directory_not_made
+    FAULT mkdir:5:EACCES
+    ARGS new com.example.app
+    ERR "anti: cannot make app/test")
 # anti license of a runtime archive opens the listing of licenses/, the
 # record of the sources and the licence of antic and anti, in that order.
 anti_message(fault_license_listing_unread
