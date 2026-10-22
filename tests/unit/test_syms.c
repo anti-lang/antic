@@ -130,6 +130,26 @@ static void map_names(void)
     text_free(&where);
 }
 
+/* The last line of a map may end without a newline. An address it does
+   not hold is in no line, and the lookup ends at the end of the map. */
+static void map_last_line_open(void)
+{
+    static const char map[] =
+        "# build -\n"
+        "0000000000001000-0000000000001010 app.main app.anti:3";
+    struct text function = {0};
+    struct text where = {0};
+
+    CHECK(syms_map_lookup(map, 0x1004, &function, &where));
+    CHECK_STR(text_cstr(&function), "app.main");
+    CHECK_STR(text_cstr(&where), "app.anti:3");
+    text_free(&function);
+    text_free(&where);
+    CHECK(!syms_map_lookup(map, 0x1010, &function, &where));
+    text_free(&function);
+    text_free(&where);
+}
+
 /* M24 of the second audit: the build id of a program is the line after the
    begin marker of its notice. A line of the same form that the data of the
    program holds before the notice is not its id. */
@@ -389,6 +409,7 @@ void test_syms(void)
     unit_without_id();
     program_without_functions();
     map_names();
+    map_last_line_open();
     build_id_of_notice();
     object_no_file();
     configuration_fifo();
