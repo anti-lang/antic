@@ -1,5 +1,6 @@
 anti: test_syms-program carries no build id
 anti: cannot read test_syms-conf/fifo
     #0 0x1 (test_syms-fifo+0x10)
+    #0 0x1 (test_syms-universal:x86_64+0x10)
 anti: the data of 0123456789abcdef/prog.map is broken
 anti: the data of prog.map is broken

@@ -344,6 +344,37 @@ static void report_fifo(void)
 #endif
 }
 
+/* A frame of a report whose module is a universal file of macOS that
+   holds no file of the processor the frame names: one arm64 file, and a
+   frame of x86_64. The line comes out as it went in. Windows writes the
+   line itself, as for report_fifo. */
+#define UNIVERSAL "test_syms-universal"
+#define UNIVERSAL_FRAME "    #0 0x1 (" UNIVERSAL ":x86_64+0x10)"
+static void report_universal(void)
+{
+#if !defined(_WIN32)
+    static const unsigned char header[] = {
+        0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 1,    0x01, 0, 0, 0x0c,
+        0,    0,    0,    0,    0, 0, 0x10, 0, 0,    0, 0, 0x10,
+        0,    0,    0,    0x0e,
+    };
+    static const char *const argv[] = {
+        "/bin/sh", "-c", "echo '" UNIVERSAL_FRAME "' >&2", NULL,
+    };
+    FILE *f = platform_open(UNIVERSAL, true);
+
+    CHECK(f != NULL);
+    if (f != NULL) {
+        CHECK(fwrite(header, 1, sizeof header, f) == sizeof header);
+        fclose(f);
+    }
+    CHECK(memreport_run(argv) == 0);
+    remove(UNIVERSAL);
+#else
+    fputs(UNIVERSAL_FRAME "\n", stderr);
+#endif
+}
+
 /* Write entries to the archive with the first byte of the bytes of the
    last entry changed, so its data no longer matches its CRC. */
 static void write_broken(struct zip_entry *entries, size_t count)
@@ -414,5 +445,6 @@ void test_syms(void)
     object_no_file();
     configuration_fifo();
     report_fifo();
+    report_universal();
     broken_entries();
 }
