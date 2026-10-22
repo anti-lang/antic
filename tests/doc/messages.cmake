@@ -48,6 +48,13 @@ anti_message(module_fence_never_closed STATUS 0
     OUT "doc: 1 module into ${WORK}/pages"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti
     ERR "anti: one.anti: warning: the doc comment of the module holds a fence that nothing closes")
+# A library file beside a source. The source gets its interface file in
+# the work directory, and the library file is read as it stands.
+anti_message(library_beside_a_source STATUS 0
+    FILES one.anti "//! A module.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "doc: 2 modules into ${WORK}/pages"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}"
+         "${RUNTIME}/std/anti/simd.antl" one.anti)
 anti_message(source_imports_no_module
     FILES one.anti "//! A module.\n\nimport com.example.gone;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti
