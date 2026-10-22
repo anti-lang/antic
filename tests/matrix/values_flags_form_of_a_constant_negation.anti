@@ -1,7 +1,7 @@
-//! The flags form on unary `-` of a constant gives the wrapped result and
-//! its flags, as it does on a variable. Unary `-` of the least value
-//! leaves the range of its type, and the flags form never traps, so it is
-//! no refusal of R031: an `i32` and an `i64`.
+//! The flags form on unary `-` of a constant gives the wrapped result and its
+//! flags, as it does on a variable. Unary `-` of the least value leaves the
+//! range of its type, and the flags form never traps, so it is no refusal of
+//! R031: an `i32` and an `i64`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
