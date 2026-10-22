@@ -1356,7 +1356,9 @@ static void resolve_fields(struct checker *c, struct item *it,
             if (types_same_name(&fields[k].name, &fields[j].name)) {
                 sema_error_at(c, fields[j].pos, "%s `%.*s` has two fields "
                               "named `%.*s`",
-                              it->kind == ITEM_UNION ? "union" : "struct",
+                              it->kind == ITEM_UNION   ? "union"
+                              : it->kind == ITEM_CLASS ? "class"
+                                                       : "struct",
                               (int)it->name.length, it->name.text,
                               (int)fields[j].name.length, fields[j].name.text);
             }
