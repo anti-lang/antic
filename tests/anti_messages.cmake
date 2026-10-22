@@ -227,10 +227,11 @@ anti_message(fault_new_module_not_written
     FAULT open:2:EACCES
     ARGS new com.example.app
     ERR "anti: cannot write app/src/com/example/app.anti")
-# T153: the directory `test`, the fifth after the directory of the
-# project and the three of the module.
+# T153: the directory `test`. Each path is made from the top down, so the
+# directory of the module takes the project and its three directories,
+# and `test` the project and itself: the seventh mkdir.
 anti_message(fault_new_test_directory_not_made
-    FAULT mkdir:5:EACCES
+    FAULT mkdir:7:EACCES
     ARGS new com.example.app
     ERR "anti: cannot make app/test")
 # anti license of a runtime archive opens the listing of licenses/, the
