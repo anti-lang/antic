@@ -1,0 +1,10 @@
+//! No implicit conversion between integers: an `i32` plus an `i64` is refused,
+//! where C++ would widen the `i32`.
+
+fn main() -> int
+{
+	let a: i32 = 1;
+	let b: i64 = 2;
+	let c = a + b;
+	return c as int;
+}

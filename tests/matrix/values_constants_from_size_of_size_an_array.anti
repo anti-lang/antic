@@ -1,0 +1,31 @@
+//! Constants built from `size_of` and from each other give the length of a
+//! fixed array and of its repeat literal, and `size_of` of a `?i32`, a tuple
+//! and a packed struct follows C layout.
+
+import anti.io;
+import anti.text;
+
+packed struct Wire
+{
+	tag: u8,
+	len: u32,
+}
+
+const WORD: int = size_of(i64);
+const N: int = WORD * 4;
+const LAST: int = N - 1;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let buf: [N]u8 = [7; N];
+	buf[LAST] = 9;
+	say(f"{buf.len} {buf[0]} {buf[LAST]}");
+	say(f"{size_of(?i32)} {size_of((u8, i64))} {size_of(Wire)}");
+	return 0;
+}

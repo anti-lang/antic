@@ -1,0 +1,1 @@
+classes_class_with_two_fields_of_one_name.anti:7:2: error: class `Account` has two fields named `balance`

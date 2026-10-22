@@ -1,0 +1,44 @@
+//! `anti.reflect` reads the descriptor of an object of a derived class: its
+//! name, the names of its own fields, and through `parent` the name and the
+//! fields of its base.
+
+import anti.io;
+import anti.reflect;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Shape
+{
+	pub x: int = 0,
+}
+
+class Circle inherits Shape
+{
+	pub r: f64 = 1.0,
+	pub label: str = "c",
+}
+
+fn main() -> int
+{
+	let c = alloc Circle { };
+	let d = reflect.describe(c as *byte) else {
+		return 1;
+	};
+	say(f"{reflect.name(d)}");
+	for i in 0..reflect.field_count(d) {
+		say(f"field {reflect.field(d, i).name}");
+	}
+	if let p = reflect.parent(d) {
+		say(f"parent {reflect.name(p)}");
+		for i in 0..reflect.field_count(p) {
+			say(f"base field {reflect.field(p, i).name}");
+		}
+	}
+	delete(c);
+	return 0;
+}

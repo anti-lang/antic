@@ -1,0 +1,47 @@
+//! Jobs dispatched on objects of their own write their own keys into one
+//! `SyncMap`, a synchronized generic class they take as a pointer argument, and
+//! the map holds every entry once they joined.
+
+import anti.collection.synchronized.{SyncMap};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Filler
+{
+	pub start: int = 0,
+}
+
+worker fn fill(f: *Filler, m: *SyncMap<int, int>) -> int
+{
+	for i in f.start..f.start + 100 {
+		m.set(i, i * 2);
+	}
+	return 100;
+}
+
+fn main() -> int
+{
+	let m = SyncMap<int, int>.new();
+	let fa = alloc Filler { start: 0 };
+	let fb = alloc Filler { start: 100 };
+	let fc = alloc Filler { start: 200 };
+	let a = dispatch fa -> fill(&m);
+	let b = dispatch fb -> fill(&m);
+	let c = dispatch fc -> fill(&m);
+	let n = join(a) + join(b) + join(c);
+	let sum = 0;
+	for i in 0..300 {
+		sum += m.get(i) ?? -1000000;
+	}
+	say(f"{n} {m.count()} {sum}");
+	delete(fa);
+	delete(fb);
+	delete(fc);
+	return 0;
+}

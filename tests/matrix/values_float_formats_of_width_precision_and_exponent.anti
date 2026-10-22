@@ -1,0 +1,29 @@
+//! The format specifications of floats: a width with a precision, `e` with and
+//! without one, the shortest form of a large and a small value, and a float
+//! left in its field with `<`.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let x = 3.14159;
+	say(f"[{x:8.3f}]");
+	say(f"[{x:e}]");
+	say(f"[{x:.2e}]");
+	say(f"[{x:<8.1}]");
+	say(f"[{x:^9.2f}]");
+	let big = 1.0e20;
+	let small = 0.0001;
+	let smaller = 0.00001;
+	say(f"{big} {small} {smaller}");
+	let neg = -0.5;
+	say(f"[{neg:08.2f}]");
+	return 0;
+}

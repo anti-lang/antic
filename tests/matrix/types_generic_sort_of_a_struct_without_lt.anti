@@ -1,0 +1,23 @@
+//! A generic function with `T: lt` called with a struct whose module declares
+//! no `operator fn lt` is refused at the call: a struct never meets `lt` by
+//! default.
+
+struct Card
+{
+	rank: int,
+}
+
+fn smaller<T: lt>(a: T, b: T) -> bool
+{
+	return a < b;
+}
+
+fn main() -> int
+{
+	let a = Card { rank: 1 };
+	let b = Card { rank: 2 };
+	if smaller(a, b) {
+		return 1;
+	}
+	return 0;
+}

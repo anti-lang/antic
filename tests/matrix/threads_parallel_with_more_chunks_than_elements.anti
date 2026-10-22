@@ -1,0 +1,34 @@
+//! `parallel` asked for eight chunks over three elements still gives each
+//! element to exactly one chunk, so the sum of the results is the sum of the
+//! slice whatever the count of results.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn sum(chunk: []int) -> int
+{
+	let total = 0;
+	for x in chunk {
+		total += x;
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let xs: [3]int = [100, 20, 3];
+	let parts = parallel xs[0..3] by 8 -> sum;
+	let total = 0;
+	for p in parts {
+		total += p;
+	}
+	say(f"{total} {parts.len >= 1}");
+	free(parts.ptr);
+	return 0;
+}

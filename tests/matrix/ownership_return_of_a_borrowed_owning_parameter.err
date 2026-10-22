@@ -1,0 +1,1 @@
+ownership_return_of_a_borrowed_owning_parameter.anti:16:9: error: `a` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(a)`

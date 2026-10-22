@@ -1,0 +1,25 @@
+//! The functions of `text.Builder` called by hand, with the parameters an
+//! `f"..."` passes for its specifications: a width, an alignment of
+//! `text.Align`, zero padding and a radix, to write a table.
+
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let rows: [3]int = [7, -42, 1234];
+	for n in rows {
+		let b = text.Builder.new();
+		b.append("|");
+		b.append_int(n, 10, false, 6);
+		b.append("|");
+		b.append_int(n, 16, true, 6, text.Align.Left);
+		b.append("|");
+		b.append_int(n, 10, false, 6, text.Align.Right, true);
+		b.append("|");
+		let s = b.take();
+		io.println(s);
+		free(s.ptr);
+	}
+	return 0;
+}

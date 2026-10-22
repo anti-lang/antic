@@ -1,0 +1,1 @@
+errors_try_in_a_closure_passed_by_a_failing_function.anti:16:10: error: `try` outside a function that may fail

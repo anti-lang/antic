@@ -1,0 +1,25 @@
+//! A `Deque<str>` takes values at both ends and gives them back from both ends,
+//! the undo and redo buffer of an editor.
+
+import anti.collection.deque.{Deque};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let d = Deque<str>.new();
+	d.push_back("b");
+	d.push_back("c");
+	d.push_front("a");
+	d.push_front("z");
+	let front = d.pop_front() ?? "-";
+	let back = d.pop_back() ?? "-";
+	say(f#"{front} {back} {d.front() ?? "-"} {d.back() ?? "-"} {d.count}"#);
+	return 0;
+}

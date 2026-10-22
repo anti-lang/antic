@@ -1,0 +1,52 @@
+//! An event loop over an array of variant values: the `switch` binds the fields
+//! of each case, one arm breaks out of the `for` and another continues it.
+
+import anti.io;
+import anti.text;
+
+variant Event
+{
+	Key { code: int },
+	Move { dx: int, dy: int },
+	Idle,
+	Quit,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let events: [6]Event = [
+		Event.Key { code: 65 },
+		Event.Idle,
+		Event.Move { dx: 3, dy: -1 },
+		Event.Move { dx: -1, dy: 4 },
+		Event.Quit,
+		Event.Key { code: 66 },
+		];
+	let x = 0;
+	let y = 0;
+	let handled = 0;
+	for e in events {
+		switch e {
+			Key k => say(f"key {k.code}"),
+			Move m => {
+				x += m.dx;
+				y += m.dy;
+			},
+			Idle => {
+				continue;
+			},
+			Quit => {
+				break;
+			},
+		}
+		handled += 1;
+	}
+	say(f"at {x} {y} after {handled}");
+	return 0;
+}

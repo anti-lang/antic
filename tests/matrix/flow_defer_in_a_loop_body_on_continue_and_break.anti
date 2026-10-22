@@ -1,0 +1,27 @@
+//! A `defer` in the body of a `for` runs at the end of every turn: at the
+//! closing brace, at a `continue` and at the `break` that ends the loop.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	for i in 0..6 {
+		defer say(f"leave {i}");
+		if i == 3 {
+			break;
+		}
+		if i % 2 == 0 {
+			continue;
+		}
+		say(f"odd {i}");
+	}
+	say(f"done");
+	return 0;
+}

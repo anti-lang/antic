@@ -1,0 +1,26 @@
+//! A worker that may fail is called directly with a handler, and `dispatch`
+//! refuses it, since `join` has no handler to give.
+
+import anti.lang;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn run(t: *Task) -> int may fail
+{
+	if t.n < 0 {
+		fail lang.Error.new(1, "negative");
+	}
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 3 };
+	let job = dispatch t -> run();
+	let n = join(job);
+	delete(t);
+	return n;
+}

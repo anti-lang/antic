@@ -1,0 +1,43 @@
+//! A struct with a class part that owns something follows the value rules of a
+//! class: it moves into an `own` parameter, the callee tears it down at its
+//! end, and the caller's block does not tear it down again.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+struct Pair
+{
+	t: Tracked,
+	n: int,
+}
+
+fn consume(own p: Pair) -> int
+{
+	say(f"consume {p.t.id}");
+	return p.n;
+}
+
+fn main() -> int
+{
+	let p = Pair { t: Tracked { id: 7 }, n: 3 };
+	let q = Pair { t: Tracked { id: 8 }, n: 4 };
+	let n = consume(p);
+	say(f"back {n}");
+	return n + q.n;
+}

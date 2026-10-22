@@ -1,0 +1,39 @@
+//! A handler of `catch` inside a loop leaves its block with `break`, and
+//! another with `continue`, as a programmer from Java leaves a `catch` inside a
+//! loop. The values parsed before the bad one stay added.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let inputs: [6]str = ["4", "", "15", "x7", "8", "9"];
+	let sum = 0;
+	for s in inputs {
+		if s.len == 0 {
+			continue;
+		}
+		let n = text.parse_int(s) catch e {
+			say(f"stop at {s}");
+			break;
+		};
+		sum += n;
+	}
+	say(f"sum {sum}");
+	let skipped = 0;
+	for s in inputs {
+		let n = text.parse_int(s) catch {
+			skipped += 1;
+			continue;
+		};
+		sum += n;
+	}
+	say(f"sum {sum} skipped {skipped}");
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! `return v;` writes its value before the deferred statements of the block
+//! run, as a `finally` of Java does for a primitive: a `defer` that changes the
+//! local afterwards does not change the result.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn counted(start: int) -> int
+{
+	let n = start;
+	defer n += 100;
+	defer say(f"defer sees {n}");
+	n += 1;
+	return n;
+}
+
+fn main() -> int
+{
+	let r = counted(4);
+	say(f"result {r}");
+	return 0;
+}

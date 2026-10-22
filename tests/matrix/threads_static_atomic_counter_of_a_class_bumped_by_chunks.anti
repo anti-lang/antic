@@ -1,0 +1,41 @@
+//! A static atomic field of a class counts the elements every chunk of a
+//! `parallel` saw, and its `add` gives the value it held before.
+
+import anti.io;
+import anti.text;
+
+class Stats
+{
+	pub static atomic seen: int = 0;
+	pub static atomic big: int = 0;
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn count(chunk: []int) -> int
+{
+	for x in chunk {
+		Stats.seen.add(1);
+		if x >= 50 {
+			Stats.big.add(1);
+		}
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let xs: [100]int = [0; 100];
+	for i in 0..100 {
+		xs[i] = i;
+	}
+	let parts = parallel xs[0..100] by 5 -> count;
+	free(parts.ptr);
+	let before = Stats.seen.add(1000);
+	say(f"{before} {Stats.seen.load()} {Stats.big.load()}");
+	return 0;
+}

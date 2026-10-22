@@ -1,0 +1,31 @@
+//! A pattern literal with two groups matched against each line of a fixed
+//! array: a line that matches gives its groups as fields of the match, and
+//! `find_all` walks every number of the whole text.
+
+import anti.io;
+import anti.regex;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let lines: [4]str = ["width=640", "height = 480", "# comment", "depth=24"];
+	let found = 0;
+	for line in lines {
+		if let m = line.matches(re"^(\w+)=(\d+)$") {
+			say(f"{m.1} is {m.2}");
+			found += 1;
+		}
+	}
+	let total = 0;
+	for m in "a1 b22 c333".find_all(re"\d+") {
+		total += m.all.len;
+	}
+	say(f"{found} {total}");
+	return 0;
+}

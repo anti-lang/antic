@@ -1,0 +1,4 @@
+exit 0
+after 0: 10
+after 2: 20
+total 20

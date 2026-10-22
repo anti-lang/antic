@@ -1,0 +1,55 @@
+//! A `construct` that fails after it set two owning fields tears them down last
+//! to first, without its own `destruct`, and `alloc` frees the object. The call
+//! that succeeds keeps both.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Part
+{
+	pub name: str = "",
+
+	fn destruct(self)
+	{
+		say(f"drop {self.name}");
+	}
+}
+
+class Machine
+{
+	own a: ?*Part = none,
+	own b: ?*Part = none,
+
+	fn construct(self, ok: bool) may fail
+	{
+		self.a = alloc Part { name: "a" };
+		self.b = alloc Part { name: "b" };
+		if !ok {
+			fail lang.Error.new(9, "broken");
+		}
+	}
+
+	fn destruct(self)
+	{
+		say(f"machine");
+	}
+}
+
+fn main() -> int
+{
+	let bad = alloc Machine(false) catch e {
+		say(f"failed {e.code}");
+		let good = alloc Machine(true) catch fatal;
+		yield good;
+	};
+	say(f"built");
+	delete(bad);
+	return 0;
+}

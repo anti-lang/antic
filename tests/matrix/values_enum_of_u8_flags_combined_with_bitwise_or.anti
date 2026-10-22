@@ -1,0 +1,32 @@
+//! An enum over `u8` whose last value combines the others with `|`, and a mask
+//! built from its values as integers, tested with `&` in parentheses.
+
+import anti.io;
+import anti.text;
+
+enum Perm: u8
+{
+	Read = 1,
+	Write = 2,
+	Exec = 4,
+	All = Read | Write | Exec,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let p = (Perm.Read as u8) | (Perm.Exec as u8);
+	let can_write = (p & (Perm.Write as u8)) != 0;
+	let can_exec = (p & (Perm.Exec as u8)) != 0;
+	say(f"{p} {can_write} {can_exec} {Perm.All as int}");
+	let back = 7 as Perm;
+	if back == Perm.All {
+		say(f"all");
+	}
+	return 0;
+}

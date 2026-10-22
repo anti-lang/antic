@@ -1,0 +1,28 @@
+//! A union of an `f32` and a `u32` reads the bits of a float, the type pun a
+//! programmer from C writes, and a write of the integer gives the float back.
+
+import anti.io;
+import anti.text;
+
+union Bits
+{
+	f: f32,
+	u: u32,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let b = Bits { f: 1.0 };
+	say(f"{b.u:x}");
+	b.f = -2.5;
+	say(f"{b.u:x}");
+	b.u = 0x40490FDB;
+	say(f"{b.f}");
+	return 0;
+}

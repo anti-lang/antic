@@ -1,0 +1,54 @@
+//! An `own ?fn(int) -> int` field takes a `snapshot fn` that copies a `str` and
+//! an `int`, through a `keep own` parameter. `dup` of the class copies the
+//! snapshot, and a change of the captured locals after the snapshot reaches
+//! neither.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Button
+{
+	pub label: str = "",
+	own on_click: ?fn(int) -> int = none,
+
+	pub fn on(self, keep own f: fn(int) -> int)
+	{
+		self.on_click = f;
+	}
+
+	pub fn off(self)
+	{
+		self.on_click = none;
+	}
+
+	pub fn click(self, n: int) -> int
+	{
+		let f = self.on_click else {
+			return -1;
+		};
+		return f(n);
+	}
+}
+
+fn main() -> int
+{
+	let name = "ok";
+	let base = 100;
+	let b = Button { label: "first" };
+	say(f"{b.click(1)}");
+	b.on(snapshot fn(n: int) -> int {
+		return base + n + name.len;
+	});
+	base = 0;
+	name = "changed";
+	let c = dup(b);
+	b.off();
+	say(f"{b.click(5)} {c.click(5)} {c.label}");
+	return 0;
+}

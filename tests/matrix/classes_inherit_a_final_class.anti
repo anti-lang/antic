@@ -1,0 +1,16 @@
+//! `final class` forbids inheritance, so a class that names it as its base is
+//! refused.
+
+final class Config
+{
+	pub path: str = "",
+}
+
+class Local inherits Config
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

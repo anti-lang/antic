@@ -1,0 +1,27 @@
+//! A tuple `(int, int)` as the key of a `Map`, the coordinates of a sparse
+//! grid: `set` replaces the value of an equal key, and the walk keeps the order
+//! of insertion.
+
+import anti.collection.map.{Map};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let cells = Map<(int, int), str>.new();
+	cells.set((0, 0), "origin");
+	cells.set((2, -1), "rock");
+	cells.set((0, 0), "start");
+	cells.set((-3, 4), "tree");
+	for (k, v) in cells {
+		say(f"{k.0} {k.1} {v}");
+	}
+	say(f"{cells.contains((2, -1))} {cells.contains((-1, 2))} {cells.count}");
+	return 0;
+}

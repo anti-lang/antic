@@ -1,0 +1,22 @@
+//! `push` takes its element `own`, so a local with a `destruct` moves into the
+//! list, and reading it afterwards is refused. A programmer from Java expects
+//! the list to hold a reference to the same object.
+
+import anti.collection.list.{List};
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let all = List<Texture>.new();
+	let t = Texture { id: 7 };
+	all.push(t);
+	return t.id;
+}

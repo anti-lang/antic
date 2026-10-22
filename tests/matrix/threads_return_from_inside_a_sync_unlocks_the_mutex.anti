@@ -1,0 +1,48 @@
+//! A `return` from inside `sync m { }` and a `break` out of a loop inside it
+//! unlock the Mutex on the way out, so a second call takes it again without
+//! waiting forever.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn find(m: *Mutex, xs: []int, want: int) -> int
+{
+	sync m {
+		for i, x in xs {
+			if x == want {
+				return i;
+			}
+		}
+	}
+	return -1;
+}
+
+fn first_big(m: *Mutex, xs: []int) -> int
+{
+	let at = -1;
+	sync m {
+		for i, x in xs {
+			if x > 10 {
+				at = i;
+				break;
+			}
+		}
+	}
+	return at;
+}
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	let xs: [5]int = [3, 14, 1, 59, 2];
+	say(f"{find(&m, xs[0..5], 1)} {find(&m, xs[0..5], 59)} {find(&m, xs[0..5], 7)}");
+	say(f"{first_big(&m, xs[0..5])} {first_big(&m, xs[2..5])}");
+	m.destroy();
+	return 0;
+}

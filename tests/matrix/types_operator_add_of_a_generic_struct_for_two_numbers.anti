@@ -1,0 +1,33 @@
+//! A generic struct `Vec2<T>` with a module-level `operator fn add` under `T:
+//! Number`, used for `int` and `f32` in a sum of three operands.
+
+import anti.io;
+import anti.text;
+
+struct Vec2<T>
+{
+	x: T,
+	y: T,
+}
+
+operator fn add<T: Number>(a: Vec2<T>, b: Vec2<T>) -> Vec2<T>
+{
+	return Vec2<T> { x: a.x + b.x, y: a.y + b.y };
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = Vec2<int> { x: 1, y: 2 };
+	let b = Vec2<int> { x: 10, y: 20 };
+	let c = a + b;
+	c = c + a;
+	let f = Vec2<f32> { x: 0.5, y: 1.5 } + Vec2<f32> { x: 0.25, y: 0.25 };
+	say(f"{c.x} {c.y} {f.x} {f.y}");
+	return 0;
+}

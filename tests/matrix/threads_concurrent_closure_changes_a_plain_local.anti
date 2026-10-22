@@ -1,0 +1,27 @@
+//! A closure passed through a `concurrent` parameter may change a captured
+//! variable only when its type is thread-safe, so `+=` on a plain `int` is
+//! refused, the data race a programmer from Java writes with a lambda.
+
+worker fn apply(chunk: []int, concurrent f: fn(int)) -> int
+{
+	for x in chunk {
+		f(x);
+	}
+	return chunk.len;
+}
+
+fn for_each(xs: []int, concurrent f: fn(int))
+{
+	let parts = parallel xs -> apply(f);
+	free(parts.ptr);
+}
+
+fn main() -> int
+{
+	let xs: [4]int = [1, 2, 3, 4];
+	let sum = 0;
+	for_each(xs[0..4], fn(x) {
+		sum += x;
+	});
+	return sum;
+}

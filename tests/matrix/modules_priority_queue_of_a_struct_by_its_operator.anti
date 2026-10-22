@@ -1,0 +1,39 @@
+//! A `PriorityQueue` of a struct whose module gives it `operator fn lt` pops
+//! the smallest first, the order of a scheduler of tasks.
+
+import anti.collection.queue.{PriorityQueue};
+import anti.io;
+import anti.text;
+
+struct Task
+{
+	due: int,
+	name: str,
+}
+
+operator fn lt(a: Task, b: Task) -> bool
+{
+	return a.due < b.due;
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let q = PriorityQueue<Task>.new();
+	q.push(Task { due: 30, name: "mail" });
+	q.push(Task { due: 5, name: "boot" });
+	q.push(Task { due: 12, name: "sync" });
+	q.push(Task { due: 1, name: "wake" });
+	while true do {
+		let t = q.pop() else {
+			break;
+		};
+		say(f"{t.due} {t.name}");
+	}
+	return 0;
+}

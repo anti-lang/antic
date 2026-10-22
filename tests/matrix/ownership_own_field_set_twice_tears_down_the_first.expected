@@ -1,0 +1,7 @@
+exit 0
+drop item 1
+two set
+drop item 2
+cleared
+end
+drop item 3

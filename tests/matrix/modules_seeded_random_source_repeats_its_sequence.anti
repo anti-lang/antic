@@ -1,0 +1,36 @@
+//! Two `Random` sources with one seed give one sequence, `reseed` starts it
+//! again, and every value stays in the range asked for.
+
+import anti.io;
+import anti.random;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = random.Random.new(42);
+	let b = random.Random.new(42);
+	let same = true;
+	let in_range = true;
+	let first = a.between(1, 6);
+	let again = b.between(1, 6);
+	for i in 0..100 {
+		let x = a.between(1, 6);
+		let y = b.between(1, 6);
+		if x != y {
+			same = false;
+		}
+		if x < 1 || x > 6 || a.below(10) >= 10 {
+			in_range = false;
+		}
+		b.below(10);
+	}
+	a.reseed(42);
+	say(f"{same} {in_range} {first == again} {a.between(1, 6) == first}");
+	return 0;
+}

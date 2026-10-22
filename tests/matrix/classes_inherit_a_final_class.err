@@ -1,0 +1,1 @@
+classes_inherit_a_final_class.anti:9:13: error: `Local` cannot inherit `final` class `Config`

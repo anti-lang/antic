@@ -1,0 +1,106 @@
+//! A calculator of the kind a programmer writes first: a recursive descent over
+//! a `str` with a `switch` on a `char` in each level. Every arm of the `switch`
+//! of `primary` returns, so it ends the path of the function, and `term` and
+//! `expr` leave their `while true` from the `else` of a `switch`.
+
+import anti.io;
+import anti.text;
+
+struct Parser
+{
+	text: str,
+	at: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn peek(p: *Parser) -> char
+{
+	if p.at >= p.text.len {
+		return '$';
+	}
+	return p.text[p.at] as u32 as char;
+}
+
+fn primary(p: *Parser) -> int
+{
+	switch peek(p) {
+		'(' => {
+			p.at += 1;
+			let v = expr(p);
+			p.at += 1;
+			return v;
+		},
+		'-' => {
+			p.at += 1;
+			return -primary(p);
+		},
+		else => {
+			let n = 0;
+			while peek(p) >= '0' && peek(p) <= '9' do {
+				n = n * 10 + ((peek(p) as u32 - '0' as u32) as int);
+				p.at += 1;
+			}
+			return n;
+		},
+	}
+}
+
+fn term(p: *Parser) -> int
+{
+	let v = primary(p);
+	while true do {
+		switch peek(p) {
+			'*' => {
+				p.at += 1;
+				v *= primary(p);
+			},
+			'/' => {
+				p.at += 1;
+				v /= primary(p);
+			},
+			else => {
+				return v;
+			},
+		}
+	}
+}
+
+fn expr(p: *Parser) -> int
+{
+	let v = term(p);
+	while true do {
+		switch peek(p) {
+			'+' => {
+				p.at += 1;
+				v += term(p);
+			},
+			'-' => {
+				p.at += 1;
+				v -= term(p);
+			},
+			else => {
+				return v;
+			},
+		}
+	}
+}
+
+fn eval(s: str) -> int
+{
+	let p = Parser { text: s, at: 0 };
+	return expr(&p);
+}
+
+fn main() -> int
+{
+	say(f#"{eval("2+3*(4-1)")}"#);
+	say(f#"{eval("-(8-2)/3+10")}"#);
+	say(f#"{eval("7-2-1")}"#);
+	say(f#"{eval("100/7/2")}"#);
+	return 0;
+}

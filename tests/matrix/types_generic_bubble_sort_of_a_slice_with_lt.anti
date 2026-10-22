@@ -1,0 +1,50 @@
+//! A generic bubble sort over a slice, `T: lt`, swaps with a local as a
+//! programmer from C++ writes it, for `int`, `str` and a struct whose module
+//! gives it `operator fn lt`.
+
+import anti.io;
+import anti.text;
+
+struct Card
+{
+	rank: int,
+	name: str,
+}
+
+operator fn lt(a: Card, b: Card) -> bool
+{
+	return a.rank < b.rank;
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn sort<T: lt>(xs: []T)
+{
+	for i in 0..xs.len {
+		for j in 0..xs.len - 1 - i {
+			if xs[j + 1] < xs[j] {
+				let t = xs[j];
+				xs[j] = xs[j + 1];
+				xs[j + 1] = t;
+			}
+		}
+	}
+}
+
+fn main() -> int
+{
+	let ns: [5]int = [4, -1, 9, 0, 3];
+	sort(ns[0..5]);
+	say(f"{ns[0]} {ns[1]} {ns[2]} {ns[3]} {ns[4]}");
+	let ws: [3]str = ["pear", "fig", "apple"];
+	sort(ws[0..3]);
+	say(f"{ws[0]} {ws[1]} {ws[2]}");
+	let cs: [3]Card = [Card { rank: 12, name: "queen" }, Card { rank: 1, name: "ace" }, Card { rank: 7, name: "seven" }];
+	sort(cs[0..3]);
+	say(f"{cs[0].name} {cs[1].name} {cs[2].name}");
+	return 0;
+}

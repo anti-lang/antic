@@ -1,0 +1,35 @@
+//! A loop over names looks each one up in two maps with `if let` and `else if
+//! let`, and counts the misses in the last `else`.
+
+import anti.collection.map.{Map};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let ages = Map<str, int>.new();
+	ages.set("ann", 31);
+	ages.set("bo", 47);
+	let towns = Map<str, str>.new();
+	towns.set("cy", "Delft");
+	towns.set("ann", "Leiden");
+	let names: [4]str = ["ann", "cy", "di", "bo"];
+	let misses = 0;
+	for n in names {
+		if let a = ages.get(n) {
+			say(f"{n} is {a}");
+		} else if let t = towns.get(n) {
+			say(f"{n} lives in {t}");
+		} else {
+			misses += 1;
+		}
+	}
+	say(f"misses {misses}");
+	return 0;
+}

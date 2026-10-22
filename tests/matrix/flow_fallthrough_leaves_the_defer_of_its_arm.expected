@@ -1,0 +1,7 @@
+exit 0
+leave 3 at 100
+leave 2 at 110
+grade 3: 111
+leave 2 at 10
+grade 2: 11
+grade 5: 0

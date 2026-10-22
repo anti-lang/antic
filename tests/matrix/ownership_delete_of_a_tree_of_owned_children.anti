@@ -1,0 +1,55 @@
+//! `delete` of the root of a binary tree whose children are `own ?*Node` fields
+//! runs the `destruct` of each node before its fields, which go last to first,
+//! so the right child goes before the left one.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Node
+{
+	pub value: int = 0,
+	own left: ?*Node = none,
+	own right: ?*Node = none,
+
+	pub fn grow(self, l: ?*Node, r: ?*Node)
+	{
+		self.left = l;
+		self.right = r;
+	}
+
+	pub fn sum(self) -> int
+	{
+		let s = self.value;
+		if let l = self.left {
+			s += l.sum();
+		}
+		if let r = self.right {
+			s += r.sum();
+		}
+		return s;
+	}
+
+	fn destruct(self)
+	{
+		say(f"node {self.value}");
+	}
+}
+
+fn main() -> int
+{
+	let four = alloc Node { value: 4 };
+	let two = alloc Node { value: 2 };
+	two.grow(four, none);
+	let three = alloc Node { value: 3 };
+	let root = alloc Node { value: 1 };
+	root.grow(two, three);
+	say(f"sum {root.sum()}");
+	delete(root);
+	return 0;
+}

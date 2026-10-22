@@ -1,0 +1,70 @@
+//! A class nested in a class body is the node of a linked list with an `own`
+//! link, so the list frees its chain with itself, first node first, and the
+//! outer class reaches the private fields of the nested one. A new node goes to
+//! the end, a fresh value in the `own` field of the last.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class IntList
+{
+	class Node
+	{
+		value: int = 0,
+		own next: ?*Node = none,
+
+		fn destruct(self)
+		{
+			say(f"free {self.value}");
+		}
+	}
+
+	own head: ?*Node = none,
+	size: int = 0,
+
+	pub fn push_back(self, v: int)
+	{
+		self.size += 1;
+		let p = self.head else {
+			self.head = alloc Node { value: v };
+			return;
+		};
+		while p.next != none do {
+			let n = p.next else {
+				return;
+			};
+			p = n;
+		}
+		p.next = alloc Node { value: v };
+	}
+
+	pub fn sum(self) -> int
+	{
+		let s = 0;
+		let p = self.head;
+		while p != none do {
+			s += p.value;
+			p = p.next;
+		}
+		return s;
+	}
+}
+
+fn main() -> int
+{
+	{
+		let l = IntList { };
+		l.push_back(1);
+		l.push_back(2);
+		l.push_back(3);
+		say(f"{l.sum()}");
+	}
+	say(f"end");
+	return 0;
+}

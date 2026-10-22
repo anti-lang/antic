@@ -1,0 +1,5 @@
+exit 0
+visit a
+visit c
+visit b
+visited 3

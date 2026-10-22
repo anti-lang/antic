@@ -1,0 +1,29 @@
+//! `=` from one `own ?*Node` field into another copies an existing value that a
+//! field owns, which would give the node two owners and free it twice. It is
+//! refused as `=` of any existing owning value is, and `dup` gives the second
+//! field a node of its own. A programmer from C++ writes the line where
+//! `unique_ptr` would ask for `std::move`.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	own head: ?*Node = none,
+	own spare: ?*Node = none,
+
+	pub fn fill(self)
+	{
+		self.head = alloc Node { value: 1 };
+		self.spare = self.head;
+	}
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	h.fill();
+	return 0;
+}

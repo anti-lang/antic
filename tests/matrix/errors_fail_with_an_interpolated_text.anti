@@ -1,0 +1,32 @@
+//! `fail` of an `f"..."` makes an error of code 0 that owns a copy of the text,
+//! so the function frees its own text, and the handler reads the message after
+//! the function returned.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn check(n: int) may fail
+{
+	if n > 10 {
+		let msg = f"value {n} is above 10";
+		defer free(msg.ptr);
+		fail msg;
+	}
+}
+
+fn main() -> int
+{
+	let xs: [3]int = [3, 12, 40];
+	for x in xs {
+		check(x) catch e {
+			say(f"{e.code}: {e.message}");
+		};
+	}
+	return 0;
+}

@@ -1,0 +1,27 @@
+//! `continue` in the body of `do { } while cond` goes on to the condition, as
+//! it does in C, so the loop ends when the condition fails after a `continue`
+//! as well.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let i = 0;
+	let odd = 0;
+	do {
+		i += 1;
+		if i % 2 == 0 {
+			continue;
+		}
+		odd += i;
+	} while i < 8
+	say(f"i {i} odd {odd}");
+	return 0;
+}

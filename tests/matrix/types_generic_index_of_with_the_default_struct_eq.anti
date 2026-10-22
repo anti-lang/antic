@@ -1,0 +1,40 @@
+//! A generic search with `T: eq` over a slice of a struct that has the default
+//! `==`, over a slice of `str` and over a slice of tuples.
+
+import anti.io;
+import anti.text;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn index_of<T: eq>(xs: []T, x: T) -> ?int
+{
+	for i, v in xs {
+		if v == x {
+			return i;
+		}
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let ps: [3]Point = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }, Point { x: 1, y: 4 }];
+	let a = index_of(ps[0..3], Point { x: 1, y: 4 }) ?? -1;
+	let b = index_of(ps[0..3], Point { x: 4, y: 1 }) ?? -1;
+	let ws: [3]str = ["x", "yy", "zzz"];
+	let c = index_of(ws[0..3], "zzz") ?? -1;
+	let ts: [2](int, str) = [(1, "a"), (2, "b")];
+	let d = index_of(ts[0..2], (2, "b")) ?? -1;
+	say(f"{a} {b} {c} {d}");
+	return 0;
+}

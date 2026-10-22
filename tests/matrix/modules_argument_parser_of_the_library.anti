@@ -1,0 +1,30 @@
+//! The `Parser` of `anti.args` reads a flag, a value with a letter, an integer
+//! value and two positional arguments from the command line.
+
+import anti.args;
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main(argv: []str) -> int
+{
+	let p = args.Parser.new("probe", "reads options");
+	p.flag("verbose", 'v' as u32 as byte, "talk more");
+	p.value("name", 'n' as u32 as byte, "who", "nobody");
+	p.value("count", 'c' as u32 as byte, "how many", "1");
+	p.parse(argv) catch e {
+		say(f"error {e.message}");
+		return 1;
+	};
+	let name = p.text_of("name") ?? "-";
+	say(f#"{p.given("verbose")} {name} {p.int_of("count", 0)} {p.len()}"#);
+	for i in 0..p.len() {
+		say(f#"at {i}: {p.at(i) ?? "-"}"#);
+	}
+	return 0;
+}

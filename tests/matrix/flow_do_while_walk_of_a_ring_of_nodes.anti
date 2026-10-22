@@ -1,0 +1,39 @@
+//! A ring of three nodes walked with `do { } while`: the body runs once before
+//! the condition reads the pointer, and the walk ends when it comes back to the
+//! start.
+
+import anti.io;
+import anti.text;
+
+struct Node
+{
+	name: str,
+	next: ?*Node,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = Node { name: "a", next: none };
+	let b = Node { name: "b", next: &a };
+	let c = Node { name: "c", next: &b };
+	a.next = &c;
+	let start: *Node = &a;
+	let p = start;
+	let visited = 0;
+	do {
+		say(f"visit {p.name}");
+		visited += 1;
+		let n = p.next else {
+			break;
+		};
+		p = n;
+	} while p != start
+	say(f"visited {visited}");
+	return 0;
+}

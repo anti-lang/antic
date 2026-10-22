@@ -1,0 +1,54 @@
+//! An `own []Member` field over `alloc(Member, n)`, whose zeroed elements hold
+//! nothing, so `=` of a literal into each destroys nothing. The class tears the
+//! elements down last to first with the object.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Member
+{
+	pub name: str = "",
+
+	fn destruct(self)
+	{
+		say(f"drop {self.name}");
+	}
+}
+
+class Team
+{
+	own members: []Member,
+
+	pub fn of(n: int) -> Team
+	{
+		let p = alloc(Member, n) else {
+			io.exit(1);
+		};
+		let t = Team { members: []Member { ptr: p, len: n } };
+		t.members[0] = Member { name: "ann" };
+		t.members[1] = Member { name: "bo" };
+		t.members[2] = Member { name: "cy" };
+		return t;
+	}
+
+	pub fn size(self) -> int
+	{
+		return self.members.len;
+	}
+}
+
+fn main() -> int
+{
+	{
+		let t = Team.of(3);
+		say(f"team of {t.size()}");
+	}
+	say(f"end");
+	return 0;
+}

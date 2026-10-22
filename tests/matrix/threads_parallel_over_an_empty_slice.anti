@@ -1,0 +1,33 @@
+//! `parallel` over an empty slice runs no element, and the results add up to
+//! zero whatever their count. The worker would stop the program on any element.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn sum(chunk: []int) -> int
+{
+	let total = 0;
+	for x in chunk {
+		total += 1000 / (x - x);
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let xs: [4]int = [1, 2, 3, 4];
+	let parts = parallel xs[2..2] by 4 -> sum;
+	let total = 0;
+	for p in parts {
+		total += p;
+	}
+	say(f"{total}");
+	free(parts.ptr);
+	return 0;
+}

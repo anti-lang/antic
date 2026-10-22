@@ -1,0 +1,26 @@
+//! A failing call with its `catch` stands wherever the call stands, by the
+//! entry on both forms of a failing call in `docs/decisions.md`: as the
+//! argument of another call, as the left operand of `+` and as the value of an
+//! `{expr}` of an `f"..."`, as a programmer from Kotlin writes `?:` after a
+//! call.
+
+import anti.io;
+import anti.text;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let a = twice(text.parse_int("4") catch fatal);
+	let b = text.parse_int("5") catch fatal + 1;
+	let c = twice(text.parse_int("x") catch {
+		yield 50;
+	});
+	let s = f#"{text.parse_int("6") catch fatal}"#;
+	io.println(s);
+	free(s.ptr);
+	return a + b + c;
+}

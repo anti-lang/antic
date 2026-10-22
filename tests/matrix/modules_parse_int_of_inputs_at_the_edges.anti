@@ -1,0 +1,25 @@
+//! `text.parse_int` of the inputs a reader of a file meets: a sign, leading
+//! zeros, the ends of `int`, one past them, and text around the digits, each
+//! with its own handler.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let inputs: [7]str = ["+42", "-007", "9223372036854775807", "-9223372036854775808", "9223372036854775808", " 5", "12a"];
+	for s in inputs {
+		let n = text.parse_int(s) catch {
+			say(f"[{s}] refused");
+			continue;
+		};
+		say(f"[{s}] {n}");
+	}
+	return 0;
+}

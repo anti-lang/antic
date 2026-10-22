@@ -1,0 +1,33 @@
+//! `let b = a;` copies a struct with an array field, so a change through `b`
+//! leaves `a` alone, and an array of such structs copies its elements on `=` as
+//! well. A programmer from Java expects a reference.
+
+import anti.io;
+import anti.text;
+
+struct Buf
+{
+	data: [3]int,
+	n: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = Buf { data: [1, 2, 3], n: 3 };
+	let b = a;
+	b.data[0] = 99;
+	b.n = 1;
+	say(f"a {a.data[0]} {a.n} b {b.data[0]} {b.n}");
+	let all: [2]Buf = [a, b];
+	let other: [2]Buf = [a, a];
+	other = all;
+	all[1].data[2] = -5;
+	say(f"other {other[1].data[0]} {other[1].data[2]} all {all[1].data[2]}");
+	return 0;
+}

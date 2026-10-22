@@ -1,0 +1,37 @@
+//! `remove_at` gives an element of a `List` to the caller, which owns it now.
+//! It goes at the end of the caller's block, and the list tears down the rest
+//! at the end of its own, last to first.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+fn main() -> int
+{
+	let xs = List<Tracked>.new();
+	for i in 1..5 {
+		xs.push(Tracked { id: i });
+	}
+	{
+		let t = xs.remove_at(1);
+		say(f"took {t.id} left {xs.count}");
+	}
+	say(f"block done");
+	return 0;
+}

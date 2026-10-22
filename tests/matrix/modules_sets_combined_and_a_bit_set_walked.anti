@@ -1,0 +1,47 @@
+//! `union`, `intersect` and `minus` of two `Set<int>`, which keep the order of
+//! insertion, and a `BitSet` that walks its members in order.
+
+import anti.collection.set.{BitSet, Set};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn show(s: *Set<int>) -> int
+{
+	let sum = 0;
+	for x in s {
+		sum = sum * 10 + x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let a = Set<int>.new();
+	let b = Set<int>.new();
+	for x in 1..5 {
+		a.add(x);
+	}
+	b.add(4);
+	b.add(3);
+	b.add(7);
+	let u = a.union(b);
+	let i = a.intersect(b);
+	let m = a.minus(b);
+	say(f"{show(&u)} {show(&i)} {show(&m)} {i.is_subset(a)}");
+	let bits = BitSet.new();
+	bits.add(9);
+	bits.add(2);
+	bits.add(5);
+	let order = 0;
+	for n in bits {
+		order = order * 10 + n;
+	}
+	say(f"{order}");
+	return 0;
+}

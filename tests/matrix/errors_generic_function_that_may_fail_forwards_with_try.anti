@@ -1,0 +1,45 @@
+//! A generic `may fail` function fails on an empty slice and gives a copy of
+//! the first element otherwise. A second generic function forwards its failure
+//! with `try`, for `int` and for `str`.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn first<T>(xs: []T) -> T may fail
+{
+	if xs.len == 0 {
+		fail lang.Error.new(7, "empty");
+	}
+	return dup(xs[0]);
+}
+
+fn first_twice<T: add>(xs: []T) -> T may fail
+{
+	let a = try first(xs);
+	return a + a;
+}
+
+fn main() -> int
+{
+	let ns: [3]int = [21, 1, 2];
+	let ws: [1]str = ["w"];
+	let twice = first_twice(ns[0..3]) catch fatal;
+	let word = first(ws[0..1]) catch fatal;
+	say(f"{twice} {word}");
+	let none_left = first_twice(ns[0..0]) catch e {
+		say(f"code {e.code} {e.message}");
+		yield 0;
+	};
+	let w = first(ws[0..0]) catch {
+		yield "fallback";
+	};
+	say(f"{none_left} {w}");
+	return 0;
+}

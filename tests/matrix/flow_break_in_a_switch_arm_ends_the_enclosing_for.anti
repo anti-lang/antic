@@ -1,0 +1,34 @@
+//! A `break` in an arm of a `switch` inside a `for` ends the loop, and a
+//! `continue` there starts its next turn. A programmer from C++ reads the
+//! `break` as the end of the `switch`. Anti has no `break` of a `switch`.
+
+import anti.io;
+import anti.text;
+
+enum Kind { Add, Skip, Stop }
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let ops: [5]Kind = [Kind.Add, Kind.Skip, Kind.Add, Kind.Stop, Kind.Add];
+	let total = 0;
+	for i, k in ops {
+		switch k {
+			Kind.Add => total += 10,
+			Kind.Skip => {
+				continue;
+			},
+			Kind.Stop => {
+				break;
+			},
+		}
+		say(f"after {i}: {total}");
+	}
+	say(f"total {total}");
+	return 0;
+}

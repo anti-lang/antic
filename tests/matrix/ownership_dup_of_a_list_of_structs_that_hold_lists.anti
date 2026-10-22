@@ -1,0 +1,52 @@
+//! A `List` of a struct whose part is a `List<int>`, which makes the struct
+//! owning: `dup` of the outer list copies each inner list into room of its own,
+//! so a push through the copy leaves the original rows.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+struct Row
+{
+	name: str,
+	cells: List<int>,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn row(name: str, n: int) -> Row
+{
+	let r = Row { name: name, cells: List<int>.new() };
+	for i in 0..n {
+		r.cells.push(i + 1);
+	}
+	return r;
+}
+
+fn total(rows: *List<Row>) -> int
+{
+	let sum = 0;
+	for r in &rows {
+		for c in r.cells {
+			sum += c;
+		}
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let rows = List<Row>.new();
+	rows.push(row("a", 2));
+	rows.push(row("b", 3));
+	let copy = dup(rows);
+	copy.modify(1, fn(r) {
+		r.cells.push(99);
+	});
+	say(f"{total(&rows)} {total(&copy)} {copy.count}");
+	return 0;
+}

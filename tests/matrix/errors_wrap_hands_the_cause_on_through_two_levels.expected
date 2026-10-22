@@ -1,0 +1,4 @@
+exit 0
+8080: port 8080
+http: 40 bad port
+70000: 41 port too large

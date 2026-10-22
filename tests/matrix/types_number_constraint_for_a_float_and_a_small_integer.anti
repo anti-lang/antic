@@ -1,0 +1,38 @@
+//! A generic `clamp` and `lerp` under `T: Number` for `f32`, `i8` and `i32`,
+//! with owned parameters so the function may return them.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn clamp<T: Number>(own x: T, own lo: T, own hi: T) -> T
+{
+	if x < lo {
+		return lo;
+	}
+	if hi < x {
+		return hi;
+	}
+	return x;
+}
+
+fn lerp<T: Number>(a: T, b: T, num: T, den: T) -> T
+{
+	return a + (b - a) * num / den;
+}
+
+fn main() -> int
+{
+	let f: f32 = 1.75;
+	say(f"{clamp(f, 0.0, 1.0)} {clamp(-f, -1.0, 1.0)} {lerp(f, 3.75, 1.0, 4.0)}");
+	let s: i8 = -100;
+	say(f"{clamp(s, -50, 50)} {lerp(s, 20, 1, 4)}");
+	let u: i32 = 60000;
+	say(f"{clamp(u, 0, 1000)} {lerp(u, 0, 1, 3)}");
+	return 0;
+}

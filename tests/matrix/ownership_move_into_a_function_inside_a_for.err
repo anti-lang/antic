@@ -1,0 +1,1 @@
+ownership_move_into_a_function_inside_a_for.anti:21:8: error: `t` moves into `take` inside a loop, which would move it again

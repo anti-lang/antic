@@ -1,0 +1,61 @@
+//! A class implements two interfaces as named sub-objects. `&c` converts to a
+//! pointer of each, a function of each module-level helper calls through it,
+//! and the calls reach the one object.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+abstract class Named
+{
+	abstract fn name(self) -> str;
+}
+
+abstract class Counted
+{
+	abstract fn count(self) -> int;
+	abstract fn bump(self);
+}
+
+class Clicker
+{
+	implements n: Named,
+	implements c: Counted,
+	pub clicks: int = 0,
+
+	concrete fn Named::name(self) -> str
+	{
+		return "clicker";
+	}
+
+	concrete fn Counted::count(self) -> int
+	{
+		return self.clicks;
+	}
+
+	concrete fn Counted::bump(self)
+	{
+		self.clicks += 1;
+	}
+}
+
+fn show(n: *Named, c: *Counted)
+{
+	c.bump();
+	say(f"{n.name()} {c.count()}");
+}
+
+fn main() -> int
+{
+	let k = Clicker { };
+	show(&k, &k);
+	show(&k, &k);
+	k.clicks += 10;
+	show(&k, &k);
+	return 0;
+}

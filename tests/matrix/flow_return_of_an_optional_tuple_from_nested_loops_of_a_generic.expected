@@ -1,0 +1,4 @@
+exit 0
+int 3 4
+f64 0 2
+none

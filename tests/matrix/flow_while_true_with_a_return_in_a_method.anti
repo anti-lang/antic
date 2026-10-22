@@ -1,0 +1,42 @@
+//! A function of a class body whose `while true` has no `break` and leaves by
+//! `return` alone, so the function needs no `return` after the loop.
+
+import anti.io;
+import anti.text;
+
+class Collatz
+{
+	pub start: int = 1,
+
+	pub fn steps(self) -> int
+	{
+		let n = self.start;
+		let count = 0;
+		while true do {
+			if n == 1 {
+				return count;
+			}
+			if n % 2 == 0 {
+				n = n / 2;
+			} else {
+				n = 3 * n + 1;
+			}
+			count += 1;
+		}
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let c = Collatz { start: 27 };
+	say(f"27: {c.steps()}");
+	c.start = 6;
+	say(f"6: {c.steps()}");
+	return 0;
+}

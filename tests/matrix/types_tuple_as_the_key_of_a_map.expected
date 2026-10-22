@@ -1,0 +1,5 @@
+exit 0
+0 0 start
+2 -1 rock
+-3 4 tree
+true false 3

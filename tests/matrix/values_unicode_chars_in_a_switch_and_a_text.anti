@@ -1,0 +1,42 @@
+//! `char` literals with `\u{}` escapes: a `switch` on a `char` takes them as
+//! arms, `as u32` gives the scalar value, and an `f"..."` writes each character
+//! as UTF-8.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn kind(c: char) -> str
+{
+	switch c {
+		'\u{e9}' => {
+			return "e acute";
+		},
+		'\u{1F600}' => {
+			return "smile";
+		},
+		'a' => {
+			return "ascii";
+		},
+		else => {
+			return "other";
+		},
+	}
+}
+
+fn main() -> int
+{
+	let cs: [4]char = ['a', '\u{e9}', '\u{1F600}', '\u{3b1}'];
+	for c in cs {
+		say(f"{c} {c as u32} {kind(c)}");
+	}
+	let s = f"{cs[1]}{cs[2]}";
+	say(f"{s.len} {text.char_count(s)}");
+	free(s.ptr);
+	return 0;
+}

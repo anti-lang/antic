@@ -1,0 +1,32 @@
+//! `catch none` counts a failure as `none` where the result is a `?int`, and
+//! `??` then gives the fallback, the shape of a `TryParse` of C#.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn parse_opt(s: str) -> ?int may fail
+{
+	if s.len == 0 {
+		return none;
+	}
+	return try text.parse_int(s);
+}
+
+fn main() -> int
+{
+	let inputs: [4]str = ["12", "", "zz", "-3"];
+	let sum = 0;
+	for s in inputs {
+		let n = parse_opt(s) catch none;
+		sum += n ?? 100;
+		say(f"[{s}] {n == none}");
+	}
+	say(f"sum {sum}");
+	return 0;
+}

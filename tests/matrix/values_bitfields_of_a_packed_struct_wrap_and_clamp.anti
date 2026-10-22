@@ -1,0 +1,30 @@
+//! Bitfields of four bits in a packed struct: `+%=` wraps at the width, `+|=`
+//! clamps there, and the struct takes three bytes.
+
+import anti.io;
+import anti.text;
+
+packed struct Header
+{
+	kind: u8 : 4,
+	flags: u8 : 4,
+	len: u16,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let h = Header { kind: 15, flags: 14, len: 300 };
+	h.kind +%= 1;
+	h.flags +|= 5;
+	say(f"{h.kind} {h.flags} {h.len} {size_of(Header)}");
+	h.kind = 9;
+	h.flags -|= 20;
+	say(f"{h.kind} {h.flags}");
+	return 0;
+}

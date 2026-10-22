@@ -1,0 +1,24 @@
+//! `size_of` of copies of one generic struct follows C layout for each set of
+//! arguments, and a nested copy holds the other.
+
+import anti.io;
+import anti.text;
+
+struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	say(f"{size_of(Pair<u8, i64>)} {size_of(Pair<u8, u8>)} {size_of(Pair<i16, f32>)}");
+	say(f"{size_of(Pair<Pair<u8, u8>, u16>)} {size_of(Pair<str, ?int>)} {size_of(Pair<[3]u8, u8>)}");
+	return 0;
+}

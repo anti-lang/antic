@@ -1,0 +1,50 @@
+//! `dup` of a class with an `own []int` field copies the elements into room of
+//! its own, so a change through the copy leaves the original, and each frees
+//! its own buffer at the end of the block.
+
+import anti.io;
+import anti.text;
+
+class Buffer
+{
+	pub name: str = "",
+	own data: []int,
+
+	pub fn of(name: str, n: int) -> Buffer
+	{
+		let p = alloc(int, n) else {
+			io.exit(1);
+		};
+		let b = Buffer { name: name, data: []int { ptr: p, len: n } };
+		for i in 0..n {
+			b.data[i] = i * 3;
+		}
+		return b;
+	}
+
+	pub fn at(self, i: int) -> int
+	{
+		return self.data[i];
+	}
+
+	pub fn set(self, i: int, v: int)
+	{
+		self.data[i] = v;
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = Buffer.of("a", 4);
+	let b = dup(a);
+	b.set(1, 100);
+	b.name = "b";
+	say(f"{a.name} {a.at(1)} {b.name} {b.at(1)} {a.at(3)} {b.at(3)}");
+	return 0;
+}

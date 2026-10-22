@@ -1,0 +1,1 @@
+modules_private_function_of_a_library_module.anti:11:2: error: `pad` is private to `Builder`

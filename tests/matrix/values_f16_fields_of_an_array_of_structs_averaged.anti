@@ -1,0 +1,33 @@
+//! An array of structs with an `f16` field: each write takes `as f16`, each
+//! read gives an `f32`, and the average is exact for these values.
+
+import anti.io;
+import anti.text;
+
+struct Sample
+{
+	id: int,
+	t: f16,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let s: [4]Sample = [Sample { id: 0, t: 0.0 as f16 }; 4];
+	let values: [4]f32 = [1.5, 2.25, 0.125, 100.0];
+	for i in 0..4 {
+		s[i].id = i;
+		s[i].t = values[i] as f16;
+	}
+	let sum: f32 = 0.0;
+	for x in s {
+		sum += x.t;
+	}
+	say(f"{sum} {sum / 4.0} {s[3].t}");
+	return 0;
+}

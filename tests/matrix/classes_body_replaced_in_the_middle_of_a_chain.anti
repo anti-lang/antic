@@ -1,0 +1,51 @@
+//! A chain of three classes where the middle one replaces a function and the
+//! last does not: a call through a pointer to the base on an object of the last
+//! class reaches the middle body.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Logger
+{
+	pub fn prefix(self) -> str
+	{
+		return "plain";
+	}
+
+	pub fn line(self, n: int) -> int
+	{
+		say(f"{self.prefix()} {n}");
+		return n;
+	}
+}
+
+class Timed inherits Logger
+{
+	concrete fn prefix(self) -> str
+	{
+		return "timed";
+	}
+}
+
+class Quiet inherits Timed
+{
+	pub level: int = 0,
+}
+
+fn main() -> int
+{
+	let q = Quiet { };
+	let l: *Logger = &q;
+	l.line(1);
+	let t: *Timed = &q;
+	t.line(2);
+	let plain = Logger { };
+	plain.line(3);
+	return 0;
+}

@@ -1,0 +1,5 @@
+exit 0
+(()(())): depth 3
+((x)): unexpected byte at 2
+((): unclosed at 3
+()(): depth 1

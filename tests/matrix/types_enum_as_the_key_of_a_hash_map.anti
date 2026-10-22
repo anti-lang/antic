@@ -1,0 +1,26 @@
+//! An enum as the key of a `HashMap`: every type meets `hash` and an enum meets
+//! `eq`, so counting by colour needs no code of its own.
+
+import anti.collection.map.{HashMap};
+import anti.io;
+import anti.text;
+
+enum Color { Red, Green, Blue }
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let seen: [7]Color = [Color.Red, Color.Blue, Color.Red, Color.Green, Color.Red, Color.Blue, Color.Red];
+	let counts = HashMap<Color, int>.new();
+	for c in seen {
+		let n = counts.get(c) ?? 0;
+		counts.set(c, n + 1);
+	}
+	say(f"{counts.get(Color.Red) ?? 0} {counts.get(Color.Green) ?? 0} {counts.get(Color.Blue) ?? 0} {counts.count}");
+	return 0;
+}

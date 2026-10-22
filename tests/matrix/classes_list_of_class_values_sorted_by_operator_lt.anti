@@ -1,0 +1,37 @@
+//! A class with `operator fn lt` meets `Ordered` with its default `==`, so
+//! `sort` of a `List` of its values orders them by the operator.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Person
+{
+	pub name: str = "",
+	pub age: int = 0,
+
+	operator fn lt(self, o: Person) -> bool
+	{
+		return self.age < o.age;
+	}
+}
+
+fn main() -> int
+{
+	let people = List<Person>.new();
+	people.push(Person { name: "ann", age: 41 });
+	people.push(Person { name: "bo", age: 7 });
+	people.push(Person { name: "cy", age: 66 });
+	people.push(Person { name: "di", age: 23 });
+	people.sort();
+	for p in people {
+		say(f"{p.name} {p.age}");
+	}
+	return 0;
+}

@@ -1,0 +1,41 @@
+//! A variant with a case that holds a class with a `destruct`: `=` of a fresh
+//! literal in a loop tears down the case the local held first, and the end of
+//! the block tears down the last one.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+variant Slot
+{
+	Holding { t: Tracked },
+	Empty,
+}
+
+fn main() -> int
+{
+	let s = Slot.Empty;
+	for i in 1..4 {
+		s = Slot.Holding { t: Tracked { id: i } };
+		say(f"set {i}");
+	}
+	s = Slot.Empty;
+	say(f"emptied");
+	s = Slot.Holding { t: Tracked { id: 9 } };
+	return 0;
+}

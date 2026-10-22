@@ -1,0 +1,34 @@
+//! A bubble sort of a fixed array of `str` with `<`, which compares the bytes,
+//! so capitals come first, and `==` that compares the text.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let words: [5]str = ["pear", "apple", "Apple", "banana", "Banana"];
+	for i in 0..words.len {
+		for j in 0..words.len - 1 - i {
+			if words[j + 1] < words[j] {
+				let t = words[j];
+				words[j] = words[j + 1];
+				words[j + 1] = t;
+			}
+		}
+	}
+	for w in words {
+		say(f"{w}");
+	}
+	let joined = f"{words[0]}{words[2]}";
+	if joined == "Appleapple" {
+		say(f"equal text");
+	}
+	free(joined.ptr);
+	return 0;
+}

@@ -1,0 +1,44 @@
+//! The default `==` of a copy of a generic variant, `Maybe<str>` and
+//! `Maybe<Point>`, reached through a generic function with `T: eq`, which
+//! compares the case and then its fields, a `str` by its text.
+
+import anti.io;
+import anti.text;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+variant Maybe<T>
+{
+	Some { value: T },
+	Nothing,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn same<T: eq>(a: T, b: T) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	let built = f"ab{1}";
+	let a = Maybe<str>.Some { value: "ab1" };
+	let b = Maybe<str>.Some { value: built };
+	let c = Maybe<str>.Some { value: "ab2" };
+	let d = Maybe<str>.Nothing;
+	say(f"{same(a, b)} {same(a, c)} {same(a, d)} {same(d, Maybe<str>.Nothing)}");
+	let p = Maybe<Point>.Some { value: Point { x: 1, y: 2 } };
+	let q = Maybe<Point>.Some { value: Point { x: 1, y: 2 } };
+	say(f"{same(p, q)} {p == q} {same(p, Maybe<Point>.Nothing)}");
+	free(built.ptr);
+	return 0;
+}

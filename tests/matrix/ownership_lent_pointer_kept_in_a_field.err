@@ -1,0 +1,1 @@
+ownership_lent_pointer_kept_in_a_field.anti:15:15: error: `p` is lent for the call and cannot be stored

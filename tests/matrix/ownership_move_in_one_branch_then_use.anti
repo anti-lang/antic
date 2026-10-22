@@ -1,0 +1,24 @@
+//! A move of an owning local in one branch of an `if` and a use after the `if`
+//! is refused, since the branch may have run.
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own t: Texture)
+{
+}
+
+fn main(args: []str) -> int
+{
+	let t = Texture { id: 7 };
+	if args.len > 1 {
+		take(t);
+	}
+	return t.id;
+}

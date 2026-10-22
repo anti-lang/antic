@@ -1,0 +1,8 @@
+exit 3
+# daily
+row 0
+row 1
+end
+# weekly
+row 0
+signed

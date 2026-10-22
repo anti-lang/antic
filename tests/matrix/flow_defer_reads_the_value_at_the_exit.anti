@@ -1,0 +1,24 @@
+//! A `defer` runs its statement at the exit of the block, so it reads the value
+//! a local holds then and not the value it held when the `defer` stood. A
+//! programmer from Go expects the arguments to be read early.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let state = 1;
+	{
+		defer say(f"state at exit {state}");
+		state = 2;
+		state *= 5;
+	}
+	say(f"after the block {state}");
+	return 0;
+}

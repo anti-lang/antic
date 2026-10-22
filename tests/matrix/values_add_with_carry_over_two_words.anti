@@ -1,0 +1,29 @@
+//! A 128-bit addition over two `u64` words: the flags form gives the carry of
+//! the low word, and the high word adds it in, `a + b + f.carry`.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn add128(a_hi: u64, a_lo: u64, b_hi: u64, b_lo: u64) -> (u64, u64)
+{
+	let (lo, f) = a_lo + b_lo;
+	let hi = a_hi + b_hi + f.carry;
+	return (hi, lo);
+}
+
+fn main() -> int
+{
+	let (h1, l1) = add128(0, 0xFFFF_FFFF_FFFF_FFFF, 0, 1);
+	say(f"{h1} {l1}");
+	let (h2, l2) = add128(5, 0x8000_0000_0000_0000, 2, 0x8000_0000_0000_0001);
+	say(f"{h2} {l2}");
+	let (h3, l3) = add128(1, 2, 3, 4);
+	say(f"{h3} {l3}");
+	return 0;
+}

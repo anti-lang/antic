@@ -1,0 +1,45 @@
+//! A `fn(str) -> int may fail` parameter: the helper calls it with `try` and
+//! forwards the failure, and a named function and an anonymous one both pass as
+//! its argument.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn apply_all(xs: []str, f: fn(str) -> int may fail) -> int may fail
+{
+	let sum = 0;
+	for x in xs {
+		sum += try f(x);
+	}
+	return sum;
+}
+
+fn strict(s: str) -> int may fail
+{
+	return try text.parse_int(s);
+}
+
+fn main() -> int
+{
+	let good: [2]str = ["4", "5"];
+	let bad: [3]str = ["4", "q", "5"];
+	let all = apply_all(good[0..2], strict) catch fatal;
+	say(f"{all}");
+	let r = apply_all(bad[0..3], strict) catch {
+		yield -1;
+	};
+	let lenient = apply_all(bad[0..3], fn(s: str) -> int may fail {
+		if s.len == 1 && s[0] == 'q' as u32 as u8 {
+			return 0;
+		}
+		return try text.parse_int(s);
+	}) catch fatal;
+	say(f"{r} {lenient}");
+	return 0;
+}

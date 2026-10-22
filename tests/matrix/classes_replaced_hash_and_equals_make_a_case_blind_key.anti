@@ -1,0 +1,60 @@
+//! A class replaces `hash` and `equals` so two names that differ in case are
+//! one key of a `HashMap`, as `hashCode` and `equals` do in Java.
+
+import anti.collection.map.{HashMap};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn lower(b: byte) -> u64
+{
+	if b >= 65 && b <= 90 {
+		return (b + 32) as u64;
+	}
+	return b as u64;
+}
+
+class Name
+{
+	pub text: str = "",
+
+	concrete fn hash(self) -> u64
+	{
+		let h: u64 = 14695981039346656037;
+		for i in 0..self.text.len {
+			h = (h ^ lower(self.text[i])) *% 1099511628211;
+		}
+		return h;
+	}
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		let n = other as? *Name else {
+			return false;
+		};
+		if n.text.len != self.text.len {
+			return false;
+		}
+		for i in 0..self.text.len {
+			if lower(n.text[i]) != lower(self.text[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+fn main() -> int
+{
+	let ages = HashMap<Name, int>.new();
+	ages.set(Name { text: "Ann" }, 41);
+	ages.set(Name { text: "ANN" }, 42);
+	ages.set(Name { text: "bo" }, 7);
+	say(f#"{ages.count} {ages.get(Name { text: "aNn" }) ?? -1} {ages.get(Name { text: "BO" }) ?? -1}"#);
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! A `Ring<int, 3>` allocates nothing after it is made: `push` gives `false`
+//! when it is full, `pop` gives the oldest, and room comes back.
+
+import anti.collection.ring.{Ring};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let r = Ring<int, 3>.new();
+	let pushed = 0;
+	for i in 1..6 {
+		if r.push(i * 10) {
+			pushed += 1;
+		}
+	}
+	let a = r.pop() ?? 0;
+	let again = r.push(99);
+	let b = r.pop() ?? 0;
+	say(f"{pushed} {a} {again} {b} {r.is_full()} {r.peek() ?? 0}");
+	return 0;
+}

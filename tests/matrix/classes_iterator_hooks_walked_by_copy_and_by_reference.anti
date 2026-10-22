@@ -1,0 +1,53 @@
+//! A class with `iter` and an iterator class with `next` and `value`: `for x in
+//! c` walks copies, and with a `value` that gives a `lent` pointer `for x in
+//! &c` changes the elements in place.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Team
+{
+	pub scores: [3]int = [0; 3],
+
+	operator fn iter(self) -> TeamWalk
+	{
+		return TeamWalk { team: self, at: -1 };
+	}
+}
+
+class TeamWalk
+{
+	pub team: *Team,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < 3;
+	}
+
+	operator fn value(self) -> lent *int
+	{
+		return &self.team.scores[self.at];
+	}
+}
+
+fn main() -> int
+{
+	let t = Team { scores: [5, 7, 9] };
+	for s in &t {
+		*s += 1;
+	}
+	let sum = 0;
+	for s in t {
+		sum += s;
+	}
+	say(f"{t.scores[0]} {t.scores[2]} {sum}");
+	return 0;
+}

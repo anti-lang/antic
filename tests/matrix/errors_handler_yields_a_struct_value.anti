@@ -1,0 +1,38 @@
+//! The handler of a call whose result is a struct ends with `yield` of a struct
+//! literal, and the local takes it as it takes the result.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+struct Config
+{
+	port: int,
+	host: str,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn load(name: str) -> Config may fail
+{
+	if name.len > 4 {
+		fail lang.Error.new(2, "unknown");
+	}
+	return Config { port: name.len * 1000, host: name };
+}
+
+fn main() -> int
+{
+	let names: [2]str = ["dev", "staging"];
+	for n in names {
+		let c = load(n) catch {
+			yield Config { port: 80, host: "localhost" };
+		};
+		say(f"{c.host}:{c.port}");
+	}
+	return 0;
+}

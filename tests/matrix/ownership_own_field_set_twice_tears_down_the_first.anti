@@ -1,0 +1,50 @@
+//! `=` to an `own ?*Item` field deletes the object the field held, as a
+//! `unique_ptr` does, so setting it twice in a method drops the first object at
+//! once and the second with the holder.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Item
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop item {self.id}");
+	}
+}
+
+class Holder
+{
+	own item: ?*Item = none,
+
+	pub fn put(self, id: int)
+	{
+		self.item = alloc Item { id: id };
+	}
+
+	pub fn clear(self)
+	{
+		self.item = none;
+	}
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	h.put(1);
+	h.put(2);
+	say(f"two set");
+	h.clear();
+	say(f"cleared");
+	h.put(3);
+	say(f"end");
+	return 0;
+}

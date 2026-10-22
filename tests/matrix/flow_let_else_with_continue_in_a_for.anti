@@ -1,0 +1,44 @@
+//! `let ... else { continue; }` in the body of a `for` skips the turns whose
+//! lookup gives `none`. The lookup is a `switch` on an `int` whose arms return
+//! a `str` and whose `else` returns `none`.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn lookup(k: int) -> ?str
+{
+	switch k {
+		1 => {
+			return "one";
+		},
+		3 => {
+			return "three";
+		},
+		4 => {
+			return "four";
+		},
+		else => {
+			return none;
+		},
+	}
+}
+
+fn main() -> int
+{
+	let hits = 0;
+	for k in 0..6 {
+		let name = lookup(k) else {
+			continue;
+		};
+		hits += 1;
+		say(f"{k} {name}");
+	}
+	say(f"hits {hits}");
+	return 0;
+}

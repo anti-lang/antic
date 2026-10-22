@@ -1,0 +1,19 @@
+//! `destroy(&v)` of a local moves it out, so naming the local afterwards is
+//! refused, as a programmer who calls a destructor in C++ by hand would like
+//! the compiler to say.
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let t = Texture { id: 7 };
+	destroy(&t);
+	return t.id;
+}

@@ -1,0 +1,25 @@
+//! Literals at the ends of `u64` and `i64` with `_` separators, a wrapping add
+//! past the top of `u64` and the least `i64` written out.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let top: u64 = 0xFFFF_FFFF_FFFF_FFFF;
+	say(f"{top}");
+	say(f"{top +% 1} {top -% top}");
+	let least: i64 = -9_223_372_036_854_775_808;
+	let most: i64 = 9_223_372_036_854_775_807;
+	say(f"{least} {most}");
+	say(f"{least +% -1}");
+	let half = top / 2;
+	say(f"{half} {half as i64 == most}");
+	return 0;
+}

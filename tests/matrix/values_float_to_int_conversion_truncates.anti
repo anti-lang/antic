@@ -1,0 +1,22 @@
+//! `as` from `f64` to `int` and `i32` truncates toward zero for both signs, and
+//! `as` from `int` to `f32` rounds to the nearest float.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let xs: [4]f64 = [2.9, -2.9, 0.5, -0.5];
+	for x in xs {
+		say(f"{x as int} {x as i32}");
+	}
+	let big = 16777217;
+	say(f"{big as f32}");
+	return 0;
+}

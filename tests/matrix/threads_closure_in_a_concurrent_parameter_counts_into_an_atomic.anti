@@ -1,0 +1,49 @@
+//! A closure passed through a `concurrent` parameter reaches the workers of a
+//! `parallel` and changes an atomic local it captures, the one kind of captured
+//! variable it may change.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn apply(chunk: []int, concurrent f: fn(int)) -> int
+{
+	for x in chunk {
+		f(x);
+	}
+	return chunk.len;
+}
+
+fn for_each(xs: []int, concurrent f: fn(int)) -> int
+{
+	let parts = parallel xs by 4 -> apply(f);
+	let n = 0;
+	for p in parts {
+		n += p;
+	}
+	free(parts.ptr);
+	return n;
+}
+
+fn main() -> int
+{
+	let xs: [64]int = [0; 64];
+	for i in 0..64 {
+		xs[i] = i;
+	}
+	let evens: atomic int = 0;
+	let sum: atomic int = 0;
+	let seen = for_each(xs[0..64], fn(x) {
+		if x % 2 == 0 {
+			evens.add(1);
+		}
+		sum.add(x);
+	});
+	say(f"{seen} {evens.load()} {sum.load()}");
+	return 0;
+}

@@ -1,0 +1,27 @@
+//! A `Pair<Pair<int, str>, ?int>` built by a literal whose arguments the type
+//! of the local gives, read field by field and compared with `==`.
+
+import anti.io;
+import anti.text;
+
+struct Pair<A, B>
+{
+	first: A,
+	second: B,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let p: Pair<Pair<int, str>, ?int> = Pair { first: Pair { first: 7, second: "seven" }, second: none };
+	let q = Pair<Pair<int, str>, ?int> { first: Pair<int, str> { first: 7, second: "seven" }, second: 3 };
+	say(f"{p.first.first} {p.first.second} {p.second == none} {q.second ?? 0}");
+	q.second = none;
+	say(f"{p == q}");
+	return 0;
+}

@@ -1,0 +1,32 @@
+//! A `defer` in a loop body calls a helper with an anonymous function that
+//! reads the loop variable and a local of the turn. The closure runs at the end
+//! of each turn, by R004 of "Rules of 2026-10-13".
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn run(f: fn())
+{
+	f();
+}
+
+fn main() -> int
+{
+	let total = 0;
+	for i in 1..4 {
+		let square = i * i;
+		defer run(fn() {
+			total += square;
+			say(f"turn {i} adds {square}");
+		});
+		square += 1;
+	}
+	say(f"total {total}");
+	return 0;
+}

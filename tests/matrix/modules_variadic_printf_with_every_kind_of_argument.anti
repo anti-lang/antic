@@ -1,0 +1,17 @@
+//! `printf` of the C library with a `c_int`, a `c_long`, an `f64`, a `str`
+//! through its `.ptr`, a `char` widened to `c_int` and a `u64`, the arguments a
+//! variadic C function takes.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let n: c_int = -12;
+	let l: c_long = 123456789;
+	let x = 2.5;
+	let s = "anti";
+	let c = 'Z';
+	let u: u64 = 18446744073709551615;
+	printf("%d %ld %.2f %s %c %llu\n".ptr, n, l, x, s.ptr, c as u32 as c_int, u);
+	return 0;
+}

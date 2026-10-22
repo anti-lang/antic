@@ -1,0 +1,22 @@
+//! `?.` on a `?T` field of the loop variable of a `for` that reads a `str`
+//! field is refused: the result of `?.` is a pointer, and a programmer from C#
+//! writes the `?.` of a field of any type.
+
+struct Address
+{
+	city: str,
+}
+
+struct User
+{
+	addr: ?Address,
+}
+
+fn main() -> int
+{
+	let users: [1]User = [User { addr: none }];
+	for u in users {
+		let city = u.addr?.city ?? "unknown";
+	}
+	return 0;
+}

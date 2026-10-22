@@ -1,0 +1,54 @@
+//! A worker sends structs through a `chan Point` smaller than what passes
+//! through it and closes it, and `main` receives until the channel is closed
+//! and empty.
+
+import anti.io;
+import anti.text;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Source
+{
+	pub n: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn produce(s: *Source, out: chan Point) -> int
+{
+	for i in 0..s.n {
+		send(out, Point { x: i, y: i * i });
+	}
+	close(out);
+	return s.n;
+}
+
+fn main() -> int
+{
+	let c = chan Point(2);
+	let s = alloc Source { n: 50 };
+	let job = dispatch s -> produce(c);
+	let sx = 0;
+	let sy = 0;
+	let count = 0;
+	while true do {
+		let p = recv(c) else {
+			break;
+		};
+		sx += p.x;
+		sy += p.y;
+		count += 1;
+	}
+	say(f"{join(job)} {count} {sx} {sy}");
+	delete(c);
+	delete(s);
+	return 0;
+}

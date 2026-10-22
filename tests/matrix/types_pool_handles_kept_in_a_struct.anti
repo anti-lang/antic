@@ -1,0 +1,32 @@
+//! Handles of a `Pool<str>` kept in the fields of a struct: a removed slot
+//! finds nothing through its stale handle, and a new element takes the slot
+//! under another generation.
+
+import anti.collection.pool.{Handle, Pool};
+import anti.io;
+import anti.text;
+
+struct Team
+{
+	lead: Handle<str>,
+	second: Handle<str>,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let staff = Pool<str>.new();
+	let t = Team { lead: staff.add("ann"), second: staff.add("bo") };
+	say(f#"{staff.get(t.lead) ?? "-"} {staff.get(t.second) ?? "-"}"#);
+	let gone = staff.remove(t.lead) ?? "-";
+	let fresh = staff.add("cy");
+	say(f#"{gone} {staff.get(t.lead) ?? "-"} {staff.get(fresh) ?? "-"} {staff.contains(t.lead)}"#);
+	staff.set(t.second, "bea");
+	say(f#"{staff.get(t.second) ?? "-"} {staff.count}"#);
+	return 0;
+}

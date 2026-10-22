@@ -1,0 +1,41 @@
+//! `import anti.text as t;` renames the module, and the alias names its items
+//! inside a generic function and inside a closure in it.
+
+import anti.io;
+import anti.text as t;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn joined<T>(xs: []T, f: fn(T) -> str) -> str
+{
+	let b = t.Builder.new();
+	for i, x in xs {
+		if i > 0 {
+			b.append(", ");
+		}
+		b.append(f(x));
+	}
+	return b.take();
+}
+
+fn main() -> int
+{
+	let ns: [3]int = [1, 22, 333];
+	let digits = 0;
+	let s = joined(ns[0..3], fn(n) {
+		let b = t.Builder.new();
+		b.append_int(n);
+		digits += b.len();
+		if t.equal(b.text(), "22") {
+			return "twenty-two";
+		}
+		return "number";
+	});
+	say(f"{s} / {digits}");
+	free(s.ptr);
+	return 0;
+}

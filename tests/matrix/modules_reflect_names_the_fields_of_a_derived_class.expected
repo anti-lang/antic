@@ -1,0 +1,6 @@
+exit 0
+Circle
+field r
+field label
+parent Shape
+base field x

@@ -1,0 +1,53 @@
+//! `as? *T` in a loop over base pointers gives `none` for the objects of
+//! another class, `is` tests the class, and `as` converts where the test proved
+//! it.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Node
+{
+	pub id: int = 0,
+}
+
+class Leaf inherits Node
+{
+	pub value: int = 0,
+}
+
+class Branch inherits Node
+{
+	pub kids: int = 0,
+}
+
+class Twig inherits Branch
+{
+}
+
+fn main() -> int
+{
+	let a = Leaf { id: 1, value: 10 };
+	let b = Branch { id: 2, kids: 3 };
+	let c = Twig { id: 3, kids: 1 };
+	let d = Leaf { id: 4, value: 20 };
+	let all: [4]*Node = [&a, &b, &c, &d];
+	let leaves = 0;
+	let kids = 0;
+	for n in all {
+		if let l = n as? *Leaf {
+			leaves += l.value;
+		} else if n is *Branch {
+			let br = n as *Branch;
+			kids += br.kids;
+			say(f"branch {br.id} twig {n is *Twig}");
+		}
+	}
+	say(f"{leaves} {kids}");
+	return 0;
+}

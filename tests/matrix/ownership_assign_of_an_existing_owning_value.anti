@@ -1,0 +1,19 @@
+//! `=` that copies an existing value with an owning part is refused: a
+//! programmer from C++ expects a copy assignment, and Anti asks for `dup`.
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let a = Texture { id: 1 };
+	let b = Texture { id: 2 };
+	b = a;
+	return b.id;
+}

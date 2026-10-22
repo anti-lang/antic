@@ -1,0 +1,7 @@
+exit 0
+3 inner ok
+3 outer ok
+6 inner caught 6
+6 outer ok
+9 inner caught 9
+9 outer caught 9

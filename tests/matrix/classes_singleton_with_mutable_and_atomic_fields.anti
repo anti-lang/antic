@@ -1,0 +1,40 @@
+//! A singleton holds a plain field fixed after creation, a `mutable` field
+//! written from functions and an atomic counter, and every `get` reaches the
+//! one instance.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+singleton class Settings
+{
+	path: str = "app.toml",
+	mutable title: str = "untitled",
+	atomic reads: int = 0,
+
+	pub fn read_path(self) -> str
+	{
+		self.reads.add(1);
+		return self.path;
+	}
+}
+
+fn rename(t: str)
+{
+	Settings.get().title = t;
+}
+
+fn main() -> int
+{
+	let a = Settings.get().read_path();
+	rename("report");
+	let s = Settings.get();
+	let b = s.read_path();
+	say(f"{a} {b} {s.title} {Settings.get().reads.load()}");
+	return 0;
+}

@@ -1,0 +1,38 @@
+//! Brightness of the pixels of an image: `+|` and `-|=` on the `u8` elements of
+//! an array field of a struct, and `*|` on an `i8`.
+
+import anti.io;
+import anti.text;
+
+struct Image
+{
+	px: [4]u8,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn show(img: *Image)
+{
+	say(f"{img.px[0]} {img.px[1]} {img.px[2]} {img.px[3]}");
+}
+
+fn main() -> int
+{
+	let img = Image { px: [10, 200, 155, 156] };
+	for i in 0..4 {
+		img.px[i] = img.px[i] +| 100;
+	}
+	show(&img);
+	for i in 0..4 {
+		img.px[i] -|= 60;
+	}
+	show(&img);
+	let gain: i8 = -100;
+	let twice = gain *| 2;
+	say(f"{twice}");
+	return 0;
+}

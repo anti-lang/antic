@@ -1,0 +1,40 @@
+//! A generic function returns a `?(int, int)` from inside two nested `for`
+//! loops, for an `int` and an `f64` copy, and `none` after both loops.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn find_pair<T: add + eq>(xs: []T, target: T) -> ?(int, int)
+{
+	for i in 0..xs.len {
+		for j in i + 1..xs.len {
+			if xs[i] + xs[j] == target {
+				return (i, j);
+			}
+		}
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let a: [5]int = [3, 8, 1, 9, 4];
+	if let p = find_pair(a[0..5], 13) {
+		say(f"int {p.0} {p.1}");
+	}
+	let f: [3]f64 = [0.5, 1.25, 2.0];
+	if let p = find_pair(f[0..3], 2.5) {
+		say(f"f64 {p.0} {p.1}");
+	}
+	let missing = find_pair(a[0..5], 100);
+	if missing == none {
+		say(f"none");
+	}
+	return 0;
+}

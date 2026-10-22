@@ -1,0 +1,67 @@
+//! `select` over two channels that two dispatched workers fill and close: an
+//! arm takes `none` from a channel once it is closed and empty, and the loop
+//! ends when both are.
+
+import anti.io;
+import anti.text;
+
+class Producer
+{
+	pub first: int = 0,
+	pub count: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn produce(p: *Producer, out: chan int) -> int
+{
+	for i in 0..p.count {
+		send(out, p.first + i);
+	}
+	close(out);
+	return p.count;
+}
+
+fn main() -> int
+{
+	let a = chan int(3);
+	let b = chan int(1);
+	let pa = alloc Producer { first: 1, count: 40 };
+	let pb = alloc Producer { first: 1000, count: 25 };
+	let ja = dispatch pa -> produce(a);
+	let jb = dispatch pb -> produce(b);
+	let a_open = true;
+	let b_open = true;
+	let sum = 0;
+	let got = 0;
+	while a_open || b_open do {
+		select {
+			a x => {
+				if let v = x {
+					sum += *v;
+					got += 1;
+				} else {
+					a_open = false;
+				}
+			},
+			b y => {
+				if let v = y {
+					sum += *v;
+					got += 1;
+				} else {
+					b_open = false;
+				}
+			},
+		}
+	}
+	say(f"{join(ja)} {join(jb)} {got} {sum}");
+	delete(a);
+	delete(b);
+	delete(pa);
+	delete(pb);
+	return 0;
+}

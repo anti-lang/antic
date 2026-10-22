@@ -1,0 +1,48 @@
+//! A `SpscRing<int, 8>` passes a thousand values from one dispatched worker to
+//! `main`: the worker retries a `push` while the ring is full, and `main`
+//! retries a `pop` while it is empty.
+
+import anti.collection.concurrent.{SpscRing};
+import anti.io;
+import anti.text;
+
+class Feeder
+{
+	pub count: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn feed(f: *Feeder, ring: *SpscRing<int, 8>) -> int
+{
+	for i in 0..f.count {
+		while !ring.push(i) do { }
+	}
+	return f.count;
+}
+
+fn main() -> int
+{
+	let ring = SpscRing<int, 8>.new();
+	let f = alloc Feeder { count: 1000 };
+	let job = dispatch f -> feed(&ring);
+	let sum = 0;
+	let got = 0;
+	let in_order = true;
+	while got < 1000 do {
+		if let v = ring.pop() {
+			if v != got {
+				in_order = false;
+			}
+			sum += v;
+			got += 1;
+		}
+	}
+	say(f"{join(job)} {got} {sum} {in_order}");
+	delete(f);
+	return 0;
+}

@@ -1,0 +1,34 @@
+//! `f"..."` writes a class value and a pointer to one with their `to_text`,
+//! which a class replaces with a text of its own, and a width pads it as it
+//! pads a `str`.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Money
+{
+	pub cents: int = 0,
+
+	concrete fn to_text(self) -> str
+	{
+		if self.cents < 0 {
+			return "debt";
+		}
+		return "money";
+	}
+}
+
+fn main() -> int
+{
+	let m = Money { cents: 250 };
+	let d = Money { cents: -5 };
+	let p = &d;
+	say(f"[{m}] [{p}] [{m:>7}] [{d:<6}]");
+	return 0;
+}

@@ -1,0 +1,26 @@
+//! The `Duration` of `anti.time` built from three units, added, converted back,
+//! and `between` two readings, with `now` read twice in order.
+
+import anti.io;
+import anti.text;
+import anti.time;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = time.seconds(2);
+	let b = time.milliseconds(1500);
+	let c = time.microseconds(250000);
+	let sum = time.add(time.add(a, b), c);
+	say(f"{time.as_milliseconds(sum)} {time.as_seconds(sum)}");
+	let first = time.now();
+	let second = time.now();
+	let d = time.between(second, first);
+	say(f"{time.as_milliseconds(d) >= 0} {time.as_seconds(time.between(4000000000, 0))}");
+	return 0;
+}

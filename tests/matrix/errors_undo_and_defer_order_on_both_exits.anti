@@ -1,0 +1,35 @@
+//! In one block, every `undo` runs before the `defer` statements, last declared
+//! first, on the fail path. On `return` no `undo` runs and the `defer`
+//! statements still do.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn step(n: int) -> int may fail
+{
+	defer say(f"defer one {n}");
+	undo say(f"undo one {n}");
+	defer say(f"defer two {n}");
+	undo say(f"undo two {n}");
+	if n < 0 {
+		fail "negative";
+	}
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let a = step(4) catch fatal;
+	say(f"got {a}");
+	let b = step(-1) catch {
+		yield 0;
+	};
+	say(f"got {b}");
+	return 0;
+}

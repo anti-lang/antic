@@ -1,0 +1,9 @@
+exit 0
+defer two 4
+defer one 4
+got 8
+undo two -1
+undo one -1
+defer two -1
+defer one -1
+got 0

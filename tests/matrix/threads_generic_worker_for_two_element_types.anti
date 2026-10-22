@@ -1,0 +1,32 @@
+//! A generic worker with `T: add` summing the chunks of a `parallel` for an
+//! `int` and an `f64` slice, with the zero passed as an argument.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn total<T: add>(chunk: []T, zero: T) -> T
+{
+	let sum = dup(zero);
+	for x in chunk {
+		sum = sum + x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let ints: [6]int = [1, 2, 3, 4, 5, 6];
+	let floats: [4]f64 = [0.5, 0.25, 0.125, 2.0];
+	let a = parallel ints[0..6] by 2 -> total(0);
+	let b = parallel floats[0..4] by 2 -> total(0.0);
+	say(f"{a[0] + a[1]} {b[0] + b[1]}");
+	free(a.ptr);
+	free(b.ptr);
+	return 0;
+}

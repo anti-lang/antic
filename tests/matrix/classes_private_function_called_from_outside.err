@@ -1,0 +1,1 @@
+classes_private_function_called_from_outside.anti:17:9: error: `open` is private to `Vault`

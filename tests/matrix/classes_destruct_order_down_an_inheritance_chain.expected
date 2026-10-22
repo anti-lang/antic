@@ -1,0 +1,10 @@
+exit 0
+derived
+base
+part of derived
+part of base
+--
+derived
+base
+part of derived
+part of base

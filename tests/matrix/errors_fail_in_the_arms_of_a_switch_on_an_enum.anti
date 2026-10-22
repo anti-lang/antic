@@ -1,0 +1,46 @@
+//! `fail` stands in the arms of a `switch` on an enum, and an arm that returns
+//! beside them. With every arm ending the path, the `switch` ends the function.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+enum Op { Add, Div, Halt }
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn run(op: Op, a: int, b: int) -> int may fail
+{
+	switch op {
+		Op.Add => {
+			return a + b;
+		},
+		Op.Div => {
+			if b == 0 {
+				fail lang.Error.new(3, "division by zero");
+			}
+			return a / b;
+		},
+		Op.Halt => {
+			fail "halt";
+		},
+	}
+}
+
+fn main() -> int
+{
+	let ops: [4]Op = [Op.Add, Op.Div, Op.Div, Op.Halt];
+	let bs: [4]int = [2, 4, 0, 1];
+	for i, op in ops {
+		let r = run(op, 20, bs[i]) catch e {
+			say(f"{i}: {e.code} {e.message}");
+			yield -1;
+		};
+		say(f"{i} = {r}");
+	}
+	return 0;
+}

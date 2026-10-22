@@ -1,0 +1,50 @@
+//! A struct holds a fixed array of variant values. A loop writes cases into the
+//! array field through a pointer, and a `switch` reads each back.
+
+import anti.io;
+import anti.text;
+
+variant Slot
+{
+	Free,
+	Used { owner: int, weight: f64 },
+}
+
+struct Shelf
+{
+	name: str,
+	slots: [4]Slot,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn fill(s: *Shelf)
+{
+	for i in 0..4 {
+		if i % 2 == 1 {
+			s.slots[i] = Slot.Used { owner: i * 10, weight: i as f64 * 1.5 };
+		}
+	}
+}
+
+fn main() -> int
+{
+	let s = Shelf { name: "top", slots: [Slot.Free; 4] };
+	fill(&s);
+	let total = 0.0;
+	for i, slot in s.slots {
+		switch slot {
+			Free => say(f"{i} free"),
+			Used u => {
+				total += u.weight;
+				say(f"{i} owner {u.owner}");
+			},
+		}
+	}
+	say(f"{s.name} {total}");
+	return 0;
+}

@@ -1,0 +1,37 @@
+//! A function returns a tuple of two owning class values. `let (a, b)` takes it
+//! apart, and the two locals go at the end of the block, last to first, each
+//! once.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+fn make(n: int) -> (Tracked, Tracked)
+{
+	return (Tracked { id: n }, Tracked { id: n + 1 });
+}
+
+fn main() -> int
+{
+	{
+		let (a, b) = make(10);
+		say(f"{a.id} {b.id}");
+	}
+	say(f"end");
+	return 0;
+}

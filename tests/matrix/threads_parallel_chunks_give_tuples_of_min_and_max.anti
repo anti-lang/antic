@@ -1,0 +1,45 @@
+//! A worker returns a tuple, so `parallel` gives a slice of tuples, one per
+//! chunk, which the caller folds into the least and the largest value.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn bounds(chunk: []i32) -> (i32, i32)
+{
+	let lo = chunk[0];
+	let hi = chunk[0];
+	for x in chunk {
+		if x < lo {
+			lo = x;
+		}
+		if x > hi {
+			hi = x;
+		}
+	}
+	return (lo, hi);
+}
+
+fn main() -> int
+{
+	let xs: [12]i32 = [5, -3, 17, 8, 0, 22, -9, 4, 13, 6, -1, 2];
+	let parts = parallel xs[0..12] by 4 -> bounds;
+	let lo = parts[0].0;
+	let hi = parts[0].1;
+	for p in parts {
+		if p.0 < lo {
+			lo = p.0;
+		}
+		if p.1 > hi {
+			hi = p.1;
+		}
+	}
+	say(f"{parts.len} {lo} {hi}");
+	free(parts.ptr);
+	return 0;
+}

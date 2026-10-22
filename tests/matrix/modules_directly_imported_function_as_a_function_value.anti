@@ -1,0 +1,34 @@
+//! A function a direct import names passes as a function value, `equal` of
+//! `anti.text` to a parameter of type `fn(str, str) -> bool`, beside a function
+//! of the program.
+
+import anti.io;
+import anti.text.{equal};
+
+fn count_with(xs: []str, x: str, same: fn(str, str) -> bool) -> int
+{
+	let n = 0;
+	for s in xs {
+		if same(s, x) {
+			n += 1;
+		}
+	}
+	return n;
+}
+
+fn same_length(a: str, b: str) -> bool
+{
+	return a.len == b.len;
+}
+
+fn main() -> int
+{
+	let words: [4]str = ["ab", "cd", "ab", "xyz"];
+	let a = count_with(words[0..4], "ab", equal);
+	let b = count_with(words[0..4], "zz", same_length);
+	let f = equal;
+	if f("q", "q") {
+		io.println("value");
+	}
+	return a * 10 + b;
+}

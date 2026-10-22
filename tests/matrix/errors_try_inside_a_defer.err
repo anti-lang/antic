@@ -1,0 +1,1 @@
+errors_try_inside_a_defer.anti:8:8: error: `try` inside a `defer`

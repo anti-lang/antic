@@ -1,0 +1,58 @@
+//! A recursive descent over nested brackets fails deep in the recursion with
+//! the position in an error subclass, and `try` carries it up every level to
+//! the one handler.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+class SyntaxError inherits lang.Error
+{
+	pub at_byte: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn group(s: str, i: int) -> (int, int) may fail
+{
+	let deepest = 0;
+	let at = i;
+	while at < s.len do {
+		if s[at] == '(' as u32 as u8 {
+			let (d, next) = try group(s, at + 1);
+			if d + 1 > deepest {
+				deepest = d + 1;
+			}
+			at = next;
+		} else if s[at] == ')' as u32 as u8 {
+			return (deepest, at + 1);
+		} else {
+			fail alloc SyntaxError { code: 5, message: "unexpected byte", at_byte: at };
+		}
+	}
+	if i > 0 {
+		fail alloc SyntaxError { code: 6, message: "unclosed", at_byte: at };
+	}
+	return (deepest, at);
+}
+
+fn main() -> int
+{
+	let inputs: [4]str = ["(()(()))", "((x))", "(()", "()()"];
+	for s in inputs {
+		let (d, n) = group(s, 0) catch e {
+			if let se = e as? *SyntaxError {
+				say(f"{s}: {se.message} at {se.at_byte}");
+			}
+			yield (-1, 0);
+		};
+		if d >= 0 {
+			say(f"{s}: depth {d}");
+		}
+	}
+	return 0;
+}

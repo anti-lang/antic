@@ -1,0 +1,37 @@
+//! An `ArenaAllocator` gives the room of a `List` and the text a `Builder`
+//! takes into it. The list gives its room back at the end of its block and
+//! `free_all` releases the arena.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.mem;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 4096);
+	{
+		let xs = List<int>.new(0, &arena);
+		for i in 0..100 {
+			xs.push(i);
+		}
+		let b = text.Builder.new();
+		b.append("items ");
+		b.append_int(xs.count);
+		let t = b.take_in(&arena);
+		io.println(t);
+		let sum = 0;
+		for x in xs {
+			sum += x;
+		}
+		say(f"{sum}");
+	}
+	arena.free_all();
+	return 0;
+}

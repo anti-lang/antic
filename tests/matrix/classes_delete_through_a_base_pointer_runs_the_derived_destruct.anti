@@ -1,0 +1,72 @@
+//! A `List<*Shape>` of objects of two derived classes: the abstract `area`
+//! dispatches through the table, and `delete` through the base pointer runs the
+//! `destruct` of the derived class and then the base's, the virtual destructor
+//! of C++ without the word `virtual`.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+abstract class Shape
+{
+	pub name: str = "",
+
+	abstract fn area(self) -> f64;
+
+	fn destruct(self)
+	{
+		say(f"shape {self.name}");
+	}
+}
+
+class Circle inherits Shape
+{
+	pub r: f64 = 1.0,
+
+	concrete fn area(self) -> f64
+	{
+		return 3.0 * self.r * self.r;
+	}
+
+	fn destruct(self)
+	{
+		say(f"circle {self.r}");
+	}
+}
+
+class Square inherits Shape
+{
+	pub side: f64 = 1.0,
+
+	concrete fn area(self) -> f64
+	{
+		return self.side * self.side;
+	}
+
+	fn destruct(self)
+	{
+		say(f"square {self.side}");
+	}
+}
+
+fn main() -> int
+{
+	let shapes = List<*Shape>.new();
+	shapes.push(alloc Circle { name: "c", r: 2.0 });
+	shapes.push(alloc Square { name: "s", side: 3.0 });
+	let total = 0.0;
+	for s in shapes {
+		total += s.area();
+	}
+	say(f"total {total}");
+	for s in shapes {
+		delete(s);
+	}
+	return 0;
+}

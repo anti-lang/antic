@@ -1,0 +1,55 @@
+//! A function returns a `?Shape` of a variant. `if let` takes the value out of
+//! the optional, an inner `if let` binds a case, and `is` tests the case of
+//! each value of an array.
+
+import anti.io;
+import anti.text;
+
+variant Shape
+{
+	Circle { r: f64 },
+	Rect { w: f64, h: f64 },
+	Empty,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn pick(i: int) -> ?Shape
+{
+	switch i {
+		0 => {
+			return Shape.Circle { r: 2.0 };
+		},
+		1 => {
+			return Shape.Rect { w: 2.0, h: 3.5 };
+		},
+		2 => {
+			return Shape.Empty;
+		},
+		else => {
+			return none;
+		},
+	}
+}
+
+fn main() -> int
+{
+	for i in 0..4 {
+		if let s = pick(i) {
+			if let Rect r = s {
+				say(f"{i} rect {r.w * r.h}");
+			} else if let Circle c = s {
+				say(f"{i} circle {c.r}");
+			} else {
+				say(f"{i} empty {s is Shape.Empty}");
+			}
+		} else {
+			say(f"{i} none");
+		}
+	}
+	return 0;
+}

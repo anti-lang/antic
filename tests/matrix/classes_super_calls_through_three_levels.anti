@@ -1,0 +1,51 @@
+//! `self.super.describe()` in a chain of three classes: each level adds its
+//! part to the text of the level above, and a call through a pointer to the
+//! base reaches the deepest body.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Animal
+{
+	pub fn describe(self) -> int
+	{
+		say(f"animal");
+		return 1;
+	}
+}
+
+class Dog inherits Animal
+{
+	concrete fn describe(self) -> int
+	{
+		let n = self.super.describe();
+		say(f"dog");
+		return n + 10;
+	}
+}
+
+class Puppy inherits Dog
+{
+	concrete fn describe(self) -> int
+	{
+		let n = self.super.describe();
+		say(f"puppy");
+		return n + 100;
+	}
+}
+
+fn main() -> int
+{
+	let p = Puppy { };
+	let a: *Animal = &p;
+	say(f"{a.describe()}");
+	let d = Dog { };
+	say(f"{d.describe()}");
+	return 0;
+}

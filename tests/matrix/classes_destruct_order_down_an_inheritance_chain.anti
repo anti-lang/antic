@@ -1,0 +1,53 @@
+//! The teardown of an object of a derived class runs the `destruct` of the
+//! derived class first and the base's after it. The fields go after every
+//! `destruct`, last to first, so those of the concrete level go first.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Part
+{
+	pub name: str = "",
+
+	fn destruct(self)
+	{
+		say(f"part {self.name}");
+	}
+}
+
+class Base
+{
+	pub base_part: Part = Part { name: "of base" },
+
+	fn destruct(self)
+	{
+		say(f"base");
+	}
+}
+
+class Derived inherits Base
+{
+	pub own_part: Part = Part { name: "of derived" },
+
+	fn destruct(self)
+	{
+		say(f"derived");
+	}
+}
+
+fn main() -> int
+{
+	let p = alloc Derived { };
+	delete(p);
+	say(f"--");
+	{
+		let v = Derived { };
+	}
+	return 0;
+}

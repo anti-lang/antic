@@ -1,0 +1,38 @@
+//! `use name: T` composes: the public fields and functions of `T` are reachable
+//! on the class, and the part is reachable by its name.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Position
+{
+	pub x: int = 0,
+	pub y: int = 0,
+
+	pub fn shift(self, dx: int, dy: int)
+	{
+		self.x += dx;
+		self.y += dy;
+	}
+}
+
+class Sprite
+{
+	use pos: Position,
+	pub name: str = "",
+}
+
+fn main() -> int
+{
+	let s = Sprite { name: "hero" };
+	s.shift(3, 4);
+	s.shift(1, 1);
+	say(f"{s.name} {s.x} {s.y} {s.pos.x}");
+	return 0;
+}

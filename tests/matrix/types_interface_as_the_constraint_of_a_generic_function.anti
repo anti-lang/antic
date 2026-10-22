@@ -1,0 +1,55 @@
+//! An abstract class as the constraint of a type parameter: a generic function
+//! over a slice of class values calls the abstract function, for two classes
+//! that fill it.
+
+import anti.io;
+import anti.text;
+
+abstract class Shape
+{
+	abstract fn area(self) -> f64;
+}
+
+class Square inherits Shape
+{
+	pub side: f64 = 1.0,
+
+	concrete fn area(self) -> f64
+	{
+		return self.side * self.side;
+	}
+}
+
+class Strip inherits Shape
+{
+	pub w: f64 = 1.0,
+	pub h: f64 = 1.0,
+
+	concrete fn area(self) -> f64
+	{
+		return self.w * self.h;
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn total<T: Shape>(xs: []T) -> f64
+{
+	let sum = 0.0;
+	for x in xs {
+		sum += x.area();
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let sq: [2]Square = [Square { side: 2.0 }, Square { side: 3.0 }];
+	let st: [3]Strip = [Strip { w: 1.0, h: 0.5 }; 3];
+	say(f"{total(sq[0..2])} {total(st[0..3])}");
+	return 0;
+}

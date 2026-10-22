@@ -1,0 +1,13 @@
+//! Two fields of one name in a class are refused, and the message names the
+//! class as a class, as it names a struct and a union by their kinds.
+
+class Account
+{
+	balance: int = 0,
+	balance: f64 = 0.0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

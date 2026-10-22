@@ -1,0 +1,41 @@
+//! `type Scores = List<int>;` names a copy of a generic class, and the alias
+//! stands in a parameter, a result and a local, interchangeable with the type
+//! it names.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+type Scores = List<int>;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn make(n: int) -> Scores
+{
+	let s = Scores.new();
+	for i in 0..n {
+		s.push(i * i);
+	}
+	return s;
+}
+
+fn total(s: *Scores) -> int
+{
+	let sum = 0;
+	for x in s {
+		sum += x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let a = make(5);
+	let b: List<int> = make(3);
+	say(f"{total(&a)} {total(&b)} {a.count} {b.count}");
+	return 0;
+}

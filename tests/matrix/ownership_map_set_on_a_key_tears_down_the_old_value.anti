@@ -1,0 +1,41 @@
+//! `set` on a key that a `Map` holds already tears the old value down, `remove`
+//! gives the value to the caller, and the map tears down what it still holds at
+//! the end of its block, last to first as every sequence.
+
+import anti.collection.map.{Map};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+fn main() -> int
+{
+	{
+		let m = Map<str, Tracked>.new();
+		m.set("a", Tracked { id: 1 });
+		m.set("b", Tracked { id: 2 });
+		m.set("a", Tracked { id: 3 });
+		say(f"replaced");
+		if let t = m.remove("b") {
+			say(f"removed {t.id}");
+		}
+		say(f"after remove");
+		m.set("c", Tracked { id: 4 });
+	}
+	say(f"end");
+	return 0;
+}

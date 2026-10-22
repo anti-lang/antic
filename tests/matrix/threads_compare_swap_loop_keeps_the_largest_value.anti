@@ -1,0 +1,57 @@
+//! The lock-free maximum: each chunk of a `parallel` reads an atomic field of a
+//! concurrent class and retries `compare_swap` until its value stands or a
+//! larger one does.
+
+import anti.io;
+import anti.text;
+
+concurrent class Best
+{
+	atomic value: int = -1,
+
+	pub fn offer(self, v: int)
+	{
+		while true do {
+			let cur = self.value.load();
+			if v <= cur {
+				return;
+			}
+			if self.value.compare_swap(cur, v) {
+				return;
+			}
+		}
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.value.load();
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn scan(chunk: []int, b: *Best) -> int
+{
+	for x in chunk {
+		b.offer(x);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let xs: [200]int = [0; 200];
+	for i in 0..200 {
+		xs[i] = (i * 37) % 199;
+	}
+	let b = alloc Best { };
+	let parts = parallel xs[0..200] by 6 -> scan(b);
+	free(parts.ptr);
+	say(f"{b.get()}");
+	delete(b);
+	return 0;
+}

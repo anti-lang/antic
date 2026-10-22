@@ -1,0 +1,35 @@
+//! A command line parsed as a programmer from C does: a `while` over the
+//! arguments after the name of the program, a `switch` on each `str`, and an
+//! arm that reads the next argument.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main(args: []str) -> int
+{
+	let verbose = 0;
+	let name = "nobody";
+	let others = 0;
+	let i = 1;
+	while i < args.len do {
+		switch args[i] {
+			"-v" => verbose += 1,
+			"--name" => {
+				i += 1;
+				if i < args.len {
+					name = args[i];
+				}
+			},
+			else => others += 1,
+		}
+		i += 1;
+	}
+	say(f"verbose {verbose} name {name} others {others}");
+	return verbose;
+}

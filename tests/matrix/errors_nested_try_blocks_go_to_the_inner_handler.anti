@@ -1,0 +1,46 @@
+//! Two nested `try` blocks: a failure in the inner block reaches the inner
+//! handler alone, and the outer block goes on after it. A failure after the
+//! inner block reaches the outer handler.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn check(n: int, limit: int) may fail
+{
+	if n > limit {
+		fail lang.Error.new(n, "over");
+	}
+}
+
+fn run(n: int)
+{
+	try {
+		try {
+			check(n, 5);
+			say(f"{n} inner ok");
+		} catch e {
+			say(f"{n} inner caught {e.code}");
+			yield;
+		}
+		check(n, 7);
+		say(f"{n} outer ok");
+	} catch e {
+		say(f"{n} outer caught {e.code}");
+		yield;
+	}
+}
+
+fn main() -> int
+{
+	run(3);
+	run(6);
+	run(9);
+	return 0;
+}

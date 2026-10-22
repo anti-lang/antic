@@ -1,0 +1,43 @@
+//! A `List<fn(int) -> int>` of named functions, the table of callbacks a
+//! programmer from C keeps, applied in order to a value.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn double(n: int) -> int
+{
+	return n * 2;
+}
+
+fn inc(n: int) -> int
+{
+	return n + 1;
+}
+
+fn square(n: int) -> int
+{
+	return n * n;
+}
+
+fn main() -> int
+{
+	let steps = List<fn(int) -> int>.new();
+	steps.push(inc);
+	steps.push(double);
+	steps.push(square);
+	steps.push(inc);
+	let v = 3;
+	for f in steps {
+		v = f(v);
+	}
+	let first = steps.first() ?? double;
+	say(f"{v} {first(10)} {steps.count}");
+	return 0;
+}

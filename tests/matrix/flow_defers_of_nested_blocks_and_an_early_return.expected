@@ -1,0 +1,11 @@
+exit 6
+in block
+inner block
+in if
+second defer
+first defer
+---
+in block
+inner block
+second defer
+first defer

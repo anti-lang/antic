@@ -1,0 +1,37 @@
+//! A `worker fn` that may fail is called directly with a handler, as the rules
+//! allow, in a loop over chunks of an array.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn checked_sum(chunk: []int) -> int may fail
+{
+	let total = 0;
+	for x in chunk {
+		if x < 0 {
+			fail lang.Error.new(x, "negative");
+		}
+		total += x;
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let data: [6]int = [1, 2, 3, -4, 5, 6];
+	for i in 0..3 {
+		let s = checked_sum(data[i * 2..i * 2 + 2]) catch e {
+			say(f"chunk {i}: {e.message} {e.code}");
+			yield 0;
+		};
+		say(f"chunk {i}: {s}");
+	}
+	return 0;
+}

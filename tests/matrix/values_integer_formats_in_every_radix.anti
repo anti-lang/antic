@@ -1,0 +1,25 @@
+//! The integer formats: `b`, `o`, `x` and `X`, zero padding to a width, a
+//! negative value in hex and with zeros, and the top of `u64`.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let n = 255;
+	say(f"{n:b} {n:o} {n:x} {n:X}");
+	say(f"[{n:012b}] [{n:>6x}] [{n:<6}]");
+	let m = -42;
+	say(f"{m:x} [{m:06}] [{m:6}]");
+	let top: u64 = 0xFFFF_FFFF_FFFF_FFFF;
+	say(f"{top:x} {top:o}");
+	let small: u8 = 9;
+	say(f"[{small:03}]");
+	return 0;
+}

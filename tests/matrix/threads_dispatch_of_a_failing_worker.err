@@ -1,0 +1,1 @@
+threads_dispatch_of_a_failing_worker.anti:22:26: error: `run` may fail, and `dispatch` runs a worker that cannot fail

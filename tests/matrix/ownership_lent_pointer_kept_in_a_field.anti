@@ -1,0 +1,25 @@
+//! A `lent` pointer is valid during the call alone, so storing it into a field
+//! of an object that outlives the call is refused.
+
+class Person
+{
+	pub age: int = 0,
+}
+
+class Registry
+{
+	pub last: ?*Person = none,
+
+	pub fn note(self, lent p: *Person)
+	{
+		self.last = p;
+	}
+}
+
+fn main() -> int
+{
+	let r = Registry { };
+	let p = Person { age: 3 };
+	r.note(&p);
+	return 0;
+}

@@ -1,0 +1,9 @@
+exit 0
+drop 1
+replaced
+removed 2
+drop 2
+after remove
+drop 4
+drop 3
+end

@@ -1,0 +1,52 @@
+//! A `protected` field and function of a base are reached from a function of a
+//! derived class and through its chain, and stay out of reach of `main`, which
+//! uses the public function.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Account
+{
+	protected balance: int = 0,
+
+	protected fn apply(self, n: int)
+	{
+		self.balance += n;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.balance;
+	}
+}
+
+class Savings inherits Account
+{
+	pub rate: int = 10,
+
+	pub fn add_interest(self)
+	{
+		self.apply(self.balance * self.rate / 100);
+	}
+
+	pub fn deposit(self, n: int)
+	{
+		self.apply(n);
+	}
+}
+
+fn main() -> int
+{
+	let s = Savings { };
+	s.deposit(500);
+	s.add_interest();
+	s.add_interest();
+	say(f"{s.get()}");
+	return 0;
+}

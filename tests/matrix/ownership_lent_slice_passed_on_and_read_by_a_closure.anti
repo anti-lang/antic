@@ -1,0 +1,40 @@
+//! A `lent []int` parameter passed on to another `lent` parameter whose
+//! function calls a closure for each element. The closure captures a local of
+//! the first function and lives no longer than the call.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn each(lent xs: []int, f: fn(int))
+{
+	for x in xs {
+		f(x);
+	}
+}
+
+fn stats(lent xs: []int) -> (int, int)
+{
+	let sum = 0;
+	let top = xs[0];
+	each(xs, fn(x) {
+		sum += x;
+		if x > top {
+			top = x;
+		}
+	});
+	return (sum, top);
+}
+
+fn main() -> int
+{
+	let a: [5]int = [4, 9, -2, 7, 1];
+	let (s, t) = stats(a[0..5]);
+	say(f"{s} {t}");
+	return 0;
+}

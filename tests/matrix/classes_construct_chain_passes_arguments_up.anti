@@ -1,0 +1,57 @@
+//! Three levels of `construct` with arguments: each calls
+//! `self.super.construct(...)` first, and the fields of every level hold what
+//! the call gave.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Entity
+{
+	pub id: int = 0,
+
+	fn construct(self, id: int)
+	{
+		self.id = id;
+		say(f"entity {id}");
+	}
+}
+
+class Mob inherits Entity
+{
+	pub hp: int = 0,
+
+	fn construct(self, id: int, hp: int)
+	{
+		self.super.construct(id);
+		self.hp = hp;
+		say(f"mob {hp}");
+	}
+}
+
+class Boss inherits Mob
+{
+	pub name: str = "",
+
+	fn construct(self, id: int, hp: int, name: str)
+	{
+		self.super.construct(id, hp * 10);
+		self.name = name;
+		say(f"boss {name}");
+	}
+}
+
+fn main() -> int
+{
+	let b = Boss(7, 50, "ogre");
+	say(f"{b.id} {b.hp} {b.name}");
+	let p = alloc Boss(8, 1, "imp");
+	say(f"{p.id} {p.hp} {p.name}");
+	delete(p);
+	return 0;
+}

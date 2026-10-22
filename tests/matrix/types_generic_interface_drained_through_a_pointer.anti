@@ -1,0 +1,69 @@
+//! A generic abstract class `Source<T>` with two classes that fill it for `int`
+//! and for `str`, drained by one generic function that takes a pointer to the
+//! interface, with its type argument written out.
+
+import anti.io;
+import anti.text;
+
+abstract class Source<T>
+{
+	abstract fn next(self) -> ?T;
+}
+
+class Countdown inherits Source<int>
+{
+	pub n: int = 0,
+
+	concrete fn next(self) -> ?int
+	{
+		if self.n == 0 {
+			return none;
+		}
+		self.n -= 1;
+		return self.n + 1;
+	}
+}
+
+class Words inherits Source<str>
+{
+	pub at: int = 0,
+
+	concrete fn next(self) -> ?str
+	{
+		self.at += 1;
+		switch self.at {
+			1 => {
+				return "one";
+			},
+			2 => {
+				return "two";
+			},
+			else => {
+				return none;
+			},
+		}
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn drain<T>(s: *Source<T>) -> int
+{
+	let n = 0;
+	while s.next() != none do {
+		n += 1;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let c = Countdown { n: 4 };
+	let w = Words { };
+	say(f"{drain<int>(&c)} {drain<str>(&w)} {c.n} {w.at}");
+	return 0;
+}

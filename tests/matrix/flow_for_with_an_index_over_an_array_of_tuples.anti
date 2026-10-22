@@ -1,0 +1,27 @@
+//! `for i, p in pairs` over a fixed array of `(str, int)` tuples reads the
+//! elements as `p.0` and `p.1`, and the loop finds the largest value.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let pairs: [4](str, int) = [("ann", 31), ("bo", 47), ("cy", 12), ("di", 47)];
+	let best = 0;
+	let best_at = -1;
+	for i, p in pairs {
+		if p.1 > best {
+			best = p.1;
+			best_at = i;
+		}
+		say(f"{i} {p.0} {p.1}");
+	}
+	say(f"best {pairs[best_at].0} at {best_at}");
+	return 0;
+}

@@ -1,0 +1,13 @@
+//! A function of a library module without `pub` is private to its file, so a
+//! call through the name of the module is refused, here the helper `pad` of
+//! `text.Builder` that the formats use.
+
+import anti.text;
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	b.append("x");
+	b.pad(0, 4, text.Align.Left, false);
+	return b.len();
+}

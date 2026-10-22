@@ -1,0 +1,40 @@
+//! A channel of a class with a `destruct`: the value `recv` gives belongs to
+//! its block, and `delete` of the channel tears down the two it still holds,
+//! the oldest first.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+fn main() -> int
+{
+	let c = chan Tracked(4);
+	send(c, Tracked { id: 1 });
+	send(c, Tracked { id: 2 });
+	send(c, Tracked { id: 3 });
+	{
+		let t = recv(c) else {
+			return 1;
+		};
+		say(f"got {t.id}");
+	}
+	say(f"deleting");
+	delete(c);
+	say(f"end");
+	return 0;
+}

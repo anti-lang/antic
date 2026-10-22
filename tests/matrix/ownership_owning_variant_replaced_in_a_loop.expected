@@ -1,0 +1,9 @@
+exit 0
+set 1
+drop 1
+set 2
+drop 2
+set 3
+drop 3
+emptied
+drop 9

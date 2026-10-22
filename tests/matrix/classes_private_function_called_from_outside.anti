@@ -1,0 +1,18 @@
+//! A function of a class body without `pub` is private to the class, so a call
+//! from `main` is refused, as a private method of Java is.
+
+class Vault
+{
+	secret: int = 42,
+
+	fn open(self) -> int
+	{
+		return self.secret;
+	}
+}
+
+fn main() -> int
+{
+	let v = Vault { };
+	return v.open();
+}

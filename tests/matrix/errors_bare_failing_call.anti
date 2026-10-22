@@ -1,0 +1,10 @@
+//! A call of a `may fail` function without a handler is refused, where a
+//! programmer from C++ expects an exception to travel on its own.
+
+import anti.text;
+
+fn main() -> int
+{
+	let n = text.parse_int("12");
+	return n;
+}

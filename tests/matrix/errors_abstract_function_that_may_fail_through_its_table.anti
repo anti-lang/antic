@@ -1,0 +1,56 @@
+//! An abstract `may fail` function filled by two classes and called through a
+//! pointer to the abstract class, so the failure travels through the table to
+//! the handler at the call. The class whose body never fails allows
+//! `never-fails`, as the contract asks it to fail.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+abstract class Store
+{
+	abstract fn put(self, key: str, n: int) -> int may fail;
+}
+
+class Memory inherits Store
+{
+	pub count: int = 0,
+
+	concrete fn put(self, key: str, n: int) -> int may fail allow(never-fails, "the contract may fail")
+	{
+		self.count += 1;
+		return self.count;
+	}
+}
+
+class ReadOnly inherits Store
+{
+	concrete fn put(self, key: str, n: int) -> int may fail
+	{
+		fail lang.Error.new(13, "read only");
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn save(s: *Store, key: str) -> int
+{
+	let n = s.put(key, 1) catch e {
+		say(f"{key}: {e.message}");
+		yield -1;
+	};
+	return n;
+}
+
+fn main() -> int
+{
+	let m = Memory { };
+	let r = ReadOnly { };
+	say(f#"{save(&m, "a")} {save(&m, "b")}"#);
+	say(f#"{save(&r, "c")}"#);
+	return 0;
+}

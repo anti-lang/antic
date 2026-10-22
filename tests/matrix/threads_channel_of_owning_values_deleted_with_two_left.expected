@@ -1,0 +1,7 @@
+exit 0
+got 1
+drop 1
+deleting
+drop 2
+drop 3
+end

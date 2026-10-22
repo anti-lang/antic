@@ -1,0 +1,37 @@
+//! An `own` parameter moved on by `return` is not torn down by the function,
+//! and a chain of such calls drops the value once, at the end of the caller's
+//! block.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+fn bump(own t: Tracked) -> Tracked
+{
+	t.id += 1;
+	return t;
+}
+
+fn main() -> int
+{
+	let t = bump(bump(bump(Tracked { id: 1 })));
+	say(f"got {t.id}");
+	let u = bump(t);
+	say(f"moved {u.id}");
+	return 0;
+}

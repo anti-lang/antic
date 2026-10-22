@@ -1,0 +1,50 @@
+//! A generic struct with a type parameter and a constant length, and free
+//! functions of its module called with the method-call sugar, for two lengths
+//! and two element types.
+
+import anti.io;
+import anti.text;
+
+struct Ring<T, N: int>
+{
+	items: [N]T,
+	head: int,
+	count: int,
+}
+
+fn put<T, N: int>(r: *Ring<T, N>, own x: T)
+{
+	r.items[(r.head + r.count) % N] = x;
+	if r.count < N {
+		r.count += 1;
+	} else {
+		r.head = (r.head + 1) % N;
+	}
+}
+
+fn oldest<T, N: int>(r: *Ring<T, N>) -> T
+{
+	return r.items[r.head];
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let r = Ring<int, 3> { items: [0; 3], head: 0, count: 0 };
+	for i in 1..6 {
+		r.put(i * 10);
+	}
+	say(f"{r.count} {r.oldest()}");
+	let f = Ring<f32, 2> { items: [0.0; 2], head: 0, count: 0 };
+	f.put(1.5);
+	say(f"{f.count} {f.oldest()}");
+	f.put(2.5);
+	f.put(3.5);
+	say(f"{f.count} {f.oldest()} {size_of(Ring<f32, 2>)}");
+	return 0;
+}

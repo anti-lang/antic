@@ -1,0 +1,10 @@
+exit 0
+start 0
+done 0
+start 1
+done 1
+start 2
+done 2
+start 3
+undo 3
+caught 3

@@ -1,0 +1,30 @@
+//! A `SortedMap<str, int>` walks in the order of its keys whatever the order of
+//! insertion, and `first`, `last` and `floor` read its ends and the entry at or
+//! below a key.
+
+import anti.collection.sorted.{SortedMap};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let m = SortedMap<str, int>.new();
+	m.set("pear", 3);
+	m.set("apple", 1);
+	m.set("fig", 2);
+	m.set("banana", 5);
+	for (k, v) in m {
+		say(f"{k} {v}");
+	}
+	let f = m.first() ?? ("", 0);
+	let l = m.last() ?? ("", 0);
+	let at = m.floor("c") ?? ("", 0);
+	say(f"{f.0} {l.0} {at.0}");
+	return 0;
+}

@@ -1,0 +1,83 @@
+//! A state machine: an enum of states, a `while` whose condition reads the
+//! state, and a transition function whose `switch` covers every state without
+//! `else` and holds a nested `switch` on a `char`.
+
+import anti.io;
+import anti.text;
+
+enum State { Idle, Running, Paused, Done }
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn step(s: State, c: char) -> State
+{
+	switch s {
+		State.Idle => {
+			if c == 's' {
+				return State.Running;
+			}
+			return State.Idle;
+		},
+		State.Running => {
+			switch c {
+				'p' => {
+					return State.Paused;
+				},
+				'q' => {
+					return State.Done;
+				},
+				else => {
+					return State.Running;
+				},
+			}
+		},
+		State.Paused => {
+			if c == 'r' {
+				return State.Running;
+			}
+			if c == 'q' {
+				return State.Done;
+			}
+			return State.Paused;
+		},
+		State.Done => {
+			return State.Done;
+		},
+	}
+}
+
+fn name(s: State) -> str
+{
+	switch s {
+		State.Idle => {
+			return "idle";
+		},
+		State.Running => {
+			return "running";
+		},
+		State.Paused => {
+			return "paused";
+		},
+		State.Done => {
+			return "done";
+		},
+	}
+}
+
+fn main() -> int
+{
+	let inputs: [8]char = ['x', 's', 'p', 'x', 'r', 'q', 's', 'p'];
+	let s = State.Idle;
+	let i = 0;
+	while s != State.Done && i < inputs.len do {
+		s = step(s, inputs[i]);
+		say(f"{inputs[i]} -> {name(s)}");
+		i += 1;
+	}
+	say(f"stopped after {i}");
+	return 0;
+}

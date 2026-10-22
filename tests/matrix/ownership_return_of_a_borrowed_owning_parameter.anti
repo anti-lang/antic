@@ -1,0 +1,23 @@
+//! A parameter without `own` belongs to the caller, so returning one whose
+//! class owns something is refused, where a programmer from Java returns the
+//! reference it received.
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn pick(a: Texture) -> Texture
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let t = pick(Texture { id: 3 });
+	return t.id;
+}

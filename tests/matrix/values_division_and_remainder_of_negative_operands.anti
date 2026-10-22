@@ -1,0 +1,25 @@
+//! Integer division truncates toward zero and the remainder takes the sign of
+//! the dividend, as in C, for `int`, `i8` and `i32` operands.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = -7;
+	let b = 2;
+	say(f"{a / b} {a % b} {7 / -2} {7 % -2} {-7 / -2} {-7 % -2}");
+	let c: i8 = -128;
+	let d: i8 = 3;
+	say(f"{c / d} {c % d}");
+	let e: i32 = -1000000;
+	let f: i32 = 7;
+	say(f"{e / f} {e % f}");
+	return 0;
+}

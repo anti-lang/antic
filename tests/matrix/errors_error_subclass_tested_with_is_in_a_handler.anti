@@ -1,0 +1,47 @@
+//! A library error as a subclass of `Error` with a field of its own, made with
+//! `alloc`. The handler tests it with `is`, reads its field through `as`, and
+//! handles a plain error from the same call apart.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+class ParseError inherits lang.Error
+{
+	pub line: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn parse(s: str, line: int) -> int may fail
+{
+	if s.len == 0 {
+		fail "empty input";
+	}
+	if s[0] == 'x' as u32 as u8 {
+		fail alloc ParseError { code: 2, message: "bad start", line: line };
+	}
+	return s.len;
+}
+
+fn main() -> int
+{
+	let inputs: [3]str = ["abc", "", "xyz"];
+	for i, s in inputs {
+		let n = parse(s, i + 1) catch e {
+			if e is *ParseError {
+				let p = e as *ParseError;
+				say(f"parse error {p.code} on line {p.line}: {p.message}");
+			} else {
+				say(f"error {e.code}: {e.message}");
+			}
+			yield -1;
+		};
+		say(f"{i} gives {n}");
+	}
+	return 0;
+}

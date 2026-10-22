@@ -1,0 +1,41 @@
+//! The end of a block tears a class value down: its `destruct` first, then its
+//! fields last to first. A local array of the class goes last to first after
+//! it, as the locals of a block go in reverse.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Part
+{
+	pub name: str = "",
+
+	fn destruct(self)
+	{
+		say(f"part {self.name}");
+	}
+}
+
+class Machine
+{
+	pub first: Part = Part { name: "first" },
+	pub second: Part = Part { name: "second" },
+
+	fn destruct(self)
+	{
+		say(f"machine");
+	}
+}
+
+fn main() -> int
+{
+	let parts: [3]Part = [Part { name: "p0" }, Part { name: "p1" }, Part { name: "p2" }];
+	let m = Machine { };
+	say(f"{parts[0].name} {m.second.name}");
+	return 0;
+}

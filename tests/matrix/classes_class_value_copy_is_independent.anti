@@ -1,0 +1,36 @@
+//! A class value is a value: `let b = a;` copies a class without owning parts,
+//! so a change through `b` leaves `a`, and only a pointer shares the object. A
+//! programmer from Java expects `b` to be `a`.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Point
+{
+	pub x: int = 0,
+	pub y: int = 0,
+
+	pub fn move(self, dx: int)
+	{
+		self.x += dx;
+	}
+}
+
+fn main() -> int
+{
+	let a = Point { x: 1, y: 2 };
+	let b = a;
+	b.move(10);
+	let p = &a;
+	p.move(100);
+	say(f"{a.x} {b.x} {a == b}");
+	b.x = a.x;
+	say(f"{a == b}");
+	return 0;
+}

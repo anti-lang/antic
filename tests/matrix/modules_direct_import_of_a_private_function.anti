@@ -1,0 +1,12 @@
+//! A direct import names public items of the module alone, so `put`, a private
+//! function of its `Builder`, is refused in the list.
+
+import anti.text.{equal, put};
+
+fn main() -> int
+{
+	if equal("a", "a") {
+		return 0;
+	}
+	return 1;
+}

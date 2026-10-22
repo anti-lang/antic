@@ -1,0 +1,23 @@
+//! The default `==` of a tuple of an `int` and a `str` compares the text, and
+//! two equal tuples hash alike, built from a literal and from a text.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let s = f"a{1}";
+	let t1 = (1, "a1");
+	let t2 = (1, s);
+	let t3 = (2, "a1");
+	say(f"{t1 == t2} {t1 == t3} {t1 != t3}");
+	say(f"{t1.hash() == t2.hash()}");
+	free(s.ptr);
+	return 0;
+}

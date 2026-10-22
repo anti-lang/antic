@@ -1,0 +1,47 @@
+//! `alloc Circle(r)` with a `construct` that may fail: a failed one frees the
+//! object, and the handler continues the loop. The objects built go into a
+//! `List` of pointers, deleted at the end.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Circle
+{
+	pub r: f64 = 0.0,
+
+	fn construct(self, r: f64) may fail
+	{
+		if r <= 0.0 {
+			fail lang.Error.new(1, "radius");
+		}
+		self.r = r;
+	}
+}
+
+fn main() -> int
+{
+	let radii: [4]f64 = [1.5, -2.0, 0.0, 3.0];
+	let all = List<*Circle>.new();
+	for r in radii {
+		let c = alloc Circle(r) catch e {
+			say(f"refused {r}");
+			continue;
+		};
+		all.push(c);
+	}
+	let sum = 0.0;
+	for c in all {
+		sum += c.r;
+		delete(c);
+	}
+	say(f"{all.count} {sum}");
+	return 0;
+}

@@ -1,0 +1,40 @@
+//! `lend_slice` of a `List` lends its elements as a slice to a closure, and
+//! `parallel` inside the closure runs over that slice before the closure
+//! returns.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn squares(chunk: []int) -> int
+{
+	let total = 0;
+	for x in chunk {
+		total += x * x;
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let xs = List<int>.new();
+	for i in 1..21 {
+		xs.push(i);
+	}
+	let total = 0;
+	xs.lend_slice(fn(s) {
+		let parts = parallel s by 3 -> squares;
+		for p in parts {
+			total += p;
+		}
+		free(parts.ptr);
+	});
+	say(f"{total}");
+	return 0;
+}

@@ -1,0 +1,38 @@
+//! An `export fn` with C types is an ordinary function to the module that
+//! declares it: a call, a function value and a call from a loop.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+export fn checksum(data: ?*byte, n: c_int) -> c_uint
+{
+	let p = data else {
+		return 0;
+	};
+	let s = []byte { ptr: p, len: n as int };
+	let sum: c_uint = 0;
+	for b in s {
+		sum = sum *% 31 +% (b as c_uint);
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let text = "hello";
+	let direct = checksum(text.ptr, text.len as c_int);
+	let f = checksum;
+	let again = f(text.ptr, 3);
+	let total: c_uint = 0;
+	for i in 0..3 {
+		total +%= checksum(text.ptr, i as c_int);
+	}
+	say(f"{direct} {again} {total}");
+	return 0;
+}

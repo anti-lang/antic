@@ -1,0 +1,20 @@
+//! A field and a function of one name in one class, the getter a programmer
+//! from Java writes beside its field, are refused as a name declared twice:
+//! `b.size` names a member, which would be the field or the function bound to
+//! `b`, and `b.size()` could reach neither for certain.
+
+class Box
+{
+	size: int = 0,
+
+	pub fn size(self) -> int
+	{
+		return self.size;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	return b.size();
+}

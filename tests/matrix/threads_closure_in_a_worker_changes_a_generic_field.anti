@@ -1,0 +1,70 @@
+//! A synchronized generic class `Bag<T>` with a `List<T>` field. Workers
+//! dispatched on objects of their own take a pointer to one `Bag<int>`, and
+//! inside each worker an anonymous function passed to a helper adds to it.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+synchronized class Bag<T>
+{
+	items: List<T>,
+
+	pub fn make() -> Bag<T>
+	{
+		return Bag<T> { items: List<T>.new() };
+	}
+
+	pub fn add(self, own x: T)
+	{
+		self.items.push(x);
+	}
+
+	pub fn size(self) -> int
+	{
+		return self.items.count;
+	}
+}
+
+class Filler
+{
+	pub base: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn times(n: int, f: fn(int))
+{
+	for i in 0..n {
+		f(i);
+	}
+}
+
+worker fn fill(w: *Filler, bag: *Bag<int>, n: int) -> int
+{
+	let added = 0;
+	times(n, fn(i) {
+		bag.add(w.base + i);
+		added += 1;
+	});
+	return added;
+}
+
+fn main() -> int
+{
+	let made = Bag<int>.make();
+	let bag = &made;
+	let a = alloc Filler { base: 0 };
+	let b = alloc Filler { base: 1000 };
+	let ja = dispatch a -> fill(bag, 300);
+	let jb = dispatch b -> fill(bag, 200);
+	let n = join(ja) + join(jb);
+	say(f"{n} {bag.size()}");
+	delete(a);
+	delete(b);
+	return 0;
+}

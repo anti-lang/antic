@@ -1,0 +1,51 @@
+//! A generic variant `Result<T, E>` is taken apart by a `switch` in a generic
+//! function that owns its arguments, for `int` with `str` errors and for `str`
+//! with `int` errors.
+
+import anti.io;
+import anti.text;
+
+variant Result<T, E>
+{
+	Ok { value: T },
+	Err { error: E },
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn value_or<T, E>(own r: Result<T, E>, own fallback: T) -> T
+{
+	switch r {
+		Ok o => {
+			return o.value;
+		},
+		Err e => {
+			return fallback;
+		},
+	}
+}
+
+fn parse(s: str) -> Result<int, str>
+{
+	if s.len == 0 {
+		return Result<int, str>.Err { error: "empty" };
+	}
+	return Result<int, str>.Ok { value: s.len * 10 };
+}
+
+fn main() -> int
+{
+	say(f#"{value_or(parse("abc"), -1)} {value_or(parse(""), -1)}"#);
+	let named = Result<str, int>.Ok { value: "kept" };
+	let failed = Result<str, int>.Err { error: 404 };
+	say(f#"{value_or(named, "none")} {value_or(failed, "none")}"#);
+	let r = parse("");
+	if let Err e = r {
+		say(f"error {e.error}");
+	}
+	return 0;
+}

@@ -1,0 +1,30 @@
+//! A direct import of `List` beside `list.sort` and `list.map` called through
+//! the name of the module, which a direct import leaves reachable, and the same
+//! functions reached as methods of the list.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let xs = List<int>.new();
+	xs.push(5);
+	xs.push(-2);
+	xs.push(9);
+	list.sort(&xs);
+	let ys = xs.map<int, int>(fn(n) {
+		return n * 10;
+	});
+	let zs = list.map<int, int>(&xs, fn(n) {
+		return n + 1;
+	});
+	say(f"{xs.get(0) ?? 0} {ys.get(2) ?? 0} {zs.get(1) ?? 0} {zs.count}");
+	return 0;
+}

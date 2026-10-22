@@ -1,0 +1,39 @@
+//! A walk over a linked list of structs on the stack: `while p != none` narrows
+//! `p` in the body, an `if` and an `else` read it, and the last statement of
+//! the body moves `p` on.
+
+import anti.io;
+import anti.text;
+
+struct Node
+{
+	value: int,
+	next: ?*Node,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let c = Node { value: 3, next: none };
+	let b = Node { value: -2, next: &c };
+	let a = Node { value: 1, next: &b };
+	let p: ?*Node = &a;
+	let sum = 0;
+	let seen = 0;
+	while p != none do {
+		seen += 1;
+		if p.value < 0 {
+			say(f"skip {p.value}");
+		} else {
+			sum += p.value;
+		}
+		p = p.next;
+	}
+	say(f"sum {sum} of {seen}");
+	return 0;
+}

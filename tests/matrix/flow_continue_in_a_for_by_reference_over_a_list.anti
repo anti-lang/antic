@@ -1,0 +1,38 @@
+//! `for p in &list` lends each element of a `List` of a struct for one turn. A
+//! `continue` skips the change of some turns, and the change of the others
+//! reaches the elements in the list.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+struct Item
+{
+	name: str,
+	stock: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let items = List<Item>.new();
+	items.push(Item { name: "nut", stock: 0 });
+	items.push(Item { name: "bolt", stock: 5 });
+	items.push(Item { name: "gear", stock: 0 });
+	items.push(Item { name: "cog", stock: 2 });
+	for p in &items {
+		if p.stock > 0 {
+			continue;
+		}
+		p.stock = 10;
+	}
+	for it in items {
+		say(f"{it.name} {it.stock}");
+	}
+	return 0;
+}

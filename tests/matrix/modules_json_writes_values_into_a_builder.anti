@@ -1,0 +1,39 @@
+//! The writers of `anti.json` fill a `text.Builder` with an object built by
+//! hand: a quoted text with escapes, an integer and a `bool`, and `member`
+//! reads one field back.
+
+import anti.io;
+import anti.json;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	b.append("{");
+	json.write_text("name", &b);
+	b.append(": ");
+	json.write_text("a \"quoted\" tab\t", &b);
+	b.append(", ");
+	json.write_text("count", &b);
+	b.append(": ");
+	json.write_int(-42, &b);
+	b.append(", ");
+	json.write_text("ok", &b);
+	b.append(": ");
+	json.write_bool(true, &b);
+	b.append("}");
+	let s = b.take();
+	io.println(s);
+	let count = "";
+	if json.member(s, "count", &count) {
+		io.println(count);
+	}
+	free(s.ptr);
+	return 0;
+}

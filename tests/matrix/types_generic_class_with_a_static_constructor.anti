@@ -1,0 +1,41 @@
+//! A generic class with private fields and a static `of` that builds a value
+//! from owned arguments, called with and without type arguments.
+
+import anti.io;
+import anti.text;
+
+class Labeled<T>
+{
+	label: str,
+	value: T,
+
+	pub fn of(label: str, own value: T) -> Labeled<T>
+	{
+		return Labeled<T> { label: label, value: value };
+	}
+
+	pub fn name(self) -> str
+	{
+		return self.label;
+	}
+
+	pub fn get(self) -> T
+	{
+		return dup(self.value);
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a = Labeled<int>.of("count", 42);
+	let b = Labeled.of("ratio", 0.25);
+	let c = Labeled<str>.of("name", "ada");
+	say(f"{a.name()}={a.get()} {b.name()}={b.get()} {c.name()}={c.get()}");
+	return 0;
+}

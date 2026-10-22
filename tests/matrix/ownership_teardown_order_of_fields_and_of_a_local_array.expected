@@ -1,0 +1,8 @@
+exit 0
+p0 second
+machine
+part second
+part first
+part p2
+part p1
+part p0

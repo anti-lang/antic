@@ -1,0 +1,57 @@
+//! Four jobs, dispatched on four objects of their own, change the count of one
+//! synchronized object through a pointer argument at the same time. Each public
+//! function runs under the hidden lock, so no increment is lost.
+
+import anti.io;
+import anti.text;
+
+synchronized class Counter
+{
+	count: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.count += n;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.count;
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Task
+{
+	pub id: int = 0,
+}
+
+worker fn bump(t: *Task, c: *Counter, times: int) -> int
+{
+	for i in 0..times {
+		c.add(1);
+	}
+	return times;
+}
+
+fn main() -> int
+{
+	let c = alloc Counter { };
+	let tasks = [alloc Task { id: 1 }, alloc Task { id: 2 }, alloc Task { id: 3 }, alloc Task { id: 4 }];
+	let a = dispatch tasks[0] -> bump(c, 10000);
+	let b = dispatch tasks[1] -> bump(c, 20000);
+	let d = dispatch tasks[2] -> bump(c, 30000);
+	let e = dispatch tasks[3] -> bump(c, 40000);
+	let done = join(a) + join(b) + join(d) + join(e);
+	say(f"{done} {c.get()}");
+	for t in tasks {
+		delete(t);
+	}
+	delete(c);
+	return 0;
+}

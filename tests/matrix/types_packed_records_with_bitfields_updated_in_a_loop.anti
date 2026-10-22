@@ -1,0 +1,42 @@
+//! An array of packed records with bitfields across two units: a loop sets each
+//! field from its index, and a second loop reads them back and sums.
+
+import anti.io;
+import anti.text;
+
+packed struct Rec
+{
+	kind: u8 : 3,
+	level: u8 : 5,
+	id: u16 : 12,
+	flags: u16 : 4,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let rs: [6]Rec = [Rec { kind: 0, level: 0, id: 0, flags: 0 }; 6];
+	for i in 0..6 {
+		rs[i].kind = (i % 8) as u8;
+		rs[i].level = (i * 5) as u8;
+		rs[i].id = (i * 700) as u16;
+		rs[i].flags = (15 - i) as u16;
+	}
+	let k = 0;
+	let l = 0;
+	let d = 0;
+	let f = 0;
+	for r in rs {
+		k += r.kind as int;
+		l += r.level as int;
+		d += r.id as int;
+		f += r.flags as int;
+	}
+	say(f"{size_of(Rec)} {k} {l} {d} {f}");
+	return 0;
+}

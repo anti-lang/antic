@@ -1,0 +1,38 @@
+//! An `undo` in the body of a loop belongs to the block of one turn. The turns
+//! that ended normally ran no `undo`, and the turn whose call fails runs its
+//! own before the failure leaves the function.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn step(i: int) may fail
+{
+	if i == 3 {
+		fail lang.Error.new(i, "step failed");
+	}
+}
+
+fn run() may fail
+{
+	for i in 0..5 {
+		say(f"start {i}");
+		undo say(f"undo {i}");
+		try step(i);
+		say(f"done {i}");
+	}
+}
+
+fn main() -> int
+{
+	run() catch e {
+		say(f"caught {e.code}");
+	};
+	return 0;
+}

@@ -1,0 +1,1 @@
+values_mask_test_without_parentheses.anti:7:5: error: the operands of `&` have the types `u8` and `bool`

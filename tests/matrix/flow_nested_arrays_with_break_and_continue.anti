@@ -1,0 +1,46 @@
+//! A two-dimensional array `[3][4]int`: the inner loop breaks at the first
+//! negative value, the outer loop continues past a row that held one, and a
+//! `for` over the rows copies each `[4]int`.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let grid: [3][4]int = [[1, 2, -3, 4], [5, 6, 7, 8], [9, -1, 2, 3]];
+	let found = -1;
+	for r in 0..3 {
+		let ok = true;
+		for c in 0..4 {
+			if grid[r][c] < 0 {
+				ok = false;
+				break;
+			}
+		}
+		if !ok {
+			continue;
+		}
+		found = r;
+		break;
+	}
+	say(f"first clean row {found}");
+	let negatives = 0;
+	let total = 0;
+	for row in grid {
+		for i, v in row {
+			if v < 0 {
+				negatives += 1;
+				continue;
+			}
+			total += v * i;
+		}
+	}
+	say(f"negatives {negatives} weighted {total}");
+	return 0;
+}

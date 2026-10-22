@@ -1,0 +1,9 @@
+exit 0
+entity 7
+mob 500
+boss ogre
+7 500 ogre
+entity 8
+mob 10
+boss imp
+8 10 imp

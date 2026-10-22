@@ -1,0 +1,92 @@
+//! A generic `Stack<T>` with a nested struct `Node` on the heap, the shape of
+//! the overview, used for `str` and for a struct. `destruct` frees the nodes
+//! left, and `top` takes a function value of its own `U`.
+
+import anti.io;
+import anti.text;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Stack<T>
+{
+	struct Node
+	{
+		value: T,
+		next: ?*Node,
+	}
+
+	head: ?*Node = none,
+	size: int = 0,
+
+	pub fn push(self, own v: T)
+	{
+		self.head = alloc Node { value: v, next: self.head };
+		self.size += 1;
+	}
+
+	pub fn pop(self) -> ?T
+	{
+		let h = self.head else {
+			return none;
+		};
+		self.head = h.next;
+		self.size -= 1;
+		let v = h.value;
+		free(h);
+		return v;
+	}
+
+	pub fn top<U>(self, own fallback: U, f: fn(T) -> U) -> U
+	{
+		let h = self.head else {
+			return fallback;
+		};
+		return f(h.value);
+	}
+
+	pub fn count(self) -> int
+	{
+		return self.size;
+	}
+
+	fn destruct(self)
+	{
+		let p = self.head;
+		while p != none do {
+			let n = p.next;
+			free(p);
+			p = n;
+		}
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let words = Stack<str> { };
+	words.push("a");
+	words.push("bb");
+	words.push("ccc");
+	say(f"{words.count()} {words.top(0, fn(s) { return s.len; })}");
+	let w = words.pop() ?? "";
+	say(f"popped {w} left {words.count()}");
+	let points = Stack<Point> { };
+	points.push(Point { x: 1, y: 2 });
+	points.push(Point { x: 3, y: 4 });
+	let sum = points.top(-1, fn(p) { return p.x + p.y; });
+	say(f"{sum}");
+	let p = points.pop() ?? Point { x: 0, y: 0 };
+	let q = points.pop() ?? Point { x: 0, y: 0 };
+	let r = points.pop();
+	say(f"{p.x} {q.y} {r == none} {points.top(-1, fn(p) { return p.x; })}");
+	return 0;
+}

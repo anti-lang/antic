@@ -1,0 +1,31 @@
+//! The default `==` of two values of a derived class compares the fields of the
+//! base as well as its own, and `equals` through `*Object` gives the same
+//! answer.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Base
+{
+	pub id: int = 0,
+}
+
+class Item inherits Base
+{
+	pub name: str = "",
+}
+
+fn main() -> int
+{
+	let a = Item { id: 1, name: "x" };
+	let b = Item { id: 2, name: "x" };
+	let c = Item { id: 1, name: "x" };
+	say(f"{a == b} {a == c} {a.equals(&b)} {a.equals(&c)}");
+	return 0;
+}

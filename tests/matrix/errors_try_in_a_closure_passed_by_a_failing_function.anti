@@ -1,0 +1,24 @@
+//! An anonymous function passed to a parameter of type `fn(str) -> int` cannot
+//! fail, so `try` in its body is refused, though the function around it may
+//! fail.
+
+import anti.text;
+
+fn apply(s: str, f: fn(str) -> int) -> int
+{
+	return f(s);
+}
+
+fn total(s: str) -> int may fail
+{
+	let first = try text.parse_int(s);
+	return first + apply(s, fn(x) {
+		return try text.parse_int(x);
+	});
+}
+
+fn main() -> int
+{
+	let n = total("4") catch fatal;
+	return n;
+}

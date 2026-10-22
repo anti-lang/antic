@@ -1,0 +1,54 @@
+//! A function walks a `List<Point>` it receives as a pointer with `for`,
+//! decides with a `switch` in the body and returns the first match from inside
+//! the loop as a `?Point`.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn first_in(ps: *List<Point>, q: int) -> ?Point
+{
+	for p in ps {
+		let ok = false;
+		switch q {
+			1 => ok = p.x > 0 && p.y > 0,
+			2 => ok = p.x < 0 && p.y > 0,
+			3 => ok = p.x < 0 && p.y < 0,
+			4 => ok = p.x > 0 && p.y < 0,
+			else => ok = false,
+		}
+		if ok {
+			return p;
+		}
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let ps = List<Point>.new();
+	ps.push(Point { x: 1, y: 2 });
+	ps.push(Point { x: -3, y: 4 });
+	ps.push(Point { x: 5, y: -6 });
+	ps.push(Point { x: -7, y: -8 });
+	for q in 1..6 {
+		if let p = first_in(&ps, q) {
+			say(f"{q}: {p.x} {p.y}");
+		} else {
+			say(f"{q}: none");
+		}
+	}
+	return 0;
+}

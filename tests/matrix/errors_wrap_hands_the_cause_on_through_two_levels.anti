@@ -1,0 +1,44 @@
+//! `Error.wrap` takes the error of a handler as its cause, so the handler does
+//! not delete it, and `fail` hands the wrapper on. The caller reads the code
+//! and the message of the outer error.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn read_port(s: str) -> int may fail
+{
+	return try text.parse_int(s);
+}
+
+fn load(s: str) -> int may fail
+{
+	let p = read_port(s) catch e {
+		fail lang.Error.wrap(40, "bad port", e);
+	};
+	if p > 65535 {
+		fail lang.Error.new(41, "port too large");
+	}
+	return p;
+}
+
+fn main() -> int
+{
+	let inputs: [3]str = ["8080", "http", "70000"];
+	for s in inputs {
+		let p = load(s) catch e {
+			say(f"{s}: {e.code} {e.message}");
+			yield -1;
+		};
+		if p >= 0 {
+			say(f"{s}: port {p}");
+		}
+	}
+	return 0;
+}

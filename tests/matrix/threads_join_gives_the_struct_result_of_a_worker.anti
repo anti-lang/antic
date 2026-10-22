@@ -1,0 +1,55 @@
+//! A worker returns a struct, and `join` gives it to the caller. The jobs of an
+//! array are joined in the order of the array.
+
+import anti.io;
+import anti.text;
+
+struct Stats
+{
+	min: int,
+	max: int,
+	sum: int,
+}
+
+class Series
+{
+	pub start: int = 0,
+	pub len: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn stats(s: *Series) -> Stats
+{
+	let r = Stats { min: s.start, max: s.start, sum: 0 };
+	for i in s.start..s.start + s.len {
+		let v = (i * 7) % 11;
+		if v < r.min {
+			r.min = v;
+		}
+		if v > r.max {
+			r.max = v;
+		}
+		r.sum += v;
+	}
+	return r;
+}
+
+fn main() -> int
+{
+	let a = alloc Series { start: 0, len: 11 };
+	let b = alloc Series { start: 5, len: 3 };
+	let ja = dispatch a -> stats();
+	let jb = dispatch b -> stats();
+	let sa = join(ja);
+	let sb = join(jb);
+	say(f"{sa.min} {sa.max} {sa.sum}");
+	say(f"{sb.min} {sb.max} {sb.sum}");
+	delete(a);
+	delete(b);
+	return 0;
+}

@@ -1,0 +1,1 @@
+ownership_assign_of_an_existing_owning_value.anti:17:6: error: `Texture` has a `destruct`, use `dup` instead of `=`

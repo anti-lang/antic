@@ -1,0 +1,48 @@
+//! Two interfaces declare `describe` with different results, and a class fills
+//! each with a qualified body. A call through each interface reaches its own
+//! body.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+abstract class Labeled
+{
+	abstract fn describe(self) -> str;
+}
+
+abstract class Weighted
+{
+	abstract fn describe(self) -> int;
+}
+
+class Crate
+{
+	implements l: Labeled,
+	implements w: Weighted,
+	pub kg: int = 12,
+
+	concrete fn Labeled::describe(self) -> str
+	{
+		return "crate";
+	}
+
+	concrete fn Weighted::describe(self) -> int
+	{
+		return self.kg;
+	}
+}
+
+fn main() -> int
+{
+	let c = Crate { };
+	let l: *Labeled = &c;
+	let w: *Weighted = &c;
+	say(f"{l.describe()} {w.describe()}");
+	return 0;
+}

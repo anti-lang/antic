@@ -1,0 +1,37 @@
+//! A `try { }` block inside a loop: a failing call in it forwards to its
+//! handler, which ends with `yield;`, and the loop goes on with the next turn.
+//! Statements after the failing call in the block do not run.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn check(n: int) may fail
+{
+	if n % 3 == 0 {
+		fail lang.Error.new(n, "multiple of three");
+	}
+}
+
+fn main() -> int
+{
+	let ok = 0;
+	for i in 1..8 {
+		try {
+			check(i);
+			check(i + 1);
+			ok += 1;
+		} catch e {
+			say(f"{i}: {e.code}");
+			yield;
+		}
+	}
+	say(f"ok {ok}");
+	return 0;
+}

@@ -1,0 +1,37 @@
+//! A `List` of a simd struct: `push` takes each vector by value, `for` walks
+//! copies of them, `+=` adds lane by lane and `sum` folds the total.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let vs = List<Vec4>.new();
+	for i in 0..4 {
+		let f = i as f32;
+		vs.push(Vec4 { x: f, y: f * 2.0, z: 0.5, w: -1.0 });
+	}
+	let total = Vec4.splat(0.0);
+	for v in vs {
+		total += v;
+	}
+	say(f"{total.x} {total.y} {total.z} {total.w} {total.sum()}");
+	let last = vs.last() ?? Vec4.splat(0.0);
+	say(f"{last.y} {vs.count}");
+	return 0;
+}

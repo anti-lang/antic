@@ -1,0 +1,43 @@
+//! A `const` of a class body sizes an array field and gives a field its
+//! default, and `Class.NAME` reaches it in the body and from outside.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class History
+{
+	pub const SIZE: int = 4;
+	pub const START: int = -1;
+
+	values: [History.SIZE]int = [History.START; History.SIZE],
+	next: int = 0,
+
+	pub fn record(self, v: int)
+	{
+		self.values[self.next % History.SIZE] = v;
+		self.next += 1;
+	}
+
+	pub fn at(self, i: int) -> int
+	{
+		return self.values[i];
+	}
+}
+
+fn main() -> int
+{
+	let h = History { };
+	for i in 1..7 {
+		h.record(i * 10);
+	}
+	say(f"{History.SIZE} {h.at(0)} {h.at(1)} {h.at(2)} {h.at(3)}");
+	let fresh = History { };
+	say(f"{fresh.at(3)}");
+	return 0;
+}

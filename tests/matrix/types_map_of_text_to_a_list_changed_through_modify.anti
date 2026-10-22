@@ -1,0 +1,41 @@
+//! A `Map<str, List<int>>`: `set` moves a new list in, `modify` lends the list
+//! to a closure that pushes, `get` gives a copy, and the copy does not change
+//! the list in the map.
+
+import anti.collection.list.{List};
+import anti.collection.map.{Map};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let groups = Map<str, List<int>>.new();
+	groups.set("even", List<int>.new());
+	groups.set("odd", List<int>.new());
+	for i in 0..7 {
+		let key = "odd";
+		if i % 2 == 0 {
+			key = "even";
+		}
+		groups.modify(key, fn(l) {
+			l.push(i);
+		});
+	}
+	let copy = groups.get("even") ?? List<int>.new();
+	copy.push(100);
+	for (k, v) in &groups {
+		let sum = 0;
+		for x in v {
+			sum += x;
+		}
+		say(f"{k} {v.count} {sum}");
+	}
+	say(f"copy {copy.count}");
+	return 0;
+}

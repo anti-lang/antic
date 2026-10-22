@@ -1,0 +1,46 @@
+//! The default `==` of a class with an `own []byte` field compares the bytes
+//! element by element, so a `dup` is equal to its original and stops being
+//! equal after one byte changes.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Doc
+{
+	pub title: str = "",
+	own body: []byte,
+
+	pub fn of(title: str, n: int) -> Doc
+	{
+		let p = alloc(byte, n) else {
+			io.exit(1);
+		};
+		let d = Doc { title: title, body: []byte { ptr: p, len: n } };
+		for i in 0..n {
+			d.body[i] = (65 + i) as byte;
+		}
+		return d;
+	}
+
+	pub fn poke(self, i: int)
+	{
+		self.body[i] = 0;
+	}
+}
+
+fn main() -> int
+{
+	let a = Doc.of("x", 5);
+	let b = dup(a);
+	let c = Doc.of("x", 5);
+	say(f"{a == b} {a == c} {a.hash() == c.hash()}");
+	b.poke(4);
+	say(f"{a == b}");
+	return 0;
+}

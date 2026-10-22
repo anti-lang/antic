@@ -1,0 +1,1 @@
+classes_concrete_over_a_protected_function.anti:22:14: error: `Weekly.footer` is `concrete` and replaces nothing

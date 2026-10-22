@@ -1,0 +1,68 @@
+//! `sync a, b { }` holds the locks of two synchronized accounts in the order of
+//! their addresses. Two jobs move money in opposite directions at once, and the
+//! sum of both accounts never changes.
+
+import anti.io;
+import anti.text;
+
+synchronized class Account
+{
+	balance: int = 0,
+
+	fn construct(self, start: int)
+	{
+		self.balance = start;
+	}
+
+	pub fn add(self, n: int)
+	{
+		self.balance += n;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.balance;
+	}
+}
+
+class Mover
+{
+	pub from: *Account,
+	pub to: *Account,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn move_all(m: *Mover, times: int) -> int
+{
+	let from = m.from;
+	let to = m.to;
+	for i in 0..times {
+		sync from, to {
+			from.add(-1);
+			to.add(1);
+		}
+	}
+	return times;
+}
+
+fn main() -> int
+{
+	let a = alloc Account(1000);
+	let b = alloc Account(1000);
+	let ab = alloc Mover { from: a, to: b };
+	let ba = alloc Mover { from: b, to: a };
+	let j1 = dispatch ab -> move_all(5000);
+	let j2 = dispatch ba -> move_all(3000);
+	let moved = join(j1) + join(j2);
+	say(f"{moved} {a.get()} {b.get()} {a.get() + b.get()}");
+	delete(ab);
+	delete(ba);
+	delete(a);
+	delete(b);
+	return 0;
+}

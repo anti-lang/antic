@@ -1,0 +1,28 @@
+//! The `defer` statements of a function, of a nested block and of the block of
+//! an `if` that returns run in the reverse order of their declaration, each at
+//! the exit of its own block.
+
+import anti.io;
+
+fn work(n: int) -> int
+{
+	defer io.println("first defer");
+	{
+		defer io.println("inner block");
+		io.println("in block");
+	}
+	defer io.println("second defer");
+	if n > 0 {
+		defer io.println("in if");
+		return n * 2;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let a = work(3);
+	io.println("---");
+	let b = work(0);
+	return a + b;
+}

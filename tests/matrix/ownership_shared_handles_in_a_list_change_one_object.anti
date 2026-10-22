@@ -1,0 +1,49 @@
+//! `Shared<Counter>` handles: two handles in a `List` and one local all reach
+//! one object, `modify` through one is seen through the others, and the object
+//! goes when the last handle does.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.mem.{Shared};
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Counter
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"counter gone at {self.n}");
+	}
+}
+
+fn main() -> int
+{
+	let c = Shared<Counter>.new(Counter { n: 1 });
+	{
+		let all = List<Shared<Counter>>.new();
+		all.push(c.share());
+		all.push(c.share());
+		all.modify(0, fn(h) {
+			h.modify(fn(p) {
+				p.n += 10;
+			});
+		});
+		c.modify(fn(p) {
+			p.n *= 2;
+		});
+		all.read(1, fn(h) {
+			h.read(fn(p) {
+				say(f"through the list {p.n}");
+			});
+		});
+	}
+	say(f"list gone");
+	return 0;
+}

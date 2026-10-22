@@ -1,0 +1,40 @@
+//! A recursive function over a `?*Node`: an `if` that returns on `none` narrows
+//! the name for the rest of the function, and the recursive call passes the
+//! field, which stays a `?*Node`.
+
+import anti.io;
+import anti.text;
+
+struct Node
+{
+	value: int,
+	next: ?*Node,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn sum(n: ?*Node, depth: int) -> int
+{
+	if n == none {
+		return 0;
+	}
+	if n.next == none {
+		say(f"last at depth {depth}");
+	}
+	return n.value + sum(n.next, depth + 1);
+}
+
+fn main() -> int
+{
+	let d = Node { value: 40, next: none };
+	let c = Node { value: 30, next: &d };
+	let b = Node { value: 20, next: &c };
+	let a = Node { value: 10, next: &b };
+	say(f"sum {sum(&a, 0)}");
+	say(f"empty {sum(none, 0)}");
+	return 0;
+}

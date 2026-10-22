@@ -1,0 +1,36 @@
+//! A local array of a thousand structs filled by a repeat literal, changed in a
+//! loop and summed, the size of a frame a programmer from C uses for a scratch
+//! table.
+
+import anti.io;
+import anti.text;
+
+struct P
+{
+	x: int,
+	y: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let ps: [1000]P = [P { x: 1, y: 2 }; 1000];
+	for i in 0..1000 {
+		if i % 10 == 0 {
+			ps[i].x = i;
+		}
+	}
+	let sx = 0;
+	let sy = 0;
+	for p in ps {
+		sx += p.x;
+		sy += p.y;
+	}
+	say(f"{sx} {sy}");
+	return 0;
+}

@@ -1,0 +1,1 @@
+errors_bare_failing_call.anti:8:10: error: `parse_int` may fail and its error is not handled

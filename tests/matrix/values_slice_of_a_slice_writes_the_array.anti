@@ -1,0 +1,24 @@
+//! A slice of a slice of a fixed array: a write through the inner slice reaches
+//! the array, and `.len` of each counts its own elements.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let a: [6]int = [0, 1, 2, 3, 4, 5];
+	let s = a[1..5];
+	let t = s[1..3];
+	t[0] = 100;
+	t[1] += 200;
+	say(f"{s.len} {t.len}");
+	say(f"{a[0]} {a[1]} {a[2]} {a[3]} {a[4]} {a[5]}");
+	say(f"{s[1]} {s[2]}");
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! FNV-1a of 32 bits over the bytes of a `str`, as a programmer ports it from
+//! C: `^` with the byte widened to `u32` and `*%` by the prime, written in hex.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn fnv1a(s: str) -> u32
+{
+	let h: u32 = 2166136261;
+	for i in 0..s.len {
+		h = (h ^ (s[i] as u32)) *% 16777619;
+	}
+	return h;
+}
+
+fn main() -> int
+{
+	say(f#"{fnv1a(""):x}"#);
+	say(f#"{fnv1a("a"):x}"#);
+	say(f#"{fnv1a("foobar"):x}"#);
+	return 0;
+}

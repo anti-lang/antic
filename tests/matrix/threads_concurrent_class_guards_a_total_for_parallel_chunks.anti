@@ -1,0 +1,57 @@
+//! A concurrent class guards its total with a Mutex field, and the chunks of a
+//! `parallel` add into it through a pointer argument. The total is read under
+//! the lock after every chunk ran.
+
+import anti.io;
+import anti.text;
+
+concurrent class Bank
+{
+	lock: Mutex,
+	total: int = 0 guarded by lock,
+	deposits: int = 0 guarded by lock,
+
+	pub fn deposit(self, n: int)
+	{
+		sync self.lock {
+			self.total += n;
+			self.deposits += 1;
+		}
+	}
+
+	pub fn report(self) -> (int, int)
+	{
+		sync self.lock {
+			return (self.total, self.deposits);
+		}
+	}
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn pay(chunk: []int, b: *Bank) -> int
+{
+	for x in chunk {
+		b.deposit(x);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let amounts: [100]int = [0; 100];
+	for i in 0..100 {
+		amounts[i] = i + 1;
+	}
+	let b = alloc Bank { };
+	let parts = parallel amounts[0..100] by 7 -> pay(b);
+	let (total, n) = b.report();
+	say(f"{parts.len} {total} {n}");
+	free(parts.ptr);
+	delete(b);
+	return 0;
+}

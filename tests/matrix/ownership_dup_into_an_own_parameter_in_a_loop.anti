@@ -1,0 +1,38 @@
+//! `dup` gives a fresh copy for each turn of a loop, which moves into an `own`
+//! parameter and goes at the end of the call, while the original stays with the
+//! caller until its block ends.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Tracked
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		say(f"drop {self.id}");
+	}
+}
+
+fn take(own t: Tracked, turn: int)
+{
+	t.id += turn * 100;
+	say(f"took {t.id}");
+}
+
+fn main() -> int
+{
+	let t = Tracked { id: 5 };
+	for i in 1..4 {
+		take(dup(t), i);
+	}
+	say(f"kept {t.id}");
+	return 0;
+}

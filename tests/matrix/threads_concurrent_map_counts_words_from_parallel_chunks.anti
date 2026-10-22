@@ -1,0 +1,39 @@
+//! A `ConcurrentMap<str, int>` counts words from the chunks of a `parallel`:
+//! `update` changes an entry in place under the lock of its part, and `add`
+//! puts in a new one only where none stands.
+
+import anti.collection.concurrent.{ConcurrentMap};
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn count(chunk: []str, m: *ConcurrentMap<str, int>) -> int
+{
+	for w in chunk {
+		if !m.update(w, fn(n) {
+			*n += 1;
+		}) {
+			if !m.add(w, 1) {
+				m.update(w, fn(n) {
+					*n += 1;
+				});
+			}
+		}
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let words: [12]str = ["a", "b", "a", "c", "a", "b", "d", "a", "c", "b", "a", "d"];
+	let map = ConcurrentMap<str, int>.new();
+	let parts = parallel words[0..12] by 4 -> count(&map);
+	free(parts.ptr);
+	say(f#"{map.get("a") ?? 0} {map.get("b") ?? 0} {map.get("c") ?? 0} {map.get("d") ?? 0} {map.count()}"#);
+	return 0;
+}

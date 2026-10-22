@@ -1,0 +1,6 @@
+exit 0
+0 gives 3
+error 0: empty input
+1 gives -1
+parse error 2 on line 3: bad start
+2 gives -1

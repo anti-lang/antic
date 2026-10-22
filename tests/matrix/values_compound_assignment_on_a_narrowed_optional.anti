@@ -1,0 +1,34 @@
+//! A `?int` narrowed by a test takes `+=` and `*=`, which keep the narrowing,
+//! and `??` reads it after the block. A `?f64` field of a struct does the same
+//! through `if let`.
+
+import anti.io;
+import anti.text;
+
+struct Stats
+{
+	mean: ?f64,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let n: ?int = 5;
+	if n != none {
+		n += 1;
+		n *= 2;
+		say(f"{n}");
+	}
+	say(f"{n ?? 0}");
+	let s = Stats { mean: 1.5 };
+	if let m = s.mean {
+		s.mean = m * 4.0;
+	}
+	say(f"{s.mean ?? 0.0}");
+	return 0;
+}

@@ -1,0 +1,19 @@
+//! Worker parameters are pointer-free apart from a thread-safe object, so a
+//! `*int` parameter that every chunk would write is refused.
+
+worker fn add_into(chunk: []int, total: *int) -> int
+{
+	for x in chunk {
+		*total += x;
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let xs: [4]int = [1, 2, 3, 4];
+	let total = 0;
+	let parts = parallel xs[0..4] -> add_into(&total);
+	free(parts.ptr);
+	return total;
+}

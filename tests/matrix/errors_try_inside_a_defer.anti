@@ -1,0 +1,16 @@
+//! `try` inside a `defer` is refused, as `return` and `fail` are, even in a
+//! function that may fail.
+
+import anti.text;
+
+fn load(s: str) -> int may fail
+{
+	defer try text.parse_int(s);
+	return 1;
+}
+
+fn main() -> int
+{
+	let n = load("1") catch fatal;
+	return n;
+}

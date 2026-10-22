@@ -1,0 +1,33 @@
+//! A `may fail` function returns a tuple through its out pointer, and `let (q,
+//! r) = f() catch ...` takes the result apart, with a `yield` of a tuple in the
+//! handler.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn divmod(a: int, b: int) -> (int, int) may fail
+{
+	if b == 0 {
+		fail lang.Error.new(1, "zero");
+	}
+	return (a / b, a % b);
+}
+
+fn main() -> int
+{
+	let bs: [3]int = [3, 0, -4];
+	for b in bs {
+		let (q, r) = divmod(17, b) catch {
+			yield (0, -1);
+		};
+		say(f"{b}: {q} {r}");
+	}
+	return 0;
+}

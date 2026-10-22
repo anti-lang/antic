@@ -1,0 +1,8 @@
+exit 0
+x -> idle
+s -> running
+p -> paused
+x -> paused
+r -> running
+q -> done
+stopped after 6

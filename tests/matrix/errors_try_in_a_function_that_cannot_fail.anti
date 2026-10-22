@@ -1,0 +1,20 @@
+//! `try` forwards the error and is refused outside a function that may fail,
+//! here in a method of a class.
+
+import anti.text;
+
+class Reader
+{
+	pub text: str = "",
+
+	pub fn value(self) -> int
+	{
+		return try text.parse_int(self.text);
+	}
+}
+
+fn main() -> int
+{
+	let r = Reader { text: "3" };
+	return r.value();
+}

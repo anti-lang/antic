@@ -1,0 +1,6 @@
+exit 0
+sum 10
+node 1
+node 3
+node 2
+node 4

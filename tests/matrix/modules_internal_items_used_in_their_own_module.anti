@@ -1,0 +1,41 @@
+//! `internal` items, a function, a struct and a constant, are used freely by
+//! the module that declares them, beside `pub` and private ones.
+
+import anti.io;
+import anti.text;
+
+internal const LIMIT: int = 3;
+
+internal struct Window
+{
+	lo: int,
+	hi: int,
+}
+
+internal fn clamp(w: Window, v: int) -> int
+{
+	if v < w.lo {
+		return w.lo;
+	}
+	if v > w.hi {
+		return w.hi;
+	}
+	return v;
+}
+
+pub fn run(v: int) -> int
+{
+	return clamp(Window { lo: -LIMIT, hi: LIMIT }, v);
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	say(f"{run(-9)} {run(2)} {run(40)}");
+	return 0;
+}

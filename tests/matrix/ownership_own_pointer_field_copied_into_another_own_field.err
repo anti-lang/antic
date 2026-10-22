@@ -1,0 +1,1 @@
+ownership_own_pointer_field_copied_into_another_own_field.anti:20:16: error: `self.head` is held by an `own` field, use `dup` instead of `=`

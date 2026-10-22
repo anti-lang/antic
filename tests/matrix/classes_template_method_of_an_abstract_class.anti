@@ -1,0 +1,77 @@
+//! The template method: a public function of an abstract class calls its
+//! abstract steps, which two classes fill, and a public hook with a body that
+//! one of them replaces.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+abstract class Report
+{
+	abstract fn title(self) -> str;
+	abstract fn rows(self) -> int;
+
+	pub fn footer(self) -> str
+	{
+		return "end";
+	}
+
+	pub fn render(self) -> int
+	{
+		say(f"# {self.title()}");
+		let n = self.rows();
+		for i in 0..n {
+			say(f"row {i}");
+		}
+		say(f"{self.footer()}");
+		return n;
+	}
+}
+
+class Daily inherits Report
+{
+	concrete fn title(self) -> str
+	{
+		return "daily";
+	}
+
+	concrete fn rows(self) -> int
+	{
+		return 2;
+	}
+}
+
+class Weekly inherits Report
+{
+	concrete fn title(self) -> str
+	{
+		return "weekly";
+	}
+
+	concrete fn rows(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn footer(self) -> str
+	{
+		return "signed";
+	}
+}
+
+fn main() -> int
+{
+	let d = Daily { };
+	let w = Weekly { };
+	let reports: [2]*Report = [&d, &w];
+	let total = 0;
+	for r in reports {
+		total += r.render();
+	}
+	return total;
+}

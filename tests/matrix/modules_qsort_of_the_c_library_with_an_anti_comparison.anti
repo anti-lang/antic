@@ -1,0 +1,42 @@
+//! `qsort` of the C library sorts an array of `i32` with a comparison written
+//! in Anti, passed as a C function pointer, as a programmer from C sorts
+//! without a library of the language.
+
+import anti.io;
+import anti.text;
+
+extern fn qsort(base: ?*byte, n: c_size_t, size: c_size_t, cmp: fn(?*byte, ?*byte) -> c_int);
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn by_value(a: ?*byte, b: ?*byte) -> c_int
+{
+	let x = a else {
+		return 0;
+	};
+	let y = b else {
+		return 0;
+	};
+	let l = *(x as *i32);
+	let r = *(y as *i32);
+	if l < r {
+		return -1;
+	}
+	if l > r {
+		return 1;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let xs: [6]i32 = [42, -7, 0, 19, -7, 3];
+	let s = xs[0..6];
+	qsort(s.ptr as ?*byte, 6, size_of(i32) as c_size_t, by_value);
+	say(f"{xs[0]} {xs[1]} {xs[2]} {xs[3]} {xs[4]} {xs[5]}");
+	return 0;
+}

@@ -1,0 +1,42 @@
+//! `fallthrough;` leaves the block of its arm for the next arm, so the `defer`
+//! of the arm runs before the next arm's body, as at every other exit of a
+//! block.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn grade(n: int) -> int
+{
+	let points = 0;
+	switch n {
+		3 => {
+			defer say(f"leave 3 at {points}");
+			points += 100;
+			fallthrough;
+		},
+		2 => {
+			defer say(f"leave 2 at {points}");
+			points += 10;
+			fallthrough;
+		},
+		1 => {
+			points += 1;
+		},
+		else => { },
+	}
+	return points;
+}
+
+fn main() -> int
+{
+	say(f"grade 3: {grade(3)}");
+	say(f"grade 2: {grade(2)}");
+	say(f"grade 5: {grade(5)}");
+	return 0;
+}

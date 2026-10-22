@@ -1,0 +1,1 @@
+modules_direct_import_of_a_private_function.anti:4:26: error: `anti.text` has no public item `put`

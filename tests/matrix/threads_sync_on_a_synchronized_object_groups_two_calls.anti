@@ -1,0 +1,68 @@
+//! `sync obj { }` holds the hidden lock of a synchronized object across two of
+//! its public calls, which take the lock again without waiting. Jobs that move
+//! between two fields under it never show a half move.
+
+import anti.io;
+import anti.text;
+
+synchronized class Pair
+{
+	left: int = 0,
+	right: int = 0,
+
+	pub fn take_left(self)
+	{
+		self.left -= 1;
+	}
+
+	pub fn give_right(self)
+	{
+		self.right += 1;
+	}
+
+	pub fn sum(self) -> int
+	{
+		return self.left + self.right;
+	}
+}
+
+class Mover
+{
+	pub times: int = 0,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn move(m: *Mover, p: *Pair) -> int
+{
+	let odd = 0;
+	for i in 0..m.times {
+		sync p {
+			p.take_left();
+			if p.sum() != -1 {
+				odd += 1;
+			}
+			p.give_right();
+		}
+	}
+	return odd;
+}
+
+fn main() -> int
+{
+	let p = alloc Pair { };
+	let a = alloc Mover { times: 20000 };
+	let b = alloc Mover { times: 30000 };
+	let ja = dispatch a -> move(p);
+	let jb = dispatch b -> move(p);
+	let odd = join(ja) + join(jb);
+	say(f"{odd} {p.sum()}");
+	delete(a);
+	delete(b);
+	delete(p);
+	return 0;
+}

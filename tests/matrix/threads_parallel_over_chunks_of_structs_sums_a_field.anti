@@ -1,0 +1,43 @@
+//! `parallel` over a slice of structs in three chunks: each worker sums a field
+//! of its chunk, and the caller adds the results and frees them.
+
+import anti.io;
+import anti.text;
+
+struct Particle
+{
+	x: f64,
+	mass: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+worker fn total_mass(chunk: []Particle) -> int
+{
+	let sum = 0;
+	for p in chunk {
+		sum += p.mass;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let ps: [10]Particle = [Particle { x: 0.0, mass: 0 }; 10];
+	for i in 0..10 {
+		ps[i].mass = i * i;
+		ps[i].x = i as f64;
+	}
+	let parts = parallel ps[0..10] by 3 -> total_mass;
+	let sum = 0;
+	for p in parts {
+		sum += p;
+	}
+	say(f"{parts.len} {sum}");
+	free(parts.ptr);
+	return 0;
+}

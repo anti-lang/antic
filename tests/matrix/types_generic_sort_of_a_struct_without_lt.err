@@ -1,0 +1,1 @@
+types_generic_sort_of_a_struct_without_lt.anti:19:5: error: `Card` has no `lt`, which `smaller` needs for `T`. A struct or a class has no default order and declares `operator fn lt`

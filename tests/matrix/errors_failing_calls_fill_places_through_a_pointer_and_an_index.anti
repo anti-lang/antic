@@ -1,0 +1,40 @@
+//! A failing call whose `catch` yields fills a place: an element of an array, a
+//! field through a pointer and a dereferenced pointer, as the entry on both
+//! forms of a failing call allows.
+
+import anti.io;
+import anti.text;
+
+struct Totals
+{
+	last: int,
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let inputs: [3]str = ["7", "x", "-2"];
+	let parsed: [3]int = [0, 0, 0];
+	let t = Totals { last: 0 };
+	let p = &t;
+	let n = 0;
+	let q = &n;
+	for i, s in inputs {
+		parsed[i] = text.parse_int(s) catch {
+			yield 100;
+		};
+		p.last = text.parse_int(s) catch {
+			yield -100;
+		};
+		*q = text.parse_int(s) catch e {
+			yield e.code * 0 + 9;
+		};
+	}
+	say(f"{parsed[0]} {parsed[1]} {parsed[2]} {t.last} {n}");
+	return 0;
+}
