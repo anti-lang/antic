@@ -137,3 +137,6 @@ matrix_values_flags_form_of_constants_memory_checks T180 The flags form of two s
 matrix_closures_snapshot_of_an_if_let_binding_dev T181 A snapshot refuses the int that if let binds from a ?int.
 matrix_closures_snapshot_of_an_if_let_binding_release T181 A snapshot refuses the int that if let binds from a ?int.
 matrix_closures_snapshot_of_an_if_let_binding_memory_checks T181 A snapshot refuses the int that if let binds from a ?int.
+matrix_flow_do_while_before_a_parenthesized_statement_dev T182 A statement that starts with a parenthesis after do while is read as a call of the condition.
+matrix_flow_do_while_before_a_parenthesized_statement_release T182 A statement that starts with a parenthesis after do while is read as a call of the condition.
+matrix_flow_do_while_before_a_parenthesized_statement_memory_checks T182 A statement that starts with a parenthesis after do while is read as a call of the condition.

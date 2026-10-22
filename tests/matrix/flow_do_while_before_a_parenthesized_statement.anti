@@ -1,0 +1,19 @@
+//! A `do { } while cond` takes no `;` after its condition, by "Statements"
+//! in `docs/decisions.md`, so the statement after it starts on its own. Here
+//! that statement starts with a parenthesis, `(*p) = n;`, which is no
+//! argument list of the condition.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let n: int = 0;
+	let v: int = 7;
+	let p: *int = &v;
+	do {
+		n += 1;
+	} while n < 3
+	(*p) = n;
+	printf("%d %d\n".ptr, n as c_int, v as c_int);
+	return 0;
+}
