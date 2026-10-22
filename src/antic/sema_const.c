@@ -350,10 +350,11 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
         /* DESIGN: unary `-` of the least value has no value in its
            type, by R031 of "Rules of 2026-10-13". A literal under the
            `-` is the least value itself, which integer_literal holds to
-           the range. */
+           the range. The flags form gives the wrapped result here, as
+           it does for `+`. */
         int bits = types_is_target_sized(result) ? 64 : types_bits(result);
         if (a->kind == CONST_INT && types_is_signed(result) &&
-            e->as.unary.operand->kind != EXPR_INT &&
+            e != c->flags_value && e->as.unary.operand->kind != EXPR_INT &&
             arith_overflows('-', 0, a->as.integer, bits, true)) {
             operand_text(&x, e->as.unary.operand, a);
             sema_error_at(c, e->pos,
@@ -406,6 +407,7 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
                           text_cstr(&x), o, text_cstr(&y));
             found = true;
         } else if (sign != 0 && a->kind != CONST_SYMBOLIC &&
+                   e != c->flags_value &&
                    (in_constant || types_is_signed(t)) &&
                    arith_overflows(sign, a->as.integer, b->as.integer,
                                    types_is_target_sized(t) ? 64 : bits,
@@ -414,7 +416,9 @@ static bool reports_undefined(struct checker *c, const struct expr *e,
                R029 of "Rules of 2026-10-13", in an unsigned type as
                well. `+%` and `+|` name a result outside the range. A
                signed operation that runs stops a dev build, so it is
-               refused wherever its operands are constants. */
+               refused wherever its operands are constants. The
+               operation of the flags form traps in no build and gives
+               the wrapped result, so it is no such operation. */
             sema_error_at(c, e->pos, "`%s %s %s` does not fit `%s`",
                           text_cstr(&x), o, text_cstr(&y), sema_tn(t));
             found = true;

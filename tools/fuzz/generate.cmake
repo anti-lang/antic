@@ -964,11 +964,6 @@ function(fuzz_statement out decl_out)
         fuzz_name(f g)
         fuzz_expr(a ${type} 1)
         fuzz_expr(b ${type} 1)
-        # The first operand reads the accumulator, so the operation is no
-        # constant: antic refuses the flags form of two signed constants
-        # out of range, finding T180 of docs/audit/tests-findings.md.
-        fuzz_convert(held int ${type} "${ctx_acc}")
-        set(a "(${a} ^ ${held})")
         math(EXPR top "${fuzz_bits_${type}} - 1")
         fuzz_weighted(form add:3 sub:2 mul:2 shl:1 shr:1 neg:1 carry:2)
         if(form STREQUAL "add")
@@ -981,7 +976,10 @@ function(fuzz_statement out decl_out)
             set(op "${a} << (${b} & ${top})")
         elseif(form STREQUAL "shr")
             set(op "${a} >> (${b} & ${top})")
-        elseif(form STREQUAL "neg" AND fuzz_signed_${type})
+        elseif(form STREQUAL "neg" AND fuzz_signed_${type} AND
+               NOT a MATCHES "^[0-9]+$")
+            # A `-` directly before a literal forms a constant, which the
+            # flags form refuses.
             set(op "-${a}")
         else()
             set(op "${a} + ${b}")

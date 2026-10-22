@@ -1,0 +1,21 @@
+//! The flags form on unary `-` of a constant gives the wrapped result and
+//! its flags, as it does on a variable. Unary `-` of the least value
+//! leaves the range of its type, and the flags form never traps, so it is
+//! no refusal of R031: an `i32` and an `i64`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const LEAST32: i32 = -2147483648;
+const LEAST64: i64 = -9223372036854775808;
+
+fn main() -> int
+{
+	let (a, fa) = -LEAST32;
+	printf("i32 %d %d %d %d %d\n".ptr, a as c_int, fa.overflow as c_int,
+		fa.carry as c_int, fa.zero as c_int, fa.negative as c_int);
+	let (b, fb) = -LEAST64;
+	printf("i64 %d %d %d %d %d\n".ptr, (b == LEAST64) as c_int,
+		fb.overflow as c_int, fb.carry as c_int, fb.zero as c_int,
+		fb.negative as c_int);
+	return 0;
+}

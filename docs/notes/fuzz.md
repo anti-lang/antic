@@ -99,11 +99,11 @@ needs a filter after it is written:
 - Nothing reads the time, the environment or a random source. The default
   hash is left out, since the runtime chooses its seed at start.
 
-The generator also steers around three open findings of
-`docs/audit/tests-findings.md`, each at the line that does so: the flags
-form of two constants, T180, a snapshot of an `if let` binding, T181, and a
-statement that starts with `(` after a `do` loop, T182. A fix of a finding
-removes its workaround.
+The generator also steers around two open findings of
+`docs/audit/tests-findings.md`, each at the line that does so: a snapshot
+of an `if let` binding, T181, and a statement that starts with `(` after a
+`do` loop, T182. A fix of a finding removes its workaround, as the fix of
+T180 removed the one of the flags form of two constants.
 
 ## The kinds of find
 

@@ -1340,6 +1340,7 @@ static void check_flags_assign(struct checker *c, struct stmt *s)
 {
     struct expr *target = s->as.assign.target;
     struct expr *value = s->as.assign.value;
+    const struct expr *outer;
     struct type *places[2];
     struct type *t;
     size_t i;
@@ -1377,7 +1378,10 @@ static void check_flags_assign(struct checker *c, struct stmt *s)
                       sema_tn(places[1]));
         return;
     }
+    outer = c->flags_value;
+    c->flags_value = value;
     t = sema_check_expr(c, value, places[0]);
+    c->flags_value = outer;
     if (flags_operation(c, value, t)) {
         sema_require(c, value, t, places[0]);
     }
@@ -1388,17 +1392,24 @@ static void check_flags_assign(struct checker *c, struct stmt *s)
    elements from there. */
 static void check_destructuring_let(struct checker *c, struct stmt *s)
 {
+    const struct expr *outer;
     struct symbol *value;
     struct context sized;
     struct type *t;
+    bool flags_shape = s->as.let.name_count == 2 &&
+                       s->as.let.guard.kind == HANDLE_NONE &&
+                       (s->as.let.value->kind == EXPR_BINARY ||
+                        s->as.let.value->kind == EXPR_UNARY);
 
     sema_enter_sized(c, &sized);
+    /* An operation of integers gives no tuple, so a value of this shape
+       whose operands are integers is the flags form. */
+    outer = c->flags_value;
+    c->flags_value = flags_shape ? s->as.let.value : NULL;
     t = sema_check_expr(c, s->as.let.value, NULL);
+    c->flags_value = outer;
     sema_leave(c, &sized);
-    if (s->as.let.name_count == 2 && s->as.let.guard.kind == HANDLE_NONE &&
-        !sema_is_error(t) && t->kind != TYPE_TUPLE &&
-        (s->as.let.value->kind == EXPR_BINARY ||
-         s->as.let.value->kind == EXPR_UNARY)) {
+    if (flags_shape && !sema_is_error(t) && t->kind != TYPE_TUPLE) {
         check_flags_let(c, s, t);
         return;
     }

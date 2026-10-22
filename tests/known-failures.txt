@@ -131,9 +131,6 @@ matrix_types_generic_operator_with_a_literal_of_its_parameter_memory_checks T176
 matrix_ownership_compare_an_own_function_with_a_plain_one_refused T177 The message of == between an own fn and a plain one leaves out own.
 fmt_default_struct_literal T178 anti fmt takes the brace of a struct literal in a default parameter for the body.
 anti_build_message_path_chain_to_a_package_without_a_version T179 A path dependency of a path dependency that names no version is looked for in a repository.
-matrix_values_flags_form_of_constants_dev T180 The flags form of two signed constants is refused as a constant out of range.
-matrix_values_flags_form_of_constants_release T180 The flags form of two signed constants is refused as a constant out of range.
-matrix_values_flags_form_of_constants_memory_checks T180 The flags form of two signed constants is refused as a constant out of range.
 matrix_closures_snapshot_of_an_if_let_binding_dev T181 A snapshot refuses the int that if let binds from a ?int.
 matrix_closures_snapshot_of_an_if_let_binding_release T181 A snapshot refuses the int that if let binds from a ?int.
 matrix_closures_snapshot_of_an_if_let_binding_memory_checks T181 A snapshot refuses the int that if let binds from a ?int.

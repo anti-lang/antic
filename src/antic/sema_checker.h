@@ -196,6 +196,9 @@ struct checker {
     /* The name that the `=` checked now gives a new value, which is no
        use of the value it held. */
     const struct expr *assigned;
+    /* The operation of the flags form checked now, whose result wraps
+       and sets the flags rather than leave its range, or NULL. */
+    const struct expr *flags_value;
     /* The copies named before the functions had their types, whose
        constraints are checked once they do. */
     struct pending_check *pending;
