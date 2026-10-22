@@ -68,6 +68,18 @@ anti_message(fault_frameworks_unread
     ARGS test --work ../test --runtime "${RUNTIME}" com/example/twice.anti
     ERR "${one_segment}"
         "antic: cannot read ../test/twice.antl")
+# The compile of a library the runner imports, compile_imports of test.c,
+# whose llc is the second program the run starts, after that of the
+# object of the module.
+set(text_text "//! Doubling.\n\nimport anti.text;\n\n/// Twice n.\npub fn twice(n: int) -> int\n{\n\treturn n * 2;\n}\n\ntests\n{\n\tfn doubles()\n\t{\n\t\tlet same = text.equal(\"a\", \"a\");\n\t\tassert(same);\n\t}\n}\n")
+anti_message(fault_import_not_compiled
+    FILES com/example/twice.anti "${text_text}"
+    FAULT run:3:EACCES
+    OUT "anti test: 1 tests in 1 modules, 1 module failed"
+    ARGS test --work ../test --runtime "${RUNTIME}" com/example/twice.anti
+    ERR "${one_segment}"
+        "anti: cannot run ${RUNTIME}/bin/llc${EXE}: Permission denied"
+        "antic: llc failed")
 # The compile of the object of the module in a dev run, compile_object of
 # test.c, whose llc is the first program the run starts. The run stops
 # before it counts the tests.
