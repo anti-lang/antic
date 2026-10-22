@@ -169,3 +169,11 @@ default size, 10001 to 15840, and 3200 at size 16, 20001 to 23200, in
 116 minutes. None showed a find. 150 seeds at size 40 were all refused
 at `fn f16`, a keyword. The step fuzz-fix named the functions `fun0` and
 on, which lifted that limit.
+
+## The campaign of the step fuzz-fix
+
+On 2026-10-22 the generator of commit `679d68d2` ran again, after the
+fixes of T180, T181 and T182 and the names `fun0` and on. It ran the 150
+seeds 30001 to 30150 at size 40 and the seeds 1, 5 and 3122 of the three
+findings. It ran 1000 new seeds as well, 40001 to 41000, at the default
+size. None showed a find.
