@@ -17,6 +17,15 @@ anti_message(modules_import_each_other
           src/com/example/b.anti "//! The second.\n\nimport com.example.a;\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "anti: the imports form a cycle: com.example.a -> com.example.b -> com.example.a")
+# The cycle is named from the first module the order left out, which
+# here comes after one that the order took.
+anti_message(modules_import_each_other_after_one_in_order
+    FILES anti.toml "${check_manifest}"
+          src/com/example/a.anti "//! The first.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+          src/com/example/b.anti "//! The second.\n\nimport com.example.c;\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
+          src/com/example/c.anti "//! The third.\n\nimport com.example.b;\n\n/// Three.\npub fn three() -> int\n{\n\treturn 3;\n}\n"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "anti: the imports form a cycle: com.example.b -> com.example.c -> com.example.b")
 # The block names a function its module keeps private, which a user of
 # the module does not reach.
 anti_message(block_fails
