@@ -314,6 +314,24 @@ static bool implements_refused(const struct type *t)
     return false;
 }
 
+/* Whether a level of the chain of t declares a public function named
+   name, which then has an entry in the table. */
+static bool public_in_chain(const struct type *t, const struct name *name)
+{
+    size_t i;
+
+    for (; t != NULL; t = sema_inherited(t)) {
+        for (i = 0; i < t->member_count; i++) {
+            const struct item *m = t->members[i];
+            if (m->kind == ITEM_FN && m->pub &&
+                types_same_name(&m->name, name)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /* The entries a `concrete fn` m of t fills, each compared with m. A
    qualified body fills the table its qualifier names. An unqualified one
    fills the entry of the base chain, unless a body qualified by a base
@@ -348,6 +366,17 @@ static void check_replacement(struct checker *c, const struct item *it,
     entry = types_holds_entry(t, m)
                 ? chain_entry(sema_inherited(t), &m->name, &owner)
                 : NULL;
+    /* A protected or a private function has no entry and is called
+       directly, by "Visibility" in docs/anti-object-model.md, so a
+       `concrete fn` of its name replaces nothing, by T188 of
+       docs/audit/tests-findings.md. A name that a public function above
+       it declares keeps its entry, as `destruct` of `anti.lang.Error`
+       keeps the one of `Object`. A static function of the base keeps
+       the message of may_fill, which names the `self` it lacks. */
+    if (entry != NULL && entry->has_self &&
+        !public_in_chain(sema_inherited(t), &m->name)) {
+        entry = NULL;
+    }
     if (entry != NULL && !may_fill(c, it, m, entry, owner)) {
         return;
     }

@@ -132,4 +132,3 @@ matrix_ownership_compare_an_own_function_with_a_plain_one_refused T177 The messa
 fmt_default_struct_literal T178 anti fmt takes the brace of a struct literal in a default parameter for the body.
 anti_build_message_path_chain_to_a_package_without_a_version T179 A path dependency of a path dependency that names no version is looked for in a repository.
 matrix_classes_class_with_two_fields_of_one_name_refused T184 The message of two fields of one name calls a class a struct.
-matrix_classes_concrete_over_a_protected_function_refused T188 A concrete fn over a protected or private function of the base replaces nothing and is taken.

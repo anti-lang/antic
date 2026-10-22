@@ -1,0 +1,30 @@
+//! A private `fn` has no entry in the table and is called directly, so a
+//! `concrete fn` of the same name in a derived class replaces nothing. It is
+//! refused as a `concrete fn` over a `protected fn` is.
+
+abstract class Report
+{
+	fn footer(self) -> str
+	{
+		return "end";
+	}
+
+	pub fn render(self) -> str
+	{
+		return self.footer();
+	}
+}
+
+class Weekly inherits Report
+{
+	concrete fn footer(self) -> str
+	{
+		return "signed";
+	}
+}
+
+fn main() -> int
+{
+	let w = Weekly { };
+	return w.render().len;
+}
