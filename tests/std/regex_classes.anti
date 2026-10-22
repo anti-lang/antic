@@ -2,7 +2,8 @@
 //! with and without braces, a negated property, a property the class ends
 //! inside, a byte in hexadecimal with capital digits, the POSIX forms with `.`
 //! and `=`, a negated class and a range with a character outside ASCII, a range
-//! of two such characters, and letters quoted with `\Q`. A pattern of text
+//! of two such characters, and letters quoted with `\Q`, in a class and outside
+//! one beside a character outside ASCII and a sign after `z`. A pattern of text
 //! takes CRLF as its newline, and a pattern of two groups of one name gives the
 //! first that took part. Each line prints what came of the pattern.
 import anti.lang;
@@ -36,6 +37,7 @@ fn main() -> int
 	try_bytes("[[.a.]]", "a");
 	try_bytes("[[=a=]]", "a");
 	try_bytes("[\\Qab\\E]", "b");
+	try_bytes("\\Q\u{e9}~\\E", "\u{e9}~");
 	try_bytes("[^\\Q\u{e9}\\E]", "a");
 	try_bytes("[a-\u{e9}]", "a");
 	try_bytes("[\u{e9}-\u{ea}]", "a");
