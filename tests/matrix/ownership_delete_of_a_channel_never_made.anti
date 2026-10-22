@@ -1,0 +1,38 @@
+//! `delete(c)` of a channel that was never made, in an element of
+//! `alloc(T, n)` the program has not filled. The element holds a class
+//! value with a `destruct`, so `alloc` zeroes it, and the channel beside it
+//! holds no handle. The delete tears down no value and frees nothing, by
+//! R075 of "Rules of 2026-10-13".
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	pub static atomic live: int = 0;
+
+	fn destruct(self)
+	{
+		Key.live.sub(1);
+	}
+}
+
+struct Box
+{
+	k: Key,
+	c: chan Key,
+}
+
+fn main() -> int
+{
+	let p = alloc(Box, 1) else {
+		return 1;
+	};
+	delete((*p).c);
+	printf("delete of a channel never made: alive %d\n".ptr, Key.live.load() as c_int);
+	free(p);
+	return 0;
+}
