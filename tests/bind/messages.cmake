@@ -458,6 +458,12 @@ anti_message(fault_probe_not_written
     FAULT open:4:EACCES
     ARGS bind api.json --probe -o ../out
     ERR "anti: cannot write ../out/probe_api.anti")
+# The shim of a static inline function, written after the module.
+anti_message(fault_shim_not_written
+    FILES api.h "static inline int twice(int n) { return n * 2; }\n"
+    FAULT open:2:EACCES
+    ARGS bind --clang api.h -o ../out --runtime "${RUNTIME}"
+    ERR "anti: cannot write ../out/shim_api.c")
 # T153: the output directory, which anti bind leaves without a message.
 anti_message(fault_out_not_made
     FILES api.json "${fault_api}"
