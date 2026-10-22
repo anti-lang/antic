@@ -134,3 +134,6 @@ anti_build_message_path_chain_to_a_package_without_a_version T179 A path depende
 matrix_values_flags_form_of_constants_dev T180 The flags form of two signed constants is refused as a constant out of range.
 matrix_values_flags_form_of_constants_release T180 The flags form of two signed constants is refused as a constant out of range.
 matrix_values_flags_form_of_constants_memory_checks T180 The flags form of two signed constants is refused as a constant out of range.
+matrix_closures_snapshot_of_an_if_let_binding_dev T181 A snapshot refuses the int that if let binds from a ?int.
+matrix_closures_snapshot_of_an_if_let_binding_release T181 A snapshot refuses the int that if let binds from a ?int.
+matrix_closures_snapshot_of_an_if_let_binding_memory_checks T181 A snapshot refuses the int that if let binds from a ?int.

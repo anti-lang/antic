@@ -1,0 +1,34 @@
+//! A `snapshot fn` takes the value that `if let` binds from a `?int`, an
+//! `int` in the block of the `if let`, as it takes the binding of a
+//! `let ... else` and a plain `int`. A snapshot holds numbers.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn get(x: int) -> ?int
+{
+	if x == 0 {
+		return none;
+	}
+	return x * 2;
+}
+
+fn run(f: fn() -> int) -> int
+{
+	return f();
+}
+
+fn main() -> int
+{
+	if let q = get(3) {
+		printf("if let %d\n".ptr, run(snapshot fn() -> int {
+			return q;
+		}) as c_int);
+	}
+	let r = get(4) else {
+		return 1;
+	};
+	printf("let else %d\n".ptr, run(snapshot fn() -> int {
+		return r;
+	}) as c_int);
+	return 0;
+}
