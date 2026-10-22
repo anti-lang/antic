@@ -1,0 +1,23 @@
+//! An empty `str` that a snapshot on the heap captures keeps its NUL as well,
+//! so its `ptr` is the C string of no bytes. The bytes of the second text
+//! follow it in the block, so without that NUL strlen of the first reads the
+//! second.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn strlen(s: ?*byte) -> c_size_t;
+
+fn run(keep own f: fn())
+{
+	f();
+}
+
+fn main() -> int
+{
+	let first = "";
+	let second = "cde";
+	run(snapshot fn() {
+		printf("[%s] %d\n".ptr, first.ptr, strlen(first.ptr) as c_int);
+		printf("[%s] %d\n".ptr, second.ptr, strlen(second.ptr) as c_int);
+	});
+	return 0;
+}
