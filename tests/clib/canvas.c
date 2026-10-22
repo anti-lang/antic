@@ -4,6 +4,7 @@
 #include "../binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "canvas.h"
 
@@ -32,6 +33,7 @@ int main(void)
     Tile t;
     Square a;
     Square b;
+    Square z;
     struct anti_Error *e;
 
     anti_Square_init(s);
@@ -83,6 +85,11 @@ int main(void)
            anti_lang_Object_equals(&a.base.base, NULL),
            anti_lang_Object_equals(NULL, &a.base.base),
            anti_lang_Object_hash(NULL) == 0);
+    /* An object that no init has set up has no table. It hashes as 0
+       and equals no other object. */
+    memset(&z, 0, sizeof z);
+    printf("%d %d\n", anti_lang_Object_hash(&z.base.base) == 0,
+           anti_lang_Object_equals(&z.base.base, &a.base.base));
     anti_lang_Object_destruct(&a.base.base);
     printf("%d\n", a.side);
     return 0;
