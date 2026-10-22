@@ -1,6 +1,7 @@
 # S30 of the second audit. Each allocation helper of anti exits through
 # files_out_of_memory when the C library refuses the memory, with status 70 and
-# the message, and never comes back with NULL. Run with cmake -P and these
+# the message, and never comes back with NULL. A count whose bytes a size_t
+# cannot hold ends the same way. Run with cmake -P and these
 # values:
 #   PROGRAM  files_oom_tests, built from tests/unit/test_files_oom.c
 #   WORK     a directory this run writes into
@@ -16,7 +17,8 @@ file(MAKE_DIRECTORY "${WORK}")
 # The message stands whole in its own value, which is the form the test
 # diagnostics_covered reads.
 set(message "anti: out of memory")
-foreach(helper array resize grow name)
+foreach(helper array resize grow name array_overflow resize_overflow
+       grow_overflow)
     program_expect("files_${helper}" COMMAND "${PROGRAM}" ${helper}
                    STATUS 70 ERR_MATCH "${message}\n$")
 endforeach()

@@ -3,8 +3,10 @@
    now exits through files_out_of_memory, as files.h says. The program asks one
    helper, named by its argument, for more memory than any host gives, and
    tests/runners/run_files_oom.cmake checks the exit. name asks
-   symmap_readable_name, whose room comes from files_array. A helper that comes
-   back prints what it returned and ends with status 0. */
+   symmap_readable_name, whose room comes from files_array. The three cases
+   whose names end in _overflow ask each helper for a count whose bytes a
+   size_t cannot hold. A helper that comes back prints what it returned and
+   ends with status 0. */
 
 #include <stdint.h>
 #include <stdio.h>
@@ -34,7 +36,9 @@ int main(int argc, char **argv)
     void *items = NULL;
 
     if (argc != 2) {
-        fputs("usage: files_oom_tests array|resize|grow|name\n", stderr);
+        fputs("usage: files_oom_tests array|resize|grow|name|"
+              "array_overflow|resize_overflow|grow_overflow\n",
+              stderr);
         return 2;
     }
     if (strcmp(argv[1], "array") == 0) {
@@ -44,6 +48,14 @@ int main(int argc, char **argv)
     } else if (strcmp(argv[1], "grow") == 0) {
         /* The room doubles to TOO_MANY. */
         size_t room = TOO_MANY / 2;
+        items = files_grow(NULL, &room, 1);
+    } else if (strcmp(argv[1], "array_overflow") == 0) {
+        items = files_array(SIZE_MAX, 2);
+    } else if (strcmp(argv[1], "resize_overflow") == 0) {
+        items = files_resize(NULL, SIZE_MAX, 2);
+    } else if (strcmp(argv[1], "grow_overflow") == 0) {
+        /* The room cannot double. */
+        size_t room = SIZE_MAX / 2 + 1;
         items = files_grow(NULL, &room, 1);
     } else if (strcmp(argv[1], "name") == 0) {
         /* The room of the name read back is asked for before any byte
