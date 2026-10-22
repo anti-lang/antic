@@ -1,0 +1,20 @@
+//! The flags form on two constant operands gives the wrapped result and its
+//! flags, as it does on two variables. The flags form never traps, so a
+//! constant one that leaves the range of its type is no refusal of R029: an
+//! `i32` sum, an `i32` product and a `u8` difference.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let (a, fa) = (2147483647 as i32) + (1 as i32);
+	printf("add %d %d %d %d %d\n".ptr, a as c_int, fa.overflow as c_int,
+		fa.carry as c_int, fa.zero as c_int, fa.negative as c_int);
+	let (m, fm) = (1030901720 as i32) * (522783658 as i32);
+	printf("mul %d %d %d %d %d\n".ptr, m as c_int, fm.overflow as c_int,
+		fm.carry as c_int, fm.zero as c_int, fm.negative as c_int);
+	let (s, fs) = (0 as u8) - (1 as u8);
+	printf("sub %d %d %d %d %d\n".ptr, s as c_int, fs.overflow as c_int,
+		fs.carry as c_int, fs.zero as c_int, fs.negative as c_int);
+	return 0;
+}
