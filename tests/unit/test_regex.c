@@ -1,7 +1,8 @@
 /* The rewriter of a byte pattern of src/rt/regex.c on every prefix of one
    pattern, and the lookup of a group by a name that holds a NUL. Each
    prefix is a heap copy without a NUL, so AddressSanitizer reports a read
-   past its end. */
+   past its end. The message of a refusal of a byte pattern in a buffer
+   shorter than it. */
 
 #include <stdlib.h>
 #include <string.h>
@@ -79,8 +80,24 @@ static void name_with_a_nul(void)
     anti_rt_regex_free(compiled);
 }
 
+/* The message of a refusal of a byte pattern comes back cut to the room
+   it is given and ended by a NUL, and no room takes no byte. */
+static void message_cut(void)
+{
+    unsigned char out[8];
+
+    memset(out, 'x', sizeof out);
+    anti_rt_regex_message_into(ANTI_RT_REGEX_WIDE_NEGATED, out, 0);
+    CHECK(out[0] == 'x');
+    anti_rt_regex_message_into(ANTI_RT_REGEX_WIDE_NEGATED, out, sizeof out);
+    CHECK(strcmp((const char *)out, "a byte ") == 0);
+    anti_rt_regex_message_into(ANTI_RT_REGEX_WIDE_RANGE, out, 3);
+    CHECK(strcmp((const char *)out, "a ") == 0);
+}
+
 void test_regex(void)
 {
     every_prefix();
     name_with_a_nul();
+    message_cut();
 }
