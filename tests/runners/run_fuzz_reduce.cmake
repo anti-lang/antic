@@ -14,6 +14,7 @@
 
 cmake_minimum_required(VERSION 3.21)
 
+include("${ROOT}/tests/program_output.cmake")
 include("${ROOT}/tools/fuzz/generate.cmake")
 
 set(MOST 10)
@@ -58,9 +59,7 @@ string(FIND "${text}" "${LINE}" kept)
 if(kept EQUAL -1)
     message(FATAL_ERROR "the reduced program lost the line it shows:\n${text}")
 endif()
-execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" --front-end "${reduced}"
-                RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
-                ENCODING NONE)
+antic_run(status out err COMMAND --runtime "${RUNTIME}" --front-end "${reduced}")
 string(REGEX REPLACE "^[^\n]*\\.anti:[0-9]+:[0-9]+: " "" err "${err}")
 if(NOT status EQUAL 1 OR NOT err STREQUAL "${MESSAGE}\n")
     message(FATAL_ERROR "antic gives ${status} and `${err}` for the reduced program, "

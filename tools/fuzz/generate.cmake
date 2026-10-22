@@ -22,6 +22,8 @@
 #     through `+%` and the atomic adds of `Sink`, which do not depend on
 #     the order.
 
+cmake_minimum_required(VERSION 3.21)
+
 include("${CMAKE_CURRENT_LIST_DIR}/common.cmake")
 
 set(FUZZ_SCALARS int i32 u32 u8 u64)
