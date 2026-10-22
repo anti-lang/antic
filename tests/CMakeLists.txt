@@ -5790,6 +5790,22 @@ add_test(NAME ir_tuple_out
         "-DLINE=export fn com.example.tuples.tuples_divide(%0: i64, %1: i64, %2: ptr nonnull deref(size_of (int, int))) -> ptr {"
         -P "${ANTIC_RUNNERS}/run_ir_line.cmake")
 
+# The record of a class names each `inject` field, with `final` where the
+# field has it, and an extern function that may free writes its effects
+# without `nofree`. tests/dump/ir_marks.anti holds both.
+add_test(NAME ir_inject_marks
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},${CMAKE_CURRENT_SOURCE_DIR}/dump/ir_marks.anti"
+        "-DLINE=class ir_marks.Holder descriptor @ir_marks.Holder.descriptor base @anti_lang_Object_descriptor table @ir_marks.Holder.table init @ir_marks.Holder.init inject final alloc anti.mem.Allocator by @anti.mem.Allocator.descriptor inject clock anti.time.Clock by @anti.time.Clock.descriptor"
+        -P "${ANTIC_RUNNERS}/run_ir_line.cmake")
+add_test(NAME ir_effects_may_free
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTIC=$<TARGET_FILE:antic>"
+        "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},${CMAKE_CURRENT_SOURCE_DIR}/dump/ir_marks.anti"
+        "-DLINE=extern fn anti_rt_grow(ptr, i64) -> ptr effects writes"
+        -P "${ANTIC_RUNNERS}/run_ir_line.cmake")
+
 # The Windows unwind data of unwind.anti, decoded by llvm-readobj from the
 # object that llvm-mc writes.
 foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"

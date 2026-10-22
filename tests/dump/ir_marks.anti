@@ -1,0 +1,47 @@
+//! The marks of the IR listing that main.ir does not hold: an `inject` field
+//! with and without `final` in the record of a class, and the effects of a
+//! runtime function that may free, which `to_slice` calls.
+
+import anti.lang;
+import anti.mem;
+import anti.time;
+
+class Holder
+{
+	inject final alloc: *mem.Allocator,
+	inject clock: *time.Clock,
+	pub n: int = 0,
+}
+
+class CountIter
+{
+	pub limit: int,
+	pub at: int,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at < self.limit;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
+
+fn collected(it: *CountIter) -> int
+{
+	let items = it.to_slice();
+	defer {
+		free(items.ptr);
+	}
+	return items.len;
+}
+
+fn main() -> int
+{
+	let h = Holder {};
+	let it = CountIter { limit: 3, at: 0 };
+	return collected(&it) + h.n;
+}
