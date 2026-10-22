@@ -2,8 +2,8 @@
    `anti bind --clang`: a header found through `-I`, an enum without a
    name, records declared inside a record, macros that name an enumerator,
    each other or nothing, a macro taken back, compound literals the
-   generator takes and refuses, the forms of `#pragma pack` and a
-   variable. */
+   generator takes and refuses, the forms of `#pragma pack`, a variable
+   and a record that holds a record of zeros twice. */
 #ifndef FORMS_H
 #define FORMS_H
 
@@ -103,6 +103,32 @@ struct FormsKept
 
 /* A union that a typedef names without a tag. */
 typedef union { int i; float f; } FormsEither;
+
+/* The probe sets the first field that can hold a value other than zero.
+   A FormsBlank holds none, since its enum has the one value 0, so the
+   walk through FormsTwice passes over first, finds second as a record it
+   knows to hold none, and sets n. */
+enum FormsZero
+{
+    FORMS_ZERO = 0
+};
+
+struct FormsBlank
+{
+    enum FormsZero z;
+};
+
+struct FormsTwice
+{
+    struct FormsBlank first;
+    struct FormsBlank second;
+    int n;
+};
+
+struct FormsHolder
+{
+    struct FormsTwice twice;
+};
 
 extern int forms_counter;
 

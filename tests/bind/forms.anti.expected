@@ -25,6 +25,11 @@ pub enum FormsMode
 	FORMS_MODE_B = 1,
 }
 
+pub enum FormsZero
+{
+	FORMS_ZERO = 0,
+}
+
 pub struct FormsOuter
 {
 	inner: FormsInner,
@@ -82,6 +87,23 @@ pub union FormsEither
 {
 	i: c_int,
 	f: c_float,
+}
+
+pub struct FormsBlank
+{
+	z: FormsZero,
+}
+
+pub struct FormsTwice
+{
+	first: FormsBlank,
+	second: FormsBlank,
+	n: c_int,
+}
+
+pub struct FormsHolder
+{
+	twice: FormsTwice,
 }
 
 pub extern fn forms_take(m: FormsMode, o: ?*FormsOuter, p: FormsPair) -> c_int;
