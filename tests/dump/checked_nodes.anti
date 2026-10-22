@@ -2,9 +2,11 @@
 //! tree cannot hold: the read and the write of an atomic field, `p?.x`,
 //! `to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a
 //! call whose error the `catch` of its block takes, and the bound names of a
-//! `switch` on a variant and of a `select`.
+//! `switch` on a variant and of a `select`, and the descriptor of the
+//! interface that `instance` of a library takes.
 
 import anti.lang;
+import anti.plugin;
 
 simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
 
@@ -115,6 +117,25 @@ fn bound(s: Shape, c: chan int) -> int
 		},
 	}
 	return acc;
+}
+
+abstract class Named
+{
+	abstract fn name(self) -> int;
+}
+
+class Tagged inherits Named
+{
+	concrete fn name(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn provided(lib: *plugin.Library) -> int
+{
+	let n = lib.instance(Named) catch fatal;
+	return n.name();
 }
 
 fn main() -> int

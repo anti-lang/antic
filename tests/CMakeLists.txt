@@ -5715,8 +5715,9 @@ antic_dump_test(ast nodes
 
 # The nodes the checker writes into the tree: an atomic read and write,
 # `p?.x`, `to_slice`, the built-ins of a simd struct, `mul_high`, a call
-# whose error the `catch` of its block takes and the bound names of the
-# arms of a `switch` and of a `select`.
+# whose error the `catch` of its block takes, the bound names of the
+# arms of a `switch` and of a `select` and the descriptor of the interface
+# that `instance` of a library takes.
 antic_dump_test(types checked_nodes
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/checked_nodes.types"
     ARGS -I "${ANTIC_RUNTIME_DIR}/std"

@@ -1,5 +1,6 @@
-module_doc "The nodes the checker writes into the tree, which the dump of the parsed\ntree cannot hold: the read and the write of an atomic field, `p?.x`,\n`to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a\ncall whose error the `catch` of its block takes, and the bound names of a\n`switch` on a variant and of a `select`."
+module_doc "The nodes the checker writes into the tree, which the dump of the parsed\ntree cannot hold: the read and the write of an atomic field, `p?.x`,\n`to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a\ncall whose error the `catch` of its block takes, and the bound names of a\n`switch` on a variant and of a `select`, and the descriptor of the\ninterface that `instance` of a library takes."
 import anti.lang
+import anti.plugin
 struct_decl Vec4
   simd
   field x                  f32
@@ -248,6 +249,40 @@ function bound             fn(Shape, chan int) -> int
                 block
     return_stmt
       ident acc            int
+class_decl Named           Named
+  abstract
+  pub function name        fn(*Named) -> int
+    abstract
+    self
+    result
+      type int
+class_decl Tagged          Tagged
+  inherits Named
+  pub function name        fn(*Tagged) -> int
+    concrete
+    self
+    result
+      type int
+    block
+      return_stmt
+        int_lit 1          int
+function provided          fn(*Library) -> int
+  param lib                *Library
+    type *
+      type plugin.Library
+  result
+    type int
+  block
+    let_stmt n             *Named
+      call                 *Named
+        ident Library.instance_at fn(*Library, *byte) -> *Object may fail
+        ident lib          *Library
+        descriptor Named   *byte
+        catch_fatal
+    return_stmt
+      call                 int
+        ident Named.name   fn(*Named) -> int
+        ident n            *Named
 function main              fn() -> int
   result
     type int
