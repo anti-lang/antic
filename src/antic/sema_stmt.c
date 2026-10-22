@@ -776,6 +776,13 @@ static void check_assign(struct checker *c, struct stmt *s)
             sema_bitfield_constant(c, s->as.assign.value, bits);
         }
         sema_bind_value(c, s->as.assign.value, sema_place_name(target), t);
+        if (target->kind == EXPR_FIELD &&
+            sema_struct_of(target->as.field.base->type) != NULL) {
+            sema_refuse_own_field_copy(
+                c, types_find_field(sema_struct_of(target->as.field.base->type),
+                                    &target->as.field.name),
+                s->as.assign.value, target);
+        }
         sema_check_closure_lifetime(c, target, s->as.assign.value);
         sema_check_leak_store(c, target, s->as.assign.value, t);
         if (target->kind == EXPR_NAME && target->symbol != NULL &&

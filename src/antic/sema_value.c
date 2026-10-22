@@ -409,6 +409,50 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
     sema_refuse_lock_copy(c, value, t);
 }
 
+/* DESIGN: an `own` field owns the memory its pointer or slice names, and
+   its type alone does not say so. `=` or a literal that reads one `own`
+   field into another, `self.spare = self.head`, gives that memory two
+   owners, and both free it, as T187 showed. "Ownership and copies" in
+   `docs/anti-object-model.md` refuses the copy that gives a value two
+   owners, and `dup` is the way. A field given the pointer it holds,
+   `b.one = b.one`, keeps one owner. A type that owns memory itself is
+   refused by `sema_refuse_owned_copy`. */
+void sema_refuse_own_field_copy(struct checker *c,
+                                const struct struct_field *into,
+                                const struct expr *value,
+                                const struct expr *target)
+{
+    const struct type *s;
+    const struct struct_field *from;
+    struct text spelled = {0};
+    struct text place = {0};
+
+    if (into == NULL || !into->owned || value->kind != EXPR_FIELD ||
+        value->type == NULL || sema_is_error(value->type) ||
+        sema_type_owns(value->type) || value->as.field.base->type == NULL) {
+        return;
+    }
+    s = sema_struct_of(value->as.field.base->type);
+    from = s != NULL ? types_find_field(s, &value->as.field.name) : NULL;
+    if (from == NULL || !from->owned) {
+        return;
+    }
+    if (!sema_spell(&spelled, value)) {
+        text_free(&spelled);
+        text_appendf(&spelled, "the value");
+    }
+    if (target != NULL && sema_spell(&place, target) &&
+        strcmp(text_cstr(&place), text_cstr(&spelled)) == 0) {
+        text_free(&place);
+        text_free(&spelled);
+        return;
+    }
+    text_free(&place);
+    sema_error_at(c, value->pos, "`%s` is held by an `own` field, use `dup` "
+                  "instead of `=`", text_cstr(&spelled));
+    text_free(&spelled);
+}
+
 /* The largest `align(N)` of t and of the parts it holds in place, or 0.
    A packed type puts its fields at any offset, so it has its own N
    alone. answered holds the types with fields met in this walk. */

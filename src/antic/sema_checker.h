@@ -747,6 +747,12 @@ void sema_bind_value(struct checker *c, struct expr *value, struct name into,
                      const struct type *t);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             const struct type *t);
+/* Refuse value, an `own` field, as the value of the `own` field into,
+   which target names when an assignment writes it. */
+void sema_refuse_own_field_copy(struct checker *c,
+                                const struct struct_field *into,
+                                const struct expr *value,
+                                const struct expr *target);
 /* Whether value, a part of a tuple, struct or variant literal, moves into
    it, and the move of such a part once the literal has read every part.
    literal names the type of the literal. */

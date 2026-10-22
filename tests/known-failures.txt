@@ -136,5 +136,4 @@ matrix_classes_field_and_function_of_one_name_refused T185 A field and a functio
 matrix_errors_catch_on_a_call_that_stands_as_an_argument_dev T186 A call with catch is refused as an argument, an operand and the value of an interpolation.
 matrix_errors_catch_on_a_call_that_stands_as_an_argument_release T186 A call with catch is refused as an argument, an operand and the value of an interpolation.
 matrix_errors_catch_on_a_call_that_stands_as_an_argument_memory_checks T186 A call with catch is refused as an argument, an operand and the value of an interpolation.
-matrix_ownership_own_pointer_field_copied_into_another_own_field_refused T187 Assigning one own pointer field to another gives the object two owners.
 matrix_classes_concrete_over_a_protected_function_refused T188 A concrete fn over a protected or private function of the base replaces nothing and is taken.

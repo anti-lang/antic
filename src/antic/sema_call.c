@@ -2909,6 +2909,7 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
             sema_refuse_lock_copy(c, inits[i].value, f->type);
         } else {
             sema_refuse_owned_copy(c, inits[i].value, f->type);
+            sema_refuse_own_field_copy(c, f, inits[i].value, NULL);
         }
     }
     for (i = 0; i < count; i++) {
