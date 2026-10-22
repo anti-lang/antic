@@ -11,6 +11,9 @@
 # a dependency of a path, and a lock file whose needs, modules, digests
 # or packages the graph no longer gives.
 #
+# A fourth part takes back a pick whose two dependencies are both in the
+# graph, one of which needs the other.
+#
 # The first part: the project needs a 1.x and b 1.x. The walk first picks a 1.1.0, which
 # needs c =2.0.0 and d 1.0.0. Then b 1.0.0 needs a =1.0.0, so a goes back
 # to 1.0.0, which needs c =1.0.0 and no d. The requirements of the first
@@ -319,3 +322,86 @@ changed_lock("a module added"
 changed_lock("a package named twice"
              "[[package]]\nname = \"com.example.g\"\n"
              "[[package]]\nname = \"com.example.g\"\nversion = \"1.0.0\"\n\n[[package]]\nname = \"com.example.g\"\n")
+
+# The fourth part, in a repository of its own: the project needs a 1.x
+# and h 1.x, h needs k and k needs a =1.0.0. The first round picks a
+# 1.1.0, which needs c =2.0.0 and d, and h. The second picks c 2.0.0, d,
+# which needs c as well, and k. The third takes a back, and with it c and
+# d. d gives c to the work a second time, which finds c out of the graph
+# already. The lock file names a 1.0.0 and c 1.0.0, and no d.
+foreach(package h k)
+    set(project "${WORK}/${package}")
+    file(WRITE "${project}/anti.toml"
+         "[package]\n"
+         "name = \"com.example.${package}\"\n"
+         "version = \"1.0.0\"\n")
+    file(WRITE "${project}/src/com/example/${package}.anti"
+         "//! A package of the resolution test.\n"
+         "\n"
+         "/// One.\n"
+         "pub fn one() -> int\n"
+         "{\n"
+         "\treturn 1;\n"
+         "}\n")
+    run_anti("${project}" build)
+    set(library_${package}
+        "${project}/dist/${HOST}/dev/com/example/${package}.antl")
+    file(SHA256 "${library_${package}}" digest_${package})
+endforeach()
+set(repo "${WORK}/repo-back")
+set(a "")
+entry(a a 1.0.0 "{ name = \"com.example.c\", version = \"=1.0.0\" }")
+entry(a a 1.1.0 "{ name = \"com.example.c\", version = \"=2.0.0\" }, { name = \"com.example.d\", version = \"1.0.0\" }")
+publish(a "${a}" 1.0.0 1.1.0)
+set(c "")
+entry(c c 1.0.0 "")
+entry(c c 2.0.0 "")
+publish(c "${c}" 1.0.0 2.0.0)
+set(d "")
+entry(d d 1.0.0 "{ name = \"com.example.c\", version = \">=1.0.0\" }")
+publish(d "${d}" 1.0.0)
+set(h "")
+entry(h h 1.0.0 "{ name = \"com.example.k\", version = \"1.0.0\" }")
+publish(h "${h}" 1.0.0)
+set(k "")
+entry(k k 1.0.0 "{ name = \"com.example.a\", version = \"=1.0.0\" }")
+publish(k "${k}" 1.0.0)
+set(project "${WORK}/back")
+file_url("${repo}" back_url)
+file(WRITE "${project}/anti.toml"
+     "[package]\n"
+     "name = \"com.example.back\"\n"
+     "version = \"0.1.0\"\n"
+     "\n"
+     "[repositories]\n"
+     "local = \"${back_url}\"\n"
+     "\n"
+     "[dependencies]\n"
+     "\"com.example.a\" = { version = \"1.0.0\", repo = \"local\" }\n"
+     "\"com.example.h\" = { version = \"1.0.0\", repo = \"local\" }\n")
+file(WRITE "${project}/src/com/example/back.anti"
+     "//! A program over a, h and the packages they need.\n"
+     "\n"
+     "import com.example.a;\n"
+     "import com.example.h;\n"
+     "\n"
+     "fn main() -> int\n"
+     "{\n"
+     "\treturn a.one() + h.one();\n"
+     "}\n")
+run_anti("${project}" build)
+program_expect("the program of the fourth part"
+               COMMAND "${project}/dist/${HOST}/dev/back" STATUS 2 OUT "")
+file(READ "${project}/anti.lock" lock)
+foreach(pick "a\"\nversion = \"1.0.0" "c\"\nversion = \"1.0.0"
+        "h\"\nversion = \"1.0.0" "k\"\nversion = \"1.0.0")
+    if(NOT lock MATCHES "name = \"com.example.${pick}\"")
+        message(FATAL_ERROR "the lock file of the fourth part names no "
+                            "com.example.${pick}:\n${lock}")
+    endif()
+endforeach()
+if(lock MATCHES "com.example.d")
+    message(FATAL_ERROR "the lock file of the fourth part keeps "
+                        "com.example.d, which only the dropped pick of a "
+                        "needs:\n${lock}")
+endif()
