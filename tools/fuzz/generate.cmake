@@ -1461,10 +1461,11 @@ function(fuzz_generate out seed size)
     string(APPEND text "${declarations}")
     set(names "")
     math(EXPR last "${size} - 1")
+    # The prefix is no f, since f16, f32 and f64 are keywords.
     foreach(f RANGE ${last})
-        fuzz_function(fn "f${f}")
+        fuzz_function(fn "fun${f}")
         string(APPEND text "${fn}")
-        list(APPEND names "f${f}")
+        list(APPEND names "fun${f}")
     endforeach()
 
     # main calls every function with literal arguments and mixes each

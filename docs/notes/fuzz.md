@@ -18,9 +18,9 @@ cmake -DFIND=build/fuzz/finds/1046 -P tools/fuzz/reduce.cmake
 ```
 
 - `generate.cmake` writes the program of one seed. `-DSIZE` sets the count
-  of functions, 6 by default, and 16 at most. A size above 16 names a
-  function `f16`, a keyword, and antic refuses every such program. A seed has at most nine digits, and one
-  seed gives the same program on every run and every host.
+  of functions, 6 by default, named `fun0` and on, since `f16` is a
+  keyword. A seed has at most nine digits, and one seed gives the same
+  program on every run and every host.
 - `run.cmake` checks the seeds `FIRST` to `FIRST + COUNT - 1`, `JOBS` of
   them at once, 8 by default. A seed that shows nothing leaves an empty
   directory under `build/fuzz/work/`, and `-DKEEP=ON` keeps its program and
@@ -167,4 +167,5 @@ a type. Literals were read as `int`.
 On 2026-10-22 the generator of commit `cf4fc31a` ran 5840 seeds at the
 default size, 10001 to 15840, and 3200 at size 16, 20001 to 23200, in
 116 minutes. None showed a find. 150 seeds at size 40 were all refused
-at `fn f16`, which is the limit above.
+at `fn f16`, a keyword. The step fuzz-fix named the functions `fun0` and
+on, which lifted that limit.
