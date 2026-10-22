@@ -3193,6 +3193,27 @@ if(ANTIC_HOST_OS STREQUAL "windows")
         matrix_types_alloc_of_a_type_aligned_above_16_memory_checks
         PROPERTIES DISABLED TRUE)
 endif()
+# The fuzzer of tools/fuzz, after Csmith, docs/notes/fuzz.md. fuzz_smoke
+# writes the programs of the seeds 1 to 20, builds each in dev mode, in
+# release mode and with --memory-checks, and compares the three runs. A
+# find is saved under its work directory. fuzz_reduce shrinks a find of
+# the kind `refused` to the line that shows it.
+# DESIGN: twenty seeds take about 15 s on the development Mac with ten at
+# once, and the task of the fuzzer asks for under a minute. The limit of
+# ctest stands above that for the sanitizer trees, whose antic is slower.
+add_test(NAME fuzz_smoke
+    COMMAND "${CMAKE_COMMAND}" ${ANTIC_AND_RUNTIME}
+        -DFIRST=1 -DCOUNT=20 -DJOBS=10
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fuzz/smoke"
+        "-DFINDS=${CMAKE_CURRENT_BINARY_DIR}/fuzz/finds"
+        -P "${PROJECT_SOURCE_DIR}/tools/fuzz/run.cmake")
+set_tests_properties(fuzz_smoke PROPERTIES TIMEOUT 300)
+add_test(NAME fuzz_reduce
+    COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        ${ANTIC_AND_RUNTIME}
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fuzz/reduce"
+        -P "${ANTIC_RUNNERS}/run_fuzz_reduce.cmake")
+
 # Programs of the classes area once more under an option that takes a part
 # of the class away. --no-reflect drops the field lists, and the default
 # `equals` and `hash`, `is`, `as` and `dup` give what they give with them.

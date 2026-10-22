@@ -340,6 +340,13 @@ it are disabled in that tree alone.
 - The measurement was built and run on the development Mac alone.
   `docs/reports/2026-10-12-tests-coverage-baseline.md` holds the first one.
 
+`tools/fuzz/` holds the fuzzer, after Csmith, in CMake scripts.
+`cmake -DFIRST=1 -DCOUNT=200 -P tools/fuzz/run.cmake` writes the program
+of each seed, builds it in dev mode, in release mode and with
+`--memory-checks`, and saves each find under `build/fuzz/finds/<seed>/`.
+`cmake -DFIND=build/fuzz/finds/<seed> -P tools/fuzz/reduce.cmake` shrinks
+one. The test `fuzz_smoke` runs the seeds 1 to 20. See `docs/notes/fuzz.md`.
+
 The pinned downloads lie in `build/deps/`, one copy for all three trees. A
 release adds the LLVM tools of the other five hosts in
 `build/deps/llvm-tools/<host>` for the packer. The
@@ -367,7 +374,7 @@ for a reader's build and never for a release.
 | `tests/` | Test programs, expected outputs, the runner |
 | `tests/matrix/` | The matrix of constructs and contexts, by decision 28 of "Decisions of 2026-10-11" |
 | `tests/runners/` | The runners `run_*.cmake` of the tests, by decision 13 of "Decisions of 2026-10-11" |
-| `tools/` | Helper scripts, the pins, the installers and the docs-style checker |
+| `tools/` | Helper scripts, the pins, the installers, the docs-style checker and the fuzzer |
 | `tools/keys/` | `release.pem`, the public key that checks the LLVM tools, and the ignored `private/` |
 | `docs/` | The specifications, the decisions and the reports |
 | `LICENSES/` | Licence texts of bundled components |

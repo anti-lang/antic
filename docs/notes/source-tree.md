@@ -668,6 +668,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_fmt_canonical_self.cmake` | Tests that `run_fmt_canonical.cmake` fails when `anti fmt --check` ends by a signal. |
 | `tests/runners/run_framework.cmake` | Links a program with a framework, or expects the refusal without an SDK. |
 | `tests/runners/run_front_end.cmake` | Runs `antic --front-end` on a good and a bad program. |
+| `tests/runners/run_fuzz_reduce.cmake` | Shrinks a find of the fuzzer that the checker refuses with the reducer of `tools/fuzz/`. |
 | `tests/runners/run_function_alignment.cmake` | Checks the 16-byte alignment of ARM64 functions. |
 | `tests/runners/run_glibc_link.cmake` | Links a C probe of a native library against the glibc sysroot. |
 | `tests/runners/run_glibc_sysroot.cmake` | Checks the glibc pins and runs the sysroot script on stand-in packages. |
@@ -851,6 +852,10 @@ the data the scripts read.
 | `tools/faults.cmake` | The option `ANTIC_FAULTS`, and the copies of antic, `anti` and the runtime with the seam of `src/rt/fault.h`. |
 | `tools/downloads.html.in` | The template of the downloads page that step 9 of a release fills. |
 | `tools/fetch-release.cmake` | Downloads one archive of the LLVM release and checks it against the pin, the manifest and the signature. |
+| `tools/fuzz/common.cmake` | The paths, the time limits and the check of one program in three modes that the scripts of the fuzzer share. |
+| `tools/fuzz/generate.cmake` | Writes the random valid Anti program of one seed, after Csmith. |
+| `tools/fuzz/reduce.cmake` | Shrinks the program of a find of the fuzzer to a small program that still shows it. |
+| `tools/fuzz/run.cmake` | Checks the programs of a range of seeds in dev mode, in release mode and with `--memory-checks`, and saves each find. |
 | `tools/get-clang.cmake` | Installs the pinned clang of the host. |
 | `tools/get-llvm.cmake` | Installs the pinned LLVM tools of the host, or lays out those of another host for the packer. |
 | `tools/get-sysroot.cmake` | Installs the sysroot of each named target and the licences of its components. |
