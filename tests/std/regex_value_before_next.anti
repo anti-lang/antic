@@ -1,0 +1,19 @@
+//! `value` of a walk of `find_all` before its first `next`. The walk stands at
+//! no match yet, so `anti_rt_regex_current` gives none and the program stops at
+//! the `catch fatal` of `value`, with status 1, before it prints the length of
+//! a match.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let r = regex.compile("b") catch fatal;
+	let found = regex.find_all("abc", r) catch fatal;
+	printf("before next\n".ptr);
+	let m = found.value();
+	printf("length %d\n".ptr, m.all.len as c_int);
+	return 0;
+}
