@@ -138,11 +138,6 @@ anti: %s names the package %s, which is no package name\n
 # and of a lock file before repo_module reads it.
 anti: %s names the module %s of %s, which is no module path\n
 
-# src/anti/sdk.c
-# Stays: a Mac without the Command Line Tools gives it. The development
-# Mac holds them, and no test removes them.
-anti: /Library/Developer/CommandLineTools/SDKs holds no SDK. Run xcode-select --install, or name one with --sdk\n
-
 # src/anti/symmap.c
 
 # src/anti/syms.c
