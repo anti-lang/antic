@@ -10,49 +10,49 @@ struct Point
 
 synchronized class Shape
 {
-	origin: Point = Point { x: 0, y: 0 },
-	corners: [4]int = [0, 0, 0, 0],
-	list: []int,
+	spot: Point = Point { x: 0, y: 0 },
+	points: [4]int = [0, 0, 0, 0],
+	values: []int,
 
 	fn construct(self, list: []int)
 	{
-		self.list = list;
+		self.values = list;
 	}
 
 	pub fn origin(self) -> *Point
 	{
-		return &self.origin;
+		return &self.spot;
 	}
 
 	pub fn corners(self) -> []int
 	{
-		return self.corners[0..4];
+		return self.points[0..4];
 	}
 
 	pub fn list(self) -> []int
 	{
-		return self.list;
+		return self.values;
 	}
 
 	pub fn x(self) -> *int
 	{
-		let at = &self.origin.x;
+		let at = &self.spot.x;
 		return at;
 	}
 
 	pub fn visit(self, f: fn(*Point))
 	{
-		f(&self.origin);
+		f(&self.spot);
 	}
 
 	pub fn place(self) -> Point
 	{
-		return self.origin;
+		return self.spot;
 	}
 
 	fn inside(self) -> *Point
 	{
-		return &self.origin;
+		return &self.spot;
 	}
 }
 

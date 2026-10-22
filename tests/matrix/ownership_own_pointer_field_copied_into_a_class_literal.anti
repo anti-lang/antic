@@ -1,6 +1,6 @@
-//! A class literal that gives its `own` field the pointer another `own`
-//! field holds would give the node two owners, as `=` would. It is refused
-//! with the same words.
+//! A class literal that gives its `own` field the pointer another `own` field
+//! holds would give the node two owners, as `=` would. It is refused with the
+//! same words.
 
 class Node
 {
