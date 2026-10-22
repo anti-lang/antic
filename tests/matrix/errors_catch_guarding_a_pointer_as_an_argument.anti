@@ -1,0 +1,27 @@
+//! A `catch` on a call that cannot fail and gives a `?*T` guards the pointer
+//! and binds the one it proved. Only a `let` has a name for it, so the same
+//! `catch` as an argument is refused, where antic stopped with a crash.
+
+class Box
+{
+	pub n: int = 0,
+}
+
+fn find(b: *Box, want: int) -> ?*Box
+{
+	if b.n == want {
+		return b;
+	}
+	return none;
+}
+
+fn show(b: ?*Box) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	let b = Box { n: 3 };
+	return show(find(&b, 3) catch { yield none; });
+}

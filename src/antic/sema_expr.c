@@ -1929,6 +1929,10 @@ static struct type *check_optional(struct checker *c, struct expr *e)
     if (c->discarded == e) {
         c->discarded = access;
     }
+    /* So does the `let` that takes over the `catch` of the call. */
+    if (c->guard_taker == e) {
+        c->guard_taker = access;
+    }
     result = sema_check_expr(c, access, NULL);
     sema_leave_scope(c, &scope);
     if (sema_is_error(result)) {

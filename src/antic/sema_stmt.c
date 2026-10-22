@@ -1847,6 +1847,7 @@ static void mark_let_symbol(struct checker *c, struct stmt *s,
 /* `let name = value;` and `let name: T = value;`. */
 static void check_let(struct checker *c, struct stmt *s)
 {
+    const struct expr *taker;
     struct type *declared;
     struct context sized;
     struct type *t;
@@ -1861,6 +1862,10 @@ static void check_let(struct checker *c, struct stmt *s)
                                       : NULL;
     /* `let m: *T = p else { }` names the type the binding has, and
        the value beside it is the `?*T` of the same element. */
+    taker = c->guard_taker;
+    c->guard_taker = s->as.let.value->kind == EXPR_OPTIONAL
+                         ? s->as.let.value->as.optional.access
+                         : s->as.let.value;
     if (s->as.let.otherwise != NULL && declared != NULL &&
         (declared->kind == TYPE_POINTER || declared->kind == TYPE_FN) &&
         !declared->nullable) {
@@ -1869,6 +1874,7 @@ static void check_let(struct checker *c, struct stmt *s)
     } else {
         t = sema_check_expr(c, s->as.let.value, declared);
     }
+    c->guard_taker = taker;
     sema_leave(c, &sized);
     /* `let m = p catch fatal` and `let m = p catch e { }` guard the
        pointer with the error forms. A call that gives a `?*T` keeps

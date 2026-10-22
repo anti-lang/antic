@@ -173,6 +173,9 @@ struct checker {
     struct handler_state handler;   /* the handler under check */
     bool saw_fail;              /* the body holds a `fail` or a `try` */
     const struct expr *top_call; /* the first statement's call, or NULL */
+    /* The call whose `catch` the `let` checked now takes over when the
+       call cannot fail and gives a `?*T`, or NULL. */
+    const struct expr *guard_taker;
     /* The call of the expression statement checked now, whose value
        nothing takes, or NULL. */
     const struct expr *discarded;

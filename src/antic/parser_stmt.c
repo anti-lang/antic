@@ -23,9 +23,6 @@ static struct stmt *new_stmt(struct parser *p, enum stmt_kind kind,
     return s;
 }
 
-static bool read_handler(struct parser *p, struct handler *out,
-                         bool required);
-
 /* The names of a destructuring, `(a, b)`. The opening parenthesis is
    read, and the list holds two names or more. */
 static struct binding *bindings(struct parser *p, size_t *count)
@@ -76,10 +73,10 @@ static struct stmt *let_or_const(struct parser *p)
             return NULL;
         }
         if (parser_check(p, TOKEN_CATCH) &&
-            !read_handler(p, s->as.let.value->kind == EXPR_CALL
-                                 ? &s->as.let.value->as.call.handler
-                                 : &s->as.let.guard,
-                          false)) {
+            !parser_read_handler(p, s->as.let.value->kind == EXPR_CALL
+                                        ? &s->as.let.value->as.call.handler
+                                        : &s->as.let.guard,
+                                 false)) {
             return NULL;
         }
         return parser_expect(p, TOKEN_SEMICOLON) ? s : NULL;
@@ -119,9 +116,10 @@ static struct stmt *let_or_const(struct parser *p)
            checker refuses a value that is neither. The two forms read
            alike. A call that cannot fail is a guard as well, and the
            checker decides which of the two it holds. */
-        if (!read_handler(p, v->kind == EXPR_CALL ? &v->as.call.handler
-                                                  : &s->as.let.guard,
-                          false)) {
+        if (!parser_read_handler(p,
+                                 v->kind == EXPR_CALL ? &v->as.call.handler
+                                                      : &s->as.let.guard,
+                                 false)) {
             return NULL;
         }
     }
@@ -175,7 +173,7 @@ static struct stmt *arm_body(struct parser *p, const char *refusal)
         return (s->as.assign.value = parser_expression(p)) == NULL ? NULL : s;
     }
     if (e->kind == EXPR_CALL && parser_check(p, TOKEN_CATCH) &&
-        !read_handler(p, &e->as.call.handler, false)) {
+        !parser_read_handler(p, &e->as.call.handler, false)) {
         return NULL;
     }
     if (!is_call_statement(e)) {
@@ -315,9 +313,8 @@ static struct stmt *if_statement(struct parser *p)
     return s;
 }
 
-/* `catch e { }`, `catch { }` or `catch fatal`. With required set the
-   handler must be there. */
-static bool read_handler(struct parser *p, struct handler *out, bool required)
+bool parser_read_handler(struct parser *p, struct handler *out,
+                         bool required)
 {
     memset(out, 0, sizeof *out);
     out->pos = parser_pos_of(parser_peek(p));
@@ -622,14 +619,14 @@ static struct stmt *expression_statement(struct parser *p,
                                      "stands in a `let`");
                 return NULL;
             }
-            if (!read_handler(p, &v->as.call.handler, false)) {
+            if (!parser_read_handler(p, &v->as.call.handler, false)) {
                 return NULL;
             }
         }
     } else {
         /* A call that can fail carries its handler here. */
         if (e->kind == EXPR_CALL && parser_check(p, TOKEN_CATCH) &&
-            !read_handler(p, &e->as.call.handler, false)) {
+            !parser_read_handler(p, &e->as.call.handler, false)) {
             return NULL;
         }
         if (!parser_check(p, TOKEN_SEMICOLON)) {
@@ -816,7 +813,7 @@ static struct stmt *statement_level(struct parser *p)
         parser_next(p);
         s = new_stmt(p, STMT_TRY, t);
         if ((s->as.try_block.body = parser_block(p)) == NULL ||
-            !read_handler(p, &s->as.try_block.handler, true)) {
+            !parser_read_handler(p, &s->as.try_block.handler, true)) {
             return NULL;
         }
         return s;

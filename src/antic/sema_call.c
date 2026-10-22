@@ -2275,6 +2275,15 @@ static struct type *unfailing_result(struct checker *c, struct expr *e,
                           "handle");
             return sema_builtin(c, TYPE_ERROR);
         }
+        /* A guard binds the pointer it proved, and only a `let` has a
+           name for it. Anywhere else the handler had no taker, and the
+           lowering read a handler of a call that cannot fail. */
+        if (e != c->guard_taker) {
+            sema_error_at(c, e->as.call.handler.pos,
+                          "this call cannot fail, and a `catch` that guards "
+                          "the pointer it gives stands in a `let`");
+            return sema_builtin(c, TYPE_ERROR);
+        }
         e->as.call.guards_pointer = true;
     }
     if (provided != NULL) {

@@ -130,6 +130,10 @@ struct expr *parser_do_condition(struct parser *p);
 
 bool parser_is_assign_op(enum token_kind kind);
 struct block *parser_block(struct parser *p);
+/* `catch e { }`, `catch { }`, `catch none` or `catch fatal` into out.
+   With required set the handler must be there. */
+bool parser_read_handler(struct parser *p, struct handler *out,
+                         bool required);
 
 /* parser_clause.c */
 

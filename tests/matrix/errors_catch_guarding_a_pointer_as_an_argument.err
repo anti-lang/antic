@@ -1,0 +1,1 @@
+errors_catch_guarding_a_pointer_as_an_argument.anti:26:26: error: this call cannot fail, and a `catch` that guards the pointer it gives stands in a `let`

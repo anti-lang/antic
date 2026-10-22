@@ -843,6 +843,18 @@ static struct expr *postfix_links(struct parser *p)
             return NULL;
         }
         e = outer;
+        /* DESIGN: both forms of a failing call stand wherever the call
+           stands, by the entry of docs/decisions.md on them and T186 of
+           docs/audit/tests-findings.md: an argument, an operand, a
+           result and an `{expr}` of an `f"..."` take `f(x) catch fatal`
+           as a `let` does. The `catch` after the `)` belongs to the call
+           and ends the chain, so `f(x) catch fatal + 1` adds to the value
+           the handled call gives. */
+        if (e->kind == EXPR_CALL && parser_check(p, TOKEN_CATCH)) {
+            return parser_read_handler(p, &e->as.call.handler, false)
+                       ? e
+                       : NULL;
+        }
     }
     return NULL;
 }
