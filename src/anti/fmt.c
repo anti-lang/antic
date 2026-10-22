@@ -1919,9 +1919,14 @@ bool fmt_source(const char *source, size_t length, struct text *out)
             continue;
         }
         if (breaks_line(&e, &pieces, i, p)) {
+            /* The condition of a `do` ends with its line, as antic reads
+               it, unless the line ends inside a bracket or before a
+               value. */
+            bool goes_on = e.do_tail && (e.brackets > 0 ||
+                                         last_opens_value(&e));
             flush(&e);
-            e.cont = e.stmt.open && !e.do_tail;
-            if (e.do_tail) {
+            e.cont = e.stmt.open && (!e.do_tail || goes_on);
+            if (e.do_tail && !goes_on) {
                 reset_statement(&e);
                 e.do_tail = false;
             }

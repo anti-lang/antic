@@ -705,7 +705,7 @@ bool parser_parse(const char *source, const struct token_list *tokens,
     struct list dropped = {NULL, 0, 0, sizeof(struct dropped_doc)};
     struct parser p = {source, NULL, tokens->items, NULL, NULL, 0, 0, arena,
                        diags, false, true, false, 0, 0, &clauses, &dropped,
-                       BLOCK_NONE, false, 0};
+                       BLOCK_NONE, false, 0, false};
     struct module *m = arena_alloc(arena, sizeof *m);
     struct list imports = {NULL, 0, 0, sizeof(struct import)};
     struct list items = {NULL, 0, 0, sizeof(struct item *)};

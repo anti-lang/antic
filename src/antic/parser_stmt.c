@@ -673,7 +673,7 @@ static struct stmt *statement_level(struct parser *p)
         s = new_stmt(p, STMT_DO_WHILE, t);
         if ((s->as.loop.body = parser_block(p)) == NULL ||
             !parser_expect(p, TOKEN_WHILE) ||
-            (s->as.loop.cond = parser_condition(p)) == NULL) {
+            (s->as.loop.cond = parser_do_condition(p)) == NULL) {
             return NULL;
         }
         return s;

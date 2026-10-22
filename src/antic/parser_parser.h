@@ -50,6 +50,12 @@ struct parser {
        second and moves past the token. angles counts the lists open. */
     bool half;
     int angles;
+    /* DESIGN: the condition of `do { } while cond` takes no `;`, so it
+       ends at a line break. An operator or a link that stands first on
+       its line, outside the brackets of the condition, starts the next
+       statement instead of continuing the condition. line_ends is set
+       while that condition is read. */
+    bool line_ends;
 };
 
 /* A growable array of fixed-size elements, copied into the memory pool
@@ -118,6 +124,7 @@ struct expr *parser_new_expr(struct parser *p, enum expr_kind kind,
 int parser_precedence(enum token_kind kind);
 struct expr *parser_expression(struct parser *p);
 struct expr *parser_condition(struct parser *p);
+struct expr *parser_do_condition(struct parser *p);
 
 /* parser_stmt.c */
 

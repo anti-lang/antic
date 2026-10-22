@@ -313,7 +313,7 @@ if x < 0 { unreachable; }
 
 ## Loops
 
-`while cond do { }` for zero or more, `do { } while cond` for at least one. `for` over ranges and slices with an optional binding and a constant step, and over collections and iterators. Labels for `break` and `continue`. Everything else is a `while`.
+`while cond do { }` for zero or more, `do { } while cond` for at least one, whose condition ends with its line. `for` over ranges and slices with an optional binding and a constant step, and over collections and iterators. Labels for `break` and `continue`. Everything else is a `while`.
 
 <!-- overview: context, docs-style:ignore
 ```anti

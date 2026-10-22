@@ -1,0 +1,18 @@
+//! The condition of `do { } while cond` ends at its line, so a statement that
+//! starts with `*` on the next line, `*p = n;`, is a statement of its own and
+//! no product with the condition.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let n: int = 0;
+	let v: int = 7;
+	let p: *int = &v;
+	do {
+		n += 1;
+	} while n < 3
+	*p = n;
+	printf("%d %d\n".ptr, n as c_int, v as c_int);
+	return 0;
+}

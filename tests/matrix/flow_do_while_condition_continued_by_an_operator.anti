@@ -1,0 +1,12 @@
+//! The condition of `do { } while cond` ends at its line. An operator that
+//! stands first on the next line starts a statement, which `&& n != 10` cannot.
+
+fn main() -> int
+{
+	let n: int = 0;
+	do {
+		n += 1;
+	} while n < 3
+	&& n != 10;
+	return n;
+}

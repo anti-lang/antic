@@ -28,7 +28,7 @@ A condition has type `bool`. No integer and no pointer converts to it, so a test
 
 `&&` and `||` evaluate the left operand first and the right one only when the left does not decide. `!` negates a `bool`.
 
-`while cond do { }` tests before each turn and runs its block zero or more times. `do { } while cond` runs its block once before the first test. No `;` follows the condition of a `do` loop.
+`while cond do { }` tests before each turn and runs its block zero or more times. `do { } while cond` runs its block once before the first test. No `;` follows the condition of a `do` loop, so the condition ends with its line. It goes on to the next line after an operator, `n < 3 &&`, and inside a bracket it opens. An operator, a call or an index that stands first on the next line starts the next statement instead.
 
 `if` is a statement. Anti has no conditional expression and no `if` that gives a value. An assignment is a statement as well, so a condition cannot hold one.
 

@@ -861,13 +861,9 @@ function(fuzz_statement out decl_out)
             fuzz_block(body ${n} "${t}\t${i} += 1;\n")
             set(text "${t}let ${i}: int = 0;\n${t}while ${i} < ${bound} do ${body}\n")
         else()
-            # The loop stands in a block of its own, so a `}` follows its
-            # condition. A statement that starts with `(` after it is read
-            # as a call of the condition: finding T182.
             set(leaf_int ${leaf_int} ${i})
-            math(EXPR ctx_indent "${ctx_indent} + 1")
-            fuzz_block(body ${n} "${t}\t\t${i} += 1;\n")
-            set(text "${t}{\n${t}\tlet ${i}: int = 0;\n${t}\tdo ${body} while ${i} < ${bound}\n${t}}\n")
+            fuzz_block(body ${n} "${t}\t${i} += 1;\n")
+            set(text "${t}let ${i}: int = 0;\n${t}do ${body} while ${i} < ${bound}\n")
         endif()
 
     elseif(kind STREQUAL "switch")

@@ -1,0 +1,27 @@
+//! The condition of `do { } while cond` goes on over a line that ends with an
+//! operator, and over the lines inside a bracket it opens, as an argument list
+//! does.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn below(a: int, b: int) -> bool
+{
+	return a < b;
+}
+
+fn main() -> int
+{
+	let n: int = 0;
+	do {
+		n += 1;
+	} while n < 3 &&
+		n != 10
+	printf("after an operator %d\n".ptr, n as c_int);
+	let m: int = 0;
+	do {
+		m += 1;
+	} while below(m,
+		4)
+	printf("in a bracket %d\n".ptr, m as c_int);
+	return 0;
+}

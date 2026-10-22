@@ -154,6 +154,7 @@ static struct expr *placeholder(struct parser *p,
     inner.panic = false;
     inner.ok = true;
     inner.no_struct_literal = false;
+    inner.line_ends = false;
     e = parser_expression(&inner);
     /* The tree of the expression counts toward the chain around the
        literal, so a chain in each level stays within PARSE_DEPTH_MAX, by
@@ -227,6 +228,7 @@ static struct expr *anonymous_fn(struct parser *p, const struct token *at)
     struct expr *e = parser_new_expr(p, EXPR_FN, at);
     struct item *it = parser_node(p, sizeof *it);
     bool saved = p->no_struct_literal;
+    bool saved_line = p->line_ends;
 
     parser_next(p);
     it->kind = ITEM_FN;
@@ -265,8 +267,10 @@ static struct expr *anonymous_fn(struct parser *p, const struct token *at)
     }
     parser_may_fail_after(p, it);
     p->no_struct_literal = false;
+    p->line_ends = false;
     it->body = parser_block(p);
     p->no_struct_literal = saved;
+    p->line_ends = saved_line;
     return it->body != NULL ? e : NULL;
 }
 
@@ -792,6 +796,16 @@ static struct expr *field_link(struct parser *p, struct expr *e,
     return outer;
 }
 
+/* Whether the next token ends the condition of a `do { } while`: it
+   stands on a later line than the token before it, outside every bracket
+   the condition opens. A bracket clears no_struct_literal, and the body
+   of an anonymous function clears line_ends. */
+static bool ends_at_line(const struct parser *p)
+{
+    return p->line_ends && p->no_struct_literal && p->pos > 0 &&
+           parser_peek(p)->line > p->tokens[p->pos - 1].line;
+}
+
 static struct expr *postfix_links(struct parser *p)
 {
     struct expr *e = primary(p);
@@ -799,6 +813,10 @@ static struct expr *postfix_links(struct parser *p)
     while (e != NULL) {
         const struct token *t = parser_peek(p);
         struct expr *outer;
+
+        if (ends_at_line(p)) {
+            return e;
+        }
 
         if (parser_accept(p, TOKEN_LPAREN)) {
             bool saved = p->no_struct_literal;
@@ -908,7 +926,7 @@ static struct expr *cast_links(struct parser *p)
 {
     struct expr *e = unary(p);
 
-    while (e != NULL &&
+    while (e != NULL && !ends_at_line(p) &&
            (parser_check(p, TOKEN_AS) || parser_check(p, TOKEN_IS))) {
         bool test = parser_check(p, TOKEN_IS);
         const struct token *word = parser_next(p);
@@ -1034,7 +1052,7 @@ static struct expr *binary_links(struct parser *p, int min)
 {
     struct expr *left = cast(p);
 
-    while (left != NULL) {
+    while (left != NULL && !ends_at_line(p)) {
         const struct token *op = parser_peek(p);
         struct expr *e;
         /* `in` is a contextual word, as it is after `for`. A name right
@@ -1099,10 +1117,29 @@ struct expr *parser_expression(struct parser *p)
 struct expr *parser_condition(struct parser *p)
 {
     bool saved = p->no_struct_literal;
+    bool saved_line = p->line_ends;
     struct expr *e;
 
     p->no_struct_literal = true;
+    p->line_ends = false;
     e = parser_expression(p);
     p->no_struct_literal = saved;
+    p->line_ends = saved_line;
+    return e;
+}
+
+/* The condition of `do { } while cond`, which ends at a line break as
+   well, since no `;` follows it. */
+struct expr *parser_do_condition(struct parser *p)
+{
+    bool saved = p->no_struct_literal;
+    bool saved_line = p->line_ends;
+    struct expr *e;
+
+    p->no_struct_literal = true;
+    p->line_ends = true;
+    e = parser_expression(p);
+    p->no_struct_literal = saved;
+    p->line_ends = saved_line;
     return e;
 }
