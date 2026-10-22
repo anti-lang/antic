@@ -863,6 +863,9 @@ static bool has_params(const struct type *t, struct ptr_set *answered)
         if (types_is_chan(t)) {
             return has_params(t->element, answered);
         }
+        if (t->case_of != NULL) {
+            return has_params(t->case_of, answered);
+        }
         if (t->generic != NULL && !ptr_set_add(answered, t)) {
             return false;
         }
@@ -952,6 +955,25 @@ static const struct symbolic *param_value(const struct type *p)
     const struct symbol *sym = p->param->symbol;
 
     return sym != NULL && sym->value != NULL ? sym->value->as.symbolic : NULL;
+}
+
+/* The struct of a case of a variant, t, in the copy of the variant with
+   the arguments of map in place. */
+static struct type *subst_case(struct checker *c, struct type *t,
+                               const struct generic_map *map)
+{
+    struct type *v = subst(c, t->case_of, map);
+    size_t i;
+
+    if (v == t->case_of || v->kind != TYPE_VARIANT) {
+        return t;
+    }
+    for (i = 0; i < t->case_of->param_count && i < v->param_count; i++) {
+        if (t->case_of->params[i] == t) {
+            return v->params[i];
+        }
+    }
+    return t;
 }
 
 /* The type t nested in a generic class, as the body of the class names
@@ -1071,6 +1093,9 @@ static struct type *subst(struct checker *c, struct type *t,
         if (types_is_chan(t)) {
             element = subst(c, t->element, map);
             return element == t->element ? t : types_chan(c->types, element);
+        }
+        if (t->case_of != NULL) {
+            return subst_case(c, t, map);
         }
         if (t->generic == NULL && t->nested_in != NULL) {
             return subst_nested(c, t, map);
@@ -1896,6 +1921,9 @@ static bool names_param(const struct type *t, const struct type *param,
     case TYPE_VARIANT:
         if (types_is_chan(t)) {
             return names_param(t->element, param, answered);
+        }
+        if (t->case_of != NULL) {
+            return names_param(t->case_of, param, answered);
         }
         if (t->generic != NULL && !ptr_set_add(answered, t)) {
             return false;

@@ -299,6 +299,12 @@ struct type {
        `List<int>.Node`. nested_in is the class it is
        declared in, or NULL for any other type. */
     struct type *nested_in;
+    /* DESIGN: the struct of the fields of a case belongs to its variant,
+       and a copy of a generic variant has a struct of its own per case.
+       case_of names the variant, so a copy of a generic function that
+       binds a case finds the struct of the variant's copy, as T183
+       showed. NULL for every other type. */
+    struct type *case_of;
     /* DESIGN: a copy that `export type Name = G<Args>;` offers to C is
        an export class to C under the name the `type` gives it. Its
        table, its descriptor, its init and its functions carry that name

@@ -1543,6 +1543,11 @@ void types_set_cases(struct types *types, struct type *v, struct type *tag,
     v->params = types_alloc_array(types->arena, count + 1, sizeof *v->params);
     memcpy(v->params, payloads, count * sizeof *v->params);
     v->param_count = count;
+    for (i = 0; i < count; i++) {
+        if (payloads[i] != NULL) {
+            payloads[i]->case_of = v;
+        }
+    }
     fields[0].name = name_of(VARIANT_TAG);
     fields[0].type = tag;
     fields[0].vis = VIS_PUB;
@@ -1606,6 +1611,7 @@ bool types_cases_from_fields(struct types *types, struct type *v)
         for (j = 0; u != NULL && j < u->field_count; j++) {
             if (types_same_name(&u->fields[j].name, &tag->fields[i].name)) {
                 v->params[i] = u->fields[j].type;
+                v->params[i]->case_of = v;
             }
         }
     }
