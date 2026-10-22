@@ -619,9 +619,7 @@ function(fuzz_statement out decl_out)
         fuzz_pick(opt opt_0 opt_1)
         fuzz_expr(e int 1)
         if(form STREQUAL "iflet")
-            # The binding of `if let` takes the prefix w, which a snapshot
-            # does not read: finding T181.
-            fuzz_name(name w)
+            fuzz_name(name v)
             set(ctx_saved "${leaf_int}")
             list(APPEND leaf_int ${name})
             fuzz_block_size(n)
@@ -1004,7 +1002,7 @@ function(fuzz_statement out decl_out)
         # A snapshot holds numbers, bool, char, structs of those and str
         # alone, so its body reads the plain names of numbers.
         foreach(type IN LISTS FUZZ_SCALARS)
-            list(FILTER leaf_${type} INCLUDE REGEX "^[a-vx-z][a-z]*[0-9]*$")
+            list(FILTER leaf_${type} INCLUDE REGEX "^[a-z]+[0-9]*$")
         endforeach()
         set(leaf_bool "")
         fuzz_expr(e int 1)

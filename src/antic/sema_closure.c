@@ -379,7 +379,9 @@ static bool snapshot_copies(const struct type *t, bool top)
    copy the address and not what it points at. The first write of a
    captured value and each capture of another type are refused. An
    atomic local is shared state, and a copy of it is not, so a snapshot
-   names none, by R090 of "Rules of 2026-10-13". */
+   names none, by R090 of "Rules of 2026-10-13". The name of an `if let`
+   that its block never assigns is read as the value it binds, in the
+   snapshot as everywhere in the block, so that value is what it holds. */
 static void check_snapshot(struct checker *c, const struct expr *e)
 {
     const struct item *it = e->as.fn;
@@ -388,18 +390,25 @@ static void check_snapshot(struct checker *c, const struct expr *e)
     for (i = 0; i < it->capture_count; i++) {
         const struct capture *cap = &it->captures[i];
         const struct symbol *sym = cap->symbol;
-        if (sym->type == NULL || sema_is_error(sym->type)) {
+        const struct type *held = sym->type;
+        if (held == NULL || sema_is_error(held)) {
             continue;
+        }
+        if (sym->steady && types_is_nullable(held)) {
+            const struct type *proved = sema_narrowed_type(c, sym);
+            if (proved != NULL) {
+                held = proved;
+            }
         }
         if (sym->atomic) {
             sema_error_at(c, e->pos, "a snapshot holds copies, and the "
                           "atomic `%.*s` is shared state",
                           (int)sym->name.length, sym->name.text);
-        } else if (!snapshot_copies(sym->type, true)) {
+        } else if (!snapshot_copies(held, true)) {
             sema_error_at(c, e->pos, "a snapshot holds values that copy "
                           "fully, and `%.*s` is `%s`",
                           (int)sym->name.length, sym->name.text,
-                          sema_tn(sym->type));
+                          sema_tn(held));
         } else if (cap->written) {
             sema_error_at(c, cap->write, "`%.*s` is changed in a snapshot, "
                           "which is read-only", (int)sym->name.length,

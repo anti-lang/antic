@@ -1,0 +1,24 @@
+//! A `snapshot fn` refuses the pointer that `if let` binds from a `?*int`.
+//! The name holds a `*int` in the block, and a snapshot holds values that
+//! copy fully, which an address does not.
+
+fn find(p: *int) -> ?*int
+{
+	return p;
+}
+
+fn run(f: fn() -> int) -> int
+{
+	return f();
+}
+
+fn main() -> int
+{
+	let x = 3;
+	if let q = find(&x) {
+		return run(snapshot fn() -> int {
+			return *q;
+		});
+	}
+	return 0;
+}

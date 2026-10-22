@@ -1,0 +1,1 @@
+closures_snapshot_of_an_if_let_pointer.anti:19:14: error: a snapshot holds values that copy fully, and `q` is `*int`
