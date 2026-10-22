@@ -41,7 +41,7 @@ fn collected(it: *CountIter) -> int
 
 fn main() -> int
 {
-	let h = Holder {};
+	let h = Holder { };
 	let it = CountIter { limit: 3, at: 0 };
 	return collected(&it) + h.n;
 }

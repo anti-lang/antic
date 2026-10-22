@@ -2,8 +2,8 @@
 //! tree cannot hold: the read and the write of an atomic field, `p?.x`,
 //! `to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a
 //! call whose error the `catch` of its block takes, and the bound names of a
-//! `switch` on a variant and of a `select`, and the descriptor of the
-//! interface that `instance` of a library takes.
+//! `switch` on a variant and of a `select`, and the descriptor of the interface
+//! that `instance` of a library takes.
 
 import anti.lang;
 import anti.plugin;
