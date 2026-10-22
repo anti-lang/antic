@@ -753,6 +753,18 @@ static bool descends_or_copies(const struct type *a, const struct type *b)
 
 static bool method_call(struct checker *c, struct expr *call);
 
+/* Whether s has a field named name that is no function and a function
+   of the same name, which the declaration of s refuses. */
+static bool field_shadows_function(const struct type *s,
+                                   const struct name *name)
+{
+    const struct struct_field *f = types_find_field(s, name);
+    const struct item *m = reached_member(s, name);
+
+    return f != NULL && f->type != NULL && f->type->kind != TYPE_FN &&
+           m != NULL && m->kind == ITEM_FN;
+}
+
 /* The class of the chain of t whose library file names name among its
    private functions, NULL for none. */
 static const struct type *private_owner(const struct type *t,
@@ -2045,9 +2057,13 @@ static bool method_callee(struct checker *c, struct expr *e,
         }
     }
     /* DESIGN: a union has no methods, so v.f(args) on a union is
-       always a call of the function pointer in field f. */
+       always a call of the function pointer in field f. A field and a
+       function of one name are refused where the function is declared,
+       by T185 of docs/audit/tests-findings.md, and the call then reaches
+       the function rather than give a second message. */
     if (s != NULL && !s->is_union &&
-        types_find_field(s, &callee->as.field.name) == NULL) {
+        (types_find_field(s, &callee->as.field.name) == NULL ||
+         field_shadows_function(s, &callee->as.field.name))) {
         if (!method_call(c, e)) {
             form->result = sema_builtin(c, TYPE_ERROR);
             return true;

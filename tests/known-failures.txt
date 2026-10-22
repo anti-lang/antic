@@ -132,7 +132,6 @@ matrix_ownership_compare_an_own_function_with_a_plain_one_refused T177 The messa
 fmt_default_struct_literal T178 anti fmt takes the brace of a struct literal in a default parameter for the body.
 anti_build_message_path_chain_to_a_package_without_a_version T179 A path dependency of a path dependency that names no version is looked for in a repository.
 matrix_classes_class_with_two_fields_of_one_name_refused T184 The message of two fields of one name calls a class a struct.
-matrix_classes_field_and_function_of_one_name_refused T185 A field and a function of one name in one class are taken, and the function cannot be called.
 matrix_errors_catch_on_a_call_that_stands_as_an_argument_dev T186 A call with catch is refused as an argument, an operand and the value of an interpolation.
 matrix_errors_catch_on_a_call_that_stands_as_an_argument_release T186 A call with catch is refused as an argument, an operand and the value of an interpolation.
 matrix_errors_catch_on_a_call_that_stands_as_an_argument_memory_checks T186 A call with catch is refused as an argument, an operand and the value of an interpolation.

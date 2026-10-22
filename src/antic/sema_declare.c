@@ -1574,6 +1574,20 @@ static void declare_members(struct checker *c, struct item *it)
                               (int)m->name.length, m->name.text);
             }
         }
+        /* DESIGN: `c.size` names one member, the field or the function
+           bound to `c`, by "Functions" in docs/anti-object-model.md. A
+           field and a function of one name in one body could be neither
+           for certain, so the function declares the name twice, by T185
+           of docs/audit/tests-findings.md. */
+        for (k = 0; (it->kind == ITEM_CLASS || it->kind == ITEM_STRUCT) &&
+                    m->kind == ITEM_FN && k < it->param_count;
+             k++) {
+            if (types_same_name(&it->params[k].name, &m->name)) {
+                sema_error_at(c, m->name_pos, "`%.*s` declares `%.*s` twice",
+                              (int)it->name.length, it->name.text,
+                              (int)m->name.length, m->name.text);
+            }
+        }
         text = types_member_symbol(c->arena, &it->name, m);
         if (m->contract == FN_ABSTRACT) {
             it->symbol->type->has_abstract = true;
