@@ -1,3 +1,1 @@
-exit 0
-parallel 36
-dispatch 11
+abort
