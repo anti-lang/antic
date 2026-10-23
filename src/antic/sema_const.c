@@ -575,6 +575,15 @@ static bool const_as(struct checker *c, struct expr *e,
     if (!sema_eval_const(c, e->as.cast.operand, &a)) {
         return false;
     }
+    /* `as` to the type the value has already gives that value, in a
+       constant as everywhere else, by R059 of "Rules of 2026-10-13": a
+       bool, a str, a struct and an enum value as well as a number. T171
+       of docs/audit/tests-findings.md. */
+    if (e->as.cast.operand->type == e->type) {
+        *out = a;
+        out->type = e->type;
+        return true;
+    }
     out->type = e->type;
     if (a.kind != CONST_SYMBOLIC &&
         reports_undefined(c, e, e->type, &a, NULL, true)) {

@@ -56,12 +56,6 @@ error_layout_text_saturating T163 The text of a size names a wrapping or saturat
 error_layout_text_mul_high T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
 std_serialize_infinite_float T164 serialize writes an infinite float as inf, which deserialize refuses.
 matrix_types_enum_internal_function_refused T165 An internal function of an enum body gives a second message at self.
-matrix_values_as_its_own_type_in_constant_dev T171 A constant refuses as to the type it has already.
-matrix_values_as_its_own_type_in_constant_release T171 A constant refuses as to the type it has already.
-matrix_values_as_its_own_type_in_constant_memory_checks T171 A constant refuses as to the type it has already.
-matrix_values_as_its_own_enum_in_constant_dev T171 A constant refuses as to the type it has already.
-matrix_values_as_its_own_enum_in_constant_release T171 A constant refuses as to the type it has already.
-matrix_values_as_its_own_enum_in_constant_memory_checks T171 A constant refuses as to the type it has already.
 matrix_types_generic_operator_of_a_class_named_through_the_class_dev T172 An operator of a class body takes no type argument of its own from its operands.
 matrix_types_generic_operator_of_a_class_named_through_the_class_release T172 An operator of a class body takes no type argument of its own from its operands.
 matrix_types_generic_operator_of_a_class_named_through_the_class_memory_checks T172 An operator of a class body takes no type argument of its own from its operands.
