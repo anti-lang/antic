@@ -59,6 +59,44 @@ static void unexpected(struct emitter *e, const char *what)
     text_free(&name);
 }
 
+/* DESIGN: a frame of 2^31 bytes or more is a compile error on every
+   target, by the two entries on such frames under "Compiler behaviour"
+   in docs/decisions.md, T142 of docs/audit/tests-findings.md. The limit
+   is that of x86_64, so a program that compiles for one target compiles
+   for every target. Each alloca of the entry block adds its size at its
+   alignment, and each sum is checked against the limit before it is
+   made, so no sum of 64 bits wraps. */
+#define FRAME_LIMIT UINT64_C(0x7fffffff)
+
+void llvm_emit_frame_add(struct emitter *e, uint64_t size, uint64_t align)
+{
+    struct text name = {0};
+    uint64_t at;
+
+    if (e->failed) {
+        return;
+    }
+    if (align == 0) {
+        align = 1;
+    }
+    if (align <= FRAME_LIMIT && size <= FRAME_LIMIT) {
+        at = (e->frame + align - 1) & ~(align - 1);
+        if (at <= FRAME_LIMIT && size <= FRAME_LIMIT - at) {
+            e->frame = at + size;
+            return;
+        }
+    }
+    e->failed = true;
+    ir_name_append(&name, e->f->module, e->f->name);
+    text_format(e->error, e->error_size,
+                "the stack frame of `%s` needs more than %" PRIu64
+                " bytes, the most an %s frame holds",
+                text_cstr(&name), FRAME_LIMIT,
+                target_info(e->o->target)->arch == ARCH_X86_64 ? "x86_64"
+                                                               : "ARM64");
+    text_free(&name);
+}
+
 /* The LLVM type of a value of type, or NULL after a failure. c_long,
    c_wchar and the word of a Mutex take the integer of their width on the
    target, where layout_resolve has left one. */
@@ -592,6 +630,8 @@ static void slot(struct emitter *e, const struct ir_inst *inst)
 {
     char value[24];
 
+    llvm_emit_frame_add(e, layout_size(e->l, inst->of),
+                        layout_align(e->l, inst->of));
     text_appendf(e->allocas, "  %%s%" PRIu32 " = alloca [%" PRIu64
                              " x i8], align %" PRIu64 "\n",
                  inst->result, layout_size(e->l, inst->of),
@@ -1865,6 +1905,7 @@ void llvm_emit_definition(struct emitter *e, const struct ir_function *f)
     e->f = f;
     e->value = 0;
     e->slots = 0;
+    e->frame = 0;
     text_append(out, "define ");
     llvm_emit_linkage(e, f);
     if (!llvm_emit_signature(e, f, true,
@@ -1887,6 +1928,8 @@ void llvm_emit_definition(struct emitter *e, const struct ir_function *f)
     for (t = 0; t < f->temp_count && !e->failed; t++) {
         const char *name = llvm_emit_value_type(e, f->temps[t]);
         if (name != NULL) {
+            llvm_emit_frame_add(e, layout_size(e->l, ir_scalar(f->temps[t])),
+                                llvm_emit_align_of(e, f->temps[t]));
             text_appendf(out, "  %%t%" PRIu32 " = alloca %s, align %" PRIu64
                               "\n",
                          t, name, llvm_emit_align_of(e, f->temps[t]));

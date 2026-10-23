@@ -46,6 +46,7 @@ static uint64_t word_align(uint64_t align)
    entry block, for a copy that a call or a signature needs. */
 static uint32_t entry_slot(struct emitter *e, uint64_t size, uint64_t align)
 {
+    llvm_emit_frame_add(e, size, align);
     text_appendf(e->allocas, "  %%a%" PRIu32 " = alloca [%" PRIu64
                              " x i8], align %" PRIu64 "\n",
                  e->slots, size, align);

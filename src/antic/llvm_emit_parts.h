@@ -67,6 +67,7 @@ struct emitter {
     const struct ir_module *m;
     struct text *allocas;           /* the allocas of the entry block */
     uint32_t slots;                 /* the next %a<n> of the function */
+    uint64_t frame;                 /* the bytes of its allocas so far */
     struct classified signature;    /* of the function */
     /* The four i1 values of the last flag operation, in the order of
        enum ir_flag, each a value or a constant, and its result
@@ -110,6 +111,7 @@ void llvm_emit_global_symbol(struct text *out, enum target t,
 bool llvm_emit_imports(const struct emitter *e);
 
 /* llvm_emit_function.c */
+void llvm_emit_frame_add(struct emitter *e, uint64_t size, uint64_t align);
 const char *llvm_emit_value_type(struct emitter *e, enum ir_type type);
 uint64_t llvm_emit_align_of(struct emitter *e, enum ir_type type);
 void llvm_emit_int_constant(struct text *out, enum ir_type type,
