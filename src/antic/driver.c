@@ -60,7 +60,9 @@ static bool ends_with(const char *s, const char *suffix)
 }
 
 /* Read the whole file into out. A source stops at LEX_SOURCE_MAX, and a
-   larger one is refused before more of it is read. */
+   larger one is refused before more of it is read. A read that fails
+   leaves out as it was, so no caller reads the part before the failure,
+   T152 of docs/audit/tests-findings.md. */
 static bool read_file(const char *path, struct text *out, bool source)
 {
     size_t limit = source ? LEX_SOURCE_MAX : SIZE_MAX;
@@ -68,6 +70,7 @@ static bool read_file(const char *path, struct text *out, bool source)
     char buffer[4096];
     size_t n;
     size_t total = 0;
+    size_t before = out->length;
     bool ok = true;
 
     if (f == NULL) {
@@ -89,6 +92,10 @@ static bool read_file(const char *path, struct text *out, bool source)
         ok = false;
     }
     ANTI_FCLOSE(f);
+    if (!ok && out->data != NULL) {
+        out->length = before;
+        out->data[before] = '\0';
+    }
     return ok;
 }
 
@@ -1496,12 +1503,12 @@ static const struct interface *library_interface(const struct options *o,
     memset(&empty, 0, sizeof empty);
     with_input.libraries = listed;
     with_input.library_count = o->library_count + 1;
-    if (!driver_read_bytes(o->input, &source) ||
-        !antl_header((const uint8_t *)source.data, source.length, arena,
+    if (!driver_read_bytes(o->input, &source)) {
+        goto done;
+    }
+    if (!antl_header((const uint8_t *)source.data, source.length, arena,
                      &header, error, sizeof error)) {
-        if (source.length > 0) {
-            say_antic("%s %s\n", o->input, error);
-        }
+        say_antic("%s %s\n", o->input, error);
         goto done;
     }
     if (!driver_find_libraries(&with_input, &empty, arena, &paths)) {
@@ -1670,12 +1677,12 @@ bool driver_library_header(const struct options *o, struct text *out)
     listed = driver_libraries_with_input(o);
     with_input.libraries = listed;
     with_input.library_count = o->library_count + 1;
-    if (!driver_read_bytes(o->input, &source) ||
-        !antl_header((const uint8_t *)source.data, source.length, &arena,
+    if (!driver_read_bytes(o->input, &source)) {
+        goto done;
+    }
+    if (!antl_header((const uint8_t *)source.data, source.length, &arena,
                      &header, error, sizeof error)) {
-        if (source.length > 0) {
-            say_antic("%s %s\n", o->input, error);
-        }
+        say_antic("%s %s\n", o->input, error);
         goto done;
     }
     if (!driver_find_libraries(&with_input, &empty, &arena, &paths)) {

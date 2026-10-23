@@ -188,12 +188,13 @@ static bool link_names(const char *const *paths, size_t count,
     for (i = 0; i < count; i++) {
         struct text bytes = {0};
         struct interface header;
-        if (!driver_read_bytes(paths[i], &bytes) ||
-            !antl_header((const uint8_t *)bytes.data, bytes.length, arena,
-                         &header, error, sizeof error)) {
-            if (bytes.length > 0) {
-                say_antic("%s %s\n", paths[i], error);
-            }
+        bool loaded = driver_read_bytes(paths[i], &bytes);
+        if (loaded && !antl_header((const uint8_t *)bytes.data, bytes.length,
+                                 arena, &header, error, sizeof error)) {
+            say_antic("%s %s\n", paths[i], error);
+            loaded = false;
+        }
+        if (!loaded) {
             text_free(&bytes);
             free((void *)list);
             return false;

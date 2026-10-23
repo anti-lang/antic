@@ -20,9 +20,6 @@
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
 clib_regex_link_line T146 The link line of a static library names no glue of anti.regex and no PCRE2.
-anti_build_message_fault_library_read_partway T152 A library file read part of the way gets a second line with the bytes of an error buffer nothing wrote.
-anti_doc_message_fault_library_read_partway T152 A library file read part of the way gets a second line with the bytes of an error buffer nothing wrote.
-anti_bind_message_fault_header_read_partway T152 A library file read part of the way gets a second line with the bytes of an error buffer nothing wrote.
 anti_build_message_fault_object_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_build_message_fault_imported_object_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_test_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.
