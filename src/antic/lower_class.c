@@ -228,7 +228,7 @@ void lower_singleton_get(struct lowerer *l, const struct item *it)
               build, done);
     l->b = build;
     args[0] = lower_size_operand(l, t);
-    made = lower_new_memory(l, args[0]);
+    made = lower_new_memory(l, t, args[0]);
     lower_prepare_object(l, t, NULL, made);
     lower_build_on_heap(l, made);
     lower_run_construct(l, t, made);

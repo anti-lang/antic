@@ -377,7 +377,8 @@ struct ir_operand lower_literal_address(struct lowerer *l,
 uint32_t lower_table_agg(struct lowerer *l, size_t n);
 const struct type *lower_struct_of_expr(const struct expr *e);
 bool lower_bound_is_direct(const struct expr *e, const struct type *s);
-struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size);
+struct ir_operand lower_new_memory(struct lowerer *l, const struct type *t,
+                                   struct ir_operand size);
 struct ir_operand lower_rt_call(struct lowerer *l, enum rt_function f,
                                 const struct ir_operand *args);
 /* lower_rt_call with the result read as result, which holds the bits of

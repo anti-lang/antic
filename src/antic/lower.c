@@ -1146,19 +1146,34 @@ struct ir_operand lower_rt_call_as(struct lowerer *l, enum rt_function f,
     return result == IR_VOID ? lower_none() : lower_temp(l, call);
 }
 
-/* The memory of one object of `alloc T { }`, `alloc T(args)` or a
-   singleton, size bytes of malloc. Out of memory is fatal for them, so a
-   NULL from malloc ends the program through anti_rt_out_of_memory, which
-   never returns, and the code after the branch writes through the
-   result. */
-struct ir_operand lower_new_memory(struct lowerer *l, struct ir_operand size)
+/* The memory of one object of type t of `alloc T { }`, `alloc T(args)`
+   or a singleton, size bytes of malloc. Out of memory is fatal for them,
+   so a NULL from malloc ends the program through anti_rt_out_of_memory,
+   which never returns, and the code after the branch writes through the
+   result. A type that `align(N)` raises above 16 takes its memory from
+   anti_rt_alloc_aligned at N, as `alloc(T, n)` does by R050, T150 of
+   docs/audit/tests-findings.md. */
+struct ir_operand lower_new_memory(struct lowerer *l, const struct type *t,
+                                   struct ir_operand size)
 {
-    struct ir_function *malloc_fn =
-        lower_c_function(l, "malloc", IR_PTR, IR_I64);
-    struct ir_operand made =
-        lower_temp(l, ir_call(l->f, l->b, IR_PTR, ir_func_op(malloc_fn),
-                              &size, 1));
-    struct ir_operand none = lower_temp(
+    uint64_t align = sema_declared_align(t);
+    struct ir_operand made;
+    struct ir_operand none;
+
+    if (align > LOWER_MALLOC_ALIGN) {
+        struct ir_operand args[4];
+        args[0] = ir_int_op(IR_I64, 1);
+        args[1] = size;
+        args[2] = ir_int_op(IR_I64, align);
+        args[3] = ir_int_op(IR_I64, 0);
+        made = lower_rt_call(l, RT_FN_ALLOC_ALIGNED, args);
+    } else {
+        struct ir_function *malloc_fn =
+            lower_c_function(l, "malloc", IR_PTR, IR_I64);
+        made = lower_temp(l, ir_call(l->f, l->b, IR_PTR,
+                                     ir_func_op(malloc_fn), &size, 1));
+    }
+    none = lower_temp(
         l, ir_binary(l->f, l->b, IR_EQ, IR_I8, made, ir_int_op(IR_PTR, 0)));
     struct ir_block *lost = lower_new_block(l);
     struct ir_block *rest = lower_new_block(l);

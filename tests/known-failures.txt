@@ -27,9 +27,6 @@ modules_optional_class_field_release T148 antic crashes on the default none of a
 modules_optional_class_field_dev T148 antic crashes on the default none of a ?T of a class value of a library.
 modules_later_class_default_release T149 A field default that names a class declared later damages the library file.
 modules_later_class_default_dev T149 A field default that names a class declared later damages the library file.
-matrix_types_alloc_of_an_object_aligned_above_16_dev T150 alloc C { } of a class aligned above 16 gives an object at a multiple of 16 alone.
-matrix_types_alloc_of_an_object_aligned_above_16_release T150 alloc C { } of a class aligned above 16 gives an object at a multiple of 16 alone.
-matrix_types_alloc_of_an_object_aligned_above_16_memory_checks T150 alloc C { } of a class aligned above 16 gives an object at a multiple of 16 alone.
 antic_message_fault_runtime_license_unread T151 antic links a binary whose notice lacks a licence text it could not read, and ends with status 0.
 anti_build_message_fault_library_read_partway T152 A library file read part of the way gets a second line with the bytes of an error buffer nothing wrote.
 anti_doc_message_fault_library_read_partway T152 A library file read part of the way gets a second line with the bytes of an error buffer nothing wrote.
