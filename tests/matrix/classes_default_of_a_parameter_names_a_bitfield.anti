@@ -12,11 +12,12 @@ class Bits
 	pub rest: int = 7,
 }
 
-fn show(b: Bits = Bits { low: 2, rest: 3 }) -> int {
+fn show(b: Bits = Bits { low: 2, rest: 3 }) -> int
+{
 	return b.low as int * 100 + b.flag as int * 10 + b.rest;
 }
 
-	fn main() -> int
+fn main() -> int
 {
 	printf("default %lld\n".ptr, show());
 	printf("given %lld\n".ptr, show(Bits { flag: 0 }));

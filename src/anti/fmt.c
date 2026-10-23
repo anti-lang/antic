@@ -1141,7 +1141,10 @@ static void note_token(struct emitter *e, enum token_kind kind)
 
 static enum brace_kind classify(const struct emitter *e)
 {
-    if (e->stmt.item) {
+    /* An item body stands after the brackets of its header close, so a
+       brace inside them, as the literal of a default `p: P = P { x: 1 }`,
+       builds a value, T178 of docs/audit/tests-findings.md. */
+    if (e->stmt.item && e->brackets == 0) {
         return BRACE_ITEM;
     }
     if (e->stmt.governed || !e->stmt.open) {

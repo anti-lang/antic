@@ -58,7 +58,8 @@ pub class Holder
 }
 
 /// The fields of `p`, which defaults to a literal of a class.
-pub fn show(p: Pair = Pair { b: 2 }) {
+pub fn show(p: Pair = Pair { b: 2 })
+{
 	printf("pair %d %d %d made %d\n".ptr, p.a as c_int, p.b as c_int,
 		p.sum() as c_int, p.made as c_int);
 }

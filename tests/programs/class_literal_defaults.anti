@@ -33,17 +33,19 @@ class Holder
 	pub labelled: Labelled = Labelled { b: 3, label: "set" },
 }
 
-fn show(p: Pair = Pair { b: 2 }) {
+fn show(p: Pair = Pair { b: 2 })
+{
 	printf("pair %d %d %d made %d\n".ptr, p.a as c_int, p.b as c_int,
 		p.sum() as c_int, p.made as c_int);
 }
 
-	fn show_labelled(p: Labelled = Labelled { a: 4 }) {
+fn show_labelled(p: Labelled = Labelled { a: 4 })
+{
 	printf("labelled %d %d %.*s %d\n".ptr, p.a as c_int, p.b as c_int,
 		p.label.len as c_int, p.label.ptr, p.sum() as c_int);
 }
 
-	class Noted
+class Noted
 {
 	pub n: int = 1,
 
@@ -53,11 +55,12 @@ fn show(p: Pair = Pair { b: 2 }) {
 	}
 }
 
-fn note(x: Noted = Noted { n: 2 }) {
+fn note(x: Noted = Noted { n: 2 })
+{
 	printf("note %d\n".ptr, x.n as c_int);
 }
 
-	fn main() -> int
+fn main() -> int
 {
 	note(Noted { n: 3 });
 	note();
