@@ -844,13 +844,39 @@ static void show_row(struct anti_builder *b, char *at, int64_t count,
     put(b, "]");
 }
 
+/* Level k of the array of shape a at bytes, as `[a, b]` through every
+   level of it. */
+static void show_level(struct anti_builder *b, char *bytes,
+                       const struct anti_array_shape *a, int64_t k)
+{
+    size_t block = a->size;
+    int64_t i;
+
+    for (i = k + 1; i < a->levels; i++) {
+        block *= (size_t)a->lengths[i];
+    }
+    put(b, "[");
+    for (i = 0; i < a->lengths[k]; i++) {
+        char *at = bytes + (size_t)i * block;
+        put(b, i == 0 ? "" : ", ");
+        if (k + 1 == a->levels) {
+            show_value(b, at, a->inner, a->element, (int64_t)a->size);
+        } else {
+            show_level(b, at, a, k + 1);
+        }
+    }
+    put(b, "]");
+}
+
 /* DESIGN: the text of an element, as `to_text` of a collection writes
    it. A number, a bool and `none` stand as they are, and a str and a
    char as a quoted JSON string. A class writes its own `to_text`, in
    place or through a pointer. A struct is `{"x": 1, "y": 2}`, and an
    array and a slice are `[1, 2]`. A pointer to anything else writes what
    it points at, and a type that no walk reads is `?`. size is the bytes
-   of an array, which its type id does not give. */
+   of an array element, which its type id does not give, or 0. A field
+   passes 0, and its type id and descriptor give the lengths of its
+   levels, as serialize reads them. */
 static void show_value(struct anti_builder *b, void *bytes, int64_t type,
                        const struct anti_descriptor *d, int64_t size)
 {
@@ -889,7 +915,14 @@ static void show_value(struct anti_builder *b, void *bytes, int64_t type,
     }
     case ANTI_TYPE_ARRAY: {
         size_t one = anti_rt_element_size(type, d);
-        if (one == 0 || size == 0) {
+        struct anti_array_shape shape;
+        if (size == 0) {
+            if (anti_rt_array_shape(type, d, &shape) == 0 || shape.size == 0) {
+                put(b, "?");
+            } else {
+                show_level(b, bytes, &shape, 0);
+            }
+        } else if (one == 0) {
             put(b, "?");
         } else {
             show_row(b, bytes, size / (int64_t)one, ANTI_TYPE_ELEMENT(type), d);
