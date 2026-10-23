@@ -110,10 +110,19 @@ static bool copy_stubs(const char *dir, const char *rel, const char *stage)
         text_appendf(&from, "%s/%s", dir, name);
         text_appendf(&inside, "%s/%s", rel, name);
         kind = platform_kind(text_cstr(&from), false);
-        if (kind == PLATFORM_DIRECTORY) {
+        /* An entry whose kind the system refuses to give may be a
+           directory of stubs or a stub, so the copy fails rather than
+           leave it out of the bundle, T155 of
+           docs/audit/tests-findings.md. */
+        if (kind == PLATFORM_UNREADABLE) {
+            ok = false;
+        } else if (kind == PLATFORM_DIRECTORY) {
             ok = copy_stubs(text_cstr(&from), text_cstr(&inside), stage);
         } else if (is_stub(name) &&
-                   platform_kind(text_cstr(&from), true) == PLATFORM_FILE) {
+                   (kind = platform_kind(text_cstr(&from), true)) ==
+                       PLATFORM_UNREADABLE) {
+            ok = false;
+        } else if (is_stub(name) && kind == PLATFORM_FILE) {
             struct text to = {0};
             struct text parent = {0};
             text_appendf(&to, "%s/%s", stage, text_cstr(&inside));
