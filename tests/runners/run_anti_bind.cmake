@@ -654,8 +654,7 @@ elseif(CASE STREQUAL "api_typedef_chain")
 elseif(CASE STREQUAL "api_alias_chain_long")
     # T159: forty aliases, each of which names the one before it once, and
     # the first is int. The chain names no alias twice, so the parameter
-    # is a c_int. The reader stops at a depth of 32 and says that the
-    # alias it stopped at names itself.
+    # is a c_int, and the reader gives no warning.
     set(aliases "{\"name\": \"G0\", \"type\": \"int\"}")
     foreach(i RANGE 1 40)
         math(EXPR before "${i} - 1")
