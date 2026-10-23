@@ -714,6 +714,11 @@ struct emitter {
     bool type_bracket;          /* the last `]` closed a type */
     const struct piece *prev;   /* the last piece on the line */
     const struct piece *prev2;
+    /* The last two tokens on the line, which a comment between them and
+       the next leaves in place, so the `+` after `x` and a comment adds,
+       T174 of docs/audit/tests-findings.md. */
+    const struct piece *tok;
+    const struct piece *tok2;
     bool prev_prefix;           /* the last piece is a prefix operator */
     struct frame *frames;
     size_t frame_count;
@@ -792,6 +797,8 @@ static void flush(struct emitter *e)
     text_clear(&e->line);
     e->prev = NULL;
     e->prev2 = NULL;
+    e->tok = NULL;
+    e->tok2 = NULL;
     e->prev_prefix = false;
     e->type_bracket = false;
 }
@@ -867,13 +874,13 @@ static bool ends_value(const struct piece *p)
    which opens the type after it. */
 static bool last_is_lent(const struct emitter *e)
 {
-    return e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
-           e->prev->token->kind == TOKEN_IDENT && e->prev->length == 4 &&
-           memcmp(e->src + e->prev->offset, "lent", 4) == 0 &&
-           e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
-           (e->prev2->token->kind == TOKEN_ARROW ||
-            e->prev2->token->kind == TOKEN_LPAREN ||
-            e->prev2->token->kind == TOKEN_COMMA);
+    return e->tok != NULL && e->tok->kind == PIECE_TOKEN &&
+           e->tok->token->kind == TOKEN_IDENT && e->tok->length == 4 &&
+           memcmp(e->src + e->tok->offset, "lent", 4) == 0 &&
+           e->tok2 != NULL && e->tok2->kind == PIECE_TOKEN &&
+           (e->tok2->token->kind == TOKEN_ARROW ||
+            e->tok2->token->kind == TOKEN_LPAREN ||
+            e->tok2->token->kind == TOKEN_COMMA);
 }
 
 /* Whether the piece written last ends a value. A name behind a dot is
@@ -884,14 +891,14 @@ static bool last_ends_value(const struct emitter *e)
     if (last_is_lent(e)) {
         return false;
     }
-    if (e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
-        (e->prev2->token->kind == TOKEN_DOT ||
-         e->prev2->token->kind == TOKEN_QUESTION_DOT ||
-         e->prev2->token->kind == TOKEN_COLON_COLON) &&
-        e->prev != NULL && e->prev->kind == PIECE_TOKEN) {
+    if (e->tok2 != NULL && e->tok2->kind == PIECE_TOKEN &&
+        (e->tok2->token->kind == TOKEN_DOT ||
+         e->tok2->token->kind == TOKEN_QUESTION_DOT ||
+         e->tok2->token->kind == TOKEN_COLON_COLON) &&
+        e->tok != NULL && e->tok->kind == PIECE_TOKEN) {
         return true;
     }
-    return ends_value(e->prev);
+    return ends_value(e->tok);
 }
 
 /* Whether a value opens after the piece written last. The word before an
@@ -900,15 +907,15 @@ static bool last_ends_value(const struct emitter *e)
    a variable of that name holds. */
 static bool last_opens_value(const struct emitter *e)
 {
-    if (e->prev2 != NULL && e->prev2->kind == PIECE_TOKEN &&
-        (e->prev2->token->kind == TOKEN_DOT ||
-         e->prev2->token->kind == TOKEN_QUESTION_DOT ||
-         e->prev2->token->kind == TOKEN_COLON_COLON)) {
+    if (e->tok2 != NULL && e->tok2->kind == PIECE_TOKEN &&
+        (e->tok2->token->kind == TOKEN_DOT ||
+         e->tok2->token->kind == TOKEN_QUESTION_DOT ||
+         e->tok2->token->kind == TOKEN_COLON_COLON)) {
         return false;
     }
-    if (e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
-        e->prev->token->kind == TOKEN_IDENT &&
-        contextual_word(e->src + e->prev->offset, e->prev->length)) {
+    if (e->tok != NULL && e->tok->kind == PIECE_TOKEN &&
+        e->tok->token->kind == TOKEN_IDENT &&
+        contextual_word(e->src + e->tok->offset, e->tok->length)) {
         return true;
     }
     return !last_ends_value(e);
@@ -1062,6 +1069,10 @@ static void append_piece(struct emitter *e, const struct piece *p, bool space)
                      prefix_operator(e, p->token->kind);
     e->prev2 = e->prev;
     e->prev = p;
+    if (p->kind == PIECE_TOKEN) {
+        e->tok2 = e->tok;
+        e->tok = p;
+    }
     e->type_bracket = false;
 }
 
