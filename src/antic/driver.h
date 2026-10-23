@@ -186,10 +186,13 @@ enum { DRIVER_RUNTIME_PACKAGES = 3 };
    says that the link takes the C library of musl. Each carries the
    identifier of notice_component_license and the text of licenses/ of
    the archive at runtime, in the memory pool, and an empty text where
-   runtime is NULL. Returns the count. The notice of antic and the one
-   `anti` writes from a project both start with these. */
-size_t driver_runtime_packages(const char *runtime, bool musl,
-                               struct arena *arena, struct package *out);
+   runtime is NULL. Stores the count in *count. Returns false after a
+   text that cannot be read, which the message names. The notice of
+   antic and the one `anti` writes from a project both start with
+   these. */
+bool driver_runtime_packages(const char *runtime, bool musl,
+                             struct arena *arena, struct package *out,
+                             size_t *count);
 
 /* The library files that options->libraries needs: those files, every
    module each of them imports, and every module below those. The paths

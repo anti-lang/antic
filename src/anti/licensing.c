@@ -369,8 +369,9 @@ int licensing_plain(const char *runtime)
             packages[i].license = OWN_LICENSE;
             packages[i].license_text = pooled(&arena, &own);
         }
-        count = 2 + driver_runtime_packages(runtime, false, &arena,
-                                            &packages[2]);
+        ok = driver_runtime_packages(runtime, false, &arena, &packages[2],
+                                     &count);
+        count += 2;
         for (i = 0; ok && i < found.count; i++) {
             struct text name = {0};
             if (component_of(text_cstr(&found.items[i]), &name) &&
@@ -414,11 +415,11 @@ bool licensing_project(const struct licensing_project *p, struct text *out)
     const struct package **list =
         files_array(p->library_count + DRIVER_RUNTIME_PACKAGES + 1,
                     sizeof *list);
-    size_t archived =
-        driver_runtime_packages(p->runtime, p->musl, &arena, archive);
+    size_t archived = 0;
     size_t n = 0;
     size_t i;
-    bool ok = true;
+    bool ok = driver_runtime_packages(p->runtime, p->musl, &arena, archive,
+                                      &archived);
 
     for (i = 0; i < archived; i++) {
         list[n++] = &archive[i];

@@ -915,7 +915,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
    has in a notice, with the identifier of notice_component_license and
    the text of <runtime>/RUNTIME_LICENSES_DIR/<component>.txt. The text
    stays empty when runtime is NULL. */
-static void archive_package(const char *runtime, const char *name,
+static bool archive_package(const char *runtime, const char *name,
                             const char *component, const char *version,
                             struct arena *arena, struct package *out)
 {
@@ -923,6 +923,7 @@ static void archive_package(const char *runtime, const char *name,
     struct text text = {0};
     struct text license = {0};
     char *copy;
+    bool ok = true;
 
     memset(out, 0, sizeof *out);
     out->name = name;
@@ -934,7 +935,14 @@ static void archive_package(const char *runtime, const char *name,
     out->license_text = "";
     text_appendf(&path, "%s/%s/%s%s", runtime != NULL ? runtime : ".",
                  RUNTIME_LICENSES_DIR, component, RUNTIME_LICENSE_SUFFIX);
-    if (runtime != NULL && read_text(text_cstr(&path), &text)) {
+    /* DESIGN: a text that cannot be read ends the run, as every other
+       file the driver names and cannot open does, so no binary ships a
+       notice without the text of a component it links. T151 of
+       docs/audit/tests-findings.md. */
+    if (runtime != NULL) {
+        ok = read_text(text_cstr(&path), &text);
+    }
+    if (ok && runtime != NULL) {
         copy = arena_alloc(arena, text.length + 1);
         memcpy(copy, text_cstr(&text), text.length);
         out->license_text = copy;
@@ -942,22 +950,27 @@ static void archive_package(const char *runtime, const char *name,
     text_free(&path);
     text_free(&text);
     text_free(&license);
+    return ok;
 }
 
-size_t driver_runtime_packages(const char *runtime, bool musl,
-                               struct arena *arena, struct package *out)
+bool driver_runtime_packages(const char *runtime, bool musl,
+                             struct arena *arena, struct package *out,
+                             size_t *count)
 {
     size_t n = 0;
+    bool ok = archive_package(runtime, RUNTIME_MODULE, RUNTIME_LICENSE_NAME,
+                              ANTIC_VERSION, arena, &out[n++]);
 
-    archive_package(runtime, RUNTIME_MODULE, RUNTIME_LICENSE_NAME,
-                    ANTIC_VERSION, arena, &out[n++]);
-    if (musl) {
-        archive_package(runtime, MUSL_PACKAGE, MUSL_PACKAGE,
-                        ANTIC_MUSL_VERSION, arena, &out[n++]);
-        archive_package(runtime, MIMALLOC_PACKAGE, MIMALLOC_PACKAGE,
-                        ANTIC_MIMALLOC_VERSION, arena, &out[n++]);
+    if (ok && musl) {
+        ok = archive_package(runtime, MUSL_PACKAGE, MUSL_PACKAGE,
+                             ANTIC_MUSL_VERSION, arena, &out[n++]);
     }
-    return n;
+    if (ok && musl) {
+        ok = archive_package(runtime, MIMALLOC_PACKAGE, MIMALLOC_PACKAGE,
+                             ANTIC_MIMALLOC_VERSION, arena, &out[n++]);
+    }
+    *count = n;
+    return ok;
 }
 
 /* The licence notice of a linked binary: the runtime, musl and mimalloc
@@ -969,17 +982,16 @@ size_t driver_runtime_packages(const char *runtime, bool musl,
    2026-10-08 that its notice names them, each with the version of its
    pin and the text of the runtime archive. A program of the glibc mode
    and of any other target links neither and names neither. */
-static void build_notice(const struct options *o,
+static bool build_notice(const struct options *o,
                          const struct extras *extras, struct arena *arena,
                          struct text *out)
 {
     const struct interface *own = extras->own;
     size_t count = extras->library_count;
-    const struct package **list =
-        alloc_zeroed(count + DRIVER_RUNTIME_PACKAGES + 1, sizeof *list);
+    const struct package **list;
     struct package archive[DRIVER_RUNTIME_PACKAGES];
     bool musl = driver_links_musl(o, extras);
-    size_t archived = driver_runtime_packages(o->runtime, musl, arena, archive);
+    size_t archived = 0;
     size_t n = 0;
     size_t i;
     size_t j;
@@ -987,6 +999,11 @@ static void build_notice(const struct options *o,
     if (o->links_musl != NULL) {
         *o->links_musl = musl;
     }
+    if (!driver_runtime_packages(o->runtime, musl, arena, archive,
+                                 &archived)) {
+        return false;
+    }
+    list = alloc_zeroed(count + DRIVER_RUNTIME_PACKAGES + 1, sizeof *list);
     for (i = 0; i < archived; i++) {
         list[n++] = &archive[i];
     }
@@ -1011,6 +1028,7 @@ static void build_notice(const struct options *o,
     list[n++] = &own->package;
     notice_text(out, list, n);
     free((void *)list);
+    return true;
 }
 
 /* Lower the program, run the optimizer passes and run llvm_back_end for
@@ -1059,8 +1077,9 @@ static int back_end(const struct options *o, struct module *tree,
                 o->input);
         return 1;
     }
-    if (extras->own != NULL) {
-        build_notice(o, extras, program->arena, &extras->notice);
+    if (extras->own != NULL &&
+        !build_notice(o, extras, program->arena, &extras->notice)) {
+        return 1;
     }
     extras->regex = holds_module(program, REGEX_MODULE);
     for (i = 0; driver_is_plugin(o) && i < program->class_count; i++) {
