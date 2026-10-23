@@ -11,14 +11,9 @@
 #include "jsontree.h"
 #include "say.h"
 
-/* The deepest chain of aliases a description resolves, the bound of the
-   depth of a type of bind_parse_type. */
-#define BIND_ALIAS_DEPTH 256
-
 struct api {
     struct bind_module *b;
     const struct json_value *root;
-    int depth;                  /* of the types being parsed */
     struct bind_list resolving; /* the names of the aliases being
                                    resolved, the outermost first */
     const char *unparsed;       /* the first type of an entry that did not
@@ -192,8 +187,9 @@ static const struct bind_type *typedef_named(void *context, const char *name)
     }
     /* DESIGN: an alias that names itself, directly or through others,
        stands on the list of the aliases being resolved when it is named
-       again, and only then. A chain of distinct aliases resolves at any
-       depth up to the bound of parse, T159 of
+       again, and only then. A chain of distinct aliases resolves up to
+       the bound of the depth of a type of bind_parse_type, which holds
+       the recursion within the stack, T159 of
        docs/audit/tests-findings.md. */
     for (i = 0; i < a->resolving.count; i++) {
         if (strcmp(a->resolving.items[i], name) == 0) {
@@ -244,21 +240,11 @@ static const struct bind_type *parse(struct api *a, const char *c)
     struct bind_names names;
     const struct bind_type *t;
 
-    /* typedef_named refuses an alias that names itself. A chain of
-       distinct aliases deeper than the bound of a type is refused here,
-       before the recursion grows the stack without end. */
-    if (a->depth > BIND_ALIAS_DEPTH) {
-        bind_warn(a->b, "the type `%s` nests deeper than %d aliases", c,
-                  BIND_ALIAS_DEPTH);
-        return NULL;
-    }
     names.typedef_named = typedef_named;
     names.record_named = record_named;
     names.enum_named = enum_named;
     names.context = a;
-    a->depth++;
     t = bind_parse_type(a->b, c, &names);
-    a->depth--;
     /* R170 of "Rules of 2026-10-13": the entry that leaves something out
        names the type in its one warning. The innermost type that does
        not parse fails first, through an alias or a callback. */
@@ -614,7 +600,6 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
     }
     a.b = b;
     a.root = tree.root;
-    a.depth = 0;
     a.unparsed = NULL;
     memset(&a.resolved, 0, sizeof a.resolved);
     memset(&a.resolving, 0, sizeof a.resolving);
