@@ -56,7 +56,6 @@ error_layout_text_saturating T163 The text of a size names a wrapping or saturat
 error_layout_text_mul_high T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
 std_serialize_infinite_float T164 serialize writes an infinite float as inf, which deserialize refuses.
 matrix_types_enum_internal_function_refused T165 An internal function of an enum body gives a second message at self.
-anti_bind_message_clang_static_returns_a_function T167 anti bind writes a shim that returns a function from a void function.
 matrix_threads_concurrent_class_writes_a_field_of_its_base_refused T168 A write in a concurrent class to a field of its concurrent base is not checked.
 anti_build_message_path_chain_of_two_projects T169 A path project that names another path project is not resolved through its library file.
 anti_bind_message_clang_enum_of_128_bits T170 anti bind gives an enum of __int128 the base c_int and wrong values.

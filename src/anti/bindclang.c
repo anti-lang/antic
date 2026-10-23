@@ -940,6 +940,23 @@ static void declare_typedef(struct reader *r, const struct json_value *node)
     r->generation++;
 }
 
+/* The byte after the parenthesis that closes the one at open, or the end
+   of the text where none closes it. */
+static const char *after_group(const char *open)
+{
+    size_t depth = 0;
+    const char *p;
+
+    for (p = open; *p != '\0'; p++) {
+        if (*p == '(') {
+            depth++;
+        } else if (*p == ')' && --depth == 0) {
+            return p + 1;
+        }
+    }
+    return p;
+}
+
 /* A typedef of the header names the anonymous record or enum it owns. */
 static void name_owned(struct reader *r, const struct json_value *node)
 {
@@ -1026,6 +1043,16 @@ static void declare_function(struct reader *r, const struct json_value *node)
             const char *open = strchr(c, '(');
             f->c_result = bind_strndup(r->b, c,
                                        open != NULL ? (size_t)(open - c) : 0);
+            /* DESIGN: the type of a function is its result, then its
+               parameters in the first parentheses. A function that
+               returns a function wraps its name in them instead, as
+               `void (*(void))(int)`, and something follows their close.
+               Its result is then the whole type, which holds a `(`, so
+               bind_settle leaves the function out, T167 of
+               docs/audit/tests-findings.md. */
+            if (open != NULL && *after_group(open) != '\0') {
+                f->c_result = bind_strdup(r->b, c);
+            }
             while (f->c_result[0] != '\0' &&
                    f->c_result[strlen(f->c_result) - 1] == ' ') {
                 f->c_result = bind_strndup(r->b, f->c_result,
