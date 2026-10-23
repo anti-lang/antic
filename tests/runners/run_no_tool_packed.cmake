@@ -75,7 +75,12 @@ execute_process(COMMAND "${CMAKE_COMMAND}" "-DLLVM_BIN=${runtime_bin}"
                         -P "${ROOT}/tools/check-llvm.cmake"
                 OUTPUT_VARIABLE out ERROR_VARIABLE err
                 RESULT_VARIABLE status ENCODING NONE)
-if(status EQUAL 0 OR NOT err MATCHES "holds ${TOOL}")
+# CMake wraps the text of a message at the width it sees, and a long path
+# moves the break, so a line break and the spaces after it may stand
+# between two words of the refusal. They read as one space here, T138 of
+# docs/audit/tests-findings.md.
+string(REGEX REPLACE "[ \t]*\n[ \t]*" " " flat "${err}")
+if(status EQUAL 0 OR NOT flat MATCHES "holds ${TOOL}")
     message(FATAL_ERROR "tools/check-llvm.cmake accepted ${TOOL} in bin/ of "
                         "the runtime archive:\n${out}${err}")
 endif()
