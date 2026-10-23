@@ -324,7 +324,7 @@ static bool build_static(const struct options *o, const char *object,
     if (ok) {
         struct text line = {0};
         link_line(&line, o->target, path, o->runtime, o->cpu,
-                  o->bundle_runtime);
+                  o->bundle_runtime, extras->regex);
         printf("%s\n", text_cstr(&line));
         text_free(&line);
     }

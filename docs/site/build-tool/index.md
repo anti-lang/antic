@@ -339,7 +339,7 @@ The option `--lib` of `anti build` turns a library project into a library for C.
 | `macos-*` | `lib<name>.a` | `lib<name>.dylib` |
 | `windows-*` | `<name>.lib` | `<name>.dll` and the import library `<name>.lib` |
 
-A static library holds no runtime. The tool prints the command line that links a C program with the archive and the `libanti_rt.a` of the target and its level. The option `--bundle-runtime` puts the runtime into the archive, and the printed line then names the archive alone. A shared library links the runtime in. The glue of `anti.regex` and PCRE2 are never in the archive. The printed line does not name them yet, so a C program of such a library adds the archives `anti_rt_regex` and `pcre2-8` of `lib/<target>/` of the package after the runtime.
+A static library holds no runtime. The tool prints the command line that links a C program with the archive and the `libanti_rt.a` of the target and its level. The option `--bundle-runtime` puts the runtime into the archive, and the printed line then names the archive alone. A shared library links the runtime in. The glue of `anti.regex` and PCRE2 are never in the archive. The printed line of a library that imports `anti.regex` names the archives `anti_rt_regex` and `pcre2-8` of `lib/<target>/` of the package after the library, before the runtime.
 
 A dev build of the library project `com.example.geo` for macos-arm64 prints this line, with the path of the package in place of `<package>`.
 

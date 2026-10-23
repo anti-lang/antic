@@ -1174,11 +1174,21 @@ void link_relocatable_command(struct link_command *c, enum target t,
 }
 
 void link_line(struct text *out, enum target t, const char *library,
-               const char *runtime, enum cpu_level cpu, bool bundled)
+               const char *runtime, enum cpu_level cpu, bool bundled,
+               bool regex)
 {
     bool windows = target_info(t)->os == OS_WINDOWS;
 
     text_appendf(out, "%s main.c %s", windows ? "cl" : "cc", library);
+    /* The glue calls the runtime and PCRE2, so a linker that reads its
+       inputs once takes it before both, T146 of
+       docs/audit/tests-findings.md. */
+    if (regex) {
+        text_append(out, " ");
+        link_native_library(out, runtime, t, NATIVE_REGEX_GLUE);
+        text_append(out, " ");
+        link_native_library(out, runtime, t, NATIVE_PCRE2);
+    }
     if (!bundled) {
         text_append(out, " ");
         link_runtime_library(out, runtime, t, cpu);

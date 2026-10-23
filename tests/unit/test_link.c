@@ -522,25 +522,36 @@ static void libraries(void)
     joined(&c, "/rt/bin/ld.lld -r -o joined.o geo.o init.c.o utf.c.o");
     link_command_free(&c);
 
-    link_line(&line, TARGET_LINUX_X86_64, "libgeo.a", "/rt", CPU_V3, false);
+    link_line(&line, TARGET_LINUX_X86_64, "libgeo.a", "/rt", CPU_V3, false,
+              false);
     CHECK_STR(text_cstr(&line),
               "cc main.c libgeo.a "
               "/rt/lib/linux-x86_64/v3/libanti_rt.a -lpthread -lm");
     text_free(&line);
     /* A program of a lower level links the runtime of that level. */
-    link_line(&line, TARGET_LINUX_X86_64, "libgeo.a", "/rt", CPU_V1, false);
+    link_line(&line, TARGET_LINUX_X86_64, "libgeo.a", "/rt", CPU_V1, false,
+              false);
     CHECK_STR(text_cstr(&line),
               "cc main.c libgeo.a "
               "/rt/lib/linux-x86_64/v1/libanti_rt.a -lpthread -lm");
     text_free(&line);
     link_line(&line, TARGET_MACOS_ARM64, "libgeo.a", "/rt", CPU_ARMV8_5,
-              false);
+              false, false);
     CHECK_STR(text_cstr(&line), "cc main.c libgeo.a "
                                 "/rt/lib/macos-arm64/armv8.5/libanti_rt.a");
     text_free(&line);
     link_line(&line, TARGET_WINDOWS_X86_64, "geo.lib", "C:/rt", CPU_V3,
-              true);
+              true, false);
     CHECK_STR(text_cstr(&line), "cl main.c geo.lib");
+    text_free(&line);
+    /* A library that holds anti.regex names the glue and PCRE2, which
+       the archive never holds, by T146. */
+    link_line(&line, TARGET_MACOS_ARM64, "libgeo.a", "/rt", CPU_ARMV8_5,
+              false, true);
+    CHECK_STR(text_cstr(&line),
+              "cc main.c libgeo.a /rt/lib/macos-arm64/libanti_rt_regex.a "
+              "/rt/lib/macos-arm64/libpcre2-8.a "
+              "/rt/lib/macos-arm64/armv8.5/libanti_rt.a");
     text_free(&line);
 }
 

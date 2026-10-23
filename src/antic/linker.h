@@ -130,9 +130,13 @@ void link_relocatable_command(struct link_command *c, enum target t,
                               const char *const *objects, size_t count);
 
 /* Append the command line that links a C program main.c with the static
-   library, as antic prints it. A bundled runtime needs no runtime library. */
+   library, as antic prints it. A bundled runtime needs no runtime library.
+   A library that holds anti.regex names the glue of the runtime and
+   PCRE2 after it, which the archive never holds, as the link of an
+   executable takes them. */
 void link_line(struct text *out, enum target t, const char *library,
-               const char *runtime, enum cpu_level cpu, bool bundled);
+               const char *runtime, enum cpu_level cpu, bool bundled,
+               bool regex);
 
 /* Whether path names an object file or an archive for the linker. */
 bool link_is_input(const char *path);
