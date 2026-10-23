@@ -1,6 +1,7 @@
 /* The C behind anti.lang.Object: the functions of the root, the walk
    that writes JSON and text, and delete, destroy, dup and give. */
 
+#include <float.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -464,6 +465,23 @@ static void put_value(struct anti_builder *b, const void *bytes,
                       int64_t owned);
 
 /* Level k of the array of shape a at bytes, as a JSON array. */
+/* DESIGN: a float of serialize is a number of JSON, which has no
+   spelling of an infinity. An infinity is written as 1e999 with its
+   sign, a JSON number whose exact value no float holds, which the
+   reader of src/rt/text.c rounds to the infinity again, by the
+   [provisional] entry on infinities under "Object model" in
+   docs/decisions.md. A round trip then gives the same text and the same
+   value, T164 of docs/audit/tests-findings.md. single writes the digits
+   of an f32. */
+static void put_float(struct anti_builder *b, double value, int single)
+{
+    if (value > DBL_MAX || value < -DBL_MAX) {
+        put(b, value > 0 ? "1e999" : "-1e999");
+        return;
+    }
+    anti_rt_builder_float(b, value, -1, 0, single);
+}
+
 static void put_level(struct anti_builder *b, const void *bytes,
                       const struct anti_array_shape *a, int64_t k)
 {
@@ -553,19 +571,19 @@ static void put_value(struct anti_builder *b, const void *bytes,
     case ANTI_TYPE_F16: {
         uint16_t h;
         memcpy(&h, bytes, sizeof h);
-        anti_rt_builder_float(b, (double)anti_rt_f16_widen(h), -1, 0, 1);
+        put_float(b, (double)anti_rt_f16_widen(h), 1);
         return;
     }
     case ANTI_TYPE_F32: {
         float v;
         memcpy(&v, bytes, sizeof v);
-        anti_rt_builder_float(b, (double)v, -1, 0, 1);
+        put_float(b, (double)v, 1);
         return;
     }
     case ANTI_TYPE_F64: {
         double v;
         memcpy(&v, bytes, sizeof v);
-        anti_rt_builder_float(b, v, -1, 0, 0);
+        put_float(b, v, 0);
         return;
     }
     case ANTI_TYPE_STR: {
