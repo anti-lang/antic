@@ -1480,6 +1480,59 @@ void sema_check_nesting(struct checker *c, struct type *t, struct pos pos)
     }
 }
 
+/* Whether the constant v holds the value of a class literal whose class
+   had fewer fields when v was made than it has now. */
+static bool holds_short_class(const struct const_value *v)
+{
+    size_t i;
+
+    if (v->kind != CONST_STRUCT && v->kind != CONST_ARRAY &&
+        v->kind != CONST_REPEAT) {
+        return false;
+    }
+    if (v->kind == CONST_STRUCT && v->type != NULL &&
+        v->type->kind == TYPE_CLASS &&
+        v->as.aggregate.count != v->type->field_count) {
+        return true;
+    }
+    for (i = 0; i < v->as.aggregate.count; i++) {
+        if (holds_short_class(&v->as.aggregate.items[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* DESIGN: the fields of the types are declared in the order of the file,
+   and a default is evaluated with the fields of its type. A class literal
+   in it holds one item per field of its class, and a class that the file
+   declares later had no fields yet, so its value was short. Such a
+   default is evaluated again once every type has its fields, and the
+   library file then carries a whole value, T149 of
+   docs/audit/tests-findings.md. */
+static void complete_defaults(struct checker *c, struct item *it)
+{
+    struct type *t = it->symbol->type;
+    size_t base_fields = it->kind == ITEM_CLASS ? 1 : 0;
+    size_t j;
+
+    for (j = 0; j < it->param_count && base_fields + j < t->field_count;
+         j++) {
+        struct struct_field *f = &t->fields[base_fields + j];
+        struct const_value *v;
+        struct context sized;
+        if (f->constant == NULL || !holds_short_class(f->constant)) {
+            continue;
+        }
+        v = arena_alloc(c->arena, sizeof *v);
+        sema_enter_sized(c, &sized);
+        if (sema_eval_const(c, it->params[j].value, v)) {
+            f->constant = v;
+        }
+        sema_leave(c, &sized);
+    }
+}
+
 /* The fields of every struct, union and class, then the refusal of a
    type that contains itself or nests too deep. */
 void sema_declare_all_fields(struct checker *c)
@@ -1495,6 +1548,17 @@ void sema_declare_all_fields(struct checker *c)
             struct context outer;
             sema_enter_within(c, it, &outer);
             declare_fields(c, it);
+            sema_leave(c, &outer);
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL &&
+            (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
+             it->kind == ITEM_CLASS)) {
+            struct context outer;
+            sema_enter_within(c, it, &outer);
+            complete_defaults(c, it);
             sema_leave(c, &outer);
         }
     }
