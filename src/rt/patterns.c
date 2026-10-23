@@ -169,6 +169,18 @@ static int64_t failure(int rc)
                        (const char *)message);
 }
 
+/* DESIGN: a `Regex` that holds no pattern stops the program at a
+   search, by the [provisional] entry under "Regular expressions" in
+   docs/decisions.md. `Object.deserialize` leaves one in a field the text
+   gives as `null`. Every function that takes a pattern from Anti checks
+   it first, so PCRE2 never reads the missing handle. */
+static void held(const void *pattern)
+{
+    if (pattern == NULL) {
+        anti_rt_fail_abort("anti: a search of a Regex that holds no pattern");
+    }
+}
+
 static pcre2_match_data *match_data(const void *pattern, int full)
 {
     pcre2_match_data *md =
@@ -338,6 +350,7 @@ int64_t anti_rt_regex_begin(struct anti_cursor *c, const void *pattern,
     int64_t total = 0;
     int64_t status;
 
+    held(pattern);
     cursor_reset(c, pattern, s, length);
     if (limit < 0 || check != 0) {
         status = count_all(pattern, s, length, &total);
@@ -418,9 +431,11 @@ int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
                             int64_t length, struct anti_maybe_match *out)
 {
     struct anti_matches it;
-    pcre2_match_data *md = match_data(pattern, 0);
+    pcre2_match_data *md;
     int64_t status;
 
+    held(pattern);
+    md = match_data(pattern, 0);
     (void)walk_begin(&it, pattern, s, length, 1);
     status = advance(&it.cursor, &it.current, md);
     pcre2_match_data_free(md);
@@ -437,10 +452,13 @@ int64_t anti_rt_regex_first(const void *pattern, const unsigned char *s,
 int64_t anti_rt_regex_test(const void *pattern, const unsigned char *s,
                            int64_t length)
 {
-    pcre2_match_data *md = match_data(pattern, 0);
-    int rc = pcre2_match(ANTI_PATTERN_CODE(pattern), s, (PCRE2_SIZE)length, 0,
-                         0, md, NULL);
+    pcre2_match_data *md;
+    int rc;
 
+    held(pattern);
+    md = match_data(pattern, 0);
+    rc = pcre2_match(ANTI_PATTERN_CODE(pattern), s, (PCRE2_SIZE)length, 0, 0,
+                     md, NULL);
     pcre2_match_data_free(md);
     if (rc == PCRE2_ERROR_NOMATCH) {
         return DONE;
@@ -566,7 +584,10 @@ int64_t anti_rt_regex_template_fits(const void *pattern,
 {
     struct anti_rt_piece piece;
     int64_t offset = 0;
-    int64_t count = anti_rt_regex_group_count(pattern);
+    int64_t count;
+
+    held(pattern);
+    count = anti_rt_regex_group_count(pattern);
 
     while (anti_rt_regex_piece(bytes, length, &offset, &piece)) {
         if ((piece.kind == ANTI_RT_PIECE_NUMBER && piece.number > count) ||
@@ -692,7 +713,7 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
                             const unsigned char *name, int64_t name_length,
                             int64_t at, int64_t limit)
 {
-    int64_t count = anti_rt_regex_group_count(pattern);
+    int64_t count;
     int64_t group = into;
     int64_t places = 0;
     int64_t status;
@@ -701,6 +722,8 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
     struct anti_matches it;
     pcre2_match_data *md;
 
+    held(pattern);
+    count = anti_rt_regex_group_count(pattern);
     if (name_length > 0) {
         group = anti_rt_regex_group_number(pattern, name, name_length);
         if (group < 0) {

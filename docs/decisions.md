@@ -1923,8 +1923,9 @@ antic had two native back ends, x86_64 and ARM64, until the step `switch` of `do
   search, as memory that runs out does. `Object.deserialize` leaves such a `Regex` in a
   field that the text gives as `null`, which `serialize` writes there, when the class
   declares the field without a default. Reason: no document decided the search, and a stop
-  keeps the program defined and the same in dev and in release, where PCRE2 reads the
-  missing handle today. T166 of `docs/audit/tests-findings.md` holds it.
+  keeps the program defined and the same in dev and in release, where PCRE2 read the
+  missing handle before. Every function of `src/rt/patterns.c` that takes a pattern from
+  Anti checks it first, the fix of T166 of `docs/audit/tests-findings.md`.
 - [provisional] A module that writes a pattern literal or `Regex.compile` imports
   `anti.regex`. Without the import the literal is refused with `` a pattern literal is
   compiled by `anti.regex`, so the module imports `anti.regex` `` and the call with ``
