@@ -121,7 +121,6 @@ matrix_types_generic_operator_of_a_class_named_through_the_class_release T172 An
 matrix_types_generic_operator_of_a_class_named_through_the_class_memory_checks T172 An operator of a class body takes no type argument of its own from its operands.
 anti_doc_operators_private T173 The developer's page heads an operator that shares its name without its type.
 fmt_comment_before_operator T174 anti fmt reads a binary operator after a comment as a prefix.
-std_collection_text_values_no_reflect T175 to_text of a collection reads the field lists that --no-reflect drops.
 matrix_types_generic_operator_with_a_literal_of_its_parameter_dev T176 A literal takes the left operand's type where a generic operator's second parameter is its type parameter.
 matrix_types_generic_operator_with_a_literal_of_its_parameter_release T176 A literal takes the left operand's type where a generic operator's second parameter is its type parameter.
 matrix_types_generic_operator_with_a_literal_of_its_parameter_memory_checks T176 A literal takes the left operand's type where a generic operator's second parameter is its type parameter.

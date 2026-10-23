@@ -515,7 +515,7 @@ static struct ir_global *value_descriptor(struct lowerer *l,
 }
 
 /* Give the descriptor g the field list list of count records, a global
-   of module named name. `--no-reflect` drops it, as it drops the list of
+   of module named name. `--no-reflect` keeps it, as it keeps the list of
    a struct. */
 static void give_fields(struct lowerer *l, struct ir_global *g,
                         const char *module, const char *name,
@@ -523,9 +523,6 @@ static void give_fields(struct lowerer *l, struct ir_global *g,
 {
     struct ir_const *value = g->value;
 
-    if (l->no_reflect) {
-        return;
-    }
     value->items[RT_DESCRIPTOR_FIELD_COUNT].integer = count;
     value->items[RT_DESCRIPTOR_FIELDS].kind = IR_CONST_ADDR;
     value->items[RT_DESCRIPTOR_FIELDS].global = ir_global_add_value(l->m, module, name, list)->index;
@@ -1318,7 +1315,13 @@ struct ir_global *lower_struct_descriptor(struct lowerer *l,
     value->items[RT_DESCRIPTOR_NAME_LENGTH].integer = t->name.length;
     value->items[RT_DESCRIPTOR_SIZE].kind = IR_CONST_SYM;
     value->items[RT_DESCRIPTOR_SIZE].sym = ir_sym_size_of(l->m, lower_vtype_of(l, t));
-    if (!l->no_reflect && count > 0) {
+    /* DESIGN: `--no-reflect` drops the field lists of the classes alone.
+       A struct, a variant, a `?T`, a tuple and an array keep theirs,
+       since `to_text` of a collection walks them for the text of an
+       element, which a program under `--no-reflect` calls as well, T175
+       of docs/audit/tests-findings.md. `serialize`, `deserialize` and
+       `anti.reflect` stay refused, and a class keeps no list they read. */
+    if (count > 0) {
         value->items[RT_DESCRIPTOR_FIELD_COUNT].integer = count;
         value->items[RT_DESCRIPTOR_FIELDS].kind = IR_CONST_ADDR;
         value->items[RT_DESCRIPTOR_FIELDS].global = lower_class_fields(l, t)->index;
