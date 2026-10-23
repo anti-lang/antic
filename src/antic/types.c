@@ -349,7 +349,17 @@ static const char *operator_spelling(enum token_kind op)
     case TOKEN_LT: return "<";
     case TOKEN_LE: return "<=";
     case TOKEN_GT: return ">";
-    default: return ">=";
+    case TOKEN_GE: return ">=";
+    /* The wrapping and saturating operators stand in a length as the
+       source writes them, T163 of docs/audit/tests-findings.md. */
+    case TOKEN_PLUS_WRAP: return "+%";
+    case TOKEN_MINUS_WRAP: return "-%";
+    case TOKEN_STAR_WRAP: return "*%";
+    case TOKEN_SHL_WRAP: return "<<%";
+    case TOKEN_PLUS_SAT: return "+|";
+    case TOKEN_MINUS_SAT: return "-|";
+    case TOKEN_STAR_SAT: return "*|";
+    default: return "?";
     }
 }
 
@@ -401,6 +411,16 @@ void types_symbolic_print(struct text *out, const struct symbolic *s,
         break;
     }
     case SYMBOLIC_BINARY:
+        /* `mul_high` is a built-in that the checker makes an operator,
+           and the source writes it as a call. */
+        if (s->op == TOKEN_MUL_HIGH) {
+            text_append(out, MUL_HIGH "(");
+            types_symbolic_print(out, s->a, qualified);
+            text_append(out, ", ");
+            types_symbolic_print(out, s->b, qualified);
+            text_append(out, ")");
+            break;
+        }
         print_operand(out, s->a, qualified);
         text_appendf(out, " %s ", operator_spelling(s->op));
         print_operand(out, s->b, qualified);
