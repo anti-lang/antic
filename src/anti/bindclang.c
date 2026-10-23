@@ -901,6 +901,15 @@ static void declare_enum(struct reader *r, const struct json_value *node)
     fixed = json_member_string(json_get(node, "fixedUnderlyingType"),
                                "qualType");
     fixed_type = fixed != NULL ? parse(r, fixed) : NULL;
+    /* A fixed base that Anti has no type of, as `__int128`, leaves the
+       enum out, and with it every declaration that names it, by "Left
+       out" in docs/notes/bind.md. T170 of docs/audit/tests-findings.md. */
+    if (fixed != NULL &&
+        (fixed_type == NULL || fixed_type->kind != BIND_SCALAR)) {
+        bind_warn(r->b, "`%s` is left out: Anti has no form for its base `%s`",
+                  tag != NULL ? tag : "an enum without a name", fixed);
+        return;
+    }
     if (fixed_type != NULL && fixed_type->kind == BIND_SCALAR) {
         if (strcmp(fixed_type->name, "c_int") != 0) {
             e->base = fixed_type->name;

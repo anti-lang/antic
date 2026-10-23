@@ -114,8 +114,10 @@ A record is bound when every field has an Anti type. A record that names a
 record left out is left out too, until nothing changes. A function is bound
 when its result and every parameter have one. A `long double` has none.
 Neither has an array member of no length, nor a struct passed by value that
-the API never defines. Each declaration left out gets a warning that says
-why, and the command goes on.
+the API never defines. An enum whose fixed base has no Anti type, as
+`__int128`, is left out with its enumerators, and so is every declaration
+that names it. Each declaration left out gets a warning that says why, and
+the command goes on.
 
 A description leaves out a function without its name or its result and a
 struct without its name, with a warning each. A type that does not parse
