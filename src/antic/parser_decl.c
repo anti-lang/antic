@@ -663,6 +663,18 @@ bool parser_members_of(struct parser *p, struct item *it,
             }
             continue;
         }
+        /* The word is dropped after its message, as in a class body, so
+           the function after it parses and gives no second message, T165
+           of docs/audit/tests-findings.md. */
+        if (parser_check(p, TOKEN_INTERNAL)) {
+            const struct token *word = parser_peek(p);
+            diagnostics_add(p->diags, word->line, word->column,
+                            "`internal` marks a module item, and a class "
+                            "member is `pub`, `protected` or neither");
+            p->ok = false;
+            parser_next(p);
+            continue;
+        }
         m = parser_member(p, it);
         if (m == NULL) {
             free(list.data);
