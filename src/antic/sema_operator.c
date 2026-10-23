@@ -283,6 +283,12 @@ bool sema_hook_well_formed(struct checker *c, const struct symbol *hook,
 {
     const struct type *sig = hook != NULL ? hook->type : NULL;
 
+    /* A hook whose signature the checker refused, as one that names an
+       unknown type, has that one message, T161 of
+       docs/audit/tests-findings.md. */
+    if (sig != NULL && sig->kind == TYPE_ERROR) {
+        return false;
+    }
     if (sig == NULL || sig->kind != TYPE_FN) {
         return true;
     }
