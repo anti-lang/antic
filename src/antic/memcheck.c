@@ -168,12 +168,29 @@ static uint64_t lanes(struct checker *c, const struct ir_inst *inst, bool mask)
            (mask ? 1 : layout_size(c->layouts, ir_scalar(inst->type)));
 }
 
+/* DESIGN: a bitfield is checked as the load or the store of its unit,
+   by the entries on --memory-checks under "Generics and collections" in
+   docs/decisions.md. The IR names the aggregate, and the unit starts
+   unit_offset bytes into it, so the check covers the bytes from the start
+   of the aggregate to the end of the unit. Every one of them belongs to
+   the aggregate, and the unit is among them. T141 of
+   docs/audit/tests-findings.md. */
+static uint64_t bit_unit_end(struct checker *c, const struct ir_inst *inst)
+{
+    const struct layout_bits *where =
+        &layout_agg(c->layouts, inst->of.agg)->bits[inst->field];
+
+    return where->unit_offset +
+           layout_size(c->layouts, ir_scalar(where->unit_type));
+}
+
 static bool is_comparison(uint32_t op)
 {
     return (op >= IR_EQ && op <= IR_UGE) || (op >= IR_FEQ && op <= IR_FGE);
 }
 
-/* The checks of inst, a load or a store or a simd operation on memory. A
+/* The checks of inst, a load or a store, of a bitfield as well, or a simd
+   operation on memory. A
    simd comparison writes a mask, and a fold with IR_OR or IR_AND reads
    one. */
 static void check_inst(struct checker *c, const struct ir_inst *inst)
@@ -189,6 +206,12 @@ static void check_inst(struct checker *c, const struct ir_inst *inst)
     case IR_STORE:
         check(c, true, inst->b,
               layout_size(c->layouts, ir_scalar(inst->type)), line);
+        break;
+    case IR_BITLOAD:
+        check(c, false, inst->a, bit_unit_end(c, inst), line);
+        break;
+    case IR_BITSTORE:
+        check(c, true, inst->b, bit_unit_end(c, inst), line);
         break;
     case IR_MEMCOPY:
         check(c, false, inst->b, layout_size(c->layouts, inst->of), line);

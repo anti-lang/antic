@@ -19,7 +19,6 @@
 # The test known_failures checks the list against the table of the findings.
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
-memory_checks_bitfield T141 --memory-checks puts no check on a load or a store of a bitfield.
 clib_regex_link_line T146 The link line of a static library names no glue of anti.regex and no PCRE2.
 modules_optional_class_field_release T148 antic crashes on the default none of a ?T of a class value of a library.
 modules_optional_class_field_dev T148 antic crashes on the default none of a ?T of a class value of a library.
