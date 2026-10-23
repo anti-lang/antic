@@ -16,6 +16,12 @@ void alloc_out_of_memory(void)
     exit(70);
 }
 
+void alloc_out_of_memory_for(long long size)
+{
+    say_antic("out of memory for %lld bytes\n", size);
+    exit(70);
+}
+
 size_t alloc_product(size_t a, size_t b)
 {
     if (b != 0 && a > SIZE_MAX / b) {

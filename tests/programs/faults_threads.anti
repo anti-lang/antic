@@ -2,9 +2,9 @@
 //! slice over the pool and `dispatch` hands an object to it. A thread of the
 //! pool that the system does not start leaves the work to the threads that did
 //! and to the caller, and memory that runs out for the start of a thread, the
-//! results or a job stops the program. A case of `faults_threads.faults` refuses one call, through the
-//! variable `ANTI_FAULT` of `src/rt/fault.h`. The program runs with
-//! --anti.threads=4, so the pool starts three threads.
+//! results or a job stops the program. A case of `faults_threads.faults`
+//! refuses one call, through the variable `ANTI_FAULT` of `src/rt/fault.h`. The
+//! program runs with --anti.threads=4, so the pool starts three threads.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

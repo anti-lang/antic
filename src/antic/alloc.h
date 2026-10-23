@@ -18,6 +18,10 @@
    70. */
 _Noreturn void alloc_out_of_memory(void);
 
+/* The same for a failed allocation of size bytes in a file of the
+   runtime that antic builds in, whose message names them. */
+_Noreturn void alloc_out_of_memory_for(long long size);
+
 /* Return a * b, and end the run as an allocation failure does when the
    product overflows size_t. */
 size_t alloc_product(size_t a, size_t b);
