@@ -97,14 +97,18 @@ static void elf_lines(struct map *m, const struct text *bytes)
 
 /* The file and the line of every function of a Mach-O program. The link
    keeps the debug information in the objects and names them in its
-   debug map, so each object is read and relocated once. */
-static void macho_lines(struct map *m, const struct anti_macho_table *t)
+   debug map, so each object is read and relocated once. An object that
+   cannot be read ends the map with false, since a map without its lines
+   would leave `anti symbols resolve` without them, T154 of
+   docs/audit/tests-findings.md. */
+static bool macho_lines(struct map *m, const struct anti_macho_table *t)
 {
     struct text object_path = {0};
     struct text object = {0};
     size_t i;
+    bool ok = true;
 
-    for (i = 0; i < m->count; i++) {
+    for (i = 0; ok && i < m->count; i++) {
         struct anti_found found;
         const char *path;
         const char *symbol;
@@ -119,7 +123,7 @@ static void macho_lines(struct map *m, const struct anti_macho_table *t)
             object_path.length = 0;
             text_append(&object_path, path);
             if (!files_read_reported(path, &object)) {
-                object.length = 0;
+                ok = false;
                 continue;
             }
             anti_rt_macho_relocate((uint8_t *)object.data, object.length);
@@ -136,6 +140,7 @@ static void macho_lines(struct map *m, const struct anti_macho_table *t)
     }
     text_free(&object_path);
     text_free(&object);
+    return ok;
 }
 
 /* Sort the functions by address. A program the reader finds no
@@ -176,7 +181,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
     struct anti_macho_table table;
     uint64_t text_address;
     size_t i;
-    bool ok;
+    bool ok = true;
 
     if (!files_read_reported(program, &bytes)) {
         return false;
@@ -191,7 +196,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
                                    false, 0, &table)) {
         anti_rt_macho_functions(&table, add_function, &m);
         sort_map(&m);
-        macho_lines(&m, &table);
+        ok = macho_lines(&m, &table);
     }
     text_append(&out, "# The map of a symbols archive of Anti.\n");
     text_appendf(&out, "%s%s\n", SYMMAP_BUILD_LINE, id);
@@ -220,7 +225,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
         }
         text_append(&out, "\n");
     }
-    ok = files_write(path, &out);
+    ok = ok && files_write(path, &out);
     for (i = 0; i < m.count; i++) {
         text_free(&m.items[i].name);
         text_free(&m.items[i].file);
