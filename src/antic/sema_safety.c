@@ -508,7 +508,10 @@ static const struct struct_field *written_field(const struct expr *e)
                  t = t->base) {
                 f = types_find_field(t, &e->as.field.name);
             }
-            if (f != NULL && f->home != NULL &&
+            /* The base of a class is the same object, so `super` on the
+               way up leaves the field found below it, T168 of
+               docs/audit/tests-findings.md. */
+            if (f != NULL && f->home != NULL && f->form != FIELD_BASE &&
                 f->home->safety == SAFETY_CONCURRENT) {
                 found = f;
             }
