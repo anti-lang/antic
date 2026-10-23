@@ -271,10 +271,17 @@ static enum repo_answer fetch(const char *url, const char *destination,
             if (!files_exists(text_cstr(&source))) {
                 answer = REPO_ABSENT;
             } else {
-                ok = files_copy(text_cstr(&source), text_cstr(&temporary));
-                if (!ok) {
+                /* DESIGN: each failure names the file that failed, the
+                   file of the repository or the copy in the cache, T156
+                   of docs/audit/tests-findings.md. */
+                enum files_copied copied = files_copy_which(
+                    text_cstr(&source), text_cstr(&temporary));
+                ok = copied == FILES_COPIED;
+                if (copied == FILES_UNREAD) {
                     say_anti("%s: cannot read %s\n", url,
                              text_cstr(&source));
+                } else if (copied == FILES_UNWRITTEN) {
+                    say_anti("cannot write %s\n", text_cstr(&temporary));
                 }
             }
         }
@@ -293,7 +300,14 @@ static enum repo_answer fetch(const char *url, const char *destination,
             files_exists(destination)) {
             ok = true;
         } else {
-            ok = files_copy(text_cstr(&temporary), destination);
+            enum files_copied copied =
+                files_copy_which(text_cstr(&temporary), destination);
+            ok = copied == FILES_COPIED;
+            if (copied == FILES_UNREAD) {
+                say_anti("cannot read %s\n", text_cstr(&temporary));
+            } else if (copied == FILES_UNWRITTEN) {
+                say_anti("cannot write %s\n", destination);
+            }
         }
         text_free(&bytes);
         answer = ok ? REPO_HELD : REPO_FAILED;

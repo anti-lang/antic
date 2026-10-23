@@ -45,6 +45,14 @@ bool files_remove_tree(const char *path);
 /* Copy the bytes of the file from to the new file to. */
 bool files_copy(const char *from, const char *to);
 
+/* What files_copy_which gives: the copy is done, or from could not be
+   opened or read, or to could not be made, written or closed. */
+enum files_copied { FILES_COPIED, FILES_UNREAD, FILES_UNWRITTEN };
+
+/* files_copy, which says which of the two files failed, for a caller
+   that names it. */
+enum files_copied files_copy_which(const char *from, const char *to);
+
 /* Copy the file and give the copy the execute bits of the original. A
    program that `anti build` copies into `dist/` is run from there, and
    files_copy writes a plain file. Windows decides by the suffix, so the

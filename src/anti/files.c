@@ -170,31 +170,41 @@ bool files_remove_tree(const char *path)
     return platform_remove_entry(path) && ok;
 }
 
-bool files_copy(const char *from, const char *to)
+enum files_copied files_copy_which(const char *from, const char *to)
 {
     FILE *in = platform_open(from, false);
     FILE *out;
     char buffer[65536];
     size_t n;
-    bool ok = true;
+    enum files_copied result = FILES_COPIED;
 
     if (in == NULL) {
-        return false;
+        return FILES_UNREAD;
     }
     out = platform_open(to, true);
     if (out == NULL) {
         ANTI_FCLOSE(in);
-        return false;
+        return FILES_UNWRITTEN;
     }
     while ((n = ANTI_FREAD(buffer, 1, sizeof buffer, in)) > 0) {
         if (ANTI_FWRITE(buffer, 1, n, out) != n) {
-            ok = false;
+            result = FILES_UNWRITTEN;
             break;
         }
     }
-    ok = ok && !ANTI_FERROR(in);
+    if (result == FILES_COPIED && ANTI_FERROR(in)) {
+        result = FILES_UNREAD;
+    }
     ANTI_FCLOSE(in);
-    return ANTI_FCLOSE(out) == 0 && ok;
+    if (ANTI_FCLOSE(out) != 0 && result == FILES_COPIED) {
+        result = FILES_UNWRITTEN;
+    }
+    return result;
+}
+
+bool files_copy(const char *from, const char *to)
+{
+    return files_copy_which(from, to) == FILES_COPIED;
 }
 
 static void cannot_read(const char *path)
