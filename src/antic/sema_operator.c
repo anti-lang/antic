@@ -37,7 +37,11 @@ static struct type *right_literal_type(struct checker *c, enum token_kind op,
         fn->type->param_count < 2) {
         return left;
     }
-    param = fn->type->params[1];
+    /* DESIGN: a parameter that names a type parameter takes what the
+       left operand gives it, so `a + 5` against `b: T` with a Key<int> on
+       the left gives the literal the type int, by T074, before the copy
+       of the operator is made. T176 of docs/audit/tests-findings.md. */
+    param = sema_operator_right(c, fn, left);
     return sema_has_params(param) ? left : param;
 }
 

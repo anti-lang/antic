@@ -900,6 +900,11 @@ struct type *sema_worker_copy(struct checker *c, struct expr *call,
 struct type *sema_operator_copy(struct checker *c, struct expr *call,
                                 struct type *fn, const struct symbol *sym,
                                 struct type *left, struct type *right);
+/* The type of the second parameter of the operator sym, with what the
+   left operand left gives the type parameters, for a literal in its
+   place. A parameter that the left operand leaves open stays in it. */
+struct type *sema_operator_right(struct checker *c, const struct symbol *sym,
+                                 struct type *left);
 bool sema_param_operator(struct checker *c, struct expr *e,
                          enum token_kind op, const char *hook,
                          struct type *operand);

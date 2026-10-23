@@ -2501,6 +2501,28 @@ struct type *sema_operator_copy(struct checker *c, struct expr *call,
     return finish_copy(c, call, fn, it, &map);
 }
 
+struct type *sema_operator_right(struct checker *c, const struct symbol *sym,
+                                 struct type *left)
+{
+    const struct item *it = sym->item;
+    const struct item *owner = it != NULL ? it->owner : NULL;
+    struct type *fn = sym->type;
+    struct type *outer = owner != NULL && owner->type_param_count > 0 &&
+                                 owner->symbol != NULL
+                             ? owner->symbol->type
+                             : NULL;
+    size_t outer_count = outer != NULL ? outer->type_param_count : 0;
+    size_t own = it != NULL ? it->type_param_count : 0;
+    struct generic_map map;
+
+    if (outer_count + own == 0) {
+        return fn->params[1];
+    }
+    open_map(c, &map, outer, outer_count, it, own);
+    unify(fn->params[0], operand_as(c, fn->params[0], left), &map);
+    return subst(c, fn->params[1], &map);
+}
+
 /* Operators on a type parameter */
 
 /* Report that the generic that declares the parameter p uses the form
