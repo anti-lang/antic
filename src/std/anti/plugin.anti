@@ -95,12 +95,12 @@ pub class Library
 	///
 	/// A library that `load` opened more than once closes at the last `unload`.
 	/// It fails with `IN_USE` while an object of one of its classes is alive,
-	/// and the library stays open. The message of the error is the runtime's,
-	/// as the message of a failed `load` is.
+	/// and the library stays open. The message of the error is the reason, a
+	/// copy that the error owns, as the message of a failed `load` is.
 	pub fn unload(self) may fail
 	{
 		if !anti_rt_plugin_unload(self.handle) {
-			fail lang.Error.new(IN_USE, anti_rt_plugin_message());
+			fail reason(IN_USE);
 		}
 		self.handle = none;
 	}
@@ -110,13 +110,32 @@ pub class Library
 ///
 /// It fails with `NOT_LOADED` when the file is no library of this runtime, or
 /// provides nothing, or carries an interface of its own where the host's is the
-/// one it must provide. The message of the error belongs to the runtime, and
-/// the next `load`, `instance` or `unload` of the same thread writes over it.
+/// one it must provide. The message of the error is the reason, a copy that the
+/// error owns.
 pub fn load(path: str) -> *Library may fail
 {
 	let opened = anti_rt_plugin_load(path.ptr, path.len);
 	let handle = opened else {
-		fail lang.Error.new(NOT_LOADED, anti_rt_plugin_message());
+		fail reason(NOT_LOADED);
 	};
 	return alloc Library(handle);
+}
+
+/// An error with `code` that owns a copy of the reason the runtime gave. The
+/// next `load`, `instance` or `unload` of the thread writes over the runtime's
+/// text, so an error that kept it would print the reason of a later call.
+fn reason(code: int) -> *lang.Error
+{
+	copied_reason() catch e {
+		e.code = code;
+		return e;
+	};
+	return lang.Error.new(code, "");
+}
+
+/// Fail with the reason the runtime gave. A `str` that is no literal makes an
+/// error that owns a copy of it, by R017 of "Answers of 2026-10-18".
+fn copied_reason() may fail
+{
+	fail anti_rt_plugin_message();
 }
