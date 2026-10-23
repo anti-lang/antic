@@ -896,6 +896,16 @@ const struct symbolic *sema_fold_symbolic(struct checker *c,
     memset(&out, 0, sizeof out);
     out.type = s->type;
     if (s->kind == SYMBOLIC_CAST) {
+        /* A bool converts to 0 or 1, as `true as int` does outside a
+           generic, so a comparison of the constant parameters of a copy
+           that folds to a bool gives the length it gives elsewhere, T160
+           of docs/audit/tests-findings.md. */
+        if (operand->kind == TYPE_BOOL && a.kind == CONST_BOOL &&
+            types_is_integer(s->type)) {
+            out.kind = CONST_INT;
+            out.as.integer = a.as.boolean ? 1 : 0;
+            return as_symbolic(c, &out);
+        }
         if (!types_is_integer(operand) || !types_is_integer(s->type) ||
             !integer_fits(&a, s->type)) {
             return s;
