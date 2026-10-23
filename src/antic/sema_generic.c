@@ -1861,6 +1861,13 @@ static void unify(struct type *param, struct type *arg,
         }
         return;
     default:
+        /* A channel is a struct of anti.lang with its element, so `chan
+           T` gives T the element of the channel, T162 of
+           docs/audit/tests-findings.md. */
+        if (types_is_chan(param) && types_is_chan(arg)) {
+            unify(param->element, arg->element, map);
+            return;
+        }
         if (param->generic != NULL && param->generic == arg->generic) {
             for (i = 0; i < param->generic->type_param_count; i++) {
                 unify(param->args[i], arg->args[i], map);
