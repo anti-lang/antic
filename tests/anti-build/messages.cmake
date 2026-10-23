@@ -990,17 +990,17 @@ path_message(fault_path_listing_unstated stat:17:EACCES
     "anti: cannot read ./units/lib/dist/${HOST}/dev/com")
 path_message(fault_path_module_unread open:21:EACCES
     "anti: cannot read ${path_library}")
-path_message(fault_path_module_digest_unread open:22:EACCES
+path_message(fault_path_module_digest_unread open:23:EACCES
     "anti: cannot read ${path_library}")
-path_message(fault_path_key_unread open:36:EACCES
+path_message(fault_path_key_unread open:37:EACCES
     "anti: cannot read ${path_library}")
-path_message(fault_path_closure_unread open:46:EACCES
+path_message(fault_path_closure_unread open:47:EACCES
     "anti: cannot read ${path_library}")
-path_message(fault_path_link_unopened open:48:EACCES
+path_message(fault_path_link_unopened open:49:EACCES
     "antic: cannot open ${path_library}")
-path_message(fault_path_interface_unopened open:51:EACCES
+path_message(fault_path_interface_unopened open:52:EACCES
     "antic: cannot open ${path_library}")
-path_message(fault_path_interfaces_unopened open:52:EACCES
+path_message(fault_path_interfaces_unopened open:53:EACCES
     "antic: cannot open ${path_library}")
 # The library file of the program's own module, read for the closure of
 # the link, driver_libraries of driver_search.c and build_dev of build.c.

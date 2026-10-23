@@ -56,7 +56,6 @@ error_layout_text_saturating T163 The text of a size names a wrapping or saturat
 error_layout_text_mul_high T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
 std_serialize_infinite_float T164 serialize writes an infinite float as inf, which deserialize refuses.
 matrix_types_enum_internal_function_refused T165 An internal function of an enum body gives a second message at self.
-anti_build_message_path_chain_of_two_projects T169 A path project that names another path project is not resolved through its library file.
 anti_bind_message_clang_enum_of_128_bits T170 anti bind gives an enum of __int128 the base c_int and wrong values.
 matrix_values_as_its_own_type_in_constant_dev T171 A constant refuses as to the type it has already.
 matrix_values_as_its_own_type_in_constant_release T171 A constant refuses as to the type it has already.
@@ -74,4 +73,3 @@ matrix_types_generic_operator_with_a_literal_of_its_parameter_release T176 A lit
 matrix_types_generic_operator_with_a_literal_of_its_parameter_memory_checks T176 A literal takes the left operand's type where a generic operator's second parameter is its type parameter.
 matrix_ownership_compare_an_own_function_with_a_plain_one_refused T177 The message of == between an own fn and a plain one leaves out own.
 fmt_default_struct_literal T178 anti fmt takes the brace of a struct literal in a default parameter for the body.
-anti_build_message_path_chain_to_a_package_without_a_version T179 A path dependency of a path dependency that names no version is looked for in a repository.

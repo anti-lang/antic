@@ -379,6 +379,48 @@ done:
     return ok;
 }
 
+/* DESIGN: a project of a path dependency names its own dependencies in
+   its manifest, and its library files carry them by name, constraint and
+   URL alone, with no path. A dependency of the project by a path is
+   therefore required here by that path, joined to the path of the
+   project, so a chain of projects resolves at any depth, by R165 of
+   "Rules of 2026-10-13" and "Dependencies" in docs/tooling.md. T169 and
+   T179 of docs/audit/tests-findings.md. */
+static bool require_project_paths(struct resolver *r,
+                                  const struct requirement *req,
+                                  const char *given)
+{
+    struct text manifest_path = {0};
+    struct manifest m;
+    size_t i;
+    bool ok = true;
+
+    memset(&m, 0, sizeof m);
+    text_appendf(&manifest_path, "%s/%s", given, MANIFEST_FILE);
+    if (files_exists(text_cstr(&manifest_path))) {
+        ok = manifest_read(text_cstr(&manifest_path), false, &m);
+    }
+    for (i = 0; ok && i < m.dependency_count; i++) {
+        const struct manifest_dependency *d = &m.dependencies[i];
+        const char *path = text_cstr(&d->path);
+        struct text joined = {0};
+        if (d->path.length == 0) {
+            continue;
+        }
+        if (path[0] == '/' || (path[0] != '\0' && path[1] == ':')) {
+            text_append(&joined, path);
+        } else {
+            text_appendf(&joined, "%s/%s", text_cstr(&req->path), path);
+        }
+        require(r, text_cstr(&d->name), text_cstr(&d->version), NULL,
+                text_cstr(&joined), text_cstr(&req->name));
+        text_free(&joined);
+    }
+    manifest_free(&m);
+    text_free(&manifest_path);
+    return ok;
+}
+
 /* Read a package from a directory of library files. Every `.antl` under
    it whose header names this package belongs to it, as the module its
    header names. M339 of the audit: the module path came from the place
@@ -423,7 +465,8 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
                 out->path.length = 0;
                 text_append(&out->path, text_cstr(&directory));
                 if (!library_header(file, &name, &version, &module, r,
-                                    text_cstr(&req->name))) {
+                                    text_cstr(&req->name)) ||
+                    !require_project_paths(r, req, text_cstr(&given))) {
                     goto done;
                 }
             }
