@@ -517,6 +517,26 @@ void lower_store_constant(struct lowerer *l, const struct type *t,
         store_repeat(l, t, v, dest);
         return;
     }
+    /* DESIGN: a constant of a `?T` is the value of its T or none, and not
+       the struct of the value and the flag, as const_tree reads it. A
+       `?T` that holds a class writes its value part by part and then the
+       flag, and its none is the constant of zeros and a flag of 0, which
+       holds no class to build. A field default of a library file reaches
+       here, T148 of docs/audit/tests-findings.md. */
+    if (parts && t->kind == TYPE_OPTIONAL) {
+        const struct type *inner = t;
+        if (v->kind == CONST_NULL) {
+            ir_memcopy(l->f, l->b, dest, lower_const_address(l, v, t),
+                       lower_vtype_of(l, t));
+            return;
+        }
+        while (inner->kind == TYPE_OPTIONAL) {
+            inner = inner->element;
+        }
+        lower_store_constant(l, inner, v, dest);
+        lower_set_optional(l, t, inner, dest, 1);
+        return;
+    }
     if (parts && t->kind == TYPE_ARRAY) {
         for (i = 0; i < v->as.aggregate.count; i++) {
             lower_store_constant(
