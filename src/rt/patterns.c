@@ -10,6 +10,7 @@
 #include "grow.h"
 #include "platform.h"
 #include "regex.h"
+#include "std.h"
 #include "str.h"
 
 #include <stdbool.h>
@@ -105,7 +106,7 @@ struct anti_text anti_rt_regex_message(int32_t code)
     if (have == NULL) {
         made = ANTI_FAULT(ALLOC, NULL, malloc(ANTI_RT_REGEX_MESSAGE_ROOM));
         if (made == NULL) {
-            return text;
+            anti_rt_out_of_memory(ANTI_RT_REGEX_MESSAGE_ROOM);
         }
         anti_rt_regex_message_into(code, made, ANTI_RT_REGEX_MESSAGE_ROOM);
         if (anti_rt_atomic_compare_swap(slot, (int64_t)sizeof(void *), 0,

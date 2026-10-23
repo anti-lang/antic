@@ -133,6 +133,7 @@ and the pass over the whole program.
 | `src/antic/reach.h` | The interface of `reach.c`. |
 | `src/antic/rt_abi.c` | The tables behind `rt_abi.h`: the functions of the runtime that generated code calls and the records it writes. |
 | `src/antic/rt_abi.h` | The contract with the runtime: the functions generated code calls and the records it writes. |
+| `src/antic/rt_memory.c` | The end of a run whose memory ran out in `src/rt/toml.c` or `src/rt/regex.c`, for antic and anti. |
 | `src/antic/whole.c` | The class model, devirtualisation, the merge of copies, the singleton check, the table facts and `whole_program`, which runs the passes. |
 | `src/antic/whole.h` | The passes over the IR of the whole program and the class model they share. |
 | `src/antic/whole_parts.h` | What the two files of the pass over the whole program share, each under the file that defines it. |

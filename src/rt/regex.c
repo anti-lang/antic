@@ -5,6 +5,7 @@
 #include "regex.h"
 #include "fault.h"
 #include "grow.h"
+#include "std.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -22,13 +23,28 @@
    option of the compile stands for one. */
 #define TEXT_OPTIONS PCRE2_UTF
 
+/* DESIGN: memory that runs out while a pattern compiles stops the run
+   through anti_rt_out_of_memory, by decision 4 of "Decisions of
+   2026-10-11" in docs/decisions.md, so it never reads as a pattern that
+   does not compile. That holds for the memory of PCRE2 as well, which
+   reports PCRE2_ERROR_HEAP_FAILED. The runtime defines the function in
+   mem.c, and antic and anti in src/antic/rt_memory.c. T139 of
+   docs/audit/tests-findings.md. */
+
+/* Stop the run when PCRE2 found no memory for the compile of the length
+   bytes of a pattern, error. The message names those bytes, the one size
+   the compile knows. */
+static void compile_failed(int error, int64_t length)
+{
+    if (error == PCRE2_ERROR_HEAP_FAILED) {
+        anti_rt_out_of_memory(length);
+    }
+}
+
 /* The handle of compiled, which PCRE2 compiled from the length bytes of
-   the pattern at bytes, or NULL for a compile that failed. A handle that
-   finds no memory gives the code back and reports PCRE2_ERROR_NOMEMORY
-   through *code and *offset. */
+   the pattern at bytes, or NULL for a compile that failed. */
 static void *keep(pcre2_code *compiled, const unsigned char *bytes,
-                  int64_t length, int is_bytes, int32_t *code,
-                  int64_t *offset)
+                  int64_t length, int is_bytes)
 {
     struct anti_pattern *p;
 
@@ -36,16 +52,12 @@ static void *keep(pcre2_code *compiled, const unsigned char *bytes,
         return NULL;
     }
     p = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *p));
-    if (p != NULL) {
-        p->text =
-            ANTI_FAULT(ALLOC, NULL, malloc(length > 0 ? (size_t)length : 1));
+    if (p == NULL) {
+        anti_rt_out_of_memory((int64_t)sizeof *p);
     }
-    if (p == NULL || p->text == NULL) {
-        free(p);
-        pcre2_code_free(compiled);
-        *code = PCRE2_ERROR_NOMEMORY;
-        *offset = 0;
-        return NULL;
+    p->text = ANTI_FAULT(ALLOC, NULL, malloc(length > 0 ? (size_t)length : 1));
+    if (p->text == NULL) {
+        anti_rt_out_of_memory(length > 0 ? length : 1);
     }
     if (length > 0) {
         memcpy(p->text, bytes, (size_t)length);
@@ -65,10 +77,11 @@ void *anti_rt_regex_compile(const unsigned char *bytes, int64_t length,
                                          TEXT_OPTIONS, &error, &at, NULL);
 
     if (compiled == NULL) {
+        compile_failed(error, length);
         *code = (int32_t)error;
         *offset = (int64_t)at;
     }
-    return keep(compiled, bytes, length, 0, code, offset);
+    return keep(compiled, bytes, length, 0);
 }
 
 /* DESIGN: a byte pattern compiles without UTF mode, so `.` and every
@@ -88,7 +101,6 @@ struct wide {
     int64_t n;
     int64_t out_room;
     int64_t from_room;
-    int failed;
 };
 
 static void put(struct wide *w, unsigned char c, int64_t from)
@@ -97,24 +109,18 @@ static void put(struct wide *w, unsigned char c, int64_t from)
     unsigned char *out;
     int64_t *map;
 
-    if (w->failed) {
-        return;
-    }
     if (w->n > INT64_MAX / word - 1) {
-        w->failed = 1;
-        return;
+        anti_rt_out_of_memory(INT64_MAX);
     }
     out = anti_rt_reserve(w->out, &w->out_room, w->n, 1, 64);
     if (out == NULL) {
-        w->failed = 1;
-        return;
+        anti_rt_out_of_memory(w->n + 1);
     }
     w->out = out;
     map = anti_rt_reserve(w->from, &w->from_room, w->n * word, word,
                           64 * word);
     if (map == NULL) {
-        w->failed = 1;
-        return;
+        anti_rt_out_of_memory((w->n + 1) * word);
     }
     w->from = map;
     w->out[w->n] = c;
@@ -497,19 +503,15 @@ void *anti_rt_regex_compile_bytes(const unsigned char *bytes, int64_t length,
     if (!widen(&w, bytes, length, code, offset)) {
         goto done;
     }
-    if (w.failed) {
-        *code = PCRE2_ERROR_NOMEMORY;
-        *offset = 0;
-        goto done;
-    }
     compiled = pcre2_compile(w.n == 0 ? (PCRE2_SPTR) "" : w.out,
                              (PCRE2_SIZE)w.n, BYTE_OPTIONS, &error, &at,
                              NULL);
     if (compiled == NULL) {
+        compile_failed(error, w.n);
         *code = (int32_t)error;
         *offset = (int64_t)at < w.n ? w.from[at] : length;
     }
-    kept = keep(compiled, bytes, length, 1, code, offset);
+    kept = keep(compiled, bytes, length, 1);
 done:
     free(w.out);
     free(w.from);

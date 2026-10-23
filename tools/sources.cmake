@@ -80,6 +80,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/platform.c
     src/antic/reach.c
     src/antic/rt_abi.c
+    src/antic/rt_memory.c
     src/antic/say.c
     src/antic/sha256.c
     src/antic/userdirs.c

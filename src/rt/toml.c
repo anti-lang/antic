@@ -7,7 +7,15 @@
    reader: the runtime, the module anti.toml, which is a face over this
    list and which anti.log reads its file with, antic for the plugin
    index, and anti for the manifest, the lock file, the index of a
-   repository and the files `anti symbols` reads. */
+   repository and the files `anti symbols` reads.
+
+   DESIGN: memory that runs out stops the run through
+   anti_rt_out_of_memory, by decision 4 of "Decisions of 2026-10-11" in
+   docs/decisions.md, so a text the reader could not keep never reads as
+   a text outside the subset. The runtime defines the function in mem.c,
+   and antic and anti in src/antic/rt_memory.c, where it ends the run as
+   every allocation of the compiler does. T139 of
+   docs/audit/tests-findings.md. */
 
 #include <stdint.h>
 #include <stdio.h>
@@ -16,6 +24,7 @@
 
 #include "toml.h"
 #include "fault.h"
+#include "std.h"
 
 /* The room of a dotted path, the table and the key, with its NUL. A key
    longer than that is refused where it is read, so its length also fits
@@ -111,7 +120,7 @@ static char *keep(const char *text, int64_t length)
     char *copy = ANTI_FAULT(ALLOC, NULL, malloc((size_t)length + 1));
 
     if (copy == NULL) {
-        return NULL;
+        anti_rt_out_of_memory(length + 1);
     }
     memcpy(copy, text, (size_t)length);
     copy[length] = '\0';
@@ -129,15 +138,13 @@ static void add(struct anti_toml *doc, struct reader *r, const char *key,
         /* A room whose double does not fit a size_t in bytes counts as
            memory that ran out. */
         if (doc->capacity > SIZE_MAX / 2 / sizeof *grown) {
-            r->failed = 1;
-            return;
+            anti_rt_out_of_memory(INT64_MAX);
         }
         capacity = doc->capacity == 0 ? 16 : doc->capacity * 2;
         grown = ANTI_FAULT(ALLOC, NULL,
                            realloc(doc->pairs, capacity * sizeof *grown));
         if (grown == NULL) {
-            r->failed = 1;
-            return;
+            anti_rt_out_of_memory((int64_t)(capacity * sizeof *grown));
         }
         doc->pairs = grown;
         doc->capacity = capacity;
@@ -148,14 +155,6 @@ static void add(struct anti_toml *doc, struct reader *r, const char *key,
     pair->key_length = key_length;
     pair->value_length = value_length;
     pair->line = r->line;
-    if (pair->key == NULL || pair->value == NULL) {
-        /* The pair is not counted, so anti_rt_toml_free never sees
-           the half that was copied. */
-        free(pair->key);
-        free(pair->value);
-        r->failed = 1;
-        return;
-    }
     doc->count++;
 }
 
@@ -187,23 +186,21 @@ static struct under *slot_of(const struct anti_toml *doc, const char *name,
     return &doc->names[i];
 }
 
-/* Double the room of the paths, or give 0 when the memory runs out. */
-static int grow_names(struct anti_toml *doc)
+/* Double the room of the paths. */
+static void grow_names(struct anti_toml *doc)
 {
     struct under *old = doc->names;
     size_t old_room = doc->room;
     size_t i;
 
     if (doc->room > SIZE_MAX / 2 / sizeof *old) {
-        return 0;
+        anti_rt_out_of_memory(INT64_MAX);
     }
     doc->room = doc->room == 0 ? 64 : doc->room * 2;
     doc->names =
         ANTI_FAULT(ALLOC, NULL, calloc(doc->room, sizeof *doc->names));
     if (doc->names == NULL) {
-        doc->names = old;
-        doc->room = old_room;
-        return 0;
+        anti_rt_out_of_memory((int64_t)(doc->room * sizeof *doc->names));
     }
     for (i = 0; i < old_room; i++) {
         if (old[i].length != 0) {
@@ -212,14 +209,13 @@ static int grow_names(struct anti_toml *doc)
         }
     }
     free(old);
-    return 1;
 }
 
 /* Note the key of the pair at index under each of its paths that ends
    before a dot, with the number that follows the dot. A `[[name]]` header
    holds bare bytes and dots alone, so the paths stop at the first other
-   byte. Gives 0 when the memory runs out. */
-static int index_pair(struct anti_toml *doc, size_t index)
+   byte. */
+static void index_pair(struct anti_toml *doc, size_t index)
 {
     const char *key = doc->pairs[index].key;
     size_t length = (size_t)doc->pairs[index].key_length;
@@ -235,8 +231,8 @@ static int index_pair(struct anti_toml *doc, size_t index)
         }
         h = hash_more(h, key + from, p - from);
         from = p;
-        if (doc->names_count + 1 > doc->room / 2 && !grow_names(doc)) {
-            return 0;
+        if (doc->names_count + 1 > doc->room / 2) {
+            grow_names(doc);
         }
         slot = slot_of(doc, key, p, h);
         if (slot->length == 0) {
@@ -251,13 +247,12 @@ static int index_pair(struct anti_toml *doc, size_t index)
             slot->largest = number;
         }
     }
-    return 1;
 }
 
 /* The count of `[[name]]` tables seen so far under that name: one past
    the largest number that follows the name and a dot in any key read so
    far. It is -1 when that number is the limit of `int64_t`, which leaves
-   no next count, and when the memory of the paths runs out.
+   no next count.
 
    DESIGN: the paths of the keys are indexed once each, at the first
    header after them, so a header costs the same whatever was read before
@@ -268,9 +263,7 @@ static int64_t repeats(struct anti_toml *doc, const char *name, size_t length)
     const struct under *slot;
 
     for (; doc->indexed < doc->count; doc->indexed++) {
-        if (!index_pair(doc, doc->indexed)) {
-            return -1;
-        }
+        index_pair(doc, doc->indexed);
     }
     if (doc->room == 0) {
         return 0;
@@ -585,7 +578,7 @@ struct anti_toml *anti_rt_toml_read(const unsigned char *bytes, int64_t len)
     struct reader r;
 
     if (doc == NULL) {
-        return NULL;
+        anti_rt_out_of_memory((int64_t)sizeof *doc);
     }
     memset(&r, 0, sizeof r);
     r.bytes = bytes;

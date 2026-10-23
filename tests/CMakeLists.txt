@@ -554,7 +554,7 @@ add_test(NAME unit_signal COMMAND rt_signal_tests)
 # rt.configure while another thread reads the keys, in a program of its own
 # with stand-ins for the loader. The runtime of an Anti program carries no
 # sanitizer, and this program does in the sanitizer builds.
-antic_rt_sources(conf_sources conf inject assert toml atomic fs hash utf
+antic_rt_sources(conf_sources conf inject assert toml atomic fs hash mem utf
     platform_posix platform_windows)
 add_executable(rt_conf_tests unit/test_conf_race.c ${conf_sources})
 target_link_libraries(rt_conf_tests PRIVATE Threads::Threads

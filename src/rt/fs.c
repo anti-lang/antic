@@ -5,7 +5,9 @@
    DESIGN: every function reports a failure through errno and nothing
    else, so the module builds each error with SystemError.from_errno on
    every system. The calls of the system stand in the platform layer,
-   which takes a path in UTF-8 on every system. */
+   which takes a path in UTF-8 on every system. Memory that runs out is
+   no such failure: it stops the program through anti_rt_out_of_memory,
+   by decision 4 of "Decisions of 2026-10-11" in docs/decisions.md. */
 
 #include <errno.h>
 #include <limits.h>
@@ -29,7 +31,7 @@ static void release(void *p)
 }
 
 /* The path of the len bytes at bytes, ended by a NUL, or NULL with
-   errno set.
+   errno set, ENOMEM among it.
 
    DESIGN: a str carries its length, and a slice of one ends where its
    bytes do and not at a NUL. So the bytes are copied. A NUL inside
@@ -56,9 +58,21 @@ static char *native_path(const unsigned char *bytes, int64_t len)
     return path;
 }
 
-void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t mode)
+/* The path of native_path for a function that anti.fs calls, where
+   memory that runs out stops the program. */
+static char *path_of_module(const unsigned char *bytes, int64_t len)
 {
-    char *name = native_path(path, len);
+    char *path = native_path(bytes, len);
+
+    if (path == NULL && errno == ENOMEM) {
+        anti_rt_out_of_memory(len + 1);
+    }
+    return path;
+}
+
+/* The stream of the file at the path name, or NULL with errno set. */
+static FILE *open_named(char *name, int32_t mode)
+{
     FILE *file;
 
     if (name == NULL) {
@@ -67,6 +81,11 @@ void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t mode)
     file = anti_rt_file_open(name, mode);
     release(name);
     return file;
+}
+
+void *anti_rt_fs_open(const unsigned char *path, int64_t len, int32_t mode)
+{
+    return open_named(path_of_module(path, len), mode);
 }
 
 /* The size of the file in bytes, or -1 with errno set.
@@ -94,8 +113,9 @@ int64_t anti_rt_fs_size(void *file)
 
 unsigned char *anti_rt_fs_read(const char *path, int64_t *length)
 {
-    FILE *f = anti_rt_fs_open((const unsigned char *)path,
-                              (int64_t)strlen(path), ANTI_FILE_READ);
+    FILE *f = open_named(native_path((const unsigned char *)path,
+                                     (int64_t)strlen(path)),
+                         ANTI_FILE_READ);
     unsigned char *bytes = NULL;
     int64_t size;
 
@@ -153,8 +173,9 @@ static int add_name(struct names *n, const unsigned char *name, size_t len)
                                 (int64_t)len + 1, 256);
     }
     if (grown == NULL) {
-        errno = ENOMEM;
-        return -1;
+        anti_rt_out_of_memory(len < (size_t)(INT64_MAX - n->length)
+                                  ? n->length + (int64_t)len + 1
+                                  : INT64_MAX);
     }
     n->bytes = grown;
     if (len > 0) {
@@ -186,9 +207,7 @@ static struct anti_text *finish(struct names *n, int64_t *count)
     int64_t i;
 
     if (block == NULL) {
-        release(n->bytes);
-        errno = ENOMEM;
-        return NULL;
+        anti_rt_out_of_memory((int64_t)(head + length + 1));
     }
     if (length > 0) {
         memcpy(block + head, n->bytes, length);
@@ -218,7 +237,7 @@ struct anti_text *anti_rt_fs_list(const unsigned char *path, int64_t len,
                                   int64_t *count)
 {
     struct names n = {NULL, 0, 0, 0};
-    char *name = native_path(path, len);
+    char *name = path_of_module(path, len);
     int status;
     int saved;
 
@@ -239,7 +258,7 @@ struct anti_text *anti_rt_fs_list(const unsigned char *path, int64_t len,
 /* Remove the file, or give -1 with errno set. */
 int32_t anti_rt_fs_remove(const unsigned char *path, int64_t len)
 {
-    char *name = native_path(path, len);
+    char *name = path_of_module(path, len);
     int status;
 
     if (name == NULL) {
@@ -254,8 +273,8 @@ int32_t anti_rt_fs_remove(const unsigned char *path, int64_t len)
 int32_t anti_rt_fs_rename(const unsigned char *from, int64_t from_len,
                           const unsigned char *to, int64_t to_len)
 {
-    char *old_name = native_path(from, from_len);
-    char *new_name = old_name != NULL ? native_path(to, to_len) : NULL;
+    char *old_name = path_of_module(from, from_len);
+    char *new_name = old_name != NULL ? path_of_module(to, to_len) : NULL;
     int status = -1;
 
     if (new_name != NULL) {
