@@ -56,9 +56,6 @@ error_layout_text_saturating T163 The text of a size names a wrapping or saturat
 error_layout_text_mul_high T163 The text of a size names a wrapping or saturating operator or mul_high as `>=`.
 std_serialize_infinite_float T164 serialize writes an infinite float as inf, which deserialize refuses.
 matrix_types_enum_internal_function_refused T165 An internal function of an enum body gives a second message at self.
-matrix_types_generic_operator_of_a_class_named_through_the_class_dev T172 An operator of a class body takes no type argument of its own from its operands.
-matrix_types_generic_operator_of_a_class_named_through_the_class_release T172 An operator of a class body takes no type argument of its own from its operands.
-matrix_types_generic_operator_of_a_class_named_through_the_class_memory_checks T172 An operator of a class body takes no type argument of its own from its operands.
 anti_doc_operators_private T173 The developer's page heads an operator that shares its name without its type.
 fmt_comment_before_operator T174 anti fmt reads a binary operator after a comment as a prefix.
 matrix_types_generic_operator_with_a_literal_of_its_parameter_dev T176 A literal takes the left operand's type where a generic operator's second parameter is its type parameter.

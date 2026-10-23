@@ -2382,6 +2382,76 @@ struct type *sema_worker_copy(struct checker *c, struct expr *call,
    `operator fn` of its module. Its arguments come from the types of the
    operands, as those of a call come from its arguments. A function of
    a copy of a generic class takes the arguments of the copy. */
+/* The operand of an operator in the place of its parameter param: a
+   pointer to the operand where the parameter is one and the operand is
+   not. */
+static struct type *operand_as(struct checker *c, const struct type *param,
+                               struct type *operand)
+{
+    return param->kind == TYPE_POINTER && operand->kind != TYPE_POINTER
+               ? types_pointer(c->types, operand)
+               : operand;
+}
+
+/* DESIGN: an `operator fn` of a class body with type parameters of its
+   own takes them from its operands, by R067 of "Rules of 2026-10-13", as
+   a function of a module does. A generic class gives its own parameters
+   from the left operand, the copy that `self` is, and the copy of the
+   operator is recorded on the call with both, as a call of a function of
+   the class with parameters of its own is. T172 of
+   docs/audit/tests-findings.md. */
+static struct type *member_operator_copy(struct checker *c,
+                                         struct expr *call, struct type *fn,
+                                         const struct item *it,
+                                         struct type *left,
+                                         struct type *right)
+{
+    const struct item *owner = it->owner;
+    struct type *outer = owner->type_param_count > 0 && owner->symbol != NULL
+                             ? owner->symbol->type
+                             : NULL;
+    size_t outer_count = outer != NULL ? outer->type_param_count : 0;
+    struct type *copy = NULL;
+    struct generic_map map;
+    size_t i;
+
+    open_map(c, &map, outer, outer_count, it, it->type_param_count);
+    if (outer != NULL) {
+        copy = sema_copy_in_chain(left, outer);
+    }
+    if (copy != NULL && copy != outer) {
+        for (i = 0; i < outer_count; i++) {
+            map.args[i] = copy->args[i];
+            map.values[i] = copy->values[i];
+        }
+        map.from = outer;
+        map.to = copy;
+    } else if (copy == outer && outer != NULL) {
+        for (i = 0; i < outer_count; i++) {
+            struct type *p = outer->type_params[i];
+            map.args[i] = p->param->constant ? NULL : p;
+            map.values[i] = p->param->constant ? param_value(p) : NULL;
+        }
+    }
+    if (fn->param_count > 0) {
+        unify(fn->params[0], operand_as(c, fn->params[0], left), &map);
+    }
+    if (fn->param_count > 1 && right != NULL) {
+        unify(fn->params[1], operand_as(c, fn->params[1], right), &map);
+    }
+    for (i = 0; i < map.count; i++) {
+        if (map.args[i] == NULL && map.values[i] == NULL) {
+            if (!operator_leaves_open(it, fn, map.params[i])) {
+                refuse_unbound(c, call->pos, map.params[i], &it->name);
+            }
+            return NULL;
+        }
+    }
+    meets_all(c, &map, outer_count, outer != NULL ? &outer->name : NULL,
+              &it->name, call->pos);
+    return record_copy(c, call, fn, &map);
+}
+
 struct type *sema_operator_copy(struct checker *c, struct expr *call,
                                 struct type *fn, const struct symbol *sym,
                                 struct type *left, struct type *right)
@@ -2397,8 +2467,11 @@ struct type *sema_operator_copy(struct checker *c, struct expr *call,
         struct type *copy = sema_copy_in_chain(left, owner->symbol->type);
         return copy != NULL ? sema_member_type(c, fn, copy) : fn;
     }
-    if (count == 0 || owner != NULL) {
+    if (count == 0) {
         return fn;
+    }
+    if (owner != NULL) {
+        return member_operator_copy(c, call, fn, it, left, right);
     }
     params = types_alloc_array(c->arena, count + 1, sizeof *params);
     memset(&map, 0, sizeof map);
