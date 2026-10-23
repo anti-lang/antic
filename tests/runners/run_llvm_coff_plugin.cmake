@@ -1,7 +1,8 @@
 # Build the plugin host of tests/plugin and its library for a Windows
 # target, and check what the link of each side reads. Every name the
 # library imports through an __imp_ entry stands in the host's .def file,
-# the library exports anti_rt_imports and anti_rt_provides, and the count
+# the library exports anti_rt_imports, anti_rt_provides and the notice
+# anti_licenses, whose build id a trace reads by the export, and the count
 # that leads anti_rt_imports is the number of its places. Neither program
 # runs here: the VM run runs them. Run with cmake -P and these values:
 #   ANTIC     the antic executable
@@ -59,7 +60,7 @@ endforeach()
 
 execute_process(COMMAND "${READOBJ}" --coff-exports "${dir}/lib/lib${LIBRARY}.dll"
                 OUTPUT_VARIABLE exports ENCODING NONE)
-foreach(name anti_rt_imports anti_rt_provides)
+foreach(name anti_rt_imports anti_rt_provides anti_licenses)
     if(NOT exports MATCHES "Name: ${name}\n")
         message(FATAL_ERROR "the library exports no ${name}:\n${exports}")
     endif()

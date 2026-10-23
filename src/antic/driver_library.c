@@ -379,8 +379,10 @@ static void append_exports(struct text *out, const struct extras *extras,
 /* DESIGN: the exported surface of a shared library for C is the export
    functions and anti_licenses. Windows takes it as a .def file and macOS
    as an -exported_symbols_list. Linux takes --exclude-libs, because the
-   runtime is an archive. A Windows plugin exports its table and the list
-   of the places the loader fills with the addresses of the host. */
+   runtime is an archive. A Windows plugin exports its table, the list
+   of the places the loader fills with the addresses of the host and
+   anti_licenses, whose build id the trace of the host reads by the
+   export, T136 of docs/audit/tests-findings.md. */
 
 /* Write the file of the exported surface of a shared library in dir, at
    exported on macOS and at def on Windows, and name it in s. */
@@ -404,7 +406,8 @@ static bool write_exports(const struct options *o, const struct extras *extras,
         text_appendf(&content, "LIBRARY %s\nEXPORTS\n", name);
         if (s->plugin) {
             text_append(&content, "    anti_rt_provides DATA\n"
-                                  "    anti_rt_imports DATA\n");
+                                  "    anti_rt_imports DATA\n"
+                                  "    anti_licenses DATA\n");
         } else {
             append_exports(&content, extras, "    ");
             text_append(&content, "    anti_licenses DATA\n");
