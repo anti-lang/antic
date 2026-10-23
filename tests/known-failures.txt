@@ -37,23 +37,12 @@ anti_doc_message_fault_work_not_made T153 anti ends with 1 and no message when i
 anti_bind_message_fault_out_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_message_fault_new_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_message_fault_new_test_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-std_faults_trace_fault_module_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
-std_faults_trace_fault_name_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
-std_faults_trace_fault_text_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
-std_faults_trace_fault_text_room_memory T139 A stack trace drops a name or its text where memory that runs out stops the program.
 anti_build_message_fault_debug_object_unread T154 anti writes the map of a release without the lines of an object it cannot read, and ends with status 0. host=macos
 anti_message_fault_sdk_export_stub_kind_unread T155 anti sdk export leaves a stub whose kind it cannot read out of the bundle, and ends with status 0. host=macos
 anti_build_message_fault_fetch_index_copy_not_written T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_index_not_cached T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_module_not_cached T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_module_copy_unread T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
-plugin_faults_host_fault_slot_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
-plugin_faults_host_fault_object_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
-plugin_named_host_fault_name_memory T139 The loader of plugins fails the load or instance where memory that runs out stops the program. host=macos,linux
-std_faults_registry_fault_object_memory T139 The registry gives none where memory that runs out stops the program.
-std_faults_registry_fault_objects_memory T139 The registry gives none where memory that runs out stops the program.
-std_faults_registry_fault_blocks_memory T139 The registry gives none where memory that runs out stops the program.
-std_faults_registry_fault_fields_memory T139 The registry gives none where memory that runs out stops the program.
 anti_build_message_fault_fetch_index_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_build_message_fault_fetch_package_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_test_message_fault_library_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.

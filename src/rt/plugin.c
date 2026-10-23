@@ -11,6 +11,7 @@
 
 #include "plugin.h"
 
+#include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -318,8 +319,8 @@ static int needs_stubs(const struct anti_provides *e)
 }
 
 /* The table of the sub-object an object of the entry gets, with a stub
-   in every slot the library lacks. NULL when there is no memory for
-   it. The library keeps the table in its list of stubs, and free_stubs
+   in every slot the library lacks. Memory that runs out for it stops the
+   program. The library keeps the table in its list of stubs, and free_stubs
    frees it when the library closes. */
 static const void **stubs_of(const struct anti_provides *e)
 {
@@ -334,7 +335,9 @@ static const void **stubs_of(const struct anti_provides *e)
         calloc(1, sizeof *head +
                       (size_t)(d->function_count + 1) * sizeof(void *)));
     if (head == NULL) {
-        return NULL;
+        anti_rt_out_of_memory(
+            (int64_t)(sizeof *head +
+                      (size_t)(d->function_count + 1) * sizeof(void *)));
     }
     head->magic = ANTI_STUBBED_MAGIC;
     head->entry = e;
@@ -378,8 +381,7 @@ static void *build(const struct anti_plugin *p,
     }
     object = ANTI_FAULT(ALLOC, NULL, calloc(1, (size_t)e->class_of->size));
     if (object == NULL) {
-        fail("out of memory");
-        return NULL;
+        anti_rt_out_of_memory(e->class_of->size);
     }
     e->init(object);
     sub = (struct anti_object *)(void *)((unsigned char *)object + e->offset);
@@ -481,13 +483,12 @@ static struct anti_plugin *claim(void *handle,
             p->stubbed = ANTI_FAULT(
                 ALLOC, NULL,
                 calloc((size_t)table->count, sizeof *p->stubbed));
+            if (p->stubbed == NULL) {
+                anti_rt_out_of_memory(
+                    (int64_t)((size_t)table->count * sizeof *p->stubbed));
+            }
         }
-        one = p->stubbed != NULL ? stubs_of(&table->entries[i]) : NULL;
-        if (one == NULL) {
-            free_stubs(p, table->count);
-            fail("out of memory");
-            return NULL;
-        }
+        one = stubs_of(&table->entries[i]);
         p->stubbed[i] = one;
     }
     p->handle = handle;
@@ -541,17 +542,16 @@ struct anti_reached {
     const struct anti_descriptor **items;
     int64_t count;
     int64_t room;
-    int short_of_memory;
 };
 
 /* Add d to the descriptors to check, unless it is there already. */
-static int reach(struct anti_reached *r, const struct anti_descriptor *d)
+static void reach(struct anti_reached *r, const struct anti_descriptor *d)
 {
     int64_t i;
 
     for (i = 0; i < r->count; i++) {
         if (r->items[i] == d) {
-            return 1;
+            return;
         }
     }
     if (r->count == r->room) {
@@ -560,14 +560,12 @@ static int reach(struct anti_reached *r, const struct anti_descriptor *d)
             ANTI_FAULT(ALLOC, NULL,
                        realloc(r->items, (size_t)room * sizeof *items));
         if (items == NULL) {
-            r->short_of_memory = 1;
-            return 0;
+            anti_rt_out_of_memory((int64_t)((size_t)room * sizeof *items));
         }
         r->items = items;
         r->room = room;
     }
     r->items[r->count++] = d;
-    return 1;
 }
 
 /* The bytes of one element of an array of the type id, whose element
@@ -614,9 +612,11 @@ static int64_t array_width(int64_t type, const struct anti_descriptor *d,
         }
         element = d->fields[levels - 1].descriptor;
     }
-    if (element != NULL &&
-        (!list_sound(element, 1, sizeof *element) || !reach(r, element))) {
-        return -1;
+    if (element != NULL) {
+        if (!list_sound(element, 1, sizeof *element)) {
+            return -1;
+        }
+        reach(r, element);
     }
     width = element_width(type, element);
     for (i = 0; i < levels && width >= 0; i++) {
@@ -645,9 +645,8 @@ static int64_t width_of(const struct anti_field *f, struct anti_reached *r)
     if (type == ANTI_TYPE_ARRAY) {
         return array_width(f->type, d, r);
     }
-    if (d != NULL && ANTI_TYPE_ELEMENT(f->type) != ANTI_TYPE_ARRAY &&
-        !reach(r, d)) {
-        return -1;
+    if (d != NULL && ANTI_TYPE_ELEMENT(f->type) != ANTI_TYPE_ARRAY) {
+        reach(r, d);
     }
     switch (type) {
     case ANTI_TYPE_STRUCT:
@@ -759,10 +758,6 @@ static int class_sound(const struct anti_descriptor *d,
     return up == NULL && steps == d->depth;
 }
 
-/* The reason of damage_of where the list of the descriptors to check
-   could not grow. */
-static const char no_memory[] = "out of memory";
-
 /* What is damaged in the table of a library, or NULL when every value
    the loader reads is sound. The descriptors the fields reach join r,
    and each is checked in turn. */
@@ -819,15 +814,15 @@ static const char *damage_in(const struct anti_provided *table,
     return NULL;
 }
 
-/* What is damaged in the table of a library, no_memory, or NULL when
-   every value the loader reads is sound. */
+/* What is damaged in the table of a library, or NULL when every value
+   the loader reads is sound. */
 static const char *damage_of(const struct anti_provided *table)
 {
-    struct anti_reached r = {NULL, 0, 0, 0};
+    struct anti_reached r = {NULL, 0, 0};
     const char *damage = damage_in(table, &r);
 
     free(r.items);
-    return r.short_of_memory ? no_memory : damage;
+    return damage;
 }
 
 /* The longest a symbol or a module path of a message of the loader is. */
@@ -893,7 +888,7 @@ static unsigned char *file_bytes(const char *path, size_t *length)
             capacity = capacity == 0 ? 65536 : capacity * 2;
             grown = ANTI_FAULT(ALLOC, NULL, realloc(bytes, capacity));
             if (grown == NULL) {
-                break;
+                anti_rt_out_of_memory((int64_t)capacity);
             }
             bytes = grown;
         }
@@ -1006,10 +1001,6 @@ void *anti_rt_plugin_load(const unsigned char *path, int64_t length)
         goto close;
     }
     damage = damage_of(table);
-    if (damage == no_memory) {
-        fail("out of memory");
-        goto close;
-    }
     if (damage != NULL) {
         fail("%s carries a damaged table of what it provides: %s", name,
              damage);
@@ -1279,7 +1270,11 @@ static int discover_in(const char *dir, size_t dir_length,
     if (!joined(index, sizeof index, dir, dir_length, ANTI_PLUGIN_INDEX)) {
         return 0;
     }
+    errno = 0;
     bytes = anti_rt_fs_read(index, &bytes_length);
+    if (bytes == NULL && errno == ENOMEM) {
+        anti_rt_fail_memory("for the index %s", index);
+    }
     if (bytes == NULL) {
         return 0;
     }

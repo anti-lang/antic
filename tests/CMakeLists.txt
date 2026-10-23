@@ -544,7 +544,7 @@ endif()
 # The signal table of the runtime, in a program of its own. The test
 # starts threads, and so does the reader of the platform layer.
 find_package(Threads REQUIRED)
-antic_rt_sources(signal_sources signal atomic utf platform_posix
+antic_rt_sources(signal_sources signal assert atomic utf platform_posix
     platform_windows)
 add_executable(rt_signal_tests unit/test_signal.c ${signal_sources})
 target_link_libraries(rt_signal_tests PRIVATE Threads::Threads
@@ -609,7 +609,7 @@ add_test(NAME unit_plugin_race COMMAND rt_plugin_tests)
 # threads of the layer. The library of
 # an empty plugin table is copied into a directory whose name is outside
 # ASCII, which a loader that takes the ANSI code page cannot open.
-antic_rt_sources(platform_sources utf platform_posix platform_windows)
+antic_rt_sources(platform_sources assert utf platform_posix platform_windows)
 add_executable(rt_platform_tests unit/test_platform.c ${platform_sources})
 target_link_libraries(rt_platform_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
@@ -668,7 +668,7 @@ add_test(NAME unit_rt_oom_fs
 # the system gives no random bytes. hash.c builds with anti_rt_entropy
 # named after the stand-in of the test, which gives none.
 antic_rt_sources(draw_sources hash)
-antic_rt_sources(draw_platform_sources atomic utf platform_posix
+antic_rt_sources(draw_platform_sources assert atomic utf platform_posix
     platform_windows)
 add_library(rt_hash_draw_runtime OBJECT ${draw_sources})
 target_compile_definitions(rt_hash_draw_runtime PRIVATE

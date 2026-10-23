@@ -511,7 +511,7 @@ Each holds one case per message of a command, which
 | `tests/unit/check.h` | The two assertion macros, which count a failure and go on. |
 | `tests/unit/path_rules.h` | The cases of the path rules that both platform layers are run over. |
 | `tests/unit/pipeline.c` | The stages that `pipeline.h` declares. |
-| `tests/unit/pipeline.h` | The stages the unit tests run a source through, for one module or a compilation of several, and the IR print without the types of the runtime. |
+| `tests/unit/pipeline.h` | The stages the unit tests run a source through, for one module or a compilation of more than one, and the IR print without the types of the runtime. |
 | `tests/unit/plugin_bad.c` | A shared library with a writable plugin table, which `test_plugin_table.c` damages and loads. |
 | `tests/unit/plugin_table.c` | A shared library with an empty plugin table, which `test_plugin_race.c` and `test_platform.c` load. |
 | `tests/unit/symbols_probe.c` | A program that looks a function up in a binary of another target with the readers of `src/rt/symbols.c`. |

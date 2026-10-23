@@ -15,7 +15,8 @@
 #   FAULT_RUNTIME optional, the runtime of the fault tests of a tree of
 #             ANTIC_FAULTS. The run then builds the host that calls
 #             through reflection against it alone and loads the older
-#             library while an allocation of the loader fails
+#             library while an allocation of the loader fails, which
+#             stops the program
 #
 # A Windows library links against the import library of its host, so
 # each host there takes a library of its own.
@@ -89,9 +90,10 @@ set(root_floor-1.1 "${versions}/floor")
 
 # The loader writes a table of stubs for the sub-object of the older
 # library's class. The seventh allocation of the host is the list of
-# such tables and the eighth the table itself, and the load fails for
-# want of memory at either. The host builds with --lto none, since the
-# runtime of the fault tests carries no bitcode.
+# such tables and the eighth the table itself, and memory that runs out
+# at either stops the program, by decision 4 of "Decisions of
+# 2026-10-11". The host builds with --lto none, since the runtime of the
+# fault tests carries no bitcode.
 if(DEFINED FAULT_RUNTIME)
     antic_build(--runtime "${FAULT_RUNTIME}" --lto none
                 -I "${versions}" -I "${SOURCES}" -I "${WORK}/base"
@@ -101,7 +103,8 @@ if(DEFINED FAULT_RUNTIME)
         set(ENV{ANTI_FAULT} "alloc:${n}:ENOMEM")
         program_expect("reflector one, allocation ${n} failing"
                        COMMAND "${WORK}/reflector${EXE}" "${library}"
-                       STATUS 1 OUT "out of memory\n")
+                       ABORTS OUT ""
+                       ERR_MATCH "^anti: out of memory for [0-9]+ bytes\n$")
     endforeach()
     unset(ENV{ANTI_FAULT})
     return()

@@ -1,2 +1,1 @@
-exit 0
-faults_trace_copy.inside<int> 0
+abort

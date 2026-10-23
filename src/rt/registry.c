@@ -122,15 +122,20 @@ static void given(struct anti_plugin *slot)
     }
 }
 
-/* A zeroed object of the class, prepared as a literal of it would be. */
+/* A zeroed object of the class, prepared as a literal of it would be.
+   Memory that runs out for it stops the program, by decision 4 of
+   "Decisions of 2026-10-11" in docs/decisions.md, as for every list of
+   the reader below. An allocator of `Object.deserialize` that gives none
+   is no such case: the read then gives none. */
 static void *build(const struct anti_class *c)
 {
     void *object =
         ANTI_FAULT(ALLOC, NULL, calloc(1, (size_t)c->descriptor->size));
 
-    if (object != NULL) {
-        c->init(object);
+    if (object == NULL) {
+        anti_rt_out_of_memory(c->descriptor->size);
     }
+    c->init(object);
     return object;
 }
 
@@ -209,7 +214,7 @@ static void *lend(struct reader *r, size_t size, int64_t align)
     blocks = anti_rt_reserve(m->blocks, &m->room, m->count * one, one,
                              16 * one);
     if (blocks == NULL) {
-        return NULL;
+        anti_rt_out_of_memory((m->count + 1) * one);
     }
     m->blocks = blocks;
     p = alloc(r->from, (int64_t)size, align);
@@ -223,7 +228,7 @@ static void *lend(struct reader *r, size_t size, int64_t align)
 
 /* Room for one more prepared object, taken before its construct runs,
    so that every object whose construct ran is on the list. */
-static bool room_for_object(struct made *m)
+static void room_for_object(struct made *m)
 {
     int64_t one = (int64_t)sizeof *m->objects;
     struct built *objects =
@@ -231,10 +236,9 @@ static bool room_for_object(struct made *m)
                         one, 8 * one);
 
     if (objects == NULL) {
-        return false;
+        anti_rt_out_of_memory((m->object_count + 1) * one);
     }
     m->objects = objects;
-    return true;
 }
 
 /* Record that owner, a field of another object, holds object. */
@@ -841,7 +845,7 @@ static bool fill(struct reader *r, void *object,
     if (count > 0) {
         seen = ANTI_FAULT(ALLOC, NULL, calloc((size_t)(count + 7) / 8, 1));
         if (seen == NULL) {
-            return false;
+            anti_rt_out_of_memory((count + 7) / 8);
         }
     }
     do {
@@ -898,11 +902,11 @@ static void *read_object(struct reader *r,
     }
     c = registry_find(name, (int64_t)length, &slot);
     if (c == NULL || !descends(c->descriptor, expected) ||
-        (c->flags & ANTI_CLASS_REQUIRED) != 0 ||
-        !room_for_object(r->made)) {
+        (c->flags & ANTI_CLASS_REQUIRED) != 0) {
         given(slot);
         return NULL;
     }
+    room_for_object(r->made);
     object = lend(r, (size_t)c->descriptor->size, OBJECT_ALIGN);
     if (object == NULL) {
         given(slot);

@@ -155,8 +155,10 @@ int32_t anti_rt_cpu_level(void)
     int32_t level = ANTI_CPU_NONE;
     size_t i;
 
-    if (anti_rt_getenv("ANTI_CPU_LEVEL", &simulated) == 0 &&
-        simulated != NULL) {
+    if (anti_rt_getenv("ANTI_CPU_LEVEL", &simulated) != 0) {
+        anti_rt_start_out_of_memory();
+    }
+    if (simulated != NULL) {
         for (i = 0; i < sizeof rows / sizeof rows[0]; i++) {
             const char *name = anti_rt_cpu_level_name(rows[i].level);
             if (strcmp(simulated, name) == 0) {

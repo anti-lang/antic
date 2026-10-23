@@ -34,6 +34,7 @@
 #endif
 
 #include "cpu_level.h"
+#include "fail.h"
 #include "fault.h"
 #include "platform.h"
 #include "utf.h"
@@ -95,8 +96,10 @@ struct anti_rt_monitor *anti_rt_monitor_new(void)
     struct anti_rt_monitor *m = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *m));
     int made = 0;
 
+    /* Memory that runs out stops the program, by decision 4 of
+       "Decisions of 2026-10-11" in docs/decisions.md. */
     if (m == NULL) {
-        return NULL;
+        anti_rt_fail_memory("for a lock");
     }
     if (ANTI_FAULT(LOCK, errno, pthread_mutex_init(&m->lock, NULL)) != 0) {
         goto fail;
@@ -248,7 +251,7 @@ int anti_rt_thread_start(void (*body)(void))
     pthread_t thread;
 
     if (start == NULL) {
-        return -1;
+        anti_rt_fail_memory("for the start of a thread");
     }
     start->body = body;
     if (ANTI_FAULT(THREAD, errno,

@@ -50,7 +50,8 @@ void anti_rt_trace_frame(uint64_t address, struct anti_raw_frame *out);
 
 /* The text of count frames: one line per module, then one per frame,
    ended by a NUL and without a last newline. The caller frees it, and
-   NULL means the memory ran out. */
+   NULL means a line did not fit its room. Memory that runs out stops the
+   program. */
 unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
                                   int64_t count);
 

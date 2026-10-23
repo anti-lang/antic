@@ -107,8 +107,10 @@ struct anti_rt_monitor *anti_rt_monitor_new(void)
 {
     struct anti_rt_monitor *m = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *m));
 
+    /* Memory that runs out stops the program, by decision 4 of
+       "Decisions of 2026-10-11" in docs/decisions.md. */
     if (m == NULL) {
-        return NULL;
+        anti_rt_fail_memory("for a lock");
     }
     InitializeSRWLock(&m->lock);
     InitializeConditionVariable(&m->conditions[0]);
@@ -182,7 +184,7 @@ int anti_rt_thread_start(void (*body)(void))
     HANDLE thread;
 
     if (start == NULL) {
-        return -1;
+        anti_rt_fail_memory("for the start of a thread");
     }
     start->body = body;
     thread = ANTI_FAULT_SYSTEM(

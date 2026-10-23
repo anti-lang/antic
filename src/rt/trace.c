@@ -16,11 +16,13 @@
 
 #include "trace.h"
 
+#include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "fail.h"
 #include "fault.h"
 #include "grow.h"
 #include "license.h"
@@ -78,16 +80,20 @@ static struct anti_text keep_in(struct kept **list, const char *s, size_t n)
         k = n < SIZE_MAX - sizeof *k
                 ? ANTI_FAULT(ALLOC, NULL, malloc(sizeof *k + n + 1))
                 : NULL;
-        if (k != NULL) {
-            memcpy(k->bytes, s, n);
-            k->bytes[n] = 0;
-            k->length = n;
-            k->next = *list;
-            *list = k;
+        if (k == NULL) {
+            anti_rt_lock_release(ANTI_RT_LOCK_TRACE_TEXTS);
+            anti_rt_out_of_memory(n < SIZE_MAX - sizeof *k
+                                      ? (int64_t)(sizeof *k + n + 1)
+                                      : INT64_MAX);
         }
+        memcpy(k->bytes, s, n);
+        k->bytes[n] = 0;
+        k->length = n;
+        k->next = *list;
+        *list = k;
     }
     anti_rt_lock_release(ANTI_RT_LOCK_TRACE_TEXTS);
-    return k != NULL ? text_part(k->bytes, k->length) : text_of(NULL);
+    return text_part(k->bytes, k->length);
 }
 
 static struct anti_text keep(const char *s, size_t n)
@@ -110,7 +116,7 @@ static struct anti_text function_name(const char *s, size_t n, bool stable)
     }
     readable = ANTI_FAULT(ALLOC, NULL, malloc(n + 1));
     if (readable == NULL) {
-        return stable ? text_part(s, n) : keep(s, n);
+        anti_rt_out_of_memory((int64_t)n + 1);
     }
     length = anti_rt_symbol_unescape(s, n, readable, n);
     t = length > 0 ? keep(readable, length)
@@ -178,11 +184,18 @@ static const struct loaded *load(const char *path, bool object)
         l->path = ANTI_FAULT(ALLOC, NULL, malloc(strlen(path) + 1));
         if (l->path == NULL) {
             free(l);
+            l = NULL;
         } else {
             memcpy(l->path, path, strlen(path) + 1);
             /* A file that cannot be read whole leaves the entry without
-               bytes, so it is not tried again. */
+               bytes, so it is not tried again. Memory that runs out for
+               its bytes stops the program, as it does for the entry. */
+            errno = 0;
             l->bytes = anti_rt_fs_read(path, &size);
+            if (l->bytes == NULL && errno == ENOMEM) {
+                anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
+                anti_rt_fail_memory("for the file %s of a trace", path);
+            }
             l->size = l->bytes != NULL ? (size_t)size : 0;
             if (l->bytes != NULL && object) {
                 anti_rt_macho_relocate(l->bytes, l->size);
@@ -193,6 +206,9 @@ static const struct loaded *load(const char *path, bool object)
         }
     }
     anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
+    if (l == NULL) {
+        anti_rt_fail_memory("for the file %s of a trace", path);
+    }
     return found;
 }
 
@@ -249,15 +265,15 @@ static struct anti_text macho_id(const uint8_t *header)
                        SIZE_MAX);
         id = keep_in(&kept_paths, (const char *)id.ptr, (size_t)id.len);
     }
-    /* An id without room for its entry is read again by the next
-       capture. */
     k = ANTI_FAULT(ALLOC, NULL, malloc(sizeof *k));
-    if (k != NULL) {
-        k->header = header;
-        k->id = id;
-        k->next = known;
-        known = k;
+    if (k == NULL) {
+        anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
+        anti_rt_out_of_memory((int64_t)sizeof *k);
     }
+    k->header = header;
+    k->id = id;
+    k->next = known;
+    known = k;
     anti_rt_lock_release(ANTI_RT_LOCK_TRACE_FILES);
     return id;
 }
@@ -434,8 +450,8 @@ void anti_rt_trace_symbolize(const struct anti_raw_frame *frame,
     }
 }
 
-/* A text that grows, for the text of a trace. It turns NULL when the
-   memory runs out. */
+/* A text that grows, for the text of a trace. Memory that runs out for
+   it stops the program. */
 struct growing {
     unsigned char *bytes;
     int64_t used;
@@ -454,9 +470,8 @@ static void add(struct growing *g, const void *bytes, int64_t n)
     }
     more = anti_rt_reserve(g->bytes, &g->room, g->used + 1, n, 256);
     if (more == NULL) {
-        free(g->bytes);
-        g->bytes = NULL;
-        return;
+        anti_rt_out_of_memory(n > INT64_MAX - g->used - 1 ? INT64_MAX
+                                                          : g->used + 1 + n);
     }
     g->bytes = more;
     memcpy(g->bytes + g->used, bytes, (size_t)n);
@@ -523,7 +538,7 @@ unsigned char *anti_rt_trace_text(const struct anti_raw_frame *frames,
     g.used = 0;
     g.bytes = ANTI_FAULT(ALLOC, NULL, malloc((size_t)g.room));
     if (g.bytes == NULL) {
-        return NULL;
+        anti_rt_out_of_memory(g.room);
     }
     g.bytes[0] = 0;
     for (i = 0; i < count; i++) {

@@ -189,8 +189,8 @@ enum anti_rt_lock {
 /* The monitor of the lock which, never NULL. */
 struct anti_rt_monitor *anti_rt_monitor_of(enum anti_rt_lock which);
 
-/* A monitor on the heap, or NULL when the system or the memory gives
-   none. anti_rt_monitor_free ends it. */
+/* A monitor on the heap, or NULL when the system gives none. Memory
+   that runs out stops the program. anti_rt_monitor_free ends it. */
 struct anti_rt_monitor *anti_rt_monitor_new(void);
 
 /* End a monitor of anti_rt_monitor_new and free it. No thread may hold
@@ -253,7 +253,8 @@ void anti_rt_word_lock(struct anti_rt_word *w);
 void anti_rt_word_unlock(struct anti_rt_word *w);
 
 /* Start a thread that runs body and ends with it. Nothing joins the
-   thread. Returns 0, or -1 when the system starts none. */
+   thread. Returns 0, or -1 when the system starts none. Memory that runs
+   out stops the program. */
 int anti_rt_thread_start(void (*body)(void));
 
 /* The block of the heap that holds the thread-local variables of the
