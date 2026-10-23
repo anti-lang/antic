@@ -19,29 +19,12 @@
 # The test known_failures checks the list against the table of the findings.
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
-anti_build_message_fault_object_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_build_message_fault_imported_object_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_test_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_check_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_doc_message_fault_work_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_bind_message_fault_out_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_message_fault_new_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_message_fault_new_test_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_build_message_fault_debug_object_unread T154 anti writes the map of a release without the lines of an object it cannot read, and ends with status 0. host=macos
 anti_message_fault_sdk_export_stub_kind_unread T155 anti sdk export leaves a stub whose kind it cannot read out of the bundle, and ends with status 0. host=macos
 anti_build_message_fault_fetch_index_copy_not_written T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_index_not_cached T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_module_not_cached T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
 anti_build_message_fault_fetch_module_copy_unread T156 The fetch of a dependency names the wrong file or none when it cannot write the cache.
-anti_build_message_fault_fetch_index_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_build_message_fault_fetch_package_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_test_message_fault_library_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_test_message_fault_runner_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_test_message_fault_imports_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_check_message_fault_library_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_check_message_fault_user_block_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_check_message_fault_dev_block_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
-anti_doc_message_fault_library_directory_not_made T153 anti ends with 1 and no message when it cannot make a directory.
 anti_bind_api_alias_chain_long T159 A chain of 40 aliases is refused as an alias that names itself.
 matrix_types_generic_length_of_a_comparison_dev T160 A cast of a folded comparison stays unfolded in the length of a generic copy.
 matrix_types_generic_length_of_a_comparison_release T160 A cast of a folded comparison stays unfolded in the length of a generic copy.

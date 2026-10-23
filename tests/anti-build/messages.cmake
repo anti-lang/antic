@@ -779,13 +779,15 @@ anti_message(fault_build_directory_not_made
     FAULT mkdir:2:EACCES
     ARGS build ${tools}
     ERR "anti: cannot make ${dev_dir}")
-# T153: the directory of the object of a module, unit_file of units.c,
-# which build.c leaves without a message.
-anti_message(fault_object_directory_not_made
+# T153: the directory of the library file of a module, unit_file of
+# units.c, which build.c left without a message. The module that links
+# has no object of its own, since antic compiles it from its source, so
+# the directory of an object stands in the case after the next.
+anti_message(fault_library_file_directory_not_made
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT mkdir:13:EACCES
+    FAULT mkdir:15:EACCES
     ARGS build ${tools}
-    ERR "anti: cannot make ${dev_dir}/obj/com/example")
+    ERR "anti: cannot make ${dev_dir}/lib/com/example")
 # T153: the directory of the object of a module that the program imports,
 # module_object of build.c.
 anti_message(fault_imported_object_directory_not_made

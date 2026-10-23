@@ -118,7 +118,7 @@ static bool copy_stubs(const char *dir, const char *rel, const char *stage)
             struct text parent = {0};
             text_appendf(&to, "%s/%s", stage, text_cstr(&inside));
             text_appendf(&parent, "%s/%s", stage, rel);
-            ok = files_make_dirs(text_cstr(&parent)) &&
+            ok = files_make_dirs_or_say(text_cstr(&parent)) &&
                  files_copy(text_cstr(&from), text_cstr(&to));
             text_free(&to);
             text_free(&parent);

@@ -44,7 +44,7 @@ int bind_header(const char *library, const char *out_dir,
     unit_options(&o, NULL, runtime, roots, root_count, target, cpu);
     o.input = library;
     if (!unit_library_header(library, &arena, &package, &module) ||
-        !files_make_dirs(out_dir) || !driver_library_header(&o, &header)) {
+        !files_make_dirs_or_say(out_dir) || !driver_library_header(&o, &header)) {
         goto done;
     }
     text_appendf(&path, "%s/%s%s", out_dir, modpath_last(module),
@@ -157,7 +157,7 @@ int bind_run(const struct bind_request *q)
         }
     }
     bind_settle(&b);
-    if (!files_make_dirs(q->out_dir)) {
+    if (!files_make_dirs_or_say(q->out_dir)) {
         goto done;
     }
     bind_write_module(&b, &out);

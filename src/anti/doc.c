@@ -855,7 +855,7 @@ int doc_run(const struct doc_request *r)
     unit_options(&base, r->package, r->runtime, search, search_count, target,
                  cpu);
     base.front_end = true;
-    if (!files_make_dirs(r->out) || !files_make_dirs(r->work) ||
+    if (!files_make_dirs_or_say(r->out) || !files_make_dirs_or_say(r->work) ||
         !write_interfaces(r->sources, r->source_count, &base, r->work, units,
                           order)) {
         status = 1;

@@ -81,7 +81,7 @@ int project_new(const char *name)
        path is the package name, and `test/`. */
     text_appendf(&path, "%s/src", text_cstr(&directory));
     text_appendf(&file, "%s/%s", text_cstr(&directory), MANIFEST_FILE);
-    if (!files_make_dirs(text_cstr(&directory)) ||
+    if (!files_make_dirs_or_say(text_cstr(&directory)) ||
         !files_write(text_cstr(&file), &manifest)) {
         goto done;
     }
@@ -92,7 +92,7 @@ int project_new(const char *name)
     }
     path.length = 0;
     text_appendf(&path, "%s/test", text_cstr(&directory));
-    if (!files_make_dirs(text_cstr(&path))) {
+    if (!files_make_dirs_or_say(text_cstr(&path))) {
         goto done;
     }
     printf("anti: %s holds the project %s\n", text_cstr(&directory), name);

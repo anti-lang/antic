@@ -355,7 +355,7 @@ static bool index_dir(const char *prefix, const char *name, struct text *out)
     anti_rt_sha256_update(&digest, prefix, strlen(prefix));
     anti_rt_sha256_hex(&digest, hex);
     text_appendf(out, "/index/%s/%s", hex, name);
-    return files_make_dirs(text_cstr(out));
+    return files_make_dirs_or_say(text_cstr(out));
 }
 
 enum repo_answer repo_index(const char *prefix, const char *name,
@@ -433,7 +433,7 @@ bool repo_module(const char *prefix, const char *name, const char *version,
         goto done;
     }
     text_appendf(&directory, "/pkg/%s/%s", name, version);
-    if (!files_make_dirs(text_cstr(&directory))) {
+    if (!files_make_dirs_or_say(text_cstr(&directory))) {
         goto done;
     }
     text_appendf(out, "%s/%s%s", text_cstr(&directory), module, ANTL_SUFFIX);

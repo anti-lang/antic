@@ -269,7 +269,7 @@ static bool compile_block(const struct unit *u, const struct doc_block *one,
         wrap_block(one, text_cstr(&flat), &source);
     } else {
         text_appendf(&directory, "%s/%s", work, CHECK_DOCS_DIR);
-        if (!files_make_dirs(text_cstr(&directory))) {
+        if (!files_make_dirs_or_say(text_cstr(&directory))) {
             goto done;
         }
         text_appendf(&path, "%s/%s_%zu%s", text_cstr(&directory),
@@ -433,7 +433,7 @@ int check_run(const struct check_request *r)
         status = found.count == 0 ? 2 : 1;
         goto done;
     }
-    if (!files_make_dirs(r->work)) {
+    if (!files_make_dirs_or_say(r->work)) {
         status = 1;
         goto done;
     }

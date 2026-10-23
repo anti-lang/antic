@@ -154,7 +154,7 @@ static bool compile_imports(const struct test_unit *u,
         goto done;
     }
     text_appendf(&directory, "%s/" TEST_RUNNER_DIR "/imports/%s", work, flat);
-    if (!files_make_dirs(text_cstr(&directory))) {
+    if (!files_make_dirs_or_say(text_cstr(&directory))) {
         ok = false;
         goto done;
     }
@@ -276,7 +276,7 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
        `_`, since a dot in the file name is a segment of its own. */
     write_runner(u, &source);
     text_appendf(&directory, "%s/%s", work, TEST_RUNNER_DIR);
-    if (!files_make_dirs(text_cstr(&directory))) {
+    if (!files_make_dirs_or_say(text_cstr(&directory))) {
         goto done;
     }
     unit_flat_path(text_cstr(&u->unit.path), &flat);
@@ -340,7 +340,7 @@ int test_run(const struct test_request *r)
         say_anti("test takes one or more .anti files\n");
         return 2;
     }
-    if (!files_make_dirs(r->work)) {
+    if (!files_make_dirs_or_say(r->work)) {
         return 1;
     }
     units = files_array(r->source_count, sizeof *units);

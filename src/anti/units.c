@@ -118,7 +118,7 @@ bool unit_file(const char *dir, const char *module,
     if (directory.length > 0) {
         directory.data[--directory.length] = '\0';
     }
-    ok = directory.length == 0 || files_make_dirs(text_cstr(&directory));
+    ok = directory.length == 0 || files_make_dirs_or_say(text_cstr(&directory));
     text_free(&directory);
     return ok;
 }
