@@ -649,7 +649,14 @@ static void tree_item(struct doc_page *p, const struct item *it, bool notes)
     }
     spelled_now = types_item_spelled(it);
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
-    text_append_bytes(&one->name, it->name.text, it->name.length);
+    /* An `operator fn` that shares its name is headed by the name of its
+       symbol, `eq:Point`, as the page of the interface heads it, T173 of
+       docs/audit/tests-findings.md. */
+    if (it->kind == ITEM_FN && it->is_operator) {
+        text_append_bytes(&one->name, sym->name.text, sym->name.length);
+    } else {
+        text_append_bytes(&one->name, it->name.text, it->name.length);
+    }
     doc_copy(&one->doc, &it->doc);
     if (notes) {
         doc_copy(&one->note, &it->note);
