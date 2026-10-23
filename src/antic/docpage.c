@@ -23,8 +23,19 @@
    signature reads it, and anti writes one page at a time. */
 static unsigned spelled_now;
 
+/* DESIGN: a page writes a declaration as the source writes it, where the
+   `own` of an owned function value stands before the name, `own f:` and
+   `keep own f:`. The type after the colon then leaves it out, while the
+   name of the type in a message says `own fn(...)`, by T177 of
+   docs/audit/tests-findings.md. */
 static void doc_type_name(struct text *out, const struct type *t)
 {
+    if (t != NULL && t->kind == TYPE_FN && t->owned) {
+        struct type bare = *t;
+        bare.owned = false;
+        types_name_spelled(out, &bare, spelled_now);
+        return;
+    }
     types_name_spelled(out, t, spelled_now);
 }
 
