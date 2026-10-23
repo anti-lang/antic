@@ -2018,6 +2018,13 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         size_t shown = t->param_count - (t->has_out ? 1 : 0);
         const struct type *result =
             t->has_out ? t->params[shown]->element : t->result;
+        /* The owned form is a type of its own, `own fn(...)`, by Eddie's
+           entry of 2026-09-24 under "Anonymous functions and closures"
+           in docs/decisions.md, so its name says so, T177 of
+           docs/audit/tests-findings.md. */
+        if (t->owned) {
+            text_append(out, "own ");
+        }
         if (t->nullable) {
             text_append(out, "?");
         }
@@ -2031,7 +2038,7 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
                 text_append(out, ", ");
             }
             if (p->kind == TYPE_FN && !p->bound) {
-                text_append(out, p->owned        ? "keep own "
+                text_append(out, p->owned        ? "keep "
                                  : !p->context   ? "keep "
                                  : p->concurrent ? "concurrent "
                                                  : "");
