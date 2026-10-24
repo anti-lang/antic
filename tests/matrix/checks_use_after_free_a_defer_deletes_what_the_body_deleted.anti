@@ -1,0 +1,17 @@
+//! E2 and a defer: the deferred block runs at the exit, after the body deleted
+//! the node, and deletes it a second time on every run.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	defer {
+		delete(p);
+	}
+	delete(p);
+	return 0;
+}

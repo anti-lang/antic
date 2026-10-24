@@ -1,0 +1,1 @@
+checks_use_after_free_an_undo_reads_what_the_body_deleted.anti:16:22: error: `p` was deleted on line 18 [use-after-free]

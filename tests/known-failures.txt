@@ -25,3 +25,7 @@ matrix_ownership_reference_to_a_local_as_an_argument_of_dispatch_refused T193 E1
 matrix_ownership_reference_to_a_local_as_an_argument_of_parallel_refused T193 E1 lets the address of a local pass as an argument of the worker of `parallel`.
 matrix_checks_uninitialized_read_in_a_defer_refused T194 C1 reads nothing in a `defer`, so an element no path writes passes there.
 matrix_checks_uninitialized_read_in_an_undo_refused T194 C1 reads nothing in an `undo`, so an element no path writes passes there.
+matrix_checks_use_after_free_a_defer_reads_what_the_body_deleted_refused T195 E2 walks a `defer` with the state where it stands, so a read after the body deleted the value passes.
+matrix_checks_use_after_free_a_defer_deletes_what_the_body_deleted_refused T195 E2 walks a `defer` with the state where it stands, so a second `delete` at the exit passes.
+matrix_checks_use_after_free_an_undo_reads_what_the_body_deleted_refused T195 E2 walks an `undo` with the state where it stands, so a read after the body deleted the value passes.
+matrix_checks_use_after_free_a_defer_reads_what_a_later_defer_deleted_refused T195 E2 walks each `defer` apart, so a read after a later `defer` deleted the value passes.
