@@ -214,6 +214,13 @@ not re-open a settled decision without asking Eddie.
   `ctest -I 1,1150`, `ctest -I 1151,2250`, `ctest -I 2251,4000`,
   `ctest -I 4001,5200` and `ctest -I 5201,7000`: `asan` 250 s, 187 s,
   246 s, 180 s and 536 s, `ubsan` 244 s, 169 s, 208 s, 163 s and 413 s.
+  The review of the checks measured `host` as `ctest -I 1,2100`,
+  `ctest -I 2101,4300` and `ctest -I 4301,6700`: 385 s, 269 s and 327 s.
+  It ran `asan` as `ctest -I 1,1150`, `ctest -I 1151,2250`,
+  `ctest -I 2251,4000`, `ctest -I 4001,5200`, `ctest -I 5201,6000` and
+  `ctest -I 6001,7000`: 249 s, 190 s, 244 s, 178 s, 445 s and 375 s. It
+  ran `ubsan` as the first four parts and `ctest -I 5201,7000`: 245 s,
+  169 s, 201 s, 160 s and 389 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -803,16 +810,19 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6647 ctest tests pass on the development Mac, and two of them, the
+- 6659 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  Eleven of them are expected failures there, `fmt_handler_in_parentheses`
+  Twenty of them are expected failures there, `fmt_handler_in_parentheses`
   of T190, `matrix_classes_super_of_a_base_that_is_no_class_refused`
   of T191, the two programs of T193 that pass the address of a local
   to the worker of `dispatch` and of `parallel`, and the seven refusals
   of T194, T195 and T196 that the checks of 2026-10-20 let through in a
-  `defer`, an `undo` and a closure. The other two lines of
-  `tests/known-failures.txt`, T136 and T138, carry `host=windows`. The
-  ASan and the UBSan builds run 6645 each with the same skips, without
+  `defer`, an `undo` and a closure. The review of the checks added six
+  refusals of T197, T198 and T199 that `escaping-local` lets through,
+  and the three runs of the program of T200 that C3 refuses. The other
+  two lines of `tests/known-failures.txt`, T136 and T138, carry
+  `host=windows`. The ASan and the UBSan builds run 6657 each with the
+  same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
