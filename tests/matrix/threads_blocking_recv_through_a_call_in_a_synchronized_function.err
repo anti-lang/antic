@@ -1,0 +1,1 @@
+threads_blocking_recv_through_a_call_in_a_synchronized_function.anti:19:17: error: `receive` may wait in `recv` on line 7 while `Inbox.work` holds the lock of its object [blocking-under-lock]

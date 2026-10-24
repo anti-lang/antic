@@ -1,0 +1,7 @@
+exit 0
+directly: 15
+through calls: 19
+after a sync block: 10
+in a construct: 10
+in an anonymous function: 11
+in a worker: 5

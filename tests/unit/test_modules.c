@@ -303,7 +303,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 90, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 91, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -363,6 +363,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0,                                     /* classes */
     0, 0, 0, 0,                                     /* no locks of functions */
     0, 0, 0, 0,                                     /* no edges of lock orders */
+    0, 0, 0, 0,                                     /* no functions that wait */
 };
 
 static void writes_format(void)
@@ -1599,17 +1600,37 @@ static void refuses_file(const uint8_t *data, size_t size,
 
 static bool reads_file(const struct text *bytes);
 
+/* A function that waits, appended to the last count of scale_antl: the
+   name `f`, the kind, line 1 and the module `m`. A kind past the last of
+   enum wait_kind is damage. */
+static void damaged_wait(void)
+{
+    uint8_t longer[sizeof scale_antl + 18];
+    uint8_t *record = longer + sizeof scale_antl;
+
+    memcpy(longer, scale_antl, sizeof scale_antl);
+    longer[sizeof scale_antl - 4] = 1;
+    memset(record, 0, 18);
+    record[0] = 1;
+    record[4] = 'f';
+    record[5] = WAIT_KIND_COUNT;
+    record[9] = 1;
+    record[13] = 1;
+    record[17] = 'm';
+    refuses_file(longer, sizeof longer, NULL);
+}
+
 static void damaged_files(void)
 {
     /* Where the fields a poke below reaches sit, counted back from the
-       end of the file. First the two counts of the lock orders and the
+       end of the file. First the three counts of the lock orders and the
        classes, two instructions of 53 bytes each and the 15 bytes that
        open the body. Then the one parameter of
        the signature with its facts, its count, the source of the function
        and its result with its extension. */
     enum {
-        TAIL = 8 + 4 + 2 * 53 + 15,
-        MUL_OPERAND = 8 + 4 + 2 * 53 - 12,
+        TAIL = 12 + 4 + 2 * 53 + 15,
+        MUL_OPERAND = 12 + 4 + 2 * 53 - 12,
         PARAM_FACTS = TAIL + 4 + 1,
         PARAM_DEREF = TAIL + 4,
         PARAM_EXT = PARAM_FACTS + 4 + 1,
@@ -1627,9 +1648,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 91;
+    copy[4] = 92;
     refuses_file(copy, sizeof copy,
-                 "has format version 91, and antic reads version 90");
+                 "has format version 92, and antic reads version 91");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -3978,6 +3999,7 @@ void test_modules(void)
     one_struct_descriptor();
     dependencies();
     damaged_files();
+    damaged_wait();
     damaged_records();
     damaged_simd();
     damaged_constants();

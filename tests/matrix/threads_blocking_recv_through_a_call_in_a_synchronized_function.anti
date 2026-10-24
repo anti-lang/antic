@@ -1,0 +1,33 @@
+//! A public function of a synchronized class calls a function that holds a
+//! `recv`, which may wait while the hidden lock of the object is held. The call
+//! gets the warning `blocking-under-lock`, which a release build refuses.
+
+fn receive(c: chan int) -> int
+{
+	let v = recv(c) else {
+		return 0;
+	};
+	return *v;
+}
+
+synchronized class Inbox
+{
+	count: int = 0,
+
+	pub fn work(self, c: chan int) -> int
+	{
+		self.count += receive(c);
+		return self.count;
+	}
+}
+
+fn main() -> int
+{
+	let box = alloc Inbox { };
+	let c = chan int(1);
+	send(c, 4);
+	let n = box.work(c);
+	delete(c);
+	delete(box);
+	return n - 4;
+}

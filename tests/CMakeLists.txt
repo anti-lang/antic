@@ -3937,6 +3937,7 @@ antic_library_files(generic_limits LIBRARIES gen)
 antic_library_files(externs LIBRARIES first second)
 antic_library_files(lock_orders LIBRARIES locks)
 antic_library_files(lock_sides LIBRARIES pairs left right)
+antic_library_files(waits LIBRARIES waits)
 
 # The refusals at the boundary of a module, one message each. A case names
 # the program of tests/errors, the tree of its library files and the
@@ -3971,6 +3972,7 @@ foreach(case
         "modules_internal_struct_as_a_type|levels|org.other"
         "modules_internal_union|levels|org.other"
         "modules_internal_variant|levels|org.other"
+        "modules_blocking_under_lock|waits|"
         "modules_lock_order|lock_orders|"
         "modules_lock_order_of_a_synchronized_class|lock_orders|"
         "modules_lock_order_of_two_libraries|lock_sides|"
@@ -4604,6 +4606,14 @@ antic_warnings_test(warning_unused_clauses
 antic_warnings_test(warning_unused_doc_clause
     "--runtime,${ANTIC_RUNTIME_DIR},--dev,--doc-warnings,--warn-undocumented,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_doc.s,allow_unused.anti"
     "allow_unused.anti:10:1: warning: `allow(undocumented)` silences nothing [unused-allow]")
+
+# The warning `blocking-under-lock` in a dev build, which goes on. It
+# names the innermost lock, and an `allow` before a statement and in the
+# header of a function silences it.
+antic_warnings_test(warning_blocking_under_lock
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/blocking_under_lock.s,blocking_under_lock.anti"
+    "blocking_under_lock.anti:26:3: warning: `send` may wait while the `sync` of line 25 holds its lock [blocking-under-lock];blocking_under_lock.anti:33:3: warning: `send` may wait while the `sync` of line 32 holds its locks [blocking-under-lock];blocking_under_lock.anti:41:4: warning: `send` may wait while the `sync` of line 40 holds its lock [blocking-under-lock]"
+    "blocking_under_lock.anti:50:;blocking_under_lock.anti:58:")
 
 # Doc warnings come only with --doc-warnings, which anti check passes.
 add_expect_test(warning_note STATUS 0

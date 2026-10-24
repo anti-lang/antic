@@ -32,10 +32,27 @@ A name stands at the end of its message, `` `e` shadows the outer `e`
 | `unused-allow` | An `allow` silences nothing. | Remove the clause. |
 | `unused-unchecked` | An `unchecked` overrules nothing. | Remove the clause. |
 | `nothing-exported` | `--lib static` builds a module without an exported item, so C finds nothing in the library, by R131 of "Rules of 2026-10-13". | Export what C calls, or allow it where the library is linked for its module alone. |
+| `blocking-under-lock` | A `recv`, a `send`, a `select`, a `join` or a `join_all`, or a call of a function that reaches one, stands in a `sync` block or in a function of a synchronized class that holds the hidden lock. | Take what the lock guards, leave the block, then wait, or allow it where the wait cannot block for long. |
 
 The five doc warnings come with `--doc-warnings` alone, which `anti check`
 passes. They belong to its doc class, which fails nothing. They stay warnings
 under `--warnings-as-errors` and in a release build.
+
+`sema_lock.c` holds `blocking-under-lock` beside `lock-order`. It reads the
+same calls, so a call through a table, an interface or a function value is
+not followed. Every channel has room for a bounded number of values, so any
+`send` may find it full, and a `select` has no `else`, so every one may
+wait. The message names the innermost lock, and for a call the first wait
+the callee reaches:
+
+```text
+`next_two` may wait in `recv` on line 7 of `com.example.waits` while the `sync` of line 19 holds its lock [blocking-under-lock]
+```
+
+A library file carries the first wait of each function of its module that
+waits. A call of a library function is then followed as well.
+`tests/errors/blocking_under_lock.anti` and `tests/errors/allow_levels.anti`
+silence it.
 
 ## Safety checks
 
@@ -80,7 +97,6 @@ the name to `src/antic/warnings.c`.
 
 | Warning | Meaning | Fix |
 |---|---|---|
-| `blocking-under-lock` | A `recv`, a `send` on a channel that can be full, a `select` without `else`, a `join` or a `join_all`, or a call that leads to one, stands in a `sync` block or a function of a synchronized class. | Take what the lock guards, leave the block, then wait. |
 | `unused-result` | The program drops the result of a call to a function without effects, so the call does nothing. | Use the result, or remove the call. |
 
 ## Levels and cover

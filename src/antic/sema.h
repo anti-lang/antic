@@ -227,14 +227,38 @@ struct lock_function {
     size_t count;
 };
 
-/* What the safety check `lock-order` keeps of a module for the modules
-   that import it: the locks of its functions and the edges of its code
-   that no `unchecked(lock-order)` overruled. */
+/* The waits of the warning `blocking-under-lock`. A library file carries
+   the kind as its number, so a new kind goes last. */
+enum wait_kind {
+    WAIT_RECV,
+    WAIT_SEND,
+    WAIT_SELECT,
+    WAIT_JOIN,
+    WAIT_JOIN_ALL,
+    WAIT_KIND_COUNT
+};
+
+/* A function that may wait, itself or through the calls it names: the
+   kind and the line of the first wait it reaches, and the module whose
+   source holds that line. */
+struct wait_function {
+    struct name symbol;
+    enum wait_kind kind;
+    int line;
+    struct name module;
+};
+
+/* What the safety check `lock-order` and the warning
+   `blocking-under-lock` keep of a module for the modules that import it:
+   the locks of its functions, the edges of its code that no
+   `unchecked(lock-order)` overruled, and the functions that may wait. */
 struct lock_facts {
     struct lock_function *functions;
     size_t function_count;
     struct lock_edge *edges;
     size_t edge_count;
+    struct wait_function *waits;
+    size_t wait_count;
 };
 
 struct interface {

@@ -1,0 +1,24 @@
+//! The program calls a function of a library that waits on a channel through
+//! another function, while a `sync` block holds its lock. The library file
+//! carries the wait, so the call gets the warning `blocking-under-lock`.
+
+import com.example.waits;
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(2);
+	send(c, 4);
+	send(c, 5);
+	sync box.lock {
+		box.count += waits.next_two(c);
+	}
+	delete(c);
+	return box.count - 9;
+}

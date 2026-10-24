@@ -78,6 +78,20 @@ fn handled() -> int
 	return e;
 }
 
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn post(box: *Inbox, c: chan int)
+{
+	sync box.lock {
+		allow(blocking-under-lock, "the channel has room for every value")
+		send(c, box.count);
+	}
+}
+
 tests
 {
 	fn shadowing()

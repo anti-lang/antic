@@ -207,3 +207,10 @@ channels.
   `unchecked`, and the cases `modules_lock_order_*` a cycle across modules.
   `traps/lock_order_unfollowed.anti` takes a pair both ways through an
   interface and a function value, which the check leaves to the dev check.
+- The warning `blocking-under-lock` of the same pass reads the same calls
+  and warns of a wait where the code holds a lock. The programs
+  `threads_blocking_*` of `tests/matrix/` hold each kind of wait directly
+  and through a call, in a `sync` block and in a function of a
+  synchronized class, and the same waits outside a lock.
+  `errors/blocking_under_lock.anti` holds a dev build and `allow`, and the
+  case `modules_blocking_under_lock` a wait inside a library.

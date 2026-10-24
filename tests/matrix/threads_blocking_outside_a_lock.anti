@@ -1,0 +1,184 @@
+//! Every wait outside a lock compiles without the warning
+//! `blocking-under-lock`: each kind of wait directly and through a call, a wait
+//! after a `sync` block, a `construct` of a synchronized class, which takes no
+//! hidden lock, an anonymous function written in a `sync` block and called
+//! after it, and a worker that a `sync` block starts, which holds none of its
+//! locks.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 4,
+}
+
+worker fn read(t: *Task) -> int
+{
+	return t.n;
+}
+
+worker fn again(t: *Task) -> int
+{
+	let inner = dispatch t -> read;
+	return join(inner) + 1;
+}
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+synchronized class Mailbox
+{
+	count: int = 0,
+
+	fn construct(self, c: chan int)
+	{
+		self.count = self.take(c);
+	}
+
+	fn take(self, c: chan int) -> int
+	{
+		let v = recv(c) else {
+			return 0;
+		};
+		return *v;
+	}
+
+	pub fn total(self) -> int
+	{
+		return self.count;
+	}
+}
+
+fn receive(c: chan int) -> int
+{
+	let v = recv(c) else {
+		return 0;
+	};
+	return *v;
+}
+
+fn put(c: chan int, n: int)
+{
+	send(c, n);
+}
+
+fn pick(c: chan int) -> int
+{
+	let n = 0;
+	select {
+		c v => {
+			let x = v else {
+				return 0;
+			};
+			n = *x;
+		}
+	}
+	return n;
+}
+
+fn finish(t: *Task) -> int
+{
+	let job = dispatch t -> read;
+	return join(job);
+}
+
+fn finish_all(t: *Task)
+{
+	let jobs = [dispatch t -> read];
+	join_all(jobs[0..1]);
+}
+
+fn directly(c: chan int, t: *Task)
+{
+	send(c, 5);
+	let v = recv(c) else {
+		return;
+	};
+	let got = *v;
+	send(c, 6);
+	select {
+		c x => {
+			let y = x else {
+				return;
+			};
+			got += *y;
+		}
+	}
+	let job = dispatch t -> read;
+	got += join(job);
+	let jobs = [dispatch t -> read];
+	join_all(jobs[0..1]);
+	printf("directly: %d\n".ptr, got as c_int);
+}
+
+fn through_calls(c: chan int, t: *Task)
+{
+	put(c, 7);
+	let got = receive(c);
+	put(c, 8);
+	got += pick(c);
+	got += finish(t);
+	finish_all(t);
+	printf("through calls: %d\n".ptr, got as c_int);
+}
+
+fn after_a_sync_block(box: *Inbox, c: chan int)
+{
+	sync box.lock {
+		box.count += 1;
+	}
+	send(c, 9);
+	box.count += receive(c);
+	printf("after a sync block: %d\n".ptr, box.count as c_int);
+}
+
+fn in_a_construct(c: chan int)
+{
+	send(c, 10);
+	let m = alloc Mailbox(c);
+	printf("in a construct: %d\n".ptr, m.total() as c_int);
+	delete(m);
+}
+
+fn in_an_anonymous_function(box: *Inbox, c: chan int)
+{
+	let later = fn(from: chan int) -> int {
+		return 0;
+	};
+	sync box.lock {
+		later = fn(from: chan int) -> int {
+			return receive(from);
+		};
+	}
+	send(c, 11);
+	printf("in an anonymous function: %d\n".ptr, later(c) as c_int);
+}
+
+fn in_a_worker(box: *Inbox, t: *Task)
+{
+	let job = dispatch t -> read;
+	let first = join(job);
+	sync box.lock {
+		job = dispatch t -> again;
+	}
+	printf("in a worker: %d\n".ptr, (first + join(job)) as c_int);
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	let t = alloc Task { };
+	directly(c, t);
+	through_calls(c, t);
+	after_a_sync_block(&box, c);
+	in_a_construct(c);
+	in_an_anonymous_function(&box, c);
+	in_a_worker(&box, t);
+	delete(t);
+	delete(c);
+	return 0;
+}

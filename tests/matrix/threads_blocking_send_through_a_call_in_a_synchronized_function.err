@@ -1,0 +1,1 @@
+threads_blocking_send_through_a_call_in_a_synchronized_function.anti:16:3: error: `put` may wait in `send` on line 7 while `Inbox.work` holds the lock of its object [blocking-under-lock]

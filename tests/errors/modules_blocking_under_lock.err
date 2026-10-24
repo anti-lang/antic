@@ -1,0 +1,1 @@
+modules_blocking_under_lock.anti:20:16: error: `next_two` may wait in `recv` on line 7 of `com.example.waits` while the `sync` of line 19 holds its lock [blocking-under-lock]

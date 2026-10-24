@@ -1,0 +1,35 @@
+//! A `sync` block calls a function that holds a `recv`, which may wait while
+//! the block holds its lock. The call gets the warning `blocking-under-lock`,
+//! which a release build refuses.
+
+fn receive(c: chan int) -> int
+{
+	let v = recv(c) else {
+		return 0;
+	};
+	return *v;
+}
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn work(box: *Inbox, c: chan int) -> int
+{
+	sync box.lock {
+		box.count += receive(c);
+	}
+	return box.count;
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	let n = work(&box, c);
+	delete(c);
+	return n - 4;
+}

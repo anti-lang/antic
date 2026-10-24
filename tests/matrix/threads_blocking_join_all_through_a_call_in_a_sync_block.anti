@@ -1,0 +1,42 @@
+//! A `sync` block calls a function that holds a `join_all`, which may wait
+//! while the block holds its lock. The call gets the warning
+//! `blocking-under-lock`, which a release build refuses.
+
+class Task
+{
+	pub n: int = 4,
+}
+
+worker fn read(t: *Task) -> int
+{
+	return t.n;
+}
+
+fn finish_all(t: *Task)
+{
+	let jobs = [dispatch t -> read];
+	join_all(jobs[0..1]);
+}
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn work(box: *Inbox, t: *Task) -> int
+{
+	sync box.lock {
+		finish_all(t);
+	}
+	return box.count;
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let t = alloc Task { };
+	let n = work(&box, t);
+	delete(t);
+	return n - 4;
+}

@@ -1,9 +1,11 @@
 /* The safety check `lock-order`, C4 of "Compile-time checks of
    2026-10-20" in docs/decisions.md: a cycle in the graph of the orders
-   in which the program takes its locks. The pass reads the module once
-   the checker has checked every function and made the copies of the
-   generics, and the edges and the locks of the functions of every
-   library the module reads. */
+   in which the program takes its locks. The warning
+   `blocking-under-lock`, C5 of the same entry: a wait while a lock is
+   held. The pass reads the module once the checker has checked every
+   function and made the copies of the generics, and the edges, the
+   locks and the waits of the functions of every library the module
+   reads. */
 
 #include <stdlib.h>
 #include <string.h>
@@ -53,6 +55,51 @@ struct site {
     size_t lock_count;
 };
 
+/* DESIGN: a wait of C5 is a `recv`, a `send`, a `select`, a `join` or
+   a `join_all`. Every channel has a capacity of one value or more, so
+   any `send` may find it full, and a `select` has no `else`, so every
+   one may wait. A function waits when it holds a wait or calls a
+   function that waits, by the calls the lock orders follow, so a call
+   through a table, an interface or a function value is not followed
+   here either. A wait or a call of a function that waits gets the
+   warning where the code holds a lock: inside a `sync` block or in a
+   function of a synchronized class that takes the hidden lock. The body
+   of an anonymous function and a worker hold no lock at their start.
+
+   Where a function first waits is what the message names. The pass
+   reads each body once and keeps its waits and its calls in the order
+   of the text. Once it knows which functions wait, a walk of the calls
+   of each in that order, entering each callee once, finds the first
+   wait it reaches. A copy of a generic of another module counts its
+   waits for the calls of it, and warns of none, since its lines name
+   that module's source. */
+
+/* The kind, the line and the module of the wait a function reaches
+   first. module is empty for a line of the module that compiles. */
+struct wait_origin {
+    enum wait_kind kind;
+    int line;
+    struct name module;
+};
+
+/* A wait, a call of a function of the module, or a call of a library
+   function that waits, with what the code holds there. callee is
+   NO_INDEX for a wait and a library call, and symbol is NULL for a wait.
+   origin is the wait itself or the library's record. When held is set,
+   lock_fn names the function of a synchronized class whose hidden lock
+   the code holds, or is NULL for the `sync` at lock_pos that holds
+   lock_count locks. */
+struct wait_site {
+    struct pos pos;
+    size_t callee;
+    const struct symbol *symbol;
+    struct wait_origin origin;
+    bool held;
+    struct pos lock_pos;
+    size_t lock_count;
+    const struct item *lock_fn;
+};
+
 /* One function whose body the pass reads. */
 struct function {
     const struct item *item;
@@ -66,6 +113,10 @@ struct function {
     size_t *callees;    /* the functions of the module it calls */
     size_t callee_count;
     size_t callee_capacity;
+    size_t first_wait;  /* its sites of waits */
+    size_t wait_count;
+    bool waits;         /* whether it reaches a wait */
+    struct wait_origin wait;    /* the first it reaches */
 };
 
 /* One edge of the graph, of the module or of a library. module is NULL
@@ -96,6 +147,15 @@ struct lock_walk {
     size_t held_count;
     size_t held_capacity;
     size_t current;     /* the function being read */
+    struct wait_site *waits;
+    size_t wait_count;
+    size_t wait_capacity;
+    /* What the code holds where the walk stands, as struct wait_site
+       records it. */
+    bool holding;
+    struct pos hold_pos;
+    size_t hold_count;
+    const struct item *hold_fn;
 };
 
 #define NO_INDEX ((size_t)-1)
@@ -314,6 +374,49 @@ static void hold(struct lock_walk *w, size_t lock)
     w->held[w->held_count++] = lock;
 }
 
+/* The module whose source holds the lines of the function being read,
+   empty for the module that compiles. */
+static struct name current_module(const struct lock_walk *w)
+{
+    struct name n;
+    const char *home = w->fns[w->current].home;
+
+    n.text = home != NULL ? home : "";
+    n.length = home != NULL ? strlen(home) : 0;
+    return n;
+}
+
+/* Record at pos a wait of kind, or a call of the function of the module
+   callee or of the library function symbol, with what the code holds. */
+static void add_wait_site(struct lock_walk *w, struct pos pos, size_t callee,
+                          const struct symbol *symbol,
+                          struct wait_origin origin)
+{
+    struct wait_site *s;
+
+    w->waits = alloc_grow(w->waits, &w->wait_capacity, w->wait_count,
+                          sizeof *w->waits);
+    s = &w->waits[w->wait_count++];
+    s->pos = pos;
+    s->callee = callee;
+    s->symbol = symbol;
+    s->origin = origin;
+    s->held = w->holding;
+    s->lock_pos = w->hold_pos;
+    s->lock_count = w->hold_count;
+    s->lock_fn = w->hold_fn;
+}
+
+static void add_wait(struct lock_walk *w, struct pos pos, enum wait_kind kind)
+{
+    struct wait_origin origin;
+
+    origin.kind = kind;
+    origin.line = pos.line;
+    origin.module = current_module(w);
+    add_wait_site(w, pos, NO_INDEX, NULL, origin);
+}
+
 /* The module of the generic whose copy it is, or of the function an
    anonymous function is written in, as lowering names its source. NULL
    for a function of the module. */
@@ -370,7 +473,27 @@ static bool library_locks(struct lock_walk *w, const struct symbol *sym,
     return false;
 }
 
-/* What the call e takes. */
+/* The first wait of the library function of sym, as its library file
+   records it. Returns whether the function may wait. */
+static bool library_wait(const struct symbol *sym, struct wait_origin *out)
+{
+    const struct lock_facts *facts =
+        sym->home != NULL ? sym->home->locks : NULL;
+    size_t i;
+
+    for (i = 0; facts != NULL && i < facts->wait_count; i++) {
+        const struct wait_function *f = &facts->waits[i];
+        if (same_text(&f->symbol, &sym->name)) {
+            out->kind = f->kind;
+            out->line = f->line;
+            out->module = f->module;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* What the call e takes, and whether it may wait. */
 static void take_call(struct lock_walk *w, const struct expr *e)
 {
     const struct expr *callee = e->as.call.callee;
@@ -390,9 +513,18 @@ static void take_call(struct lock_walk *w, const struct expr *e)
     }
     if (e->as.call.dispatch == NULL && sym->item != NULL &&
         ptr_index_get(&w->fn_index, sym->item, &index)) {
+        struct wait_origin none;
+        memset(&none, 0, sizeof none);
         add_callee(w, index);
         add_site(w, e->pos, NO_INDEX, index, 0, 0);
+        add_wait_site(w, e->pos, index, sym, none);
         return;
+    }
+    if (e->as.call.dispatch == NULL && sym->home != NULL) {
+        struct wait_origin origin;
+        if (library_wait(sym, &origin)) {
+            add_wait_site(w, e->pos, NO_INDEX, sym, origin);
+        }
     }
     if (e->as.call.dispatch == NULL && sym->home != NULL &&
         library_locks(w, sym, &first, &count)) {
@@ -433,6 +565,16 @@ static bool walk_expr(void *data, const struct expr *e)
     case EXPR_CALL:
         take_call(w, e);
         return true;
+    case EXPR_SYNC_OP:
+        if (e->as.sync_op.op == SYNC_RECV) {
+            add_wait(w, e->pos, WAIT_RECV);
+        } else if (e->as.sync_op.op == SYNC_SEND) {
+            add_wait(w, e->pos, WAIT_SEND);
+        }
+        return true;
+    case EXPR_JOIN:
+        add_wait(w, e->pos, e->as.join.all ? WAIT_JOIN_ALL : WAIT_JOIN);
+        return true;
     case EXPR_FN:
         if (e->as.fn != NULL && e->as.fn->body != NULL) {
             function_of(w, e->as.fn, true);
@@ -459,7 +601,15 @@ static bool walk_stmt(void *data, const struct stmt *s)
     size_t held = w->held_count;
     size_t first;
     size_t second = NO_INDEX;
+    bool holding = w->holding;
+    struct pos hold_pos = w->hold_pos;
+    size_t hold_count = w->hold_count;
+    const struct item *hold_fn = w->hold_fn;
 
+    if (s->kind == STMT_SELECT) {
+        add_wait(w, s->pos, WAIT_SELECT);
+        return true;
+    }
     if (s->kind != STMT_SYNC) {
         return true;
     }
@@ -481,8 +631,16 @@ static bool walk_stmt(void *data, const struct stmt *s)
     if (second != NO_INDEX) {
         hold(w, second);
     }
+    w->holding = true;
+    w->hold_pos = s->pos;
+    w->hold_count = s->as.sync.second != NULL ? 2 : 1;
+    w->hold_fn = NULL;
     ast_walk_block(&v, s->as.sync.body);
     w->held_count = held;
+    w->holding = holding;
+    w->hold_pos = hold_pos;
+    w->hold_count = hold_count;
+    w->hold_fn = hold_fn;
     return false;
 }
 
@@ -525,6 +683,10 @@ static void read_function(struct lock_walk *w, size_t index)
 
     w->current = index;
     w->held_count = 0;
+    w->holding = t != NULL;
+    w->hold_fn = t != NULL ? it : NULL;
+    w->hold_count = 0;
+    w->fns[index].first_wait = w->wait_count;
     if (t != NULL) {
         size_t lock = field_lock(w, t, &hidden_lock);
         if (lock != NO_INDEX) {
@@ -533,6 +695,175 @@ static void read_function(struct lock_walk *w, size_t index)
         }
     }
     ast_walk_block(&v, it->body);
+    w->fns[index].wait_count = w->wait_count - w->fns[index].first_wait;
+}
+
+/* The wait the site s reaches, or NULL when it reaches none. */
+static const struct wait_origin *site_wait(const struct lock_walk *w,
+                                           const struct wait_site *s)
+{
+    if (s->callee == NO_INDEX) {
+        return &s->origin;
+    }
+    return w->fns[s->callee].waits ? &w->fns[s->callee].wait : NULL;
+}
+
+/* The first wait that a walk of the sites of f in the order of the text
+   reaches, entering each callee that waits once. stamp, stack_fn and
+   stack_at hold a row per function, and mark is new for each walk.
+   Returns false when f reaches no wait. */
+static bool first_wait(const struct lock_walk *w, size_t f, size_t mark,
+                       size_t *stamp, size_t *stack_fn, size_t *stack_at,
+                       struct wait_origin *out)
+{
+    size_t depth = 1;
+
+    stamp[f] = mark;
+    stack_fn[0] = f;
+    stack_at[0] = w->fns[f].first_wait;
+    while (depth > 0) {
+        const struct function *fn = &w->fns[stack_fn[depth - 1]];
+        size_t i = stack_at[depth - 1];
+        const struct wait_site *s;
+        if (i == fn->first_wait + fn->wait_count) {
+            depth--;
+            continue;
+        }
+        stack_at[depth - 1] = i + 1;
+        s = &w->waits[i];
+        if (s->callee == NO_INDEX) {
+            *out = s->origin;
+            return true;
+        }
+        if (w->fns[s->callee].waits && stamp[s->callee] != mark) {
+            stamp[s->callee] = mark;
+            stack_fn[depth] = s->callee;
+            stack_at[depth] = w->fns[s->callee].first_wait;
+            depth++;
+        }
+    }
+    return false;
+}
+
+/* Mark each function that reaches a wait, itself or through its
+   callees, and give it the first wait it reaches. */
+static void find_waits(struct lock_walk *w)
+{
+    size_t *stamp = alloc_zeroed(w->fn_count + 1, sizeof *stamp);
+    size_t *stack_fn = alloc_zeroed(w->fn_count + 1, sizeof *stack_fn);
+    size_t *stack_at = alloc_zeroed(w->fn_count + 1, sizeof *stack_at);
+    bool changed = true;
+    size_t f;
+    size_t i;
+
+    while (changed) {
+        changed = false;
+        for (f = 0; f < w->fn_count; f++) {
+            struct function *fn = &w->fns[f];
+            for (i = fn->first_wait;
+                 !fn->waits && i < fn->first_wait + fn->wait_count; i++) {
+                if (site_wait(w, &w->waits[i]) != NULL) {
+                    fn->waits = true;
+                    changed = true;
+                }
+            }
+        }
+    }
+    for (f = 0; f < w->fn_count; f++) {
+        struct function *fn = &w->fns[f];
+        if (fn->waits) {
+            fn->waits = first_wait(w, f, f + 1, stamp, stack_fn, stack_at,
+                                   &fn->wait);
+        }
+    }
+    free(stamp);
+    free(stack_fn);
+    free(stack_at);
+}
+
+static const char *const WAIT_NAMES[WAIT_KIND_COUNT] = {
+    [WAIT_RECV] = "recv",
+    [WAIT_SEND] = "send",
+    [WAIT_SELECT] = "select",
+    [WAIT_JOIN] = "join",
+    [WAIT_JOIN_ALL] = "join_all",
+};
+
+/* Whether a site before s in the table stands at the same place, as the
+   sites of two copies of one generic do. */
+static bool warned_before(const struct lock_walk *w, size_t s)
+{
+    size_t k;
+
+    for (k = 0; k < s; k++) {
+        if (w->waits[k].held && w->waits[k].pos.line == w->waits[s].pos.line &&
+            w->waits[k].pos.column == w->waits[s].pos.column &&
+            site_wait(w, &w->waits[k]) != NULL) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The warning `blocking-under-lock` at the site s, which reaches the
+   wait o while the code holds a lock. */
+static void warn_wait(struct lock_walk *w, const struct wait_site *s,
+                      const struct wait_origin *o)
+{
+    char held[LOCK_TEXT];
+    char at[LOCK_TEXT];
+
+    if (s->lock_fn != NULL) {
+        const struct name *n = &s->lock_fn->symbol->name;
+        text_format_name(held, sizeof held,
+                         "`%.*s` holds the lock of its object", (int)n->length,
+                         n->text);
+    } else {
+        text_format_name(held, sizeof held, "the `sync` of line %d holds %s",
+                         s->lock_pos.line,
+                         s->lock_count > 1 ? "its locks" : "its lock");
+    }
+    if (s->symbol == NULL) {
+        diagnostics_warn(w->c->diags, NAME_BLOCKING_UNDER_LOCK, s->pos.line,
+                         s->pos.column, "`%s` may wait while %s",
+                         WAIT_NAMES[o->kind], held);
+        return;
+    }
+    if (o->module.length > 0) {
+        text_format_name(at, sizeof at, "on line %d of `%.*s`", o->line,
+                         (int)o->module.length, o->module.text);
+    } else {
+        text_format_name(at, sizeof at, "on line %d", o->line);
+    }
+    diagnostics_warn(w->c->diags, NAME_BLOCKING_UNDER_LOCK, s->pos.line,
+                     s->pos.column, "`%.*s` may wait in `%s` %s while %s",
+                     (int)s->symbol->name.length, s->symbol->name.text,
+                     WAIT_NAMES[o->kind], at, held);
+}
+
+/* Warn of every wait of the module and every call that leads to one
+   where the code holds a lock. */
+static void warn_waits(struct lock_walk *w)
+{
+    size_t f;
+    size_t i;
+
+    if (w->c->ctx.quiet > 0) {
+        return;
+    }
+    for (f = 0; f < w->fn_count; f++) {
+        const struct function *fn = &w->fns[f];
+        if (fn->home != NULL) {
+            continue;
+        }
+        for (i = fn->first_wait; i < fn->first_wait + fn->wait_count; i++) {
+            const struct wait_site *s = &w->waits[i];
+            const struct wait_origin *o = site_wait(w, s);
+            if (s->held && o != NULL && !warned_before(w, i)) {
+                warn_wait(w, s, o);
+            }
+        }
+    }
 }
 
 /* The locks each function takes, itself or through its callees, as a
@@ -891,8 +1222,8 @@ static bool own_before(const struct graph *g, size_t e)
 }
 
 /* What the module keeps for the modules that import it: the locks of
-   each named function that takes any, and the edges of the module that
-   the graph kept. */
+   each named function that takes any, the edges of the module that the
+   graph kept, and the first wait of each named function that waits. */
 static void keep_facts(struct lock_walk *w, const bool *takes,
                        const struct graph *g)
 {
@@ -928,7 +1259,23 @@ static void keep_facts(struct lock_walk *w, const bool *takes,
         out->column = edge->pos.column;
         facts->edge_count++;
     }
-    if (facts->function_count > 0 || facts->edge_count > 0) {
+    facts->waits = arena_alloc(
+        c->arena, alloc_product(w->fn_count + 1, sizeof *facts->waits));
+    for (f = 0; f < w->fn_count; f++) {
+        const struct function *fn = &w->fns[f];
+        struct wait_function *out = &facts->waits[facts->wait_count];
+        if (fn->anonymous || fn->item->symbol == NULL || !fn->waits) {
+            continue;
+        }
+        out->symbol = fn->item->symbol->name;
+        out->kind = fn->wait.kind;
+        out->line = fn->wait.line;
+        out->module =
+            fn->wait.module.length > 0 ? fn->wait.module : c->module_name;
+        facts->wait_count++;
+    }
+    if (facts->function_count > 0 || facts->edge_count > 0 ||
+        facts->wait_count > 0) {
         c->module->locks = facts;
     }
 }
@@ -953,6 +1300,8 @@ void sema_check_lock_order(struct checker *c)
     for (i = 0; i < w.fn_count; i++) {
         read_function(&w, i);
     }
+    find_waits(&w);
+    warn_waits(&w);
     /* The edges of the libraries name their locks first, so the table
        of the locks each function takes has a column for every lock. */
     library_edges(&w, &g);
@@ -975,5 +1324,6 @@ void sema_check_lock_order(struct checker *c)
     free(w.sites);
     free(w.pool);
     free(w.held);
+    free(w.waits);
     ptr_index_free(&w.fn_index);
 }

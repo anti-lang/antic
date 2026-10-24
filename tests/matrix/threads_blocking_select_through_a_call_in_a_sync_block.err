@@ -1,0 +1,1 @@
+threads_blocking_select_through_a_call_in_a_sync_block.anti:28:16: error: `pick` may wait in `select` on line 8 while the `sync` of line 27 holds its lock [blocking-under-lock]

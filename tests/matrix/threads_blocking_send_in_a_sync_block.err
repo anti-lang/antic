@@ -1,0 +1,1 @@
+threads_blocking_send_in_a_sync_block.anti:13:3: error: `send` may wait while the `sync` of line 12 holds its lock [blocking-under-lock]

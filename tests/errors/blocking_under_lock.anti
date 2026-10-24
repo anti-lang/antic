@@ -1,0 +1,77 @@
+//! The warning `blocking-under-lock` prints in a dev build, which goes on. It
+//! names the innermost lock, and `sync a, b` holds two.
+//! `allow(blocking-under-lock, "reason")` silences it before a statement and
+//! last in the header of a function. allow_levels.anti silences it in a release
+//! build.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+synchronized class Box
+{
+	n: int = 0,
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+}
+
+fn warned(box: *Inbox, c: chan int)
+{
+	sync box.lock {
+		send(c, box.count);
+	}
+}
+
+fn both(a: *Box, b: *Box, c: chan int)
+{
+	sync a, b {
+		send(c, 1);
+	}
+}
+
+fn nested(box: *Inbox, b: *Box, c: chan int)
+{
+	sync b {
+		sync box.lock {
+			send(c, 2);
+		}
+	}
+}
+
+fn allowed_here(box: *Inbox, c: chan int)
+{
+	sync box.lock {
+		allow(blocking-under-lock, "the channel has room for every value")
+		send(c, box.count);
+	}
+}
+
+fn allowed_in_the_header(box: *Inbox, c: chan int)
+	allow(blocking-under-lock, "the channel has room for every value")
+{
+	sync box.lock {
+		send(c, box.count);
+	}
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let a = alloc Box { };
+	let b = alloc Box { };
+	let c = chan int(8);
+	warned(&box, c);
+	both(a, b, c);
+	nested(&box, b, c);
+	allowed_here(&box, c);
+	allowed_in_the_header(&box, c);
+	delete(c);
+	delete(a);
+	delete(b);
+	return 0;
+}

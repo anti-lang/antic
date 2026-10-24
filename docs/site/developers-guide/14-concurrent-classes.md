@@ -1249,6 +1249,41 @@ fn main() -> int
 
 The check follows no call through an interface, a function value or a plugin, since the function that runs is not known. The dev check finds an order such a call takes. `unchecked(lock-order, "reason")` overrules the check.
 
+### A wait under a lock
+
+A thread that waits while it holds a lock makes every other thread that needs the lock wait as well, and a thread that would end the wait may need that lock. The warning `blocking-under-lock` names a `recv`, a `send`, a `select`, a `join` or a `join_all` inside a `sync` block or in a function of a synchronized class that holds the hidden lock. It names a call of a function that reaches one as well, through the calls the lock orders follow. Every channel has room for a bounded number of values, so any `send` may find it full, and a `select` waits until one of its channels is ready.
+
+```anti refused
+//! error: `recv` may wait while the `sync` of line 10 holds its lock [blocking-under-lock]
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn take(box: *Inbox, c: chan int)
+{
+	sync box.lock {
+		let v = recv(c) else {
+			return;
+		};
+		box.count += *v;
+	}
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	take(&box, c);
+	delete(c);
+	return box.count - 4;
+}
+```
+
+A dev build prints the warning and goes on, and a release build refuses it. The fix takes the value first and holds the lock for what it guards alone. Some waits cannot block for long, such as a `recv` on a channel local to the block that holds its values. There `allow(blocking-under-lock, "reason")` silences the warning, and the reason says why.
+
 ### How antic builds it
 
 The check is in the lock calls of a dev build. Each takes the place of the lock as a text.

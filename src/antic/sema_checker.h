@@ -829,7 +829,8 @@ void sema_check_indices(struct checker *c, const struct item *it,
 /* sema_lock.c */
 
 /* The safety check `lock-order` over the functions of the module, the
-   copies of its generics among them, and the edges of its libraries. It
+   copies of its generics among them, and the edges of its libraries,
+   and the warning `blocking-under-lock` over the same functions. It
    keeps what the modules that import it need in c->module->locks. */
 void sema_check_lock_order(struct checker *c);
 

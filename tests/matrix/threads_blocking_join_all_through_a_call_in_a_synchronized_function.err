@@ -1,0 +1,1 @@
+threads_blocking_join_all_through_a_call_in_a_synchronized_function.anti:27:3: error: `finish_all` may wait in `join_all` on line 18 while `Inbox.work` holds the lock of its object [blocking-under-lock]

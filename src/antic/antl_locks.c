@@ -1,6 +1,7 @@
 /* The section of the lock orders of a library file, the last of the
-   file: what the safety check `lock-order` keeps of the module for the
-   modules that import it. */
+   file: what the safety check `lock-order` and the warning
+   `blocking-under-lock` keep of the module for the modules that import
+   it. */
 
 #include "antl_io.h"
 
@@ -10,8 +11,10 @@
    each with its line and column. A lock is three strings: the module and
    the name of its struct or class and the name of its field. The section
    names no type of the type table, so a lock of a struct that the module
-   keeps private adds nothing to the interface. A module without locks
-   writes two counts of 0. */
+   keeps private adds nothing to the interface. The functions that may
+   wait follow, each by the name of its symbol with the kind, the line
+   and the module of the first wait it reaches. A module without locks
+   and waits writes three counts of 0. */
 
 static void put_lock(struct writer *w, const struct lock_name *lock)
 {
@@ -26,6 +29,7 @@ void antl_put_locks(struct writer *w, const struct lock_facts *facts)
     size_t j;
 
     if (facts == NULL) {
+        antl_put_count(w, 0);
         antl_put_count(w, 0);
         antl_put_count(w, 0);
         return;
@@ -46,6 +50,14 @@ void antl_put_locks(struct writer *w, const struct lock_facts *facts)
         put_lock(w, &e->taken);
         antl_put_u32(w, (uint32_t)e->line);
         antl_put_u32(w, (uint32_t)e->column);
+    }
+    antl_put_count(w, facts->wait_count);
+    for (i = 0; i < facts->wait_count; i++) {
+        const struct wait_function *f = &facts->waits[i];
+        antl_put_bytes(w, f->symbol.text, f->symbol.length);
+        antl_put_u32(w, (uint32_t)f->kind);
+        antl_put_u32(w, (uint32_t)f->line);
+        antl_put_bytes(w, f->module.text, f->module.length);
     }
 }
 
@@ -90,8 +102,25 @@ void antl_read_locks(struct reader *r)
         e->column = antl_get_int(r);
     }
     facts->edge_count = r->failed ? 0 : count;
-    if (!r->failed &&
-        (facts->function_count > 0 || facts->edge_count > 0)) {
+    /* A name, a kind, a line and a module take 16 bytes at least. */
+    count = r->failed ? 0 : antl_get_count(r, 16);
+    facts->waits = antl_allocate(r, count, sizeof *facts->waits);
+    for (i = 0; i < count && !r->failed; i++) {
+        struct wait_function *f = &facts->waits[i];
+        int kind;
+        f->symbol = antl_get_name(r);
+        kind = antl_get_int(r);
+        if (!r->failed && (kind < 0 || kind >= WAIT_KIND_COUNT)) {
+            antl_damaged(r);
+            break;
+        }
+        f->kind = (enum wait_kind)kind;
+        f->line = antl_get_int(r);
+        f->module = antl_get_name(r);
+    }
+    facts->wait_count = r->failed ? 0 : count;
+    if (!r->failed && (facts->function_count > 0 || facts->edge_count > 0 ||
+                       facts->wait_count > 0)) {
         r->iface->locks = facts;
     }
 }

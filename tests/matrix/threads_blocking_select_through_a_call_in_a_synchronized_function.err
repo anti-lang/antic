@@ -1,0 +1,1 @@
+threads_blocking_select_through_a_call_in_a_synchronized_function.anti:25:17: error: `pick` may wait in `select` on line 8 while `Inbox.work` holds the lock of its object [blocking-under-lock]

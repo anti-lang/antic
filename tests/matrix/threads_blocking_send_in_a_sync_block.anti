@@ -1,0 +1,26 @@
+//! A `send` inside a `sync` block may wait while the block holds its lock. It
+//! gets the warning `blocking-under-lock`, which a release build refuses.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn work(box: *Inbox, c: chan int) -> int
+{
+	sync box.lock {
+		send(c, box.count);
+	}
+	return box.count;
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	let n = work(&box, c);
+	delete(c);
+	return n - 4;
+}

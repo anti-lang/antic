@@ -1,0 +1,35 @@
+//! A `join` in a public function of a synchronized class may wait while the
+//! function holds the hidden lock of its object. It gets the warning
+//! `blocking-under-lock`, which a release build refuses.
+
+class Task
+{
+	pub n: int = 4,
+}
+
+worker fn read(t: *Task) -> int
+{
+	return t.n;
+}
+
+synchronized class Inbox
+{
+	count: int = 0,
+
+	pub fn work(self, t: *Task) -> int
+	{
+		let job = dispatch t -> read;
+		self.count += join(job);
+		return self.count;
+	}
+}
+
+fn main() -> int
+{
+	let box = alloc Inbox { };
+	let t = alloc Task { };
+	let n = box.work(t);
+	delete(t);
+	delete(box);
+	return n - 4;
+}

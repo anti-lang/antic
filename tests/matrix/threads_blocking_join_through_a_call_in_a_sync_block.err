@@ -1,0 +1,1 @@
+threads_blocking_join_through_a_call_in_a_sync_block.anti:30:16: error: `finish` may wait in `join` on line 18 while the `sync` of line 29 holds its lock [blocking-under-lock]

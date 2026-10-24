@@ -1,0 +1,18 @@
+//! Functions that wait on a channel, which the programs of tests/errors call
+//! while they hold a lock.
+
+/// Takes the next value of `c`, or 0 once it is closed and empty.
+pub fn next(c: chan int) -> int
+{
+	let v = recv(c) else {
+		return 0;
+	};
+	return *v;
+}
+
+/// Takes the next two values of `c` through `next`, so it waits as well.
+pub fn next_two(c: chan int) -> int
+{
+	let first = next(c);
+	return first + next(c);
+}
