@@ -36,6 +36,7 @@ fn corner(p: *Point, read: bool) -> int
 fn adopt(h: *Holder, own n: *Node) -> int
 {
 	h.node = n;
+	unchecked(use-after-free, "until the step sweep")
 	n.v = 1;
 	let m = h.node else {
 		return -1;
