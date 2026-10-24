@@ -1,0 +1,17 @@
+//! The off by one on a slice parameter: the last turn of `0..s.len + 1` reads
+//! the element at `s.len`, past the end of any slice.
+
+fn sum(s: []int) -> int
+{
+	let total = 0;
+	for i in 0..s.len + 1 {
+		total += s[i];
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	return sum(xs[0..3]);
+}

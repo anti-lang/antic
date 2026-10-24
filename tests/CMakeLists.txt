@@ -1646,6 +1646,9 @@ antic_check_test(bounds_simd "index out of bounds"
 antic_check_test(bounds_str "index out of bounds"
     "bounds_str\\.anti:[0-9]+: index out of bounds: index 7, length 3"
     ON)
+antic_check_test(bounds_unproved "index out of bounds"
+    "bounds_unproved\\.anti:[0-9]+: index out of bounds: index 4, length 4"
+    ON)
 antic_check_test(overflow_add "overflow in"
     "overflow_add\\.anti:[0-9]+: overflow in \\+: left 9223372036854775807, right 1"
     ON)
@@ -4929,6 +4932,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "escaping_local|--dev,-S,-o,${LISTINGS}/escaping_local.s,escaping_local.anti"
         "use_after_free|--dev,-S,-o,${LISTINGS}/use_after_free.s,use_after_free.anti"
         "uninitialized_read|--dev,-S,-o,${LISTINGS}/uninitialized_read.s,uninitialized_read.anti"
+        "index_out_of_range|--dev,-S,-o,${LISTINGS}/index_out_of_range.s,index_out_of_range.anti"
         "catch_none|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_none.s,catch_none.anti"
         "nested_public|-S,-o,${LISTINGS}/nested_public.s,nested_public.anti"
         "nested_outside|-S,-o,${LISTINGS}/nested_outside.s,nested_outside.anti"

@@ -1,0 +1,12 @@
+//! A loop by 2 over an odd length reads the element after its own on every
+//! turn, and on the last turn that element lies past the end.
+
+fn main() -> int
+{
+	let xs = [1, 2, 3, 4, 5];
+	let total = 0;
+	for i in 0..xs.len by 2 {
+		total += xs[i] + xs[i + 1];
+	}
+	return total;
+}

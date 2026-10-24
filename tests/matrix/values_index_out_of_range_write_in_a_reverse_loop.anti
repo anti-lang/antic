@@ -1,0 +1,11 @@
+//! A write in a loop that walks backwards: `by -1` visits the values of `by 1`
+//! in reverse, and its first turn stores past the end.
+
+fn main() -> int
+{
+	let xs = [0, 0, 0, 0];
+	for i in 0..xs.len + 1 by -1 {
+		xs[i] = i;
+	}
+	return xs[0];
+}

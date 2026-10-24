@@ -699,10 +699,24 @@ A release build drops the check, with every other check of dev mode. An index ou
 
 Two options of antic override the mode. `--checks` keeps the checks in a release build, and `--no-checks` drops them from a dev build. The build that compiles the program decides.
 
-Two accesses are not checked in any mode.
+`p[i]` of a pointer is not checked in any mode, since a pointer has no length.
 
-- `p[i]` of a pointer. A pointer has no length.
-- An index that is a constant. `a[4]` of a `[4]int` compiles, and the check of dev mode finds it when it runs.
+The checker refuses an index it proves out of range, in every mode. A constant index outside a fixed array is an error. The safety check `index-out-of-range` refuses the others it can prove. It knows the value of a constant and of `.len` of a fixed array, and the length of a slice or a `str` that the function never changes. It knows the value of a local that the function never assigns after its `let` and whose address it never takes. It knows every value that the variable of a `for` over a range takes, with its step. An index whose value lies below zero or at the length on every path that reaches it is refused. For the variable of a loop that holds when every turn runs to the end of the body and reaches the index. The body has no `break`, `continue`, `return`, `fail` or `yield`, and no `while` inside it. The index stands outside every `if` and every condition of the body. The message names the value and, in a loop, the line of the `for`.
+
+```anti refused
+//! error: the index reaches 4 on a turn of the `for` on line 7, outside `xs` of length 4 [index-out-of-range]
+fn main() -> int
+{
+	let xs = [1, 2, 3, 4];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		total += xs[i];
+	}
+	return total;
+}
+```
+
+The check refuses what it proves. An index it cannot follow, as one in a loop that may leave before its last turn, keeps the bounds check of dev mode. `unchecked(index-out-of-range, "reason")` overrules the check.
 
 `for x in s` walks from the first element to the last by the length of the slice and makes no check per element.
 

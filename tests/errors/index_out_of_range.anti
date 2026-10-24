@@ -1,0 +1,33 @@
+//! The safety check `index-out-of-range` stops a dev build as it stops a
+//! release build, and `unchecked(index-out-of-range, "reason")` overrules it
+//! before a statement and last in the header of a function.
+
+fn statement() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		unchecked(index-out-of-range, "the test reads past the end alone")
+		total += xs[i];
+	}
+	return total;
+}
+
+fn function() -> int unchecked(index-out-of-range, "the test reads past the end alone")
+{
+	let xs = [1, 2, 3];
+	let last = xs.len;
+	return xs[last];
+}
+
+fn refused() -> int
+{
+	let xs = [1, 2, 3];
+	let last = xs.len;
+	return xs[last];
+}
+
+fn main() -> int
+{
+	return statement() + function() + refused();
+}

@@ -1,0 +1,9 @@
+//! A local that holds one value on every path, used as an index past the end of
+//! a fixed array.
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let last = xs.len;
+	return xs[last];
+}

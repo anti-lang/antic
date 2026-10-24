@@ -1,0 +1,13 @@
+//! The off by one of a loop that runs one turn too many: `0..xs.len + 1`
+//! reaches the length itself on its last turn, an index past the end on every
+//! run.
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		total += xs[i];
+	}
+	return total;
+}

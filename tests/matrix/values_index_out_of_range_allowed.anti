@@ -1,0 +1,156 @@
+//! The indices that the safety check `index-out-of-range` allows, since it
+//! cannot prove them out of range on every run. A loop that may leave before
+//! its last turn, an index inside an `if`, after a `continue` or under a test
+//! of the bound, a local or a slice that the function changes, a local whose
+//! address it takes, a `while` loop, an index from a call, a step that stays in
+//! the range and a range without a turn. A dev build checks each of them.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn lower(p: *int)
+{
+	*p = 2;
+}
+
+fn last_index(n: int) -> int
+{
+	return n - 1;
+}
+
+fn by_a_break() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		if i == xs.len {
+			break;
+		}
+		total += xs[i];
+	}
+	return total;
+}
+
+fn inside_an_if() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		if i < xs.len {
+			total += xs[i];
+		}
+	}
+	return total;
+}
+
+fn after_a_continue() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		if i == xs.len {
+			continue;
+		}
+		total += xs[i];
+	}
+	return total;
+}
+
+fn by_a_return() -> int
+{
+	let xs = [1, 2, 3];
+	for i in 0..xs.len + 1 {
+		if xs[i] == 2 {
+			return i;
+		}
+	}
+	return -1;
+}
+
+fn changed_local() -> int
+{
+	let xs = [1, 2, 3];
+	let k = xs.len;
+	k = k - 1;
+	return xs[k];
+}
+
+fn changed_slice() -> int
+{
+	let xs = [1, 2, 3];
+	let s = xs[0..1];
+	s = xs[0..3];
+	return s[2];
+}
+
+fn address_taken() -> int
+{
+	let xs = [1, 2, 3];
+	let k = 3;
+	lower(&k);
+	return xs[k];
+}
+
+fn by_a_while() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	let i = 0;
+	while i < xs.len do {
+		total += xs[i];
+		i += 1;
+	}
+	return total;
+}
+
+fn from_a_call() -> int
+{
+	let xs = [1, 2, 3];
+	return xs[last_index(xs.len)];
+}
+
+fn step_in_range() -> int
+{
+	let xs = [1, 2, 3, 4, 5];
+	let total = 0;
+	for i in 0..xs.len - 1 by 2 {
+		total += xs[i] + xs[i + 1];
+	}
+	return total;
+}
+
+fn no_turn() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in xs.len..xs.len {
+		total += xs[i];
+	}
+	return total;
+}
+
+fn of_a_parameter(s: []int) -> int
+{
+	let total = 0;
+	for i in 0..s.len {
+		total += s[i];
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	printf("by a break: %d\n".ptr, by_a_break() as c_int);
+	printf("inside an if: %d\n".ptr, inside_an_if() as c_int);
+	printf("after a continue: %d\n".ptr, after_a_continue() as c_int);
+	printf("by a return: %d\n".ptr, by_a_return() as c_int);
+	printf("a changed local: %d\n".ptr, changed_local() as c_int);
+	printf("a changed slice: %d\n".ptr, changed_slice() as c_int);
+	printf("an address taken: %d\n".ptr, address_taken() as c_int);
+	printf("by a while: %d\n".ptr, by_a_while() as c_int);
+	printf("from a call: %d\n".ptr, from_a_call() as c_int);
+	printf("a step in the range: %d\n".ptr, step_in_range() as c_int);
+	printf("no turn: %d\n".ptr, no_turn() as c_int);
+	printf("of a parameter: %d\n".ptr, of_a_parameter(xs[0..3]) as c_int);
+	return 0;
+}

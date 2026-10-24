@@ -1,0 +1,13 @@
+exit 0
+by a break: 6
+inside an if: 6
+after a continue: 6
+by a return: 1
+a changed local: 3
+a changed slice: 3
+an address taken: 3
+by a while: 6
+from a call: 3
+a step in the range: 10
+no turn: 0
+of a parameter: 6

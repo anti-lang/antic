@@ -1,0 +1,13 @@
+//! A constant index below zero on a slice names no element, whatever the length
+//! of the slice.
+
+fn first(s: []int) -> int
+{
+	return s[-1];
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	return first(xs[0..3]);
+}

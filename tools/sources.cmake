@@ -92,6 +92,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema_closure.c
     src/antic/sema_generic.c
     src/antic/sema_hash.c
+    src/antic/sema_index.c
     src/antic/sema_copies.c
     src/antic/sema_const.c
     src/antic/sema_declare.c

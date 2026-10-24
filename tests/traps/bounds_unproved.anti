@@ -1,0 +1,24 @@
+//! An index past the end on the last turn of a loop that may leave before it.
+//! The safety check `index-out-of-range` cannot prove the turn runs, so the
+//! program compiles, and a build with the checks stops at the index.
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: int)
+{
+}
+
+fn main() -> int
+{
+	let a = [1, 2, 3, 4];
+	for i in 0..a.len + 1 {
+		if opaque(i) < 0 {
+			break;
+		}
+		sink(a[i]);
+	}
+	return 7;
+}

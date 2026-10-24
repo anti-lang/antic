@@ -79,6 +79,7 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/sema_expr.c` | Checks expressions and the conversions a value makes where it stands, and dispatches over the kinds of expression. |
 | `src/antic/sema_generic.c` | The generics of the checker: type parameters, constraints, aliases, the copies of generic types, substitution and inference, and the strip of generics before the later passes. |
 | `src/antic/sema_hash.c` | The checker's part of hashing and of the default `==`, and the default `equals` and `hash` of each class. |
+| `src/antic/sema_index.c` | The safety check `index-out-of-range`: the range of each integer local and loop variable of a checked body, and the refusal of an index that every path reaching it takes out of range. |
 | `src/antic/sema_operator.c` | Checks the binary operators, `in` and `??` through the operator table, and finds the `operator fn` functions and language hooks of a type. |
 | `src/antic/sema_pattern.c` | The methods of `str`, `[]byte` and a match that become calls of `anti.regex` and `anti.text`, the groups of a literal as fields, the pattern literal with its checks, and `Regex.compile`. |
 | `src/antic/sema_safety.c` | The checks of the thread-safe classes: the kind of a class, its base, the hidden lock, the guards and the reach of a field. |
