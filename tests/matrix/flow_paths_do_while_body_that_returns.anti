@@ -1,6 +1,6 @@
-//! C3 of the compile-time checks: the body of a `do ... while` runs once
-//! before its condition, so a body that returns on every path ends the path
-//! of the function, and no path reaches its end without a result.
+//! C3 of the compile-time checks: the body of a `do ... while` runs once before
+//! its condition, so a body that returns on every path ends the path of the
+//! function, and no path reaches its end without a result.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 

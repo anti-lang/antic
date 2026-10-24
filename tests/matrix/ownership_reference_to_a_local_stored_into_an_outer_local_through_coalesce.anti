@@ -1,5 +1,5 @@
-//! A reference to a local of an inner block on the right of `??`, stored into
-//! a local of an outer block. The left is `none`, so the outer local holds it.
+//! A reference to a local of an inner block on the right of `??`, stored into a
+//! local of an outer block. The left is `none`, so the outer local holds it.
 
 fn main() -> int
 {

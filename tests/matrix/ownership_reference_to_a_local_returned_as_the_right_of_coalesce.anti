@@ -1,5 +1,5 @@
-//! The right of `??` is the value of the expression when the left is `none`,
-//! so a reference to a local there is returned on that path.
+//! The right of `??` is the value of the expression when the left is `none`, so
+//! a reference to a local there is returned on that path.
 
 fn pick(q: ?*int) -> *int
 {

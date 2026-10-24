@@ -1,5 +1,5 @@
-//! A local that holds `self` reaches the object, as `self` does, so the
-//! address of a local stored through it outlives the local.
+//! A local that holds `self` reaches the object, as `self` does, so the address
+//! of a local stored through it outlives the local.
 
 class Holder
 {
