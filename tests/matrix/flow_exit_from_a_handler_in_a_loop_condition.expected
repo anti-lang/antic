@@ -1,0 +1,7 @@
+exit 0
+while break 3
+do break 3
+while continue 51
+do continue 51
+nested while break 6
+nested do break 6

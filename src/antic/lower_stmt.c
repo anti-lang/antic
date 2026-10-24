@@ -235,21 +235,26 @@ static void lower_loop(struct lowerer *l, const struct stmt *s)
     loop.defers_at = l->defers;
     loop.temps_at = l->temp_count;
     ir_jump(l->f, l->b, first);
+    /* DESIGN: the condition runs once per turn, so the checker reads it
+       inside the loop, and a `break` or a `continue` that ends the
+       handler of a call there belongs to this loop. `break` leaves it
+       and `continue` tests the condition again. T189 of
+       docs/audit/tests-findings.md. */
+    l->loop = &loop;
     if (is_while) {
         l->b = test;
         lower_branch(l, s->as.loop.cond, body, exit);
     }
-    l->loop = &loop;
     l->b = body;
     lower_block(l, s->as.loop.body);
     if (l->b != NULL) {
         ir_jump(l->f, l->b, test);
     }
-    l->loop = loop.outer;
     if (!is_while) {
         l->b = test;
         lower_branch(l, s->as.loop.cond, body, exit);
     }
+    l->loop = loop.outer;
     l->b = exit;
 }
 

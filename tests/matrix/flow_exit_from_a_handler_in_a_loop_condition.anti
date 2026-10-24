@@ -1,0 +1,107 @@
+//! A `break` or a `continue` that ends the handler of a call in the condition
+//! of a `while` or of a `do ... while` belongs to that loop, as the checker
+//! reads it. `break` leaves the loop and `continue` tests the condition again.
+//! Each function prints one line, alone and inside an outer loop.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn value(n: int) -> int may fail
+{
+	if n == 3 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn while_break() -> int
+{
+	let i = 0;
+	while (value(i) catch e {
+		break;
+	}) < 10 do {
+		i += 1;
+	}
+	return i;
+}
+
+fn do_break() -> int
+{
+	let i = 0;
+	do {
+		i += 1;
+	} while (value(i) catch e {
+		break;
+	}) < 10
+	return i;
+}
+
+fn while_continue() -> int
+{
+	let i = 0;
+	let skipped = 0;
+	while (value(i) catch e {
+		skipped += 1;
+		i += 1;
+		continue;
+	}) < 5 do {
+		i += 1;
+	}
+	return i * 10 + skipped;
+}
+
+fn do_continue() -> int
+{
+	let i = 0;
+	let skipped = 0;
+	do {
+		i += 1;
+	} while (value(i) catch e {
+		skipped += 1;
+		i += 1;
+		continue;
+	}) < 5
+	return i * 10 + skipped;
+}
+
+fn nested_while_break() -> int
+{
+	let total = 0;
+	for o in 0..2 {
+		let i = 0;
+		while (value(i) catch e {
+			break;
+		}) < 10 do {
+			i += 1;
+		}
+		total += i;
+	}
+	return total;
+}
+
+fn nested_do_break() -> int
+{
+	let total = 0;
+	for o in 0..2 {
+		let i = 0;
+		do {
+			i += 1;
+		} while (value(i) catch e {
+			break;
+		}) < 10
+		total += i;
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	printf("while break %d\n".ptr, while_break() as c_int);
+	printf("do break %d\n".ptr, do_break() as c_int);
+	printf("while continue %d\n".ptr, while_continue() as c_int);
+	printf("do continue %d\n".ptr, do_continue() as c_int);
+	printf("nested while break %d\n".ptr, nested_while_break() as c_int);
+	printf("nested do break %d\n".ptr, nested_do_break() as c_int);
+	return 0;
+}

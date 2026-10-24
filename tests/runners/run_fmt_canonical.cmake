@@ -24,6 +24,7 @@ set(SKIP
     "${TESTS}/fmt/handler_in_parentheses.anti"
     "${TESTS}/fmt/loose.anti"
     "${TESTS}/matrix/classes_call_in_an_inherited_field_of_a_default_parameter.anti"
+    "${TESTS}/matrix/flow_exit_from_a_handler_in_a_loop_condition.anti"
     "${TESTS}/matrix/types_as_with_a_question_mark_before_a_number_type.anti"
     "${TESTS}/matrix/types_as_with_a_question_mark_before_its_type.anti"
     "${TESTS}/modules/lines/com/example/geo.anti")

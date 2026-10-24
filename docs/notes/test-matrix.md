@@ -559,6 +559,7 @@ of lowering meet:
 | `flow_yield_needs_value`, `flow_yield_takes_no_value`, `flow_yield_outside_handler` | three refusals of `yield` | |
 | `flow_paths_<kind>_after_<way>`, 40 refusals | C3 of "Compile-time checks of 2026-10-20": a path that reaches its end without what its kind requires. The kinds are `result`, `may_fail`, `never`, `handler` of a value and `let_else`. The ways are `switch`, `loop`, `defer`, `undo`, `catch_handler`, `let_else`, `nested` and `combined` | |
 | `flow_paths_that_end_nested` | C3: the paths that end, nested and combined, for each kind, in all three modes | |
+| `flow_exit_from_a_handler_in_a_loop_condition` | C3: a `break` and a `continue` that end a handler in the condition of a `while` and of a `do ... while` belong to that loop | T189 |
 
 The triples among them, each a rule that reads three things at once:
 
