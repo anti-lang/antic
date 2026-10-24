@@ -797,12 +797,12 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6471 ctest tests pass on the development Mac, and two of them, the
+- 6488 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   One of them is an expected failure there, `fmt_handler_in_parentheses`
   of T190. The other two lines of `tests/known-failures.txt`, T136 and
   T138, carry `host=windows`. The
-  ASan and the UBSan builds run 6469 each with the same skips, without
+  ASan and the UBSan builds run 6486 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
