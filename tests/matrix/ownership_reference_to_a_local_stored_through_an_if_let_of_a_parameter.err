@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_stored_through_an_if_let_of_a_parameter.anti:13:9: error: a reference to `x` is stored into the field `p`, and `x` ends at line 15 [escaping-local]

@@ -1,0 +1,22 @@
+//! `if let` binds the pointer of a parameter, which reaches the memory of the
+//! caller, so the address of a local stored through it outlives the local.
+
+struct Holder
+{
+	p: ?*int,
+}
+
+fn keep(m: ?*Holder)
+{
+	let x = 5;
+	if let h = m {
+		h.p = &x;
+	}
+}
+
+fn main() -> int
+{
+	let h = Holder { p: none };
+	keep(&h);
+	return 0;
+}

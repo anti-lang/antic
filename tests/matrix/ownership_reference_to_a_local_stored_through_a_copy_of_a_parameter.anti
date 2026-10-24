@@ -1,0 +1,22 @@
+//! A local that holds the pointer of a parameter reaches the memory of the
+//! caller, as the parameter does, so the address of a local stored through it
+//! outlives the local.
+
+struct Holder
+{
+	p: ?*int,
+}
+
+fn keep(h: *Holder)
+{
+	let q = h;
+	let x = 5;
+	q.p = &x;
+}
+
+fn main() -> int
+{
+	let h = Holder { p: none };
+	keep(&h);
+	return 0;
+}

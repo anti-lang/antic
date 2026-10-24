@@ -1,0 +1,22 @@
+//! A local that holds `self` reaches the object, as `self` does, so the
+//! address of a local stored through it outlives the local.
+
+class Holder
+{
+	pub p: ?*int = none,
+
+	pub fn keep(self)
+	{
+		let me = self;
+		let x = 5;
+		me.p = &x;
+	}
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { };
+	h.keep();
+	delete(h);
+	return 0;
+}
