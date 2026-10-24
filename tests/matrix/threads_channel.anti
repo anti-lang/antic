@@ -283,6 +283,7 @@ fn in_dispatch(e: *Env, start: int) -> int
 fn in_sync(e: *Env, k: int) -> int
 {
 	let acc = 0;
+	allow(blocking-under-lock, "the channel is local to the block, has room for both values and is closed before the loop")
 	sync e.lock {
 		let c = chan int(2);
 		send(c, k);

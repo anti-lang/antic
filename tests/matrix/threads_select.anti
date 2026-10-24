@@ -397,6 +397,7 @@ fn in_dispatch(e: *Env, start: int) -> int
 fn in_sync(e: *Env, k: int) -> int
 {
 	let acc = 0;
+	allow(blocking-under-lock, "the channels are local to the block, and each select finds a value or a closed channel")
 	sync e.lock {
 		let c = chan int(1);
 		let d = chan int(1);

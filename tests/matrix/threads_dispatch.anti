@@ -216,6 +216,7 @@ fn in_dispatch(e: *Env, start: int) -> int
 fn in_sync(e: *Env, k: int) -> int
 {
 	let acc = 0;
+	allow(blocking-under-lock, "the two workers take no lock and end after one addition each")
 	sync e.lock {
 		let one = dispatch e.a -> add(k);
 		let jobs = [dispatch e.b -> keep(k + 1)];
