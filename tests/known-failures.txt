@@ -35,3 +35,4 @@ matrix_ownership_reference_to_a_local_stored_into_an_outer_local_through_coalesc
 matrix_ownership_reference_to_a_local_stored_through_a_copy_of_a_parameter_refused T198 E1 counts a place reached through a copy of a parameter as memory whose end it cannot see.
 matrix_ownership_reference_to_a_local_stored_through_a_copy_of_self_refused T198 E1 counts a place reached through a copy of `self` as memory whose end it cannot see.
 matrix_ownership_reference_to_a_local_stored_through_an_if_let_of_a_parameter_refused T198 E1 counts a place reached through an `if let` of a parameter as memory whose end it cannot see.
+matrix_ownership_reference_to_a_local_returned_from_a_switch_binding_refused T199 E1 declares the name a `switch` arm binds with no reference.

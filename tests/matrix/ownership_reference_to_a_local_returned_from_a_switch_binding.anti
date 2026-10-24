@@ -1,0 +1,29 @@
+//! A case of a variant that holds a reference to a local, bound by `switch`.
+//! The binding is a copy of the case, so a field of it holds the reference, and
+//! returning it outlives the local.
+
+variant Ref
+{
+	Some { p: *int },
+	Empty,
+}
+
+fn make() -> ?*int
+{
+	let x = 5;
+	let r = Ref.Some { p: &x };
+	switch r {
+		Some s => {
+			return s.p;
+		},
+		Empty => {
+			return none;
+		},
+	}
+}
+
+fn main() -> int
+{
+	let p = make();
+	return 0;
+}

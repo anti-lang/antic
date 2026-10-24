@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_returned_from_a_switch_binding.anti:17:11: error: a reference to `x` is returned, and `x` ends at line 23 [escaping-local]
