@@ -1,0 +1,12 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` inside the body of a loop.
+
+fn main() -> int
+{
+	let total = 0;
+	for i in 0..4 {
+		i.hash();
+		total += i;
+	}
+	return total - 6;
+}

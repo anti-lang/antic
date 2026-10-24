@@ -1,0 +1,34 @@
+//! The default hash of a struct of numbers, a `str`, a pointer, an array, a
+//! tuple and an enum reaches no function of the program. A call of it whose
+//! result nothing takes gets the warning `unused-result`.
+
+enum Kind
+{
+	Small,
+	Large,
+}
+
+struct Node
+{
+	value: int,
+	next: ?*Node,
+}
+
+struct Record
+{
+	id: int,
+	name: str,
+	scale: f32,
+	node: ?*Node,
+	pair: (int, bool),
+	cells: [2]int,
+	kind: Kind,
+	inner: Node,
+}
+
+fn main() -> int
+{
+	let r = Record { id: 1, name: "one", scale: 1.5, node: none, pair: (2, true), cells: [3, 4], kind: Kind.Large, inner: Node { value: 5, next: none } };
+	r.hash();
+	return r.id - 1;
+}

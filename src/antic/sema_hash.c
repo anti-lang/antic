@@ -236,6 +236,91 @@ bool sema_is_hash_call(const struct expr *e)
              callee->as.field.base->type->kind == TYPE_PARAM));
 }
 
+/* DESIGN: the default hash has no effects where lowering writes it as
+   arithmetic, loads and anti_rt_hash_bytes, whose row of the runtime
+   functions reads its arguments alone. It has effects, as far as antic
+   knows, where a part calls a function: a hook of the program, which
+   the list of the call holds, the `hash` of a class, which a class below
+   may replace, and the hash of a Regex, a function of the runtime of the
+   class any. A part of a type parameter is the hook of each copy, so a
+   generic counts as having effects. The parts follow lower_part_of. */
+static bool part_without_effects(const struct type *t);
+
+/* Whether every field of the struct or the tuple t that the hash takes
+   has a hash without effects. */
+static bool fields_without_effects(const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < t->field_count; i++) {
+        if (!types_field_is_unit_break(&t->fields[i]) &&
+            !part_without_effects(t->fields[i].type)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool part_without_effects(const struct type *t)
+{
+    size_t i;
+
+    switch (t->kind) {
+    case TYPE_CLASS:
+    case TYPE_PARAM:
+        return false;
+    case TYPE_ARRAY:
+    case TYPE_OPTIONAL:
+        return part_without_effects(t->element);
+    case TYPE_VARIANT:
+        for (i = 0; i < t->param_count; i++) {
+            if (t->params[i] != NULL && !part_without_effects(t->params[i])) {
+                return false;
+            }
+        }
+        return true;
+    case TYPE_STRUCT:
+        if (types_is_regex(t)) {
+            return false;
+        }
+        /* A union hashes its bytes. */
+        return t->is_union || fields_without_effects(t);
+    case TYPE_TUPLE:
+        return fields_without_effects(t);
+    default:
+        /* A number, a `str`, a pointer, a slice inside a value, which
+           hashes as the view, and a function, which hashes by its code. */
+        return true;
+    }
+}
+
+bool sema_hash_without_effects(const struct expr *e)
+{
+    const struct type *t;
+
+    if (e->kind != EXPR_CALL || !e->as.call.hashes ||
+        e->as.call.hash_count > 0) {
+        return false;
+    }
+    t = e->as.call.callee->as.field.base->type;
+    if (t == NULL) {
+        return false;
+    }
+    /* A pointer hashes as its address, and a `*T` of a type with fields
+       as what it points at, as lower_hash reads it. */
+    if (t->kind == TYPE_POINTER) {
+        if (t->nullable || !types_has_fields(t->element)) {
+            return true;
+        }
+        t = t->element;
+    }
+    /* A slice that is the value hashed takes its elements. */
+    if (t->kind == TYPE_SLICE) {
+        t = t->element;
+    }
+    return part_without_effects(t);
+}
+
 /* The default `==` */
 
 /* The checked call of the `operator fn eq` of type t that compares two

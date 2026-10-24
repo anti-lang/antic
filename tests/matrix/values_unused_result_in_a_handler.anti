@@ -1,0 +1,22 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` inside the handler of a `catch`.
+
+import anti.lang;
+
+fn check(n: int) may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+}
+
+fn main() -> int
+{
+	let n = -1;
+	check(n) catch e {
+		n.hash();
+		delete(e);
+		return 0;
+	};
+	return 1;
+}

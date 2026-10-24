@@ -1,0 +1,12 @@
+//! `anti_rt_hash_bytes` reads the memory its arguments point to and nothing
+//! else, by its row of the runtime functions. A call of it whose result nothing
+//! takes gets the warning `unused-result`.
+
+extern fn anti_rt_hash_bytes(bytes: ?*byte, count: i64) -> u64;
+
+fn main() -> int
+{
+	let s = "seven";
+	anti_rt_hash_bytes(s.ptr as ?*byte, s.len as i64);
+	return 0;
+}

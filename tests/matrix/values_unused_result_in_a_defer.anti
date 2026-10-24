@@ -1,0 +1,9 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` as the statement of a `defer`.
+
+fn main() -> int
+{
+	let n = 5;
+	defer n.hash();
+	return n - 5;
+}

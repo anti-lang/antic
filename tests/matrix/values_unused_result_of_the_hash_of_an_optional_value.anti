@@ -1,0 +1,9 @@
+//! The default hash of a `?T` takes its flag and its value. A call of it whose
+//! result nothing takes gets the warning `unused-result`.
+
+fn main() -> int
+{
+	let v: ?int = 4;
+	v.hash();
+	return 0;
+}

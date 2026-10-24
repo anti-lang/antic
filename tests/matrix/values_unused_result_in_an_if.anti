@@ -1,0 +1,16 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` inside a branch of an `if`.
+
+fn pick(n: int) -> int
+{
+	if n > 2 {
+		n.hash();
+		return 1;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return pick(3) - 1;
+}

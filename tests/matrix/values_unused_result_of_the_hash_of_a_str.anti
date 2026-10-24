@@ -1,0 +1,9 @@
+//! The default hash of a `str` reads its bytes alone. A call of it whose result
+//! nothing takes gets the warning `unused-result`.
+
+fn main() -> int
+{
+	let s = "seven";
+	s.hash();
+	return s.len - 5;
+}

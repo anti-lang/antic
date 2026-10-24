@@ -92,6 +92,13 @@ fn post(box: *Inbox, c: chan int)
 	}
 }
 
+fn key(n: int) -> int
+{
+	allow(unused-result, "the hash is dropped on purpose")
+	n.hash();
+	return n;
+}
+
 tests
 {
 	fn shadowing()

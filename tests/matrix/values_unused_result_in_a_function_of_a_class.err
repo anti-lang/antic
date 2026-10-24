@@ -1,0 +1,1 @@
+values_unused_result_in_a_function_of_a_class.anti:10:3: error: `hash` has no effects and its result is dropped, so the call does nothing [unused-result]

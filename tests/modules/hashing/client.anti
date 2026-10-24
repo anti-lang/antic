@@ -1,5 +1,7 @@
 //! A program that hashes the types of another module, through its generics and
-//! inside a struct of its own, and compares them with the default `==`.
+//! inside a struct of its own, and compares them with the default `==`. A hash
+//! that reaches the `operator fn hash` of the library may have effects, so its
+//! dropped result gets no warning `unused-result`.
 
 import com.example.keys;
 
@@ -38,6 +40,8 @@ fn main() -> int
 	};
 	printf("entry %d %d\n".ptr, same(e.hash(), f.hash()), same(f.hash(),
 		g.hash()));
+	n.hash();
+	e.hash();
 	printf("tuple %d\n".ptr, same(keys.with_one("x"), ("x", 1).hash()));
 	printf("larger %d\n".ptr, keys.larger(4, 9) as c_int);
 	printf("equal %d %d\n".ptr, (e == f) as c_int, (f == f) as c_int);

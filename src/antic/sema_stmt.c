@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "rt_abi.h"
 #include "sema_checker.h"
 
 struct worker_walk;
@@ -2199,6 +2200,47 @@ bool sema_refuse_in_deferred(struct checker *c, struct pos pos,
    so an `undo` in one is refused. Outside a `try` block, a function that
    cannot fail has no such exit either, and its `undo` is the warning
    `undo-never-runs`. False after a refusal. */
+/* DESIGN: the warning `unused-result`, C6 of "Compile-time checks of
+   2026-10-20". A call that the statement e drops does nothing when antic
+   knows the function has no effects. antic knows it of three: the
+   default hash where sema_hash_without_effects says so, `mul_high`,
+   which becomes the instruction, and an `extern fn` that names a
+   function of the runtime whose row has the class none or reads its
+   arguments, with willreturn. Every function of the program and every
+   other C function may have effects, since no pass reads the effects of
+   a body. The arguments and the receiver still run, so the warning names
+   the call alone. A copy of a generic reads no statement again, so it
+   warns of nothing. */
+static void warn_unused_result(struct checker *c, const struct expr *e)
+{
+    const char *name = NULL;
+    size_t length = 0;
+    const struct symbol *sym;
+
+    if (e->kind == EXPR_BINARY && e->as.binary.op == TOKEN_MUL_HIGH) {
+        name = MUL_HIGH;
+        length = sizeof MUL_HIGH - 1;
+    } else if (e->kind == EXPR_CALL && sema_hash_without_effects(e)) {
+        name = LANG_HOOK_HASH;
+        length = sizeof LANG_HOOK_HASH - 1;
+    } else if (e->kind == EXPR_CALL &&
+               (sym = e->as.call.callee->symbol) != NULL &&
+               sym->kind == SYMBOL_EXTERN_FN && sym->type != NULL &&
+               sym->type->kind == TYPE_FN &&
+               sym->type->result->kind != TYPE_VOID &&
+               rt_without_effects(sym->name.text, sym->name.length)) {
+        name = sym->name.text;
+        length = sym->name.length;
+    }
+    if (name == NULL) {
+        return;
+    }
+    diagnostics_warn(c->diags, NAME_UNUSED_RESULT, e->pos.line, e->pos.column,
+                     "`%.*s` has no effects and its result is dropped, so "
+                     "the call does nothing",
+                     (int)length, name);
+}
+
 static bool check_undo(struct checker *c, const struct stmt *s)
 {
     if (sema_refuse_in_deferred(c, s->pos, "undo")) {
@@ -2239,7 +2281,9 @@ static void check_stmt(struct checker *c, struct stmt *s)
     case STMT_EXPR: {
         const struct expr *outer = c->discarded;
         c->discarded = s->as.expr;
-        sema_check_expr(c, s->as.expr, NULL);
+        if (!sema_is_error(sema_check_expr(c, s->as.expr, NULL))) {
+            warn_unused_result(c, s->as.expr);
+        }
         c->discarded = outer;
         return;
     }

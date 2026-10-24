@@ -986,6 +986,10 @@ bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
                     struct type **result);
 /* Whether e is `x.hash()` in the form that sema_hash_call gives. */
 bool sema_is_hash_call(const struct expr *e);
+/* Whether the checked call e is the default hash of a value whose parts
+   reach no function of the program and no function of the runtime that
+   has effects, so that the call has none. */
+bool sema_hash_without_effects(const struct expr *e);
 /* Whether a value of type t has the default `==`. A class value has it,
    and so has a struct, a tuple, a variant or a `?T` whose every part has
    `==`, its own or the default. */

@@ -1,0 +1,10 @@
+//! The default hash of an `int` has no effects. A call of it whose result
+//! nothing takes does nothing and gets the warning `unused-result`, which a
+//! release build refuses.
+
+fn main() -> int
+{
+	let n = 7;
+	n.hash();
+	return n - 7;
+}

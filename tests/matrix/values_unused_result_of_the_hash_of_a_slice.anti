@@ -1,0 +1,14 @@
+//! The default hash of a slice of numbers reads its elements alone. A call of
+//! it whose result nothing takes gets the warning `unused-result`.
+
+fn total(xs: []int) -> int
+{
+	xs.hash();
+	return xs.len;
+}
+
+fn main() -> int
+{
+	let a = [1, 2, 3];
+	return total(a[0..3]) - 3;
+}

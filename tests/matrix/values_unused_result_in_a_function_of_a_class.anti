@@ -1,0 +1,22 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` inside a function of a class.
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn bump(self)
+	{
+		self.n.hash();
+		self.n += 1;
+	}
+}
+
+fn main() -> int
+{
+	let c = alloc Counter { };
+	c.bump();
+	let n = c.n;
+	delete(c);
+	return n - 1;
+}

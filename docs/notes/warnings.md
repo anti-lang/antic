@@ -33,6 +33,7 @@ A name stands at the end of its message, `` `e` shadows the outer `e`
 | `unused-unchecked` | An `unchecked` overrules nothing. | Remove the clause. |
 | `nothing-exported` | `--lib static` builds a module without an exported item, so C finds nothing in the library, by R131 of "Rules of 2026-10-13". | Export what C calls, or allow it where the library is linked for its module alone. |
 | `blocking-under-lock` | A `recv`, a `send`, a `select`, a `join` or a `join_all`, or a call of a function that reaches one, stands in a `sync` block or in a function of a synchronized class that holds the hidden lock. | Take what the lock guards, leave the block, then wait, or allow it where the wait cannot block for long. |
+| `unused-result` | The program drops the result of a call to a function without effects, so the call does nothing. | Use the result, or remove the call. |
 
 The five doc warnings come with `--doc-warnings` alone, which `anti check`
 passes. They belong to its doc class, which fails nothing. They stay warnings
@@ -52,6 +53,25 @@ the callee reaches:
 A library file carries the first wait of each function of its module that
 waits. A call of a library function is then followed as well.
 `tests/errors/blocking_under_lock.anti` and `tests/errors/allow_levels.anti`
+silence it.
+
+`warn_unused_result` of `sema_stmt.c` gives `unused-result` at a statement
+that is a call. antic knows three calls without effects. The first is the
+default hash of a value whose parts reach no function of the program, no
+`hash` of a class and no Regex, which `sema_hash_without_effects` reads.
+The second is `mul_high`. The third is an `extern fn` that names a
+function of the runtime whose row has the class none or reads its
+arguments, with willreturn, which `rt_without_effects` of `rt_abi.c`
+reads. No pass reads the effects of a function body, so a function of the
+program never warns. Neither does a simd built-in, which the optimizer
+counts as an instruction with effects. A copy of a generic checks no
+statement again and warns of nothing. The message names the function:
+
+```text
+`hash` has no effects and its result is dropped, so the call does nothing [unused-result]
+```
+
+`tests/errors/unused_result.anti` and `tests/errors/allow_levels.anti`
 silence it.
 
 ## Safety checks
@@ -85,19 +105,6 @@ closes it.
 | `uninitialized-read` | An element of `alloc(T, n)` is read before any path wrote it. | Write the element, or fill the whole range, before the read. |
 | `index-out-of-range` | An index is out of range on every turn or every path that reaches it. | Correct the bound, as `0..n` in place of `0..n + 1`. |
 | `lock-order` | The graph of lock orders of the program holds a cycle, so two places take the same locks in opposite orders. | Take the locks in one order everywhere, or both with `sync a, b`. |
-
-## Decided and not built
-
-"Compile-time checks of 2026-10-20" in `docs/decisions.md` decides these
-names and their rules. No check of antic gives one yet, so `allow` and
-`unchecked` refuse each as a name they do not know. The test
-`warning_names` reads the two tables above alone, and the step that builds
-a name moves its row into the table of its kind, in the commit that adds
-the name to `src/antic/warnings.c`.
-
-| Warning | Meaning | Fix |
-|---|---|---|
-| `unused-result` | The program drops the result of a call to a function without effects, so the call does nothing. | Use the result, or remove the call. |
 
 ## Levels and cover
 

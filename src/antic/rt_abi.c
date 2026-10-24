@@ -4,6 +4,7 @@
 #include "rt_abi.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "alloc.h"
 
@@ -27,6 +28,22 @@ const struct rt_signature *rt_signature(enum rt_function f)
 const char *rt_name(enum rt_function f)
 {
     return signatures[f].name;
+}
+
+bool rt_without_effects(const char *name, size_t length)
+{
+    size_t i;
+
+    for (i = 0; i < RT_FUNCTION_COUNT; i++) {
+        const struct rt_signature *s = &signatures[i];
+        if (strlen(s->name) == length && memcmp(s->name, name, length) == 0) {
+            return (s->effects == IR_EFFECTS_NONE ||
+                    s->effects == IR_EFFECTS_READS_ARGS) &&
+                   (s->guarantees & IR_WILLRETURN) != 0 &&
+                   !s->never_returns && s->types[0] != IR_VOID;
+        }
+    }
+    return false;
 }
 
 /* One item of a record: the member of the C struct and its IR type. */

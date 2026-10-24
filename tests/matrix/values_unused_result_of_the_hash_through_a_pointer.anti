@@ -1,0 +1,20 @@
+//! The default hash through a `*T` reads the struct it points at. A call of it
+//! whose result nothing takes gets the warning `unused-result`.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn key(p: *Point) -> int
+{
+	p.hash();
+	return p.x;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 3, y: 4 };
+	return key(&p) - 3;
+}

@@ -1,0 +1,1 @@
+values_unused_result_of_the_hash_of_an_optional_value.anti:7:2: error: `hash` has no effects and its result is dropped, so the call does nothing [unused-result]

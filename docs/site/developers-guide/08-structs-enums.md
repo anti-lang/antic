@@ -35,6 +35,24 @@ The method-call form works on a struct. `r.area()` is `area(&r)`, and `r.widen(2
 
 `==` and `!=` compare two structs field by field, each field by its kind. A number compares by its value, a `str` by its bytes, a pointer by its address and an inline struct by these rules again. `x.hash()` gives a `u64` over the same fields in the same order, so two structs that are equal hash alike. A struct has no default `<`. An `operator fn` at module level replaces a default or adds an operator, as the section on operators of [chapter 9]({{% relref "09-classes" %}}) shows.
 
+The default `x.hash()` computes a value and changes nothing. A call of it whose result nothing takes does nothing, and the warning `unused-result` names it. A dev build prints the warning and a release build refuses it. `mul_high(a, b)` gets the same warning. A hash that reaches an `operator fn hash` of the program or the `hash` of a class gets none, since antic does not read the effects of a function body.
+
+```anti refused
+//! error: `hash` has no effects and its result is dropped, so the call does nothing [unused-result]
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn main() -> int
+{
+	let p = Point { x: 3, y: 4 };
+	p.hash();
+	return p.x - 3;
+}
+```
+
 `size_of(T)` is the size of a type in bytes on the target, padding included.
 
 `export struct` writes the struct into the C header of a library. An `export fn` names only exported types in its signature.

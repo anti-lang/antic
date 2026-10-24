@@ -1,0 +1,15 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` inside the body of an anonymous function.
+
+fn apply(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+fn main() -> int
+{
+	return apply(3, fn(x) {
+		x.hash();
+		return x + 1;
+	}) - 4;
+}

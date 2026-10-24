@@ -1,0 +1,34 @@
+//! The warning `unused-result` prints in a dev build, which goes on. It names
+//! the function whose call has no effects: the default hash, `mul_high` and a
+//! function of the runtime without effects. `allow(unused-result, "reason")`
+//! silences it before a statement and last in the header of a function.
+//! allow_levels.anti silences it in a release build.
+
+extern fn anti_rt_hash_bytes(bytes: ?*byte, count: i64) -> u64;
+
+fn warned(n: int, s: str)
+{
+	n.hash();
+	mul_high(n, n);
+	anti_rt_hash_bytes(s.ptr as ?*byte, s.len as i64);
+}
+
+fn allowed_here(n: int)
+{
+	allow(unused-result, "the test drops the hash on purpose")
+	n.hash();
+}
+
+fn allowed_in_the_header(n: int)
+	allow(unused-result, "the test drops the hash on purpose")
+{
+	n.hash();
+}
+
+fn main() -> int
+{
+	warned(3, "three");
+	allowed_here(3);
+	allowed_in_the_header(3);
+	return 0;
+}

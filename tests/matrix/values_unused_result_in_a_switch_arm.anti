@@ -1,0 +1,20 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` inside an arm of a `switch`.
+
+fn name(n: int) -> int
+{
+	switch n {
+		1 => {
+			n.hash();
+			return 10;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return name(1) - 10;
+}

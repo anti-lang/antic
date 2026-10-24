@@ -323,6 +323,12 @@ const struct rt_signature *rt_signature(enum rt_function f);
 /* The C name of function f, which the IR and the runtime share. */
 const char *rt_name(enum rt_function f);
 
+/* Whether the row named by the length bytes at name is a function
+   without effects: one of the classes none or reads its arguments, with
+   willreturn, and with a result. A call of it changes nothing and ends
+   on every path. */
+bool rt_without_effects(const char *name, size_t length);
+
 /* The records, each a list of rows F(id, member, IR type), in the order
    of the members of its C struct. */
 

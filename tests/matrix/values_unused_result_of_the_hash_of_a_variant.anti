@@ -1,0 +1,16 @@
+//! The default hash of a variant takes its tag and the fields of its case. A
+//! call of it whose result nothing takes gets the warning `unused-result`.
+
+variant Shape
+{
+	Circle { r: f32 },
+	Square { side: int },
+	Empty,
+}
+
+fn main() -> int
+{
+	let s = Shape.Square { side: 3 };
+	s.hash();
+	return 0;
+}

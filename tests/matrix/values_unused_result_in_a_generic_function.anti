@@ -1,0 +1,16 @@
+//! A call without effects whose result nothing takes gets the warning
+//! `unused-result` inside a generic function, where its receiver holds no type
+//! parameter.
+
+fn count<T>(xs: []T) -> int
+{
+	let n = xs.len;
+	n.hash();
+	return n;
+}
+
+fn main() -> int
+{
+	let a = [1, 2, 3];
+	return count<int>(a[0..3]) - 3;
+}

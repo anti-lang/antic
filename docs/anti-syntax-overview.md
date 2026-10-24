@@ -1523,8 +1523,6 @@ The five `doc-` warnings and `undocumented` come with `--doc-warnings`, which `a
 | `index-out-of-range` | An index is out of range on every path that reaches it. |
 | `lock-order` | Two places take the same two locks in opposite orders. |
 
-Not built yet: the warning `unused-result`, decided under "Compile-time checks of 2026-10-20" in `docs/decisions.md`.
-
 ## Wire formats
 
 A description of bytes in a `.fmt` file, from which `anti format` generates a parser, a writer and the classes. Not part of the language.

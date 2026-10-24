@@ -1,0 +1,90 @@
+//! A dropped result of a call that antic does not know to be without effects
+//! gets no warning `unused-result`: a function of the program, one whose body
+//! has no effects among them, a class's `hash`, which a class below may
+//! replace, a struct's `operator fn hash`, the default hash of a struct that
+//! reaches one, and `x.hash()` on a value of a type parameter, in the generic
+//! and in its copies. The program prints one line per form.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Key
+{
+	id: int,
+}
+
+operator fn hash(k: Key) -> u64
+{
+	printf("operator hash %d\n".ptr, k.id as c_int);
+	return k.id as u64;
+}
+
+struct Entry
+{
+	key: Key,
+	weight: int,
+}
+
+class Named
+{
+	pub name: str = "",
+
+	concrete fn hash(self) -> u64
+	{
+		printf("class hash\n".ptr);
+		return self.name.len as u64;
+	}
+
+	concrete fn equals(self, other: *Object) -> bool
+	{
+		let n = other as? *Named else {
+			return false;
+		};
+		return n.name.len == self.name.len;
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+fn bump(count: *int) -> int
+{
+	*count += 1;
+	return *count;
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn touch<T: hash>(x: T)
+{
+	x.hash();
+}
+
+fn main() -> int
+{
+	let count = 0;
+	bump(&count);
+	bump(&count);
+	printf("function of the program %d\n".ptr, count as c_int);
+	twice(4);
+	printf("function without effects\n".ptr);
+	let named = alloc Named { name: "four" };
+	named.hash();
+	let plain = alloc Plain { n: 2 };
+	plain.hash();
+	printf("class value\n".ptr);
+	let k = Key { id: 7 };
+	k.hash();
+	let e = Entry { key: Key { id: 8 }, weight: 1 };
+	e.hash();
+	touch(k);
+	touch(3);
+	printf("type parameter\n".ptr);
+	delete(named);
+	delete(plain);
+	return 0;
+}

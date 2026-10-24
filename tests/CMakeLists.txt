@@ -4615,6 +4615,14 @@ antic_warnings_test(warning_blocking_under_lock
     "blocking_under_lock.anti:26:3: warning: `send` may wait while the `sync` of line 25 holds its lock [blocking-under-lock];blocking_under_lock.anti:33:3: warning: `send` may wait while the `sync` of line 32 holds its locks [blocking-under-lock];blocking_under_lock.anti:41:4: warning: `send` may wait while the `sync` of line 40 holds its lock [blocking-under-lock]"
     "blocking_under_lock.anti:50:;blocking_under_lock.anti:58:")
 
+# The warning `unused-result` in a dev build, which goes on. It names the
+# function whose call has no effects, and an `allow` before a statement
+# and in the header of a function silences it.
+antic_warnings_test(warning_unused_result
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/unused_result.s,unused_result.anti"
+    "unused_result.anti:11:2: warning: `hash` has no effects and its result is dropped, so the call does nothing [unused-result];unused_result.anti:12:2: warning: `mul_high` has no effects and its result is dropped, so the call does nothing [unused-result];unused_result.anti:13:2: warning: `anti_rt_hash_bytes` has no effects and its result is dropped, so the call does nothing [unused-result]"
+    "unused_result.anti:19:;unused_result.anti:25:")
+
 # Doc warnings come only with --doc-warnings, which anti check passes.
 add_expect_test(warning_note STATUS 0
     PATTERN "note.anti:2:8: warning: the pub item `warm` has a `//#` note and no `///` comment"

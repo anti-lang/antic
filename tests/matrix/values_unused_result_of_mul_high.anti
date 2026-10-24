@@ -1,0 +1,10 @@
+//! `mul_high(a, b)` is arithmetic on its operands. A call of it whose result
+//! nothing takes gets the warning `unused-result`.
+
+fn main() -> int
+{
+	let a: u64 = 1 << 40;
+	let b: u64 = 1 << 30;
+	mul_high(a, b);
+	return 0;
+}
