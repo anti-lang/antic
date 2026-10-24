@@ -208,6 +208,12 @@ not re-open a settled decision without asking Eddie.
   `ctest -I 1151,2250`, `ctest -I 2251,4000` and `ctest -I 4001,6400`:
   255 s, 201 s, 249 s and 563 s. It ran `ubsan` in the same parts, with
   the last split at 5200: 250 s, 183 s, 208 s, 169 s and 343 s.
+  The step of the checks in their contexts measured `host` as
+  `ctest -I 1,2100`, `ctest -I 2101,4300` and `ctest -I 4301,6647`:
+  377 s, 266 s and 314 s. It ran each sanitizer suite as
+  `ctest -I 1,1150`, `ctest -I 1151,2250`, `ctest -I 2251,4000`,
+  `ctest -I 4001,5200` and `ctest -I 5201,7000`: `asan` 250 s, 187 s,
+  246 s, 180 s and 536 s, `ubsan` 244 s, 169 s, 208 s, 163 s and 413 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -797,14 +803,16 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6538 ctest tests pass on the development Mac, and two of them, the
+- 6647 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  Four of them are expected failures there, `fmt_handler_in_parentheses`
+  Eleven of them are expected failures there, `fmt_handler_in_parentheses`
   of T190, `matrix_classes_super_of_a_base_that_is_no_class_refused`
-  of T191 and the two programs of T193 that pass the address of a local
-  to the worker of `dispatch` and of `parallel`. The other two lines of
+  of T191, the two programs of T193 that pass the address of a local
+  to the worker of `dispatch` and of `parallel`, and the seven refusals
+  of T194, T195 and T196 that the checks of 2026-10-20 let through in a
+  `defer`, an `undo` and a closure. The other two lines of
   `tests/known-failures.txt`, T136 and T138, carry `host=windows`. The
-  ASan and the UBSan builds run 6536 each with the same skips, without
+  ASan and the UBSan builds run 6645 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
