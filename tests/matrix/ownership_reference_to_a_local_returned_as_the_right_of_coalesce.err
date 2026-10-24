@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_returned_as_the_right_of_coalesce.anti:7:9: error: a reference to `x` is returned, and `x` ends at line 8 [escaping-local]

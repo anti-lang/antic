@@ -30,3 +30,5 @@ matrix_checks_use_after_free_a_defer_deletes_what_the_body_deleted_refused T195 
 matrix_checks_use_after_free_an_undo_reads_what_the_body_deleted_refused T195 E2 walks an `undo` with the state where it stands, so a read after the body deleted the value passes.
 matrix_checks_use_after_free_a_defer_reads_what_a_later_defer_deleted_refused T195 E2 walks each `defer` apart, so a read after a later `defer` deleted the value passes.
 matrix_checks_index_out_of_range_in_a_closure_refused T196 C2 checks no index in the body of an anonymous function.
+matrix_ownership_reference_to_a_local_returned_as_the_right_of_coalesce_refused T197 E1 follows no reference through `??`, so a reference returned on its right passes.
+matrix_ownership_reference_to_a_local_stored_into_an_outer_local_through_coalesce_refused T197 E1 follows no reference through `??`, so a reference stored into an outer local on its right passes.
