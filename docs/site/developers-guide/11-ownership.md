@@ -387,7 +387,7 @@ fn main() -> int
 
 The check refuses what it proves. A reference stored into memory the function allocated, or behind a pointer the function read, keeps the run-time checks of dev mode and `--memory-checks`. The function cannot see when that memory ends. `unchecked(escaping-local, "reason")` overrules the check.
 
-`parallel` waits for every chunk before it returns, so the slice of a local array it takes never outlives the array. The check refuses it all the same, as the rule names `parallel`. The examples of the chapters on threads pass such a slice with `unchecked(escaping-local, "parallel waits for every chunk while the array lives")`.
+`parallel` waits for every chunk before it returns, so the slice of a local array it takes never outlives the array. The check refuses it all the same, as the rule names `parallel`. The examples of the chapters on threads pass such a slice with `unchecked(escaping-local, "parallel waits for every chunk while the array lives")`. A job of `dispatch` that the block joins before its local ends is the same case, and its reason says so.
 
 ### Uses after the end
 

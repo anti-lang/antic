@@ -174,9 +174,9 @@ fn list_cases()
 	show("list reversed", a == b, false);
 	b.reverse();
 
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let there = dispatch &a -> compare_lists(&b, ROUNDS);
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let rewritten = dispatch &b -> rewrite_list(ROUNDS);
 	let back = compare_lists(&b, &a, ROUNDS);
 	let met = join(there) + back;
@@ -212,9 +212,9 @@ fn map_cases()
 	show("map with one key more", a == b, false);
 	let extra = b.remove(ELEMENTS);
 
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let there = dispatch &a -> compare_maps(&b, ROUNDS);
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let rewritten = dispatch &b -> rewrite_map(ROUNDS);
 	let back = compare_maps(&b, &a, ROUNDS);
 	let met = join(there) + back;
@@ -246,9 +246,9 @@ fn set_cases()
 	show("set with one element less", a == b, a != b);
 	let back_in = b.add(7);
 
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let there = dispatch &a -> compare_sets(&b, ROUNDS);
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let rewritten = dispatch &b -> rewrite_set(ROUNDS);
 	let back = compare_sets(&b, &a, ROUNDS);
 	let met = join(there) + back;
@@ -285,9 +285,9 @@ fn pool_cases()
 		*p = 7;
 	});
 
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let there = dispatch &a -> compare_pools(&b, ROUNDS);
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let rewritten = dispatch &b -> rewrite_pool(ROUNDS);
 	let back = compare_pools(&b, &a, ROUNDS);
 	let met = join(there) + back;

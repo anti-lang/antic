@@ -114,7 +114,7 @@ fn main() -> int
 		(*numbers)[i] = i;
 	}
 	let p = SyncPool<int>.new();
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let watcher = dispatch &p -> watch(10);
 	let wrongs = parallel (*numbers)[0..NUMBERS] by 16 -> own_numbers(&p);
 	let wrong = 0;
@@ -148,7 +148,7 @@ fn main() -> int
 		swaps as c_int);
 
 	let (value, version) = counters.get_versioned(a) ?? (0, -1);
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "the block joins the job before the local ends")
 	let job = dispatch &counters -> bump(a);
 	let bumped = join(job);
 	counters.set_if_version(a, 0, version) catch e {
