@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_stored_through_a_parameter.anti:7:9: error: a reference to `x` is stored through the parameter `out`, and `x` ends at line 8 [escaping-local]

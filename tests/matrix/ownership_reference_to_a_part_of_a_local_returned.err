@@ -1,0 +1,1 @@
+ownership_reference_to_a_part_of_a_local_returned.anti:13:9: error: a reference to `p` is returned, and `p` ends at line 14 [escaping-local]

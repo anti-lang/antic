@@ -1,0 +1,1 @@
+ownership_reference_in_a_local_returned.anti:8:9: error: a reference to `x` is returned, and `x` ends at line 9 [escaping-local]

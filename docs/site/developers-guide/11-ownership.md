@@ -359,6 +359,34 @@ Where it lives: `sema_lent_form` of `src/antic/sema.c`. `sema_require` and `thro
 
 The example allocates four blocks, two sprites and two pixel buffers. `drop(s)` frees all four with one `delete` in the source. No option turns the test for a zero table off.
 
+### References to locals
+
+The address of a local or of a parameter, the address of a part of one and a slice of a local array are references to that local. So is every value made from one by a field access, an index, a slice or a view with `as`. A reference may stand in the locals of the block of its local and of the blocks inside it, and a call it is passed to gets it lent. It may not outlive its local. The safety check `escaping-local` refuses a reference that is returned or yielded. It refuses one stored into a local of an outer block, into a place that a parameter or `self` reaches, into a static field or into a collection of an outer block. It refuses one passed to `dispatch` or `parallel`, and one that a closure passed to a `concurrent` parameter captures. The message names the local, the line where it ends and the place.
+
+```anti refused
+//! error: a reference to `x` is returned, and `x` ends at line
+fn address() -> *int
+{
+	let x = 5;
+	return &x;
+}
+```
+
+```anti refused
+//! error: a reference to `x` is stored into `p` of an outer block, and `x` ends at line
+fn main() -> int
+{
+	let p: ?*int = none;
+	if true {
+		let x = 5;
+		p = &x;
+	}
+	return 0;
+}
+```
+
+The check refuses what it proves. A reference stored into memory the function allocated, or behind a pointer the function read, keeps the run-time checks of dev mode and `--memory-checks`. The function cannot see when that memory ends. `unchecked(escaping-local, "reason")` overrules the check.
+
 ### Pitfalls
 
 For a Java programmer:

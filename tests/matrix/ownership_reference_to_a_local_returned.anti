@@ -1,0 +1,12 @@
+//! The address of a local outlives the local when the function returns it.
+
+fn address() -> *int
+{
+	let x = 5;
+	return &x;
+}
+
+fn main() -> int
+{
+	return *address() - 5;
+}

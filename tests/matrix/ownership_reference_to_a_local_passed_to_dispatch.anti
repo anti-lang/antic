@@ -1,0 +1,20 @@
+//! `dispatch` hands its object to another thread, so the address of a local is
+//! refused there.
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn main() -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	return join(job) - 1;
+}

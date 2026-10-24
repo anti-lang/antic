@@ -2546,6 +2546,7 @@ void sema_check_function(struct checker *c, struct item *it)
     struct context at = c->ctx;
     struct context saved;
     struct scope params;
+    size_t first;
     size_t i;
 
     if (sema_is_error(it->symbol->type)) {
@@ -2580,6 +2581,7 @@ void sema_check_function(struct checker *c, struct item *it)
     }
     c->saw_fail = false;
     c->top_call = NULL;
+    first = c->diags->count;
     if (it->body != NULL && it->body->count > 0 &&
         it->body->stmts[0]->kind == STMT_EXPR &&
         it->body->stmts[0]->as.expr->kind == EXPR_CALL) {
@@ -2587,6 +2589,7 @@ void sema_check_function(struct checker *c, struct item *it)
     }
     sema_check_block(c, it->body);
     sema_check_construct_sets(c, it);
+    sema_check_escapes(c, it, first);
     sema_leave_scope(c, &params);
     if (it->symbol->type->never && !sema_block_returns(it->body)) {
         char named[128];

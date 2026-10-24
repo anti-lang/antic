@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_stored_into_an_outer_local.anti:9:7: error: a reference to `x` is stored into `p` of an outer block, and `x` ends at line 10 [escaping-local]

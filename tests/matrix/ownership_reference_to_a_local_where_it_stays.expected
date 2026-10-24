@@ -1,0 +1,10 @@
+exit 0
+a local of the same block: 5
+a local of an inner block: 6
+a local of the same block, assigned inside: 7
+an argument: 8 6
+a lent argument: 9
+a parameter: 20
+a part of a local of the same block: 11
+a closure at a plain parameter: 13
+memory the function allocated: 14

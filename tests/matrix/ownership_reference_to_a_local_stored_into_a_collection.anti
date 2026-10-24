@@ -1,0 +1,14 @@
+//! A collection of an outer block outlives a local of an inner one, so it takes
+//! no address of one.
+
+import anti.collection.list;
+
+fn main() -> int
+{
+	let all = list.List<*int>.new();
+	if true {
+		let x = 5;
+		all.push(&x);
+	}
+	return 0;
+}

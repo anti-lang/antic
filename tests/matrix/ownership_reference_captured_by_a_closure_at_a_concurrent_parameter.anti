@@ -1,0 +1,16 @@
+//! A closure passed to a `concurrent` parameter reaches other threads, so it
+//! captures no local that holds the address of a local.
+
+fn each(concurrent f: fn(int) -> int) -> int
+{
+	return f(1);
+}
+
+fn main() -> int
+{
+	let x = 5;
+	let p = &x;
+	return each(fn(i) {
+		return *p + i;
+	}) - 6;
+}

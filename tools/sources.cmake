@@ -96,6 +96,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema_const.c
     src/antic/sema_declare.c
     src/antic/sema_doc.c
+    src/antic/sema_escape.c
     src/antic/sema_export.c
     src/antic/sema_expr.c
     src/antic/sema_operator.c

@@ -1,0 +1,15 @@
+//! A place that a pointer parameter reaches outlives every local of the
+//! function, so the address of one is refused there.
+
+fn fill(out: *?*int)
+{
+	let x = 5;
+	*out = &x;
+}
+
+fn main() -> int
+{
+	let p: ?*int = none;
+	fill(&p);
+	return 0;
+}

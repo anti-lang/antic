@@ -1,0 +1,12 @@
+//! A local of an outer block outlives a local of an inner one, so it takes no
+//! address of one.
+
+fn main() -> int
+{
+	let p: ?*int = none;
+	if true {
+		let x = 5;
+		p = &x;
+	}
+	return 0;
+}

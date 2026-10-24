@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_stored_into_a_collection.anti:11:12: error: a reference to `x` is stored into the collection `all`, and `x` ends at line 12 [escaping-local]

@@ -1,0 +1,14 @@
+//! The address of an element of a slice of a local array is a part of the
+//! array, which outlives it when the function returns it.
+
+fn address() -> *int
+{
+	let all = [1, 2, 3, 4];
+	let some = all[0..4];
+	return &some[2];
+}
+
+fn main() -> int
+{
+	return *address() - 3;
+}

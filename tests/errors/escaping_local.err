@@ -1,0 +1,1 @@
+escaping_local.anti:21:9: error: a reference to `x` is returned, and `x` ends at line 22 [escaping-local]

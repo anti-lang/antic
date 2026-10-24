@@ -1,0 +1,20 @@
+//! A field of the object that `self` points at outlives every local of the
+//! function, so the address of one is refused there.
+
+class Box
+{
+	pub p: ?*int = none,
+
+	pub fn keep(self)
+	{
+		let x = 5;
+		self.p = &x;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	b.keep();
+	return 0;
+}

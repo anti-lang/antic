@@ -1,0 +1,15 @@
+//! An element of a slice that a parameter holds outlives every local of the
+//! function, so the address of one is refused there.
+
+fn fill(all: []?*int)
+{
+	let x = 5;
+	all[0] = &x;
+}
+
+fn main() -> int
+{
+	let all: [2]?*int = [none, none];
+	fill(all[0..2]);
+	return 0;
+}

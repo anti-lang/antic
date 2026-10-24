@@ -1,0 +1,19 @@
+//! `parallel` hands the chunks of its array to other threads, so a slice of a
+//! local array is refused there.
+
+worker fn total(chunk: []int) -> int
+{
+	let sum = 0;
+	for x in chunk {
+		sum += x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let numbers = [1, 2, 3, 4];
+	let parts = parallel numbers[0..4] by 2 -> total;
+	free(parts.ptr);
+	return 0;
+}

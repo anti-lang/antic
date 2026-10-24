@@ -1,0 +1,1 @@
+ownership_slice_of_a_local_array_returned.anti:6:9: error: a reference to `all` is returned, and `all` ends at line 7 [escaping-local]

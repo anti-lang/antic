@@ -1,0 +1,140 @@
+//! A reference to a local in every place where it does not outlive the local: a
+//! local of the same block and of an inner block, an argument of a call and of
+//! a `lent` parameter, a part of a local of the same block, a local that a
+//! closure captures for a plain parameter, and memory the function allocated.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+struct Holder
+{
+	p: ?*int,
+}
+
+fn read(p: *int) -> int
+{
+	return *p;
+}
+
+fn read_lent(lent p: *int) -> int
+{
+	return *p;
+}
+
+fn total(xs: []int) -> int
+{
+	let sum = 0;
+	for x in xs {
+		sum += x;
+	}
+	return sum;
+}
+
+fn apply(f: fn(int) -> int) -> int
+{
+	return f(1);
+}
+
+fn same_block()
+{
+	let x = 5;
+	let p = &x;
+	say(f"a local of the same block: {*p}");
+}
+
+fn inner_block()
+{
+	let x = 6;
+	if true {
+		let p = &x;
+		let q = p;
+		say(f"a local of an inner block: {*q}");
+	}
+}
+
+fn assigned_in_an_inner_block()
+{
+	let x = 7;
+	let p: ?*int = none;
+	if true {
+		p = &x;
+	}
+	if let q = p {
+		say(f"a local of the same block, assigned inside: {*q}");
+	}
+}
+
+fn argument()
+{
+	let x = 8;
+	let all = [1, 2, 3];
+	say(f"an argument: {read(&x)} {total(all[0..3])}");
+}
+
+fn lent_argument()
+{
+	let x = 9;
+	say(f"a lent argument: {read_lent(&x)}");
+}
+
+fn twice(n: int) -> int
+{
+	let p = &n;
+	*p *= 2;
+	return *p;
+}
+
+fn parameter()
+{
+	say(f"a parameter: {twice(10)}");
+}
+
+fn part_of_a_local()
+{
+	let x = 11;
+	let h = Holder { p: none };
+	h.p = &x;
+	if let q = h.p {
+		say(f"a part of a local of the same block: {*q}");
+	}
+}
+
+fn captured()
+{
+	let x = 12;
+	let p = &x;
+	say(f"a closure at a plain parameter: {apply(fn(i) {
+		return *p + i;
+	})}");
+}
+
+fn allocated()
+{
+	let x = 14;
+	let h = alloc Holder { p: none };
+	h.p = &x;
+	if let q = h.p {
+		say(f"memory the function allocated: {*q}");
+	}
+	free(h);
+}
+
+fn main() -> int
+{
+	same_block();
+	inner_block();
+	assigned_in_an_inner_block();
+	argument();
+	lent_argument();
+	parameter();
+	part_of_a_local();
+	captured();
+	allocated();
+	return 0;
+}

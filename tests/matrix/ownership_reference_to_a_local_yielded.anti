@@ -1,0 +1,18 @@
+//! A handler that yields the address of a local of its own block gives that
+//! address to the `let` after the block has ended.
+
+import anti.lang;
+
+fn find(s: str) -> *int may fail
+{
+	fail "not found";
+}
+
+fn main() -> int
+{
+	let p = find("x") catch {
+		let fallback = 5;
+		yield &fallback;
+	};
+	return *p - 5;
+}

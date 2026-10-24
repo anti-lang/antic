@@ -4926,6 +4926,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "allow_names|-S,-o,${LISTINGS}/allow_names.s,allow_names.anti"
         "allow_places|-S,-o,${LISTINGS}/allow_places.s,allow_places.anti"
         "allow_unused|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/allow_unused.s,allow_unused.anti"
+        "escaping_local|--dev,-S,-o,${LISTINGS}/escaping_local.s,escaping_local.anti"
         "catch_none|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_none.s,catch_none.anti"
         "nested_public|-S,-o,${LISTINGS}/nested_public.s,nested_public.anti"
         "nested_outside|-S,-o,${LISTINGS}/nested_outside.s,nested_outside.anti"

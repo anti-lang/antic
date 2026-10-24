@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_stored_into_a_global.anti:12:18: error: a reference to `x` is stored into the global `seen`, and `x` ends at line 13 [escaping-local]

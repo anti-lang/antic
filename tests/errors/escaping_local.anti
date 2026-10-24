@@ -1,0 +1,30 @@
+//! The safety check `escaping-local` stops a dev build as it stops a release
+//! build, and `unchecked(escaping-local, "reason")` overrules it before a
+//! statement and last in the header of a function.
+
+fn statement() -> *int
+{
+	let x = 1;
+	unchecked(escaping-local, "the caller reads nothing through it")
+	return &x;
+}
+
+fn function() -> *int unchecked(escaping-local, "the caller reads nothing through it")
+{
+	let x = 2;
+	return &x;
+}
+
+fn refused() -> *int
+{
+	let x = 3;
+	return &x;
+}
+
+fn main() -> int
+{
+	let a = statement();
+	let b = function();
+	let c = refused();
+	return 0;
+}

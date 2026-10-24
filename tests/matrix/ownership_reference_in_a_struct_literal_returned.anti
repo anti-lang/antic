@@ -1,0 +1,18 @@
+//! A struct literal that holds the address of a local gives that address out
+//! when the function returns the struct.
+
+struct Holder
+{
+	p: *int,
+}
+
+fn holder() -> Holder
+{
+	let x = 5;
+	return Holder { p: &x };
+}
+
+fn main() -> int
+{
+	return *holder().p - 5;
+}

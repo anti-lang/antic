@@ -1,0 +1,14 @@
+//! A local that holds the address of another local gives that address out when
+//! the function returns the local.
+
+fn address() -> *int
+{
+	let x = 5;
+	let p = &x;
+	return p;
+}
+
+fn main() -> int
+{
+	return *address() - 5;
+}

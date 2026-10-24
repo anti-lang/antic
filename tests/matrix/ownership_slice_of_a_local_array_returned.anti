@@ -1,0 +1,12 @@
+//! A slice of a local array outlives the array when the function returns it.
+
+fn numbers() -> []int
+{
+	let all = [1, 2, 3, 4];
+	return all[1..3];
+}
+
+fn main() -> int
+{
+	return numbers().len - 2;
+}

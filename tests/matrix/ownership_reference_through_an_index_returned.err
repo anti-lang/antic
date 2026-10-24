@@ -1,0 +1,1 @@
+ownership_reference_through_an_index_returned.anti:8:9: error: a reference to `all` is returned, and `all` ends at line 9 [escaping-local]

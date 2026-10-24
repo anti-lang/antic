@@ -1,0 +1,19 @@
+//! The address of a field of a local struct outlives the local when the
+//! function returns it.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn address() -> *int
+{
+	let p = Point { x: 1, y: 2 };
+	return &p.y;
+}
+
+fn main() -> int
+{
+	return *address() - 2;
+}

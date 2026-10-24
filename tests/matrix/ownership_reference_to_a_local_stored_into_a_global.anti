@@ -1,0 +1,19 @@
+//! A static field is a global, which outlives every local, so the address of
+//! one is refused there.
+
+class Last
+{
+	pub static atomic seen: ?*int = none;
+}
+
+fn remember()
+{
+	let x = 5;
+	Last.seen.store(&x);
+}
+
+fn main() -> int
+{
+	remember();
+	return 0;
+}

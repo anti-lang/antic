@@ -19,7 +19,8 @@
    capture. sema_value.c holds the value rules: what a value owns, and
    when it moves, when it is copied and when a copy is refused.
    sema_safety.c checks the thread-safe classes and says which types are
-   thread-safe. sema_generic.c checks generics,
+   thread-safe. sema_escape.c refuses a reference to a local that would
+   outlive the local. sema_generic.c checks generics,
    and sema_copies.c compiles their copies. sema_hash.c checks hashing
    and the default `==`, and sema_pattern.c the pattern literals and
    their calls. sema_export.c checks what crosses to C and writes the
@@ -783,6 +784,14 @@ void sema_refuse_moved(struct checker *c, const struct expr *e,
 void sema_note_move(struct checker *c, const struct symbol *callee,
                     size_t index, const struct expr *receiver,
                     struct expr *arg);
+
+/* sema_escape.c */
+
+/* The safety check `escaping-local` over the body of it, which the
+   checker checked. It reads nothing when a diagnostic from index first
+   on is an error. */
+void sema_check_escapes(struct checker *c, const struct item *it,
+                        size_t first);
 
 /* sema_safety.c */
 

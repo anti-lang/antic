@@ -1,0 +1,13 @@
+//! A view by `as` of the address of a local is that address, which outlives the
+//! local when the function returns it.
+
+fn bytes() -> *byte
+{
+	let x = 5;
+	return &x as *byte;
+}
+
+fn main() -> int
+{
+	return *bytes() as int - 5;
+}

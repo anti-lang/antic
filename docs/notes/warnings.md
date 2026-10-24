@@ -43,12 +43,15 @@ under `--warnings-as-errors` and in a release build.
 `unguarded-field`, which reads the fields of a concurrent class, and
 `pattern.c` holds `exponential-pattern`, which `sema_check_pattern` runs on
 every pattern literal. `tests/programs/lock_free_queue.anti` and
-`tests/programs/pattern_literals.anti` overrule each.
+`tests/programs/pattern_literals.anti` overrule each. `sema_escape.c` holds
+`escaping-local`, a walk of every function body after the checker, and
+`tests/errors/escaping_local.anti` overrules it.
 
 | Name | Meaning | Fix |
 |---|---|---|
 | `unguarded-field` | A field of a concurrent class is not guarded, atomic or fixed. | Guard the field with `guarded by`, make it `atomic`, or fix it at construction. |
 | `exponential-pattern` | A pattern literal nests repeats over text that overlaps, which can take exponential time. | Use the possessive quantifiers or an atomic group, `a++` or `(?>...)`. |
+| `escaping-local` | A reference to a local or a parameter, or to a part of one, would outlive it: returned, yielded, stored outside its block, sent, dispatched or captured by a closure that leaves. | Give the value its own memory with `alloc` or `dup`, or keep the reference inside the block of its local. |
 
 ## Decided and not built
 
@@ -66,7 +69,6 @@ the name to `src/antic/warnings.c`.
 
 | Safety check | Meaning | Fix |
 |---|---|---|
-| `escaping-local` | A reference to a local or a parameter, or to a part of one, would outlive it: returned, yielded, stored outside its block, sent, dispatched or captured by a closure that leaves. | Give the value its own memory with `alloc` or `dup`, or keep the reference inside the block of its local. |
 | `use-after-free` | A value is used on a path after `delete`, `destroy` or a move of it. | Assign it a new value first, or use it before it dies. |
 | `uninitialized-read` | An element of `alloc(T, n)` is read before any path wrote it. | Write the element, or fill the whole range, before the read. |
 | `index-out-of-range` | An index is out of range on every turn or every path that reaches it. | Correct the bound, as `0..n` in place of `0..=n`. |

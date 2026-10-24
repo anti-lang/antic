@@ -1,0 +1,1 @@
+ownership_reference_to_a_parameter_returned.anti:6:9: error: a reference to `n` is returned, and `n` ends at line 7 [escaping-local]
