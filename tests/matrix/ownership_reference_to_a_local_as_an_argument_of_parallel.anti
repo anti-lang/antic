@@ -1,0 +1,33 @@
+//! `parallel` hands the arguments of its worker to other threads as well as its
+//! chunks, so the address of a local is refused as an argument.
+
+synchronized class Counter
+{
+	n: int = 0,
+
+	pub fn bump(self, by: int) -> int
+	{
+		self.n += by;
+		return self.n;
+	}
+}
+
+worker fn count(chunk: []int, c: *Counter) -> int
+{
+	return c.bump(chunk.len);
+}
+
+fn main() -> int
+{
+	let xs = alloc([4]int, 1) else {
+		return 1;
+	};
+	for i in 0..4 {
+		(*xs)[i] = i;
+	}
+	let c = Counter { };
+	let parts = parallel (*xs)[0..4] by 2 -> count(&c);
+	free(parts.ptr);
+	free(xs);
+	return 0;
+}
