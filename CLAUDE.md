@@ -202,6 +202,12 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite as `ctest -I 1,1150`, `ctest -I 1151,2250` and
   `ctest -I 2251,4945`: `asan` 266 s, 369 s and 351 s, `ubsan` 241 s,
   352 s and 269 s.
+  The step of the open findings of 2026-10-23 measured `host` as
+  `ctest -I 1,2100`, `ctest -I 2101,4300` and `ctest -I 4301,6400`:
+  406 s, 269 s and 305 s. It ran `asan` as `ctest -I 1,1150`,
+  `ctest -I 1151,2250`, `ctest -I 2251,4000` and `ctest -I 4001,6400`:
+  255 s, 201 s, 249 s and 563 s. It ran `ubsan` in the same parts, with
+  the last split at 5200: 250 s, 183 s, 208 s, 169 s and 343 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -224,10 +230,12 @@ not re-open a settled decision without asking Eddie.
   language feature and no new module or public item of the library. They
   get no new option and no new command either. A fix may add one only
   when the defect it fixes cannot be fixed without it. The commit and the
-  report then name the defect and say why. The ten cases of "Rules of
-  2026-10-13" that wait for Eddie stay as they are: R009, R017, R037,
-  R051, R054, R066, R074, R083, R100 and R134. So does the question of
-  R081, the finding T127. No step changes them or their tests. See
+  report then name the defect and say why. On 2026-10-18 Eddie answered
+  the ten cases of "Rules of 2026-10-13" that waited for him: R009, R017,
+  R037, R051, R054, R066, R074, R083, R100 and R134. He answered the
+  question of R081 as well. "Answers of 2026-10-18" in `docs/decisions.md`
+  holds the answers, the code builds them, and T127 is closed as no
+  defect. See
   "Feature freeze of 2026-10-14" in `docs/decisions.md`.
 - The gap procedure. Where a specification is silent, take the smallest option
   that keeps every struct C layout and the IR free of sizes. Record one
@@ -789,25 +797,26 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 4947 ctest tests pass on the development Mac, and two of them, the
+- 6362 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  374 of them are the expected failures of `tests/known-failures.txt`.
-  The ASan and the UBSan builds run 4945 each with the same skips, without
+  None of them is an expected failure there: the two lines of
+  `tests/known-failures.txt`, T136 and T138, carry `host=windows`. The
+  ASan and the UBSan builds run 6360 each with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
   shows a leak of antic under AddressSanitizer. `overview_examples` compiles every
   `anti` block of `docs/anti-syntax-overview.md` through the front end.
 - The rules of flow and of errors of 2026-10-13 are built, R001 to R025 of
-  "Rules of 2026-10-13" in `docs/decisions.md`, apart from R009 and R017,
-  which wait for Eddie. A `switch` whose every arm and `else` end the path
+  "Rules of 2026-10-13" in `docs/decisions.md`, R009 and R017 as
+  "Answers of 2026-10-18" gives them. A `switch` whose every arm and `else` end the path
   ends the path, and so does a `while true` without a `break` of its own.
   The handler of a `try` block takes `yield;`, and a `try` in the block
   forwards to it. An `undo` that cannot run is the warning
   `undo-never-runs` or refused. A `construct` that fails tears down what
   was built before it. `docs/reports/2026-10-13-rules-flow-errors.md`
   reports the step.
-- The rules of values and of constants are built, R026 to R047 apart from
-  R037, which waits for Eddie. A constant that leaves the range of its
+- The rules of values and of constants are built, R026 to R047, R037 as
+  "Answers of 2026-10-18" gives it. A constant that leaves the range of its
   type is refused: a narrowing `as`, a conversion to `char`, `+`, `-`, `*`
   and unary `-`, a shift by a count below zero and an index below zero on
   a fixed array. A dev build stops the least value divided by -1, unary
@@ -820,8 +829,8 @@ reports what it finished.
   constant parameter with its argument in place. R034 keeps the operator
   on a union. `docs/reports/2026-10-14-rules-values.md` and
   `docs/reports/2026-10-14-rules-values-2.md` report the two sessions.
-- The rules of types and of generics are built, R048 to R069 apart from
-  R051, R054 and R066, which wait for Eddie. A constant that does not fit
+- The rules of types and of generics are built, R048 to R069, R051, R054
+  and R066 as "Answers of 2026-10-18" gives them. A constant that does not fit
   the width of a bitfield is refused, a dev build stops any other value
   that does not fit, and `+|=` clamps at the width. `alloc(T, n)` of a
   type that `align(N)` raises above 16 takes aligned memory from
@@ -832,8 +841,8 @@ reports what it finished.
   `operator fn` whose type parameter no operand names is refused, and a
   generic call names the parameter whose shape an argument misses.
   `docs/reports/2026-10-14-rules-types.md` reports the step.
-- The rules of ownership are built, R070 to R085 apart from R074 and R083,
-  which wait for Eddie, and R081, which the expected failure T127 holds.
+- The rules of ownership are built, R070 to R085, R074, R081 and R083 as
+  "Answers of 2026-10-18" gives them.
   `delete(c)` tears down every value the channel still holds, the oldest
   first, through `anti_rt_chan_held` of the runtime. An array literal
   moves an owning local, as a tuple literal does. A use after a move into
@@ -851,7 +860,8 @@ reports what it finished.
   function of a thread-safe class stores no pointer into its fields
   outside the object. `docs/reports/2026-10-14-rules-threads.md` reports
   the step.
-- The rules of classes are built, R101 to R120. R100 waits for Eddie.
+- The rules of classes are built, R100 to R120, R100 as "Answers of
+  2026-10-18" gives it.
   An `operator fn eq` gives a `bool` and takes no class
   with a Mutex by value. The `construct` of a singleton takes no
   parameters, no class inherits a singleton, `dup` and `*` of one are
@@ -860,8 +870,8 @@ reports what it finished.
   `destroyed` has a teardown, so the hook runs at the end of every value.
   An abstract function takes `self`.
   `docs/reports/2026-10-14-rules-classes.md` reports the step.
-- The rules of modules and of C are built, R121 to R135. R134 waits for
-  Eddie. Two modules that import each other are refused with the cycle
+- The rules of modules and of C are built, R121 to R135, R134 as
+  "Answers of 2026-10-18" gives it. Two modules that import each other are refused with the cycle
   named. An `extern fn` takes C types alone, a function of the runtime
   apart, and one C function has one signature in a program. `c_long` and
   `c_ulong` are variadic arguments. `export` takes no `operator fn` and no
