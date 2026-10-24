@@ -1,0 +1,1 @@
+flow_paths_result_after_catch_handler.anti:24:4: error: `f` can reach its end without `return`

@@ -1,0 +1,37 @@
+//! C3 of the compile-time checks: the `else` of a `let` reaches its end without
+//! leaving. A call statement whose handler ends the path goes on when the call
+//! succeeds.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn stop(n: int) -> never
+{
+	exit(n as c_int);
+}
+
+fn f(p: ?*int, q: ?*int, n: int) -> int
+{
+	let w = q else {
+		value(n) catch failed {
+			return 0;
+		};
+	};
+	return *w;
+}
+
+fn main() -> int
+{
+	return 0;
+}

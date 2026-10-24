@@ -557,6 +557,8 @@ of lowering meet:
 | `flow_if_let_case_arms_all_return`, `flow_if_let_arms_all_return` | an `if let` whose arm and `else` return ends the path, on a case of a variant and on a `?T` | T007, the second |
 | `flow_switch_two_else`, `flow_switch_arm_not_statement`, `flow_for_step_not_integer`, `flow_for_range_not_integer` | four refusals of the parser and the checker | |
 | `flow_yield_needs_value`, `flow_yield_takes_no_value`, `flow_yield_outside_handler` | three refusals of `yield` | |
+| `flow_paths_<kind>_after_<way>`, 40 refusals | C3 of "Compile-time checks of 2026-10-20": a path that reaches its end without what its kind requires. The kinds are `result`, `may_fail`, `never`, `handler` of a value and `let_else`. The ways are `switch`, `loop`, `defer`, `undo`, `catch_handler`, `let_else`, `nested` and `combined` | |
+| `flow_paths_that_end_nested` | C3: the paths that end, nested and combined, for each kind, in all three modes | |
 
 The triples among them, each a rule that reads three things at once:
 

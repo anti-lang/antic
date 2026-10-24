@@ -1,0 +1,149 @@
+//! C3 of the compile-time checks: the paths that end, nested and combined, for
+//! each kind of function and handler. A handler of a value ends in a `while
+//! true` whose `yield` stands in an `if`, and in a `sync` block. The `else` of
+//! a `let` ends in a `switch` whose arms `fail` or call a function that never
+//! returns. A function with a result ends in an `if let` whose arm ends in a
+//! `switch` and whose `else` ends in a `while true`. A function that returns
+//! `never` ends in a `switch` on an enum. Each prints one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+enum Way
+{
+	Out,
+	Back,
+}
+
+class Guarded
+{
+	pub lock: Mutex,
+	pub hits: int,
+}
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn stop(n: int) -> never
+{
+	printf("never %d\n".ptr, n as c_int);
+	exit(0);
+}
+
+fn handler_forever(n: int) -> int
+{
+	let x = value(n) catch e {
+		let k = 0;
+		while true do {
+			k += 1;
+			if k == 3 {
+				yield k * 10;
+			}
+		}
+	};
+	return x;
+}
+
+fn handler_in_sync(g: *Guarded, n: int) -> int
+{
+	let x = value(n) catch e {
+		sync g.lock {
+			g.hits += 1;
+			yield 7;
+		}
+	};
+	return x;
+}
+
+fn let_else_in_switch(p: ?*int, n: int) -> int may fail
+{
+	let v = p else {
+		switch n {
+			1 => {
+				fail "one";
+			},
+			2 => stop(2),
+			else => {
+				if n > 5 {
+					fail "large";
+				} else {
+					fail "small";
+				}
+			},
+		}
+	};
+	while true do {
+		if *v > 3 {
+			return *v;
+		}
+		*v += 1;
+	}
+}
+
+fn result_in_if_let(o: ?int, n: int) -> int
+{
+	if let v = o {
+		switch v {
+			1 => {
+				return 10;
+			},
+			else => {
+				return v;
+			},
+		}
+	} else {
+		let k = n;
+		while true do {
+			if k > 2 {
+				return k;
+			}
+			k += 1;
+		}
+	}
+}
+
+fn never_on_an_enum(w: Way, n: int) -> never
+{
+	switch w {
+		Way.Out => {
+			stop(n);
+		},
+		Way.Back => {
+			while true do {
+				stop(n + 1);
+			}
+		},
+	}
+}
+
+fn main() -> int
+{
+	printf("handler forever %d %d\n".ptr, handler_forever(1) as c_int,
+		handler_forever(5) as c_int);
+	let g = Guarded { lock: Mutex.new(), hits: 0 };
+	let a = handler_in_sync(&g, 2);
+	let b = handler_in_sync(&g, 4);
+	printf("handler in sync %d %d %d\n".ptr, a as c_int, b as c_int,
+		g.hits as c_int);
+	let one = 1;
+	let given = let_else_in_switch(&one, 1) catch {
+		yield -1;
+	};
+	let failed = let_else_in_switch(none, 7) catch e {
+		printf("failed %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
+		yield -2;
+	};
+	printf("let else %d %d\n".ptr, given as c_int, failed as c_int);
+	let none_int: ?int = none;
+	printf("if let %d %d %d\n".ptr, result_in_if_let(1, 0) as c_int,
+		result_in_if_let(6, 0) as c_int, result_in_if_let(none_int, 0) as c_int);
+	never_on_an_enum(Way.Back, 4);
+}

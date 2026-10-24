@@ -1,0 +1,1 @@
+flow_paths_handler_after_switch.anti:25:19: error: the handler of a value can reach its end without `yield`

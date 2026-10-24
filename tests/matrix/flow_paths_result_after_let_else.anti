@@ -1,0 +1,34 @@
+//! C3 of the compile-time checks: a function with a result reaches its end
+//! without `return`. A `let` whose `else` leaves goes on with the value.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn stop(n: int) -> never
+{
+	exit(n as c_int);
+}
+
+fn f(p: ?*int, n: int) -> int
+{
+	let v = p else {
+		return 1;
+	};
+	printf("%d\n".ptr, *v as c_int);
+}
+
+fn main() -> int
+{
+	return 0;
+}

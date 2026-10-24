@@ -1,0 +1,1 @@
+flow_paths_never_after_combined.anti:24:4: error: `f` returns `never` and can reach its end

@@ -1,0 +1,1 @@
+flow_paths_let_else_after_catch_handler.anti:26:17: error: the `else` of a `let` leaves the block it stands in

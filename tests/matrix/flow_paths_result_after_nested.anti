@@ -1,0 +1,45 @@
+//! C3 of the compile-time checks: a function with a result reaches its end
+//! without `return`. An `if` without `else` deep inside branches that end the
+//! path.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn stop(n: int) -> never
+{
+	exit(n as c_int);
+}
+
+fn f(p: ?*int, n: int) -> int
+{
+	if n > 0 {
+		switch n {
+			1 => {
+				return 1;
+			},
+			else => {
+				if n > 5 {
+					return 1;
+				}
+			},
+		}
+	} else {
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

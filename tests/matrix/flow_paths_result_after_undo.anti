@@ -1,0 +1,37 @@
+//! C3 of the compile-time checks: a function with a result reaches its end
+//! without `return`. A `try` block with an `undo` ends where its handler does.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn stop(n: int) -> never
+{
+	exit(n as c_int);
+}
+
+fn f(p: ?*int, n: int) -> int
+{
+	try {
+		undo stop(n);
+		value(n);
+		return 1;
+	} catch {
+		printf("failed\n".ptr);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

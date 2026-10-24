@@ -1,0 +1,1 @@
+flow_paths_may_fail_after_combined.anti:24:4: error: `f` can reach its end without `return`

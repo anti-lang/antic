@@ -1,0 +1,41 @@
+//! C3 of the compile-time checks: a function that returns `never` reaches its
+//! end. A `switch` has an arm that reaches its end.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn stop(n: int) -> never
+{
+	exit(n as c_int);
+}
+
+fn f(p: ?*int, n: int) -> never
+{
+	switch n {
+		1 => {
+			stop(n);
+		},
+		2 => {
+			printf("two\n".ptr);
+		},
+		else => {
+			stop(n);
+		},
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

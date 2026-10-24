@@ -1,0 +1,44 @@
+//! C3 of the compile-time checks: the handler of a value reaches its end
+//! without `yield`. A `switch` has an arm that reaches its end.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n;
+}
+
+fn stop(n: int) -> never
+{
+	exit(n as c_int);
+}
+
+fn f(p: ?*int, n: int) -> int
+{
+	let x = value(n) catch e {
+		switch n {
+			1 => {
+				yield 1;
+			},
+			2 => {
+				printf("two\n".ptr);
+			},
+			else => {
+				yield 1;
+			},
+		}
+	};
+	return x;
+}
+
+fn main() -> int
+{
+	return 0;
+}
