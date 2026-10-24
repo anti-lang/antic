@@ -1,0 +1,42 @@
+//! Escaping-local passes a `yield` of a reference to a local declared outside
+//! the handler, which still lives where the value of the call is taken, and a
+//! collection of the same block that takes the address of a local, which ends
+//! with the local. Each prints the value it reads through the reference.
+
+import anti.collection.list;
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn failing() -> *int may fail
+{
+	fail "refused";
+}
+
+fn yielded() -> int
+{
+	let x = 5;
+	let p = failing() catch e {
+		yield &x;
+	};
+	return *p;
+}
+
+fn same_block() -> int
+{
+	let x = 7;
+	let all = list.List<*int>.new();
+	all.push(&x);
+	let total = 0;
+	for p in all {
+		total += *p;
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	printf("yield of an outer local: %d\n".ptr, yielded() as c_int);
+	printf("collection of the same block: %d\n".ptr, same_block() as c_int);
+	return 0;
+}
