@@ -1,0 +1,1 @@
+classes_super_of_a_base_that_is_no_class.anti:5:11: error: `Animal` is not a class

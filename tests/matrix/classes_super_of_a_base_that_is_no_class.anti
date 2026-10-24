@@ -1,0 +1,21 @@
+//! A class names a base that is no class, and a function reads a field and
+//! calls a function through `self.super`. antic refuses the base and nothing
+//! after it, since `self.super` has no type to check.
+
+class Dog inherits Animal
+{
+	fn legs(self) -> int
+	{
+		return self.super.legs;
+	}
+
+	fn sound(self) -> int
+	{
+		return self.super.sound();
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
