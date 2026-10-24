@@ -118,6 +118,7 @@ fn main() -> int
 
 	let factor = 3;
 	let values: [4]int = [1, 2, 3, 4];
+	unchecked(escaping-local, "until the step sweep")
 	let parts = parallel values[0..4] by 2 -> scaled(fn(x) { return x * factor; });
 	printf("%d %d\n".ptr, parts[0] as c_int, parts[1] as c_int);
 	free(parts.ptr);

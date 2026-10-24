@@ -23,6 +23,7 @@ worker fn sum(chunk: []int) -> int
 fn main() -> int
 {
 	let xs: [3]int = [100, 20, 3];
+	unchecked(escaping-local, "until the step sweep")
 	let parts = parallel xs[0..3] by 8 -> sum;
 	let total = 0;
 	for p in parts {

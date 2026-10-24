@@ -82,7 +82,9 @@ fn main() -> int
 	printf("back: equal %d, same hash %d\n".ptr, (a == b) as c_int,
 		(a.hash() == b.hash()) as c_int);
 
+	unchecked(escaping-local, "until the step sweep")
 	let there = dispatch &a -> compare(&b, ROUNDS);
+	unchecked(escaping-local, "until the step sweep")
 	let back = dispatch &b -> compare(&a, ROUNDS);
 	let met = join(there) + join(back);
 	printf("both orders: %d of %d equal\n".ptr, met as c_int,

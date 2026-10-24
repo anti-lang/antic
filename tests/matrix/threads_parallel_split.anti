@@ -38,27 +38,35 @@ fn main() -> int
 {
 	let items = [1, 2, 3, 4, 5, 6, 7];
 	let zero = 0;
+	unchecked(escaping-local, "until the step sweep")
 	let by_zero = parallel items[0..7] by zero -> count;
 	printf("by 0: %d elements\n".ptr, total(by_zero) as c_int);
 	free(by_zero.ptr);
+	unchecked(escaping-local, "until the step sweep")
 	let plain = parallel items[0..7] -> count;
 	printf("no by: %d elements\n".ptr, total(plain) as c_int);
 	free(plain.ptr);
+	unchecked(escaping-local, "until the step sweep")
 	let above = parallel items[0..7] by 20 -> count;
 	printf("by 20: %d chunks, %d elements\n".ptr, above.len as c_int, total(above) as c_int);
 	free(above.ptr);
+	unchecked(escaping-local, "until the step sweep")
 	let uneven = parallel items[0..7] by 3 -> count;
 	printf("by 3: %d %d %d\n".ptr, uneven[0] as c_int, uneven[1] as c_int, uneven[2] as c_int);
 	free(uneven.ptr);
+	unchecked(escaping-local, "until the step sweep")
 	let ordered = parallel items[0..7] by 3 -> first(100, 5);
 	printf("first of each: %d %d %d\n".ptr, ordered[0] as c_int, ordered[1] as c_int, ordered[2] as c_int);
 	free(ordered.ptr);
+	unchecked(escaping-local, "until the step sweep")
 	let empty = parallel items[0..0] by 3 -> count;
 	printf("empty: %d chunks\n".ptr, empty.len as c_int);
 	free(empty.ptr);
+	unchecked(escaping-local, "until the step sweep")
 	let one = parallel items[2..3] by 4 -> first(1, 0);
 	printf("one element: %d chunks, %d\n".ptr, one.len as c_int, one[0] as c_int);
 	free(one.ptr);
+	unchecked(escaping-local, "until the step sweep")
 	let written = parallel items[0..7] by 7 -> double;
 	printf("doubled: %d %d %d, %d chunks\n".ptr, items[0] as c_int, items[3] as c_int, items[6] as c_int,
 		written.len as c_int);

@@ -1148,8 +1148,10 @@ class Sprite
 {
 	pub x: int = 0,
 }
-let numbers: [8]int = [1, 2, 3, 4, 5, 6, 7, 8];
-let data = numbers[0..8];
+let room = alloc(int, 8) else {
+	return 1;
+};
+let data = []int { ptr: room, len: 8 };
 let sprite = alloc Sprite { };
 let frame = 1;
 ```

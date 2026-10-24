@@ -271,6 +271,7 @@ fn on_threads()
 		let handles: [8]Shared<Hits> = [first.share(), first.share(),
 			first.share(), first.share(), first.share(), first.share(),
 			first.share(), first.share()];
+		unchecked(escaping-local, "until the step sweep")
 		let parts = parallel handles[0..8] by 8 -> touch;
 		let n = 0;
 		for i in 0..parts.len {

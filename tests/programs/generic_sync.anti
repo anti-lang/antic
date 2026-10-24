@@ -109,6 +109,7 @@ fn main() -> int
 	free(parts.ptr);
 	let floats = alloc Tally<float>(0.5);
 	let halves: [4]float = [0.25, 0.25, 0.25, 0.25];
+	unchecked(escaping-local, "until the step sweep")
 	let more = parallel halves[0..4] by 2 -> fill<float>(floats);
 	free(more.ptr);
 	printf("%d %d %d %d\n".ptr, ints.total() as c_int, ints.count() as c_int,

@@ -65,6 +65,7 @@ fn main() -> int
 		}
 		let group = trace.Composite.new();
 		Shared.group.store(group);
+		unchecked(escaping-local, "until the step sweep")
 		let taken = parallel threads[0..THREADS] by THREADS -> add();
 		let total = 0;
 		for t in 0..THREADS {

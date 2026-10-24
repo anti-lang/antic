@@ -32,6 +32,7 @@ fn main() -> int
 {
 	let items = [1, 2, 3, 4];
 	let s = alloc Scale { };
+	unchecked(escaping-local, "until the step sweep")
 	let plain = parallel items[0..4] by 2 -> each(s.by);
 	printf("a function that captures nothing: %d %d\n".ptr, plain[0] as c_int, plain[1] as c_int);
 	free(plain.ptr);
@@ -40,6 +41,7 @@ fn main() -> int
 	s.set(snapshot fn(n) -> int {
 		return n * factor;
 	});
+	unchecked(escaping-local, "until the step sweep")
 	let copied = parallel items[0..4] by 2 -> each(s.by);
 	printf("a snapshot: %d %d\n".ptr, copied[0] as c_int, copied[1] as c_int);
 	free(copied.ptr);

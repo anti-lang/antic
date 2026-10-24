@@ -49,6 +49,7 @@ fn main() -> int
 		xs[i] = (i * 37) % 199;
 	}
 	let b = alloc Best { };
+	unchecked(escaping-local, "until the step sweep")
 	let parts = parallel xs[0..200] by 6 -> scan(b);
 	free(parts.ptr);
 	say(f"{b.get()}");

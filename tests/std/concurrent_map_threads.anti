@@ -128,6 +128,7 @@ fn main() -> int
 	for i in 0..KEYS {
 		(*keys)[i] = i;
 	}
+	unchecked(escaping-local, "until the step sweep")
 	let watcher = dispatch &m -> watch(20);
 	let wrongs = parallel (*keys)[0..KEYS] by 16 -> own_keys(&m);
 	let wrong = 0;

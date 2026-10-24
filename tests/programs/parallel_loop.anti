@@ -20,6 +20,7 @@ fn main() -> int
 	let last = 0;
 
 	while rounds < 1000 do {
+		unchecked(escaping-local, "until the step sweep")
 		let parts = parallel all by 4 -> total;
 		let sum = 0;
 		let i = 0;

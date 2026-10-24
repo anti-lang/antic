@@ -65,6 +65,7 @@ fn clean() -> int
 	let n = p.n;
 	free(p);
 	let numbers = [1, 2, 3, 4];
+	unchecked(escaping-local, "until the step sweep")
 	let parts = parallel numbers[0..4] by 2 -> total;
 	let sum = parts[0] + parts[1];
 	free(parts.ptr);

@@ -1129,6 +1129,9 @@ function(fuzz_statement out decl_out)
             fuzz_pick(chunks 1 2 3 4 8)
             fuzz_expr(k int 1)
             set(text "${t}{\n${t}\tlet ${a} = [${items}];\n")
+            # The step sweep of escaping-local decides the slice of a local
+            # array that `parallel` takes.
+            string(APPEND text "${t}\tunchecked(escaping-local, \"until the step sweep\")\n")
             string(APPEND text "${t}\tlet ${p} = parallel ${a}[0..8] by ${chunks} -> sum_${w}(${k});\n")
             string(APPEND text "${t}\tfor ${x} in ${p} {\n${t}\t\t${place} = ${place} +% ${x};\n${t}\t}\n")
             string(APPEND text "${t}\tfree(${p}.ptr);\n${t}}\n")
@@ -1145,6 +1148,9 @@ function(fuzz_statement out decl_out)
             fuzz_pick(chunks 1 2 4 8)
             fuzz_expr(k int 1)
             set(text "${t}{\n${t}\tlet ${tally} = alloc Tally { };\n${t}\tlet ${a} = [${items}];\n")
+            # The step sweep of escaping-local decides the slice of a local
+            # array that `parallel` takes.
+            string(APPEND text "${t}\tunchecked(escaping-local, \"until the step sweep\")\n")
             string(APPEND text "${t}\tlet ${p} = parallel ${a}[0..8] by ${chunks} -> tally_${w}(${tally}, ${k});\n")
             string(APPEND text "${t}\tfree(${p}.ptr);\n")
             string(APPEND text "${t}\t${place} = ${place} +% ${tally}.get();\n")

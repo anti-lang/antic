@@ -33,6 +33,7 @@ fn main() -> int
 	for i in 0..100 {
 		xs[i] = i;
 	}
+	unchecked(escaping-local, "until the step sweep")
 	let parts = parallel xs[0..100] by 5 -> count;
 	free(parts.ptr);
 	let before = Stats.seen.add(1000);

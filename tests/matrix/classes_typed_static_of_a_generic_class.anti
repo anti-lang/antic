@@ -12,6 +12,7 @@ class Box<T>
 fn main() -> int
 {
 	let n = 5;
+	unchecked(escaping-local, "until the step sweep")
 	Box<int>.last.store(&n);
 	let p = Box<int>.last.load();
 	if p != none {

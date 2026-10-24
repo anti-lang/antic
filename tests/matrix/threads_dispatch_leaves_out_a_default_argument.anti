@@ -37,6 +37,7 @@ fn main() -> int
 	delete(t);
 
 	let items = [1, 2, 3, 4];
+	unchecked(escaping-local, "until the step sweep")
 	let parts = parallel items[0..4] by 2 -> sum;
 	printf("parallel: %d %d\n".ptr, parts[0] as c_int, parts[1] as c_int);
 	free(parts.ptr);
