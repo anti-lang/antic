@@ -953,8 +953,10 @@ void sema_check_lock_order(struct checker *c)
     for (i = 0; i < w.fn_count; i++) {
         read_function(&w, i);
     }
-    takes = locks_taken(&w);
+    /* The edges of the libraries name their locks first, so the table
+       of the locks each function takes has a column for every lock. */
     library_edges(&w, &g);
+    takes = locks_taken(&w);
     site_edges(&w, takes, &g);
     if (g.count > 0) {
         qsort(g.edges, g.count, sizeof *g.edges, edge_order);
