@@ -1143,7 +1143,7 @@ class Vault
 	pub n: int = 0,
 }
 
-fn main() -> int
+fn main() -> int unchecked(lock-order, "until the step sweep")
 {
 	let x = alloc Account(100);
 	let y = alloc Account(100);
@@ -1191,7 +1191,7 @@ after pay: 120 80
 vault 4
 ```
 
-The test runs the release build, which prints the two lines alone. The program has one thread, so it cannot deadlock. It takes two pairs of locks in both orders all the same.
+The test runs the release build, which prints the two lines alone. The program has one thread, so it cannot deadlock. It takes two pairs of locks in both orders all the same. The safety check `lock-order` of the next section refuses the two orders of `v.a` and `v.b`, so the header of `main` overrules it.
 
 `anti run` builds the same file in dev mode as `src/main.anti` of a project. The run then writes two more lines to standard error.
 

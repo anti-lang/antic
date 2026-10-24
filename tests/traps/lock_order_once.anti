@@ -19,7 +19,7 @@ fn forward(l: *Locks)
 	}
 }
 
-fn backward(l: *Locks)
+fn backward(l: *Locks) unchecked(lock-order, "until the step sweep")
 {
 	sync l.b {
 		sync l.a {

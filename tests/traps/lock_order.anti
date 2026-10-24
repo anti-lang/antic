@@ -47,7 +47,7 @@ worker fn forward(t: *Task, box: *Box) -> int
 	return 0;
 }
 
-worker fn backward(t: *Task, box: *Box) -> int
+worker fn backward(t: *Task, box: *Box) -> int unchecked(lock-order, "until the step sweep")
 {
 	sync t.pair.b {
 		sync t.pair.a {
