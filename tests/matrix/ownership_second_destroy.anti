@@ -1,0 +1,18 @@
+//! A second `destroy` of one local runs its teardown twice.
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let t = Texture { id: 7 };
+	destroy(&t);
+	destroy(&t);
+	return 0;
+}

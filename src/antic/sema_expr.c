@@ -2024,10 +2024,6 @@ static struct type *check_name(struct checker *c, struct expr *e)
                       sym->moved_into->name.text);
         return sema_builtin(c, TYPE_ERROR);
     }
-    if (sym->moved) {
-        sema_refuse_moved(c, e, sym);
-        return sema_builtin(c, TYPE_ERROR);
-    }
     if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
         c->deferring > 0) {
         sym->deferred = true;

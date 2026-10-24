@@ -1,0 +1,19 @@
+//! A pointer given a new value at the start of the body and deleted at its end
+//! is alive in every turn. Its use after the loop is refused, since every path
+//! to it deleted it: the one before the loop and the last turn.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 0 };
+	delete(p);
+	for i in 0..3 {
+		p = alloc Node { n: i };
+		delete(p);
+	}
+	return p.n;
+}

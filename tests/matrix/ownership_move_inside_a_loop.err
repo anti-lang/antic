@@ -1,1 +1,1 @@
-ownership_move_inside_a_loop.anti:22:8: error: `a` moves into `take` inside a loop, which would move it again
+ownership_move_inside_a_loop.anti:22:8: error: `a` was moved into `take` on line 22 in the turn before [use-after-free]

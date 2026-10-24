@@ -37,6 +37,7 @@ static const struct name_entry NAMES[NAME_COUNT] = {
     [NAME_UNGUARDED_FIELD] = {"unguarded-field", KIND_SAFETY_CHECK},
     [NAME_EXPONENTIAL_PATTERN] = {"exponential-pattern", KIND_SAFETY_CHECK},
     [NAME_ESCAPING_LOCAL] = {"escaping-local", KIND_SAFETY_CHECK},
+    [NAME_USE_AFTER_FREE] = {"use-after-free", KIND_SAFETY_CHECK},
 };
 
 const char *warnings_name(enum diag_name name)

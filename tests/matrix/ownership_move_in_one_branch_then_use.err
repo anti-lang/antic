@@ -1,1 +1,1 @@
-ownership_move_in_one_branch_then_use.anti:23:9: error: `t` was moved into `take`
+ownership_move_in_one_branch_then_use.anti:23:9: error: `t` was moved into `take` on line 21 on one of the paths here [use-after-free]

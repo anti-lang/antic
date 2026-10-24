@@ -1,0 +1,1 @@
+ownership_index_after_destroy.anti:16:9: error: `all` was destroyed on line 15 [use-after-free]

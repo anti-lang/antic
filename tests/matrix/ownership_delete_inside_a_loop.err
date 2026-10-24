@@ -1,0 +1,1 @@
+ownership_delete_inside_a_loop.anti:14:12: error: `p` was deleted on line 15 in the turn before [use-after-free]

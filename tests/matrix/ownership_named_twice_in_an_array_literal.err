@@ -1,1 +1,1 @@
-ownership_named_twice_in_an_array_literal.anti:16:15: error: `a` was moved into `[2]Key`
+ownership_named_twice_in_an_array_literal.anti:16:15: error: `a` was moved into `[2]Key` on line 16 [use-after-free]

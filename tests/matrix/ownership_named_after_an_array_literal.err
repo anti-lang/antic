@@ -1,1 +1,1 @@
-ownership_named_after_an_array_literal.anti:17:9: error: `a` was moved into `[2]Key`
+ownership_named_after_an_array_literal.anti:17:9: error: `a` was moved into `[2]Key` on line 16 [use-after-free]

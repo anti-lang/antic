@@ -36,6 +36,12 @@ fn main() -> int
 	let all = [Slot.Empty; 2];
 	let box = Box { s: Slot.Empty };
 	let c = box.s;
+	return 0;
+}
+
+fn moved() -> int
+{
+	let a = Slot.Full { k: Key { } };
 	take(a);
 	let t = a.tag;
 	return 0;

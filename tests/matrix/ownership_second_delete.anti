@@ -1,0 +1,14 @@
+//! A second `delete` of one pointer frees the object twice.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	delete(p);
+	return 0;
+}

@@ -1487,5 +1487,6 @@ bool sema_check(struct module *module, const struct sema_inputs *in,
        entries all the same, as sema_leave_scope frees every other one. */
     free(c.module_scope.entries);
     free(c.module_scope.narrowed);
+    ptr_map_free(&c.moves);
     return c.ok;
 }

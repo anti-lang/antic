@@ -1,1 +1,1 @@
-ownership_named_after_a_move_a_class_with_a_destruct.anti:27:18: error: `a` was moved into `take`
+ownership_named_after_a_move_a_class_with_a_destruct.anti:27:18: error: `a` was moved into `take` on line 26 [use-after-free]

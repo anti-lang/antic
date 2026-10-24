@@ -1,7 +1,7 @@
 literal_moves.anti:26:10: error: `k` belongs to the caller and does not move. Mark it `own` to take it over, or copy it with `dup(k)`
-literal_moves.anti:33:11: error: `y` was moved into `(T, int)`
-literal_moves.anti:41:10: error: `k` was moved into `(Key, int)`
-literal_moves.anti:44:2: error: `j` was moved into `Pair`
-literal_moves.anti:47:12: error: `m` moves into `(Key, int)` inside a loop, which would move it again
-literal_moves.anti:51:11: error: `v` was moved into `Slot.Full`
-literal_moves.anti:53:14: error: `w` was moved into `(Key, Key)`
+literal_moves.anti:33:11: error: `y` was moved into `(T, int)` on line 32 [use-after-free]
+literal_moves.anti:41:10: error: `k` was moved into `(Key, int)` on line 40 [use-after-free]
+literal_moves.anti:44:2: error: `j` was moved into `Pair` on line 43 [use-after-free]
+literal_moves.anti:47:12: error: `m` was moved into `(Key, int)` on line 47 in the turn before [use-after-free]
+literal_moves.anti:51:11: error: `v` was moved into `Slot.Full` on line 50 [use-after-free]
+literal_moves.anti:53:14: error: `w` was moved into `(Key, Key)` on line 53 [use-after-free]

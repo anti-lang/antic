@@ -1,0 +1,14 @@
+//! A pointer read after `delete` of it. The object is freed, and the read would
+//! reach freed memory on every run.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	return p.n;
+}

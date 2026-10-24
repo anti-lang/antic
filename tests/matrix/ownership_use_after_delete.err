@@ -1,0 +1,1 @@
+ownership_use_after_delete.anti:13:9: error: `p` was deleted on line 12 [use-after-free]

@@ -797,9 +797,13 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
     const struct expr *target = s->as.assign.target;
     const struct expr *value = s->as.assign.value;
     bool handled = lower_is_handled_call(value) && value->as.call.out != NULL;
-    const struct struct_field *own = s->as.assign.op == TOKEN_ASSIGN
-                                         ? lower_own_field(target)
-                                         : NULL;
+    /* DESIGN: E2 of "Compile-time checks of 2026-10-20". An `own` field
+       of `self` that `delete`, `destroy` or a move left dead holds no
+       value, and `=` tears nothing down there. */
+    const struct struct_field *own =
+        s->as.assign.op == TOKEN_ASSIGN && !s->as.assign.tears_nothing
+            ? lower_own_field(target)
+            : NULL;
     struct place p;
     struct ir_operand old = lower_none();
     struct ir_operand v;

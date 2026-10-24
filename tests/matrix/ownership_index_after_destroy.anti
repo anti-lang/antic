@@ -1,0 +1,17 @@
+//! An element of an array of class values read after `destroy` of the array.
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let all = [Texture { id: 1 }, Texture { id: 2 }];
+	destroy(&all);
+	return all[0].id;
+}

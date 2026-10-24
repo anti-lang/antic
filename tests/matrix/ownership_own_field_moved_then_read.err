@@ -1,0 +1,1 @@
+ownership_own_field_moved_then_read.anti:20:10: error: `self.one` was moved into `take` on line 19 [use-after-free]

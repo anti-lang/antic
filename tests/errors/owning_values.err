@@ -6,5 +6,5 @@ owning_values.anti:43:6: error: `Pair` owns what its parts own, use `dup` instea
 owning_values.anti:45:10: error: `(Key, int)` owns what its parts own, use `dup` instead of `=`
 owning_values.anti:46:6: error: `(Key, int)` owns what its parts own, use `dup` instead of `=`
 owning_values.anti:47:13: error: `Pair` owns what its parts own, and the repeat form copies one value into every element
-owning_values.anti:49:10: error: `p` was moved into `take`
-owning_values.anti:51:9: error: `t` was moved into `take_tuple`
+owning_values.anti:56:10: error: `p` was moved into `take` on line 55 [use-after-free]
+owning_values.anti:58:9: error: `t` was moved into `take_tuple` on line 57 [use-after-free]

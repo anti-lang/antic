@@ -387,6 +387,56 @@ fn main() -> int
 
 The check refuses what it proves. A reference stored into memory the function allocated, or behind a pointer the function read, keeps the run-time checks of dev mode and `--memory-checks`. The function cannot see when that memory ends. `unchecked(escaping-local, "reason")` overrules the check.
 
+### Uses after the end
+
+`delete` and `destroy` end a local or a parameter, and so does a move of it. The safety check `use-after-free` follows the paths of the function. On a path after the end it refuses a read, a field access, a call through the value, an index, a second `delete` or `destroy` and a move. An assignment of a new value makes the value alive again. A value dead on one of the paths into a join is dead after the join. A loop that ends a value declared before it must give it a new value before the end of its body, or the next turn is refused. The message names the value, the line where it ended and how.
+
+```anti refused
+//! error: `p` was deleted on line 10 [use-after-free]
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	return p.n;
+}
+```
+
+An `own` field of `self` follows the same rule within one function. After `delete(self.one)` the field is dead until `=` gives it a new value, and that `=` frees nothing, since the old object is gone already. `destroy` leaves the memory where it was, so `free(p)` and a view of `p` as `*byte` after it give the memory back.
+
+```anti
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: *Node,
+
+	pub fn renew(self, n: int)
+	{
+		delete(self.one);
+		self.one = alloc Node { n: n };
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { one: alloc Node { n: 1 } };
+	b.renew(2);
+	let n = b.one.n;
+	delete(b);
+	return n - 2;
+}
+```
+
+The check refuses what it proves. Two places may hold one object, and one may free it while the other keeps its pointer. `--memory-checks` and the versions of a `Pool` find that at run time. `unchecked(use-after-free, "reason")` overrules the check.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -397,7 +447,7 @@ For a Java programmer:
 For a C programmer:
 
 - `own` frees with the object. A `free` of the same field in `destruct` frees it twice. Memory that a class gives back its own way, with `fclose` or a function of a library, stands in a field without `own`.
-- `=` to an `own` field frees what the field held. A `delete` or a `free` of the old value before the `=` frees it twice.
+- `=` to an `own` field frees what the field held. After a `delete` of an `own` field of `self`, the `=` frees nothing. Through any other object, a `delete` or a `free` of the old value before the `=` frees it twice.
 - An `own` field takes memory of `alloc`. The address of a local stored there compiles, and the teardown frees a stack address.
 - A `lent` parameter cannot be saved for later, not even in a local of the plain pointer type.
 
@@ -423,15 +473,14 @@ A value that owns nothing is copied by `=` and `let`, byte for byte. A value tha
 - A fresh value moves. A literal, a call result and the result of `dup` have no other owner. A `let`, an `=`, a `return` and an argument therefore take them without a copy of what they own.
 - `dup` copies. `dup(x)` of a value gives a value. For a pointer to a class, `dup(p)` gives a new object on the heap and a pointer to it. Each `own` field of the copy gets memory of its own, and a class value held inline copies itself the same way. Other pointer fields copy the address. `dup` of a value that owns nothing gives its bytes.
 
-A local moves in four places. It moves as an argument of an `own` parameter and as a part of a tuple, struct, class or variant literal. It moves by `return` and by `destroy(&x)`. After a move the name is dead. The checker refuses every mention that follows the move in the text, an assignment to the name included.
+A local moves in four places. It moves as an argument of an `own` parameter and as a part of a tuple, struct, class or variant literal. It moves by `return` and by `destroy(&x)`. After a move the name is dead on that path. The safety check `use-after-free` follows the paths of the function and refuses a use of the name on a path after the move, until an assignment gives it a new value. A local dead on one of the paths into a join, the end of an `if` among them, is dead after the join. A loop that moves a local declared before it must give the local a new value before the end of its body, or the use in the next turn is refused.
 
-The order of the text is the order of execution except in three cases, and the checker refuses the move in each.
+Two cases run code after the move that the paths do not show, and the checker refuses the move in each.
 
-- A move inside a loop that began after the `let` would run again.
 - A `defer` or an `undo` that names the local runs after the move.
 - A closure that captured the local may read it after the move.
 
-A move on one path of an `if` is accepted. The local is then dead after the `if` on both paths. The code tears it down at the end of its block only when it did not move.
+A move on one path of an `if` is accepted, and so is a move on each path. The code tears the local down at the end of its block only when it did not move.
 
 What moves at an `own` parameter follows the type. A value that owns something moves. So does a value that holds a pointer, such as a `*T`, a slice or a struct with a pointer field. An `int`, a `str` and a struct of numbers are copied, and the caller keeps its local. A value that stays where it is, a field or an element, does not move, and the checker asks for `dup`.
 
@@ -550,7 +599,7 @@ fn main() -> int
 ```
 
 ```anti refused
-//! error: `a` was moved into `take`
+//! error: `a` was moved into `take` on line 14 [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
@@ -569,8 +618,9 @@ fn main() -> int
 }
 ```
 
-```anti refused
-//! error: `a` was moved into `take`
+The checker accepts each of the following. An assignment gives a moved local a new value, and the local is alive again. A move on each path of an `if` moves the local once on every path.
+
+```anti
 class Box
 {
 	pub own data: ?*int = none,
@@ -586,12 +636,11 @@ fn main() -> int
 	let a = Box { };
 	take(a);
 	a = Box { n: 2 };
-	return 0;
+	return a.n - 2;
 }
 ```
 
-```anti refused
-//! error: `a` was moved into `take`
+```anti
 class Box
 {
 	pub own data: ?*int = none,
@@ -614,10 +663,10 @@ fn main() -> int
 }
 ```
 
-The last block moves `a` on both paths. The second `take(a)` follows the first in the text, so the checker refuses it. The accepted form moves once, after the `if`.
+The checker refuses each of the following.
 
 ```anti refused
-//! error: `a` moves into `take` inside a loop, which would move it again
+//! error: `a` was moved into `take` on line 14 in the turn before [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
@@ -684,7 +733,7 @@ fn main() -> int
 ```
 
 ```anti refused
-//! error: `p` was moved into `end`
+//! error: `p` was moved into `end` on line 15 [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
@@ -705,7 +754,7 @@ fn main() -> int
 ```
 
 ```anti refused
-//! error: `a` was moved into `Pair`
+//! error: `a` was moved into `Pair` on line 16 [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
@@ -912,8 +961,7 @@ For a C programmer:
 For a C++ programmer:
 
 - A move is not a member function. No move constructor runs, and a class cannot replace what a move does.
-- A moved local is not reusable. An assignment to it after the move is refused, where C++ accepts one.
-- A move on both paths of an `if` is refused. The move is written once, after the `if`.
+- A moved local is dead until an assignment gives it a new value, as in C++. A use before that assignment is refused, where C++ reads the moved-from object.
 - No copy constructor runs by itself. Every copy of an owning value stands in the source as `dup`.
 - A class replaces the copy with `concrete fn copy(self, to: *Object)`, which fills `to` and allocates no object.
 
@@ -1083,7 +1131,7 @@ end of main
 The checker refuses each of the following.
 
 ```anti refused
-//! error: `k` was moved into `destroy`
+//! error: `k` was destroyed on line 14 [use-after-free]
 class Res
 {
 	pub n: int = 0,
@@ -1504,7 +1552,7 @@ fn hand_on(b: Box)
 ```
 
 ```anti refused
-//! error: `b` was moved into `take`
+//! error: `b` was moved into `take` on line 12 [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
@@ -1522,7 +1570,7 @@ fn twice(own b: Box)
 ```
 
 ```anti refused
-//! error: `b` was moved into `c`
+//! error: `b` was moved into `c` on line 10 [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
@@ -1554,7 +1602,7 @@ fn from_pointer(p: *Box)
 ```
 
 ```anti refused
-//! error: `xs` was moved into `total`
+//! error: `xs` was moved into `total` on line 11 [use-after-free]
 fn total(own xs: []int) -> int
 {
 	return xs.len;

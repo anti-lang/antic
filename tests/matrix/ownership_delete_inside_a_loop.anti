@@ -1,0 +1,18 @@
+//! A pointer declared before a loop and deleted in its body, which does not
+//! give it a new value. The next turn would read the freed object.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	let total = 0;
+	for i in 0..3 {
+		total += p.n + i;
+		delete(p);
+	}
+	return total;
+}

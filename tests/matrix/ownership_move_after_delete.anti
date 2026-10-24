@@ -1,0 +1,20 @@
+//! A pointer moved into an `own` parameter after `delete` of it. The function
+//! would take over an object that is freed.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn take(own p: *Node)
+{
+	delete(p);
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	take(p);
+	return 0;
+}

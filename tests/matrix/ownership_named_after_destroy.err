@@ -1,1 +1,1 @@
-ownership_named_after_destroy.anti:22:9: error: `a` was moved into `destroy`
+ownership_named_after_destroy.anti:22:9: error: `a` was destroyed on line 21 [use-after-free]

@@ -1,0 +1,21 @@
+//! A pointer read after it moved into an `own` field. The field owns the object
+//! now, and the delete of its holder frees it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let p = alloc Node { n: 1 };
+	b.one = p;
+	delete(b);
+	return p.n;
+}

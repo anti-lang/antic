@@ -1,0 +1,169 @@
+//! The uses that the safety check `use-after-free` allows. A value given a new
+//! value after it died is alive again, on every path and in every turn that
+//! gives it one. A path that ends after the death leaves the value alive on the
+//! others, and a value that died in one branch and got a new value there is
+//! alive after the join. A value moved in one branch is read in the other. An
+//! `own` field of `self` given a new value after `delete` of it is alive, and
+//! the assignment tears nothing down, so each key is torn down once, in a class
+//! and in a copy of a generic class. Each key prints its teardown.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("  teardown of key %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Box
+{
+	pub own one: *Key,
+
+	pub fn renew(self, n: int)
+	{
+		delete(self.one);
+		self.one = alloc Key { n: n };
+	}
+}
+
+class Shelf<T>
+{
+	pub own one: *Key,
+	pub extra: T,
+
+	pub fn renew(self, n: int)
+	{
+		delete(self.one);
+		self.one = alloc Key { n: n };
+	}
+}
+
+fn take(own k: *Key)
+{
+	delete(k);
+}
+
+fn keep(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn assigned_again()
+{
+	let p = alloc Key { n: 1 };
+	delete(p);
+	p = alloc Key { n: 2 };
+	printf("assigned again: %d\n".ptr, p.n as c_int);
+	delete(p);
+}
+
+fn moved_and_assigned_again()
+{
+	let p = alloc Key { n: 3 };
+	take(p);
+	p = alloc Key { n: 4 };
+	printf("moved and assigned again: %d\n".ptr, p.n as c_int);
+	take(p);
+}
+
+fn a_path_that_ends(early: bool)
+{
+	let p = alloc Key { n: 5 };
+	if early {
+		delete(p);
+		printf("a path that ends early\n".ptr);
+		return;
+	}
+	printf("a path that goes on: %d\n".ptr, p.n as c_int);
+	delete(p);
+}
+
+fn dead_in_a_branch_and_alive_again(again: bool)
+{
+	let p = alloc Key { n: 6 };
+	if again {
+		delete(p);
+		p = alloc Key { n: 7 };
+	}
+	printf("alive after the join: %d\n".ptr, p.n as c_int);
+	delete(p);
+}
+
+fn moved_in_one_branch_and_read_in_the_other(moving: bool)
+{
+	let k = Key { n: 8 };
+	if moving {
+		keep(k);
+		printf("moved in one branch\n".ptr);
+	} else {
+		printf("read in the other: %d\n".ptr, k.n as c_int);
+	}
+}
+
+fn assigned_again_in_each_turn()
+{
+	let p = alloc Key { n: 10 };
+	for i in 0..3 {
+		printf("turn %d: %d\n".ptr, i as c_int, p.n as c_int);
+		delete(p);
+		p = alloc Key { n: 11 + i };
+	}
+	delete(p);
+}
+
+fn moved_in_each_turn()
+{
+	let k = Key { n: 20 };
+	for i in 0..2 {
+		keep(k);
+		k = Key { n: 21 + i };
+	}
+}
+
+fn a_turn_that_leaves()
+{
+	let p = alloc Key { n: 30 };
+	while true do {
+		delete(p);
+		break;
+	}
+	printf("left the loop\n".ptr);
+}
+
+fn own_field_given_a_new_value()
+{
+	let b = alloc Box { one: alloc Key { n: 40 } };
+	b.renew(41);
+	printf("own field: %d\n".ptr, b.one.n as c_int);
+	delete(b);
+}
+
+fn own_field_of_a_generic_class()
+{
+	let s = alloc Shelf<int> { one: alloc Key { n: 50 }, extra: 0 };
+	s.renew(51);
+	printf("own field of a generic class: %d\n".ptr, s.one.n as c_int);
+	delete(s);
+}
+
+fn main() -> int
+{
+	assigned_again();
+	moved_and_assigned_again();
+	a_path_that_ends(true);
+	a_path_that_ends(false);
+	dead_in_a_branch_and_alive_again(true);
+	dead_in_a_branch_and_alive_again(false);
+	moved_in_one_branch_and_read_in_the_other(true);
+	moved_in_one_branch_and_read_in_the_other(false);
+	assigned_again_in_each_turn();
+	moved_in_each_turn();
+	a_turn_that_leaves();
+	own_field_given_a_new_value();
+	own_field_of_a_generic_class();
+	return 0;
+}

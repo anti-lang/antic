@@ -1,0 +1,37 @@
+//! The safety check `use-after-free` stops a dev build as it stops a release
+//! build, and `unchecked(use-after-free, "reason")` overrules it before a
+//! statement and last in the header of a function.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn statement() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	unchecked(use-after-free, "the test copies the address alone")
+	let address = p;
+	return 0;
+}
+
+fn function() -> int unchecked(use-after-free, "the test copies the address alone")
+{
+	let p = alloc Node { n: 2 };
+	delete(p);
+	let address = p;
+	return 0;
+}
+
+fn refused() -> int
+{
+	let p = alloc Node { n: 3 };
+	delete(p);
+	return p.n;
+}
+
+fn main() -> int
+{
+	return statement() + function() + refused();
+}

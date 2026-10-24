@@ -130,21 +130,17 @@ struct symbol {
     bool deferred;
     /* A `keep own` parameter that moved into an owner. */
     bool snapshot_moved;
-    /* Where the symbol moved: a `keep own` parameter into an owner, and
-       a local or a parameter by the moves of `moved` below. */
+    /* Where a `keep own` parameter moved into an owner. */
     struct pos moved_at;
     /* DESIGN: a local or a parameter that moved into an `own` parameter,
-       or an `own` parameter that moved on by `=` or `let`. It is not
-       named after the move in the order of the text. moved_by names the
-       function it moved into and moved_to the object of that call, or
-       the place `=` wrote, and either may be empty. Lowering tears such
-       a local down only when its table is not zero, since the move
-       clears it and a move may stand on one path alone. */
+       or an `own` parameter that moved on by `=` or `let`, on some path.
+       The safety check `use-after-free` refuses a use of it on a path
+       after the move. Lowering tears such a local down only when its
+       table is not zero, since the move clears it and a move may stand
+       on one path alone. */
     bool moved;
-    struct name moved_to;
-    struct name moved_by;
-    /* The loops around the declaration of a local, which a move inside a
-       deeper one would repeat. */
+    /* The loops around the declaration of a local, which the checks of
+       the next turn of a loop read. */
     int loops;
     /* A local or a parameter that a closure captures. */
     bool captured;

@@ -1,0 +1,1 @@
+ownership_use_after_a_move_into_a_local.anti:15:9: error: `t` was moved into `held` on line 14 [use-after-free]

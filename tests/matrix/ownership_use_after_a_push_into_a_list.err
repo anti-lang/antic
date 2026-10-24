@@ -1,1 +1,1 @@
-ownership_use_after_a_push_into_a_list.anti:21:9: error: `t` was moved into `all` by `push`
+ownership_use_after_a_push_into_a_list.anti:21:9: error: `t` was moved into `all` by `push` on line 20 [use-after-free]

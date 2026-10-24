@@ -74,6 +74,7 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/sema_declare.c` | Every pass that declares the items of a module, with the checks of `provides`, `link` and a simd struct. |
 | `src/antic/sema_doc.c` | The doc warnings of `anti check`, reading the module alone. |
 | `src/antic/sema_escape.c` | The safety check `escaping-local`: a walk of a checked body that follows each reference to a local and refuses one that would outlive it. |
+| `src/antic/sema_free.c` | The safety check `use-after-free`: a walk of the paths of a checked body that refuses a use of a value after `delete`, `destroy` or a move of it. |
 | `src/antic/sema_export.c` | The checks of what crosses to C, export items and the pointers of an `extern fn`, and the interface of a checked module. |
 | `src/antic/sema_expr.c` | Checks expressions and the conversions a value makes where it stands, and dispatches over the kinds of expression. |
 | `src/antic/sema_generic.c` | The generics of the checker: type parameters, constraints, aliases, the copies of generic types, substitution and inference, and the strip of generics before the later passes. |

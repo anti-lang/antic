@@ -1,0 +1,38 @@
+exit 0
+  teardown of key 1
+assigned again: 2
+  teardown of key 2
+  teardown of key 3
+moved and assigned again: 4
+  teardown of key 4
+  teardown of key 5
+a path that ends early
+a path that goes on: 5
+  teardown of key 5
+  teardown of key 6
+alive after the join: 7
+  teardown of key 7
+alive after the join: 6
+  teardown of key 6
+  teardown of key 8
+moved in one branch
+read in the other: 8
+  teardown of key 8
+turn 0: 10
+  teardown of key 10
+turn 1: 11
+  teardown of key 11
+turn 2: 12
+  teardown of key 12
+  teardown of key 13
+  teardown of key 20
+  teardown of key 21
+  teardown of key 22
+  teardown of key 30
+left the loop
+  teardown of key 40
+own field: 41
+  teardown of key 41
+  teardown of key 50
+own field of a generic class: 51
+  teardown of key 51

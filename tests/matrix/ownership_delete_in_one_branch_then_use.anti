@@ -1,0 +1,16 @@
+//! A pointer deleted in one branch of an `if` and read after it. The value is
+//! dead on one of the two paths into the join, so it is dead after it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main(args: []str) -> int
+{
+	let p = alloc Node { n: 1 };
+	if args.len > 1 {
+		delete(p);
+	}
+	return p.n;
+}

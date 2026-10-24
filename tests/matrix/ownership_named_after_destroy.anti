@@ -1,5 +1,5 @@
-//! A local named after `destroy(&a)`. `destroy` of a local counts as a move:
-//! the value is torn down, and the block tears it down no more.
+//! A local named after `destroy(&a)`. `destroy` of a local ends it: the value
+//! is torn down, and the block tears it down no more.
 
 class Key
 {

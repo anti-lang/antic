@@ -1,0 +1,1 @@
+ownership_use_after_a_move_of_a_pointer.anti:18:9: error: `p` was moved into `take` on line 17 [use-after-free]

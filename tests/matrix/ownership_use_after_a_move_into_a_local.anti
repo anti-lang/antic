@@ -1,0 +1,21 @@
+//! An `own` parameter read after `let` moved it into a local.
+
+class Texture
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn keep(own t: Texture) -> int
+{
+	let held = t;
+	return t.id + held.id;
+}
+
+fn main() -> int
+{
+	return keep(Texture { id: 7 });
+}

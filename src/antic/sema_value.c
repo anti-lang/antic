@@ -523,32 +523,6 @@ void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
     }
 }
 
-/* Refuse the name e of sym, which moved before it in the order of the
-   text. The message names the place the value moved into and the
-   function that took it. A move into a place without a name, the
-   `*slot(to)` of `*slot(to) = b`, names its line, by R082 of "Rules of
-   2026-10-13". */
-void sema_refuse_moved(struct checker *c, const struct expr *e,
-                         const struct symbol *sym)
-{
-    if (sym->moved_by.length > 0 && sym->moved_to.length > 0) {
-        sema_error_at(c, e->pos, "`%.*s` was moved into `%.*s` by `%.*s`",
-                      (int)e->as.name.length, e->as.name.text,
-                      (int)sym->moved_to.length, sym->moved_to.text,
-                      (int)sym->moved_by.length, sym->moved_by.text);
-    } else if (sym->moved_by.length == 0 && sym->moved_to.length == 0) {
-        sema_error_at(c, e->pos, "`%.*s` was moved on line %u",
-                      (int)e->as.name.length, e->as.name.text,
-                      (unsigned)sym->moved_at.line);
-    } else {
-        const struct name *to = sym->moved_by.length > 0 ? &sym->moved_by
-                                                         : &sym->moved_to;
-        sema_error_at(c, e->pos, "`%.*s` was moved into `%.*s`",
-                      (int)e->as.name.length, e->as.name.text,
-                      (int)to->length, to->text);
-    }
-}
-
 /* Whether a value of t may own something in a copy of a generic: a type
    parameter, or a value that holds one in place. A pointer or a slice
    to one owns nothing. */
@@ -648,10 +622,6 @@ void sema_move_into_literal(struct checker *c, struct expr *value,
     if (!sema_literal_moves(value)) {
         return;
     }
-    if (value->symbol->moved) {
-        sema_refuse_moved(c, value, value->symbol);
-        return;
-    }
     length = strlen(literal);
     text = types_alloc_array(c->arena, length + 1, 1);
     memcpy(text, literal, length + 1);
@@ -702,20 +672,22 @@ static struct name bare_name(const struct symbol *sym)
 }
 
 /* DESIGN: a local passed to an `own` parameter moves, and so does an
-   `own` parameter that `=` or `let` stores. The local is not named after
-   the move, so the checker refuses a mention after it in the order of
-   the text. That order is the order of execution unless a loop repeats
-   the move, a `defer` or an `undo` that names the local runs at an exit
-   after it, or a closure that captures it runs later. All three are
-   refused, and so is a move inside a closure, which may run more than
-   once. A parameter that is not `own` belongs to the caller, so one
-   whose value may own memory does not move, as
-   `sema_refuse_caller_value` says. Returns whether e moved. */
+   `own` parameter that `=` or `let` stores. The checker marks the move
+   and notes where it went. The safety check `use-after-free` follows
+   the paths of the body and refuses a use of the local after the move,
+   in the next turn of a loop among them, until a new value. A `defer` or
+   an `undo` that names the local runs at an exit after the move, and a
+   closure that captures it may run later, so both are refused, and so
+   is a move inside a closure, which may run more than once. A parameter
+   that is not `own` belongs to the caller, so one whose value may own
+   memory does not move, as `sema_refuse_caller_value` says. Returns
+   whether e moved. */
 bool sema_move_local(struct checker *c, struct expr *e,
                      const struct name *into, const struct name *by)
 {
     struct symbol *sym = e->symbol;
     const struct name *target = by->length > 0 ? by : into;
+    struct move_note *note;
 
     if (c->ctx.quiet > 0) {
         return true;
@@ -733,12 +705,6 @@ bool sema_move_local(struct checker *c, struct expr *e,
                       (int)target->length, target->text);
         return false;
     }
-    if (c->loop_depth > sym->loops) {
-        sema_error_at(c, e->pos, "`%.*s` moves into `%.*s` inside a loop, "
-                      "which would move it again", (int)sym->name.length,
-                      sym->name.text, (int)target->length, target->text);
-        return false;
-    }
     if (sym->deferred) {
         sema_error_at(c, e->pos, "`%.*s` moves into `%.*s` while a `defer` or "
                       "an `undo` names it", (int)sym->name.length,
@@ -748,11 +714,12 @@ bool sema_move_local(struct checker *c, struct expr *e,
     if (sema_refuse_caller_value(c, e)) {
         return false;
     }
+    note = arena_alloc(c->arena, sizeof *note);
+    note->into = *into;
+    note->by = *by;
+    ptr_map_put(&c->moves, e, note);
     e->moves = true;
     sym->moved = true;
-    sym->moved_at = e->pos;
-    sym->moved_to = *into;
-    sym->moved_by = *by;
     return true;
 }
 

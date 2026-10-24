@@ -786,8 +786,6 @@ static void io_sym_body(struct io *io, struct symbol *s)
     io_bool(io, &s->snapshot_moved);
     io_pos(io, &s->moved_at);
     io_bool(io, &s->moved);
-    io_name(io, &s->moved_to);
-    io_name(io, &s->moved_by);
     io_int(io, &s->loops);
     io_bool(io, &s->captured);
     io_bool(io, &s->own_param);
@@ -1170,6 +1168,7 @@ static void io_stmt_body(struct io *io, struct stmt *s)
         io_token(io, &s->as.assign.op);
         io_expr(io, &s->as.assign.target);
         io_expr(io, &s->as.assign.value);
+        io_bool(io, &s->as.assign.tears_nothing);
         break;
     case STMT_IF:
         array = s->as.if_chain.branches;

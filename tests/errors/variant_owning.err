@@ -3,4 +3,4 @@ variant_owning.anti:34:10: error: `Slot` owns what its parts own, use `dup` inst
 variant_owning.anti:35:6: error: `Slot` owns what its parts own, use `dup` instead of `=`
 variant_owning.anti:36:13: error: `Slot` owns what its parts own, and the repeat form copies one value into every element
 variant_owning.anti:38:10: error: `Slot` owns what its parts own, use `dup` instead of `=`
-variant_owning.anti:40:10: error: `a` was moved into `take`
+variant_owning.anti:46:10: error: `a` was moved into `take` on line 45 [use-after-free]

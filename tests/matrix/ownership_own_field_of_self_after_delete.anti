@@ -1,0 +1,24 @@
+//! An `own` field of `self` read after `delete` of it, before it is given a new
+//! value.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: *Node,
+
+	pub fn clear(self) -> int
+	{
+		delete(self.one);
+		return self.one.n;
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { one: alloc Node { n: 1 } };
+	return b.clear();
+}

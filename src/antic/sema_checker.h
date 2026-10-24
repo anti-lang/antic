@@ -20,7 +20,8 @@
    when it moves, when it is copied and when a copy is refused.
    sema_safety.c checks the thread-safe classes and says which types are
    thread-safe. sema_escape.c refuses a reference to a local that would
-   outlive the local. sema_generic.c checks generics,
+   outlive the local, and sema_free.c a use of a value on a path after
+   `delete`, `destroy` or a move of it. sema_generic.c checks generics,
    and sema_copies.c compiles their copies. sema_hash.c checks hashing
    and the default `==`, and sema_pattern.c the pattern literals and
    their calls. sema_export.c checks what crosses to C and writes the
@@ -141,6 +142,13 @@ struct handler_state {
     bool of_try;            /* the handler of a `try` block */
 };
 
+/* The place and the function of a move the checker marked, which the
+   message of the safety check `use-after-free` names. */
+struct move_note {
+    struct name into;
+    struct name by;
+};
+
 struct checker {
     struct types *types;
     struct arena *arena;
@@ -152,6 +160,8 @@ struct checker {
     size_t library_count;
     struct scope module_scope;
     struct context ctx;         /* written by sema_enter and sema_leave */
+    /* The move_note of each name the checker marked as moving. */
+    struct ptr_map moves;
     int loop_depth;
     /* The loops around the statement checked now, outermost first, as
        far as LOOPS_OPEN_MAX. */
@@ -774,10 +784,6 @@ void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
    the place it lives in. */
 void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
                                  const struct type *t);
-/* Refuse the name e of sym, which moved before it in the order of the
-   text. */
-void sema_refuse_moved(struct checker *c, const struct expr *e,
-                       const struct symbol *sym);
 /* The move of arg, argument index of a call of callee, into an `own`
    parameter. receiver is the object of a call of a function of a class,
    or NULL. */
@@ -792,6 +798,14 @@ void sema_note_move(struct checker *c, const struct symbol *callee,
    on is an error. */
 void sema_check_escapes(struct checker *c, const struct item *it,
                         size_t first);
+
+/* sema_free.c */
+
+/* The safety check `use-after-free` over the body of it, which the
+   checker checked. It reads nothing when a diagnostic from index first
+   on is an error of the checker. */
+void sema_check_frees(struct checker *c, const struct item *it,
+                      size_t first);
 
 /* sema_safety.c */
 

@@ -653,6 +653,10 @@ struct stmt {
             enum token_kind op;     /* TOKEN_ASSIGN or a compound op */
             struct expr *target;
             struct expr *value;
+            /* `=` to an `own` field of `self` that `delete`, `destroy` or
+               a move left dead on a path, which tears nothing down. Set
+               by the safety check `use-after-free`. */
+            bool tears_nothing;
         } assign;
         struct {
             struct if_branch *branches;

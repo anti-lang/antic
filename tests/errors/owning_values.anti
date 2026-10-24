@@ -45,6 +45,13 @@ fn main() -> int
 	let u = t;
 	u = t;
 	let all = [Pair { k: Key { }, n: 1 }; 2];
+	return 0;
+}
+
+fn moved() -> int
+{
+	let p = Pair { k: Key { }, n: 1 };
+	let t = (Key { }, 1);
 	take(p);
 	let n = p.n;
 	take_tuple(t);

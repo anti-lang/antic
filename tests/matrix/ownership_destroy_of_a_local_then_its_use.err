@@ -1,1 +1,1 @@
-ownership_destroy_of_a_local_then_its_use.anti:18:9: error: `t` was moved into `destroy`
+ownership_destroy_of_a_local_then_its_use.anti:18:9: error: `t` was destroyed on line 17 [use-after-free]

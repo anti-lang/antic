@@ -1,0 +1,19 @@
+//! A pointer read after it moved into an `own` parameter, whose function
+//! deleted the object.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn take(own p: *Node)
+{
+	delete(p);
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	take(p);
+	return p.n;
+}

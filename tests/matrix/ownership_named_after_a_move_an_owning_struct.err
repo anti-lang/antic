@@ -1,1 +1,1 @@
-ownership_named_after_a_move_an_owning_struct.anti:40:18: error: `a` was moved into `take`
+ownership_named_after_a_move_an_owning_struct.anti:40:18: error: `a` was moved into `take` on line 39 [use-after-free]

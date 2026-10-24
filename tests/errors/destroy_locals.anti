@@ -1,6 +1,7 @@
-//! `destroy(&c)` of a local counts as moving `c` out, so naming `c` again is
-//! refused. `destroy` of a part of a local is refused: it takes the whole
-//! value, or the part a class with its own teardown holds.
+//! `destroy(&c)` of a local ends `c`, so naming `c` again is refused, on the
+//! path after the `destroy` and after an `if` that destroys it on one path.
+//! `destroy` of a part of a local is refused: it takes the whole value, or the
+//! part a class with its own teardown holds.
 
 class Key
 {
@@ -21,6 +22,17 @@ class Box
 
 fn main() -> int
 {
+	let q = Pair { k: Key { }, n: 2 };
+	destroy(&q.k);
+	let box = Box { k: Key { } };
+	destroy(&box.k);
+	let keys: [2]Key = [Key { }, Key { }];
+	destroy(&keys[0]);
+	return 0;
+}
+
+fn destroyed() -> int
+{
 	let k = Key { };
 	destroy(&k);
 	let a = k.n;
@@ -29,11 +41,5 @@ fn main() -> int
 		destroy(&p);
 	}
 	let b = p.n;
-	let q = Pair { k: Key { }, n: 2 };
-	destroy(&q.k);
-	let box = Box { k: Key { } };
-	destroy(&box.k);
-	let keys: [2]Key = [Key { }, Key { }];
-	destroy(&keys[0]);
 	return a + b;
 }
