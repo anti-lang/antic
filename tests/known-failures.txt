@@ -36,3 +36,6 @@ matrix_ownership_reference_to_a_local_stored_through_a_copy_of_a_parameter_refus
 matrix_ownership_reference_to_a_local_stored_through_a_copy_of_self_refused T198 E1 counts a place reached through a copy of `self` as memory whose end it cannot see.
 matrix_ownership_reference_to_a_local_stored_through_an_if_let_of_a_parameter_refused T198 E1 counts a place reached through an `if let` of a parameter as memory whose end it cannot see.
 matrix_ownership_reference_to_a_local_returned_from_a_switch_binding_refused T199 E1 declares the name a `switch` arm binds with no reference.
+matrix_flow_paths_do_while_body_that_returns_dev T200 C3 does not end the path at a `do ... while` whose body returns.
+matrix_flow_paths_do_while_body_that_returns_release T200 C3 does not end the path at a `do ... while` whose body returns.
+matrix_flow_paths_do_while_body_that_returns_memory_checks T200 C3 does not end the path at a `do ... while` whose body returns.

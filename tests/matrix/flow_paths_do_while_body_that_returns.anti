@@ -1,0 +1,18 @@
+//! C3 of the compile-time checks: the body of a `do ... while` runs once
+//! before its condition, so a body that returns on every path ends the path
+//! of the function, and no path reaches its end without a result.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pick(k: int) -> int
+{
+	do {
+		return k;
+	} while k > 0
+}
+
+fn main() -> int
+{
+	printf("do body returns: %d\n".ptr, pick(3) as c_int);
+	return 0;
+}
