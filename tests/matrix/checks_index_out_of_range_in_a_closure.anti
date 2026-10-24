@@ -1,0 +1,19 @@
+//! C2 in a closure: a `for` over `0..xs.len + 1` in an anonymous function
+//! reaches the length itself on its last turn.
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn main() -> int
+{
+	return call(fn(v) {
+		let xs = [v, v, v];
+		let total = 0;
+		for i in 0..xs.len + 1 {
+			total += xs[i];
+		}
+		return total;
+	}, 3);
+}

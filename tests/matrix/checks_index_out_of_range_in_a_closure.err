@@ -1,0 +1,1 @@
+checks_index_out_of_range_in_a_closure.anti:15:16: error: the index reaches 3 on a turn of the `for` on line 14, outside `xs` of length 3 [index-out-of-range]
