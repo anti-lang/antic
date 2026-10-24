@@ -1143,7 +1143,7 @@ class Vault
 	pub n: int = 0,
 }
 
-fn main() -> int unchecked(lock-order, "until the step sweep")
+fn main() -> int unchecked(lock-order, "both orders on purpose, for the check of dev mode")
 {
 	let x = alloc Account(100);
 	let y = alloc Account(100);
