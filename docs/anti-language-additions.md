@@ -956,7 +956,7 @@ fn parse_all(lines: []str) may fail
 
 `unchecked` works as `allow` does, for safety checks instead of warnings.
 
-- Every safety check has a stable name, printed at the end of its message: `` `head` is not guarded, atomic or fixed [unguarded-field] ``. The names are listed in the documentation with the warnings, each with its meaning and its fix. The first two are `unguarded-field` and `exponential-pattern`.
+- Every safety check has a stable name, printed at the end of its message: `` `head` is not guarded, atomic or fixed [unguarded-field] ``. The names are listed in the documentation with the warnings, each with its meaning and its fix. The first two are `unguarded-field` and `exponential-pattern`. The compile-time checks of 2026-10-20 add `escaping-local`, `use-after-free`, `uninitialized-read`, `index-out-of-range` and `lock-order`, and the warnings `blocking-under-lock` and `unused-result`. "Compile-time checks of 2026-10-20" in `docs/decisions.md` holds their rules.
 - `unchecked(name, "reason")` overrules one check, and both the name and the reason are required. It applies at the levels of `allow`. It stands before a statement, last in a declaration's header, or at the top of the file ending with `;`. It also applies after a field's type, for that field alone.
 - An `unchecked` that overrules nothing is a warning, `[unused-unchecked]`.
 - Only safety checks can be named. An error is never overruled, and `unchecked` naming one is refused.

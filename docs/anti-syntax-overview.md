@@ -1506,6 +1506,8 @@ Every warning and every safety check has a stable name at the end of its message
 | `doc-dropped` | A doc comment stands where no item or field follows it. |
 | `unused-allow` | An `allow` silences nothing. |
 | `unused-unchecked` | An `unchecked` overrules nothing. |
+| `blocking-under-lock` | A `recv`, a `send`, a `select` without `else` or a `join` may wait while a lock is held. |
+| `unused-result` | The program drops the result of a call that has no effects. |
 
 The five `doc-` warnings and `undocumented` come with `--doc-warnings`, which `anti check` passes.
 
@@ -1513,6 +1515,13 @@ The five `doc-` warnings and `undocumented` come with `--doc-warnings`, which `a
 |---|---|
 | `unguarded-field` | A field of a concurrent class is not guarded, atomic or fixed. |
 | `exponential-pattern` | A pattern literal nests repeats over text that overlaps, which can take exponential time. |
+| `escaping-local` | A reference to a local or a parameter would outlive it. |
+| `use-after-free` | A value is used after `delete`, `destroy` or a move of it. |
+| `uninitialized-read` | An element of `alloc(T, n)` is read before any path wrote it. |
+| `index-out-of-range` | An index is out of range on every path that reaches it. |
+| `lock-order` | Two places take the same two locks in opposite orders. |
+
+Not built yet: the warnings `blocking-under-lock` and `unused-result` and the safety checks `escaping-local`, `use-after-free`, `uninitialized-read`, `index-out-of-range` and `lock-order`, decided under "Compile-time checks of 2026-10-20" in `docs/decisions.md`.
 
 ## Wire formats
 

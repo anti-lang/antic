@@ -50,6 +50,28 @@ every pattern literal. `tests/programs/lock_free_queue.anti` and
 | `unguarded-field` | A field of a concurrent class is not guarded, atomic or fixed. | Guard the field with `guarded by`, make it `atomic`, or fix it at construction. |
 | `exponential-pattern` | A pattern literal nests repeats over text that overlaps, which can take exponential time. | Use the possessive quantifiers or an atomic group, `a++` or `(?>...)`. |
 
+## Decided and not built
+
+"Compile-time checks of 2026-10-20" in `docs/decisions.md` decides these
+names and their rules. No check of antic gives one yet, so `allow` and
+`unchecked` refuse each as a name they do not know. The test
+`warning_names` reads the two tables above alone, and the step that builds
+a name moves its row into the table of its kind, in the commit that adds
+the name to `src/antic/warnings.c`.
+
+| Warning | Meaning | Fix |
+|---|---|---|
+| `blocking-under-lock` | A `recv`, a `send` on a channel that can be full, a `select` without `else`, a `join` or a `join_all`, or a call that leads to one, stands in a `sync` block or a function of a synchronized class. | Take what the lock guards, leave the block, then wait. |
+| `unused-result` | The program drops the result of a call to a function without effects, so the call does nothing. | Use the result, or remove the call. |
+
+| Safety check | Meaning | Fix |
+|---|---|---|
+| `escaping-local` | A reference to a local or a parameter, or to a part of one, would outlive it: returned, yielded, stored outside its block, sent, dispatched or captured by a closure that leaves. | Give the value its own memory with `alloc` or `dup`, or keep the reference inside the block of its local. |
+| `use-after-free` | A value is used on a path after `delete`, `destroy` or a move of it. | Assign it a new value first, or use it before it dies. |
+| `uninitialized-read` | An element of `alloc(T, n)` is read before any path wrote it. | Write the element, or fill the whole range, before the read. |
+| `index-out-of-range` | An index is out of range on every turn or every path that reaches it. | Correct the bound, as `0..n` in place of `0..=n`. |
+| `lock-order` | The graph of lock orders of the program holds a cycle, so two places take the same locks in opposite orders. | Take the locks in one order everywhere, or both with `sync a, b`. |
+
 ## Levels and cover
 
 The parser reads each clause where it applies and records the source it
