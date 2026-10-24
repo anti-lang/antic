@@ -68,7 +68,7 @@ fn main() -> int
 	let results = chan int(4);
 	let roles = [0, 1, 2];
 	let all = roles[0..3];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let done = parallel all by 3 -> run(a, b, results);
 	free(done.ptr);
 	close(results);

@@ -50,7 +50,7 @@ worker fn sum(chunk: []int, k: Key) -> int
 fn run()
 {
 	let items = [1, 2, 3, 4];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..4] by 2 -> sum(key(10));
 	let total = 0;
 	for p in parts {

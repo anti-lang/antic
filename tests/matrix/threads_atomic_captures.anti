@@ -37,7 +37,7 @@ fn main() -> int
 	let items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 	let sum: atomic int = 0;
 	let seen: atomic bool = false;
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..10] by 5 -> each(fn(v) {
 		sum.add(v);
 		seen.store(true);

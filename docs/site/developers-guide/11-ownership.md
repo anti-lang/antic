@@ -387,6 +387,8 @@ fn main() -> int
 
 The check refuses what it proves. A reference stored into memory the function allocated, or behind a pointer the function read, keeps the run-time checks of dev mode and `--memory-checks`. The function cannot see when that memory ends. `unchecked(escaping-local, "reason")` overrules the check.
 
+`parallel` waits for every chunk before it returns, so the slice of a local array it takes never outlives the array. The check refuses it all the same, as the rule names `parallel`. The examples of the chapters on threads pass such a slice with `unchecked(escaping-local, "parallel waits for every chunk while the array lives")`.
+
 ### Uses after the end
 
 `delete` and `destroy` end a local or a parameter, and so does a move of it. The safety check `use-after-free` follows the paths of the function. On a path after the end it refuses a read, a field access, a call through the value, an index, a second `delete` or `destroy` and a move. An assignment of a new value makes the value alive again. A value dead on one of the paths into a join is dead after the join. A loop that ends a value declared before it must give it a new value before the end of its body, or the next turn is refused. The message names the value, the line where it ended and how.

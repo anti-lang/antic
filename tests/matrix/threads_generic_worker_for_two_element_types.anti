@@ -23,9 +23,9 @@ fn main() -> int
 {
 	let ints: [6]int = [1, 2, 3, 4, 5, 6];
 	let floats: [4]f64 = [0.5, 0.25, 0.125, 2.0];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let a = parallel ints[0..6] by 2 -> total(0);
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let b = parallel floats[0..4] by 2 -> total(0.0);
 	say(f"{a[0] + a[1]} {b[0] + b[1]}");
 	free(a.ptr);

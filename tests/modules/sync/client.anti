@@ -34,7 +34,7 @@ fn main() -> int
 
 	let ledger = alloc queue.Ledger { };
 	let ones = [1, 1, 1, 1, 1, 1, 1, 1];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let posted = parallel ones[0..8] by 4 -> post(ledger);
 	free(posted.ptr);
 	sync ledger {
@@ -54,7 +54,7 @@ fn main() -> int
 	let c = queue.channel(8);
 	let numbers = [1, 2, 3, 4];
 	let all = numbers[0..4];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let counts = parallel all by 2 -> feed(c);
 	free(counts.ptr);
 	close(c);

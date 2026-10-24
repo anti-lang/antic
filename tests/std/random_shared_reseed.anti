@@ -73,7 +73,7 @@ fn main() -> int
 	for i in 0..RACES {
 		Stop.started.store(false);
 		Stop.done.store(false);
-		unchecked(escaping-local, "until the step sweep")
+		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let torn = parallel sides[0..2] by 2 -> race();
 		outside += torn[1];
 		if torn[0] > 0 {

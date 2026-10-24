@@ -22,7 +22,7 @@ worker fn sum(chunk: []int) -> int
 fn main() -> int
 {
 	let xs: [4]int = [1, 2, 3, 4];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel xs[2..2] by 4 -> sum;
 	let total = 0;
 	for p in parts {

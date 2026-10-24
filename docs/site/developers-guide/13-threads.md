@@ -512,7 +512,7 @@ fn main() -> int
 {
 	let numbers: [10]int = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 	let data = numbers[0..10];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let spans = parallel data by 4 -> span;
 	for s in spans {
 		let line = f"chunk {s.low}..{s.high}";
@@ -521,9 +521,9 @@ fn main() -> int
 	}
 	free(spans.ptr);
 
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let many = parallel data by 25 -> sum;
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let none_at_all = parallel data[0..0] by 4 -> sum;
 	let line = f"by 25 gives {many.len} chunks, an empty slice gives {none_at_all.len}";
 	io.println(line);
@@ -534,7 +534,7 @@ fn main() -> int
 	io.println(line);
 	free(line.ptr);
 
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let lens = parallel data by 2 -> double;
 	free(lens.ptr);
 	line = f"total after doubling {total(&numbers[0], 10)}";
@@ -1191,7 +1191,7 @@ fn main() -> int
 	free(line.ptr);
 
 	let numbers: [8]int = [1, 2, 3, 4, 5, 6, 7, 8];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let lens = parallel numbers[0..8] by 4 -> tally;
 	free(lens.ptr);
 	let seen: atomic int = 0;

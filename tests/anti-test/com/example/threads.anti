@@ -63,13 +63,13 @@ fixtures
 	{
 		let acc = 0;
 		let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
-		unchecked(escaping-local, "until the step sweep")
+		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let parts = parallel numbers[0..8] by 4 -> sum(k);
 		for part in parts {
 			acc += part;
 		}
 		free(parts.ptr);
-		unchecked(escaping-local, "until the step sweep")
+		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let lengths = parallel numbers[0..8] -> count;
 		for length in lengths {
 			acc += length;
@@ -214,13 +214,13 @@ tests
 		let k = 3;
 		let acc = 0;
 		let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
-		unchecked(escaping-local, "until the step sweep")
+		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let parts = parallel numbers[0..8] by 4 -> sum(k);
 		for part in parts {
 			acc += part;
 		}
 		free(parts.ptr);
-		unchecked(escaping-local, "until the step sweep")
+		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let lengths = parallel numbers[0..8] -> count;
 		for length in lengths {
 			acc += length;

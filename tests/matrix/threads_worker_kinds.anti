@@ -97,7 +97,7 @@ fn of_i8(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]i8 = [-8, 7];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_i8(-8);
 	let pb = &parts[0];
 	printf("i8 %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -124,7 +124,7 @@ fn of_i16(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]i16 = [-300, 300];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_i16(-300);
 	let pb = &parts[0];
 	printf("i16 %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -151,7 +151,7 @@ fn of_i32(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]i32 = [-70000, 70000];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_i32(-70000);
 	let pb = &parts[0];
 	printf("i32 %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -178,7 +178,7 @@ fn of_i64(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]i64 = [-5000000000, 5000000000];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_i64(-5000000000);
 	let pb = &parts[0];
 	printf("i64 %lld %lld\n".ptr, *pa, *pb);
@@ -205,7 +205,7 @@ fn of_u8(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]u8 = [200, 255];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_u8(200);
 	let pb = &parts[0];
 	printf("u8 %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -232,7 +232,7 @@ fn of_u16(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]u16 = [60000, 65535];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_u16(60000);
 	let pb = &parts[0];
 	printf("u16 %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -259,7 +259,7 @@ fn of_u32(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]u32 = [4000000000, 1];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_u32(4000000000);
 	let pb = &parts[0];
 	printf("u32 %lld %lld\n".ptr, *pa as i64, *pb as i64);
@@ -286,7 +286,7 @@ fn of_u64(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]u64 = [18000000000000000000, 2];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_u64(18000000000000000000);
 	let pb = &parts[0];
 	printf("u64 %llu %llu\n".ptr, *pa, *pb);
@@ -313,7 +313,7 @@ fn of_uint(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]uint = [3, 4];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_uint(3);
 	let pb = &parts[0];
 	printf("uint %llu %llu\n".ptr, *pa as u64, *pb as u64);
@@ -340,7 +340,7 @@ fn of_byte(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]byte = [65, 250];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_byte(65);
 	let pb = &parts[0];
 	printf("byte %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -367,7 +367,7 @@ fn of_f32(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]f32 = [1.5, -2.25];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_f32(1.5);
 	let pb = &parts[0];
 	printf("f32 %g %g\n".ptr, *pa as f64, *pb as f64);
@@ -394,7 +394,7 @@ fn of_f64(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]f64 = [0.125, 1024.5];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_f64(0.125);
 	let pb = &parts[0];
 	printf("f64 %g %g\n".ptr, *pa, *pb);
@@ -409,9 +409,9 @@ worker fn last_f16(chunk: []f16) -> f32
 fn of_f16()
 {
 	let items: [2]f16 = [1.5 as f16, -0.5 as f16];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let whole = parallel items[0..2] by 1 -> last_f16;
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let halves = parallel items[0..2] by 2 -> last_f16;
 	printf("f16 %g %g\n".ptr, halves[0] as f64, whole[0] as f64);
 	free(whole.ptr);
@@ -438,7 +438,7 @@ fn of_bool(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]bool = [true, false];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_bool(true);
 	let pb = &parts[0];
 	printf("bool %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -465,7 +465,7 @@ fn of_char(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]char = ['a', '\u{e9}'];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_char('a');
 	let pb = &parts[0];
 	printf("char %u %u\n".ptr, *pa as u32, *pb as u32);
@@ -492,7 +492,7 @@ fn of_str(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]str = ["one", "two"];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_str("one");
 	let pb = &parts[0];
 	printf("str %s %s\n".ptr, (*pa).ptr, (*pb).ptr);
@@ -519,7 +519,7 @@ fn of_fixed_array(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2][3]int = [[1, 2, 3], [4, 5, 6]];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_fixed_array([1, 2, 3]);
 	let pb = &parts[0];
 	printf("fixed_array %d %d\n".ptr, ((*pa)[0] * 10 + (*pa)[2]) as c_int, ((*pb)[0] * 10 + (*pb)[2]) as c_int);
@@ -546,7 +546,7 @@ fn of_optional_value(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2] ?int = [none, 5];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_optional_value(none);
 	let pb = &parts[0];
 	printf("optional_value %d %d\n".ptr, (*pa ?? -1) as c_int, (*pb ?? -1) as c_int);
@@ -573,7 +573,7 @@ fn of_tuple(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2](int, str) = [(1, "x"), (2, "y")];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_tuple((1, "x"));
 	let pb = &parts[0];
 	printf("tuple %d%s %d%s\n".ptr, pa.0 as c_int, pa.1.ptr, pb.0 as c_int, pb.1.ptr);
@@ -600,7 +600,7 @@ fn of_struct(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]Point = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_struct(Point { x: 1, y: 2 });
 	let pb = &parts[0];
 	printf("struct %d %d\n".ptr, (pa.x * 10 + pa.y) as c_int, (pb.x * 10 + pb.y) as c_int);
@@ -627,7 +627,7 @@ fn of_packed_struct(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]Record = [Record { tag: 1, n: 20 }, Record { tag: 3, n: 40 }];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_packed_struct(Record { tag: 1, n: 20 });
 	let pb = &parts[0];
 	printf("packed_struct %d %d\n".ptr, (pa.tag as int + pa.n) as c_int, (pb.tag as int + pb.n) as c_int);
@@ -654,7 +654,7 @@ fn of_simd_struct(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]Vec4 = [Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 }, Vec4 { x: 0.5, y: 0.5, z: 0.5, w: 0.5 }];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_simd_struct(Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 });
 	let pb = &parts[0];
 	printf("simd_struct %g %g\n".ptr, (pa.x + pa.y + pa.z + pa.w) as f64, (pb.x + pb.y + pb.z + pb.w) as f64);
@@ -681,7 +681,7 @@ fn of_union(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]Word = [Word { n: 5 }, Word { n: 6 }];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_union(Word { n: 5 });
 	let pb = &parts[0];
 	printf("union %d %d\n".ptr, pa.n as c_int, pb.n as c_int);
@@ -708,7 +708,7 @@ fn of_enum(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]Level = [Level.High, Level.Low];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_enum(Level.High);
 	let pb = &parts[0];
 	printf("enum %d %d\n".ptr, *pa as c_int, *pb as c_int);
@@ -735,7 +735,7 @@ fn of_variant(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]Shape = [Shape.Circle { r: 2 }, Shape.Empty];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_variant(Shape.Circle { r: 2 });
 	let pb = &parts[0];
 	printf("variant %d %d\n".ptr, area(*pa) as c_int, area(*pb) as c_int);
@@ -762,7 +762,7 @@ fn of_class(t: *Task)
 	let a = join(first);
 	let pa = &a;
 	let items: [2]Plain = [Plain { n: 3 }, Plain { n: 4 }];
-	unchecked(escaping-local, "until the step sweep")
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> last_class(Plain { n: 3 });
 	let pb = &parts[0];
 	printf("class %d %d\n".ptr, pa.n as c_int, pb.n as c_int);
