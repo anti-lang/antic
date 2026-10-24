@@ -1,0 +1,24 @@
+//! C2 in a switch arm: a `for` over `0..xs.len + 1` reaches the length itself
+//! on its last turn.
+
+fn pick(k: int) -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	switch k {
+		1 => {
+			for i in 0..xs.len + 1 {
+				total += xs[i];
+			}
+		},
+		else => {
+			total = -1;
+		},
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	return pick(1);
+}

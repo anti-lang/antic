@@ -1,0 +1,1 @@
+checks_lock_order_in_a_loop_body.anti:24:4: error: `Pair.a` is locked here while `Pair.b` is held, and line 14 locks them in the other order [lock-order]

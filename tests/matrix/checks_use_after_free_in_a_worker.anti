@@ -1,0 +1,30 @@
+//! E2 in a worker: a worker reads a node after it tore it down. A worker
+//! deletes no object, so it destroys the node and frees it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+worker fn tally(part: []int) -> int
+{
+	let p = alloc Node { n: part[0] };
+	destroy(p);
+	let n = p.n;
+	free(p);
+	return n;
+}
+
+fn main() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return 1;
+	};
+	(*room)[0] = 1;
+	(*room)[1] = 2;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n - 3;
+}

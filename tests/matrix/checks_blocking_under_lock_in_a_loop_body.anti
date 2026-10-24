@@ -1,0 +1,30 @@
+//! C5 in a loop body: a `recv` in a loop inside a `sync` block may wait while
+//! the block holds its lock.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn work(box: *Inbox, c: chan int)
+{
+	sync box.lock {
+		for i in 0..1 {
+			let v = recv(c) else {
+				return;
+			};
+			box.count += *v;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	work(&box, c);
+	delete(c);
+	return box.count - 4;
+}

@@ -1,0 +1,17 @@
+//! C2 in a generic body: a `for` over `0..xs.len + 1` in a generic function
+//! reaches the length itself on its last turn.
+
+fn last<T>(xs: [3]T) -> int
+{
+	let n = 0;
+	for i in 0..xs.len + 1 {
+		let p = &xs[i];
+		n += 1;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	return last<int>([1, 2, 3]);
+}

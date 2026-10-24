@@ -1,0 +1,1 @@
+checks_escaping_local_in_a_generic_body.anti:6:9: error: a reference to `x` is returned, and `x` ends at line 7 [escaping-local]

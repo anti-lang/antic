@@ -1,0 +1,27 @@
+//! E2 in a generic body: a generic function reads a value after it moved it
+//! into an `own` parameter of a call.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn take<T>(own a: T) -> T
+{
+	return a;
+}
+
+fn twice<T>(own a: T) -> T
+{
+	let b = take<T>(a);
+	let c = a;
+	return b;
+}
+
+fn main() -> int
+{
+	let p = twice<*Node>(alloc Node { n: 1 });
+	let n = p.n;
+	delete(p);
+	return n - 1;
+}

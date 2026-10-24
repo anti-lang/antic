@@ -1,0 +1,32 @@
+//! C5 in a `tests` block: a test holds a `sync` block whose `recv` may wait
+//! while it holds its lock. The case passes `--warnings-as-errors`, as a
+//! release build refuses the warning.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+tests
+{
+	fn waits_under_the_lock()
+	{
+		let box = Inbox { count: 0 };
+		let c = chan int(1);
+		send(c, 4);
+		sync box.lock {
+			let v = recv(c) else {
+				return;
+			};
+			box.count += *v;
+		}
+		delete(c);
+		assert(box.count == 4);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

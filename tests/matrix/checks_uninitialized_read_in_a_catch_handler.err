@@ -1,0 +1,1 @@
+checks_uninitialized_read_in_a_catch_handler.anti:18:11: error: element 1 of `p` is read before every path from `alloc` on line 14 wrote it [uninitialized-read]

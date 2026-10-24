@@ -1,0 +1,206 @@
+//! C1 lets through every read of an element that each path wrote before it: a
+//! constant index written on every path, a computed index after a loop that
+//! wrote the whole range, and a buffer that a call took. Each context is a
+//! function of its own and prints one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn fill(p: *int, n: int, v: int)
+{
+	for i in 0..n {
+		p[i] = v + i;
+	}
+}
+
+fn in_loop(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	for i in 0..n {
+		p[i] = i * 2;
+	}
+	let total = 0;
+	for i in 0..n {
+		total += p[i];
+	}
+	free(p);
+	return total;
+}
+
+fn in_switch(k: int) -> int
+{
+	switch k {
+		1 => {
+			let p = alloc(int, 4) else {
+				return -1;
+			};
+			p[1] = k + 1;
+			let v = p[1];
+			free(p);
+			return v;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn in_defer(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	fill(p, n, 3);
+	defer {
+		printf("defer: %d\n".ptr, p[n - 1]);
+		free(p);
+	}
+	return p[0];
+}
+
+fn in_undo(n: int) may fail
+{
+	let p = alloc(int, n) else {
+		fail "no memory";
+	};
+	p[0] = 4;
+	undo {
+		printf("undo: %d\n".ptr, p[0]);
+		free(p);
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(k: int) -> int
+{
+	let v = failing(k) catch e {
+		let p = alloc(int, 2) else {
+			yield -1;
+		};
+		p[0] = k;
+		p[1] = k + 1;
+		let w = p[0] + p[1];
+		free(p);
+		yield w;
+	};
+	return v;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	return call(fn(v) {
+		let p = alloc(int, v) else {
+			return -1;
+		};
+		fill(p, v, v);
+		let w = p[v - 1];
+		free(p);
+		return w;
+	}, k);
+}
+
+worker fn tally(part: []int) -> int
+{
+	let p = alloc(int, 3) else {
+		return -1;
+	};
+	for i in 0..3 {
+		p[i] = part[0] + i;
+	}
+	let w = p[0] + p[2];
+	free(p);
+	return w;
+}
+
+fn in_worker() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return -1;
+	};
+	(*room)[0] = 5;
+	(*room)[1] = 6;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn in_sync(b: *Box, k: int) -> int
+{
+	sync b.lock {
+		let p = alloc(int, 2) else {
+			return -1;
+		};
+		p[0] = k;
+		b.total += p[0];
+		free(p);
+	}
+	return b.total;
+}
+
+fn second<T>(own v: T, own w: T) -> T
+{
+	let p = alloc(T, 2) else {
+		return w;
+	};
+	p[0] = v;
+	p[1] = w;
+	let r = p[1];
+	free(p);
+	return r;
+}
+
+class Maker
+{
+	pub base: int = 0,
+
+	pub fn make(self) -> int
+	{
+		let p = alloc(int, 3) else {
+			return -1;
+		};
+		fill(p, 3, self.base);
+		let w = p[2];
+		free(p);
+		return w;
+	}
+}
+
+fn main() -> int
+{
+	printf("loop body: %d\n".ptr, in_loop(4));
+	printf("switch arm: %d\n".ptr, in_switch(1));
+	printf("after defer: %d\n".ptr, in_defer(3));
+	in_undo(2) catch e {
+		printf("after undo\n".ptr);
+	};
+	printf("catch handler: %d\n".ptr, in_catch(6));
+	printf("closure: %d\n".ptr, in_closure(7));
+	printf("worker: %d\n".ptr, in_worker());
+	let b = Box { total: 0 };
+	printf("sync block: %d\n".ptr, in_sync(&b, 8));
+	printf("generic body: %d\n".ptr, second<int>(1, 9));
+	let m = Maker { base: 10 };
+	printf("method: %d\n".ptr, m.make());
+	return 0;
+}

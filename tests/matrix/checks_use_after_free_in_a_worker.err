@@ -1,0 +1,1 @@
+checks_use_after_free_in_a_worker.anti:13:10: error: `p` was destroyed on line 12 [use-after-free]

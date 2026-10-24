@@ -1,0 +1,1 @@
+checks_escaping_local_in_a_closure.anti:13:10: error: a reference to `x` is returned, and `x` ends at line 14 [escaping-local]

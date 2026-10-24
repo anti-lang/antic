@@ -1,0 +1,24 @@
+//! C1 in a method: a function of a class reads element 1 of `alloc(T, n)`,
+//! which no path wrote.
+
+class Maker
+{
+	pub base: int = 0,
+
+	pub fn make(self) -> int
+	{
+		let p = alloc(int, 4) else {
+			return -1;
+		};
+		p[0] = self.base;
+		let w = p[1];
+		free(p);
+		return w;
+	}
+}
+
+fn main() -> int
+{
+	let m = Maker { base: 1 };
+	return m.make();
+}

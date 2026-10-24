@@ -1,0 +1,28 @@
+//! E2 in a catch handler: the handler reads a node after it deleted it.
+
+import anti.lang;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn pick(k: int) -> int
+{
+	let v = failing(k) catch e {
+		let p = alloc Node { n: k };
+		delete(p);
+		yield p.n;
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	return pick(2) - 2;
+}

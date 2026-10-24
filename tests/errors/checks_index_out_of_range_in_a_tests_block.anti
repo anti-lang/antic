@@ -1,0 +1,20 @@
+//! C2 in a `tests` block: a `for` over `0..xs.len + 1` in a test reaches the
+//! length itself on its last turn.
+
+tests
+{
+	fn sums_one_too_many()
+	{
+		let xs = [1, 2, 3];
+		let total = 0;
+		for i in 0..xs.len + 1 {
+			total += xs[i];
+		}
+		assert(total == 6);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

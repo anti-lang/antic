@@ -1,0 +1,1 @@
+checks_blocking_under_lock_in_a_generic_body.anti:13:11: error: `recv` may wait while the `sync` of line 12 holds its lock [blocking-under-lock]

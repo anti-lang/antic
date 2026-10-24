@@ -443,7 +443,8 @@ column means that no source holds the row at all.
 | Threads | 29 | 402 | 4 | 189 | 7 |
 | Classes | 26 | 58 | 0 | 0 | 0 |
 | Modules | 19 | 30 | 0 | 0 | 0 |
-| All | 206 | 2313 | 25 | 1484 | 8 |
+| Checks | 16 | 176 | 0 | 0 | 0 |
+| All | 222 | 2489 | 25 | 1484 | 8 |
 
 ### Flow
 
@@ -1744,6 +1745,53 @@ Where two rules meet, and where three do:
 - An exported class, a `construct` with arguments and a type C cannot
   hold: `matrix/modules_export_class_construct_takes_a_str`.
 
+### Checks
+
+The compile-time checks of "Compile-time checks of 2026-10-20" in
+`docs/decisions.md` are a row each. C3 is a sweep and no check, and its row
+holds the `else` of a `let` that reaches its end, a form that stands in
+every context. A cell of the first table names the refusal of the check in
+that context. Each refusal holds the one message of its check. A refusal in
+a `tests` block is a case of `tests/errors/` that passes `--front-end
+--tests`, and those of C5 and C6 pass `--warnings-as-errors` as well, since
+both are warnings. Eleven contexts apply: the ten of the first table and
+the `tests` block. The other eight contexts of "The contexts" hold no form
+a check names apart from these.
+
+| Check | Held, with the source that holds its refusal | Open |
+|---|---|---|
+| E1, `escaping-local` | loop body `matrix/checks_escaping_local_in_a_loop_body`, switch arm `matrix/checks_escaping_local_in_a_switch_arm`, `defer` `matrix/checks_escaping_local_in_a_defer`, `undo` `matrix/checks_escaping_local_in_an_undo`, catch handler `matrix/checks_escaping_local_in_a_catch_handler`, closure `matrix/checks_escaping_local_in_a_closure`, worker `matrix/checks_escaping_local_in_a_worker`, `sync` block `matrix/checks_escaping_local_in_a_sync_block`, generic body `matrix/checks_escaping_local_in_a_generic_body`, method `matrix/checks_escaping_local_in_a_method`, `tests` block `errors/checks_escaping_local_in_a_tests_block` | none |
+| E2, `use-after-free` | loop body `matrix/checks_use_after_free_in_a_loop_body`, switch arm `matrix/checks_use_after_free_in_a_switch_arm`, `defer` `matrix/checks_use_after_free_in_a_defer`, `undo` `matrix/checks_use_after_free_in_an_undo`, catch handler `matrix/checks_use_after_free_in_a_catch_handler`, closure `matrix/checks_use_after_free_in_a_closure`, worker `matrix/checks_use_after_free_in_a_worker`, `sync` block `matrix/checks_use_after_free_in_a_sync_block`, generic body `matrix/checks_use_after_free_in_a_generic_body`, method `matrix/checks_use_after_free_in_a_method`, `tests` block `errors/checks_use_after_free_in_a_tests_block` | none |
+| C1, `uninitialized-read` | loop body `matrix/checks_uninitialized_read_in_a_loop_body`, switch arm `matrix/checks_uninitialized_read_in_a_switch_arm`, `defer` `matrix/checks_uninitialized_read_in_a_defer` T194, `undo` `matrix/checks_uninitialized_read_in_an_undo` T194, catch handler `matrix/checks_uninitialized_read_in_a_catch_handler`, closure `matrix/checks_uninitialized_read_in_a_closure`, worker `matrix/checks_uninitialized_read_in_a_worker`, `sync` block `matrix/checks_uninitialized_read_in_a_sync_block`, generic body `matrix/checks_uninitialized_read_in_a_generic_body`, method `matrix/checks_uninitialized_read_in_a_method`, `tests` block `errors/checks_uninitialized_read_in_a_tests_block` | none |
+| C2, `index-out-of-range` | loop body `matrix/checks_index_out_of_range_in_a_loop_body`, switch arm `matrix/checks_index_out_of_range_in_a_switch_arm`, `defer` `matrix/checks_index_out_of_range_in_a_defer`, `undo` `matrix/checks_index_out_of_range_in_an_undo`, catch handler `matrix/checks_index_out_of_range_in_a_catch_handler`, closure `matrix/checks_index_out_of_range_in_a_closure` T196, worker `matrix/checks_index_out_of_range_in_a_worker`, `sync` block `matrix/checks_index_out_of_range_in_a_sync_block`, generic body `matrix/checks_index_out_of_range_in_a_generic_body`, method `matrix/checks_index_out_of_range_in_a_method`, `tests` block `errors/checks_index_out_of_range_in_a_tests_block` | none |
+| C3, the paths: the `else` of a `let` | loop body `matrix/checks_paths_let_else_in_a_loop_body`, switch arm `matrix/checks_paths_let_else_in_a_switch_arm`, `defer` `matrix/checks_paths_let_else_in_a_defer`, `undo` `matrix/checks_paths_let_else_in_an_undo`, catch handler `matrix/checks_paths_let_else_in_a_catch_handler`, closure `matrix/checks_paths_let_else_in_a_closure`, worker `matrix/checks_paths_let_else_in_a_worker`, `sync` block `matrix/checks_paths_let_else_in_a_sync_block`, generic body `matrix/checks_paths_let_else_in_a_generic_body`, method `matrix/checks_paths_let_else_in_a_method`, `tests` block `errors/checks_paths_let_else_in_a_tests_block` | none |
+| C4, `lock-order` | loop body `matrix/checks_lock_order_in_a_loop_body`, switch arm `matrix/checks_lock_order_in_a_switch_arm`, `defer` `matrix/checks_lock_order_in_a_defer`, `undo` `matrix/checks_lock_order_in_an_undo`, catch handler `matrix/checks_lock_order_in_a_catch_handler`, closure `matrix/checks_lock_order_in_a_closure`, worker `matrix/checks_lock_order_in_a_worker`, `sync` block `matrix/threads_lock_order_two_mutexes`, generic body `matrix/checks_lock_order_in_a_generic_body`, method `matrix/checks_lock_order_in_a_method`, `tests` block `errors/checks_lock_order_in_a_tests_block` | none |
+| C5, `blocking-under-lock` | loop body `matrix/checks_blocking_under_lock_in_a_loop_body`, switch arm `matrix/checks_blocking_under_lock_in_a_switch_arm`, `defer` `matrix/checks_blocking_under_lock_in_a_defer`, `undo` `matrix/checks_blocking_under_lock_in_an_undo`, catch handler `matrix/checks_blocking_under_lock_in_a_catch_handler`, closure `matrix/checks_blocking_under_lock_in_a_closure`, worker `matrix/checks_blocking_under_lock_in_a_worker`, `sync` block `matrix/threads_blocking_recv_in_a_sync_block`, generic body `matrix/checks_blocking_under_lock_in_a_generic_body`, method `matrix/checks_blocking_under_lock_in_a_method`, `tests` block `errors/checks_blocking_under_lock_in_a_tests_block` | none |
+| C6, `unused-result` | loop body `matrix/values_unused_result_in_a_loop`, switch arm `matrix/checks_unused_result_in_a_switch_arm`, `defer` `matrix/values_unused_result_in_a_defer`, `undo` `matrix/checks_unused_result_in_an_undo`, catch handler `matrix/values_unused_result_in_a_handler`, closure `matrix/values_unused_result_in_an_anonymous_function`, worker `matrix/checks_unused_result_in_a_worker`, `sync` block `matrix/checks_unused_result_in_a_sync_block`, generic body `matrix/values_unused_result_in_a_generic_function`, method `matrix/values_unused_result_in_a_function_of_a_class`, `tests` block `errors/checks_unused_result_in_a_tests_block` | none |
+
+A cell of the second table names a program that holds, in each context,
+the forms the check lets through. Each runs in dev mode, in release mode
+and with `--memory-checks`, and the three print the same lines. The module
+`anti-test/com/example/checks` holds one test per check in a `tests` block,
+which `anti_test_checks` runs.
+
+| Check | Held, with the program that holds what it lets through | Open |
+|---|---|---|
+| E1, `escaping-local` | `matrix/checks_escaping_local_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+| E2, `use-after-free` | `matrix/checks_use_after_free_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+| C1, `uninitialized-read` | `matrix/checks_uninitialized_read_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+| C2, `index-out-of-range` | `matrix/checks_index_out_of_range_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+| C3, the paths: the `else` of a `let` | `matrix/checks_paths_let_else_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+| C4, `lock-order` | `matrix/checks_lock_order_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+| C5, `blocking-under-lock` | `matrix/checks_blocking_under_lock_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+| C6, `unused-result` | `matrix/checks_unused_result_passes_in_contexts` in the ten contexts, `tests` block `anti-test/com/example/checks` | none |
+
+E2 has four refusals more, each a known failure of T195: a `defer` that
+reads or deletes a value the body deletes after the statement, an `undo`
+that reads one, and a `defer` that reads a value a later `defer` deletes.
+`matrix/checks_use_after_free_a_defer_reads_what_the_body_deleted` names
+the first.
+
 ### The rules of decisions 19 to 27
 
 "Language rules" under "Decisions of 2026-10-11" in `docs/decisions.md`
@@ -1884,3 +1932,7 @@ On 2026-10-13, after the last step of the test run:
 - 748 messages: 731 expected by a test and 17 open. antic gives 598 with 6
   open, and anti 150 with 11 open. Each open line states why it stays.
 - 134 options and commands: 134 passed by a test and none open.
+
+On 2026-10-24 the step of the checks in their contexts added the area
+checks: 16 rows, whose 176 cells are held and none open. Three of them are
+held by a known failure, T194 and T196.

@@ -1,0 +1,1 @@
+checks_escaping_local_in_a_tests_block.anti:14:19: error: a reference to `x` is stored into the global `seen`, and `x` ends at line 15 [escaping-local]

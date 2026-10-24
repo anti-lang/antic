@@ -1,0 +1,1 @@
+checks_use_after_free_in_a_sync_block.anti:19:14: error: `p` was deleted on line 18 [use-after-free]

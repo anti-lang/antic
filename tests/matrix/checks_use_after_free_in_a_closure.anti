@@ -1,0 +1,20 @@
+//! E2 in a closure: an anonymous function reads a node after it deleted it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn main() -> int
+{
+	return call(fn(v) {
+		let p = alloc Node { n: v };
+		delete(p);
+		return p.n;
+	}, 3) - 3;
+}

@@ -1,0 +1,189 @@
+//! C5 lets through a `recv` outside every lock. Each context takes a value from
+//! the channel before it takes the lock, is a function of its own and prints
+//! one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Inbox
+{
+	pub lock: Mutex,
+	pub count: int = 0,
+}
+
+fn take(c: chan int) -> int
+{
+	let v = recv(c) else {
+		return 0;
+	};
+	return *v;
+}
+
+fn in_loop(box: *Inbox, c: chan int) -> int
+{
+	for i in 0..1 {
+		let v = take(c);
+		sync box.lock {
+			box.count += v;
+		}
+	}
+	return box.count;
+}
+
+fn in_switch(box: *Inbox, c: chan int, k: int) -> int
+{
+	switch k {
+		1 => {
+			let v = take(c);
+			sync box.lock {
+				box.count += v;
+			}
+		},
+		else => {
+			box.count = -1;
+		},
+	}
+	return box.count;
+}
+
+fn in_defer(box: *Inbox, c: chan int)
+{
+	defer {
+		let v = take(c);
+		sync box.lock {
+			box.count += v;
+		}
+		printf("defer: %d\n".ptr, box.count);
+	}
+}
+
+fn in_undo(box: *Inbox, c: chan int) may fail
+{
+	undo {
+		let v = take(c);
+		sync box.lock {
+			box.count += v;
+		}
+		printf("undo: %d\n".ptr, box.count);
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(box: *Inbox, c: chan int) -> int
+{
+	let got = failing(1) catch e {
+		yield take(c);
+	};
+	sync box.lock {
+		box.count += got;
+	}
+	return box.count;
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn in_closure(box: *Inbox, c: chan int) -> int
+{
+	call(fn() {
+		let v = take(c);
+		sync box.lock {
+			box.count += v;
+		}
+	});
+	return box.count;
+}
+
+worker fn drain(box: *Inbox, c: chan int) -> int
+{
+	let v = take(c);
+	sync box.lock {
+		box.count += v;
+	}
+	return box.count;
+}
+
+fn in_worker(box: *Inbox, c: chan int) -> int
+{
+	let j = dispatch box -> drain(c);
+	return join(j);
+}
+
+fn in_sync(box: *Inbox, c: chan int) -> int
+{
+	let v = take(c);
+	sync box.lock {
+		let w = v * 1;
+		box.count += w;
+	}
+	return box.count;
+}
+
+fn add<T>(box: *Inbox, c: chan T, f: fn(*T) -> int) -> int
+{
+	let v = recv(c) else {
+		return box.count;
+	};
+	let n = f(v);
+	sync box.lock {
+		box.count += n;
+	}
+	return box.count;
+}
+
+fn plain(v: *int) -> int
+{
+	return *v;
+}
+
+class Worker
+{
+	pub fn work(self, box: *Inbox, c: chan int) -> int
+	{
+		let v = take(c);
+		sync box.lock {
+			box.count += v;
+		}
+		return box.count;
+	}
+}
+
+fn main() -> int
+{
+	let box = alloc Inbox { };
+	let c = chan int(1);
+	send(c, 1);
+	printf("loop body: %d\n".ptr, in_loop(box, c));
+	send(c, 2);
+	printf("switch arm: %d\n".ptr, in_switch(box, c, 1));
+	send(c, 3);
+	in_defer(box, c);
+	send(c, 4);
+	in_undo(box, c) catch e {
+		printf("after undo\n".ptr);
+	};
+	send(c, 5);
+	printf("catch handler: %d\n".ptr, in_catch(box, c));
+	send(c, 6);
+	printf("closure: %d\n".ptr, in_closure(box, c));
+	send(c, 7);
+	printf("worker: %d\n".ptr, in_worker(box, c));
+	send(c, 8);
+	printf("sync block: %d\n".ptr, in_sync(box, c));
+	send(c, 9);
+	printf("generic body: %d\n".ptr, add<int>(box, c, plain));
+	send(c, 10);
+	let w = Worker { };
+	printf("method: %d\n".ptr, w.work(box, c));
+	delete(c);
+	delete(box);
+	return 0;
+}

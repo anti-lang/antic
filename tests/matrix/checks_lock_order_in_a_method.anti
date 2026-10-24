@@ -1,0 +1,39 @@
+//! C4 in a method: `forward` takes `a` and then `b`, and a function of a class
+//! takes `b` and then `a`.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+class Undo
+{
+	pub fn backward(self, p: *Pair)
+	{
+		sync p.b {
+			sync p.a {
+				p.n -= 1;
+			}
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	let u = Undo { };
+	u.backward(&p);
+	return p.n;
+}

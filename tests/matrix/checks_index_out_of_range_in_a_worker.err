@@ -1,0 +1,1 @@
+checks_index_out_of_range_in_a_worker.anti:9:15: error: the index reaches 3 on a turn of the `for` on line 8, outside `xs` of length 3 [index-out-of-range]

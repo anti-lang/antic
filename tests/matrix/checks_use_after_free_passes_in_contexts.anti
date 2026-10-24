@@ -1,0 +1,193 @@
+//! E2 lets through every use of a value that is alive on every path to it: a
+//! value deleted and given a new one, a value deleted on a path that then
+//! leaves, and a value declared outside a loop that the body deletes and
+//! assigns again. Each context is a function of its own and prints one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn in_loop() -> int
+{
+	let p = alloc Node { n: 1 };
+	let total = 0;
+	for i in 0..3 {
+		total += p.n;
+		delete(p);
+		p = alloc Node { n: i + 2 };
+	}
+	total += p.n;
+	delete(p);
+	return total;
+}
+
+fn in_switch(k: int) -> int
+{
+	let p = alloc Node { n: k };
+	switch k {
+		1 => {
+			delete(p);
+			return 10;
+		},
+		else => {
+			p.n += 1;
+		},
+	}
+	let n = p.n;
+	delete(p);
+	return n;
+}
+
+fn in_defer(k: int) -> int
+{
+	let p = alloc Node { n: k };
+	defer {
+		let n = p.n;
+		delete(p);
+		p = alloc Node { n: n + 1 };
+		printf("defer: %d\n".ptr, p.n);
+		delete(p);
+	}
+	return p.n;
+}
+
+fn in_undo(own p: *Node) may fail
+{
+	undo {
+		let n = p.n;
+		delete(p);
+		printf("undo: %d\n".ptr, n);
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(k: int) -> int
+{
+	let p = alloc Node { n: k };
+	let v = failing(k) catch e {
+		delete(p);
+		p = alloc Node { n: k + 1 };
+		yield p.n;
+	};
+	delete(p);
+	return v;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	return call(fn(v) {
+		let p = alloc Node { n: v };
+		delete(p);
+		p = alloc Node { n: v * 2 };
+		let n = p.n;
+		delete(p);
+		return n;
+	}, k);
+}
+
+worker fn tally(part: []int) -> int
+{
+	let p = alloc Node { n: part[0] };
+	destroy(p);
+	free(p);
+	p = alloc Node { n: part[0] + 1 };
+	let n = p.n;
+	destroy(p);
+	free(p);
+	return n;
+}
+
+fn in_worker() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return -1;
+	};
+	(*room)[0] = 3;
+	(*room)[1] = 4;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn in_sync(b: *Box, k: int) -> int
+{
+	sync b.lock {
+		let p = alloc Node { n: k };
+		delete(p);
+		p = alloc Node { n: k + 5 };
+		b.total += p.n;
+		delete(p);
+	}
+	return b.total;
+}
+
+fn take<T>(own a: T) -> T
+{
+	return a;
+}
+
+fn again<T>(own a: T) -> T
+{
+	let b = take<T>(a);
+	a = take<T>(b);
+	return a;
+}
+
+class Maker
+{
+	pub base: int = 0,
+
+	pub fn make(self) -> int
+	{
+		let p = alloc Node { n: self.base };
+		delete(p);
+		p = alloc Node { n: self.base + 1 };
+		let n = p.n;
+		delete(p);
+		return n;
+	}
+}
+
+fn main() -> int
+{
+	printf("loop body: %d\n".ptr, in_loop());
+	printf("switch arm: %d %d\n".ptr, in_switch(1), in_switch(2));
+	printf("after defer: %d\n".ptr, in_defer(4));
+	in_undo(alloc Node { n: 5 }) catch e {
+		printf("after undo\n".ptr);
+	};
+	printf("catch handler: %d\n".ptr, in_catch(6));
+	printf("closure: %d\n".ptr, in_closure(7));
+	printf("worker: %d\n".ptr, in_worker());
+	let b = Box { total: 0 };
+	printf("sync block: %d\n".ptr, in_sync(&b, 8));
+	let p = again<*Node>(alloc Node { n: 9 });
+	printf("generic body: %d\n".ptr, p.n);
+	delete(p);
+	let m = Maker { base: 10 };
+	printf("method: %d\n".ptr, m.make());
+	return 0;
+}

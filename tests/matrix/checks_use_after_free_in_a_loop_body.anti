@@ -1,0 +1,17 @@
+//! E2 in a loop body: each turn reads a node after it deleted it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let total = 0;
+	for i in 0..2 {
+		let p = alloc Node { n: i };
+		delete(p);
+		total += p.n;
+	}
+	return total;
+}

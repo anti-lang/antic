@@ -1,0 +1,1 @@
+checks_index_out_of_range_in_a_switch_arm.anti:11:17: error: the index reaches 3 on a turn of the `for` on line 10, outside `xs` of length 3 [index-out-of-range]

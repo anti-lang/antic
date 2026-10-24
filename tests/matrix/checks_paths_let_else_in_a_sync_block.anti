@@ -1,0 +1,25 @@
+//! C3 in a sync block: the `else` of a `let` inside the block reaches its end
+//! without leaving.
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn add(b: *Box, p: ?*int)
+{
+	sync b.lock {
+		let v = p else {
+			b.total += 1;
+		};
+		b.total += *v;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { total: 0 };
+	add(&b, none);
+	return b.total;
+}

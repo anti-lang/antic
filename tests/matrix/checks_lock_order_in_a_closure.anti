@@ -1,0 +1,42 @@
+//! C4 in a closure: `forward` takes `a` and then `b`, and an anonymous function
+//! takes `b` and then `a`.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn backward(p: *Pair)
+{
+	call(fn() {
+		sync p.b {
+			sync p.a {
+				p.n -= 1;
+			}
+		}
+	});
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	backward(&p);
+	return p.n;
+}

@@ -1,0 +1,35 @@
+//! C5 in a closure: an anonymous function holds a `sync` block whose `recv` may
+//! wait while it holds its lock.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn work(box: *Inbox, c: chan int)
+{
+	call(fn() {
+		sync box.lock {
+			let v = recv(c) else {
+				return;
+			};
+			box.count += *v;
+		}
+	});
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	work(&box, c);
+	delete(c);
+	return box.count - 4;
+}

@@ -1,0 +1,19 @@
+//! C3 in a loop body: the `else` of a `let` reaches its end without leaving the
+//! turn.
+
+fn total(p: ?*int, n: int) -> int
+{
+	let t = 0;
+	for i in 0..n {
+		let v = p else {
+			t += 1;
+		};
+		t += *v;
+	}
+	return t;
+}
+
+fn main() -> int
+{
+	return total(none, 2);
+}

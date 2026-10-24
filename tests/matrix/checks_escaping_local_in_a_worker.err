@@ -1,0 +1,1 @@
+checks_escaping_local_in_a_worker.anti:12:18: error: a reference to `x` is stored into the global `seen`, and `x` ends at line 14 [escaping-local]

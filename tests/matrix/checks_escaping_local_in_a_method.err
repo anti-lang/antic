@@ -1,0 +1,1 @@
+checks_escaping_local_in_a_method.anti:11:12: error: a reference to `x` is stored into the field `p`, and `x` ends at line 12 [escaping-local]

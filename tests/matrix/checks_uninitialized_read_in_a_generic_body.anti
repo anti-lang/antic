@@ -1,0 +1,18 @@
+//! C1 in a generic body: a generic function reads element 1 of `alloc(T, n)`,
+//! which no path wrote.
+
+fn second<T>(own v: T, own fallback: T) -> T
+{
+	let p = alloc(T, 2) else {
+		return fallback;
+	};
+	p[0] = v;
+	let w = p[1];
+	free(p);
+	return w;
+}
+
+fn main() -> int
+{
+	return second<int>(1, 0);
+}

@@ -1,0 +1,1 @@
+checks_unused_result_in_an_undo.anti:9:3: error: `hash` has no effects and its result is dropped, so the call does nothing [unused-result]

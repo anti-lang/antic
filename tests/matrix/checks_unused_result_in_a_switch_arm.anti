@@ -1,0 +1,19 @@
+//! C6 in a switch arm: a call without effects whose result nothing takes.
+
+fn pick(k: int) -> int
+{
+	switch k {
+		1 => {
+			k.hash();
+			return k;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return pick(1) - 1;
+}

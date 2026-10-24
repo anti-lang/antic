@@ -1,0 +1,36 @@
+//! C4 in a generic body: `forward` takes `a` and then `b`, and a generic
+//! function takes `b` and then `a`.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn backward<T>(p: *Pair, v: *T)
+{
+	sync p.b {
+		sync p.a {
+			p.n -= 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	let x = 0;
+	backward<int>(&p, &x);
+	return p.n;
+}

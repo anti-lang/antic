@@ -1,0 +1,163 @@
+//! C6 lets through a call without effects whose result the program takes, and a
+//! call with effects whose result it drops. Each context is a function of its
+//! own and prints one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn bump(p: *int) -> int
+{
+	*p += 1;
+	return *p;
+}
+
+fn same(k: int) -> bool
+{
+	return k.hash() == k.hash();
+}
+
+fn in_loop() -> int
+{
+	let n = 0;
+	for i in 0..3 {
+		bump(&n);
+		n += same(i) as int;
+	}
+	return n;
+}
+
+fn in_switch(k: int) -> int
+{
+	let n = 0;
+	switch k {
+		1 => {
+			bump(&n);
+			n += same(k) as int;
+		},
+		else => {
+			n = -1;
+		},
+	}
+	return n;
+}
+
+fn in_defer(k: int) -> int
+{
+	let n = k;
+	defer {
+		bump(&n);
+		printf("defer: %d\n".ptr, n + same(k) as int);
+	}
+	return n;
+}
+
+fn in_undo(k: int) may fail
+{
+	let n = k;
+	undo {
+		bump(&n);
+		printf("undo: %d\n".ptr, n + same(k) as int);
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(k: int) -> int
+{
+	let n = k;
+	let v = failing(k) catch e {
+		bump(&n);
+		yield n + same(k) as int;
+	};
+	return v;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	return call(fn(v) {
+		let n = v;
+		bump(&n);
+		return n + same(v) as int;
+	}, k);
+}
+
+worker fn tally(part: []int) -> int
+{
+	let n = part[0];
+	bump(&n);
+	return n + same(part[0]) as int;
+}
+
+fn in_worker() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return -1;
+	};
+	(*room)[0] = 7;
+	(*room)[1] = 8;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] * 100 + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn in_sync(b: *Box, k: int) -> int
+{
+	sync b.lock {
+		bump(&b.total);
+		b.total += same(k) as int;
+	}
+	return b.total;
+}
+
+fn hashes<T: hash>(v: T) -> bool
+{
+	return v.hash() == v.hash();
+}
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn count(self, k: int) -> int
+	{
+		bump(&self.n);
+		return self.n + same(k) as int;
+	}
+}
+
+fn main() -> int
+{
+	printf("loop body: %d\n".ptr, in_loop());
+	printf("switch arm: %d\n".ptr, in_switch(1));
+	printf("after defer: %d\n".ptr, in_defer(3));
+	in_undo(4) catch e {
+		printf("after undo\n".ptr);
+	};
+	printf("catch handler: %d\n".ptr, in_catch(5));
+	printf("closure: %d\n".ptr, in_closure(6));
+	printf("worker: %d\n".ptr, in_worker());
+	let b = Box { total: 0 };
+	printf("sync block: %d\n".ptr, in_sync(&b, 9));
+	printf("generic body: %d\n".ptr, hashes<int>(10) as int);
+	let c = Counter { n: 10 };
+	printf("method: %d\n".ptr, c.count(11));
+	return 0;
+}

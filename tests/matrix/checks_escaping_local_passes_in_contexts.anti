@@ -1,0 +1,172 @@
+//! E1 lets through every reference that stays inside the life of its local: one
+//! kept in a local of the block or of a block inside it, and one passed to a
+//! call, which gets it lent. Each context is a function of its own and prints
+//! one line. The worker and the `parallel` that runs it carry the `unchecked`
+//! of every `parallel` of a local array, since `parallel` waits for every chunk
+//! while the array lives.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn bump(p: *int) -> int
+{
+	*p += 1;
+	return *p;
+}
+
+fn read(xs: []int) -> int
+{
+	return xs[0] + xs[xs.len - 1];
+}
+
+fn in_loop() -> int
+{
+	let total = 0;
+	for i in 0..3 {
+		let x = i;
+		let p = &x;
+		{
+			let q = p;
+			total += bump(q);
+		}
+	}
+	return total;
+}
+
+fn in_switch(k: int) -> int
+{
+	switch k {
+		1 => {
+			let xs = [k, k + 1, k + 2];
+			let s = xs[0..3];
+			return read(s);
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn in_defer() -> int
+{
+	let x = 4;
+	defer {
+		let p = &x;
+		printf("defer: %d\n".ptr, bump(p));
+	}
+	return x;
+}
+
+fn in_undo() may fail
+{
+	let x = 5;
+	undo {
+		let p = &x;
+		printf("undo: %d\n".ptr, bump(p));
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(k: int) -> int
+{
+	let v = failing(k) catch e {
+		let x = k;
+		yield bump(&x);
+	};
+	return v;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	let base = 10;
+	return call(fn(v) {
+		let x = v + base;
+		return bump(&x);
+	}, k);
+}
+
+worker fn tally(part: []int) -> int
+{
+	let x = part[0];
+	return bump(&x);
+}
+
+fn in_worker() -> int
+{
+	let xs = [7, 8];
+	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
+	let sums = parallel xs[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	return n;
+}
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn in_sync(b: *Box) -> int
+{
+	sync b.lock {
+		let x = 9;
+		let p = &x;
+		b.total += bump(p);
+	}
+	return b.total;
+}
+
+fn twice<T>(v: T, f: fn(*T) -> int) -> int
+{
+	let x = dup(v);
+	let p = &x;
+	return f(p) + f(p);
+}
+
+fn as_int(p: *int) -> int
+{
+	return *p;
+}
+
+class Keeper
+{
+	pub n: int = 0,
+
+	pub fn keep(self, k: int) -> int
+	{
+		let x = k;
+		self.n = bump(&x);
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	printf("loop body: %d\n".ptr, in_loop());
+	printf("switch arm: %d\n".ptr, in_switch(1));
+	printf("after defer: %d\n".ptr, in_defer());
+	in_undo() catch e {
+		printf("after undo\n".ptr);
+	};
+	printf("catch handler: %d\n".ptr, in_catch(2));
+	printf("closure: %d\n".ptr, in_closure(3));
+	printf("worker: %d\n".ptr, in_worker());
+	let b = Box { total: 0 };
+	printf("sync block: %d\n".ptr, in_sync(&b));
+	printf("generic body: %d\n".ptr, twice<int>(6, as_int));
+	let k = Keeper { };
+	printf("method: %d\n".ptr, k.keep(11));
+	return 0;
+}

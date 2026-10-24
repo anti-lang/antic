@@ -1,0 +1,27 @@
+//! C2 in an undo: a `for` over `0..xs.len + 1` in the block of the fail path
+//! reaches the length itself on its last turn.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show() may fail
+{
+	let xs = [1, 2, 3];
+	undo {
+		let total = 0;
+		for i in 0..xs.len + 1 {
+			total += xs[i];
+		}
+		printf("%d\n".ptr, total);
+	}
+	fail "undone";
+}
+
+fn main() -> int
+{
+	show() catch e {
+		return 0;
+	};
+	return 1;
+}

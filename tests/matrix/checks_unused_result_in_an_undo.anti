@@ -1,0 +1,20 @@
+//! C6 in an undo: a call without effects whose result nothing takes, in the
+//! block of a fail path.
+
+import anti.lang;
+
+fn work(k: int) may fail
+{
+	undo {
+		k.hash();
+	}
+	fail "undone";
+}
+
+fn main() -> int
+{
+	work(1) catch e {
+		return 0;
+	};
+	return 1;
+}

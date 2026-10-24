@@ -1,0 +1,1 @@
+checks_uninitialized_read_in_a_tests_block.anti:12:10: error: element 1 of `p` is read before every path from `alloc` on line 8 wrote it [uninitialized-read]

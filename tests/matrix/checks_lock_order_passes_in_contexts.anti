@@ -1,0 +1,190 @@
+//! C4 lets through a program whose every context takes `a` before `b`, the
+//! `sync` block through a call that takes `b`. The check of dev mode reports no
+//! order taken both ways. Each context is a function of its own and prints one
+//! line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Pair
+{
+	pub a: Mutex,
+	pub b: Mutex,
+	pub n: int = 0,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn in_loop(p: *Pair) -> int
+{
+	for i in 0..2 {
+		sync p.a {
+			sync p.b {
+				p.n += 1;
+			}
+		}
+	}
+	return p.n;
+}
+
+fn in_switch(p: *Pair, k: int) -> int
+{
+	switch k {
+		1 => {
+			sync p.a {
+				sync p.b {
+					p.n += 10;
+				}
+			}
+		},
+		else => {
+			p.n = 0;
+		},
+	}
+	return p.n;
+}
+
+fn in_defer(p: *Pair)
+{
+	defer {
+		sync p.a {
+			sync p.b {
+				p.n += 1;
+			}
+		}
+		printf("defer: %d\n".ptr, p.n);
+	}
+}
+
+fn in_undo(p: *Pair) may fail
+{
+	undo {
+		sync p.a {
+			sync p.b {
+				p.n += 1;
+			}
+		}
+		printf("undo: %d\n".ptr, p.n);
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(p: *Pair) -> int
+{
+	failing(1) catch e {
+		sync p.a {
+			sync p.b {
+				p.n += 1;
+			}
+		}
+	};
+	return p.n;
+}
+
+fn call(f: fn())
+{
+	f();
+}
+
+fn in_closure(p: *Pair) -> int
+{
+	call(fn() {
+		sync p.a {
+			sync p.b {
+				p.n += 1;
+			}
+		}
+	});
+	return p.n;
+}
+
+worker fn step(p: *Pair) -> int
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+	return p.n;
+}
+
+fn in_worker(p: *Pair) -> int
+{
+	let j = dispatch p -> step;
+	return join(j);
+}
+
+fn bump_b(p: *Pair)
+{
+	sync p.b {
+		p.n += 1;
+	}
+}
+
+fn in_sync(p: *Pair) -> int
+{
+	sync p.a {
+		bump_b(p);
+	}
+	return p.n;
+}
+
+fn twice<T>(p: *Pair, v: *T) -> int
+{
+	for i in 0..2 {
+		sync p.a {
+			sync p.b {
+				p.n += 1;
+			}
+		}
+	}
+	return p.n;
+}
+
+class Stepper
+{
+	pub fn step(self, p: *Pair) -> int
+	{
+		sync p.a {
+			sync p.b {
+				p.n += 1;
+			}
+		}
+		return p.n;
+	}
+}
+
+fn main() -> int
+{
+	let p = alloc Pair { };
+	forward(p);
+	printf("loop body: %d\n".ptr, in_loop(p));
+	printf("switch arm: %d\n".ptr, in_switch(p, 1));
+	in_defer(p);
+	in_undo(p) catch e {
+		printf("after undo\n".ptr);
+	};
+	printf("catch handler: %d\n".ptr, in_catch(p));
+	printf("closure: %d\n".ptr, in_closure(p));
+	printf("worker: %d\n".ptr, in_worker(p));
+	printf("sync block: %d\n".ptr, in_sync(p));
+	let x = 0;
+	printf("generic body: %d\n".ptr, twice<int>(p, &x));
+	let s = Stepper { };
+	printf("method: %d\n".ptr, s.step(p));
+	delete(p);
+	return 0;
+}

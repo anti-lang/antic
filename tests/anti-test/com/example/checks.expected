@@ -1,0 +1,9 @@
+ok com.example.checks.escaping_local_lent_to_a_call
+ok com.example.checks.use_after_free_after_a_new_value
+ok com.example.checks.uninitialized_read_after_the_whole_range
+ok com.example.checks.index_out_of_range_inside_the_length
+ok com.example.checks.paths_of_an_else_that_leaves
+ok com.example.checks.lock_order_taken_one_way
+ok com.example.checks.blocking_outside_the_lock
+ok com.example.checks.unused_result_taken
+anti test: 8 tests in 1 modules, 0 modules failed

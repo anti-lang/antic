@@ -1,0 +1,23 @@
+//! E1 in a catch handler: the handler returns the address of a local it
+//! declared.
+
+import anti.lang;
+
+fn failing(k: int) -> *int may fail
+{
+	fail "refused";
+}
+
+fn pick(k: int) -> *int
+{
+	let p = failing(k) catch e {
+		let x = k;
+		return &x;
+	};
+	return p;
+}
+
+fn main() -> int
+{
+	return *pick(2) - 2;
+}

@@ -1,0 +1,27 @@
+//! C2 in a catch handler: a `for` over `0..xs.len + 1` in the handler reaches
+//! the length itself on its last turn.
+
+import anti.lang;
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn pick(k: int) -> int
+{
+	let xs = [1, 2, 3];
+	let v = failing(k) catch e {
+		let total = 0;
+		for i in 0..xs.len + 1 {
+			total += xs[i];
+		}
+		yield total;
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	return pick(2);
+}

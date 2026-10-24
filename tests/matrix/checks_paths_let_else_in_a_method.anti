@@ -1,0 +1,21 @@
+//! C3 in a method: the `else` of a `let` in a function of a class reaches its
+//! end without leaving.
+
+class Reader
+{
+	pub base: int = 0,
+
+	pub fn read(self, p: ?*int) -> int
+	{
+		let v = p else {
+			self.base += 1;
+		};
+		return *v + self.base;
+	}
+}
+
+fn main() -> int
+{
+	let r = Reader { };
+	return r.read(none);
+}

@@ -1,0 +1,1 @@
+checks_paths_let_else_in_a_catch_handler.anti:14:18: error: the `else` of a `let` leaves the block it stands in

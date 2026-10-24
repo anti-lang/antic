@@ -1,0 +1,1 @@
+checks_use_after_free_in_a_closure.anti:18:10: error: `p` was deleted on line 17 [use-after-free]

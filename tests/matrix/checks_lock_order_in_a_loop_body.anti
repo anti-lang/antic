@@ -1,0 +1,38 @@
+//! C4 in a loop body: `forward` takes `a` and then `b`, and a loop body takes
+//! `b` and then `a`.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn backward(p: *Pair)
+{
+	for i in 0..2 {
+		sync p.b {
+			sync p.a {
+				p.n -= 1;
+			}
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	backward(&p);
+	p.n += 1;
+	return p.n;
+}

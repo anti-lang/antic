@@ -1,0 +1,1 @@
+checks_escaping_local_in_a_switch_arm.anti:8:11: error: a reference to `x` is returned, and `x` ends at line 9 [escaping-local]

@@ -1,0 +1,28 @@
+//! C5 in a defer: a deferred block holds a `sync` block whose `recv` may wait
+//! while it holds its lock.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn work(box: *Inbox, c: chan int)
+{
+	defer {
+		sync box.lock {
+			let v = recv(c) ?? &box.count;
+			box.count += *v;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	work(&box, c);
+	delete(c);
+	return box.count - 4;
+}

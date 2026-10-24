@@ -1,0 +1,26 @@
+//! C2 in a worker: a `for` over `0..xs.len + 1` in a worker reaches the length
+//! itself on its last turn.
+
+worker fn tally(part: []int) -> int
+{
+	let xs = [part[0], part[0], part[0]];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		total += xs[i];
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return 1;
+	};
+	(*room)[0] = 1;
+	(*room)[1] = 2;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}

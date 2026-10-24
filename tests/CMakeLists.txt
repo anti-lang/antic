@@ -5028,6 +5028,14 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "tests_block_twice|--front-end,--tests,tests_block_twice.anti"
         "tests_block_without_a_brace|--front-end,--tests,tests_block_without_a_brace.anti"
         "tests_block_function_without_a_name|--front-end,--tests,tests_block_function_without_a_name.anti"
+        "checks_escaping_local_in_a_tests_block|--front-end,--tests,checks_escaping_local_in_a_tests_block.anti"
+        "checks_use_after_free_in_a_tests_block|--front-end,--tests,checks_use_after_free_in_a_tests_block.anti"
+        "checks_uninitialized_read_in_a_tests_block|--front-end,--tests,checks_uninitialized_read_in_a_tests_block.anti"
+        "checks_index_out_of_range_in_a_tests_block|--front-end,--tests,checks_index_out_of_range_in_a_tests_block.anti"
+        "checks_paths_let_else_in_a_tests_block|--front-end,--tests,checks_paths_let_else_in_a_tests_block.anti"
+        "checks_lock_order_in_a_tests_block|--front-end,--tests,checks_lock_order_in_a_tests_block.anti"
+        "checks_blocking_under_lock_in_a_tests_block|--front-end,--tests,--warnings-as-errors,checks_blocking_under_lock_in_a_tests_block.anti"
+        "checks_unused_result_in_a_tests_block|--front-end,--tests,--warnings-as-errors,checks_unused_result_in_a_tests_block.anti"
         "fixtures_block_holds_a_struct|--front-end,--tests,fixtures_block_holds_a_struct.anti"
         "fixtures_block_twice|--front-end,--tests,fixtures_block_twice.anti"
         "hex_escape_short|--front-end,hex_escape_short.anti"
@@ -6308,6 +6316,19 @@ add_test(NAME anti_test_classes
         "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
         "-DMODULE=com/example/classes"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-classes"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
+# The forms that each compile-time check of 2026-10-20 lets through, in a
+# `tests` block, as anti_test_flow holds the constructs of the flow area.
+# The refusals of the checks there are the cases checks_*_in_a_tests_block
+# of tests/errors.
+add_test(NAME anti_test_checks
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/checks"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-checks"
         -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
 
 # `anti run --memory-checks` and `anti test --memory-checks` put the report

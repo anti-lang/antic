@@ -1,0 +1,21 @@
+//! E1 in a `tests` block: a test stores the address of its local into a static
+//! field, a global, which outlives the local.
+
+class Last
+{
+	pub static atomic seen: ?*int = none;
+}
+
+tests
+{
+	fn keeps_an_address()
+	{
+		let x = 1;
+		Last.seen.store(&x);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

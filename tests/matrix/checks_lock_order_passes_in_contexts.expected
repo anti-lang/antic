@@ -1,0 +1,12 @@
+exit 0
+loop body: 3
+switch arm: 13
+defer: 14
+undo: 15
+after undo
+catch handler: 16
+closure: 17
+worker: 18
+sync block: 19
+generic body: 21
+method: 22

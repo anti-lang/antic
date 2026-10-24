@@ -1,0 +1,25 @@
+//! C3 in a catch handler: the `else` of a `let` inside a handler reaches its
+//! end without leaving.
+
+import anti.lang;
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn pick(p: ?*int, k: int) -> int
+{
+	let got = failing(k) catch e {
+		let v = p else {
+			k += 1;
+		};
+		yield *v;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	return pick(none, 1);
+}

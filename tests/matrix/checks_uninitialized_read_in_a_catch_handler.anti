@@ -1,0 +1,28 @@
+//! C1 in a catch handler: the handler reads element 1 of `alloc(T, n)`, which
+//! no path wrote.
+
+import anti.lang;
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn pick(k: int) -> int
+{
+	let v = failing(k) catch e {
+		let p = alloc(int, 4) else {
+			yield -1;
+		};
+		p[0] = k;
+		let w = p[1];
+		free(p);
+		yield w;
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	return pick(2);
+}

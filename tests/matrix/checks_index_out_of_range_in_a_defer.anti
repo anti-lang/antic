@@ -1,0 +1,22 @@
+//! C2 in a defer: a `for` over `0..xs.len + 1` in the deferred block reaches
+//! the length itself on its last turn.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show()
+{
+	let xs = [1, 2, 3];
+	defer {
+		let total = 0;
+		for i in 0..xs.len + 1 {
+			total += xs[i];
+		}
+		printf("%d\n".ptr, total);
+	}
+}
+
+fn main() -> int
+{
+	show();
+	return 0;
+}

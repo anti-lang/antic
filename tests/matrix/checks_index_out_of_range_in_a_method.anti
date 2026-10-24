@@ -1,0 +1,23 @@
+//! C2 in a method: a `for` over `0..xs.len + 1` in a function of a class
+//! reaches the length itself on its last turn.
+
+class Summer
+{
+	pub base: int = 0,
+
+	pub fn sum(self) -> int
+	{
+		let xs = [self.base, self.base, self.base];
+		let total = 0;
+		for i in 0..xs.len + 1 {
+			total += xs[i];
+		}
+		return total;
+	}
+}
+
+fn main() -> int
+{
+	let s = Summer { base: 1 };
+	return s.sum();
+}

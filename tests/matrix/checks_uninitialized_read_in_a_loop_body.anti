@@ -1,0 +1,16 @@
+//! C1 in a loop body: each turn reads element 1 of `alloc(T, n)`, which no path
+//! wrote.
+
+fn main() -> int
+{
+	let p = alloc(int, 4) else {
+		return 1;
+	};
+	p[0] = 1;
+	let total = 0;
+	for i in 0..2 {
+		total += p[1];
+	}
+	free(p);
+	return total;
+}

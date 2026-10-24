@@ -1,0 +1,1 @@
+checks_escaping_local_in_an_undo.anti:14:19: error: a reference to `x` is stored into the global `seen`, and `x` ends at line 17 [escaping-local]

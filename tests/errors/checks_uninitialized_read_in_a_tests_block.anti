@@ -1,0 +1,20 @@
+//! C1 in a `tests` block: a test reads element 1 of `alloc(T, n)`, which no
+//! path wrote.
+
+tests
+{
+	fn reads_an_unwritten_element()
+	{
+		let p = alloc(int, 4) else {
+			return;
+		};
+		p[0] = 1;
+		assert(p[1] == 0);
+		free(p);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,27 @@
+//! C1 in a sync block: the block reads element 1 of `alloc(T, n)`, which no
+//! path wrote.
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn add(b: *Box, k: int)
+{
+	sync b.lock {
+		let p = alloc(int, 4) else {
+			return;
+		};
+		p[0] = k;
+		b.total += p[1];
+		free(p);
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { total: 0 };
+	add(&b, 1);
+	return b.total;
+}

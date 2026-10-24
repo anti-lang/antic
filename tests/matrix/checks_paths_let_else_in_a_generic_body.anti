@@ -1,0 +1,16 @@
+//! C3 in a generic body: the `else` of a `let` in a generic function reaches
+//! its end without leaving.
+
+fn pick<T>(p: ?*T, fallback: *T) -> *T
+{
+	let v = p else {
+		let n = 1;
+	};
+	return v;
+}
+
+fn main() -> int
+{
+	let f = 0;
+	return *pick<int>(none, &f);
+}

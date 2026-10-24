@@ -1,0 +1,42 @@
+//! C4 in a switch arm: `forward` takes `a` and then `b`, and an arm takes `b`
+//! and then `a`.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn backward(p: *Pair, k: int)
+{
+	switch k {
+		1 => {
+			sync p.b {
+				sync p.a {
+					p.n -= 1;
+				}
+			}
+		},
+		else => {
+			p.n += 1;
+		},
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	backward(&p, 1);
+	return p.n;
+}

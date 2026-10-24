@@ -1,0 +1,21 @@
+//! C3 in a defer: the `else` of a `let` in the deferred block reaches its end
+//! without leaving. A `defer` takes no `return`, so nothing but a loop of its
+//! own or a call that never returns could end that path.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(p: ?*int)
+{
+	defer {
+		let v = p else {
+			printf("none\n".ptr);
+		};
+		printf("%d\n".ptr, *v);
+	}
+}
+
+fn main() -> int
+{
+	show(none);
+	return 0;
+}

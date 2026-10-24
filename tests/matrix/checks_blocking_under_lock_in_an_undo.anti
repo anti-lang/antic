@@ -1,0 +1,33 @@
+//! C5 in an undo: the block of a fail path holds a `sync` block whose `recv`
+//! may wait while it holds its lock.
+
+import anti.lang;
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn work(box: *Inbox, c: chan int) may fail
+{
+	undo {
+		sync box.lock {
+			let v = recv(c) ?? &box.count;
+			box.count += *v;
+		}
+	}
+	fail "undone";
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	work(&box, c) catch e {
+		box.count += 0;
+	};
+	delete(c);
+	return box.count - 4;
+}

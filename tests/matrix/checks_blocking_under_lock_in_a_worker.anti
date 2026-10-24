@@ -1,0 +1,31 @@
+//! C5 in a worker: a worker holds a `sync` block whose `recv` may wait while it
+//! holds its lock.
+
+class Inbox
+{
+	pub lock: Mutex,
+	pub count: int = 0,
+}
+
+worker fn drain(box: *Inbox, c: chan int) -> int
+{
+	sync box.lock {
+		let v = recv(c) else {
+			return 0;
+		};
+		box.count += *v;
+	}
+	return box.count;
+}
+
+fn main() -> int
+{
+	let box = alloc Inbox { };
+	let c = chan int(1);
+	send(c, 4);
+	let j = dispatch box -> drain(c);
+	let n = join(j);
+	delete(c);
+	delete(box);
+	return n - 4;
+}

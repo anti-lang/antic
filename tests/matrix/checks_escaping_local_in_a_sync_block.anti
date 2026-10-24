@@ -1,0 +1,23 @@
+//! E1 in a sync block: the block stores the address of a local into a field of
+//! the guarded struct, which outlives the local.
+
+struct Box
+{
+	lock: Mutex,
+	p: ?*int,
+}
+
+fn keep(b: *Box, k: int)
+{
+	sync b.lock {
+		let x = k;
+		b.p = &x;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { p: none };
+	keep(&b, 1);
+	return 0;
+}

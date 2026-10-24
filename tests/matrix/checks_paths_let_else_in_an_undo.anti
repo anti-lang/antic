@@ -1,0 +1,25 @@
+//! C3 in an undo: the `else` of a `let` in the block of the fail path reaches
+//! its end without leaving.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(p: ?*int) may fail
+{
+	undo {
+		let v = p else {
+			printf("none\n".ptr);
+		};
+		printf("%d\n".ptr, *v);
+	}
+	fail "undone";
+}
+
+fn main() -> int
+{
+	show(none) catch e {
+		return 0;
+	};
+	return 1;
+}

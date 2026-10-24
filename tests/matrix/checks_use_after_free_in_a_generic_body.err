@@ -1,0 +1,1 @@
+checks_use_after_free_in_a_generic_body.anti:17:10: error: `a` was moved into `take` on line 16 [use-after-free]

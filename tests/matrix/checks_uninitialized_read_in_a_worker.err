@@ -1,0 +1,1 @@
+checks_uninitialized_read_in_a_worker.anti:10:10: error: element 1 of `p` is read before every path from `alloc` on line 6 wrote it [uninitialized-read]

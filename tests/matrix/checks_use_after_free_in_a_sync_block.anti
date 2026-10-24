@@ -1,0 +1,28 @@
+//! E2 in a sync block: the block reads a node after it deleted it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn add(b: *Box, k: int)
+{
+	sync b.lock {
+		let p = alloc Node { n: k };
+		delete(p);
+		b.total += p.n;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { total: 0 };
+	add(&b, 1);
+	return b.total - 1;
+}

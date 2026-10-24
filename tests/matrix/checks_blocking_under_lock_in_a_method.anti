@@ -1,0 +1,32 @@
+//! C5 in a method: a function of a plain class holds a `sync` block whose
+//! `recv` may wait while it holds its lock.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+class Worker
+{
+	pub fn work(self, box: *Inbox, c: chan int)
+	{
+		sync box.lock {
+			let v = recv(c) else {
+				return;
+			};
+			box.count += *v;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	let w = Worker { };
+	w.work(&box, c);
+	delete(c);
+	return box.count - 4;
+}

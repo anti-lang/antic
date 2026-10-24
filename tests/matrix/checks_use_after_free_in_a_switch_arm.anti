@@ -1,0 +1,25 @@
+//! E2 in a switch arm: the arm reads a node after it deleted it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn pick(k: int) -> int
+{
+	switch k {
+		1 => {
+			let p = alloc Node { n: k };
+			delete(p);
+			return p.n;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return pick(1) - 1;
+}

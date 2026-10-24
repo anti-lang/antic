@@ -1,0 +1,22 @@
+//! C6 in a sync block: a call without effects whose result nothing takes.
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn add(b: *Box, k: int)
+{
+	sync b.lock {
+		k.hash();
+		b.total += k;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { total: 0 };
+	add(&b, 1);
+	return b.total - 1;
+}

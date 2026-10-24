@@ -1,0 +1,138 @@
+//! The forms that each compile-time check of 2026-10-20 lets through, each in a
+//! function of a `tests` block. `anti test` compiles the block, and each test
+//! asserts what its forms compute.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn bump(p: *int) -> int
+{
+	*p += 1;
+	return *p;
+}
+
+fn held(k: int) -> ?int
+{
+	if k % 2 == 0 {
+		return none;
+	}
+	return k;
+}
+
+fn take(c: chan int) -> int
+{
+	let v = recv(c) else {
+		return 0;
+	};
+	return *v;
+}
+
+tests
+{
+	fn escaping_local_lent_to_a_call()
+	{
+		let x = 1;
+		let p = &x;
+		{
+			let q = p;
+			let got = bump(q);
+			assert(got == 2);
+		}
+		assert(x == 2);
+	}
+
+	fn use_after_free_after_a_new_value()
+	{
+		let p = alloc Node { n: 1 };
+		delete(p);
+		p = alloc Node { n: 2 };
+		assert(p.n == 2);
+		delete(p);
+	}
+
+	fn uninitialized_read_after_the_whole_range()
+	{
+		let p = alloc(int, 3) else {
+			return;
+		};
+		for i in 0..3 {
+			p[i] = i + 1;
+		}
+		let total = p[0] + p[1] + p[2];
+		free(p);
+		assert(total == 6);
+	}
+
+	fn index_out_of_range_inside_the_length()
+	{
+		let xs = [1, 2, 3];
+		let total = 0;
+		for i in 0..xs.len {
+			total += xs[i];
+		}
+		assert(total + xs[xs.len - 1] == 9);
+	}
+
+	fn paths_of_an_else_that_leaves()
+	{
+		let total = 0;
+		for i in 0..4 {
+			let v = held(i) else {
+				continue;
+			};
+			total += v;
+		}
+		assert(total == 4);
+	}
+
+	fn lock_order_taken_one_way()
+	{
+		let p = Pair { n: 0 };
+		for i in 0..2 {
+			sync p.a {
+				sync p.b {
+					p.n += 1;
+				}
+			}
+		}
+		assert(p.n == 2);
+	}
+
+	fn blocking_outside_the_lock()
+	{
+		let box = Inbox { count: 0 };
+		let c = chan int(1);
+		send(c, 4);
+		let v = take(c);
+		sync box.lock {
+			box.count += v;
+		}
+		delete(c);
+		assert(box.count == 4);
+	}
+
+	fn unused_result_taken()
+	{
+		let n = 0;
+		bump(&n);
+		let first = n.hash();
+		let second = n.hash();
+		assert(first == second);
+		assert(n == 1);
+	}
+}

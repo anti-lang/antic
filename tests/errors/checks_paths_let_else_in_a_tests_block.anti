@@ -1,0 +1,23 @@
+//! C3 in a `tests` block: the `else` of a `let` in a test reaches its end
+//! without leaving.
+
+fn none_of() -> ?*int
+{
+	return none;
+}
+
+tests
+{
+	fn reads_none()
+	{
+		let v = none_of() else {
+			let n = 1;
+		};
+		assert(*v == 1);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

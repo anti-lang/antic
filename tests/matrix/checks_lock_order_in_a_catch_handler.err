@@ -1,0 +1,1 @@
+checks_lock_order_in_a_catch_handler.anti:31:4: error: `Pair.a` is locked here while `Pair.b` is held, and line 16 locks them in the other order [lock-order]

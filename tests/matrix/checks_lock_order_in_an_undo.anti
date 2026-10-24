@@ -1,0 +1,42 @@
+//! C4 in an undo: `forward` takes `a` and then `b`, and the block of a fail
+//! path takes `b` and then `a`.
+
+import anti.lang;
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn backward(p: *Pair) may fail
+{
+	undo {
+		sync p.b {
+			sync p.a {
+				p.n -= 1;
+			}
+		}
+	}
+	fail "undone";
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	backward(&p) catch e {
+		return p.n;
+	};
+	return p.n;
+}

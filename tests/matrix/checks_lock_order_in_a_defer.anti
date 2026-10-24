@@ -1,0 +1,37 @@
+//! C4 in a defer: `forward` takes `a` and then `b`, and a deferred block takes
+//! `b` and then `a`.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn backward(p: *Pair)
+{
+	defer {
+		sync p.b {
+			sync p.a {
+				p.n -= 1;
+			}
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	backward(&p);
+	return p.n;
+}

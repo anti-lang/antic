@@ -1,0 +1,1 @@
+checks_index_out_of_range_in_a_generic_body.anti:8:15: error: the index reaches 3 on a turn of the `for` on line 7, outside `xs` of length 3 [index-out-of-range]

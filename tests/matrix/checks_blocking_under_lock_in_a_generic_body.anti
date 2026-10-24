@@ -1,0 +1,33 @@
+//! C5 in a generic body: a generic function holds a `sync` block whose `recv`
+//! may wait while it holds its lock.
+
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn work<T>(box: *Inbox, c: chan T, add: fn(*T) -> int)
+{
+	sync box.lock {
+		let v = recv(c) else {
+			return;
+		};
+		box.count += add(v);
+	}
+}
+
+fn plain(v: *int) -> int
+{
+	return *v;
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	work<int>(&box, c, plain);
+	delete(c);
+	return box.count - 4;
+}

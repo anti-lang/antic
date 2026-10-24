@@ -1,0 +1,25 @@
+//! C2 in a sync block: a `for` over `0..xs.len + 1` inside the block reaches
+//! the length itself on its last turn.
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn add(b: *Box)
+{
+	let xs = [1, 2, 3];
+	sync b.lock {
+		for i in 0..xs.len + 1 {
+			b.total += xs[i];
+		}
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { total: 0 };
+	add(&b);
+	return b.total;
+}

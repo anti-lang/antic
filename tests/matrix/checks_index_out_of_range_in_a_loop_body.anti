@@ -1,0 +1,14 @@
+//! C2 in a loop body: an inner `for` over `0..xs.len + 1` reaches the length
+//! itself on its last turn, on every turn of the outer loop.
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for j in 0..2 {
+		for i in 0..xs.len + 1 {
+			total += xs[i];
+		}
+	}
+	return total;
+}

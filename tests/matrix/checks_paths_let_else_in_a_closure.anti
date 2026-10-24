@@ -1,0 +1,17 @@
+//! C3 in a closure: the `else` of a `let` in an anonymous function reaches its
+//! end without leaving.
+
+fn call(f: fn(?*int) -> int) -> int
+{
+	return f(none);
+}
+
+fn main() -> int
+{
+	return call(fn(p) {
+		let v = p else {
+			let n = 1;
+		};
+		return *v;
+	});
+}

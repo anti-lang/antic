@@ -1,0 +1,21 @@
+//! C6 in a worker: a call without effects whose result nothing takes.
+
+worker fn tally(part: []int) -> int
+{
+	part[0].hash();
+	return part[0];
+}
+
+fn main() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return 1;
+	};
+	(*room)[0] = 1;
+	(*room)[1] = 2;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n - 3;
+}

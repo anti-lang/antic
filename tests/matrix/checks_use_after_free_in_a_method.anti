@@ -1,0 +1,24 @@
+//! E2 in a method: a function of a class reads a node after it deleted it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Maker
+{
+	pub base: int = 0,
+
+	pub fn make(self) -> int
+	{
+		let p = alloc Node { n: self.base };
+		delete(p);
+		return p.n;
+	}
+}
+
+fn main() -> int
+{
+	let m = Maker { base: 1 };
+	return m.make() - 1;
+}

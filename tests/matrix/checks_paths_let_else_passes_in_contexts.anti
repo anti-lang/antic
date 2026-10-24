@@ -1,0 +1,194 @@
+//! C3 lets through every `else` of a `let` that leaves: `continue` and `break`
+//! in a loop, `return` in a function, `yield` in a handler and a `break` of a
+//! loop of its own in a `defer` and an `undo`, which take no `return`. Each
+//! context is a function of its own and prints one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn held(k: int) -> ?int
+{
+	if k % 2 == 0 {
+		return none;
+	}
+	return k;
+}
+
+fn in_loop() -> int
+{
+	let total = 0;
+	for i in 0..6 {
+		let v = held(i) else {
+			continue;
+		};
+		if v > 4 {
+			let w = held(v + 1) else {
+				break;
+			};
+			total += w;
+		}
+		total += v;
+	}
+	return total;
+}
+
+fn in_switch(k: int) -> int
+{
+	switch k {
+		1 => {
+			let v = held(k + 1) else {
+				return -1;
+			};
+			return v;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn in_defer(k: int) -> int
+{
+	defer {
+		let shown = 0;
+		for i in 0..1 {
+			let v = held(k) else {
+				break;
+			};
+			shown = v;
+		}
+		printf("defer: %d\n".ptr, shown);
+	}
+	return k;
+}
+
+fn in_undo(k: int) may fail
+{
+	undo {
+		let shown = 0;
+		for i in 0..1 {
+			let v = held(k) else {
+				break;
+			};
+			shown = v;
+		}
+		printf("undo: %d\n".ptr, shown);
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(k: int) -> int
+{
+	let got = failing(k) catch e {
+		let v = held(k) else {
+			yield -1;
+		};
+		yield v;
+	};
+	return got;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	return call(fn(n) {
+		let v = held(n) else {
+			return -1;
+		};
+		return v * 10;
+	}, k);
+}
+
+worker fn tally(part: []int) -> int
+{
+	let v = held(part[0]) else {
+		return 0;
+	};
+	return v;
+}
+
+fn in_worker() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return -1;
+	};
+	(*room)[0] = 3;
+	(*room)[1] = 4;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] * 100 + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn in_sync(b: *Box, k: int) -> int
+{
+	sync b.lock {
+		let v = held(k) else {
+			return -1;
+		};
+		b.total += v;
+	}
+	return b.total;
+}
+
+fn pick<T>(p: ?*T, fallback: *T) -> *T
+{
+	let v = p else {
+		return fallback;
+	};
+	return v;
+}
+
+class Reader
+{
+	pub base: int = 0,
+
+	pub fn read(self, k: int) -> int
+	{
+		let v = held(k) else {
+			return self.base;
+		};
+		return v + self.base;
+	}
+}
+
+fn main() -> int
+{
+	printf("loop body: %d\n".ptr, in_loop());
+	printf("switch arm: %d\n".ptr, in_switch(1));
+	let d5 = in_defer(5);
+	let d6 = in_defer(6);
+	printf("after defer: %d %d\n".ptr, d5, d6);
+	in_undo(7) catch e {
+		printf("after undo\n".ptr);
+	};
+	printf("catch handler: %d %d\n".ptr, in_catch(9), in_catch(8));
+	printf("closure: %d %d\n".ptr, in_closure(1), in_closure(2));
+	printf("worker: %d\n".ptr, in_worker());
+	let b = Box { total: 0 };
+	let s3 = in_sync(&b, 3);
+	let s4 = in_sync(&b, 4);
+	printf("sync block: %d %d\n".ptr, s3, s4);
+	let f = 7;
+	printf("generic body: %d\n".ptr, *pick<int>(none, &f));
+	let r = Reader { base: 10 };
+	printf("method: %d %d\n".ptr, r.read(1), r.read(2));
+	return 0;
+}

@@ -1,0 +1,21 @@
+//! E2 in a `tests` block: a test reads a node after it deleted it.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+tests
+{
+	fn reads_a_deleted_node()
+	{
+		let p = alloc Node { n: 1 };
+		delete(p);
+		assert(p.n == 1);
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

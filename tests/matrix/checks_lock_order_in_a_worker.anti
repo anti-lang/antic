@@ -1,0 +1,38 @@
+//! C4 in a worker: `forward` takes `a` and then `b`, and a worker takes `b` and
+//! then `a`.
+
+class Pair
+{
+	pub a: Mutex,
+	pub b: Mutex,
+	pub n: int = 0,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+worker fn backward(p: *Pair) -> int
+{
+	sync p.b {
+		sync p.a {
+			p.n -= 1;
+		}
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let p = alloc Pair { };
+	forward(p);
+	let j = dispatch p -> backward;
+	let n = join(j) + p.n;
+	delete(p);
+	return n;
+}

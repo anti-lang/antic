@@ -1,0 +1,173 @@
+//! C2 lets through every index it cannot prove outside the range: a `for` over
+//! `0..xs.len`, the last element at `xs.len - 1`, a step that stays inside the
+//! length and an index read at run time, which keeps the bounds check of dev
+//! mode. Each context is a function of its own and prints one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn sum(xs: [4]int) -> int
+{
+	let total = 0;
+	for i in 0..xs.len {
+		total += xs[i];
+	}
+	return total;
+}
+
+fn in_loop() -> int
+{
+	let xs = [1, 2, 3, 4];
+	let total = 0;
+	for j in 0..2 {
+		for i in 0..xs.len by 2 {
+			total += xs[i] + j;
+		}
+	}
+	return total;
+}
+
+fn in_switch(k: int) -> int
+{
+	let xs = [1, 2, 3, 4];
+	switch k {
+		1 => {
+			return xs[xs.len - 1] + sum(xs);
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn in_defer() -> int
+{
+	let xs = [5, 6, 7, 8];
+	defer {
+		printf("defer: %d\n".ptr, sum(xs) + xs[0]);
+	}
+	return xs[3];
+}
+
+fn in_undo() may fail
+{
+	let xs = [1, 1, 1, 1];
+	undo {
+		printf("undo: %d\n".ptr, sum(xs));
+	}
+	fail "undone";
+}
+
+fn failing(k: int) -> int may fail
+{
+	fail "refused";
+}
+
+fn in_catch(k: int) -> int
+{
+	let xs = [k, k, k, k];
+	let v = failing(k) catch e {
+		yield xs[k] + sum(xs);
+	};
+	return v;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	return call(fn(v) {
+		let xs = [v, v + 1, v + 2, v + 3];
+		let total = 0;
+		for i in 0..xs.len {
+			total += xs[i];
+		}
+		return total;
+	}, k);
+}
+
+worker fn tally(part: []int) -> int
+{
+	let total = 0;
+	for i in 0..part.len {
+		total += part[i];
+	}
+	return total;
+}
+
+fn in_worker() -> int
+{
+	let room = alloc([4]int, 1) else {
+		return -1;
+	};
+	(*room)[0] = 1;
+	(*room)[1] = 2;
+	(*room)[2] = 3;
+	(*room)[3] = 4;
+	let sums = parallel (*room)[0..4] by 2 -> tally;
+	let n = sums[0] * 100 + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}
+
+struct Box
+{
+	lock: Mutex,
+	total: int,
+}
+
+fn in_sync(b: *Box) -> int
+{
+	let xs = [2, 4, 6, 8];
+	sync b.lock {
+		for i in 0..xs.len {
+			b.total += xs[i];
+		}
+	}
+	return b.total;
+}
+
+fn count<T>(xs: [4]T) -> int
+{
+	let n = 0;
+	for i in 0..xs.len {
+		let p = &xs[i];
+		n += 1;
+	}
+	return n;
+}
+
+class Summer
+{
+	pub base: int = 0,
+
+	pub fn total(self) -> int
+	{
+		let xs = [self.base, self.base, self.base, self.base];
+		return sum(xs) + xs[xs.len - 1];
+	}
+}
+
+fn main(args: []str) -> int
+{
+	printf("loop body: %d\n".ptr, in_loop());
+	printf("switch arm: %d\n".ptr, in_switch(1));
+	printf("after defer: %d\n".ptr, in_defer());
+	in_undo() catch e {
+		printf("after undo\n".ptr);
+	};
+	printf("catch handler: %d\n".ptr, in_catch(args.len + 1));
+	printf("closure: %d\n".ptr, in_closure(3));
+	printf("worker: %d\n".ptr, in_worker());
+	let b = Box { total: 0 };
+	printf("sync block: %d\n".ptr, in_sync(&b));
+	printf("generic body: %d\n".ptr, count<int>([1, 2, 3, 4]));
+	let s = Summer { base: 5 };
+	printf("method: %d\n".ptr, s.total());
+	return 0;
+}

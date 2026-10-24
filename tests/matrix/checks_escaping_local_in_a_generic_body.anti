@@ -1,0 +1,12 @@
+//! E1 in a generic body: a generic function returns the address of its local.
+
+fn boxed<T>(v: T) -> *T
+{
+	let x = dup(v);
+	return &x;
+}
+
+fn main() -> int
+{
+	return *boxed<int>(5) - 5;
+}

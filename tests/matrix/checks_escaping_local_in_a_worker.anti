@@ -1,0 +1,28 @@
+//! E1 in a worker: a worker stores the address of a local into a static field,
+//! a global, which outlives the local.
+
+class Last
+{
+	pub static atomic seen: ?*int = none;
+}
+
+worker fn tally(part: []int) -> int
+{
+	let x = part[0];
+	Last.seen.store(&x);
+	return x;
+}
+
+fn main() -> int
+{
+	let room = alloc([2]int, 1) else {
+		return 1;
+	};
+	(*room)[0] = 1;
+	(*room)[1] = 2;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n - 3;
+}

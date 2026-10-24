@@ -1,0 +1,21 @@
+//! E1 in a defer: the deferred block stores the address of a local into a
+//! static field, a global, which outlives the local.
+
+class Last
+{
+	pub static atomic seen: ?*int = none;
+}
+
+fn remember(k: int)
+{
+	let x = k;
+	defer {
+		Last.seen.store(&x);
+	}
+}
+
+fn main() -> int
+{
+	remember(4);
+	return 0;
+}

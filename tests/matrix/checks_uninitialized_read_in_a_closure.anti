@@ -1,0 +1,20 @@
+//! C1 in a closure: an anonymous function reads element 1 of `alloc(T, n)`,
+//! which no path wrote.
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn main() -> int
+{
+	return call(fn(v) {
+		let p = alloc(int, 4) else {
+			return -1;
+		};
+		p[0] = v;
+		let w = p[1];
+		free(p);
+		return w;
+	}, 3);
+}

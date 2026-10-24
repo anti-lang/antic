@@ -1,0 +1,1 @@
+checks_blocking_under_lock_in_a_tests_block.anti:19:12: error: `recv` may wait while the `sync` of line 18 holds its lock [blocking-under-lock]

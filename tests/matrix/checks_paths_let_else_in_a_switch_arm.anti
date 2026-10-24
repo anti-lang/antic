@@ -1,0 +1,22 @@
+//! C3 in a switch arm: the `else` of a `let` in an arm reaches its end without
+//! leaving.
+
+fn pick(p: ?*int, k: int) -> int
+{
+	switch k {
+		1 => {
+			let v = p else {
+				k += 1;
+			};
+			return *v;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return pick(none, 1);
+}

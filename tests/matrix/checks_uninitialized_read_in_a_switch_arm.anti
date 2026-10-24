@@ -1,0 +1,25 @@
+//! C1 in a switch arm: the arm reads element 1 of `alloc(T, n)`, which no path
+//! wrote.
+
+fn pick(k: int) -> int
+{
+	switch k {
+		1 => {
+			let p = alloc(int, 4) else {
+				return -1;
+			};
+			p[0] = k;
+			let v = p[1];
+			free(p);
+			return v;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return pick(1);
+}
