@@ -1,0 +1,10 @@
+exit 0
+on every path: 8 9
+by a for loop: 6
+by a while loop: 9
+by the library: 0
+at the same index: 6
+passed to a call: 5
+passed in every turn: 23
+stored into a literal: 4
+returned: 1

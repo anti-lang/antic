@@ -1,0 +1,16 @@
+//! An element of `alloc(T, n)` written in one branch of an `if` and read after
+//! it at the same constant index. The path that skips the branch reads an
+//! element no write reached.
+
+fn main(args: []str) -> int
+{
+	let p = alloc(int, 2) else {
+		return 1;
+	};
+	if args.len > 1 {
+		p[0] = 1;
+	}
+	let v = p[0];
+	free(p);
+	return v;
+}

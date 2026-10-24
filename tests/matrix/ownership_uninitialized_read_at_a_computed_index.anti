@@ -1,0 +1,14 @@
+//! An element of `alloc(T, n)` read at a computed index before a write of the
+//! whole range. One element is written, and the index may name any other.
+
+fn main(args: []str) -> int
+{
+	let n = args.len + 3;
+	let p = alloc(int, n) else {
+		return 1;
+	};
+	p[0] = 1;
+	let v = p[n - 1];
+	free(p);
+	return v;
+}

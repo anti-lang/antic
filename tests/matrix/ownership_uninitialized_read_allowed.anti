@@ -1,0 +1,172 @@
+//! The reads that the safety check `uninitialized-read` allows. An element read
+//! at a constant index was written there on every path before it. An element
+//! read at a computed index follows a write of the whole range by a `for` loop,
+//! by a `while` loop or by `memset` of the C library, or follows a write at the
+//! same index. A buffer passed to a call, in every turn of a loop as well,
+//! stored into a literal or returned counts as written, since the function
+//! cannot see what the callee does.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn memset(to: ?*byte, value: c_int, count: c_size_t) -> ?*byte;
+
+struct Holder
+{
+	items: *int,
+	count: int,
+}
+
+fn fill(p: *int, n: int)
+{
+	for i in 0..n {
+		p[i] = i + 1;
+	}
+}
+
+fn fill_holder(h: *Holder)
+{
+	fill(h.items, h.count);
+}
+
+fn fresh(n: int) -> ?*int
+{
+	let p = alloc(int, n) else {
+		return none;
+	};
+	return p;
+}
+
+fn on_every_path(flag: bool) -> int
+{
+	let p = alloc(int, 2) else {
+		return -1;
+	};
+	if flag {
+		p[0] = 3;
+	} else {
+		p[0] = 4;
+	}
+	p[1] = 5;
+	let v = p[0] + p[1];
+	free(p);
+	return v;
+}
+
+fn by_a_for_loop(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	for i in 0..n {
+		p[i] = i * 2;
+	}
+	let v = p[n - 1];
+	free(p);
+	return v;
+}
+
+fn by_a_while_loop(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	let i = 0;
+	while i < n do {
+		p[i] = i * 3;
+		i += 1;
+	}
+	let v = p[n - 1];
+	free(p);
+	return v;
+}
+
+fn by_the_library(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	memset(p as ?*byte, 0, (n * 8) as c_size_t);
+	let v = p[n - 1] + p[0];
+	free(p);
+	return v;
+}
+
+fn at_the_same_index(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	let total = 0;
+	for i in 0..n {
+		p[i] = i;
+		total += p[i];
+	}
+	free(p);
+	return total;
+}
+
+fn passed_to_a_call(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	fill(p, n);
+	let v = p[n - 1] + p[0];
+	free(p);
+	return v;
+}
+
+fn put(p: *int, i: int)
+{
+	p[i] = 10 + i;
+}
+
+fn passed_in_every_turn(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	for i in 0..n {
+		put(p, i);
+	}
+	let v = p[n - 1] + p[0];
+	free(p);
+	return v;
+}
+
+fn stored_into_a_literal(n: int) -> int
+{
+	let p = alloc(int, n) else {
+		return -1;
+	};
+	let h = Holder { items: p, count: n };
+	fill_holder(&h);
+	let v = p[n - 1];
+	free(p);
+	return v;
+}
+
+fn returned(n: int) -> int
+{
+	let p = fresh(n) else {
+		return -1;
+	};
+	fill(p, n);
+	let v = p[0];
+	free(p);
+	return v;
+}
+
+fn main() -> int
+{
+	printf("on every path: %d %d\n".ptr, on_every_path(true) as c_int,
+		on_every_path(false) as c_int);
+	printf("by a for loop: %d\n".ptr, by_a_for_loop(4) as c_int);
+	printf("by a while loop: %d\n".ptr, by_a_while_loop(4) as c_int);
+	printf("by the library: %d\n".ptr, by_the_library(4) as c_int);
+	printf("at the same index: %d\n".ptr, at_the_same_index(4) as c_int);
+	printf("passed to a call: %d\n".ptr, passed_to_a_call(4) as c_int);
+	printf("passed in every turn: %d\n".ptr, passed_in_every_turn(4) as c_int);
+	printf("stored into a literal: %d\n".ptr, stored_into_a_literal(4) as c_int);
+	printf("returned: %d\n".ptr, returned(4) as c_int);
+	return 0;
+}

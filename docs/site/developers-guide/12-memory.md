@@ -40,6 +40,42 @@ The memory of `alloc(T, n)` stands at the alignment of `T`. It comes from `anti_
 
 The memory of `alloc(T, n)` is not written. Its elements hold what the allocator left there, and the program stores each before it reads it. One case differs. Where `T` is a class or owns something, the memory is zeroed. Every element then has a zero table until the program fills it.
 
+The safety check `uninitialized-read` follows the paths of the function from the `alloc`. A read at a constant index needs a write at that index on every path before it. A read at a computed index needs a write of the whole range first, by a loop whose every turn writes an element. A write at the same index before the read is enough as well. A buffer passed to a call, returned or stored counts as written from there on, since the function cannot see what the callee does. The message names the element and the line of the `alloc`.
+
+```anti refused
+//! error: element 1 of `p` is read before every path from `alloc` on line 5 wrote it [uninitialized-read]
+fn main() -> int
+{
+	let p = alloc(int, 2) else {
+		return 1;
+	};
+	p[0] = 7;
+	let v = p[1];
+	free(p);
+	return v;
+}
+```
+
+A loop that writes every element comes first, and the read after it compiles.
+
+```anti
+fn main() -> int
+{
+	let n = 4;
+	let p = alloc(int, n) else {
+		return 1;
+	};
+	for i in 0..n {
+		p[i] = i * i;
+	}
+	let v = p[n - 1];
+	free(p);
+	return v - 9;
+}
+```
+
+The check refuses what it proves. A read it cannot follow counts as written, and `unchecked(uninitialized-read, "reason")` overrules the check.
+
 A pointer has no arithmetic. `p + 1` and `q - p` are refused, a pointer does not convert to an integer or back, and `<` does not compare two pointers. `&p[i]` is the one form that moves a pointer.
 
 `free` takes memory that `alloc` gave. It runs no teardown. An object of a class that owns something ends with `delete(p)`, which [chapter 11]({{% relref "11-ownership" %}}) holds.

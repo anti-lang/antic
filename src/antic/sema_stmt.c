@@ -2591,6 +2591,7 @@ void sema_check_function(struct checker *c, struct item *it)
     sema_check_construct_sets(c, it);
     sema_check_escapes(c, it, first);
     sema_check_frees(c, it, first);
+    sema_check_fills(c, it, first);
     sema_leave_scope(c, &params);
     if (it->symbol->type->never && !sema_block_returns(it->body)) {
         char named[128];

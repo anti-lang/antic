@@ -1,0 +1,17 @@
+//! An element of `alloc(T, n)` read at the index a loop writes, before the
+//! loop. The loop writes the whole range after the read, so the read comes
+//! first.
+
+fn main() -> int
+{
+	let p = alloc(int, 4) else {
+		return 1;
+	};
+	let total = 0;
+	for i in 0..4 {
+		total += p[i];
+		p[i] = i;
+	}
+	free(p);
+	return total;
+}

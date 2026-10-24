@@ -1,0 +1,1 @@
+ownership_uninitialized_read_written_on_one_path.anti:13:10: error: element 0 of `p` is read before every path from `alloc` on line 7 wrote it [uninitialized-read]

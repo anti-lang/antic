@@ -47,7 +47,9 @@ every pattern literal. `tests/programs/lock_free_queue.anti` and
 `escaping-local`, a walk of every function body after the checker, and
 `tests/errors/escaping_local.anti` overrules it. `sema_free.c` holds
 `use-after-free`, a walk of the paths of every function body after the
-checker, and `tests/errors/use_after_free.anti` overrules it.
+checker, and `tests/errors/use_after_free.anti` overrules it. `sema_uninit.c` holds
+`uninitialized-read`, a walk of the paths of every function body after
+the checker, and `tests/errors/uninitialized_read.anti` overrules it.
 
 | Name | Meaning | Fix |
 |---|---|---|
@@ -55,6 +57,7 @@ checker, and `tests/errors/use_after_free.anti` overrules it.
 | `exponential-pattern` | A pattern literal nests repeats over text that overlaps, which can take exponential time. | Use the possessive quantifiers or an atomic group, `a++` or `(?>...)`. |
 | `escaping-local` | A reference to a local or a parameter, or to a part of one, would outlive it: returned, yielded, stored outside its block, sent, dispatched or captured by a closure that leaves. | Give the value its own memory with `alloc` or `dup`, or keep the reference inside the block of its local. |
 | `use-after-free` | A value is used on a path after `delete`, `destroy` or a move of it. | Assign it a new value first, or use it before it dies. |
+| `uninitialized-read` | An element of `alloc(T, n)` is read before any path wrote it. | Write the element, or fill the whole range, before the read. |
 
 ## Decided and not built
 
@@ -72,7 +75,6 @@ the name to `src/antic/warnings.c`.
 
 | Safety check | Meaning | Fix |
 |---|---|---|
-| `uninitialized-read` | An element of `alloc(T, n)` is read before any path wrote it. | Write the element, or fill the whole range, before the read. |
 | `index-out-of-range` | An index is out of range on every turn or every path that reaches it. | Correct the bound, as `0..n` in place of `0..=n`. |
 | `lock-order` | The graph of lock orders of the program holds a cycle, so two places take the same locks in opposite orders. | Take the locks in one order everywhere, or both with `sync a, b`. |
 

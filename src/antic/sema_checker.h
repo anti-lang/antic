@@ -21,12 +21,13 @@
    sema_safety.c checks the thread-safe classes and says which types are
    thread-safe. sema_escape.c refuses a reference to a local that would
    outlive the local, and sema_free.c a use of a value on a path after
-   `delete`, `destroy` or a move of it. sema_generic.c checks generics,
-   and sema_copies.c compiles their copies. sema_hash.c checks hashing
-   and the default `==`, and sema_pattern.c the pattern literals and
-   their calls. sema_export.c checks what crosses to C and writes the
-   interface of a module, and sema_doc.c the doc warnings, which read the
-   module alone.
+   `delete`, `destroy` or a move of it. sema_uninit.c refuses a read of
+   an element of `alloc(T, n)` before a path wrote it. sema_generic.c
+   checks generics, and sema_copies.c compiles their copies. sema_hash.c
+   checks hashing and the default `==`, and sema_pattern.c the pattern
+   literals and their calls. sema_export.c checks what crosses to C and
+   writes the interface of a module, and sema_doc.c the doc warnings,
+   which read the module alone.
 
    DESIGN: every node, type, name and list a function of the checker
    makes lies in the arena of the checker, c->arena, which the pool of
@@ -805,6 +806,14 @@ void sema_check_escapes(struct checker *c, const struct item *it,
    checker checked. It reads nothing when a diagnostic from index first
    on is an error of the checker. */
 void sema_check_frees(struct checker *c, const struct item *it,
+                      size_t first);
+
+/* sema_uninit.c */
+
+/* The safety check `uninitialized-read` over the body of it, which the
+   checker checked. It reads nothing when a diagnostic from index first
+   on is an error of the checker. */
+void sema_check_fills(struct checker *c, const struct item *it,
                       size_t first);
 
 /* sema_safety.c */

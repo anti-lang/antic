@@ -85,6 +85,7 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/sema_simd.c` | The checks of simd structs: operators lane by lane, `as` with the C layout it compares, and the built-ins. |
 | `src/antic/sema_stmt.c` | Checks statements and function bodies, and walks the functions a worker reaches. |
 | `src/antic/sema_thread.c` | The atomic operations, `Mutex.new` and `destroy`, the channel operations, and the workers of `parallel` and `dispatch` with `join`. |
+| `src/antic/sema_uninit.c` | The safety check `uninitialized-read`: a walk of the paths of a checked body that refuses a read of an element of `alloc(T, n)` before a path wrote it. |
 | `src/antic/sema_value.c` | The value rules: what owns something, what moves, and the copies that `=`, `let`, a literal and a call refuse. |
 | `src/antic/types.c` | Builds and interns the checked types of a compilation, answers the predicates on them, declares the types of `anti.lang` the compiler knows, names types and measures how deep values nest. |
 | `src/antic/types.h` | The interface of `types.c`, with the names of the library modules the compiler knows. |

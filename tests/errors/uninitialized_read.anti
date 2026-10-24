@@ -1,0 +1,39 @@
+//! The safety check `uninitialized-read` stops a dev build as it stops a
+//! release build, and `unchecked(uninitialized-read, "reason")` overrules it
+//! before a statement and last in the header of a function.
+
+fn statement() -> int
+{
+	let p = alloc(int, 2) else {
+		return 1;
+	};
+	unchecked(uninitialized-read, "the test reads the element alone")
+	let v = p[1];
+	free(p);
+	return 0;
+}
+
+fn function() -> int unchecked(uninitialized-read, "the test reads the element alone")
+{
+	let p = alloc(int, 2) else {
+		return 1;
+	};
+	let v = p[1];
+	free(p);
+	return 0;
+}
+
+fn refused() -> int
+{
+	let p = alloc(int, 2) else {
+		return 1;
+	};
+	let v = p[1];
+	free(p);
+	return v;
+}
+
+fn main() -> int
+{
+	return statement() + function() + refused();
+}

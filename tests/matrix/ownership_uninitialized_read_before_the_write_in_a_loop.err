@@ -1,0 +1,1 @@
+ownership_uninitialized_read_before_the_write_in_a_loop.anti:12:12: error: an element of `p` is read at a computed index before every path from `alloc` on line 7 wrote the whole range [uninitialized-read]

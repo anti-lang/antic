@@ -1,0 +1,13 @@
+//! An element of `alloc(T, n)` read at a constant index that no path wrote. The
+//! element holds what the allocator left there on every run.
+
+fn main() -> int
+{
+	let p = alloc(int, 4) else {
+		return 1;
+	};
+	p[0] = 1;
+	let v = p[1];
+	free(p);
+	return v;
+}

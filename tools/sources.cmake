@@ -106,6 +106,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema_simd.c
     src/antic/sema_stmt.c
     src/antic/sema_thread.c
+    src/antic/sema_uninit.c
     src/antic/sema_value.c
     src/antic/target.c
     src/antic/text.c
