@@ -1,0 +1,15 @@
+//! Two libraries take the locks of a pair in opposite orders, and neither
+//! imports the other. The program that imports both holds the cycle, and the
+//! message stands at its `main`.
+
+import com.example.left;
+import com.example.pairs;
+import com.example.right;
+
+fn main() -> int
+{
+	let p = pairs.pair();
+	left.forward(&p);
+	right.backward(&p);
+	return 0;
+}

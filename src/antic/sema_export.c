@@ -635,6 +635,7 @@ void sema_interface(const struct module *module, const char *module_name,
                       module->linux_libraries[i].name.length);
     }
     out->linux_library_count = module->linux_library_count;
+    out->locks = module->locks;
     out->items = types_alloc_array(
         arena, module->item_count + module->stripped_count + 1,
         sizeof *out->items);

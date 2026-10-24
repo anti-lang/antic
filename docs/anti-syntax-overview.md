@@ -1523,7 +1523,7 @@ The five `doc-` warnings and `undocumented` come with `--doc-warnings`, which `a
 | `index-out-of-range` | An index is out of range on every path that reaches it. |
 | `lock-order` | Two places take the same two locks in opposite orders. |
 
-Not built yet: the warnings `blocking-under-lock` and `unused-result` and the safety check `lock-order`, decided under "Compile-time checks of 2026-10-20" in `docs/decisions.md`.
+Not built yet: the warnings `blocking-under-lock` and `unused-result`, decided under "Compile-time checks of 2026-10-20" in `docs/decisions.md`.
 
 ## Wire formats
 

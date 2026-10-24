@@ -30,6 +30,7 @@ struct struct_field;    /* a field of a checked type */
 struct expr;
 struct item;
 struct symbolic;
+struct lock_facts;  /* the lock orders of a module, in sema.h */
 
 enum type_expr_kind {
     TYPEX_BUILTIN,  /* int, f32, str and the other type keywords */
@@ -1153,6 +1154,9 @@ struct module {
        and every `constraint`. The interface of the module carries them. */
     struct item **stripped;
     size_t stripped_count;
+    /* Set by the checker: what the safety check `lock-order` keeps of
+       the module, which its interface carries. NULL when it has none. */
+    const struct lock_facts *locks;
 };
 
 /* Append the tree of module to out, one node per line, indented by two

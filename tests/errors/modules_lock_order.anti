@@ -1,0 +1,21 @@
+//! A library takes `a` before `b`, and the program takes `b` before `a`. The
+//! message names the place in the program and the line of the library.
+
+import com.example.locks;
+
+fn backward(p: *locks.Pair)
+{
+	sync p.b {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = locks.pair();
+	locks.forward(&p);
+	backward(&p);
+	return 0;
+}

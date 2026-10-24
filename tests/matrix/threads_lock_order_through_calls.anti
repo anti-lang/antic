@@ -1,0 +1,46 @@
+//! A function that holds one lock calls a function that takes the other, and a
+//! second function takes the two the other way round through a call of its own.
+//! The graph of lock orders follows the calls the program names.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn bump_b(p: *Pair)
+{
+	sync p.b {
+		p.n += 1;
+	}
+}
+
+fn bump_a(p: *Pair)
+{
+	sync p.a {
+		p.n += 1;
+	}
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		bump_b(p);
+	}
+}
+
+fn backward(p: *Pair)
+{
+	sync p.b {
+		bump_a(p);
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	backward(&p);
+	return p.n - 2;
+}

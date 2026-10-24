@@ -1,0 +1,59 @@
+//! antic follows no call through an interface or a function value in the graph
+//! of lock orders, so it compiles this program. A dev build records the orders
+//! in which the program takes its locks while it runs and reports the conflict.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+abstract class Step
+{
+	abstract fn run(self, p: *Pair);
+}
+
+class TakeB inherits Step
+{
+	concrete fn run(self, p: *Pair)
+	{
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn take_a(p: *Pair)
+{
+	sync p.a {
+		p.n += 1;
+	}
+}
+
+fn through_an_interface(p: *Pair, step: *Step)
+{
+	sync p.a {
+		step.run(p);
+	}
+}
+
+fn through_a_value(p: *Pair, f: fn(*Pair))
+{
+	sync p.b {
+		f(p);
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	let step = alloc TakeB { };
+	through_an_interface(&p, step);
+	through_a_value(&p, take_a);
+	free(step);
+	printf("%d\n".ptr, p.n as c_int);
+	return 0;
+}

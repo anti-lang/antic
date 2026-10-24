@@ -303,7 +303,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 89, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 90, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -361,6 +361,8 @@ static const uint8_t scale_antl[] = {
     0, 255, 255, 255, 255, 0, 0, 0, 0,
     0, 0, 0, 0,
     0, 0, 0, 0,                                     /* classes */
+    0, 0, 0, 0,                                     /* no locks of functions */
+    0, 0, 0, 0,                                     /* no edges of lock orders */
 };
 
 static void writes_format(void)
@@ -1600,13 +1602,14 @@ static bool reads_file(const struct text *bytes);
 static void damaged_files(void)
 {
     /* Where the fields a poke below reaches sit, counted back from the
-       end of the file. First the classes, two instructions of 53 bytes
-       each and the 15 bytes that open the body. Then the one parameter of
+       end of the file. First the two counts of the lock orders and the
+       classes, two instructions of 53 bytes each and the 15 bytes that
+       open the body. Then the one parameter of
        the signature with its facts, its count, the source of the function
        and its result with its extension. */
     enum {
-        TAIL = 4 + 2 * 53 + 15,
-        MUL_OPERAND = 4 + 2 * 53 - 12,
+        TAIL = 8 + 4 + 2 * 53 + 15,
+        MUL_OPERAND = 8 + 4 + 2 * 53 - 12,
         PARAM_FACTS = TAIL + 4 + 1,
         PARAM_DEREF = TAIL + 4,
         PARAM_EXT = PARAM_FACTS + 4 + 1,
@@ -1624,9 +1627,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 90;
+    copy[4] = 91;
     refuses_file(copy, sizeof copy,
-                 "has format version 90, and antic reads version 89");
+                 "has format version 91, and antic reads version 90");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

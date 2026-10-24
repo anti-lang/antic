@@ -1482,6 +1482,9 @@ bool sema_check(struct module *module, const struct sema_inputs *in,
     if (c.ok && module->compile_copies) {
         sema_compile_copies(&c);
     }
+    if (c.ok) {
+        sema_check_lock_order(&c);
+    }
     sema_leave(&c, &outside);
     /* The module scope never narrows, and its list is freed beside the
        entries all the same, as sema_leave_scope frees every other one. */

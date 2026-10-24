@@ -1,0 +1,1 @@
+modules_lock_order_of_a_synchronized_class.anti:12:3: error: `Counter` is locked here while `Pair.a` is held, and line 24 of `com.example.locks` locks them in the other order [lock-order]

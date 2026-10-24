@@ -177,6 +177,9 @@ struct interface *antl_read(const uint8_t *data, size_t size,
     if (!r.failed) {
         antl_read_ir(&r, in->program);
     }
+    if (!r.failed) {
+        antl_read_locks(&r);
+    }
     if (!r.failed && r.pos != r.size) {
         antl_damaged(&r);
     }

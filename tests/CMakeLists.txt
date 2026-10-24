@@ -2017,13 +2017,15 @@ set_tests_properties(lock_order PROPERTIES TIMEOUT 120)
 # orders, a ring of three locks, a lock that `destroy` ended and the hidden
 # lock of an object that its thread takes again. lock_order_once holds the
 # two orders of a pair more than once, which a dev build reports once.
+# lock_order_unfollowed takes a pair both ways through an interface and a
+# function value, which the safety check `lock-order` does not follow.
 # check_join_twice: a second `join` of one job that the checker cannot see
 # traps in a dev build, by decision 23 of "Decisions of 2026-10-11".
 # DESIGN: run_dev_report.cmake stops a program after ANTIC_REPORT_SECONDS,
 # so a program that hangs fails its test as an ordinary failure, which
 # WILL_FAIL of tests/known-failures.txt expects.
 set(ANTIC_REPORT_SECONDS 20)
-foreach(name IN ITEMS lock_orders lock_order_once)
+foreach(name IN ITEMS lock_orders lock_order_once lock_order_unfollowed)
     add_test(NAME ${name}
         COMMAND "${CMAKE_COMMAND}"
             ${ANTIC_AND_RUNTIME}
@@ -3933,6 +3935,8 @@ antic_library_files(items LIBRARIES items)
 antic_library_files(exports LIBRARIES exports)
 antic_library_files(generic_limits LIBRARIES gen)
 antic_library_files(externs LIBRARIES first second)
+antic_library_files(lock_orders LIBRARIES locks)
+antic_library_files(lock_sides LIBRARIES pairs left right)
 
 # The refusals at the boundary of a module, one message each. A case names
 # the program of tests/errors, the tree of its library files and the
@@ -3967,6 +3971,10 @@ foreach(case
         "modules_internal_struct_as_a_type|levels|org.other"
         "modules_internal_union|levels|org.other"
         "modules_internal_variant|levels|org.other"
+        "modules_lock_order|lock_orders|"
+        "modules_lock_order_of_a_synchronized_class|lock_orders|"
+        "modules_lock_order_of_two_libraries|lock_sides|"
+        "modules_lock_order_through_a_call|lock_orders|"
         "modules_member_private_field|levels|"
         "modules_member_private_field_from_a_class_below|levels|"
         "modules_member_private_field_in_a_literal|levels|"
@@ -4933,6 +4941,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "use_after_free|--dev,-S,-o,${LISTINGS}/use_after_free.s,use_after_free.anti"
         "uninitialized_read|--dev,-S,-o,${LISTINGS}/uninitialized_read.s,uninitialized_read.anti"
         "index_out_of_range|--dev,-S,-o,${LISTINGS}/index_out_of_range.s,index_out_of_range.anti"
+        "lock_order|--dev,-S,-o,${LISTINGS}/lock_order.s,lock_order.anti"
         "catch_none|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/catch_none.s,catch_none.anti"
         "nested_public|-S,-o,${LISTINGS}/nested_public.s,nested_public.anti"
         "nested_outside|-S,-o,${LISTINGS}/nested_outside.s,nested_outside.anti"

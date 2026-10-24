@@ -1,0 +1,1 @@
+anti: two locks are taken in opposite orders and can deadlock: lock_order_unfollowed.anti:31 takes one while holding the one of lock_order_unfollowed.anti:45, and lock_order_unfollowed.anti:23 takes that one while holding the one of lock_order_unfollowed.anti:38

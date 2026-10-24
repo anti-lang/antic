@@ -1204,6 +1204,51 @@ anti: two locks are taken in opposite orders and can deadlock: main.anti:55 take
 - Lines 49 and 50 take `v.a` and then `v.b`, and lines 54 and 55 take `v.b` and then `v.a`.
 - `sync p, q` and `sync q, p` give no report. Both take the two locks in the order of their addresses.
 
+### The check at compile time
+
+antic refuses an order it can prove in every build, before a run takes it. The safety check `lock-order` builds a graph of the orders in which the program takes its locks. An edge leads from one lock to another wherever code that holds the first takes the second. The code holds the lock of each `sync` block around it, and a public function of a synchronized class holds the hidden lock of its object. A call takes every lock its callee takes, and the graph follows the calls the program names, into the functions of a library as well. A cycle is refused, and the message names both places.
+
+A lock is named by its class and its field, since antic cannot know the objects. `v.a` of every `Vault` is one lock, and so is the hidden lock of every `Account`. A lock that the code holds already adds no edge, so `x.pay(y, 10)` and `y.pay(x, 30)` of the example above pass the check, and the dev check reports them. `sync a, b` adds no edge between its two locks.
+
+```anti refused
+//! error: `Vault.a` is locked here while `Vault.b` is held, and line 12 locks them in the other order [lock-order]
+class Vault
+{
+	pub a: Mutex,
+	pub b: Mutex,
+	pub n: int = 0,
+}
+
+fn forward(v: *Vault)
+{
+	sync v.a {
+		sync v.b {
+			v.n += 1;
+		}
+	}
+}
+
+fn backward(v: *Vault)
+{
+	sync v.b {
+		sync v.a {
+			v.n -= 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let v = alloc Vault { };
+	forward(v);
+	backward(v);
+	free(v);
+	return 0;
+}
+```
+
+The check follows no call through an interface, a function value or a plugin, since the function that runs is not known. The dev check finds an order such a call takes. `unchecked(lock-order, "reason")` overrules the check.
+
 ### How antic builds it
 
 The check is in the lock calls of a dev build. Each takes the place of the lock as a text.

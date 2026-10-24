@@ -1,0 +1,13 @@
+//! The program holds `b` and calls a function of a library that takes `a` and
+//! then `b`. The graph follows the call into the library.
+
+import com.example.locks;
+
+fn main() -> int
+{
+	let p = locks.pair();
+	sync p.b {
+		locks.forward(&p);
+	}
+	return 0;
+}

@@ -23,7 +23,8 @@
    outlive the local, and sema_free.c a use of a value on a path after
    `delete`, `destroy` or a move of it. sema_uninit.c refuses a read of
    an element of `alloc(T, n)` before a path wrote it, and sema_index.c
-   an index out of range on every path that reaches it. sema_generic.c
+   an index out of range on every path that reaches it. sema_lock.c
+   refuses a cycle in the graph of lock orders. sema_generic.c
    checks generics, and sema_copies.c compiles their copies. sema_hash.c
    checks hashing and the default `==`, and sema_pattern.c the pattern
    literals and their calls. sema_export.c checks what crosses to C and
@@ -824,6 +825,13 @@ void sema_check_fills(struct checker *c, const struct item *it,
    on is an error of the checker. */
 void sema_check_indices(struct checker *c, const struct item *it,
                         size_t first);
+
+/* sema_lock.c */
+
+/* The safety check `lock-order` over the functions of the module, the
+   copies of its generics among them, and the edges of its libraries. It
+   keeps what the modules that import it need in c->module->locks. */
+void sema_check_lock_order(struct checker *c);
 
 /* sema_safety.c */
 

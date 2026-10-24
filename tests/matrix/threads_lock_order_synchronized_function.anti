@@ -1,0 +1,43 @@
+//! A function of a synchronized class runs under the hidden lock of its object
+//! and takes a Mutex. A function that holds that Mutex calls the class, so the
+//! two take the locks in opposite orders.
+
+struct Gate
+{
+	m: Mutex,
+	n: int,
+}
+
+synchronized class Counter
+{
+	n: int = 0,
+
+	pub fn add(self, g: *Gate)
+	{
+		sync g.m {
+			self.n += g.n;
+		}
+	}
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+}
+
+fn touch(g: *Gate, c: *Counter)
+{
+	sync g.m {
+		c.bump();
+	}
+}
+
+fn main() -> int
+{
+	let g = Gate { n: 1 };
+	let c = alloc Counter { };
+	c.add(&g);
+	touch(&g, c);
+	free(c);
+	return 0;
+}

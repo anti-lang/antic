@@ -80,6 +80,7 @@ The lexer, the parser, the syntax tree, the checked types and the checker.
 | `src/antic/sema_generic.c` | The generics of the checker: type parameters, constraints, aliases, the copies of generic types, substitution and inference, and the strip of generics before the later passes. |
 | `src/antic/sema_hash.c` | The checker's part of hashing and of the default `==`, and the default `equals` and `hash` of each class. |
 | `src/antic/sema_index.c` | The safety check `index-out-of-range`: the range of each integer local and loop variable of a checked body, and the refusal of an index that every path reaching it takes out of range. |
+| `src/antic/sema_lock.c` | The safety check `lock-order`: the graph of the orders in which the module and its libraries take their locks, the refusal of a cycle, and what a library file keeps for the modules that import it. |
 | `src/antic/sema_operator.c` | Checks the binary operators, `in` and `??` through the operator table, and finds the `operator fn` functions and language hooks of a type. |
 | `src/antic/sema_pattern.c` | The methods of `str`, `[]byte` and a match that become calls of `anti.regex` and `anti.text`, the groups of a literal as fields, the pattern literal with its checks, and `Regex.compile`. |
 | `src/antic/sema_safety.c` | The checks of the thread-safe classes: the kind of a class, its base, the hidden lock, the guards and the reach of a field. |
@@ -206,6 +207,7 @@ The library file, and the code that every part of antic and `anti` uses.
 | `src/antic/antl.c` | The magic, the checks of the enums the tables store, two shared helpers and the top of the reader, `antl_header` and `antl_read`. |
 | `src/antic/antl.h` | The public face of the library file: its version, the depth limit of a tree and the five entry points. |
 | `src/antic/antl_io.c` | The primitives that write and read an integer, a count, a name and a C string, each with its check. |
+| `src/antic/antl_locks.c` | The section of the lock orders of a library file: the locks of the functions of the module and the edges of its code. |
 | `src/antic/antl_io.h` | The inside of the library file: the writer, the reader and the functions its files share, each under the file that defines it. |
 | `src/antic/antl_read.c` | The reader of the type table, the constants and the items, with the checks of each record. |
 | `src/antic/antl_read_ir.c` | The reader of the IR, which moves each record to the indices of the program and merges the copies it has. |

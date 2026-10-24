@@ -1,0 +1,1 @@
+threads_lock_order_two_mutexes.anti:24:3: error: `Pair.a` is locked here while `Pair.b` is held, and line 15 locks them in the other order [lock-order]

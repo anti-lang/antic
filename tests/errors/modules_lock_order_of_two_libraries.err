@@ -1,0 +1,1 @@
+modules_lock_order_of_two_libraries.anti:9:1: error: `Pair.a` is locked on line 10 of `com.example.right` while `Pair.b` is held, and line 8 of `com.example.left` locks them in the other order [lock-order]

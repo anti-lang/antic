@@ -1,0 +1,47 @@
+//! Three functions take three locks each after the one before, `a` before `b`,
+//! `b` before `c` and `c` before `a`. No two of them take one pair both ways
+//! round, and the three together close a cycle.
+
+struct Ring
+{
+	a: Mutex,
+	b: Mutex,
+	c: Mutex,
+	n: int,
+}
+
+fn first(r: *Ring)
+{
+	sync r.a {
+		sync r.b {
+			r.n += 1;
+		}
+	}
+}
+
+fn second(r: *Ring)
+{
+	sync r.b {
+		sync r.c {
+			r.n += 1;
+		}
+	}
+}
+
+fn third(r: *Ring)
+{
+	sync r.c {
+		sync r.a {
+			r.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let r = Ring { n: 0 };
+	first(&r);
+	second(&r);
+	third(&r);
+	return r.n - 3;
+}

@@ -1,0 +1,131 @@
+//! What the graph of lock orders lets pass. `sync a, b` takes two hidden locks
+//! in the order of their addresses and adds no edge, so a program names them
+//! both ways round. Two objects of one class take one lock of the graph, which
+//! counts no edge from a lock to itself. A Mutex that no field names is no lock
+//! of the graph. Two functions that take two locks in one order agree.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Box
+{
+	n: int = 0,
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+synchronized class Bag
+{
+	n: int = 0,
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+struct Gate
+{
+	m: Mutex,
+	n: int,
+}
+
+fn pair_forward(box: *Box, bag: *Bag) -> int
+{
+	sync box, bag {
+		box.bump();
+		bag.bump();
+	}
+	return box.get() + bag.get();
+}
+
+fn pair_backward(box: *Box, bag: *Bag) -> int
+{
+	sync bag, box {
+		bag.bump();
+		box.bump();
+	}
+	return box.get() + bag.get();
+}
+
+fn same_class(x: *Gate, y: *Gate) -> int
+{
+	sync x.m {
+		sync y.m {
+			x.n += 1;
+			y.n += 1;
+		}
+	}
+	return x.n + y.n;
+}
+
+fn pointer_first(m: *Mutex, g: *Gate) -> int
+{
+	sync m {
+		sync g.m {
+			g.n += 1;
+		}
+	}
+	return g.n;
+}
+
+fn gate_first(m: *Mutex, g: *Gate) -> int
+{
+	sync g.m {
+		sync m {
+			g.n += 1;
+		}
+	}
+	return g.n;
+}
+
+fn one_order(g: *Gate, box: *Box) -> int
+{
+	sync g.m {
+		box.bump();
+	}
+	return box.get();
+}
+
+fn same_order(g: *Gate, box: *Box) -> int
+{
+	sync g.m {
+		sync box {
+			g.n += 1;
+		}
+	}
+	return g.n;
+}
+
+fn main() -> int
+{
+	let box = alloc Box { };
+	let bag = alloc Bag { };
+	let x = Gate { n: 0 };
+	let y = Gate { n: 0 };
+	let z = Gate { n: 0 };
+	let m = Mutex.new();
+	printf("sync a, b: %d\n".ptr, pair_forward(box, bag) as c_int);
+	printf("sync b, a: %d\n".ptr, pair_backward(box, bag) as c_int);
+	printf("one class: %d\n".ptr, same_class(&x, &y) as c_int);
+	printf("a pointer first: %d\n".ptr, pointer_first(&m, &y) as c_int);
+	printf("a field first: %d\n".ptr, gate_first(&m, &z) as c_int);
+	printf("one order: %d\n".ptr, one_order(&x, box) as c_int);
+	printf("the same order: %d\n".ptr, same_order(&x, box) as c_int);
+	destroy(&m);
+	free(box);
+	free(bag);
+	return 0;
+}

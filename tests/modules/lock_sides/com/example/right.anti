@@ -1,0 +1,14 @@
+//! Takes the two locks of a pair, `b` first. The library does not import the
+//! one that takes them the other way round, so a program that imports both
+//! holds the cycle.
+
+import com.example.pairs;
+
+pub fn backward(p: *pairs.Pair)
+{
+	sync p.b {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}

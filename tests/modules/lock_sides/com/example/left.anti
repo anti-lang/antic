@@ -1,0 +1,12 @@
+//! Takes the two locks of a pair, `a` first.
+
+import com.example.pairs;
+
+pub fn forward(p: *pairs.Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}

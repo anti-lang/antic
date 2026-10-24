@@ -8,7 +8,8 @@
    items and the IR. antl_read.c reads the type table, the constants and
    the items, and antl_read_ir.c reads the IR. antl_tree.c writes and
    reads the section of the generics: their declarations and the checked
-   tree of each body. antl_verify.c holds what the reader built to the
+   tree of each body. antl_locks.c writes and reads the section of the
+   lock orders. antl_verify.c holds what the reader built to the
    rules a file must meet. No other file includes this one. */
 
 #include <stdbool.h>
@@ -215,6 +216,13 @@ void antl_put_generics(struct writer *w);
 /* Read the section of the generics into the interface, and link each
    generic of its items to its declaration. */
 void antl_read_generics(struct reader *r);
+
+/* antl_locks.c */
+
+/* Write the section of the lock orders of facts, which may be NULL. */
+void antl_put_locks(struct writer *w, const struct lock_facts *facts);
+/* Read the section of the lock orders into the interface. */
+void antl_read_locks(struct reader *r);
 
 /* antl_verify.c */
 

@@ -1,0 +1,16 @@
+//! A synchronized class of a library takes a Mutex under its hidden lock, and
+//! the program calls the class while it holds that Mutex.
+
+import com.example.locks;
+
+fn main() -> int
+{
+	let p = locks.pair();
+	let c = alloc locks.Counter { };
+	c.add(&p);
+	sync p.a {
+		c.bump();
+	}
+	free(c);
+	return 0;
+}

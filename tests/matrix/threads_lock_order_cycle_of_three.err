@@ -1,0 +1,1 @@
+threads_lock_order_cycle_of_three.anti:34:3: error: `Ring.a` is locked here while `Ring.c` is held, and line 16 locks `Ring.b` while `Ring.a` is held, on a cycle of 3 locks [lock-order]

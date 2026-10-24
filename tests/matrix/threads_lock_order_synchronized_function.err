@@ -1,0 +1,1 @@
+threads_lock_order_synchronized_function.anti:31:3: error: `Counter` is locked here while `Gate.m` is held, and line 17 locks them in the other order [lock-order]

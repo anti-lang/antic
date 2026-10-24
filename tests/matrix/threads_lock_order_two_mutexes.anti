@@ -1,0 +1,36 @@
+//! Two functions take the two locks of a pair in opposite orders, so two
+//! threads that run them at once can each hold one lock and wait for the other.
+//! The message names both places.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn backward(p: *Pair)
+{
+	sync p.b {
+		sync p.a {
+			p.n -= 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	backward(&p);
+	return p.n;
+}

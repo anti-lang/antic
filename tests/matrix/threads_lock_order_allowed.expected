@@ -1,0 +1,8 @@
+exit 0
+sync a, b: 2
+sync b, a: 4
+one class: 2
+a pointer first: 2
+a field first: 1
+one order: 3
+the same order: 2

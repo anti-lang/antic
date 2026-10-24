@@ -14,6 +14,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/antic.c
     src/antic/antl.c
     src/antic/antl_io.c
+    src/antic/antl_locks.c
     src/antic/antl_read.c
     src/antic/antl_read_ir.c
     src/antic/antl_tree.c
@@ -93,6 +94,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/sema_generic.c
     src/antic/sema_hash.c
     src/antic/sema_index.c
+    src/antic/sema_lock.c
     src/antic/sema_copies.c
     src/antic/sema_const.c
     src/antic/sema_declare.c

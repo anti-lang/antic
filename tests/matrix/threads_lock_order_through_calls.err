@@ -1,0 +1,1 @@
+threads_lock_order_through_calls.anti:36:3: error: `Pair.a` is locked here while `Pair.b` is held, and line 29 locks them in the other order [lock-order]

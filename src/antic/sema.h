@@ -197,6 +197,46 @@ struct symbol {
 
 /* What other modules see of a module: its imports and its pub items. A
    library file stores it, and an import reads it. */
+/* DESIGN: a lock of the graph of lock orders of the safety check
+   `lock-order` is named by text: the module and the name of the struct
+   or class that declares it, and the name of its Mutex field, or
+   HIDDEN_LOCK for the hidden lock of a synchronized class. The graph
+   cannot know the objects at compile time, and one class read from two
+   library files is one lock. */
+struct lock_name {
+    struct name module;
+    struct name type;
+    struct name field;
+};
+
+/* An edge of the graph: code at line and column of its module that holds
+   held takes taken. */
+struct lock_edge {
+    struct lock_name held;
+    struct lock_name taken;
+    int line;
+    int column;
+};
+
+/* The locks a function takes, itself or through the calls it names. The
+   symbol is the name of the function's symbol, `f` or `T.f`, as a call
+   of another module names it. */
+struct lock_function {
+    struct name symbol;
+    struct lock_name *locks;
+    size_t count;
+};
+
+/* What the safety check `lock-order` keeps of a module for the modules
+   that import it: the locks of its functions and the edges of its code
+   that no `unchecked(lock-order)` overruled. */
+struct lock_facts {
+    struct lock_function *functions;
+    size_t function_count;
+    struct lock_edge *edges;
+    size_t edge_count;
+};
+
 struct interface {
     struct package package;
     const char *doc;                /* the `//!` text of the module */
@@ -214,6 +254,7 @@ struct interface {
     size_t framework_count;
     const char **linux_libraries;   /* of its `link linux` lines */
     size_t linux_library_count;
+    const struct lock_facts *locks; /* NULL when it has none */
 };
 
 /* The inputs of one compilation, which sema_check and sema_doc_warnings

@@ -1,0 +1,1 @@
+lock_order.anti:46:3: error: `Pair.b` is locked here while `Pair.c` is held, and line 17 locks them in the other order [lock-order]

@@ -1,0 +1,43 @@
+//! Two Mutex fields and a synchronized class, which a library takes in an order
+//! of its own. The programs of tests/errors take them the other way round.
+
+pub struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+pub fn pair() -> Pair
+{
+	return Pair { a: Mutex.new(), b: Mutex.new(), n: 0 };
+}
+
+/// A count under the hidden lock of its object.
+pub synchronized class Counter
+{
+	n: int = 0,
+
+	/// Takes `p.a` while the hidden lock of the object is held.
+	pub fn add(self, p: *Pair)
+	{
+		sync p.a {
+			self.n += p.n;
+		}
+	}
+
+	pub fn bump(self)
+	{
+		self.n += 1;
+	}
+}
+
+/// Takes `p.a` and then `p.b`.
+pub fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}

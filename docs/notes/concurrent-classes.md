@@ -200,3 +200,10 @@ channels.
   in a dev build and expects no report. `errors/sync_pairs.anti` holds the
   refusals, and `std/concurrent_map_equal.anti` compares and hashes maps built
   in different orders.
+- The safety check `lock-order` of `sema_lock.c` refuses at compile time what
+  the dev check reports while a program runs, where the calls the program
+  names show it. The programs `threads_lock_order_*` of `tests/matrix/` hold
+  its refusals and what it lets pass, `errors/lock_order.anti` a dev build and
+  `unchecked`, and the cases `modules_lock_order_*` a cycle across modules.
+  `traps/lock_order_unfollowed.anti` takes a pair both ways through an
+  interface and a function value, which the check leaves to the dev check.

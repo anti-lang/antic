@@ -40,6 +40,7 @@ static const struct name_entry NAMES[NAME_COUNT] = {
     [NAME_USE_AFTER_FREE] = {"use-after-free", KIND_SAFETY_CHECK},
     [NAME_UNINITIALIZED_READ] = {"uninitialized-read", KIND_SAFETY_CHECK},
     [NAME_INDEX_OUT_OF_RANGE] = {"index-out-of-range", KIND_SAFETY_CHECK},
+    [NAME_LOCK_ORDER] = {"lock-order", KIND_SAFETY_CHECK},
 };
 
 const char *warnings_name(enum diag_name name)

@@ -1176,6 +1176,7 @@ bool antl_write(struct text *out, const struct interface *iface,
     }
     antl_put_generics(&w);
     put_ir(&w, ir);
+    antl_put_locks(&w, iface->locks);
     free((void *)w.types);
     free((void *)w.externs);
     return !w.failed;

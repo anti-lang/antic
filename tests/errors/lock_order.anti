@@ -1,0 +1,60 @@
+//! The safety check `lock-order` stops a dev build as it stops a release build,
+//! and `unchecked(lock-order, "reason")` overrules it before a statement and
+//! last in the header of a function.
+
+struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	c: Mutex,
+	n: int,
+}
+
+fn forward(p: *Pair)
+{
+	sync p.a {
+		sync p.b {
+			sync p.c {
+				p.n += 1;
+			}
+		}
+	}
+}
+
+fn statement(p: *Pair)
+{
+	sync p.b {
+		unchecked(lock-order, "the test takes the locks both ways alone")
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}
+
+fn function(p: *Pair) unchecked(lock-order, "the test takes the locks both ways alone")
+{
+	sync p.c {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}
+
+fn refused(p: *Pair)
+{
+	sync p.c {
+		sync p.b {
+			p.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Pair { n: 0 };
+	forward(&p);
+	statement(&p);
+	function(&p);
+	refused(&p);
+	return p.n - 4;
+}

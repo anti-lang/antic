@@ -1,0 +1,13 @@
+//! A struct of two Mutex fields, which two libraries take in opposite orders.
+
+pub struct Pair
+{
+	a: Mutex,
+	b: Mutex,
+	n: int,
+}
+
+pub fn pair() -> Pair
+{
+	return Pair { a: Mutex.new(), b: Mutex.new(), n: 0 };
+}
