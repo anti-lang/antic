@@ -6740,6 +6740,15 @@ add_expect_test(fmt_default_struct_literal STATUS 0
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/default_struct_literal.anti")
 
+# A handler of more than one statement inside the parentheses of a
+# condition. The source is in the canonical form, and fmt_canonical passes
+# over it until `anti fmt` agrees: finding T190 of
+# docs/audit/tests-findings.md.
+add_expect_test(fmt_handler_in_parentheses STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/handler_in_parentheses.anti")
+
 # Every source of the standard library and of the tests stands in the
 # canonical form, so that `anti fmt` over the checkout writes nothing.
 add_test(NAME fmt_canonical

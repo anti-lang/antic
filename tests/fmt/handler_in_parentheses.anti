@@ -1,0 +1,23 @@
+//! A handler of two statements inside the parentheses of a condition.
+
+fn value(n: int) -> int may fail
+{
+	if n == 3 {
+		fail "three";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let i = 0;
+	let skipped = 0;
+	while (value(i) catch e {
+		skipped += 1;
+		i += 1;
+		continue;
+	}) < 5 do {
+		i += 1;
+	}
+	return skipped;
+}
