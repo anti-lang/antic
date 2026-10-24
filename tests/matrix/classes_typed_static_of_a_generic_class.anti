@@ -1,5 +1,6 @@
 //! A static field of a generic class has the type of its copy outside the
-//! class: `?*T` of `Box<int>` is `?*int`.
+//! class: `?*T` of `Box<int>` is `?*int`. The static holds memory of `alloc`,
+//! since the address of a local would outlive the local there.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -11,13 +12,17 @@ class Box<T>
 
 fn main() -> int
 {
-	let n = 5;
-	unchecked(escaping-local, "until the step sweep")
-	Box<int>.last.store(&n);
+	let n = alloc(int, 1) else {
+		return 1;
+	};
+	*n = 5;
+	Box<int>.last.store(n);
 	let p = Box<int>.last.load();
 	if p != none {
 		printf("last: %d\n".ptr, *p as c_int);
 	}
 	printf("other copy: %d\n".ptr, (Box<u8>.last.load() == none) as c_int);
+	Box<int>.last.store(none);
+	free(n);
 	return 0;
 }
