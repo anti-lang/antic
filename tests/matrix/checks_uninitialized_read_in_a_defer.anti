@@ -1,0 +1,22 @@
+//! C1 in a defer: the deferred block reads element 1 of `alloc(T, n)`, which no
+//! path wrote.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show() -> int
+{
+	let p = alloc(int, 4) else {
+		return 1;
+	};
+	p[0] = 1;
+	defer {
+		printf("%d\n".ptr, p[1]);
+		free(p);
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return show();
+}

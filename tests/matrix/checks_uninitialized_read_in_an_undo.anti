@@ -1,0 +1,27 @@
+//! C1 in an undo: the block of the fail path reads element 1 of `alloc(T, n)`,
+//! which no path wrote.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show() may fail
+{
+	let p = alloc(int, 4) else {
+		fail "no memory";
+	};
+	p[0] = 1;
+	undo {
+		printf("%d\n".ptr, p[1]);
+		free(p);
+	}
+	fail "undone";
+}
+
+fn main() -> int
+{
+	show() catch e {
+		return 0;
+	};
+	return 1;
+}

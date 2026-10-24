@@ -23,3 +23,5 @@ fmt_handler_in_parentheses T190 `anti fmt` indents the second statement of a han
 matrix_classes_super_of_a_base_that_is_no_class_refused T191 antic crashes on a read or a call through `self.super` of a class whose base is no class.
 matrix_ownership_reference_to_a_local_as_an_argument_of_dispatch_refused T193 E1 checks the object of `dispatch` and the array of `parallel` and not the arguments of their worker.
 matrix_ownership_reference_to_a_local_as_an_argument_of_parallel_refused T193 E1 lets the address of a local pass as an argument of the worker of `parallel`.
+matrix_checks_uninitialized_read_in_a_defer_refused T194 C1 reads nothing in a `defer`, so an element no path writes passes there.
+matrix_checks_uninitialized_read_in_an_undo_refused T194 C1 reads nothing in an `undo`, so an element no path writes passes there.
