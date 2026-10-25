@@ -1,0 +1,12 @@
+exit 0
+field default 32
+field type 64
+nested struct 32
+nested class 65
+function 64
+static function 128
+anonymous function 63
+parameter 7
+local 3
+generic class 9 12
+outside 64 5

@@ -1,0 +1,1 @@
+classes_constant_by_its_bare_name_outside_the_class.anti:11:9: error: unknown name `MAX`

@@ -175,6 +175,28 @@ const struct item *sema_within(const struct item *it)
     return it != NULL && it->owner != NULL ? it->owner : it;
 }
 
+/* DESIGN: Q20 of "Answers of 2026-10-24". The bare name of a `const`
+   of a class body reaches it inside that class: in its fields, their
+   defaults, its functions and the types nested in it, whose text stands
+   inside the class. A derived class names a constant of its base as
+   `Shape.MAX`, and a static field keeps `Name.field`. The constant
+   stands at the level of its class, so a local or a parameter of the
+   same name wins and an item of the module of the same name is hidden. */
+static struct symbol *body_constant(const struct item *it,
+                                    const struct name *name)
+{
+    size_t i;
+
+    for (i = 0; i < it->member_count; i++) {
+        const struct item *m = it->members[i];
+        if (m->kind == ITEM_CONST && !m->is_static && m->symbol != NULL &&
+            types_same_name(&m->name, name)) {
+            return m->symbol;
+        }
+    }
+    return NULL;
+}
+
 /* DESIGN: a type nested in a class is named as written in the body of
    that class. It is named so in the body of every type nested in it as
    well, and nowhere else. The innermost class wins, then the classes around it, then the
@@ -187,6 +209,10 @@ static struct symbol *nested_find(const struct checker *c,
     size_t i;
 
     for (it = c->ctx.within; it != NULL; it = it->outer) {
+        struct symbol *constant = body_constant(it, name);
+        if (constant != NULL) {
+            return constant;
+        }
         for (i = 0; i < it->nested_count; i++) {
             const struct item *inner = it->nested[i];
             if (inner->symbol != NULL &&
@@ -198,7 +224,8 @@ static struct symbol *nested_find(const struct checker *c,
     return NULL;
 }
 
-/* An item of the module by name, the nested types of c->ctx.within first. */
+/* An item of the module by name, the constants and the nested types of
+   c->ctx.within first. */
 struct symbol *sema_module_find(const struct checker *c,
                                 const struct name *name)
 {

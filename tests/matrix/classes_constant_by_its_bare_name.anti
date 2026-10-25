@@ -1,0 +1,106 @@
+//! The bare name of a constant of a class body reaches it inside that class, by
+//! Q20 of "Answers of 2026-10-24": in another constant, the type and the
+//! default of a field, a type nested in the class, a function, a static
+//! function, an anonymous function and the body of a generic class. A local or
+//! a parameter of the same name wins, the constant hides a constant of the
+//! module of the same name, and outside the class `Limits.MAX` names it. The
+//! program prints one line per form.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const MAX: int = 5;
+
+class Limits
+{
+	pub const MAX: int = 64;
+	const HALF: int = MAX / 2;
+
+	struct Slot
+	{
+		cells: [HALF]u8,
+	}
+
+	class Inner
+	{
+		pub fn get(self) -> int
+		{
+			return MAX + 1;
+		}
+	}
+
+	pub used: int = HALF,
+	pub row: [MAX]u8 = [1; MAX],
+	slot: Slot = Slot { cells: [2; HALF] },
+
+	pub fn most(self) -> int
+	{
+		return MAX;
+	}
+
+	pub fn slot_size(self) -> int
+	{
+		return self.slot.cells.len;
+	}
+
+	pub fn inner(self) -> int
+	{
+		let i = Inner { };
+		return i.get();
+	}
+
+	pub fn most_of_all() -> int
+	{
+		return MAX * 2;
+	}
+
+	pub fn through_a_closure(self) -> int
+	{
+		let f = fn() -> int {
+			return MAX - 1;
+		};
+		return f();
+	}
+
+	pub fn parameter_wins(self, MAX: int) -> int
+	{
+		return MAX;
+	}
+
+	pub fn local_wins(self) -> int
+	{
+		let MAX = 3;
+		return MAX;
+	}
+}
+
+class Buffer<T>
+{
+	const SIZE: int = 4;
+	const BYTES: int = size_of(T) as int;
+
+	pub items: [SIZE]T,
+
+	pub fn size(self) -> int
+	{
+		return SIZE + self.items.len + BYTES;
+	}
+}
+
+fn main() -> int
+{
+	let l = Limits { };
+	printf("field default %lld\n".ptr, l.used);
+	printf("field type %lld\n".ptr, l.row.len);
+	printf("nested struct %lld\n".ptr, l.slot_size());
+	printf("nested class %lld\n".ptr, l.inner());
+	printf("function %lld\n".ptr, l.most());
+	printf("static function %lld\n".ptr, Limits.most_of_all());
+	printf("anonymous function %lld\n".ptr, l.through_a_closure());
+	printf("parameter %lld\n".ptr, l.parameter_wins(7));
+	printf("local %lld\n".ptr, l.local_wins());
+	let b = Buffer<u8> { items: [0; 4] };
+	let w = Buffer<i32> { items: [0; 4] };
+	printf("generic class %lld %lld\n".ptr, b.size(), w.size());
+	printf("outside %lld %lld\n".ptr, Limits.MAX, MAX);
+	return 0;
+}

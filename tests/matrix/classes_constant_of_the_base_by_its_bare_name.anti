@@ -1,0 +1,21 @@
+//! A derived class names a constant of its base as `Shape.MAX`. The bare name
+//! reaches a constant in the class that declares it alone.
+
+class Shape
+{
+	protected const MAX: int = 8;
+}
+
+class Circle inherits Shape
+{
+	pub fn most(self) -> int
+	{
+		return MAX;
+	}
+}
+
+fn main() -> int
+{
+	let c = Circle { };
+	return c.most();
+}

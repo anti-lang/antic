@@ -682,7 +682,7 @@ A method of Java is virtual unless it is `private`, `static` or `final`, and the
 
 ### The feature
 
-A function of a class body takes `self`, a `*Class`, as its first parameter. A field is always written `self.x`: a bare `x` in a body is a local, a parameter or an item of the module.
+A function of a class body takes `self`, a `*Class`, as its first parameter. A field is always written `self.x`: a bare `x` in a body is a local, a parameter, a constant of the class or an item of the module.
 
 - `pub fn` has an entry in the table of the class and is visible everywhere.
 - `fn` without a marker is private to the class, and `protected fn` reaches the classes below. Neither has a table entry, and both are called directly.
@@ -690,7 +690,7 @@ A function of a class body takes `self`, a `*Class`, as its first parameter. A f
 - `concrete fn f(self)` replaces an inherited entry. The word is required: a function that matches an inherited one without it is refused, and so is a `concrete fn` that matches nothing.
 - `pub final fn` cannot be replaced, so every call of it is direct.
 - A function without `self` is static and is called as `Circle.unit()`.
-- `const NAME: T = e;` is a constant of the class, reached as `Shape.UNIT`.
+- `const NAME: T = e;` is a constant of the class. Inside the class its bare name `UNIT` reaches it: in another constant, the type and the default of a field, a type nested in the class and every function. Outside the class, and in a class that inherits it, it is `Shape.UNIT`. A local or a parameter of the same name wins, and the constant hides an item of the module of the same name. `self.UNIT` is refused.
 - `self.super.f(args)` calls the body of the base, directly.
 - `let f = c.scaled;` is a bound function, two words, the object and the entry. `f()` calls it.
 
@@ -1008,6 +1008,7 @@ For a Java programmer:
 - `self` is written, in the parameter list and before every field.
 - A function is private unless it says `pub`. Java's default is visible in the package.
 - Replacing a function takes `concrete`. A function with the name of an inherited one and no `concrete` is an error, where Java overrides without a word.
+- A constant of the base is `Shape.UNIT` in a derived class. Java reaches an inherited `static final` field by its bare name.
 
 For a C programmer:
 

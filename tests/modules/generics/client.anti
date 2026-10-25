@@ -208,5 +208,7 @@ fn main() -> int
 	let doubled = gen.doubled(Lanes { a: 1, b: 2, c: 3, d: -4 });
 	printf("%d %d %d %d %d\n".ptr, pulled as c_int, doubled.a as c_int,
 		doubled.b as c_int, doubled.c as c_int, doubled.d as c_int);
+	let slots = gen.Slots<u8> { items: [0; 3] };
+	printf("%d %d\n".ptr, slots.count() as c_int, slots.items.len as c_int);
 	return 0;
 }

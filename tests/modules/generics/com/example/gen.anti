@@ -201,6 +201,20 @@ pub fn pull<T>(s: *Feed<T>) -> T
 	return s.get();
 }
 
+/// A row of a fixed count of values, which its body names by the bare name of
+/// its constant.
+pub class Slots<T>
+{
+	pub const COUNT: int = 3;
+
+	pub items: [COUNT]T,
+
+	pub fn count(self) -> int
+	{
+		return COUNT + self.items.len;
+	}
+}
+
 /// The sum of a value with itself, for any type that adds, a simd struct among
 /// them.
 pub fn doubled<T: add>(a: T) -> T

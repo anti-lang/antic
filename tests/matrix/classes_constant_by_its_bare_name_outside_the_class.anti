@@ -1,0 +1,17 @@
+//! Outside its class a constant of a class body is named `Limits.MAX`, by Q20
+//! of "Answers of 2026-10-24", and its bare name is unknown there.
+
+class Limits
+{
+	pub const MAX: int = 64;
+}
+
+fn most() -> int
+{
+	return MAX;
+}
+
+fn main() -> int
+{
+	return most();
+}
