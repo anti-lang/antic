@@ -474,8 +474,8 @@ static const struct struct_field *field_up(const struct type *s,
    as the value of a call does. The argument is an `own` field of an
    optional pointer in a place, and `take` writes the place as `=`
    does, so a place `=` refuses is refused with the same words. A
-   statement that drops the value is refused, since nothing would own
-   the object. `take` is a built-in name, as `close` is, and a function
+   value that no new owner keeps is refused, since nothing would own
+   the object, as sema_check_kept says. `take` is a built-in name, as `close` is, and a function
    `take` in scope keeps its name. The `[provisional]` entries after the
    same answers in docs/decisions.md say both. */
 struct type *sema_check_take(struct checker *c, struct expr *e)
@@ -542,9 +542,9 @@ struct type *sema_check_take(struct checker *c, struct expr *e)
     if (sema_refuse_write(c, arg)) {
         goto done;
     }
-    /* The object has the value as its one owner, and a statement that
+    /* The object has the value as its one owner, and a place that
        drops the value would lose it. */
-    if (c->discarded == e) {
+    if (c->keeper != e) {
         sema_error_at(c, e->pos, "the object that `" TAKE_NAME "` moves out "
                       "of %s is dropped here, and `=` with `none` tears it "
                       "down", text_cstr(&spelled));
@@ -558,6 +558,35 @@ struct type *sema_check_take(struct checker *c, struct expr *e)
 done:
     text_free(&spelled);
     return result;
+}
+
+/* DESIGN: the value of `take(x.f)` is the one owner of its object, so
+   it stands where a new owner takes it over: the value of a `let`, of
+   an `if let`, of `=` and of `return`, an argument of an `own`
+   parameter and a part of a literal. Anywhere else the value is
+   dropped, in a comparison and as an argument of a parameter that
+   belongs to the caller among them, by T203 of
+   docs/audit/tests-findings.md. Checks e as sema_check_expr does, and
+   as such a value when kept is true. */
+struct type *sema_check_kept(struct checker *c, struct expr *e,
+                             struct type *expected, bool kept)
+{
+    const struct expr *outer = c->keeper;
+    struct type *t;
+
+    if (kept) {
+        c->keeper = e;
+    }
+    t = sema_check_expr(c, e, expected);
+    c->keeper = outer;
+    return t;
+}
+
+/* Whether parameter index of callee is `own`. */
+bool sema_owned_param(const struct symbol *callee, size_t index)
+{
+    return callee != NULL && callee->owned != NULL &&
+           index < callee->owned_count && callee->owned[index];
 }
 
 /* The largest `align(N)` of t and of the parts it holds in place, or 0.

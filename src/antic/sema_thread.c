@@ -802,7 +802,9 @@ static bool worker_args(struct checker *c, struct expr *call,
     for (i = 0; i < arg_count; i++) {
         const struct type *param = fn->params[i + 1];
         ok = sema_require(c, args[i],
-                          sema_check_expr(c, args[i], fn->params[i + 1]),
+                          sema_check_kept(c, args[i], fn->params[i + 1],
+                                          sema_owned_param(callee->symbol,
+                                                           i + 1)),
                           fn->params[i + 1]) && ok;
         sema_refuse_lock_copy(c, args[i], param);
         sema_refuse_worker_closure(c, args[i], param);

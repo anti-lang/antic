@@ -1,0 +1,109 @@
+//! The value `take(x.f)` gives is a fresh owner, which moves on where a new
+//! owner takes it over. A tuple literal, an array literal and a struct literal
+//! take it as a part, and the `own` parameter of a `construct` and of a generic
+//! function whose type the argument gives take it as an argument. Each place
+//! prints the value of the node it got, then deletes it, and the last line
+//! shows that no node was lost.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+
+	pub static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+struct Pair
+{
+	node: ?*Node,
+	tag: int,
+}
+
+class Keeper
+{
+	pub own kept: ?*Node = none,
+
+	fn construct(self, own n: ?*Node)
+	{
+		self.kept = n;
+	}
+}
+
+fn print_and_delete(place: ?*byte, n: ?*Node)
+{
+	let node = n else {
+		printf("%s: none\n".ptr, place);
+		return;
+	};
+	printf("%s: %d\n".ptr, place, node.value as c_int);
+	delete(node);
+}
+
+fn kept<T>(own x: T) -> T
+{
+	return x;
+}
+
+fn into_a_tuple()
+{
+	let h = Holder { head: alloc Node { value: 1 } };
+	let t = (take(h.head), 7);
+	print_and_delete("tuple".ptr, t.0);
+}
+
+fn into_an_array()
+{
+	let h = Holder { head: alloc Node { value: 2 } };
+	let a = [take(h.head)];
+	print_and_delete("array".ptr, a[0]);
+}
+
+fn into_a_struct()
+{
+	let h = Holder { head: alloc Node { value: 3 } };
+	let p = Pair { node: take(h.head), tag: 1 };
+	print_and_delete("struct".ptr, p.node);
+}
+
+fn into_a_construct()
+{
+	let h = Holder { head: alloc Node { value: 4 } };
+	let k = Keeper(take(h.head));
+	let n = k.kept else {
+		return;
+	};
+	printf("construct: %d\n".ptr, n.value as c_int);
+}
+
+fn into_a_generic_parameter()
+{
+	let h = Holder { head: alloc Node { value: 5 } };
+	print_and_delete("generic".ptr, kept(take(h.head)));
+}
+
+fn main() -> int
+{
+	into_a_tuple();
+	into_an_array();
+	into_a_struct();
+	into_a_construct();
+	into_a_generic_parameter();
+	printf("live %d\n".ptr, Node.live.load() as c_int);
+	return 0;
+}

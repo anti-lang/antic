@@ -2148,8 +2148,9 @@ static struct type *class_args(struct generic_map *map, struct type *outer,
    parameters. Gives the type of an argument that failed its check, or
    NULL. */
 static struct type *infer(struct checker *c, struct expr *e,
-                          const struct type *fn, size_t fixed,
-                          bool by_receiver, const struct generic_map *map,
+                          const struct type *fn, const struct symbol *sym,
+                          size_t fixed, bool by_receiver,
+                          const struct generic_map *map,
                           const struct generic_call *g)
 {
     size_t i;
@@ -2171,7 +2172,8 @@ static struct type *infer(struct checker *c, struct expr *e,
         if (!open) {
             continue;
         }
-        t = sema_check_expr(c, e->as.call.args[i], NULL);
+        t = sema_check_kept(c, e->as.call.args[i], NULL,
+                            sema_owned_param(sym, i));
         g->prechecked[i] = t;
         if (sema_is_error(t)) {
             return t;
@@ -2213,7 +2215,7 @@ struct type *sema_infer_literal(struct checker *c, struct expr *e,
                 init->value->kind == EXPR_FN) {
                 break;
             }
-            checked[i] = sema_check_expr(c, init->value, NULL);
+            checked[i] = sema_check_kept(c, init->value, NULL, true);
             if (sema_is_error(checked[i])) {
                 return checked[i];
             }
@@ -2294,7 +2296,7 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
     }
-    failed = infer(c, e, fn, fixed, outer == NULL, &map, g);
+    failed = infer(c, e, fn, sym, fixed, outer == NULL, &map, g);
     if (failed != NULL) {
         return failed;
     }

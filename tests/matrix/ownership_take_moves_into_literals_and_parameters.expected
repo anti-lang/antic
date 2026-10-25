@@ -1,0 +1,7 @@
+exit 0
+tuple: 1
+array: 2
+struct: 3
+construct: 4
+generic: 5
+live 0

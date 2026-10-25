@@ -2386,7 +2386,36 @@ static bool check_undo(struct checker *c, const struct stmt *s)
     return true;
 }
 
+/* The value of s that a new owner takes over, by sema_check_kept, or
+   NULL. */
+static const struct expr *kept_value(const struct stmt *s)
+{
+    switch (s->kind) {
+    case STMT_LET:
+        return s->as.let.value;
+    case STMT_ASSIGN:
+        return s->as.assign.op == TOKEN_ASSIGN ? s->as.assign.value : NULL;
+    case STMT_RETURN:
+        return s->as.return_value;
+    case STMT_SWITCH:
+        return s->as.switch_stmt.if_let ? s->as.switch_stmt.value : NULL;
+    default:
+        return NULL;
+    }
+}
+
+static void check_stmt_kind(struct checker *c, struct stmt *s);
+
 static void check_stmt(struct checker *c, struct stmt *s)
+{
+    const struct expr *outer = c->keeper;
+
+    c->keeper = kept_value(s);
+    check_stmt_kind(c, s);
+    c->keeper = outer;
+}
+
+static void check_stmt_kind(struct checker *c, struct stmt *s)
 {
     struct type *t;
     struct symbol *sym;

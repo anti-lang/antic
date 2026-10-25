@@ -1549,7 +1549,8 @@ static struct type *check_construct(struct checker *c, struct expr *e,
     }
     for (i = 0; i < given; i++) {
         struct expr *arg = e->as.call.args[i];
-        struct type *got = sema_check_expr(c, arg, fn->params[i + 1]);
+        struct type *got = sema_check_kept(c, arg, fn->params[i + 1],
+                                           sema_owned_param(m->symbol, i + 1));
         c->lent_use = LENT_PASSED;
         ok = sema_require(c, arg, got, fn->params[i + 1]) && ok;
         c->lent_use = LENT_STORED;
@@ -2370,7 +2371,8 @@ static struct type *check_call(struct checker *c, struct expr *e,
         if (i < fn->param_count) {
             struct type *t = g->prechecked[i] != NULL
                                  ? g->prechecked[i]
-                                 : sema_check_expr(c, arg, fn->params[i]);
+                                 : sema_check_kept(c, arg, fn->params[i],
+                                                   sema_owned_param(sym, i));
             c->lent_use = sym != NULL && sym->kind == SYMBOL_EXTERN_FN
                               ? LENT_TO_C
                               : LENT_PASSED;
@@ -2930,7 +2932,8 @@ bool sema_check_field_inits(struct checker *c, struct expr *e,
         if (!sema_require(c, inits[i].value,
                           given != NULL && given[i] != NULL
                               ? given[i]
-                              : sema_check_expr(c, inits[i].value, f->type),
+                              : sema_check_kept(c, inits[i].value, f->type,
+                                                true),
                           f->type)) {
             ok = false;
         } else if (sema_bitfield_constant(c, inits[i].value, f)) {

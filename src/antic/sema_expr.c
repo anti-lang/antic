@@ -2614,7 +2614,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         bool ok = true;
         for (i = 0; i < e->as.array_lit.count; i++) {
             struct expr *item = e->as.array_lit.elements[i];
-            struct type *it = sema_check_expr(c, item, element);
+            struct type *it = sema_check_kept(c, item, element, true);
             if (element == NULL) {
                 element = it;
             } else {
@@ -2655,7 +2655,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             struct expr *item = e->as.tuple.elements[i];
             struct type *element =
                 want != NULL ? want->params[i] : NULL;
-            elements[i] = sema_check_expr(c, item, element);
+            elements[i] = sema_check_kept(c, item, element, true);
             if (element != NULL) {
                 ok = sema_require(c, item, elements[i], element) && ok;
                 elements[i] = element;

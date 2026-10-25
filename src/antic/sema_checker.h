@@ -193,6 +193,8 @@ struct checker {
     /* The call of the expression statement checked now, whose value
        nothing takes, or NULL. */
     const struct expr *discarded;
+    /* The value checked now that a new owner takes over, or NULL. */
+    const struct expr *keeper;
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct stmt *deferred;    /* the innermost of them, or NULL */
     int deferred_loops;         /* loop_depth where deferred began */
@@ -812,6 +814,9 @@ void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
 /* The move of arg, argument index of a call of callee, into an `own`
    parameter. receiver is the object of a call of a function of a class,
    or NULL. */
+struct type *sema_check_kept(struct checker *c, struct expr *e,
+                             struct type *expected, bool kept);
+bool sema_owned_param(const struct symbol *callee, size_t index);
 void sema_note_move(struct checker *c, const struct symbol *callee,
                     size_t index, const struct expr *receiver,
                     struct expr *arg);
