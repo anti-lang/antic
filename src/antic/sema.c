@@ -1499,8 +1499,12 @@ bool sema_check(struct module *module, const struct sema_inputs *in,
     sema_declare_generics(&c);
     sema_resolve_generics(&c);
     sema_resolve_bases(&c);
-    sema_declare_enums_and_variants(&c);
+    /* DESIGN: the value of an enum may name a constant of a class body,
+       by its bare name inside the class and as `Table.ROWS` outside it.
+       The symbols of those constants come first, so the value folds,
+       by T204 and T205 of docs/audit/tests-findings.md. */
     sema_declare_body_constants(&c);
+    sema_declare_enums_and_variants(&c);
     sema_declare_all_fields(&c);
     sema_check_guards(&c);
     sema_declare_function_types(&c);

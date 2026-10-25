@@ -26,9 +26,3 @@ modules_generic_constant_release T202 A constant of a generic class of a library
 modules_generic_constant_dev T202 A constant of a generic class of a library cannot be named outside the class through a copy.
 matrix_ownership_take_compared_with_none_refused T203 A statement that drops the value of `take` inside an expression is accepted, and the object leaks.
 matrix_ownership_take_passed_to_a_parameter_that_is_not_own_refused T203 A statement that drops the value of `take` inside an expression is accepted, and the object leaks.
-matrix_classes_constant_by_its_bare_name_in_a_nested_enum_dev T204 The value of an enum nested in a class cannot name a constant of the class by its bare name.
-matrix_classes_constant_by_its_bare_name_in_a_nested_enum_release T204 The value of an enum nested in a class cannot name a constant of the class by its bare name.
-matrix_classes_constant_by_its_bare_name_in_a_nested_enum_memory_checks T204 The value of an enum nested in a class cannot name a constant of the class by its bare name.
-matrix_classes_constant_of_a_class_as_the_value_of_an_enum_dev T205 A constant of a class as the value of an enum reads 0.
-matrix_classes_constant_of_a_class_as_the_value_of_an_enum_release T205 A constant of a class as the value of an enum reads 0.
-matrix_classes_constant_of_a_class_as_the_value_of_an_enum_memory_checks T205 A constant of a class as the value of an enum reads 0.
