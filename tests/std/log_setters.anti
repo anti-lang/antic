@@ -1,0 +1,99 @@
+//! The setters of `Logger` change its name, its level and its format under the
+//! lock of the logger. Then two workers write lines while the main thread sets
+//! the name again and again, and every line carries one of the two names whole.
+import anti.io;
+import anti.lang;
+import anti.log;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const LINES: int = 2000;
+
+/// The object each worker is dispatched on.
+class Chatter
+{
+	pub n: int = 0,
+}
+
+/// The lines the workers wrote, and those whose name was neither of the two.
+singleton class Seen
+{
+	pub atomic lines: int = 0,
+	pub atomic torn: int = 0,
+}
+
+/// Print the line without the wall clock that opens it.
+fn shown(line: str)
+{
+	if line.len != 0 && line[0] == 0x7B {
+		let comma = text.find_byte(line, 0x2C);
+		io.print("{");
+		io.print(text.slice(line, comma + 1, line.len));
+		return;
+	}
+	let space = text.find_byte(line, 0x20);
+	io.print(text.slice(line, space + 1, line.len));
+}
+
+/// Count the line of a worker, and the line whose name is torn.
+fn counted(line: str)
+{
+	Seen.get().lines.add(1);
+	let after = text.slice(line, text.find_byte(line, 0x20) + 1, line.len);
+	if !text.equal(after, "warn short chunk\n")
+		&& !text.equal(after, "warn a-much-longer-name chunk\n") {
+		Seen.get().torn.add(1);
+	}
+}
+
+worker fn chatter(c: *Chatter, lines: int) -> int
+{
+	for i in 0..lines {
+		log.warn("chunk");
+	}
+	return lines;
+}
+
+fn main() -> int
+{
+	let before = log.set(log.SinkLogger.new("first", log.Level.Info,
+		log.CallbackSink.new(shown))) else { return 1; };
+	delete(before);
+	let logger = log.logger();
+	log.info("one");
+
+	logger.set_level(log.Level.Error);
+	log.info("dropped");
+	log.error("two");
+
+	logger.set_level(log.Level.Info);
+	logger.set_name("second");
+	log.info("three");
+
+	logger.set_format(log.Format.Json);
+	logger.set_name("");
+	log.info("four");
+	logger.set_format(log.Format.Text);
+
+	let old = log.set(log.SinkLogger.new("short", log.Level.Info,
+		log.CallbackSink.new(counted))) else { return 2; };
+	delete(old);
+	let a = alloc Chatter { };
+	let b = alloc Chatter { };
+	let first = dispatch a -> chatter(LINES);
+	let second = dispatch b -> chatter(LINES);
+	for i in 0..LINES {
+		if i % 2 == 0 {
+			log.logger().set_name("a-much-longer-name");
+		} else {
+			log.logger().set_name("short");
+		}
+	}
+	let written = join(first) + join(second);
+	delete(a);
+	delete(b);
+	printf("written %d, seen %d, torn %d\n".ptr, written as c_int,
+		Seen.get().lines.load() as c_int, Seen.get().torn.load() as c_int);
+	return 0;
+}

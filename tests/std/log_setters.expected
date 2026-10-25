@@ -1,0 +1,6 @@
+exit 0
+info first one
+error first two
+info second three
+{"level":"info","name":"","message":"four"}
+written 4000, seen 4000, torn 0

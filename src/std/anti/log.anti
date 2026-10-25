@@ -133,11 +133,16 @@ pub class CallbackSink inherits Sink
 /// collect them.
 ///
 /// A name, a level and a format stand here, because every logger carries them
-/// and `log.logger().level` reads and writes one. Every thread that writes a
-/// line reads the three with no lock, so a program writes them before it starts
-/// the threads that log. A change while those threads run is a new logger given
-/// to `log.set`, and the old one is deleted once they stopped. `SinkLogger` is
-/// the default, which writes through a `Sink`.
+/// and `log.logger().level` reads one. A program changes them through
+/// `set_name`, `set_level` and `set_format`, which take the lock of the logger,
+/// and the loggers of this module read the three under the same lock while they
+/// make a line. So a thread may change them while others log. A write to the
+/// field itself takes no lock. `SinkLogger` is the default, which writes
+/// through a `Sink`.
+///
+/// DESIGN: by Q4 of "Answers of 2026-10-24" in `docs/decisions.md`. The fields
+/// stay public, so a program that reads or writes them still compiles under the
+/// feature freeze, and the setters are the guarded way to write them.
 pub abstract class Logger
 {
 	/// The name that every line of this logger carries.
@@ -146,9 +151,38 @@ pub abstract class Logger
 	pub level: Level = Level.Info,
 	/// The shape of a line.
 	pub format: Format = Format.Text,
+	/// The lock the setters take, and a logger while it reads the three.
+	protected lock: Mutex,
 
 	/// Write `message` at `level`, unless the logger drops that level.
 	abstract fn log(self, level: Level, message: str);
+
+	/// Give every later line the name `name`, under the lock of the logger.
+	///
+	/// The logger keeps the text as it is given, so the text lives as long as
+	/// the logger uses it.
+	pub fn set_name(self, name: str)
+	{
+		sync self.lock {
+			self.name = name;
+		}
+	}
+
+	/// Drop every later line below `level`, under the lock of the logger.
+	pub fn set_level(self, level: Level)
+	{
+		sync self.lock {
+			self.level = level;
+		}
+	}
+
+	/// Write every later line in `format`, under the lock of the logger.
+	pub fn set_format(self, format: Format)
+	{
+		sync self.lock {
+			self.format = format;
+		}
+	}
 
 	/// The provider the link takes where the build names none, which is the
 	/// logger of the program.
@@ -220,11 +254,13 @@ pub class SinkLogger inherits Logger
 
 	concrete fn log(self, level: Level, message: str)
 	{
-		if (level as int) < (self.level as int) {
-			return;
-		}
 		let line = text.Builder.new();
-		line_of(self, level, message, &line);
+		sync self.lock {
+			if (level as int) < (self.level as int) {
+				return;
+			}
+			line_of(self, level, message, &line);
+		}
 		self.sink.write(line.text());
 	}
 }
@@ -298,11 +334,13 @@ class FileLogger inherits Logger
 
 	concrete fn log(self, level: Level, message: str)
 	{
-		if (level as int) < (self.level as int) {
-			return;
-		}
 		let line = text.Builder.new();
-		line_of(self, level, message, &line);
+		sync self.lock {
+			if (level as int) < (self.level as int) {
+				return;
+			}
+			line_of(self, level, message, &line);
+		}
 		for i in 0..self.count {
 			if (level as int) >= (self.legs[i].level as int) {
 				self.legs[i].sink.write(line.text());

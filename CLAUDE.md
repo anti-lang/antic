@@ -267,7 +267,7 @@ not re-open a settled decision without asking Eddie.
   `docs/reports/2026-10-22-solid-summary.md`, under "Answers of
   2026-10-24" in `docs/decisions.md`. Q17, `take(x.f)`, is the one new
   form the freeze lets in by name, and Q4 lets in the setters of
-  `anti.log.Logger`. `take` is built, and the setters are not built yet. See
+  `anti.log.Logger`. `take` and the setters are built. See
   "Feature freeze of 2026-10-14" in `docs/decisions.md`.
 - The gap procedure. Where a specification is silent, take the smallest option
   that keeps every struct C layout and the IR free of sizes. Record one
