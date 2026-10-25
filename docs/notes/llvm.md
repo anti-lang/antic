@@ -224,7 +224,7 @@ rules, and the tests named there pin each fact.
 - `emit_identity` holds the digests of the `--dump-llvm` text of every
   program of `tests/programs` on the six targets. `link_identity_macos-arm64`
   holds the digest of one linked program, and `unwind_<target>` the Windows
-  unwind data of the assembly llc writes for `tests/dump/unwind.anti`.
+  unwind data of the assembly llc writes for `tests/asm/unwind.anti`.
   `docs/notes/value-rules.md` says how to write each again.
 - The tests that read assembly read the one of llc, whose instruction lines
   start with a tab. `cpu_level_<level>` and `f16_<target>_<level>` read a dev

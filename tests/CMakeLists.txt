@@ -1999,7 +1999,7 @@ add_test(NAME mutex_size
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DOPT=${ANTIC_OPT}"
         "-DLLC=${ANTIC_LLC}"
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/mutex_size.anti"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/asm/mutex_size.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/mutex_size"
         -P "${ANTIC_RUNNERS}/run_mutex_size.cmake")
 
@@ -2216,7 +2216,7 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             "-DHOST=${ANTIC_HOST_TARGET}"
             "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
             "-DMIMALLOC_VERSION=${ANTIC_MIMALLOC_VERSION}"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/licenses.notice"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/programs/licenses.notice"
             -P "${ANTIC_RUNNERS}/run_licenses.cmake")
 endif()
 
@@ -2835,7 +2835,7 @@ set_tests_properties(conf_environment_utf8 PROPERTIES
 # The readers of the symbol table and the line table, on the binaries
 # that this host links for the other targets.
 antic_rt_sources(probe_sources symbols)
-add_executable(symbols_probe unit/symbols_probe.c ${probe_sources})
+add_executable(symbols_probe trace/symbols_probe.c ${probe_sources})
 target_link_libraries(symbols_probe PRIVATE antic_core)
 target_include_directories(symbols_probe PRIVATE ../src/rt)
 antic_coverage(symbols_probe)
@@ -2912,7 +2912,7 @@ foreach(case static shared exports two loader header bundle classes
             "-DLLVM_AR=${ANTIC_LLVM_AR}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+            "-DHEADERS=${CMAKE_CURRENT_SOURCE_DIR}/clib/headers"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib"
             "-DCASE=${case}"
             "-DCC=${ANTIC_TEST_CC}"
@@ -2938,7 +2938,7 @@ if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
                 "-DLLVM_AR=${ANTIC_LLVM_AR}"
                 "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                 "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-                "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+                "-DHEADERS=${CMAKE_CURRENT_SOURCE_DIR}/clib/headers"
                 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
                 "-DCASE=bundle"
                 "-DCC=${CMAKE_C_COMPILER}"
@@ -2979,7 +2979,7 @@ if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
                     "-DLLVM_AR=${ANTIC_LLVM_AR}"
                     "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
                     "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-                    "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+                    "-DHEADERS=${CMAKE_CURRENT_SOURCE_DIR}/clib/headers"
                     "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/clib-${target}"
                     "-DCASE=${case}"
                     "-DCC=${CMAKE_C_COMPILER}"
@@ -5110,7 +5110,7 @@ add_test(NAME llvm_datalayout_pin
         -P "${ANTIC_RUNNERS}/run_llvm_datalayout_pin.cmake")
 
 # The text of the LLVM back end passes the verifier of opt for every program
-# of tests/dump and tests/programs, in release and dev mode, one test per
+# of tests/dump, tests/asm and tests/programs, in release and dev mode, one test per
 # target. From the step emit-wide on the translator takes every operation
 # of the IR, so a program it refuses fails the test.
 # DESIGN: one test per target, since each runs antic twice per program. As
@@ -5122,7 +5122,7 @@ foreach(target IN LISTS ANTIC_TARGETS)
             "-DANTIC=$<TARGET_FILE:antic>"
             "-DOPT=${ANTIC_OPT}"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/programs"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/dump,${CMAKE_CURRENT_SOURCE_DIR}/asm,${CMAKE_CURRENT_SOURCE_DIR}/programs"
             "-DTARGETS=${target}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm_verify/${target}"
             -P "${ANTIC_RUNNERS}/run_llvm_verify.cmake")
@@ -5293,7 +5293,7 @@ endforeach()
 add_test(NAME llvm_atomics
     COMMAND "${CMAKE_COMMAND}"
         ${ANTIC_AND_RUNTIME}
-        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/asm/atomics.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/llvm-atomics"
         -P "${ANTIC_RUNNERS}/run_llvm_atomics.cmake")
 set(atomic_lse "\tcasal\t|\tldaddal\t|\tswpal\t|\tcasalb\t|\tcasalh\t")
@@ -5324,7 +5324,7 @@ foreach(case "linux-arm64,armv8.0,${atomic_exclusive},${atomic_lse}"
             ${ANTIC_AND_RUNTIME}
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/atomics.anti"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/asm/atomics.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/atomics-level"
             "-DUSES=${uses}"
             "-DAVOIDS=${avoids}"
@@ -5373,7 +5373,7 @@ foreach(case "linux-x86_64,v1,${f16_call},cvtph2ps|cvtps2ph|${f16_rt}"
             ${ANTIC_AND_RUNTIME}
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/asm/half.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/f16"
             "-DUSES=${uses}"
             "-DAVOIDS=${avoids}"
@@ -5398,7 +5398,7 @@ foreach(case "linux-x86_64,v3,vaddps[^\n]*%ymm,1"
             ${ANTIC_AND_RUNTIME}
             "-DTARGET=${target}"
             "-DLEVEL=${level}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/simd_wide.anti"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/asm/simd_wide.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/simd"
             "-DPATTERN=${pattern}"
             "-DCOUNT=${count}"
@@ -5902,9 +5902,9 @@ foreach(target_triple "windows-x86_64,x86_64-pc-windows-msvc"
             "-DLLVM_READOBJ=${ANTIC_RUNTIME_READOBJ}"
             "-DTARGET=${target}"
             "-DTRIPLE=${triple}"
-            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.anti"
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/asm/unwind.anti"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unwind"
-            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/dump/unwind.${target}.unwind"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/asm/unwind.${target}.unwind"
             -P "${ANTIC_RUNNERS}/run_unwind.cmake")
 endforeach()
 
@@ -6085,11 +6085,13 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     list(GET parts 0 target)
     list(GET parts 1 triple)
     foreach(source main loop twice cell spill7 sum args x86 arm64 floatcalls
-            floats structs strings fnptr half)
+            floats structs strings fnptr)
         antic_asm_test(${source}
             "${CMAKE_CURRENT_SOURCE_DIR}/dump/${source}.anti"
             "${CMAKE_CURRENT_BINARY_DIR}/asm")
     endforeach()
+    antic_asm_test(half "${CMAKE_CURRENT_SOURCE_DIR}/asm/half.anti"
+        "${CMAKE_CURRENT_BINARY_DIR}/asm")
     # Sizes, C types, unions, bitfields, packed and aligned structs and
     # export, from the program and ABI tests.
     foreach(source programs/sizes programs/c_types programs/bitfields
@@ -6136,7 +6138,7 @@ foreach(target_triple "linux-x86_64,x86_64-unknown-linux-gnu"
     # The calls of the runtime that convert f16 below x86-64-v3.
     if(target MATCHES "x86_64$")
         antic_asm_test(half_v1
-            "${CMAKE_CURRENT_SOURCE_DIR}/dump/half.anti"
+            "${CMAKE_CURRENT_SOURCE_DIR}/asm/half.anti"
             "${CMAKE_CURRENT_BINARY_DIR}/asm-v1"
             OPTIONS "--cpu|v1")
     endif()
@@ -6965,7 +6967,7 @@ foreach(case IN LISTS anti_bind_cases)
             "-DANTI=$<TARGET_FILE:anti>"
             ${ANTIC_AND_RUNTIME}
             "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/clib"
-            "-DDUMP=${CMAKE_CURRENT_SOURCE_DIR}/dump"
+            "-DHEADERS=${CMAKE_CURRENT_SOURCE_DIR}/clib/headers"
             "-DBIND=${CMAKE_CURRENT_SOURCE_DIR}/bind"
             "-DABI=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"

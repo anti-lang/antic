@@ -23,7 +23,7 @@ set(top_files CLAUDE.md README.md CHANGELOG.md LICENSE CMakeLists.txt
 # build link c. A tracked .claude/settings.json is one, when there is one.
 set(tool_entries .gitattributes .editorconfig .claude/settings.json r c)
 set(src_directories antic anti rt std native)
-set(tests_directories abi anti-build anti-symbols anti-test bench bind check
+set(tests_directories abi anti-build anti-symbols anti-test asm bench bind check
     clib conf doc dump emit-identity errors fmt framework inject link-identity
     matrix modules opt plugin programs raw runners std trace traps unit)
 set(docs_directories audit notes reports site)

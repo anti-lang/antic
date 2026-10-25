@@ -7,7 +7,7 @@
 #             api_malformed, clang_malformed, ast_malformed,
 #             api_typedef_chain, clang_typedef_chain or clang_of_the_tree
 #   SOURCES   tests/clib, for the case header
-#   DUMP      tests/dump, the headers that antic --lib writes
+#   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
 #   ABI       tests/abi, whose abi_raymath.expected the case raymath reads
 #   RAYLIB    the pinned raylib source
@@ -161,7 +161,7 @@ endif()
 
 if(CASE STREQUAL "header")
     # The header of each library file equals the header that antic --lib
-    # writes for the same module, which tests/dump holds.
+    # writes for the same module, which tests/clib/headers holds.
     foreach(name geo shapes canvas failing tuples flags variants simdlib
             nested forms never)
         antic_build(-c --runtime "${RUNTIME}" -I "${SOURCES}" -o
@@ -170,8 +170,8 @@ if(CASE STREQUAL "header")
         tool_run("" "${ANTI}" bind --header "${WORK}/${name}.antl" -o "${WORK}/out"
                     --runtime "${RUNTIME}" -I "${SOURCES}")
         file(READ "${WORK}/out/${name}.h" got)
-        file(READ "${DUMP}/${name}.h" wanted)
-        expect_same_text("${name}.h, against ${DUMP}/${name}.h," "${wanted}"
+        file(READ "${HEADERS}/${name}.h" wanted)
+        expect_same_text("${name}.h, against ${HEADERS}/${name}.h," "${wanted}"
                          "${got}")
     endforeach()
     # M26 of the second audit: the header takes the last segment of the module
@@ -193,7 +193,7 @@ if(CASE STREQUAL "header")
             message(FATAL_ERROR "${library} gave ${written}, not geo.h")
         endif()
         file(READ "${WORK}/renamed-out/geo.h" got)
-        file(READ "${DUMP}/geo.h" wanted)
+        file(READ "${HEADERS}/geo.h" wanted)
         expect_same_text("the header of ${library}, against geo.h,"
                          "${wanted}" "${got}")
     endforeach()

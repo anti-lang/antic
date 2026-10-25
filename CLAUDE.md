@@ -480,6 +480,11 @@ Where a test goes:
 - `tests/traps/`: a check of dev mode or of `--memory-checks` that stops a
   program, `check_<name>`.
 - `tests/dump/`: what antic prints for a stage, `dump_<stage>_<subject>`.
+- `tests/asm/`: the code antic writes for a target and a level, read from
+  its assembly or its object, as `atomics_<target>_<level>` and
+  `unwind_<target>`. By Q9 of "Answers of 2026-10-24" each directory
+  holds one kind of test, so the expected C headers stand in
+  `tests/clib/headers/`.
 - `tests/modules/`: a program of more than one module, in release mode and
   in dev mode. A refusal at the boundary of a module is a program
   `tests/errors/modules_<name>.anti`, whose case in `tests/CMakeLists.txt`

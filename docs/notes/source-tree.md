@@ -466,16 +466,17 @@ The data files of a directory have no row of their own.
 | Directory | Purpose |
 |---|---|
 | `tests/abi/` | C sources, Anti programs and expected outputs that compare the layouts and the calls of C with those of Anti, and the link probes of the native libraries. |
+| `tests/asm/` | Sources of the tests that read the code antic writes for a target and a level: the atomics, `f16`, the width of a simd operation, the size of a Mutex and the unwind data of Windows. |
 | `tests/anti-build/` | The projects that `anti build`, `anti run` and `anti license` run over. |
 | `tests/anti-symbols/` | The project `tracer` of `anti symbols`. |
 | `tests/anti-test/` | The modules that `anti test` runs. |
 | `tests/bench/` | The benchmark programs with their C twins, outside the suite, and `ablate/`, the measurement of `docs/work-order-llvm-optimization.md`. |
 | `tests/bind/` | C headers, `raylib_api.json` and the expected binding modules of `anti bind`. |
 | `tests/check/` | The projects of `anti check`. |
-| `tests/clib/` | Libraries for C, the C and C++ programs that link them and their expected outputs. |
+| `tests/clib/` | Libraries for C, the C and C++ programs that link them, their expected outputs and, in `headers/`, the expected C headers that `antic --lib` writes. |
 | `tests/conf/` | Runtime configuration files, the programs that read them and the patterns their output must match. |
 | `tests/doc/` | The fixture of `anti doc`, its expected pages and `antl_rename.c`. |
-| `tests/dump/` | Sources and the expected dumps of the stages of antic, the expected C headers, the unwind data and the list of targets. |
+| `tests/dump/` | Sources and the expected dumps of the stages of antic, and the list of targets that `--print-targets` prints. |
 | `tests/emit-identity/` | The manifest of the digests that `emit_identity` compares. |
 | `tests/errors/` | Programs antic refuses, each with its expected messages. |
 | `tests/fmt/` | Sources and their canonical form for `anti fmt`. |
@@ -486,10 +487,10 @@ The data files of a directory have no row of their own.
 | `tests/modules/` | Programs of more than one module, two library files as hex and `poke_byte.c`. |
 | `tests/opt/` | Sources with their expected IR before and after the optimizer. |
 | `tests/plugin/` | The hosts and the libraries of the plugin tests, with the versions of one interface. |
-| `tests/programs/` | Programs whose subject is one feature, with their expected exit status and output. |
+| `tests/programs/` | Programs whose subject is one feature, with their expected exit status and output, and the notice that `program_licenses` expects. |
 | `tests/raw/` | A C program and an Anti program that write a CR, an LF and a NUL. |
 | `tests/std/` | Programs whose subject is a module of the standard library, with their expected output. |
-| `tests/trace/` | Programs of hooks, tracing and stack traces with the patterns their output must match. |
+| `tests/trace/` | Programs of hooks, tracing and stack traces with the patterns their output must match, and `symbols_probe.c`, which reads the symbols of a binary of another target. |
 | `tests/traps/` | Programs that must stop: the dev-mode checks and the programs of `--memory-checks`. |
 
 ### The tables of messages
@@ -520,7 +521,6 @@ Each holds one case per message of a command, which
 | `tests/unit/pipeline.h` | The stages the unit tests run a source through, for one module or a compilation of more than one, and the IR print without the types of the runtime. |
 | `tests/unit/plugin_bad.c` | A shared library with a writable plugin table, which `test_plugin_table.c` damages and loads. |
 | `tests/unit/plugin_table.c` | A shared library with an empty plugin table, which `test_plugin_race.c` and `test_platform.c` load. |
-| `tests/unit/symbols_probe.c` | A program that looks a function up in a binary of another target with the readers of `src/rt/symbols.c`. |
 | `tests/unit/syms.err` | The standard error that the group `syms` of `test_syms.c` writes, which `unit_syms_messages` compares. |
 | `tests/unit/test_abi.c` | `abi_classify`, one case per rule of the calling conventions. |
 | `tests/unit/test_alloc_oom.c` | A program that asks one allocation helper of antic for more memory than a host gives, for `run_alloc_oom.cmake`. |

@@ -4,7 +4,7 @@
 # with cmake -P and these values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime archive
-#   SOURCE    tests/dump/atomics.anti
+#   SOURCE    tests/asm/atomics.anti
 #   WORK      a directory for the text
 
 cmake_minimum_required(VERSION 3.21)

@@ -2,7 +2,7 @@
 #   ANTIC    the antic executable
 #   OPT      the opt of the pinned release
 #   LLC      the llc of the pinned release
-#   SOURCE   tests/dump/mutex_size.anti
+#   SOURCE   tests/asm/mutex_size.anti
 #   WORK     a directory for the listings
 #
 # main returns size_of(Mutex) times 1000, which the back end folds into
