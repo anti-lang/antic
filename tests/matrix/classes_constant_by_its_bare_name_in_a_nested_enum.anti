@@ -1,0 +1,36 @@
+//! The bare name of a constant of a class body reaches it in the types nested
+//! in the class, by Q20 of "Answers of 2026-10-24" and its `[provisional]`
+//! entry in `docs/decisions.md`. The values of a nested enum stand there, so
+//! `Small = ROWS` names the constant of `Table`. The program prints the two
+//! values of the enum.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Table
+{
+	const ROWS: c_int = 3;
+	const COLS: c_int = ROWS + 1;
+
+	enum Kind
+	{
+		Small = ROWS,
+		Large = COLS * 10,
+	}
+
+	pub fn small(self) -> int
+	{
+		return Kind.Small as int;
+	}
+
+	pub fn large(self) -> int
+	{
+		return Kind.Large as int;
+	}
+}
+
+fn main() -> int
+{
+	let t = Table { };
+	printf("small %lld, large %lld\n".ptr, t.small(), t.large());
+	return 0;
+}
