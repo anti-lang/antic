@@ -18,9 +18,10 @@
 #define LOCK_FILE "anti.lock"
 
 /* The build and the dist directory of the default layout of
-   docs/tooling.md, which `[layout]` replaces for `anti build`. The work
-   directories of `anti check`, `anti doc` and `anti test` stand in the
-   first, as docs/decisions.md gives them. */
+   docs/tooling.md, which `[layout]` replaces. The work directories of
+   `anti check`, `anti doc` and `anti test` and the pages of `anti doc`
+   stand in the build directory of the layout, by Q7 of "Answers of
+   2026-10-24" in docs/decisions.md. */
 #define MANIFEST_BUILD_DIR "build"
 #define MANIFEST_DIST_DIR "dist"
 
@@ -68,14 +69,15 @@ bool manifest_inject_read(const char *path, bool tests,
    may free a table whose read failed. */
 void manifest_inject_free(struct manifest_inject *table);
 
-/* The source and test directories of a project, which `[layout]` of the
-   manifest may name, and the package name of `[package]`. The defaults of
-   docs/tooling.md stand where the file does not, and a missing file gives
-   both defaults and no package name. The package name decides which
-   modules share an `internal` item, so every compile of `anti check`,
-   `anti build`, `anti test` and `anti doc` carries it. */
+/* The source, test and build directories of a project, which `[layout]`
+   of the manifest may name, and the package name of `[package]`. The
+   defaults of docs/tooling.md stand where the file does not, and a
+   missing file gives the defaults and no package name. The package name
+   decides which modules share an `internal` item, so every compile of
+   `anti check`, `anti build`, `anti test` and `anti doc` carries it. */
 bool manifest_layout_read(const char *path, struct text *src,
-                          struct text *test, struct text *package);
+                          struct text *test, struct text *build,
+                          struct text *package);
 
 /* One entry of `[repositories]`, an alias and the URL prefix it names. */
 struct manifest_repository {

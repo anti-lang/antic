@@ -10,9 +10,10 @@
    means every `.anti` file under the source and test directories of the
    manifest. roots are the -I search roots, which also give each module
    its path. work holds the interface files and the modules of the doc
-   blocks. runtime names the runtime archive. undocumented reports every
-   `pub` item without a `///` comment, and all_targets runs the front end
-   once per target instead of once for the host. */
+   blocks, and NULL gives `check` in the build directory of `[layout]`.
+   runtime names the runtime archive. undocumented reports every `pub`
+   item without a `///` comment, and all_targets runs the front end once
+   per target instead of once for the host. */
 struct check_request {
     const char *const *sources;
     size_t source_count;

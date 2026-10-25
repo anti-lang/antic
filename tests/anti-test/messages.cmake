@@ -15,6 +15,15 @@ anti_message(fault_work_not_made
     FAULT mkdir:2:EACCES
     ARGS test --work ../test --runtime "${RUNTIME}" com/example/twice.anti
     ERR "anti: cannot make ../test")
+# Without --work the files of the run stand in the build directory of
+# `[layout]`, by Q7 of "Answers of 2026-10-24" in docs/decisions.md. A
+# file stands where that directory belongs.
+anti_message(work_in_the_layout
+    FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n\n[layout]\nbuild = \"out\"\n"
+          com/example/twice.anti "${twice_text}"
+          out "A file where the build directory belongs.\n"
+    ARGS test --runtime "${RUNTIME}" com/example/twice.anti
+    ERR "anti: out is a file where a directory belongs")
 # The module has no root, so its path is one segment and the compile
 # warns of it before every message that follows.
 set(one_segment "com/example/twice.anti:1:1: warning: the module path `twice` has one segment, which is for a program's own files [single-segment-path]")

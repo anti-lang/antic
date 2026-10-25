@@ -509,7 +509,7 @@ static int check_command(int argc, char **argv)
     struct check_request request = {0};
     const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **roots = files_array((size_t)argc, sizeof *roots);
-    const char *work = MANIFEST_BUILD_DIR "/check";
+    const char *work = NULL;
     const char *runtime = NULL;
     struct text home = {0};
     size_t count = 0;
@@ -569,10 +569,13 @@ static int doc_command(int argc, char **argv)
     struct files_list found = {0};
     struct text src = {0};
     struct text test = {0};
+    struct text build = {0};
     struct text package = {0};
     struct text home = {0};
-    const char *out = MANIFEST_BUILD_DIR "/doc";
-    const char *work = MANIFEST_BUILD_DIR "/doc-work";
+    struct text out_text = {0};
+    struct text work_text = {0};
+    const char *out = NULL;
+    const char *work = NULL;
     const char *runtime = NULL;
     size_t count = 0;
     size_t root_count = 0;
@@ -611,10 +614,21 @@ static int doc_command(int argc, char **argv)
        `[layout]` from project_sources, as `anti check` and `anti fmt` do,
        so the three read the same files. The test directory holds no
        module a reader of the library documents. Every compile carries the
-       package name, with a file or without. */
-    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
+       package name, with a file or without. Without -o and --work the
+       pages and the files of the run stand in the build directory of
+       `[layout]`, by Q7 of "Answers of 2026-10-24". */
+    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &build,
+                              &package)) {
         status = 1;
         goto done;
+    }
+    if (out == NULL) {
+        text_appendf(&out_text, "%s/doc", text_cstr(&build));
+        out = text_cstr(&out_text);
+    }
+    if (work == NULL) {
+        text_appendf(&work_text, "%s/doc-work", text_cstr(&build));
+        work = text_cstr(&work_text);
     }
     if (count == 0) {
         if (!project_sources(text_cstr(&src), NULL, &found)) {
@@ -647,8 +661,11 @@ done:
     files_list_free(&found);
     text_free(&src);
     text_free(&test);
+    text_free(&build);
     text_free(&package);
     text_free(&home);
+    text_free(&out_text);
+    text_free(&work_text);
     return status;
 }
 
@@ -660,6 +677,7 @@ static int fmt_command(int argc, char **argv)
     struct files_list found = {0};
     struct text src = {0};
     struct text test = {0};
+    struct text build = {0};
     struct text package = {0};
     size_t count = 0;
     bool check = false;
@@ -680,7 +698,8 @@ static int fmt_command(int argc, char **argv)
        directory of `[layout]` from project_sources, as `anti check` does,
        so that the two read the same files. */
     if (count == 0) {
-        if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
+        if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &build,
+                                  &package)) {
             status = 1;
             goto done;
         }
@@ -699,6 +718,7 @@ done:
     files_list_free(&found);
     text_free(&src);
     text_free(&test);
+    text_free(&build);
     text_free(&package);
     return status;
 }
@@ -709,11 +729,13 @@ static int test_command(int argc, char **argv)
     struct test_request request = {0};
     const char **sources = files_array((size_t)argc, sizeof *sources);
     const char **roots = files_array((size_t)argc, sizeof *roots);
-    const char *work = MANIFEST_BUILD_DIR "/tests";
+    const char *work = NULL;
     const char *runtime = NULL;
     struct manifest_inject inject = {0};
     struct text src = {0};
     struct text test = {0};
+    struct text build = {0};
+    struct text work_text = {0};
     struct text package = {0};
     struct text home = {0};
     size_t count = 0;
@@ -747,11 +769,18 @@ static int test_command(int argc, char **argv)
     }
     /* DESIGN: the manifest is `anti.toml` of the project root, and
        `anti test` runs there. A project without one injects nothing and
-       names no package, which is no error. */
+       names no package, which is no error. Without --work the files of
+       the run stand in the build directory of `[layout]`, by Q7 of
+       "Answers of 2026-10-24". */
     if (!manifest_inject_read(MANIFEST_FILE, true, &inject) ||
-        !manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
+        !manifest_layout_read(MANIFEST_FILE, &src, &test, &build,
+                              &package)) {
         status = 1;
         goto done;
+    }
+    if (work == NULL) {
+        text_appendf(&work_text, "%s/tests", text_cstr(&build));
+        work = text_cstr(&work_text);
     }
     request.sources = sources;
     request.source_count = count;
@@ -770,6 +799,8 @@ done:
     manifest_inject_free(&inject);
     text_free(&src);
     text_free(&test);
+    text_free(&build);
+    text_free(&work_text);
     text_free(&package);
     free((void *)sources);
     free((void *)roots);

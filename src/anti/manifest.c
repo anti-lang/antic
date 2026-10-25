@@ -217,26 +217,29 @@ static const char *value_of(const struct anti_toml *doc, const char *key)
 static void text_of_key(const struct anti_toml *doc, const char *key,
                         struct text *out);
 
-/* The source and the test directory of doc, or of the default layout
-   where doc is NULL or names none. */
+/* The source, the test and the build directory of doc, or of the default
+   layout where doc is NULL or names none. */
 static void layout_of(const struct anti_toml *doc, struct text *src,
-                      struct text *test)
+                      struct text *test, struct text *build)
 {
     text_append(src, DEFAULT_SRC);
     text_append(test, DEFAULT_TEST);
+    text_append(build, MANIFEST_BUILD_DIR);
     if (doc != NULL) {
         text_of_key(doc, "layout.src", src);
         text_of_key(doc, "layout.test", test);
+        text_of_key(doc, "layout.build", build);
     }
 }
 
 bool manifest_layout_read(const char *path, struct text *src,
-                          struct text *test, struct text *package)
+                          struct text *test, struct text *build,
+                          struct text *package)
 {
     struct anti_toml *doc;
     enum opened opened = open_manifest(path, &doc);
 
-    layout_of(doc, src, test);
+    layout_of(doc, src, test, build);
     if (opened == OPENED) {
         text_of_key(doc, "package.name", package);
         anti_rt_toml_free(doc);
@@ -393,7 +396,6 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     bool ok = false;
 
     memset(out, 0, sizeof *out);
-    text_append(&out->build, MANIFEST_BUILD_DIR);
     text_append(&out->dist, MANIFEST_DIST_DIR);
     opened = open_manifest(path, &doc);
     if (opened == OPENED_MISSING) {
@@ -403,7 +405,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     if (opened != OPENED) {
         goto done;
     }
-    layout_of(doc, &out->src, &out->test);
+    layout_of(doc, &out->src, &out->test, &out->build);
     text_of_key(doc, "package.name", &out->name);
     text_of_key(doc, "package.version", &out->version);
     text_of_key(doc, "package.antic", &out->antic);
@@ -411,7 +413,6 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     text_of_key(doc, "package.license_text", &out->license_text);
     array_of_key(doc, "package.attribution", &out->attribution,
                  &out->attribution_count);
-    text_of_key(doc, "layout.build", &out->build);
     text_of_key(doc, "layout.dist", &out->dist);
     array_of_key(doc, "targets.default", &out->default_targets,
                  &out->default_target_count);

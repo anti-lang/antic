@@ -349,7 +349,7 @@ anti test -I src src/com/example/purse.anti
 | `-I <dir>` | a root. The module path of a file is its path under the root, so `src/com/example/purse.anti` under `-I src` is `com.example.purse` |
 | `--release` | builds each runner as a whole program with the assertions and the dev checks off |
 | `--memory-checks` | builds every module with `--memory-checks` and reads each report through the symbolizer |
-| `--work <dir>` | the directory of the files of the run, `build/tests` by default |
+| `--work <dir>` | the directory of the files of the run, `tests` in the build directory of `[layout]` by default, which is `build/tests` |
 | `--runtime <dir>` | the runtime archive, for a build of Anti itself |
 
 The root is compared with the path as written. `-I src` matches `src/com/example/purse.anti` and does not match `./src/com/example/purse.anti`, whose module is then `purse` alone.

@@ -404,6 +404,9 @@ int check_run(const struct check_request *r)
     struct text package = {0};
     struct text src = {0};
     struct text test = {0};
+    struct text build = {0};
+    struct text work_text = {0};
+    const char *work = r->work;
     struct unit *units = NULL;
     const char **path_roots = NULL;
     size_t path_root_count;
@@ -422,9 +425,16 @@ int check_run(const struct check_request *r)
        files this run writes carry the name. The source and the test
        directory are search roots of the run, because the directories
        under them mirror the module paths. */
-    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &package)) {
+    if (!manifest_layout_read(MANIFEST_FILE, &src, &test, &build,
+                              &package)) {
         status = 1;
         goto done;
+    }
+    /* Without --work the files of the run stand in the build directory
+       of `[layout]`, by Q7 of "Answers of 2026-10-24". */
+    if (work == NULL) {
+        text_appendf(&work_text, "%s/check", text_cstr(&build));
+        work = text_cstr(&work_text);
     }
     /* R160 of "Rules of 2026-10-13": a project without a source is a
        wrong use of the command, which ends with 2 as `anti doc` does. */
@@ -433,7 +443,7 @@ int check_run(const struct check_request *r)
         status = found.count == 0 ? 2 : 1;
         goto done;
     }
-    if (!files_make_dirs_or_say(r->work)) {
+    if (!files_make_dirs_or_say(work)) {
         status = 1;
         goto done;
     }
@@ -452,11 +462,11 @@ int check_run(const struct check_request *r)
     /* The work directory holds the interface files of this run, and the
        roots hold the sources. All of them are search roots, the work
        directory first, so a module of the run wins. */
-    search[0] = r->work;
+    search[0] = work;
     for (i = 0; i < path_root_count; i++) {
         search[i + 1] = path_roots[i];
     }
-    text_appendf(&dev_root, "%s/%s", r->work, CHECK_DEV_DIR);
+    text_appendf(&dev_root, "%s/%s", work, CHECK_DEV_DIR);
     block_search[0] = text_cstr(&dev_root);
     for (i = 0; i <= path_root_count; i++) {
         block_search[i + 1] = search[i];
@@ -472,7 +482,7 @@ int check_run(const struct check_request *r)
     for (i = 0; i < count; i++) {
         const char *source =
             r->source_count > 0 ? r->sources[i] : text_cstr(&found.items[i]);
-        unit_read(source, path_roots, path_root_count, r->work, &units[i]);
+        unit_read(source, path_roots, path_root_count, work, &units[i]);
     }
     if (!unit_order(units, count, order)) {
         status = 1;
@@ -492,7 +502,7 @@ int check_run(const struct check_request *r)
     printf("\n");
 
     for (i = 0; i < count; i++) {
-        if (!unit_blocks(&units[order[i]], &blocks, r->work, &blocks_count,
+        if (!unit_blocks(&units[order[i]], &blocks, work, &blocks_count,
                          &blocks_failed)) {
             blocks_failed++;
         }
@@ -536,6 +546,8 @@ done:
     text_free(&package);
     text_free(&src);
     text_free(&test);
+    text_free(&build);
+    text_free(&work_text);
     files_list_free(&found);
     return status;
 }

@@ -383,7 +383,7 @@ The classes run in this order. The first class that fails ends the run, and the 
 | `--targets all` | run the front end once per target. The first line then reads `1 file, 6 targets` |
 | `--warn-undocumented` | add the warning for a `pub` item without a doc comment |
 | `<file.anti>...` | check those files. Without one, every source under the directories of `[layout]` |
-| `--work <dir>` | the directory of the modules it writes for the doc blocks. `build/check` in the example |
+| `--work <dir>` | the directory of the modules it writes for the doc blocks. `check` in the build directory of `[layout]` without it, `build/check` in the example |
 
 With `--warn-undocumented`, a run over a `pub` function without a doc comment that is not in the canonical form prints:
 
@@ -520,7 +520,7 @@ Three facts of the page follow from how the tool reads a module.
 
 | Option | Effect |
 |---|---|
-| `-o <dir>` | the directory of the pages |
+| `-o <dir>` | the directory of the pages, `doc` in the build directory of `[layout]` without it |
 | `--markdown` | write Markdown, with each signature and each example as an `anti` block |
 | `--private` | keep the items that are not `pub` |
 | `--dev` | the developer's pages: the private items and the `//#` notes of the source |

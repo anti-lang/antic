@@ -9,6 +9,15 @@ anti_message(no_source STATUS 2
     FILES anti.toml "${check_manifest}" src/notes.txt "No module.\n"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "anti: no .anti file under src or test")
+# Without --work the files of the run stand in the build directory of
+# `[layout]`, by Q7 of "Answers of 2026-10-24" in docs/decisions.md. A
+# file stands where that directory belongs.
+anti_message(work_in_the_layout
+    FILES anti.toml "${check_manifest}\n[layout]\nbuild = \"out\"\n"
+          src/com/example/one.anti "//! One.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+          out "A file where the build directory belongs.\n"
+    ARGS check --runtime "${RUNTIME}"
+    ERR "anti: out is a file where a directory belongs")
 # Two modules that import each other have no order, by R125 of "Rules of
 # 2026-10-13" in docs/decisions.md.
 anti_message(modules_import_each_other

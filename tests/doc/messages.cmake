@@ -8,6 +8,15 @@ anti_message(no_source STATUS 2
     FILES src/notes.txt "No module.\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}"
     ERR "anti: no .anti file under src")
+# Without -o and --work the pages and the files of the run stand in the
+# build directory of `[layout]`, by Q7 of "Answers of 2026-10-24" in
+# docs/decisions.md. A file stands where that directory belongs.
+anti_message(work_in_the_layout
+    FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n\n[layout]\nbuild = \"out\"\n"
+          src/com/example/one.anti "//! One.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+          out "A file where the build directory belongs.\n"
+    ARGS doc --runtime "${RUNTIME}"
+    ERR "anti: out is a file where a directory belongs")
 foreach(items dev private)
     anti_message(${items}_of_a_library
         FILES one.antl "A library file, which holds the public interface alone.\n"
