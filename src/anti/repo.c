@@ -120,9 +120,16 @@ static bool file_url_path(const char *url, struct text *out)
         return false;
     }
     /* A Windows path stands as file:///C:/dir, whose leading slash is no
-       part of it. */
+       part of it. On macOS and Linux, where such a path is not absolute,
+       it is a path of another system, by Q15 of "Answers of 2026-10-24"
+       in docs/decisions.md. */
     if (rest[1] != '\0' && rest[2] == ':') {
         rest++;
+        if (!platform_path_is_absolute(rest)) {
+            say_anti("%s: a file:// URL names %s, which is a path of "
+                     "another system\n", url, rest);
+            return false;
+        }
     }
     text_append(out, rest);
     return true;

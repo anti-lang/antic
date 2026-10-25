@@ -157,6 +157,8 @@ asked. The last run on real x86_64 hardware was the workflow run of 2026-10-08.
   `ANTIC_RUNTIME_READOBJ`. Without the suffix, 13 checks of the runtime skipped.
 - antic writes objects as `.obj`, and the tests name a dev object with `anti_object`.
 - The `file://` URL of a Windows path is `file:///C:/dir`. anti refuses `file://C:/dir`.
+  On macOS and Linux it refuses `file:///C:/dir` as a path of another system, by Q15 of
+  "Answers of 2026-10-24" in `docs/decisions.md`.
 - Windows follows no link written with `/`. `file(READ_SYMLINK)` gives a link back with
   backslashes. CMake reads a junction as a link to an absolute path such as
   `C:/Program Files`.
