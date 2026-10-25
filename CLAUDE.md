@@ -71,7 +71,8 @@ not re-open a settled decision without asking Eddie.
   per push and not once per commit. `cmake --preset asan` and `cmake --preset
   ubsan`, each with the full suite. Build and test the asan tree with
   `cmake --build --preset asan` and `ctest --preset asan`, whose presets set
-  `ASAN_OPTIONS=detect_leaks=1`. UndefinedBehaviorSanitizer found a real
+  `ASAN_OPTIONS=detect_leaks=1`. The presets of `ubsan` set the same and
+  compile with `-g`, by Q8 of "Answers of 2026-10-24". UndefinedBehaviorSanitizer found a real
   defect on its first run here, a `bool` field read as 64 that the ordinary
   build passed over.
 - Each of the three suites finishes in under 9 minutes with `ctest -j14`,

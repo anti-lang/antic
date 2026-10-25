@@ -766,6 +766,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_plugin.cmake` | Builds a plugin and its hosts and checks loading and injection. |
 | `tests/runners/run_plugin_kinds.cmake` | Builds a host and a plugin whose interface takes and gives every kind of value, and runs the host. |
 | `tests/runners/run_plugin_versions.cmake` | Loads libraries of one interface, each built against another version of it, into hosts of other versions, to check the version rules. |
+| `tests/runners/run_presets.cmake` | Reads the settings of `CMakePresets.json` that the answers of 2026-10-24 decide. |
 | `tests/runners/run_pre_commit.cmake` | Drives the pre-commit hook in a scratch repository. |
 | `tests/runners/run_probe.cmake` | Compares the ABI probe in C with the one in Anti. |
 | `tests/runners/run_probe_self.cmake` | Tests that `run_probe.cmake` fails for two probes that print the same and end with a status other than 0. |

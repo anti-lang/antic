@@ -38,7 +38,7 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all",
+                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -g",
                 "ANTIC_FAULTS": "ON"
             }
         },
@@ -59,7 +59,8 @@
         { "name": "release", "configurePreset": "release" },
         { "name": "asan", "configurePreset": "asan",
           "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
-        { "name": "ubsan", "configurePreset": "ubsan" },
+        { "name": "ubsan", "configurePreset": "ubsan",
+          "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
         { "name": "coverage", "configurePreset": "coverage" }
     ],
     "testPresets": [
@@ -67,7 +68,8 @@
         { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
         { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true },
           "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
-        { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true } },
+        { "name": "ubsan", "configurePreset": "ubsan", "output": { "outputOnFailure": true },
+          "environment": { "ASAN_OPTIONS": "detect_leaks=1" } },
         { "name": "coverage", "configurePreset": "coverage", "output": { "outputOnFailure": true } }
     ]
 }

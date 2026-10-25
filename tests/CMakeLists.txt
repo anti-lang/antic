@@ -7766,6 +7766,11 @@ add_test(NAME target_lists
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${ANTIC_RUNNERS}/run_target_lists.cmake")
 
+# The settings of CMakePresets.json that the answers of 2026-10-24 decide.
+add_test(NAME presets
+    COMMAND "${CMAKE_COMMAND}" "-DPRESETS=${CMAKE_SOURCE_DIR}/CMakePresets.json"
+            -P "${ANTIC_RUNNERS}/run_presets.cmake")
+
 # A configure with -DANTI_DEPS_DIR reads the pinned downloads of another
 # directory, and a copy of the sources builds against this tree's.
 add_test(NAME deps_dir
