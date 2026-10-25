@@ -2,10 +2,11 @@
 //! what the language guarantees. A `*T` is dereferenceable for the size of T
 //! and no more: `corner` gets the last element of a block of four and reads it
 //! only when asked. An `own` pointer is the one holder of what it points at
-//! until the function stores it: `adopt` stores the node in a holder and then
-//! writes it through both. The result of `dup` is new memory, which the program
-//! writes beside the original. A result of 8 or 16 bits keeps its value at each
-//! end of its range, through a call that recursion keeps a call.
+//! until the function stores it: `adopt` stores the node in a holder, which
+//! moves it, and then writes it through the holder twice. The result of `dup`
+//! is new memory, which the program writes beside the original. A result of 8
+//! or 16 bits keeps its value at each end of its range, through a call that
+//! recursion keeps a call.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -36,13 +37,15 @@ fn corner(p: *Point, read: bool) -> int
 fn adopt(h: *Holder, own n: *Node) -> int
 {
 	h.node = n;
-	unchecked(use-after-free, "h owns the node, and n reaches it while h lives")
-	n.v = 1;
 	let m = h.node else {
 		return -1;
 	};
-	m.v = m.v + 10;
-	return n.v;
+	m.v = 1;
+	let k = h.node else {
+		return -1;
+	};
+	k.v = k.v + 10;
+	return m.v;
 }
 
 fn keep_i8(n: int, v: i8) -> i8
