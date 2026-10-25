@@ -385,6 +385,15 @@ anti_message(repositories_older_alone
           ${units_index} "${index_head}version = \"1.1.0\"\nmodules = [${units_module}]\n"
     ARGS build ${tools}
     ERR "anti: no repository of the manifest has a version of com.example.units that satisfies every constraint on it")
+# By Q5 of "Answers of 2026-10-24" the search then asks the next
+# repository, which holds the version. Its library file is not there, and
+# the message names the second repository.
+anti_message(repositories_older_then_second
+    FILES anti.toml "${asking_manifest}" ${app_source} "${app_text}"
+          ${units_index} "${index_head}version = \"1.1.0\"\nmodules = [${units_module}]\n"
+          ../second/com.example.units/index.toml "${index_head}version = \"1.2.0\"\nmodules = [${units_module}]\n"
+    ARGS build ${tools}
+    ERR "anti: ${second_url}/com.example.units/1.2.0/com.example.units.antl: the repository holds no such file")
 anti_message(repositories_one_unread
     FILES anti.toml "${asking_manifest}" ${app_source} "${app_text}"
           ${units_index} "name = \n"
