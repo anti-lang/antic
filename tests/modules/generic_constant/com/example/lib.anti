@@ -1,0 +1,11 @@
+//! A library whose generic class declares a constant. Another module names the
+//! constant of a copy as `lib.Gen<u8>.M`.
+
+/// A class with a constant of its own and one of its type argument.
+pub class Gen<T>
+{
+	pub const M: int = 3;
+	pub const SIZE: int = size_of(T) as int;
+
+	pub v: T,
+}

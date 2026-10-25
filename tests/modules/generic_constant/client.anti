@@ -1,0 +1,13 @@
+//! A program that names the constants of copies of a generic class of a library
+//! outside the class, as `Name.CONST`, T202 of docs/audit/tests-findings.md.
+
+import com.example.lib;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("%d %d %d\n".ptr, lib.Gen<u8>.M as c_int,
+		lib.Gen<u8>.SIZE as c_int, lib.Gen<i32>.SIZE as c_int);
+	return 0;
+}

@@ -3440,6 +3440,15 @@ antic_modules_test(generics
     STD lang mem text
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generics")
 
+# The constants of copies of a generic class of a library, named outside
+# the class as `Name.CONST`. T202 of docs/audit/tests-findings.md: the
+# library file carries no constant of a generic.
+antic_modules_test(generic_constant
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_constant"
+    LIBRARIES lib
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_constant")
+
 # Direct imports. A program and a library name the items of another
 # library without its module name, and reach the module by its name as
 # well. A generic among them has its copy made in the program.
