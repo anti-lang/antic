@@ -253,7 +253,11 @@ not re-open a settled decision without asking Eddie.
   R037, R051, R054, R066, R074, R083, R100 and R134. He answered the
   question of R081 as well. "Answers of 2026-10-18" in `docs/decisions.md`
   holds the answers, the code builds them, and T127 is closed as no
-  defect. See
+  defect. On 2026-10-24 Eddie answered the twenty questions of
+  `docs/reports/2026-10-22-solid-summary.md`, under "Answers of
+  2026-10-24" in `docs/decisions.md`. Q17, `take(x.f)`, is the one new
+  form the freeze lets in by name, and Q4 lets in the setters of
+  `anti.log.Logger`. Neither is built yet. See
   "Feature freeze of 2026-10-14" in `docs/decisions.md`.
 - The gap procedure. Where a specification is silent, take the smallest option
   that keeps every struct C layout and the IR free of sizes. Record one
@@ -622,8 +626,10 @@ The two guards and the lists of the matrix:
     `docs/reports/2026-09-19-first-sessions-10-to-13.md` reports 10 to 13.
 14. The `[module]` thresholds of `anti.log`. They stay. Every log call passes
     its own module path as a compile-time constant. The check is then one
-    comparison against a table read at start. `log.named("http")` may exist
-    beside them for a logger per subsystem, not instead of them.
+    comparison against a table read at the first line the program
+    writes, by Q3 of "Answers of 2026-10-24". The thresholds are not
+    built yet. `log.named("http")` may exist beside them for a logger
+    per subsystem, not instead of them.
 15. Done. `f"..."` and `rf"..."` with their format specifications, as
     calls of `anti.text.Builder`. `docs/reports/2026-09-21-interpolation.md`
     reports it, and `docs/notes/interpolation.md` holds its choices.
