@@ -56,6 +56,28 @@ struct state {
 struct loop_flow {
     struct state breaks;
     struct state turns;             /* the ends of the turns, and `continue` */
+    size_t base;                    /* the pending statements of the loop */
+};
+
+/* DESIGN: a `defer` or an `undo` runs where its block is left, so the
+   walk reads it at each exit with the state of that exit, and not where
+   it stands. An exit runs the pending statements of every block it
+   leaves, innermost first and the last declared first in each block. An
+   error exit, `fail`, `try` and a call that hands its error to a `try`
+   block, runs the `undo` statements of a block before its `defer`
+   statements, as lowering does. The walk of an exit goes on from a copy
+   of the state, which the path goes on without. */
+struct pending {
+    const struct stmt *s;           /* the statement the exit runs */
+    bool undo;
+    size_t block;                   /* the depth of its block */
+};
+
+struct exits {
+    struct pending *items;
+    size_t count;
+    size_t capacity;
+    size_t depth;                   /* the depth of the block walked now */
 };
 
 /* The locals the walk follows, which the walk of a closure shares. The
@@ -77,11 +99,18 @@ struct fill_walk {
     struct state *yields;           /* the handler a `yield` leaves */
     struct state *tried;            /* the handler of the `try` block */
     struct state *fall;             /* the arm a `fallthrough` enters */
+    struct exits *exits;            /* NULL inside a deferred statement */
+    size_t yield_base;              /* the pending statements of the handler */
+    size_t try_base;                /* those of the body of the `try` block */
+    size_t fall_base;               /* those of the arm */
+    bool at_exit;                   /* the walk of the statements of an exit */
 };
 
 static void walk_block(struct fill_walk *w, const struct block *b);
 static void walk_stmt(struct fill_walk *w, const struct stmt *s);
 static void walk_expr(struct fill_walk *w, const struct expr *e);
+static void run_exits(struct fill_walk *w, size_t base, bool failing);
+static size_t pending_count(const struct fill_walk *w);
 
 static struct state state_live(void)
 {
@@ -402,7 +431,8 @@ static void read_element(struct fill_walk *w, const struct expr *base,
     if (known && has_key(f, &k)) {
         return;
     }
-    if (!w->quiet && !f->reported) {
+    if (!w->quiet && !f->reported &&
+        !(w->at_exit && sema_reported_at(w->c, pos, NAME_UNINITIALIZED_READ))) {
         const struct name *name = &base->symbol->name;
         if (known && k.kind == KEY_CONSTANT) {
             sema_check_at(w->c, NAME_UNINITIALIZED_READ, pos,
@@ -549,17 +579,24 @@ static void walk_handler(struct fill_walk *w, const struct handler *h)
     struct state *yields = w->yields;
     struct state given = state_none();
     struct state ok;
+    size_t yield_base = w->yield_base;
 
+    if (h->kind == HANDLE_TRY) {
+        run_exits(w, 0, true);
+    }
     if (h->kind != HANDLE_BLOCK || h->body == NULL) {
         if (h->kind == HANDLE_ENCLOSING && w->tried != NULL) {
+            run_exits(w, w->try_base, true);
             state_join(w->tried, &w->now);
         }
         return;
     }
     ok = state_copy(&w->now);
     w->yields = &given;
+    w->yield_base = pending_count(w);
     walk_block(w, h->body);
     w->yields = yields;
+    w->yield_base = yield_base;
     state_join(&ok, &w->now);
     state_join(&ok, &given);
     state_take(&w->now, &ok);
@@ -586,6 +623,7 @@ static void walk_call(struct fill_walk *w, const struct expr *e)
 static void walk_closure(struct fill_walk *w, const struct item *fn)
 {
     struct fill_walk inner = *w;
+    struct exits exits = {NULL, 0, 0, 0};
 
     if (fn == NULL || fn->body == NULL) {
         return;
@@ -597,8 +635,56 @@ static void walk_closure(struct fill_walk *w, const struct item *fn)
     inner.yields = NULL;
     inner.tried = NULL;
     inner.fall = NULL;
+    inner.exits = w->exits != NULL ? &exits : NULL;
     walk_block(&inner, fn->body);
     state_free(&inner.now);
+    free(exits.items);
+}
+
+/* Run the pending statements above base at an exit, from a copy of the
+   state now. failing marks an error exit. */
+static void run_exits(struct fill_walk *w, size_t base, bool failing)
+{
+    struct fill_walk inner;
+    const struct exits *x = w->exits;
+    size_t end;
+    size_t start;
+    size_t i;
+
+    if (x == NULL || !w->now.live || x->count <= base) {
+        return;
+    }
+    inner = *w;
+    inner.now = state_copy(&w->now);
+    inner.exits = NULL;
+    inner.at_exit = true;
+    inner.loop = NULL;
+    inner.yields = NULL;
+    inner.tried = NULL;
+    inner.fall = NULL;
+    for (end = x->count; end > base && inner.now.live; end = start) {
+        for (start = end; start > base &&
+                          x->items[start - 1].block == x->items[end - 1].block;
+             start--) {
+        }
+        for (i = end; failing && i > start; i--) {
+            if (x->items[i - 1].undo) {
+                walk_stmt(&inner, x->items[i - 1].s);
+            }
+        }
+        for (i = end; i > start; i--) {
+            if (!x->items[i - 1].undo) {
+                walk_stmt(&inner, x->items[i - 1].s);
+            }
+        }
+    }
+    state_free(&inner.now);
+}
+
+/* The count of the pending statements, the base of an exit. */
+static size_t pending_count(const struct fill_walk *w)
+{
+    return w->exits != NULL ? w->exits->count : 0;
 }
 
 /* Whether e compares a pointer with `none`, which reads no element. */
@@ -854,12 +940,14 @@ static void walk_arms(struct fill_walk *w, const struct switch_arm *arms,
                       bool none_matched)
 {
     struct state *fall = w->fall;
+    size_t fall_base = w->fall_base;
     struct state before = state_copy(&w->now);
     struct state after = state_none();
     struct state fell = state_none();
     size_t i;
 
     w->fall = &fell;
+    w->fall_base = pending_count(w);
     for (i = 0; i < count; i++) {
         struct state previous = fell;
         state_free(&w->now);
@@ -882,6 +970,7 @@ static void walk_arms(struct fill_walk *w, const struct switch_arm *arms,
         state_join(&after, &w->now);
     }
     w->fall = fall;
+    w->fall_base = fall_base;
     state_take(&w->now, &after);
     state_free(&before);
     state_free(&fell);
@@ -957,6 +1046,7 @@ static void walk_loop(struct fill_walk *w, const struct loop_parts *p)
 
     flow.breaks = state_none();
     flow.turns = state_none();
+    flow.base = pending_count(w);
     w->quiet = true;
     one_turn(w, p, &flow, &exits, &ends);
     w->quiet = quiet;
@@ -1033,19 +1123,25 @@ static void walk_try(struct fill_walk *w, const struct stmt *s)
 {
     struct state *tried = w->tried;
     struct state *yields = w->yields;
+    size_t try_base = w->try_base;
+    size_t yield_base = w->yield_base;
     struct state failed = state_none();
     struct state given = state_none();
     struct state after;
 
     w->tried = &failed;
+    w->try_base = pending_count(w);
     walk_block(w, s->as.try_block.body);
     w->tried = tried;
+    w->try_base = try_base;
     after = state_copy(&w->now);
     if (failed.live && s->as.try_block.handler.body != NULL) {
         state_take(&w->now, &failed);
         w->yields = &given;
+        w->yield_base = pending_count(w);
         walk_block(w, s->as.try_block.handler.body);
         w->yields = yields;
+        w->yield_base = yield_base;
         state_join(&after, &w->now);
         state_join(&after, &given);
     }
@@ -1094,11 +1190,20 @@ static void walk_stmt(struct fill_walk *w, const struct stmt *s)
         return;
     case STMT_DEFER:
     case STMT_UNDO:
-        /* DESIGN: a `defer` or an `undo` runs at an exit, after writes
-           the path may still make, so the walk reads nothing in it. */
+        /* A deferred statement inside another one is read nowhere. */
+        if (w->exits != NULL) {
+            struct exits *x = w->exits;
+            x->items = alloc_grow(x->items, &x->capacity, x->count,
+                                  sizeof *x->items);
+            x->items[x->count].s = s->as.deferred;
+            x->items[x->count].undo = s->kind == STMT_UNDO;
+            x->items[x->count].block = x->depth;
+            x->count++;
+        }
         return;
     case STMT_FAIL:
         walk_expr(w, s->as.fail.value);
+        run_exits(w, 0, true);
         leave(w, NULL);
         return;
     case STMT_SWITCH:
@@ -1114,10 +1219,12 @@ static void walk_stmt(struct fill_walk *w, const struct stmt *s)
         return;
     case STMT_RETURN:
         walk_expr(w, s->as.return_value);
+        run_exits(w, 0, false);
         leave(w, NULL);
         return;
     case STMT_YIELD:
         walk_expr(w, s->as.yielded);
+        run_exits(w, w->yield_base, false);
         leave(w, w->yields);
         return;
     case STMT_TRY:
@@ -1132,23 +1239,37 @@ static void walk_stmt(struct fill_walk *w, const struct stmt *s)
         walk_block(w, s->as.sync.body);
         return;
     case STMT_BREAK:
-        leave(w, w->loop != NULL ? &w->loop->breaks : NULL);
-        return;
     case STMT_CONTINUE:
-        leave(w, w->loop != NULL ? &w->loop->turns : NULL);
+        if (w->loop != NULL) {
+            run_exits(w, w->loop->base, false);
+        }
+        leave(w, w->loop == NULL           ? NULL
+                 : s->kind == STMT_BREAK ? &w->loop->breaks
+                                         : &w->loop->turns);
         return;
     case STMT_FALLTHROUGH:
+        run_exits(w, w->fall_base, false);
         leave(w, w->fall);
         return;
     }
 }
 
+/* The closing brace is an exit of the block, and never an error. */
 static void walk_block(struct fill_walk *w, const struct block *b)
 {
+    size_t base = pending_count(w);
     size_t i;
 
+    if (w->exits != NULL) {
+        w->exits->depth++;
+    }
     for (i = 0; b != NULL && i < b->count; i++) {
         walk_stmt(w, b->stmts[i]);
+    }
+    if (w->exits != NULL) {
+        run_exits(w, base, false);
+        w->exits->count = base;
+        w->exits->depth--;
     }
 }
 
@@ -1156,6 +1277,7 @@ void sema_check_fills(struct checker *c, const struct item *it, size_t first)
 {
     struct fill_walk w;
     struct buffers buffers = {NULL, 0, 0};
+    struct exits exits = {NULL, 0, 0, 0};
     size_t i;
 
     /* A body with an error has types the pass cannot trust. A safety
@@ -1173,8 +1295,10 @@ void sema_check_fills(struct checker *c, const struct item *it, size_t first)
     w.c = c;
     w.frame = it;
     w.buffers = &buffers;
+    w.exits = &exits;
     w.now = state_live();
     walk_block(&w, it->body);
     state_free(&w.now);
     free(buffers.items);
+    free(exits.items);
 }

@@ -1,0 +1,22 @@
+//! E2 of the compile-time checks reads a `defer` at each exit where it runs.
+//! The value is dead where the statement stands and alive again at the exit,
+//! after an assignment of a new value, so the `delete` of the `defer` passes.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	defer {
+		printf("a defer deletes what the exit holds: %d\n".ptr, p.n as c_int);
+		delete(p);
+	}
+	p = alloc Node { n: 2 };
+	return 0;
+}

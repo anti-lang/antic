@@ -20,10 +20,4 @@
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
 fmt_handler_in_parentheses T190 `anti fmt` indents the second statement of a handler inside parentheses as a continuation line.
-matrix_checks_uninitialized_read_in_a_defer_refused T194 C1 reads nothing in a `defer`, so an element no path writes passes there.
-matrix_checks_uninitialized_read_in_an_undo_refused T194 C1 reads nothing in an `undo`, so an element no path writes passes there.
-matrix_checks_use_after_free_a_defer_reads_what_the_body_deleted_refused T195 E2 walks a `defer` with the state where it stands, so a read after the body deleted the value passes.
-matrix_checks_use_after_free_a_defer_deletes_what_the_body_deleted_refused T195 E2 walks a `defer` with the state where it stands, so a second `delete` at the exit passes.
-matrix_checks_use_after_free_an_undo_reads_what_the_body_deleted_refused T195 E2 walks an `undo` with the state where it stands, so a read after the body deleted the value passes.
-matrix_checks_use_after_free_a_defer_reads_what_a_later_defer_deleted_refused T195 E2 walks each `defer` apart, so a read after a later `defer` deleted the value passes.
 matrix_checks_index_out_of_range_in_a_closure_refused T196 C2 checks no index in the body of an anonymous function.

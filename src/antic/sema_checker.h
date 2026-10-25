@@ -318,6 +318,11 @@ void sema_error_at(struct checker *c, struct pos pos, const char *format,
 void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
                    const char *format, ...)
     ATTRIBUTE_PRINTF(4, 5);
+/* Whether a safety check named name stands at pos already. A
+   statement that the walk of a check reads at more than one exit gives
+   its message once. */
+bool sema_reported_at(const struct checker *c, struct pos pos,
+                      enum diag_name name);
 const char *sema_tn(const struct type *t);
 struct type *sema_builtin(struct checker *c, enum type_kind kind);
 bool sema_is_error(const struct type *t);

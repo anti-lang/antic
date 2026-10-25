@@ -1,0 +1,27 @@
+//! E2 of the compile-time checks: a `defer` that two exits run reads a value
+//! the body deleted before both, and the read gets one message.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn show(k: int) -> int
+{
+	let p = alloc Node { n: k };
+	defer {
+		printf("%d\n".ptr, p.n);
+	}
+	delete(p);
+	if k > 0 {
+		return 1;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return show(1) - 1;
+}

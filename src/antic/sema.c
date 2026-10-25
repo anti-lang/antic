@@ -61,6 +61,21 @@ void sema_check_at(struct checker *c, enum diag_name name, struct pos pos,
     va_end(args);
 }
 
+bool sema_reported_at(const struct checker *c, struct pos pos,
+                      enum diag_name name)
+{
+    size_t i;
+
+    for (i = 0; i < c->diags->count; i++) {
+        const struct diagnostic *d = &c->diags->items[i];
+        if (d->name == name && d->line == pos.line &&
+            d->column == pos.column) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* A type name for a message, kept in one of four rotating buffers so
    that one message can name up to four types. DESIGN: the buffers are
    global state, which antic may keep since it runs on one thread. The

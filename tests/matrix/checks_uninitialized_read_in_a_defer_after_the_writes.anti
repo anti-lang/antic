@@ -1,0 +1,48 @@
+//! C1 of the compile-time checks reads a `defer` and an `undo` at each exit
+//! where they run. The writes after the statement and before the exit count, so
+//! each read here passes.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(n: int) -> int
+{
+	let p = alloc(int, 2) else {
+		return 1;
+	};
+	defer {
+		printf("a defer at the exit: %d %d\n".ptr, p[0], p[1]);
+		free(p);
+	}
+	p[0] = 1;
+	p[1] = 2;
+	if n > 0 {
+		return 0;
+	}
+	return 1;
+}
+
+fn undone() may fail
+{
+	let p = alloc(int, 1) else {
+		fail "no memory";
+	};
+	undo {
+		printf("an undo at the fail: %d\n".ptr, p[0]);
+	}
+	defer {
+		free(p);
+	}
+	p[0] = 3;
+	fail "undone";
+}
+
+fn main() -> int
+{
+	let r = show(1);
+	undone() catch {
+		return r;
+	};
+	return 1;
+}

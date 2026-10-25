@@ -1,0 +1,25 @@
+//! C1 of the compile-time checks: a `defer` that two exits run reads an element
+//! no path writes, and the read gets one message.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(n: int) -> int
+{
+	let p = alloc(int, 4) else {
+		return 1;
+	};
+	p[0] = 1;
+	defer {
+		printf("%d\n".ptr, p[1]);
+		free(p);
+	}
+	if n > 0 {
+		return 0;
+	}
+	return 2;
+}
+
+fn main() -> int
+{
+	return show(1);
+}
