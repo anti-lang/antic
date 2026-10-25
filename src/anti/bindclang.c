@@ -129,7 +129,14 @@ static bool check_version(const char *clang)
     if (major == needed) {
         return true;
     }
-    say_anti("%s is clang %d, and ", clang, major);
+    /* A first line that names no version, or one that no int holds,
+       gives no major, by Q14 of "Answers of 2026-10-24". */
+    if (major < 0) {
+        say_anti("cannot read the version of %s from `%s --version`, and ",
+                 clang, clang);
+    } else {
+        say_anti("%s is clang %d, and ", clang, major);
+    }
     where_to_get(needed);
     return false;
 }

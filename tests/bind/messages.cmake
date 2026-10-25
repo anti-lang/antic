@@ -414,7 +414,7 @@ if(NOT CMAKE_HOST_WIN32)
         SETUP clang_version_on_the_second_line
         ENV "PATH=${WORK}/fake:$ENV{PATH}"
         ARGS ${clang_bind}
-        ERR "anti: clang is clang -1, and ${clang_where}")
+        ERR "anti: cannot read the version of clang from `clang --version`, and ${clang_where}")
 endif()
 
 # A macro of one float whose value %g writes with an exponent above zero,

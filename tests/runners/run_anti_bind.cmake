@@ -589,7 +589,7 @@ elseif(CASE STREQUAL "ast_malformed")
     fake_clang()
     file(WRITE "${WORK}/fake/version"
          "clang version 99999999999999999999.1.0\nTarget: x\n")
-    expect_refusal("is clang -1, and bind --clang ${clang_where}" ${fake})
+    expect_refusal("cannot read the version of .* from `.* --version`, and bind --clang ${clang_where}" ${fake})
     file(WRITE "${WORK}/fake/version" "clang version 23.1.0\nTarget: x\n")
     # S31 of the second audit. A line marker past the lines clang counts, one
     # that no integer holds, and one at the end of int64_t with a line after
