@@ -1,0 +1,23 @@
+//! The value of an enum after `=` is a constant expression, and `Table.ROWS`
+//! names a constant of a class body outside the class. An enum at module level
+//! takes it as a value, and the value after it follows it. The program prints
+//! both values.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Table
+{
+	pub const ROWS: c_int = 3;
+}
+
+enum Kind
+{
+	Small = Table.ROWS,
+	Next,
+}
+
+fn main() -> int
+{
+	printf("small %d, next %d\n".ptr, Kind.Small as c_int, Kind.Next as c_int);
+	return 0;
+}
