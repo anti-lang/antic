@@ -1,0 +1,30 @@
+//! The correction of C3 of 2026-10-25: a `yield;` in the handler of a `try`
+//! block goes on after the block, so the function can reach its end without a
+//! result although the body returns.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn f(n: int) -> int
+{
+	try {
+		return risky(n);
+	} catch e {
+		printf("%d\n".ptr, e.code as c_int);
+		yield;
+	}
+}
+
+fn main() -> int
+{
+	return f(1) - 10;
+}

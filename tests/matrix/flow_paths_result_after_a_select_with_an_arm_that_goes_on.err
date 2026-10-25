@@ -1,0 +1,1 @@
+flow_paths_result_after_a_select_with_an_arm_that_goes_on.anti:17:4: error: `f` can reach its end without `return`

@@ -28,6 +28,3 @@ matrix_checks_use_after_free_a_defer_deletes_what_the_body_deleted_refused T195 
 matrix_checks_use_after_free_an_undo_reads_what_the_body_deleted_refused T195 E2 walks an `undo` with the state where it stands, so a read after the body deleted the value passes.
 matrix_checks_use_after_free_a_defer_reads_what_a_later_defer_deleted_refused T195 E2 walks each `defer` apart, so a read after a later `defer` deleted the value passes.
 matrix_checks_index_out_of_range_in_a_closure_refused T196 C2 checks no index in the body of an anonymous function.
-matrix_flow_paths_do_while_body_that_returns_dev T200 C3 does not end the path at a `do ... while` whose body returns.
-matrix_flow_paths_do_while_body_that_returns_release T200 C3 does not end the path at a `do ... while` whose body returns.
-matrix_flow_paths_do_while_body_that_returns_memory_checks T200 C3 does not end the path at a `do ... while` whose body returns.

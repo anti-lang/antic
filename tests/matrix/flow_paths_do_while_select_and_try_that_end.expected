@@ -1,0 +1,4 @@
+exit 0
+a select whose arms return: 107
+a try block whose body and handler return: 20 -3
+a do ... while whose body returns or fails: 5 0

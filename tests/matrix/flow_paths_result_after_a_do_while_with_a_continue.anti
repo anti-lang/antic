@@ -1,0 +1,32 @@
+//! The correction of C3 of 2026-10-25: a `continue` in the body of a `do ...
+//! while` reaches its condition, which may end the loop, so the function can
+//! reach its end without a result.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn f(k: int) -> int
+{
+	let n = k;
+	do {
+		n -= 1;
+		if n > 0 {
+			continue;
+		}
+		return n;
+	} while n > 5
+}
+
+fn main() -> int
+{
+	return f(1) + risky(0) catch fatal;
+}

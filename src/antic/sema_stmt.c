@@ -238,6 +238,73 @@ static bool switch_ends(const struct stmt *s,
            ends(otherwise);
 }
 
+static bool finds_exit(void *data, const struct stmt *s)
+{
+    bool *found = data;
+
+    switch (s->kind) {
+    case STMT_BREAK:
+    case STMT_CONTINUE:
+        *found = true;
+        return false;
+    case STMT_WHILE:
+    case STMT_DO_WHILE:
+    case STMT_FOR:
+        return false;
+    default:
+        return true;
+    }
+}
+
+/* DESIGN: the correction of C3 of 2026-10-25, after R003. The body of a
+   `do ... while` runs before its condition, so the loop ends the path
+   when its body does and holds no `break` or `continue` of its own,
+   which would reach the condition or the statement after the loop. */
+static bool do_ends(const struct stmt *s, bool (*ends)(const struct block *))
+{
+    struct ast_visitor v = {NULL, finds_exit, NULL};
+    bool found = false;
+
+    if (s->kind != STMT_DO_WHILE) {
+        return false;
+    }
+    v.data = &found;
+    ast_walk_block(&v, s->as.loop.body);
+    return !found && ends(s->as.loop.body);
+}
+
+/* A `select` waits until one of its channels is ready and runs that arm
+   alone, so it ends the path when every arm does. */
+static bool select_ends(const struct stmt *s,
+                        bool (*ends)(const struct stmt *))
+{
+    size_t i;
+
+    for (i = 0; i < s->as.select.count; i++) {
+        if (!ends(s->as.select.arms[i].body)) {
+            return false;
+        }
+    }
+    return s->as.select.count > 0;
+}
+
+/* A `try` block ends the path when its body and its handler do. A
+   `yield;` of the handler goes on after the block, so the handler must
+   end the path of the function, whatever the block asks of its body. */
+static bool try_ends(const struct stmt *s, bool (*ends)(const struct block *))
+{
+    const struct handler *h = &s->as.try_block.handler;
+
+    if (!ends(s->as.try_block.body)) {
+        return false;
+    }
+    if (h->kind == HANDLE_FATAL) {
+        return true;
+    }
+    return h->kind == HANDLE_BLOCK && h->body != NULL &&
+           sema_block_returns(h->body);
+}
+
 static bool stmt_returns(const struct stmt *s);
 
 /* Whether the arm of a `switch`, a statement or a block, ends the path
@@ -259,8 +326,14 @@ static bool stmt_returns(const struct stmt *s)
     if (s->kind == STMT_SWITCH && !s->as.switch_stmt.if_let) {
         return switch_ends(s, arm_returns);
     }
-    if (loops_forever(s)) {
+    if (loops_forever(s) || do_ends(s, sema_block_returns)) {
         return true;
+    }
+    if (s->kind == STMT_SELECT) {
+        return select_ends(s, arm_returns);
+    }
+    if (s->kind == STMT_TRY) {
+        return try_ends(s, sema_block_returns);
     }
     /* A `sync` block returns when its last statement does. */
     if (s->kind == STMT_SYNC) {
@@ -325,6 +398,12 @@ static bool stmt_leaves(const struct stmt *s)
                block_leaves(s->as.switch_stmt.otherwise->as.block);
     case STMT_WHILE:
         return loops_forever(s);
+    case STMT_DO_WHILE:
+        return do_ends(s, block_leaves);
+    case STMT_SELECT:
+        return select_ends(s, stmt_leaves);
+    case STMT_TRY:
+        return try_ends(s, block_leaves);
     case STMT_IF:
         if (s->as.if_chain.else_body == NULL) {
             return false;

@@ -1,0 +1,85 @@
+//! The correction of C3 of 2026-10-25: a `select` whose every arm ends the
+//! path, a `try` block whose body and handler both end it and a `do ... while`
+//! whose body ends it end the path of the function. Each stands last in a
+//! function with a result, a `may fail` function or a function that returns
+//! `never`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn first(a: chan int, b: chan int) -> int
+{
+	select {
+		a x => {
+			let v = x else {
+				return -1;
+			};
+			return *v;
+		},
+		b y => {
+			let w = y else {
+				return -2;
+			};
+			return *w + 100;
+		},
+	}
+}
+
+fn guarded(n: int) -> int
+{
+	try {
+		let r = risky(n);
+		return r;
+	} catch e {
+		return -e.code;
+	}
+}
+
+fn counted(k: int) -> int may fail
+{
+	do {
+		if k < 0 {
+			fail "below zero";
+		}
+		return k + 1;
+	} while k > 0
+}
+
+fn stop(n: int) -> never
+{
+	do {
+		exit(n as c_int);
+	} while n > 0
+}
+
+fn main() -> int
+{
+	let a = chan int(1);
+	let b = chan int(1);
+	send(b, 7);
+	printf("a select whose arms return: %d\n".ptr, first(a, b) as c_int);
+	let ok = guarded(2);
+	let refused = guarded(3);
+	printf("a try block whose body and handler return: %d %d\n".ptr,
+		ok as c_int, refused as c_int);
+	let c = counted(4) catch fatal;
+	let d = counted(-1) catch {
+		yield 0;
+	};
+	printf("a do ... while whose body returns or fails: %d %d\n".ptr,
+		c as c_int, d as c_int);
+	delete(a);
+	delete(b);
+	return 0;
+}

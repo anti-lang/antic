@@ -1589,10 +1589,12 @@ static void lower_switch(struct lowerer *l, const struct stmt *s)
 
 /* DESIGN: R003 of "Rules of 2026-10-13". The checker takes a `switch`
    whose every arm and `else` end the path, and a `while true` without a
-   `break` of its own, as the end of the path. The block after such a
-   statement is one that no path of the program reaches: the exit of the
-   loop, or the test after the last arm of a `switch` that names every
-   value. It ends in IR_UNREACHABLE, so the function needs no `return`
+   `break` of its own, as the end of the path. The correction of C3 of
+   2026-10-25 adds a `do ... while`, a `select` and a `try` block whose
+   every path ends it. The block after such a statement is one that no
+   path of the program reaches: the exit of the loop, the join after the
+   arms or after the handler, or the test after the last arm of a
+   `switch` that names every value. It ends in IR_UNREACHABLE, so the function needs no `return`
    there and no exit action runs. */
 static void end_path(struct lowerer *l, const struct stmt *s)
 {
@@ -1671,6 +1673,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
             ir_jump(l->f, l->b, join);
         }
         l->b = join;
+        end_path(l, s);
         return;
     }
     case STMT_CONST:
@@ -1848,6 +1851,7 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s)
         return;
     case STMT_SELECT:
         lower_select(l, s);
+        end_path(l, s);
         return;
     }
 }

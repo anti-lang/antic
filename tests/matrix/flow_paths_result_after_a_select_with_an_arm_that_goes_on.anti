@@ -1,0 +1,38 @@
+//! The correction of C3 of 2026-10-25: a `select` ends the path when every arm
+//! does, and one arm here goes on after the `select`, so the function can reach
+//! its end without a result.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn risky(n: int) -> int may fail
+{
+	if n > 2 {
+		fail lang.Error.new(n, "refused");
+	}
+	return n * 10;
+}
+
+fn f(a: chan int, b: chan int) -> int
+{
+	select {
+		a x => {
+			return 1;
+		},
+		b y => {
+			printf("b\n".ptr);
+		},
+	}
+}
+
+fn main() -> int
+{
+	let a = chan int(1);
+	let b = chan int(1);
+	send(a, 1);
+	let r = f(a, b) + risky(0) catch fatal;
+	delete(a);
+	delete(b);
+	return r - 1;
+}
