@@ -3187,6 +3187,10 @@ The record filled these gaps of the four answers by the gap procedure of `CLAUDE
 - [provisional] The walk of Q19 follows `inherits` alone. An abstract class that an `implements` line names gives no type argument. Reason: a class may implement more than one, and the answer takes the one path of single inheritance.
 - [provisional] The bare name of Q20 reaches a constant in the class that declares it and in the types nested in it. Their text stands inside that class. A derived class names a constant of its base as `Shape.MAX`. Inside the class the constant hides an item of its module of the same name. `self.NAME` stays refused. Reason: the answer says "inside that class", and the nearest declaration wins.
 
+The step `points` that builds Q3 to Q15 filled these gaps by the gap procedure of `CLAUDE.md`.
+
+- [provisional] With `cl main.c` gone, the line of a Windows library names the libraries alone, with no compiler and no `main.c`. They stand in the order of the line of every other target: the library, the glue, PCRE2 and the runtime. Reason: no tool of the pinned toolchain compiles C for a user, and a C compiler of Windows takes the libraries in its own syntax.
+
 ## Open
 
 - Enums used as bit flags want a form of their own, to be designed later. A binding writes such a parameter with the integer type of C, and the caller converts each value with `as`.

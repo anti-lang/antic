@@ -540,9 +540,16 @@ static void libraries(void)
     CHECK_STR(text_cstr(&line), "cc main.c libgeo.a "
                                 "/rt/lib/macos-arm64/armv8.5/libanti_rt.a");
     text_free(&line);
+    /* A line of Windows names the libraries alone, by Q8 of "Answers of
+       2026-10-24": no compiler of the host is the one to name. */
     link_line(&line, TARGET_WINDOWS_X86_64, "geo.lib", "C:/rt", CPU_V3,
               true, false);
-    CHECK_STR(text_cstr(&line), "cl main.c geo.lib");
+    CHECK_STR(text_cstr(&line), "geo.lib");
+    text_free(&line);
+    link_line(&line, TARGET_WINDOWS_ARM64, "geo.lib", "C:/rt", CPU_ARMV8_2,
+              false, false);
+    CHECK_STR(text_cstr(&line),
+              "geo.lib C:/rt/lib/windows-arm64/armv8.2/anti_rt.lib");
     text_free(&line);
     /* A library that holds anti.regex names the glue and PCRE2, which
        the archive never holds, by T146. */

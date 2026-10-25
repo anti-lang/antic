@@ -945,6 +945,8 @@ cc main.c libgeometry.a <package>/lib/linux-x86_64/v3/libanti_rt.a -lpthread -lm
 cc main.c libgeometry.a -lpthread -lm
 ```
 
+For a Windows target the line names the libraries alone, as `geometry.lib` and the `anti_rt.lib` of the target. A C compiler of Windows takes them in its own syntax.
+
 | File | Bytes | Contents |
 |---|---:|---|
 | `libgeometry.a`, static | 48,480 | `geometry.o` and `geometry.package.o` |

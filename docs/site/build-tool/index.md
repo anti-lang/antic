@@ -347,7 +347,7 @@ A dev build of the library project `com.example.geo` for macos-arm64 prints this
 cc main.c ./build/macos-arm64/dev/libgeo.a <package>/lib/macos-arm64/armv8.5/libanti_rt.a
 ```
 
-With `--bundle-runtime` after `--lib static`, the same build prints `cc main.c ./build/macos-arm64/dev/libgeo.a`.
+With `--bundle-runtime` after `--lib static`, the same build prints `cc main.c ./build/macos-arm64/dev/libgeo.a`. For a Windows target the line names the libraries alone, with no compiler and no `main.c`, since a C compiler of Windows takes them in its own syntax.
 
 The option `--soname` writes the version from `anti.toml` into a shared library. On Linux the file is `lib<name>.so.<major>` with a `lib<name>.so` symlink, and on macOS the compatibility version and the current version carry it. Windows has no equivalent, and without the option a library carries no version. Every library of macOS has the install name `@rpath/<file name>`, with the option and without it, so a program that links one names its directory with `-rpath`. The major version is the compatibility version, and a change to any exported signature or struct requires a new major version. The shared library of `com.example.geo` at version 0.1.0 names these, as llvm-objdump prints them.
 

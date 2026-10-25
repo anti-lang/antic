@@ -1177,9 +1177,15 @@ void link_line(struct text *out, enum target t, const char *library,
                const char *runtime, enum cpu_level cpu, bool bundled,
                bool regex)
 {
-    bool windows = target_info(t)->os == OS_WINDOWS;
-
-    text_appendf(out, "%s main.c %s", windows ? "cl" : "cc", library);
+    /* DESIGN: a line of Windows names the libraries alone, by Q8 of
+       "Answers of 2026-10-24" in docs/decisions.md. cl is no tool of the
+       pinned toolchain, and a C compiler of Windows takes the libraries
+       in its own syntax around them. */
+    if (target_info(t)->os == OS_WINDOWS) {
+        text_append(out, library);
+    } else {
+        text_appendf(out, "cc main.c %s", library);
+    }
     /* The glue calls the runtime and PCRE2, so a linker that reads its
        inputs once takes it before both, T146 of
        docs/audit/tests-findings.md. */

@@ -152,6 +152,10 @@ link line:
 cc main.c libgeometry.a /path/to/lib/linux-x86_64/libanti_rt.a -lpthread -lm
 ```
 
+For a Windows target the line names the libraries alone, `geometry.lib` and the
+`anti_rt.lib` of the target, by Q8 of "Answers of 2026-10-24" in `docs/decisions.md`.
+The C compiler of a Windows program takes them in its own syntax.
+
 The runtime initialises itself from a constructor that runs when the program loads.
 The static case does as the shared one, by decision 5 of "Decisions of 2026-10-11".
 The constructor chooses the seed of the hashing collections, and no exported function

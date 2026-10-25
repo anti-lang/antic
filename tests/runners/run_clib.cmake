@@ -33,7 +33,7 @@ set(PREFIX lib)
 set(STATIC_SUFFIX ".a")
 set(HOST_SHARED_SUFFIX ".so")
 set(EXE "")
-set(DRIVER cc)
+set(LEAD "cc main.c ")
 set(LINK ${HOST_LINK})
 set(TARGET_OPTION "")
 if("${TARGET}" MATCHES "^windows-")
@@ -41,10 +41,11 @@ if("${TARGET}" MATCHES "^windows-")
     set(STATIC_SUFFIX ".lib")
     set(HOST_SHARED_SUFFIX ".dll")
     set(EXE ".exe")
-    # DRIVER is the word the link line of link_line in src/antic/linker.c
-    # starts with, which the cases compare. The C programs of the cases
-    # compile with the pinned clang, as the DESIGN below says.
-    set(DRIVER cl)
+    # LEAD is the text the link line of link_line in src/antic/linker.c
+    # starts with, which the cases compare. A line of Windows names the
+    # libraries alone, by Q8 of "Answers of 2026-10-24". The C programs of
+    # the cases compile with the pinned clang, as the DESIGN below says.
+    set(LEAD "")
 elseif(APPLE)
     set(HOST_SHARED_SUFFIX ".dylib")
 endif()
@@ -220,7 +221,7 @@ if(CASE STREQUAL "static")
     library(geo static "${dir}")
     # The printed line links main.c with the archive and the runtime.
     string(STRIP "${tool_stdout}" line)
-    if(NOT line MATCHES "^${DRIVER} main.c ${library_file} ${RUNTIME}/lib/[a-z0-9_-]+/[a-z0-9.]+/${RUNTIME_LIBRARY}")
+    if(NOT line MATCHES "^${LEAD}${library_file} ${RUNTIME}/lib/[a-z0-9_-]+/[a-z0-9.]+/${RUNTIME_LIBRARY}")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
     # The archive keeps the copy of the package header in an object.
@@ -228,7 +229,7 @@ if(CASE STREQUAL "static")
     if(NOT tool_stdout MATCHES "geo.package.o")
         message(FATAL_ERROR "the archive holds no package header\n${tool_stdout}")
     endif()
-    string(REPLACE "${DRIVER} main.c " "" inputs "${line}")
+    string(REPLACE "${LEAD}" "" inputs "${line}")
     separate_arguments(inputs UNIX_COMMAND "${inputs}")
     program("${dir}/roundtrip${EXE}" OPTIONS -I "${dir}"
             SOURCES "${SOURCES}/roundtrip.c" INPUTS ${inputs})
@@ -583,7 +584,7 @@ elseif(CASE STREQUAL "bundle")
     if("${TARGET}" MATCHES "^linux-")
         set(system " -lpthread -lm")
     endif()
-    if(NOT line STREQUAL "${DRIVER} main.c ${geo}${system}")
+    if(NOT line STREQUAL "${LEAD}${geo}${system}")
         message(FATAL_ERROR "unexpected link line: ${line}")
     endif()
     # A C program links the bundled library and nothing else of Anti,

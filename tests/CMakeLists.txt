@@ -1594,7 +1594,7 @@ endif()
 # and PCRE2 after it, as the link of a program of Anti takes them, by
 # "Static library" of docs/libraries-for-c.md (T146).
 add_expect_test(clib_regex_link_line STATUS 0
-    PATTERN "^c[cl] main\\.c .*libmatcher\\.a .*anti_rt_regex\\.(a|lib) .*pcre2-8\\.(a|lib)"
+    PATTERN "^(cc main\\.c )?.*libmatcher\\.a .*anti_rt_regex\\.(a|lib) .*pcre2-8\\.(a|lib)"
     COMMAND "$<TARGET_FILE:antic>" --lib static
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/libmatcher.a"
@@ -4110,7 +4110,7 @@ add_expect_test(error_modules_library_exports_nothing STATUS 1
 # alone.
 add_expect_test(modules_library_exports_a_member STATUS 0
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
-    PATTERN "^c[cl] main\\.c [^ ]*modules_library_exports_a_member\\.a [^ ]*anti_rt\\.(a|lib)[^a-z]*$"
+    PATTERN "^(cc main\\.c )?[^ ]*modules_library_exports_a_member\\.a [^ ]*anti_rt\\.(a|lib)[^a-z]*$"
     COMMAND "$<TARGET_FILE:antic>" --lib static
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_library_exports_a_member.a"
