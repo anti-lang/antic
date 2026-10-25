@@ -545,7 +545,7 @@ The matrix, by decision 28 of "Decisions of 2026-10-11":
   function and one line of output per context. Every program is an
   executable the suite builds three times, and `flow_<construct>` of the
   area flow shows the form. A program may hold more than one construct
-  as well, as `values_aggregates` does, where a line of output names its
+  as well, as `values_aggregates_arrays` does, where a line of output names its
   construct and its place. antic 0.2.0 takes 21 s for 150 such functions
   in one program, so a program stays below about 80. A cell that shows a
   defect gets a program of its own, so the list of the known failures

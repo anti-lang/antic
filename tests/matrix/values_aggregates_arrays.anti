@@ -1,0 +1,875 @@
+//! The array literals, the array repeats and the slice literals of the values
+//! area, each in every place its row of docs/notes/test-matrix.md left open.
+//! Each construct in each place is a function of its own, named after both, and
+//! the program prints one line per construct, place and input. The struct
+//! literals, the tuples and what reads an aggregate stand in
+//! values_aggregates_records_and_reads.anti, so neither program comes near its
+//! time limit under UBSan, by Q9 of "Answers of 2026-10-24".
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+
+class Task
+{
+	pub n: int = 0,
+}
+
+
+fn in_arm_array(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let xs = [n, 20, 300];
+			acc += xs[0] + xs[1] + xs[2] + xs.len;
+		},
+	}
+	return acc;
+}
+
+
+fn held_array(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+
+fn in_if_let_array(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_array(n) {
+		acc += v - n * 3;
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+
+fn in_defer_array(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+	}
+	acc = 5;
+}
+
+
+fn in_undo_array(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+
+fn risky_array(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+
+fn in_catch_array(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_array(n) catch {
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+		yield acc;
+	};
+	return got;
+}
+
+
+fn apply_array(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+
+fn in_closure_array(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_array(start, fn(n) {
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+		return acc;
+	});
+	return got + acc;
+}
+
+
+worker fn in_worker_array(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let xs = [n, 20, 300];
+	acc += xs[0] + xs[1] + xs[2] + xs.len;
+	return acc;
+}
+
+
+worker fn work_array(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+
+fn in_dispatch_array(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_array(fn(n) {
+		let acc = 0;
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+		return acc;
+	});
+	return join(job);
+}
+
+
+struct Guarded_array
+{
+	lock: Mutex,
+	entered: int,
+}
+
+
+fn in_sync_array(g: *Guarded_array, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let xs = [n, 20, 300];
+		acc += xs[0] + xs[1] + xs[2] + xs.len;
+	}
+	return acc;
+}
+
+
+fn in_select_array(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let xs = [n, 20, 300];
+			acc += xs[0] + xs[1] + xs[2] + xs.len;
+		},
+	}
+	return acc;
+}
+
+
+class Outer_array
+{
+	class Inner_array
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let xs = [n, 20, 300];
+			acc += xs[0] + xs[1] + xs[2] + xs.len;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_array { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+
+fn in_loop_array_repeat(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+	}
+	return acc;
+}
+
+
+fn in_arm_array_repeat(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let xs = [n * 2; 4];
+			acc += xs[0] + xs[3] + xs.len;
+		},
+	}
+	return acc;
+}
+
+
+fn held_array_repeat(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+
+fn in_if_let_array_repeat(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_array_repeat(n) {
+		acc += v - n * 3;
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+
+fn in_defer_array_repeat(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+	}
+	acc = 5;
+}
+
+
+fn in_undo_array_repeat(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+
+fn risky_array_repeat(n: int) -> int may fail
+{
+	if n != 0 {
+		fail "refused";
+	}
+	return -1;
+}
+
+
+fn in_catch_array_repeat(n: int) -> int
+{
+	let acc = 0;
+	let got = risky_array_repeat(n) catch {
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+		yield acc;
+	};
+	return got;
+}
+
+
+fn apply_array_repeat(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+
+fn in_closure_array_repeat(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_array_repeat(start, fn(n) {
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+		return acc;
+	});
+	return got + acc;
+}
+
+
+worker fn in_worker_array_repeat(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let xs = [n * 2; 4];
+	acc += xs[0] + xs[3] + xs.len;
+	return acc;
+}
+
+
+worker fn work_array_repeat(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+
+fn in_dispatch_array_repeat(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_array_repeat(fn(n) {
+		let acc = 0;
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+		return acc;
+	});
+	return join(job);
+}
+
+
+struct Guarded_array_repeat
+{
+	lock: Mutex,
+	entered: int,
+}
+
+
+fn in_sync_array_repeat(g: *Guarded_array_repeat, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let xs = [n * 2; 4];
+		acc += xs[0] + xs[3] + xs.len;
+	}
+	return acc;
+}
+
+
+fn in_select_array_repeat(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let xs = [n * 2; 4];
+			acc += xs[0] + xs[3] + xs.len;
+		},
+	}
+	return acc;
+}
+
+
+class Outer_array_repeat
+{
+	class Inner_array_repeat
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let xs = [n * 2; 4];
+			acc += xs[0] + xs[3] + xs.len;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_array_repeat { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+
+fn in_loop_slice_literal(n: int) -> int
+{
+	let acc = 0;
+	for turn in 0..2 {
+		acc += turn;
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+	}
+	return acc;
+}
+
+
+fn in_arm_slice_literal(n: int) -> int
+{
+	let acc = 0;
+	switch n {
+		0 => acc = -1,
+		else => {
+			let xs = [n, 20, 300];
+			let s = []int { ptr: &xs[0], len: 2 };
+			acc += s[0] + s[1] + s.len;
+		},
+	}
+	return acc;
+}
+
+
+fn held_slice_literal(n: int) -> ?int
+{
+	if n == 0 {
+		return none;
+	}
+	return n * 3;
+}
+
+
+fn in_if_let_slice_literal(n: int) -> int
+{
+	let acc = 0;
+	if let v = held_slice_literal(n) {
+		acc += v - n * 3;
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+	} else {
+		acc = -1;
+	}
+	return acc;
+}
+
+
+fn in_defer_slice_literal(n: int, out: *int)
+{
+	let acc = 0;
+	defer *out = acc;
+	defer {
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+	}
+	acc = 5;
+}
+
+
+fn in_undo_slice_literal(n: int, out: *int) may fail
+{
+	let acc = 0;
+	undo *out = acc;
+	undo {
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+	}
+	acc = 5;
+	*out = -1;
+	if n != 0 {
+		fail "undone";
+	}
+}
+
+
+fn apply_slice_literal(n: int, f: fn(int) -> int) -> int
+{
+	return f(n);
+}
+
+
+fn in_closure_slice_literal(start: int) -> int
+{
+	let acc = 0;
+	let got = apply_slice_literal(start, fn(n) {
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+		return acc;
+	});
+	return got + acc;
+}
+
+
+worker fn in_worker_slice_literal(t: *Task) -> int
+{
+	let n = t.n;
+	let acc = 0;
+	let xs = [n, 20, 300];
+	let s = []int { ptr: &xs[0], len: 2 };
+	acc += s[0] + s[1] + s.len;
+	return acc;
+}
+
+
+worker fn work_slice_literal(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+
+fn in_dispatch_slice_literal(t: *Task, start: int) -> int
+{
+	t.n = start;
+	let job = dispatch t -> work_slice_literal(fn(n) {
+		let acc = 0;
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+		return acc;
+	});
+	return join(job);
+}
+
+
+struct Guarded_slice_literal
+{
+	lock: Mutex,
+	entered: int,
+}
+
+
+fn in_sync_slice_literal(g: *Guarded_slice_literal, n: int) -> int
+{
+	let acc = 0;
+	sync g.lock {
+		g.entered += 1;
+		let xs = [n, 20, 300];
+		let s = []int { ptr: &xs[0], len: 2 };
+		acc += s[0] + s[1] + s.len;
+	}
+	return acc;
+}
+
+
+fn in_select_slice_literal(c: chan int, n: int) -> int
+{
+	let acc = 0;
+	send(c, n * 3);
+	select {
+		c x => {
+			let v = x else {
+				return -1;
+			};
+			acc += *v - n * 3;
+			let xs = [n, 20, 300];
+			let s = []int { ptr: &xs[0], len: 2 };
+			acc += s[0] + s[1] + s.len;
+		},
+	}
+	return acc;
+}
+
+
+class Outer_slice_literal
+{
+	class Inner_slice_literal
+	{
+		pub base: int = 0,
+
+		pub fn run(self, n: int) -> int
+		{
+			let acc = self.base;
+			let xs = [n, 20, 300];
+			let s = []int { ptr: &xs[0], len: 2 };
+			acc += s[0] + s[1] + s.len;
+			return acc;
+		}
+	}
+
+	pub fn go(self, n: int) -> int
+	{
+		let inner = Inner_slice_literal { base: 1000 };
+		return inner.run(n);
+	}
+}
+
+fn main() -> int
+{
+	let task = alloc Task { };
+	{
+		printf("array arm %d\n".ptr, in_arm_array(0) as c_int);
+		printf("array arm %d\n".ptr, in_arm_array(1) as c_int);
+		printf("array arm %d\n".ptr, in_arm_array(2) as c_int);
+		printf("array arm %d\n".ptr, in_arm_array(3) as c_int);
+		printf("array arm %d\n".ptr, in_arm_array(4) as c_int);
+		printf("array if_let %d\n".ptr, in_if_let_array(0) as c_int);
+		printf("array if_let %d\n".ptr, in_if_let_array(1) as c_int);
+		printf("array if_let %d\n".ptr, in_if_let_array(2) as c_int);
+		printf("array if_let %d\n".ptr, in_if_let_array(3) as c_int);
+		printf("array if_let %d\n".ptr, in_if_let_array(4) as c_int);
+		let deferred = 0;
+		in_defer_array(1, &deferred);
+		printf("array defer %d\n".ptr, deferred as c_int);
+		in_defer_array(2, &deferred);
+		printf("array defer %d\n".ptr, deferred as c_int);
+		in_defer_array(3, &deferred);
+		printf("array defer %d\n".ptr, deferred as c_int);
+		in_defer_array(4, &deferred);
+		printf("array defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_array(0, &undone) catch {
+			yield;
+		};
+		printf("array undo %d\n".ptr, undone as c_int);
+		in_undo_array(1, &undone) catch {
+			yield;
+		};
+		printf("array undo %d\n".ptr, undone as c_int);
+		in_undo_array(2, &undone) catch {
+			yield;
+		};
+		printf("array undo %d\n".ptr, undone as c_int);
+		in_undo_array(3, &undone) catch {
+			yield;
+		};
+		printf("array undo %d\n".ptr, undone as c_int);
+		in_undo_array(4, &undone) catch {
+			yield;
+		};
+		printf("array undo %d\n".ptr, undone as c_int);
+		printf("array catch %d\n".ptr, in_catch_array(0) as c_int);
+		printf("array catch %d\n".ptr, in_catch_array(1) as c_int);
+		printf("array catch %d\n".ptr, in_catch_array(2) as c_int);
+		printf("array catch %d\n".ptr, in_catch_array(3) as c_int);
+		printf("array catch %d\n".ptr, in_catch_array(4) as c_int);
+		printf("array closure %d\n".ptr, in_closure_array(1) as c_int);
+		printf("array closure %d\n".ptr, in_closure_array(2) as c_int);
+		printf("array closure %d\n".ptr, in_closure_array(3) as c_int);
+		printf("array closure %d\n".ptr, in_closure_array(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_array();
+		printf("array worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_array();
+		printf("array worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_array();
+		printf("array worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_array();
+		printf("array worker %d\n".ptr, join(job3) as c_int);
+		printf("array dispatch %d\n".ptr, in_dispatch_array(task, 1) as c_int);
+		printf("array dispatch %d\n".ptr, in_dispatch_array(task, 2) as c_int);
+		printf("array dispatch %d\n".ptr, in_dispatch_array(task, 3) as c_int);
+		printf("array dispatch %d\n".ptr, in_dispatch_array(task, 4) as c_int);
+		let g = Guarded_array { lock: Mutex.new(), entered: 0 };
+		printf("array sync %d\n".ptr, in_sync_array(&g, 1) as c_int);
+		printf("array sync %d\n".ptr, in_sync_array(&g, 2) as c_int);
+		printf("array sync %d\n".ptr, in_sync_array(&g, 3) as c_int);
+		printf("array sync %d\n".ptr, in_sync_array(&g, 4) as c_int);
+		printf("array sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("array select %d\n".ptr, in_select_array(c, 1) as c_int);
+		printf("array select %d\n".ptr, in_select_array(c, 2) as c_int);
+		printf("array select %d\n".ptr, in_select_array(c, 3) as c_int);
+		printf("array select %d\n".ptr, in_select_array(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_array { };
+		printf("array nested %d\n".ptr, outer.go(1) as c_int);
+		printf("array nested %d\n".ptr, outer.go(2) as c_int);
+		printf("array nested %d\n".ptr, outer.go(3) as c_int);
+		printf("array nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("array_repeat loop %d\n".ptr, in_loop_array_repeat(1) as c_int);
+		printf("array_repeat loop %d\n".ptr, in_loop_array_repeat(2) as c_int);
+		printf("array_repeat loop %d\n".ptr, in_loop_array_repeat(3) as c_int);
+		printf("array_repeat loop %d\n".ptr, in_loop_array_repeat(4) as c_int);
+		printf("array_repeat arm %d\n".ptr, in_arm_array_repeat(0) as c_int);
+		printf("array_repeat arm %d\n".ptr, in_arm_array_repeat(1) as c_int);
+		printf("array_repeat arm %d\n".ptr, in_arm_array_repeat(2) as c_int);
+		printf("array_repeat arm %d\n".ptr, in_arm_array_repeat(3) as c_int);
+		printf("array_repeat arm %d\n".ptr, in_arm_array_repeat(4) as c_int);
+		printf("array_repeat if_let %d\n".ptr, in_if_let_array_repeat(0) as c_int);
+		printf("array_repeat if_let %d\n".ptr, in_if_let_array_repeat(1) as c_int);
+		printf("array_repeat if_let %d\n".ptr, in_if_let_array_repeat(2) as c_int);
+		printf("array_repeat if_let %d\n".ptr, in_if_let_array_repeat(3) as c_int);
+		printf("array_repeat if_let %d\n".ptr, in_if_let_array_repeat(4) as c_int);
+		let deferred = 0;
+		in_defer_array_repeat(1, &deferred);
+		printf("array_repeat defer %d\n".ptr, deferred as c_int);
+		in_defer_array_repeat(2, &deferred);
+		printf("array_repeat defer %d\n".ptr, deferred as c_int);
+		in_defer_array_repeat(3, &deferred);
+		printf("array_repeat defer %d\n".ptr, deferred as c_int);
+		in_defer_array_repeat(4, &deferred);
+		printf("array_repeat defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_array_repeat(0, &undone) catch {
+			yield;
+		};
+		printf("array_repeat undo %d\n".ptr, undone as c_int);
+		in_undo_array_repeat(1, &undone) catch {
+			yield;
+		};
+		printf("array_repeat undo %d\n".ptr, undone as c_int);
+		in_undo_array_repeat(2, &undone) catch {
+			yield;
+		};
+		printf("array_repeat undo %d\n".ptr, undone as c_int);
+		in_undo_array_repeat(3, &undone) catch {
+			yield;
+		};
+		printf("array_repeat undo %d\n".ptr, undone as c_int);
+		in_undo_array_repeat(4, &undone) catch {
+			yield;
+		};
+		printf("array_repeat undo %d\n".ptr, undone as c_int);
+		printf("array_repeat catch %d\n".ptr, in_catch_array_repeat(0) as c_int);
+		printf("array_repeat catch %d\n".ptr, in_catch_array_repeat(1) as c_int);
+		printf("array_repeat catch %d\n".ptr, in_catch_array_repeat(2) as c_int);
+		printf("array_repeat catch %d\n".ptr, in_catch_array_repeat(3) as c_int);
+		printf("array_repeat catch %d\n".ptr, in_catch_array_repeat(4) as c_int);
+		printf("array_repeat closure %d\n".ptr, in_closure_array_repeat(1) as c_int);
+		printf("array_repeat closure %d\n".ptr, in_closure_array_repeat(2) as c_int);
+		printf("array_repeat closure %d\n".ptr, in_closure_array_repeat(3) as c_int);
+		printf("array_repeat closure %d\n".ptr, in_closure_array_repeat(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_array_repeat();
+		printf("array_repeat worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_array_repeat();
+		printf("array_repeat worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_array_repeat();
+		printf("array_repeat worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_array_repeat();
+		printf("array_repeat worker %d\n".ptr, join(job3) as c_int);
+		printf("array_repeat dispatch %d\n".ptr, in_dispatch_array_repeat(task, 1) as c_int);
+		printf("array_repeat dispatch %d\n".ptr, in_dispatch_array_repeat(task, 2) as c_int);
+		printf("array_repeat dispatch %d\n".ptr, in_dispatch_array_repeat(task, 3) as c_int);
+		printf("array_repeat dispatch %d\n".ptr, in_dispatch_array_repeat(task, 4) as c_int);
+		let g = Guarded_array_repeat { lock: Mutex.new(), entered: 0 };
+		printf("array_repeat sync %d\n".ptr, in_sync_array_repeat(&g, 1) as c_int);
+		printf("array_repeat sync %d\n".ptr, in_sync_array_repeat(&g, 2) as c_int);
+		printf("array_repeat sync %d\n".ptr, in_sync_array_repeat(&g, 3) as c_int);
+		printf("array_repeat sync %d\n".ptr, in_sync_array_repeat(&g, 4) as c_int);
+		printf("array_repeat sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("array_repeat select %d\n".ptr, in_select_array_repeat(c, 1) as c_int);
+		printf("array_repeat select %d\n".ptr, in_select_array_repeat(c, 2) as c_int);
+		printf("array_repeat select %d\n".ptr, in_select_array_repeat(c, 3) as c_int);
+		printf("array_repeat select %d\n".ptr, in_select_array_repeat(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_array_repeat { };
+		printf("array_repeat nested %d\n".ptr, outer.go(1) as c_int);
+		printf("array_repeat nested %d\n".ptr, outer.go(2) as c_int);
+		printf("array_repeat nested %d\n".ptr, outer.go(3) as c_int);
+		printf("array_repeat nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	{
+		printf("slice_literal loop %d\n".ptr, in_loop_slice_literal(1) as c_int);
+		printf("slice_literal loop %d\n".ptr, in_loop_slice_literal(2) as c_int);
+		printf("slice_literal loop %d\n".ptr, in_loop_slice_literal(3) as c_int);
+		printf("slice_literal loop %d\n".ptr, in_loop_slice_literal(4) as c_int);
+		printf("slice_literal arm %d\n".ptr, in_arm_slice_literal(0) as c_int);
+		printf("slice_literal arm %d\n".ptr, in_arm_slice_literal(1) as c_int);
+		printf("slice_literal arm %d\n".ptr, in_arm_slice_literal(2) as c_int);
+		printf("slice_literal arm %d\n".ptr, in_arm_slice_literal(3) as c_int);
+		printf("slice_literal arm %d\n".ptr, in_arm_slice_literal(4) as c_int);
+		printf("slice_literal if_let %d\n".ptr, in_if_let_slice_literal(0) as c_int);
+		printf("slice_literal if_let %d\n".ptr, in_if_let_slice_literal(1) as c_int);
+		printf("slice_literal if_let %d\n".ptr, in_if_let_slice_literal(2) as c_int);
+		printf("slice_literal if_let %d\n".ptr, in_if_let_slice_literal(3) as c_int);
+		printf("slice_literal if_let %d\n".ptr, in_if_let_slice_literal(4) as c_int);
+		let deferred = 0;
+		in_defer_slice_literal(1, &deferred);
+		printf("slice_literal defer %d\n".ptr, deferred as c_int);
+		in_defer_slice_literal(2, &deferred);
+		printf("slice_literal defer %d\n".ptr, deferred as c_int);
+		in_defer_slice_literal(3, &deferred);
+		printf("slice_literal defer %d\n".ptr, deferred as c_int);
+		in_defer_slice_literal(4, &deferred);
+		printf("slice_literal defer %d\n".ptr, deferred as c_int);
+		let undone = 0;
+		in_undo_slice_literal(0, &undone) catch {
+			yield;
+		};
+		printf("slice_literal undo %d\n".ptr, undone as c_int);
+		in_undo_slice_literal(1, &undone) catch {
+			yield;
+		};
+		printf("slice_literal undo %d\n".ptr, undone as c_int);
+		in_undo_slice_literal(2, &undone) catch {
+			yield;
+		};
+		printf("slice_literal undo %d\n".ptr, undone as c_int);
+		in_undo_slice_literal(3, &undone) catch {
+			yield;
+		};
+		printf("slice_literal undo %d\n".ptr, undone as c_int);
+		in_undo_slice_literal(4, &undone) catch {
+			yield;
+		};
+		printf("slice_literal undo %d\n".ptr, undone as c_int);
+		printf("slice_literal closure %d\n".ptr, in_closure_slice_literal(1) as c_int);
+		printf("slice_literal closure %d\n".ptr, in_closure_slice_literal(2) as c_int);
+		printf("slice_literal closure %d\n".ptr, in_closure_slice_literal(3) as c_int);
+		printf("slice_literal closure %d\n".ptr, in_closure_slice_literal(4) as c_int);
+		task.n = 1;
+		let job0 = dispatch task -> in_worker_slice_literal();
+		printf("slice_literal worker %d\n".ptr, join(job0) as c_int);
+		task.n = 2;
+		let job1 = dispatch task -> in_worker_slice_literal();
+		printf("slice_literal worker %d\n".ptr, join(job1) as c_int);
+		task.n = 3;
+		let job2 = dispatch task -> in_worker_slice_literal();
+		printf("slice_literal worker %d\n".ptr, join(job2) as c_int);
+		task.n = 4;
+		let job3 = dispatch task -> in_worker_slice_literal();
+		printf("slice_literal worker %d\n".ptr, join(job3) as c_int);
+		printf("slice_literal dispatch %d\n".ptr, in_dispatch_slice_literal(task, 1) as c_int);
+		printf("slice_literal dispatch %d\n".ptr, in_dispatch_slice_literal(task, 2) as c_int);
+		printf("slice_literal dispatch %d\n".ptr, in_dispatch_slice_literal(task, 3) as c_int);
+		printf("slice_literal dispatch %d\n".ptr, in_dispatch_slice_literal(task, 4) as c_int);
+		let g = Guarded_slice_literal { lock: Mutex.new(), entered: 0 };
+		printf("slice_literal sync %d\n".ptr, in_sync_slice_literal(&g, 1) as c_int);
+		printf("slice_literal sync %d\n".ptr, in_sync_slice_literal(&g, 2) as c_int);
+		printf("slice_literal sync %d\n".ptr, in_sync_slice_literal(&g, 3) as c_int);
+		printf("slice_literal sync %d\n".ptr, in_sync_slice_literal(&g, 4) as c_int);
+		printf("slice_literal sync entered %d\n".ptr, g.entered as c_int);
+		g.lock.destroy();
+		let c = chan int(1);
+		printf("slice_literal select %d\n".ptr, in_select_slice_literal(c, 1) as c_int);
+		printf("slice_literal select %d\n".ptr, in_select_slice_literal(c, 2) as c_int);
+		printf("slice_literal select %d\n".ptr, in_select_slice_literal(c, 3) as c_int);
+		printf("slice_literal select %d\n".ptr, in_select_slice_literal(c, 4) as c_int);
+		delete(c);
+		let outer = Outer_slice_literal { };
+		printf("slice_literal nested %d\n".ptr, outer.go(1) as c_int);
+		printf("slice_literal nested %d\n".ptr, outer.go(2) as c_int);
+		printf("slice_literal nested %d\n".ptr, outer.go(3) as c_int);
+		printf("slice_literal nested %d\n".ptr, outer.go(4) as c_int);
+	}
+	delete(task);
+	return 0;
+}
