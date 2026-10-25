@@ -1,0 +1,1 @@
+flow_paths_result_after_a_try_block_whose_handler_yields_before_its_return.anti:18:4: error: `f` can reach its end without `return`

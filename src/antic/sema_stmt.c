@@ -288,12 +288,60 @@ static bool select_ends(const struct stmt *s,
     return s->as.select.count > 0;
 }
 
+static bool finds_yield(void *data, const struct stmt *s);
+
+/* A handler of a call or of a `let` keeps the `yield` of its body. */
+static bool skips_handlers(void *data, const struct expr *e)
+{
+    struct ast_visitor v = {skips_handlers, finds_yield, NULL};
+    size_t i;
+
+    if (e->kind != EXPR_CALL || e->as.call.handler.kind != HANDLE_BLOCK) {
+        return true;
+    }
+    v.data = data;
+    ast_walk_expr(&v, e->as.call.callee);
+    for (i = 0; i < e->as.call.arg_count; i++) {
+        ast_walk_expr(&v, e->as.call.args[i]);
+    }
+    return false;
+}
+
+/* Whether a `yield` of the handler being walked stands in s. */
+static bool finds_yield(void *data, const struct stmt *s)
+{
+    struct ast_visitor v = {skips_handlers, finds_yield, NULL};
+    bool *found = data;
+
+    v.data = data;
+    switch (s->kind) {
+    case STMT_YIELD:
+        *found = true;
+        return false;
+    case STMT_TRY:
+        ast_walk_block(&v, s->as.try_block.body);
+        return false;
+    case STMT_LET:
+        if (s->as.let.guard.kind == HANDLE_BLOCK) {
+            ast_walk_expr(&v, s->as.let.value);
+            ast_walk_block(&v, s->as.let.otherwise);
+            return false;
+        }
+        return true;
+    default:
+        return true;
+    }
+}
+
 /* A `try` block ends the path when its body and its handler do. A
-   `yield;` of the handler goes on after the block, so the handler must
-   end the path of the function, whatever the block asks of its body. */
+   `yield;` of the handler goes on after the block wherever it stands, so
+   the handler holds none and ends the path of the function, whatever the
+   block asks of its body. */
 static bool try_ends(const struct stmt *s, bool (*ends)(const struct block *))
 {
     const struct handler *h = &s->as.try_block.handler;
+    struct ast_visitor v = {skips_handlers, finds_yield, NULL};
+    bool found = false;
 
     if (!ends(s->as.try_block.body)) {
         return false;
@@ -301,8 +349,12 @@ static bool try_ends(const struct stmt *s, bool (*ends)(const struct block *))
     if (h->kind == HANDLE_FATAL) {
         return true;
     }
-    return h->kind == HANDLE_BLOCK && h->body != NULL &&
-           sema_block_returns(h->body);
+    if (h->kind != HANDLE_BLOCK || h->body == NULL) {
+        return false;
+    }
+    v.data = &found;
+    ast_walk_block(&v, h->body);
+    return !found && sema_block_returns(h->body);
 }
 
 static bool stmt_returns(const struct stmt *s);
