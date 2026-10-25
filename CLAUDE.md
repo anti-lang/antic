@@ -243,6 +243,12 @@ not re-open a settled decision without asking Eddie.
   of `asan`, the last up to test 6742, since `ubsan` now detects leaks
   and compiles with `-g`: `asan` 247 s, 191 s, 252 s, 190 s, 447 s and
   360 s, `ubsan` 257 s, 191 s, 251 s, 197 s, 456 s and 354 s.
+  The step `review` of the same answers measured `host` as
+  `ctest -I 1,2100`, `ctest -I 2101,4300` and `ctest -I 4301,6800`:
+  370 s, 259 s and 258 s. It ran each sanitizer suite in the six parts
+  of `asan`, the last up to test 7000: `asan` 241 s, 189 s, 250 s,
+  185 s, 440 s and 352 s, `ubsan` 249 s, 190 s, 248 s, 194 s, 459 s and
+  355 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -843,13 +849,14 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6744 ctest tests pass on the development Mac, and two of them, the
+- 6752 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  Five of them are expected failures there, the three modes of
-  `matrix_ownership_local_of_a_defer_moves` of T201 and the two of
-  `modules_generic_constant` of T202. Of the seven lines of
-  `tests/known-failures.txt`, those of T136 and T138 carry
-  `host=windows`. The ASan and the UBSan builds run 6742 each
+  Thirteen of them are expected failures there, the three modes of
+  `matrix_ownership_local_of_a_defer_moves` of T201, the two of
+  `modules_generic_constant` of T202, the two refusals of `take` of
+  T203 and the three modes of each program of T204 and T205. Of the
+  fifteen lines of `tests/known-failures.txt`, those of T136 and T138
+  carry `host=windows`. The ASan and the UBSan builds run 6750 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
