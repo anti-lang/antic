@@ -2141,6 +2141,9 @@ antic had two native back ends, x86_64 and ARM64, until the step `switch` of `do
   operand is a literal. A byte sequence calls `patch_bytes` or `patch_bytes_fixed`.
   Reason: the rule of origin names `find`, `with` and `at`, and `into` decides the span
   as `find` does.
+  The two stay in `anti.regex` by Q10 of "Answers of 2026-10-24", since `anti.text`
+  gets no `patch_bytes` under the feature freeze. A patch by bytes therefore links the
+  glue of `anti.regex` and PCRE2.
 - [provisional] `patch` finds every place before it writes a byte. With a pattern it
   runs the walk twice. The match limit, a missing group and a `with` that does not fit
   so fail before any byte changes. A match whose group did not take part is neither
