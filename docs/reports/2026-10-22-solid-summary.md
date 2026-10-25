@@ -166,7 +166,10 @@ Among them, the entries on the native back end are now in the past tense. The ne
 ## Questions that wait for Eddie
 
 The ten cases of the rules and R081 wait no more. "Answers of 2026-10-18"
-holds the answers, and the code builds them. The run raised these:
+holds the answers, and the code builds them. The run raised these twenty.
+All twenty are answered: "Answers of 2026-10-24" in `docs/decisions.md`
+holds the answers as Q1 to Q20, numbered as here. Q17 to Q20 change the
+language, and the steps that build the answers change the code.
 
 1. `CLAUDE.md` still says the ten cases wait and that T127 holds R081, and
    its State gives 4947 tests. `answers-record`, `answers-owned` and
