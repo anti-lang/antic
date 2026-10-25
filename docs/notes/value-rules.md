@@ -99,6 +99,12 @@ should alter may move.
 - A copy of a generic checks again only the nodes whose type holds a type
   parameter. A mark set on the generic node, such as `value` of `dup`, keeps
   its meaning in every copy. The tree of a library file must carry it.
+- `take(x.f)` is the node `EXPR_TAKE`, which the checker writes from the call
+  in `sema_check_take` of `sema_value.c`. Its type is that of the field, and
+  a copy of a generic takes it from the generic node, as it takes the type of
+  an atomic operation. `use-after-free` reads the field and counts it alive
+  afterwards, since `none` is a value that `=` tears down. The tree of a
+  library file carries the node, and the format version is 92.
 - `execute_process` in a script of `tests/` passes `ENCODING NONE`, or
   `raw_output` fails.
 - A file restored with `cp` right after a build may carry the time of its

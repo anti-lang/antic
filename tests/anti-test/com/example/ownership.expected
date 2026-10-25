@@ -18,4 +18,6 @@ ok com.example.ownership.chain_in_fixtures
 ok com.example.ownership.chain_in_tests
 ok com.example.ownership.to_slice_in_fixtures
 ok com.example.ownership.to_slice_in_tests
-anti test: 20 tests in 1 modules, 0 modules failed
+ok com.example.ownership.take_in_fixtures
+ok com.example.ownership.take_in_tests
+anti test: 22 tests in 1 modules, 0 modules failed

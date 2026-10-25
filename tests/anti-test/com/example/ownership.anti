@@ -174,6 +174,16 @@ fixtures
 		free(all.ptr);
 		return n;
 	}
+	fn fix_take(k: int) -> int
+	{
+		let node = Node { n: k, leaf: alloc Leaf { n: k + 1 } };
+		let taken = take(node.leaf) else {
+			return -1;
+		};
+		let n = taken.n * 100 + (node.leaf == none) as int;
+		delete(taken);
+		return n;
+	}
 }
 
 tests
@@ -337,5 +347,22 @@ tests
 		assert(all.len == 2);
 		assert(all[0] + all[1] == 23);
 		free(all.ptr);
+	}
+	fn take_in_fixtures()
+	{
+		let got24 = fix_take(4);
+		assert(got24 == 501);
+	}
+
+	fn take_in_tests()
+	{
+		let node = Node { n: 50, leaf: alloc Leaf { n: 51 } };
+		let taken = take(node.leaf) else {
+			assert(false);
+			return;
+		};
+		assert(taken.n == 51);
+		assert(node.leaf == none);
+		delete(taken);
 	}
 }

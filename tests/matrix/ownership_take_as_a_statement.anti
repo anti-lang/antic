@@ -1,0 +1,20 @@
+//! The value of `take(x.f)` is the one owner of the object it moves out. A
+//! statement that drops the value would lose the object, and is refused. `x.f =
+//! none` tears the object down instead.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let h = Holder { head: alloc Node { value: 1 } };
+	take(h.head);
+	return 0;
+}

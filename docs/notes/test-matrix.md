@@ -229,6 +229,7 @@ A call takes a handler, from `enum handler_kind`:
 | `alloc(S { })`, `alloc(T, n)`, `alloc(C(args))` | `EXPR_ALLOC` |
 | `free(p)` | `EXPR_FREE` |
 | `dup(e)`, `delete(p)`, `destroy(p)`, each with `from` | `EXPR_OBJECT` |
+| `take(x.f)` | `EXPR_TAKE` |
 | `size_of(T)` | `EXPR_SIZE_OF` |
 | `parallel xs -> f(a)`, `parallel xs by n -> f(a)` | `EXPR_PARALLEL` |
 | `dispatch p -> f`, `dispatch p -> f(a)` | `EXPR_DISPATCH` |
@@ -988,6 +989,7 @@ the source of the test `fmt_alias_of_function`, T025.
 | iterator to slice, `to_slice` | function `programs/effects_edges`, module level `matrix/ownership_to_slice_at_module_level`, method `matrix/ownership_pointers_in_contexts`, loop body `matrix/ownership_pointers_in_contexts`, switch arm `matrix/ownership_pointers_in_contexts`, `if let` `matrix/ownership_pointers_in_contexts`, `defer` `matrix/ownership_pointers_in_contexts`, `undo` `matrix/ownership_pointers_in_contexts`, catch handler `matrix/ownership_pointers_in_contexts`, closure `matrix/ownership_pointers_in_contexts`, worker `matrix/ownership_pointers_in_contexts`, `dispatch` or `parallel` `matrix/ownership_pointers_in_contexts`, `sync` block `matrix/ownership_pointers_in_contexts`, `select` arm `matrix/ownership_pointers_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership`, generic body `matrix/ownership_pointers_in_contexts`, nested type `matrix/ownership_pointers_in_contexts`, library module `modules/ownership/com/example/ownership` | none |
 | `own` field or parameter | `matrix/ownership_own_fields_and_parameters`, and `matrix/ownership_values_in_an_argument` for an `own` parameter of each kind of owning value | none |
 | `delete(p, from)` and `destroy(p, from)` | `std/deserialize_alloc` | none |
+| `take(x.f)` | function `matrix/ownership_take_leaves_none`, method `matrix/ownership_take_leaves_none`, generic body `matrix/ownership_take_leaves_none`, library module `modules/generic_take/com/example/chain`, loop body `matrix/ownership_take_in_contexts`, switch arm `matrix/ownership_take_in_contexts`, `if let` `matrix/ownership_take_in_contexts`, `defer` `matrix/ownership_take_in_contexts`, `undo` `matrix/ownership_take_in_contexts`, catch handler `matrix/ownership_take_in_contexts`, closure `matrix/ownership_take_in_contexts`, worker `matrix/ownership_take_in_contexts`, `dispatch` or `parallel` `matrix/ownership_take_in_contexts`, `sync` block `matrix/ownership_take_in_contexts`, `select` arm `matrix/ownership_take_in_contexts`, nested type `matrix/ownership_take_in_contexts`, `tests` block `anti-test/com/example/ownership`, `fixtures` block `anti-test/com/example/ownership` | module level, which cannot exist: a constant holds no `take`, which writes a place |
 
 The kinds of ownership:
 

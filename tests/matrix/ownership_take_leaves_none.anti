@@ -1,0 +1,119 @@
+//! `take(x.f)` moves the object out of an `own ?*T` field and leaves `none` in
+//! it. Each context takes a node out of a field and prints whether the field
+//! holds `none` afterwards and the value of the node it gave, then deletes the
+//! node. A field that holds `none` gives `none`. Each `Node` counts the live
+//! nodes, so the last line shows that no node was lost or freed twice.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+
+	pub static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+
+	pub fn take_head(self) -> ?*Node
+	{
+		return take(self.head);
+	}
+}
+
+class Outer
+{
+	pub inner: Holder,
+}
+
+class Box<T>
+{
+	pub own item: ?*T = none,
+
+	pub fn take_item(self) -> ?*T
+	{
+		return take(self.item);
+	}
+}
+
+fn report(context: ?*byte, empty: bool, n: ?*Node)
+{
+	let node = n else {
+		printf("%s: field none %d, gave none\n".ptr, context, empty as c_int);
+		return;
+	};
+	printf("%s: field none %d, gave %d\n".ptr, context, empty as c_int, node.value as c_int);
+	delete(node);
+}
+
+fn from(h: *Holder) -> ?*Node
+{
+	return take(h.head);
+}
+
+fn of_self()
+{
+	let h = Holder { head: alloc Node { value: 1 } };
+	let n = h.take_head();
+	report("self".ptr, h.head == none, n);
+}
+
+fn through_a_pointer()
+{
+	let h = alloc Holder { head: alloc Node { value: 2 } };
+	let n = from(h);
+	report("pointer".ptr, h.head == none, n);
+	delete(h);
+}
+
+fn of_a_local()
+{
+	let h = Holder { head: alloc Node { value: 3 } };
+	let n = take(h.head);
+	report("local".ptr, h.head == none, n);
+}
+
+fn of_a_nested_field()
+{
+	let o = Outer { inner: Holder { head: alloc Node { value: 4 } } };
+	let n = take(o.inner.head);
+	report("nested".ptr, o.inner.head == none, n);
+}
+
+fn of_a_generic_class()
+{
+	let b = Box<Node> { item: alloc Node { value: 5 } };
+	let n = b.take_item();
+	report("generic".ptr, b.item == none, n);
+}
+
+fn of_an_empty_field()
+{
+	let h = Holder { };
+	let n = take(h.head);
+	report("empty".ptr, h.head == none, n);
+}
+
+fn main() -> int
+{
+	of_self();
+	through_a_pointer();
+	of_a_local();
+	of_a_nested_field();
+	of_a_generic_class();
+	of_an_empty_field();
+	printf("live %d\n".ptr, Node.live.load() as c_int);
+	return 0;
+}

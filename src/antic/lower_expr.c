@@ -2009,6 +2009,8 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         return lower_sync_op(l, e);
     case EXPR_SIMD:
         return lower_simd(l, e);
+    case EXPR_TAKE:
+        return lower_take(l, e);
     /* The address of the descriptor of a class, which `lib.instance(I)`
        and `lib.supports(I, f)` pass to the loader. */
     case EXPR_DESCRIPTOR:

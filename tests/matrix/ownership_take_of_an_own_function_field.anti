@@ -1,0 +1,15 @@
+//! `take(x.f)` takes an `own` field of an optional pointer alone. An `own`
+//! field of type `?fn(...)` can hold `none`, but holds a snapshot and no
+//! pointer, and `take` of it is refused.
+
+class Holder
+{
+	pub own run: ?fn() -> int = none,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	let f = take(h.run);
+	return 0;
+}

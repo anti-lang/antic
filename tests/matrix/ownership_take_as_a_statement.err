@@ -1,0 +1,1 @@
+ownership_take_as_a_statement.anti:18:2: error: the object that `take` moves out of `h.head` is dropped here, and `=` with `none` tears it down

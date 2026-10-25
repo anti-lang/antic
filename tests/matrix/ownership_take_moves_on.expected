@@ -1,0 +1,12 @@
+exit 0
+own field: 1 2 3
+  teardown of node 1
+  teardown of node 2
+  teardown of node 3
+own parameter: 4
+  teardown of node 4
+class literal: 5
+  teardown of node 5
+local: 6
+  teardown of node 6
+end

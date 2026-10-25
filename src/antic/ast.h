@@ -159,7 +159,8 @@ enum expr_kind {
     EXPR_DESCRIPTOR,                /* the descriptor of a class, as `*byte` */
     EXPR_COLLECT,                   /* `it.to_slice()` of an iterator */
     EXPR_FN,                        /* `fn(params) { body }`, anonymous */
-    EXPR_PATTERN                    /* `re"..."`, its bytes in text */
+    EXPR_PATTERN,                   /* `re"..."`, its bytes in text */
+    EXPR_TAKE                       /* `take(x.f)`, checked */
 };
 
 /* The format specification after the colon of an `{expr}`, as the
@@ -540,6 +541,8 @@ struct expr {
         /* EXPR_FN: the anonymous function, an ITEM_FN whose enclosing
            names the function it is written in. */
         struct item *fn;
+        /* EXPR_TAKE: the `own ?*T` field that `take(x.f)` empties. */
+        struct expr *take;
     } as;
 };
 

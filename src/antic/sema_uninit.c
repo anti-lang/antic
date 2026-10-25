@@ -839,6 +839,9 @@ static void walk_expr(struct fill_walk *w, const struct expr *e)
     case EXPR_FN:
         walk_closure(w, e->as.fn);
         return;
+    case EXPR_TAKE:
+        walk_expr(w, e->as.take);
+        return;
     case EXPR_INT:
     case EXPR_FLOAT:
     case EXPR_CHAR:

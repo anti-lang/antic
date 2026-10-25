@@ -1888,7 +1888,7 @@ struct callee_form {
 };
 
 /* The calls the compiler gives a meaning of its own before any lookup:
-   an operation on an atomic field, `mul_high`, `close`, `Mutex.new()`,
+   an operation on an atomic field, `mul_high`, `close`, `take`, `Mutex.new()`,
    `Regex.compile` and the functions of `anti.simd`. */
 static bool builtin_call(struct checker *c, struct expr *e,
                          struct type *expected, struct callee_form *form)
@@ -1908,6 +1908,11 @@ static bool builtin_call(struct checker *c, struct expr *e,
         sema_name_is(&callee->as.name, CHAN_CLOSE) &&
         sema_lookup(c, &callee->as.name) == NULL) {
         form->result = sema_check_close(c, e);
+        return true;
+    }
+    if (callee->kind == EXPR_NAME && sema_name_is(&callee->as.name, TAKE_NAME) &&
+        sema_lookup(c, &callee->as.name) == NULL) {
+        form->result = sema_check_take(c, e);
         return true;
     }
     if (callee->kind == EXPR_FIELD &&

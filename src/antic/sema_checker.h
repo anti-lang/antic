@@ -716,6 +716,10 @@ bool sema_refuse_singleton_write(struct checker *c, const struct expr *target,
                                  struct pos pos);
 bool sema_refuse_count_write(struct checker *c, const struct expr *target,
                              struct pos pos);
+/* Refuse a write of target that `=` refuses with the same words: the
+   variable of a `for` and a part of its copy, a read-only field of a
+   singleton and `count` of a collection. Returns whether it refused. */
+bool sema_refuse_write(struct checker *c, const struct expr *target);
 
 void sema_walk_worker(struct checker *c, const struct item *worker);
 bool sema_fills(const struct type *t, const struct type *abstract);
@@ -769,6 +773,8 @@ void sema_bind_value(struct checker *c, struct expr *value, struct name into,
                      const struct type *t);
 void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
                             const struct type *t);
+/* `take(x.f)`, the call e, which becomes EXPR_TAKE. */
+struct type *sema_check_take(struct checker *c, struct expr *e);
 /* Refuse value, an `own` field, as the value of the `own` field into,
    which target names when an assignment writes it. */
 void sema_refuse_own_field_copy(struct checker *c,

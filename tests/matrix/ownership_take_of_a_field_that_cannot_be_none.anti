@@ -1,0 +1,20 @@
+//! `take(x.f)` leaves `none` in its field, so it takes an `own` field of an
+//! optional pointer alone. An `own *Node` field cannot hold `none`, and `take`
+//! of it is refused.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: *Node,
+}
+
+fn main() -> int
+{
+	let h = Holder { head: alloc Node { value: 1 } };
+	let n = take(h.head);
+	return 0;
+}

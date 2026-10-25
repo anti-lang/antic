@@ -171,6 +171,9 @@ static void walk_children(const struct ast_visitor *v, const struct expr *e)
     case EXPR_COLLECT:
         walk_iteration(v, &e->as.collect);
         return;
+    case EXPR_TAKE:
+        ast_walk_expr(v, e->as.take);
+        return;
     case EXPR_INT:
     case EXPR_FLOAT:
     case EXPR_CHAR:

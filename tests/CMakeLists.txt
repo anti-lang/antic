@@ -3699,6 +3699,16 @@ antic_modules_test(generic_atomic
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_atomic")
 
+# A generic list of a library module whose nodes own their successor, and
+# whose functions move a node with `take`. The client makes its copies
+# from the tree the library file carries, by Q17 of "Answers of
+# 2026-10-24".
+antic_modules_test(generic_take
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_take"
+    LIBRARIES chain
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_take")
+
 # A class of a library module built with arguments under the name of its
 # module, `built.Built(4)` and `alloc built.Built(5)`. T030 of
 # docs/audit/tests-findings.md.

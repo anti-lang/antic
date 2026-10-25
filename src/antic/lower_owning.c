@@ -573,6 +573,29 @@ void lower_replace_buffer(struct lowerer *l, const struct type *t,
     l->b = after;
 }
 
+/* DESIGN: Q17 of "Answers of 2026-10-24". `take(x.f)` reads the pointer
+   of the field and writes `none` there, so the object keeps one owner,
+   the value, which moves on as the value of a call does. The checker
+   refuses a statement that drops the value. The field changes, so the
+   `changed` hook sees it as it sees `=`. */
+struct ir_operand lower_take(struct lowerer *l, const struct expr *e)
+{
+    const struct expr *field = e->as.take;
+    struct place p;
+    struct ir_operand v;
+
+    if (!lower_place(l, field, &p)) {
+        return lower_none();
+    }
+    v = lower_read_place(l, &p);
+    ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0), p.address);
+    if (p.typed.type != IR_VOID) {
+        ir_type_access(l->b, p.typed, p.member);
+    }
+    lower_hook_changed(l, &p, field);
+    return v;
+}
+
 /* DESIGN: the copy of an `own` pointer or slice gets a buffer of its own.
    An object behind a pointer to a class is copied through its table. Any
    other buffer is copied byte for byte, and then each element copies

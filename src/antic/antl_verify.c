@@ -836,6 +836,9 @@ static struct seen walk_at(struct verify *v, const struct expr *e,
     case EXPR_SIMD:
         join(&s, walk_list(v, e->as.simd.args, e->as.simd.arg_count, d));
         break;
+    case EXPR_TAKE:
+        join(&s, walk_expr(v, e->as.take, d));
+        break;
     case EXPR_COLLECT:
         join(&s, walk_iteration(v, &e->as.collect, d));
         break;

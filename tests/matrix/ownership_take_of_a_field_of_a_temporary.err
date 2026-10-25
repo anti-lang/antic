@@ -1,0 +1,1 @@
+ownership_take_of_a_field_of_a_temporary.anti:22:15: error: `take` writes `none` into its field, and the field of a temporary value stands in no place

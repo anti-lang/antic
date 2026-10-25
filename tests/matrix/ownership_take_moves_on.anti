@@ -1,0 +1,106 @@
+//! The value `take(x.f)` gives is a fresh owner, which moves on as every `own`
+//! value does: into an `own` field by `=` and by a class literal, into an `own`
+//! parameter, which gives the node back itself, and through a local that `=`
+//! then stores. A list whose nodes own their successor pushes at its front with
+//! `n.next = take(self.head);` and frees its chain with itself. Each `Node`
+//! prints its teardown, so the lines show that every node has one owner and is
+//! freed once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+	pub own next: ?*Node = none,
+
+	fn destruct(self)
+	{
+		printf("  teardown of node %d\n".ptr, self.value as c_int);
+	}
+}
+
+class Chain
+{
+	own head: ?*Node = none,
+
+	pub fn push_front(self, value: int)
+	{
+		let n = alloc Node { value: value };
+		n.next = take(self.head);
+		self.head = n;
+	}
+
+	pub fn print(self)
+	{
+		let p = self.head;
+		while p != none do {
+			printf(" %d".ptr, p.value as c_int);
+			p = p.next;
+		}
+		printf("\n".ptr);
+	}
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn consume(own n: ?*Node)
+{
+	printf("own parameter:".ptr);
+	let node = n else {
+		printf(" none\n".ptr);
+		return;
+	};
+	printf(" %d\n".ptr, node.value as c_int);
+	delete(node);
+}
+
+fn into_an_own_field()
+{
+	let c = Chain { };
+	c.push_front(3);
+	c.push_front(2);
+	c.push_front(1);
+	printf("own field:".ptr);
+	c.print();
+}
+
+fn into_an_own_parameter()
+{
+	let h = Holder { head: alloc Node { value: 4 } };
+	consume(take(h.head));
+}
+
+fn into_a_class_literal()
+{
+	let h = Holder { head: alloc Node { value: 5 } };
+	let other = Holder { head: take(h.head) };
+	let n = other.head else {
+		return;
+	};
+	printf("class literal: %d\n".ptr, n.value as c_int);
+}
+
+fn through_a_local()
+{
+	let h = Holder { head: alloc Node { value: 6 } };
+	let other = Holder { };
+	let n = take(h.head);
+	other.head = n;
+	let m = other.head else {
+		return;
+	};
+	printf("local: %d\n".ptr, m.value as c_int);
+}
+
+fn main() -> int
+{
+	into_an_own_field();
+	into_an_own_parameter();
+	into_a_class_literal();
+	through_a_local();
+	printf("end\n".ptr);
+	return 0;
+}

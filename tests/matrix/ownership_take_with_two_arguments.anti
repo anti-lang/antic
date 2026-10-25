@@ -1,0 +1,19 @@
+//! `take(x.f)` takes the one field it empties. A second argument is refused.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+	pub own spare: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	let n = take(h.head, h.spare);
+	return 0;
+}

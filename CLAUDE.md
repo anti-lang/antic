@@ -257,7 +257,7 @@ not re-open a settled decision without asking Eddie.
   `docs/reports/2026-10-22-solid-summary.md`, under "Answers of
   2026-10-24" in `docs/decisions.md`. Q17, `take(x.f)`, is the one new
   form the freeze lets in by name, and Q4 lets in the setters of
-  `anti.log.Logger`. Neither is built yet. See
+  `anti.log.Logger`. `take` is built, and the setters are not built yet. See
   "Feature freeze of 2026-10-14" in `docs/decisions.md`.
 - The gap procedure. Where a specification is silent, take the smallest option
   that keeps every struct C layout and the IR free of sizes. Record one
@@ -1305,7 +1305,7 @@ reports what it finished.
   source, which the test `anti_doc` checks. `--dev` and `--private` read the
   syntax tree for the private items and the `//#` notes and refuse a library
   file. The library file now carries the parameter names of a function of a
-  class body and the `worker` mark, and its format version is 91. See "The doc
+  class body and the `worker` mark, and its format version is 92. See "The doc
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops

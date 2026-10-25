@@ -1,0 +1,41 @@
+//! A field that `take(x.f)` emptied is torn down by R074 as before when it is
+//! assigned again: `=` tears down the `none` it holds, which frees nothing, and
+//! the next `=` tears down the node the first one stored. The node `take` gave
+//! lives on until the program deletes it. Each `Node` prints its teardown.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+
+	fn destruct(self)
+	{
+		printf("  teardown of node %d\n".ptr, self.value as c_int);
+	}
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	{
+		let h = Holder { head: alloc Node { value: 1 } };
+		let n = take(h.head);
+		printf("taken\n".ptr);
+		h.head = alloc Node { value: 2 };
+		printf("assigned once\n".ptr);
+		h.head = alloc Node { value: 3 };
+		printf("assigned twice\n".ptr);
+		let taken = n else {
+			return 1;
+		};
+		delete(taken);
+		printf("deleted\n".ptr);
+	}
+	printf("end\n".ptr);
+	return 0;
+}

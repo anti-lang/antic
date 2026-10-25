@@ -1,0 +1,277 @@
+//! `take(x.f)` in these places: loop body, switch arm, if let, defer, undo,
+//! catch handler, closure, worker, dispatch or parallel, sync block, select
+//! arm, nested type. Each place takes the node out of the `own` field of a
+//! `Holder` and gives the value of the node plus 100 when the field holds
+//! `none` afterwards. Each `Node` counts the live nodes, so the last line shows
+//! that every node taken was freed once.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+
+	pub static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Node.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Node.live.sub(1);
+	}
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn filled(k: int) -> Holder
+{
+	return Holder { head: alloc Node { value: k } };
+}
+
+/// The value of the node n plus 100 when h holds `none`. It deletes n.
+fn gone(own n: ?*Node, h: *Holder) -> int
+{
+	let node = n else {
+		return -1;
+	};
+	let v = node.value + (h.head == none) as int * 100;
+	delete(node);
+	return v;
+}
+
+fn failing(k: int) -> int may fail
+{
+	if k > 0 {
+		fail "refused";
+	}
+	return k;
+}
+
+fn held(k: int) -> ?int
+{
+	if k == 0 {
+		return none;
+	}
+	return k;
+}
+
+class Places
+{
+	class Inner
+	{
+		pub h: Holder,
+
+		pub fn run(self, k: int) -> int
+		{
+			self.h.head = alloc Node { value: k };
+			let n = take(self.h.head);
+			return gone(n, &self.h);
+		}
+	}
+
+	pub fn in_nested(self, k: int) -> int
+	{
+		let inner = Inner { };
+		return inner.run(k);
+	}
+}
+
+fn in_loop(k: int) -> int
+{
+	let total = 0;
+	for i in 0..2 {
+		let h = filled(k + i);
+		let n = take(h.head);
+		total += gone(n, &h);
+	}
+	return total;
+}
+
+fn in_switch(k: int) -> int
+{
+	let h = filled(k);
+	let got = 0;
+	switch k {
+		3 => got = gone(take(h.head), &h),
+		else => got = -1,
+	}
+	return got;
+}
+
+fn in_if_let(k: int) -> int
+{
+	if let v = held(k) {
+		let h = filled(v);
+		let n = take(h.head);
+		return gone(n, &h);
+	}
+	return -1;
+}
+
+fn in_defer(k: int, out: *int)
+{
+	let h = filled(k);
+	defer {
+		*out = gone(take(h.head), &h);
+	}
+}
+
+fn in_undo(k: int, out: *int) may fail
+{
+	let h = filled(k);
+	undo {
+		*out = gone(take(h.head), &h);
+	}
+	fail "undone";
+}
+
+fn in_catch(k: int) -> int
+{
+	let h = filled(k);
+	let got = failing(k) catch e {
+		let n = take(h.head);
+		yield gone(n, &h);
+	};
+	return got;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	let h = filled(k);
+	return call(fn(v) {
+		let n = take(h.head);
+		return gone(n, &h) + v - k;
+	}, k);
+}
+
+/// A worker deletes no object, so the node is torn down in place and freed.
+worker fn tally(part: []int) -> int
+{
+	let total = 0;
+	for v in part {
+		let h = filled(v);
+		let n = take(h.head) else {
+			return -1;
+		};
+		total += n.value + (h.head == none) as int * 100;
+		destroy(n);
+		free(n);
+	}
+	return total;
+}
+
+fn in_worker(k: int) -> int
+{
+	let room = alloc([2]int, 1) else {
+		return -1;
+	};
+	(*room)[0] = k;
+	(*room)[1] = k + 1;
+	let sums = parallel (*room)[0..2] by 2 -> tally;
+	let n = sums[0] + sums[1];
+	free(sums.ptr);
+	free(room);
+	return n;
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task, concurrent f: fn(int) -> int) -> int
+{
+	return f(t.n);
+}
+
+fn in_dispatch(k: int) -> int
+{
+	let t = alloc Task { n: k };
+	let job = dispatch t -> work(fn(v) {
+		let h = filled(v);
+		let n = take(h.head) else {
+			return -1;
+		};
+		let got = n.value + (h.head == none) as int * 100;
+		destroy(n);
+		free(n);
+		return got;
+	});
+	let n = join(job);
+	delete(t);
+	return n;
+}
+
+struct Guard
+{
+	lock: Mutex,
+}
+
+fn in_sync(g: *Guard, k: int) -> int
+{
+	let got = 0;
+	sync g.lock {
+		let h = filled(k);
+		let n = take(h.head);
+		got = gone(n, &h);
+	}
+	return got;
+}
+
+fn in_select(c: chan int, k: int) -> int
+{
+	let got = 0;
+	send(c, k);
+	select {
+		c v => {
+			let p = v else {
+				return -1;
+			};
+			let h = filled(*p);
+			let n = take(h.head);
+			got = gone(n, &h);
+		},
+	}
+	return got;
+}
+
+fn main() -> int
+{
+	printf("take in loop body: %d\n".ptr, in_loop(1) as c_int);
+	printf("take in switch arm: %d\n".ptr, in_switch(3) as c_int);
+	printf("take in if let: %d\n".ptr, in_if_let(4) as c_int);
+	let out = 0;
+	in_defer(5, &out);
+	printf("take in defer: %d\n".ptr, out as c_int);
+	in_undo(6, &out) catch {
+		yield;
+	};
+	printf("take in undo: %d\n".ptr, out as c_int);
+	printf("take in catch handler: %d\n".ptr, in_catch(7) as c_int);
+	printf("take in closure: %d\n".ptr, in_closure(8) as c_int);
+	printf("take in worker: %d\n".ptr, in_worker(9) as c_int);
+	printf("take in dispatch: %d\n".ptr, in_dispatch(10) as c_int);
+	let g = Guard { lock: Mutex.new() };
+	printf("take in sync block: %d\n".ptr, in_sync(&g, 11) as c_int);
+	g.lock.destroy();
+	let c = chan int(1);
+	printf("take in select arm: %d\n".ptr, in_select(c, 12) as c_int);
+	delete(c);
+	let places = Places { };
+	printf("take in nested type: %d\n".ptr, places.in_nested(13) as c_int);
+	printf("live %d\n".ptr, Node.live.load() as c_int);
+	return 0;
+}

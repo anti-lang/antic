@@ -1,0 +1,14 @@
+//! `take(x.f)` takes an `own` field. A local is no field: it moves by `=`,
+//! `let`, a call or `return` already, and `take` of it is refused.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+fn main() -> int
+{
+	let p: ?*Node = alloc Node { value: 1 };
+	let q = take(p);
+	return 0;
+}

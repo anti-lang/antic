@@ -1,0 +1,35 @@
+//! A generic list of a library module whose nodes own their successor. It
+//! pushes at its front and pops from it with `take`. The library file carries
+//! the checked tree of each function, and the client compiles its copies from
+//! it.
+
+/// A node that owns the node after it.
+pub class Node<T>
+{
+	pub value: T,
+	pub own next: ?*Node<T> = none,
+}
+
+/// A list of nodes, the first of which it owns.
+pub class Chain<T>
+{
+	own head: ?*Node<T> = none,
+
+	/// Put `value` in front of the first node.
+	pub fn push_front(self, own value: T)
+	{
+		let n = alloc Node<T> { value: value };
+		n.next = take(self.head);
+		self.head = n;
+	}
+
+	/// Take the first node out of the list, or `none` when it is empty.
+	pub fn pop_front(self) -> ?*Node<T>
+	{
+		let n = take(self.head) else {
+			return none;
+		};
+		self.head = take(n.next);
+		return n;
+	}
+}

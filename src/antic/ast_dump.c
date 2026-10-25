@@ -537,6 +537,11 @@ static void dump_expr(struct dumper *d, int depth, const struct expr *e)
         end(d, start, type);
         dump_expr(d, depth + 1, e->as.join.job);
         break;
+    case EXPR_TAKE:
+        text_append(d->out, "take");
+        end(d, start, type);
+        dump_expr(d, depth + 1, e->as.take);
+        break;
     case EXPR_SYNC_OP: {
         static const char *const names[] = {
             [SYNC_MUTEX_NEW] = "mutex_new",

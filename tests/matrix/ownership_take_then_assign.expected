@@ -1,0 +1,9 @@
+exit 0
+taken
+assigned once
+  teardown of node 2
+assigned twice
+  teardown of node 1
+deleted
+  teardown of node 3
+end

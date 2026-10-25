@@ -1,0 +1,8 @@
+exit 0
+self: field none 1, gave 1
+pointer: field none 1, gave 2
+local: field none 1, gave 3
+nested: field none 1, gave 4
+generic: field none 1, gave 5
+empty: field none 1, gave none
+live 0

@@ -31,7 +31,7 @@
    writer puts, in the same order. */
 
 /* The file stores these enums as bytes. */
-_Static_assert(EXPR_PATTERN == 37, "raise ANTL_VERSION, then update this");
+_Static_assert(EXPR_TAKE == 38, "raise ANTL_VERSION, then update this");
 _Static_assert(STMT_SELECT == 21, "raise ANTL_VERSION, then update this");
 _Static_assert(ITEM_TYPE == 9, "raise ANTL_VERSION, then update this");
 _Static_assert(TYPEX_OPTIONAL == 9, "raise ANTL_VERSION, then update this");
@@ -944,7 +944,7 @@ static void io_expr_body(struct io *io, struct expr *e)
     size_t lanes;
     size_t i;
 
-    IO_ENUM(io, e->kind, EXPR_PATTERN);
+    IO_ENUM(io, e->kind, EXPR_TAKE);
     io_pos(io, &e->pos);
     io_text(io, &e->spelling);
     io_type(io, &e->type);
@@ -1132,6 +1132,9 @@ static void io_expr_body(struct io *io, struct expr *e)
         break;
     case EXPR_FN:
         io_item(io, &e->as.fn);
+        break;
+    case EXPR_TAKE:
+        io_expr(io, &e->as.take);
         break;
     case EXPR_NONE:
     case EXPR_HERE:

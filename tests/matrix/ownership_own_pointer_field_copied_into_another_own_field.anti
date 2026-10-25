@@ -1,29 +1,40 @@
 //! `=` from one `own ?*Node` field into another copies an existing value that a
 //! field owns, which would give the node two owners and free it twice. It is
-//! refused as `=` of any existing owning value is, and `dup` gives the second
-//! field a node of its own. A programmer from C++ writes the line where
-//! `unique_ptr` would ask for `std::move`.
+//! refused as `=` of any existing owning value is. `take` moves the node out
+//! and leaves `none` behind, and `dup` gives the second field a node of its
+//! own. A programmer from C++ writes the line where `unique_ptr` would ask for
+//! `std::move`. The list whose nodes own their successor pushes at its front
+//! through `take`, which compiles, and `spare` keeps the refused line.
 
 class Node
 {
 	pub value: int = 0,
+	pub own next: ?*Node = none,
 }
 
-class Holder
+class Chain
 {
 	own head: ?*Node = none,
 	own spare: ?*Node = none,
 
-	pub fn fill(self)
+	pub fn push_front(self, value: int)
 	{
-		self.head = alloc Node { value: 1 };
+		let n = alloc Node { value: value };
+		n.next = take(self.head);
+		self.head = n;
+	}
+
+	pub fn keep_spare(self)
+	{
 		self.spare = self.head;
 	}
 }
 
 fn main() -> int
 {
-	let h = Holder { };
-	h.fill();
+	let c = Chain { };
+	c.push_front(1);
+	c.push_front(2);
+	c.keep_spare();
 	return 0;
 }

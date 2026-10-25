@@ -790,6 +790,14 @@ static void walk_expr(struct free_walk *w, const struct expr *e)
     case EXPR_FN:
         walk_closure(w, e->as.fn);
         return;
+    /* The field holds `none` after `take`, which is a value of its own,
+       so `=` tears down the `none` and the field is alive again. */
+    case EXPR_TAKE:
+        walk_expr(w, e->as.take);
+        if (value_of(w, e->as.take, &v)) {
+            revive(w, &v);
+        }
+        return;
     case EXPR_INT:
     case EXPR_FLOAT:
     case EXPR_CHAR:

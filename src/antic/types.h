@@ -609,6 +609,8 @@ struct type *types_object(struct types *types);
 #define MUTEX_NEW "new"
 #define MUTEX_DESTROY "destroy"
 #define CHAN_CLOSE "close"
+/* `take(x.f)` of Q17 of "Answers of 2026-10-24", a built-in name. */
+#define TAKE_NAME "take"
 
 /* DESIGN: `FieldDescriptor` is the built-in struct that the `changed`
    hook takes, which the compiler declares in `anti.lang` as it does

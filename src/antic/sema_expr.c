@@ -2759,6 +2759,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
     case EXPR_SYNC_OP:
         return sema_check_sync_op(c, e);
     case EXPR_SIMD:
+    case EXPR_TAKE:
         return e->type;
     case EXPR_OBJECT:
         return check_object(c, e);

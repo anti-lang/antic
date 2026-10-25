@@ -1,0 +1,26 @@
+//! The client of the chain library: a copy of a generic list of the library
+//! whose `push_front` and `pop_front` move nodes with `take`. Each node popped
+//! is deleted, and the nodes left are freed with the list.
+
+import com.example.chain;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let c = chain.Chain<int> { };
+	c.push_front(3);
+	c.push_front(2);
+	c.push_front(1);
+	let first = c.pop_front() else {
+		return 1;
+	};
+	let second = c.pop_front() else {
+		return 1;
+	};
+	printf("popped %d %d, next none %d\n".ptr, first.value as c_int, second.value as c_int,
+		(first.next == none) as c_int);
+	delete(first);
+	delete(second);
+	return 0;
+}

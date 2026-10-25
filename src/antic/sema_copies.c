@@ -1308,6 +1308,9 @@ static struct expr *xe(struct clone *cl, struct expr *e)
     case EXPR_COLLECT:
         xiter(cl, &n->as.collect, &e->as.collect);
         break;
+    case EXPR_TAKE:
+        n->as.take = xe(cl, e->as.take);
+        break;
     case EXPR_FN:
         n->as.fn = xi(cl, e->as.fn);
         break;

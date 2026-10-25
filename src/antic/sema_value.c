@@ -414,9 +414,9 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
    field into another, `self.spare = self.head`, gives that memory two
    owners, and both free it, as T187 showed. "Ownership and copies" in
    `docs/anti-object-model.md` refuses the copy that gives a value two
-   owners, and `dup` is the way. A field given the pointer it holds,
-   `b.one = b.one`, keeps one owner. A type that owns memory itself is
-   refused by `sema_refuse_owned_copy`. */
+   owners. `take` moves the value and `dup` copies it. A field given the
+   pointer it holds, `b.one = b.one`, keeps one owner. A type that owns
+   memory itself is refused by `sema_refuse_owned_copy`. */
 void sema_refuse_own_field_copy(struct checker *c,
                                 const struct struct_field *into,
                                 const struct expr *value,
@@ -448,9 +448,116 @@ void sema_refuse_own_field_copy(struct checker *c,
         return;
     }
     text_free(&place);
-    sema_error_at(c, value->pos, "`%s` is held by an `own` field, use `dup` "
-                  "instead of `=`", text_cstr(&spelled));
+    sema_error_at(c, value->pos, "`%s` is held by an `own` field, use `take` "
+                  "to move it or `dup` to copy it", text_cstr(&spelled));
     text_free(&spelled);
+}
+
+/* The field of the class s or of a class above it that name names. */
+static const struct struct_field *field_up(const struct type *s,
+                                           const struct name *name)
+{
+    const struct struct_field *f;
+
+    for (; s != NULL; s = s->kind == TYPE_CLASS ? s->base : NULL) {
+        if ((f = types_find_field(s, name)) != NULL) {
+            return f;
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: Q17 of "Answers of 2026-10-24". `take(x.f)` moves the object
+   out of an `own ?*T` field and leaves `none` there, the move that the
+   refusal of `=` between two `own` fields left without a form (T187).
+   The value is a fresh owner of the type of the field, which moves on
+   as the value of a call does. The argument is an `own` field of an
+   optional pointer in a place, and `take` writes the place as `=`
+   does, so a place `=` refuses is refused with the same words. A
+   statement that drops the value is refused, since nothing would own
+   the object. `take` is a built-in name, as `close` is, and a function
+   `take` in scope keeps its name. The `[provisional]` entries after the
+   same answers in docs/decisions.md say both. */
+struct type *sema_check_take(struct checker *c, struct expr *e)
+{
+    struct expr *arg;
+    struct type *t;
+    const struct struct_field *f = NULL;
+    const struct type *s;
+    struct text spelled = {0};
+    struct text name = {0};
+    struct type *result = sema_builtin(c, TYPE_ERROR);
+
+    if (e->as.call.handler.kind != HANDLE_NONE) {
+        sema_error_at(c, e->as.call.handler.pos,
+                      "this call cannot fail, so it has no error to handle");
+        return result;
+    }
+    if (e->as.call.arg_count != 1) {
+        sema_error_at(c, e->pos, "`" TAKE_NAME "` takes 1 argument, found %zu",
+                      e->as.call.arg_count);
+        return result;
+    }
+    arg = e->as.call.args[0];
+    t = sema_check_storage(c, arg);
+    if (sema_is_error(t)) {
+        return t;
+    }
+    if (sema_spell(&name, arg)) {
+        text_appendf(&spelled, "`%s`", text_cstr(&name));
+    } else {
+        text_appendf(&spelled, "its argument");
+    }
+    text_free(&name);
+    if (arg->kind != EXPR_FIELD || arg->symbol != NULL) {
+        sema_error_at(c, arg->pos, "`" TAKE_NAME "` takes an `own` field, and "
+                      "%s is no field", text_cstr(&spelled));
+        goto done;
+    }
+    s = sema_struct_of(arg->as.field.base->type);
+    f = s != NULL ? field_up(s, &arg->as.field.name) : NULL;
+    if (f == NULL || !f->owned) {
+        sema_error_at(c, arg->pos, "`" TAKE_NAME "` takes an `own` field, and "
+                      "%s is not `own`", text_cstr(&spelled));
+        goto done;
+    }
+    if (!types_is_nullable(t)) {
+        sema_error_at(c, arg->pos, "`" TAKE_NAME "` leaves `none` in %s, "
+                      "whose type `%s` cannot be `none`", text_cstr(&spelled),
+                      sema_tn(t));
+        goto done;
+    }
+    if (t->kind != TYPE_POINTER) {
+        sema_error_at(c, arg->pos, "`" TAKE_NAME "` takes an `own` field of "
+                      "an optional pointer, and %s has type `%s`",
+                      text_cstr(&spelled), sema_tn(t));
+        goto done;
+    }
+    if (!sema_is_place(arg)) {
+        sema_error_at(c, arg->pos, "`" TAKE_NAME "` writes `none` into its "
+                      "field, and the field of a temporary value stands in "
+                      "no place");
+        goto done;
+    }
+    if (sema_refuse_write(c, arg)) {
+        goto done;
+    }
+    /* The object has the value as its one owner, and a statement that
+       drops the value would lose it. */
+    if (c->discarded == e) {
+        sema_error_at(c, e->pos, "the object that `" TAKE_NAME "` moves out "
+                      "of %s is dropped here, and `=` with `none` tears it "
+                      "down", text_cstr(&spelled));
+        goto done;
+    }
+    sema_note_write(c, arg);
+    e->kind = EXPR_TAKE;
+    memset(&e->as, 0, sizeof e->as);
+    e->as.take = arg;
+    result = t;
+done:
+    text_free(&spelled);
+    return result;
 }
 
 /* The largest `align(N)` of t and of the parts it holds in place, or 0.

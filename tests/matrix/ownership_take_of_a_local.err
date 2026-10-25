@@ -1,0 +1,1 @@
+ownership_take_of_a_local.anti:12:15: error: `take` takes an `own` field, and `p` is no field

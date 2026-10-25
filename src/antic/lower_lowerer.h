@@ -823,6 +823,9 @@ const struct struct_field *lower_own_field(const struct expr *e);
    take a buffer whose address is next. */
 void lower_replace_buffer(struct lowerer *l, const struct type *t,
                           struct ir_operand at, struct ir_operand next);
+/* `take(x.f)`, e, which gives the pointer the field held and leaves
+   `none` there. */
+struct ir_operand lower_take(struct lowerer *l, const struct expr *e);
 /* The copy of what the value of type t at from owns into the value at
    into, whose bytes are already the same. Each class value, each `own fn`
    and each part that holds one is copied as `dup` copies it. */

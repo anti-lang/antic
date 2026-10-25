@@ -1,0 +1,24 @@
+//! `take(x.f)` writes `none` into its field, so the field stands in a place.
+//! The field of a value that a call returns stands in no place, and `take` of
+//! it is refused.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn make() -> Holder
+{
+	return Holder { head: alloc Node { value: 1 } };
+}
+
+fn main() -> int
+{
+	let n = take(make().head);
+	return 0;
+}

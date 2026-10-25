@@ -25,6 +25,7 @@ Java frees an object when no reference reaches it, so no reference owns anything
 - The teardown of the object frees the memory. An `own` pointer to a class is deleted through the table of the object it points at. An object of a derived class therefore runs its own teardown. The elements of an `own` slice are torn down last to first, and then the buffer is freed.
 - `dup` of the object gives the copy memory of its own, with a copy of the contents.
 - `=` to the field tears down what the field held before the new value goes in, as `reset` of a `unique_ptr` does. A field given the pointer it holds keeps it.
+- `take(x.f)` moves the object out of an `own ?*T` field and leaves `none` there, as `std::move` out of a `unique_ptr` leaves it empty. The value it gives is the one owner of the object.
 
 A pointer field without `own` is an address. The teardown leaves it alone, and `dup` copies the address.
 
@@ -296,6 +297,136 @@ fn main() -> int
 }
 ```
 
+`=` from one `own` field into another would give the object two owners, and the checker refuses it. `take(x.f)` is the move: it gives the pointer the field held and writes `none` into the field. The value is a fresh owner of type `?*T`, which moves on as the value of a call does: into an `own` field, into an `own` parameter or into a local. An `=` to the emptied field later tears down the `none`, which frees nothing. A list whose nodes own their successor pushes and pops at its front with it.
+
+```anti
+//! name: chain
+import anti.io;
+import anti.text;
+
+class Node
+{
+	pub value: int = 0,
+	pub own next: ?*Node = none,
+}
+
+class Chain
+{
+	own head: ?*Node = none,
+
+	pub fn push_front(self, value: int)
+	{
+		let n = alloc Node { value: value };
+		n.next = take(self.head);
+		self.head = n;
+	}
+
+	pub fn pop_front(self) -> ?*Node
+	{
+		let n = take(self.head) else {
+			return none;
+		};
+		self.head = take(n.next);
+		return n;
+	}
+
+	pub fn count(self) -> int
+	{
+		let total = 0;
+		let p = self.head;
+		while p != none do {
+			total += 1;
+			p = p.next;
+		}
+		return total;
+	}
+}
+
+fn main() -> int
+{
+	let c = Chain { };
+	for i in 1..4 {
+		c.push_front(i);
+	}
+	let first = c.pop_front() catch fatal;
+	let line = f"popped {first.value}, {c.count()} left, its next none: {first.next == none}";
+	io.println(line);
+	free(line.ptr);
+	delete(first);
+	return 0;
+}
+```
+
+```text output
+popped 3, 2 left, its next none: true
+```
+
+`pop_front` takes the first node out of `head`, then the second out of the first node's `next` into `head`. The node it returns owns nothing more, and `main` deletes it. The two nodes left go with `c` at the end of `main`.
+
+`take` is a built-in name, as `close` is. A function named `take` in scope keeps the name, and `b.take()` stays a call of a function of `b`. The checker refuses each of the following.
+
+```anti refused
+//! error: `take` leaves `none` in `h.head`, whose type `*Node` cannot be `none`
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: *Node,
+}
+
+fn main() -> int
+{
+	let h = Holder { head: alloc Node { } };
+	let n = take(h.head);
+	return 0;
+}
+```
+
+```anti refused
+//! error: `take` takes an `own` field, and `h.head` is not `own`
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	let n = take(h.head);
+	return 0;
+}
+```
+
+```anti refused
+//! error: the object that `take` moves out of `h.head` is dropped here, and `=` with `none` tears it down
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let h = Holder { head: alloc Node { } };
+	take(h.head);
+	return 0;
+}
+```
+
+A local, a parameter and any other value that is no field are refused as well: each of them moves by `let`, `=`, a call or `return` already.
+
 ### How antic builds it
 
 `own` and `lent` are facts of the checker. Neither changes the layout of a value, and `lent` leaves no trace in the code.
@@ -339,7 +470,21 @@ b0:
 
 A dev build writes the same calls in the same order and calls `destruct` where the release build inlined it. Dev mode adds no check here, and a release build removes no call.
 
-Where it lives: `sema_lent_form` of `src/antic/sema.c`. `sema_require` and `through_lent` of `src/antic/sema_expr.c` refuse the uses of a lent pointer. `lower_class_teardown` and `destroy_buffer` of `src/antic/lower_owning.c` write the teardown. `anti_rt_delete`, `anti_rt_delete_from` and `anti_rt_give` of `src/rt/object.c`.
+`take(x.f)` is one load and one store of `none`, in both modes.
+
+```llvm excerpt=chain target=linux-x86_64 mode=release
+define internal noundef ptr @chain.Chain.pop_front(
+b0:
+  %v1 = getelementptr inbounds nuw i8, ptr %p0, i64 8
+  %v3 = load ptr, ptr %v1, align 8
+  store ptr null, ptr %v1, align 8
+  %v6 = icmp eq ptr %v3, null
+```
+
+- `head` stands at offset 8 of `self`. The load reads the node, and the store leaves `none` behind before anything else runs.
+- The test against `null` is the `else` of the `let`, which returns `none` for an empty list.
+
+Where it lives: `sema_lent_form` of `src/antic/sema.c`. `sema_check_take` of `src/antic/sema_value.c` checks `take`, and `lower_take` of `src/antic/lower_owning.c` writes it. `sema_require` and `through_lent` of `src/antic/sema_expr.c` refuse the uses of a lent pointer. `lower_class_teardown` and `destroy_buffer` of `src/antic/lower_owning.c` write the teardown. `anti_rt_delete`, `anti_rt_delete_from` and `anti_rt_give` of `src/rt/object.c`.
 
 ### What it costs
 
@@ -351,6 +496,7 @@ Where it lives: `sema_lent_form` of `src/antic/sema.c`. `sema_require` and `thro
 | Bytes and instructions `lent` adds | 0 | 0 |
 | Teardown of an `own` pointer to a class | one `anti_rt_delete_from`, one indirect call of the teardown, one `free`, one store of `none` | the same |
 | Teardown of an `own` slice of bytes | one `anti_rt_give`, one `free`, one store of `none` | the same |
+| `take(x.f)` | one load, one store of `none` | the same |
 | Checks | the test for a zero table in `anti_rt_delete_from` | the same |
 | Atomic operations | two loads in the `anti_rt_hook` of each object torn down, and what a `destruct` of the program does | the same |
 | Locks | 0 | 0 |
@@ -480,6 +626,7 @@ For a C programmer:
 For a C++ programmer:
 
 - An `own` field is a `unique_ptr` without the wrapper type: the field is 8 bytes, the class teardown frees it, and `=` deletes the old object as `reset` does.
+- `std::move` of a `unique_ptr` field is `take(x.f)`. A plain `=` from one `own` field into another is refused, where C++ would copy the pointer and free it twice.
 - `lent` is checked. A reference parameter of C++ may be stored by the callee, and the checker refuses the same store of a `lent` pointer.
 - A plain `*T` parameter is not lent. The function may store it, and the caller keeps the object alive.
 

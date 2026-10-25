@@ -1,0 +1,1 @@
+ownership_take_of_a_field_that_cannot_be_none.anti:18:15: error: `take` leaves `none` in `h.head`, whose type `*Node` cannot be `none`

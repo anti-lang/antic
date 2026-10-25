@@ -1374,6 +1374,7 @@ bool sema_eval_const(struct checker *c, struct expr *e,
     case EXPR_SYNC_OP:
     case EXPR_SIMD:
     case EXPR_DESCRIPTOR:
+    case EXPR_TAKE:
         return fail_const(c, e, "a call");
     case EXPR_SLICE:
     case EXPR_SLICE_LIT:

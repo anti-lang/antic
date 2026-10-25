@@ -1,0 +1,21 @@
+//! `take(x.f)` moves the object out of an `own` field, which owns it. A field
+//! without `own` owns nothing, so there is nothing to move, and `take` of it is
+//! refused.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let node = Node { value: 1 };
+	let h = Holder { head: &node };
+	let n = take(h.head);
+	return 0;
+}

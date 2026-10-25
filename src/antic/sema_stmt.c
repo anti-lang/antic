@@ -1220,6 +1220,7 @@ static bool visit_call(void *data, const struct expr *e)
     case EXPR_COLLECT:
     case EXPR_SYNC_OP:
     case EXPR_SIMD:
+    case EXPR_TAKE:
         *found = true;
         break;
     default:
@@ -2800,6 +2801,21 @@ void sema_check_function(struct checker *c, struct item *it)
     }
     c->saw_fail = false;
     sema_leave(c, &saved);
+}
+
+bool sema_refuse_write(struct checker *c, const struct expr *target)
+{
+    struct symbol *copy = walked_copy(target);
+
+    if (copy != NULL || (target->kind == EXPR_NAME &&
+                         target->symbol != NULL &&
+                         target->symbol->read_only)) {
+        refuse_read_only(c, target->pos,
+                         copy != NULL ? copy : target->symbol);
+        return true;
+    }
+    return sema_refuse_singleton_write(c, target, target->pos) ||
+           sema_refuse_count_write(c, target, target->pos);
 }
 
 /* DESIGN: a field of a singleton is read-only after creation, so
