@@ -68,9 +68,12 @@ endfunction()
 # functions the program links and no more.
 #
 # DESIGN: a compile names the pattern, and the tests set no
-# LLVM_PROFILE_FILE, because the variable reaches every process of a
-# test, antic and the program alike, and a program has to write
-# elsewhere than antic. A test that sets the variable for a program it
+# LLVM_PROFILE_FILE. The pattern per compile replaced the variable, which
+# ctest set for every test of the tree, and Q12 of "Answers of
+# 2026-10-24" in docs/decisions.md keeps it. The variable reaches every
+# process of a test, antic and the program alike, and a program has to
+# write elsewhere than antic: antic takes a pool of nine files and a
+# program a file per process, and one variable gives both one pattern. A test that sets the variable for a program it
 # built itself, as profile_guided does, still sets it for that program,
 # and every run collects, a part of ctest -I as much as the whole suite.
 # The build itself runs antic on the standard library and leaves
