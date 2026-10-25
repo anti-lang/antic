@@ -1391,7 +1391,12 @@ static void declare_fields(struct checker *c, struct item *it)
         fields[0].name.length = sizeof super_text - 1;
         fields[0].pos = it->name_pos;
         fields[0].form = FIELD_BASE;
-        fields[0].type = it->symbol->type->base;
+        /* A base that resolve_base refused leaves no base type. The
+           field then has the error type, so a use of `self.super` gives
+           no second message and reads no base. */
+        fields[0].type = it->symbol->type->base != NULL
+                             ? it->symbol->type->base
+                             : sema_builtin(c, TYPE_ERROR);
     }
     fields += base_fields;
     resolve_fields(c, it, fields);
