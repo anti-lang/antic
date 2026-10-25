@@ -1,0 +1,1 @@
+types_simd_struct_meets_no_eq.anti:19:10: error: `Vec4` has no `eq`, which `same` needs for `T`. A comparison of a simd struct gives a mask of its lanes

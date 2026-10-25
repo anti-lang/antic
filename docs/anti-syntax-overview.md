@@ -631,7 +631,7 @@ let d = simd.select(m, a, b);
 let s = c.sum();
 ```
 
-Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus apply lane by lane. So do the compound assignments `+=`, `-=`, `*=` and `/=`, and `&=`, `|=`, `^=`, `<<=` and `>>=` on integer lanes, as `v += w`. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select`, `simd.any` and `simd.all` are in `anti.simd`. `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` are built in. `as` between a `simd struct` and the array or plain struct of the same bytes is free. The back end maps each operation to the target's native width, so the lane count is the programmer's and the instruction count is the machine's. An `f32x8` is one instruction at x86-64-v3 and two everywhere else. A `simd struct` of 16 bytes is the vector type of C in the header and passes in a vector register, and one of another size passes as the struct of its lanes. Above the vector cap it is an array and a loop, which the warning `above-vector-cap` names at its declaration. The built-in operators meet the constraints `add`, `sub`, `mul`, `div` and `neg` lane by lane, so `twice<T: add>` takes a `Vec4`. A simd struct does not meet `lt`, and so it does not meet `Number`. Not built yet: the constraints a simd struct meets.
+Arithmetic, the bitwise operators on integer lanes, comparisons and unary minus apply lane by lane. So do the compound assignments `+=`, `-=`, `*=` and `/=`, and `&=`, `|=`, `^=`, `<<=` and `>>=` on integer lanes, as `v += w`. A comparison yields a mask, a `simd struct` of `bool` with the same lane count. `simd.select`, `simd.any` and `simd.all` are in `anti.simd`. `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` are built in. `as` between a `simd struct` and the array or plain struct of the same bytes is free. The back end maps each operation to the target's native width, so the lane count is the programmer's and the instruction count is the machine's. An `f32x8` is one instruction at x86-64-v3 and two everywhere else. A `simd struct` of 16 bytes is the vector type of C in the header and passes in a vector register, and one of another size passes as the struct of its lanes. Above the vector cap it is an array and a loop, which the warning `above-vector-cap` names at its declaration. The built-in operators meet the constraints `add`, `sub`, `mul`, `div` and `neg` lane by lane, so `twice<T: add>` takes a `Vec4`. A simd struct does not meet `lt`, and so it does not meet `Number`.
 
 ## Enums
 
@@ -899,7 +899,7 @@ worker fn total<T: add>(chunk: []T, zero: T) -> T
 }
 ```
 
-Not built yet: the cache of copies in a dev build, inference through the bases of an argument and the constraints a simd struct meets. A library file carries no function of a class with type parameters of its own and no type nested in a generic class.
+Not built yet: the cache of copies in a dev build and inference through the bases of an argument. A library file carries no function of a class with type parameters of its own and no type nested in a generic class.
 
 ## Ownership
 

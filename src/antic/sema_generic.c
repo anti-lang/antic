@@ -667,6 +667,9 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
         sema_concurrent_lacks(c, t, hook)) {
         return false;
     }
+    if (types_is_simd(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
+        return sema_simd_meets(t, hook);
+    }
     if (types_has_fields(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
         return sema_operator_symbol(c, t, hook) != NULL ||
                (strcmp(hook, LANG_HOOK_EQ) == 0 && sema_default_eq(c, t));
@@ -2767,6 +2770,10 @@ void sema_strip_generics(struct module *module, struct arena *arena)
 
 const char *sema_no_order(const struct type *t, const char *hook)
 {
+    if (types_is_simd(t) && (strcmp(hook, LANG_HOOK_LT) == 0 ||
+                             strcmp(hook, LANG_HOOK_EQ) == 0)) {
+        return ". A comparison of a simd struct gives a mask of its lanes";
+    }
     if (strcmp(hook, LANG_HOOK_LT) != 0 ||
         (t->kind != TYPE_STRUCT && t->kind != TYPE_CLASS)) {
         return "";

@@ -23,6 +23,31 @@ bool sema_simd_lane_refused(const struct type *lane)
     return types_lane_bytes(lane) == 0 || lane->kind == TYPE_CHAR;
 }
 
+/* DESIGN: Q18 of "Answers of 2026-10-24". The built-in operators of a
+   simd struct meet the constraints `add`, `sub`, `mul`, `div` and `neg`
+   where they apply to its lanes, as the checks below give them: the
+   four on lanes of numbers and `neg` on signed or float lanes. A mask of
+   `bool` lanes meets none. No other hook is met: the answer names five,
+   and `==` and `<` give a mask and no `bool`, so a simd struct meets
+   neither `eq` nor `lt`, and with them not `Number`. */
+bool sema_simd_meets(const struct type *s, const char *hook)
+{
+    struct type *lane = types_simd_lane(s);
+
+    if (sema_simd_lane_refused(lane)) {
+        return false;
+    }
+    if (strcmp(hook, "add") == 0 || strcmp(hook, "sub") == 0 ||
+        strcmp(hook, "mul") == 0 || strcmp(hook, "div") == 0) {
+        return simd_numeric(lane);
+    }
+    if (strcmp(hook, "neg") == 0) {
+        return types_is_signed(lane) || types_is_float(lane) ||
+               lane->kind == TYPE_F16;
+    }
+    return false;
+}
+
 /* Unary `-` and `~` on a simd struct apply lane by lane, with the lanes
    that each takes on one value. */
 struct type *sema_check_simd_unary(struct checker *c, struct expr *e,

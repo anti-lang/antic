@@ -1,0 +1,21 @@
+//! A simd struct does not meet `Number` of `anti.lang`, which holds `lt`, by
+//! Q18 of "Answers of 2026-10-24".
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn twice<T: Number>(a: T) -> T
+{
+	return a + a;
+}
+
+fn main() -> int
+{
+	let v = twice(Vec4.splat(1.0));
+	return 0;
+}

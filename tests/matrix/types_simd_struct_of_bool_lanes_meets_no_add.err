@@ -1,0 +1,1 @@
+types_simd_struct_of_bool_lanes_meets_no_add.anti:23:10: error: `Bits` has no `add`, which `twice` needs for `T`

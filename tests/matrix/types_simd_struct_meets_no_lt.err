@@ -1,0 +1,1 @@
+types_simd_struct_meets_no_lt.anti:22:10: error: `Vec4` has no `lt`, which `larger` needs for `T`. A comparison of a simd struct gives a mask of its lanes

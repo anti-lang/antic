@@ -1,0 +1,1 @@
+types_simd_struct_of_unsigned_lanes_meets_no_neg.anti:19:10: error: `Count4` has no `neg`, which `negated` needs for `T`

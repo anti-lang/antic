@@ -506,6 +506,7 @@ struct type *sema_check_in(struct checker *c, struct expr *e);
 /* sema_simd.c */
 
 bool sema_simd_lane_refused(const struct type *lane);
+bool sema_simd_meets(const struct type *s, const char *hook);
 struct type *sema_check_simd_unary(struct checker *c, struct expr *e,
                                    struct type *t);
 void sema_check_simd_compound(struct checker *c, struct pos pos,
@@ -884,7 +885,8 @@ bool sema_generic_open(struct checker *c, const struct expr *e,
 struct type *sema_infer_literal(struct checker *c, struct expr *e,
                                 struct type *t, struct type ***given);
 /* The end of a refusal of the hook named hook on type t: what a struct
-   or a class without `lt` declares, and "" for any other. */
+   or a class without `lt` declares, what a comparison of a simd struct
+   gives for `lt` and `eq`, and "" for any other. */
 const char *sema_no_order(const struct type *t, const char *hook);
 /* Whether name is one of the twenty of the hook table: the fourteen
    operators, the five language hooks and `hash`. */

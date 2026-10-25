@@ -326,13 +326,15 @@ A constraint after `:` states what the generic needs from a type argument. The b
 |---|---|---|
 | none | store, copy with `dup`, move, pass on, `size_of(T)` | every type |
 | `lt`, `eq` | `a < b` and its derived comparisons, `a == b` | a type with that operator, built in or by `operator fn` |
-| `add`, `sub`, `mul`, `div`, `neg` and the other operator names | the operator | the same |
+| `add`, `sub`, `mul`, `div`, `neg` and the other operator names | the operator | the same, and a simd struct for the first five where its lanes take the operator |
 | `hash` | `x.hash()` | every type with a hash |
 | `iter`, `index` | `for x in c`, `c[i]` | a type with that hook |
 | an abstract class, `S: Shape` | the `pub` functions of the interface on a `*S` | a class that implements or inherits it |
 | `A + B` | what both give | a type that meets both |
 
 `constraint Summable = add + lt;` names a set, and the name stands wherever a constraint may. `anti.lang` declares `Number`, the arithmetic operators with `lt`, and `Ordered`, which is `eq + lt`.
+
+A simd struct meets `add`, `sub`, `mul` and `div` on lanes of numbers and `neg` on signed or float lanes, through its built-in operators, so `twice<T: add>` takes a `Vec4` and adds it lane by lane. A comparison of a simd struct gives a mask of its lanes and no `bool`. A simd struct therefore meets neither `lt` nor `eq`, and not `Number`.
 
 The checker checks twice. The body is checked against the constraints where the generic is written. Each use is checked where it stands: the type argument must meet every constraint. So an error names the code that made it, the body or the call, and never a line inside a copy.
 
@@ -552,6 +554,7 @@ Where it lives: `sema_meets_hook` and `sema_meets_param` of `src/antic/sema_gene
 | A constraint | nothing at run time | nothing |
 | An operator on a built-in type argument | one instruction, with its dev check where the operator has one | one instruction |
 | An operator on a struct or class argument | one direct call of its `operator fn` | the same, or inlined |
+| An operator on a simd struct argument | the operation lane by lane, as on the simd struct itself | the same |
 | A function of an interface constraint | one dispatch through the interface table | a dispatch, or a direct call when one class fills the entry |
 | Heap allocations, calls into the runtime | 0 | 0 |
 | Work of the checker | the body once, and each use once | the same |
@@ -572,6 +575,7 @@ For a C++ programmer:
 - A body may use only what its constraints give. A use that happens to work for today's arguments, without a constraint, is refused.
 - A constraint is checked at each use by name. No substitution failure silently removes a candidate.
 - A struct has no `<` unless its module declares `operator fn lt`, so `Ordered` is not met by a struct by default.
+- A simd struct meets `add` but not `Number`. A generic that compares its values with `<` takes no simd struct.
 
 ## Copies per use
 

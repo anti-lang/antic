@@ -1,0 +1,25 @@
+//! A simd struct meets `add` where `+` applies to its lanes, so one of `bool`
+//! lanes, the form of a mask, does not.
+
+simd struct Bits
+{
+	a: bool,
+	b: bool,
+	c: bool,
+	d: bool,
+	e: bool,
+	f: bool,
+	g: bool,
+	h: bool,
+}
+
+fn twice<T: add>(a: T) -> T
+{
+	return a + a;
+}
+
+fn main() -> int
+{
+	let b = twice(Bits.splat(true));
+	return 0;
+}

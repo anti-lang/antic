@@ -1,0 +1,12 @@
+exit 0
+add 2 4 6 8
+add written out 2 4 6 8
+sub -1 0 1 2
+mul 2 4 6 8
+div 0.5 1 1.5 2
+neg -1 -2 -3 -4
+named constraint 1.5 -0 -2.5 -6
+class field 3 4 5 6
+function of a class 2 4 6 8
+i32 lanes 2 -4 6 -8 -2 8
+f16 lanes 1 2 3 4

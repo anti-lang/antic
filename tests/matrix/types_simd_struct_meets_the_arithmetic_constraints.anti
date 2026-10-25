@@ -1,0 +1,119 @@
+//! The built-in operators of a simd struct meet `add`, `sub`, `mul`, `div` and
+//! `neg` lane by lane, by Q18 of "Answers of 2026-10-24". A generic function
+//! takes a simd struct for each, inferred and written out, as do a named
+//! constraint, a field of a generic class, a function of a class with a type
+//! parameter of its own and lanes of `i32` and of `f16`. The program prints one
+//! line per form.
+
+import anti.io;
+import anti.text;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+simd struct Int4
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+simd struct Half4
+{
+	p: f16,
+	q: f16,
+	r: f16,
+	s: f16,
+}
+
+constraint Lanes = add + sub + mul + div + neg;
+
+class Sum<T: add>
+{
+	pub total: T,
+
+	pub fn plus(self, v: T)
+	{
+		self.total = self.total + v;
+	}
+}
+
+class Scaler
+{
+	pub fn times<T: mul>(self, a: T, b: T) -> T
+	{
+		return a * b;
+	}
+}
+
+fn twice<T: add>(a: T) -> T
+{
+	return a + a;
+}
+
+fn less<T: sub>(a: T, b: T) -> T
+{
+	return a - b;
+}
+
+fn product<T: mul>(a: T, b: T) -> T
+{
+	return a * b;
+}
+
+fn ratio<T: div>(a: T, b: T) -> T
+{
+	return a / b;
+}
+
+fn negated<T: neg>(a: T) -> T
+{
+	return -a;
+}
+
+fn mixed<T: Lanes>(a: T, b: T) -> T
+{
+	return -((a + b) * (a - b) / b);
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn show(name: str, v: Vec4)
+{
+	say(f"{name} {v.x} {v.y} {v.z} {v.w}");
+}
+
+fn main() -> int
+{
+	let a = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let b = Vec4.splat(2.0);
+	show("add", twice(a));
+	show("add written out", twice<Vec4>(a));
+	show("sub", less(a, b));
+	show("mul", product(a, b));
+	show("div", ratio(a, b));
+	show("neg", negated(a));
+	show("named constraint", mixed(a, b));
+	let s = Sum<Vec4> { total: Vec4.splat(0.0) };
+	s.plus(a);
+	s.plus(b);
+	show("class field", s.total);
+	let k = Scaler { };
+	show("function of a class", k.times(a, b));
+	let i = twice(Int4 { a: 1, b: -2, c: 3, d: -4 });
+	let n = negated(i);
+	say(f"i32 lanes {i.a} {i.b} {i.c} {i.d} {n.a} {n.d}");
+	let h = twice(Half4 { p: 0.5 as f16, q: 1.0 as f16, r: 1.5 as f16, s: 2.0 as f16 });
+	say(f"f16 lanes {h.p} {h.q} {h.r} {h.s}");
+	return 0;
+}
