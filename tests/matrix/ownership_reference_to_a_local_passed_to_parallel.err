@@ -1,1 +1,0 @@
-ownership_reference_to_a_local_passed_to_parallel.anti:16:23: error: a reference to `numbers` is passed to `parallel`, and `numbers` ends at line 19 [escaping-local]

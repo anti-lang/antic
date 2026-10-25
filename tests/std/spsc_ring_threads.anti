@@ -111,7 +111,6 @@ worker fn produce_tags(r: *SpscRing<Tag, 16>, n: int) -> int
 fn main() -> int
 {
 	let r = SpscRing<int, 64>.new();
-	unchecked(escaping-local, "the block joins the job before the local ends")
 	let producer = dispatch &r -> produce(RUN);
 	let wrong = 0;
 	for i in 0..RUN {
@@ -128,7 +127,6 @@ fn main() -> int
 	printf("to main: %d sent, %d out of order, %d left\n".ptr, sent as c_int,
 		wrong as c_int, r.count() as c_int);
 
-	unchecked(escaping-local, "the block joins the job before the local ends")
 	let consumer = dispatch &r -> consume(RUN);
 	for i in 0..RUN {
 		while true do {
@@ -143,7 +141,6 @@ fn main() -> int
 		r.count() as c_int);
 
 	let pairs = SpscRing<(int, int), 7>.new();
-	unchecked(escaping-local, "the block joins the job before the local ends")
 	let pair_job = dispatch &pairs -> produce_pairs(SHORT_RUN);
 	let torn = 0;
 	for i in 0..SHORT_RUN {
@@ -161,7 +158,6 @@ fn main() -> int
 
 	{
 		let tags = SpscRing<Tag, 16>.new();
-		unchecked(escaping-local, "the block joins the job before the local ends")
 		let tag_job = dispatch &tags -> produce_tags(SHORT_RUN);
 		let lost = 0;
 		for i in 0..SHORT_RUN {

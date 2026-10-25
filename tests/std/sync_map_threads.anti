@@ -149,7 +149,6 @@ fn main() -> int
 	for i in 0..KEYS {
 		(*keys)[i] = i;
 	}
-	unchecked(escaping-local, "the block joins the job before the local ends")
 	let watcher = dispatch &m -> watch(20);
 	let wrongs = parallel (*keys)[0..KEYS] by 16 -> own_keys(&m);
 	let wrong = 0;
@@ -185,7 +184,6 @@ fn main() -> int
 	printf("shared: %d updates, %d compare and sets\n".ptr, updates as c_int,
 		swaps as c_int);
 	let (value, version) = m.get_versioned(-1) ?? (0, -1);
-	unchecked(escaping-local, "the block joins the job before the local ends")
 	let job = dispatch &m -> bump(-1);
 	let bumped = join(job);
 	m.set_if_version(-1, 0, version) catch e {

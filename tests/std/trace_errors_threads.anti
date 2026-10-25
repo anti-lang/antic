@@ -97,7 +97,6 @@ fn main() -> int
 	for run in 0..RUNS {
 		let m = trace.ErrorMonitor.new();
 		Shared.monitor.store(m);
-		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let done = parallel threads[0..THREADS] by THREADS -> fail_all();
 		free(done.ptr);
 		if !whole(m) {

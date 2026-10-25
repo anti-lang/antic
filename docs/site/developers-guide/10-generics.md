@@ -904,7 +904,6 @@ fn main() -> int
 	t.add(5);
 	t.add(6);
 	let numbers: [8]int = [1, 2, 3, 4, 5, 6, 7, 8];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel numbers[0..8] by 4 -> total(0);
 	let whole = 0;
 	for part in parts {

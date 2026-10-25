@@ -81,7 +81,6 @@ fn main() -> int
 		Flag.joining.store(0);
 		Flag.stop.store(0);
 		let outer_job = dispatch f -> outer();
-		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let parts = parallel all by 2 -> total;
 		Flag.stop.store(1);
 		answers = answers + join(outer_job) + parts[0] + parts[1];

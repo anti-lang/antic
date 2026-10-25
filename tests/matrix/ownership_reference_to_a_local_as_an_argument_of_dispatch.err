@@ -1,1 +1,1 @@
-ownership_reference_to_a_local_as_an_argument_of_dispatch.anti:24:36: error: a reference to `b` is passed to `dispatch`, and `b` ends at line 28 [escaping-local]
+ownership_reference_to_a_local_as_an_argument_of_dispatch.anti:24:36: error: a reference to `b` is passed to `dispatch`, and `b` ends at line 29 [escaping-local]

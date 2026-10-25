@@ -58,7 +58,6 @@ fn main() -> int
 	let p = trace.Profiler.new();
 	Shared.profiler.store(p);
 	let threads: [THREADS]int = [0; THREADS];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let made = parallel threads[0..THREADS] by THREADS -> hit();
 	let total = 0;
 	for m in made {

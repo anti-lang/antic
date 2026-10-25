@@ -65,7 +65,6 @@ fn main() -> int
 	for t in 0..THREADS {
 		threads[t] = t;
 	}
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let wrong = parallel threads[0..THREADS] by THREADS -> ask();
 	let total = 0;
 	for n in wrong {

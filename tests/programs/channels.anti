@@ -40,7 +40,6 @@ fn main() -> int
 	let squares = chan int(64);
 	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
 	let all = numbers[0..8];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let counts = parallel all by 4 -> produce(squares);
 	free(counts.ptr);
 	close(squares);

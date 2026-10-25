@@ -39,7 +39,6 @@ fn main() -> int
 	let spots = chan Spot(4);
 	let marks = chan Mark(4);
 	let items = [Spot { x: 1 }, Spot { x: 2 }];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel items[0..2] by 1 -> count();
 	free(parts.ptr);
 	let s = Spot { x: 3 };

@@ -1,5 +1,14 @@
-//! `parallel` hands the chunks of its array to other threads, so a slice of a
-//! local array is refused there.
+//! `parallel` waits for every chunk before it gives its value, so a slice of a
+//! local array passed to it never outlives the array.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
 
 worker fn total(chunk: []int) -> int
 {
@@ -14,6 +23,7 @@ fn main() -> int
 {
 	let numbers = [1, 2, 3, 4];
 	let parts = parallel numbers[0..4] by 2 -> total;
+	say(f"the chunks of a local array: {parts[0]} {parts[1]}");
 	free(parts.ptr);
 	return 0;
 }

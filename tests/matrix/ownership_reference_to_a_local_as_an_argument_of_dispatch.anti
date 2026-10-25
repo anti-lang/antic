@@ -1,5 +1,6 @@
 //! `dispatch` hands the arguments of its worker to another thread as well as
-//! its object, so the address of a local is refused as an argument.
+//! its object, so the address of a local is refused as an argument when the
+//! block of the local joins the job on one path alone.
 
 synchronized class Counter
 {
@@ -17,12 +18,20 @@ worker fn bump_both(a: *Counter, b: *Counter) -> int
 	return a.bump(1) + b.bump(1);
 }
 
+fn run(a: *Counter, wait: bool) -> int
+{
+	let b = Counter { };
+	let job = dispatch a -> bump_both(&b);
+	if wait {
+		return join(job);
+	}
+	return 0;
+}
+
 fn main() -> int
 {
 	let a = alloc Counter { };
-	let b = Counter { };
-	let job = dispatch a -> bump_both(&b);
-	let r = join(job);
+	let r = run(a, true);
 	free(a);
 	return r - 2;
 }

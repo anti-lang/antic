@@ -32,7 +32,6 @@ fn main() -> int
 		ps[i].mass = i * i;
 		ps[i].x = i as f64;
 	}
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel ps[0..10] by 3 -> total_mass;
 	let sum = 0;
 	for p in parts {

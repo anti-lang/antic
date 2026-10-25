@@ -1,0 +1,4 @@
+exit 0
+the object, joined by a let: 2
+the object, joined by a return: 4
+an argument, joined after a loop, a handler and a closure: 5 3 6

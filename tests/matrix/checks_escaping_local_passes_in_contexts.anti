@@ -105,7 +105,6 @@ worker fn tally(part: []int) -> int
 fn in_worker() -> int
 {
 	let xs = [7, 8];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let sums = parallel xs[0..2] by 2 -> tally;
 	let n = sums[0] + sums[1];
 	free(sums.ptr);

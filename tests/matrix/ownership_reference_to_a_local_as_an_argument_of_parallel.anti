@@ -1,5 +1,14 @@
-//! `parallel` hands the arguments of its worker to other threads as well as its
-//! chunks, so the address of a local is refused as an argument.
+//! `parallel` waits for every chunk before it gives its value, so the address
+//! of a local passed as an argument of its worker never outlives the local.
+
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
 
 synchronized class Counter
 {
@@ -8,6 +17,11 @@ synchronized class Counter
 	pub fn bump(self, by: int) -> int
 	{
 		self.n += by;
+		return self.n;
+	}
+
+	pub fn get(self) -> int
+	{
 		return self.n;
 	}
 }
@@ -27,6 +41,7 @@ fn main() -> int
 	}
 	let c = Counter { };
 	let parts = parallel (*xs)[0..4] by 2 -> count(&c);
+	say(f"the elements counted through a local: {c.get()}");
 	free(parts.ptr);
 	free(xs);
 	return 0;

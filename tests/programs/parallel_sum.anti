@@ -38,9 +38,7 @@ fn main() -> int
 {
 	let numbers = [1, 2, 3, 4, 5, 6, 7, 8];
 	let all = numbers[0..8];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel all by 4 -> total;
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let doubled = parallel all by 2 -> scaled(2);
 
 	if parts.len != 4 {
@@ -48,6 +46,5 @@ fn main() -> int
 	}
 	/* 36 from the first, 72 from the second, and 36 again with the
 	   chunk count that the machine decides. */
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	return add_up(parts) + add_up(doubled) + add_up(parallel all -> total);
 }

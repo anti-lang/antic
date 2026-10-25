@@ -32,7 +32,6 @@ fn main() -> int
 {
 	let words: [12]str = ["a", "b", "a", "c", "a", "b", "d", "a", "c", "b", "a", "d"];
 	let map = ConcurrentMap<str, int>.new();
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel words[0..12] by 4 -> count(&map);
 	free(parts.ptr);
 	say(f#"{map.get("a") ?? 0} {map.get("b") ?? 0} {map.get("c") ?? 0} {map.get("d") ?? 0} {map.count()}"#);

@@ -1,0 +1,1 @@
+ownership_reference_to_a_local_passed_to_dispatch_with_a_try_before_the_join.anti:29:21: error: a reference to `c` is passed to `dispatch`, and `c` ends at line 32 [escaping-local]

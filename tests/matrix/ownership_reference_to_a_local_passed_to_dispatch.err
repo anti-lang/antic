@@ -1,1 +1,1 @@
-ownership_reference_to_a_local_passed_to_dispatch.anti:18:21: error: a reference to `c` is passed to `dispatch`, and `c` ends at line 20 [escaping-local]
+ownership_reference_to_a_local_passed_to_dispatch.anti:19:21: error: a reference to `c` is passed to `dispatch`, and `c` ends at line 24 [escaping-local]

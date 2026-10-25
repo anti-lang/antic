@@ -361,7 +361,7 @@ The example allocates four blocks, two sprites and two pixel buffers. `drop(s)` 
 
 ### References to locals
 
-The address of a local or of a parameter, the address of a part of one and a slice of a local array are references to that local. So is every value made from one by a field access, an index, a slice or a view with `as`. A reference may stand in the locals of the block of its local and of the blocks inside it, and a call it is passed to gets it lent. It may not outlive its local. The safety check `escaping-local` refuses a reference that is returned or yielded. It refuses one stored into a local of an outer block, into a place that a parameter or `self` reaches, into a static field or into a collection of an outer block. It refuses one passed to `dispatch` or `parallel`, and one that a closure passed to a `concurrent` parameter captures. The message names the local, the line where it ends and the place.
+The address of a local or of a parameter, the address of a part of one and a slice of a local array are references to that local. So is every value made from one by a field access, an index, a slice or a view with `as`. A reference may stand in the locals of the block of its local and of the blocks inside it, and a call it is passed to gets it lent. It may not outlive its local. The safety check `escaping-local` refuses a reference that is returned or yielded. It refuses one stored into a local of an outer block, into a place that a parameter or `self` reaches, into a static field or into a collection of an outer block. It refuses one passed to `dispatch`, as its object or as an argument of its worker, unless the block of the local joins the job on every path, and one that a closure passed to a `concurrent` parameter captures. The message names the local, the line where it ends and the place.
 
 ```anti refused
 //! error: a reference to `x` is returned, and `x` ends at line
@@ -387,7 +387,31 @@ fn main() -> int
 
 The check refuses what it proves. A reference stored into memory the function allocated, or behind a pointer the function read, keeps the run-time checks of dev mode and `--memory-checks`. The function cannot see when that memory ends. `unchecked(escaping-local, "reason")` overrules the check.
 
-`parallel` waits for every chunk before it returns, so the slice of a local array it takes never outlives the array. The check refuses it all the same, as the rule names `parallel`. The examples of the chapters on threads pass such a slice with `unchecked(escaping-local, "parallel waits for every chunk while the array lives")`. A job of `dispatch` that the block joins before its local ends is the same case, and its reason says so.
+`parallel` waits for every chunk before it returns, so the slice of a local array it takes and a reference passed to its worker never outlive the local. The check lets both pass. A job of `dispatch` runs until it is joined. A reference passed to it passes when the job is the value of a `let` and a later statement of the same block joins it on every path. No `return`, `fail`, `try`, `break` or `continue` that leaves the block may stand between the two. A `break` of a loop between them and a `yield` of a handler between them stay inside the block.
+
+```anti refused
+//! error: a reference to `c` is passed to `dispatch`, and `c` ends at line
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn run(wait: bool) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	if wait {
+		return join(job);
+	}
+	return 0;
+}
+```
 
 ### Uses after the end
 

@@ -49,7 +49,6 @@ fn main() -> int
 		xs[i] = (i * 37) % 199;
 	}
 	let b = alloc Best { };
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel xs[0..200] by 6 -> scan(b);
 	free(parts.ptr);
 	say(f"{b.get()}");

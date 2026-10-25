@@ -1,0 +1,27 @@
+//! A `break` between `dispatch` and its `join` leaves the block of the local
+//! while the job may still run, so the address of the local is refused.
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn main() -> int
+{
+	let total = 0;
+	for i in 0..3 {
+		let c = Counter { };
+		let job = dispatch &c -> bump(i);
+		if i == 2 {
+			break;
+		}
+		total += join(job);
+	}
+	return total - 1;
+}

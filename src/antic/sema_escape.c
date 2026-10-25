@@ -18,13 +18,16 @@
    on whatever path that `=` stands, so a later `=` of another value
    clears it. A local holds no reference of a block deeper than its own,
    since that `=` is refused, so a reference it holds is alive wherever
-   the local is. The check refuses only what it proves, and the run-time
-   checks keep the rest. */
+   the local is. A local that holds a copy of a parameter's pointer
+   reaches the memory of that parameter, which outlives the call, and the
+   record names the parameter as well. The check refuses only what it
+   proves, and the run-time checks keep the rest. */
 struct escape_local {
     const struct symbol *symbol;
     int depth;
     int ends;                       /* the line of the closing brace */
     size_t refers;                  /* the index of that local plus 1, or 0 */
+    size_t reaches;                 /* the index of the parameter plus 1 */
 };
 
 struct escape_walk {
@@ -36,6 +39,7 @@ struct escape_walk {
     int ends;                       /* the end of the block walked now */
     const struct item *frame;       /* the function a `return` leaves */
     int handler;                    /* the depth of the handler, or -1 */
+    const struct expr *joined;      /* a `dispatch` its block joins */
 };
 
 /* Where a local reference would outlive its local. */
@@ -49,7 +53,6 @@ enum escape_place {
     ESCAPE_GLOBAL,
     ESCAPE_COLLECTION,
     ESCAPE_DISPATCH,
-    ESCAPE_PARALLEL,
     ESCAPE_CONCURRENT
 };
 
@@ -85,6 +88,7 @@ static size_t declare(struct escape_walk *w, const struct symbol *sym,
     w->locals[w->count].depth = depth;
     w->locals[w->count].ends = ends;
     w->locals[w->count].refers = 0;
+    w->locals[w->count].reaches = 0;
     return w->count++;
 }
 
@@ -230,6 +234,13 @@ static const struct escape_local *root_of(const struct escape_walk *w,
             return NULL;
         }
         return root_of(w, e->as.index.base);
+    case EXPR_BINARY:
+        /* `q ?? &x` is the value of either side. */
+        if (e->as.binary.op != TOKEN_QUESTION_QUESTION) {
+            return NULL;
+        }
+        return deeper(root_of(w, e->as.binary.left),
+                      root_of(w, e->as.binary.right));
     case EXPR_TUPLE:
         for (i = 0; i < e->as.tuple.count; i++) {
             r = deeper(r, root_of(w, e->as.tuple.elements[i]));
@@ -248,6 +259,42 @@ static const struct escape_local *root_of(const struct escape_walk *w,
     default:
         return NULL;
     }
+}
+
+/* Whether sym is a parameter whose memory outlives the call: one that
+   is not `own`, `self` among them. */
+static bool outer_param(const struct symbol *sym)
+{
+    return sym != NULL && sym->kind == SYMBOL_PARAM && !sym->own_param;
+}
+
+/* The record of the parameter whose pointer the value e copies: the
+   parameter itself, a local that holds a copy of it, or an `as` view of
+   either. NULL for every other value. */
+static const struct escape_local *reached_param(const struct escape_walk *w,
+                                                const struct expr *e)
+{
+    const struct escape_local *r;
+    const struct type *t;
+
+    while (e != NULL && e->kind == EXPR_CAST && !e->as.cast.test) {
+        e = e->as.cast.operand;
+    }
+    if (e == NULL || e->kind != EXPR_NAME || e->type == NULL) {
+        return NULL;
+    }
+    t = e->type->kind == TYPE_OPTIONAL ? e->type->element : e->type;
+    if (t == NULL || (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE)) {
+        return NULL;
+    }
+    r = find(w, e->symbol);
+    if (r == NULL) {
+        return NULL;
+    }
+    if (outer_param(r->symbol)) {
+        return r;
+    }
+    return r->reaches > 0 ? &w->locals[r->reaches - 1] : NULL;
 }
 
 /* The name a message gives the place e: the variable, or the field, that
@@ -334,11 +381,6 @@ static void refuse(struct escape_walk *w, struct pos pos,
                       "passed to `dispatch`, and `%.*s` ends at line %d", len,
                       n->text, len, n->text, root->ends);
         return;
-    case ESCAPE_PARALLEL:
-        sema_check_at(c, NAME_ESCAPING_LOCAL, pos, "a reference to `%.*s` is "
-                      "passed to `parallel`, and `%.*s` ends at line %d", len,
-                      n->text, len, n->text, root->ends);
-        return;
     case ESCAPE_CONCURRENT:
         sema_check_at(c, NAME_ESCAPING_LOCAL, pos, "a closure passed to the "
                       "concurrent parameter `%.*s` captures a reference to "
@@ -358,13 +400,14 @@ enum anchor_kind {
 struct anchor {
     enum anchor_kind kind;
     size_t local;                   /* the index of ANCHOR_LOCAL */
-    const struct expr *through;     /* the parameter a place is reached by */
+    const struct name *through;     /* the parameter a place is reached by */
     bool global;
 };
 
 /* DESIGN: a place outlives every local of the function when a parameter
    that is not `own` reaches it, since the caller holds that memory before
-   the call and after it, and when it is a static field, a global. A place
+   the call and after it, and when it is a static field, a global. A
+   local that holds a copy of such a parameter reaches the same memory. A place
    in a local, or reached through a reference to one, lives as long as
    that local. Memory the function allocated, or reached through a pointer
    it read, has an end the function cannot prove, so it keeps the run-time
@@ -405,10 +448,10 @@ static struct anchor anchor_of(const struct escape_walk *w,
                 return anchor_of(w, base);
             }
         }
-        if (base->kind == EXPR_NAME && base->symbol != NULL &&
-            base->symbol->kind == SYMBOL_PARAM && !base->symbol->own_param) {
+        r = base->kind == EXPR_NAME ? reached_param(w, base) : NULL;
+        if (r != NULL) {
             a.kind = ANCHOR_OUTLIVES;
-            a.through = base;
+            a.through = &r->symbol->name;
             return a;
         }
         r = root_of(w, base);
@@ -436,7 +479,7 @@ static void refuse_store(struct escape_walk *w, const struct expr *target,
         refuse(w, value->pos, root, ESCAPE_ELEMENT,
                place_name(target->as.index.base));
     } else if (a->through != NULL) {
-        refuse(w, value->pos, root, ESCAPE_THROUGH, &a->through->as.name);
+        refuse(w, value->pos, root, ESCAPE_THROUGH, a->through);
     } else if (a->kind == ANCHOR_LOCAL) {
         refuse(w, value->pos, root, ESCAPE_OUTER,
                &w->locals[a->local].symbol->name);
@@ -451,6 +494,9 @@ static void check_store(struct escape_walk *w, const struct expr *target,
     struct anchor a = anchor_of(w, target);
     struct escape_local *held;
 
+    if (target->kind == EXPR_NAME && a.kind == ANCHOR_LOCAL) {
+        w->locals[a.local].reaches = index_of(w, reached_param(w, value));
+    }
     if (root == NULL) {
         /* A new value that holds no reference clears a local. */
         if (target->kind == EXPR_NAME && a.kind == ANCHOR_LOCAL) {
@@ -535,9 +581,7 @@ static void check_collection(struct escape_walk *w, const struct expr *call)
             a.through = NULL;
             a.global = false;
             a.local = 0;
-            if (place->kind == EXPR_NAME && place->symbol != NULL &&
-                place->symbol->kind == SYMBOL_PARAM &&
-                !place->symbol->own_param) {
+            if (place->kind == EXPR_NAME && reached_param(w, place) != NULL) {
                 a.kind = ANCHOR_OUTLIVES;
             }
         }
@@ -611,6 +655,236 @@ static void check_concurrent(struct escape_walk *w, const struct expr *call)
     }
 }
 
+/* DESIGN: E1 as "Compile-time checks of 2026-10-20" in docs/decisions.md
+   corrects it on 2026-10-25. `parallel` waits for every chunk before it
+   gives its value, so its array and the arguments of its worker are lent
+   for the length of the expression and never refused. A job of
+   `dispatch` runs on until it is joined, so a local reference passed to
+   it as the object or as an argument of the worker is refused, unless
+   the block joins the job while the local lives: walk_block finds that
+   join and marks the `dispatch` in w->joined. */
+static void check_dispatch(struct escape_walk *w, const struct expr *e)
+{
+    const struct expr *call = e->as.dispatch.call;
+    const struct escape_local *root = root_of(w, e->as.dispatch.object);
+    size_t i;
+
+    if (root != NULL) {
+        refuse(w, e->as.dispatch.object->pos, root, ESCAPE_DISPATCH, NULL);
+        return;
+    }
+    for (i = 0; call != NULL && call->kind == EXPR_CALL &&
+                i < call->as.call.arg_count;
+         i++) {
+        root = root_of(w, call->as.call.args[i]);
+        if (root != NULL) {
+            refuse(w, call->as.call.args[i]->pos, root, ESCAPE_DISPATCH,
+                   NULL);
+            return;
+        }
+    }
+}
+
+/* Whether e joins the job sym whenever it is evaluated: `join(sym)`, or
+   an operand, a cast, an argument or a part of an `f"..."` that does.
+   The right side of `&&`, `||` and `??` and a call after `?.` may not
+   run. */
+static bool joins(const struct expr *e, const struct symbol *sym)
+{
+    size_t i;
+
+    if (e == NULL) {
+        return false;
+    }
+    switch (e->kind) {
+    case EXPR_JOIN:
+        return !e->as.join.all && e->as.join.job->kind == EXPR_NAME &&
+               e->as.join.job->symbol == sym;
+    case EXPR_BINARY:
+        if (joins(e->as.binary.left, sym)) {
+            return true;
+        }
+        return e->as.binary.op != TOKEN_AND_AND &&
+               e->as.binary.op != TOKEN_OR_OR &&
+               e->as.binary.op != TOKEN_QUESTION_QUESTION &&
+               joins(e->as.binary.right, sym);
+    case EXPR_UNARY:
+        return joins(e->as.unary.operand, sym);
+    case EXPR_CAST:
+        return joins(e->as.cast.operand, sym);
+    case EXPR_CALL:
+        for (i = 0; !e->as.call.optional && i < e->as.call.arg_count; i++) {
+            if (joins(e->as.call.args[i], sym)) {
+                return true;
+            }
+        }
+        return false;
+    case EXPR_FORMAT:
+        for (i = 0; i < e->as.format.count; i++) {
+            if (joins(e->as.format.parts[i].value, sym)) {
+                return true;
+            }
+        }
+        return false;
+    default:
+        return false;
+    }
+}
+
+/* What a scan for a way out of a block has met. */
+struct leave_scan {
+    const struct symbol *job;
+    bool leaves;                    /* a way out of the block, or a use */
+    bool in_loop;                   /* inside a loop the scan entered */
+    bool in_handler;                /* inside a handler the scan entered */
+};
+
+static bool leave_stmt(void *data, const struct stmt *s);
+
+static bool leave_expr(void *data, const struct expr *e)
+{
+    struct leave_scan *scan = data;
+
+    if (e->kind == EXPR_NAME && scan->job != NULL && e->symbol == scan->job) {
+        scan->leaves = true;
+    }
+    if (e->kind == EXPR_CALL && (e->as.call.handler.kind == HANDLE_TRY)) {
+        scan->leaves = true;
+    }
+    if (e->kind == EXPR_CALL && e->as.call.handler.kind == HANDLE_BLOCK &&
+        !scan->in_handler) {
+        struct leave_scan inner = *scan;
+        struct ast_visitor v = {leave_expr, leave_stmt, NULL};
+        size_t i;
+
+        v.data = scan;
+        ast_walk_expr(&v, e->as.call.callee);
+        for (i = 0; i < e->as.call.arg_count; i++) {
+            ast_walk_expr(&v, e->as.call.args[i]);
+        }
+        inner.in_handler = true;
+        v.data = &inner;
+        ast_walk_block(&v, e->as.call.handler.body);
+        scan->leaves = scan->leaves || inner.leaves;
+        return false;
+    }
+    return !scan->leaves;
+}
+
+static bool leave_stmt(void *data, const struct stmt *s)
+{
+    struct leave_scan *scan = data;
+
+    switch (s->kind) {
+    case STMT_RETURN:
+    case STMT_FAIL:
+    case STMT_FALLTHROUGH:
+        scan->leaves = true;
+        break;
+    case STMT_YIELD:
+        scan->leaves = scan->leaves || !scan->in_handler;
+        break;
+    case STMT_BREAK:
+    case STMT_CONTINUE:
+        scan->leaves = scan->leaves || !scan->in_loop;
+        break;
+    case STMT_WHILE:
+    case STMT_DO_WHILE:
+    case STMT_FOR:
+        if (!scan->in_loop) {
+            struct leave_scan inner = *scan;
+            struct ast_visitor v = {leave_expr, leave_stmt, NULL};
+
+            inner.in_loop = true;
+            v.data = &inner;
+            ast_walk_stmt(&v, s);
+            scan->leaves = scan->leaves || inner.leaves;
+            return false;
+        }
+        break;
+    case STMT_LET:
+        if (s->as.let.guard.kind == HANDLE_BLOCK && !scan->in_handler) {
+            struct leave_scan inner = *scan;
+            struct ast_visitor v = {leave_expr, leave_stmt, NULL};
+
+            v.data = scan;
+            ast_walk_expr(&v, s->as.let.value);
+            ast_walk_block(&v, s->as.let.otherwise);
+            inner.in_handler = true;
+            v.data = &inner;
+            ast_walk_block(&v, s->as.let.guard.body);
+            scan->leaves = scan->leaves || inner.leaves;
+            return false;
+        }
+        break;
+    default:
+        break;
+    }
+    return !scan->leaves;
+}
+
+/* Whether the statement s may leave the block it stands in, or names the
+   job sym, which may then be given away before its join. A NULL sym
+   names no job. A loop or a handler s holds keeps its own `break`,
+   `continue` and `yield`, and a closure its own `return`. A `return`
+   that joins the job leaves after the join, so its value alone is
+   read. */
+static bool may_leave(const struct stmt *s, const struct symbol *sym)
+{
+    struct leave_scan scan = {sym, false, false, false};
+    struct ast_visitor v = {leave_expr, leave_stmt, NULL};
+
+    v.data = &scan;
+    if (s->kind == STMT_RETURN && sym == NULL) {
+        ast_walk_expr(&v, s->as.return_value);
+    } else {
+        ast_walk_stmt(&v, s);
+    }
+    return scan.leaves;
+}
+
+/* Whether the statement s joins the job sym whenever it runs. */
+static bool joins_stmt(const struct stmt *s, const struct symbol *sym)
+{
+    switch (s->kind) {
+    case STMT_LET:
+        return joins(s->as.let.value, sym);
+    case STMT_EXPR:
+        return joins(s->as.expr, sym);
+    case STMT_ASSIGN:
+        return joins(s->as.assign.value, sym);
+    case STMT_RETURN:
+        return joins(s->as.return_value, sym);
+    default:
+        return false;
+    }
+}
+
+/* Whether the `let` b->stmts[at] binds a job of `dispatch` that a later
+   statement of b joins on every path. No statement between the two may
+   leave the block or name the job, and a closure may not capture it. */
+static bool joined_later(const struct block *b, size_t at)
+{
+    const struct stmt *s = b->stmts[at];
+    const struct symbol *job = s->as.let.symbol;
+    size_t i;
+
+    if (s->kind != STMT_LET || s->as.let.name_count != 0 || job == NULL ||
+        job->captured || s->as.let.value == NULL ||
+        s->as.let.value->kind != EXPR_DISPATCH) {
+        return false;
+    }
+    for (i = at + 1; i < b->count; i++) {
+        if (joins_stmt(b->stmts[i], job)) {
+            return !may_leave(b->stmts[i], NULL);
+        }
+        if (may_leave(b->stmts[i], job)) {
+            return false;
+        }
+    }
+    return false;
+}
+
 /* An anonymous function is a frame of its own: its `return` leaves it,
    and no `yield` crosses into it. */
 static void walk_function(struct escape_walk *w, const struct item *it)
@@ -665,7 +939,6 @@ static void walk_list(struct escape_walk *w, struct expr *const *list,
 static bool visit_expr(void *data, const struct expr *e)
 {
     struct escape_walk *w = data;
-    const struct escape_local *root;
 
     switch (e->kind) {
     case EXPR_CALL:
@@ -680,21 +953,8 @@ static bool visit_expr(void *data, const struct expr *e)
         walk_function(w, e->as.fn);
         return false;
     case EXPR_DISPATCH:
-        root = root_of(w, e->as.dispatch.object);
-        if (root != NULL) {
-            refuse(w, e->as.dispatch.object->pos, root, ESCAPE_DISPATCH,
-                   NULL);
-        }
-        return true;
-    case EXPR_PARALLEL:
-        root = root_of(w, e->as.parallel.array);
-        if (root == NULL && e->as.parallel.array->type != NULL &&
-            e->as.parallel.array->type->kind == TYPE_ARRAY) {
-            root = place_root(w, e->as.parallel.array);
-        }
-        if (root != NULL) {
-            refuse(w, e->as.parallel.array->pos, root, ESCAPE_PARALLEL,
-                   NULL);
+        if (e != w->joined) {
+            check_dispatch(w, e);
         }
         return true;
     case EXPR_ATOMIC:
@@ -735,6 +995,7 @@ static void walk_let(struct escape_walk *w, const struct stmt *s)
         if (s->as.let.symbol != NULL) {
             at = declare(w, s->as.let.symbol, w->depth, w->ends);
             w->locals[at].refers = index_of(w, root_of(w, value));
+            w->locals[at].reaches = index_of(w, reached_param(w, value));
         }
         return;
     }
@@ -750,23 +1011,32 @@ static void walk_let(struct escape_walk *w, const struct stmt *s)
         }
         at = declare(w, s->as.let.names[i].symbol, w->depth, w->ends);
         w->locals[at].refers = index_of(w, root_of(w, part));
+        w->locals[at].reaches = index_of(w, reached_param(w, part));
     }
 }
 
 /* The arms of a `switch` and of a `select`, each with the name it binds
-   declared for its body. */
+   declared for its body. The name an arm of a `switch` binds is a part of
+   value, the value switched on, and holds what value holds, as the name
+   of `let ... else` does. A `select` binds a value of a channel, which
+   holds no reference, and passes NULL. */
 static void walk_arms(struct escape_walk *w, const struct switch_arm *arms,
-                      size_t count)
+                      size_t count, const struct expr *value)
 {
     size_t i;
+    size_t at;
 
     for (i = 0; arms != NULL && i < count; i++) {
         const struct stmt *body = arms[i].body;
         walk_expr(w, arms[i].test != NULL ? arms[i].test : arms[i].value);
         if (arms[i].bound != NULL && body != NULL) {
-            declare(w, arms[i].bound, w->depth + 1,
-                    body->kind == STMT_BLOCK ? body->as.block->end.line
-                                             : body->pos.line);
+            at = declare(w, arms[i].bound, w->depth + 1,
+                         body->kind == STMT_BLOCK ? body->as.block->end.line
+                                                  : body->pos.line);
+            if (carries(arms[i].bound->type)) {
+                w->locals[at].refers = index_of(w, root_of(w, value));
+                w->locals[at].reaches = index_of(w, reached_param(w, value));
+            }
         }
         w->depth++;
         walk_stmt(w, body);
@@ -870,7 +1140,8 @@ static void walk_stmt(struct escape_walk *w, const struct stmt *s)
         return;
     case STMT_SWITCH:
         walk_expr(w, s->as.switch_stmt.value);
-        walk_arms(w, s->as.switch_stmt.arms, s->as.switch_stmt.count);
+        walk_arms(w, s->as.switch_stmt.arms, s->as.switch_stmt.count,
+                  s->as.switch_stmt.value);
         w->depth++;
         walk_stmt(w, s->as.switch_stmt.otherwise);
         w->depth--;
@@ -897,7 +1168,7 @@ static void walk_stmt(struct escape_walk *w, const struct stmt *s)
         walk_block(w, s->as.sync.body, true);
         return;
     case STMT_SELECT:
-        walk_arms(w, s->as.select.arms, s->as.select.count);
+        walk_arms(w, s->as.select.arms, s->as.select.count, NULL);
         return;
     case STMT_BREAK:
     case STMT_CONTINUE:
@@ -923,7 +1194,13 @@ static void walk_block(struct escape_walk *w, const struct block *b,
     }
     w->ends = b->end.line;
     for (i = 0; i < b->count; i++) {
+        const struct expr *joined = w->joined;
+
+        if (joined_later(b, i)) {
+            w->joined = b->stmts[i]->as.let.value;
+        }
         walk_stmt(w, b->stmts[i]);
+        w->joined = joined;
     }
     w->ends = ends;
     if (deep) {

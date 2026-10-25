@@ -20,7 +20,6 @@ fn main() -> int
 	let last = 0;
 
 	while rounds < 1000 do {
-		unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 		let parts = parallel all by 4 -> total;
 		let sum = 0;
 		let i = 0;

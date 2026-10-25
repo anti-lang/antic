@@ -28,7 +28,6 @@ worker fn bounds(chunk: []i32) -> (i32, i32)
 fn main() -> int
 {
 	let xs: [12]i32 = [5, -3, 17, 8, 0, 22, -9, 4, 13, 6, -1, 2];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel xs[0..12] by 4 -> bounds;
 	let lo = parts[0].0;
 	let hi = parts[0].1;

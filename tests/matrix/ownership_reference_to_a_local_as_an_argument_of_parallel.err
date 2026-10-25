@@ -1,1 +1,0 @@
-ownership_reference_to_a_local_as_an_argument_of_parallel.anti:29:49: error: a reference to `c` is passed to `parallel`, and `c` ends at line 33 [escaping-local]

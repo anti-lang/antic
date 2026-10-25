@@ -48,7 +48,6 @@ fn main() -> int
 		amounts[i] = i + 1;
 	}
 	let b = alloc Bank { };
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel amounts[0..100] by 7 -> pay(b);
 	let (total, n) = b.report();
 	say(f"{parts.len} {total} {n}");

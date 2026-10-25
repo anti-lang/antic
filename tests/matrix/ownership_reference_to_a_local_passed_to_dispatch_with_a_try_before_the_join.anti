@@ -1,0 +1,38 @@
+//! A `try` between `dispatch` and its `join` hands an error on and leaves the
+//! block of the local while the job may still run, so the address of the local
+//! is refused.
+
+import anti.lang;
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn checked(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn run(n: int) -> int may fail
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	let k = try checked(n);
+	return join(job) + k;
+}
+
+fn main() -> int
+{
+	let r = run(0) catch fatal;
+	return r - 1;
+}

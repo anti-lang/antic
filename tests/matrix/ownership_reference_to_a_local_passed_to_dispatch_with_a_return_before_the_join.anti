@@ -1,0 +1,28 @@
+//! A `return` between `dispatch` and its `join` leaves the block of the local
+//! while the job may still run, so the address of the local is refused.
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn run(early: bool) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	if early {
+		return 0;
+	}
+	return join(job);
+}
+
+fn main() -> int
+{
+	return run(false) - 1;
+}

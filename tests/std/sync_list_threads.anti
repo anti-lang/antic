@@ -135,7 +135,6 @@ fn main() -> int
 		(*numbers)[i] = i;
 	}
 	let l = SyncList<int>.new();
-	unchecked(escaping-local, "the block joins the job before the local ends")
 	let watcher = dispatch &l -> watch(10);
 	let misses = parallel (*numbers)[0..NUMBERS] by 16 -> fill(&l);
 	let missed = 0;
@@ -179,7 +178,6 @@ fn main() -> int
 	let (e, version) = counters.find_first_versioned(fn(e) {
 		return e.0 == 0;
 	}) ?? ((0, 0), -1);
-	unchecked(escaping-local, "the block joins the job before the local ends")
 	let job = dispatch &counters -> bump(0);
 	let held = join(job);
 	counters.set_if_version((0, 0), version) catch err {

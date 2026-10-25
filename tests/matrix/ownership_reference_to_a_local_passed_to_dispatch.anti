@@ -1,5 +1,6 @@
-//! `dispatch` hands its object to another thread, so the address of a local is
-//! refused there.
+//! `dispatch` hands its object to another thread until the job is joined, so
+//! the address of a local is refused there when the block of the local joins
+//! the job on one path alone.
 
 class Counter
 {
@@ -12,9 +13,17 @@ worker fn bump(c: *Counter, by: int) -> int
 	return c.n;
 }
 
-fn main() -> int
+fn run(wait: bool) -> int
 {
 	let c = Counter { };
 	let job = dispatch &c -> bump(1);
-	return join(job) - 1;
+	if wait {
+		return join(job);
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return run(true) - 1;
 }

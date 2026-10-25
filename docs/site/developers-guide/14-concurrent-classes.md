@@ -100,7 +100,6 @@ fn main() -> int
 {
 	let t = alloc Tally { };
 	let ones: [1000]int = [1; 1000];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel ones[0..1000] by 8 -> fill(t);
 	free(parts.ptr);
 	let line = f"total {t.total()}, noted {t.noted()}";
@@ -480,7 +479,6 @@ fn main() -> int
 {
 	let s = alloc Stock(600);
 	let ones: [1000]int = [1; 1000];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel ones[0..1000] by 8 -> fill(s);
 	let taken = 0;
 	for p in parts {
@@ -906,7 +904,6 @@ fn main() -> int
 	let x = alloc Account(100);
 	let y = alloc Account(100);
 	let ones: [4000]int = [1; 4000];
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel ones[0..4000] by 8 -> shuffle(x, y);
 	free(parts.ptr);
 	let line = f"after 8000 transfers: {x.get()} {y.get()}, equal {*x == *y}";
@@ -1445,7 +1442,6 @@ fn main() -> int
 	for i in 0..1000 {
 		numbers[i] = i;
 	}
-	unchecked(escaping-local, "parallel waits for every chunk while the array lives")
 	let parts = parallel numbers[0..1000] by 8 -> record(&seen, &last, &hits);
 	free(parts.ptr);
 
