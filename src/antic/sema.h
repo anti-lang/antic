@@ -128,6 +128,8 @@ struct symbol {
     int caught_loops;
     const struct symbol *moved_into;
     bool deferred;
+    /* The `defer` and `undo` blocks around the declaration. */
+    int deferring;
     /* A `keep own` parameter that moved into an owner. */
     bool snapshot_moved;
     /* Where a `keep own` parameter moved into an owner. */

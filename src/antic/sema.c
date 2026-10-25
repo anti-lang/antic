@@ -331,6 +331,7 @@ struct symbol *sema_declare(struct checker *c, enum symbol_kind kind,
     sym->frame = c->ctx.function;
     sym->depth = s->depth;
     sym->loops = c->loop_depth;
+    sym->deferring = c->deferring;
     sema_scope_put(s, name, sym);
     return sym;
 }

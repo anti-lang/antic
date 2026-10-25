@@ -2024,8 +2024,11 @@ static struct type *check_name(struct checker *c, struct expr *e)
                       sym->moved_into->name.text);
         return sema_builtin(c, TYPE_ERROR);
     }
+    /* A local declared inside the `defer` or `undo` block lives in it
+       alone, so no exit of the function names it, by T201 of
+       docs/audit/tests-findings.md. */
     if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&
-        c->deferring > 0) {
+        c->deferring > sym->deferring) {
         sym->deferred = true;
     }
     /* An atomic local is read and written by its own calls alone,
