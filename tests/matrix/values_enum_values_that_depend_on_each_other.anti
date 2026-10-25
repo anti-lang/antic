@@ -1,0 +1,18 @@
+//! A value of an enum that names a value of a second enum, whose value names
+//! the first value again, depends on itself and is refused, as a constant that
+//! names itself is.
+
+enum First
+{
+	A = Second.B as i32,
+}
+
+enum Second
+{
+	B = First.A as i32,
+}
+
+fn main() -> int
+{
+	return First.A as int;
+}

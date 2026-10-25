@@ -1,0 +1,1 @@
+values_enum_values_that_depend_on_each_other.anti:12:6: error: `First` depends on itself

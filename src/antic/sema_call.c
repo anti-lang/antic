@@ -2525,6 +2525,9 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (t->kind == TYPE_VARIANT) {
         return variant_case_value(c, e, t);
     }
+    if (t->kind == TYPE_ENUM && !sema_enum_values_ready(c, t, e->pos)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (t->kind == TYPE_ENUM && (f = types_find_field(t, name)) != NULL) {
         e->as.field.enum_value = (uint32_t)(f - t->fields) + 1;
         return t;

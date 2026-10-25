@@ -165,6 +165,11 @@ struct checker {
     struct context ctx;         /* written by sema_enter and sema_leave */
     /* The move_note of each name the checker marked as moving. */
     struct ptr_map moves;
+    /* The enums of the module whose values are declared or being
+       declared, and those whose values are declared. */
+    struct ptr_set enums_started;
+    struct ptr_set enums_declared;
+    bool enums_ready;           /* every enum of the module has its values */
     int loop_depth;
     /* The loops around the statement checked now, outermost first, as
        far as LOOPS_OPEN_MAX. */
@@ -431,6 +436,8 @@ void sema_declare_items(struct checker *c);
 void sema_declare_direct_names(struct checker *c, const struct import *imp);
 void sema_resolve_bases(struct checker *c);
 void sema_declare_enums_and_variants(struct checker *c);
+bool sema_enum_values_ready(struct checker *c, const struct type *t,
+                            struct pos use);
 void sema_declare_body_constants(struct checker *c);
 void sema_declare_all_fields(struct checker *c);
 void sema_declare_function_types(struct checker *c);

@@ -1,0 +1,31 @@
+//! The value of an enum after `=` is a constant expression, which may name a
+//! value of an enum declared later in the module, directly or through a
+//! constant of a class. The values of that enum are known where the name
+//! reaches them. The program prints the values of both enums.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Kind
+{
+	Small = Later.X as c_int,
+	Next,
+	Last = Table.ROWS,
+}
+
+class Table
+{
+	pub const ROWS: c_int = Later.Y as c_int;
+}
+
+enum Later
+{
+	X = 5,
+	Y = 9,
+}
+
+fn main() -> int
+{
+	printf("small %d, next %d, last %d\n".ptr, Kind.Small as c_int,
+		Kind.Next as c_int, Kind.Last as c_int);
+	return 0;
+}

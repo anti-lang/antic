@@ -1537,5 +1537,7 @@ bool sema_check(struct module *module, const struct sema_inputs *in,
     free(c.module_scope.entries);
     free(c.module_scope.narrowed);
     ptr_map_free(&c.moves);
+    ptr_set_free(&c.enums_started);
+    ptr_set_free(&c.enums_declared);
     return c.ok;
 }

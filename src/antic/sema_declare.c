@@ -1207,6 +1207,58 @@ static void declare_enum_values(struct checker *c, struct item *it)
     types_set_fields(c->types, it->symbol->type, values, it->param_count);
 }
 
+/* DESIGN: the value of an enum may name a value of an enum declared
+   later in the module, directly or through a constant, by T206 of
+   docs/audit/tests-findings.md. The values of that enum are declared
+   where the name reaches them, in the context of its declaration, so
+   the values of the enum checked now are not in scope there. A value
+   that reaches its own enum again depends on itself. */
+static void declare_enum(struct checker *c, struct item *it)
+{
+    struct context at = sema_declaration_context(c, it);
+    struct context outer;
+    const struct item *item = c->enum_item;
+    size_t value = c->enum_value;
+
+    ptr_set_add(&c->enums_started, it->symbol->type);
+    sema_enter(c, &at, &outer);
+    declare_enum_values(c, it);
+    sema_leave(c, &outer);
+    c->enum_item = item;
+    c->enum_value = value;
+    ptr_set_add(&c->enums_declared, it->symbol->type);
+}
+
+/* Whether the values of the enum t can be read at use. An enum of the
+   module whose values are not declared yet has them declared here. One
+   whose values are being declared depends on itself, which is
+   reported. An enum of another module has its values already. */
+bool sema_enum_values_ready(struct checker *c, const struct type *t,
+                            struct pos use)
+{
+    const struct module *module = c->module;
+    size_t i;
+
+    if (c->enums_ready || ptr_set_has(&c->enums_declared, t)) {
+        return true;
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol == NULL || it->kind != ITEM_ENUM ||
+            it->symbol->type != t) {
+            continue;
+        }
+        if (ptr_set_has(&c->enums_started, t)) {
+            sema_error_at(c, use, "`%.*s` depends on itself",
+                          (int)it->name.length, it->name.text);
+            return false;
+        }
+        declare_enum(c, it);
+        return true;
+    }
+    return true;
+}
+
 void sema_declare_enums_and_variants(struct checker *c)
 {
     const struct module *module = c->module;
@@ -1214,13 +1266,12 @@ void sema_declare_enums_and_variants(struct checker *c)
 
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
-        if (it->symbol != NULL && it->kind == ITEM_ENUM) {
-            struct context outer;
-            sema_enter_within(c, it, &outer);
-            declare_enum_values(c, it);
-            sema_leave(c, &outer);
+        if (it->symbol != NULL && it->kind == ITEM_ENUM &&
+            !ptr_set_has(&c->enums_started, it->symbol->type)) {
+            declare_enum(c, it);
         }
     }
+    c->enums_ready = true;
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_VARIANT) {
