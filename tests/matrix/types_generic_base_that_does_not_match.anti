@@ -1,0 +1,40 @@
+//! Inference walks up the bases of an argument and stops at the first that
+//! matches. A class whose chain holds no copy of the generic gives no type
+//! argument, and the call is refused.
+
+abstract class Source<T>
+{
+	abstract fn get(self) -> T;
+}
+
+abstract class Sink<T>
+{
+	abstract fn put(self, v: T);
+}
+
+class Count inherits Source<int>
+{
+	concrete fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Drop inherits Sink<int>
+{
+	concrete fn put(self, v: int)
+	{
+	}
+}
+
+fn drain<T>(s: *Source<T>) -> T
+{
+	return s.get();
+}
+
+fn main() -> int
+{
+	let d = Drop { };
+	let v = drain(&d);
+	return 0;
+}

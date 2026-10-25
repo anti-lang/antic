@@ -1,0 +1,1 @@
+types_generic_inferred_through_an_implements_line.anti:28:16: error: `s` of `drain` takes `*Source<T>`, found `*Counter`

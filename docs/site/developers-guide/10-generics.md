@@ -31,6 +31,7 @@ A function, a struct, a class, a variant and an abstract class take type paramet
 A use names its arguments, or the compiler infers them.
 
 - A call infers the type arguments from its arguments: `largest(3, 7)` is `largest<int>`.
+- A class argument gives them through its bases. With `class Countdown inherits Source<int>`, `drain(&c)` for a parameter `*Source<T>` is `drain<int>`. The walk follows `inherits` up the chain, which has one path, and the first copy of `Source` decides. A class that names `Source<int>` in an `implements` line gives no type argument and writes it out, `drain<int>(&c)`.
 - A call writes them out where nothing gives them, `largest<f64>(2.5, 1.5)`.
 - A type always writes them: `Pair<int, str>`, `Maybe<int>.Some { value: 6 }`, `Cell<f64> { value: 2.5 }`.
 - A literal takes them from the type the context expects: `let p: Pair<int, str> = Pair { first: 1, second: "one" };`.

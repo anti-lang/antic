@@ -1,0 +1,106 @@
+//! A generic call infers its type arguments through the base classes of an
+//! argument, by Q19 of "Answers of 2026-10-24": a class that inherits
+//! `Source<int>` gives `T = int` for a parameter `*Source<T>`. The program
+//! takes a base one and two levels up, a generic class whose base takes its
+//! parameter, a base of a tuple, a parameter `?*Source<T>`, a function of a
+//! class with a type parameter of its own and `self` in the body of a generic
+//! class, one line per form.
+
+import anti.io;
+import anti.text;
+
+abstract class Source<T>
+{
+	abstract fn get(self) -> T;
+}
+
+class Countdown inherits Source<int>
+{
+	pub left: int = 3,
+
+	concrete fn get(self) -> int
+	{
+		return self.left;
+	}
+}
+
+class Slow inherits Countdown
+{
+	pub pause: int = 1,
+}
+
+class Named<U> inherits Source<U>
+{
+	pub value: U,
+
+	concrete fn get(self) -> U
+	{
+		return self.value;
+	}
+
+	pub fn again(self) -> U
+	{
+		return drain(self);
+	}
+}
+
+class Corner inherits Source<(int, int)>
+{
+	concrete fn get(self) -> (int, int)
+	{
+		return (4, 5);
+	}
+}
+
+class Reader
+{
+	pub fn read<T>(self, s: *Source<T>) -> T
+	{
+		return s.get();
+	}
+}
+
+fn drain<T>(s: *Source<T>) -> T
+{
+	return s.get();
+}
+
+fn maybe<T>(s: ?*Source<T>, own other: T) -> T
+{
+	if let p = s {
+		return p.get();
+	}
+	return other;
+}
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let c = Countdown { };
+	let one: int = drain(&c);
+	say(f"one level {one}");
+	let s = Slow { left: 7 };
+	let two: int = drain(&s);
+	say(f"two levels {two}");
+	let n = Named<str> { value: "named" };
+	let text: str = drain(&n);
+	say(f"generic class {text}");
+	let k = Corner { };
+	let (x, y) = drain(&k);
+	say(f"tuple {x} {y}");
+	let none_given: ?*Countdown = none;
+	let first: int = maybe(&c, 9);
+	let second: int = maybe(none_given, 9);
+	say(f"optional pointer {first} {second}");
+	let r = Reader { };
+	let read: int = r.read(&s);
+	say(f"function of a class {read}");
+	let again: str = n.again();
+	say(f"generic body {again}");
+	return 0;
+}

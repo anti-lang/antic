@@ -1871,6 +1871,17 @@ static void unify(struct type *param, struct type *arg,
             unify(param->element, arg->element, map);
             return;
         }
+        /* DESIGN: Q19 of "Answers of 2026-10-24". A class gives the
+           type arguments of the first class up its `inherits` chain that
+           is a copy of the generic the parameter names. Inheritance is
+           single, so the walk has one path. An `implements` line gives
+           none, since a class may implement more than one. */
+        if (param->generic != NULL && param->kind == TYPE_CLASS) {
+            arg = sema_copy_in_chain(arg, param->generic);
+            if (arg == NULL || arg->generic != param->generic) {
+                return;
+            }
+        }
         if (param->generic != NULL && param->generic == arg->generic) {
             for (i = 0; i < param->generic->type_param_count; i++) {
                 unify(param->args[i], arg->args[i], map);

@@ -1,0 +1,1 @@
+types_generic_base_that_does_not_match.anti:38:16: error: `s` of `drain` takes `*Source<T>`, found `*Drop`

@@ -899,7 +899,7 @@ worker fn total<T: add>(chunk: []T, zero: T) -> T
 }
 ```
 
-Not built yet: the cache of copies in a dev build and inference through the bases of an argument. A library file carries no function of a class with type parameters of its own and no type nested in a generic class.
+Not built yet: the cache of copies in a dev build. A library file carries no function of a class with type parameters of its own and no type nested in a generic class.
 
 ## Ownership
 

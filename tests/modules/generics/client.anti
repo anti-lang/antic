@@ -22,6 +22,27 @@ class Person
 	pub age: int,
 }
 
+simd struct Lanes
+{
+	a: i32,
+	b: i32,
+	c: i32,
+	d: i32,
+}
+
+class Ticks inherits gen.Feed<int>
+{
+	concrete fn get(self) -> int
+	{
+		return 11;
+	}
+}
+
+class Slow inherits Ticks
+{
+	pub pause: int = 1,
+}
+
 class Square inherits gen.Measured
 {
 	pub side: int,
@@ -181,5 +202,11 @@ fn main() -> int
 	let (turned, tag) = gen.reversed(gen.Bytes256.load(bytes[0..256], 0), 7);
 	printf("%d %d %d %d\n".ptr, turned.l0 as c_int, turned.l1 as c_int,
 		turned.l255 as c_int, tag as c_int);
+
+	let slow = Slow { };
+	let pulled: int = gen.pull(&slow);
+	let doubled = gen.doubled(Lanes { a: 1, b: 2, c: 3, d: -4 });
+	printf("%d %d %d %d %d\n".ptr, pulled as c_int, doubled.a as c_int,
+		doubled.b as c_int, doubled.c as c_int, doubled.d as c_int);
 	return 0;
 }

@@ -189,6 +189,25 @@ pub fn larger<T: Measured>(a: *T, b: *T) -> int
 	return max(a.area(), b.area());
 }
 
+/// A source of values of one type.
+pub abstract class Feed<T>
+{
+	pub abstract fn get(self) -> T;
+}
+
+/// The value of a feed. A call infers `T` through the bases of its argument.
+pub fn pull<T>(s: *Feed<T>) -> T
+{
+	return s.get();
+}
+
+/// The sum of a value with itself, for any type that adds, a simd struct among
+/// them.
+pub fn doubled<T: add>(a: T) -> T
+{
+	return a + a;
+}
+
 /// Swaps the first two values of an indexed collection.
 pub fn swap<C: index + set_index>(c: C)
 {

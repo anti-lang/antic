@@ -1,0 +1,30 @@
+//! Inference follows `inherits` alone. An abstract class that an `implements`
+//! line names gives no type argument, since a class may implement more than
+//! one.
+
+abstract class Source<T>
+{
+	abstract fn get(self) -> T;
+}
+
+class Counter
+{
+	implements source: Source<int>,
+
+	concrete fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn drain<T>(s: *Source<T>) -> T
+{
+	return s.get();
+}
+
+fn main() -> int
+{
+	let c = Counter { };
+	let v = drain(&c);
+	return 0;
+}
