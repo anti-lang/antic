@@ -1876,6 +1876,6 @@ Tokens beside the operators of C: `:: => -> .. ... ?* ?? ?.`, `as?`, the wrappin
 
 String prefixes: `r b br f rf x re`.
 
-Built-in functions known by name: `mul_high`, `close(c)` on a channel unless a function `close` is in scope, `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` of a simd struct, and `select`, `any` and `all` of `anti.simd`.
+Built-in functions known by name: `mul_high`, `close(c)` on a channel unless a function `close` is in scope, `take(x.f)` on an `own ?*T` field unless a function `take` is in scope, `splat`, `load`, `store`, `shuffle`, `sum`, `min`, `max` and `dot` of a simd struct, and `select`, `any` and `all` of `anti.simd`.
 
-Not built yet: `show`, `unreachable`, `undefined`, `embed` and `take`, which the lexer reads as names. `take(x.f)` is to be a built-in name, as `close` is, so a function `take` in scope keeps its name.
+Not built yet: `show`, `unreachable`, `undefined` and `embed`, which the lexer reads as names.
