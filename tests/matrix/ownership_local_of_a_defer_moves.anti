@@ -1,0 +1,52 @@
+//! A local declared inside the block of a `defer` or an `undo` moves into an
+//! `own` parameter there. The block that declares the local is the statement
+//! that names it, so no exit runs that statement after the move, and the move
+//! compiles as it does in a function body.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+}
+
+fn gone(own n: ?*Node) -> int
+{
+	let node = n else {
+		return -1;
+	};
+	let v = node.value;
+	delete(node);
+	return v;
+}
+
+fn in_defer(out: *int)
+{
+	defer {
+		let n: ?*Node = alloc Node { value: 1 };
+		*out = gone(n);
+	}
+}
+
+fn in_undo(out: *int) may fail
+{
+	undo {
+		let n: ?*Node = alloc Node { value: 2 };
+		*out = gone(n);
+	}
+	fail "undone";
+}
+
+fn main() -> int
+{
+	let out = 0;
+	in_defer(&out);
+	printf("defer: %d\n".ptr, out as c_int);
+	in_undo(&out) catch {
+		yield;
+	};
+	printf("undo: %d\n".ptr, out as c_int);
+	return 0;
+}
