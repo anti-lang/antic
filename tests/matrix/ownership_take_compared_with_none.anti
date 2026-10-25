@@ -1,0 +1,23 @@
+//! The value of `take(x.f)` is the one owner of the object it moves out. A
+//! comparison with `none` reads the value and drops it, so the statement that
+//! holds the comparison loses the object, as one that drops the value does, and
+//! is refused.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let h = Holder { head: alloc Node { value: 1 } };
+	if take(h.head) != none {
+		return 1;
+	}
+	return 0;
+}

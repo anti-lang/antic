@@ -1,0 +1,29 @@
+//! The value of `take(x.f)` is the one owner of the object it moves out. A
+//! parameter that is not `own` belongs to the caller and does not take the
+//! object over, so the statement that passes the value there drops it, as one
+//! that drops the value does, and is refused.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn peek(n: ?*Node) -> int
+{
+	let m = n else {
+		return -1;
+	};
+	return m.value;
+}
+
+fn main() -> int
+{
+	let h = Holder { head: alloc Node { value: 1 } };
+	let v = peek(take(h.head));
+	return v;
+}

@@ -1,0 +1,1 @@
+ownership_take_compared_with_none.anti:19:5: error: the object that `take` moves out of `h.head` is dropped here, and `=` with `none` tears it down

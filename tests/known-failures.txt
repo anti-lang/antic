@@ -24,3 +24,5 @@ matrix_ownership_local_of_a_defer_moves_release T201 A local declared in the blo
 matrix_ownership_local_of_a_defer_moves_memory_checks T201 A local declared in the block of a `defer` or an `undo` cannot move into an `own` parameter there.
 modules_generic_constant_release T202 A constant of a generic class of a library cannot be named outside the class through a copy.
 modules_generic_constant_dev T202 A constant of a generic class of a library cannot be named outside the class through a copy.
+matrix_ownership_take_compared_with_none_refused T203 A statement that drops the value of `take` inside an expression is accepted, and the object leaks.
+matrix_ownership_take_passed_to_a_parameter_that_is_not_own_refused T203 A statement that drops the value of `take` inside an expression is accepted, and the object leaks.
