@@ -7,7 +7,8 @@
 # DESIGN: the option chooses at configure time whether a tree builds the
 # copies. The presets host, asan, ubsan and coverage of CMakePresets.json
 # turn it on, so the suite of each runs the fault tests, and the preset
-# release leaves it off. A Release build refuses it. The copies are
+# release leaves it off, by Q11 of "Answers of 2026-10-24" in
+# docs/decisions.md. The test presets reads both. A Release build refuses it. The copies are
 # programs and an archive of their own, antic_faults, anti_faults and
 # runtime-faults/, and antic, anti and runtime/ of the same tree stay
 # what a tree without the option builds. So no package, which the packer

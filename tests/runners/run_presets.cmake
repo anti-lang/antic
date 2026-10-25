@@ -2,7 +2,8 @@
 # docs/decisions.md decides. By Q8 the preset ubsan, which runs
 # AddressSanitizer beside UndefinedBehaviorSanitizer, compiles with -g as
 # asan does, and its build and test presets set the ASAN_OPTIONS of
-# asan's. Run with cmake -P and this value:
+# asan's. By Q11, ANTIC_FAULTS is on in the test presets host, asan, ubsan
+# and coverage, and never on in release. Run with cmake -P and this value:
 #   PRESETS   the file CMakePresets.json
 
 cmake_minimum_required(VERSION 3.21)
@@ -44,3 +45,14 @@ foreach(kind buildPresets testPresets)
                             "to ${given}, and asan sets ${wanted}")
     endif()
 endforeach()
+
+foreach(name host asan ubsan coverage)
+    preset_value(faults configurePresets ${name} cacheVariables ANTIC_FAULTS)
+    if(NOT faults STREQUAL "ON")
+        message(FATAL_ERROR "the preset ${name} sets ANTIC_FAULTS to ${faults}")
+    endif()
+endforeach()
+preset_value(faults configurePresets release cacheVariables ANTIC_FAULTS)
+if(NOT faults STREQUAL "NOTFOUND" AND faults)
+    message(FATAL_ERROR "the preset release turns ANTIC_FAULTS on")
+endif()
