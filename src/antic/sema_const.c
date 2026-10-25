@@ -956,6 +956,60 @@ const struct symbolic *sema_fold_symbolic(struct checker *c,
     return one_value(&out) ? as_symbolic(c, &out) : s;
 }
 
+/* The first `<<%` of s, in the order of its operands, whose operands are
+   numbers and whose signed count is below zero. NULL without one. */
+static const struct symbolic *shift_below_zero(const struct symbolic *s)
+{
+    const struct symbolic *found;
+
+    if (s == NULL || (s->kind != SYMBOLIC_UNARY && s->kind != SYMBOLIC_BINARY &&
+                      s->kind != SYMBOLIC_CAST)) {
+        return NULL;
+    }
+    found = shift_below_zero(s->a);
+    if (found == NULL && s->kind == SYMBOLIC_BINARY) {
+        found = shift_below_zero(s->b);
+    }
+    if (found == NULL && s->kind == SYMBOLIC_BINARY &&
+        s->op == TOKEN_SHL_WRAP && s->a != NULL &&
+        s->a->kind == SYMBOLIC_INT && s->b != NULL &&
+        s->b->kind == SYMBOLIC_INT && types_is_signed(s->a->type) &&
+        sema_signed_bits(s->b->value) < 0) {
+        found = s;
+    }
+    return found;
+}
+
+/* DESIGN: a copy of a generic refuses `<<%` by a count below zero as a
+   constant does, by Q13 of "Answers of 2026-10-24" in docs/decisions.md.
+   sema_fold_symbolic leaves such an operation open, since it has no
+   value, and the back end took the count as one at or above the width
+   and gave the length 0. */
+bool sema_refuse_copy_shift(struct checker *c, struct pos pos,
+                            const struct type *t)
+{
+    const struct symbolic *found = NULL;
+    struct text spelled = {0};
+
+    while (t != NULL && found == NULL) {
+        if (t->kind == TYPE_ARRAY) {
+            found = shift_below_zero(t->length_of);
+        } else if (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE &&
+                   t->kind != TYPE_OPTIONAL) {
+            break;
+        }
+        t = t->element;
+    }
+    if (found == NULL || found == c->copy_shift_refused) {
+        return found != NULL;
+    }
+    c->copy_shift_refused = found;
+    types_symbolic_print(&spelled, found, false);
+    sema_error_at(c, pos, "`%s` shifts out of range", text_cstr(&spelled));
+    text_free(&spelled);
+    return true;
+}
+
 /* A binary operator on constant operands. */
 static bool const_binary(struct checker *c, struct expr *e,
                          struct const_value *out)

@@ -179,7 +179,7 @@ The switch is the one `assert` uses: emitted in dev mode, absent in release, dec
 
 ## Wrapping and saturating operators
 
-- `+% -% *% <<%` give the modulo result in every build and never trap. A reader sees the `%` and knows wrap was intended. One case is no result modulo anything: `<<%` by a count below zero stops a dev build, and a constant one is refused, by R032.
+- `+% -% *% <<%` give the modulo result in every build and never trap. A reader sees the `%` and knows wrap was intended. One case is no result modulo anything: `<<%` by a count below zero stops a dev build, and a constant one is refused, by R032. So is one that a copy of a generic leaves, as `[N <<% (N - 4)]int` with `N = 3`, by Q13 of "Answers of 2026-10-24".
 - `+| -| *|` clamp at the type's minimum or maximum. Both CPUs have a two-instruction form.
 - Both families apply to integer types only, both operands of one type, and follow the precedence of the plain operator.
 - The plain operators keep their meaning: a trap on overflow in dev mode, a wrap in release.

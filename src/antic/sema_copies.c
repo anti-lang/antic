@@ -136,6 +136,7 @@ static struct type *ty(struct clone *cl, struct type *t, struct pos pos)
     if (sema_has_params(r)) {
         copy_failed(cl, pos, NULL, "which names a type its arguments do not settle");
     }
+    sema_refuse_copy_shift(cl->k->c, pos, r);
     return r;
 }
 

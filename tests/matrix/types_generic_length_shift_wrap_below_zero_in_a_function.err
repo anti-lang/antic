@@ -1,0 +1,1 @@
+types_generic_length_shift_wrap_below_zero_in_a_function.anti:9:30: error: `3 <<% -1` shifts out of range

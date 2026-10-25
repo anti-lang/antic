@@ -1375,6 +1375,8 @@ static void check_copy(struct checker *c, struct type *copy)
     if (!sema_has_params(copy) && types_has_fields(copy)) {
         sema_check_nesting(c, copy, pos);
         for (i = 0; i < copy->field_count; i++) {
+            sema_refuse_copy_shift(c, copy->fields[i].pos,
+                                   copy->fields[i].type);
             if (types_is_chan(copy->fields[i].type)) {
                 sema_refuse_chan_element(c, chan_field_pos(copy, i),
                                          copy->fields[i].type->element);

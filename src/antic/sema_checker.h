@@ -228,6 +228,9 @@ struct checker {
     size_t copy_count;          /* the copies of generic types made */
     bool copy_refused;
     bool copy_name_refused;         /* a cut copy name was reported */
+    /* The `<<%` of a length that sema_refuse_copy_shift reported last,
+       so a copy that names the length twice reports it once. */
+    const struct symbolic *copy_shift_refused;
     const struct type *copy_root;   /* the generic the chain began with */
     const struct type *copy_cut;    /* a copy in the chain has a cut name */
     /* The answers of the question of a default `==` being asked, which
@@ -702,6 +705,13 @@ bool sema_eval_const(struct checker *c, struct expr *e,
    numbers. */
 const struct symbolic *sema_fold_symbolic(struct checker *c,
                                           const struct symbolic *s);
+/* Report, at pos, the first `<<%` in a length of t, an array type or one
+   that points to arrays, whose operands are numbers and whose count is
+   below zero. A copy of a generic leaves such a length where the
+   arguments of the copy make the operands numbers. True when it
+   reported. */
+bool sema_refuse_copy_shift(struct checker *c, struct pos pos,
+                            const struct type *t);
 /* Refuse the first call or `??` in e, a constant expression, in the order
    the evaluator meets them. True when it refused. */
 bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e);

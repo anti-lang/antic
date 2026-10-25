@@ -1,0 +1,16 @@
+//! A length of a copy of a generic struct shifts with `<<%` by a count below
+//! zero, which a copy refuses as a constant does, by Q13 of "Answers of
+//! 2026-10-24".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Box<N: int>
+{
+	cells: [N <<% (N - 4)]int,
+}
+
+fn main() -> int
+{
+	printf("size %d\n".ptr, size_of(Box<3>) as c_int);
+	return 0;
+}
