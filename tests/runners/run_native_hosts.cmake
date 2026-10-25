@@ -1,11 +1,11 @@
 # The native libraries of linux-arm64 call no helper of the outline
-# atomics, `__aarch64_*`, whichever host built them. They take no
-# -mno-outline-atomics, which the runtime of Linux takes, because a
-# library compiles for musl, or for glibc with --sysroot, and the driver
-# of clang adds the outline atomics for neither. The DESIGN comment of
-# antic_native_target in src/native/CMakeLists.txt records it, and this
-# test keeps it true. The libraries of clang that the archive copies
-# stand outside it. Run with cmake -P and these values:
+# atomics, `__aarch64_*`, whichever host built them. They take
+# -mno-outline-atomics from antic_linux_code_options of CMakeLists.txt, as
+# the runtime of Linux does, by Q6 of "Answers of 2026-10-24" in
+# docs/decisions.md. The driver of clang adds the outline atomics where it
+# finds a GCC of the host, and this test keeps them out. The libraries of
+# clang that the archive copies stand outside it. Run with cmake -P and
+# these values:
 #   RUNTIME   the runtime archive
 #   OBJDUMP   the llvm-objdump executable
 #   WORK      a file for the listing

@@ -606,36 +606,46 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     endforeach()
 endif()
 
+# The two code options that every C library of a Linux target takes, the
+# runtime and the native libraries of src/native/ with the glue of
+# anti.regex alike, by Q6 of "Answers of 2026-10-24" in docs/decisions.md.
+# Empty for any other target.
+#
+# [provisional] DESIGN: a library of ARM64 Linux names no outline atomics.
+# For a triple that names glibc, the bitcode of every Linux target among
+# them, the clang driver of a Linux host that finds a GCC of the host adds
+# +outline-atomics, where a Mac adds nothing. The runtime then differed by
+# host, against the rule that one target's runtime is the same bytes
+# whichever host built it, and its atomics at armv8.0 were calls of
+# __aarch64_*. The tests runtime_hosts and native_hosts read every library
+# and member.
+#
+# [provisional] DESIGN: a library of Linux keeps the frame record of every
+# function that calls another, as every Anti function does on Linux, since
+# anti_rt_trace_walk follows the records through the frames. clang omits the
+# frame pointer at -O2 on x86_64 Linux, and on a GitHub runner of x86_64 the
+# trace stopped at the C main of the runtime. A native library that calls
+# back into Anti then stopped the trace at its frame. ARM64 keeps the
+# records already, and macOS keeps them on both processors. The tests
+# runtime_frames and native_frames read them.
+function(antic_linux_code_options out target)
+    set(options "")
+    if(target MATCHES "^linux-arm64")
+        list(APPEND options -mno-outline-atomics)
+    endif()
+    if(target MATCHES "^linux-")
+        list(APPEND options -fno-omit-frame-pointer -momit-leaf-frame-pointer)
+    endif()
+    set(${out} "${options}" PARENT_SCOPE)
+endfunction()
+
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
         if(NOT EXISTS "${sysroot}")
             continue()
         endif()
-        # [provisional] DESIGN: a runtime of ARM64 Linux names no outline
-        # atomics. For a triple that names glibc, the bitcode of every
-        # Linux target among them, the clang driver of a Linux host that
-        # finds a GCC of the host adds +outline-atomics, where a Mac adds
-        # nothing. The runtime then differed by host, against the rule that
-        # one target's runtime is the same bytes whichever host built it,
-        # and its atomics at armv8.0 were calls of __aarch64_*. The test
-        # runtime_hosts reads every library and member.
-        set(code_options "")
-        if(target MATCHES "^linux-arm64")
-            set(code_options -mno-outline-atomics)
-        endif()
-        # [provisional] DESIGN: a runtime of Linux keeps the frame record of
-        # every function that calls another, as every Anti function does on
-        # Linux, since anti_rt_trace_walk follows the records through the
-        # frames of the runtime. clang omits the frame pointer at -O2 on
-        # x86_64 Linux, and on a GitHub runner of x86_64 the trace stopped
-        # at the C main of the runtime. ARM64 keeps the records already, and
-        # macOS keeps them on both processors. The test runtime_frames reads
-        # main of every runtime of Linux and macOS.
-        if(target MATCHES "^linux-")
-            list(APPEND code_options -fno-omit-frame-pointer
-                 -momit-leaf-frame-pointer)
-        endif()
+        antic_linux_code_options(code_options "${target}")
         antic_target_triple(triple "${target}")
         antic_target_c_options(c_options "${target}" "${sysroot}"
             "${ANTIC_CLANG_RESOURCE_DIR}")

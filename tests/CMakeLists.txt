@@ -7031,8 +7031,7 @@ add_test(NAME runtime_hosts
         -P "${ANTIC_RUNNERS}/run_runtime_hosts.cmake")
 set_tests_properties(runtime_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 
-# The native libraries of linux-arm64 call no outline atomics on any host,
-# without the option that keeps them out of the runtime.
+# The native libraries of linux-arm64 call no outline atomics on any host.
 add_test(NAME native_hosts
     COMMAND "${CMAKE_COMMAND}"
         "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
@@ -7040,6 +7039,16 @@ add_test(NAME native_hosts
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-hosts.txt"
         -P "${ANTIC_RUNNERS}/run_native_hosts.cmake")
 set_tests_properties(native_hosts PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+# Every function of a native library of Linux that calls another keeps
+# its frame record, as the runtime does.
+add_test(NAME native_frames
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-frames.txt"
+        -P "${ANTIC_RUNNERS}/run_native_frames.cmake")
+set_tests_properties(native_frames PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # bin/ of the runtime archive is built by the root CMakeLists.txt from
 # the directory of the pinned LLVM tools, and by no file of tests/.

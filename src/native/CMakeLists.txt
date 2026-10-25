@@ -31,25 +31,16 @@ endif()
 # builds of anti_rt take for the same target, and the -march of the
 # default level.
 #
-# [provisional] DESIGN: the native libraries take neither of the two code
-# options that the runtime of Linux adds in CMakeLists.txt. They need no
-# -mno-outline-atomics: the driver of clang adds the outline atomics where
-# it finds a GCC of the host, for a triple of glibc without a sysroot, and
-# a library compiles for musl, or for glibc with --sysroot. The libraries
-# of linux-arm64 built on anti-linux called no __aarch64_* helper on
-# 2026-10-17, and the test native_hosts reads them. They keep no frame
-# record where clang drops one: anti_rt_trace_walk follows the records
-# through the frames of the runtime, and no module of the standard library
-# hands a native library an Anti function to call back. A program that
-# does so through a binding of its own gets a trace that stops at the
-# frame of the library.
+# The code options of antic_linux_code_options of the top-level file go
+# with them, as the runtime of the same target takes them.
 function(antic_native_target out_triple out_flags target)
     antic_target_triple(triple "${target}")
     antic_target_c_options(flags "${target}"
         "${ANTIC_RUNTIME_DIR}/sysroot/${target}" "${ANTIC_CLANG_RESOURCE_DIR}")
     antic_cpu_level(level "${target}")
     antic_cpu_march(march "${level}")
-    list(APPEND flags "${march}")
+    antic_linux_code_options(code_options "${target}")
+    list(APPEND flags "${march}" ${code_options})
     set(${out_triple} "${triple}" PARENT_SCOPE)
     set(${out_flags} "${flags}" PARENT_SCOPE)
 endfunction()
