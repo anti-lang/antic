@@ -120,7 +120,7 @@ fn narrowed()
 	if let b = find(alloc Node { n: 2 }, true) {
 		delete(b);
 	}
-		printf("delete in an if let: alive %d\n".ptr, Node.live.load() as c_int);
+	printf("delete in an if let: alive %d\n".ptr, Node.live.load() as c_int);
 	let c = find(alloc Node { n: 3 }, true) else {
 		return;
 	};

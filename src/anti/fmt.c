@@ -694,6 +694,7 @@ struct frame {
        stands in come back at its `}`. */
     size_t depth;
     bool cont;
+    bool do_tail;               /* the `while` of a `do` block is open */
     size_t brackets;
     bool *bracket_type;
 };
@@ -1551,6 +1552,7 @@ static void emit_anonymous_open(struct emitter *e, const struct piece_list *l,
     f.saved = e->stmt;
     f.depth = e->depth;
     f.cont = e->cont;
+    f.do_tail = e->do_tail;
     f.brackets = e->brackets;
     if (e->brackets > 0) {
         f.bracket_type = files_array(e->brackets, sizeof *f.bracket_type);
@@ -1583,6 +1585,7 @@ static void emit_anonymous_close(struct emitter *e, const struct piece *p,
         append_piece(e, p, false);
     }
     e->stmt = f->saved;
+    e->do_tail = f->do_tail;
     e->brackets = 0;
     while (e->brackets < f->brackets) {
         push_bracket(e, f->bracket_type[e->brackets]);
@@ -1599,6 +1602,15 @@ static void emit_brace_open(struct emitter *e, const struct piece_list *l,
     struct frame f;
 
     if (e->anonymous && e->brackets == e->anonymous_brackets) {
+        emit_anonymous_open(e, l, p);
+        return;
+    }
+    /* A block inside brackets, the handler of a call in the parentheses
+       of a condition or in an argument, interrupts the expression as the
+       body of an anonymous function does. Its statements end at their
+       `;` and stand one tab in from the line of the `{`, T190 of
+       docs/audit/tests-findings.md. */
+    if (kind == BRACE_BLOCK && e->brackets > 0) {
         emit_anonymous_open(e, l, p);
         return;
     }

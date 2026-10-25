@@ -29,7 +29,7 @@ fn main(args: []str) -> int
 	if let Dot d = w.grow(kinds.Shape.Dot { r: 4 }) {
 		r = d.r;
 	}
-		printf("variant %lld\n".ptr, r);
+	printf("variant %lld\n".ptr, r);
 	printf("optional %lld %lld\n".ptr, w.find(numbers[0..4], 3) ?? -1, w.find(numbers[0..4], 9) ?? -1);
 	let t = w.pair(1);
 	printf("tuple %lld %.*s\n".ptr, t.0, t.1.len as c_int, t.1.ptr);
