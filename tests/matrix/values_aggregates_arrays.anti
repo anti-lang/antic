@@ -10,12 +10,10 @@ import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
-
 class Task
 {
 	pub n: int = 0,
 }
-
 
 fn in_arm_array(n: int) -> int
 {
@@ -30,7 +28,6 @@ fn in_arm_array(n: int) -> int
 	return acc;
 }
 
-
 fn held_array(n: int) -> ?int
 {
 	if n == 0 {
@@ -38,7 +35,6 @@ fn held_array(n: int) -> ?int
 	}
 	return n * 3;
 }
-
 
 fn in_if_let_array(n: int) -> int
 {
@@ -53,7 +49,6 @@ fn in_if_let_array(n: int) -> int
 	return acc;
 }
 
-
 fn in_defer_array(n: int, out: *int)
 {
 	let acc = 0;
@@ -64,7 +59,6 @@ fn in_defer_array(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_array(n: int, out: *int) may fail
 {
@@ -81,7 +75,6 @@ fn in_undo_array(n: int, out: *int) may fail
 	}
 }
 
-
 fn risky_array(n: int) -> int may fail
 {
 	if n != 0 {
@@ -89,7 +82,6 @@ fn risky_array(n: int) -> int may fail
 	}
 	return -1;
 }
-
 
 fn in_catch_array(n: int) -> int
 {
@@ -102,12 +94,10 @@ fn in_catch_array(n: int) -> int
 	return got;
 }
 
-
 fn apply_array(n: int, f: fn(int) -> int) -> int
 {
 	return f(n);
 }
-
 
 fn in_closure_array(start: int) -> int
 {
@@ -120,7 +110,6 @@ fn in_closure_array(start: int) -> int
 	return got + acc;
 }
 
-
 worker fn in_worker_array(t: *Task) -> int
 {
 	let n = t.n;
@@ -130,12 +119,10 @@ worker fn in_worker_array(t: *Task) -> int
 	return acc;
 }
 
-
 worker fn work_array(t: *Task, concurrent f: fn(int) -> int) -> int
 {
 	return f(t.n);
 }
-
 
 fn in_dispatch_array(t: *Task, start: int) -> int
 {
@@ -149,13 +136,11 @@ fn in_dispatch_array(t: *Task, start: int) -> int
 	return join(job);
 }
 
-
 struct Guarded_array
 {
 	lock: Mutex,
 	entered: int,
 }
-
 
 fn in_sync_array(g: *Guarded_array, n: int) -> int
 {
@@ -167,7 +152,6 @@ fn in_sync_array(g: *Guarded_array, n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_select_array(c: chan int, n: int) -> int
 {
@@ -185,7 +169,6 @@ fn in_select_array(c: chan int, n: int) -> int
 	}
 	return acc;
 }
-
 
 class Outer_array
 {
@@ -209,7 +192,6 @@ class Outer_array
 	}
 }
 
-
 fn in_loop_array_repeat(n: int) -> int
 {
 	let acc = 0;
@@ -220,7 +202,6 @@ fn in_loop_array_repeat(n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_arm_array_repeat(n: int) -> int
 {
@@ -235,7 +216,6 @@ fn in_arm_array_repeat(n: int) -> int
 	return acc;
 }
 
-
 fn held_array_repeat(n: int) -> ?int
 {
 	if n == 0 {
@@ -243,7 +223,6 @@ fn held_array_repeat(n: int) -> ?int
 	}
 	return n * 3;
 }
-
 
 fn in_if_let_array_repeat(n: int) -> int
 {
@@ -258,7 +237,6 @@ fn in_if_let_array_repeat(n: int) -> int
 	return acc;
 }
 
-
 fn in_defer_array_repeat(n: int, out: *int)
 {
 	let acc = 0;
@@ -269,7 +247,6 @@ fn in_defer_array_repeat(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_array_repeat(n: int, out: *int) may fail
 {
@@ -286,7 +263,6 @@ fn in_undo_array_repeat(n: int, out: *int) may fail
 	}
 }
 
-
 fn risky_array_repeat(n: int) -> int may fail
 {
 	if n != 0 {
@@ -294,7 +270,6 @@ fn risky_array_repeat(n: int) -> int may fail
 	}
 	return -1;
 }
-
 
 fn in_catch_array_repeat(n: int) -> int
 {
@@ -307,12 +282,10 @@ fn in_catch_array_repeat(n: int) -> int
 	return got;
 }
 
-
 fn apply_array_repeat(n: int, f: fn(int) -> int) -> int
 {
 	return f(n);
 }
-
 
 fn in_closure_array_repeat(start: int) -> int
 {
@@ -325,7 +298,6 @@ fn in_closure_array_repeat(start: int) -> int
 	return got + acc;
 }
 
-
 worker fn in_worker_array_repeat(t: *Task) -> int
 {
 	let n = t.n;
@@ -335,12 +307,10 @@ worker fn in_worker_array_repeat(t: *Task) -> int
 	return acc;
 }
 
-
 worker fn work_array_repeat(t: *Task, concurrent f: fn(int) -> int) -> int
 {
 	return f(t.n);
 }
-
 
 fn in_dispatch_array_repeat(t: *Task, start: int) -> int
 {
@@ -354,13 +324,11 @@ fn in_dispatch_array_repeat(t: *Task, start: int) -> int
 	return join(job);
 }
 
-
 struct Guarded_array_repeat
 {
 	lock: Mutex,
 	entered: int,
 }
-
 
 fn in_sync_array_repeat(g: *Guarded_array_repeat, n: int) -> int
 {
@@ -372,7 +340,6 @@ fn in_sync_array_repeat(g: *Guarded_array_repeat, n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_select_array_repeat(c: chan int, n: int) -> int
 {
@@ -390,7 +357,6 @@ fn in_select_array_repeat(c: chan int, n: int) -> int
 	}
 	return acc;
 }
-
 
 class Outer_array_repeat
 {
@@ -414,7 +380,6 @@ class Outer_array_repeat
 	}
 }
 
-
 fn in_loop_slice_literal(n: int) -> int
 {
 	let acc = 0;
@@ -426,7 +391,6 @@ fn in_loop_slice_literal(n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_arm_slice_literal(n: int) -> int
 {
@@ -442,7 +406,6 @@ fn in_arm_slice_literal(n: int) -> int
 	return acc;
 }
 
-
 fn held_slice_literal(n: int) -> ?int
 {
 	if n == 0 {
@@ -450,7 +413,6 @@ fn held_slice_literal(n: int) -> ?int
 	}
 	return n * 3;
 }
-
 
 fn in_if_let_slice_literal(n: int) -> int
 {
@@ -466,7 +428,6 @@ fn in_if_let_slice_literal(n: int) -> int
 	return acc;
 }
 
-
 fn in_defer_slice_literal(n: int, out: *int)
 {
 	let acc = 0;
@@ -478,7 +439,6 @@ fn in_defer_slice_literal(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_slice_literal(n: int, out: *int) may fail
 {
@@ -496,12 +456,10 @@ fn in_undo_slice_literal(n: int, out: *int) may fail
 	}
 }
 
-
 fn apply_slice_literal(n: int, f: fn(int) -> int) -> int
 {
 	return f(n);
 }
-
 
 fn in_closure_slice_literal(start: int) -> int
 {
@@ -515,7 +473,6 @@ fn in_closure_slice_literal(start: int) -> int
 	return got + acc;
 }
 
-
 worker fn in_worker_slice_literal(t: *Task) -> int
 {
 	let n = t.n;
@@ -526,12 +483,10 @@ worker fn in_worker_slice_literal(t: *Task) -> int
 	return acc;
 }
 
-
 worker fn work_slice_literal(t: *Task, concurrent f: fn(int) -> int) -> int
 {
 	return f(t.n);
 }
-
 
 fn in_dispatch_slice_literal(t: *Task, start: int) -> int
 {
@@ -546,13 +501,11 @@ fn in_dispatch_slice_literal(t: *Task, start: int) -> int
 	return join(job);
 }
 
-
 struct Guarded_slice_literal
 {
 	lock: Mutex,
 	entered: int,
 }
-
 
 fn in_sync_slice_literal(g: *Guarded_slice_literal, n: int) -> int
 {
@@ -565,7 +518,6 @@ fn in_sync_slice_literal(g: *Guarded_slice_literal, n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_select_slice_literal(c: chan int, n: int) -> int
 {
@@ -584,7 +536,6 @@ fn in_select_slice_literal(c: chan int, n: int) -> int
 	}
 	return acc;
 }
-
 
 class Outer_slice_literal
 {

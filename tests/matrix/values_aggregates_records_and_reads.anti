@@ -16,12 +16,10 @@ struct Pt
 	y: int,
 }
 
-
 class Task
 {
 	pub n: int = 0,
 }
-
 
 fn in_defer_struct_literal(n: int, out: *int)
 {
@@ -33,7 +31,6 @@ fn in_defer_struct_literal(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_struct_literal(n: int, out: *int) may fail
 {
@@ -50,12 +47,10 @@ fn in_undo_struct_literal(n: int, out: *int) may fail
 	}
 }
 
-
 fn apply_struct_literal(n: int, f: fn(int) -> int) -> int
 {
 	return f(n);
 }
-
 
 fn in_closure_struct_literal(start: int) -> int
 {
@@ -68,12 +63,10 @@ fn in_closure_struct_literal(start: int) -> int
 	return got + acc;
 }
 
-
 worker fn work_struct_literal(t: *Task, concurrent f: fn(int) -> int) -> int
 {
 	return f(t.n);
 }
-
 
 fn in_dispatch_struct_literal(t: *Task, start: int) -> int
 {
@@ -87,13 +80,11 @@ fn in_dispatch_struct_literal(t: *Task, start: int) -> int
 	return join(job);
 }
 
-
 struct Guarded_struct_literal
 {
 	lock: Mutex,
 	entered: int,
 }
-
 
 fn in_sync_struct_literal(g: *Guarded_struct_literal, n: int) -> int
 {
@@ -105,7 +96,6 @@ fn in_sync_struct_literal(g: *Guarded_struct_literal, n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_select_struct_literal(c: chan int, n: int) -> int
 {
@@ -124,7 +114,6 @@ fn in_select_struct_literal(c: chan int, n: int) -> int
 	return acc;
 }
 
-
 fn in_arm_tuple(n: int) -> int
 {
 	let acc = 0;
@@ -138,7 +127,6 @@ fn in_arm_tuple(n: int) -> int
 	return acc;
 }
 
-
 fn held_tuple(n: int) -> ?int
 {
 	if n == 0 {
@@ -146,7 +134,6 @@ fn held_tuple(n: int) -> ?int
 	}
 	return n * 3;
 }
-
 
 fn in_if_let_tuple(n: int) -> int
 {
@@ -161,7 +148,6 @@ fn in_if_let_tuple(n: int) -> int
 	return acc;
 }
 
-
 fn in_defer_tuple(n: int, out: *int)
 {
 	let acc = 0;
@@ -172,7 +158,6 @@ fn in_defer_tuple(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_tuple(n: int, out: *int) may fail
 {
@@ -189,12 +174,10 @@ fn in_undo_tuple(n: int, out: *int) may fail
 	}
 }
 
-
 fn apply_tuple(n: int, f: fn(int) -> int) -> int
 {
 	return f(n);
 }
-
 
 fn in_closure_tuple(start: int) -> int
 {
@@ -207,12 +190,10 @@ fn in_closure_tuple(start: int) -> int
 	return got + acc;
 }
 
-
 worker fn work_tuple(t: *Task, concurrent f: fn(int) -> int) -> int
 {
 	return f(t.n);
 }
-
 
 fn in_dispatch_tuple(t: *Task, start: int) -> int
 {
@@ -226,13 +207,11 @@ fn in_dispatch_tuple(t: *Task, start: int) -> int
 	return join(job);
 }
 
-
 struct Guarded_tuple
 {
 	lock: Mutex,
 	entered: int,
 }
-
 
 fn in_sync_tuple(g: *Guarded_tuple, n: int) -> int
 {
@@ -244,7 +223,6 @@ fn in_sync_tuple(g: *Guarded_tuple, n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_select_tuple(c: chan int, n: int) -> int
 {
@@ -262,7 +240,6 @@ fn in_select_tuple(c: chan int, n: int) -> int
 	}
 	return acc;
 }
-
 
 class Outer_tuple
 {
@@ -286,7 +263,6 @@ class Outer_tuple
 	}
 }
 
-
 fn in_arm_tuple_element(n: int) -> int
 {
 	let acc = 0;
@@ -301,7 +277,6 @@ fn in_arm_tuple_element(n: int) -> int
 	return acc;
 }
 
-
 fn held_tuple_element(n: int) -> ?int
 {
 	if n == 0 {
@@ -309,7 +284,6 @@ fn held_tuple_element(n: int) -> ?int
 	}
 	return n * 3;
 }
-
 
 fn in_if_let_tuple_element(n: int) -> int
 {
@@ -325,7 +299,6 @@ fn in_if_let_tuple_element(n: int) -> int
 	return acc;
 }
 
-
 fn in_defer_tuple_element(n: int, out: *int)
 {
 	let acc = 0;
@@ -337,7 +310,6 @@ fn in_defer_tuple_element(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_tuple_element(n: int, out: *int) may fail
 {
@@ -355,7 +327,6 @@ fn in_undo_tuple_element(n: int, out: *int) may fail
 	}
 }
 
-
 fn risky_tuple_element(n: int) -> int may fail
 {
 	if n != 0 {
@@ -363,7 +334,6 @@ fn risky_tuple_element(n: int) -> int may fail
 	}
 	return -1;
 }
-
 
 fn in_catch_tuple_element(n: int) -> int
 {
@@ -377,12 +347,10 @@ fn in_catch_tuple_element(n: int) -> int
 	return got;
 }
 
-
 worker fn work_tuple_element(t: *Task, concurrent f: fn(int) -> int) -> int
 {
 	return f(t.n);
 }
-
 
 fn in_dispatch_tuple_element(t: *Task, start: int) -> int
 {
@@ -397,13 +365,11 @@ fn in_dispatch_tuple_element(t: *Task, start: int) -> int
 	return join(job);
 }
 
-
 struct Guarded_tuple_element
 {
 	lock: Mutex,
 	entered: int,
 }
-
 
 fn in_sync_tuple_element(g: *Guarded_tuple_element, n: int) -> int
 {
@@ -416,7 +382,6 @@ fn in_sync_tuple_element(g: *Guarded_tuple_element, n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_select_tuple_element(c: chan int, n: int) -> int
 {
@@ -436,7 +401,6 @@ fn in_select_tuple_element(c: chan int, n: int) -> int
 	return acc;
 }
 
-
 fn in_generic_tuple_element<T>(n: int) -> int
 {
 	let acc = size_of(T) as int;
@@ -448,7 +412,6 @@ fn in_generic_tuple_element<T>(n: int) -> int
 	acc += t.1 + t.0;
 	return acc;
 }
-
 
 class Outer_tuple_element
 {
@@ -473,7 +436,6 @@ class Outer_tuple_element
 	}
 }
 
-
 fn in_arm_index(n: int) -> int
 {
 	let acc = 0;
@@ -488,7 +450,6 @@ fn in_arm_index(n: int) -> int
 	return acc;
 }
 
-
 fn held_index(n: int) -> ?int
 {
 	if n == 0 {
@@ -496,7 +457,6 @@ fn held_index(n: int) -> ?int
 	}
 	return n * 3;
 }
-
 
 fn in_if_let_index(n: int) -> int
 {
@@ -512,7 +472,6 @@ fn in_if_let_index(n: int) -> int
 	return acc;
 }
 
-
 fn in_defer_index(n: int, out: *int)
 {
 	let acc = 0;
@@ -524,7 +483,6 @@ fn in_defer_index(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_index(n: int, out: *int) may fail
 {
@@ -542,7 +500,6 @@ fn in_undo_index(n: int, out: *int) may fail
 	}
 }
 
-
 fn risky_index(n: int) -> int may fail
 {
 	if n != 0 {
@@ -550,7 +507,6 @@ fn risky_index(n: int) -> int may fail
 	}
 	return -1;
 }
-
 
 fn in_catch_index(n: int) -> int
 {
@@ -563,7 +519,6 @@ fn in_catch_index(n: int) -> int
 	};
 	return got;
 }
-
 
 fn in_select_index(c: chan int, n: int) -> int
 {
@@ -582,7 +537,6 @@ fn in_select_index(c: chan int, n: int) -> int
 	}
 	return acc;
 }
-
 
 class Outer_index
 {
@@ -607,7 +561,6 @@ class Outer_index
 	}
 }
 
-
 fn in_arm_slice(n: int) -> int
 {
 	let acc = 0;
@@ -622,7 +575,6 @@ fn in_arm_slice(n: int) -> int
 	return acc;
 }
 
-
 fn held_slice(n: int) -> ?int
 {
 	if n == 0 {
@@ -630,7 +582,6 @@ fn held_slice(n: int) -> ?int
 	}
 	return n * 3;
 }
-
 
 fn in_if_let_slice(n: int) -> int
 {
@@ -646,7 +597,6 @@ fn in_if_let_slice(n: int) -> int
 	return acc;
 }
 
-
 fn in_defer_slice(n: int, out: *int)
 {
 	let acc = 0;
@@ -658,7 +608,6 @@ fn in_defer_slice(n: int, out: *int)
 	}
 	acc = 5;
 }
-
 
 fn in_undo_slice(n: int, out: *int) may fail
 {
@@ -676,7 +625,6 @@ fn in_undo_slice(n: int, out: *int) may fail
 	}
 }
 
-
 fn risky_slice(n: int) -> int may fail
 {
 	if n != 0 {
@@ -684,7 +632,6 @@ fn risky_slice(n: int) -> int may fail
 	}
 	return -1;
 }
-
 
 fn in_catch_slice(n: int) -> int
 {
@@ -698,7 +645,6 @@ fn in_catch_slice(n: int) -> int
 	return got;
 }
 
-
 worker fn in_worker_slice(t: *Task) -> int
 {
 	let n = t.n;
@@ -709,13 +655,11 @@ worker fn in_worker_slice(t: *Task) -> int
 	return acc;
 }
 
-
 struct Guarded_slice
 {
 	lock: Mutex,
 	entered: int,
 }
-
 
 fn in_sync_slice(g: *Guarded_slice, n: int) -> int
 {
@@ -728,7 +672,6 @@ fn in_sync_slice(g: *Guarded_slice, n: int) -> int
 	}
 	return acc;
 }
-
 
 fn in_select_slice(c: chan int, n: int) -> int
 {
@@ -748,7 +691,6 @@ fn in_select_slice(c: chan int, n: int) -> int
 	return acc;
 }
 
-
 fn in_generic_slice<T>(n: int) -> int
 {
 	let acc = size_of(T) as int;
@@ -760,7 +702,6 @@ fn in_generic_slice<T>(n: int) -> int
 	acc += s.len * 100 + s[0] + s[n - 1];
 	return acc;
 }
-
 
 class Outer_slice
 {
@@ -784,7 +725,6 @@ class Outer_slice
 		return inner.run(n);
 	}
 }
-
 
 fn in_select_field(c: chan int, n: int) -> int
 {
