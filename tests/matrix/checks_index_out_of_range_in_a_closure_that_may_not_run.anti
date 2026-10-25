@@ -1,0 +1,27 @@
+//! C2 of the compile-time checks reads the body of an anonymous function where
+//! it stands. A `for` around the closure does not count it as reached, since
+//! the closure may not run, so an index of the variable of that `for` passes,
+//! and so does an index of a parameter of the closure.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn when_large(n: int, f: fn(int) -> int) -> int
+{
+	if n > 100 {
+		return f(n);
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len + 1 {
+		total += when_large(i, fn(k) {
+			return xs[i] + xs[k];
+		});
+	}
+	printf("a closure that never runs: %d\n".ptr, total as c_int);
+	return 0;
+}

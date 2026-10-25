@@ -192,13 +192,24 @@ static bool collect_stmt(void *data, const struct stmt *s)
 }
 
 /* A closure may change a local it captures, so the walk that finds the
-   changes enters the body of every anonymous function. */
+   changes enters the body of every anonymous function. The parameters of
+   one hold one unknown value each, as those of the function do. */
 static bool collect_expr(void *data, const struct expr *e)
 {
     struct index_walk *w = data;
     struct ast_visitor v = {collect_expr, collect_stmt, NULL};
+    struct fact *f;
+    size_t i;
 
     v.data = w;
+    for (i = 0; e->kind == EXPR_FN && e->as.fn != NULL &&
+                i < e->as.fn->param_count;
+         i++) {
+        f = add_fact(w, e->as.fn->params[i].symbol);
+        if (f != NULL) {
+            f->param = true;
+        }
+    }
     if (e->kind == EXPR_UNARY && e->as.unary.op == TOKEN_AMP) {
         mark_changed(w, e->as.unary.operand);
     }
@@ -897,10 +908,21 @@ static void check_index(struct index_walk *w, const struct expr *e)
     }
 }
 
+/* DESIGN: the body of an anonymous function is checked where it stands,
+   with the facts of the function around it, T196. An index there that a
+   `for` of the closure reaches on every turn is refused. A `for` of the
+   function around it does not count the closure as reached, since the
+   closure may never run. */
 static bool visit_index(void *data, const struct expr *e)
 {
+    struct ast_visitor v = {visit_index, NULL, NULL};
+
     if (e->kind == EXPR_INDEX) {
         check_index(data, e);
+    }
+    if (e->kind == EXPR_FN && e->as.fn != NULL) {
+        v.data = data;
+        ast_walk_block(&v, e->as.fn->body);
     }
     return true;
 }
