@@ -402,6 +402,10 @@ static void check_expr(struct verify *v, const struct expr *e)
     case EXPR_OBJECT:
         need(v, e->as.object.operand != NULL);
         break;
+    /* lower_take reads the place of a field, as the checker wrote it. */
+    case EXPR_TAKE:
+        need(v, e->as.take != NULL && e->as.take->kind == EXPR_FIELD);
+        break;
     case EXPR_ATOMIC:
         need(v, e->as.atomic.place != NULL);
         break;
