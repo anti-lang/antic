@@ -1390,6 +1390,18 @@ A singleton's `construct` takes no parameters, the class declares no `get`, no c
 
 Atomic operations: `load store add sub and or swap compare_swap`, sequentially consistent. `add`, `sub`, `and`, `or` and `swap` give the value the field held before. `add` and `sub` take an integer, and `and` and `or` an integer or a `bool`. In a singleton a plain field is read-only after creation and `atomic` fields are atomic. `mutable` fields may be written anywhere except from a worker, which the compiler checks.
 
+An atomic field or local is read with `load()` and written with `store(v)`, and `=` and `+=` on one are refused. It holds an integer, a `bool`, a `char`, an `f16`, a pointer or a plain function pointer.
+
+```anti refused
+//! error: `count` is atomic, so it is read with `load()` and written with `store(v)`
+class Circle
+{
+	pub static atomic count: int = 0;
+}
+
+Circle.count += 1;
+```
+
 ## Threads
 
 Structured fork-join over an array with `parallel`, and one object at a time with `dispatch`.
