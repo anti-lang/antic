@@ -2111,7 +2111,7 @@ let pushed = samples.push(0.5);
 let s = samples.pop() ?? 0.0;
 ```
 
-Not built yet: named arguments, which the not-built example above writes, `deserialize` of a collection, and the versioned `set` of `SpscRing`, since the ring has no `set`.
+Not built yet: named arguments, which the not-built example above writes, and `deserialize` of a collection.
 
 ## Standard library
 
