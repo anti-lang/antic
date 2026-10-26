@@ -145,9 +145,9 @@ Two other lines stand at module level. `link framework "CoreAudio";` names a fra
 
 Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `uint` for `u64`, `float` for `f64`, `byte` for `u8`. `f16` is storage only, read as `f32` and written with `as f16`. `bool`. `char`, a 32-bit Unicode scalar. `str`, immutable UTF-8, pointer plus length, NUL-terminated outside its length. A file name the system gives keeps its bytes where they are no UTF-8, so it still opens the file. `==` compares the text of two `str` values, `<` compares their bytes, which for UTF-8 is the order of the code points, and a `str` meets `eq`, `Ordered` and `hash`. Fixed arrays `[N]T`. Slices `[]T`, pointer plus length. Pointers `*T` and nullable pointers `?*T`. Optional values `?T` of any type, and `??T` is a `?T` whose value is a `?T`. Function pointers `fn(i32) -> i32` and nullable ones `?fn(i32) -> i32`. Tuples `(int, str)`, anonymous structs with C layout. Structs, enums, variants, classes. No implicit conversions between numbers.
 
-A slice and a `str` have `.len`, an `int`, and `.ptr`, a `?*T` or a `?*byte`, both read-only. An array has `.len` alone. `s[i]` on a `str` is a `byte`, and `s[lo..hi]` is a `[]byte`. `a[lo..hi]` on an array or a slice is a `[]T`, and both bounds are required.
+A slice and a `str` have `.len`, an `int`, and `.ptr`, a `?*T` or a `?*byte`, both read-only. An array has `.len` alone. The length `N` of `[N]T` is a constant `int` of at least 1. A length computed from `size_of` stands in the type of a field or a local alone, and the `.len` of such an array is no constant. `s[i]` on a `str` is a `byte`, and `s[lo..hi]` is a `[]byte`. `a[lo..hi]` on an array or a slice is a `[]T`, and both bounds are required.
 
-The compiler declares `Object`, `Job`, `Flags`, `Mutex`, `chan T`, `Regex`, `ByteRegex`, `Match`, `ByteMatch`, `FieldDescriptor` and the constraint `Number` in `anti.lang`, and the source of `anti.lang` declares the rest of the root. The C types for bindings are `c_char c_uchar c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong c_size_t c_float c_double c_wchar`. `c_long`, `c_ulong` and `c_wchar` take the width of the target.
+The compiler declares `Object`, `Job`, `Flags`, `Mutex`, `chan T`, `Regex`, `ByteRegex`, `Match`, `ByteMatch`, `FieldDescriptor` and the constraint `Number` in `anti.lang`, and the source of `anti.lang` declares the rest of the root. The C types for bindings are `c_char c_uchar c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong c_size_t c_float c_double c_wchar`. `c_long`, `c_ulong` and `c_wchar` take the width of the target. A `void *` of C is a `*byte`, and a `?*byte` where it may be `NULL`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -170,6 +170,7 @@ let first = name[0];
 let rest = name[1..3];
 let again = []int { ptr: s.ptr, len: s.len };
 let twice: ??int = none;
+let word: [size_of(i64)]byte = [0; size_of(i64)];
 ```
 
 ## Literals
