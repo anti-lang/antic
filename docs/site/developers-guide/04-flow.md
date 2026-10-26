@@ -1,13 +1,13 @@
 ---
 title: "Flow"
-description: "if and while, for over ranges and collections, switch on values and what each compiles to, break and continue, defer and undo."
-summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `char`, a `str` and a variant with what each compiles to, `break` and `continue`, `defer` and `undo`, each with how antic builds it and what it costs."
+description: "if and while, for over ranges and collections, switch on values and on str, x in lo..hi, break and continue, defer and undo, and the paths that end a function."
+summary: "`if` and `while`, `for` over a range and over a collection, `switch` on an integer, a `char`, a `str` and a variant, `x in lo..hi`, `break` and `continue`, `defer` and `undo`, and the paths that end a function, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:24:00+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 40
 tags: [compilers, programming-languages]
-keywords: [control flow, if, while, for loop, switch, break, continue, defer, undo]
+keywords: [control flow, if, while, for loop, switch, break, continue, defer, undo, missing return, noreturn]
 ---
 
 A statement of this chapter becomes basic blocks and branches in the IR of antic, and nothing else. No statement here allocates or takes a lock. A `for` over a collection calls its iterator, and a `switch` on a `str` calls `anti.text.equal`. A dev build calls the runtime when a check fails.
@@ -102,7 +102,7 @@ length 12 0
 
 A condition that compares a local or a parameter with `none` narrows that name. In `length` the parameter `p` has type `?*int`. Right of `p != none &&` and inside the block it has type `*int`, so `*p` compiles. A test `p == none` whose block leaves narrows `p` for the rest of the enclosing block. `&&` narrows what follows it, and `||` narrows nothing inside the block, since either side may have been the true one. An assignment to the name ends the narrowing. A field is never narrowed, because any call may write it. [Chapter 7]({{% relref "07-optionals" %}}) holds the full rule, with `if let` and `let ... else`, which bind the checked value to a new name.
 
-A function with a result ends every path in a `return`. The checker reads the form of the last statement alone. An `if` whose every branch leaves, with an `else`, counts, and so does an `if let` whose block and `else` both leave. A block counts when its last statement does. A `switch` whose every arm and `else` end the path counts too, and without an `else` it counts on an enum or a variant, where it names every value. A `while true do { }` counts when no `break` belongs to it. A `do { } while` counts when its body does and no `break` or `continue` belongs to it, since the body runs before the condition. A `select` counts when every arm does, and a `try` block when its body and its handler both do. A `yield;` of the handler goes on after the block.
+A function with a result ends every path in a `return`, and the checker reads the form of the last statement to decide it. An `if` counts when it has an `else` and every branch leaves. "Paths that end a function" at the end of this chapter lists every form and every kind of function and handler.
 
 The checker refuses each of the following.
 
@@ -278,6 +278,18 @@ Where it lives: `if_statement` and `statement` of `src/antic/parser_stmt.c` pars
 | Checks inserted | none | none |
 
 An `if` or a loop inserts no check of its own. The checks inside `odd_part` and `digits` belong to `>>`, `/` and `+=`, and [chapter 3]({{% relref "03-values" %}}) gives their cost.
+
+The forms that do the same job:
+
+| Job | Form | Cost |
+|---|---|---|
+| a counted loop | `for i in lo..hi` | one compare per turn, no overflow at the end of the type, a trip count `opt` reads |
+| a loop whose end the body decides | `while cond do { }` | the condition per turn |
+| a body that runs once before the test | `do { } while cond` | the condition per turn, none before the first |
+| one value against a list of constants | `switch` | in release, a table or a jump where `opt` finds one |
+| a value against a range | `x in lo..hi` | two compares, one with constant bounds in release |
+
+A `while` that counts with `i += 1` carries the overflow check of `+=` in a dev build. The `for` over the same range carries none, as its excerpt in the next section shows, so it is the form for a count.
 
 ### Pitfalls
 
@@ -601,9 +613,9 @@ For a C++ programmer:
 
 `switch` takes a value of an integer type, an enum, a `char`, a `str` or a variant. Each arm names one value, then `=>`, then a body. A comma separates the arms. One arm runs, and none falls into the next unless it says so.
 
-The body of an arm is a call, an assignment or a block. Anything else, such as a `return`, stands in a block.
+The body of an arm is a call, an assignment or a block. A call is any call that stands as a statement: `1 => free(p)`, and a call that may fail with its handler, `1 => save(n) catch { }`. Anything else, such as a `return`, stands in a block.
 
-The value of an arm is a constant expression of the type of the `switch`, and an enum value is written with its type, `Kind.Circle`. Each value has one arm. `else` takes every value that no arm names, and a `switch` has at most one.
+The value of an arm is a constant expression of the type of the `switch`, and an enum value is written with its type, `Kind.Circle`. Each value has one arm. The checker compares the values, not their spelling, so an arm `size_of(i64)` and an arm `8` name one value. Two values of an enum may share a number, and a `switch` names at most one of them. That arm covers both. `else` takes every value that no arm names, and a `switch` has at most one.
 
 A `switch` on an enum without `else` names every value of the enum. A `switch` on a variant without `else` names every case. A `switch` on an integer, a `char` or a `str` without `else` does nothing when no arm matches. A `switch` on a `char` takes `char` literals as its arms, `'a' =>` or `'\n' =>`, and compares the scalar values as integers. A `bool` and a value of a type parameter are refused.
 
@@ -631,6 +643,11 @@ export fn days(month: int) -> int
 		11 => n = 30,
 	}
 	return n;
+}
+
+export fn in_month(n: int) -> bool
+{
+	return n in 1..13;
 }
 
 fn level(name: str) -> int
@@ -676,6 +693,7 @@ fn say(line: str)
 fn main() -> int
 {
 	say(f"days {days(2)} {days(4)} {days(12)}");
+	say(f"in_month {in_month(12)} {in_month(13)}");
 	let info = level("info");
 	let trace = level("trace");
 	say(f"level {info} {trace}");
@@ -687,14 +705,23 @@ fn main() -> int
 
 ```text output
 days 28 30 31
+in_month true false
 level 1 -1
 area 12 10 0
 corners 0 4 4
 ```
 
-`x in lo..hi` is an expression of type `bool` that is true when `x` lies in the range. It stands in a condition, not as the value of an arm, so a `switch` has no arm for a range of values.
+`x in lo..hi` is an expression of type `bool`, written for `x >= lo && x < hi`, so the range excludes `hi` as the range of a `for` does. It computes `x` once, then `lo`, and `hi` only when `x` reaches `lo`, as the `&&` does. The three have one type, which the first of them that is no literal names: an integer, a `char`, a float, or a type with an `operator fn lt`, which both comparisons call. With three constant operands the expression is a constant. The right side is a range and takes no `by`, and `in` without a range is refused. `in` binds as `<` does, so `i + 1 in 0..n * 2` needs no parentheses. The expression is no value of an arm, so a `switch` has no arm for a range of values, and an `if` chain of `in` tests takes its place.
 
 The checker refuses each of the following.
+
+```anti refused
+//! error: `in` takes a range
+fn has(x: int, y: int) -> bool
+{
+	return x in y;
+}
+```
 
 ```anti refused
 //! error: `switch` takes an enum, an integer, a `char`, a `str` or a variant, found `float`
@@ -728,6 +755,32 @@ let x = 1;
 switch x {
 	1 => x = 0,
 	1 => x = 2,
+}
+```
+
+```anti refused
+//! error: this value already has an arm
+let n = 8;
+let r = 0;
+switch n {
+	size_of(i64) => r = 1,
+	8 => r = 2,
+}
+```
+
+```anti refused
+//! error: this value already has an arm
+enum Code { Ok = 0, Fine = 0, Bad = 1 }
+
+fn rank(c: Code) -> int
+{
+	let r = 0;
+	switch c {
+		Code.Ok => r = 1,
+		Code.Fine => r = 2,
+		Code.Bad => r = 3,
+	}
+	return r;
 }
 ```
 
@@ -863,6 +916,17 @@ b2:
 
 `%2` is a `str` in the frame for the literal `"debug"`: the address of its bytes and the length 5. The call compares it with the text of the `switch`. `equal` compares the lengths first and the bytes only when the lengths agree. The arms are not hashed and not sorted, so a text that matches no arm costs one call per arm.
 
+`x in lo..hi` is the two compares of its `&&`, a branch between them in a dev build. With constant bounds a release build folds them into one.
+
+```llvm excerpt=arms target=linux-x86_64 mode=release
+define internal noundef zeroext range(i8 0, 2) i8 @in_month(i64 noundef %p0)
+b0:
+  %0 = add i64 %p0, -1
+  %spec.select = icmp ult i64 %0, 12
+```
+
+`add` moves the range 1 to 12 down to 0 to 11, and the one unsigned compare `ult` with 12 tests both ends: a value below 1 becomes a large unsigned number. The object holds `decq`, `cmpq $12` and `setb`, with no branch.
+
 A `switch` on a variant loads the tag once and compares it with the number of each arm's case. An arm that binds copies the fields of its case into a slot of the frame first. "Pattern matching" of [chapter 8]({{% relref "08-structs-enums" %}}) shows that code.
 
 Where it lives: the `TOKEN_SWITCH` case of `statement` and `arm_body` of `src/antic/parser_stmt.c`. `check_switch`, `check_switch_covers` and `refuse_same_value` of `src/antic/sema_stmt.c`. `lower_switch`, `arm_test` and `bind_case_fields` of `src/antic/lower_stmt.c`. `equal` is in `src/std/anti/text.anti`.
@@ -883,6 +947,18 @@ Where it lives: the `TOKEN_SWITCH` case of `statement` and `arm_body` of `src/an
 The completeness of a `switch` on an enum or a variant is a rule of the checker. No arm for an impossible value and no trap is added at run time.
 
 The order of the arms is the order of the tests in a dev build. In a release build the order does not decide the code of an integer `switch`.
+
+| Cost of `x in lo..hi` | Dev | Release |
+|---|---|---|
+| Compares | two, with a branch between them | two, or one unsigned compare for constant bounds |
+| Calls | none, or two calls of `operator fn lt` for a class | the same |
+
+The choice among the forms that pick one path:
+
+- A `switch` on an integer, a `char` or an enum of many arms is the cheaper form in a release build, where `opt` may make it a table. A chain of `if` tests the same values in the order written.
+- A `switch` on an enum or a variant without `else` lets a release build drop the test of the last arm, as the last section shows. The checker also refuses it when a new value or case has no arm.
+- A `switch` on a `str` of n arms costs up to n calls of `equal`. A text matched against many values is a lookup in a `HashMap<str, V>` of [chapter 16]({{% relref "16-collections" %}}), which hashes the text once.
+- A test of a range of values is an `in` in an `if` chain, since an arm holds one value.
 
 ### Pitfalls
 
@@ -1092,6 +1168,11 @@ Where it lives: the `STMT_BREAK` and `STMT_CONTINUE` cases of `check_stmt` in `s
 
 The code size grows with the exits. A block with d deferred statements and e exits holds d times e copies in the IR.
 
+The forms that leave more than one loop:
+
+- A flag that the outer condition reads costs one store where it is set. A dev build adds one load and one compare per outer turn.
+- A function that holds both loops and leaves with `return` costs a call where `opt` does not inline it, and no flag. The function also gives the search result a name.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1284,6 +1365,39 @@ fn run(n: int) -> int
 }
 ```
 
+An `undo` runs on a failing exit, so it belongs in a function that can fail. In any other function it never runs, and the checker gives the warning `undo-never-runs`. A release build refuses every warning, as [chapter 6]({{% relref "06-errors" %}}) describes, so the block below fails there.
+
+```anti refused
+//! error: an `undo` in a function that cannot fail never runs [undo-never-runs]
+extern fn note(n: c_int);
+
+fn plain()
+{
+	undo note(1);
+	note(2);
+}
+```
+
+An `undo` inside a `defer` or inside another `undo` is refused. The statement around it runs on the way out of its block, after the failure that an `undo` waits for, so the inner `undo` would never run. A `defer` inside an `undo` is allowed and runs at the end of the block of the `undo`.
+
+```anti refused
+//! error: `undo` inside a `defer`
+extern fn note(n: c_int);
+
+fn risky() may fail
+{
+	fail "stopped";
+}
+
+fn build() may fail
+{
+	defer {
+		undo note(1);
+	}
+	try risky();
+}
+```
+
 A local that a `defer` or an `undo` names cannot move into an `own` parameter, since the deferred statement would read it after the move. [Chapter 11]({{% relref "11-ownership" %}}) shows that refusal.
 
 ### How antic builds it
@@ -1359,10 +1473,388 @@ For a C programmer:
 
 - The deferred statement reads the variable at the exit. `defer free(p);` frees what `p` holds then, so `p` is not reassigned in between.
 - `undo` replaces the `if (failed)` before a cleanup label. It runs on the error exit alone.
-- A `return`, a `break`, a `continue`, a `fail` or a `try` inside a deferred statement is not refused, and antic 0.2.0 crashes on it. A deferred statement ends at its own end.
+- A deferred statement cannot jump. `return`, `fail`, `try` and a `break` or `continue` of a loop outside it are refused, so cleanup code never leaves its function early.
 
 For a C++ programmer:
 
 - The order is that of destructors, last declared first, with one difference: every `undo` of a block runs before its `defer` statements.
 - A `defer` is not an object. It cannot be dismissed, as a scope guard can. `undo` is the form that runs on failure alone.
 - A deferred statement that changes a struct local changes the result of a `return` that names it. A scalar result is fixed before the deferred statements run.
+
+## Paths that end a function
+
+### What you know
+
+Java refuses a method with a result that can complete normally, with "missing return statement", and treats `while (true)` without a `break` as a loop that never completes. C and C++ accept a function that falls off its end. The value the caller reads is then undefined, and a compiler warns with `-Wreturn-type` where it sees the path. C++ marks a function that never returns `[[noreturn]]`, and C11 `_Noreturn`.
+
+### The feature
+
+Each kind of function and of handler requires something at the end of every path, and the checker refuses a path that ends without it.
+
+| Kind | Every path ends in | Message of the refusal |
+|---|---|---|
+| a function with a result, `may fail` or not | `return`, `fail` or a call that never returns | `` `f` can reach its end without `return` `` |
+| an anonymous function with a result | the same | `` the anonymous function can reach its end without `return` `` |
+| a function that returns `never` | `fail` or a call that never returns | `` `f` returns `never` and can reach its end `` |
+| the handler of a value, `let v = f() catch { }` | `yield`, `return`, `fail`, `break`, `continue` or a call that never returns | `` the handler of a value can reach its end without `yield` `` |
+| the `else` of a `let` | the same | `` the `else` of a `let` leaves the block it stands in `` |
+
+A `may fail` function without a result may reach its end, which returns no error. The handler of a call statement, whose result nothing takes, may reach its end as well: `save(n) catch { };` goes on after the call. [Chapter 6]({{% relref "06-errors" %}}) describes handlers, and [chapter 7]({{% relref "07-optionals" %}}) the `else` of a `let`.
+
+The checker reads the form of the last statement of a block, never the values. These forms end the path when the parts named end it:
+
+- `return`, `fail`, and a call of a function that returns `never`, which [chapter 5]({{% relref "05-functions" %}}) describes.
+- A block, a `sync` block and the block of a `let` that ends a handler, through their last statement.
+- An `if` with an `else`, through every branch and the `else`. An `if let` through its block and its `else`.
+- A `switch` through every arm and its `else`. Without an `else` it ends the path on an enum or a variant alone, where it names every value. An arm that ends in `fallthrough` ends where the next arm does.
+- `while true do { }` whose body holds no `break` of its own. The condition is the literal `true`.
+- `do { } while c` whose body ends the path and holds no `break` or `continue` of its own, since the body runs before the condition.
+- A `select` through every arm, since it runs one arm and waits until a channel is ready. [Chapter 13]({{% relref "13-threads" %}}) describes it.
+- A `try` block whose body ends the path and whose handler ends the path of the function. A `yield;` in the handler goes on after the block, so such a handler does not end it.
+
+A `break` or a `continue` ends the path of a handler and of the `else` of a `let`, since both leave the statement. Inside the handler of a call in the condition of a `while` or a `do` loop they belong to that loop: `break` leaves it, and `continue` tests the condition again. The bounds and the step of a `for` run once before its first turn, so a `break` in a handler there belongs to the loop around the `for`, and is refused without one.
+
+```anti
+//! name: ends
+import anti.io;
+import anti.text;
+
+enum Dir { North, East, South, West }
+
+export fn turn(d: Dir) -> Dir
+{
+	switch d {
+		Dir.North => { return Dir.East; },
+		Dir.East => { return Dir.South; },
+		Dir.South => { return Dir.West; },
+		Dir.West => { return Dir.North; },
+	}
+}
+
+export fn first_zero(p: *int) -> int
+{
+	let i = 0;
+	while true do {
+		if p[i] == 0 {
+			return i;
+		}
+		i += 1;
+	}
+}
+
+fn checked(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n;
+}
+
+fn doubled(n: int) -> int
+{
+	try {
+		let v = checked(n);
+		return v * 2;
+	} catch e {
+		return -1;
+	}
+}
+
+fn halve(n: int) -> int
+{
+	let h = checked(n) catch {
+		yield 0;
+	};
+	return h / 2;
+}
+
+fn first_of(p: ?*int) -> int
+{
+	let v = p else {
+		return -1;
+	};
+	return *v;
+}
+
+fn count_ok(items: []int) -> int
+{
+	let ok = 0;
+	for x in items {
+		checked(x) catch {
+			continue;
+		};
+		ok += 1;
+	}
+	return ok;
+}
+
+fn stop(code: int) -> never
+{
+	io.println("stopping");
+	io.exit(code);
+}
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	let zs = [3, 1, 0, -4];
+	say(f"turn {turn(Dir.West) as int}, first_zero {first_zero(&zs[0])}");
+	say(f"doubled {doubled(4)} {doubled(-4)}, halve {halve(9)} {halve(-9)}");
+	say(f"first_of {first_of(&zs[1])} {first_of(none)}, count_ok {count_ok(zs[0..4])}");
+	stop(0);
+}
+```
+
+```text output
+turn 0, first_zero 2
+doubled 8 -1, halve 4 0
+first_of 1 -1, count_ok 3
+stopping
+```
+
+`turn` ends in a `switch` that names every value of `Dir`, `first_zero` in a `while true` without a `break`, and `doubled` in a `try` block whose body and handler both return. `main` ends in a call of `stop`, which returns `never`, so it needs no `return`.
+
+The checker refuses each of the following. Each could reach its end on some run, or the checker cannot tell from the form.
+
+```anti refused
+//! error: `sign` can reach its end without `return`
+fn sign(x: int) -> int
+{
+	if x > 0 {
+		return 1;
+	}
+	if x <= 0 {
+		return 0;
+	}
+}
+```
+
+```anti refused
+//! error: `name` can reach its end without `return`
+fn name(n: int) -> int
+{
+	switch n {
+		0 => { return 10; },
+		1 => { return 11; },
+	}
+}
+```
+
+```anti refused
+//! error: `spin` can reach its end without `return`
+fn spin(n: int) -> int
+{
+	while n >= 0 do {
+		if n == 5 {
+			return n;
+		}
+		n += 1;
+	}
+}
+```
+
+```anti refused
+//! error: `again` can reach its end without `return`
+fn again(n: int) -> int
+{
+	do {
+		if n > 3 {
+			continue;
+		}
+		return n;
+	} while n > 0
+}
+```
+
+```anti refused
+//! error: `parsed` can reach its end without `return`
+fn checked(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n;
+}
+
+fn parsed(n: int) -> int
+{
+	try {
+		let v = checked(n);
+		return v;
+	} catch e {
+		yield;
+	}
+}
+```
+
+```anti refused
+//! error: `stop` returns `never` and can reach its end
+extern fn exit(status: c_int) -> never;
+
+fn stop(n: int) -> never
+{
+	if n > 0 {
+		exit(n as c_int);
+	}
+}
+```
+
+```anti refused
+//! error: the handler of a value can reach its end without `yield`
+fn checked(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "negative";
+	}
+	return n;
+}
+
+fn halve(n: int) -> int
+{
+	let h = checked(n) catch {
+		let zero = 0;
+	};
+	return h / 2;
+}
+```
+
+```anti refused
+//! error: the `else` of a `let` leaves the block it stands in
+fn first_of(p: ?*int) -> int
+{
+	let v = p else {
+		let missing = -1;
+	};
+	return *v;
+}
+```
+
+```anti refused
+//! error: `break` outside a loop
+fn count() -> int may fail
+{
+	fail "no count";
+}
+
+fn total() -> int
+{
+	let t = 0;
+	for i in 0..count() catch { break; } {
+		t += i;
+	}
+	return t;
+}
+```
+
+```anti refused
+//! error: the anonymous function can reach its end without `return`
+fn apply(f: fn(int) -> int) -> int
+{
+	return f(1);
+}
+
+fn run() -> int
+{
+	return apply(fn(x) {
+		if x > 0 {
+			return x;
+		}
+	});
+}
+```
+
+### How antic builds it
+
+The checks cost nothing at run time: they decide which programs compile. What a program gains is that every path that remains ends in a `ret`, a call that never returns or a jump to code that runs.
+
+Lowering ends the block after a form that ends the path, the exit of a `while true` or the join after the arms of a `switch`, with `unreachable`. No path reaches that block, so it needs no `return` and runs no deferred statement.
+
+```ir excerpt=ends target=linux-x86_64 mode=dev
+export fn ends.turn(%0: i32) -> i32 range 0, 4 {
+...
+b6:
+    %5 = eq i8 %1, 3
+    branch %5, b7, b8
+b7:
+    ret i32 0
+b8:
+    jump b9
+b9:
+    unreachable
+}
+```
+
+`b6` is the test of the last arm, `Dir.West`, and `b7` its `return`. `b8` is the path for a value that no arm names, and it jumps to `b9`, the join after the `switch`, which is `unreachable`. A dev build writes no instruction for that block, and no trap.
+
+A release build reads `unreachable` as a fact: no value other than the four reaches the `switch`.
+
+```llvm excerpt=ends target=linux-x86_64 mode=release
+define internal noundef range(i32 0, 4) i32 @turn(i32 noundef %p0)
+b0:
+  %0 = icmp ult i32 %p0, 3
+  br i1 %0, label %switch.lookup, label %b6
+...
+b6:                                               ; preds = %b0
+  %v16 = icmp eq i32 %p0, 3
+  tail call void @llvm.assume(i1 %v16)
+  br label %common.ret
+```
+
+The first three arms became `p0 + 1`. The last compare is no longer a branch: `llvm.assume` records that `p0` is 3 on that path, and the return is 0. The code for a value outside `Dir` is gone.
+
+A call of a function that returns `never` ends its block with `unreachable` in the same way, and the function carries the LLVM attributes `noreturn` and `cold`.
+
+```llvm excerpt=ends target=linux-x86_64 mode=dev
+define hidden void @ends.stop(i64 noundef %p0) noreturn cold #0 {
+...
+  call void (i64) @ends.stop(i64 0)
+  unreachable
+```
+
+`noreturn` lets LLVM drop the code after each call, and `cold` places the paths that lead to it away from the hot ones.
+
+The fact holds as long as no value outside the enum reaches the `switch`. A value of an enum comes from a literal or from `n as Dir`. A dev build checks the `as` and stops the program with `value not declared by Dir: value 7`. A release build drops that check, and a `switch` that receives such a value then runs code that assumes another, with no defined result.
+
+Where it lives: `stmt_returns`, `stmt_leaves`, `switch_ends`, `loops_forever`, `do_ends`, `select_ends` and `try_ends` of `src/antic/sema_stmt.c` read the forms. `sema_check_function` of the same file gives the messages of a function, the `else` of a `let` is checked in `check_let`, and `refuse_handler_end` of `src/antic/sema_call.c` checks the handler of a value. `end_path` of `src/antic/lower_stmt.c` writes `unreachable`, and `src/antic/llvm_emit_function.c` writes `noreturn cold` on a function that returns `never`.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| A path the checker proves is never taken | a block with no instruction | nothing, and the compare before it may go |
+| A call of a `never` function | the call | the call, on a path placed as cold |
+| Heap allocations | 0 | 0 |
+| Calls into the runtime | 0 | 0 |
+| Checks inserted | none of their own. `n as Dir` checks the value | none |
+
+The check of `as` on an enum is the one that keeps the fact true. `--no-checks` drops it from a dev build, and a release build has it only with `--checks`.
+
+The forms that end a path without a `return`:
+
+- A `switch` on an enum or a variant without `else` ends the path and lets a release build drop the test of the last arm. A `switch` with an `else` that returns ends it too and keeps a path for every value.
+- `while true` ends the path where the loop leaves by `return` alone. A `while` with a condition needs a `return` after it, which costs nothing when no path reaches it.
+- A call of a `never` function ends a path that stops the program, as `io.exit`, `Error.fatal` or a function of the program that calls one of them.
+
+### Pitfalls
+
+For a Java programmer:
+
+- The rule reads the form alone, as Java's does. `while n >= 0` that never ends still needs a `return` after it.
+- `do { } while` whose body returns ends the path, where Java asks for a `return` after it.
+- A `switch` on an enum that names every value ends the path. Java's switch statement needs a `default` for that.
+
+For a C programmer:
+
+- A function with a result that can reach its end does not compile. No path returns an undefined value.
+- `if (x > 0) return 1; if (x <= 0) return 0;` is refused. The second test becomes an `else`.
+- A function that ends the program declares `-> never`, and every caller's path ends at the call.
+
+For a C++ programmer:
+
+- `-> never` is part of the type, not an attribute. The checker refuses a body of such a function that can reach its end.
+- A value of an enum outside its values exists only through `as`, which a dev build checks. A release build assumes the values of a complete `switch`, as `std::unreachable()` after it would.
