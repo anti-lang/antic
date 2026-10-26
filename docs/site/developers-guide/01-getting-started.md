@@ -3,7 +3,7 @@ title: "Getting started"
 description: "Installing the package of Anti, the first program, anti build and anti run, dev and release builds and where the files go."
 summary: "The package per platform and its one-command install, antic and anti, a first program, `anti build` and `anti run`, the dev and the release mode and the directories an install and a build write."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 10
 tags: [compilers, programming-languages]
@@ -120,10 +120,17 @@ antic [options] <file.anti> [<library.antl>...] [<object.o> <archive.a>...]
 | `--cpu <level>` | the processor level. [Chapter 20]({{% relref "20-targets" %}}) lists the levels |
 | `-S` | stop after writing the assembly text |
 | `-c` | write the library file `<file>.antl` of the module and stop |
-| `-I <dir>` | a search root: module `a.b` is `a/b.anti` or `a/b.antl` under it |
+| `-I <dir>` | a search root. An `import a.b;` reads the library file `a/b.antl` under it, and an input `a/b.anti` under it has the module path `a.b` |
 | `-g` | write the source positions and keep the debug sections |
 
-`antic --help` prints the options. Later chapters name eight of them again: `--checks`, `--no-checks`, `--asserts`, `--no-asserts`, `--trace`, `--no-trace`, `--no-hooks` and `--no-reflect`. An `import` resolves in one of three places: a library file on the command line, a file under a search root, or `std/` of the package.
+`antic --help` prints the options. Later chapters name eight of them again: `--checks`, `--no-checks`, `--asserts`, `--no-asserts`, `--trace`, `--no-trace`, `--no-hooks` and `--no-reflect`. An `import` resolves in one of three places: a library file on the command line, a library file under a search root, or `std/` of the package. A search root finds no source file, so a module of your own is compiled with `-c` first.
+
+| Exit status of antic | Meaning |
+|---|---|
+| 0 | the output is written |
+| 1 | antic refused the program, or a step of the build failed |
+| 2 | antic refused the command line |
+| 70 | memory ran out |
 
 `anti` is the tool for a project. It reads the manifest `anti.toml` and resolves the dependencies. It compiles through the driver of antic, which is linked into `anti`, and starts no `antic` process.
 
@@ -175,7 +182,7 @@ if t.equal("a", "a") {
 }
 ```
 
-`import anti.io.{println};` makes the listed public items of a module visible without its name. `import anti.text as t;` gives the module another name in the file. The guide has no chapter on modules, and "Modules" of `docs/anti-syntax-overview.md` holds their rules.
+`import anti.io.{println};` makes the listed public items of a module visible without its name. `import anti.text as t;` gives the module another name in the file. [Chapter 18]({{% relref "18-the-tool" %}}) holds the rules of modules, imports and visibility.
 
 ### Hello with antic alone
 
@@ -224,7 +231,13 @@ A dev build of `com.example.hello` on macos-arm64 writes these files.
 | `dist/macos-arm64/dev/hello` | the program, copied for delivery |
 | `dist/macos-arm64/dev/NOTICE.txt` | the licence notice of what the program links |
 
-The library file and each object under `obj/` have a file with the suffix `.key` beside them. The key is one line. It holds the SHA-256 of the input, the version of antic, the target and the processor level. It also says whether the build writes debug lines. The word `strict` follows in a build that refuses warnings and `memory-checks` in a build with `--memory-checks`. A build compiles a module again only when its key changes.
+The library file and each object under `obj/` have a file with the suffix `.key` beside them. The first line of a key holds the SHA-256 of the input, the version of antic, the target, the processor level and `g` or `no-g`, whether the output carries debug lines. The word `strict` follows in a build that refuses warnings, and `memory-checks` in a build with `--memory-checks`. The next lines hold the options the manifest gives the compile: the package and its version, the licence, the dependencies, the injections and `--strip-docs`. Last come the lines `import <path> <digest>`, one per library file the module reads, so a change of an imported module compiles the importer again. This is the key of the library file of `com.example.hello`. A build compiles a module again only when its key changes.
+
+```text
+4e202596e117f4eeaa3c351e089cc05c1a659eacc73ad5dee3f05392e117b74b 0.2.0 macos-arm64 armv8.5 no-g
+package com.example.hello 0.1.0
+import <runtime>/std/anti/io.antl e45c155563951d5911aec062ddb2cceff94697cba37d1a1cfad9611372d9fb91
+```
 
 `build/` is disposable, and `dist/` holds what a user runs. [Chapter 18]({{% relref "18-the-tool" %}}) describes the manifest, the lock file and the cache.
 
@@ -269,7 +282,7 @@ the product wrapped
 
 The output above is the release build. `args.len` is 1 without arguments, and 2 times 2 to the power 62 is one past the largest `int`. The release build wraps to the least `int`, which is negative.
 
-A dev build of the same file stops at the multiplication. It prints `grow.anti:6: overflow in *: left 2, right 4611686018427387904` to the standard error and aborts. The text stands in the dev module as a constant.
+A dev build of the same file stops at the multiplication. Saved as `grow.anti` without the `//!` line, which marks the block for the test of the guide, it prints `grow.anti:5: overflow in *: left 2, right 4611686018427387904` to the standard error and aborts. The text stands in the dev module as a constant.
 
 ```llvm excerpt=grow target=linux-x86_64 mode=dev
 overflow in *\00"
