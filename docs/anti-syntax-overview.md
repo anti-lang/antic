@@ -608,6 +608,20 @@ fn wire(p: *Panel)
 }
 ```
 
+An anonymous function stands in a function body alone, never at module level. `break` and `continue` inside it reach a loop inside it alone, and never one around it. A captured `?*T` keeps its declared type inside the closure, since the closure may run after the test that narrowed it. The closure tests it again:
+
+```anti refused
+//! error: `p` may be `none`, check it or use `?*T`
+struct Node { value: int }
+fn each(f: fn()) { f(); }
+
+let a = Node { value: 1 };
+let p: ?*Node = &a;
+if p != none {
+	each(fn() { let v = p.value; });
+}
+```
+
 A closure never outlives what it captures. It is passed to a parameter that does not keep it, or held in a local used the same way, and never stored in a field, a return value, a global or a `keep` parameter. Creating one allocates nothing. A parameter that passes its function on to `parallel` or `dispatch` is marked `concurrent`, and a closure there may change a captured variable only when its type is thread-safe. A worker takes a closure through a `concurrent` parameter alone. `snapshot fn` copies what it uses when it is made, is read-only, and holds numbers, `bool`, `char`, structs of those and `str`. It is accepted at an `own` field, a `keep own` parameter and a `concurrent` parameter, and a plain `keep` parameter refuses it. A parameter that does not keep its argument is two words, the code and a context pointer, and a plain kept function value stays one C function pointer. `own fn` is two words as well, the code and a snapshot on the heap that its owner frees. `=` does not copy it, and `dup` copies it with its snapshot. An `own` field of type `?fn(...)` takes `none`, as its default and with `=`, which frees the snapshot the field held. The header writes the two words of a parameter as a callback and a `void *` context, and an `own fn` field as a struct of the code and the snapshot. An `extern fn` takes C function pointers alone.
 
 ## Tuples
