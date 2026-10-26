@@ -2127,6 +2127,15 @@ io.println(s);
 free(s.ptr);
 ```
 
+```anti
+import anti.fs;
+import anti.log;
+
+let f = fs.open("app.log", fs.Mode.Append) catch fatal;
+fs.close(f) catch fatal;
+log.logger().set_level(log.Level.Warn);
+```
+
 The 23 modules, with their public items and the functions among them that may fail:
 
 | Module | Public items | May fail |
@@ -2138,21 +2147,21 @@ The 23 modules, with their public items and the functions among them that may fa
 | `anti.error` | `SystemError` with `from_errno` and `from_win32`, `on_fatal`, `check` | |
 | `anti.time` | `Duration` with `nanoseconds`, `microseconds`, `milliseconds`, `seconds`, `as_milliseconds`, `as_seconds`, `add` and `between`, `now`, `wall`, `sleep`, `Clock`, `SystemClock` | |
 | `anti.os` | `INTERRUPT`, `BREAK`, `TERMINATE`, `on_signal`, `signal_pending`, `user_config_dir`, `user_data_dir`, `user_cache_dir` | the three directories |
-| `anti.fs` | `Mode`, `File`, `open` with `Mode.Read` as its default, `read`, `write`, `flush`, `size`, `close`, `list`, `remove`, `rename`, `read_file`, `write_file`, `FileSystem`, `SystemFileSystem` | every function |
-| `anti.reflect` | `TypeId`, `Field`, `Function`, `describe`, `parent`, `name`, `field_count`, `field`, `function_count`, `function`, `get`, `set`, `new`, `call`, `ValueKind`, `Value`, `nothing`, `of_int`, `of_uint`, `of_float`, `of_bool`, `of_char`, `of_str`, `of_ptr`, `BAD_INDEX`, `NOT_CARRIED`, `WRONG_KIND`, `WRONG_COUNT` | `set`, `call` |
+| `anti.fs` | `Mode` with `Read`, `Write` and `Append`, `File`, `open` with `Mode.Read` as its default, `read`, `write`, `flush`, `size`, `close`, `list`, `remove`, `rename`, `read_file`, `write_file`, `FileSystem`, `SystemFileSystem` | every function |
+| `anti.reflect` | `TypeId`, `Field`, `Function`, `describe`, `parent`, `name`, `field_count`, `field`, `function_count`, `function`, `get`, `set`, `new`, `call`, `ValueKind`, `Value` with its union `Payload`, `nothing`, `of_int`, `of_uint`, `of_float`, `of_bool`, `of_char`, `of_str`, `of_ptr`, `BAD_INDEX`, `NOT_CARRIED`, `WRONG_KIND`, `WRONG_COUNT` | `set`, `call` |
 | `anti.random` | `Source`, `Random`, `SharedRandom` | |
-| `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `Changed`, `Snapshot<T>`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `find_one`, `update_one` and `remove_one` of every collection |
-| `anti.toml` | `Document`, `int_value`, `bool_value` | `Document.read` |
+| `anti.collection` | `Iterable<T>`, `Iterator<T>`, `Collection<T>`, `Indexed<T>`, `IndexedWalk<T>`, `Copies<T>`, `NotOne`, `Changed`, `Snapshot<T>`, `allocator`, `equal`, the hashing helpers `hash_in_order`, `hash_in_order_by`, `hash_in_any_order`, `hash_sum` and `hash_of_sum`, and the writers of the text of a collection | `find_one`, `update_one` and `remove_one` of every collection, `set_if_version` of `Pool`, of the synchronized collections and of `ConcurrentMap`, and `find_one_versioned` of the synchronized ones |
+| `anti.toml` | `Document`, `int_value`, `bool_value` | `Document.read`, `Document.open` |
 | `anti.config` | `Config`, `FileConfig`, `current`, `read` | `read` |
 | `anti.args` | `Parser`, `UNKNOWN_OPTION`, `MISSING_VALUE`, `FLAG_WITH_VALUE` | `Parser.parse` |
 | `anti.json` | `write`, `write_text`, `write_int`, `write_bool`, `member`, `unquote` | `unquote` |
-| `anti.log` | `Level`, `Format`, `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger`, `SinkLogger`, `Log`, `logger`, `set`, `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `level_name`, `level_of`, `register` | `FileSink.new` |
+| `anti.log` | `Level`, `Format`, `Sink`, `StderrSink`, `FileSink`, `CallbackSink`, `Logger` with `set_name`, `set_level` and `set_format`, `SinkLogger`, `Log`, `logger`, `set`, `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `level_name`, `level_of`, `register` | `FileSink.new` |
 | `anti.debug` | `backtrace` | |
 | `anti.mem` | `Allocator`, `LibcAllocator`, `ArenaAllocator`, `Shared<T>` | |
 | `anti.runtime` | `configure`, `get` | |
 | `anti.simd` | nothing of its own: the compiler knows `select`, `any` and `all` by name | |
 | `anti.trace` | `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal`, `Composite`, `start`, `install`, `PROFILE_SLOTS`, `JOURNAL_SLOTS`, `MESSAGE_BYTES`, `COMPOSITE_SLOTS` | |
-| `anti.plugin` | `Library` with `instance`, `supports`, `live` and `unload`, `load`, `NOT_LOADED`, `IN_USE` | `load`, `instance`, `unload` |
+| `anti.plugin` | `Library` with `instance_at`, `supports_at`, `live` and `unload`, which the forms `lib.instance(I)` and `lib.supports(I, "f")` call, `load`, `NOT_LOADED`, `IN_USE` | `load`, `instance_at`, `unload` |
 | `anti.regex` | `Error`, `BadPattern`, `TooExpensive`, `MissingGroup`, `LengthMismatch`, `compile`, `compile_bytes`, `Cursor`, `Matches`, `Pieces`, `ByteMatches`, `BytePieces`, and the functions behind the methods of `str` and `[]byte` | `compile`, `compile_bytes`, and a method with a compiled pattern |
 
 The 12 modules under `anti.collection`, each with the `operator fn eq` and `operator fn hash` of its classes:
