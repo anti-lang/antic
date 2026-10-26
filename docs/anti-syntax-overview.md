@@ -1215,6 +1215,19 @@ let g = n catch fatal;    // an anti.lang.NoneDereference on none
 let k = n ?? &default_node;
 ```
 
+The check narrows a name alone, and an assignment to the name ends the narrowing. A field such as `n.next` stays a `?*T` after its test, so the code binds it to a name first, with `let m = n.next else { }` or `if let`:
+
+```anti refused
+//! error: `n.next` may be `none`, check it or use `?*T`
+struct Node { value: int, next: ?*Node }
+
+let last = Node { value: 2, next: none };
+let n = Node { value: 1, next: &last };
+if n.next != none {
+	let v = n.next.value;
+}
+```
+
 `alloc T { }` returns `*T`, `alloc(T, n)` returns `?*T` as raw memory at the alignment of `T`. Every pointer in an `extern fn` is `?*T`. No pointer arithmetic beyond indexing. A function value follows the same rule: `fn(...)` never holds `none` and `?fn(...)` may.
 
 `p as *U` between two pointer types is a view, the same address read as another type. Bytes reach any memory, every pointer is one type and an integer meets its other sign. A struct holds its parts, an array its elements and a simd struct its lanes. Two structs of which neither holds the other keep apart. A view used where it stands reaches any memory, and a view passed on is a pointer of its own type. A release build orders loads and stores by these rules. "Aliasing of views" in `docs/anti-language-additions.md` holds them.
