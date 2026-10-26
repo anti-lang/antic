@@ -3,7 +3,7 @@ title: "C interop"
 description: "extern fn, the C types, the ABI of a call, anti bind, link, libraries for C with --lib and --bundle-runtime, and plugins across the boundary."
 summary: "`extern fn` and the C types, the ABI of a call, `anti bind`, `link`, libraries for C with `--lib` and `--bundle-runtime`, and plugins across the boundary, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 170
 tags: [compilers, programming-languages]
@@ -51,6 +51,8 @@ The rules of a declaration and of a call:
 - A parameter of function type takes a named function. A closure that captures a variable is refused, since C receives one pointer and no context.
 - A text literal ends in a zero byte, so `"hello".ptr` is a C string. `text.from_c(p)` of `anti.text` gives the `str` of a C string.
 - `may fail` and `export` are refused on an `extern fn`.
+- A parameter of an `extern fn` takes no default value, and no `lent`, `own`, `concurrent` or `keep own`. C keeps what it likes, tears nothing down and receives one function pointer. `keep` before a function parameter is accepted and changes nothing, since every function pointer of C is one word.
+- One C function has one signature in a program. A second `extern fn` of the same name in the module is `` `abs` is already declared ``, and one with another signature in another module stops the build with `` antic: app.anti declares `extern fn abs` with another signature than a library of the program ``.
 
 The symbol comes from the C library of the target, which every program links. It may also come from an object or an archive on the command line of antic, `antic main.anti helper.o libshapes.a`, or from a library that a `link` line names.
 
@@ -124,6 +126,27 @@ extern fn parse(s: ?*byte) -> c_int may fail;
 ```anti refused
 //! error: an `extern fn` cannot be exported
 export extern fn tick() -> c_int;
+```
+
+```anti refused
+//! error: an `extern fn` declares what C declares, and C has no default values
+extern fn abs(n: c_int = 3) -> c_int;
+```
+
+```anti refused
+//! error: an `extern fn` takes no `lent` parameter, since C may keep the pointer
+extern fn use_it(lent p: ?*byte);
+```
+
+```anti refused
+//! error: an `extern fn` takes plain C function pointers, and `keep own` holds a snapshot
+extern fn run(keep own f: fn(c_int));
+```
+
+```anti refused
+//! error: `abs` is already declared
+extern fn abs(n: c_int) -> c_int;
+extern fn abs(n: c_long) -> c_long;
 ```
 
 ```anti refused
@@ -277,6 +300,12 @@ The costs are the same in dev and in release.
 | Checks inserted | none, in either mode. The test of a `?*T` result is code the program writes |
 | Copies of code | none. One `declare` per function and module |
 
+The other ways to reach code that C compiled:
+
+- An `extern fn` written by hand suits a few functions of the C library, as `strlen` or `qsort`. Nothing checks it against a header.
+- `anti bind` writes the declarations of a whole header and a probe that checks every layout. It suits a library of more than a few functions, and an inline function needs its shim.
+- A plugin of Anti, the last section, is the form for code that is Anti on both sides. Its calls go through a table, two loads and an indirect call each, where a call of C is one `call`.
+
 `text.from_c(p)` is one call of `anti_rt_text_from_c`, which runs `strlen` and copies no byte. The `str` it gives is a view of the C string.
 
 ### Pitfalls
@@ -307,13 +336,16 @@ A C compiler passes the first arguments in registers and the rest on the stack, 
 
 ### The feature
 
-`export` gives an item of a module its place in C. It stands before `fn`, `struct`, `union`, `const` and `type`, and it implies `pub`.
+`export` gives an item of a module its place in C. It stands before `fn`, `struct`, `union`, `enum`, `variant`, `class`, `const` and `type`, and it implies `pub`.
 
 | Item | What C sees |
 |---|---|
 | `export fn dot(a: Vec2, b: Vec2) -> c_int` | the symbol `dot`, with no module in its name, and a prototype in the header |
 | `export struct Vec2 { x: c_int, y: c_int }` | a `typedef struct Vec2` with the same fields |
 | `export union Bits { whole: u32, parts: [4]u8 }` | a `typedef union Bits` |
+| `export enum Color { Red, Green }` | an `enum Color` with the values `Color_Red` and `Color_Green` |
+| `export variant Shape { Circle { r: f32 }, Empty }` | an `enum Shape_tag` and a `typedef struct Shape` of the tag and a union of the cases |
+| `export class Counter { ... }` | a `struct Counter` behind its table pointer, the struct of its table, its descriptor and the helpers `anti_Counter_init`, `anti_Counter_delete` and the others of [chapter 9]({{% relref "09-classes" %}}) |
 | `export const LIMIT: c_int = 8;` | a `#define`, or a `static const` for a `str` |
 | `export type IntList = List<int>;` | one copy of a generic struct or class, under the name `IntList` |
 
@@ -435,6 +467,19 @@ export fn code(c: char) -> int
 ```
 
 ```anti refused
+//! error: `operator fn eq` is not exported, since C has no operators
+export struct V
+{
+	x: c_int,
+}
+
+export operator fn eq(a: V, b: V) -> bool
+{
+	return a.x == b.x;
+}
+```
+
+```anti refused
 //! error: the parameter `p` of export fn `px` has type `P`, and `P` is not exported
 struct P
 {
@@ -487,6 +532,34 @@ retq
 
 On arm64 the two structs arrive in `x0` and `x1` the same way. The Microsoft convention passes a struct of 8 bytes in one register as well, and a `Box` by a pointer to a copy.
 
+A call from C needs no exported name. `sort4` hands `qsort` the address of `by_value`, and `qsort` calls it for each pair of elements. The machine code of both:
+
+```asm excerpt=geometry target=linux-x86_64 mode=release
+<geometry.by_value>:
+pushq %rbp
+movq %rsp, %rbp
+testq %rdi, %rdi
+je
+testq %rsi, %rsi
+je
+movl (%rdi), %eax
+subl (%rsi), %eax
+popq %rbp
+retq
+...
+<sort4>:
+leaq (%rip), %rcx
+movl $0x4, %esi
+movl $0x4, %edx
+jmp
+```
+
+- C passes the two pointers in `rdi` and `rsi`, the first two integer registers, and `by_value` reads them there. Anti and C agree on the registers, so `qsort` needs no stub.
+- The two tests against zero are the `catch fatal` of the two conversions. A null pointer from C jumps to the end, which calls `NoneDereference.new` and then `Error.fatal`, and the program stops.
+- The two loads and the `subl` are `*x - *y`, and the result leaves in `eax`, where `qsort` reads it.
+- `pushq %rbp` and `popq %rbp` keep the frame pointer, which the stack traces of [chapter 6]({{% relref "06-errors" %}}) walk.
+- `sort4` loads the address of `by_value` into `rcx`, the fourth argument, sets the count and the size to 4, and jumps to `qsort`.
+
 The C program below calls the library that "Libraries for C" builds from the module `geometry`.
 
 ```c
@@ -537,6 +610,8 @@ Where it lives: `src/antic/sema_export.c` and `src/antic/sema_declare.c` hold th
 | Checks of dev mode inside the function | the overflow checks of `a.x * b.x + a.y * b.y`, three in `dot` | none |
 | Atomic operations and locks | none | none |
 | Copies of code | one function per `export fn`. A release build may inline it into Anti callers and keeps the symbol |
+
+A struct of up to 16 bytes crosses in registers, and a larger one is copied to the stack by the caller. A C interface that passes large structs passes them by pointer, `*Box`, which costs one register. A `str` or a slice crosses as a pointer and a length, which the function puts back together. A `may fail` function adds one out pointer and a test of the result in C. It costs an object on the heap only on the path that fails.
 
 A check of dev mode that fails inside an exported function ends the process of the C program. `--no-checks` drops the checks from a dev build.
 
@@ -692,7 +767,7 @@ pub extern fn shapes_log(format: ?*byte, ...);
 pub extern fn point_length_squared(p: Point) -> c_float;
 ```
 
-The typedef `ShapeVisitor` is gone, and its function type stands where the header used the name. The comments of the header are not carried over.
+`--clang` reads the header against the sysroot of the target in the package, so a tree without a package passes `--runtime` with the runtime archive. The typedef `ShapeVisitor` is gone, and its function type stands where the header used the name. The comments of the header are not carried over.
 
 An inline function has no symbol in any library, so a call of it could not link. The shim gives it one. `shim_shapes.c` is a C file that the user compiles with the library:
 
@@ -758,6 +833,8 @@ A binding is declarations. It adds no code to a program, in dev or in release.
 | A bound constant | a constant of the module, folded where it is used |
 | Heap allocations, calls into the runtime, atomic operations, locks, checks | none |
 | Running `anti bind` | two runs of clang. It is a step of development and no step of a build |
+
+`anti bind --clang` reads the header as clang reads it, `#if` blocks and typedefs included. `anti bind <api.json>` takes a description that a project such as raylib publishes, and needs no clang. Declarations written by hand are the choice for a few functions, and they take no probe.
 
 ### Pitfalls
 
@@ -853,12 +930,12 @@ declare noundef ptr @XOpenDisplay(ptr noundef)
 
 The names reach the linker. On Linux, lld links the program as a position independent executable against the glibc sysroot of the package. It names the dynamic linker, the libraries of the `link linux` lines, libm and libc. It takes the runtime that was built against the headers of glibc 2.35. On macOS, lld receives `-framework Name` and reads the framework from the SDK.
 
-The table holds the two link modes of Linux, built on macOS for linux-x86_64. The first program has a `main` that calls `XOpenDisplay(none)` and prints `a display` with `io.println` when the result is not `none`. The second prints `a line` and calls nothing else.
+The table holds the two link modes of Linux, built on macOS for linux-x86_64 by antic of `c2806b61`. The first program has a `main` that calls `XOpenDisplay(none)` and prints `a display` with `io.println` when the result is not `none`. The second prints `a line` and calls nothing else.
 
 | Program | Bytes | Needed libraries | Interpreter |
 |---|---:|---|---|
-| with `--linux-lib X11` | 26,184 | `libX11.so.6`, `libc.so.6`, `libm.so.6` | `/lib64/ld-linux-x86-64.so.2` |
-| without | 227,760 | none | none |
+| with `--linux-lib X11` | 29,112 | `libX11.so.6`, `libc.so.6`, `libm.so.6` | `/lib64/ld-linux-x86-64.so.2` |
+| without | 228,800 | none | none |
 
 The second column is the output of `llvm-readobj --needed-libs` of the pinned tools.
 
@@ -922,9 +999,9 @@ The form of the library decides how the runtime reaches the C program.
 | `--lib static --bundle-runtime` | inside the archive | the archive, `-lpthread -lm` |
 | `--lib shared` | inside the shared library, every symbol of it hidden | the shared library |
 
-antic prints the link line of a static library when it has written it. Two static libraries of Anti in one C program share the one `libanti_rt.a`. Two bundled libraries in one program fail to link, with the duplicate symbol `anti_rt_bundle`.
+antic prints the link line of a static library when it has written it. On macOS the line lacks `-lpthread -lm`, which `libSystem` holds. Two static libraries of Anti in one C program share the one `libanti_rt.a`. Two bundled libraries in one program fail to link, with the duplicate symbol `anti_rt_bundle`.
 
-A C program calls an exported function without a call that starts anything. A static or a shared library starts its runtime from a constructor that runs when the library loads. No exported function checks for a start.
+A C program calls an exported function without a call that starts anything. A static or a shared library starts its runtime from a constructor, an entry of `.init_array` in its object. The constructor runs when the image that holds it loads. For a static library that is the start of the C program, before its `main`. No exported function checks for a start.
 
 Memory crosses as between two C libraries. A library takes its memory from the `malloc` of the process it runs in: `libgeometry.so` imports `malloc` and `free` as open names. C may therefore `free` what an exported function returned. The comment of each function says who frees what.
 
@@ -949,11 +1026,11 @@ For a Windows target the line names the libraries alone, as `geometry.lib` and t
 
 | File | Bytes | Contents |
 |---|---:|---|
-| `libgeometry.a`, static | 48,480 | `geometry.o` and `geometry.package.o` |
-| `libgeometry.a`, bundled | 362,292 | `geometry.bundled.o` and `geometry.package.o` |
-| `libgeometry.so` | 85,352 | the module and the runtime in one image |
+| `libgeometry.a`, static | 51,904 | `geometry.o` and `geometry.package.o` |
+| `libgeometry.a`, bundled | 381,062 | `geometry.bundled.o` and `geometry.package.o` |
+| `libgeometry.so` | 86,816 | the module and the runtime in one image |
 
-The header of all three is the same:
+The sizes are those of antic of `c2806b61` for linux-x86_64. The header of all three is the same, apart from its first comment. In the bundled form that comment adds that the archive holds the runtime and that one such archive goes into a program:
 
 ```c
 typedef struct Vec2 {
@@ -979,15 +1056,23 @@ void sort4(int32_t *numbers);
 
 The lines above stand between an include guard, the includes of `<stdbool.h>`, `<stddef.h>` and `<stdint.h>`, and an `extern "C"` block for C++.
 
-antic refuses a library form it cannot write.
+antic refuses a library form it cannot write, with one message each.
 
-```sh
-antic --lib shared --soname geometry.anti
-```
+| Command line | Message |
+|---|---|
+| `--lib shared --soname` | `antic: --soname needs --package-version` |
+| `--lib static --soname` | `antic: --soname gives a library of --lib shared its major version, and a library of --lib static has none` |
+| `--lib shared --bundle-runtime` | `antic: --bundle-runtime puts the runtime into a library of --lib static, and a library of --lib shared links it` |
+| `--lib static --no-runtime` | `antic: --no-runtime builds a plugin, which is a library of --lib shared` |
+| `--lib static --dev` | `antic: --lib static builds in release mode, without --dev` |
 
-```text
-antic: --soname needs --package-version
-```
+A module that exports nothing gets the warning `nothing-exported` from `--lib static`, which the release build of a library refuses as it refuses every warning: `the module exports nothing, and --lib static writes a library for C`. `allow(nothing-exported, "reason")` at the top of the file silences it.
+
+The name of a shared library follows its platform.
+
+- On Linux, `--soname --package-version 1.2.3` writes `libgeometry.so.1` with the soname `libgeometry.so.1`, and the link `libgeometry.so` beside it.
+- On macOS, every library has the install name `@rpath/libgeometry.dylib`, so a program finds it through its rpath. `--soname` adds the current version 1.2.3 and the compatibility version 1.0.0.
+- On Windows, lld-link runs with `/Brepro`, so two links of one input give equal bytes. Two builds of `geometry.dll` and `geometry.lib` for windows-x86_64 compare equal.
 
 ### How antic builds it
 
@@ -1008,7 +1093,7 @@ b0:
 
 A static library is an archive that `llvm-ar` of the package writes. Its second member, `geometry.package.o`, holds the package header of the library, which `anti license --from-archive` reads. `--bundle-runtime` links the object of the library and the objects of the runtime into one relocatable object, on Linux and Windows. On macOS the archive holds the library object, the runtime members and one marker member.
 
-A shared library is linked by lld with the runtime inside. Only the exported names are visible. The dynamic symbol table of `libgeometry.so` defines seven names: `dot`, `width`, `parse`, `checked`, `sort4`, `anti_licenses` and `anti_rt_backtrace_default`. The first five are the exported functions of the module. The other 40 dynamic symbols are functions of the C library that the image imports, such as `malloc`, `qsort` and `pthread_mutex_lock`. The image holds an `.init_array` section, whose entry starts the runtime when the library loads.
+A shared library is linked by lld with the runtime inside. Only the exported names are visible. The dynamic symbol table of `libgeometry.so` defines seven names: `dot`, `width`, `parse`, `checked`, `sort4`, `anti_rt_backtrace_default` and `anti_licenses`. The first five are the exported functions of the module. The other 43 dynamic symbols are functions of the C library that the image imports, such as `malloc`, `qsort` and `pthread_mutex_lock`. The image holds an `.init_array` section, whose entry starts the runtime when the library loads.
 
 The header writes a C type for each Anti type.
 
@@ -1019,7 +1104,9 @@ The header writes a C type for each Anti type.
 | `c_long`, `c_ulong`, `c_wchar` | `long`, `unsigned long`, `wchar_t` |
 | `*byte`, `?*byte` | `uint8_t *` |
 | `*T` | `T * /* non-null */` |
-| a `packed` struct, `align(N)` | `#pragma pack`, `ANTI_ALIGNAS(N)` |
+| a `packed` struct | `#pragma pack(push, 1)` and `#pragma pack(pop)` around it |
+| `align(N)` of a struct, a union or a variant that is not packed | `ANTI_ALIGNAS(N)` on its first field, `_Alignas` in C and `alignas` in C++ |
+| `align(N)` of a packed type and of a class | `ANTI_ALIGNED(N)` on the type, `__attribute__((aligned(n)))` or `__declspec(align(n))` of MSVC, which no `#pragma pack` caps |
 
 Where it lives: `src/antic/header.c` writes the header, `src/antic/driver_library.c` the archive and its bundle, and `src/antic/linker.c` the link of a shared library. `src/antic/llvm_emit.c` writes the constructor of a library, and `anti_rt_init` of `src/rt/init.c` is the start it runs.
 
@@ -1028,14 +1115,20 @@ Where it lives: `src/antic/header.c` writes the header, `src/antic/driver_librar
 | Cost | Count |
 |---|---|
 | A call from C | one `call`, as "The ABI of a call" shows |
-| The static archive of the example | 48,480 bytes, and the C program links `libanti_rt.a` once |
-| The bundled archive | 362,292 bytes, with the runtime of the level `v3` inside |
-| The shared library | 85,352 bytes, with the runtime inside |
-| Start of the runtime | once per process for a static library, once per shared library for a shared one |
+| The static archive of the example | 51,904 bytes, and the C program links `libanti_rt.a` once |
+| The bundled archive | 381,062 bytes, with the runtime of the level `v3` inside |
+| The shared library | 86,816 bytes, with the runtime inside |
+| Start of the runtime | once per process for a static library, before `main`. Once per shared library for a shared one, when it loads |
 | Threads | none until the first `parallel` or `dispatch` of the library, which starts the pool, as [chapter 13]({{% relref "13-threads" %}}) describes |
 | Checks | by the mode of the build, as for a program. A library of dev mode carries the checks into the C program |
 
 The sizes are those of release builds for linux-x86_64.
+
+The three forms answer three needs.
+
+- `--lib static` suits a C program that links one or more libraries of Anti. They share one runtime, and the C program names `libanti_rt.a` on its link line.
+- `--lib static --bundle-runtime` suits a C program that links one library of Anti and wants one archive to name. It costs the whole runtime inside the archive, 329,158 bytes more in the example, and a second bundled archive does not link.
+- `--lib shared` suits a library loaded by programs that are not built with it, or by another language. Each shared library carries a runtime of its own, its threads and its hash seed.
 
 ### Pitfalls
 
@@ -1047,7 +1140,7 @@ For a Java programmer:
 For a C programmer:
 
 - A `c_char` parameter is `int8_t` in the header, and `*byte` is `uint8_t *`. A `char *` of C passes with a cast.
-- The start of a static library is at its first use and not before `main`. The first call of an exported function pays it.
+- A static library starts its runtime before `main` of the C program, from a constructor of its object. No exported function pays for a start.
 - Two bundled archives in one program do not link. One of them is built without `--bundle-runtime`.
 - A failure Anti cannot report calls `abort()`. The first lines of the header say so.
 
@@ -1070,7 +1163,7 @@ A plugin is the third kind of shared library antic writes. It is for an Anti pro
 | Shared output | Built with | Holds a runtime | Visible symbols | Loaded by |
 |---|---|---|---|---|
 | A library for C | `--lib shared` | its own, hidden | the `export` items | the dynamic linker, for a C program |
-| A plugin | `--lib shared --no-runtime` | none | `anti_rt_provides` and `anti_licenses` | `plugin.load` of an Anti program |
+| A plugin | `--lib shared --no-runtime` | none | `anti_rt_provides`, `anti_rt_plugin_modules` and `anti_licenses` | `plugin.load` of an Anti program |
 | A host program | no option. `--closed` turns it off | its own, visible | its functions and data | the system |
 
 A plugin holds the code of its own module and nothing else. Every function of the runtime, the root class and the descriptor of each interface are names it leaves open. The loader of the system binds them to the host when the plugin loads. A plugin and its host therefore share one runtime, one allocator, one pool of threads and one set of class descriptors.
@@ -1136,15 +1229,15 @@ declare void @anti_lang_Object_created(ptr noundef nonnull dereferenceable(8))
 - The table has 18 entries: the descriptor, the seven functions of the root, the nine hooks and `greet`. Its second and third entries name functions of the root class, which the plugin does not define.
 - The `declare` line is one of those open names. In a program the runtime in the same link defines it. In a plugin the loader binds it to the host.
 
-The plugin of `tests/plugin`, the class `Fancy` of `net.example.fancy`, built for linux-x86_64 with its host:
+The plugin of `tests/plugin`, the class `Fancy` of `net.example.fancy`, built for linux-x86_64 with its host by antic of `c2806b61`:
 
 | Binary | Bytes | Dynamic symbols | Needed libraries |
 |---|---:|---|---|
-| `libfancy.so`, the plugin | 15,152 | 2 defined, 20 left open | none |
-| the host | 284,472 | 751 defined, 83 left open | `ld-linux-x86-64.so.2`, `libc.so.6`, `libm.so.6` |
-| the host with `--closed` | 352,528 | none | none |
+| `libfancy.so`, the plugin | 15,448 | 3 defined, 20 left open | none |
+| the host | 330,512 | 913 defined, 85 left open | `ld-linux-x86-64.so.2`, `libc.so.6`, `libm.so.6` |
+| the host with `--closed` | 388,216 | none | none |
 
-The 20 open names of the plugin are `anti_rt_descriptor`, `anti_rt_hook`, the descriptor of `Greeter`, the descriptor of the root class and its 16 functions. The two names it defines are `anti_rt_provides`, the table `plugin.load` reads, and `anti_licenses`.
+The 20 open names of the plugin are `anti_rt_descriptor`, `anti_rt_hook`, the descriptor of `Greeter`, the descriptor of the root class and its 16 functions. The three names it defines are `anti_rt_provides`, the table `plugin.load` reads, `anti_rt_plugin_modules`, the modules the plugin reaches, and `anti_licenses`.
 
 The closed host is larger than the open one because it is static. It holds musl and the allocator, where the open host takes the C library of the system.
 
@@ -1156,8 +1249,8 @@ Where it lives: `whole_hosts_plugins` and the test before `devirtualise` in `src
 |---|---|
 | A call from the host into a plugin | one dispatch through the table of the object: two loads and an indirect call |
 | A call from a plugin into the runtime | one call through the procedure linkage table of the plugin |
-| Bytes of the plugin of the example | 15,152, since it holds no runtime |
-| Bytes a host pays to be bound against | its dynamic symbol table, 834 names in the example |
+| Bytes of the plugin of the example | 15,448, since it holds no runtime |
+| Bytes a host pays to be bound against | its dynamic symbol table, 998 names in the example |
 | A Linux host | dynamic against glibc 2.35 or newer, where a closed program is static |
 | Heap allocations of an instance | one, of the size the descriptor of the class gives |
 | Atomic operations and locks | those of `plugin.load` and of the count of live objects, which [chapter 15]({{% relref "15-hooks" %}}) counts |
