@@ -1,16 +1,16 @@
 ---
 title: "Memory"
 description: "Pointers, slices and views, the aliasing of views, the bounds checks, anti.mem, the allocator, alloc and free, and --memory-checks."
-summary: "Pointers, slices and views with their aliasing, the bounds checks of dev mode, `anti.mem` and the allocator, `alloc` and `free`, and `--memory-checks`, each with how antic builds it and what it costs."
+summary: "Pointers, slices and views with their aliasing, the bounds checks of dev mode and the safety check `index-out-of-range`, `anti.mem` and the allocator, `alloc` and `free`, and `--memory-checks`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 120
 tags: [compilers, programming-languages]
 keywords: [pointers, slices, views, aliasing, bounds checks, allocator, AddressSanitizer, memory checks]
 ---
 
-A pointer is one machine address, and a slice is an address and a length. `alloc` is a call of `malloc` and `free` a call of `free`. A dev build checks every index of an array, a slice and a `str` against its length, and a release build drops that check. `--memory-checks` puts a call of AddressSanitizer before every load and store through a pointer.
+A pointer is one machine address, and a slice is an address and a length. `alloc` is a call of `malloc` and `free` a call of `free`. A dev build checks every index of an array, a slice and a `str` against its length, and a release build drops that check. The checker refuses, in every mode, an index it proves out of range. `--memory-checks` puts a call of AddressSanitizer before every load and store through a pointer.
 
 ## Pointers
 
@@ -80,7 +80,16 @@ A pointer has no arithmetic. `p + 1` and `q - p` are refused, a pointer does not
 
 `free` takes memory that `alloc` gave. It runs no teardown. An object of a class that owns something ends with `delete(p)`, which [chapter 11]({{% relref "11-ownership" %}}) holds.
 
-The checker does not follow the life of what a pointer points at. A pointer to a local may be returned, and a pointer may be read after `free`. Both compile, and both are errors of the program. `lent` of [chapter 11]({{% relref "11-ownership" %}}) is the checked form for a pointer that must not outlive a call.
+The checker follows the life of what a pointer points at within one function, by the two safety checks of [References to locals and uses after the end]({{% relref "11-ownership#references-to-locals-and-uses-after-the-end" %}}). `escaping-local` refuses a pointer to a local that is returned or stored where it outlives the local. `use-after-free` refuses a use of a value after `delete` or `destroy`. `free` ends no value for that check, so a read through a pointer after its `free` compiles and is an error of the program. `--memory-checks` reports it at run time. `lent` of [chapter 11]({{% relref "11-ownership" %}}) is the checked form for a pointer that must not outlive a call.
+
+```anti refused
+//! error: a reference to `x` is returned, and `x` ends at line
+fn address(n: int) -> *int
+{
+	let x = n;
+	return &x;
+}
+```
 
 ```anti
 //! name: ptrs
@@ -316,6 +325,13 @@ Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/a
 | Atomic operations and locks | 0 | 0 |
 
 A program for Linux links statically against musl and takes mimalloc as its `malloc` and `free`. A program for macOS or Windows, and a Linux program that links against glibc, takes the allocator of that C library.
+
+The counts choose where a value lives and how the program reaches it.
+
+- A local lives in the frame and costs no call. It is the form for a value whose life is the block, and the check `escaping-local` keeps every pointer to it inside that life.
+- `alloc T { }` costs one `malloc` and one `free`, and is the form for a value that outlives the function that makes it. A class that owns something ends with `delete(p)` instead of `free`.
+- `alloc(T, n)` costs one call of the runtime beside the allocation and gives `none` where `alloc T { }` ends the program. It is the form for a run of values whose count is known at run time alone.
+- A `*T` is 8 bytes and its index has no check in any mode. A `[]T` is 16 bytes and its index is checked in dev mode. A run of values that a function indexes travels as a slice, and a `*T` points at one value.
 
 ### Pitfalls
 
@@ -664,7 +680,7 @@ A slice passes in two registers on five targets and as a pointer to a copy of it
 For a Java programmer:
 
 - An array is a value. `let b = a;` copies every element, and a change of `b` leaves `a`.
-- A slice does not keep its elements alive. A slice of a local array is wrong once the function returns, and the checker does not refuse its `return`.
+- A slice does not keep its elements alive. The checker refuses the `return` of a slice of a local array. A slice of memory of `alloc` is wrong after its `free`, and nothing refuses that.
 - A part of a slice shares the elements. Java's `Arrays.copyOfRange` copies them, and `s[lo..hi]` refers to the originals.
 
 For a C programmer:
@@ -701,7 +717,17 @@ Two options of antic override the mode. `--checks` keeps the checks in a release
 
 `p[i]` of a pointer is not checked in any mode, since a pointer has no length.
 
-The checker refuses an index it proves out of range, in every mode. A constant index outside a fixed array is an error. The safety check `index-out-of-range` refuses the others it can prove. It knows the value of a constant and of `.len` of a fixed array, and the length of a slice or a `str` that the function never changes. It knows the value of a local that the function never assigns after its `let` and whose address it never takes. It knows every value that the variable of a `for` over a range takes, with its step. An index whose value lies below zero or at the length on every path that reaches it is refused. For the variable of a loop that holds when every turn runs to the end of the body and reaches the index. The body has no `break`, `continue`, `return`, `fail` or `yield`, and no `while` inside it. The index stands outside every `if` and every condition of the body. The message names the value and, in a loop, the line of the `for`.
+The checker refuses an index it proves out of range, in every mode. A constant index outside a fixed array is an error. The safety check `index-out-of-range` refuses the others it can prove. It knows these values within one function.
+
+- A constant, and `.len` of a fixed array and of a literal `str`.
+- The length of a slice or a `str` that the function never changes, which is unknown and 0 or more. The length of a part `a[lo..hi]` is `hi - lo`.
+- The value of a local that the function never assigns after its `let`. The function never takes its address and never names it as the place of a result.
+- Every value that the variable of a `for` over a range takes, with its step.
+- `+`, `-`, unary `-` and `*` by a constant of the values above.
+
+An index of one value that lies outside the length is refused wherever it stands. An index of the variable of a loop is refused when every turn runs to the end of the body and reaches the index. The body then holds no `break`, `continue`, `return`, `fail`, `yield` or `fallthrough`. It holds no call that a `try`, a `try` block or `catch fatal` hands an error on from, and no call of a function that returns `never`. It holds no `while`, no `do` and no walk of a collection. The index stands outside every `if` and every arm, outside the right side of `&&`, `||` and `??`, and outside a handler, an `assert` and a `defer`.
+
+An array whose length comes from `size_of` keeps the check of dev mode and is never refused, since its length differs between targets. The message names the value and, in a loop, the line of the `for`.
 
 ```anti refused
 //! error: the index reaches 4 on a turn of the `for` on line 7, outside `xs` of length 4 [index-out-of-range]
@@ -717,6 +743,40 @@ fn main() -> int
 ```
 
 The check refuses what it proves. An index it cannot follow, as one in a loop that may leave before its last turn, keeps the bounds check of dev mode. `unchecked(index-out-of-range, "reason")` overrules the check.
+
+`first_above` holds the same mistake, a range one past the length. The `return` inside the `if` may end the loop before its last turn, so the checker proves nothing and the program compiles.
+
+```anti
+//! name: proved
+import anti.io;
+import anti.text;
+
+export fn first_above(p: *int, n: int, limit: int) -> int
+{
+	let xs = []int { ptr: p, len: n };
+	for i in 0..xs.len + 1 {
+		if xs[i] > limit {
+			return i;
+		}
+	}
+	return -1;
+}
+
+fn main() -> int
+{
+	let nums: [4]int = [1, 5, 9, 2];
+	let line = f"first above 4: {first_above(&nums[0], 4, 4)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+first above 4: 1
+```
+
+With a limit of 10 no element is above it, and the loop reaches `xs[4]`. A dev build, or a release build with `--checks`, stops there with `proved.anti:8: index out of bounds: index 4, length 4`. A release build without `--checks` reads the 8 bytes after the array.
 
 `for x in s` walks from the first element to the last by the length of the slice and makes no check per element.
 
@@ -784,6 +844,8 @@ fn named(xs: []int) -> int
 
 ### How antic builds it
 
+The model is a test before the access. A dev build reads the length of the slice, the `str` or the array beside the index and compares the two. An index inside the length goes on to the load or the store. Any other index jumps to a call of the runtime that prints the message and ends the program, so the access never runs. A release build has neither the test nor the call: the access is the load or the store alone. `index-out-of-range` adds nothing to either, since it refuses a program at compile time and leaves the checks of an accepted one as they are.
+
 Lowering writes the check in every build. It is one unsigned comparison of the index with the length and a branch to a block that fails.
 
 ```ir excerpt=bounds target=linux-x86_64 mode=dev
@@ -838,6 +900,27 @@ b0:
 
 In that build of the example, the loop of `total` holds no index check. `i` runs from 0 to below `xs.len`, and the optimizer proves the comparison true. The one call of `anti_rt_check_failed` left in `total` is the overflow check of `sum +=`.
 
+An index that the checker could not refuse keeps its check, as in `first_above` of `proved`.
+
+```ir excerpt=proved target=linux-x86_64 mode=dev
+b1:
+    %13 = copy i64 %11
+    %14 = ptradd %3, offset_of []int.len
+    %15 = load i64 %14
+    %16 = load ptr %3
+    %17 = ult i8 %13, %15
+    branch %17, b9, b8
+...
+b8:
+    %18 = addr @proved.1
+    call void @anti_rt_check_failed(%18, 34, 0, %13, %15)
+    unreachable
+```
+
+- `b1` is the head of each turn. `%13` is `i`, and `%15` the length of `xs`, read from its slot on every turn.
+- `b8` is the failure that the run with a limit of 10 reaches at `i` equal to 4.
+- The range `0..xs.len + 1` itself carries a check as well, the overflow of the `+ 1`, which [Integers]({{% relref "03-values#integers" %}}) holds.
+
 Where it lives: `lower_bounds_check` of `src/antic/lower_check.c` writes the check of an index, and `lower_slice_bounds_check` of the same file that of a part. `optimize_drop_failures` of `src/antic/optimize.c` removes it, and `back_end` of `src/antic/driver.c` decides by the mode and the four options. `anti_rt_check_failed` of `src/rt/check.c` prints the message.
 
 ### What it costs
@@ -854,6 +937,13 @@ Where it lives: `lower_bounds_check` of `src/antic/lower_check.c` writes the che
 Each check adds the text of its message to the read-only data of a build that keeps it, 34 bytes for the check of `pick`. The check calls the runtime only when it fails. It allocates nothing and takes no lock.
 
 `--no-checks` gives a dev build the accesses of a release build and gives up the message. An index out of range is then a silent read or write of other memory. `--checks` gives a release build the message at the cost of the compare and the branch.
+
+The counts choose the form of an access.
+
+- `for x in s` and `for x in &s` make no check in any mode, and are the form for a walk over every element.
+- `s[i]` costs a compare and a branch in dev mode and nothing in release. It is the form for an index that the program computes.
+- `--checks` keeps that compare in release, where the optimizer removes it from a loop whose range it proves. It is the form for a program whose input decides its indices and whose release build must stop rather than read other memory.
+- `p[i]` of a pointer is never checked. It suits an index into memory of C or of `alloc(T, n)` whose length the program holds elsewhere. A slice `[]T { ptr: p, len: n }` brings the check back for the cost of one more word.
 
 ### Pitfalls
 
@@ -1206,6 +1296,13 @@ An `ArenaAllocator` is not thread-safe: `alloc` reads and writes its fields with
 
 The 100 points of the example cost one call into `counting` in place of 100, and no call to give them back one by one.
 
+The counts choose the source of memory.
+
+- `alloc` and `free` of the language call the C library directly, with no table and no indirect call. They are the form for code that has no reason to let its caller choose.
+- A `*Allocator` parameter adds two loads and an indirect call to each request. It is the form for a library or a collection whose caller decides where memory comes from.
+- `ArenaAllocator` serves a request that fits with a remainder and eight compares in release, and gives everything back with one `free` per block. It is the form for many short-lived values that end together, such as the values of one request or one frame. A value that must outlive the others goes elsewhere, since nothing is given back one by one.
+- A class of the program that inherits `Allocator` is the form for memory with rules of its own. `Counting` keeps a count of what is live.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1268,7 +1365,7 @@ READ of size 8 at 0x603000001c90 thread T0
 
 The report goes on with the place of the `free`, at line 7, and the place of the `alloc`, at line 5.
 
-The checks cover memory of the heap. An access to a local or to a global carries no check. The option therefore does not find an index past the end of a local array. The bounds check of dev mode finds that one.
+The checks cover memory of the heap. An access to a local or to a global carries no check. The option therefore does not find an index past the end of a local array, which the bounds check of dev mode finds. Nor does it find a read through a pointer to a local whose block has ended, which `escaping-local` refuses where one function shows it.
 
 The runtime marks the blocks it allocates at start and keeps until exit, so the leak report holds the leaks of the program alone.
 
@@ -1379,6 +1476,7 @@ Without the option `read` is two instructions, the load and `retq`. With it, the
 The rest of the option is in the link and in the module that holds `main`.
 
 - The program links the runtime of AddressSanitizer from the runtime archive, and `malloc` and `free` become those of that runtime.
+- A Linux program links dynamically against glibc 2.35, since the runtime of AddressSanitizer is built against glibc. Without the option it links statically against musl.
 - The module that holds `main` defines `__asan_default_options`, which turns the leak check on and makes a report exit with status 1.
 - The same module defines `anti_rt_memory_kept`, which the runtime calls for each block it keeps. It hands the block to `__lsan_ignore_object`.
 - The build writes the lines of `-g`, so a report names files and lines.
@@ -1430,9 +1528,9 @@ For a Java programmer:
 
 For a C programmer:
 
-- An access outside a local array or a global is not found. The checks cover the heap.
+- An access outside a local array or a global is not found, and neither is a read through a stale pointer into a frame. The checks cover the heap.
 - A checked program is far slower than a plain one, by the table above. A long test under the option needs a smaller input.
-- The option replaces `malloc`. A program for Linux then runs on the allocator of AddressSanitizer and not on mimalloc.
+- The option replaces `malloc`. A program for Linux then runs on the allocator of AddressSanitizer and not on mimalloc, and links against glibc and not against musl.
 
 For a C++ programmer:
 
