@@ -1807,16 +1807,7 @@ b6:                                               ; preds = %b0
 
 The first three arms became `p0 + 1`. The last compare is no longer a branch: `llvm.assume` records that `p0` is 3 on that path, and the return is 0. The code for a value outside `Dir` is gone.
 
-A call of a function that returns `never` ends its block with `unreachable` in the same way, and the function carries the LLVM attributes `noreturn` and `cold`.
-
-```llvm excerpt=ends target=linux-x86_64 mode=dev
-define hidden void @ends.stop(i64 noundef %p0) noreturn cold #0 {
-...
-  call void (i64) @ends.stop(i64 0)
-  unreachable
-```
-
-`noreturn` lets LLVM drop the code after each call, and `cold` places the paths that lead to it away from the hot ones.
+A call of a function that returns `never` ends its block with `unreachable` in the same way, and the function carries the LLVM attributes `noreturn` and `cold`. "never" of [chapter 5]({{% relref "05-functions#never" %}}) shows both.
 
 The fact holds as long as no value outside the enum reaches the `switch`. A value of an enum comes from a literal or from `n as Dir`. A dev build checks the `as` and stops the program with `value not declared by Dir: value 7`. A release build drops that check, and a `switch` that receives such a value then runs code that assumes another, with no defined result.
 
