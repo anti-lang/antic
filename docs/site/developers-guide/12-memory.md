@@ -251,7 +251,7 @@ fn end(n: int)
 
 ### How antic builds it
 
-A pointer is the type `ptr` of LLVM in both forms. `alloc T { }` is a call of `malloc` with the size of `T`, a test of the result and the stores of the literal.
+A pointer is the type `ptr` of LLVM in both forms. `alloc T { }` is a call of `malloc` with the size of `T`, a test of the result and the stores of the literal. A type that `align(N)` raises above 16 takes its memory from `anti_rt_alloc_aligned` at `N` instead, with the same test.
 
 ```llvm excerpt=ptrs target=linux-x86_64 mode=release
 define internal noundef nonnull ptr @make(i64 noundef %p0)
@@ -283,7 +283,8 @@ b2:
   ret ptr %v1
 ```
 
-- `i64 8` is the size of an `int` and `i64 16` the alignment of `malloc`. The last argument asks for zeroed memory, which an element type that is a class or owns something takes, and the runtime then calls `calloc`.
+- `i64 8` is the size of an `int` and `i64 16` the alignment of `malloc`. A type that `align(N)` raises above 16 passes `N`, and the runtime then takes the aligned memory of the platform, `posix_memalign` on macOS and Linux and `_aligned_malloc` on Windows.
+- The last argument asks for zeroed memory. A class takes it, and so does a type that `=` tears down, such as a struct that holds a class value or an `own` pointer. The runtime then calls `calloc`, or clears the aligned memory with `memset`.
 - The runtime multiplies, and a count below zero or a product past 64 bits gives `none` with no call of the allocator.
 - The call stays a call in a release build. A `malloc` in the program, whose memory goes to `free` alone, is one LLVM removes, and it takes the result as memory. The release build would then get memory where the dev build gets `none`.
 
@@ -308,7 +309,7 @@ retq
 
 Dev mode adds nothing to a dereference, to `alloc` or to `free`, and a release build removes nothing.
 
-Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/antic/lower_expr.c`, and `lower_new_memory` beside them. `anti_rt_out_of_memory` and `anti_rt_alloc_aligned` of `src/rt/mem.c`.
+Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/antic/lower_expr.c`, and `lower_new_memory` of `src/antic/lower.c`. `anti_rt_out_of_memory` and `anti_rt_alloc_aligned` of `src/rt/mem.c`.
 
 ### What it costs
 
@@ -318,8 +319,8 @@ Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/a
 | `&x`, `&s.f`, `&a[i]` | one address computation | the same |
 | `*p` and `p.f` | one load or store | the same |
 | `p[i]` | one load or store, no check | the same |
-| `alloc T { }` | one `malloc`, one compare, one branch, one store per field | the same |
-| `alloc(T, n)` | one call of the runtime, one compare of the count, one multiplication, one `malloc` or `calloc` | the same |
+| `alloc T { }` | one `malloc`, one compare, one branch, one store per field. Above an alignment of 16, one call of `anti_rt_alloc_aligned` in place of `malloc` | the same |
+| `alloc(T, n)` | one call of the runtime, one compare of the count, one multiplication, one `malloc` or `calloc`. Above an alignment of 16, the aligned memory of the platform | the same |
 | `free(p)` | one `free` | the same |
 | Checks inserted | none | none |
 | Atomic operations and locks | 0 | 0 |
@@ -594,7 +595,7 @@ define hidden void @slices.double_all(i64 %p0.0, i64 %p0.1) #0 {
 
 An array is its elements in place, in the frame or in the value that holds it, with no header.
 
-A part of a slice is an address computation and a subtraction. In the release build of `inner` both fold into the result.
+A part of a slice is an address computation and a subtraction. A dev build checks the bounds of the part before them, as [Bounds checks]({{% relref "12-memory#bounds-checks" %}}) shows. In the release build of `inner` both fold into the result.
 
 ```llvm excerpt=slices target=linux-x86_64 mode=release
   %v3 = add i64 %p1, -2
@@ -666,7 +667,7 @@ Where it lives: `ir_type_access` of `src/antic/ir.c` gives each access its type.
 |---|---|---|
 | Bytes of a `[]T` | 16 | 16 |
 | Bytes of a `[N]T` | `N` times the size of `T`, 40 for `[5]int` | the same |
-| `a[lo..hi]` | one address computation, one subtraction, no copy, no allocation | the same |
+| `a[lo..hi]` | one address computation, one subtraction, two compares and two branches of the bounds check, no copy, no allocation | one address computation, one subtraction |
 | `[]T { ptr: p, len: n }` | two stores | the same |
 | `=` of an array, and an array as an argument | a copy of all its bytes | the same |
 | `p as *U` | nothing | nothing |
@@ -1289,7 +1290,7 @@ Where it lives: `Allocator`, `LibcAllocator` and `ArenaAllocator` of `src/std/an
 | `ArenaAllocator.alloc` that does not fit | one `alloc` of `from` | the same |
 | `ArenaAllocator.free` | an empty function | the same |
 | `free_all()` | one `free` of `from` per block | the same |
-| Bytes of a block the allocator uses itself | 8, the link to the next block | the same |
+| Bytes of a block the allocator uses itself | 8, the link to the next block, and the padding to the alignment of the request that took the block | the same |
 | Locks and atomic operations | 0 | 0 |
 
 An `ArenaAllocator` is not thread-safe: `alloc` reads and writes its fields without a lock. `LibcAllocator` is as thread-safe as the C library.
@@ -1314,7 +1315,7 @@ For a C programmer:
 
 - `free(p)` of the language on memory of an `Allocator` is wrong. The memory goes back through `from.free(p)`.
 - The memory of `alloc(size, align)` is not zeroed. A class value assigned into it needs a `memset` first, since `=` tears down what the bytes seem to hold.
-- A request above the block size works. It takes a block of its own and wastes nothing.
+- A request above the block size works. It takes a block of its own, as large as the request and the link, which becomes the head block. The room left in the block before it is not handed out again.
 
 For a C++ programmer:
 
