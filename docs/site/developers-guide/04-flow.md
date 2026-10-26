@@ -403,7 +403,7 @@ sum_to 10, total_of 7
 iterator 64 bytes
 ```
 
-`List<int>` of the example is the growing sequence of `anti.collection`, which [chapter 16]({{% relref "16-collections" %}}) describes. A collection is any type with `operator fn iter(self)`, which gives a new iterator on each call. An iterator is any type with `operator fn next(self) -> bool` and `operator fn value(self) -> T`. `for x in c` calls `iter` once, then `next` before each turn and `value` at the head of each turn. `for x in it` walks an iterator in its place. A class of the program takes part by declaring the three hooks, and [chapter 9]({{% relref "09-classes" %}}) shows one.
+`List<int>` of the example is the growing sequence of `anti.collection`, which [chapter 16]({{% relref "16-collections" %}}) describes. A collection is any type with `operator fn iter(self)`, which gives a new iterator on each call. An iterator is any type with `operator fn next(self) -> bool` and `operator fn value(self) -> T`. `for x in c` calls `iter` once, then `next` before each turn and `value` at the head of each turn. `for x in it` walks an iterator in its place. A type of the program takes part by declaring the three hooks, and "Walking a collection" of [chapter 16]({{% relref "16-collections#walking-a-collection" %}}) shows one.
 
 `for x in e` copies each element, and the loop tears the copy down at the end of each turn, on every exit of the body. `for x in &e` copies nothing. Over a collection it binds what the `value` of the iterator returns, a `lent *T` for a list. [Chapter 11]({{% relref "11-ownership" %}}) describes lent pointers.
 
