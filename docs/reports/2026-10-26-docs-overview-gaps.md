@@ -219,3 +219,21 @@ No section is removed.
 - No suite ran, since the report is the one changed file, under `docs/`. The message
   texts of "Messages" in `docs/anti-language-additions.md` were not
   compared with the code, since they stand outside the overview.
+
+## State after the push of the report
+
+`git log --oneline -3`:
+
+```text
+73f1b5db Report the gaps between the syntax overview and the built language
+bceb991d Report the step of the defects T201 and T202
+6f705989 Count the suite of the step of the defects T201 and T202
+```
+
+`git status --short` printed nothing, and `git rev-parse HEAD
+origin/main` printed one hash twice:
+
+```text
+73f1b5db923e1a7d808e0d3ca00096a5eb5da869
+73f1b5db923e1a7d808e0d3ca00096a5eb5da869
+```
