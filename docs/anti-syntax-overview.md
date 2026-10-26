@@ -342,7 +342,7 @@ value
 
 ## Statements
 
-`if`, `else if`, `else`. `if let x = e { }` binds the value of a `?T`, or the fields of a variant case as `if let Circle c = s { }`, and `else if let` continues a chain. `switch` names one value per arm, and an enum value with its type, `Kind.Circle`. Two arms of one value are refused, also where one is written as `size_of(i64)` and the other as `8`. An arm is a call, an assignment or a block, and one `else` takes the rest. It falls through only where an arm ends in `fallthrough;`. Assignment is a statement, and `*p = f() catch e { }` handles the error of the call that fills a place. Blocks `{ }` are statements. `defer` and `undo` each hold one statement. A `defer` whose statement is another `defer` is refused, and so is an `undo` inside a `defer` or inside another `undo`. `assert(cond)` and `assert(cond, "message")`, whose message is a string literal. `yield v;` and `yield;` end the handler of a `catch`, see [Errors](#errors).
+`if`, `else if`, `else`. `if let x = e { }` binds the value of a `?T`, or the fields of a variant case as `if let Circle c = s { }`, and `else if let` continues a chain. `switch` names one value per arm, and an enum value with its type, `Kind.Circle`. Two arms of one value are refused, also where one is written as `size_of(i64)` and the other as `8`. An arm is a call, an assignment or a block, and one `else` takes the rest. It falls through only where an arm ends in `fallthrough;`. Assignment is a statement, and `*p = f() catch e { }` handles the error of the call that fills a place. `(r, f) = e;` assigns both parts of the flags form of [Operators](#operators) to two variables, where `e` is a `+`, `-`, `*`, `<<`, `>>` or unary `-`. Blocks `{ }` are statements. `defer` and `undo` each hold one statement. A `defer` whose statement is another `defer` is refused, and so is an `undo` inside a `defer` or inside another `undo`. `assert(cond)` and `assert(cond, "message")`, whose message is a string literal. `yield v;` and `yield;` end the handler of a `catch`, see [Errors](#errors).
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -392,6 +392,9 @@ undo fs.remove(path) catch e { e.print(); };
 assert(n > 0, "n must be positive");
 *slot = text.parse_int("7") catch { yield 0; };
 fs.flush(f) catch { yield; };
+
+let (sum, carried) = x + n;
+(sum, carried) = sum + n;
 ```
 
 ```anti not-built
