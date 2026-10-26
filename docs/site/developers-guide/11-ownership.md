@@ -600,7 +600,7 @@ class Box
 	}
 }
 
-fn take(own b: Box) -> int
+fn consume(own b: Box) -> int
 {
 	return b.n;
 }
@@ -623,8 +623,8 @@ fn end(own p: *Box)
 fn main() -> int
 {
 	let a = Box.make(1);
-	io.println("take(a)");
-	let n = take(a);
+	io.println("consume(a)");
+	let n = consume(a);
 	io.println("pass(b)");
 	let b = Box.make(2);
 	let c = pass(b);
@@ -653,7 +653,7 @@ fn main() -> int
 ```
 
 ```text output
-take(a)
+consume(a)
   destruct 1
 pass(b)
 dup(c)
@@ -668,7 +668,7 @@ end of main
   destruct 2
 ```
 
-`a` moves into `take`, which tears it down at its exit. `b` moves into `pass` and out again into `c`, and no `destruct` runs. `d` is a copy with a cell of its own, so the write of 33 leaves the 20 of `c`. `k` is an `int`, is copied into `next`, and is read after the call. At the end of `main` the two locals that still hold a value go, last to first. `a` and `b` moved and print nothing.
+`a` moves into `consume`, which tears it down at its exit. `b` moves into `pass` and out again into `c`, and no `destruct` runs. `d` is a copy with a cell of its own, so the write of 33 leaves the 20 of `c`. `k` is an `int`, is copied into `next`, and is read after the call. At the end of `main` the two locals that still hold a value go, last to first. `a` and `b` moved and print nothing.
 
 The next program moves a value into each of the other places.
 
@@ -855,21 +855,21 @@ fn main() -> int
 ```
 
 ```anti refused
-//! error: `a` was moved into `take` on line 14 [use-after-free]
+//! error: `a` was moved into `consume` on line 14 [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
 	pub n: int = 0,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
 fn main() -> int
 {
 	let a = Box { };
-	take(a);
+	consume(a);
 	return a.n;
 }
 ```
@@ -883,14 +883,14 @@ class Box
 	pub n: int = 0,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
 fn main() -> int
 {
 	let a = Box { };
-	take(a);
+	consume(a);
 	a = Box { n: 2 };
 	return a.n - 2;
 }
@@ -903,7 +903,7 @@ class Box
 	pub n: int = 0,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
@@ -911,9 +911,9 @@ fn main() -> int
 {
 	let a = Box { };
 	if a.n == 0 {
-		take(a);
+		consume(a);
 	} else {
-		take(a);
+		consume(a);
 	}
 	return 0;
 }
@@ -922,13 +922,13 @@ fn main() -> int
 The checker refuses each of the following.
 
 ```anti refused
-//! error: `a` was moved into `take` on line 14 in the turn before [use-after-free]
+//! error: `a` was moved into `consume` on line 14 in the turn before [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
@@ -936,21 +936,21 @@ fn main() -> int
 {
 	let a = Box { };
 	for i in 0..2 {
-		take(a);
+		consume(a);
 	}
 	return 0;
 }
 ```
 
 ```anti refused
-//! error: `a` moves into `take` while a `defer` or an `undo` names it
+//! error: `a` moves into `consume` while a `defer` or an `undo` names it
 class Box
 {
 	pub own data: ?*int = none,
 	pub n: int = 0,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
@@ -962,20 +962,20 @@ fn main() -> int
 {
 	let a = Box { };
 	defer show(a.n);
-	take(a);
+	consume(a);
 	return 0;
 }
 ```
 
 ```anti refused
-//! error: `a` is captured by a closure, which may read it after it moves into `take`
+//! error: `a` is captured by a closure, which may read it after it moves into `consume`
 class Box
 {
 	pub own data: ?*int = none,
 	pub n: int = 0,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
@@ -983,7 +983,7 @@ fn main() -> int
 {
 	let a = Box { };
 	let read = fn() -> int { return a.n; };
-	take(a);
+	consume(a);
 	return read();
 }
 ```
@@ -1032,20 +1032,20 @@ fn main() -> int
 ```
 
 ```anti refused
-//! error: `Box` has `own` fields, and a value that stays where it is does not move into `take`, use `dup`
+//! error: `Box` has `own` fields, and a value that stays where it is does not move into `consume`, use `dup`
 class Box
 {
 	pub own data: ?*int = none,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
 fn main() -> int
 {
 	let boxes: [2]Box = [Box { }, Box { }];
-	take(boxes[0]);
+	consume(boxes[0]);
 	return 0;
 }
 ```
@@ -1090,7 +1090,7 @@ A move is a copy of the bytes and one store. The store writes zero into the tabl
 ```ir excerpt=moves target=linux-x86_64 mode=dev
     memcopy %11, %0, moves.Box
     store ptr 0, %0
-    %12 = call i64 @moves.take(%11)
+    %12 = call i64 @moves.consume(%11)
 ```
 
 - `%0` is the slot of `a` in the frame of `main`, and `%11` is a second slot of the same frame.
@@ -1106,7 +1106,7 @@ The LLVM module shows the same three steps.
   %v14 = load ptr, ptr %t0, align 8
   store ptr null, ptr %v14, align 8
   %v15 = load ptr, ptr %t7, align 8
-  %v16 = call i64 (ptr) @moves.take(ptr byval([24 x i8]) align 8 %v15)
+  %v16 = call i64 (ptr) @moves.consume(ptr byval([24 x i8]) align 8 %v15)
 ```
 
 `byval([24 x i8])` is how linux-x86_64 passes a class value of 24 bytes: in the memory of the stack. On arm64 the same parameter is a plain pointer to the bytes in the frame of the caller.
@@ -1114,7 +1114,7 @@ The LLVM module shows the same three steps.
 The function that took the value tears it down at its exit, and tests the table first, since the value may have moved on.
 
 ```ir excerpt=moves target=linux-x86_64 mode=dev
-fn moves.take(%0: agg moves.Box) -> i64 {
+fn moves.consume(%0: agg moves.Box) -> i64 {
 b0:
     %1 = ptradd inbounds %0, offset_of moves.Box.n
     %2 = load i64 %1 !type moves.Box.n
@@ -1229,7 +1229,7 @@ The lowering is the same in dev and in release. The table gives what it writes f
 
 A move costs no atomic operation and takes no lock. The test before the teardown of a local stands in both modes, and no option removes it. The checks that `dup` makes are the tests for a zero table, in both modes.
 
-In the release build of the example opt inlined `take` and `pass` into `main`, and neither function stands in the module.
+In the release build of the example opt inlined `consume` and `pass` into `main`, and neither function stands in the module.
 
 Three forms give a function a value of an owning type, and the rows above choose between them.
 
@@ -1745,7 +1745,7 @@ fn grow(lent p: *Box)
 	p.n += 10;
 }
 
-fn take(own b: Box) -> int
+fn consume(own b: Box) -> int
 {
 	return b.n;
 }
@@ -1772,10 +1772,10 @@ fn main() -> int
 	let line = f"look {seen}, a.n {a.n}";
 	io.println(line);
 	free(line.ptr);
-	io.println("take(a)");
-	let n = take(a);
-	io.println("take of a literal");
-	n += take(Box { n: 2 });
+	io.println("consume(a)");
+	let n = consume(a);
+	io.println("consume of a literal");
+	n += consume(Box { n: 2 });
 	io.println("larger");
 	let big = larger(Box { n: 3 }, Box { n: 4 });
 	let p = alloc Box { n: 5 };
@@ -1789,9 +1789,9 @@ fn main() -> int
 
 ```text output
 look 101, a.n 12
-take(a)
+consume(a)
   destruct 12
-take of a literal
+consume of a literal
   destruct 2
 larger
   destruct 3
@@ -1843,31 +1843,31 @@ class Box
 	pub own data: ?*int = none,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
 fn hand_on(b: Box)
 {
-	take(b);
+	consume(b);
 }
 ```
 
 ```anti refused
-//! error: `b` was moved into `take` on line 12 [use-after-free]
+//! error: `b` was moved into `consume` on line 12 [use-after-free]
 class Box
 {
 	pub own data: ?*int = none,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
 fn twice(own b: Box)
 {
-	take(b);
-	take(b);
+	consume(b);
+	consume(b);
 }
 ```
 
@@ -1887,19 +1887,19 @@ fn bind(own b: Box) -> int
 ```
 
 ```anti refused
-//! error: `Box` has `own` fields, and a value that stays where it is does not move into `take`, use `dup`
+//! error: `Box` has `own` fields, and a value that stays where it is does not move into `consume`, use `dup`
 class Box
 {
 	pub own data: ?*int = none,
 }
 
-fn take(own b: Box)
+fn consume(own b: Box)
 {
 }
 
 fn from_pointer(p: *Box)
 {
-	take(*p);
+	consume(*p);
 }
 ```
 
@@ -1930,14 +1930,14 @@ define hidden void @calls.bump(ptr noundef nonnull dereferenceable(24) %p0) #0 {
 ...
 define hidden void @calls.grow(ptr noundef nonnull dereferenceable(24) %p0) #0 {
 ...
-define hidden noundef i64 @calls.take(ptr byval([24 x i8]) align 8 %p0) #0 {
+define hidden noundef i64 @calls.consume(ptr byval([24 x i8]) align 8 %p0) #0 {
 ...
 define hidden void @calls.end(ptr noalias noundef nonnull dereferenceable(24) %p0) #0 {
 ...
 define hidden void @calls.larger(ptr sret([24 x i8]) align 8 %sret, ptr byval([24 x i8]) align 8 %p0, ptr byval([24 x i8]) align 8 %p1) #0 {
 ```
 
-- `look` and `take` receive a `Box` by value. A value of 24 bytes passes in the memory of the stack on linux-x86_64, which `byval` says. The plain parameter and the `own` one have the same type.
+- `look` and `consume` receive a `Box` by value. A value of 24 bytes passes in the memory of the stack on linux-x86_64, which `byval` says. The plain parameter and the `own` one have the same type.
 - `bump` and `grow` receive a pointer. `nonnull` and `dereferenceable(24)` come from the type `*Box`, and `lent` adds nothing.
 - `end` receives an `own` pointer, which is `noalias`: the optimizer may assume that no other pointer of the function reaches the object.
 - `larger` returns a `Box` through the pointer `%sret`, which the caller passes.
@@ -1954,10 +1954,10 @@ The difference between the plain and the `own` parameter is in the code around t
 ...
     memcopy %26, %0, calls.Box
     store ptr 0, %0
-    %27 = call i64 @calls.take(%26)
+    %27 = call i64 @calls.consume(%26)
 ```
 
-`%0` is the slot of `a`. `look` receives its bytes and `bump` its address, and the IR of antic writes both as `%0`. The call of `take` has the copy and the store of a move.
+`%0` is the slot of `a`. `look` receives its bytes and `bump` its address, and the IR of antic writes both as `%0`. The call of `consume` has the copy and the store of a move.
 
 A function with two `own` parameters tears down on each exit the one that did not move.
 
@@ -2008,7 +2008,7 @@ The table chooses the parameter. A pointer, plain or `lent`, is one register for
 For a Java programmer:
 
 - A parameter of a class type is the value. A write to its field stays in the function. A parameter of type `*Box` is the reference.
-- After `take(a)` the name `a` is gone. Java has no call that ends the caller's variable.
+- After `consume(a)` the name `a` is gone. Java has no call that ends the caller's variable.
 
 For a C programmer:
 
@@ -2018,7 +2018,7 @@ For a C programmer:
 
 For a C++ programmer:
 
-- The move is at the call site without a word. `take(a)` moves, where C++ writes `take(std::move(a))`.
+- The move is at the call site without a word. `consume(a)` moves, where C++ writes `consume(std::move(a))`.
 - A plain value parameter is the bytes of the argument. No copy constructor runs, and what the bytes own stays with the caller.
 - `return b;` of a plain parameter is refused, where C++ copies or moves. The parameter needs `own`, or the function returns `dup(b)`.
 
