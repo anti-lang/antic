@@ -1,13 +1,13 @@
 ---
 title: "Concurrent classes"
-description: "Synchronized and concurrent classes, the hidden lock, guarded fields, sync blocks, the lock order checks of dev mode, and the thread-safe collections."
-summary: "`synchronized class` with its hidden lock, `concurrent class` with its guarded fields, `sync` blocks, the lock order checks of dev mode and the thread-safe collections of `anti.collection`, each with how antic builds it and what it costs."
+description: "Synchronized and concurrent classes, the hidden lock, guarded fields, sync blocks, the lock order checks of the compiler and of dev mode, and the thread-safe collections."
+summary: "`synchronized class` with its hidden lock, `concurrent class` with its guarded fields, `sync` blocks, the safety check `lock-order` and the lock order check of dev mode, and the thread-safe collections of `anti.collection`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 140
 tags: [compilers, programming-languages]
-keywords: [synchronized class, concurrent class, hidden lock, guarded fields, sync block, lock order, thread-safe collections]
+keywords: [synchronized class, concurrent class, hidden lock, guarded fields, sync block, lock order, deadlock, thread-safe collections]
 ---
 
 A class is thread-safe when it is declared so, and the checker holds it to the declaration. A `synchronized class` has one hidden lock of 24 bytes per object, and every function that is not private runs under it. A `concurrent class` has no hidden lock. Each of its fields is guarded by a `Mutex` the class names, is atomic, or is written by `construct` alone.
@@ -228,18 +228,38 @@ fn poke(t: *Tally)
 }
 ```
 
+```anti refused
+//! error: `put` of the thread-safe class `Tally` stores a pointer into its fields outside the object, store a copy
+synchronized class Tally
+{
+	count: int = 0,
+
+	pub fn put(self, out: **int) { *out = &self.count; }
+}
+```
+
+```anti refused
+//! error: `pair` of the thread-safe class `Tally` gives out a pointer into its fields, return a copy
+synchronized class Tally
+{
+	count: int = 0,
+
+	pub fn pair(self) -> (*int, int) { return (&self.count, 1); }
+}
+```
+
 For a synchronized class the checker proves the following, each by the rules above.
 
 - Every access of a field stands in `construct`, in `destruct` or in a function with `self` of the class or of a class below it.
 - Every such function that code outside the class can call holds the lock of `self` from its first statement to its exit.
-- No such function hands a pointer or a slice into the fields to its caller or to a function value.
+- No such function gives a pointer or a slice into the fields away. It does not return one, alone, inside a tuple or a struct, or as the result of a private function of the class. It passes none to a function value. It stores none through an out parameter, in another object or in a global.
 
 It leaves the following to the programmer.
 
 - A function reaches the fields of another object of its class, `other.count`, under the lock of `self` alone. `sync self, other { }` takes both.
 - A function without `self` may call a private function on an object. That call runs with no lock.
-- A private function may return a pointer into the fields, and a pointer stored in a field of the object leads out of it. What it points at is not under the lock. A function that is not private gives neither out, also inside a tuple or a struct. It does not return the result of such a private function either. A function that is not private stores no pointer into the fields through an out parameter or in another object.
-- Two objects locked in opposite orders by two threads wait for each other. The dev build reports the two orders at run time, as a later section describes.
+- A private function may return a pointer into the fields to the class, and a pointer that a field holds leads out of the object. What it points at is not under the lock.
+- Two objects of one class locked in opposite orders by two threads wait for each other. The safety check `lock-order` names a lock by its class, so it sees one lock there and no cycle. The dev build reports the two orders at run time. Both checks have sections of their own below.
 
 ### How antic builds it
 
@@ -354,6 +374,8 @@ Where it lives: `sema_safety_declare`, `sema_hidden_lock` and `sema_check_reach`
 | The record of the order | per lock that is not taken again | 0 |
 
 No flag turns the lock off. A class that does not need it is declared without `synchronized`.
+
+The lock is the price of the proof. A plain class with a `Mutex` field costs 4 bytes, or 8 on Windows, where the hidden lock costs 24. It takes the lock only where the program writes a `sync`, and the checker holds no field to that `Mutex`. A concurrent class of the next section takes a lock only around the fields it guards and reads a fixed field or an atomic with no lock at all. A synchronized class is the better form when every public function changes its state. A run of calls on one object is cheapest under one `sync obj`, as the section on `sync` blocks counts.
 
 The copies of code are one unlock call per exit of a function that opt keeps apart. `take` has two exits in the source and one unlock after opt.
 
@@ -725,7 +747,7 @@ The fourth refusal above follows from the first rule. `peek` reads `units` with 
 
 It leaves the following to the programmer.
 
-- The order of the locks. Two functions that take two locks in opposite orders compile, and the dev build reports them when they run.
+- The order of the locks beyond what the safety check `lock-order` sees. The check refuses two `Mutex` fields taken in both orders, as its section below shows. It does not see two objects of one class or a `Mutex` that no field names. It does not follow a call through a table, a function value or a plugin. The dev build reports such orders when a run takes them.
 - Which fields belong together. Two fields with two locks may each be right and wrong as a pair.
 - A sequence of atomic operations. `load` and then `store` are two operations, and another thread may run between them.
 - A guard of the class around a nested type. `guarded by People.lock` accepts a `sync` on the `lock` of any `People` object, and the checker does not know which list holds the node.
@@ -798,6 +820,8 @@ The costs are the same in dev and in release, apart from the record of the order
 | Checks at run time | 0 |
 
 The check `unguarded-field` runs in the compiler. `unchecked` removes the check for a field and adds no code and no cost. It gives up the proof for that field.
+
+A concurrent class pays for each lock where its code takes it, and for nothing else. `Stock` holds one `Mutex` of 4 bytes where a synchronized class holds 24, and `level`, `most` and `claim` take no lock at entry. The price is the code: every `sync` is written, and a private helper that reads a guarded field needs the `unchecked` of the pitfalls below. A class whose fields change together under one lock in every function is shorter as a synchronized class. A class with fields that change apart, counters and fields fixed at `construct` is cheaper as a concurrent class.
 
 ### Pitfalls
 
@@ -1084,7 +1108,316 @@ For a C++ programmer:
 - `sync a, b` has no form for a `Mutex`, where `std::scoped_lock` takes any two.
 - No form takes three locks. A third object is a nested `sync` in an order the program chooses.
 
-## Lock order checks
+## Lock order at compile time
+
+### What you know
+
+Java, C and C++ leave the order of locks to a rule of the program, written in a comment. Two threads that take two locks in opposite orders at the same moment wait for each other for good. A test run may never meet that moment, and no compiler of the three reads the rule.
+
+### The feature
+
+The safety check `lock-order` refuses a program whose locks can be taken in a cycle of orders. It builds a graph of the orders before any run, and it refuses in every build.
+
+A lock of the graph is named by its class and its field, since the compiler cannot know the objects.
+
+| Lock | Named |
+|---|---|
+| The hidden lock of a synchronized class | by the class of its chain that declares it, `` `Account` `` |
+| A `Mutex` field of a struct or a class | by its type and its field, `` `Vault.a` `` |
+| A `Mutex` local, a parameter, or one behind a pointer that no field names | no lock of the graph |
+
+An edge leads from lock A to lock B wherever code that holds A takes B.
+
+- Code holds the lock of each `sync` block around it.
+- A function of a synchronized class that takes the hidden lock holds it in its whole body. That is a function with `self` that is not private, `construct` and `destruct` apart.
+- A call takes every lock its callee takes, itself or through the calls it names.
+
+The check follows a call by its name. It reads the body of a function of the module, and the library file of a library records the locks each of its functions takes. It follows no call through a table. That is a call through an interface, a function value or a plugin. It is also a call through a pointer of a `pub` function that is not `final`, of a class that is not `final`. A class below may replace that function. Such a call of a function of a synchronized class still takes the hidden lock of the object. Every function that may run there takes it.
+
+Four places add no edge.
+
+- A lock the code holds already. The hidden lock is taken again without waiting, and a second object of the same class is the same lock of the graph.
+- The two locks of `sync a, b`, which takes them in the order of their addresses.
+- The worker of a `dispatch` or a `parallel`, which runs on another thread and holds none of the locks of the code that starts it. The body of an anonymous function holds no lock at its start either.
+- The default `==` and hash of a synchronized class.
+
+An edge that closes a cycle is refused at the place of the edge, and the message names the place of the other order. The edges of the libraries come first. The edges of the module follow in the order of the text, so the later of two places gets the error. Each cycle is refused once. A cycle that the edges of libraries alone make is refused at `main` of the program, since no library sees the others.
+
+`unchecked(lock-order, "reason")` before a statement, or last in the header of a function, overrules the check there. The edge it overrules stays out of the graph and out of the library file. A clause that overrules nothing is refused as `unused-unchecked`.
+
+```anti
+//! name: ordered
+import anti.io;
+import anti.text;
+
+final concurrent class Ledger
+{
+	lock: Mutex,
+	total: int = 0 guarded by lock,
+	entries: int = 0 guarded by lock,
+
+	pub fn note(self, n: int)
+	{
+		sync self.lock {
+			self.total += n;
+			self.entries += 1;
+		}
+	}
+
+	pub fn sum(self) -> int
+	{
+		sync self.lock {
+			return self.total;
+		}
+	}
+}
+
+synchronized class Account
+{
+	balance: int = 0,
+
+	fn construct(self, start: int)
+	{
+		self.balance = start;
+	}
+
+	pub fn pay(self, to: *Ledger, n: int)
+	{
+		self.balance -= n;
+		to.note(n);
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.balance;
+	}
+}
+
+worker fn spend(chunk: []int, a: *Account, l: *Ledger) -> int
+{
+	for n in chunk {
+		a.pay(l, n);
+	}
+	return chunk.len;
+}
+
+fn main() -> int
+{
+	let a = alloc Account(5000);
+	let l = alloc Ledger { };
+	let ones: [1000]int = [1; 1000];
+	let parts = parallel ones[0..1000] by 4 -> spend(a, l);
+	free(parts.ptr);
+	let line = f"balance {a.get()}, ledger {l.sum()}";
+	io.println(line);
+	free(line.ptr);
+	delete(l);
+	free(a);
+	return 0;
+}
+```
+
+```text output
+balance 4000, ledger 1000
+```
+
+Every path takes the lock of the `Account` first and then the `Mutex` of the `Ledger`, inside `pay`. Four chunks run `pay` at once on one account and one ledger, and none waits for another in a cycle. `Ledger` is `final`, so `to.note(n)` is a call the check follows. Without `final` the call goes through the table and the check would not see the `Mutex` it takes.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `Ledger.lock` is locked here while `Account` is held, and line
+import anti.io;
+import anti.text;
+
+final concurrent class Ledger
+{
+	lock: Mutex,
+	total: int = 0 guarded by lock,
+	entries: int = 0 guarded by lock,
+
+	pub fn note(self, n: int)
+	{
+		sync self.lock {
+			self.total += n;
+			self.entries += 1;
+		}
+	}
+
+	pub fn audit(self, a: *Account) -> int
+	{
+		sync self.lock {
+			return self.total + a.get();
+		}
+	}
+
+	pub fn sum(self) -> int
+	{
+		sync self.lock {
+			return self.total;
+		}
+	}
+}
+
+synchronized class Account
+{
+	balance: int = 0,
+
+	fn construct(self, start: int)
+	{
+		self.balance = start;
+	}
+
+	pub fn pay(self, to: *Ledger, n: int)
+	{
+		self.balance -= n;
+		to.note(n);
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.balance;
+	}
+}
+
+worker fn spend(chunk: []int, a: *Account, l: *Ledger) -> int
+{
+	for n in chunk {
+		a.pay(l, n);
+	}
+	return chunk.len;
+}
+```
+
+`audit` holds the `Mutex` of the ledger and calls `get`, which takes the lock of the account. `pay` takes the two the other way round. The error stands at `to.note(n)` in `pay`, the later edge of the two in the text.
+
+```anti refused
+//! error: `Vault.a` is locked here while `Vault.b` is held, and line 12 locks them in the other order [lock-order]
+class Vault
+{
+	pub a: Mutex,
+	pub b: Mutex,
+	pub n: int = 0,
+}
+
+fn forward(v: *Vault)
+{
+	sync v.a {
+		sync v.b {
+			v.n += 1;
+		}
+	}
+}
+
+fn backward(v: *Vault)
+{
+	sync v.b {
+		sync v.a {
+			v.n -= 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let v = alloc Vault { };
+	forward(v);
+	backward(v);
+	free(v);
+	return 0;
+}
+```
+
+```anti refused
+//! error: on a cycle of 3 locks [lock-order]
+class Vault { pub a: Mutex, pub b: Mutex, pub c: Mutex, pub n: int = 0, }
+
+fn ab(v: *Vault) { sync v.a { sync v.b { v.n += 1; } } }
+
+fn bc(v: *Vault) { sync v.b { sync v.c { v.n += 1; } } }
+
+fn ca(v: *Vault) { sync v.c { sync v.a { v.n += 1; } } }
+```
+
+```anti refused
+//! error: `unchecked(lock-order)` overrules nothing [unused-unchecked]
+class Vault { pub a: Mutex, pub n: int = 0, }
+
+fn one(v: *Vault) unchecked(lock-order, "the only lock") { sync v.a { v.n += 1; } }
+```
+
+The following compile, and each can deadlock.
+
+- `sync v.a { sync w.a { } }` in one function and the same with `w` and `v` swapped in another, for two objects of one class. Both name the lock `Vault.a`.
+- Two `Mutex` parameters taken in both orders. Neither is a lock of the graph.
+- A function that holds a lock and calls a function that takes another, through a function value, an interface or the table of a class.
+
+The lock order check of dev mode in the next section reports each of them when a run takes both orders.
+
+### How antic builds it
+
+The check runs in the compiler and adds nothing to the program. A pass reads each function of the module once the checker has checked every function. It records the locks the function takes itself and the calls it makes by name. At each `sync` and each call it records the locks the code holds there. It then computes the locks each function takes through its calls and draws the edges. It adds them to the graph one by one, in the order above. A search from the lock an edge takes back to the lock it holds finds a cycle.
+
+The code antic writes takes the locks in the order the check reads. `pay` of the example after opt holds both pairs, the one of `note` inlined inside the one of the class.
+
+```llvm excerpt=ordered target=linux-x86_64 mode=release
+define internal void @ordered.Account.pay(ptr noundef nonnull dereferenceable(40) %p0, ptr noundef nonnull dereferenceable(32) %p1, i64 noundef %p2) #0 {
+b0:
+  %v1 = getelementptr inbounds nuw i8, ptr %p0, i64 16
+  tail call void @anti_rt_object_lock(ptr nonnull %v1)
+...
+  %v1.i = getelementptr inbounds nuw i8, ptr %p1, i64 8
+  tail call void @anti_rt_mutex_lock(ptr nonnull %v1.i)
+...
+  tail call void @anti_rt_mutex_unlock(ptr nonnull %v1.i)
+  tail call void @anti_rt_object_unlock(ptr nonnull %v1)
+  ret void
+```
+
+- `%v1` is the hidden lock of the account at offset 16, taken at the entry of `pay`. That is the lock `Account` of the graph.
+- `%v1.i` is `lock` of the ledger at offset 8, taken by the inlined `note`. That is `Ledger.lock`, and the edge from `Account` to it stands between the two calls.
+- The unlocks run in the reverse order.
+
+The library file of a module carries what a module that imports it needs. That is the edges of the module that the graph kept, each with its two locks and its line, and the locks each function takes. A program that imports two libraries closes a cycle across them at its own edges, or at `main`.
+
+Where it lives: `sema_check_lock_order`, `take_call`, `mutex_lock`, `object_lock`, `find_cycles`, `refuse_cycle`, `library_edges` and `keep_facts` of `src/antic/sema_lock.c`.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| Code, checks and calls at run time | 0 | 0 |
+| A cycle the check sees | the build is refused | the same |
+| `unchecked(lock-order, "reason")` | no code | the same |
+| A library file | its kept edges and the locks of each function | the same |
+
+The check gives the program one order of its locks, and each form below keeps that order where the check alone cannot.
+
+- One order for every lock, kept in every function. The check proves it for the locks it names.
+- `sync a, b` for two objects of one synchronized class. It takes the two in the order of their addresses, and the check sees no edge between them.
+- `final` on a class or a function whose calls take locks, so that the check follows the call.
+- A `Mutex` in a field, where a local or a parameter would be no lock of the graph.
+
+`unchecked` gives up the proof for its statement or function, and the dev check of the next section is then the only one.
+
+### Pitfalls
+
+For a Java programmer:
+
+- The check is an error at compile time, before a thread dump could show anything. It names the two places of the two orders.
+- Two objects of one class are one lock for the check. A transfer between two accounts that locks them in the order of its arguments passes it, and `sync a, b` is the form that is safe.
+
+For a C programmer:
+
+- A `Mutex` behind a parameter is invisible to the check. A `Mutex` in a field of a struct or a class is what it reads.
+- The order is read through the calls by name, also into a library through its library file. A call through a function pointer ends the reading.
+
+For a C++ programmer:
+
+- A call of a virtual function, a `pub` function of a class that is not `final`, is not followed. Mark the class or the function `final` where the call takes a lock.
+- `unchecked(lock-order)` is the one escape, per statement or per function, and it must overrule something.
+
+## Lock order in dev mode
 
 ### What you know
 
@@ -1188,7 +1521,7 @@ after pay: 120 80
 vault 4
 ```
 
-The test runs the release build, which prints the two lines alone. The program has one thread, so it cannot deadlock. It takes two pairs of locks in both orders all the same. The safety check `lock-order` of the next section refuses the two orders of `v.a` and `v.b`, so the header of `main` overrules it.
+The test runs the release build, which prints the two lines alone. The program has one thread, so it cannot deadlock. It takes two pairs of locks in both orders all the same. The safety check `lock-order` of the section before refuses the two orders of `v.a` and `v.b`, so the header of `main` overrules it.
 
 `anti run` builds the same file in dev mode as `src/main.anti` of a project. The run then writes two more lines to standard error.
 
@@ -1201,85 +1534,7 @@ anti: two locks are taken in opposite orders and can deadlock: main.anti:55 take
 - Lines 49 and 50 take `v.a` and then `v.b`, and lines 54 and 55 take `v.b` and then `v.a`.
 - `sync p, q` and `sync q, p` give no report. Both take the two locks in the order of their addresses.
 
-### The check at compile time
-
-antic refuses an order it can prove in every build, before a run takes it. The safety check `lock-order` builds a graph of the orders in which the program takes its locks. An edge leads from one lock to another wherever code that holds the first takes the second. The code holds the lock of each `sync` block around it, and a public function of a synchronized class holds the hidden lock of its object. A call takes every lock its callee takes, and the graph follows the calls the program names, into the functions of a library as well. A cycle is refused, and the message names both places.
-
-A lock is named by its class and its field, since antic cannot know the objects. `v.a` of every `Vault` is one lock, and so is the hidden lock of every `Account`. A lock that the code holds already adds no edge, so `x.pay(y, 10)` and `y.pay(x, 30)` of the example above pass the check, and the dev check reports them. `sync a, b` adds no edge between its two locks.
-
-```anti refused
-//! error: `Vault.a` is locked here while `Vault.b` is held, and line 12 locks them in the other order [lock-order]
-class Vault
-{
-	pub a: Mutex,
-	pub b: Mutex,
-	pub n: int = 0,
-}
-
-fn forward(v: *Vault)
-{
-	sync v.a {
-		sync v.b {
-			v.n += 1;
-		}
-	}
-}
-
-fn backward(v: *Vault)
-{
-	sync v.b {
-		sync v.a {
-			v.n -= 1;
-		}
-	}
-}
-
-fn main() -> int
-{
-	let v = alloc Vault { };
-	forward(v);
-	backward(v);
-	free(v);
-	return 0;
-}
-```
-
-The check follows no call through an interface, a function value or a plugin, since the function that runs is not known. The dev check finds an order such a call takes. `unchecked(lock-order, "reason")` overrules the check.
-
-### A wait under a lock
-
-A thread that waits while it holds a lock makes every other thread that needs the lock wait as well, and a thread that would end the wait may need that lock. The warning `blocking-under-lock` names a `recv`, a `send`, a `select`, a `join` or a `join_all` inside a `sync` block or in a function of a synchronized class that holds the hidden lock. It names a call of a function that reaches one as well, through the calls the lock orders follow. Every channel has room for a bounded number of values, so any `send` may find it full, and a `select` waits until one of its channels is ready.
-
-```anti refused
-//! error: `recv` may wait while the `sync` of line 10 holds its lock [blocking-under-lock]
-struct Inbox
-{
-	lock: Mutex,
-	count: int,
-}
-
-fn take(box: *Inbox, c: chan int)
-{
-	sync box.lock {
-		let v = recv(c) else {
-			return;
-		};
-		box.count += *v;
-	}
-}
-
-fn main() -> int
-{
-	let box = Inbox { count: 0 };
-	let c = chan int(1);
-	send(c, 4);
-	take(&box, c);
-	delete(c);
-	return box.count - 4;
-}
-```
-
-A dev build prints the warning and goes on, and a release build refuses it. The fix takes the value first and holds the lock for what it guards alone. Some waits cannot block for long, such as a `recv` on a channel local to the block that holds its values. There `allow(blocking-under-lock, "reason")` silences the warning, and the reason says why.
+The two calls of `pay` pass the check at compile time, which names the hidden lock of every `Account` as one lock. The run sees two objects and reports them. A thread that waits for a channel or a job while it holds a lock is the other way a program stops for good. The warning `blocking-under-lock` of [chapter 13]({{% relref "13-threads#waits-under-a-lock" %}}) names it.
 
 ### How antic builds it
 
@@ -1326,7 +1581,7 @@ Where it lives: `order_take`, `order_give` and `order_forget` of `src/rt/lock.c`
 
 Every thread that takes a second lock goes through the one lock of the table. A dev build of a program with nested locks on many threads therefore runs them one after the other at that point.
 
-The check is given up in a release build. An inversion that no dev run took is found by no build.
+The check is given up in a release build. An inversion that the safety check `lock-order` does not see and that no dev run took is found by no build. The two checks cover each other. The compiler sees every path and names locks by their class. The dev build tells objects apart and sees the paths a run takes.
 
 ### Pitfalls
 
@@ -1595,6 +1850,18 @@ The costs are the same in dev and in release, apart from the record of the order
 | Copies of code | one copy of the class per set of type arguments, as [chapter 10]({{% relref "10-generics" %}}) counts |
 
 [Chapter 16]({{% relref "16-collections" %}}) holds the cost of each operation of the plain collections inside.
+
+The counts choose between the forms that share a collection.
+
+| Form | Per operation | Use it for |
+|---|---|---|
+| A plain collection owned by one thread | the operation alone | data that one thread fills and the others receive as results, through `join` or a channel |
+| A plain collection beside a `Mutex`, in a concurrent class | one `sync` around as many operations as the block holds | a few operations that must run as one step, with no versions and 8 bytes less per element |
+| `SyncList`, `SyncMap`, `SyncSet`, `SyncPool` | one hidden lock per call, and a version per element | many threads that each make a call at a time, and a read, compute and write back with `set_if_version` |
+| `ConcurrentMap` | one of 16 locks per call | a map that many threads write at once, where a `SyncMap` would make them wait on one lock |
+| `SpscRing` | one atomic load and one atomic store | one producing thread and one consuming thread, a fixed room, no wait |
+
+A run of calls that must be one step goes under `sync c { }`. The block takes the hidden lock once, and each call inside counts the depth.
 
 ### Pitfalls
 
