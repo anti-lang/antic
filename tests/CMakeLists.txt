@@ -2996,13 +2996,13 @@ if(ANTIC_LLVM_AR AND CMAKE_C_COMPILER_ID MATCHES "Clang")
     endforeach()
 endif()
 
-# The benchmarks of tests/bench: five Anti programs, each with a C twin
+# The benchmarks of tests/bench: six Anti programs, each with a C twin
 # that the pinned clang compiles at -O2. They take seconds and their times
 # vary with the machine, so they stand outside the suite and outside the
 # default build. `cmake --build build/host --target bench` builds the C
 # twins, then run_bench.cmake compiles and runs every program and prints
 # the table into build/host/tests/bench.md as well.
-set(bench_programs scalar_loop objects builder simd_loop map_work)
+set(bench_programs scalar_loop objects builder simd_loop map_work hooks)
 set(bench_executables "")
 foreach(name IN LISTS bench_programs)
     add_executable(bench_${name} EXCLUDE_FROM_ALL bench/${name}.c)

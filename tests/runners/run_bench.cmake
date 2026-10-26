@@ -33,8 +33,12 @@ cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 
-set(programs scalar_loop objects builder simd_loop map_work)
+set(programs scalar_loop objects builder simd_loop map_work hooks)
 set(dev_modules lang mem text collection collection/map)
+# The modules of the standard library one program alone imports beyond
+# dev_modules. Its dev link takes their objects as well, and the dev link
+# of every other program stays as it was.
+set(dev_modules_hooks io reflect runtime time trace)
 
 if(NOT DEFINED RUNS)
     set(RUNS 5)
@@ -99,13 +103,23 @@ function(median into)
     set(${into} "${whole}.${tenth}" PARENT_SCOPE)
 endfunction()
 
-set(dev_objects "")
-foreach(module IN LISTS dev_modules)
-    string(REPLACE "/" "_" name "${module}")
-    timed_antic(unused --dev ${options} ${tools} --runtime "${RUNTIME}"
-        -I "${RUNTIME}/std" -o "${WORK}/std/anti_${name}"
-        "${RUNTIME}/std/anti/${module}.antl")
-    list(APPEND dev_objects "${WORK}/std/anti_${name}${object_suffix}")
+# Build the dev object of each module of the list after `into` and set the
+# variable `into` to the objects.
+function(dev_objects_of into)
+    set(objects "")
+    foreach(module IN LISTS ARGN)
+        string(REPLACE "/" "_" name "${module}")
+        timed_antic(unused --dev ${options} ${tools} --runtime "${RUNTIME}"
+            -I "${RUNTIME}/std" -o "${WORK}/std/anti_${name}"
+            "${RUNTIME}/std/anti/${module}.antl")
+        list(APPEND objects "${WORK}/std/anti_${name}${object_suffix}")
+    endforeach()
+    set(${into} "${objects}" PARENT_SCOPE)
+endfunction()
+
+dev_objects_of(dev_objects ${dev_modules})
+foreach(name IN LISTS programs)
+    dev_objects_of(dev_objects_${name} ${dev_modules_${name}})
 endforeach()
 
 set(table "| Program | C run | Anti run | Anti / C | Release compile | Dev compile |\n")
@@ -120,7 +134,7 @@ foreach(name IN LISTS programs)
         list(APPEND release_times ${took})
         timed_antic(took --dev ${options} ${tools} --runtime "${RUNTIME}"
             -I "${RUNTIME}/std" -o "${WORK}/dev/${name}" "${source}"
-            ${dev_objects})
+            ${dev_objects} ${dev_objects_${name}})
         list(APPEND dev_times ${took})
     endforeach()
     set(anti_times "")

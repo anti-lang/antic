@@ -1,0 +1,40 @@
+//! The hooks of an object and the trace points of a function. Each of 20
+//! million turns allocates a `Node`, calls its traced function `step` and
+//! deletes the node. A turn passes the sites of `created` and `destroyed`, and
+//! the two trace points of `step` in a build with `--trace`. `trace.start()`
+//! installs the handlers that the runtime key `trace` names, so `ANTI_CONF`
+//! chooses one for a run. `hooks.c` is the same program in C, with `malloc` and
+//! `free`.
+
+import anti.lang;
+import anti.trace;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+trace class Node
+{
+	pub v: int = 0,
+
+	pub fn step(self, k: int) -> int
+	{
+		self.v = (self.v + k) & 1023;
+		return self.v;
+	}
+}
+
+fn main() -> int
+{
+	let handler = trace.start();
+	let total = 0;
+	for i in 0..20000000 {
+		let n = alloc Node { v: i & 255 };
+		total = total +% n.step(i & 7);
+		delete(n);
+	}
+	lang.Trace.install(none);
+	if let h = handler {
+		delete(h);
+	}
+	printf("%lld\n".ptr, total);
+	return 0;
+}
