@@ -514,11 +514,34 @@ The arguments of a job live in the job from the `dispatch` to the `join`. The ne
 
 arm64 passes the same four arguments in `x0` to `x3`, and nothing else differs.
 
+A dev build marks a job that it joined. It tests the job before the `join` and writes the address 1 into the variable after it, an address that no allocation gives.
+
+```ir excerpt=workers target=linux-x86_64 mode=dev
+export fn workers.start(%0: ptr nonnull deref(size_of workers.Image), %1: i64) -> i64 {
+...
+    %8 = load ptr %2
+    %9 = ne i8 %8, 1
+    branch %9, b2, b1
+b1:
+...
+    call void @anti_rt_check_failed(%10, 47, 7, 0, 0)
+    unreachable
+b2:
+    %11 = slot i64
+    call void @anti_rt_join_hooked(%8, size_of i64, %11)
+    %12 = load i64 %11
+    store ptr 1, %2
+```
+
+- `%8` is the job, loaded from its variable `%2`. `ne` compares it with the mark 1, and `b1` stops the program with `` `join` of a job joined already ``.
+- `store ptr 1, %2` marks the variable after the `join`. A release build writes neither the test nor the mark.
+- `join_all(jobs)` of a dev build joins the jobs one at a time in a loop, each with the same test and mark. A release build makes one call of `anti_rt_join_all_hooked`.
+
 Where it lives: `sema_check_dispatch`, `sema_check_join`, `worker_callee` and `worker_args` of `src/antic/sema_thread.c`, `sema_walk_worker` of `src/antic/sema_stmt.c`, `types_pointer_free` of `src/antic/types.c`, `lower_dispatch`, `dispatch_thunk` and `lower_join` of `src/antic/lower_worker.c`, and `anti_rt_dispatch` and `anti_rt_join` of `src/rt/threads.c`.
 
 ### What it costs
 
-The costs are the same in dev and in release.
+The costs are the same in dev and in release, but for the row of the checks.
 
 | Cost | Count |
 |---|---|
@@ -530,7 +553,7 @@ The costs are the same in dev and in release.
 | `join` | one call of the runtime, the lock of the pool, one copy of the result, three calls of `free`, and the hook `joined` |
 | Atomic operations | one atomic load per hook call, of the installed trace handler: one for a `dispatch` and one for a `join`. 0 with `--no-hooks` |
 | Threads | the processors of the machine less one, or the key `threads` less one, started once |
-| Checks | the test for an object in flight, in both modes |
+| Checks | the test for an object in flight, in both modes. In a dev build, one compare and one branch before each `join` and one store of the mark after it |
 | Copies of code | one thunk per `dispatch` in the source |
 
 The walk of the objects in flight is linear in their number.
@@ -856,12 +879,12 @@ Where it lives: `sema_check_parallel` and `chunks_below_zero` of `src/antic/sema
 
 ### What it costs
 
-The costs are the same in dev and in release.
+The costs are the same in dev and in release, but for the row of the checks.
 
 | Cost | Count |
 |---|---|
 | `parallel` | one call of the runtime |
-| Allocations | one `malloc` of the results, chunks times the bytes of a result, which the program frees |
+| Allocations | one `malloc` of the results, chunks times the bytes of a result, which the program frees. None for a slice of no elements |
 | Calls per chunk | one indirect call of the thunk, and in a dev build one call of the worker from it |
 | Locks | the lock of the pool, taken once at the start and twice per chunk |
 | Atomic operations | 0 |
@@ -1224,7 +1247,7 @@ The costs are the same in dev and in release.
 | `close` | one call, the lock of the channel once, one atomic load |
 | `select` that finds a value | one call and the lock of each channel it tries |
 | `select` that waits | two atomic operations, the lock of all selects and the lock of each channel twice, per wake |
-| `delete` | one call and two calls of `free` |
+| `delete` | one call and two calls of `free`. A channel of values that own something first takes each value it holds with one call of `anti_rt_chan_held` and tears it down, and one call more finds it empty |
 | Checks | the capacity at `chan T(n)`, the closed flag at `send` and a null handle at every operation, in both modes |
 
 A `send` that finds the channel full and a `recv` that finds it empty sleep in the system until the other side wakes them.
@@ -1350,6 +1373,11 @@ export fn write(s: *Stats, v: int)
 export fn claim(s: *Stats) -> bool
 {
 	return s.busy.compare_swap(false, true);
+}
+
+export fn mask(s: *Stats, m: int) -> int
+{
+	return s.hits.and(m);
 }
 
 fn main() -> int
@@ -1577,6 +1605,24 @@ sete %al
 - A store is `xchgq`, which locks the bus without the prefix and is a full barrier.
 - `lock cmpxchgb` compares with `%al` and sets the zero flag, which `sete` copies.
 
+x86-64 has no instruction that gives the value before an `and` or an `or`. `mask` returns it, so its `and` is a loop of `lock cmpxchgq`.
+
+```asm excerpt=counters target=linux-x86_64 mode=release
+<mask>:
+movq 0x8(%rdi), %rax
+...
+movq %rax, %rcx
+andq %rsi, %rcx
+lock
+cmpxchgq %rcx, 0x8(%rdi)
+jne 0x10 <mask+0x10>
+retq
+```
+
+- The `nopw` left out aligns the head of the loop. The loop computes the new value in `%rcx` from the value in `%rax` and stores it when the word still holds `%rax`.
+- A failed `cmpxchgq` loads what it found into `%rax`, and `jne` goes round again.
+- An `and` or an `or` whose value the program drops is one `lock andq` or `lock orq`, since it needs no value back.
+
 linux-arm64 builds at the level `armv8.0`, which has no atomic add in one instruction. Each operation that reads and writes is a loop there.
 
 ```asm excerpt=counters target=linux-arm64 mode=release
@@ -1637,8 +1683,8 @@ The costs are the same in dev and in release.
 | Cost | Count |
 |---|---|
 | Bytes of an atomic | the bytes of its type. `Stats` is 32: the table pointer, `hits`, `busy` and `small` in one word, and `plain` |
-| An operation on x86-64 | one instruction, with the `lock` prefix where it reads and writes |
-| An operation on arm64 at `armv8.2` and above | one instruction |
+| An operation on x86-64 | one instruction, with the `lock` prefix where it reads and writes. `and` and `or` whose value the program uses: a loop of a load, the operation, a `lock cmpxchg` and a branch |
+| An operation on arm64 at `armv8.2` and above | one instruction, after a `neg` for `sub` and an `mvn` for `and` |
 | `add`, `sub`, `and`, `or`, `swap` and `compare_swap` on arm64 at `armv8.0` | a loop of a load, the operation, a store and a branch |
 | Calls of the runtime | 0 |
 | Allocations and locks | 0 |
