@@ -765,7 +765,8 @@ Where it lives: `check_optional` of `src/antic/sema_expr.c` checks `?.`, and `se
 
 | Cost | Dev | Release |
 |---|---|---|
-| `if let`, `let ... else` | one test, one branch, one copy of the value into the new name | one test, and the copy where `opt` keeps it |
+| `if let` | one copy of the whole `?T` into the new name, one load of the flag, one branch | one test, and the copy where `opt` keeps it |
+| `let ... else` | one copy of the whole `?T` into a slot, one test, one branch, one copy of the value into the new name | the same, where `opt` keeps the copies |
 | `e ?? d` | one test, one branch | one test, and a conditional move where both sides are cheap |
 | `p?.x` | one test, one branch, one load | the same |
 | A chain of n `?.` | n tests, up to n loads | the same |
@@ -775,7 +776,28 @@ Where it lives: `check_optional` of `src/antic/sema_expr.c` checks `?.`, and `se
 | Heap allocations when the value is there | 0 | 0 |
 | Checks inserted | none | none |
 
-`if let` and `let ... else` copy the value into the new name. For a `?int` that is 8 bytes. For a `?T` of a large struct it is the size of the struct. A test of the name with narrowing reads the value in place.
+```anti
+//! name: unwrap
+export fn first_or_zero(v: ?int) -> int
+{
+	if let x = v {
+		return x;
+	}
+	return 0;
+}
+```
+
+```ir excerpt=unwrap target=linux-x86_64 mode=dev
+export fn unwrap.first_or_zero(%0: agg ?int) -> i64 {
+b0:
+    %1 = slot ?int
+    lifestart %1
+    memcopy %1, %0, ?int
+    %2 = ptradd %1, offset_of ?int.has
+    %3 = load i8 %2
+```
+
+In a dev build `if let x = v` copies the 16 bytes of a `?int` into the slot of `x`, `%1`, and reads the flag and the value there. `let x = v else` copies the 16 bytes into a slot and then the 8 bytes of the value into `x`. For a `?T` of a large struct each copy has the size of the struct. A test of the name `v` itself, with narrowing, copies nothing and reads the value in place.
 
 `e catch err { }` allocates an error object of at least 128 bytes on the `none` path. Where `none` is expected, `??`, `if let` and `let ... else` handle it without an allocation.
 
