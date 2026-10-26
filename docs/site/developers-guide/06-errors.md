@@ -98,6 +98,60 @@ sizes: Error 128, Odd 136, *Error 8
 
 An error made by `Error.new` or `Error.wrap` does not own its message. `message` is a `str` that points at a literal, or at memory the program keeps alive as long as the error. `fail "literal"` makes such an error over the bytes of the literal. `fail` of any other `str` makes an error that owns a copy of the text, and `fail f"..."` makes one that takes over the memory of the `f"..."`, which is a copy made for it already. The error frees what it owns when it is deleted.
 
+`anti.error` adds four parts to the convention.
+
+- `SystemError` is the error of a failing system call, a class that inherits `lang.Error` and adds the field `errno`.
+- `SystemError.from_errno()` builds one from `errno` right after a C call that set it. Its code and `errno` hold the number, and its message holds the text of the system.
+- `SystemError.from_win32()` does the same with the last error of Win32. On every other system it gives an error of code 0 with an empty message.
+- `error.on_fatal(f)` registers the one function that `fatal` runs before it ends the program, and `error.check(e)` calls `fatal` on the result of a function written by hand as `-> ?*Error`, such as a binding of C, when it holds an error.
+
+```anti
+//! name: syserr
+import anti.io;
+import anti.lang;
+import anti.text;
+import anti.error;
+
+extern fn fopen(path: ?*byte, mode: ?*byte) -> ?*byte;
+
+fn open(path: str) -> ?*byte may fail
+{
+	let f = fopen(path.ptr, "r".ptr);
+	if f == none {
+		fail error.SystemError.from_errno();
+	}
+	return f;
+}
+
+fn main() -> int
+{
+	let f = open("/no/such/file") catch e {
+		let system = e as? *error.SystemError;
+		let number = 0;
+		if let s = system {
+			number = s.errno;
+		}
+		let line = f"code {e.code}, errno {number}, a SystemError {system != none}";
+		io.println(line);
+		free(line.ptr);
+		yield none;
+	};
+	let nothing: ?*lang.Error = none;
+	error.check(nothing);
+	let line = f"sizes: SystemError {size_of(error.SystemError)}, Error {size_of(lang.Error)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+code 2, errno 2, a SystemError true
+sizes: SystemError 136, Error 128
+```
+
+`fopen` of a missing file sets `errno` to `ENOENT`, which is 2 on all six targets. The handler finds the class with `as?` and reads the field. `check` of `none` returns.
+
 The checker refuses each of the following.
 
 ```anti refused
@@ -274,7 +328,9 @@ b1:
 
 In machine code the test after each call is two instructions. The next section shows them in a release build.
 
-Where it lives: `lower_fail` and `write_origin` of `src/antic/lower_error.c` write a `fail`, and `lower_handle_error` of the same file the test after a call. `lower_function` of `src/antic/lower_function.c` adds the out pointer. `Error` and its functions are in `src/std/anti/lang.anti`. `anti_rt_delete` is in `src/rt/object.c`, and `src/antic/header.c` writes the C form of a failing function.
+`SystemError.from_errno()` is a function of `anti.error`, written in Anti. It reads `errno` through `anti_rt_errno` of the runtime, allocates the error and asks the runtime for the text of the number. The system writes that text into a buffer that its next call may write over, so `anti_rt_text_kept` copies it once, from its first use to the end of the program. Every error of the same text shares the copy, and the error owns no byte of its message.
+
+Where it lives: `lower_fail` and `write_origin` of `src/antic/lower_error.c` write a `fail`, and `lower_handle_error` of the same file the test after a call. `lower_function` of `src/antic/lower_function.c` adds the out pointer. `Error` and its functions are in `src/std/anti/lang.anti`, and `SystemError`, `on_fatal` and `check` in `src/std/anti/error.anti`, with `anti_rt_text_kept` in `src/rt/text.c`. `anti_rt_delete` is in `src/rt/object.c`, and `src/antic/header.c` writes the C form of a failing function.
 
 ### What it costs
 
@@ -287,6 +343,7 @@ Where it lives: `lower_fail` and `write_origin` of `src/antic/lower_error.c` wri
 | Each frame the error passes | one compare, one branch taken, one return | the same |
 | Handling it | one call of `anti_rt_delete`: the teardown with its `destroyed` hook and one `free` | the same |
 | Bytes of an error | 128 on the heap, and what a class of the program adds | the same |
+| `SystemError.from_errno()` | one `malloc` of 136 bytes, the calls `anti_rt_errno` and `anti_rt_errno_text`, and one copy of each distinct text of the system, kept to the end of the program | the same |
 | Bytes in a frame | 8 for a result of 8 bytes that a failing call writes | the same or none |
 | Locks | 0 | 0 |
 | Atomic operations | one load in `anti_rt_backtrace_on`, one load of the installed trace handler in each call of `anti_rt_hook` for `created` or `destroyed`, and one load of the count of loaded libraries when the error is made and again when it is deleted | the same |
@@ -714,7 +771,7 @@ An error may also carry a stack trace, the return addresses of the calls that le
 
 A trace holds raw frames: an address, and the module it lies in with its build id and its base address. `e.text()` appends them after the causes in that raw form. `anti symbols resolve` of [chapter 18]({{% relref "18-the-tool" %}}) turns it into names and lines from the symbols archive of a release.
 
-`lang.StackTrace.capture()` takes a trace anywhere, in any build. Its `frames` are the raw frames, and `text()` gives the raw form. `symbolize()` reads the name of the function of each frame from the symbol table of the program. In a build with `-g` it reads the file and the line as well.
+`lang.StackTrace.capture()` takes a trace anywhere, in any build. `debug.backtrace(skip)` of `anti.debug` is its short form, the trace of its caller without the `skip` innermost frames. Its `frames` are the raw frames, and `text()` gives the raw form. `symbolize()` reads the name of the function of each frame from the symbol table of the program. In a build with `-g` it reads the file and the line as well.
 
 ```anti
 //! name: origin
