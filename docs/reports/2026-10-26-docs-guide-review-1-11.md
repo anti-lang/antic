@@ -118,3 +118,20 @@ No defect was recorded. One point for Eddie: the load of a packed field carries 
 - The docs-style checker reports nothing on the twelve pages, in `build/drive/logs/grev-style-all.log`, and on this report.
 - `git grep` finds no TODO, FIXME or placeholder text in the twelve pages.
 - No suite ran, since the step changed `.md` files under `docs/` alone.
+
+## State after the push of the report
+
+`git log --oneline -3`:
+
+```text
+8209fcdf Report the review of chapters 1 to 11 of the developer's guide
+61c90b45 Bring the cost table of the guide in line with chapters 6 to 11
+ce3a3311 Check chapter 11 of the guide against the code
+```
+
+`git status --short` printed nothing, and `git rev-parse HEAD origin/main` printed one hash twice:
+
+```text
+8209fcdf3971c303852a583e93d993366b599262
+8209fcdf3971c303852a583e93d993366b599262
+```
