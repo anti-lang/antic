@@ -1402,7 +1402,7 @@ A local that a `defer` or an `undo` names cannot move into an `own` parameter, s
 
 ### How antic builds it
 
-A deferred statement has no run-time record. Lowering keeps a list of exit actions per block while it walks the function. At every exit it writes the statements of that list into the IR again, in reverse order. A failing exit writes the `undo` statements of a block first.
+A deferred statement has no run-time record. Its code stands again at every exit of its block, the last declared first. A failing exit runs the `undo` statements of a block before its `defer` statements. Nothing is pushed or popped while the program runs. Lowering writes the copies as it walks the function.
 
 ```anti
 //! name: paths
