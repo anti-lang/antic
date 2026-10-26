@@ -82,3 +82,20 @@ No defect was recorded. Two points for Eddie, neither against a rule. `clear` of
 - The docs-style checker reports nothing on the ten pages, in `build/drive/logs/grev2-style-all.log`, and on this report.
 - `git grep` finds no TODO, FIXME or placeholder text in the ten pages.
 - No suite ran, since the step changed `.md` files under `docs/` alone.
+
+## State after the push of the report
+
+`git log --oneline -3`:
+
+```text
+f7140af3 Report the review of chapters 12 to 21 of the developer's guide
+afe682e9 Bring the cost table of the guide in line with chapters 12 to 16
+4265c914 Check chapter 20 of the guide against the code
+```
+
+`git status --short` printed nothing, and `git rev-parse HEAD origin/main` printed one hash twice:
+
+```text
+f7140af33fce61c4e7c7f5532d259d500272701e
+f7140af33fce61c4e7c7f5532d259d500272701e
+```
