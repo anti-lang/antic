@@ -903,6 +903,14 @@ fn main() -> int
 	let report = f"r {r} carry {flags.carry} overflow {flags.overflow} zero {flags.zero}";
 	io.println(report);
 	free(report.ptr);
+	let big: i8 = 127;
+	let w: i8 = 0;
+	let g = Flags { overflow: false, carry: false, zero: false, negative: false };
+	(w, g) = big + 1;
+	let (c, h) = 127 as i8 + 1;
+	let again = f"w {w} overflow {g.overflow} negative {g.negative}, c {c} overflow {h.overflow}";
+	io.println(again);
+	free(again.ptr);
 	return 0;
 }
 ```
@@ -910,9 +918,12 @@ fn main() -> int
 ```text output
 lo 0 hi 1
 r 44 carry true overflow false zero false
+w -128 overflow true negative true, c -128 overflow true
 ```
 
 `overflow` is the signed overflow and `carry` the unsigned one. 200 plus 100 in a `u8` carries out of 8 bits. Read as signed bytes the sum is -56 plus 100, which fits.
+
+The form assigns as well: `(w, g) = e;` writes two variables that exist, and a variable whose address the program took is such a place too. The operation of the form is no constant expression. `127 as i8 + 1` alone is refused for its range, and inside the form it gives the wrapped result and its flags, as `c` shows. A shift keeps its rule, so a constant count below zero stays refused there.
 
 The checker refuses each of the following.
 
@@ -940,7 +951,14 @@ let x = 5;
 let y = x++;
 ```
 
+```anti refused
+//! error: `127 + 1` does not fit `i8`
+let c = 127 as i8 + 1;
+```
+
 ### How antic builds it
+
+An integer operation is the machine instruction of its width, on values in registers. A dev build follows each checked operation with a test and a branch to a cold block, which calls `anti_rt_check_failed` with the operands and never returns. A program that passes its checks pays the test and the branch: one `jo` after an `addq` on x86_64. A release build removes the cold block before the LLVM text is written, so the instruction stands alone. Its result carries no `nsw`, so LLVM never assumes that a signed result stays in range.
 
 Lowering writes a checked `+` as the IR operation `addov` followed by `branchov`, as [chapter 2]({{% relref "02-how-antic-works" %}}) shows for `*`. The LLVM text writes the pair as the signed `with.overflow` intrinsic of the width and a branch on its bit. This is `checked` in dev mode.
 
@@ -1050,6 +1068,18 @@ Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the ch
 An integer value takes the bytes of its type, 1 to 8. No operation of this section allocates memory or takes a lock. The one call into the runtime is `anti_rt_check_failed` on the failure arm, which a program that passes its checks never runs.
 
 `--no-checks` drops the checks of a dev build, and `--checks` keeps them in a release build. Without the checks a signed overflow wraps without a message, a division by zero gives 0 and a wrong shift count is masked. A program that relied on a check to stop then continues with the defined result.
+
+The operator states the intent, and the counts above follow from it.
+
+| Intent | Form | Cost in release |
+|---|---|---|
+| ordinary arithmetic, where an overflow is a defect | `+ - *` | one instruction, and the dev build finds the defect |
+| arithmetic modulo 2 to the width, as in a hash or a checksum | `+% -% *% <<%` | one instruction, and no dev check stops the program |
+| a value held at the end of its range, as an audio sample | `+\| -\| *\|` | six instructions for an `int` on x86_64 and four on arm64, with no branch |
+| a carry into the next word, or an overflow the program handles | the flags form | the instruction, and one more per flag read |
+| the upper half of a product | `mul_high` | one instruction: `mulx` or `imulq` on x86_64, `umulh` or `smulh` on arm64 |
+
+`+%` is the form for a computation that is meant to wrap, since `+` stops it in a dev build. `+` is the form for any other, since its release code is the same instruction as that of `+%`, and a dev build checks it.
 
 ### Pitfalls
 
