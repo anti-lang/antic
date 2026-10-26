@@ -547,7 +547,17 @@ fn half(n: int) -> int
 }
 ```
 
-Default values are a constant expression or `here`, over a module boundary as well. Not built yet: named arguments.
+Default values are a constant expression or `here`, over a module boundary as well. A parameter with a default stands after every parameter without one, and an `extern fn` takes no default, since C has none. A default belongs to the function and not to its type, so a call through a function value gives every argument:
+
+```anti refused
+//! error: the call takes 2 arguments, found 1
+fn scaled(n: int, by: int = 2) -> int { return n * by; }
+
+let f = scaled;
+let k = f(4);
+```
+
+Not built yet: named arguments.
 
 ## Anonymous functions and closures
 
