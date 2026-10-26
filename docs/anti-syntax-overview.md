@@ -272,10 +272,10 @@ C precedence, with the differences below. Arithmetic `+ - * / %`, comparison `==
 | | `<< >> <<%` |
 | | `+ - +% -% +\| -\|` |
 | | `* / % *% *\|` |
-| | `as` |
+| | `as`, `as?` and `is` |
 | tightest | `- ! ~ & *` before an operand |
 
-`as` binds tighter than every binary operator and looser than the unary ones, so `-x as u8` is `(-x) as u8`. `??` groups from the right, `a ?? b ?? c` is `a ?? (b ?? c)`. `in` binds as `<` does, and each bound takes the operators that bind tighter, so `i + 1 in 0..n * 2` needs no parentheses.
+`as` binds tighter than every binary operator and looser than the unary ones, so `-x as u8` is `(-x) as u8`, and `is` binds as `as` does. `??` groups from the right, `a ?? b ?? c` is `a ?? (b ?? c)`. `in` binds as `<` does, and each bound takes the operators that bind tighter, so `i + 1 in 0..n * 2` needs no parentheses.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -303,6 +303,39 @@ if c in 'a'..'z' { }
 let (sum, f) = a + b;
 if f.carry { }
 let round = shape is Shape.Circle;
+```
+
+`/` on integers truncates toward zero, `%` takes the sign of the dividend, and `>>` is arithmetic on a signed type and logical on an unsigned one. `b as int` of a `bool` gives 1 or 0, and no number converts to `bool`, so a test writes `n != 0`. The operands of an operator and the arguments of a call run from left to right, and an assignment computes its place before its value.
+
+```anti
+import anti.io;
+import anti.text;
+
+fn side(name: str, v: int) -> int
+{
+	io.println(name);
+	return v;
+}
+
+fn main() -> int
+{
+	let a = -7;
+	io.println(f"{a / 2} {a % 2} {7 % -2} {a >> 1}");
+	io.println(f"{true as int} {false as int}");
+	let n = side("left", 1) + side("right", 2);
+	let xs: [2]int = [0, 0];
+	xs[side("place", 1)] = side("value", n);
+	return 0;
+}
+```
+
+```text
+-3 -1 1 -4
+1 0
+left
+right
+place
+value
 ```
 
 `let (result, flags) = e;` binds the wrapped result and a `Flags` struct with `overflow`, `carry`, `zero` and `negative`. A carry in is `a + b + f.carry`. `mul_high(a, b)` gives the upper half of the full product.
