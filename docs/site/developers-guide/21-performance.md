@@ -3,7 +3,7 @@ title: "Performance"
 description: "One table of the cost of every feature of the guide, measuring with tests/bench, --profile-generate and --profile-use, tracing, and the checks a release keeps."
 summary: "One table with the cost of every feature of the guide and a link to its section, measuring with `tests/bench`, `--profile-generate` and `--profile-use`, tracing, and which checks a release build keeps and what turning them off gives up."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 210
 tags: [compilers, programming-languages]
@@ -108,8 +108,11 @@ A row gives the counts of a release build unless it names dev mode. "0" in a col
 | [The ABI of a call]({{% relref "17-c-interop#the-abi-of-a-call" %}}) | the sizes C computes | 0. One error object when a `may fail` function fails | 0 for the call | 0 | dev: the checks inside the function | one function per `export fn` |
 | [anti bind]({{% relref "17-c-interop#anti-bind" %}}) | the C layout of a bound struct | 0 | 0 | 0 | none | none. A bound inline function is one more call, into the shim |
 | [link]({{% relref "17-c-interop#link" %}}) | a `link` line adds no code and no data. A static Linux program holds musl and the allocator | 0 | 0 | 0 | none | none |
-| [Libraries for C]({{% relref "17-c-interop#libraries-for-c" %}}) | for linux-x86_64 in the example: the static archive 48,480, the bundled one 362,292, the shared library 85,352 | 0 for a call | the runtime starts once per process, or once per shared library. Its pool starts at the first `parallel` or `dispatch` | 0 for a call | by the mode of the build | none |
-| [Plugins across the boundary]({{% relref "17-c-interop#plugins-across-the-boundary" %}}) | the plugin of the example: 15,152. The host keeps its dynamic symbol table | one per instance | one call through the procedure linkage table per call into the runtime | those of `plugin.load` and of the count of live objects | once per load: the runtime version, the hash chains, the slots | no devirtualisation in a host or a plugin |
+| [Libraries for C]({{% relref "17-c-interop#libraries-for-c" %}}) | for linux-x86_64 in the example: the static archive 51,904, the bundled one 381,062, the shared library 86,816 | 0 for a call | the runtime starts once per process, before `main`, or once per shared library. Its pool starts at the first `parallel` or `dispatch` | 0 for a call | by the mode of the build | none |
+| [Plugins across the boundary]({{% relref "17-c-interop#plugins-across-the-boundary" %}}) | the plugin of the example: 15,448. The host keeps its dynamic symbol table | one per instance | one call through the procedure linkage table per call into the runtime | those of `plugin.load` and of the count of live objects | once per load: the runtime version, the hash chains, the slots | no devirtualisation in a host or a plugin |
+| [Modules and imports]({{% relref "18-the-tool#modules-and-imports" %}}) | 0. An import adds no code and no data | 0 | 0 | 0 | none | a call across modules is a direct call. Dev never inlines it, and release may |
+| [Visibility across modules]({{% relref "18-the-tool#visibility-across-modules" %}}) | 0. A `pub` function of a class takes one table entry of 8 bytes, a private or protected one none | 0 | 0 | 0 | none, at compile time alone | none. A private or protected function is a direct call |
+| [Library files]({{% relref "18-the-tool#library-files" %}}) | 0 in the program. The file of the example: 828 bytes, 676 with `--strip-docs`, one file for all six targets | 0 | 0 | 0 | none | a generic of the file is compiled again in each module that makes a copy |
 | [tests and fixtures blocks]({{% relref "19-tests#tests-and-fixtures-blocks" %}}) | 0 in a build without `--tests`. 16 in the runtime for the name of the running test | 0 by the runner | per test one `anti_rt_test_running` | 0 | the assertions of a dev run. A run with `--release` has none | one function per test and per fixture, in a test build alone |
 | [The processor levels]({{% relref "20-targets#the-processor-levels" %}}) | a level changes no size and no layout | 0 | one check of the processor at start | an atomic operation is one instruction at `armv8.2` and above | at start, in every build: the level of the machine | one runtime per target and level in the archive |
 
