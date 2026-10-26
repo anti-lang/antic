@@ -1946,7 +1946,7 @@ b0:
 
 `opt` removes the arithmetic, whose result nothing reads, and the call, whose declaration says that it reads memory alone and returns. Those are the facts the warning reads. A function of the program has no such row, so antic does not warn of its call. `opt` may still remove that call when it inlines the body.
 
-Where it lives: `warn_unused_result` of `src/antic/sema_stmt.c` gives the warning, with `sema_hash_without_effects` for the hash. The rows of the runtime functions and their effects are in `src/antic/rt_abi.h`. `NAME_UNUSED_RESULT` of `src/antic/warnings.c` holds the name.
+Where it lives: `warn_unused_result` of `src/antic/sema_stmt.c` gives the warning, with `sema_hash_without_effects` for the hash. `rt_without_effects` of `src/antic/rt_abi.c` reads the rows of the runtime functions in `src/antic/rt_abi.h`. `NAME_UNUSED_RESULT` of `src/antic/warnings.c` holds the name.
 
 ### What it costs
 
