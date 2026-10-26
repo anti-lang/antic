@@ -184,6 +184,8 @@ if t.equal("a", "a") {
 
 `import anti.io.{println};` makes the listed public items of a module visible without its name. `import anti.text as t;` gives the module another name in the file. [Chapter 18]({{% relref "18-the-tool" %}}) holds the rules of modules, imports and visibility.
 
+The `if` of the block stands outside a function, which no Anti file allows. An example of this guide without a `main` is a part of a program. Its statements stand in the body of a function that the test of the guide writes around them. "Reading the excerpts" of [chapter 2]({{% relref "02-how-antic-works#reading-the-excerpts" %}}) describes that test.
+
 ### Hello with antic alone
 
 ```sh
