@@ -333,7 +333,7 @@ Where it lives: `lower_class_record` and `table_of` of `src/antic/lower_desc.c` 
 | `&d` to a base pointer | nothing | nothing |
 | `p is *T`, `p as? *T` | five loads and two compares, and the test of the table | five loads and two compares |
 | `p as *T` | the same and a branch to `anti_rt_cast_failed` | the same |
-| Atomic operations | two loads in each call of `anti_rt_hook`: the installed trace handler and the count of loaded libraries | the same |
+| Atomic operations | one load of the installed trace handler in each call of `anti_rt_hook`. An object on the heap adds one load of the count of loaded libraries when it is made and one when `delete` frees it | the same |
 | Locks | 0 | 0 |
 | Checks inserted | the zero table before `is`, `as` and a dispatch | none of those, the check of `as` stays |
 
@@ -1143,7 +1143,7 @@ retq
 - `circle_area` calls `area` on a `*Circle`. No class below `Circle` replaces it, so the call is direct, and `opt` inlines `area` and the private `square` into three instructions.
 - `advance` calls `step` on a `*Counter`, an abstract class. `Up` is the only class of the program that fills `step`, so the pass binds the call to `Up.step`, and the increment stands in place.
 
-The pass does not run in dev mode, which compiles one module at a time and relies on `final`. It also leaves the calls alone in a plugin and in a program that loads a plugin or injects a provider. A class the compiler never saw may fill an entry there. `--closed` builds a program that loads no plugin, and the pass runs for it.
+This step of the pass runs in release mode alone, by `whole_program` of `src/antic/whole.c`. A dev build compiles one module at a time and relies on `final`. It also leaves the calls alone in a plugin and in a program that loads a plugin or injects a provider. A class the compiler never saw may fill an entry there. `--closed` builds a program that loads no plugin, and the pass runs for it.
 
 Where it lives: `lower_load_table` of `src/antic/lower_expr.c` loads the table and writes the dev check. `devirtualise` of `src/antic/whole.c`. `docs/notes/whole-program.md` holds the choices of the pass.
 
@@ -2450,7 +2450,7 @@ b0:
 - `icmp ne i8 %v7, 3` tests that its kind is 3, `Float`.
 - The `call` passes the object and the `f64` to the entry, and the result is stored back as a `Value`.
 
-`reflect.call` itself is `anti_rt_reflect_call` of the runtime. It finds the function record by its index and reads the entry from the table of the object at the record's slot. It then searches the table `anti_rt_trampolines` for the record's signature text with `strcmp`. The call therefore dispatches as any call does: an object of a derived class runs its own replacement.
+`reflect.call` itself is `anti_rt_reflect_call` of the runtime. It finds the function record by its index and reads the entry from the table of the object at the record's slot. It then walks the table `anti_rt_trampolines` and compares the signature text of each trampoline with that of the record by `anti_rt_same_bytes`, which compares the lengths first. The call therefore dispatches as any call does: an object of a derived class runs its own replacement.
 
 `reflect.new` reads `anti_rt_registry`, a list of every class of the program with its descriptor and a function that prepares an object. The whole-program pass writes it at link time.
 
@@ -2462,13 +2462,13 @@ Where it lives: `src/antic/lower_desc.c` writes descriptors, field lists and fun
 
 | Cost | Dev | Release |
 |---|---|---|
-| Read-only bytes per class | a descriptor of 136, 48 per field, 40 per `pub` function, 16 of them inherited, and the names | the same for a class that is reached |
+| Read-only bytes per class | a descriptor of 136, 48 per field, 48 per function of the table, and the names. The function list starts with the 16 records of the seven functions and the nine hooks of the root, so `Circle` with two `pub` functions has 18 records, 864 bytes | the same for a class that is reached |
 | Read-only bytes per interface part of a class | a descriptor of 136 | the same |
 | Code per distinct signature | one trampoline | the same |
 | Bytes per object | 0 | 0 |
 | `describe`, `field`, `get` | one to five calls into the runtime | the same |
 | `set` | one call and the test of the kind | the same |
-| `call` | one call into the runtime, one `strcmp` per trampoline until the match, the tests of count and kinds, one indirect call | the same |
+| `call` | one call into the runtime, one `anti_rt_same_bytes` per trampoline until the match, the tests of count and kinds, one indirect call | the same |
 | `new` | a search of the registry by name, one `malloc`, the defaults, `construct` | the same |
 | With `--no-reflect` | no field list, no function list, no trampoline, no registry | the same |
 
@@ -2478,7 +2478,7 @@ The choice among the forms that act on a class the code does not name:
 
 - An interface call reaches a function that the code names at compile time, with two loads and an indirect call. Code that knows what it calls takes this form.
 - A generic copy of [chapter 10]({{% relref "10-generics" %}}) knows the type at compile time and reads its fields as any code does, at a constant offset.
-- Reflection finds a field or a function by an index that the program computes at run time. `get` costs one to five calls into the runtime, and `call` a search of the trampolines by `strcmp` and the tests of each argument. It suits a serializer, a debugger or a binding to a scripting language, where the names arrive as data.
+- Reflection finds a field or a function by an index that the program computes at run time. `get` costs one to five calls into the runtime, and `call` a search of the trampolines by their signature texts and the tests of each argument. It suits a serializer, a debugger or a binding to a scripting language, where the names arrive as data.
 
 ### Pitfalls
 
