@@ -1708,7 +1708,7 @@ The compiler compiles every literal while it checks the module. A malformed lite
 
 `limit` takes that many matches from the start, or from the end when it is below zero, and 0 takes every match. `to_slice()` collects an iterator into a slice in new memory. A template names groups with `$1` and `${name}`, and `$$` writes one `$`.
 
-A `?Match` behaves as a `?*T` does. It stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind the match. A match has the fields `all`, `pre` and `post`, the texts of the match and of what stands before and after it, and `count`, the number of groups. `m.group(n)` and `m.took_part(n)` read a group by number. For a literal a group is a field as well: `m.1` by its number and `m.year` by its name.
+A `?Match` behaves as a `?*T` does, an optional of [chapter 7]({{% relref "07-optionals" %}}). It stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind the match. A match has the fields `all`, `pre` and `post`, the texts of the match and of what stands before and after it, and `count`, the number of groups. `m.group(n)` and `m.took_part(n)` read a group by number. For a literal a group is a field as well: `m.1` by its number and `m.year` by its name.
 
 A call with a literal at the call never fails. A search that reaches the match limit of PCRE2 stops the program with the pattern and the line. A pattern is a literal only where it stands in the call. A `Regex` bound to a local first, and one that `Regex.compile(text)` gives at run time, make the call one that may fail, with `regex.TooExpensive` or `regex.MissingGroup`. `Regex.compile` itself fails with `regex.BadPattern`, which holds the message and the position of PCRE2.
 
