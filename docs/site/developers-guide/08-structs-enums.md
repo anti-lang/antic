@@ -1572,7 +1572,7 @@ A release build trusts a number converted to an enum. A value outside the declar
 The choice among the forms that name a set of values:
 
 - An enum is its underlying integer: one byte for `Mode`, a compare for `==`, and a `switch` that the checker holds complete. It is the form for a closed set of states without data.
-- A variant of the next section carries data per case. A variant whose cases all lack fields, as `Signal`, has the size of its tag, one byte. Its tag converts to a number with `as`, so it does the work of an enum that may grow data later.
+- A variant of the next section carries data per case. A variant whose cases all lack fields, as `Signal` of that section, has the size of its tag, one byte. Its tag converts to a number with `as`, so it does the work of an enum that may grow data later.
 - A `const` of an integer type names a number without a type of its own. It suits flags that the program combines with `|`, where an enum value of a combination would be a value of its own.
 
 ### Pitfalls
