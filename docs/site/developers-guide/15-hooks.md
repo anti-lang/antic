@@ -566,7 +566,7 @@ define hidden noundef i64 @traced.Renderer.draw(ptr noundef nonnull dereferencea
 
 The handler is one word of the runtime, written and read atomically. `Trace.install` is a call of `anti_rt_trace_install`, which stores the pointer. The functions of a handler are entries 17 to 25 of its table, after the sixteen of the root.
 
-The stock handlers allocate nothing inside a hook. Each table they keep is a field of the handler with a size fixed at compile time. The counts of `LeakTracker`, `CallLogger` and `ThreadMonitor` and the totals of `ErrorMonitor` and `ChangeJournal` are atomic fields. The tables of the `Profiler` and of the `ChangeJournal` and the last error of the `ErrorMonitor` are plain fields, and no lock guards them.
+The stock handlers allocate nothing inside a hook. Each table they keep is a field of the handler with a size fixed at compile time. The counts of `LeakTracker`, `CallLogger` and `ThreadMonitor` and the totals of `ErrorMonitor` and `ChangeJournal` are atomic fields. The tables of the `Profiler` and of the `ChangeJournal` and the last error of the `ErrorMonitor` stand under a `Mutex` of the handler, which each hook that reaches them takes with `sync`. `Composite` takes its `Mutex` in `add` alone. Its hooks read the atomic count and then the list without a lock.
 
 Where it lives: `traced_function` of `src/antic/lower_function.c`, `lower_traced_class`, `lower_hook_call`, `lower_hook_failed` and `lower_hook_changed` of `src/antic/lower_hook.c`, `anti_rt_hook_call` and `anti_rt_trace_install` of `src/rt/hooks.c`, and `src/std/anti/trace.anti`.
 
@@ -586,11 +586,11 @@ Marked code is traced in a dev build and with `--trace`. It is not traced in a r
 
 The measurement of `tests/bench/hooks` in the section on hooks gives the time. Two trace points with nothing attached added 55.2 ms to 20 million calls, 2.8 ns per call. An attached `LeakTracker`, whose `enter` and `leave` are empty, added 20.2 ms for its four calls per turn.
 
-A traced function cannot be inlined across its two calls of the runtime as freely as a plain one. Its object must be in memory at both calls. `--no-trace` on a dev build gives the plain code back and gives up `enter`, `leave` and `failed` of every class.
+The two calls of the runtime are opaque to the optimizer, and each receives the object. A store to a field of the object therefore stays before the call of `leave`, as the `store` of `draw` above does. `--no-trace` on a dev build gives the plain code back and gives up `enter`, `leave` and `failed` of every class.
 
 `--no-hooks` removes these sites as well, with the five of the last section.
 
-The `Profiler` adds a read of the clock in `enter` at depth 0 and one in `leave`, and a search of its 64 names by comparing texts.
+The `Profiler` takes its `Mutex` in `enter` and in `leave`. Inside it compares the name with each name it holds, up to 64, and reads the clock in the `enter` and the `leave` of the outermost call of each name.
 
 Tracing is the form for code that a dev build or a test should watch and a release should not pay for. Two other forms watch a function.
 
@@ -1080,7 +1080,7 @@ The table holds one entry per key: the value, the layer that set it and the file
 
 The line stands in `show` of the example, with `rt.get` inlined. The call passes the key as a pointer and a length and returns the value as a `str` in two registers. `range(i64 5, 10)` is what opt knows of the length: the four keys of the example have 5 to 9 bytes. The text of the value belongs to the runtime and stays valid until the program ends.
 
-Each reader asks at its own time. The pool reads `threads` when it starts, at the first `dispatch` or `parallel`. `anti.log` reads `logger` when its default logger is built. `trace.start()` reads `trace` when the program calls it.
+Each reader asks at its own time. The pool reads `threads` when it starts, at the first `dispatch` or `parallel`, and a `parallel` without `by` reads it again for its count of chunks. `anti.log` reads `logger` when its default logger is built. `trace.start()` reads `trace` when the program calls it.
 
 Where it lives: `src/rt/start.c` for the walk of the arguments, `src/rt/conf.c` for the table, the file and `--anti.inspect`, `src/rt/toml.c` for the reader, and `src/std/anti/runtime.anti`.
 
@@ -1093,13 +1093,13 @@ The costs are the same in dev and in release.
 | At the start of every program | one walk of the arguments, and one read of the environment for `ANTI_CONF` |
 | With a file | one read and one parse per file, includes among them |
 | `rt.get(key)` | one call of the runtime, one lock, up to six comparisons of text |
-| A reader of a key | one such call, when it starts |
+| A reader of a key | one such call, when it starts. One per call of a `parallel` without `by` |
 | Bytes in the program | the table of six keys, the option texts and the TOML reader, in every program |
 | Checks | every option and every key of a file, when the program starts |
 
 No option of antic builds a program without the configuration.
 
-The keys configure the runtime alone, and each reader reads its key once. A program that asks for a key in a loop pays one call, one lock and up to six comparisons of text per turn. It reads the key once into a local. The settings of a program's own go through the modules of the standard library: `anti.args` for its command line and `anti.config` for a file of its own. A setting that never changes after the build is a constant, which costs nothing at run time.
+The keys configure the runtime alone, and each reader but `parallel` reads its key once. A program that asks for a key in a loop pays one call, one lock and up to six comparisons of text per turn. It reads the key once into a local. The settings of a program's own go through the modules of the standard library: `anti.args` for its command line and `anti.config` for a file of its own. A setting that never changes after the build is a constant, which costs nothing at run time.
 
 ### Pitfalls
 
@@ -1399,7 +1399,7 @@ Where it lives: `whole_write_provides` of `src/antic/whole_tables.c`, `whole_hos
 | The exports of a host | the names of its functions and data stay in the executable |
 | LTO | a host keeps every function and datum of its module and of its imports, so the link removes less unused code |
 
-The two programs of the example show the exports. The host measured here has a `main` that calls `speak` with the path of the library and prints the message of a failure. Built by antic of `d16646ee` on macos-arm64, it is 309,152 bytes, and the same source built with `--closed` is 151,504 bytes. The library is 59,264 bytes. The closed program fails at `plugin.load` with the message of the loader, which names the first symbol it could not find.
+The two programs of the example show the exports. The host measured here has a `main` that calls `speak` with the path of the library and prints the message of a failure. Built by antic of `465f6388` on macos-arm64, it is 309,152 bytes, and the same source built with `--closed` is 151,504 bytes. The library is 59,264 bytes. The closed program fails at `plugin.load` with the message of the loader, which names the first symbol it could not find.
 
 ### Pitfalls
 
