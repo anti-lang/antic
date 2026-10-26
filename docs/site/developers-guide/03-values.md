@@ -3,7 +3,7 @@ title: "Values"
 description: "The types and literals of Anti, variables and constants, integers that wrap or saturate, overflow checks, floats and f16, text and bytes, tuples and inference."
 summary: "Types, literals, variables and constants, integers with `+%` and `+|` and the overflow checks of dev mode, floats and `f16`, `str` and `[]byte` with their layout, tuples and type inference, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 30
 tags: [compilers, programming-languages]
@@ -127,7 +127,7 @@ let flag = 1 as bool;
 
 ### How antic builds it
 
-Each scalar type is one type of the IR and one type of LLVM, on every target.
+A scalar value has no header and no box. It is its bytes. They stand in a register while an expression uses them and in a slot of the frame for a local. A field or an element stands inline in its struct, array or object. Each scalar type is one type of the IR and one type of LLVM, on every target.
 
 | Anti | IR of antic | LLVM |
 |---|---|---|
@@ -219,7 +219,7 @@ import anti.text;
 
 fn show(name: str, bytes: int)
 {
-	let line = f"{name:<8}{bytes:>3}";
+	let line = f"{name:<10}{bytes:>5}";
 	io.println(line);
 	free(line.ptr);
 }
@@ -237,22 +237,26 @@ fn main() -> int
 	show("char", size_of(char));
 	show("*int", size_of(*int));
 	show("[4]i16", size_of([4]i16));
+	show("[1000]i32", size_of([1000]i32));
+	show("[1000]int", size_of([1000]int));
 	return 0;
 }
 ```
 
 ```text output
-bool      1
-byte      1
-i16       2
-i32       4
-int       8
-f16       2
-f32       4
-float     8
-char      4
-*int      8
-[4]i16    8
+bool          1
+byte          1
+i16           2
+i32           4
+int           8
+f16           2
+f32           4
+float         8
+char          4
+*int          8
+[4]i16        8
+[1000]i32  4000
+[1000]int  8000
 ```
 
 | Cost | Dev | Release |
@@ -267,6 +271,8 @@ char      4
 `size_of` is folded at compile time and costs nothing at run time. The integer section below shows the range check of a narrowing `as`.
 
 The `f"..."` of `show` formats its values into a text in new memory, which `free(line.ptr)` gives back. Most programs of the guide print that way, and "Text and bytes" below describes the form.
+
+The width of an integer is a choice of memory alone. An add, a compare or a load costs one instruction at every width. `int` is the type of every length and index: `s.len`, `xs.len` and the variable of `for i in 0..n` are each an `int`. A count or an index kept in an `int` therefore needs no `as`. A narrower type pays where many values stand side by side, as the last two lines of the program show: `[1000]i32` takes half the bytes of `[1000]int`. Each use of a narrow value beside an `int` costs one `as`, and a narrowing `as` carries a range check in dev mode. `byte` holds raw data and `char` one code point. A text is a `str` of UTF-8, one to four bytes per character, where an array of `char` takes four for every one.
 
 ### Pitfalls
 
@@ -311,7 +317,7 @@ y = 2.0;
 
 A local is mutable. Its type never changes, so `x = "five"` after `let x = 5;` is an error. A local lives until the end of its block.
 
-`const` declares a constant. It names its type, and its value is a constant expression: literals, other constants, operators, `as`, `size_of` and `.len` of a constant array or `str`. A constant stands at module level, in a block or in a class body, where `Name.NAME` reaches it. `pub const` makes one of a module visible to importers.
+`const` declares a constant. It names its type, and its value is a constant expression: literals, other constants, operators, `as`, `size_of` and `.len` of a constant array or `str`. A constant stands at module level, in a block or in a class body. Inside the class its bare name reaches it, in the fields, their defaults and the functions, and outside it `Name.NAME` does. A local or a parameter of the same name wins over the constant. `pub const` makes one of a module visible to importers.
 
 ```anti
 class Limits
@@ -322,6 +328,31 @@ const STEP: int = 2;
 const BYTES: int = STEP * size_of(int);
 const NAMES: [2]str = ["on", "off"];
 let m = Limits.MAX + BYTES;
+```
+
+A module holds no variables. A `let` stands in a body alone, and at module level the parser refuses it with `expected an item`. State that outlives a call lives in an object, in a singleton or in a static field of a class. A static field must be `atomic`, so each read is a `load()` and each write a `store(v)` or an `add(n)`, and no two threads race on it. [Chapter 9]({{% relref "09-classes" %}}) covers static fields and singletons.
+
+```anti
+class Counter
+{
+	pub static atomic hits: int = 0;
+	const STEP: int = 2;
+
+	pub fn bump()
+	{
+		Counter.hits.add(STEP);
+	}
+}
+Counter.bump();
+let n = Counter.hits.load();
+```
+
+```anti refused
+//! error: `count` is `static` and must be `atomic`
+class Hits
+{
+	static count: int = 0;
+}
 ```
 
 A name may be declared again in an inner block, with any type. The inner name hides the outer one until its block ends. A parameter may be hidden the same way in the body of its function.
@@ -459,6 +490,8 @@ Where it lives: `sema_const.c` of `src/antic/` computes a constant expression, a
 | Checks | none for the declaration | none |
 
 Initialising every local costs one store in dev mode. In release mode `opt` removes a store that no read follows.
+
+A value known at compile time belongs in a `const`. It costs no slot, no store and no load in either mode, and a use folds into the instruction that reads it. A `let` of the same value is a slot and a store in dev mode, which a release build folds as well. A `const` of a class body and one of the module cost the same and differ in the name that reaches them. A static atomic field is a global of the executable, named `<module>.Counter.hits` in the LLVM text. Each `add` is one `atomicrmw` instruction and each `load()` one atomic load, sequentially consistent, in both modes.
 
 ### Pitfalls
 
