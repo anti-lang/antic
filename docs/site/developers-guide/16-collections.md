@@ -71,6 +71,20 @@ A list adds the operations of a sequence.
 | `l.reserve(n)` | room for `n` more elements in one allocation |
 | `l.shrink()` | gives back the room past the last element |
 
+`sort`, `sort_by` and `map` are generic functions of the module `anti.collection.list` that a call on a list reaches as its own, `l.sort()` for `sort(&l)`. A call infers their type arguments from the arguments. An anonymous function passed to `sort_by` or `map` therefore names the types of its parameters, `l.map(fn(n: int) -> str { ... })`, or the call names the type arguments, `l.map<int, str>(fn(n) -> str { ... })`. The type of `n` then comes from `fn(T) -> U` with `T` known.
+
+Without either, the checker refuses the call.
+
+```anti refused
+//! error: `n` needs a type, which an anonymous function takes from a parameter of function type
+import anti.collection.list.{List};
+
+fn labels(l: *List<int>)
+{
+	let m = l.map(fn(n) -> str { return "x"; });
+}
+```
+
 A deque has `push_front`, `push_back`, `pop_front`, `pop_back`, `front`, `back`, `reserve` and `shrink`. The two `pop` forms and `front` and `back` give a `?T`. A deque has no `[]`.
 
 ```anti
