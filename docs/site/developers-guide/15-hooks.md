@@ -616,7 +616,7 @@ For a C++ programmer:
 
 - `leave` runs after the locals of the function are gone. A handler that reads the object in `leave` reads it after the teardowns of the body.
 - The name a hook receives is a `str` into read-only data and lives as long as the program. The error `failed` receives is deleted when its `catch` ends, so a handler copies what it keeps.
-- A handler runs on every thread that reaches a site, so a handler of the program counts with atomic fields. The tables of the stock `Profiler` are plain fields.
+- A handler runs on every thread that reaches a site, so a handler of the program counts with atomic fields. The tables of the stock `Profiler` are plain fields under a `Mutex`, which every `enter` and `leave` takes.
 
 ## Injection
 
