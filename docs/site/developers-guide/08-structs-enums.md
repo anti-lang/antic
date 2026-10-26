@@ -1241,7 +1241,7 @@ A dev build tests the first and the last element that `T.load(slice, i)` and `v.
 The choice among the forms that hold lanes:
 
 - A simd struct does one operation on all its lanes with one instruction where the target has the width. That is one `vaddps` for 16 bytes, and for 32 bytes at x86-64-v3. A value of 16 bytes passes in one vector register.
-- A plain struct of the same fields, such as `Rect` of the first section, has no operators, and the program writes one statement per field. It passes as the C convention passes a struct, two `<2 x float>` for `Rect`. `v as Plain` and back cost nothing, so a program computes on the simd struct and stores the plain one.
+- A plain struct of the same fields, such as `Rect` of the first section, has no operators, and the program writes one statement per field. It passes as the C convention passes a struct, two `<2 x float>` for `Rect`. `v as Plain` and back convert no lane: they copy the bytes, one `memcopy` of the IR, so a program computes on the simd struct and stores the plain one.
 - An array or a slice holds a count of elements that is not fixed by the type. A loop over it loads the lanes with `T.load` and computes on the simd struct.
 - A simd struct above 256 bytes is a loop over its lanes. A smaller simd struct in a loop over an array is the form that keeps each operation one instruction.
 
