@@ -1771,12 +1771,21 @@ export fn dot(a: Vec2, b: Vec2) -> c_int { return a.x * b.x + a.y * b.y; }
 export struct Vec2 { x: c_int, y: c_int }
 export union Bits { whole: u32, parts: [4]u8 }
 export const LIMIT: c_int = 8;
+export enum Mode: u8 { Read, Write }
+export variant Reply { Number { n: c_int }, Nothing }
+
+export class Counter
+{
+	pub n: c_int = 0,
+
+	pub fn get(self) -> c_int { return self.n; }
+}
 
 link framework "CoreAudio";
 link linux "X11";
 ```
 
-`extern fn` declares a C function. Every pointer of one is `?*T`, `...` declares a variadic one, whose arguments are integers of 32 or 64 bits, `c_long` and `c_ulong` among them, `f64` or pointers, and `may fail` and `export` are refused on it. Its signature takes C types alone: a `str`, a slice, a tuple, an optional value and an `own` parameter are refused, and a `char` passes as a 32-bit integer. One C function has one signature in a program, and a second `extern fn` of its name with another one is refused. `export` on `fn`, `struct`, `union`, `const` and `type` implies `pub` and puts the item into the C header, a function under its unmangled name. The signature of an `export fn` and the fields of an `export struct` or `export union` use sized integers, `int`, `uint`, `float`, `bool`, the C types, pointers to such types, exported structs and unions, and function pointers of such signatures. `char`, `str`, slices, arrays by value and non-exported structs are refused, and a field may be a fixed array of an allowed type. An `export const` has a numeric type, `bool` or `str`. An exported name that `<stdbool.h>`, `<stddef.h>` or `<stdint.h>` defines, as `SIZE_MAX`, is refused. An `export fn` of a class body is `pub` as well, `export` before an `operator fn` is refused, since C has no operators, and `export type` writes a copy of a generic, see [Generics](#generics). `link framework "Name";` links a macOS program against a framework of Apple's SDK, and `link linux "Name";` a Linux program against a library of the glibc sysroot. A Linux program that reaches a `link linux` line links dynamically against glibc 2.35, and every other one statically against musl.
+`extern fn` declares a C function. Every pointer of one is `?*T`, `...` declares a variadic one, whose arguments are integers of 32 or 64 bits, `c_long` and `c_ulong` among them, `f64` or pointers, and `may fail` and `export` are refused on it. Its signature takes C types alone: a `str`, a slice, a tuple, an optional value and an `own` parameter are refused, and a `char` passes as a 32-bit integer. A `lent` parameter is refused, since C may keep the pointer, and so are `concurrent` and `keep own`, since C takes a plain function pointer. One C function has one signature in a program, and a second `extern fn` of its name with another one is refused. `export` on `fn`, `struct`, `union`, `class`, `enum`, `variant`, `const` and `type` implies `pub` and puts the item into the C header, a function under its unmangled name, an enum as a C enum and a variant as its struct with the enum of its tags. The signature of an `export fn` and the fields of an `export struct` or `export union` use sized integers, `int`, `uint`, `float`, `bool`, the C types, pointers to such types, exported structs and unions, and function pointers of such signatures. `char`, `str`, slices, arrays by value and non-exported structs are refused, and a field may be a fixed array of an allowed type. An `export const` has a numeric type, `bool` or `str`. An exported name that `<stdbool.h>`, `<stddef.h>` or `<stdint.h>` defines, as `SIZE_MAX`, is refused. An `export fn` of a class body is `pub` as well, `export` before an `operator fn` is refused, since C has no operators, and `export type` writes a copy of a generic, see [Generics](#generics). `link framework "Name";` links a macOS program against a framework of Apple's SDK, and `link linux "Name";` a Linux program against a library of the glibc sysroot. A Linux program that reaches a `link linux` line links dynamically against glibc 2.35, and every other one statically against musl.
 
 `anti bind raylib_api.json` and `anti bind --clang header.h` generate bindings. `anti build --lib static|shared` builds a library with a header. A class is exported with its layout, tables, `anti_<Class>_init`, `anti_<Class>_construct` for a `construct` with arguments, and the dispatch wrappers. `embed("file")` puts a file's bytes in the binary. Not built yet: `embed`.
 
