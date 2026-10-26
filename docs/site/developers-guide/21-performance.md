@@ -20,9 +20,11 @@ A row gives the counts of a release build unless it names dev mode. "0" in a col
 |---|---|---|---|---|---|---|
 | [Types and literals]({{% relref "03-values#types-and-literals" %}}) | `bool` 1, `i16` 2, `i32` 4, `int` 8, `char` 4, a pointer 8 | 0 | 0 | 0 | dev: the range of a narrowing `as` | none |
 | [Variables and constants]({{% relref "03-values#variables-and-constants" %}}) | a local: one stack slot in dev, a register in release. A scalar constant: 0 | 0 | 0 | 0 | none | none |
-| [Integers]({{% relref "03-values#integers" %}}) | 1 to 8 | 0 | `anti_rt_check_failed`, on a failed check alone | 0 | dev: overflow of signed `+ - *`, a zero divisor, a shift count, a narrowing `as` | none |
+| [Operators]({{% relref "03-values#operators" %}}) | 0 | 0 | 0, apart from `==` and `<` on a `str`, and an `f16` below `v3` | 0 | none | none |
+| [Integers]({{% relref "03-values#integers" %}}) | 1 to 8 | 0 | `anti_rt_check_failed`, on a failed check alone | 0 | dev: overflow of signed `+ - *`, of the least value divided by -1 and of unary `-` of it, a zero divisor, a shift count, a narrowing `as` and `as` to `char`. Release: none, and `--checks` keeps them | none |
 | [Floats and f16]({{% relref "03-values#floats-and-f16" %}}) | `f16` 2, `f32` 4, `f64` 8 | 0 | one per read or write of an `f16` at `v1` and `v2`, 0 elsewhere | 0 | none | none |
 | [Text and bytes]({{% relref "03-values#text-and-bytes" %}}) | a `str` 16, a `char` 4 | an `f"..."`: one block of at least 32 bytes | `anti_rt_same_bytes` per `==`, one call per part of an `f"..."` | 0 | dev: the bounds of `s[i]` | none |
+| [Pattern literals]({{% relref "03-values#pattern-literals" %}}) | `Regex` 8, `Match` 96, `?Match` 104. A program with a pattern links PCRE2 | per literal three blocks at start, kept to the end. Per search two blocks that the search frees | one per search, test, step of `find_all` and `split` | 0 | none in either mode. `exponential-pattern` refuses at compile time | none |
 | [Tuples]({{% relref "03-values#tuples" %}}) | the C struct of the elements, padding included | 0 | 0 | 0 | none | none |
 | [Type inference]({{% relref "03-values#type-inference" %}}) | as with the type written | 0 | 0 | 0 | none | none |
 | [if and while]({{% relref "04-flow#if-and-while" %}}) | 0 | 0 | 0 | 0 | none | none |
@@ -30,24 +32,27 @@ A row gives the counts of a release build unless it names dev mode. "0" in a col
 | [switch]({{% relref "04-flow#switch" %}}) | 0 | 0 | 0. A `str` `switch` of n arms makes up to n calls of `anti.text.equal` | 0 | none | none |
 | [break and continue]({{% relref "04-flow#break-and-continue" %}}) | 0 | 0 | 0 | 0 | none | one copy of each deferred statement per exit |
 | [defer and undo]({{% relref "04-flow#defer-and-undo" %}}) | 0 in the frame | 0 | 0 | 0 | none | a `defer` once per exit of its block, an `undo` once per failing exit |
+| [Paths that end a function]({{% relref "04-flow#paths-that-end-a-function" %}}) | 0 | 0 | 0 | 0 | none of their own. `n as Dir` keeps its dev check | none. A path the checker proves dead has no code |
 | [Declaration and parameters]({{% relref "05-functions#declaration-and-parameters" %}}) | a struct of up to 16 bytes in two registers, a larger one as a copy | 0 | 0 | 0 | none | none |
 | [Defaults and source locations]({{% relref "05-functions#defaults-and-source-locations" %}}) | 64 of read-only data per `here` | 0 | 0 | 0 | none | none |
+| [never]({{% relref "05-functions#never" %}}) | 0 | 0 | 0 | 0 | none | none |
 | [The calling convention]({{% relref "05-functions#the-calling-convention" %}}) | one more pointer argument for a function that may fail | 0 | 0 | 0 | none | none |
 | [Inlining]({{% relref "05-functions#inlining" %}}) | 0 | 0 | a runtime call is inlined where lld chooses, under full LTO | 0 | none | one body per call site of an inlined function |
 | [Anonymous functions and closures]({{% relref "05-functions#anonymous-functions-and-closures" %}}) | in the frame: 16 for the pair and 8 per captured variable | 0 | 0 | 0 | none | none |
 | [snapshot fn and own fn]({{% relref "05-functions#snapshot-fn-and-own-fn" %}}) | an `own fn` value 16. On the heap 8 and the captures | one `malloc` per `own fn` made and per `dup` | `anti_rt_snapshot_new`, `anti_rt_snapshot_free`, `anti_rt_snapshot_text` per captured `str` | one atomic add when made, one atomic subtract when freed | none | none |
 | [Function values]({{% relref "05-functions#function-values" %}}) | 8 in a field or a result, 16 at a parameter or in a local | 0 | 0 | 0 | none | none |
+| [Calls without effects]({{% relref "05-functions#calls-without-effects" %}}) | 0 | 0 | 0 | 0 | none at run time: `unused-result` warns in a dev build and refuses a release build | none. A release build drops the call |
 | [Failing functions]({{% relref "06-errors#failing-functions" %}}) | an error: 128 on the heap | 0 for a call that does not fail, one `malloc` per new error | per new error `anti_rt_hook` and `anti_rt_backtrace_on`, and `anti_rt_delete` when it is handled | per new error two atomic loads in `anti_rt_hook` and one in `anti_rt_backtrace_on`. No lock | none | none |
 | [try and handlers]({{% relref "06-errors#try-and-handlers" %}}) | 0 | 0 | `anti_rt_delete` when a handler runs | 0 | none | the `defer` statements of the blocks left, once per `try` |
 | [Error origins and stack traces]({{% relref "06-errors#error-origins-and-stack-traces" %}}) | in the error 64 for the origin and 8 for the trace. 64 of read-only data per `fail` | a capture: 2, of 40 bytes and of 48 per frame. Dev, and release with `--anti.backtrace` | `anti_rt_trace_walk`, and `anti_rt_trace_frame` per frame | one atomic load at the first `fail` of an error | none | none |
-| [never]({{% relref "05-functions#never" %}}) | 0 | 0 | 0 | 0 | none | none |
 | [assert and the dev checks]({{% relref "06-errors#assert-and-the-dev-checks" %}}) | one text in the read-only data per assertion and per check site, in a build that keeps them | 0 | one call that does not return, on a failure alone | 0 | dev: all. Release: none, and `--checks` and `--asserts` keep them | none |
+| [Warnings, allow and unchecked]({{% relref "06-errors#warnings-allow-and-unchecked" %}}) | 0. A clause adds no code and no data | 0 | 0 | 0 | none at run time. A warning refuses a release build, and a safety check every build | none |
 | [Nullable pointers]({{% relref "07-optionals#nullable-pointers" %}}) | `*T` 8, `?*T` 8 | 0 | 0 | 0 | none. The tests are the ones the program writes | none |
 | [Optional values]({{% relref "07-optionals#optional-values" %}}) | the size of `T` and one byte, rounded up to the alignment of `T`. A `?T` of a pointer: 8 | 0 | 0 | 0 | none | none |
 | [Reading an optional]({{% relref "07-optionals#reading-an-optional" %}}) | one copy of the value for `if let` and `let ... else` | 0 when the value is there. One error of at least 128 bytes on the `none` path of a `catch` | `anti_rt_delete` of that error | 0 | none | none |
 | [Structs]({{% relref "08-structs-enums#structs" %}}) | the fields and the padding of C, and 0 beside them. Read-only: a descriptor of 136 and 48 per field | 0 | 0 | 0 | none of its own | none |
 | [packed and align]({{% relref "08-structs-enums#packed-and-align" %}}) | `Tight` 14 where `Loose` is 24. 64 for 8 bytes of fields at `align(64)` | 0 | 0 | 0 | none | none |
-| [Unions and bitfields]({{% relref "08-structs-enums#unions-and-bitfields" %}}) | a union: its largest field. Bitfields: the bits, in units of the field types | 0 | 0 | 0. A write of a bitfield is not atomic | none. A write truncates | none |
+| [Unions and bitfields]({{% relref "08-structs-enums#unions-and-bitfields" %}}) | a union: its largest field. Bitfields: the bits, in units of the field types | 0 | 0 | 0. A write of a bitfield is not atomic | dev: one compare per write of a value that is no constant. Release: none, and a write truncates | none |
 | [Simd structs]({{% relref "08-structs-enums#simd-structs" %}}) | the lanes, no padding: `Vec4` 16, `F32x8` 32 | 0 | 0 | 0 | dev: the bounds of `load` and `store`, and the checks of `/` and the shifts | none |
 | [Enums]({{% relref "08-structs-enums#enums" %}}) | its underlying type: 1, 2 or 4 | 0 | 0 on the passing path | 0 | dev: the test of `as` to an enum | none |
 | [Variants]({{% relref "08-structs-enums#variants" %}}) | the tag, the padding and the largest case: `Shape` 12, `Token` 24 | 0 | 0 | 0 | none | none |
@@ -73,10 +78,10 @@ A row gives the counts of a release build unless it names dev mode. "0" in a col
 | [Shared objects]({{% relref "11-ownership#shared-objects" %}}) | a handle 16. The cell on the heap: 32 for a value of 16 | one `malloc` per `new` | two `anti_rt_hook` per `new`, `anti_rt_delete` at the last teardown | one atomic add per `share()` and `dup`, one atomic subtract per teardown, and the atomic loads inside the hook calls. No lock | none | one copy of `Shared<T>` and `Cell<T>` per type argument |
 | [Pointers]({{% relref "12-memory#pointers" %}}) | 8 | one `malloc` or `calloc` per `alloc`, one `free` per `free` | 0. The allocator is that of the C library, mimalloc on Linux with musl | 0 | none. `p[i]` has no check in either mode | none |
 | [Slices and views]({{% relref "12-memory#slices-and-views" %}}) | a `[]T` 16, a `[N]T` `N` times the size of `T` | 0 | 0 | 0 | none | none |
-| [Bounds checks]({{% relref "12-memory#bounds-checks" %}}) | the text of each check a build keeps, 34 bytes in the example | 0 | on a failure alone | 0 | dev: one compare and one branch per `s[i]` and `a[i]`. Release: none, and `--checks` keeps them | none |
+| [Bounds checks]({{% relref "12-memory#bounds-checks" %}}) | the text of each check a build keeps, 34 bytes in the example | 0 | on a failure alone | 0 | dev: one compare and one branch per `s[i]` and `a[i]`, two per `s[lo..hi]`. Release: none, and `--checks` keeps them | none |
 | [anti.mem and the allocator]({{% relref "12-memory#antimem-and-the-allocator" %}}) | a `*Allocator` 8, an `ArenaAllocator` 56, and 8 per block it holds | an `ArenaAllocator`: one block of `from` when an `alloc` does not fit | 0. `from.alloc` is two loads and one indirect call. An `alloc` of an `ArenaAllocator` that fits makes no call in release and two in dev | 0. An `ArenaAllocator` is not thread-safe | dev: the zero table before `from.alloc` | none |
 | [--memory-checks]({{% relref "12-memory#--memory-checks" %}}) | 0 in the values | `alloc` and `free` of the AddressSanitizer runtime | `__asan_loadN` or `__asan_storeN` before every load and store through a pointer | 0 | with the option, in both modes. A release build with it links without LTO unless `--lto` is given | none |
-| [Threads, dispatch and join]({{% relref "13-threads#threads-dispatch-and-join" %}}) | a job 8 | per `dispatch` one `calloc` of 56, one `malloc` of the context when the worker takes arguments beside the object, and one `malloc` when the worker returns a value | one per `dispatch` and one of `anti_rt_hook`, one per `join`, which calls the hook `joined` | the lock of the pool once per `dispatch` and per `join`. One atomic load in the hook call of each, and none with `--no-hooks` | both modes: the test for an object in flight | one thunk per `dispatch` in the source |
+| [Threads, dispatch and join]({{% relref "13-threads#threads-dispatch-and-join" %}}) | a job 8 | per `dispatch` one `calloc` of 56, one `malloc` of the context when the worker takes arguments beside the object, and one `malloc` when the worker returns a value | one per `dispatch` and one of `anti_rt_hook`, one per `join`, which calls the hook `joined` | the lock of the pool once per `dispatch` and per `join`. One atomic load in the hook call of each, and none with `--no-hooks` | both modes: the test for an object in flight. Dev: a second `join` of one job | one thunk per `dispatch` in the source |
 | [parallel]({{% relref "13-threads#parallel" %}}) | the results: chunks times the bytes of a result | one `malloc` of the results | one per `parallel` | the lock of the pool, once at the start and twice per chunk | both modes: the bound of the results. Dev: a count of chunks below zero | one thunk per `parallel` in the source |
 | [Channels and select]({{% relref "13-threads#channels-and-select" %}}) | a channel value 8. On the heap 56 and `n` values, and a monitor | two per `chan T(n)` | one per `send`, `recv`, `close` and `select` | the lock of the channel once per `send` and `recv`, one atomic load per `send` and `close` | both modes: the capacity, the closed flag and a null handle | none |
 | [Atomics]({{% relref "13-threads#atomics" %}}) | the bytes of its type | 0 | 0 | one instruction per operation. A loop on arm64 at `armv8.0`. No lock | none | none |
@@ -113,7 +118,7 @@ A row gives the counts of a release build unless it names dev mode. "0" in a col
 | [Modules and imports]({{% relref "18-the-tool#modules-and-imports" %}}) | 0. An import adds no code and no data | 0 | 0 | 0 | none | a call across modules is a direct call. Dev never inlines it, and release may |
 | [Visibility across modules]({{% relref "18-the-tool#visibility-across-modules" %}}) | 0. A `pub` function of a class takes one table entry of 8 bytes, a private or protected one none | 0 | 0 | 0 | none, at compile time alone | none. A private or protected function is a direct call |
 | [Library files]({{% relref "18-the-tool#library-files" %}}) | 0 in the program. The file of the example: 828 bytes, 676 with `--strip-docs`, one file for all six targets | 0 | 0 | 0 | none | a generic of the file is compiled again in each module that makes a copy |
-| [tests and fixtures blocks]({{% relref "19-tests#tests-and-fixtures-blocks" %}}) | 0 in a build without `--tests`. 16 in the runtime for the name of the running test | 0 by the runner | per test one `anti_rt_test_running` | 0 | the assertions of a dev run. A run with `--release` has none | one function per test and per fixture, in a test build alone |
+| [tests and fixtures blocks]({{% relref "19-tests#tests-and-fixtures-blocks" %}}) | 0 in a build without `--tests`. 16 in the runtime for the name of the running test | 0 by the runner | per test one `anti_rt_test_running` | one lock of the runtime taken and given back per test | the assertions of a dev run. A run with `--release` has none | one function per test and per fixture, in a test build alone |
 | [The processor levels]({{% relref "20-targets#the-processor-levels" %}}) | a level changes no size and no layout | 0 | one check of the processor at start | an atomic operation is one instruction at `armv8.2` and above | at start, in every build: the level of the machine | one runtime per target and level in the archive |
 
 ## Measuring with tests/bench
@@ -139,48 +144,52 @@ The target builds the twins and runs `tests/runners/run_bench.cmake`. The runner
 
 | Program | C run | Anti run | Anti / C | Release compile | Dev compile |
 |---|---:|---:|---:|---:|---:|
-| `scalar_loop` | 283.1 ms | 284.6 ms | 1.01 | 93.1 ms | 31.6 ms |
-| `objects` | 101.2 ms | 104.0 ms | 1.03 | 202.5 ms | 39.5 ms |
-| `builder` | 42.9 ms | 56.0 ms | 1.30 | 230.5 ms | 32.0 ms |
-| `simd_loop` | 111.1 ms | 111.3 ms | 1.00 | 93.6 ms | 33.6 ms |
-| `map_work` | 125.4 ms | 136.2 ms | 1.09 | 601.6 ms | 168.7 ms |
+| `scalar_loop` | 293.3 ms | 295.7 ms | 1.01 | 112.1 ms | 35.1 ms |
+| `objects` | 105.3 ms | 108.0 ms | 1.03 | 235.7 ms | 44.2 ms |
+| `builder` | 44.6 ms | 58.2 ms | 1.30 | 262.0 ms | 35.8 ms |
+| `simd_loop` | 123.6 ms | 122.9 ms | 0.99 | 112.6 ms | 38.3 ms |
+| `map_work` | 140.2 ms | 149.8 ms | 1.07 | 729.0 ms | 196.8 ms |
+| `hooks` | 311.2 ms | 386.4 ms | 1.24 | 382.5 ms | 57.3 ms |
 
 | Condition | Value |
 |---|---|
 | Machine | Apple M4 Pro, 14 cores, 64 GB, macOS 26.6.2 |
 | Target | macos-arm64, at `armv8.5` |
-| Commit | `a9e8ffd0` |
+| Commit | `11bc8646` |
 | Mode | release, linked with full LTO. The C twin is built by the pinned clang at `-O2` |
 | Command | `cmake --build build/host --target bench` |
 | Runs | the median of 5 runs of each program and of 3 builds |
-| Load | another job ran on the machine during the run, at a load average of 2 on 14 cores |
+| Load | other jobs ran on the machine during the runs, at a load average between 4 and 16 on 14 cores |
 
 The release compile is the whole build of a program: the passes of antic, `opt`, and the LTO link with the runtime. The dev compile covers the module of the program and the link. The dev objects of the standard library are built once before the timing starts, as `anti build` keeps them in its cache.
 
+Each turn of `hooks` passes the sites of the hooks `created` and `destroyed`, which the C twin does not have. [Chapter 15]({{% relref "15-hooks#hooks" %}}) measures each site.
+
 ### Options of a build
 
-`run_bench.cmake` passes what `OPTIONS` holds to antic, for the release and the dev compile of a program. The variable `RELEASE_OPTIONS` holds options for the release build alone. Each column below is one run of the runner with one set of options. The table therefore shows what an option costs or saves on the five programs.
+`run_bench.cmake` passes what `OPTIONS` holds to antic, for the release and the dev compile of a program. The variable `RELEASE_OPTIONS` holds options for the release build alone. Each column below is one run of the runner with one set of options. The table therefore shows what an option costs or saves on the six programs.
 
 | Program | Plain | `--lto none` | `--checks --asserts` | `--no-hooks` | `--trace objects` | `--profile-use` |
 |---|---:|---:|---:|---:|---:|---:|
-| `scalar_loop` | 284.6 ms | 286.3 ms | 286.4 ms | 287.8 ms | 288.9 ms | 288.6 ms |
-| `objects` | 104.0 ms | 102.8 ms | 120.4 ms | 102.6 ms | 483.3 ms | 79.0 ms |
-| `builder` | 56.0 ms | 57.6 ms | 56.4 ms | 59.2 ms | 58.1 ms | 52.5 ms |
-| `simd_loop` | 111.3 ms | 111.5 ms | 111.5 ms | 112.3 ms | 113.7 ms | 114.5 ms |
-| `map_work` | 136.2 ms | 137.0 ms | 165.4 ms | 132.2 ms | 139.3 ms | 144.7 ms |
+| `scalar_loop` | 295.7 ms | 295.1 ms | 288.9 ms | 292.4 ms | 294.5 ms | 291.0 ms |
+| `objects` | 108.0 ms | 106.7 ms | 120.6 ms | 105.9 ms | 492.3 ms | 79.7 ms |
+| `builder` | 58.2 ms | 58.5 ms | 56.0 ms | 59.3 ms | 59.0 ms | 56.3 ms |
+| `simd_loop` | 122.9 ms | 119.8 ms | 120.2 ms | 119.6 ms | 127.5 ms | 123.3 ms |
+| `map_work` | 149.8 ms | 144.8 ms | 175.6 ms | 144.8 ms | 145.5 ms | 150.7 ms |
+| `hooks` | 386.4 ms | 500.1 ms | 389.2 ms | 335.6 ms | 386.5 ms | 381.4 ms |
 
 | Condition | Value |
 |---|---|
-| Machine, target, commit, runs | those of the table above |
+| Machine, target, commit, runs, load | those of the table above |
 | Command of the first column | `cmake --build build/host --target bench` |
 | Command of columns two to five | `cmake -DOPTIONS=<options> -P tests/runners/run_bench.cmake`, with the other values of the `bench` target and the options joined by commas |
 | Command of the last column | `cmake -DRELEASE_OPTIONS=--profile-use,<file> -P tests/runners/run_bench.cmake`, with the other values of the `bench` target |
-| C twins | the six runs measured the twins between 283.1 and 288.0 ms, 101.2 and 104.1 ms, 42.9 and 44.7 ms, 111.1 and 113.7 ms, and 125.4 and 128.3 ms |
-| Load | another job ran on the machine during the runs |
+| C twins | the six runs measured the twins between 290.4 and 293.3 ms, 105.0 and 106.3 ms, 43.6 and 46.5 ms, 117.6 and 125.6 ms, 133.3 and 140.2 ms, and 301.4 and 311.2 ms |
+| A second run | `--lto none` gave `hooks` 496.1 ms, and `--checks --asserts` gave `objects` 121.9 ms and `map_work` 179.0 ms |
 
-The range of the C twins is the noise of the six runs, up to 4 percent for `builder` and up to 3 percent for the others. A difference inside that range shows nothing. The sections below read the columns that lie outside it.
+The range of the C twins is the noise of the six runs: up to 7 percent for `builder` and `simd_loop`, 5 for `map_work`, 3 for `hooks` and about 1 for the other two. A difference inside that range shows nothing. The sections below read the columns that lie outside it.
 
-The release compile under `--lto none` took 35.7, 45.2, 65.3, 35.5 and 294.1 ms for the five programs, against the 93.1 to 601.6 ms of the full LTO link. The run times of the two links lie within the noise.
+Under `--lto none` the release compile of the six programs took 37.9, 48.8, 72.4, 38.1, 346.2 and 154.3 ms. The full LTO link took 112.1 to 729.0 ms. Five programs ran within the noise of their plain build. `hooks` ran in 500.1 ms against 386.4 ms. Each of its sites is a call of `anti_rt_hook` of the runtime. The full LTO link may inline that function into the program, as [chapter 2]({{% relref "02-how-antic-works" %}}) describes. A link of objects keeps every such call.
 
 ### A new program
 
@@ -214,12 +223,12 @@ antic refuses the options where they cannot work.
 | both options | `antic: --profile-generate and --profile-use exclude each other` |
 | `--profile-generate -S` | `antic: --profile-generate links a program, without -S, -c, --lib or --linker platform` |
 | `--profile-use` with a missing file | `antic: cannot read nothere.profdata` |
-| `--profile-use` with a raw profile | `antic: <file> is a raw profile. llvm-profdata merge -o <file> <file> writes the profile that --profile-use reads` |
+| `--profile-use` with a raw profile | `antic: <raw> is a raw profile. llvm-profdata merge -o <file> <raw> writes the profile that --profile-use reads`, where `<raw>` is the name of the file given and `<file>` stands as written |
 | `--profile-use` with another file | `antic: <file> is no profile of llvm-profdata merge` |
 
-The instrumented `objects` of macos-arm64 is 128,544 bytes, against 89,888 for the plain release program. It is a program for a training run and not one that ships.
+The instrumented `objects` of macos-arm64 is 128,880 bytes, against 90,224 for the plain release program. It is a program for a training run and not one that ships.
 
-The last column of the table of options is the build with a profile. Each of the five programs was built with `--profile-generate` and run once, and `llvm-profdata merge` wrote one profile from the five raw files. With it `objects` ran in 79.0 ms against 104.0 ms, and `builder` in 52.5 ms against 56.0 ms. `map_work` ran in 144.7 ms against 136.2 ms, which is slower by more than the noise. `scalar_loop` and `simd_loop` stayed within it. A profile is therefore measured per program before it is kept.
+The last column of the table of options is the build with a profile. Each of the six programs was built with `--profile-generate` and run once, and `llvm-profdata merge` wrote one profile from the six raw files. With it `objects` ran in 79.7 ms against 108.0 ms, 0.75 times its C twin. The other five stayed within the noise. A profile changes the code of every function it covers, and here it made one program of six faster. A program keeps a profile after a measurement of its own.
 
 The profile fits the source it was made from. `opt` matches each function to its counts by a hash of its code, and a function that changed since the training run takes none.
 
@@ -227,9 +236,9 @@ Where it lives: `profile_options` of `src/antic/llvm_run.c` passes the options t
 
 ## Tracing
 
-A traced function calls the runtime twice, once on entry and once on exit. A class marked `trace` is traced in a dev build and with `--trace`, and `--trace <pattern>` traces a class that did not ask. [Chapter 15]({{% relref "15-hooks" %}}) counts what stands inside each call.
+A traced function calls the runtime twice, once on entry and once on exit. A class marked `trace` is traced in a dev build and with `--trace`. `--trace <pattern>` traces the classes the pattern names, whether they asked or not, and leaves the marked code of other modules to the mode. [Chapter 15]({{% relref "15-hooks" %}}) counts what stands inside each call.
 
-The column `--trace objects` of the table of options traces every class of the module `objects`, in the release build, with no handler installed. On each of 20,000 passes, each of 4,096 shapes takes `grow`, `area` and one `add` of the counter. That is 245.76 million traced calls. The program ran in 483.3 ms against 104.0 ms. The other four programs hold no class of that module and stayed within the noise.
+The column `--trace objects` of the table of options traces every class of the module `objects`, in the release build, with no handler installed. On each of 20,000 passes, each of 4,096 shapes takes `grow`, `area` and one `add` of the counter. That is 245.76 million traced calls. The program ran in 492.3 ms against 108.0 ms, 4.6 times its C twin. The other five programs hold no class of that module and stayed within the noise. `hooks` marks its class `Node` with `trace`, and the release build with the pattern alone does not trace it: 386.5 ms against 386.4 ms.
 
 The time is the cost of the sites alone. An installed handler adds one indirect call per site and its own work. The stock handlers of `anti.trace` differ in that work: the `Profiler` reads the clock and searches its 64 names, and the `CallLogger` writes a line. `tests/bench` holds no program that installs a handler, so the page states no time for one.
 
@@ -239,29 +248,13 @@ Three options decide the sites of a build.
 |---|---|---|
 | none, in a dev build | `enter`, `leave`, `failed` | nothing |
 | none, in a release build | none | the three hooks, until `--trace` is given |
-| `--trace`, `--trace <pattern>` | the three hooks, in either mode | the time above, per traced call |
+| `--trace` | the three hooks, in either mode | the time above, per traced call |
+| `--trace <pattern>` | the three hooks in the classes the pattern names, in either mode. Marked code of other classes follows the mode | the same, in those classes |
 | `--trace writes` | one more call per store to a field | the same, per store |
 | `--no-trace` | none, in either mode | `enter`, `leave` and `failed` of every class |
 | `--no-hooks` | none, and none of the five hooks of every object | every hook, every handler and the loading of plugins |
 
-The column `--no-hooks` is a release build without the five hooks of every object. `objects`, `scalar_loop` and `simd_loop` stayed within the noise. `map_work` ran in 132.2 ms against 136.2 ms, at 1.05 times its twin against 1.09. `builder` ran in 59.2 ms against 56.0 ms, which lies outside the range of its twins.
-
-The column was therefore measured two more times. `map_work` repeats its gain, and `builder` does not repeat its loss.
-
-| Program | C twin | Anti with `--no-hooks` | Anti / C |
-|---|---:|---:|---:|
-| `builder`, first run | 44.7 ms | 57.8 ms | 1.29 |
-| `builder`, second run | 44.7 ms | 55.5 ms | 1.24 |
-| `map_work`, first run | 126.4 ms | 132.0 ms | 1.04 |
-| `map_work`, second run | 126.8 ms | 132.6 ms | 1.05 |
-
-| Condition | Value |
-|---|---|
-| Machine, target, mode, runs | those of the first table of this section |
-| Commit | `2d850efa`, whose compiler, runtime and bench programs equal those of `a9e8ffd0` |
-| Command | `cmake -DOPTIONS=--no-hooks -P tests/runners/run_bench.cmake`, with the other values of the `bench` target |
-| Plain build of the same hour | `builder` 57.4 ms at 1.29 times its twin, `map_work` 137.3 ms at 1.09 |
-| Load | another job ran on the machine, at a load average of 17 on 14 cores |
+The column `--no-hooks` is a release build without the five hooks of every object. `hooks` ran in 335.6 ms against 386.4 ms, at 1.10 times its twin against 1.24, since each of its turns makes and deletes one object. The other five programs stayed within the noise.
 
 ## Checks of a release build
 
@@ -270,17 +263,26 @@ Outside dev mode a program holds no check of that mode and no assertion. The opt
 | Check of dev mode | Section | In a release build | Without it |
 |---|---|---|---|
 | Overflow of signed `+ - *` | [Integers]({{% relref "03-values#integers" %}}) | dropped, kept by `--checks` | the result wraps |
+| The least value divided by -1, its remainder by -1 and unary `-` of it | [Integers]({{% relref "03-values#integers" %}}) | dropped, kept by `--checks` | the least value, and 0 for the remainder |
 | A zero divisor of `/` and `%` | [Integers]({{% relref "03-values#integers" %}}) | dropped, kept by `--checks` | the division gives 0 |
-| The count of `<<` and `>>` | [Integers]({{% relref "03-values#integers" %}}) | dropped, kept by `--checks` | the count is masked to the width |
+| The count of `<<` and `>>` below zero or at the width, and of `<<%` below zero | [Integers]({{% relref "03-values#integers" %}}) | dropped, kept by `--checks` | the count is taken modulo the width, and `<<%` gives 0 |
 | The range of a narrowing `as` | [Integers]({{% relref "03-values#integers" %}}) | dropped, kept by `--checks` | the value is truncated |
-| A number converted to an enum | [Enums]({{% relref "08-structs-enums#enums" %}}) | dropped, as the section states it | a value outside the declared ones is undefined behaviour |
+| `as` to `char` of a value outside the Unicode scalar values | [Integers]({{% relref "03-values#integers" %}}) | dropped, kept by `--checks` | the `char` holds the value unchecked |
+| A number converted to an enum | [Enums]({{% relref "08-structs-enums#enums" %}}) | dropped, kept by `--checks` | a value outside the declared ones is undefined behaviour |
+| A value written to a bitfield that does not fit its width | [Unions and bitfields]({{% relref "08-structs-enums#unions-and-bitfields" %}}) | dropped, kept by `--checks` | the value is truncated to the width |
 | The bounds of `s[i]` and `a[i]` | [Bounds checks]({{% relref "12-memory#bounds-checks" %}}) | dropped, kept by `--checks` | an index out of range reads or writes other memory |
-| The bounds of `load` and `store` of a simd struct | [Simd structs]({{% relref "08-structs-enums#simd-structs" %}}) | dropped, as the section states it | the same |
+| The bounds of `s[lo..hi]` | [Bounds checks]({{% relref "12-memory#bounds-checks" %}}) | dropped, kept by `--checks` | the slice reaches memory outside its value |
+| The bounds of `load` and `store` of a simd struct | [Simd structs]({{% relref "08-structs-enums#simd-structs" %}}) | dropped, kept by `--checks` | the same |
 | The index of `l[i]`, `remove_at(i)` and `g[x, y]` | [List and Deque]({{% relref "16-collections#list-and-deque" %}}) | dropped, kept by `--checks` | the same |
 | A collection changed during a loop over it | [Walking a collection]({{% relref "16-collections#walking-a-collection" %}}) | dropped, kept by `--checks` | the loop reads a block that a growth freed |
+| A count of chunks below zero after `by` | [parallel]({{% relref "13-threads#parallel" %}}) | dropped, kept by `--checks` | the runtime takes the count as 0, the count of the machine |
+| A second `join` of one job | [Threads, dispatch and join]({{% relref "13-threads#threads-dispatch-and-join" %}}) | dropped, and `--checks` does not bring it back. `--no-checks` drops it from a dev build | the second `join` reads a freed job. The release build of `join_twice` waited until it was stopped after 10 seconds |
 | The zero table before `is`, `as` and a dispatch | [Classes and the object in memory]({{% relref "09-classes#classes-and-the-object-in-memory" %}}) | dropped, and `--checks` does not bring it back. `--no-checks` leaves it in a dev build. The check of `p as *T` stays | a zero table pointer is not reported before the dispatch reads through it |
 | `assert` | [assert and the dev checks]({{% relref "06-errors#assert-and-the-dev-checks" %}}) | dropped with its condition, kept by `--asserts` | the condition is not evaluated |
+| A `sync` on a `Mutex` that its thread holds | [Locks]({{% relref "13-threads#locks" %}}) | not built in, with no option. `--no-checks` leaves it in a dev build | the thread waits for itself. On macOS the release build of `sync_held` ended with signal 9 |
 | The order of the locks | [Lock order in dev mode]({{% relref "14-concurrent-classes#lock-order-in-dev-mode" %}}) | not built in, with no option | an inversion that no dev run took is found by no build |
+
+Each row of the table was built from its program of `tests/traps/` on macos-arm64 in four modes: dev, dev with `--no-checks`, release and release with `--checks`. The column "In a release build" gives what those runs did.
 
 These checks stand in every build, and no option of antic removes them.
 
@@ -295,6 +297,27 @@ These checks stand in every build, and no option of antic removes them.
 | The order check after a lent entry of a sorted collection changed | [SortedMap and SortedSet]({{% relref "16-collections#sortedmap-and-sortedset" %}}) |
 | The checks of a plugin at its load | [Plugins across the boundary]({{% relref "17-c-interop#plugins-across-the-boundary" %}}) |
 | The level of the processor at start | [The processor levels]({{% relref "20-targets#the-processor-levels" %}}) |
+
+### Safety checks
+
+A safety check is a proof of the compiler, and it costs nothing at run time. It refuses a program in every build until the code is right or an `unchecked(name, "reason")` overrules it. [Chapter 6]({{% relref "06-errors#warnings-allow-and-unchecked" %}}) gives the forms of the clause. An overrule adds no code and gives up the proof at the place it covers.
+
+| Safety check | Section | Refuses | What `unchecked` gives up |
+|---|---|---|---|
+| `escaping-local` | [References to locals and uses after the end]({{% relref "11-ownership#references-to-locals-and-uses-after-the-end" %}}) | a reference to a local that would outlive it | a read of a dead frame, which no build reports, since `--memory-checks` covers the heap alone |
+| `use-after-free` | [References to locals and uses after the end]({{% relref "11-ownership#references-to-locals-and-uses-after-the-end" %}}) | a value used after `delete`, `destroy` or a move | a read of freed memory, which `--memory-checks` reports at run time for the heap |
+| `uninitialized-read` | [Pointers]({{% relref "12-memory#pointers" %}}) | an element of `alloc(T, n)` read before it is written | the read gives the bytes the allocator left there |
+| `index-out-of-range` | [Bounds checks]({{% relref "12-memory#bounds-checks" %}}) | an index out of range on every path that reaches it | the access keeps the bounds check of dev mode alone, and no check in release |
+| `unguarded-field` | [Concurrent classes]({{% relref "14-concurrent-classes#concurrent-classes" %}}) | a field of a concurrent class that nothing guards | the proof that no two threads race on the field |
+| `lock-order` | [Lock order at compile time]({{% relref "14-concurrent-classes#lock-order-at-compile-time" %}}) | two places that take the same locks in opposite orders | the proof of one order. The check of dev mode is then the only one |
+| `exponential-pattern` | [Pattern literals]({{% relref "03-values#pattern-literals" %}}) | nested repeats over overlapping text in a pattern literal | a bound on the time of a search: a text that fails to match costs time exponential in its length |
+
+Two warnings complete the table. A dev build prints them, and a release build refuses them as it refuses every warning. `allow(name, "reason")` silences one and adds no code.
+
+| Warning | Section | Points at | What `allow` gives up |
+|---|---|---|---|
+| `blocking-under-lock` | [Waits under a lock]({{% relref "13-threads#waits-under-a-lock" %}}) | a wait inside a `sync` | nothing at run time. The lock stays held for as long as the wait lasts |
+| `unused-result` | [Calls without effects]({{% relref "05-functions#calls-without-effects" %}}) | a call without effects whose result nothing takes | nothing at run time. A release build drops the call |
 
 ### A check in the code
 
@@ -381,6 +404,6 @@ jno
 
 The build for linux-arm64 shows the same two forms: `cmp` and `b.hs` for the bounds, and `adds` and `b.vc` for the overflow.
 
-The column `--checks --asserts` of the table of options is a release build that keeps the checks of dev mode. `objects` ran in 120.4 ms against 104.0 ms, and `map_work` in 165.4 ms against 136.2 ms. `scalar_loop`, `builder` and `simd_loop` stayed within the noise. The five programs hold no assertion, so the column measures the checks.
+The column `--checks --asserts` of the table of options is a release build that keeps the checks of dev mode. `objects` ran in 120.6 ms against 108.0 ms, and `map_work` in 175.6 ms against 149.8 ms. The second run gave 121.9 and 179.0 ms. `scalar_loop`, `builder`, `simd_loop` and `hooks` stayed within the noise. The six programs hold no assertion, and the library code they reach holds assertions in `tests` blocks alone, so the column measures the checks.
 
-A release build with `--checks --asserts` runs the optimized code and still stops at the first violation. It is the build for a test run of the program that ships, and the table gives what it costs on these five programs.
+A release build with `--checks --asserts` runs the optimized code and still stops at the first violation. It is the build for a test run of the program that ships, and the table gives what it costs on these six programs.
