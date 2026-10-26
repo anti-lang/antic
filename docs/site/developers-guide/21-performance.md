@@ -282,7 +282,7 @@ Outside dev mode a program holds no check of that mode and no assertion. The opt
 | A `sync` on a `Mutex` that its thread holds | [Locks]({{% relref "13-threads#locks" %}}) | not built in, with no option. `--no-checks` leaves it in a dev build | the thread waits for itself. On macOS the release build of `sync_held` ended with signal 9 |
 | The order of the locks | [Lock order in dev mode]({{% relref "14-concurrent-classes#lock-order-in-dev-mode" %}}) | not built in, with no option | an inversion that no dev run took is found by no build |
 
-Each row of the table was built from its program of `tests/traps/` on macos-arm64 in four modes: dev, dev with `--no-checks`, release and release with `--checks`. The column "In a release build" gives what those runs did.
+The programs of `tests/traps/` show every row apart from the zero table and `assert`. Each was built on macos-arm64 in release mode with and without `--checks`. `join_twice` and `sync_held` were built in dev mode with `--no-checks` as well.
 
 These checks stand in every build, and no option of antic removes them.
 
