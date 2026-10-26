@@ -58,7 +58,7 @@ A library file, `<module>.antl`, holds the public interface of a module and its 
 
 ## Source text
 
-The lexer reads the source as UTF-8 and skips a byte order mark at its start. The positions of a message count from the byte after it. Identifiers are ASCII letters, digits and `_`, and a name may not start with a digit. UTF-8 stands in literals and comments alone. A CR LF line end inside the text of a literal reads as LF. A file saved on Windows then gives the same `str` as on Linux. A NUL byte is refused outside a byte literal.
+The lexer reads the source as UTF-8 and skips a byte order mark at its start. The positions of a message count from the byte after it. Identifiers are ASCII letters, digits and `_`, and a name may not start with a digit. UTF-8 stands in literals and comments alone. A CR LF line end inside the text of a literal reads as LF. A file saved on Windows then gives the same `str` as on Linux. A NUL byte is refused in a name, in the code and in the text of a `str` literal. It may stand in a byte literal and in a comment.
 
 Comments are `//` to the end of the line and `/* */`. A block comment does not nest, so the first `*/` ends it. Six markers make a comment a doc comment, which is a token of its own and reaches the documentation that `anti doc` writes.
 
@@ -94,7 +94,7 @@ The keywords are reserved everywhere: `abstract alloc as assert atomic break cat
 let thread = 1;
 ```
 
-A contextual word is a keyword in one place and a name everywhere else. `packed`, `align`, `by`, `in`, `final`, `own`, `lent`, `keep`, `snapshot`, `simd`, `trace`, `allow` and `unchecked` are such words, and so are `may fail` after a signature and `never` after `->`. "Reserved words" of `docs/anti-syntax-overview.md` lists every one with its place.
+A contextual word is a keyword in one place and a name everywhere else. `packed`, `align`, `by`, `in`, `final`, `own`, `lent`, `keep`, `transient`, `operator`, `mutable`, `snapshot`, `simd`, `trace`, `compatible`, `concurrent`, `synchronized`, `allow` and `unchecked` are such words. So are `inject` before a field, `guarded by` after the type of a field, `fatal` after `catch`, `may fail` after a signature, `never` after `->`, and `link framework` and `link linux` at module level. "Reserved words" of `docs/anti-syntax-overview.md` lists every one with its place.
 
 The spelling `null` of C is refused with a message that names `none`, and a letter outside ASCII in a name is refused where it stands.
 
@@ -243,7 +243,7 @@ b1:
     jump b2
 ```
 
-A `str` is two words, a pointer and a length, with no terminating NUL. The IR passes it by the address of a slot. The LLVM text passes it as the convention of the target passes a struct of two words. That is two registers on five targets. windows-x86_64 passes the address of a copy, as its convention does for every struct above 8 bytes.
+A `str` is two words, a pointer and a length, with no terminating NUL. The IR passes it by the address of a slot. The LLVM text passes it as the convention of the target passes a struct of two words. That is two registers on five targets. windows-x86_64 passes the address of a copy, as its convention does for every struct whose size is not 1, 2, 4 or 8 bytes.
 
 `--dump-opt` prints the IR after the whole-program pass and the optimizer of antic. That optimizer folds constants, propagates copies, applies peephole rules and removes dead code. It then removes every function and global that `main` does not reach. For `walk` the dump holds four functions: `anti.io.print`, `anti.io.println`, `walk.area` and `walk.main`. `anti.io.eprint`, `anti.io.eprintln` and `anti.io.exit` are gone.
 
@@ -254,7 +254,7 @@ b0:
     branchov %2, b1, b2
 ```
 
-`--dump-opt` shows the checks in both modes, since it prints before the build drops them. The LLVM text is the first output where the two modes differ.
+`--dump-opt` shows the checks in both modes: it runs the whole-program pass and the optimizer without the step that drops them. The LLVM text is the first output where the two modes differ.
 
 ## The LLVM module
 
@@ -390,7 +390,7 @@ The mode is release for `antic` unless `--dev` is given, and dev for `anti build
 | Checks of dev mode | kept | dropped, and `--checks` keeps them |
 | `assert` | kept | dropped, and `--asserts` keeps them |
 | Tracing of a `trace` class | on | off, and `--trace` turns it on |
-| Linkage of a function | `hidden` | `internal` |
+| Linkage of a function | `hidden`, and global on Windows, whose COFF has no hidden symbols | `internal`, and global in a program that hosts plugins |
 | `opt` | not run | `default<O3>` or `lto-pre-link<O3>`, inline threshold 225 |
 | `llc` | `-O1` | `-O2`, or none under LTO |
 | LTO with the runtime | none | full, and `--lto thin` or `--lto none` choose another |
@@ -417,7 +417,7 @@ In dev mode the pass runs for the module that holds `main`, when that module lin
 
 The link of a release build is a full LTO link: link-time optimization over the program and the runtime together. `opt` runs `lto-pre-link<O3>` and writes bitcode as the object. `lld` then links that bitcode with the runtime. The archive holds the runtime as bitcode in `lib/<target>/<level>/bitcode/full/`. LLVM then runs its passes over the program and the runtime as one module, at `--lto-O3`. A call of `anti_rt_write` may then be inlined like a call of a function of the program.
 
-Dev mode, `-S`, `-c`, `--lib` and `--linker platform` link objects or link nothing, and refuse `--lto`. A build with `--memory-checks` and a Windows program that loads plugins link objects unless `--lto` is given. A macOS build with `--memory-checks` refuses `--lto`. `--lto none` asks for the link of objects in release mode. That link runs `opt` with `default<O3>` into `<output>.bc` and `llc -O2` on the bitcode. `lto_mode` of `src/antic/driver.c` holds the rule.
+Dev mode, `-S`, `-c`, `--lib` and `--linker platform` link objects or link nothing, and refuse `--lto`. A build with `--memory-checks` links objects unless `--lto` is given, and a macOS build with `--memory-checks` refuses `--lto`. A Windows program that hosts plugins links objects and refuses `--lto`, since the names it exports come from a COFF object. `--lto none` asks for the link of objects in release mode. That link runs `opt` with `default<O3>` into `<output>.bc` and `llc -O2` on the bitcode. `lto_mode` and `lto_usable` of `src/antic/driver.c` hold the rule.
 
 Every link drops the functions and data that nothing reaches, with `--gc-sections`, `-dead_strip` or `/OPT:REF`. For that, `llc` writes each function and each datum into a section of its own on ELF and COFF.
 
@@ -430,8 +430,8 @@ antic reads one directory beside its own executable. That directory is the runti
 | `bin/` | `opt`, `llc`, `lld`, `ld.lld`, `ld64.lld`, `lld-link`, `llvm-ar`, `llvm-objdump`, `llvm-profdata`, `llvm-readobj` and `llvm-version` |
 | `std/` | the standard library, one `.antl` per module |
 | `lib/<target>/<level>/` | `libanti_rt.a`, the runtime as objects, and `bitcode/full/` and `bitcode/thin/` with the runtime as bitcode |
-| `lib/<target>/` | the native libraries PCRE2, SQLite, Mbed TLS, miniaudio and raylib, the glue of `anti.regex` and the profile runtime of compiler-rt |
-| `lib/<target>-glibc/` | the runtime of the two Linux targets built against glibc |
+| `lib/<target>/` | the native libraries PCRE2, SQLite, Mbed TLS, miniaudio and raylib, the glue of `anti.regex` and the profile runtime of compiler-rt. On macOS and windows-x86_64 also the runtime of AddressSanitizer that `--memory-checks` links |
+| `lib/<target>-glibc/` | the runtime of the two Linux targets built against glibc, with the runtime of AddressSanitizer, the profile runtime and `libunwind.a` |
 | `sysroot/<target>/` | the C library and the system libraries each link needs |
 | `include/` | the headers of the native libraries |
 | `licenses/` | the licence text of each component |
@@ -442,7 +442,7 @@ antic looks for the archive in two places, in this order: the directory above it
 
 A Linux program links statically against the C library musl, and its allocator is mimalloc. The archive `lib/<target>/<level>/libmimalloc.a` stands before `libc.a` on the link line. `malloc`, `free`, `calloc`, `realloc` and `aligned_alloc` of the program, the runtime and musl therefore resolve to mimalloc. `link_command` of `src/antic/linker.c` writes that line. A program that names a library with `link linux` links dynamically against glibc 2.35 and keeps the allocator of glibc.
 
-A macOS program uses the allocator of `libSystem`, and a Windows program the one of `ucrtbase.dll`. The `alloc` and `free` of the language call `malloc` and `free` on every target, `alloc(T, n)` through `anti_rt_alloc_aligned` of the runtime. [Chapter 12]({{% relref "12-memory" %}}) describes `anti.mem`.
+A macOS program uses the allocator of `libSystem`, and a Windows program the one of `ucrtbase.dll`. On every target `alloc T { }` calls `malloc` and `free` calls `free`. `alloc(T, n)` calls `anti_rt_alloc_aligned` of `src/rt/mem.c`, which calls `malloc`, or `calloc` for elements that must start zeroed, or the aligned allocation of the platform for a type that `align(N)` raises above 16. [Chapter 12]({{% relref "12-memory" %}}) describes `anti.mem`.
 
 ## Contents of an executable
 
@@ -454,7 +454,7 @@ An executable holds the code of the program, the parts of the runtime the progra
 | Release, objects | `antic --target linux-x86_64 --lto none -o walk walk.anti` | 261,256 |
 | Dev | `antic --dev --target linux-x86_64 -o walk walk.anti io.o` | 262,440 |
 
-The sizes are of antic 0.2.0 at commit `05818aab`, read with `stat` on the development Mac. The dev build needs `io.o`, the dev object of `anti.io`, which `antic --dev --target linux-x86_64 -o io <archive>/std/anti/io.antl` writes.
+The sizes are of antic 0.2.0 at commit `ba2e424e`, read with `stat` on the development Mac. The dev build needs `io.o`, the dev object of `anti.io`, which `antic --dev --target linux-x86_64 -o io <archive>/std/anti/io.antl` writes.
 
 `llvm-objdump -h` and `llvm-objdump -t` of the release file give its parts.
 
@@ -563,7 +563,7 @@ b0:
 }
 ```
 
-A function shows in a release excerpt only when `main` reaches it and `opt` has not inlined every call of it. An example of the later chapters marks a function `export fn` where a release excerpt must show it. `opt` keeps an exported function under its plain name. In a library and in a program of macOS or Windows it is `dso_local`. A program of Linux that links musl statically and no object of C makes it `internal` and keeps it in `llvm.used`, so that the C library and mimalloc keep their own `read` and `write`.
+A function shows in a release excerpt only when `main` reaches it and `opt` has not inlined every call of it. An example of the later chapters marks a function `export fn` where a release excerpt must show it. `opt` keeps an exported function under its plain name. A program of Linux that links musl statically and no object of C makes it `internal` and keeps it in `llvm.used`, so that the C library and mimalloc keep their own `read` and `write`. Every other build makes it `dso_local` with default visibility.
 
 ```asm excerpt=hello target=linux-x86_64 mode=release
 <hello.main>:
