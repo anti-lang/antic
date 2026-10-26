@@ -1925,7 +1925,7 @@ Only the type of the left operand is looked up. `a + b` is `a.add(b)`, and the f
 
 For a class the function stands in the class body, with `self` as the left operand. For a struct it is a free function of the module that declares the struct, with the struct as its first parameter. Two such functions may share a name when their first parameters differ in type.
 
-The same word declares the language hooks `iter`, `next`, `value`, `index`, `set_index` and `hash`, which [chapter 16]({{% relref "16-collections" %}}) covers.
+The same word declares the language hooks `iter`, `next`, `value`, `index`, `set_index` and `hash`. `index` and `set_index` give a type the brackets, as the end of this part shows. "Walking a collection" and "Hashing and its seed" of [chapter 16]({{% relref "16-collections#walking-a-collection" %}}) cover the other four.
 
 A class or a struct without `operator fn eq` has a default `==` that compares the fields in order. On class values that default is the `equals` of the class, and a class that replaces `equals` gets its own body for `==`. A class without `concrete fn hash` has a default hash over the same fields. Neither has a default `<`, so a type that a constraint asks to be ordered declares `lt`. `==` on two class pointers stays the identity of the objects and calls nothing.
 
@@ -2154,6 +2154,127 @@ fn eq(a: Money, b: Money) -> bool { return true; }
 operator fn eq(a: Money, b: Money) -> bool { return a.cents == b.cents; }
 ```
 
+`e[i]` on a type with `operator fn index` is the call `e.index(i)`, and `e[x, y]` passes both indices. `e[i] = v` on a type with `operator fn set_index` is the call `e.set_index(i, v)`. The checker holds the two hooks to these rules.
+
+- `operator fn index(self, i: I) -> T` takes one index or more, of any types, and gives a value. It cannot fail, since the brackets have no place for a handler.
+- `operator fn set_index(self, i: I, v: T)` takes the indices of `index` in the same order and then the element that `index` gives, and returns nothing. So `e[i] = e[i]` holds for every type that has both.
+- A type with `index` alone is read-only through the brackets.
+- A compound assignment, `e[i] += v`, is refused, since it would compute `e` and `i` once for the read and once for the write. `e[i] = e[i] + v` is the form that says what runs.
+- A struct declares the two at module level, with the struct as the first parameter, as it declares its other operators.
+- The brackets reach the hook of a class through a pointer to it as well, as `b[2, 2]` on a `*Board` below.
+
+```anti
+//! name: cells
+import anti.io;
+import anti.text;
+
+export class Board
+{
+	cells: [9]int = [0; 9],
+
+	operator fn index(self, x: int, y: int) -> int
+	{
+		return self.cells[y * 3 + x];
+	}
+
+	operator fn set_index(self, x: int, y: int, v: int)
+	{
+		self.cells[y * 3 + x] = v;
+	}
+}
+
+struct Pair { a: int, b: int }
+
+operator fn index(p: Pair, i: int) -> int
+{
+	if i == 0 {
+		return p.a;
+	}
+	return p.b;
+}
+
+export fn corner(b: *Board) -> int
+{
+	return b[2, 2];
+}
+
+export fn put(b: *Board, v: int)
+{
+	b[0, 2] = v;
+}
+
+fn main() -> int
+{
+	let b = Board { };
+	b[1, 1] = 5;
+	b[2, 2] = b[1, 1] + 1;
+	put(&b, 9);
+	let p = Pair { a: 7, b: 8 };
+	let line = f"centre {b[1, 1]}, corner {corner(&b)}, low left {b[0, 2]}, pair {p[0]} {p[1]}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+centre 5, corner 6, low left 9, pair 7 8
+```
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `+=` takes no `operator fn set_index`, and `e[i] = e[i] + v` writes it
+class Board
+{
+	cells: [9]int = [0; 9],
+
+	operator fn index(self, x: int, y: int) -> int { return self.cells[y * 3 + x]; }
+
+	operator fn set_index(self, x: int, y: int, v: int) { self.cells[y * 3 + x] = v; }
+}
+
+fn bump(b: *Board)
+{
+	b[0, 0] += 1;
+}
+```
+
+```anti refused
+//! error: `Pair` has no `operator fn set_index`, which `e[i] = v` calls
+struct Pair { a: int, b: int }
+
+operator fn index(p: Pair, i: int) -> int { return p.a; }
+
+fn clear()
+{
+	let p = Pair { a: 1, b: 2 };
+	p[0] = 0;
+}
+```
+
+```anti refused
+//! error: `operator fn index` is written `operator fn index(self, i: I) -> T`
+class Board
+{
+	n: int = 0,
+
+	operator fn index(self) -> int { return self.n; }
+}
+```
+
+```anti refused
+//! error: `operator fn set_index` is written `operator fn set_index(self, i: int, v: int)`, as `index` reads
+class Board
+{
+	n: int = 0,
+
+	operator fn index(self, i: int) -> int { return self.n; }
+
+	operator fn set_index(self, i: int, v: str) { }
+}
+```
+
 ### How antic builds it
 
 An operator on a struct or a class value runs as a call of its function, the same call that `a.add(b)` makes. Nothing is looked up at run time: the type of the left operand chose the function at compile time, and the call is direct.
@@ -2223,6 +2344,39 @@ retq
 
 `pay` is one instruction: the call of `add` on the struct is inlined and the two values travel in registers. `sum` has `Vec2.add` inlined too, as one `vpaddq` over both fields. The result is an object, though. `leaq` and `movq` store its table pointer into the frame, and the `callq` is `anti_rt_hook` for its `created` hook. An operator that returns a class value pays for an object each time.
 
+The brackets of a type with the hooks are calls in the same way. An `operator fn` of a class body is `pub`, so `b[2, 2]` on a `*Board` is a call through the table of the class, entry 17, the first `pub` function of `Board`.
+
+```ir excerpt=cells target=linux-x86_64 mode=release
+export fn cells.corner(%0: ptr nonnull deref(size_of cells.Board)) -> i64 {
+b0:
+    %1 = load ptr %0 !table
+    %2 = mul i64 17, size_of ptr
+    %3 = ptradd %1, %2
+    %4 = load ptr %3 !entry
+    %5 = call i64 %4 via @cells.fn.0(%0, 2, 2) table @cells.anti_Board_descriptor 17
+```
+
+The call passes the object and the two indices. `b[0, 2] = v` in `put` is the call of entry 18, `set_index`, with the indices and the value after them. `Board` is the one class of the program that fills both entries, so a release build binds the two calls and inlines them.
+
+```llvm excerpt=cells target=linux-x86_64 mode=release
+define internal noundef i64 @corner(
+b0:
+  %v12.i = getelementptr inbounds nuw i8, ptr %p0, i64 72
+  %v14.i = load i64, ptr %v12.i, align 8
+  ret i64 %v14.i
+...
+define internal void @put(
+b0:
+  %v12.i = getelementptr inbounds nuw i8, ptr %p0, i64 56
+  store i64 %p1, ptr %v12.i, align 8
+```
+
+- `corner` is one load. Cell `(2, 2)` is element 8 of the array, at 8 bytes after the table pointer and 64 into the cells, offset 72.
+- `put` is one store at offset 56, element 6, cell `(0, 2)`.
+- A dev build keeps the dispatch with its test of the table and the bounds check of `self.cells[y * 3 + x]` inside the hook.
+
+`p[0]` on a `Pair` is a direct call of the free function `index` of the module, as `a + b` on a `Money` is.
+
 Where it lives: `src/antic/sema_operator.c` finds the function of an operator. `lower_equals` of `src/antic/lower_eq.c` and `lower_hash` of `src/antic/lower_hash.c` write the defaults, and `default_eq` of `src/antic/sema_hash.c` decides which types have one. `anti_rt_descriptor` of `src/rt/object.c`.
 
 ### What it costs
@@ -2235,6 +2389,7 @@ Where it lives: `src/antic/sema_operator.c` finds the function of an operator. `
 | Default `==` of a struct | one compare per field, in place | the same |
 | Default `==` of a class value | one call of the class's `equals`, two calls of `anti_rt_descriptor`, one compare per field | the same |
 | `==` on two class pointers | a compare of two addresses | the same |
+| `e[i]` and `e[i] = v` through the hooks | one call of `index` or `set_index`, through the table for a hook of a class behind a pointer | the same, or one load or store where the call is bound and inlined, as in `corner` |
 | Heap allocations | 0 | 0 |
 | Checks inserted | those of the arithmetic inside the function | none |
 
@@ -2243,6 +2398,7 @@ The choice among the forms of an operator:
 - A small numeric type that is added in a loop costs least as a struct with free operators. A struct result has no table pointer and no hook, and `pay` is one instruction.
 - An operator on a class value returns an object, and each result pays the store of its table pointer and the call of `anti_rt_hook`, as `sum` shows. A class suits an operator whose operands also need identity or dispatch.
 - A named function, `a.plus(b)`, costs the same call as the operator. It suits an operation that no operator symbol names, or a second form beside the operator.
+- Brackets on a type of the program cost the call of its hook, the same call that a function of another name costs. They suit a type whose reader expects them, as a grid of cells, and a function with a name suits every other access.
 - The default `==` and hash cost nothing to write and compare every field. A type whose equality leaves a field out, as `Name` leaves `uses`, declares both `eq` and `hash`.
 
 ### Pitfalls
