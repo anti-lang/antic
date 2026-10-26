@@ -2208,6 +2208,7 @@ The options of `antic` that this page names, and the ones that decide how a prog
 |---|---|
 | `-o <file>`, `-c`, `-S` | The output file, a library file, the assembly text. |
 | `-g` | The line of every statement, and the debug sections kept at the link. |
+| `-I <dir>`, `--runtime <dir>` | A search root of the imports, and the directory that holds `lib/<target>/` and the standard library. |
 | `--dev` | Dev mode: the module alone into its object, linked when it defines `main`. Without it a build is a release build. |
 | `--front-end`, `--tests` | The lexer, the parser and the checker alone, and the `tests` and `fixtures` blocks kept. |
 | `--checks`, `--no-checks`, `--asserts`, `--no-asserts` | The run-time checks and the assertions, against the mode. |
@@ -2223,7 +2224,15 @@ The options of `antic` that this page names, and the ones that decide how a prog
 | `--inject <I=P>`, `--package-name`, `--package-version` | The provider of an injectable interface, and the package of a library file. |
 | `--warnings-as-errors`, `--doc-warnings`, `--warn-undocumented`, `--strip-docs` | Every warning refused, the doc warnings on, every `pub` item without a `///` comment reported, and the doc text left out of a library file. |
 | `--dump-tokens`, `--dump-ast`, `--dump-types`, `--dump-ir`, `--dump-opt`, `--dump-llvm` | Print one stage of the compiler and stop. |
+| `--keep-llvm` | Keep `<output>.ll` and `<output>.bc` beside the output. |
 | `--print-host-target`, `--print-targets`, `--print-cpu-levels`, `--print-llvm-targets`, `--version` | Print the facts of the targets and the levels, or the version. |
+
+| Exit status of antic | Meaning |
+|---|---|
+| 0 | The output is written. |
+| 1 | antic refused the program, or a step of the build failed. |
+| 2 | antic refused the command line. |
+| 70 | Memory ran out. |
 
 ## Reserved words
 
