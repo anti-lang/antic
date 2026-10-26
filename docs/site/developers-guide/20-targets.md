@@ -3,14 +3,14 @@ title: "Targets"
 description: "The six targets, --target and --cpu, the processor levels, cross-building, script mode, -g and debugging, the build id and what a release build does with LLVM."
 summary: "The six targets, `--target` and `--cpu` with the processor levels, cross-building from any host, script mode, `-g` and debugging, the build id, and what a release build does with LLVM."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 200
 tags: [compilers, programming-languages]
 keywords: [targets, cross compilation, processor levels, cpu, debugging, build id, LLVM optimization]
 ---
 
-antic compiles for six targets, and every host builds for all six. A target is an operating system with a processor architecture. A processor level is a setting of the code generation inside one target, chosen with `--cpu`. Every command of this chapter was run on macos-arm64 with Anti 0.2.0, on an Apple M4 Pro. The page shows each output as the tool printed it.
+antic compiles for six targets, and every host builds for all six. A target is an operating system with a processor architecture. A processor level is a setting of the code generation inside one target, chosen with `--cpu`. Every command of this chapter was run on macos-arm64 with Anti 0.2.0 at commit `11bc8646`, on an Apple M4 Pro. The page shows each output as the tool printed it.
 
 ## The six targets
 
@@ -117,7 +117,7 @@ The native libraries of the runtime archive are built once per target, at the de
 antic: anti.regex is built for x86-64-v3, this program targets v1
 ```
 
-Where it lives: `cpu_from_name` and `cpu_default` of `src/antic/cpu.c`, `driver_run` of `src/antic/driver.c` for the refusals, and `link_runtime_library` of `src/antic/driver_link.c` for the runtime of a level.
+Where it lives: `cpu_from_name` and `cpu_default` of `src/antic/cpu.c`, `driver_run` of `src/antic/driver.c` for the refusals, and `link_runtime_library` of `src/antic/linker.c`, which the driver calls, for the runtime of a level.
 
 ## The processor levels
 
@@ -242,14 +242,14 @@ anti build --release --target all
 
 | File under `dist/` | Bytes |
 |---|---:|
-| `linux-x86_64/release/levels` | 273200 |
-| `linux-arm64/release/levels` | 293320 |
-| `macos-x86_64/release/levels` | 74184 |
-| `macos-arm64/release/levels` | 91744 |
-| `windows-x86_64/release/levels.exe` | 60416 |
-| `windows-arm64/release/levels.exe` | 55296 |
+| `linux-x86_64/release/levels` | 272,392 |
+| `linux-arm64/release/levels` | 295,448 |
+| `macos-x86_64/release/levels` | 78,656 |
+| `macos-arm64/release/levels` | 108,576 |
+| `windows-x86_64/release/levels.exe` | 61,440 |
+| `windows-arm64/release/levels.exe` | 57,344 |
 
-A Linux program is larger because it holds musl and mimalloc. Each directory also holds `NOTICE.txt` and `levels-symbols.zip`, the symbols archive of [chapter 18]({{% relref "18-the-tool" %}}).
+A Linux program is larger because it holds musl and mimalloc, and its `NOTICE.txt` of 8,322 bytes names both, where the other four hold 789. Each directory also holds `NOTICE.txt` and `levels-symbols.zip`, the symbols archive of [chapter 18]({{% relref "18-the-tool" %}}).
 
 | Target | Sysroot of the package |
 |---|---|
@@ -318,7 +318,7 @@ Breakpoint 1: 2 locations.
 (lldb) bt
   * frame #0: 0x0000000100000730 levels`tick at levels.anti:16 [opt] [inlined]
     frame #1: 0x0000000100000730 levels`levels.main at levels.anti:27 [opt]
-    frame #2: 0x0000000100005f98 levels`main + 504
+    frame #2: 0x0000000100006754 levels`main + 712
     frame #3: 0x000000018a9f84e4 dyld`start + 6992
 (lldb) frame variable
 error: no variable information is available in debug info for this compile unit
@@ -326,7 +326,7 @@ error: no variable information is available in debug info for this compile unit
 
 The file of the session is the block above without its first line, so `tick` returns at line 16. The breakpoint has two locations because `tick` stands in the program once as a function and once inlined into `main`. Frame 0 is the inlined copy, and frame 2 is `main` of the runtime, which has no line. `frame variable` has nothing to print.
 
-`-g` changes no instruction of the program. `llvm-objdump -d` of the pinned tools prints the same 9,996 lines for the program of the session and for the build without the option. The debug sections make the Mach-O file 95632 bytes against 91312.
+`-g` changes no instruction of the program. `llvm-objdump -d` of the pinned tools prints the same 10,528 lines for the program of the session and for the build without the option, addresses included. The debug sections make the Mach-O file 112,480 bytes against 108,144.
 
 Where it lives: `src/antic/llvm_debug.c` writes the nodes, and `link_command` of `src/antic/linker.c` keeps or strips the sections: `-S` of `ld64.lld` and `--strip-debug` of `ld.lld` in a link without `-g`.
 
@@ -348,17 +348,17 @@ The id stands in the notice of the program, as the line `build <id>` after the b
 
 | Link | Build id |
 |---|---|
-| `antic -o levels levels.anti` | `43fa9a0f682feb3d2ec2f67a1aa8421478b30b20d06ef40d814703166ab2f7ed` |
+| `antic -o levels levels.anti` | `d4279a7738f11b6c669a738a2d49b8da844f01d12e5ffbf36c82ed3daffff993` |
 | the same command in another directory | the same |
 | with `-g` | the same |
 | with `--lto none` | the same |
-| with `--target linux-x86_64` | `db301077f528bbef671b3ab65d9f7d2b005379de2a007d19b8f44117229eba65` |
+| with `--target linux-x86_64` | `54f6f5506e744f22fd05d62eedd69148f8f045424541e1e715646cf96c802f33` |
 
 A change of the source or of the runtime library gives another id, and so does a compiler that writes another LLVM text. The test `program_build_id` of the suite links one program twice, with `-g` and without it, and compares the ids.
 
 The id ties a trace to the symbols of its build. A raw stack trace prints one `module` line per loaded binary with its id. `anti symbols` matches each id to a symbols archive, as [chapter 18]({{% relref "18-the-tool" %}}) shows. `-g` does not change the id, so a trace of a stripped release program resolves against the archive of the same build.
 
-Where it lives: `build_id` and `identified_notice` of `src/antic/driver.c`, with the spans of the debug information from `src/antic/llvm_debug.c`. The runtime reads the id of a loaded module in `src/rt/platform_posix.c` and `src/rt/platform_windows.c`.
+Where it lives: `build_id` and `identified_notice` of `src/antic/driver.c`, with the spans of the debug information from `src/antic/llvm_debug.c`. At run time `anti_rt_module_at` of `src/rt/platform_posix.c` and `src/rt/platform_windows.c` finds the module of an address, and `module_id` of `src/rt/trace.c` reads its id.
 
 ## LLVM in a release build
 
