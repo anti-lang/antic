@@ -1972,7 +1972,17 @@ let r = Regex.compile(input) catch fatal;
 let n = line.matches(r) catch none;
 ```
 
-`matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either. `limit` takes that many matches from the start, or from the end when negative. A match is a `?Match`, behaves as a `?*T` does and stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind one. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, is checked at compile time for a literal, and a function may give each replacement. A call with a pattern literal never fails and stops at the match limit. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets, with `(*UCP)` for the Unicode ones. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
+`matches`, `find_all`, `replace` and `split` are methods of `str`. `find_all` and `split` are iterators, and `to_slice()` collects either. `limit` takes that many matches from the start, or from the end when negative. A match is a `?Match`, behaves as a `?*T` does and stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind one. Its fields are `all`, `group(n)`, `took_part(n)`, `count`, `pre` and `post`, and for a pattern literal a group is a field, `m.1` or `m.year`. A template names groups with `$1` and `${name}`, is checked at compile time for a literal, and a function may give each replacement. A call with a pattern literal never fails and stops at the match limit. A call with a compiled pattern may fail with `regex.TooExpensive` or `regex.MissingGroup`. A pattern is a literal only where it stands in the call, so one bound to a local first is a compiled pattern and its call needs a handler. A pattern literal is no constant expression, and a constant of type `Regex` is refused.
+
+```anti refused
+//! error: `matches` may fail and its error is not handled
+import anti.regex;
+
+let r = re"\d+";
+let m = "7 of 9".matches(r);
+```
+
+Flags are PCRE2's inline flags, `(?i)`, and `\d`, `\w` and `\s` mean their ASCII sets, with `(*UCP)` for the Unicode ones. A pattern that can take exponential time fails the safety check `exponential-pattern`. No match reads or writes anything global.
 
 ## Bytes
 
