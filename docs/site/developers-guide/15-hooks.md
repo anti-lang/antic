@@ -3,7 +3,7 @@ title: "Hooks"
 description: "Hooks and tracing, injection, runtime configuration, plugins, and what --no-hooks and --no-trace remove."
 summary: "The nine hooks of `anti.lang.Object` and the tracing built on them, injection and the standard interfaces, the runtime configuration, plugins, and what `--no-hooks` and `--no-trace` remove, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 150
 tags: [compilers, programming-languages]
@@ -240,17 +240,19 @@ b0:
 
 `anti_rt_hook` does the following, in this order.
 
-1. It loads the installed handler, one word of the runtime, with an atomic load.
-2. It loads entry 8 plus the hook number from the table of the object and compares it with the root's empty function.
-3. For `created` and `destroyed` it loads the count of open plugins. With a plugin open it finds the library the class belongs to and counts the object.
+1. It loads the installed handler, one word of the runtime, with an atomic load. With a handler installed it loads the handler's table and the entry of the hook in it.
+2. It loads the table pointer of the object and entry 8 plus the hook number from the table. It compares the entry with the root's empty function.
+3. For `created` of an object on the heap, the bit 256, it loads the count of open plugins with an atomic load. With a plugin open it finds the library the class belongs to and counts the object.
 4. It calls the handler's function when a handler is installed.
 5. It calls the object's own hook when the compare found one.
+
+The count of `destroyed` stands in `anti_rt_delete`, after the teardown, and is no part of the hook.
 
 The site of `joined` is in the runtime, since a job holds no type of its object. `join` therefore calls `anti_rt_join_hooked`, and under `--no-hooks` the plain `anti_rt_join`.
 
 arm64 has the same call with the object in `x0` and the number in `x1`.
 
-Where it lives: `lower_hook_object` and `lower_hook_copied` of `src/antic/lower_hook.c`, `root_names` of `src/antic/lower_desc.c`, `enum anti_hook` of `src/rt/object.h`, `anti_rt_hook` of `src/rt/hooks.c`, and the count of `src/rt/loaded.c`.
+Where it lives: `lower_hook_object` and `lower_hook_copied` of `src/antic/lower_hook.c`, `sema_root_fns` of `src/antic/sema_class.c`, `enum anti_hook` of `src/rt/object.h`, `anti_rt_hook` of `src/rt/hooks.c`, and the count of `src/rt/loaded.c`.
 
 ### What it costs
 
@@ -261,16 +263,25 @@ The costs are the same in dev and in release.
 | Bytes per object | 0 |
 | Bytes per class | 9 table entries of 8 bytes |
 | A site | one call of the runtime |
-| Inside the call, nothing attached | one atomic load, two loads and one compare. For `created` and `destroyed` one more atomic load and one compare |
-| Inside the call, a handler installed | the same, and one load and one indirect call |
+| Inside the call, nothing attached | one atomic load, two loads and one compare. For `created` of an object on the heap one more call, one atomic load and one compare |
+| Inside the call, a handler installed | the same, two loads of the handler's table and entry, and one indirect call |
 | Inside the call, a hook of the class | the same, and one indirect call |
-| Allocations and locks | 0. With a plugin open, `created` and `destroyed` take the lock of the loaded libraries |
+| Allocations and locks | 0. With a plugin open, `created` of an object on the heap and `delete` take the lock of the loaded libraries |
 | Sites per object | one `created` and one `destroyed` at most, one `copied` per `dup`, one `dispatched` and one `joined` per job |
 | With `--no-hooks` | 0 sites, 0 calls |
 
 `--no-hooks` gives up the five hooks of every class of the program, every `TraceHandler`, the stock handlers of `anti.trace` and the loading of plugins.
 
 The excerpts show the module before the link. The LTO of a release link may inline `anti_rt_hook` into a site, as [chapter 2]({{% relref "02-how-antic-works" %}}) describes.
+
+A hook costs its site in every build, whether a class declares one or not. Three other forms do part of the same work.
+
+| Form | Cost per object | What it gives up |
+|---|---|---|
+| A hook of the class | one call of the runtime per site, and the call of the hook | nothing |
+| Code in `construct` and `destruct` | the code alone, no call of the runtime | `copied`, `dispatched` and `joined`, and every handler |
+| A struct in place of a class | no table and no site: `alloc` of a struct calls `malloc` and nothing else | the hooks, the table and the rest of [chapter 9]({{% relref "09-classes" %}}) |
+| `--no-hooks` on the whole program | 0 sites | every hook, every handler and the loading of plugins |
 
 ### Pitfalls
 
@@ -316,9 +327,11 @@ Marked code is compiled with its calls in a dev build and without them in a rele
 | `--trace` | marked code is traced, in any mode |
 | `--no-trace` | marked code is not traced, in any mode |
 | `--trace <pattern>` | a class the pattern names is traced as well: a class, its module path or a package above it |
-| `--trace writes` | every write to a field of a traced class calls `changed` |
+| `--trace writes` | every write to a field of a traced class calls `changed`, apart from a `transient` field |
 
 The build of the module that holds a function decides for that function. A library compiled without tracing stays untraced in a program built with `--trace`.
+
+A write to a `transient` field calls no `changed` hook. `serialize` and the field list of reflection leave such a field out, so it is no part of the state a journal of changes records.
 
 `anti.lang.TraceHandler` is an abstract class that declares the same nine hooks with the object after `self`. A class that inherits it is a handler, and it declares all nine. `lang.Trace.install(h)` stores one handler for the whole program, and `lang.Trace.install(none)` removes it.
 
@@ -552,6 +565,14 @@ A traced function cannot be inlined across its two calls of the runtime as freel
 
 The `Profiler` adds a read of the clock in `enter` at depth 0 and one in `leave`, and a search of its 64 names by comparing texts.
 
+Tracing is the form for code that a dev build or a test should watch and a release should not pay for. Two other forms watch a function.
+
+| Form | Cost in a release build | What it reaches |
+|---|---|---|
+| `trace class` or `trace fn` | 0 calls, the sites are not compiled | every handler of the program, in a dev build or with `--trace` |
+| A call of `anti.log` in the function | the call, in every build | the logger, at the level the program sets |
+| `--profile-generate` of [chapter 21]({{% relref "21-performance" %}}) | none: the counters stand in the instrumented build alone | the counts of branches and calls that `--profile-use` reads |
+
 ### Pitfalls
 
 For a Java programmer:
@@ -592,7 +613,13 @@ A provider is a function without parameters that gives a pointer of the interfac
 1. `--inject Interface=Provider` on the command line of antic. `anti build` and `anti test` pass one per line of the `[inject]` table of `anti.toml`, and `anti test` lays `[inject.test]` over it.
 2. A static function `default` of the interface itself.
 
-`Provider` is the path of a function of the program, or the path of a singleton, which names its `get`. An interface with neither is refused at the link, with a message that names the class and the field.
+`Provider` is the path of a function of the program, or the path of a singleton, which names its `get`. The path of the `get` itself, `app.Console.get`, names the same function. An interface with neither is refused at the link, with a message that names the class and the field.
+
+A path that names two functions of the program is refused. A singleton `console` of the module `app` and a module `app.console` that declares a function `get` give the path `app.console.get` two meanings.
+
+```text
+main.anti: error: the provider `com.example.app.console.get` of `com.example.app.Logger` names more than one function of the program
+```
 
 ```toml
 [inject]
@@ -1045,6 +1072,8 @@ The costs are the same in dev and in release.
 
 No option of antic builds a program without the configuration.
 
+The keys configure the runtime alone, and each reader reads its key once. A program that asks for a key in a loop pays one call, one lock and up to six comparisons of text per turn. It reads the key once into a local. The settings of a program's own go through the modules of the standard library: `anti.args` for its command line and `anti.config` for a file of its own. A setting that never changes after the build is a constant, which costs nothing at run time.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1104,13 +1133,13 @@ The interface of a `provides` line is an abstract class. The class is declared i
 antic --lib shared --no-runtime -I . -o plugins/libfancy.so acme/fancy.anti
 ```
 
-antic writes `anti-plugins.toml` beside the library: the path, the runtime version, the SHA-256 digest and the interfaces of each library of the directory.
+antic writes `anti-plugins.toml` beside the library: the path, the runtime version, the SHA-256 digest and the interfaces of each library of the directory. The index below is the one of the same build on macos-arm64, with `-o plugins/libfancy.dylib`.
 
 ```toml
 [[library]]
-path = 'libfancy.so'
+path = 'libfancy.dylib'
 runtime = '0.2.0'
-digest = 'a458b6eeb5aced91928e77c6556353561f4af4506be5f76d51a345fd9aa40b3f'
+digest = '33f5e79ada38a13e2363f0d99c7a6cbecb76203bb7a576a6e3eb446fc0d9f3d6'
 interfaces = ['anti.log.Logger']
 ```
 
@@ -1178,12 +1207,17 @@ The load checks the library before any code of it runs.
 - The version of each interface fits. Every class carries the version of its package, `--package-version` of the build and `0.0.0` without one. An abstract class carries one hash per prefix of its table. The load compares the hashes of the host and of the library at the length of the shorter table.
 - No field was added to the interface between the two versions.
 - No slot that a call of the host reaches is missing in the library. A slot that `reflect.call` alone may reach is filled with a stub that names the plugin.
+- Every module the library uses is one the host imports. The system refuses to open a library with a name it cannot bind, and the message names the module.
+
+```text
+plugins/libtasks.so uses `anti.time`, which this program does not import
+```
 
 `compatible 1.1;` in the body of an abstract class names the oldest version of a plugin the interface accepts.
 
 The classes of a loaded library join the registry of the host, so `reflect.new` builds one by name.
 
-A program that can load a library exports its own functions and data, so that the library can bind against them. `--closed` builds a program without those exports. A closed program loads no plugin, and `--inject` of a library path is refused for it.
+A program that can load a library exports its own functions and data, so that the library can bind against them. It keeps every function and every datum of its own module and of each module it imports, used or not. A library may use any of them. `--closed` builds a program without those exports. A closed program loads no plugin, and `--inject` of a library path is refused for it.
 
 On Linux a host links dynamically against glibc, since a static program of musl has no loader. On Windows the link of a host writes an import library `<program>.lib`, and a plugin is linked against the import library of its host.
 
@@ -1284,11 +1318,15 @@ host.anti: error: the program loads libraries, and `--no-hooks` drops the hooks 
 
 ### How antic builds it
 
+A plugin is the code of one module and a table that says what it provides. Every other name it uses, of the runtime, of the standard library and of the interfaces, belongs to the host. The loader of the system binds each such name to the host's copy when the library is opened. A call of the host into an object of the plugin goes through the table of the object, as a call of any class does. A call of the plugin back into the host goes through an entry the loader filled.
+
 A build with `--no-runtime` emits the object of the module alone, as a dev build does, and links it with no runtime library. The pass over the whole program writes one table into it, `anti_rt_provides`. It holds the runtime version, the classes of the library and one entry per `provides` line. An entry is the path of the interface and the descriptors of the interface and of the class. It also holds the function that prepares an object and the offset of the interface inside the class.
 
 The library reaches the host through the loader of the system. On Linux and Windows a plugin reaches every function and every datum of the host through an entry the loader fills. That entry is in the GOT on ELF, and among the `__imp_` pointers of the import library on COFF. On macOS the link leaves the names undefined with `-undefined dynamic_lookup`, and the loader binds them.
 
-The host is built to be bound against. Its functions and data are global and none is hidden. The link passes `-export_dynamic` on macOS and `--export-dynamic` on Linux, and writes a `.def` file and an import library on Windows.
+The host is built to be bound against. Its functions and data are global and none is hidden. The pass over the whole program takes every function and every datum of the host's module and of its imports as an entry. The link then drops none that a plugin may bind. The link passes `-export_dynamic` on macOS and `--export-dynamic` on Linux, and writes a `.def` file and an import library on Windows.
+
+A plugin carries the list of the modules it reaches, as the constant `anti_rt_plugin_modules`. When the system refuses to open it for a name it lacks, the loader reads that list from the bytes of the file. The module whose path starts the missing name is the one the message names.
 
 `plugin.load` opens the library, reads `anti_rt_provides` and runs the checks of the list above. That every interface descriptor lies in the image of the host is the proof that the library was bound against it.
 
@@ -1332,9 +1370,9 @@ Where it lives: `whole_write_provides` of `src/antic/whole_tables.c`, `whole_hos
 | `created` and `destroyed` with a library open | one lookup of the image of the table by the system, one lock of the runtime and one atomic add, for every object of the program |
 | `created` and `destroyed` with no library open | one atomic load and one compare on top of the hook |
 | The exports of a host | the names of its functions and data stay in the executable |
-| LTO | a host keeps every exported function, so the link removes less unused code |
+| LTO | a host keeps every function and datum of its module and of its imports, so the link removes less unused code |
 
-The two programs of the example show the exports. The host measured here has a `main` that calls `speak` and prints the message of a failure. On macos-arm64 it is 255,344 bytes, and the same source built with `--closed` is 134,912 bytes. The library is 57,856 bytes. The closed program fails at `plugin.load` with the message of the loader, which names the first symbol it could not find.
+The two programs of the example show the exports. The host measured here has a `main` that calls `speak` with the path of the library and prints the message of a failure. Built by antic of `d16646ee` on macos-arm64, it is 309,152 bytes, and the same source built with `--closed` is 151,504 bytes. The library is 59,264 bytes. The closed program fails at `plugin.load` with the message of the loader, which names the first symbol it could not find.
 
 ### Pitfalls
 
