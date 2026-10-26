@@ -138,7 +138,7 @@ A scalar value has no header and no box. It is its bytes. They stand in a regist
 | `i64`, `u64` | `i64` | `i64` |
 | `f32` | `f32` | `float` |
 | `f64` | `f64` | `double` |
-| `f16` | `i16`, the bits of the half | `half` at the load and the store |
+| `f16` | `i16`, the bits of the half | `i16`, cast to `half` where it converts to or from `f32` |
 | `*T`, `?*T` | `ptr` | `ptr` |
 
 Signedness stands in the operation and not in the type: `sdiv` or `udiv`, `sext` or `zext`. A literal is an operand of an instruction and has no code of its own.
@@ -266,13 +266,13 @@ char          4
 | Calls into the runtime | 0 | 0 |
 | A literal | an immediate operand | the same |
 | A widening `as` | one `sext`, `zext` or `fpext` | the same |
-| A narrowing `as` between integers | one `trunc`, and a compare with a branch for the range check | one `trunc` |
+| A narrowing `as` between integers | one `trunc`, and a conversion back, a compare and a branch for the range check | one `trunc` |
 
 `size_of` is folded at compile time and costs nothing at run time. The integer section below shows the range check of a narrowing `as`.
 
 The `f"..."` of `show` formats its values into a text in new memory, which `free(line.ptr)` gives back. Most programs of the guide print that way, and "Text and bytes" below describes the form.
 
-The width of an integer is a choice of memory alone. An add, a compare or a load costs one instruction at every width. `int` is the type of every length and index: `s.len`, `xs.len` and the variable of `for i in 0..n` are each an `int`. A count or an index kept in an `int` therefore needs no `as`. A narrower type pays where many values stand side by side, as the last two lines of the program show: `[1000]i32` takes half the bytes of `[1000]int`. Each use of a narrow value beside an `int` costs one `as`, and a narrowing `as` carries a range check in dev mode. `byte` holds raw data and `char` one code point. A text is a `str` of UTF-8, one to four bytes per character, where an array of `char` takes four for every one.
+The width of an integer is a choice of memory. `int` is the type of every length and index: `s.len`, `xs.len` and the variable of `for i in 0..n` are each an `int`. A count or an index kept in an `int` therefore needs no `as`. A narrower type pays where many values stand side by side, as the last two lines of the program show: `[1000]i32` takes half the bytes of `[1000]int`. Each use of a narrow value beside an `int` costs one `as`, and a narrowing `as` carries a range check in dev mode. `byte` holds raw data and `char` one code point. A text is a `str` of UTF-8, one to four bytes per character, where an array of `char` takes four for every one.
 
 ### Pitfalls
 
@@ -333,6 +333,7 @@ let m = Limits.MAX + BYTES;
 A module holds no variables. A `let` stands in a body alone, and at module level the parser refuses it with `expected an item`. State that outlives a call lives in an object, in a singleton or in a static field of a class. A static field must be `atomic`, so each read is a `load()` and each write a `store(v)` or an `add(n)`, and no two threads race on it. [Chapter 9]({{% relref "09-classes" %}}) covers static fields and singletons.
 
 ```anti
+//! name: counter
 class Counter
 {
 	pub static atomic hits: int = 0;
@@ -491,7 +492,19 @@ Where it lives: `sema_const.c` of `src/antic/` computes a constant expression, a
 
 Initialising every local costs one store in dev mode. In release mode `opt` removes a store that no read follows.
 
-A value known at compile time belongs in a `const`. It costs no slot, no store and no load in either mode, and a use folds into the instruction that reads it. A `let` of the same value is a slot and a store in dev mode, which a release build folds as well. A `const` of a class body and one of the module cost the same and differ in the name that reaches them. A static atomic field is a global of the executable, named `<module>.Counter.hits` in the LLVM text. Each `add` is one `atomicrmw` instruction and each `load()` one atomic load, sequentially consistent, in both modes.
+A value known at compile time belongs in a `const`. It costs no slot, no store and no load in either mode, and a use folds into the instruction that reads it. A `let` of the same value is a slot and a store in dev mode, which a release build folds as well. A `const` of a class body and one of the module cost the same and differ in the name that reaches them. A static atomic field is a global of the executable, named `counter.Counter.hits` in the LLVM text of the block `counter` above. Each `add` is one `atomicrmw` instruction and each `load()` one atomic load, sequentially consistent, in both modes.
+
+```llvm excerpt=counter target=linux-x86_64 mode=dev
+  store ptr @counter.Counter.hits, ptr %t0, align 8
+  %v0 = load ptr, ptr %t0, align 8
+  %v1 = atomicrmw add ptr %v0, i64 2 seq_cst, align 8
+...
+  store ptr @counter.Counter.hits, ptr %t1, align 8
+  %v1 = load ptr, ptr %t1, align 8
+  %v2 = load atomic i64, ptr %v1 seq_cst, align 8
+```
+
+The first three lines are `bump`: dev mode keeps the address of the global in a slot, loads it and adds the immediate 2, the value of `STEP`, with one `atomicrmw`. The last three are the `load()` of the block. A release build uses the address of the global directly in both instructions.
 
 ### Pitfalls
 
@@ -714,7 +727,7 @@ Where it lives: `parser_precedence` and `binary_links` of `src/antic/parser_expr
 | Heap allocations | 0 | 0 |
 | Calls into the runtime | 0, apart from `==` and `<` on a `str` and an `f16` below `v3` | the same |
 
-The order of evaluation adds no instruction. In a release build a call bound to a local before the expression compiles to the same code as the call written inside it. The choice between the two is one of reading alone. `&&` and a nested `if` give the same branches. A condition of two cheap tests costs no branch in a release build either way.
+The order of evaluation adds no instruction: lowering computes each operand once, in the order of the text, as the IR of `order` shows. `==` and `<` on a `str` call `anti_rt_same_bytes` and `anti_rt_compare_bytes` of `src/rt/text.c` with the pointer and the length of both sides. A condition of two cheap tests costs no branch in a release build, as `both` shows.
 
 ### Pitfalls
 
@@ -1031,9 +1044,9 @@ b0:
 }
 ```
 
-`%v5` is the divisor, replaced by 1 when it is 0 or -1. `sdiv` therefore never sees a pair that LLVM leaves undefined. `%v8` takes `0 - a` for a divisor of -1, and `%v9` takes 0 for a divisor of 0. On arm64 the function is nine instructions with one `sdiv` and no branch. A divisor that `opt` can prove to be neither 0 nor -1, such as a constant, leaves the `sdiv` alone.
+`%v5` is the divisor, replaced by 1 when it is 0 or -1. `sdiv` therefore never sees a pair that LLVM leaves undefined. `%v8` takes `0 - a` for a divisor of -1, and `%v9` takes 0 for a divisor of 0. On arm64 the function is eight instructions and `ret`, with one `sdiv` and no branch. On x86_64 `llc` adds a branch of its own: a 64-bit `idivq` is slow, so the code tests whether both operands fit in 32 bits and then takes `divl`. A divisor that `opt` can prove to be neither 0 nor -1, such as a constant, leaves the `sdiv` alone.
 
-A shift masks its count, `and i64 %count, 63` before `shl`. A narrowing `as` is one `trunc` in release mode. In dev mode the value is also converted back and compared with the original, which is the range check.
+A shift masks its count, `and i64 %count, 63` before `shl`, which x86_64 and arm64 do in the shift instruction itself, so the machine code holds no `and`. `<<%` compares its count with the width and selects 0 at or above it, a `cmp` and a `cmov` or `csel`. A narrowing `as` is one `trunc` in release mode. In dev mode the value is also converted back and compared with the original, which is the range check.
 
 A carry in becomes one add-with-carry instruction. This is `add_wide` in release mode.
 
@@ -1060,10 +1073,31 @@ Where it lives: `lower_binary_checks` of `src/antic/lower_check.c` writes the ch
 | signed `*` | x86_64: `imulq` and `jo`. arm64: `smulh`, `mul`, `cmp`, `b.ne` | the instruction |
 | unsigned `+ - *`, and `+% -% *%` | the instruction | the instruction |
 | `+\| -\|` | no check. x86_64: 6 instructions. arm64: 4 | the same |
-| `/` and `%` | a compare and a branch for the zero check, then the release code | the division and three selects |
-| `<< >>` | a compare and a branch on the count, then the release code | the mask and the shift |
+| `/` and `%` | a compare and a branch for the zero check, and on a signed type a second test and branch for the least value divided by -1, then the release code | the division and three selects |
+| `<< >>` | a compare and a branch on the count, then the release code | the shift |
+| `<<%` | on a signed type a compare and a branch for a count below zero, then the release code | the shift, a compare and a select |
 | narrowing `as` | a conversion back, a compare and a branch | one `trunc` |
 | flags form | no check. One instruction per flag read | the same |
+
+A flag costs one instruction where the function reads it, as `setb` after the add on x86_64 or `cset` on arm64.
+
+```anti
+//! name: flagcost
+export fn carry_of(a: u64, b: u64) -> bool
+{
+	let (sum, f) = a + b;
+	return f.carry;
+}
+```
+
+```asm excerpt=flagcost target=linux-x86_64 mode=release
+<carry_of>:
+addq %rsi, %rdi
+setb %al
+retq
+```
+
+The sum is computed for its flag alone, and `setb` copies the carry flag into the result. A flag the function never reads costs nothing, as `add_wide` above shows for `zero` and `negative`.
 
 An integer value takes the bytes of its type, 1 to 8. No operation of this section allocates memory or takes a lock. The one call into the runtime is `anti_rt_check_failed` on the failure arm, which a program that passes its checks never runs.
 
@@ -1075,9 +1109,9 @@ The operator states the intent, and the counts above follow from it.
 |---|---|---|
 | ordinary arithmetic, where an overflow is a defect | `+ - *` | one instruction, and the dev build finds the defect |
 | arithmetic modulo 2 to the width, as in a hash or a checksum | `+% -% *% <<%` | one instruction, and no dev check stops the program |
-| a value held at the end of its range, as an audio sample | `+\| -\| *\|` | six instructions for an `int` on x86_64 and four on arm64, with no branch |
+| a value held at the end of its range, as an audio sample | `+\| -\| *\|` | for an `int`, six instructions for `+\|` on x86_64 and four on arm64, thirteen and twelve for `*\|`, with no branch |
 | a carry into the next word, or an overflow the program handles | the flags form | the instruction, and one more per flag read |
-| the upper half of a product | `mul_high` | one instruction: `mulx` or `imulq` on x86_64, `umulh` or `smulh` on arm64 |
+| the upper half of a product | `mul_high` | one instruction: `mulx` at `v3` or `imulq` on x86_64, `umulh` or `smulh` on arm64 |
 
 `+%` is the form for a computation that is meant to wrap, since `+` stops it in a dev build. `+` is the form for any other, since its release code is the same instruction as that of `+%`, and a dev build checks it.
 
@@ -1260,7 +1294,7 @@ b0:
 
 `fmul` and `fadd` stay two instructions, `vmulsd` and `vaddsd`, on a processor of level `v3` that has a fused one. The result of `x * y + 0.5` is therefore the same bits on all six targets. `fcmp olt` is the ordered less-than, false for a NaN. The other comparisons are `oeq`, `ole`, `ogt` and `oge`, and `!=` is `une`. `llvm.fptosi.sat` is the saturating conversion to a signed integer, and `llvm.fptoui.sat` the one to an unsigned integer.
 
-An `f16` is an `i16` of its bits in the IR of antic. The LLVM text reads it as a `half` and widens it, or narrows a `float` and stores the `half`.
+An `f16` is an `i16` of its bits in the IR of antic. The LLVM text loads the `i16`, casts it to a `half` and widens it, or narrows a `float` to a `half` and stores its bits. In release mode `opt` folds the load and the cast into a `load half`.
 
 ```llvm excerpt=floats target=linux-x86_64 mode=release
   %v12 = load half, ptr %p0, align 2, !tbaa !18
@@ -1300,8 +1334,8 @@ Where it lives: `src/antic/llvm_emit_function.c` writes the float instructions a
 | Bytes per value | `f16` 2, `f32` 4, `f64` 8 | the same |
 | `+ - * /` and a comparison | one instruction | one instruction |
 | Checks | none | none |
-| `as` between `f32` and `f64`, integer to float | one instruction | one instruction |
-| float to integer | arm64: 1 instruction. x86_64: 7 | the same |
+| `as` between `f32` and `f64`, integer to float | one instruction, apart from `u64` to float on x86_64: 5 | the same |
+| float to integer | arm64: 1 instruction. x86_64: 7 to a signed type, 15 to `u64` | the same |
 | read or write of an `f16` | arm64 and `v3`: one conversion instruction. `v1`, `v2`: one call into the runtime | the same |
 | Heap allocations | 0 | 0 |
 
@@ -1849,7 +1883,7 @@ Where it lives: `src/antic/pattern.c` compiles a literal in the checker with PCR
 | `Regex.compile` | one compile by PCRE2 and the same three blocks as a literal. No form of the language gives them back, and `--memory-checks` reports them as a leak |
 | a check of dev mode | none. A dev and a release build make the same calls |
 | locks and atomic operations | none in a search |
-| the executable | PCRE2 links when a program uses a pattern: 576,456 bytes against 228,768 for the same program with `text.find_byte`, release for linux-x86_64 at commit `ed280bc0` |
+| the executable | PCRE2 links when a program uses a pattern: 576,456 bytes against 228,768 for the same program with `text.find_byte`, release for linux-x86_64 at commit `ba2e424e` |
 
 A match takes no lock and reads no global apart from the pattern, so threads search with one `Regex` at once. PCRE2 runs without its JIT and matches by backtracking, with its frames in the second block of a search.
 
@@ -2022,7 +2056,7 @@ Where it lives: `src/antic/types.c` makes one type per distinct tuple, and `src/
 | Building one | one store per element | registers, when `opt` keeps it out of memory |
 | `t.0` | one load | one register |
 | `let (a, b) = e;` | one load and one store per element | none beyond the values |
-| Passing and returning | up to 16 bytes in two registers on System V and AAPCS64, larger through a pointer | the same |
+| Passing and returning | up to 16 bytes in two registers on System V and AAPCS64, larger through a pointer. On windows-x86_64 a tuple of 1, 2, 4 or 8 bytes in one register, any other through a pointer | the same |
 | Heap allocations | 0 | 0 |
 | Calls into the runtime | 0 | 0 |
 | Checks | none | none |
