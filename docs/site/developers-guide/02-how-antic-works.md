@@ -58,6 +58,12 @@ A library file, `<module>.antl`, holds the public interface of a module and its 
 
 ## Source text
 
+### What you know
+
+Java reads its source as Unicode and takes letters of any script in a name. C and C++ take the bytes in the encoding the compiler assumes, and a compiler decides which letters a name may hold. All three have `//` and `/* */` comments, and in none of them does a block comment nest. Java reads documentation from `/** */` comments with Javadoc, and C and C++ leave it to a tool such as Doxygen.
+
+### The feature
+
 The lexer reads the source as UTF-8 and skips a byte order mark at its start. The positions of a message count from the byte after it. Identifiers are ASCII letters, digits and `_`, and a name may not start with a digit. UTF-8 stands in literals and comments alone. A CR LF line end inside the text of a literal reads as LF. A file saved on Windows then gives the same `str` as on Linux. A NUL byte is refused in a name, in the code and in the text of a `str` literal. It may stand in a byte literal and in a comment.
 
 Comments are `//` to the end of the line and `/* */`. A block comment does not nest, so the first `*/` ends it. Six markers make a comment a doc comment, which is a token of its own and reaches the documentation that `anti doc` writes.
@@ -108,7 +114,87 @@ let p: ?*int = null;
 let größe = 1;
 ```
 
-Where it lives: `lexer_lex`, `skip_trivia`, `doc_marker` and `word_kind` of `src/antic/lexer.c`.
+### How antic builds it
+
+The source text exists before the parser alone. The lexer reads the bytes of the file once, from the first to the last, and gives the parser a list of tokens. An ordinary comment and the blanks between tokens become no token. A doc comment becomes one token of the kind `doc`, which the parser attaches to the item after it, or to the module for `//!` and `/*! */`. Nothing of a comment reaches the IR, the LLVM module or the program.
+
+A doc comment of a field or a function of a class stands inside the class, as in the block below.
+
+```anti
+//! name: notes
+pub class Square
+{
+	/// The side, in metres.
+	pub side: int = 1,
+
+	//# Kept for the tests of the module.
+	pub fn area(self) -> int
+	{
+		// The product of the two sides.
+		return self.side * self.side;
+	}
+}
+```
+
+`--dump-tokens` of it shows each kind.
+
+```tokens excerpt=notes target=linux-x86_64 mode=release
+5:2   doc      /// The side, in metres.
+6:2   keyword  pub
+6:6   ident    side
+...
+8:2   doc      //# Kept for the tests of the module.
+9:2   keyword  pub
+9:6   keyword  fn
+9:9   ident    area
+...
+10:2  symbol   {
+12:3  keyword  return
+```
+
+- The doc comment of `side` is one token of the kind `doc` that holds the whole comment, and so is the note `//#` of `area`. The parser keeps the two apart, as the doc text and the note of an item.
+- `pub`, `fn` and `int` are keywords and `side` and `area` names.
+- The ordinary comment of line 11 gives no token, so the `{` of the body and the `return` of line 12 stand on two adjacent lines of the dump.
+
+The text of a `///` and a `//!` comment travels in the library file of the module, which `anti doc` reads to write the pages of the users. A `//#` note stays in the source: `anti doc --dev` reads it from there, and the library file holds none. `antic -c --strip-docs` writes the library file without the doc text.
+
+Where it lives: `lexer_lex`, `skip_trivia`, `doc_marker` and `word_kind` of `src/antic/lexer.c`. `parser_doc_before` of `src/antic/parser.c` attaches a doc comment or a note to its item, and `put_doc` of `src/antic/antl_write.c` writes the doc text into the library file.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| A comment, a doc comment, a note | no byte of the program and no instruction | the same |
+| Bytes at run time | none: the source text makes no value, so no `size_of` applies | none |
+| Heap allocations, calls into the runtime, atomic operations, locks, checks | none | none |
+| The library file | the text of every `///` and `//!` comment. The file of `com.example.units` of [chapter 18]({{% relref "18-the-tool#library-files" %}}) is 828 bytes, and 676 with `--strip-docs` | the same |
+| Compile time | one pass of the lexer over the bytes | the same |
+
+The comment forms differ in who reads them, not in what they cost the program.
+
+- `///` and `//!` document an item and a module for the users of a library. Their text reaches the pages of `anti doc` and the library file that ships.
+- `//#` and `//#!` hold what the developers of a library need and its users do not. Their text stays in the source and reaches the pages of `anti doc --dev` alone.
+- `//` and `/* */` are notes for the reader of the source and reach no page.
+
+### Pitfalls
+
+For a Java programmer:
+
+- A name holds ASCII letters, digits and `_` alone. `größe` is refused, and a letter outside ASCII stands in a literal or a comment.
+- `/** */` documents the next item as `///` does, and `//!` the module, with no tag such as `@param`.
+- `null` is no word of Anti. The value of an empty pointer is `none`.
+
+For a C programmer:
+
+- No preprocessor exists. `#define X 1` is refused with `` unexpected character `#` ``, and a constant is a `const`.
+- A `str` literal holds no NUL and no `\xHH` above `\x7F`. A byte literal holds both.
+- A CR LF line end inside a literal reads as LF, so a file saved on Windows gives the same text.
+
+For a C++ programmer:
+
+- The contextual words, as `in`, `by` and `final`, are names wherever their construct does not stand. A variable may be called `final`.
+- `thread` is reserved, although no rule of the grammar takes it.
+- A raw text is `r"..."` with every backslash kept, and `#"..."#` holds quotes.
 
 ## Walk-through program
 
