@@ -1437,7 +1437,47 @@ let jobs = [dispatch sprite -> render(frame + 1)];
 join_all(jobs[0..1]);
 ```
 
-Worker parameters are pointer-free. The table pointer and `own` fields do not count. A `worker fn` that may fail is called directly with a handler, and `parallel` and `dispatch` refuse it. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
+`parallel` gives a `[]R` of one result per chunk, freed with `free(r.ptr)`. Arguments after the worker's name go to every chunk, and `by n` sets the count of chunks, where `by 0` takes the count of the machine. `join(job)` gives the result of the worker. A job is joined once: the checker refuses a second `join` it sees, and a dev build stops one it does not.
+
+```anti
+import anti.io;
+import anti.text;
+
+class Counter
+{
+	pub n: int = 21,
+}
+
+worker fn scaled(chunk: []int, k: int) -> int
+{
+	let total = 0;
+	for x in chunk { total += x * k; }
+	return total;
+}
+
+worker fn twice(c: *Counter) -> int { return 2 * c.n; }
+
+fn main() -> int
+{
+	let data: [4]int = [1, 2, 3, 4];
+	let parts = parallel data[0..4] by 2 -> scaled(10);
+	io.println(f"{parts.len} {parts[0]} {parts[1]}");
+	free(parts.ptr);
+	let c = alloc Counter { };
+	let job = dispatch c -> twice;
+	let r = join(job);
+	io.println(f"{r}");
+	delete(c);
+	return 0;
+}
+```
+
+```text
+2 30 70
+42
+```
+
+Worker parameters are pointer-free. The table pointer and `own` fields do not count. A worker cannot `delete` an object, which another worker may hold. A `worker fn` that may fail is called directly with a handler, and `parallel` and `dispatch` refuse it. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
 
 `sync m { }` holds a `Mutex` for its block and unlocks it on every exit. A `sync` on a `Mutex` that its thread holds already is refused where the checker sees it, and stops a dev build otherwise. `chan T` is a bounded queue of pointer-free values, and `select` waits on more than one channel, written like `switch` over them.
 
@@ -1468,7 +1508,7 @@ select {
 delete(c);
 ```
 
-A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. The value `recv` gives, and the value an arm of `select` takes, belongs to the block that holds the `recv` or the `select`, the block of the local a `let` binds it to, and is torn down at its end. `delete(c)` ends a channel and tears down every value it still holds, the oldest first. An arm of a `select` is a call, an assignment or a block, as an arm of a `switch` is, and may leave the binding out. A worker takes a `chan T` beside its values, and a pointer to a `Mutex`, which cannot be copied. Not built yet: the warning on a field written inside `sync` and read outside it.
+A `sync` on the mutex of an enclosing `sync` in the same function is refused. `close` stops what a channel takes, and what it holds is still received. A `send` on a closed channel stops the program, and so does a channel made with a capacity below 1. The value `recv` gives, and the value an arm of `select` takes, belongs to the block that holds the `recv` or the `select`, the block of the local a `let` binds it to, and is torn down at its end. `delete(c)` ends a channel and tears down every value it still holds, the oldest first. An arm of a `select` is a call, an assignment or a block, as an arm of a `switch` is, and may leave the binding out. A worker takes a `chan T` beside its values, and a pointer to a `Mutex`, which cannot be copied. Not built yet: the warning on a field written inside `sync` and read outside it.
 
 ## Concurrent classes
 
