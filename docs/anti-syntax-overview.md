@@ -233,7 +233,7 @@ let path = fr"C:\tools";
 
 ## Variables and constants
 
-`let` declares a mutable local with mandatory initialisation, and `let x: atomic int = 0;` an atomic local. `const` declares a constant expression at module level, in a block and in a class body, where `Name.NAME` reaches it. A constant whose `+`, `-`, `*` or unary `-` leaves the range of its type is refused, and `+%` and `+|` name a result outside it. Shadowing in an inner block is allowed. `let (a, b) = e;` takes a tuple apart, see [Tuples](#tuples), and `let m = p else { }` binds a checked pointer, see [Pointers](#pointers). `undefined` opts one local out of initialisation.
+`let` declares a mutable local with mandatory initialisation, and `let x: atomic int = 0;` an atomic local. `const` declares a constant expression at module level, in a block and in a class body, where `Name.NAME` reaches it. A module holds no variables: a `let` stands in a body alone, and the one global that a program writes is a `static atomic` field of a class, see [Static fields and singletons](#static-fields-and-singletons). A constant whose `+`, `-`, `*` or unary `-` leaves the range of its type is refused, and `+%` and `+|` name a result outside it. Shadowing in an inner block is allowed. `let (a, b) = e;` takes a tuple apart, see [Tuples](#tuples), and `let m = p else { }` binds a checked pointer, see [Pointers](#pointers). `undefined` opts one local out of initialisation.
 
 ```anti
 class Limits
