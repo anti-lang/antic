@@ -326,7 +326,7 @@ error: no variable information is available in debug info for this compile unit
 
 The file of the session is the block above without its first line, so `tick` returns at line 16. The breakpoint has two locations because `tick` stands in the program once as a function and once inlined into `main`. Frame 0 is the inlined copy, and frame 2 is `main` of the runtime, which has no line. `frame variable` has nothing to print.
 
-`-g` changes no instruction of the program. `llvm-objdump -d` of the pinned tools prints the same 10,528 lines for the program of the session and for the build without the option, addresses included. The debug sections make the Mach-O file 112,480 bytes against 108,144.
+`-g` changes no instruction of the program. `llvm-objdump -d` of the pinned tools prints the same 10,530 lines for the program of the session and for the build without the option, addresses included. The debug sections make the Mach-O file 112,496 bytes against 108,144. The debug map of a Mach-O program names each object by its absolute path, so the size with `-g` grows with the directory of the build. The same build in a directory whose name is 32 characters longer is 112,528 bytes.
 
 Where it lives: `src/antic/llvm_debug.c` writes the nodes, and `link_command` of `src/antic/linker.c` keeps or strips the sections: `-S` of `ld64.lld` and `--strip-debug` of `ld.lld` in a link without `-g`.
 
