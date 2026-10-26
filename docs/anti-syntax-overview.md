@@ -1741,6 +1741,16 @@ tests
 }
 ```
 
+A function of a `tests` block takes no parameters and returns nothing, because the runner calls it:
+
+```anti refused
+//! error: a `tests` function takes no parameters and returns nothing, because the runner calls it
+tests
+{
+	fn adds(n: int) { }
+}
+```
+
 `setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test` compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. The dev run links an object of every module the one under test imports, so a module of the standard library carries a `tests` block too. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off.
 
 ## C interop
