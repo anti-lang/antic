@@ -1595,7 +1595,7 @@ An atomic field has no `=` and no `+=`, and it is not read by its name alone. It
 | `add(v)`, `sub(v)`, `and(v)`, `or(v)`, `swap(v)` | the value the field held before |
 | `compare_swap(expected, new)` | `true` when the field held `expected` and now holds `new` |
 
-An atomic field, static or not, holds an integer, a `bool`, a `char`, an `f16`, a pointer or a plain function pointer, which is one C function pointer. Any other type is refused at the name of the field, an `f64` among them. `add` and `sub` take an integer field. `and` and `or` take an integer or a `bool`. Every other field takes `load`, `store`, `swap` and `compare_swap` alone.
+An atomic field, static or not, holds an integer, a `bool`, a `char`, an `f16`, a pointer or a plain function pointer, which is one C function pointer. Any other type is refused at the name of the field, an `f64` among them. "Atomics" of [chapter 13]({{% relref "13-threads#atomics" %}}) gives the operations that each of these types takes and the instructions they compile to.
 
 ```anti
 //! name: slots
