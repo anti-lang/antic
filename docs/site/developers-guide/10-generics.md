@@ -488,7 +488,7 @@ A constraint after `:` states what the generic needs from a type argument. The b
 
 A simd struct meets `add`, `sub`, `mul` and `div` on lanes of numbers and `neg` on signed or float lanes, through its built-in operators, so `twice<T: add>` takes a `Vec4` and adds it lane by lane. A comparison of a simd struct gives a mask of its lanes and no `bool`. A simd struct therefore meets neither `lt` nor `eq`, and not `Number`.
 
-The checker checks twice. The body is checked against the constraints where the generic is written. Each use is checked where it stands: the type argument must meet every constraint. So an error names the code that made it, the body or the call, and never a line inside a copy.
+The checker checks twice. The body is checked against the constraints where the generic is written. Each use is checked where it stands: the type argument must meet every constraint. So an error that a constraint catches names the code that made it, the body or the call. A few rules hold for one copy alone, as the refusals of the next sections show. Their message stands at the line of the generic that the copy breaks.
 
 ```anti
 //! name: cons
@@ -1564,5 +1564,5 @@ For a C programmer:
 
 For a C++ programmer:
 
-- An error in the body of a library generic was reported when the library was built. A user sees an error at its own use, that the argument lacks a constraint, and never one inside the body.
+- An error in the body of a library generic was reported when the library was built. A user sees an argument that lacks a constraint at its own use.
 - A function with type parameters of its own inside a class, and a type nested in a generic class, stay inside their module. A C++ member template in a header has no such limit.
