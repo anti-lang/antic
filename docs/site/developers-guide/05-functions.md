@@ -1,13 +1,13 @@
 ---
 title: "Functions"
-description: "Declaration, parameters, defaults, source locations, the calling convention, inlining, closures, snapshot fn and own fn, function values."
-summary: "Declaration and parameters, default values and source locations, the calling convention, inlining, anonymous functions and closures with their captures, `snapshot fn` and `own fn`, and function values with their layout, each with how antic builds it and what it costs."
+description: "Declaration, parameters, defaults, source locations, never, the calling convention, inlining, closures, snapshot fn and own fn, function values and calls without effects."
+summary: "Declaration and parameters, default values and source locations, `never`, the calling convention, inlining, anonymous functions and closures with their captures, `snapshot fn` and `own fn`, function values with their layout and the warning on calls without effects, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:24:00+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 50
 tags: [compilers, programming-languages]
-keywords: [functions, parameters, calling convention, inlining, closures, snapshot fn, own fn, function values]
+keywords: [functions, parameters, calling convention, inlining, closures, snapshot fn, own fn, function values, noreturn, unused result]
 ---
 
 A function of Anti is a C function. It follows the C calling convention of its target, so a debugger, a profiler and a C caller read it as they read C. A call allocates nothing. The one function value that owns heap memory is an `own fn`, which holds a snapshot of what it captured.
@@ -26,7 +26,7 @@ An argument is copied into its parameter. A parameter is a variable of the funct
 
 A name has one function. Anti has no overloading by signature. The functions of a file may stand in any order and may call themselves. A named function stands at module level or in a class body, never inside another function. The form inside a body is the anonymous function of a later section.
 
-A call gives every parameter without a default one argument, by position. The result of a call may be dropped, unless the function may fail, which [chapter 6]({{% relref "06-errors" %}}) describes.
+A call gives every parameter without a default one argument, by position. The result of a call may be dropped, unless the function may fail, which [chapter 6]({{% relref "06-errors" %}}) describes. A call that antic knows to have no effects gives the warning `unused-result` when it drops its result. "Calls without effects" at the end of this chapter describes it.
 
 The word before `fn` sets who may call it.
 
@@ -262,6 +262,18 @@ The sizes that decide the row are those the example prints: a `Point` is 16 byte
 
 Code that nothing calls costs nothing in a release program, since the whole-program build removes it. A dev build keeps every function of every module it compiles.
 
+How a parameter takes its argument decides the cost of a call:
+
+| Parameter | Copies at the call | The caller after the call |
+|---|---|---|
+| `p: Point`, a value of up to 16 bytes | two registers, or a copy and a pointer on windows-x86_64 | keeps its value, unchanged |
+| `b: Box`, a value above 16 bytes | the whole value, 40 bytes for a `Box` | keeps its value, unchanged |
+| `b: *Box` | one pointer | sees every change of the callee |
+| `own p: *Point` | one pointer | no longer names the value |
+| `lent p: *Point` | one pointer | keeps the value, and the callee kept no copy of the pointer |
+
+A small struct is cheapest by value, and the callee cannot change the caller's copy. A struct above 16 bytes that the callee only reads is cheaper behind a pointer, 8 bytes in place of its size.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -298,6 +310,8 @@ C++ gives a parameter a default argument, which is an expression evaluated at ea
 A received location is passed on as an ordinary argument. It then still names the first caller.
 
 A default travels with the function. A call from another module fills it as a call inside the module does.
+
+A default belongs to the function and not to its type. A call through a function value gives every argument, and a function with defaults fits the function type of its full parameter list alone. An `extern fn` takes no default, since it declares what C declares.
 
 ```anti
 //! name: dflt
@@ -396,6 +410,25 @@ fn caller() -> int
 ```
 
 ```anti refused
+//! error: the call takes 2 arguments, found 1
+fn scaled(n: int, by: int = 2) -> int
+{
+	return n * by;
+}
+
+fn caller() -> int
+{
+	let f = scaled;
+	return f(3);
+}
+```
+
+```anti refused
+//! error: an `extern fn` declares what C declares, and C has no default values
+extern fn put_n(s: ?*byte, n: c_int = 1) -> c_int;
+```
+
+```anti refused
 //! error: expected `int`, found `SourceLocation`
 fn line_of(at: int = here) -> int
 {
@@ -462,6 +495,152 @@ For a C++ programmer:
 - A default is a constant, fixed at compile time. It is not an expression that runs at each call, so it cannot call a function or read a variable.
 - A default cannot name an earlier parameter.
 - A changed default reaches a caller in another module when that module is compiled again.
+
+## never
+
+### What you know
+
+C marks a function that does not return with `_Noreturn` or `[[noreturn]]`, and C++ with `[[noreturn]]`. Both are hints: a function that returns anyway has undefined behaviour. Java has no such marking, and a method that always throws still needs a `return` or a `throw` after its call for the compiler.
+
+### The feature
+
+`-> never` is the result of a function that does not return. It ends the program or loops on every path. The checker enforces it: the body holds no `return`, and its end is not reachable.
+
+A call of such a function ends the path it stands on, as a `return` does. The checker of missing returns counts it, so a function may end in the call. A function type may return `never` as well, `fn(int) -> never`, and a call through a value of it ends the path in the same way.
+
+`never` is a result alone. No variable, parameter or field has the type, and a function that returns `never` cannot be marked `may fail`.
+
+`Error.fatal` is such a function. `e.fatal()` runs the function that `error.on_fatal` registered, prints the error and ends the program with the code of the error, or with 1 when the code is 0. `catch fatal` calls it.
+
+```anti
+//! name: nev
+import anti.io;
+import anti.text;
+
+extern fn exit(status: c_int) -> never;
+
+fn stop(why: str) -> never
+{
+	io.eprintln(why);
+	exit(3);
+}
+
+export fn half(n: int) -> int
+{
+	if (n & 1) == 0 {
+		return n >> 1;
+	}
+	stop("odd");
+}
+
+fn main() -> int
+{
+	let line = f"half {half(8)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+half 4
+```
+
+`half` ends in the call of `stop` and needs no `return` after it.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `stop` returns `never` and can reach its end
+fn stop(n: int) -> never
+{
+}
+```
+
+```anti refused
+//! error: `stop` returns `never` and holds no `return`
+fn stop() -> never
+{
+	return;
+}
+```
+
+```anti refused
+//! error: `never` is the result of a function that does not return, and no value has it
+extern fn exit(status: c_int) -> never;
+
+fn caller() -> int
+{
+	let x: never = exit(1);
+	return 1;
+}
+```
+
+### How antic builds it
+
+Lowering ends the block after the call with the instruction `unreachable`. No jump and no return follows.
+
+```ir excerpt=nev target=linux-x86_64 mode=dev
+fn nev.stop(%0: agg str) -> never {
+b0:
+    call void @anti.io.eprintln(%0)
+    call void @exit(3)
+    unreachable
+```
+
+```ir excerpt=nev target=linux-x86_64 mode=dev
+    call void @nev.stop(%7)
+    unreachable
+```
+
+The first excerpt is `stop`, which ends in the call of `exit`. The second is the end of `half`. The block has no `ret`, and the function has no code after the call.
+
+```llvm excerpt=nev target=linux-x86_64 mode=dev
+define hidden void @nev.stop(i64 %p0.0, i64 %p0.1) noreturn cold #0 {
+...
+declare void @exit(i32 noundef) noreturn cold #1
+```
+
+The LLVM module marks the function and the declaration `noreturn cold`. `noreturn` lets `opt` drop everything after the call. `cold` tells it that the path is rare. The block is moved out of the hot code, and the branch that leads to it is predicted not taken.
+
+The runtime functions behind the checks, `anti_rt_check_failed` and `anti_rt_assert_failed`, carry the same two attributes.
+
+Where it lives: the `never` rules of `check_stmt` and of the function check in `src/antic/sema_stmt.c`. `lower_calls_never` of `src/antic/lower_stmt.c` ends the block with `IR_UNREACHABLE`. `llvm_emit_definition` of `src/antic/llvm_emit_function.c` and `declaration` of `src/antic/llvm_emit.c` write `noreturn cold` for a function whose `never_returns` is set.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| A call of a `never` function | one call, and no instruction after it | the same |
+| The code after the call | none is written | none |
+| The path to the call | one branch | one branch, laid out as the unlikely side |
+| Heap allocations | 0 | 0 |
+| Checks inserted | none | none |
+
+The marking makes the caller smaller, since the code that would join the two paths is not written.
+
+The forms that leave a function on a path that cannot go on:
+
+- A `never` function, such as `io.exit` or one of the program, ends the program. No caller can handle it, and no `defer` of the frames above it runs.
+- `e.fatal()` and `catch fatal` print an error before they end the program, by the `never` function `Error.fatal`.
+- A `may fail` function hands the error to its caller, which decides. It costs a test of the error after each call, which [chapter 6]({{% relref "06-errors" %}}) counts, and it is the form wherever a caller may recover.
+
+### Pitfalls
+
+For a Java programmer:
+
+- No `return` or `throw` is needed after a call of a `never` function. The checker knows that the path ends.
+- `e.fatal()` ends the program without running the `defer` statements of the frames above it.
+
+For a C programmer:
+
+- `never` is checked. A function marked so that could return does not compile.
+- `exit` declared as `extern fn exit(status: c_int) -> never;` gives the checker the same fact for a C function. There the marking is a promise the declaration makes.
+
+For a C++ programmer:
+
+- `never` is a result, not an attribute, so it is part of the type of a function value.
+- No value has the type. It does not convert to any other type, as the type of a `throw` expression does.
 
 ## The calling convention
 
@@ -658,6 +837,13 @@ The convention is the same in dev and in release. A release build removes the co
 
 No call takes a lock, an atomic operation or heap memory, and no check is inserted for one.
 
+The convention is fixed, and the choice is the shape of the values a hot function takes:
+
+- Up to 16 bytes of integers and pointers, or of one float type, travel in registers on five targets. Two scalar parameters cost the same as one struct of both.
+- A struct above 16 bytes is copied at every call on all six. A `*T` parameter passes 8 bytes in its place.
+- A result above 16 bytes is written through the hidden pointer, with no copy after the return. Returning a large struct costs no more than filling one through a pointer parameter.
+- A function that may fail takes one pointer more and stores its value through it. [Chapter 6]({{% relref "06-errors" %}}) gives the rest of that cost.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -798,6 +984,12 @@ Where it lives: `llvm_opt_options` and `run_opt` of `src/antic/llvm_run.c` hold 
 
 The threshold is a cost in the units of `opt`, not a count of source lines. No option of antic changes it.
 
+No form of the language asks for inlining, so the choice is between the kinds of call:
+
+- A direct call of a function of the program is inlined in a release build when the callee is small. A small helper costs nothing there, and the dev build keeps it visible to a debugger.
+- A call through a function value or a table is inlined only when `opt` proves the target, as for `each` in the next section. A generic function of [chapter 10]({{% relref "10-generics" %}}) gets a copy per type, whose calls are direct.
+- A call into the runtime is inlined under the default `--lto full` alone.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -839,6 +1031,10 @@ The receiver of a function parameter without `keep` may call it and may pass it 
 A parameter marked `concurrent` hands its function on to `parallel` or `dispatch`. A closure passed there may change a captured variable only when the type of the variable is thread-safe. [Chapter 13]({{% relref "13-threads" %}}) describes that rule.
 
 An anonymous function that captures nothing is an ordinary function. It may go wherever a named function goes.
+
+An anonymous function stands in the body of a function. A field default, a constant and every other place at module level refuse it. Its body is a function of its own: `return` leaves the anonymous function, and a `break` or a `continue` in it reaches no loop around it.
+
+A captured `?*T` or `?fn` keeps its declared type in the body, since the closure may run after the variable changed. A test of `none` in the function around it does not narrow it there, and the body tests it again. The name that an `if let` binds is the one exception. A closure in the block of the `if let` reads it as the value without `none` when nothing in the block assigns the name or takes `&` of it, closures included.
 
 ```anti
 //! name: clo
@@ -959,6 +1155,78 @@ fn caller()
 ```
 
 ```anti refused
+//! error: an anonymous function stands in the body of a function
+class Button
+{
+	on_click: fn(int) = fn(n: int) { },
+}
+```
+
+```anti refused
+//! error: `break` outside a loop
+fn each(items: []int, f: fn(int))
+{
+	for x in items {
+		f(x);
+	}
+}
+
+fn first_big(items: []int)
+{
+	for x in items {
+		each(items, fn(n) {
+			if n > 2 {
+				break;
+			}
+		});
+	}
+}
+```
+
+```anti refused
+//! error: `p` may be `none`, check it or use `?*T`
+fn run(f: fn())
+{
+	f();
+}
+
+fn read(p: ?*int) -> int
+{
+	let r = 0;
+	if p != none {
+		run(fn() { r = *p; });
+	}
+	return r;
+}
+```
+
+```anti refused
+//! error: `q` may be `none`, test it before reading it
+fn run(f: fn())
+{
+	f();
+}
+
+fn get(n: int) -> ?int
+{
+	if n > 0 {
+		return n;
+	}
+	return none;
+}
+
+fn read() -> int
+{
+	let r = 0;
+	if let q = get(3) {
+		run(fn() { r = q * 2; });
+		q = 5;
+	}
+	return r;
+}
+```
+
+```anti refused
 //! error: `total` is changed in a closure at a `concurrent` parameter, and `int` is not thread-safe
 fn spread(concurrent f: fn(int)) { f(1); }
 
@@ -1054,6 +1322,18 @@ Where it lives: `sema_check_anonymous`, `sema_capture` and `sema_check_closure_l
 
 A closure costs no allocation in either mode, because its context is part of a frame that outlives every use of it. That is what the rules of the checker buy.
 
+The forms of a callback with state:
+
+| Form | Where the state lives | Cost per call of the callback | May be stored |
+|---|---|---|---|
+| closure | the variables of the caller, reached through the context | one indirect call, one load per variable at entry | no |
+| named function and a pointer parameter | a struct the caller passes | one indirect call | the function, as one word |
+| `snapshot fn` at a parameter without `keep` | copies in the frame | one indirect call | no |
+| `snapshot fn` kept as an `own fn` | copies in a block of the heap | one indirect call, one `malloc` when made | yes, by its owner |
+| interface of [chapter 9]({{% relref "09-classes" %}}) | the fields of an object | a call through the table of the class | yes |
+
+A closure is the cheaper form where the callee calls the function before it returns and keeps nothing. A loop body and a comparison passed to a sort are such callbacks. Code that keeps the callback for later takes an `own fn` or an object.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1083,14 +1363,16 @@ A C++ lambda with `[=]` copies its captures into the lambda object, and `std::fu
 
 `snapshot fn(params) { body }` is an anonymous function that copies the variables it names at the moment it is made. The body reads the copies and cannot assign them. A later change of the original does not reach the snapshot.
 
-A snapshot holds values that copy fully: numbers, `bool`, `char`, structs of those, and `str`. It refuses a class value, a pointer and a slice.
+A snapshot holds values that copy fully: numbers, `bool`, `char`, enums, structs of those, and a `str` that it captures by name. It refuses an array, a pointer, a slice, a function value and a class value. It refuses an atomic local too, since an atomic is shared state and a copy of it is not.
 
 A snapshot may be kept. The places that keep one own it.
 
 - An `own` field of function type, `own handler: fn(int)`.
 - A parameter marked `keep own`, which the function then stores in such a field.
 
-Such a value is an `own fn`. Its owner frees the snapshot: a class in its teardown, an assignment to the field before it stores the new value. `=` does not copy an `own fn`, and `dup` of [chapter 11]({{% relref "11-ownership" %}}) copies it with its snapshot. A named function fits an `own fn` place as well, with no snapshot.
+Such a value is an `own fn`. Its owner frees the snapshot: a class in its teardown, an assignment to the field before it stores the new value. `=` does not copy an `own fn`, and `dup` of [chapter 11]({{% relref "11-ownership" %}}) copies it with its snapshot. A named function fits an `own fn` place as well, with no snapshot. An `own` field of type `?fn(...)` takes `none`, as its default and with `=`, which frees the snapshot it held.
+
+An `own fn` passes to a `concurrent` parameter of [chapter 13]({{% relref "13-threads" %}}). It holds a snapshot, which writes nothing and captures no function value, or a function that captures nothing. No thread then changes what another reads.
 
 A snapshot also goes where a closure goes, to a parameter without `keep`. It then lives in the frame, as a closure does, and costs no allocation.
 
@@ -1184,6 +1466,30 @@ fn caller()
 ```
 
 ```anti refused
+//! error: a snapshot holds copies, and the atomic `n` is shared state
+fn run(f: fn())
+{
+	f();
+}
+
+fn caller()
+{
+	let n: atomic int = 0;
+	run(snapshot fn() { let m = n.load(); });
+}
+```
+
+```anti refused
+//! error: a snapshot holds values that copy fully, and `f` is `fn(int) -> int`
+fn keep_it(keep own f: fn(int) -> int) { }
+
+fn wrap(f: fn(int) -> int)
+{
+	keep_it(snapshot fn(n) -> int { return f(n); });
+}
+```
+
+```anti refused
 //! error: a `snapshot fn` is kept where it is owned, by a `keep own` parameter or an `own` field
 fn store(keep f: fn(int)) { }
 
@@ -1237,6 +1543,12 @@ Where it lives: `check_snapshot` of `src/antic/sema_closure.c` and `require_owne
 
 For the snapshot of the example the block is 8 bytes of size, 16 for the `str`, 8 for the `int` and 6 for the text `report`, which is 38 bytes.
 
+A snapshot costs a block of the heap only where it is kept. The choice:
+
+- A closure or a snapshot at a parameter without `keep` costs no allocation. The closure reads the variables as they are at the call, and the snapshot reads them as they were when it was made.
+- An `own fn` costs one `malloc` and one `free` per value, and one more of each per `dup`. It is the form for a handler an object keeps, as `Panel` does.
+- A named function in a plain field costs 8 bytes and nothing on the heap. It fits where the state it needs lives in the object that calls it.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1266,6 +1578,26 @@ A C function pointer is one address, called through `(*f)(x)` or `f(x)`. `std::f
 `fn(A, B) -> R` is a type. The name of a function is a value of it. A value of function type is called as a function is, `f(x)`. Two function values compare with `==`.
 
 `fn(A) -> R may fail` is the type of a function that may fail. A call through it is handled as a direct call is. A function that may fail does not fit a type without the marking.
+
+A `may fail` after a function type in a result belongs to that type. A function that may fail and gives a function that cannot fail therefore names its result through a `type` alias.
+
+```anti
+//! name: alias
+type Op = fn(int) -> int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn pick(n: int) -> Op may fail
+{
+	if n < 0 {
+		fail "no operation for a negative number";
+	}
+	return twice;
+}
+```
 
 `?fn(A) -> R` may hold `none` and is tested before the call, as a `?*T` is. A plain `fn(A) -> R` never holds `none`.
 
@@ -1381,6 +1713,24 @@ fn caller() -> int
 }
 ```
 
+```anti refused
+//! error: `fail` outside a function that may fail
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn pick(n: int) -> fn(int) -> int may fail
+{
+	if n < 0 {
+		fail "no operation for a negative number";
+	}
+	return twice;
+}
+```
+
+Without the alias the result of `pick` is a function that may fail, and `pick` itself cannot.
+
 ### How antic builds it
 
 A function value of one word is the address of the function, a `ptr` in the LLVM module. `?fn` is the same pointer, with null for `none`. An `Op` is therefore 16 bytes of `str` and two pointers, 32 bytes, and its layout is that of the C struct with two function pointers.
@@ -1427,6 +1777,18 @@ Where it lives: `types_fn_form` of `src/antic/types.c` holds the forms of a func
 
 An indirect call is not inlined unless `opt` learns the target. A table of function values, such as the `ops` of the example, is called through the pointer in both modes.
 
+The forms that choose code at run time:
+
+| Form | Bytes | A call |
+|---|---|---|
+| a function value in a field | 8 | one indirect call |
+| a function value at a parameter | 16 | one indirect call with the context |
+| an interface of [chapter 9]({{% relref "09-classes" %}}) | the object, with its table pointer | a call through the table, or a direct call where a release build devirtualises |
+| a generic of [chapter 10]({{% relref "10-generics" %}}) | nothing at run time | a direct call of the copy for the type, chosen at compile time |
+| a `switch` over an enum | the enum | compares or a table, and direct calls |
+
+A function value is the form for a table of operations and for a callback. A choice that is known at compile time is a generic, whose call `opt` may inline.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1445,3 +1807,175 @@ For a C++ programmer:
 - No function value allocates. The `own fn` of the last section is the one that owns heap memory, and its type says so.
 - A closure in a field is refused. A field takes a named function, or with `own` a snapshot.
 - Two function values are equal when they hold the address of one function. `==` does not compare what two functions do.
+
+## Calls without effects
+
+### What you know
+
+C and C++ warn of an expression statement that has no effect, such as `x + 1;`, with `-Wunused-value`. A function result that must not be dropped is marked `[[nodiscard]]` in C++17 and C23, or `__attribute__((warn_unused_result))` in GCC and Clang. `__attribute__((pure))` and `const` tell the optimizer that a call has no effects, so it may remove one whose result nothing reads. Java warns of neither.
+
+### The feature
+
+A call statement whose result nothing takes gives the warning `unused-result` when antic knows that the function has no effects. Such a call does nothing. antic knows it of three calls.
+
+| Call | Why it has no effects |
+|---|---|
+| the default hash, `x.hash()`, of a value whose parts reach no `operator fn hash`, no `hash` of a class and no `Regex` | it is arithmetic, loads and `anti_rt_hash_bytes`, which reads its arguments alone |
+| `mul_high(a, b)` | it is one instruction |
+| an `extern fn` that names a function of the runtime whose row has no effects or reads its arguments alone, returns, and has a result | the row of the runtime function says so |
+
+The message names the function: `` `hash` has no effects and its result is dropped, so the call does nothing ``.
+
+Every other call is taken as one with effects, and no warning names it. That holds for a function of the program, one whose body has no effects among them, since no pass of antic reads the effects of a body. It holds for every other C function, for the `hash` of a class, which a class below may replace, for an `operator fn hash` of the program, and for `x.hash()` on a value of a type parameter. A simd built-in such as `v.sum()` gets no warning either, since the optimizer keeps every vector instruction.
+
+The warning names the call alone. Its receiver and its arguments still run, so a dropped `f(x).hash()` still calls `f`. A generic function warns once, where the type of the receiver holds no type parameter, and its copies add no warning.
+
+`unused-result` follows the rules of every warning of [chapter 6]({{% relref "06-errors" %}}). A dev build prints it and goes on, and a release build refuses it. `allow(unused-result, "reason")` before the statement or last in the header of the function silences it.
+
+```anti
+//! name: quiet
+import anti.io;
+import anti.text;
+
+struct Key { id: int, name: str }
+
+export fn spin(n: int) -> int
+{
+	let k = Key { id: n, name: "spin" };
+	allow(unused-result, "the guide shows what a release build does with the call")
+	k.hash();
+	return n;
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	twice(4);
+	let k = Key { id: 7, name: "seven" };
+	let same = k.hash() == k.hash();
+	let line = f"spin {spin(3)}, same {same}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+spin 3, same true
+```
+
+`twice(4)` drops its result without a warning, since `twice` is a function of the program. The `allow` in `spin` keeps a call that the next part measures.
+
+A release build refuses each of the following, since it refuses every warning.
+
+```anti refused
+//! error: `hash` has no effects and its result is dropped, so the call does nothing [unused-result]
+fn main() -> int
+{
+	let n = 7;
+	n.hash();
+	return 0;
+}
+```
+
+```anti refused
+//! error: `mul_high` has no effects and its result is dropped, so the call does nothing [unused-result]
+fn main() -> int
+{
+	let a: u64 = 7;
+	mul_high(a, a);
+	return 0;
+}
+```
+
+```anti refused
+//! error: `anti_rt_hash_bytes` has no effects and its result is dropped, so the call does nothing [unused-result]
+extern fn anti_rt_hash_bytes(bytes: ?*byte, count: i64) -> u64;
+
+fn main() -> int
+{
+	let s = "seven";
+	anti_rt_hash_bytes(s.ptr as ?*byte, s.len as i64);
+	return 0;
+}
+```
+
+### How antic builds it
+
+The warning changes no code. A call it names compiles as written, and what happens to it depends on the mode.
+
+A dev build runs the call. The default hash of `Key` mixes the `int` and the bytes of the `str`:
+
+```ir excerpt=quiet target=linux-x86_64 mode=dev
+export fn quiet.spin(%0: i64) -> i64 {
+...
+    %5 = load i64 %1
+    %6 = ushr i64 %5, 33
+    %7 = xor i64 %5, %6
+    %8 = mul i64 %7, -49064778989728563
+...
+    %27 = call i64 @anti_rt_hash_bytes(%24, %26)
+    %28 = xor i64 %22, %27
+...
+    ret i64 %0
+}
+```
+
+`%5` loads `id`, and each `ushr`, `xor` and `mul` is a step of the mix. `anti_rt_hash_bytes` hashes the bytes of `name`, and its result goes into the mix. From `%5` to `%36` the function computes 32 values, one of them the call of the runtime, and returns `n` without reading any of them.
+
+The declaration of the runtime function carries the facts of its row.
+
+```llvm excerpt=quiet target=linux-x86_64 mode=dev
+declare noundef i64 @anti_rt_hash_bytes(ptr noundef, i64 noundef) memory(argmem: read) willreturn nosync nofree
+```
+
+`memory(argmem: read)` says that the function reads the memory its arguments point to and writes nothing. `willreturn` says that it returns, and `nosync` and `nofree` that it takes no lock and frees nothing.
+
+A release build removes all of it.
+
+```llvm excerpt=quiet target=linux-x86_64 mode=release
+define internal noundef i64 @spin(i64 noundef returned %p0)
+b0:
+  ret i64 %p0
+}
+```
+
+`opt` removes the arithmetic, whose result nothing reads, and the call, whose declaration says that it reads memory alone and returns. Those are the facts the warning reads. A function of the program has no such row, so antic does not warn of its call. `opt` may still remove that call when it inlines the body.
+
+Where it lives: `warn_unused_result` of `src/antic/sema_stmt.c` gives the warning, with `sema_hash_without_effects` for the hash. The rows of the runtime functions and their effects are in `src/antic/rt_abi.h`. `NAME_UNUSED_RESULT` of `src/antic/warnings.c` holds the name.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| A dropped default hash of `Key` | 31 instructions of the IR and one call of `anti_rt_hash_bytes` | nothing |
+| A dropped `mul_high` | one instruction | nothing |
+| The warning itself | no code | no code: the build is refused unless an `allow` names it |
+| Heap allocations, locks, checks | none | none |
+
+The call computes a result that nothing reads, and a release program drops it. The warning therefore points at a defect, such as a result meant for a variable. The choice:
+
+- Delete the call when its result was never needed.
+- Assign the result when it was: `let h = k.hash();`.
+- Keep the call under `allow(unused-result, "reason")` when it is there for a measurement or a test, as in `spin`.
+
+### Pitfalls
+
+For a Java programmer:
+
+- A dropped hash warns, and a release build stops on it. A call whose result Java ignores without a word does not compile here.
+- A method of the program never warns, even one that does nothing. The warning reads what antic knows, not the body.
+
+For a C programmer:
+
+- Every Anti function returns a result the caller may drop. No `[[nodiscard]]` exists. The warning comes from the facts of the callee alone.
+- An `extern fn` that names a function of the runtime takes the facts of its row. A C function of another library warns of nothing.
+
+For a C++ programmer:
+
+- No attribute marks a function pure. The three calls of the table are all the warning knows.
+- The arguments of a named call still run. `f(x).hash();` calls `f` and warns of the hash.
