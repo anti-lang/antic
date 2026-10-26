@@ -930,14 +930,14 @@ declare noundef ptr @XOpenDisplay(ptr noundef)
 
 The names reach the linker. On Linux, lld links the program as a position independent executable against the glibc sysroot of the package. It names the dynamic linker, the libraries of the `link linux` lines, libm and libc. It takes the runtime that was built against the headers of glibc 2.35. On macOS, lld receives `-framework Name` and reads the framework from the SDK.
 
-The table holds the two link modes of Linux, built on macOS for linux-x86_64 by antic of `c2806b61`. The first program has a `main` that calls `XOpenDisplay(none)` and prints `a display` with `io.println` when the result is not `none`. The second prints `a line` and calls nothing else.
+The table holds the two link modes of Linux, built on macOS for linux-x86_64 by antic of `b165ca8c`. The first program has a `main` that calls `XOpenDisplay(none)` and prints `a display` with `io.println` when the result is not `none`. The second prints `a line` and calls nothing else.
 
 | Program | Bytes | Needed libraries | Interpreter |
 |---|---:|---|---|
-| with `--linux-lib X11` | 29,112 | `libX11.so.6`, `libc.so.6`, `libm.so.6` | `/lib64/ld-linux-x86-64.so.2` |
+| with `--linux-lib X11` | 29,104 | `libX11.so.6`, `libc.so.6`, `libm.so.6` | `/lib64/ld-linux-x86-64.so.2` |
 | without | 228,800 | none | none |
 
-The second column is the output of `llvm-readobj --needed-libs` of the pinned tools.
+The third column is the output of `llvm-readobj --needed-libs` of the pinned tools, and the fourth the `PT_INTERP` header of each program.
 
 Where it lives: `parser_decl.c` and `sema_declare.c` of `src/antic/` read and check the line, `src/anti/units.c` collects the names of every module for the link, and `src/antic/driver_link.c` and `src/antic/linker.c` write the link of both modes.
 
@@ -1229,7 +1229,7 @@ declare void @anti_lang_Object_created(ptr noundef nonnull dereferenceable(8))
 - The table has 18 entries: the descriptor, the seven functions of the root, the nine hooks and `greet`. Its second and third entries name functions of the root class, which the plugin does not define.
 - The `declare` line is one of those open names. In a program the runtime in the same link defines it. In a plugin the loader binds it to the host.
 
-The plugin of `tests/plugin`, the class `Fancy` of `net.example.fancy`, built for linux-x86_64 with its host by antic of `c2806b61`:
+The plugin of `tests/plugin`, the class `Fancy` of `net.example.fancy`, built for linux-x86_64 with its host by antic of `b165ca8c`:
 
 | Binary | Bytes | Dynamic symbols | Needed libraries |
 |---|---:|---|---|
