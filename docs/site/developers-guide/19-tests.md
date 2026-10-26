@@ -367,7 +367,7 @@ anti test -I src src/com/example/purse.anti
 | `--work <dir>` | the directory of the files of the run, `tests` in the build directory of `[layout]` by default, which is `build/tests`. It is the first root of every compile of the run |
 | `--runtime <dir>` | the runtime archive, for a build of Anti itself |
 
-The root and the path are made absolute and normalised before they are compared, by R147 of "Rules of 2026-10-13". `-I src`, `-I ./src` and `-I src/` give `com.example.change` for `src/com/example/change.anti`, for `./src/com/example/change.anti` and for its absolute path alike. A file under no root takes its file name as its module path, `change`, with the warning `single-segment-path`.
+The root and the path are made absolute and normalised before they are compared, as "Modules and imports" of [chapter 18]({{% relref "18-the-tool#modules-and-imports" %}}) describes. `-I src`, `-I ./src` and `-I src/` give `com.example.change` for `src/com/example/change.anti`, for `./src/com/example/change.anti` and for its absolute path alike. A file under no root takes its file name as its module path, `change`, with the warning `single-segment-path`.
 
 The command reads `anti.toml` of the current directory when there is one. It takes the package name from it, and the providers of the `[inject]` table with those of `[inject.test]` laid over them, which [chapter 15]({{% relref "15-hooks" %}}) describes. The directories of `[layout]` choose no file: the files of a run are the ones the command line names.
 
