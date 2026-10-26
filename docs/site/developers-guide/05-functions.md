@@ -126,7 +126,7 @@ first 7, consume 5, twice 60
 sizes: Point 16, Box 40, []int 16
 ```
 
-`moved` adds 10 to its copy, and `p.x` of the caller stays 1. `widen` takes a pointer and changes the `Box` of the caller.
+`moved` adds 10 to its copy, and `p.x` of the caller stays 1. `widen` takes a pointer and changes the `Box` of the caller. `alloc Point { x: 5, y: 6 }` puts a `Point` on the heap and gives a pointer to it, and `free(p)` gives the memory back, as [chapter 12]({{% relref "12-memory" %}}) describes.
 
 The checker refuses each of the following.
 
