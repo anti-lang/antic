@@ -1,9 +1,9 @@
 ---
 title: "Ownership"
-description: "own, lent, dup, moves, teardown, temporaries, the rules at a call, Shared<T> and its counts, and what the checker refuses and why."
-summary: "`own` and `lent`, `dup` and moves, teardown and temporaries, the rules at a call, `Shared<T>` of `anti.mem` with its atomic count, and what the checker refuses and why, each with how antic builds it and what it costs."
+description: "own, lent, dup, moves, take, teardown, temporaries, the rules at a call, the safety checks escaping-local and use-after-free, Shared<T> and its counts."
+summary: "`own` and `lent`, `dup`, moves and `take`, teardown and temporaries, the rules at a call, the safety checks `escaping-local` and `use-after-free`, and `Shared<T>` of `anti.mem` with its atomic count, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 110
 tags: [compilers, programming-languages]
@@ -33,7 +33,7 @@ A class value or a struct value held inline in a field is part of the object and
 
 `own` stands on a pointer or a slice field of a class and nowhere else among fields. A `str` is immutable and shared, an inline value is owned already, and a struct takes no `own` field.
 
-The checker does not follow where the pointer of an `own` field came from. A program that stores the address of a local there, or one pointer in two `own` fields, compiles. Its teardown then frees memory that it must not free.
+The checker follows the pointer of an `own` field as far as one function shows it. A local stored there moves into the field, so one local cannot fill two `own` fields. The address of a local stored into an object that a parameter or `self` reaches is refused by the safety check `escaping-local`. What one function cannot see compiles: the address of a local stored into an object the function allocated, and a plain pointer parameter stored into an `own` field, which the caller may have filled with the address of its local. The teardown then frees memory that it must not free. [References to locals and uses after the end]({{% relref "11-ownership#references-to-locals-and-uses-after-the-end" %}}) holds both checks.
 
 `lent` before a pointer parameter or a slice parameter says that the pointer is valid during the call alone. The function reads and changes through it. It hands the pointer on to another `lent` parameter and to nothing else.
 
@@ -505,109 +505,16 @@ Where it lives: `sema_lent_form` of `src/antic/sema.c`. `sema_check_take` of `sr
 
 The example allocates four blocks, two sprites and two pixel buffers. `drop(s)` frees all four with one `delete` in the source. No option turns the test for a zero table off.
 
-### References to locals
+Four forms hold a part of an object, and the counts above choose between them.
 
-The address of a local or of a parameter, the address of a part of one and a slice of a local array are references to that local. So is every value made from one by a field access, an index, a slice or a view with `as`. A reference may stand in the locals of the block of its local and of the blocks inside it, and a call it is passed to gets it lent. It may not outlive its local. The safety check `escaping-local` refuses a reference that is returned or yielded. It refuses one stored into a local of an outer block, into a place that a parameter or `self` reaches, into a static field or into a collection of an outer block. It refuses one passed to `dispatch`, as its object or as an argument of its worker, unless the block of the local joins the job on every path, and one that a closure passed to a `concurrent` parameter captures. The message names the local, the line where it ends and the place.
+| Form | Bytes in the object | Heap allocations | Teardown |
+|---|---|---|---|
+| a class or struct value held inline | the size of the value | 0 | a direct call of the part's teardown, or nothing for a part that owns nothing |
+| `own p: *T` or `own p: ?*T` | 8 | 1 per part | `anti_rt_delete_from`, an indirect call, one `free` |
+| `p: *T` without `own` | 8 | 0 | none |
+| `Shared<T>` of [Shared objects]({{% relref "11-ownership#shared-objects" %}}) | 16 | 1 per object | an atomic subtract per handle |
 
-```anti refused
-//! error: a reference to `x` is returned, and `x` ends at line
-fn address() -> *int
-{
-	let x = 5;
-	return &x;
-}
-```
-
-```anti refused
-//! error: a reference to `x` is stored into `p` of an outer block, and `x` ends at line
-fn main() -> int
-{
-	let p: ?*int = none;
-	if true {
-		let x = 5;
-		p = &x;
-	}
-	return 0;
-}
-```
-
-The check refuses what it proves. A reference stored into memory the function allocated, or behind a pointer the function read, keeps the run-time checks of dev mode and `--memory-checks`. The function cannot see when that memory ends. `unchecked(escaping-local, "reason")` overrules the check.
-
-`parallel` waits for every chunk before it returns, so the slice of a local array it takes and a reference passed to its worker never outlive the local. The check lets both pass. A job of `dispatch` runs until it is joined. A reference passed to it passes when the job is the value of a `let` and a later statement of the same block joins it on every path. No `return`, `fail`, `try`, `break` or `continue` that leaves the block may stand between the two. A `break` of a loop between them and a `yield` of a handler between them stay inside the block.
-
-```anti refused
-//! error: a reference to `c` is passed to `dispatch`, and `c` ends at line
-class Counter
-{
-	pub n: int = 0,
-}
-
-worker fn bump(c: *Counter, by: int) -> int
-{
-	c.n += by;
-	return c.n;
-}
-
-fn run(wait: bool) -> int
-{
-	let c = Counter { };
-	let job = dispatch &c -> bump(1);
-	if wait {
-		return join(job);
-	}
-	return 0;
-}
-```
-
-### Uses after the end
-
-`delete` and `destroy` end a local or a parameter, and so does a move of it. The safety check `use-after-free` follows the paths of the function. On a path after the end it refuses a read, a field access, a call through the value, an index, a second `delete` or `destroy` and a move. An assignment of a new value makes the value alive again. A value dead on one of the paths into a join is dead after the join. A loop that ends a value declared before it must give it a new value before the end of its body, or the next turn is refused. The message names the value, the line where it ended and how.
-
-```anti refused
-//! error: `p` was deleted on line 10 [use-after-free]
-class Node
-{
-	pub n: int = 0,
-}
-
-fn main() -> int
-{
-	let p = alloc Node { n: 1 };
-	delete(p);
-	return p.n;
-}
-```
-
-An `own` field of `self` follows the same rule within one function. After `delete(self.one)` the field is dead until `=` gives it a new value, and that `=` frees nothing, since the old object is gone already. `destroy` leaves the memory where it was, so `free(p)` and a view of `p` as `*byte` after it give the memory back.
-
-```anti
-class Node
-{
-	pub n: int = 0,
-}
-
-class Box
-{
-	pub own one: *Node,
-
-	pub fn renew(self, n: int)
-	{
-		delete(self.one);
-		self.one = alloc Node { n: n };
-	}
-}
-
-fn main() -> int
-{
-	let b = alloc Box { one: alloc Node { n: 1 } };
-	b.renew(2);
-	let n = b.one.n;
-	delete(b);
-	return n - 2;
-}
-```
-
-The check refuses what it proves. Two places may hold one object, and one may free it while the other keeps its pointer. `--memory-checks` and the versions of a `Pool` find that at run time. `unchecked(use-after-free, "reason")` overrules the check.
+A part with the life of its object and one type is held inline: it costs no allocation and no indirection. An `own` pointer is the form for a part that may be absent, that `take` moves to another owner, that holds a derived class, or that is the next node of a recursive structure, which cannot hold itself inline. A plain pointer is the form for an object that lives longer than the holder, such as the texture of the example. `Shared<T>` is the form for an object with more than one owner. `lent` costs nothing over a plain pointer parameter, so a parameter that the function does not store takes it for the check alone.
 
 ### Pitfalls
 
@@ -620,7 +527,7 @@ For a C programmer:
 
 - `own` frees with the object. A `free` of the same field in `destruct` frees it twice. Memory that a class gives back its own way, with `fclose` or a function of a library, stands in a field without `own`.
 - `=` to an `own` field frees what the field held. After a `delete` of an `own` field of `self`, the `=` frees nothing. Through any other object, a `delete` or a `free` of the old value before the `=` frees it twice.
-- An `own` field takes memory of `alloc`. The address of a local stored there compiles, and the teardown frees a stack address.
+- An `own` field takes memory of `alloc`. The address of a local stored into an object that a parameter or `self` reaches is refused. Stored into an object the function allocated itself, it compiles, and the teardown frees a stack address.
 - A `lent` parameter cannot be saved for later, not even in a local of the plain pointer type.
 
 For a C++ programmer:
@@ -646,7 +553,16 @@ A value that owns nothing is copied by `=` and `let`, byte for byte. A value tha
 - A fresh value moves. A literal, a call result and the result of `dup` have no other owner. A `let`, an `=`, a `return` and an argument therefore take them without a copy of what they own.
 - `dup` copies. `dup(x)` of a value gives a value. For a pointer to a class, `dup(p)` gives a new object on the heap and a pointer to it. Each `own` field of the copy gets memory of its own, and a class value held inline copies itself the same way. Other pointer fields copy the address. `dup` of a value that owns nothing gives its bytes.
 
-A local moves in four places. It moves as an argument of an `own` parameter and as a part of a tuple, struct, class or variant literal. It moves by `return` and by `destroy(&x)`. After a move the name is dead on that path. The safety check `use-after-free` follows the paths of the function and refuses a use of the name on a path after the move, until an assignment gives it a new value. A local dead on one of the paths into a join, the end of an `if` among them, is dead after the join. A loop that moves a local declared before it must give the local a new value before the end of its body, or the use in the next turn is refused.
+A local moves in these places.
+
+- As an argument of an `own` parameter.
+- As a part of a tuple, struct, class, variant or array literal. The literal reads every part first and moves the local after, so a later part still reads it, and `[k, k]` is refused.
+- By `return`, and by `destroy(&x)`.
+- Into an `own` pointer or slice field, by `=` or as a field of a literal. After `s.top = p` the program reaches the object through its owner, `s.top`.
+
+An `own` parameter is a local of its function and moves in more places: by `let`, by `=` into any place, `*slot(to) = b` among them, by `if let` and `let ... else`, and by `yield` out of a handler.
+
+After a move the name is dead on that path. The safety check `use-after-free` follows the paths of the function. It refuses a use of the name on a path after the move, until an assignment gives it a new value. A local dead on one of the paths into a join, the end of an `if` among them, is dead after the join. A loop that moves a local declared before it gives the local a new value before the end of its body. Otherwise the use in the next turn is refused. [References to locals and uses after the end]({{% relref "11-ownership#references-to-locals-and-uses-after-the-end" %}}) holds the whole check.
 
 Two cases run code after the move that the paths do not show, and the checker refuses the move in each.
 
@@ -754,7 +670,174 @@ end of main
 
 `a` moves into `take`, which tears it down at its exit. `b` moves into `pass` and out again into `c`, and no `destruct` runs. `d` is a copy with a cell of its own, so the write of 33 leaves the 20 of `c`. `k` is an `int`, is copied into `next`, and is read after the call. At the end of `main` the two locals that still hold a value go, last to first. `a` and `b` moved and print nothing.
 
+The next program moves a value into each of the other places.
+
+```anti
+//! name: places
+import anti.io;
+import anti.text;
+import anti.lang;
+
+class Box
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		let line = f"  destruct {self.n}";
+		io.println(line);
+		free(line.ptr);
+	}
+}
+
+class Shelf
+{
+	pub own top: ?*Box = none,
+	pub held: Box,
+}
+
+fn slot(s: *Shelf) -> *Box
+{
+	return &s.held;
+}
+
+fn store(own b: Box, s: *Shelf)
+{
+	*slot(s) = b;
+}
+
+fn parse(n: int) -> Box may fail
+{
+	if n < 0 {
+		fail lang.Error.new(1, "negative");
+	}
+	return Box { n: n };
+}
+
+fn or_spare(n: int, own spare: Box) -> Box
+{
+	let got = parse(n) catch e {
+		yield spare;
+	};
+	return got;
+}
+
+fn main() -> int
+{
+	let a = Box { n: 1 };
+	let b = Box { n: 2 };
+	let row: [2]Box = [a, b];
+	let p = alloc Box { n: 3 };
+	let s = Shelf { held: Box { n: 4 } };
+	s.top = p;
+	io.println("store");
+	store(Box { n: 5 }, &s);
+	io.println("or_spare");
+	let c = or_spare(-1, Box { n: 6 });
+	let d = or_spare(7, Box { n: 8 });
+	io.println("end of main");
+	return 0;
+}
+```
+
+```text output
+store
+  destruct 4
+or_spare
+  destruct 8
+end of main
+  destruct 7
+  destruct 6
+  destruct 5
+  destruct 3
+  destruct 2
+  destruct 1
+```
+
+- `a` and `b` move into `row`, and the teardown of `row` tears both down, at the end of `main`.
+- `p` moves into `s.top`. The teardown of `s` deletes the box, the 3, and then tears down `held`.
+- `*slot(s) = b` writes through a pointer that a call gave. The 4 that `held` held goes, and the 5 moves in.
+- `or_spare(-1, ...)` yields its parameter out of the handler, and `c` holds the 6. `or_spare(7, ...)` takes no handler, and the function tears down the 8 at its exit.
+
 The checker refuses each of the following.
+
+```anti refused
+//! error: `a` was moved into `[2]Box` on line 12 [use-after-free]
+class Box
+{
+	pub own data: ?*int = none,
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let a = Box { };
+	let b = Box { };
+	let row: [2]Box = [a, b];
+	return a.n;
+}
+```
+
+```anti refused
+//! error: `k` was moved into `[2]Box` on line 11 [use-after-free]
+class Box
+{
+	pub own data: ?*int = none,
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let k = Box { };
+	let row: [2]Box = [k, k];
+	return 0;
+}
+```
+
+```anti refused
+//! error: `p` was moved into the `own` field `top` on line 15 [use-after-free]
+class Box
+{
+	pub n: int = 0,
+}
+
+class Shelf
+{
+	pub own top: ?*Box = none,
+}
+
+fn main() -> int
+{
+	let p = alloc Box { };
+	let s = Shelf { };
+	s.top = p;
+	return p.n;
+}
+```
+
+```anti refused
+//! error: `b` was moved on line 14 [use-after-free]
+class Box
+{
+	pub own data: ?*int = none,
+	pub n: int = 0,
+}
+
+fn slot(b: *Box) -> *Box
+{
+	return b;
+}
+
+fn store(own b: Box, to: *Box) -> int
+{
+	*slot(to) = b;
+	return b.n;
+}
+```
+
+The place that `*slot(to) = b` writes has no name, so the message names the line of the move.
+
+The checker refuses each of the following as well.
 
 ```anti refused
 //! error: `Box` has `own` fields, use `dup` instead of `=`
@@ -1099,6 +1182,33 @@ b0:
 
 A move of a pointer writes no code. `end(p)` passes the address, and no teardown waits for a pointer local at the end of its block.
 
+A move into an array literal and a move into an `own` field follow the same model.
+
+```ir excerpt=places target=linux-x86_64 mode=dev
+    memcopy %2, %0, places.Box
+    %10 = mul i64 1, size_of places.Box
+    %11 = ptradd %2, %10
+    memcopy %11, %1, places.Box
+    store ptr 0, %0
+    store ptr 0, %1
+...
+    %23 = load ptr %22
+    %24 = ne i8 %23, %16
+    branch %24, b3, b4
+b3:
+    %25 = load ptr %22
+    %26 = addr @places.Box.descriptor
+    call void @anti_rt_delete_from(%25, %26, 0)
+    store ptr 0, %22
+    jump b4
+b4:
+    store ptr %16, %22 !type places.Shelf.top
+```
+
+- `%2` is the slot of `row`, and `%0` and `%1` those of `a` and `b`. The two `memcopy` put the boxes into the elements, and the two stores clear the tables of the locals after the last part is in.
+- `%22` is the address of `s.top` and `%16` the pointer `p`. The field held `none`, so the compare finds the two different and `b3` calls `anti_rt_delete_from` with a null pointer, which does nothing. A field that held another box would delete it there, by the rule of `=` on an `own` field.
+- `b4` stores `p`. The local `p` is a pointer, and nothing clears it.
+
 Where it lives: `sema_refuse_owned_copy`, `sema_move_local` and `sema_note_move` of `src/antic/sema_value.c`. `lower_move_argument` of `src/antic/lower_stmt.c` and `lower_clear_owned`, `lower_copy_owned` and `lower_class_copy` of `src/antic/lower_owning.c`. `anti_rt_dup` and `anti_rt_copy_buffer` of `src/rt/object.c`.
 
 ### What it costs
@@ -1113,11 +1223,21 @@ The lowering is the same in dev and in release. The table gives what it writes f
 | `return` of a local | the bytes of the result, as every `return` | 0 | 0 | none |
 | `dup(x)` of a `Box` | three times 24 and once 8 | 1 | `anti_rt_copy_buffer`, `anti_rt_hook_copied` | one test for a zero table |
 | `dup(p)` of a `*Box` | 24 and 8 | 2 | `anti_rt_dup`, `anti_rt_copy_buffer`, `anti_rt_hook_copied` | one indirect call |
+| Two locals move into an array literal | 24 each into the array | 0 | 0 | one store of zero per local |
+| A pointer local moves into an `own` field by `=` | 0 | 0 | `anti_rt_delete_from` of the old pointer when it differs from the new one, which returns at once for `none` | one load, one compare, one store |
 | Teardown of a local that moves somewhere | 0 | 0 | 0 | one load, one compare, one branch |
 
 A move costs no atomic operation and takes no lock. The test before the teardown of a local stands in both modes, and no option removes it. The checks that `dup` makes are the tests for a zero table, in both modes.
 
 In the release build of the example opt inlined `take` and `pass` into `main`, and neither function stands in the module.
+
+Three forms give a function a value of an owning type, and the rows above choose between them.
+
+- A pointer parameter copies 8 bytes and nothing else. It is the form for a function that reads or changes the value and gives it back, whatever its size.
+- A move copies the bytes of the value and clears one table, with no allocation. It is the form for a value that changes owner. Such a value goes into a collection, a field or another object, or the callee tears it down.
+- `dup` allocates once per `own` field, and once more for the object of `dup(p)`. It is the form for two values that live on apart, and the one form of the three that costs heap memory.
+
+`take(x.f)` of [own and lent]({{% relref "11-ownership#own-and-lent" %}}) is the move out of a field, one load and one store. `dup` of the field would allocate a copy.
 
 ### Pitfalls
 
@@ -1523,6 +1643,15 @@ A value that owns nothing has no teardown, and its block emits no code for it. `
 
 `early` has two exits and two locals, and its body holds three calls of `teardown.Res.destroy`. A function with many exits and many owning locals grows by that product.
 
+Four forms end a value, and the counts above choose between them.
+
+- The end of the block costs one teardown sequence per exit and no allocation. It is the form for a value whose life is the block.
+- `destroy(&x)` ends a local before the end of its block, with the same sequence. The block then tears nothing down, so the form costs nothing over the first. It suits a value that holds a lock or a file, which the rest of the block must not keep.
+- `delete(p)` costs one call into the runtime, one indirect call and one `free`, beside the `malloc` that made the object. It is the form for a value that outlives the function that made it.
+- A temporary costs the same sequence as a local, and a statement temporary a slot of 8 bytes on top. A `let` of the value costs no slot and moves the teardown to the end of the block.
+
+A type that owns nothing has no teardown in any of the four. A struct of numbers, or a class without `destruct` and without an owning part, ends at no cost.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1870,7 +1999,9 @@ The lowering is the same in dev and in release. The table gives what it writes f
 | `own b: Box` from a fresh value | one copy of 24 bytes | the same |
 | `own p: *Box` | one register | nothing: `delete` is written by hand |
 
-No kind of parameter allocates, calls the runtime at the call, or takes a lock. The 24 bytes are the cost of passing a class value of that size and fall to two registers for a value of 16 bytes. A pointer parameter avoids the copy for a larger value.
+No kind of parameter allocates, calls the runtime at the call, or takes a lock. The 24 bytes are the cost of passing a class value of that size and fall to two registers for a value of 16 bytes.
+
+The table chooses the parameter. A pointer, plain or `lent`, is one register for a value of any size, and is the form for a function that reads or changes the caller's value. `lent` adds the check that the function keeps nothing and costs nothing. A plain value parameter copies the bytes and suits a small value that the function changes as a scratch copy. `own b: Box` costs the copy and a teardown at each exit, and is the form for a function that keeps the value or ends it. `own p: *Box` costs one register and is the form for a function that stores the object in an `own` field or deletes it.
 
 ### Pitfalls
 
@@ -1890,6 +2021,491 @@ For a C++ programmer:
 - The move is at the call site without a word. `take(a)` moves, where C++ writes `take(std::move(a))`.
 - A plain value parameter is the bytes of the argument. No copy constructor runs, and what the bytes own stays with the caller.
 - `return b;` of a plain parameter is refused, where C++ copies or moves. The parameter needs `own`, or the function returns `dup(b)`.
+
+## References to locals and uses after the end
+
+### What you know
+
+A C or C++ function may return the address of a local, and the caller reads a frame that is gone. clang and gcc warn for `return &x`, and neither language refuses it. A read after `free` or `delete` compiles in both languages, and AddressSanitizer or Valgrind finds it in a run that reaches it. Java has neither mistake: no reference reaches a local, and the collector frees no object that a reference reaches.
+
+### The feature
+
+Two safety checks follow one function at a time and refuse what it shows. A safety check stops every build, in dev and in release, and `unchecked(name, "reason")` before the statement overrules it.
+
+**`escaping-local`** refuses a reference that outlives its local. The address of a local or of a parameter is a reference to it. So are the address of a part of one and a slice of a local array. So is every value made from one by a field access, an index, a slice or a view with `as`. A reference may stand in the locals of the block of its local and of the blocks inside it. It may stand in a part of such a local as well. A call it is passed to gets it lent. The check refuses a reference in each of these places.
+
+- Returned, or yielded out of a handler that declares its local.
+- Stored into a local of an outer block or a part of one, or into a static field.
+- Stored into a place that a parameter reaches, `self` among them, unless the parameter is `own`.
+- Passed to a function of a collection that takes the argument as `own`, such as `push`. The collection belongs to an outer block or to a parameter.
+- Passed to `dispatch`, as the object or as an argument of the worker. A job joined on every path inside the block of the local is the exception.
+- Captured by a closure that is passed to a `concurrent` parameter.
+
+`parallel` waits for every chunk before it returns, so a slice of a local array and a reference passed to its worker pass the check. A job of `dispatch` runs until it is joined. A reference passed to it passes when the job is the value of a `let` and a later statement of the same block joins it on every path. No `return`, `fail`, `try`, `break` or `continue` that leaves the block may stand between the two. A `break` of a loop between them and a `yield` of a handler between them stay inside the block.
+
+The message names the local, the line where it ends and the place.
+
+```anti
+//! name: refs
+import anti.io;
+import anti.text;
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+struct Holder
+{
+	p: ?*int,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+worker fn square(xs: []int) -> int
+{
+	for x in &xs {
+		*x = *x * *x;
+	}
+	return xs.len;
+}
+
+fn grow(p: *int)
+{
+	*p += 1;
+}
+
+fn total(xs: []int) -> int
+{
+	let sum = 0;
+	for x in xs {
+		sum += x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let x = 41;
+	let h = Holder { p: none };
+	h.p = &x;
+	grow(&x);
+	let nums: [4]int = [1, 2, 3, 4];
+	let done = parallel nums[0..4] -> square;
+	free(done.ptr);
+	let c = Counter { };
+	let job = dispatch &c -> bump(5);
+	let after = join(job);
+	let p = h.p catch fatal;
+	let line = f"x {*p}, squares {total(nums[0..4])}, counter {after}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+x 42, squares 30, counter 5
+```
+
+`h` stands in the block of `x`, so `h.p = &x` passes. `grow` gets the address lent. `parallel` returns after the last chunk, and the `join` stands on the one path after the `dispatch`.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: a reference to `x` is returned, and `x` ends at line
+fn address() -> *int
+{
+	let x = 5;
+	return &x;
+}
+```
+
+```anti refused
+//! error: a reference to `a` is returned, and `a` ends at line
+fn head() -> []int
+{
+	let a: [3]int = [1, 2, 3];
+	return a[0..2];
+}
+```
+
+```anti refused
+//! error: a reference to `x` is stored into `p` of an outer block, and `x` ends at line
+fn main() -> int
+{
+	let p: ?*int = none;
+	if true {
+		let x = 5;
+		p = &x;
+	}
+	return 0;
+}
+```
+
+```anti refused
+//! error: a reference to `x` is stored into the field `node`, and `x` ends at line
+class Node
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub own node: ?*Node = none,
+}
+
+fn put(h: *Holder)
+{
+	let x = Node { n: 1 };
+	h.node = &x;
+}
+```
+
+```anti refused
+//! error: a reference to `x` is stored into the collection `xs`, and `x` ends at line
+import anti.collection.list.{List};
+
+fn fill(xs: *List<*int>)
+{
+	let x = 5;
+	xs.push(&x);
+}
+```
+
+```anti refused
+//! error: a reference to `spare` is yielded, and `spare` ends at line
+fn value(n: int) -> *int may fail
+{
+	fail "no";
+}
+
+fn pick() -> int
+{
+	let p = value(1) catch e {
+		let spare = 7;
+		yield &spare;
+	};
+	return *p;
+}
+```
+
+```anti refused
+//! error: a reference to `c` is passed to `dispatch`, and `c` ends at line
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn run(wait: bool) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	if wait {
+		return join(job);
+	}
+	return 0;
+}
+```
+
+The job of `run` is joined on one path alone, and the other returns while the worker may still write `c`.
+
+**`use-after-free`** refuses a use of a value after its end. `delete` and `destroy` end a local or a parameter, and so does a move of it, by the places of [dup and moves]({{% relref "11-ownership#dup-and-moves" %}}). The check follows the paths of the function in the order they run.
+
+- On a path after the end it refuses a read, a field access, a call through the value and an index. It refuses a second `delete` or `destroy` and a move.
+- An assignment of a new value makes the value alive again.
+- A value dead on one of the paths into a join is dead after the join.
+- A loop that ends a value declared before it gives it a new value before the end of its body. Otherwise the next turn is refused.
+- A `defer` or an `undo` is read at each exit where it runs, with the state of that exit. One that names a value deleted before the exit is refused, although it stands before the `delete` in the text.
+- A closure is read where it stands. One that names a value dead there is refused.
+- One end gives one message. The first use after it is refused, and the uses after that one follow from the same mistake. An `unchecked` before the first use covers them.
+- After `destroy(p)` the memory is still there, so `free(p)` and a view of `p` as `*byte` or `?*byte` pass. Every other use is refused.
+
+An `own` field of `self` follows the same rules within one function. After `delete(self.one)` the field is dead until `=` gives it a new value, and that `=` frees nothing, since the old object is gone already.
+
+The message names the value, the line where it ended and how.
+
+```anti
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: *Node,
+
+	pub fn renew(self, n: int)
+	{
+		delete(self.one);
+		self.one = alloc Node { n: n };
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { one: alloc Node { n: 1 } };
+	b.renew(2);
+	let n = b.one.n;
+	let k = alloc Node { n: 3 };
+	destroy(k);
+	free(k);
+	delete(b);
+	return n - 2;
+}
+```
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `p` was deleted on line 10 [use-after-free]
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	return p.n;
+}
+```
+
+```anti refused
+//! error: `p` was deleted on line 11 on one of the paths here [use-after-free]
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	if p.n > 0 {
+		delete(p);
+	}
+	return p.n;
+}
+```
+
+```anti refused
+//! error: `p` was deleted on line 14 [use-after-free]
+class Node
+{
+	pub n: int = 0,
+}
+
+fn show(n: int)
+{
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	defer show(p.n);
+	delete(p);
+	return 0;
+}
+```
+
+```anti refused
+//! error: `p` was deleted on line 10 [use-after-free]
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	let read = fn() -> int { return p.n; };
+	return read();
+}
+```
+
+The `defer` stands before the `delete` and runs at the `return`, after it. The closure stands after the `delete`, so whenever it runs, `p` is gone.
+
+An `own` field of `self` that one path deletes and another keeps is dead after the join. The `=` that follows then tears down nothing on either path, since a teardown on the path where the field died would free it twice. On the other path the old object leaks. The program stays defined and the same in every mode, and `--memory-checks` reports the leak.
+
+```anti
+//! name: halfdead
+import anti.io;
+import anti.text;
+
+class Node
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		let line = f"  destruct {self.n}";
+		io.println(line);
+		free(line.ptr);
+	}
+}
+
+class Box
+{
+	pub own one: *Node,
+
+	pub fn renew(self, n: int, first: bool)
+	{
+		if first {
+			delete(self.one);
+		}
+		self.one = alloc Node { n: n };
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { one: alloc Node { n: 1 } };
+	io.println("renew(2, true)");
+	b.renew(2, true);
+	io.println("renew(3, false)");
+	b.renew(3, false);
+	io.println("end of main");
+	return 0;
+}
+```
+
+```text output
+renew(2, true)
+  destruct 1
+renew(3, false)
+end of main
+  destruct 3
+```
+
+The 2 is never torn down. A `renew` that deletes on both paths, or on neither and leaves the teardown to `=`, frees every node.
+
+Both checks refuse what they prove and let pass what one function cannot see. These compile.
+
+- The address of a local stored into memory the function allocated. The same address stored behind a pointer the function read, or into a place that an `own` parameter reaches.
+- A closure made before a `delete` and called after it. The closure reads the value where it stands, where the value is alive.
+- Two places that hold one object, of which one deletes it while the other keeps the pointer.
+
+```anti
+class Node
+{
+	pub n: int = 0,
+}
+
+fn late() -> int
+{
+	let p = alloc Node { n: 1 };
+	let read = fn() -> int { return p.n; };
+	delete(p);
+	return read();
+}
+```
+
+`late` compiles, and its call of `read` reads freed memory.
+
+### How antic builds it
+
+Both checks run in the checker, after the types of the function are known, and leave nothing in the code. A program the checks accept compiles to the same code with them as without them. `unchecked` therefore shows what each check stops: the code does exactly what the source says.
+
+```anti
+//! name: escape
+class Node
+{
+	pub n: int = 0,
+}
+
+fn address(n: int) -> *int
+{
+	let x = n;
+	unchecked(escaping-local, "shows the code the check stops") return &x;
+}
+
+fn stale() -> int
+{
+	let p = alloc Node { n: 1 };
+	delete(p);
+	unchecked(use-after-free, "shows the code the check stops") return p.n;
+}
+```
+
+```ir excerpt=escape target=linux-x86_64 mode=dev
+fn escape.address(%0: i64) -> ptr {
+b0:
+    %1 = slot i64
+    lifestart %1
+    store i64 %0, %1
+    ret ptr %1
+}
+```
+
+- `%1` is the slot of `x` in the frame of `address`, and the store writes `n` into it.
+- `ret ptr %1` returns the address of the slot. The frame is gone once the function returns, and the next call that the caller makes writes its own frame over the same bytes.
+
+```ir excerpt=escape target=linux-x86_64 mode=dev
+    %4 = copy ptr %0
+    %5 = addr @escape.Node.descriptor
+    call void @anti_rt_delete(%4, %5)
+    %6 = ptradd inbounds %4, offset_of escape.Node.n
+    %7 = load i64 %6 !type escape.Node.n
+    ret i64 %7
+```
+
+- `anti_rt_delete` runs the teardown of the node and gives its memory to `free`.
+- The `load` reads `n` from the freed memory. `free` may have handed the block to the allocator's lists, so the load reads whatever stands there.
+
+Neither function holds a check. Dev mode adds none for either mistake, and a release build has none to remove.
+
+Where it lives: `sema_check_escapes` of `src/antic/sema_escape.c` is `escaping-local`, and `sema_check_frees` of `src/antic/sema_free.c` is `use-after-free`, each with its rules in the DESIGN comments of its file. The names of both checks stand in `src/antic/warnings.c`.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| Bytes per value | 0 | 0 |
+| Instructions, calls into the runtime, checks | 0 | 0 |
+| Atomic operations and locks | 0 | 0 |
+
+The checks cost compile time alone. What they let pass, the run-time tools find in part.
+
+| Mistake the checks let pass | Dev mode | `--memory-checks` |
+|---|---|---|
+| A reference to a local read after its block ends | nothing | nothing, since the checks cover the heap alone |
+| A read or a write of an object after `delete` | nothing | reported as a use after free |
+| A second `delete` | nothing | reported as a double free |
+| A node that the half-dead `own` field of `halfdead` leaks | nothing | reported as a leak at exit |
+| A `Handle<T>` of a `Pool<T>` whose element is gone | `none` from `get`, in every mode | the same |
+
+A refusal leaves two choices. The first is a change of the code: a value that must outlive its block goes to the heap with `alloc` and into an `own` field, a function returns a value in place of its address, a `dispatch` gets its `join` on every path, and an object reached from many places goes into a `Pool<T>` or under `Shared<T>`. Each costs what its section counts, and the checks then hold for it. The second is `unchecked` with its reason, which costs nothing at run time and leaves the program's correctness to the reason. It is the form for code that the check cannot follow but that is correct, such as a reference stored into memory that ends before the local does.
+
+### Pitfalls
+
+For a Java programmer:
+
+- A reference into a local is valid inside its block alone. A pointer that must live on points into memory of `alloc`.
+- A closure made before a `delete` may still read the object after it. Nothing keeps the object alive for the closure.
+
+For a C programmer:
+
+- `return &x` is an error, not a warning, and so is the same address passed through a local or a field of an outer block.
+- A read after `delete` on one path of an `if` is refused at the join. The check takes the worst path.
+- A `delete` of an `own` field of `self` on one path alone, followed by `=`, leaks on the other path. Delete on every path or on none.
+
+For a C++ programmer:
+
+- The checks see one function. A reference that a callee stores into memory it allocated passes, as the dangling reference of a lambda capture passes in C++.
+- A moved local is dead, and a use of it is a compile error rather than a read of a moved-from object.
+- `unchecked` is per statement and needs a reason. It changes no code, so a wrong reason gives a wrong program with no message.
 
 ## Shared objects
 
@@ -2176,7 +2792,7 @@ The costs are the same in dev and in release.
 | Locks | 0 |
 | Copies of code | one copy of `Shared<T>` and of `Cell<T>` per type argument, as [chapter 10]({{% relref "10-generics" %}}) counts |
 
-A plain pointer and an `own` field cost none of this. A program pays for the count where it writes `Shared`, and nowhere else.
+A plain pointer and an `own` field cost none of this. A program pays for the count where it writes `Shared`, and nowhere else. One owner with an `own` field and plain pointers or `lent` parameters for the others costs 8 bytes per holder and no atomic operation, and is the better form wherever one holder outlives the rest. `Shared<T>` is the form for an object whose last holder is known at run time alone, such as one that two threads or two collections hold. A `Pool<T>` of [chapter 16]({{% relref "16-collections" %}}) gives handles that hold no count and are checked on each use, for many objects of one type with one owner.
 
 The cell holds the value in place, so the object and its count are one allocation.
 
