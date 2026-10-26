@@ -1546,7 +1546,19 @@ pub concurrent class PeopleList
 let hits: atomic int = 0;
 ```
 
-A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. `sync a, b { }` holds the locks of two synchronized objects, taken in the order of their addresses and once for one object, and the default `==` of a synchronized class runs under it, its default hash under `sync a`. An operator that takes a synchronized class through pointers receives the objects themselves, and one that takes it by value is refused. A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. It has no default `==` or hash and declares the ones it needs, and `=` never copies one, also when it holds atomic fields alone. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check, and `compare_swap` takes a field of one word that it marks. A public function of either never gives out a pointer or a slice into the object's fields: not as its result, to a function value, through an out parameter or into another object. A variable that took a pointer to a guarded field inside its `sync` is used in that block alone, and not after it. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied, and no constant holds one. A dev build records the order in which each thread takes locks and reports two orders that conflict. `size_of(Mutex)` is 4 on Linux and macOS and 8 on Windows.
+A `synchronized class` gives each object a hidden lock that every public function runs under, released on every exit, and `sync obj { }` holds it for a block. `sync a, b { }` holds the locks of two synchronized objects, taken in the order of their addresses and once for one object, and the default `==` of a synchronized class runs under it, its default hash under `sync a`. An operator that takes a synchronized class through pointers receives the objects themselves, and one that takes it by value is refused. Either kind inherits `anti.lang.Object`, an abstract class without fields or a class of its own kind. A field of a synchronized class, `pub` or not, is reached by the functions of the class and of the classes below it alone, which run under its lock:
+
+```anti refused
+//! error: `count` is a field of the synchronized class `Counter`, which its own functions reach alone
+synchronized class Counter
+{
+	pub count: int = 0,
+}
+
+fn peek(c: *Counter) -> int { return c.count; }
+```
+
+A `concurrent class` leaves the locking to the programmer, and every field is guarded by a `Mutex`, atomic, or fixed after `construct`. It has no default `==` or hash and declares the ones it needs, and `=` never copies one, also when it holds atomic fields alone. `unchecked(unguarded-field, "reason")` after a field's type or in the class header overrules the check, and `compare_swap` takes a field of one word that it marks. A public function of either never gives out a pointer or a slice into the object's fields: not as its result, to a function value, through an out parameter or into another object. A variable that took a pointer to a guarded field inside its `sync` is used in that block alone, and not after it. A worker may take a pointer to a thread-safe object, and `atomic` marks a local as well. A `Mutex` is one word of the program's memory and cannot be copied, and no constant holds one. A dev build records the order in which each thread takes locks and reports two orders that conflict. `size_of(Mutex)` is 4 on Linux and macOS and 8 on Windows.
 
 ## Hooks and tracing
 
