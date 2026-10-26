@@ -3,7 +3,7 @@ title: "Classes"
 description: "Classes and the object in memory, construct and destruct, fields and methods, dispatch through interfaces, static fields, singletons, operators and reflection."
 summary: "Classes and the object in memory, `construct` and `destruct`, fields and methods, interfaces as inline sub-objects with thunks and the dispatch through them, static fields and singletons, operators, and reflection over the descriptors, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:24:00+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 90
 tags: [compilers, programming-languages]
@@ -152,6 +152,26 @@ fn blank() -> f32
 {
 	let s = Shape { };
 	return s.area();
+}
+```
+
+```anti refused
+//! error: `Shape` has the open function `area` and must be `abstract`
+class Shape
+{
+	abstract fn area(self) -> f32;
+}
+```
+
+```anti refused
+//! error: `==` compares pointers of one chain, and `*Circle` and `*Box` share none
+class Circle { pub r: int = 1, }
+
+class Box { pub w: int = 1, }
+
+fn same(c: *Circle, b: *Box) -> bool
+{
+	return c == b;
 }
 ```
 
@@ -319,6 +339,61 @@ Where it lives: `lower_class_record` and `table_of` of `src/antic/lower_desc.c` 
 
 The call of `anti_rt_hook` runs once per object made and once per teardown. `--no-hooks` drops it, with the hooks and the leak tracking of [chapter 15]({{% relref "15-hooks" %}}).
 
+Two fields as a struct and as a class value show what the class adds to a local. Each function below makes one and reads a field.
+
+```anti
+//! name: valuecost
+class P { pub x: int = 0, pub y: int = 0, }
+
+struct Q { x: int, y: int }
+
+export fn make_class(a: int) -> int
+{
+	let p = P { x: a };
+	return p.x;
+}
+
+export fn make_struct(a: int) -> int
+{
+	let q = Q { x: a, y: 0 };
+	return q.x;
+}
+```
+
+```asm excerpt=valuecost target=linux-x86_64 mode=release
+<make_class>:
+...
+leaq (%rip), %rax
+movq %rax, -0x18(%rbp)
+movq %rdi, -0x10(%rbp)
+movq $0x0, -0x8(%rbp)
+leaq -0x18(%rbp), %rdi
+xorl %esi, %esi
+callq
+movq -0x10(%rbp), %rax
+...
+<make_struct>:
+movq %rdi, %rax
+retq
+```
+
+`make_class` keeps the object in memory, since `anti_rt_hook` receives its address. It stores the table pointer and both fields, calls the hook and reads `x` back. `make_struct` is the move of its argument into the result.
+
+```asm excerpt=valuecost target=linux-x86_64 mode=release option=no-hooks
+<make_class>:
+movq %rdi, %rax
+retq
+```
+
+Under `--no-hooks` nothing takes the address of the object, and `make_class` is the same two instructions.
+
+The choice between a class and the other forms:
+
+- A struct of [chapter 8]({{% relref "08-structs-enums" %}}) costs its fields. A function that makes one and reads it is free of memory traffic, as `make_struct` shows.
+- A class value adds 8 bytes and a call of `anti_rt_hook` per value made and per teardown. It brings defaults, private fields, `construct`, `destruct`, dispatch and the descriptor that `is`, `as` and reflection read.
+- A class on the heap adds a `malloc` and a `delete` to that. It is the form for an object whose life does not follow a block, or whose class the code that holds it does not know.
+- Many small values of one kind in a loop are a struct. A thing with identity, behaviour and a life of its own is a class.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -364,7 +439,7 @@ A constructor of C++ runs the constructors of the bases and members first. A des
 3. the `own` fields of [chapter 11]({{% relref "11-ownership" %}}) and the inline class fields, each with its own teardown,
 4. the memory of the object.
 
-`destroy(&v)` does the first three for a value. A local of a class whose chain declares `destruct` or owns something is torn down at the end of its block, on every exit. The `destruct` of a class does not run on an object whose `construct` failed. What was built before the failure is torn down: every field already set, and each base whose `construct` finished, with its `destruct`.
+`destroy(&v)` does the first three for a value. A local of a class whose chain declares `destruct`, owns something or replaces the `destroyed` hook is torn down at the end of its block, on every exit. `destruct` is never called by name: `delete` and `destroy` are the two calls that run it. The `destruct` of a class does not run on an object whose `construct` failed. What was built before the failure is torn down: every field already set, and each base whose `construct` finished, with its `destruct`.
 
 ```anti
 //! name: build
@@ -578,6 +653,21 @@ fn make() -> int
 ```
 
 ```anti refused
+//! error: `destruct` is never called directly, use `delete` or `destroy`
+class Handle
+{
+	pub fd: int = 0,
+
+	fn destruct(self) { }
+}
+
+fn close(h: *Handle)
+{
+	h.destruct();
+}
+```
+
+```anti refused
 //! error: `destruct` cannot fail
 class Size
 {
@@ -653,7 +743,43 @@ Where it lives: `lower_run_construct_bodies` of `src/antic/lower_class.c` calls 
 | Heap allocations of a class value | 0 | 0 |
 | Checks inserted | `anti_rt_delete` ends the program on a zero table, in both modes | the same |
 
-A class whose chain declares no `destruct` and owns nothing has no teardown at the end of a block, and its local costs nothing there.
+A class whose chain declares no `destruct`, owns nothing and keeps the empty `destroyed` hook of the root has no teardown at the end of a block. Its local costs nothing there. A class that replaces `destroyed` has a teardown, so the hook of [chapter 15]({{% relref "15-hooks" %}}) runs at the end of every value, as `created` runs at its start.
+
+```anti
+//! name: seen
+import anti.io;
+
+class Seen
+{
+	pub n: int = 0,
+
+	concrete fn destroyed(self)
+	{
+		io.println("destroyed");
+	}
+}
+
+fn main() -> int
+{
+	{
+		let s = Seen { n: 1 };
+	}
+	io.println("after the block");
+	return 0;
+}
+```
+
+```text output
+destroyed
+after the block
+```
+
+The choice among the forms that make and end an object:
+
+- A literal with defaults runs no function of the class. It costs the stores of the fields and the `created` hook.
+- A `construct` without parameters runs after every literal and every `alloc`, one direct call per class of the chain that declares one. It suits an invariant that every object needs.
+- `Circle(args)` with a `construct` that takes them is the one constructor of the class. A second way to make an object is a static function with a name, which calls the literal or the constructor and returns the value.
+- `destruct` runs for every value of the class, at `delete` or at the end of a block. A cleanup that belongs to one place in one function, and not to every value, is a `defer` of [chapter 4]({{% relref "04-flow" %}}).
 
 ### Pitfalls
 
@@ -698,7 +824,7 @@ A field takes a default, `pub r: f32 = 1.0`, a constant expression that every li
 
 `v.f(args)` looks in the class, then up its chain, then in its `use` fields, then in the module. `use part: T,` is a field whose `pub` members are reachable on the class, so `car.start()` is `car.engine.start()`. The class does not convert to `*T`.
 
-A class body may declare a `struct`, an `enum` or a `class`. Only the class names the nested type, and a public signature that names it is refused. The class and the classes nested in it reach the private and the protected members of each other. Java gives the classes inside one class the same.
+A class body may declare a `struct`, an `enum` or a `class`. Only the class names the nested type, and a public signature that names it is refused, as is a public field of its type. The class and the classes nested in it reach the private and the protected members of each other. Java gives the classes inside one class the same. The nested type is `Car.Wheel` in the symbols and `Car_Wheel` in a C header, and it costs what the same type at module level costs.
 
 ```anti
 class Engine
@@ -905,6 +1031,39 @@ fn poke(a: *Animal) -> int
 ```
 
 ```anti refused
+//! error: `abstract fn make` takes `self` as its first parameter
+abstract class Shape
+{
+	abstract fn make() -> int;
+}
+```
+
+```anti refused
+//! error: `mutable` marks a field of a singleton, and `Counter` is none
+class Counter
+{
+	pub mutable n: int = 0,
+}
+```
+
+```anti refused
+//! error: the public function `wheel` of `Car` names `Car.Wheel`, which is private to `Car`
+class Car
+{
+	struct Wheel { size: int }
+
+	spare: Wheel = Wheel { size: 16 },
+
+	pub fn wheel(self) -> Wheel
+	{
+		return self.spare;
+	}
+}
+```
+
+A private function of a class of a library is reported as private in the module that calls it, with the message of `helper` above.
+
+```anti refused
 //! error: expected `*Engine`, found `*Car`
 class Engine
 {
@@ -1000,6 +1159,13 @@ Where it lives: `lower_load_table` of `src/antic/lower_expr.c` loads the table a
 | Bytes per `pub` function | 8 in the table of every class of the chain below | the same |
 | Heap allocations, calls into the runtime | 0 | 0 |
 | Checks inserted | the zero table before a dispatch | none |
+
+The choice among the forms of a function:
+
+- A private, protected, static or `final` function is a direct call in every build, and `opt` may inline it.
+- A `pub` function that a derived class may replace is an entry of the table. Through a pointer it is two loads and an indirect call in dev mode. A release build keeps that wherever more than one class fills the entry. It is the form for behaviour that a derived class changes.
+- A free function of the module with the object as its first parameter is a direct call and reaches the `pub` members alone. It suits an operation that the class does not need to own.
+- A bound function `c.scaled` is two words and calls through the table. A closure of [chapter 5]({{% relref "05-functions" %}}) that calls `c.scaled()` does the same with a context of its own.
 
 ### Pitfalls
 
@@ -1311,6 +1477,87 @@ Where it lives: `lower_interface_thunk` of `src/antic/lower_class.c` writes a th
 
 A call through an interface pointer takes two loads and an indirect transfer, as a call through a class pointer does. The work that tells the classes apart was done when the table was written.
 
+Three routes to one function show where the dispatch stays. `Square` and `Disc` both implement `Shape`, so the whole-program pass cannot bind a call through `Shape`.
+
+```anti
+//! name: routes
+export abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+export class Square
+{
+	implements shape: Shape,
+
+	pub side: int = 1,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+export class Disc
+{
+	implements shape: Shape,
+
+	pub r: int = 1,
+
+	concrete fn area(self) -> int
+	{
+		return 3 * self.r * self.r;
+	}
+}
+
+fn area_of<S: Shape>(s: *S) -> int
+{
+	return s.area();
+}
+
+export fn by_copy(q: *Square) -> int
+{
+	return area_of(q);
+}
+
+export fn by_face(s: *Shape) -> int
+{
+	return s.area();
+}
+
+export fn by_class(q: *Square) -> int
+{
+	return q.area();
+}
+```
+
+```asm excerpt=routes target=linux-x86_64 mode=release
+<by_copy>:
+movq 0x8(%rdi), %rax
+addq $0x8, %rdi
+jmpq *0x88(%rax)
+...
+<by_face>:
+movq (%rdi), %rax
+jmpq *0x88(%rax)
+...
+<by_class>:
+movq 0x10(%rdi), %rax
+imulq %rax, %rax
+retq
+```
+
+- `by_face` is the interface call: the load of the table and the jump through entry 17.
+- `by_copy` calls the copy `area_of<Square>`, which `opt` inlined. The copy reaches `area` through the interface of its constraint. It converts the `*Square` to its `shape` part, the `addq $0x8`, and dispatches through the table of that part, as `by_face` does.
+- `by_class` calls `area` on a `*Square`. No class below `Square` replaces it, so the call is direct and the body stands in place.
+
+The choice among the forms that call one of a set of implementations:
+
+- A pointer to the interface, `*Shape`, is two loads and an indirect call per use. Code that holds objects of more than one class in one list takes this form. A release build binds the call when one class of the program fills the entry.
+- A generic with an interface constraint, `area_of<S: Shape>`, makes one copy per class and still dispatches, as `by_copy` shows. It earns its copies when the result or another parameter has the type `S`, which a `*Shape` loses.
+- A call on the class itself, or through a `final` class, is direct and may be inlined. Code that knows the class takes this form.
+- A variant of [chapter 8]({{% relref "08-structs-enums" %}}) and a `switch` replace the table by a load of the tag and a compare per case. They suit a closed set of kinds that live as values.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1348,7 +1595,46 @@ An atomic field has no `=` and no `+=`, and it is not read by its name alone. It
 | `add(v)`, `sub(v)`, `and(v)`, `or(v)`, `swap(v)` | the value the field held before |
 | `compare_swap(expected, new)` | `true` when the field held `expected` and now holds `new` |
 
-`add` and `sub` take an integer field. `and` and `or` take an integer or a `bool`. A pointer field takes `load`, `store`, `swap` and `compare_swap` alone.
+An atomic field, static or not, holds an integer, a `bool`, a `char`, an `f16`, a pointer or a plain function pointer, which is one C function pointer. Any other type is refused at the name of the field, an `f64` among them. `add` and `sub` take an integer field. `and` and `or` take an integer or a `bool`. Every other field takes `load`, `store`, `swap` and `compare_swap` alone.
+
+```anti
+//! name: slots
+import anti.io;
+import anti.text;
+
+fn hello()
+{
+	io.println("hook");
+}
+
+class Slots
+{
+	pub atomic letter: char = 'a',
+	pub atomic half: f16 = 0.0 as f16,
+	pub atomic hook: ?fn() = none,
+}
+
+fn main() -> int
+{
+	let s = Slots { };
+	s.letter.store('z');
+	s.half.store(1.5 as f16);
+	s.hook.store(hello);
+	let h = s.hook.load() else {
+		return 1;
+	};
+	h();
+	let line = f"letter {s.letter.load()}, half {s.half.load()}, size {size_of(Slots)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+hook
+letter z, half 1.5, size 24
+```
 
 `atomic` also marks an instance field and a local, which [chapter 13]({{% relref "13-threads" %}}) covers.
 
@@ -1357,6 +1643,8 @@ An atomic field has no `=` and no `+=`, and it is not read by its name alone. It
 - The program writes no literal and no `alloc` of a singleton, and `delete` of it is refused.
 - Its `construct` takes no parameters, and the class declares no `get`, which the compiler writes.
 - No class inherits a singleton, and a singleton is never copied: `dup(Config.get())` and `*Config.get()` are refused.
+- `delete` and `destroy` take no part of a singleton, which lives as long as the program.
+- `[injections]` and `--inject` of [chapter 15]({{% relref "15-hooks" %}}) refuse the `get` of a singleton as a provider, since the path names more than one function.
 - A field without a marker is read-only after creation. `construct` sets it, and nothing else does.
 - An `atomic` field has the operations above.
 - A `mutable` field is an ordinary field that the program writes anywhere, except in a `worker fn` of [chapter 13]({{% relref "13-threads" %}}) and in what one calls. The whole-program pass checks that in every build.
@@ -1438,6 +1726,26 @@ class Ticket
 {
 	pub number: int = 0,
 	static count: int = 0;
+}
+```
+
+```anti refused
+//! error: an atomic field holds an integer, a `bool`, a `char` or a pointer, found `f64`
+class Gauge
+{
+	pub static atomic ratio: f64 = 0.0;
+}
+```
+
+```anti refused
+//! error: a part of the singleton `Config` lives as long as the program, so `destroy` does not take it
+class Part { pub n: int = 0, }
+
+singleton class Config { pub part: Part = Part { }, }
+
+fn reset()
+{
+	destroy(&Config.get().part);
 }
 ```
 
@@ -1570,6 +1878,13 @@ Where it lives: `lower_static_global` of `src/antic/lower_place.c` and `lower_si
 
 Every access of a static field is an atomic operation, also in a program with one thread. A locked instruction orders the memory of all cores and costs more than a plain one. No time for it stands here, since `tests/bench` holds no program that measures it.
 
+The choice among the forms of state that outlives a call:
+
+- A static atomic field is one word of the program, reached from any thread without a lock. Each access is an atomic instruction, `lock xaddq` for `add` on x86-64. It suits a counter or a flag.
+- A singleton holds a group of fields behind one pointer, made at the first `get()`. Its plain fields are read-only after `construct`, an `atomic` field takes the operations above, and a `mutable` field is a plain store that no worker reaches.
+- An object that the program makes and passes by pointer costs no atomic instruction and no global. State that one part of the program owns is such an object, and a test makes a fresh one per case.
+- State that more than one thread changes as a group is a concurrent class of [chapter 14]({{% relref "14-concurrent-classes" %}}), whose lock covers more than one word.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1612,7 +1927,11 @@ For a class the function stands in the class body, with `self` as the left opera
 
 The same word declares the language hooks `iter`, `next`, `value`, `index`, `set_index` and `hash`, which [chapter 16]({{% relref "16-collections" %}}) covers.
 
-A class or a struct without `operator fn eq` has a default `==` that compares the fields in order. A class without `concrete fn hash` has a default hash over the same fields. Neither has a default `<`, so a type that a constraint asks to be ordered declares `lt`. `==` on two class pointers stays the identity of the objects and calls nothing.
+A class or a struct without `operator fn eq` has a default `==` that compares the fields in order. On class values that default is the `equals` of the class, and a class that replaces `equals` gets its own body for `==`. A class without `concrete fn hash` has a default hash over the same fields. Neither has a default `<`, so a type that a constraint asks to be ordered declares `lt`. `==` on two class pointers stays the identity of the objects and calls nothing.
+
+Equal values hash alike, and the checker keeps the pair together. A class that replaces `equals` without `hash` is refused. So is one that replaces `hash` without `equals` or an `operator fn eq`, of the class or of its module.
+
+`operator fn eq` gives a `bool`, and it takes no class that holds a `Mutex` by value, since a Mutex is never copied. A slice has no `==`, and `operator fn eq` on a slice is refused. A union takes one, as [chapter 8]({{% relref "08-structs-enums" %}}) shows.
 
 ```anti
 //! name: ops
@@ -1768,6 +2087,65 @@ fn grow(a: *Vec2, by: Vec2)
 ```
 
 ```anti refused
+//! error: `Name` replaces `hash` without `equals`
+class Name
+{
+	pub text: str = "",
+
+	concrete fn hash(self) -> u64
+	{
+		return self.text.hash();
+	}
+}
+```
+
+```anti refused
+//! error: `Name` replaces `equals` without `hash`
+class Name
+{
+	pub text: str = "",
+
+	concrete fn equals(self, o: *Object) -> bool
+	{
+		return true;
+	}
+}
+```
+
+```anti refused
+//! error: `operator fn eq` gives `int`, where `==` needs a `bool`
+class Vec2
+{
+	pub x: int = 0,
+
+	operator fn eq(self, o: Vec2) -> int { return 1; }
+
+	concrete fn hash(self) -> u64 { return 1; }
+}
+```
+
+```anti refused
+//! error: `operator fn eq` takes `Guarded` by value, and its Mutex is never copied
+class Guarded
+{
+	pub lock: Mutex,
+	pub n: int = 0,
+
+	operator fn eq(self, o: Guarded) -> bool { return true; }
+
+	concrete fn hash(self) -> u64 { return 1; }
+}
+```
+
+```anti refused
+//! error: `==` is not defined on the slice `[]int`, which takes no `operator fn eq`
+operator fn eq(a: []int, b: []int) -> bool
+{
+	return true;
+}
+```
+
+```anti refused
 //! error: `eq` is already declared
 struct Money { cents: i64 }
 
@@ -1778,7 +2156,7 @@ operator fn eq(a: Money, b: Money) -> bool { return a.cents == b.cents; }
 
 ### How antic builds it
 
-The checker rewrites an operator into a call of its function, and lowering sees an ordinary call.
+An operator on a struct or a class value runs as a call of its function, the same call that `a.add(b)` makes. Nothing is looked up at run time: the type of the left operand chose the function at compile time, and the call is direct.
 
 ```ir excerpt=ops target=linux-x86_64 mode=release
 export fn ops.sum(%0: ptr nonnull deref(size_of ops.Vec2), %1: ptr nonnull deref(size_of ops.Vec2)) -> i64 {
@@ -1860,14 +2238,20 @@ Where it lives: `src/antic/sema_operator.c` finds the function of an operator. `
 | Heap allocations | 0 | 0 |
 | Checks inserted | those of the arithmetic inside the function | none |
 
-A small numeric type that is added in a loop costs least as a struct with free operators. A struct result has no table pointer and no hook.
+The choice among the forms of an operator:
+
+- A small numeric type that is added in a loop costs least as a struct with free operators. A struct result has no table pointer and no hook, and `pay` is one instruction.
+- An operator on a class value returns an object, and each result pays the store of its table pointer and the call of `anti_rt_hook`, as `sum` shows. A class suits an operator whose operands also need identity or dispatch.
+- A named function, `a.plus(b)`, costs the same call as the operator. It suits an operation that no operator symbol names, or a second form beside the operator.
+- The default `==` and hash cost nothing to write and compare every field. A type whose equality leaves a field out, as `Name` leaves `uses`, declares both `eq` and `hash`.
 
 ### Pitfalls
 
 For a Java programmer:
 
 - `==` on two class values compares their fields, through `eq` or the default. `==` on two pointers is the identity that Java's `==` is.
-- A class that replaces `hash` and keeps the default `==`, or the reverse, breaks the rule that equal values hash alike. Nothing checks it.
+- A class that replaces `hash` and keeps the default `==`, or `equals` and keeps the default hash, is refused, since equal values must hash alike.
+- An `operator fn eq` in a class body serves `==` on values of the class. `equals`, which code that holds a `*Object` calls, keeps the default unless the class replaces it with `concrete fn equals`. For `Name` above, `n == m` is true and `n.equals(&m)` is false.
 
 For a C programmer:
 
@@ -1900,7 +2284,7 @@ Every class has a descriptor: its name, its base, its size, its fields and its `
 | `call(obj, i, args)` | calls function `i` with a slice of `Value`, gives a `Value`, and may fail |
 | `new("Circle")` | a new object of the class of that name, a `?*Object` |
 
-A `Value` holds a kind and one of an `int`, a `uint`, an `f64`, a `bool`, a `char`, a `str` or a pointer. `of_int`, `of_float` and their siblings build one, and `v.data.f` reads the float of one.
+A `Value` is a struct of 24 bytes: `kind`, a `ValueKind` of one byte, and `data`, a `Payload`. `Payload` is a union of `anti.reflect` with the fields `i`, `u`, `f`, `b`, `c`, `s` and `p`, for an `int`, a `uint`, an `f64`, a `bool`, a `char`, a `str` and a pointer. `of_int`, `of_float` and their siblings build a `Value`, and `v.data.f` reads the float of one. The kind says which field of the union holds the value, as the tag of a variant would. A signed integer of any width is an `Int`, and `f16`, `f32` and `f64` are a `Float`.
 
 `set` and `call` follow the error convention of [chapter 6]({{% relref "06-errors" %}}). They fail with the code `BAD_INDEX`, `NOT_CARRIED` for a type no `Value` carries, `WRONG_KIND` or `WRONG_COUNT`.
 
@@ -1963,7 +2347,7 @@ fn main() -> int
 	reflect.call(obj, last, args[0..0]) catch e {
 		wrong = e.code == reflect.WRONG_COUNT;
 	};
-	line = f"grown {grown.data.f}, r {r.data.f}, wrong count {wrong}";
+	line = f"grown {grown.data.f}, r {r.data.f}, wrong count {wrong}, Value {size_of(reflect.Value)} bytes";
 	io.println(line);
 	free(line.ptr);
 	let b = text.Builder.new();
@@ -1991,7 +2375,7 @@ field label at 16, type id 16
 field size at 32, type id 21
 field hits at 48, type id 0
 function grow, slot 18, 2 parameter
-grown 2.5, r 2.5, wrong count true
+grown 2.5, r 2.5, wrong count true, Value 24 bytes
 {"type":"Circle","r":2.5,"label":"circle","size":{"w":2,"h":3},"hits":null}
 read back a Circle, equal true
 new Circle
@@ -2089,6 +2473,12 @@ Where it lives: `src/antic/lower_desc.c` writes descriptors, field lists and fun
 | With `--no-reflect` | no field list, no function list, no trampoline, no registry | the same |
 
 The descriptor costs space in the program and nothing in an object. A program that never imports `anti.reflect` still carries the descriptors, because `is`, `as`, `delete` and the default `serialize` read them.
+
+The choice among the forms that act on a class the code does not name:
+
+- An interface call reaches a function that the code names at compile time, with two loads and an indirect call. Code that knows what it calls takes this form.
+- A generic copy of [chapter 10]({{% relref "10-generics" %}}) knows the type at compile time and reads its fields as any code does, at a constant offset.
+- Reflection finds a field or a function by an index that the program computes at run time. `get` costs one to five calls into the runtime, and `call` a search of the trampolines by `strcmp` and the tests of each argument. It suits a serializer, a debugger or a binding to a scripting language, where the names arrive as data.
 
 ### Pitfalls
 
