@@ -1,13 +1,13 @@
 ---
 title: "Errors"
-description: "may fail, fail, try and handlers, how an error travels back, error origins and stack traces and their cost, assert and the dev checks."
-summary: "`may fail`, `fail`, `try` and the handlers, how an error travels back from `fail` to its handler, error origins and stack traces and their cost, `assert` and the checks of dev mode, each with how antic builds it and what it costs."
+description: "may fail, fail, try and handlers, how an error travels back, error origins and stack traces and their cost, assert and the dev checks, warnings with allow and unchecked."
+summary: "`may fail`, `fail`, `try` and the handlers, how an error travels back from `fail` to its handler, error origins and stack traces and their cost, `assert` and the checks of dev mode, and the warnings and safety checks with `allow` and `unchecked`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 60
 tags: [compilers, programming-languages]
-keywords: [errors, may fail, fail, try, catch, stack trace, error origin, assert, dev checks]
+keywords: [errors, may fail, fail, try, catch, stack trace, error origin, assert, dev checks, warnings, allow, unchecked]
 ---
 
 An error of Anti is an object on the heap, and a function that fails returns a pointer to it. Nothing unwinds the stack. Every caller tests the pointer with one compare and one branch, and the path without an error pays that test and nothing else.
@@ -96,7 +96,7 @@ sizes: Error 128, Odd 136, *Error 8
 
 `quarter(6)` fails in its second call of `half`, with 3. The `Odd` travels through `quarter` to the handler in `report`, which reads its fields and gives -1 in place of the result.
 
-The error does not own its message. `message` is a `str` that points at a literal, or at memory the program keeps alive as long as the error.
+An error made by `Error.new` or `Error.wrap` does not own its message. `message` is a `str` that points at a literal, or at memory the program keeps alive as long as the error. `fail "literal"` makes such an error over the bytes of the literal. `fail` of any other `str` makes an error that owns a copy of the text, and `fail f"..."` makes one that takes over the memory of the `f"..."`, which is a copy made for it already. The error frees what it owns when it is deleted.
 
 The checker refuses each of the following.
 
@@ -343,6 +343,10 @@ A handler follows a `let`, an assignment or a call statement. It does not follow
 
 The error a handler binds is deleted at every exit of the handler. `fail e;` takes it away first by handing it to the caller. So does passing it to an `own` parameter, as `Error.wrap` does with its cause. The name of the error ends with the handler.
 
+`yield v` gives the value as `let` gives a variable its value. A fresh value and an `own` parameter move into the result. An existing value that owns something, such as a local of a class with an `own` field, is refused with the message of `=`, since the local would stay a second owner. `yield dup(a)` gives a copy.
+
+`catch fatal` ends the whole program, in a worker as well, and no `defer` runs. A worker that may fail is called directly with a handler. `dispatch` and `parallel` refuse it, since no caller stands there to take its error, and [chapter 13]({{% relref "13-threads" %}}) describes both.
+
 A `try` block runs its statements until one fails. The rest of the block is skipped, its `defer` statements run, and the handler runs. A call inside the block needs no mark of its own. A call there that carries `try` forwards to the handler of the block as well, and never to the caller. In that handler `yield;` ends the handler, and the program goes on after the block.
 
 ```anti
@@ -510,7 +514,67 @@ fn caller() -> int
 }
 ```
 
-The last is the warning `shadowed-catch`, which a release build refuses.
+```anti refused
+//! error: `Key` has `own` fields, use `dup` instead of `=`
+class Leaf
+{
+	pub n: int = 0,
+}
+
+class Key
+{
+	pub n: int = 0,
+	pub own leaf: ?*Leaf = none,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n, leaf: alloc Leaf { n: n } };
+}
+
+fn failing(n: int) -> Key may fail
+{
+	if n > 0 {
+		fail "refused";
+	}
+	return key(n);
+}
+
+fn caller()
+{
+	let a = key(1);
+	let b = failing(1) catch e {
+		yield a;
+	};
+}
+```
+
+```anti refused
+//! error: `run` may fail, and `dispatch` runs a worker that cannot fail
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn run(t: *Task) -> int may fail
+{
+	if t.n > 2 {
+		fail "too large";
+	}
+	return t.n;
+}
+
+fn caller() -> int
+{
+	let t = alloc Task { };
+	let job = dispatch t -> run();
+	let got = join(job);
+	delete(t);
+	return got;
+}
+```
+
+The sixth is the warning `shadowed-catch`, which a release build refuses. The last section of this chapter describes warnings.
 
 ### How antic builds it
 
@@ -601,6 +665,18 @@ Where it lives: `sema_call.c` of `src/antic/` checks the forms and the `yield`, 
 | Checks inserted | none | none |
 
 A function with four `try` expressions and three `defer` statements holds each deferred statement five times, as [chapter 4]({{% relref "04-flow" %}}) counts.
+
+The forms differ in where the error goes, and their cost on the path without an error is the same compare and branch:
+
+| Form | Where the error goes | Cost when the call fails |
+|---|---|---|
+| `try f()` | to the caller | the deferred statements, one return |
+| `f() catch e { }` | into the handler, deleted at its end | the handler and one `anti_rt_delete` |
+| `try { } catch e { }` | into one handler for the block | the same, with one handler block in the code |
+| `f() catch none` | dropped, the result is `none` | one store and one `anti_rt_delete` |
+| `f() catch fatal` | printed, and the program ends | the print and the exit |
+
+`try` is the form where the caller can decide better. A handler is the form where the function has the answer, such as a default value. A `try` block is the form for a group of calls that share one answer. It holds the handler once, where a `catch` per call holds one copy per call.
 
 ### Pitfalls
 
@@ -701,6 +777,72 @@ module 1 - 0x000000018a9d8000 /usr/lib/dyld
 
 A `module` line gives a number, the build id, the base address and the path. A frame line gives the address, then the number of its module and the offset in it. The four frames are `load`, `main`, the entry of the runtime and the loader of the system.
 
+The `function` of an origin is the full name of the function that holds the `fail`. An anonymous function is named after the function around it and its number. A copy of a generic carries its type arguments, and a function of a nested type names each type around it.
+
+```anti
+//! name: fnames
+import anti.io;
+
+class Outer
+{
+	class Inner
+	{
+		pub fn check(self, n: int) -> int may fail
+		{
+			if n < 0 {
+				fail "nested";
+			}
+			return n;
+		}
+	}
+
+	pub fn run(self, n: int) -> int may fail
+	{
+		let i = Inner { };
+		return try i.check(n);
+	}
+}
+
+fn first<T>(x: T) -> T may fail
+{
+	fail "generic";
+}
+
+fn call(f: fn() -> int may fail) -> int may fail
+{
+	return try f();
+}
+
+fn show(e: *lang.Error)
+{
+	io.println(e.at.function);
+}
+
+fn main() -> int
+{
+	let a = first(3) catch e {
+		show(e);
+		yield 0;
+	};
+	let b = call(fn() -> int { fail "anonymous"; }) catch e {
+		show(e);
+		yield 0;
+	};
+	let o = Outer { };
+	let c = o.run(-1) catch e {
+		show(e);
+		yield 0;
+	};
+	return a + b + c;
+}
+```
+
+```text output
+fnames.first<int>
+fnames.main.0
+fnames.Outer.Inner.check
+```
+
 ### How antic builds it
 
 The code after each `fail` writes the origin, as the first section shows. It is a load of `at.line`, a compare with 0 and, for a new error, a copy of a constant `SourceLocation` of 64 bytes. That constant is the same kind of record as a `here` of [chapter 5]({{% relref "05-functions" %}}). An error that already has a line skips the copy and the rest.
@@ -749,6 +891,13 @@ The walk reads two words per frame, and `anti_rt_trace_frame` asks the loader fo
 
 The text of an error is formed at the first `text()` or `print()`, in one heap block that the error keeps and frees. An error that is handled without being printed never forms it.
 
+The choice is a setting of the run, not a form of the source:
+
+- The origin costs 64 bytes of read-only data per `fail` and a copy at each new error, in every build. It names the place, which is enough for an error that a handler reads.
+- A trace costs a walk of the stack and two heap blocks per new error. A dev build pays it by default. `--anti.backtrace=false` drops it from a dev run that fails in a loop.
+- A release run pays no trace until `--anti.backtrace` or `backtrace = true` asks for it, without a new build.
+- `lang.StackTrace.capture()` takes a trace at a place of the program's choosing, in any build, at the same cost as a capture of a `fail`.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -785,14 +934,29 @@ A dev build also inserts checks around operations that can go wrong. Each prints
 
 | Check | Fails when | Chapter |
 |---|---|---|
-| Bounds | an index is not below the length of an array, a slice or a `str` | 12 |
-| Overflow | a signed `+`, `-` or `*` leaves the range of its type | 3 |
+| Bounds | an index is not below the length of an array, a slice or a `str`, or a part `xs[lo..hi]` reaches past its length | 12 |
+| Overflow | a signed `+`, `-` or `*` leaves the range of its type, the least value is divided by -1 or its remainder by -1 taken, or unary `-` negates it | 3 |
 | Narrowing | a conversion with `as` loses the value | 3 |
+| A `char` | a conversion to `char` gives a surrogate or a value past `0x10FFFF` | 3 |
 | Division | the divisor of `/` or `%` is zero | 3 |
-| Shift | a shift count is not below the width of the type | 3 |
+| Shift | a shift count is below zero or not below the width of the type | 3 |
+| Bitfield | a write or a compound assignment gives a bitfield a value its width does not hold | 8 |
+| Enum | a number converted to an enum names none of its values | 8 |
 | Changed collection | a collection changed its size while a `for` walks it | 4 |
+| Count of chunks | the count of chunks of a `parallel` is below zero | 13 |
+| Second `join` | a job is joined a second time, where the checker cannot see it | 13 |
+| A held `Mutex` | a thread takes a `Mutex` it holds, where the checker cannot see it | 14 |
 
-Later chapters add checks of their own, such as the test of a number converted to an enum. "Checks of a release build" of [chapter 21]({{% relref "21-performance" %}}) lists every check of the guide with what a release build does with it.
+A message names the file and the line, the check and the values. Four of them, after the file and the line, read:
+
+```text
+overflow in /: left -9223372036854775808, right -1
+value out of range for char: value 55296
+value out of range for the 3 bits of a: value 9
+slice end out of bounds: index 5, length 3
+```
+
+Later chapters add checks of their own, such as the zero table pointer before a dispatch and the order of the locks. "Checks of a release build" of [chapter 21]({{% relref "21-performance" %}}) lists the checks with what a release build does with each.
 
 Four options of antic override the mode. `--checks` keeps the checks in a release build, and `--no-checks` drops them from a dev build. `--asserts` and `--no-asserts` do the same for assertions. The build of the program decides for every module in it, the standard library included.
 
@@ -851,7 +1015,9 @@ The first is a warning, which a release build refuses and a dev build prints.
 
 ### How antic builds it
 
-Lowering writes every check and every assertion in both modes. Each is a branch into a block that calls the runtime and ends in `unreachable`.
+An assertion and a check are a compare and a branch. The branch leads to a block that calls the runtime, which prints the message and aborts. A program that passes runs the compare and a branch that is not taken. Where the mode drops them, nothing of either is left in the program.
+
+Lowering writes both in both modes, each as a branch into a block that ends in `unreachable`.
 
 ```ir excerpt=asr target=linux-x86_64 mode=dev
 export fn asr.checked(%0: i64) -> i64 {
@@ -911,6 +1077,12 @@ Turning the checks off gives up the stop. Without the bounds check an index past
 
 A release build is tested with its checks on by passing `--checks --asserts`. That build runs the optimized code and still stops at the first violation.
 
+The forms that state a condition:
+
+- `assert(c)` states a fact of the program's own logic. It costs a compare and a branch in a dev build and nothing in a release build.
+- `if !c { fail "..."; }` tests a condition that a run can break, such as its input. It stays in every build, costs the same compare and branch, and hands the caller an error to handle.
+- The checks of dev mode cover the operations themselves. A program that needs the bounds check in production keeps it with `--checks`. It pays a compare and a branch per index that `opt` does not prove.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -930,3 +1102,232 @@ For a C++ programmer:
 - The checks are instructions of the compiled function, and one option of the build removes all of them. No checked library stands behind them.
 - An assertion that fails does not unwind. `defer` statements and destructors do not run.
 - `assert` takes no formatted message. The message is one literal, built into the read-only data.
+
+## Warnings, allow and unchecked
+
+### What you know
+
+C and C++ compilers warn under flags such as `-Wall`, turn warnings into errors with `-Werror`, and silence one with `#pragma GCC diagnostic` or `-Wno-<name>` and a name that differs per compiler. Java's `javac` warns under `-Xlint` and silences with `@SuppressWarnings("name")` on a declaration, without a reason. In all three a warning is advice, and a build goes on.
+
+### The feature
+
+antic reports two kinds of finding with a name. A warning points at code that compiles and is likely wrong. A safety check refuses code that would be wrong at run time, unless the program states why it is not. Each prints its name in brackets at the end of its message: `` `e` shadows the outer `e` [shadowed-catch] ``. An error has no name, and nothing silences it.
+
+| Name | Kind | Reports | Chapter |
+|---|---|---|---|
+| `never-fails` | warning | a `may fail` function with no `fail` and no `try` | 6 |
+| `shadowed-catch` | warning | the name a `catch` binds hides a variable of an outer scope | 6 |
+| `assert-call` | warning | an `assert` condition calls a function, which a release build does not run | 6 |
+| `unused-allow` | warning | an `allow` that silences nothing | 6 |
+| `unused-unchecked` | warning | an `unchecked` that overrules nothing | 6 |
+| `undo-never-runs` | warning | an `undo` that no failing exit runs | 4 |
+| `unused-result` | warning | a dropped result of a call without effects | 5 |
+| `above-vector-cap` | warning | a simd struct above 256 bytes, which is an array and a loop | 8 |
+| `unfilled-abstract` | warning | an abstract class that no class of the program fills | 9 |
+| `blocking-under-lock` | warning | a wait while a lock is held | 13 |
+| `nothing-exported` | warning | `--lib static` of a module that exports nothing | 17 |
+| `single-segment-path` | warning | a library whose module path has one segment | 18 |
+| `doc-markup`, `doc-unresolved`, `doc-note-only`, `doc-dropped`, `undocumented` | warning | the doc comments, under `--doc-warnings`, and `undocumented` under `--warn-undocumented` as well | 18 |
+| `exponential-pattern` | safety check | nested repeats over overlapping text in a pattern literal | 3 |
+| `escaping-local` | safety check | a reference to a local that would outlive it | 11 |
+| `use-after-free` | safety check | a value used after `delete`, `destroy` or a move | 11 |
+| `uninitialized-read` | safety check | an element of `alloc(T, n)` read before it is written | 12 |
+| `index-out-of-range` | safety check | an index out of range on every path that reaches it | 12 |
+| `unguarded-field` | safety check | a field of a concurrent class that nothing guards | 14 |
+| `lock-order` | safety check | two places that take the same locks in opposite orders | 14 |
+
+A dev build prints a warning and goes on, and antic exits with 0. A release build refuses every warning as an error with the same message and name, so a program that compiles in release mode has none. `--warnings-as-errors` gives a dev build the same rule, and `anti check` passes it. The five doc warnings come with `--doc-warnings` alone, which `anti check` passes, and they stay warnings in every build. A safety check refuses the program in every build.
+
+`allow(name, "reason")` silences a warning, and `unchecked(name, "reason")` overrules a safety check. The reason is a text that is not empty, and it stays in the source for the next reader. A clause covers a range of the source and stands at one of four levels.
+
+| Level | Where it stands | What it covers |
+|---|---|---|
+| statement | on the line before a statement | that statement, a block statement with its body |
+| declaration | last in the header of a function, a class or a struct, before its brace | the declaration, from its doc comment to its closing brace |
+| field | after the type of a field of a class, `unchecked` alone | that field |
+| file | at the top of the module, among the imports, ended by `;`, as `allow(assert-call, "reason");` | every line of the file |
+
+A clause silences a finding of its name whose position it covers. A clause that covers none is the warning `unused-allow` or `unused-unchecked`, reported only when the check of its name ran in this build. The doc warnings run under `--doc-warnings`, `unfilled-abstract` in the build of a program, and `nothing-exported` under `--lib static`. A clause in a `tests` block goes with the block, so a build that drops the block reports nothing of it.
+
+Both words are contextual. Before a statement, `allow(...)` followed by `;` or by more of an expression, such as `.` or an operator, is a call of a function named `allow`.
+
+```anti
+//! name: clauses
+import anti.io;
+import anti.text;
+import anti.regex;
+
+fn close_it(n: int) may fail
+	allow(never-fails, "an implementation of the contract may fail")
+{
+	if n < 0 {
+		return;
+	}
+}
+
+fn reuse(e: int) -> int
+{
+	allow(shadowed-catch, "the handler reads the error alone")
+	close_it(e) catch e {
+		return e.code;
+	};
+	return e;
+}
+
+fn repeated(s: str) -> bool
+{
+	unchecked(exponential-pattern, "the texts are a few bytes long")
+	if s.matches(re"(a+)+b") {
+		return true;
+	}
+	return false;
+}
+
+fn main() -> int
+{
+	let yes = repeated("aab");
+	let no = repeated("aa");
+	let line = f"reuse {reuse(4)}, repeated {yes} {no}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+reuse 4, repeated true false
+```
+
+The program builds in release mode, which refuses every warning, so each clause silences a finding that is there. The clause in the header of `close_it` covers the function, the one in `reuse` the call statement, and the one in `repeated` the `if` with its pattern.
+
+A release build refuses each of the following. The first three are warnings that a dev build prints.
+
+```anti refused
+//! error: `allow(never-fails)` silences nothing [unused-allow]
+fn half(n: int) -> int
+{
+	allow(never-fails, "nothing here fails")
+	let h = n / 2;
+	return h;
+}
+```
+
+```anti refused
+//! error: `close_it` may fail and never does [never-fails]
+fn close_it(n: int) may fail
+{
+	if n < 0 {
+		return;
+	}
+}
+```
+
+```anti refused
+//! error: the repeat `a+` inside `(a+)+` can take exponential time
+import anti.regex;
+
+fn repeated(s: str) -> bool
+{
+	if s.matches(re"(a+)+b") {
+		return true;
+	}
+	return false;
+}
+```
+
+```anti refused
+//! error: `escaping-local` is no warning, and `allow` silences a warning alone
+fn half(n: int) -> int
+{
+	allow(escaping-local, "a safety check needs unchecked")
+	let h = n / 2;
+	return h;
+}
+```
+
+```anti refused
+//! error: `never-fails` is no safety check, and `unchecked` overrules a safety check alone
+fn half(n: int) -> int
+{
+	unchecked(never-fails, "a warning needs allow")
+	let h = n / 2;
+	return h;
+}
+```
+
+```anti refused
+//! error: the reason of `allow(never-fails)` is empty
+fn close_it(n: int) may fail
+	allow(never-fails, "")
+{
+	if n < 0 {
+		return;
+	}
+}
+```
+
+```anti refused
+//! error: `allow` stands before a statement, last in a declaration's header or at the top of the file
+class Box
+{
+	n: int allow(never-fails, "a field takes unchecked alone"),
+}
+```
+
+A name that is neither a warning nor a safety check gets the message of the wrong kind, as `no-such-name` is no warning. A clause of the whole file that stands after an item is refused with `a clause of the whole file stands at the top of the module`.
+
+### How antic builds it
+
+A clause changes no code, and neither does a warning. The checker writes each finding with its position and its name. A pass after the checker compares the positions with the ranges of the clauses and drops each finding that a clause of its name covers. A release build then turns every warning that is left into an error. What runs is the code that the program says, with or without the clause.
+
+The function `close_it` keeps the form of a function that may fail, although no path fails.
+
+```ir excerpt=clauses target=linux-x86_64 mode=dev
+fn clauses.close_it(%0: i64) -> ptr {
+b0:
+    %1 = slt i8 %0, 0
+    branch %1, b1, b2
+b1:
+    ret ptr 0
+b2:
+    ret ptr 0
+}
+```
+
+Both paths return a null error pointer, `ret ptr 0`. Every caller still tests that pointer after the call, as the first section of this chapter shows. The warning `never-fails` therefore points at a compare and a branch per call that never finds an error. The `allow` keeps that cost where an implementation of an interface may fail and another does not.
+
+`unchecked(exponential-pattern, ...)` keeps the pattern as written. PCRE2 still backtracks through it, and its match limit stops a search that runs too long, as [chapter 3]({{% relref "03-values" %}}) describes.
+
+Where it lives: `src/antic/warnings.c` holds the one table of the names, the pass that applies the clauses, `warnings_apply`, and `warnings_promote`, which turns the warnings into errors. The parser records each clause and its range. `diagnostics_warn` of `src/antic/diagnostic.c` writes a warning, and `docs/notes/warnings.md` gives the meaning and the fix of each name.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| A warning | a line on the standard error, and antic exits with 0 | the build is refused |
+| A safety check | the build is refused | the same |
+| A clause | no code and no data | the same |
+
+A clause costs nothing at run time. The finding it silences may cost something, as `never-fails` does. The choice for each finding:
+
+- Fix the code where the finding is right. Each row of the table names a defect or a cost.
+- `allow` or `unchecked` where the program is right and the check cannot see why, with the reason that it can.
+- `--warnings-as-errors` on a dev build, as `anti check` does, finds before a release build what that build would refuse.
+
+### Pitfalls
+
+For a Java programmer:
+
+- A warning stops a release build. No release program carries a warning.
+- `allow` takes a reason, and an empty one is refused. `@SuppressWarnings` takes none.
+- A clause that silences nothing is itself a warning, so a stale `allow` does not stay.
+
+For a C programmer:
+
+- No flag selects the warnings. Every warning is on in every build, and the doc warnings come with `--doc-warnings`.
+- A clause names one finding and covers one statement, declaration, field or file. No pragma turns a warning off for the rest of the file from where it stands.
+
+For a C++ programmer:
+
+- A safety check is not a warning. It refuses the build until an `unchecked` with a reason overrules it.
+- The names are the same on every target and in every build, since one compiler gives them.
