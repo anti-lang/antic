@@ -1241,6 +1241,8 @@ let f: f32 = 1.0e40;
 
 ### How antic builds it
 
+A float lives in a floating-point register of the processor: an `xmm` register on x86_64, and a `d` or `s` register on arm64. Each operation is one instruction on it. No mode checks a float, so an operation compiles to the same instruction in both modes. A dev build keeps the locals in memory around it.
+
 A float operation is one LLVM instruction: `fadd`, `fsub`, `fmul`, `fdiv` or `fcmp`. The text carries no fast-math flag, so LLVM reorders nothing and fuses no multiply with an add.
 
 ```llvm excerpt=floats target=linux-x86_64 mode=release
@@ -1306,6 +1308,8 @@ Where it lives: `src/antic/llvm_emit_function.c` writes the float instructions a
 `Sample` above is 8 bytes: 2 for the `f16`, 2 of padding and 4 for the `f32`. An array `[1000]f16` is 2,000 bytes where `[1000]f32` is 4,000.
 
 A dev build and a release build compute the same float results, since neither adds a check or a fast-math flag.
+
+The width is a choice of precision and memory. `float` holds 15 to 17 significant decimal digits and is the type of a float literal without a context. `f32` holds 6 to 9 in half the bytes. A scalar operation costs one instruction at either width, so `f32` pays in an array, in a simd struct of [chapter 8]({{% relref "08-structs-enums" %}}) and in data for a C library, where twice the values fit the same bytes. `f16` holds 3 to 4 digits in a quarter of the bytes, and every read and write adds a conversion. It pays for a large array that the program reads far more often than it computes on.
 
 ### Pitfalls
 
@@ -1881,7 +1885,7 @@ Java has no tuple, and a method that returns two values returns an object, such 
 
 A tuple type is two or more types in parentheses, `(int, str)`. A tuple value is two or more expressions in parentheses, `(1, "one")`. `t.0` and `t.1` name its elements, which can be read and assigned. A tuple is a value: an assignment or a call copies every element.
 
-`let (a, b) = e;` takes a tuple apart into new variables, one per element. `for i, x in items` gives the index and the element of each turn.
+`let (a, b) = e;` takes a tuple apart into new variables, one per element. `for i, x in items` gives the index and the element of each turn. `for (k, v) in items` takes apart the tuple that each element of `items` is.
 
 Two tuples of one type compare with `==` when every element has `==`. A tuple has no `<`. A tuple may be an element of a tuple, a field, an array element, a constant and the key of a map.
 
@@ -1919,6 +1923,10 @@ fn main() -> int
 	for i, v in items {
 		say(f"{i}: {v}");
 	}
+	let named = [(1, "one"), (2, "two")];
+	for (k, v) in named {
+		say(f"{k}={v}");
+	}
 	say(f"(i8, i8) {size_of((i8, i8))}, (i8, int) {size_of((i8, int))}, (int, str) {size_of((int, str))}");
 	say(f"(i8, int, i8) {size_of((i8, int, i8))}, (int, i8, i8) {size_of((int, i8, i8))}");
 	return 0;
@@ -1933,6 +1941,8 @@ equal true
 0: 10
 1: 20
 2: 30
+1=one
+2=two
 (i8, i8) 2, (i8, int) 16, (int, str) 24
 (i8, int, i8) 24, (int, i8, i8) 16
 ```
@@ -2019,6 +2029,8 @@ Where it lives: `src/antic/types.c` makes one type per distinct tuple, and `src/
 
 The order of the elements decides the padding. The last line of the program above prints 24 bytes for `(i8, int, i8)` and 16 for `(int, i8, i8)`.
 
+A tuple and a struct of the same members have one layout and one cost, so the choice between them is one of names. A tuple suits a result that the caller takes apart at once, as `min_max` gives. A struct suits a value that travels further, since its fields have names, it takes an `operator fn lt` for `<`, and a C header names it as written. Returning two values in a tuple of up to 16 bytes costs two registers. Returning them through a pointer parameter costs a store and a load of each.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -2080,6 +2092,21 @@ let z = is_less<u8>(3, 4);
 
 The first call compares two `int`. The second fixes `T` as `u8` at its first argument, and the literal `4` then becomes a `u8`. The third names the type argument.
 
+A literal of a generic struct takes its type arguments from its field values, where neither the literal nor its context writes them. Each value whose field names a parameter is checked alone, with no type expected, and binds the parameter. `Pair { a: 1.5, b: 2.5 }` is a `Pair<float>`. Two values that bind one parameter to two types are refused, and so is a literal whose fields settle nothing, as `none` does not. [Chapter 10]({{% relref "10-generics" %}}) covers generic structs.
+
+```anti
+struct Pair<T>
+{
+	a: T,
+	b: T,
+}
+let p = Pair { a: 1.5, b: 2.5 };
+let q = Pair { a: 3 as u8, b: 4 as u8 };
+let r: Pair<u8> = Pair { a: 3, b: 4 };
+```
+
+The value of a field is checked before it binds, so in `q` the literal `4` is an `int` unless it is written `4 as u8`. The context of `r` gives the type, and the literals then take it.
+
 Nothing else is inferred. A parameter and a result of a function always name their types. An inferred type never depends on a later use of the variable, and it never changes.
 
 The checker refuses each of the following.
@@ -2105,6 +2132,25 @@ let n = is_less(4, small);
 //! error: expected `i16`, found `int`
 let xs = [1, 2, 3];
 let n: i16 = xs.len;
+```
+
+```anti refused
+//! error: expected `int`, found `float`
+struct Pair<T>
+{
+	a: T,
+	b: T,
+}
+let q = Pair { a: 1, b: 2.5 };
+```
+
+```anti refused
+//! error: `Box` is generic, and nothing gives its type arguments here
+struct Box<T>
+{
+	v: ?*T,
+}
+let q = Box { v: none };
 ```
 
 In the third block the literal `4` comes first, so `T` is `int` before `small` is seen.
@@ -2180,7 +2226,7 @@ Where it lives: `sema_stmt.c` of `src/antic/` gives a `let` its type. `sema_expr
 |---|---|---|
 | Bytes, instructions, calls, checks | the same as with the type written | the same as with the type written |
 
-Inference runs in the checker and adds nothing to the program.
+Inference runs in the checker and adds nothing to the program. Writing a type out is therefore a choice of reading, apart from the places where it changes the type: `let b: u8 = 200;` makes a `u8` where `let b = 200;` makes an `int`, and a type argument written on a generic literal or call settles what the values would not.
 
 ### Pitfalls
 
