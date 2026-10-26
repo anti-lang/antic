@@ -829,7 +829,7 @@ For a Java programmer:
 
 - A fixed field is no `final`. The word is not written, and the checker finds the rule by reading every write.
 - `volatile` has no form. A field that one thread writes and others read is `atomic`, with `load` and `store`.
-- A private helper that reads a guarded field is refused, although its callers hold the lock. The annotation `@GuardedBy` of Java tools accepts it.
+- A private helper that reads a guarded field is refused, although its callers hold the lock. No mark on a function says that its caller holds a lock, as `@GuardedBy` on a method does for the checkers of Java. `unchecked` before the statement is the form.
 
 For a C programmer:
 
