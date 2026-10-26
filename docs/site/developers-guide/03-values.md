@@ -512,6 +512,230 @@ For a C++ programmer:
 - `let` is no `auto` for a reference. It always makes a new variable with a copy of the value.
 - A function call is no constant expression, so no `constexpr` function exists.
 
+## Operators
+
+### What you know
+
+Java, C and C++ share one precedence table, in which `&` binds looser than `==`, so `x & 1 == 0` of C tests `x & (1 == 0)`. Java evaluates the operands and the arguments of a call from left to right. C leaves that order unspecified, and C++ fixed it in C++17 for some operators, as `<<` and `=`, but not for the arguments of a call. All three have `?:`, `++` and `--`, and an assignment is an expression whose value can be used.
+
+### The feature
+
+The binary operators bind in the order of the table, from the loosest to the tightest. Each level groups from left to right, apart from `??`, which groups from the right.
+
+| Binds | Operators |
+|---|---|
+| loosest | `\|\|` |
+| | `&&` |
+| | `\|` |
+| | `^` |
+| | `&` |
+| | `== !=` |
+| | `< <= > >=` and `in` |
+| | `??`, from the right |
+| | `<< >> <<%` |
+| | `+ - +% -% +\| -\|` |
+| | `* / % *% *\|` |
+| | `as`, `as?` and `is` |
+| | `- ! ~ & *` before an operand |
+| tightest | `.`, `?.`, a call and an index after an operand |
+
+The order is that of C. `as` binds tighter than every binary operator and looser than a prefix operator, so `-x as u8` is `(-x) as u8`. `1 << 2 + 3` is `1 << 5`. `a ?? b ?? c` is `a ?? (b ?? c)`. `x in lo..hi` binds as `<` does, and [chapter 4]({{% relref "04-flow" %}}) describes it.
+
+The types keep the traps of the C table out. `&&`, `||` and `!` take a `bool` alone, and `&`, `|`, `^` and `~` an integer alone, so `x & 1 == 0` is refused rather than computed. A comparison gives a `bool`, and a chain such as `a < b < c` compares a `bool` with an `int`, which is refused. A condition is a `bool`, never a number or a pointer.
+
+The operands of an operator and the arguments of a call run from left to right. An assignment computes its place before its value, so in `xs[i()] = v()` the call `i()` runs first. `&&` and `||` run their right operand only when the left one does not decide the result.
+
+An assignment is a statement and gives no value. Anti has no `?:`, no `++` and no `--`. A compound assignment, `+=` and the rest, is a statement as well.
+
+```anti
+//! name: order
+import anti.io;
+import anti.text;
+
+fn side(name: str, v: int) -> int
+{
+	io.println(name);
+	return v;
+}
+
+fn pair(a: int, b: int) -> int
+{
+	return a - b;
+}
+
+export fn both(a: int, b: int) -> bool
+{
+	return a > 0 && b > 0;
+}
+
+fn main(args: []str) -> int
+{
+	let n = side("a", 1) + side("b", 2) * side("c", 3);
+	let d = pair(side("first", 10), side("second", 4));
+	let xs = [0, 0, 0];
+	xs[side("place", 1)] = side("value", 5);
+	let one = args.len;
+	let shift = one << 2 + 3;
+	let low = -7 / (one + 1);
+	let flag = true as int;
+	let line = f"n {n}, d {d}, xs[1] {xs[1]}, shift {shift}, low {low}, flag {flag}, both {both(one, 0)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+a
+b
+c
+first
+second
+place
+value
+n 7, d 6, xs[1] 5, shift 32, low -3, flag 1, both false
+```
+
+`side("b", 2) * side("c", 3)` binds first, and still `side("a", 1)` runs before it, since the operands run in the order of the text. `true as int` gives 1, and `false as int` 0.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: the operands of `&` have the types `int` and `bool`
+let x = 6;
+let y = x & 1 == 0;
+```
+
+```anti refused
+//! error: the operands of `<` have the types `bool` and `int`
+let a = 1;
+let b = 2;
+let c = 3;
+let t = a < b < c;
+```
+
+```anti refused
+//! error: a condition has type `bool`, found `int`
+let n = 3;
+if n { }
+```
+
+```anti refused
+//! error: `&&` needs `bool` operands, found `int`
+let a = 5;
+let b = a && true;
+```
+
+```anti refused
+//! error: `&` needs integer operands, found `bool`
+let a = true;
+let b = a & false;
+```
+
+```anti refused
+//! error: unary `!` needs a `bool`, found `int`
+let a = 1;
+let b = !a;
+```
+
+```anti refused
+//! error: expected `;`
+let x = 1;
+let y = x > 0 ? 1 : 2;
+```
+
+```anti refused
+//! error: expected `)`
+let x = 1;
+let y = (x = 2);
+```
+
+### How antic builds it
+
+An operator on two scalars is one instruction or one intrinsic of LLVM, and the integer and float sections below give each. No operator of this chapter calls a function, apart from `==` and `<` on a `str` and the conversions of an `f16` below the level `v3`, which call the runtime. An operator of a class is a call, as [chapter 9]({{% relref "09-classes" %}}) describes.
+
+Lowering writes the operands in the order of the text, one temporary each, and then the operation. This is the start of `main` above, after lowering.
+
+```ir excerpt=order target=linux-x86_64 mode=release
+fn order.main(%0: agg []str) -> i64 {
+...
+    %6 = call i64 @order.side(%3, 1)
+...
+    %10 = call i64 @order.side(%7, 2)
+...
+    %14 = call i64 @order.side(%11, 3)
+    %15 = mulov nsw i64 %10, %14
+...
+    %17 = addov nsw i64 %6, %15
+```
+
+The three calls stand in the order of the text. `mulov` multiplies the results of the second and the third, and `addov` adds the result of the first. The left-out lines build the `str` argument of each call and the overflow checks of `*` and `+`.
+
+`&&` and `||` are branches. The right operand stands in a block of its own, which runs only when the left operand leaves the result open.
+
+```ir excerpt=order target=linux-x86_64 mode=release
+fn order.both(%0: i64, %1: i64) -> i8 zeroext range 0, 2 {
+b0:
+    %2 = sgt i8 %0, 0
+    %3 = copy i8 %2
+    branch %2, b1, b2
+b1:
+    %4 = sgt i8 %1, 0
+    %3 = copy i8 %4
+    jump b2
+b2:
+    ret i8 %3
+}
+```
+
+`%3` holds the result. It takes the left comparison, and `b1` replaces it with the right one when the left one is true. The IR is not in SSA form, so `%3` is assigned on both paths. The LLVM text of a dev build keeps the branch. In release mode `opt` sees that the right operand cannot trap and has no effect, and computes both comparisons with no branch.
+
+```llvm excerpt=order target=linux-x86_64 mode=release
+define internal noundef zeroext range(i8 0, 2) i8 @both(i64 noundef %p0, i64 noundef %p1) #4 {
+b0:
+  %v1 = icmp sgt i64 %p0, 0
+  %v7 = icmp sgt i64 %p1, 0
+  %spec.select = and i1 %v1, %v7
+```
+
+`and i1` joins the two comparisons. `opt` removes a branch only where running the right operand early changes nothing. A right operand that may trap, or that has an effect such as a call that writes, keeps its branch.
+
+Where it lives: `parser_precedence` and `binary_links` of `src/antic/parser_expr.c` hold the table. `src/antic/sema_expr.c` checks the types of the operands, and `src/antic/lower_expr.c` writes the operands in order and the branches of `&&` and `||`.
+
+### What it costs
+
+| Operation | Dev | Release |
+|---|---|---|
+| a comparison of two scalars | one instruction | one instruction |
+| `&&`, `\|\|` | one branch per operator | one `and` or `or` when the right operand is free of effects, a branch otherwise |
+| `!`, `~` | one instruction | one instruction |
+| `b as int` of a `bool` | one `zext` | one `zext` |
+| the order of evaluation | none: each operand is computed once, where it stands | none |
+| Heap allocations | 0 | 0 |
+| Calls into the runtime | 0, apart from `==` and `<` on a `str` and an `f16` below `v3` | the same |
+
+The order of evaluation adds no instruction. In a release build a call bound to a local before the expression compiles to the same code as the call written inside it. The choice between the two is one of reading alone. `&&` and a nested `if` give the same branches. A condition of two cheap tests costs no branch in a release build either way.
+
+### Pitfalls
+
+For a Java programmer:
+
+- An assignment gives no value. `while ((line = next()) != none)` has no counterpart, and the loop reads the value in its body.
+- `?:` does not exist. A `let` before an `if` that assigns it in each arm takes its place.
+- `&` and `|` take no `bool`. The non-short-circuit forms of Java have no counterpart.
+
+For a C programmer:
+
+- `x & 1 == 0` is refused, not computed. The parentheses are written: `(x & 1) == 0`.
+- The order of the operands is defined, so `f(i(), j())` runs `i` first on every target.
+- `if (p)` and `if (n)` are refused. The tests are `p != none` and `n != 0`.
+
+For a C++ programmer:
+
+- `++` and `--` do not exist. `i += 1` is the statement.
+- An operator never converts its operands. `a < b` of an `i32` and an `int` is refused, where C++ promotes.
+- The arguments of a call run from left to right, which C++ leaves open.
+
 ## Integers
 
 ### What you know
