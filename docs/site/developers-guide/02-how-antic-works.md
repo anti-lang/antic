@@ -3,7 +3,7 @@ title: "How antic works"
 description: "The passes of antic from source to executable, its IR and the LLVM module, dev and release builds, LTO, the runtime archive and how to read the excerpts."
 summary: "The passes from source to executable, the IR of antic and the LLVM module, dev and release builds, whole-program compilation and the LTO of the runtime, the runtime archive and the allocator, what an executable holds beside the program, and how to read and make the excerpts of this guide."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 20
 tags: [compilers, programming-languages]
@@ -32,6 +32,22 @@ The function `compile` of `src/antic/driver.c` runs the front end, `back_end` an
 | `llc` | the text or the bitcode | the object, or the assembly under `-S` | `llvm_run` in `src/antic/llvm_run.c` |
 | Link | the object and the runtime archive | the executable | `driver_link_program` in `src/antic/driver_link.c` and `src/antic/linker.c` |
 
+The checker runs the safety checks and two warnings of the program as well. A safety check refuses the program unless an `unchecked(name, "reason")` clause covers it. A warning is printed in dev mode, refused in a release build and silenced by `allow(name, "reason")`. Four of them walk each function once its body is checked, at the end of `sema_check_function` of `src/antic/sema_stmt.c`: `escaping-local`, `use-after-free`, `uninitialized-read` and `index-out-of-range`. The others run where their construct stands, apart from the lock graph, which runs last, after the copies of the generics. It reads the edges of every function of the module and those that each library file it imports carries, so a cycle through two modules is found.
+
+| Name | Kind | Finds | Source |
+|---|---|---|---|
+| `escaping-local` | safety check | a reference to a local or a parameter that would outlive it | `src/antic/sema_escape.c` |
+| `use-after-free` | safety check | a value used on a path after `delete`, `destroy` or a move of it | `src/antic/sema_free.c` |
+| `uninitialized-read` | safety check | an element of `alloc(T, n)` read before a path wrote it | `src/antic/sema_uninit.c` |
+| `index-out-of-range` | safety check | an index of an array, a slice or a `str` that is out of range on every path that reaches it | `src/antic/sema_index.c` |
+| `lock-order` | safety check | a cycle in the orders in which the program takes its locks | `src/antic/sema_lock.c` |
+| `blocking-under-lock` | warning | a wait while a lock is held | `src/antic/sema_lock.c` |
+| `unused-result` | warning | a dropped call of a function that antic knows has no effects | `src/antic/sema_stmt.c` |
+| `unguarded-field` | safety check | a field of a concurrent class that no Mutex guards | `src/antic/sema_safety.c` |
+| `exponential-pattern` | safety check | nested repeats over overlapping text in a pattern literal | `src/antic/sema_pattern.c` |
+
+`src/antic/warnings.c` holds the one table of the names. [Chapter 6]({{% relref "06-errors" %}}) describes the clauses, and each chapter the check of its feature.
+
 A build with `--memory-checks` adds one step after the layout, `memcheck_function` of `src/antic/memcheck.c`. [Chapter 12]({{% relref "12-memory" %}}) describes it.
 
 The parser keeps the `tests` and `fixtures` blocks of a file under `--tests` alone. Every other build drops both right after parsing, in `drop_test_blocks` of `src/antic/driver.c`.
@@ -39,6 +55,60 @@ The parser keeps the `tests` and `fixtures` blocks of a file under `--tests` alo
 The checker makes one compiled copy of each generic for each set of type arguments the module uses. The function `sema_strip_generics` then removes the generics, so lowering and every later step see no type parameter.
 
 A library file, `<module>.antl`, holds the public interface of a module and its IR. `antic -c` writes one after the checker and stops. The standard library stands in `std/` of the runtime archive as library files, one per module. A program that imports `anti.io` reads `std/anti/io.antl` and gets the IR of `anti.io` with it.
+
+## Source text
+
+The lexer reads the source as UTF-8 and skips a byte order mark at its start. The positions of a message count from the byte after it. Identifiers are ASCII letters, digits and `_`, and a name may not start with a digit. UTF-8 stands in literals and comments alone. A CR LF line end inside the text of a literal reads as LF. A file saved on Windows then gives the same `str` as on Linux. A NUL byte is refused outside a byte literal.
+
+Comments are `//` to the end of the line and `/* */`. A block comment does not nest, so the first `*/` ends it. Six markers make a comment a doc comment, which is a token of its own and reaches the documentation that `anti doc` writes.
+
+| Line form | Block form | Documents |
+|---|---|---|
+| `///` | `/** */` | the next item, for the users of a module |
+| `//!` | `/*! */` | the module, for its users |
+| `//#` | `/*# */` | the next item, for the developers of a library |
+| `//#!` | `/*#! */` | the module, for its developers |
+
+`////`, `/**/` and a comment that opens with `/***` stay ordinary comments.
+
+```anti
+//! name: source
+/*! The squares of the program. */
+
+/// The area of a square of side `n`.
+pub fn area(n: int) -> int { return n * n; }
+
+/** The perimeter of a square of side `n`. */
+pub fn perimeter(n: int) -> int { return 4 * n; }
+
+//# The side of the test square, for the developers of the module.
+fn side() -> int { return 2; }
+
+//// An ordinary comment.
+```
+
+The keywords are reserved everywhere: `abstract alloc as assert atomic break catch chan class concrete const constraint continue defer delete destroy dispatch do dup else enum export extern fail fallthrough false fixtures fn for free here if implements import inherits internal is join join_all let none parallel protected provides pub recv return select self send singleton size_of static struct super switch sync tests true try type undo union use variant while worker yield`. The names of the built-in types are keywords as well, `int` and `str` among them, and so are the C types from `c_char` to `c_wchar`. `thread` is reserved, and no rule of the grammar takes it.
+
+```anti refused
+//! error: expected identifier
+let thread = 1;
+```
+
+A contextual word is a keyword in one place and a name everywhere else. `packed`, `align`, `by`, `in`, `final`, `own`, `lent`, `keep`, `snapshot`, `simd`, `trace`, `allow` and `unchecked` are such words, and so are `may fail` after a signature and `never` after `->`. "Reserved words" of `docs/anti-syntax-overview.md` lists every one with its place.
+
+The spelling `null` of C is refused with a message that names `none`, and a letter outside ASCII in a name is refused where it stands.
+
+```anti refused
+//! error: `null` is `none` in Anti
+let p: ?*int = null;
+```
+
+```anti refused
+//! error: unexpected character outside a literal
+let größe = 1;
+```
+
+Where it lives: `lexer_lex`, `skip_trivia`, `doc_marker` and `word_kind` of `src/antic/lexer.c`.
 
 ## Walk-through program
 
@@ -161,7 +231,19 @@ The parameter of `main` is `agg []str`, an aggregate that travels as a pointer i
 
 The offset of the field is the symbol `offset_of []str.len` and no number. The IR holds no size, no offset and no alignment. That keeps the IR of a module equal for every target, so one library file serves all six. `src/antic/layout.c` lays every aggregate out for the target. It replaces each symbol with its number right before the LLVM text is written.
 
-`%5 = slot str` reserves memory in the frame for the `str` that `main` passes to `io.println`. The front end builds the `str` there with two stores, the pointer and the length 12.
+`%5 = slot str` reserves memory in the frame for the `str` that `main` passes to `io.println`. Lowering builds the `str` there with two stores in block `b1`, the pointer and the length 12, and passes its address.
+
+```ir excerpt=walk target=linux-x86_64 mode=release
+b1:
+    %6 = addr @walk.1
+    store ptr %6, %5
+    %7 = ptradd %5, offset_of str.len
+    store i64 12, %7
+    call void @anti.io.println(%5)
+    jump b2
+```
+
+A `str` is two words, a pointer and a length, with no terminating NUL. The IR passes it by the address of a slot. The LLVM text passes it as the convention of the target passes a struct of two words. That is two registers on five targets. windows-x86_64 passes the address of a copy, as its convention does for every struct above 8 bytes.
 
 `--dump-opt` prints the IR after the whole-program pass and the optimizer of antic. That optimizer folds constants, propagates copies, applies peephole rules and removes dead code. It then removes every function and global that `main` does not reach. For `walk` the dump holds four functions: `anti.io.print`, `anti.io.println`, `walk.area` and `walk.main`. `anti.io.eprint`, `anti.io.eprintln` and `anti.io.exit` are gone.
 
@@ -335,7 +417,7 @@ In dev mode the pass runs for the module that holds `main`, when that module lin
 
 The link of a release build is a full LTO link: link-time optimization over the program and the runtime together. `opt` runs `lto-pre-link<O3>` and writes bitcode as the object. `lld` then links that bitcode with the runtime. The archive holds the runtime as bitcode in `lib/<target>/<level>/bitcode/full/`. LLVM then runs its passes over the program and the runtime as one module, at `--lto-O3`. A call of `anti_rt_write` may then be inlined like a call of a function of the program.
 
-Dev mode, `--lib` and `--linker platform` link objects and refuse `--lto full` and `--lto thin`. A build with `--memory-checks` and a Windows program that loads plugins link objects unless `--lto` is given. A macOS build with `--memory-checks` refuses `--lto`. `--lto none` asks for the link of objects in release mode. That link runs `opt` with `default<O3>` into `<output>.bc` and `llc -O2` on the bitcode. `lto_mode` of `src/antic/driver.c` holds the rule.
+Dev mode, `-S`, `-c`, `--lib` and `--linker platform` link objects or link nothing, and refuse `--lto`. A build with `--memory-checks` and a Windows program that loads plugins link objects unless `--lto` is given. A macOS build with `--memory-checks` refuses `--lto`. `--lto none` asks for the link of objects in release mode. That link runs `opt` with `default<O3>` into `<output>.bc` and `llc -O2` on the bitcode. `lto_mode` of `src/antic/driver.c` holds the rule.
 
 Every link drops the functions and data that nothing reaches, with `--gc-sections`, `-dead_strip` or `/OPT:REF`. For that, `llc` writes each function and each datum into a section of its own on ELF and COFF.
 
@@ -368,22 +450,22 @@ An executable holds the code of the program, the parts of the runtime the progra
 
 | Build | Command | File size in bytes |
 |---|---|---|
-| Release, full LTO | `antic --target linux-x86_64 -o walk walk.anti` | 227,768 |
-| Release, objects | `antic --target linux-x86_64 --lto none -o walk walk.anti` | 257,368 |
-| Dev | `antic --dev --target linux-x86_64 -o walk walk.anti io.o` | 258,488 |
+| Release, full LTO | `antic --target linux-x86_64 -o walk walk.anti` | 228,800 |
+| Release, objects | `antic --target linux-x86_64 --lto none -o walk walk.anti` | 261,256 |
+| Dev | `antic --dev --target linux-x86_64 -o walk walk.anti io.o` | 262,440 |
 
-The sizes are of antic 0.2.0 at commit `ca620e14`, read with `stat`. The dev build needs `io.o`, the dev object of `anti.io`, which `antic --dev --target linux-x86_64 -o io <archive>/std/anti/io.antl` writes.
+The sizes are of antic 0.2.0 at commit `05818aab`, read with `stat` on the development Mac. The dev build needs `io.o`, the dev object of `anti.io`, which `antic --dev --target linux-x86_64 -o io <archive>/std/anti/io.antl` writes.
 
 `llvm-objdump -h` and `llvm-objdump -t` of the release file give its parts.
 
 | Part | Bytes | Contents |
 |---|---|---|
-| `.text` | 150,923 | all code. `walk.main` is 66 bytes of it |
-| `.rodata` | 20,148 | constants. `anti_licenses`, the notice, is 8,259 bytes of it |
-| `.eh_frame` | 10,980 | unwind tables |
+| `.text` | 154,635 | all code. `walk.main` is 66 bytes of it |
+| `.rodata` | 20,212 | constants. `anti_licenses`, the notice, is 8,259 bytes of it |
+| `.eh_frame` | 7,824 | unwind tables |
 | `.data.rel.ro` and `.data` | 10,920 | initialised data |
-| `.bss` | 59,576 | zeroed data, which takes no bytes of the file |
-| `.symtab` and `.strtab` | 26,686 | the symbol table and its names |
+| `.bss` | 59,720 | zeroed data, which takes no bytes of the file |
+| `.symtab` and `.strtab` | 27,078 | the symbol table and its names |
 
 The rest of `.text` is the runtime with musl and mimalloc. The start of a program runs in this order, in `main` of `src/rt/start.c`:
 
@@ -396,6 +478,16 @@ The rest of `.text` is the runtime with musl and mimalloc. The start of a progra
 7. `anti.rt.main` runs, and its result is the exit status.
 
 The notice names the licence of the runtime and of each library the program links. A program of musl carries the notices of musl and mimalloc. `anti license --from <binary>` prints it.
+
+## Where a value lives
+
+Every later section on how antic builds a feature answers the same questions with the parts of this chapter.
+
+- A local is a slot of the frame in the IR and an `alloca` in the LLVM text. Dev mode keeps it in memory, so every use is a load and every assignment a store, as `area` shows above. In a release build `opt` moves a local whose address does not escape into a register.
+- An aggregate, a struct, a `str`, a slice or a tuple, is a slot as well. The IR passes it by the address of the slot. The LLVM text passes it by the C convention of the target, which `abi_classify` of `src/antic/abi.c` gives every function of the program. A function of Anti and a C function of the same signature therefore take their arguments the same way.
+- A literal text is a constant global, as `walk.1`, and stands in `.rodata` of the executable. Using it copies no byte.
+- The heap is reached through a call: `alloc`, a function of a collection or of a builder, or a function of the runtime. A section names each heap allocation of its feature.
+- A function of the runtime is named `anti_rt_*` and written in C under `src/rt/`. A dev object calls it, and the full LTO of a release build may inline it.
 
 ## Reading the excerpts
 
@@ -432,7 +524,7 @@ A block marked `refused` does not compile, and its `//! error:` line holds a tex
 let x: int = "a";
 ```
 
-An excerpt names its block, a target and a mode. Each line of an excerpt stands in the output of antic for that block, in the order shown. A line of `...` stands for lines left out. Runs of blanks count as one blank, and the numbers of names such as `%12` and `.LBB0_3` are not compared.
+An excerpt names its block, a target and a mode. Each line of an excerpt stands in the output of antic for that block, in the order shown. A line of an excerpt matches a part of one output line, so it may leave out the end of a long line. Two lines of an excerpt with no `...` between them match two adjacent lines of the output, and a line of `...` stands for any number of lines left out. Runs of blanks count as one blank. The numbered names of LLVM, as `%12`, the labels of the assembler, as `.LBB0_3`, and the line number of a token are made equal before the comparison. The names antic gives its own values and blocks, as `%v2`, `%t0`, `%p0` and `b1`, are compared as written, so an excerpt shows them as antic numbers them.
 
 | Fence | Output it quotes |
 |---|---|
