@@ -807,17 +807,17 @@ Where it lives: `check_guards_of`, `sema_check_reach`, `sema_note_field_write` a
 
 ### What it costs
 
-The costs are the same in dev and in release, apart from the record of the order of [chapter 13]({{% relref "13-threads" %}}).
+The costs are the same in dev and in release, apart from the record of the order of [chapter 13]({{% relref "13-threads" %}}). A dev build also tests for a `Mutex` that the thread holds already.
 
 | Cost | Count |
 |---|---|
 | Bytes per object | the fields alone. `Stock` is 56: the table pointer, a `Mutex` in one word and five fields of 8 |
 | Bytes of a guard | 0 |
 | An access of a guarded field | the `sync` around it: one lock call and one unlock call per block, however many fields the block reaches |
-| An access of an atomic field | one atomic instruction |
+| An access of an atomic field | one atomic instruction, or the loop that [chapter 13]({{% relref "13-threads#atomics" %}}) shows for `and` and `or` on x86-64 and for every change at `armv8.0` |
 | A read of a fixed field | one load |
 | Allocations | 0 |
-| Checks at run time | 0 |
+| Checks at run time | 0 in release. In dev, the search of the stack of the thread for the `Mutex` that a `sync` takes |
 
 The check `unguarded-field` runs in the compiler. `unchecked` removes the check for a field and adds no code and no cost. It gives up the proof for that field.
 
@@ -1573,6 +1573,7 @@ Where it lives: `order_take`, `order_give` and `order_forget` of `src/rt/lock.c`
 | Cost | Dev | Release |
 |---|---|---|
 | A lock taken while the thread holds none | one push of 16 bytes on the stack of the thread | 0 |
+| A `Mutex` taken | one search of the stack of the thread for the same `Mutex`, which stops the program when it finds it | 0 |
 | A lock taken while the thread holds `n` others | the lock of the table, and `n` times two lookups in it | 0 |
 | A new pair | one record of 40 bytes in the table | 0 |
 | An unlock | one search of the stack from its top, and a pop | 0 |
@@ -1798,7 +1799,7 @@ b0:
 
 The elements of a `SyncList<T>` are stored as tuples `(T, int)` of the value and its version. An element of a `SyncList<int>` takes 16 bytes, where one of a `List<int>` takes 8. A smaller `T` also takes the padding before the `int`.
 
-A `ConcurrentMap` holds a pointer to 16 parts. Each part is a `Mutex`, a `HashMap` of the entries, a `HashMap` of their versions and a clock. An operation hashes the key with the seed of the map, picks the part by the top four bits of the hash and runs inside `sync part.lock`. The table of the part hashes the key again for each of its own operations. The count of the entries is an atomic field, so `count()` takes no lock. An operation over the whole map, such as `find_all` or a walk, takes the 16 locks one after the other and holds one at a time.
+A `ConcurrentMap` holds a pointer to 16 parts. Each part is a `Mutex`, a `HashMap` of the entries, a `HashMap` of their versions and a clock. An operation hashes the key with the seed of the map, picks the part by the top four bits of the hash and runs inside `sync part.lock`. The table of the part hashes the key again for each of its own operations. The count of the entries is an atomic field, so `count()` takes no lock. An operation over the whole map, such as `find_all` or a walk, takes the 16 locks one after the other and holds one at a time. `find_one`, `update_one`, `remove_one` and the hash hold all 16 at once, taken in the order of the parts, since each must see the whole map in one moment. `==` holds the 32 locks of both maps, the parts of the map at the lower address first.
 
 An `SpscRing<T, N>` holds a block of `N` elements and two atomic counters: `given`, which the producer writes, and `taken`, which the consumer writes. Each side keeps a plain copy of the counter of the other side. It reads the atomic one only when the copy says the ring is full or empty.
 
@@ -1844,7 +1845,7 @@ The costs are the same in dev and in release, apart from the record of the order
 | `get` of a `ConcurrentMap` | one `Mutex` of 16 and two hashes of the key: one to pick the part and one in the table of the part |
 | `set`, `add` and `update` of a `ConcurrentMap` | one `Mutex` of 16 and one atomic add when the count changes. Four hashes of the key for `set`, and three for an `add` or an `update` that changes the map |
 | `count()` of a `ConcurrentMap` | one atomic load |
-| An operation over a whole `ConcurrentMap` | 16 locks, one after the other |
+| An operation over a whole `ConcurrentMap` | 16 locks, one after the other. All 16 at once for `find_one`, `update_one`, `remove_one` and the hash, and all 32 of both maps for `==` |
 | `push` and `pop` of an `SpscRing` with room and with elements | one atomic load and one atomic store, no lock and no call |
 | `for x in c` | one lock, and one copy of every element into a snapshot on the heap |
 | Copies of code | one copy of the class per set of type arguments, as [chapter 10]({{% relref "10-generics" %}}) counts |
