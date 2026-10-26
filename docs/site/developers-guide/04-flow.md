@@ -914,7 +914,7 @@ b1:
 b2:
 ```
 
-`%2` is a `str` in the frame for the literal `"debug"`: the address of its bytes and the length 5. The call compares it with the text of the `switch`. `equal` compares the lengths first and the bytes only when the lengths agree. The arms are not hashed and not sorted, so a text that matches no arm costs one call per arm.
+`%2` is a `str` in the frame for the literal `"debug"`: the address of its bytes and the length 5. The call compares it with the text of the `switch`. `equal` compares the lengths first and calls `memcmp` of the C library only when the lengths agree. The arms are not hashed and not sorted, so a text that matches no arm costs one call per arm.
 
 `x in lo..hi` is the two compares of its `&&`, a branch between them in a dev build. With constant bounds a release build folds them into one.
 
