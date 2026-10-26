@@ -2,7 +2,7 @@
 
 Every feature of the language in one place, each with what it does and an example where one helps. The rules are in `docs/decisions.md`, `docs/anti-object-model.md` and `docs/anti-language-additions.md`. This overview follows them and adds nothing. Where a feature is not built yet, its section says so.
 
-The test `overview_examples` runs every `anti` block of this page through the front end of antic, so an example that stops compiling fails the suite. A block that declares `main` is built and run as well, and the `text` block after it holds what the program prints. A block that opens with `anti not-built` shows a feature that is not built yet, and the test passes over it. The last sentence of its section names that feature. A hidden block before an example declares the names the example uses without showing them.
+The test `overview_examples` runs every `anti` block of this page through the front end of antic, so an example that stops compiling fails the suite. A block that declares `main` is built and run as well, and the `text` block after it holds what the program prints. A block that opens with `anti refused` shows a program that antic refuses, and its line `//! error:` holds the text of the message the test expects. A block that opens with `anti not-built` shows a feature that is not built yet, and the test passes over it. The last sentence of its section names that feature. A hidden block before an example declares the names the example uses without showing them. The test writes `import anti.lang;` before every block that lacks it, so a block names `lang.Error` without the import. A file of its own writes that line.
 
 Contents:
 
