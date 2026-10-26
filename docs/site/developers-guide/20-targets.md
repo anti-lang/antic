@@ -105,21 +105,17 @@ A name that antic does not know is refused before it reads the source.
 | `--target linux-x86_64 --cpu armv8.2` | `antic: armv8.2 is no processor level of linux-x86_64` |
 | `--cpu v4` on macos-arm64 | `antic: v4 is no processor level of macos-arm64` |
 
-The level reaches three places.
+The next section holds what `--cpu` changes.
 
-- The LLVM text. Every function carries the attributes `"target-cpu"` and `"target-features"` of the level, so llc chooses instructions the level has.
-- The runtime. The runtime archive holds one `libanti_rt.a` per target and level, in `lib/<target>/<level>/`, with its bitcode for LTO beside it. A Linux target holds `libmimalloc.a` per level as well. The link takes the files of the level of the program.
-- The check at start, which the next section describes.
-
-The native libraries of the runtime archive are built once per target, at the default level. A program below that level that reaches one is refused at the link. A program that imports `anti.regex`, built with `--target linux-x86_64 --cpu v1`, stops with this line.
-
-```text
-antic: anti.regex is built for x86-64-v3, this program targets v1
-```
-
-Where it lives: `cpu_from_name` and `cpu_default` of `src/antic/cpu.c`, `driver_run` of `src/antic/driver.c` for the refusals, and `link_runtime_library` of `src/antic/linker.c`, which the driver calls, for the runtime of a level.
+Where it lives: `target_from_name` of `src/antic/target.c` and `cpu_from_name` of `src/antic/cpu.c` read the two names, and `driver_run` of `src/antic/driver.c` gives the refusals.
 
 ## The processor levels
+
+### What you know
+
+GCC and Clang choose the instructions of a build with `-march`, as `-march=x86-64-v3`, and MSVC with `/arch:AVX2`. A program built that way stops with an illegal instruction on a processor that lacks one, at the first such instruction it reaches. Java compiles at run time for the processor it runs on. One class file then uses AVX2 where the machine has it and SSE2 where it does not.
+
+### The feature
 
 A level names a set of instructions. x86_64 has `v1`, `v2` and `v3`, the levels x86-64, x86-64-v2 and x86-64-v3 of the System V ABI. ARM64 has `armv8.0`, `armv8.2` and `armv8.5`.
 
@@ -134,7 +130,41 @@ A level names a set of instructions. x86_64 has `v1`, `v2` and `v3`, the levels 
 
 `tools/cpu-levels` holds the exact feature string of each level, and the test `cpu_levels_pin` compares it with the table of antic.
 
-### x86_64
+`--cpu <level>` chooses the level of a build, and without it the build takes the default level of its target: `v3` on the three x86_64 targets, `armv8.0` on linux-arm64, `armv8.2` on windows-arm64 and `armv8.5` on macos-arm64. `antic --print-cpu-levels` prints the levels with their features and the default of each target. A level of the other architecture is refused, as "--target and --cpu" shows.
+
+One level holds for the whole program. No form of the language gives one function a level of its own or tests a feature of the processor. The program of the first section has one function per difference between the levels.
+
+The native libraries of the runtime archive are built once per target, at the default level. A program below that level that reaches one is refused at the link. A program that imports `anti.regex`, built with `--target linux-x86_64 --cpu v1`, stops with this line.
+
+```text
+antic: anti.regex is built for x86-64-v3, this program targets v1
+```
+
+Every program checks the processor once at its start, in `main` of the runtime, before that function calls the `main` of the program. The check compares the level of the machine with the level of the runtime that was linked. A machine below that level ends the program with status 70 and one line.
+
+macos-x86_64 defaults to `v3`, and Rosetta of macOS offers no AVX2. The default build of the program therefore stops under Rosetta, and the builds with `--cpu v1` and `--cpu v2` run.
+
+```sh
+antic --target macos-x86_64 -o levels levels.anti
+./levels
+```
+
+```text
+anti: this program needs a processor with AVX2 (x86-64-v3, 2013 or later)
+```
+
+| Level | Message of a machine below it |
+|---|---|
+| `v2` | `this program needs a processor with SSE4.2 (x86-64-v2, 2009 or later)` |
+| `v3` | `this program needs a processor with AVX2 (x86-64-v3, 2013 or later)` |
+| `armv8.2` | `this program needs an ARMv8.2 processor (Raspberry Pi 5, Apple Silicon, or later)` |
+| `armv8.5` | `this program needs an Apple Silicon Mac` |
+
+`v1` and `armv8.0` are the lowest level of their architecture and never refuse a machine. The check reads CPUID on x86_64 and asks the operating system on ARM64. Where a system has no query for a feature, the check assumes the level and lets the program start.
+
+### How antic builds it
+
+The level is a fact of the build, and the program carries it in three places. Each function of the LLVM module names the processor and its features in its attributes. llc then chooses the instructions the level has. The link takes the runtime compiled for the same level, from `lib/<target>/<level>/` of the runtime archive, with its bitcode for LTO beside it. A Linux target holds `libmimalloc.a` per level as well. The `main` of that runtime checks the processor before the program runs. A level changes no size of a value and no layout. The IR of antic and the library files are therefore the same at every level.
 
 The release build at `v1` writes `blend` with the SSE forms and `widen` as a call of the runtime.
 
@@ -174,8 +204,6 @@ retq
 
 `tick` is `lock xaddq` on all three levels. `v2` gives the code of `v1` for the three functions.
 
-### ARM64
-
 linux-arm64 defaults to `armv8.0`, where an atomic add is a loop.
 
 ```asm excerpt=levels target=linux-arm64 mode=release
@@ -204,33 +232,39 @@ ret
 
 `ldaddal` adds `x8` to the word at `x9` and leaves the old value in `x0`. The target macos-arm64 writes the same instruction by default, since its level is `armv8.5`. `blend` is `fsub`, `fmul` and `fadd` on every ARM64 level, and `widen` is a load and one `fcvt`.
 
-### The check at start
-
-Every program checks the processor once at its start, in `main` of the runtime, before that function calls the `main` of the program. The check compares the level of the machine with the level of the runtime that was linked. A machine below that level ends the program with status 70 and one line.
-
-macos-x86_64 defaults to `v3`, and Rosetta of macOS offers no AVX2. The default build of the program therefore stops under Rosetta, and the builds with `--cpu v1` and `--cpu v2` run.
-
-```sh
-antic --target macos-x86_64 -o levels levels.anti
-./levels
-```
-
-```text
-anti: this program needs a processor with AVX2 (x86-64-v3, 2013 or later)
-```
-
-| Level | Message of a machine below it |
-|---|---|
-| `v2` | `this program needs a processor with SSE4.2 (x86-64-v2, 2009 or later)` |
-| `v3` | `this program needs a processor with AVX2 (x86-64-v3, 2013 or later)` |
-| `armv8.2` | `this program needs an ARMv8.2 processor (Raspberry Pi 5, Apple Silicon, or later)` |
-| `armv8.5` | `this program needs an Apple Silicon Mac` |
-
-`v1` and `armv8.0` are the lowest level of their architecture and never refuse a machine. The check reads CPUID on x86_64 and asks the operating system on ARM64. Where a system has no query for a feature, the check assumes the level and lets the program start.
-
-The check costs one call at start. A level changes no size of a value and no layout. `antic -c` writes the same bytes for the module of this chapter at `v1` and at `v3`, and for windows-arm64 as for linux-x86_64.
-
 Where it lives: the table and the defaults are in `src/antic/cpu.c`, and `src/antic/llvm_target.c` holds the attributes of each level. `anti_rt_cpu_check` and the messages are in `src/rt/cpu.c`, compiled once per level, and `src/rt/start.c` calls the check.
+
+### What it costs
+
+| Cost | Count |
+|---|---|
+| Bytes of a value | the same at every level. `antic -c` writes the same bytes for the module of this chapter at `v1` and at `v3` |
+| The check at start | one call, once per run, in every build |
+| `blend`, the arithmetic of floats | three instructions and the return at every level. `v3` writes the VEX forms of three operands |
+| `widen`, a read of an `f16` | `v1` and `v2`: a load and a tail call of `anti_rt_f16_to_f32`. `v3`: two instructions and the return, no call. ARM64: a load and one `fcvt` at every level |
+| `tick`, an atomic add | x86_64: one `lock xaddq` at every level. ARM64: five instructions and the return at `armv8.0`, four of them a loop, and one `ldaddal` at `armv8.2` and `armv8.5` |
+| A simd struct of 32 bytes | one register at `v3`, two below it and on ARM64, as [chapter 8]({{% relref "08-structs-enums#simd-structs" %}}) shows |
+| The runtime archive | one runtime per target and level, three per target |
+| Heap allocations, locks | none, at every level |
+
+The choice of a level is a choice of the machines a program runs on. The default level runs on the machines its message at start names: x86-64-v3 of 2013 and later, every ARMv8 processor for linux-arm64, ARMv8.2 for windows-arm64 and Apple Silicon for macOS. The excerpts of this guide are of that level unless they name another. `v1` and `armv8.0` run on every processor of their architecture and pay a call per `f16` read or write on x86_64 and a loop per atomic change on ARM64. A program for one known machine takes the highest level that machine has. The native libraries limit the choice: a program that imports `anti.regex`, the module over PCRE2, stays at the default level.
+
+### Pitfalls
+
+For a Java programmer:
+
+- The level is chosen when the program is built. A program built for `v3` does not fall back to SSE2 on an older processor. It ends at its start with the message of the check.
+
+For a C programmer:
+
+- No function takes a level of its own and no code asks for a feature at run time, as `__builtin_cpu_supports` does. One level holds for the program and its runtime.
+- `-march=native` has no counterpart. `--cpu` names one of the six levels.
+- The FMA of `v3` does not fuse `a * b + c`, since antic lets LLVM contract nothing. The result is the same at every level.
+
+For a C++ programmer:
+
+- A level below the default refuses the native libraries at the link. A C++ library of one level can be linked into a program of another, and an Anti module of the native libraries cannot.
+- An illegal instruction never comes from the level: the check at start ends the program before `main` with a message, on a machine below the level.
 
 ## Cross-building
 
@@ -281,9 +315,40 @@ antic -o hello hello.anti
 
 ## -g and debugging
 
+### What you know
+
+GCC and Clang write DWARF with `-g`, and MSVC writes a PDB. The debug information of C and C++ holds the lines, the functions, the variables and the types. A debugger therefore prints a local by its name. Java keeps a table of lines and one of locals in each class file compiled with `-g`. A debugger reads them through the virtual machine that runs the program.
+
+### The feature
+
 `antic -g` writes the source position of every statement and one entry per function, and the link keeps the debug sections. `anti build` passes `-g` in dev mode and never in release mode. A release build of `anti build` writes the symbols archive instead, which [chapter 18]({{% relref "18-the-tool" %}}) describes.
 
 The debug information holds lines and function names. It holds no variable, no parameter and no type.
+
+lldb stops at a file and a line of a release build with `-g` and prints the frames by their Anti names. The session below sets a breakpoint on the `return` of `tick`.
+
+```text
+(lldb) breakpoint set -f levels.anti -l 16
+Breakpoint 1: 2 locations.
+(lldb) run
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+    frame #0: 0x0000000100000730 levels`tick at levels.anti:16 [opt] [inlined]
+(lldb) bt
+  * frame #0: 0x0000000100000730 levels`tick at levels.anti:16 [opt] [inlined]
+    frame #1: 0x0000000100000730 levels`levels.main at levels.anti:27 [opt]
+    frame #2: 0x0000000100006754 levels`main + 712
+    frame #3: 0x000000018a9f84e4 dyld`start + 6992
+(lldb) frame variable
+error: no variable information is available in debug info for this compile unit
+```
+
+The file of the session is the block above without its first line, so `tick` returns at line 16. The breakpoint has two locations because `tick` stands in the program once as a function and once inlined into `main`. Frame 0 is the inlined copy, and frame 2 is `main` of the runtime, which has no line. `frame variable` has nothing to print.
+
+`StackTrace.symbolize()` of [chapter 6]({{% relref "06-errors#error-origins-and-stack-traces" %}}) reads the same lines. In a build with `-g` it names the file and the line of each frame, and without it the function alone.
+
+### How antic builds it
+
+Lowering stamps each instruction it writes with the line of its statement, and the LLVM text carries the record as debug metadata beside the code. llc writes that metadata as the line table of the object, and the link keeps the sections that hold it. The instructions themselves are the same with and without the option.
 
 ```llvm excerpt=levels target=linux-x86_64 mode=dev option=debug
 define internal noundef i64 @tick(ptr noundef nonnull dereferenceable(16) %p0) #0 !dbg
@@ -307,28 +372,38 @@ distinct !DISubprogram(name: "tick",
 
 llc turns these nodes into a DWARF line table on ELF and Mach-O and into CodeView on COFF. On Mach-O the debug information stays in the objects beside the program: `levels.o`, and under LTO `levels.lto/0.arm64.lto.o`. ELF holds it in the program. A Windows link writes a PDB in every build, with `-g` and without it.
 
-lldb stops at a file and a line of a release build with `-g` and prints the frames by their Anti names. The session below sets a breakpoint on the `return` of `tick`.
+Where it lives: `src/antic/llvm_debug.c` writes the nodes, and `link_command` of `src/antic/linker.c` keeps or strips the sections: `-S` of `ld64.lld` and `--strip-debug` of `ld.lld` in a link without `-g`.
 
-```text
-(lldb) breakpoint set -f levels.anti -l 16
-Breakpoint 1: 2 locations.
-(lldb) run
-* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
-    frame #0: 0x0000000100000730 levels`tick at levels.anti:16 [opt] [inlined]
-(lldb) bt
-  * frame #0: 0x0000000100000730 levels`tick at levels.anti:16 [opt] [inlined]
-    frame #1: 0x0000000100000730 levels`levels.main at levels.anti:27 [opt]
-    frame #2: 0x0000000100006754 levels`main + 712
-    frame #3: 0x000000018a9f84e4 dyld`start + 6992
-(lldb) frame variable
-error: no variable information is available in debug info for this compile unit
-```
-
-The file of the session is the block above without its first line, so `tick` returns at line 16. The breakpoint has two locations because `tick` stands in the program once as a function and once inlined into `main`. Frame 0 is the inlined copy, and frame 2 is `main` of the runtime, which has no line. `frame variable` has nothing to print.
+### What it costs
 
 `-g` changes no instruction of the program. `llvm-objdump -d` of the pinned tools prints the same 10,530 lines for the program of the session and for the build without the option, addresses included. The debug sections make the Mach-O file 112,496 bytes against 108,144. The debug map of a Mach-O program names each object by its absolute path, so the size with `-g` grows with the directory of the build. The same build in a directory whose name is 32 characters longer is 112,528 bytes.
 
-Where it lives: `src/antic/llvm_debug.c` writes the nodes, and `link_command` of `src/antic/linker.c` keeps or strips the sections: `-S` of `ld64.lld` and `--strip-debug` of `ld.lld` in a link without `-g`.
+| Cost | Without `-g` | With `-g` |
+|---|---|---|
+| Instructions of the program | the plain build | the same, 10,530 lines of `llvm-objdump -d` in both |
+| Bytes of the Mach-O program of the session | 108,144 | 112,496, and more for a build directory of a longer name |
+| The build id | the id of the program | the same id, since the digest leaves the debug information out |
+| Calls into the runtime, heap allocations, locks, checks | none added | none added |
+| A dev object of `anti build` | always built with `-g` | the same |
+
+`-g` costs bytes of the file and no time of the run. A dev build of `anti build` carries it for a debugger and for the stack traces of [chapter 6]({{% relref "06-errors" %}}). A release program ships without it, and its symbols archive holds the same link with the sections kept, so a trace of the shipped program resolves later. A release build with `-g` is the form for a session of a debugger in optimized code, where inlined calls show as frames marked `[inlined]`.
+
+### Pitfalls
+
+For a Java programmer:
+
+- A debugger shows no local variable and no field of an object. `frame variable` has nothing to print, and a value is printed by the program itself.
+- A breakpoint takes a file and a line. A line inlined into two places has two locations.
+
+For a C programmer:
+
+- The compile unit says C11, since DWARF has no code for Anti. An expression typed into the debugger follows the rules of C, on a program whose variables the debugger does not know.
+- The path of a source in the debug information is the path under its search root, with an empty directory. A debugger finds the file from the directory it was started in, or through a source map such as `settings set target.source-map` of lldb.
+
+For a C++ programmer:
+
+- The name of a copy of a generic is `app.List<int>.push` in the debugger. The symbol of the object file escapes the brackets, `app.List$3cint$3e.push`, and a tool that reads the symbol table shows that form.
+- No type is described, so the debugger prints no struct and no field.
 
 ## The build id
 
