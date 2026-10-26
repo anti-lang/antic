@@ -861,7 +861,14 @@ let round = s is Shape.Circle;
 let n = s.tag as int;
 ```
 
-A declaration takes `packed` and `align(N)`. A literal of a variant of another module is `geo.Shape.Circle { r: 2.0 }`, and the test of its case `v is geo.Shape.Circle`. A `switch` names every case or has `else`, and `fallthrough` never enters an arm that binds a case's fields. The C header writes the enum of the tags. A variant with an owning case is torn down by its tag and follows the value rules of an owning struct, and an arm that binds such a case gets a copy that the arm tears down.
+A declaration takes `packed` and `align(N)`. A literal of a variant of another module is `geo.Shape.Circle { r: 2.0 }`, and the test of its case `v is geo.Shape.Circle`. A `switch` names every case or has `else`, and `fallthrough` never enters an arm that binds a case's fields. The C header writes the enum of the tags. A variant with an owning case is torn down by its tag and follows the value rules of an owning struct, and an arm that binds such a case gets a copy that the arm tears down. A variant literal is no constant expression, so a constant, the default of a field and the default of a parameter never have a variant type:
+
+```anti refused
+//! error: a variant is not a constant expression
+variant Shape { Circle { r: f32 }, Empty }
+
+const NOTHING: Shape = Shape.Empty;
+```
 
 ## Classes
 
