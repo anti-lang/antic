@@ -743,6 +743,17 @@ let bytes = size_of(Rect);
 let at = lang.SourceLocation { file: "a.anti", line: 1, column: 1, function: "main", module: "app" };
 ```
 
+A literal of a struct names every field exactly once, since a field of a struct has no default, which belongs to a class:
+
+```anti refused
+//! error: the literal of `Point` misses the field `y`
+struct Point { x: int, y: int }
+
+let p = Point { x: 1 };
+```
+
+`r.f()` on a struct with a field `f` of function type calls the field, and a free function `f` of the module stands back. Method-call sugar does not reach a union, whose functions are called as `f(&u)`.
+
 `packed` before `struct`, `union`, `class` or `variant` removes padding, apart from the padding before an atomic field or a field that holds a Mutex, and `align(N)` after the name of any of the four raises its alignment. N is a constant power of two up to 4096, and a larger N is refused. `union` has C layout, and a literal of one names exactly one field. Bitfields `flags: u32 : 4`. A constant written to a bitfield fits its width, `+%=` wraps and `+|=` saturates at that width, and a dev build stops any other value that does not fit. `_: T : 0` is a zero-width bitfield, a unit break as in C, and a union holds none. A trailing comma is allowed in every comma-separated list. `size_of(T)` is the size on the target.
 
 ## Simd structs
