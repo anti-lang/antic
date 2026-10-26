@@ -1,0 +1,4 @@
+exit 0
+return 2
+yield 5
+end 3

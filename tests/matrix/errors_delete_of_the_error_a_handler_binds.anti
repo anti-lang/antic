@@ -1,0 +1,64 @@
+//! The error a `catch` binds, deleted by the handler with `delete(e)` before
+//! the handler leaves by `return`, by `yield` and by its end. The handler
+//! deletes the error it binds at every exit, by "Errors" in
+//! docs/anti-object-model.md, so the error is deleted once on each path.
+
+import anti.io;
+import anti.lang;
+
+fn check(n: int) may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+}
+
+fn value(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn by_return(n: int) -> int
+{
+	check(n) catch e {
+		delete(e);
+		return 2;
+	};
+	return 1;
+}
+
+fn by_yield(n: int) -> int
+{
+	let v = value(n) catch e {
+		delete(e);
+		yield 5;
+	};
+	return v;
+}
+
+fn by_end(n: int) -> int
+{
+	let seen = 0;
+	check(n) catch e {
+		delete(e);
+		seen = 3;
+	};
+	return seen;
+}
+
+fn main() -> int
+{
+	if by_return(-1) == 2 {
+		io.println("return 2");
+	}
+	if by_yield(-1) == 5 {
+		io.println("yield 5");
+	}
+	if by_end(-1) == 3 {
+		io.println("end 3");
+	}
+	return 0;
+}
