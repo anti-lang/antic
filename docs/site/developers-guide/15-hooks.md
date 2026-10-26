@@ -274,6 +274,31 @@ The costs are the same in dev and in release.
 
 The excerpts show the module before the link. The LTO of a release link may inline `anti_rt_hook` into a site, as [chapter 2]({{% relref "02-how-antic-works" %}}) describes.
 
+The program `hooks` of `tests/bench` measures a site in a linked release program. Each of its 20 million turns allocates an object of a traced class, calls one function of it and deletes it, so a turn passes the sites of `created` and `destroyed`. A build with `--trace` adds the two trace points of the function, which the next section describes. `trace.start()` at the start installs the handlers that the runtime key `trace` names, so the file of `ANTI_CONF` attaches the stock `LeakTracker` for a run. Its `created` and `destroyed` each add to an atomic field, and its `enter` and `leave` are empty. The C twin is the same loop with `malloc`, a call and `free`.
+
+| Build and run | Time | Against the row it names | Per turn |
+|---|---:|---|---:|
+| The C twin | 301.9 ms | | |
+| `--no-hooks` | 329.7 ms | | |
+| Plain release, nothing attached | 382.0 ms | 52.3 ms above `--no-hooks`: two hook sites | 2.6 ns |
+| Plain release, `LeakTracker` attached | 395.1 ms | 13.1 ms above nothing attached: two calls of the handler | 0.7 ns |
+| `--trace`, nothing attached | 437.2 ms | 55.2 ms above the plain release: two trace points | 2.8 ns |
+| `--trace`, `LeakTracker` attached | 457.4 ms | 20.2 ms above `--trace`: four calls of the handler | 1.0 ns |
+
+| Condition | Value |
+|---|---|
+| Machine | Apple M4 Pro, 14 cores, 64 GB, macOS 26.6.2 |
+| Target | macos-arm64, at `armv8.5` |
+| Commit | `d3565676` |
+| Mode | release, linked with full LTO. The C twin is built by the pinned clang at `-O2` |
+| Command, the plain row | `cmake --build build/host --target bench` |
+| Command, the other rows | `cmake -DOPTIONS=<option> -P tests/runners/run_bench.cmake` with the other values of the `bench` target, and `ANTI_CONF` naming a file of `[runtime]` with `trace = "leaks"` for the rows with `LeakTracker` |
+| Runs | the median of 5 runs of each build. A second set of the five builds gave 333.3, 379.0, 396.7, 439.5 and 454.1 ms |
+| C twin | between 301.5 and 305.0 ms over the ten runs |
+| Load | other jobs ran on the machine, at a load average between 5 and 15 on 14 cores |
+
+A site with nothing attached costs about as much as the trace point of the next section. A handler adds less than the site itself, since the site loads and compares in either case. The column per turn is the difference divided by the 20 million turns.
+
 A hook costs its site in every build, whether a class declares one or not. Three other forms do part of the same work.
 
 | Form | Cost per object | What it gives up |
@@ -558,6 +583,8 @@ Where it lives: `traced_function` of `src/antic/lower_function.c`, `lower_traced
 | Allocations and locks | 0 | 0 |
 
 Marked code is traced in a dev build and with `--trace`. It is not traced in a release build and with `--no-trace`.
+
+The measurement of `tests/bench/hooks` in the section on hooks gives the time. Two trace points with nothing attached added 55.2 ms to 20 million calls, 2.8 ns per call. An attached `LeakTracker`, whose `enter` and `leave` are empty, added 20.2 ms for its four calls per turn.
 
 A traced function cannot be inlined across its two calls of the runtime as freely as a plain one. Its object must be in memory at both calls. `--no-trace` on a dev build gives the plain code back and gives up `enter`, `leave` and `failed` of every class.
 
