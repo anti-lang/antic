@@ -759,7 +759,7 @@ Where it lives: `sema_meets_hook` and `sema_meets_param` of `src/antic/sema_gene
 | A constraint | nothing at run time | nothing |
 | An operator on a built-in type argument | one instruction, with its dev check where the operator has one | one instruction |
 | An operator on a struct or class argument | one direct call of its `operator fn` | the same, or inlined |
-| An operator on a simd struct argument | the operation lane by lane, as on the simd struct itself | the same |
+| An operator on a simd struct argument | the operation of the simd struct, one vector instruction where the target has the width, as in chapter 8 | the same |
 | A function of an interface constraint | one dispatch through the interface table | a dispatch, or a direct call when one class fills the entry |
 | Heap allocations, calls into the runtime | 0 | 0 |
 | Work of the checker | the body once, and each use once | the same |
