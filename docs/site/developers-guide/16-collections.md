@@ -3,7 +3,7 @@ title: "Collections"
 description: "The layout, the growth and the cost of each operation of List, Deque, Ring, Grid, the maps and the sets, the sorted ones, Pool, Tree and PriorityQueue."
 summary: "The collections of `anti.collection` with their layout and their growth, walking, hashing and its seed, order and equality, and one table with the cost of each operation, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 160
 tags: [compilers, programming-languages]
@@ -226,6 +226,108 @@ fn keep(l: *List<int>) -> ?*int
 
 An index outside the list stops a dev build with `index out of bounds: index 5, length 2`. A release build checks nothing there, as for an array. `get`, `first` and `last` test the index in every build and give `none`.
 
+`count` is a public field that the module of the collection alone writes. Every other module reads it, and the checker refuses `=`, a compound assignment and `&` of it there.
+
+```anti refused
+//! error: `count` of `List<int>` is read-only outside its module
+import anti.collection.list.{List};
+
+fn empty(l: *List<int>)
+{
+	l.count = 0;
+}
+```
+
+A class of the program that inherits a collection writes its own `count`. The module of each class from the receiver up to `Collection<T>` counts as the module of the collection.
+
+A collection of plain pointers, such as `List<*Key>`, holds the pointers and owns none of the objects. Its teardown frees its block and deletes no object. A pointer passed to `push`, or to any `own` parameter of a collection, moves there, since it holds a pointer. The program keeps a second pointer to delete the object with.
+
+```anti
+//! name: pointers
+import anti.io;
+import anti.collection.list.{List};
+
+class Key
+{
+	pub tag: int = 0,
+
+	fn destruct(self)
+	{
+		let line = f"destruct Key {self.tag}";
+		io.println(line);
+		free(line.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let a = Key { tag: 1 };
+	let b = alloc Key { tag: 2 };
+	let kept = b;
+	{
+		let keys = List<*Key>.new();
+		keys.push(&a);
+		keys.push(b);
+		let line = f"{keys.count} pointers of {size_of(*Key)} bytes each";
+		io.println(line);
+		free(line.ptr);
+	}
+	io.println("the list is gone");
+	delete(kept);
+	return 0;
+}
+```
+
+```text output
+2 pointers of 8 bytes each
+the list is gone
+destruct Key 2
+destruct Key 1
+```
+
+`b` is dead after the `push`, and naming it again is refused by the safety check `use-after-free`. `own` stands in no type argument, so `List<own *Key>` does not parse. A list whose elements own their objects holds class values, `List<Key>`, and tears each down.
+
+An `own` argument of a function of a collection is stored in it. The safety check `escaping-local` of [chapter 11]({{% relref "11-ownership" %}}) therefore refuses a reference to a local that ends before the collection does.
+
+```anti refused
+//! error: a reference to `n` is stored into the collection `all`
+import anti.collection.list.{List};
+
+fn fill(all: *List<*int>)
+{
+	let n = 5;
+	all.push(&n);
+}
+```
+
+`serialize` writes the elements as a JSON array, `[1,2]`. `deserialize` of a collection is not built: `Object.deserialize` reads an object of a class, and gives `none` for that text.
+
+```anti
+//! name: reread
+import anti.io;
+import anti.text;
+import anti.mem;
+import anti.collection.list.{List};
+
+fn main() -> int
+{
+	let l = List<int>.new();
+	l.push(1);
+	l.push(2);
+	let b = text.Builder.new();
+	l.serialize(&b);
+	let back = Object.deserialize(b.text(), mem.LibcAllocator.get());
+	let line = f"{b.text()} reads back as none: {back == none}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+[1,2] reads back as none: true
+```
+
 ### How antic builds it
 
 `List<T>` inherits `Indexed<T>`, which inherits `Collection<T>`. A `List<int>` is one object of 136 bytes.
@@ -386,12 +488,21 @@ The checks follow the build that compiles the program, since a copy of a generic
 
 A list of 200,000 elements that is cleared with `clear` moves about 20 billion elements. A loop of `pop` moves none.
 
+The choice among the sequences follows from these counts.
+
+- `List<T>` reads by position and adds at the end. A removal at the front moves every element behind it.
+- `Deque<T>` adds and removes at both ends and moves no element there. It has no `[]`, and reads its ends with `front` and `back`.
+- `Ring<T, N>` holds at most `N` elements, allocates once when it is made and never grows. A known bound makes it the queue without growth.
+- `Pool<T>` keeps each element in its slot through every removal, and a `Handle<T>` finds it. A list renumbers the elements behind a removal.
+- An array `[T; N]` or a slice from `alloc(T, n)` has no header of 136 bytes, no record of changes and no walk check. A buffer whose size never changes needs none of them.
+
 ### Pitfalls
 
 For a Java programmer:
 
 - A `List<Point>` holds the points themselves and no references. `l[i]` gives a copy, and a change to the copy is lost.
-- `l.count` is a field and no call. The checker does not refuse a write to it, and a write breaks the list.
+- `l.count` is a field and no call. Reading it is one load, and the checker refuses a write outside the module of the list.
+- A `List<*Key>` holds references and frees none of the objects. No collector frees them either.
 - A `for` over a list that the body changes stops a dev build with a message. A release build goes on over the new state.
 
 For a C programmer:
@@ -615,6 +726,8 @@ Where it lives: `src/std/anti/collection/ring.anti` and `src/std/anti/collection
 | `find_all` and `to_text` of a ring | allocate, since each makes a new collection or a new text |
 | Atomic operations and locks | none |
 | Copies of code | one copy per pair of `T` and `N` of a ring, and one per `T` of a grid |
+
+A `Ring<T, N>` beside a `Deque<T>`: the ring allocates once and refuses an element when full, and the deque allocates on each growth and takes every element. A `Grid<T>` beside a `List<T>` of `width * height` elements: the grid adds 16 bytes and one slot, checks both coordinates in dev mode and never changes its size. A fixed array `[[T; W]; H]` of [chapter 8]({{% relref "08-structs-enums" %}}) stands inline in its owner with no heap block, when both sizes are constants.
 
 ### Pitfalls
 
@@ -938,6 +1051,8 @@ The counts are the same in dev and in release, apart from the checks of dev mode
 | Runs | the median of 5 runs of each program |
 | Load | another job ran on the machine during the run |
 
+`Map<K, V>` costs 8 bytes more per entry of capacity than `HashMap<K, V>` for `int` keys. It walks every entry ever written, removed ones included, until the next rebuild. It gives the same order on every run, which a program that writes its output or a test needs. `HashMap<K, V>` takes the fewer bytes and draws a new order at each walk. `SortedMap<K, V>` of "SortedMap and SortedSet" calls no hash and reads no seed, and walks in key order with `floor`, `ceiling` and `range`. Each lookup there costs one node per level.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1122,6 +1237,8 @@ Where it lives: `src/std/anti/collection/set.anti`, with `resize`, `combined`, `
 | Atomic operations and locks | one atomic load when a `Set` or a `HashSet` is made, for the seed. None for a `BitSet` |
 | Checks | none of its own. The checks of dev mode stand in the arithmetic, under `--checks` and `--no-checks` |
 | Copies of code | one copy per element type of a `Set` and a `HashSet`, and one `BitSet` |
+
+A `BitSet` holds a number in one bit, against 32 bytes per element of capacity of a `HashSet<int>` and at least 48 of a `Set<int>`. It is the choice for numbers that are small and dense. Its room follows the largest number. A `Set<T>` keeps insertion order and a `HashSet<T>` takes fewer bytes per element. A `SortedSet<T>` gives the order of the elements and `range`.
 
 ### Pitfalls
 
@@ -1328,6 +1445,8 @@ Where it lives: `src/std/anti/collection/sorted.anti`. `BTree<T>` holds `take_no
 
 A sorted collection reads no seed and calls no hash.
 
+A sorted collection takes up to 11 compares per level where a hashing one takes one hash and one probe. It is the choice when the program walks in key order or asks for `floor`, `ceiling`, `range`, `first` or `last`. A `List<T>` sorted once with `sort` is the choice for a set of elements that is built once and then only walked.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1528,6 +1647,8 @@ Where it lives: `src/std/anti/collection/pool.anti`. `Slots<T>` holds `slot_of`,
 
 A pool never gives a block back before its teardown. A pool that held a million elements once keeps the room of a million.
 
+A `Pool<T>` beside a `List<T>`: the pool costs 24 bytes per slot and a test of the handle per use, and keeps every element in place through a removal. A `Map<int, T>` of numbers that the program hands out finds an element through a hash and a probe, and gives its room back with `shrink`. A pool finds it with four compares and gives no room back.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1715,6 +1836,8 @@ Where it lives: `src/std/anti/collection/tree.anti` with `attach`, `detach` and 
 | `update_all` and `remove_all` of a queue | one pass, and one rebuild of the heap over all elements |
 | Atomic operations and locks | none |
 | Checks | the test of each handle of a tree, in every build |
+
+A `Tree<T>` beside a class per node: the tree allocates one block per growth and no node of its own, and `remove` frees a subtree without a call per node. A class that links its nodes with pointers takes one allocation and one `delete` per node. A `PriorityQueue<T>` beside a `SortedSet<T>`: the queue keeps equal elements, which the set holds once, and takes up to `log2 n` swaps per `push` in one block. The set walks in order and removes any element, and the queue gives its smallest alone.
 
 ### Pitfalls
 
@@ -1997,6 +2120,8 @@ Where it lives: `sema_iterate` and `watch_changes` of `src/antic/sema_expr.c`, `
 
 The record of the changes is paid in every build, since the fields and the stores stand in the library code. A release build writes the place of each change and never reads it.
 
+`for x in &c` copies nothing and lends each element. `for x in c` copies each element, and is the form for an element the body keeps or a collection that lends nothing. A loop `for i in 0..l.count` that reads `l[i]` calls `index` per turn, copies the element and checks the index in dev mode. `lend_slice` gives the whole block of a list as one `[]T` for one call, which a loop over a slice or the simd code of [chapter 8]({{% relref "08-structs-enums" %}}) reads.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -2035,7 +2160,7 @@ Every Java object has `hashCode()`, an `int` of 32 bits, and `String.hashCode()`
 | A class value | the fields of its chain, unless the class declares `concrete fn hash(self) -> u64` |
 | A collection | the elements: in order for a sequence, whatever the order for a map and a set |
 
-A struct replaces the default with `operator fn hash(a: S) -> u64` at module level. A type that declares `==` of its own declares the hash with it, since two values that are equal must hash alike. The default `==` and the default hash agree.
+A struct replaces the default with `operator fn hash(a: S) -> u64` at module level. A type that declares `==` of its own declares the hash with it, since two values that are equal must hash alike. The checker holds a class to that and refuses `equals` without `hash` and the reverse. It does not hold a struct to it, so a struct with `operator fn eq` alone keeps the default hash over every field. The default `==` and the default hash agree.
 
 The hashing collections do not use `x.hash()` as it is. Each mixes it with a seed, a `u64` that the runtime draws from the random source of the system when the program starts. `lang.hash_seed()` gives the seed. A collection reads it once, when it is made.
 
@@ -2137,6 +2262,19 @@ operator fn hash(a: S) -> int
 ```
 
 ```anti refused
+//! error: `K` replaces `hash` without `equals`
+class K
+{
+	pub n: int = 0,
+
+	concrete fn hash(self) -> u64
+	{
+		return 1;
+	}
+}
+```
+
+```anti refused
 //! error: a class replaces `hash` of `Object` with `concrete fn hash(self) -> u64`
 class K
 {
@@ -2206,12 +2344,15 @@ antic writes the default hash at the place of `x.hash()` in both modes, so the c
 
 No option turns the seed off. `--anti.hash_seed=<n>` fixes it and gives up the protection: the buckets of every table are then the same on every run.
 
+The default hash is the choice for a type whose `==` is the default, since the two agree by construction. A type with an `operator fn eq` of its own declares `operator fn hash` over the same parts. A fixed seed belongs in a test that needs the same buckets on every run. A sorted collection is the choice where no seed may enter at all.
+
 ### Pitfalls
 
 For a Java programmer:
 
 - A hash is 64 bits and unsigned. `x.hash()` is no `int`.
-- A class overrides `hash` with `concrete fn hash`, and it overrides `equals` with it. One without the other gives two equal objects in two buckets.
+- A class replaces `hash` with `concrete fn hash` and `equals` with `concrete fn equals`, both or neither. The checker refuses one without the other: `` `K` replaces `hash` without `equals` ``.
+- A struct with an `operator fn eq` of its own and no `operator fn hash` compiles, and keeps the default hash over every field. Two values that its `eq` holds equal then hash apart and land in two buckets, so such a struct declares both.
 - No program may rely on the order of a `HashMap`, not even inside one run.
 
 For a C programmer:
@@ -2474,6 +2615,8 @@ Where it lives: `sema_equals` and `sema_default_eq` of `src/antic/sema_hash.c`, 
 | Heap allocations, atomic operations and locks | none | none |
 
 `==` and `<` insert no check in either mode.
+
+`sort` of a type with `operator fn lt` calls `lt` once per compare, or inlines it. `sort_by(key)` calls `key` twice per compare, each on a copy of an element, and suits a key that is one field. `sort_with(less)` calls `less` once per compare with two lent pointers and copies nothing, the form for an element of many bytes. The default `==` compares every field. An `operator fn eq` compares the parts that make the value, and a key of a map that carries data beside its key declares one, as `Name` of "Hashing and its seed" does.
 
 ### Pitfalls
 
