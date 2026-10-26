@@ -1,0 +1,22 @@
+//! `delete(e)` of the error a `catch` binds inside a loop of its handler would
+//! delete it again on the next turn, so it is refused, as a move into an `own`
+//! parameter there is.
+
+import anti.lang;
+
+fn check(n: int) may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+}
+
+fn main() -> int
+{
+	check(-1) catch e {
+		for i in 0..2 {
+			delete(e);
+		}
+	};
+	return 0;
+}

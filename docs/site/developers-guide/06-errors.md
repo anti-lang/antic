@@ -398,7 +398,7 @@ A call of a function that may fail takes one of these forms.
 
 A handler follows a `let`, an assignment or a call statement. It does not follow a call inside a larger expression. Where the call gives a result, the handler supplies one with `yield v;`, or leaves the block with `return`, `break`, `continue` or `fail`. A handler of a call without a result ends with `yield;` or at its brace.
 
-The error a handler binds is deleted at every exit of the handler. `fail e;` takes it away first by handing it to the caller. So does passing it to an `own` parameter, as `Error.wrap` does with its cause. The name of the error ends with the handler.
+The error a handler binds is deleted at every exit of the handler. `fail e;` takes it away first by handing it to the caller. So does passing it to an `own` parameter, as `Error.wrap` does with its cause, and so does `delete(e)`. The handler names the error no more after either. The name of the error ends with the handler.
 
 `yield v` gives the value as `let` gives a variable its value. A fresh value and an `own` parameter move into the result. An existing value that owns something, such as a local of a class with an `own` field, is refused with the message of `=`, since the local would stay a second owner. `yield dup(a)` gives a copy.
 

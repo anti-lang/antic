@@ -887,6 +887,32 @@ static bool moves_at_call(const struct type *t)
    other place holds a value that stays where it is, so one that owns
    memory is refused, as `=` refuses it. receiver is the object of a
    call of a function of a class, or NULL. */
+bool sema_move_caught(struct checker *c, const struct symbol *callee,
+                       struct expr *arg)
+{
+    struct symbol *moved = arg->symbol;
+
+    if (c->loop_depth > moved->caught_loops) {
+        sema_error_at(c, arg->pos,
+                      "`%.*s` moves into `%.*s` inside a loop of its "
+                      "handler, which would move it again",
+                      (int)arg->as.name.length, arg->as.name.text,
+                      (int)callee->name.length, callee->name.text);
+        return false;
+    }
+    if (moved->deferred) {
+        sema_error_at(c, arg->pos,
+                      "`%.*s` moves into `%.*s` while a `defer` or an "
+                      "`undo` of its handler names it",
+                      (int)arg->as.name.length, arg->as.name.text,
+                      (int)callee->name.length, callee->name.text);
+        return false;
+    }
+    arg->moves = true;
+    moved->moved_into = callee;
+    return true;
+}
+
 void sema_note_move(struct checker *c, const struct symbol *callee,
                       size_t index, const struct expr *receiver,
                       struct expr *arg)
@@ -901,24 +927,7 @@ void sema_note_move(struct checker *c, const struct symbol *callee,
         return;
     }
     if (moved != NULL && moved->caught) {
-        if (c->loop_depth > moved->caught_loops) {
-            sema_error_at(c, arg->pos,
-                          "`%.*s` moves into `%.*s` inside a loop of its "
-                          "handler, which would move it again",
-                          (int)arg->as.name.length, arg->as.name.text,
-                          (int)callee->name.length, callee->name.text);
-            return;
-        }
-        if (moved->deferred) {
-            sema_error_at(c, arg->pos,
-                          "`%.*s` moves into `%.*s` while a `defer` or an "
-                          "`undo` of its handler names it",
-                          (int)arg->as.name.length, arg->as.name.text,
-                          (int)callee->name.length, callee->name.text);
-            return;
-        }
-        arg->moves = true;
-        moved->moved_into = callee;
+        sema_move_caught(c, callee, arg);
         return;
     }
     /* A `keep own` parameter takes a function by the rules of a

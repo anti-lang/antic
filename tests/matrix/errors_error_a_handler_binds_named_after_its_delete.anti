@@ -1,0 +1,22 @@
+//! `delete(e)` of the error a `catch` binds ends the handler's copy, as a move
+//! into an `own` parameter does, so the handler names the error no more after
+//! it, by T207 of docs/audit/tests-findings.md.
+
+import anti.lang;
+
+fn check(n: int) may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+}
+
+fn main() -> int
+{
+	check(-1) catch e {
+		delete(e);
+		let code = e.code;
+		return code as int;
+	};
+	return 0;
+}

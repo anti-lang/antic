@@ -824,6 +824,8 @@ void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
 struct type *sema_check_kept(struct checker *c, struct expr *e,
                              struct type *expected, bool kept);
 bool sema_owned_param(const struct symbol *callee, size_t index);
+bool sema_move_caught(struct checker *c, const struct symbol *callee,
+                       struct expr *arg);
 void sema_note_move(struct checker *c, const struct symbol *callee,
                     size_t index, const struct expr *receiver,
                     struct expr *arg);

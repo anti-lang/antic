@@ -2167,6 +2167,17 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
             destroyed_local(l, e->as.object.operand, v);
             return lower_none();
         }
+        /* The error a handler binds that `delete` moved holds `none`
+           in the handler's copy afterwards, as after a move into an
+           `own` parameter, so the delete of the handler's exit passes
+           over it. */
+        if (e->as.object.op == TOKEN_DELETE && e->as.object.operand->moves &&
+            e->as.object.operand->symbol != NULL &&
+            e->as.object.operand->symbol->caught && l->b != NULL) {
+            v = lower_temp(l, ir_unary(l->f, l->b, IR_COPY, IR_PTR, v));
+            ir_assign(l->f, l->b, e->as.object.operand->symbol->ir,
+                      ir_int_op(IR_PTR, 0));
+        }
         if (e->as.object.from != NULL) {
             struct ir_operand args[3];
             args[0] = v;

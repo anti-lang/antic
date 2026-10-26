@@ -1,0 +1,1 @@
+errors_error_a_handler_binds_named_after_its_delete.anti:18:14: error: `e` has moved into `delete` and is not named after it

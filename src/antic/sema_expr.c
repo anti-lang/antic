@@ -2305,6 +2305,10 @@ static bool refuse_ending(struct checker *c, const struct expr *e,
    of them takes have a DESIGN of their own below: a value of a type
    parameter, a class value, a struct, a tuple and a variant for
    `dup`, and a pointer to any type for `destroy`. */
+/* The place a `delete` of the error a handler binds moves it into, which
+   the messages of sema_move_caught name. */
+static const struct symbol delete_symbol = {.name = {"delete", 6}};
+
 static struct type *check_object(struct checker *c, struct expr *e)
 {
     struct type *t;
@@ -2402,6 +2406,18 @@ static struct type *check_object(struct checker *c, struct expr *e)
         sema_singleton_type(t->element)) {
         sema_error_at(c, e->pos, "`%s` is a singleton and outlives the "
                       "program", sema_tn(t->element));
+        return sema_builtin(c, TYPE_ERROR);
+    }
+    /* DESIGN: `delete(e)` of the error a handler binds ends the
+       handler's copy, as a move into an `own` parameter does, so the
+       delete that every exit of the handler runs passes over it. It is
+       refused where that move is, and the error is not named after it,
+       by T207 of docs/audit/tests-findings.md. */
+    if (e->as.object.op == TOKEN_DELETE &&
+        e->as.object.operand->kind == EXPR_NAME &&
+        e->as.object.operand->symbol != NULL &&
+        e->as.object.operand->symbol->caught &&
+        !sema_move_caught(c, &delete_symbol, e->as.object.operand)) {
         return sema_builtin(c, TYPE_ERROR);
     }
     /* R110 of "Rules of 2026-10-13": a singleton has one instance,

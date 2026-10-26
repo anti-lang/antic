@@ -1,0 +1,1 @@
+errors_delete_of_the_error_a_handler_binds_in_a_loop.anti:18:11: error: `e` moves into `delete` inside a loop of its handler, which would move it again
