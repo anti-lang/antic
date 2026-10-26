@@ -70,7 +70,24 @@ fn main() -> int
 hello
 ```
 
-`main` has one of three signatures: `fn main() -> int`, `fn main(args: []str) -> int`, `fn main(args: []str, env: []str) -> int`. Comments are `//` to the end of the line and `/* */`, which do not nest. `///` documents the next item and `//!` the module, and `//#` and `//#!` do the same for the developers of a library. Source is UTF-8. Indentation is a tab. An item body opens `{` on its own line, a statement block opens `{` on the statement's line.
+`main` has one of three signatures: `fn main() -> int`, `fn main(args: []str) -> int`, `fn main(args: []str, env: []str) -> int`. Comments are `//` to the end of the line and `/* */`, which do not nest. `///` documents the next item and `//!` the module, and `//#` and `//#!` do the same for the developers of a library. The block forms `/** */`, `/*! */`, `/*# */` and `/*#! */` mean the same. `////`, `/**/` and a comment that opens with `/***` stay ordinary comments.
+
+```anti
+/*! The squares of the program. */
+
+/// The area of a square of side `n`.
+pub fn area(n: int) -> int { return n * n; }
+
+/** The perimeter of a square of side `n`. */
+pub fn perimeter(n: int) -> int { return 4 * n; }
+
+//# The side of the test square, for the developers of the module.
+fn side() -> int { return 2; }
+
+//// An ordinary comment.
+```
+
+Source is UTF-8, and a byte order mark at its start is skipped. Identifiers are ASCII letters, digits and `_`, and UTF-8 stands in literals and comments. A CR LF line end in the text of a literal reads as LF. Indentation is a tab. An item body opens `{` on its own line, a statement block opens `{` on the statement's line.
 
 ## Modules
 
