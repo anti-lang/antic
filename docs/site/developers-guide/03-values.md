@@ -1442,6 +1442,8 @@ The text of an `f"..."` is new memory from the C library on every evaluation. It
 | `text.to_bytes(s)` | a copy of the bytes in new memory, freed with `free(result.ptr)` |
 | `text.to_text(b)` | a `str` over a copy of the bytes in new memory, freed with `free(result.ptr)`. It fails when the bytes are no valid UTF-8 |
 
+`s.to_bytes()` and `b.to_text()` are the same two calls written as methods, and the module that writes one imports `anti.text`.
+
 ```anti
 //! name: texts
 import anti.io;
@@ -1816,6 +1818,106 @@ import anti.regex;
 let m = "aaaa".matches(re"(a+)+b");
 ```
 
+`data.patch(find, with)` writes the bytes `with` over every place where `find` stands in `data`, in place, and gives the number of places. `find` is a byte sequence or a byte pattern, and `data` a `[]byte`. A `str` has no `patch`, since a text never changes.
+
+- A byte sequence is found left to right, without overlap. `with` is written at the start of each place.
+- A pattern writes into a group of each match. A pattern with one group writes into it, and one without writes over the whole match. A pattern of more groups names one with a third argument, `into`, by its number or by its name.
+- A fourth argument, `at`, writes `with` that many bytes into the span, and a fifth, `limit`, takes matches as `replace` does. The three come by position, and the call writes `0` for each it leaves out. A byte sequence takes `into` as `0` alone.
+- `patch` never changes the length of `data`. `with` must fit each span from `at` on. Where `find`, `with` and `at` are literals the checker proves the fit, against the fewest bytes the group of a literal can match, and the call cannot fail. Otherwise the call may fail with `regex.LengthMismatch`, before it writes any byte.
+
+```anti
+//! name: patches
+import anti.io;
+import anti.regex;
+import anti.text;
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	let data = "a=1;b=2;a=3".to_bytes();
+	let places = data.patch(b"a=", b"A");
+	let v = "version: 1.10.1".to_bytes();
+	v.patch(re"version: \d+\.\d+\.(\d+)", b"2");
+	let ids = "id 0042, id 0077".to_bytes();
+	let at = 2;
+	let changed = ids.patch(re"id (\d+)", b"99", 1, at) catch {
+		yield -1;
+	};
+	let short = "id 7".to_bytes();
+	let refused = short.patch(re"id (\d+)", b"99", 1, at) catch {
+		yield -1;
+	};
+	let a = data.to_text() catch fatal;
+	let b = v.to_text() catch fatal;
+	let c = ids.to_text() catch fatal;
+	say(f"{a}, {places} places");
+	say(f"{b}");
+	say(f"{c}, {changed} places, short {refused}");
+	free(a.ptr);
+	free(b.ptr);
+	free(c.ptr);
+	free(data.ptr);
+	free(v.ptr);
+	free(ids.ptr);
+	free(short.ptr);
+	return 0;
+}
+```
+
+```text output
+A=1;b=2;A=3, 2 places
+version: 1.10.2
+id 0099, id 0099, 2 places, short -1
+```
+
+The third `patch` writes `99` two bytes into the group of each match. The fourth fails: the group of `id 7` holds one byte, and two bytes at offset 2 do not fit it. `short` keeps its bytes.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: `with` of 3 bytes at offset 0 does not fit the 2 bytes of `find`
+import anti.regex;
+import anti.text;
+let data = "a=1".to_bytes();
+data.patch(b"a=", b"ABC");
+```
+
+```anti refused
+//! error: `with` of 2 bytes at offset 2 does not fit group 1 of the pattern, which can be 1 byte long
+import anti.regex;
+import anti.text;
+let data = "id 7".to_bytes();
+let n = data.patch(re"id (\d+)", b"99", 1, 2);
+```
+
+```anti refused
+//! error: the pattern has 2 groups, so `patch` names the one it writes into with `into`
+import anti.regex;
+import anti.text;
+let data = "1.2".to_bytes();
+data.patch(re"(\d)\.(\d)", b"9");
+```
+
+```anti refused
+//! error: `into` names a group of a pattern, and a byte sequence has none, so it is 0
+import anti.regex;
+import anti.text;
+let data = "a=1".to_bytes();
+data.patch(b"a=", b"A", 1);
+```
+
+```anti refused
+//! error: `str` has no field `patch`
+import anti.regex;
+let s = "abc";
+s.patch(b"a", b"b");
+```
+
 ### How antic builds it
 
 A `Regex` is one pointer to a compiled pattern on the heap. A literal is a global of its module that holds that pointer, one per distinct pattern and mode. A constructor of the module compiles every literal before `main` runs, so a use reads the global and never compiles. A method of `str` is a call of a function of `anti.regex`, which calls the runtime, which calls PCRE2. A `Match` is a value of 96 bytes that records where the search started and what it found, and it owns no memory. A group other than the whole match is found by running the search again.
@@ -1867,7 +1969,46 @@ A failed search gives a value below zero, and the left-out lines branch to `anti
 
 A field of a match is a call. `m.year` calls `group_named` of `anti.regex` with the name, and `m.1` calls `group`. The runtime runs the search of the match again with room for every group and takes the group from it. A `Match` therefore stays a value of fixed size that a function returns and copies freely. `Match` holds the pattern, the three texts `all`, `pre` and `post`, `count`, the searched text, the start of the search and its options, `struct anti_match` of `src/rt/regex.h`. A `?Match` adds the flag byte and its padding.
 
-Where it lives: `src/antic/pattern.c` compiles a literal in the checker with PCRE2. `src/antic/sema_pattern.c` checks the groups, the templates and `exponential-pattern`, and `lower_pattern` and `lower_patterns_start` of `src/antic/lower_pattern.c` write the globals and the constructor. `src/std/anti/regex.anti` holds the functions the methods call, and `src/rt/regex.c` and `src/rt/patterns.c` hold the runtime over PCRE2.
+`patch` is a call of `anti.regex` as well, with the data first and every argument the source leaves out written as 0. The two functions below each make one.
+
+```anti
+//! name: patchcode
+import anti.regex;
+
+export fn mark(p: ?*byte, n: int) -> int
+{
+	let data = []byte { ptr: p, len: n };
+	return data.patch(b"a=", b"A");
+}
+
+export fn bump(p: ?*byte, n: int) -> int
+{
+	let data = []byte { ptr: p, len: n };
+	return data.patch(re"v(\d)", b"2");
+}
+```
+
+```llvm excerpt=patchcode target=linux-x86_64 mode=release
+define dso_local noundef i64 @mark(
+b0:
+  %v29.i = tail call noundef i64 @anti_rt_bytes_patch(ptr %p0, i64 %p1, ptr nonnull @patchcode.0, i64 2, ptr nonnull @patchcode.1, i64 1, i64 0, i64 0)
+  ret i64 %v29.i
+...
+define dso_local noundef range(i64 0, -9223372036854775808) i64 @bump(
+b0:
+  %a1.sroa.0.0.copyload = load i64, ptr @patchcode.pattern.0, align 8
+  %0 = inttoptr i64 %a1.sroa.0.0.copyload to ptr
+  %v32.i = tail call i64 @anti_rt_regex_patch(ptr %0, ptr %p0, i64 %p1, ptr nonnull @patchcode.4, i64 1, i64 1, ptr nonnull @patchcode.5, i64 0, i64 0, i64 0)
+  %v34.i = icmp eq i64 %v32.i, -1
+```
+
+- `mark` passes the data, the 2 bytes of `a=`, the 1 byte of `A`, the offset 0 and the limit 0. The checker found that `A` fits `a=`, so the call is `patch_bytes_fixed` of `anti.regex`, which cannot fail and which opt inlined.
+- `bump` loads its compiled pattern from the global of the literal, as a search does. Its arguments after the data are `with`, the group 1 that the checker read off the literal, an empty name, the offset and the limit.
+- The compare with -1 is the match limit of PCRE2. That path stops the program with the pattern and the line, as a search with a literal does.
+
+`anti_rt_bytes_patch` compares bytes with `memcmp` and copies `with` with `memcpy`. `anti_rt_regex_patch` first walks every match and records where each write goes, and then writes. No search reads a byte that a write changed, and a `with` that does not fit stops the call before any byte changes.
+
+Where it lives: `src/antic/pattern.c` compiles a literal in the checker with PCRE2. `src/antic/sema_pattern.c` checks the groups, the templates and `exponential-pattern`, and `lower_pattern` and `lower_patterns_start` of `src/antic/lower_pattern.c` write the globals and the constructor. `patch_call` and `convert_call` of `src/antic/sema_pattern.c` write the calls of `patch`, `to_bytes` and `to_text`. `src/std/anti/regex.anti` holds the functions the methods call, and `src/rt/regex.c` and `src/rt/patterns.c` hold the runtime over PCRE2, `anti_rt_bytes_patch` and `anti_rt_regex_patch` among it.
 
 ### What it costs
 
@@ -1880,6 +2021,8 @@ Where it lives: `src/antic/pattern.c` compiles a literal in the checker with PCR
 | a search, a test, a step of `find_all` or `split` | one call into the runtime and PCRE2, and two blocks of the heap that the search frees before it returns: the match data of PCRE2 and its frames, at least 20 KiB |
 | reading a group other than `all` | one more search, with the same two blocks |
 | `replace`, `to_slice` | the result in new memory, which the program frees |
+| `patch` with a byte sequence | one call into the runtime and no allocation. The data changes in place |
+| `patch` with a pattern | one call, one walk of the matches by PCRE2 with the two blocks of a search, and one block of the places of the writes, all freed before it returns |
 | `Regex.compile` | one compile by PCRE2 and the same three blocks as a literal. No form of the language gives them back, and `--memory-checks` reports them as a leak |
 | a check of dev mode | none. A dev and a release build make the same calls |
 | locks and atomic operations | none in a search |
