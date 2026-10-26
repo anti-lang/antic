@@ -3,14 +3,14 @@ title: "Tests"
 description: "tests and fixtures blocks, anti test, expected output and memory checks in tests."
 summary: "The `tests` and `fixtures` blocks of a module with how antic builds them and what they cost, `anti test`, how a test states the expected output, and `--memory-checks` in tests."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 190
 tags: [compilers, programming-languages]
 keywords: [unit tests, fixtures, test runner, expected output, memory checks]
 ---
 
-A module holds its tests beside its code, in a `tests` block, and the helpers of those tests in a `fixtures` block. `anti test` compiles a module with both blocks, writes a runner that calls every test, links it and runs it. Every other build drops the two blocks after parsing, so a program and a library file hold nothing of them. Every command of this chapter was run on macos-arm64 with Anti 0.2.0, and the page shows its output as the tool printed it.
+A module holds its tests beside its code, in a `tests` block, and the helpers of those tests in a `fixtures` block. `anti test` compiles a module with both blocks, writes a runner that calls every test, links it and runs it. Every other build drops the two blocks after parsing, so a program and a library file hold nothing of them. Every command of this chapter was run on macos-arm64 with Anti 0.2.0 at commit `11bc8646`, and the page shows its output as the tool printed it.
 
 ## tests and fixtures blocks
 
@@ -222,12 +222,15 @@ Three more cases follow.
 
 ### How antic builds it
 
-The parser turns each function of a block into an ordinary function of the module and records the block it came from. The driver then takes one of two paths.
+A test is an ordinary function of its module, and it lands in the object of the module beside the code it tests. The runner is a second program, one per module. Its `main` calls the tests one after the other in the order of the block. The tests of a module therefore share one process, its main thread and its globals. A test that changes a module-level variable leaves the change for the tests after it.
 
-- Without `--tests` it removes every function that carries a block from the item list, before the checker runs. The `allow` and `unchecked` clauses of those functions go with them. No later pass sees a test.
-- With `--tests` it keeps them and makes each one public, so that a runner in another module calls them by name.
+- Before each test the runner stores the address and the length of the test's name in two words of the runtime. After the test returns it prints the `ok` line.
+- An `assert` is a compare and a branch. The passing path goes on. The failing path calls `anti_rt_assert_failed` with the text the compiler built, which prints `FAIL <name>` and the text and calls `abort`.
+- The process ends at that `abort`, so the later tests of the module do not run. `anti test` reads the status of the process and counts the module as failed.
 
-`anti test` passes `--tests` on every compile of a run. A test is then a function like any other. The dev module of the block `purse` holds this one.
+Neither block reaches a build other than `anti test`. The parser turns each function of a block into an ordinary function of the module and records the block it came from. Without `--tests` the driver removes those functions before the checker runs, with their `allow` and `unchecked` clauses, so no later pass sees a test. With `--tests` it keeps them and makes each one public, so that the runner, a module of its own, calls them by name.
+
+`anti test` passes `--tests` on every compile of a run. The dev module of the block `purse` holds the test below.
 
 ```llvm excerpt=purse target=linux-x86_64 mode=dev option=tests
 define hidden void @purse.largest_takes_the_second() #0 {
@@ -280,7 +283,7 @@ fn main() -> int
 
 The module path of a runner is `anti.test.<module>`, with each dot of the module written as `_`. The compiler refuses a library of a program under the root `anti.`, so the two never clash. A module with `setup` gets the call `<module>.setup();` before each test and `<module>.teardown();` after it.
 
-`anti_rt_test_running` stores the address and the length of the name in two words of the runtime. `anti_rt_assert_failed` reads them. With a name set it prints `FAIL <name>` and then the text of the assertion to the standard error, and calls `abort`. A test that returns reaches the `printf` that prints `ok <name>`.
+`anti_rt_test_running` stores the address and the length of the name in two words of the runtime, under a lock of the runtime that guards the pair. A worker of the test that fails while the runner names the next test then reads one name whole. `anti_rt_assert_failed` takes the same lock to read the pair. With a name set it prints `FAIL <name>` and then the text of the assertion to the standard error, and calls `abort`. Without one, in a program that is no runner, it prints the text alone. A test that returns reaches the `printf` that prints `ok <name>`.
 
 The mode decides how the runner is built.
 
@@ -295,7 +298,7 @@ Where it lives: `test_block` and `parser_parse` of `src/antic/parser.c`, `drop_t
 
 ### What it costs
 
-A build without `--tests` pays nothing for the two blocks. The module `purse` was compiled with `-S` for linux-x86_64, once as written and once with both blocks deleted. The two assembly files are equal byte for byte in dev mode and in release mode. So are the two library files that `antic -c` writes, at 17,903 bytes each for the block as this page shows it. The test `anti_test` of the suite checks that no name of a block reaches the assembly or the library file.
+A build without `--tests` pays nothing for the two blocks. The module `purse` was compiled with `-S` for linux-x86_64, once as written and once with both blocks deleted. The two assembly files are equal byte for byte in dev mode and in release mode. So are the two library files that `antic -c` writes, at 18,185 bytes each for the block as this page shows it. The test `anti_test` of the suite checks that no name of a block reaches the assembly or the library file.
 
 A test build holds what the excerpt and the runner show.
 
@@ -305,14 +308,25 @@ A test build holds what the excerpt and the runner show.
 | An `assert` of a dev run | one compare, one branch and one text in the read-only data. The call of `anti_rt_assert_failed` runs on the failing path alone |
 | An `assert` of a run with `--release` | nothing. The condition is removed with it |
 | The runner, per test | one call of `anti_rt_test_running`, one call of the test and one `printf`. One call of `setup` and one of `teardown` where the module declares them |
-| The runtime | two words, 16 bytes, for the name of the running test |
+| The runtime | two words, 16 bytes, for the name of the running test, and one lock of the runtime that guards them |
 | Heap allocations of the runner | none of its own. `printf` belongs to the C library |
-| Atomic operations and locks | none |
+| Atomic operations and locks | one take and one release of that lock per test, and one more pair in a failed assertion |
 | Processes | one per module that has a test |
 
 The text of an assertion holds the file, the line and the condition or the message. The one of the excerpt is 61 bytes and a terminator.
 
 A dev run calls antic once for the library file of each module and once for its object. For each module with a test it adds one call per imported library file and one call that compiles and links the runner. A dev run keeps no cache: every run compiles each of these again. The page states no time for a run, since `tests/bench` holds no program for one.
+
+The forms that check a program differ in where the check runs and what it reaches.
+
+| Form | Runs in | Reaches | Costs the program that ships |
+|---|---|---|---|
+| A `tests` block | `anti test`, one process per module | every private item of its module | nothing |
+| A program with `main` and an expected output | a run of the program, compared by the shell or a runner | what the program prints | nothing beyond the program |
+| `assert(c)` in the code | every dev run of the program | the state at that place | nothing in release, a compare and a branch in dev |
+| `if !c { fail "..."; }` | every run, in every build | the state at that place | a compare and a branch, and an error to handle |
+
+A `tests` block is the form for a function whose result a test computes and compares. Private helpers are in its reach. A run against an expected output is the form for what the program prints, and it tests the build that ships. An `assert` states a fact of the code that every dev run of the program checks, at no cost in release. A condition that the input can break is a `fail`, since a release build drops the assertion.
 
 ### Pitfalls
 
@@ -328,6 +342,7 @@ For a C programmer:
 - A test calls a function that is private to its module without including a source file, since the block is part of the module.
 - An assertion with a call in its condition is a warning, and the page of a test binds the result first. Under `--release` the assertion is gone, as under `NDEBUG`.
 - No test is linked into a program by accident. A build that is not a test build holds none of the code.
+- The work directory of `anti test` is a root of every compile. An import that the command line does not name is found in the library file an earlier run left there. That file may be older than its source.
 
 For a C++ programmer:
 
@@ -349,10 +364,10 @@ anti test -I src src/com/example/purse.anti
 | `-I <dir>` | a root. The module path of a file is its path under the root, so `src/com/example/purse.anti` under `-I src` is `com.example.purse` |
 | `--release` | builds each runner as a whole program with the assertions and the dev checks off |
 | `--memory-checks` | builds every module with `--memory-checks` and reads each report through the symbolizer |
-| `--work <dir>` | the directory of the files of the run, `tests` in the build directory of `[layout]` by default, which is `build/tests` |
+| `--work <dir>` | the directory of the files of the run, `tests` in the build directory of `[layout]` by default, which is `build/tests`. It is the first root of every compile of the run |
 | `--runtime <dir>` | the runtime archive, for a build of Anti itself |
 
-The root is compared with the path as written. `-I src` matches `src/com/example/purse.anti` and does not match `./src/com/example/purse.anti`, whose module is then `purse` alone.
+The root and the path are made absolute and normalised before they are compared, by R147 of "Rules of 2026-10-13". `-I src`, `-I ./src` and `-I src/` give `com.example.change` for `src/com/example/change.anti`, for `./src/com/example/change.anti` and for its absolute path alike. A file under no root takes its file name as its module path, `change`, with the warning `single-segment-path`.
 
 The command reads `anti.toml` of the current directory when there is one. It takes the package name from it, and the providers of the `[inject]` table with those of `[inject.test]` laid over them, which [chapter 15]({{% relref "15-hooks" %}}) describes. The directories of `[layout]` choose no file: the files of a run are the ones the command line names.
 
@@ -383,7 +398,9 @@ The `ok` lines and the totals go to the standard output. The exit status is 0 wh
 | `anti/test/com_example_purse.anti` | the runner |
 | `com_example_purse.runner.o`, `com_example_purse.runner` | the object of the runner and the linked program |
 
-Every module that a module of the run imports is named in the same run, or is a library file under a root. The standard library is found in the runtime archive. A run of `tally.anti` alone, which imports `com.example.purse`, stops with "cannot find module `com.example.purse`".
+Every module that a module of the run imports is named in the same run, or is a library file under a root. The work directory is the first root, so a library file that an earlier run wrote there counts. The standard library is found in the runtime archive. A run of `src/com/example/tally.anti` alone, which imports `com.example.purse`, stops with "cannot find module `com.example.purse`" in a fresh work directory. In the work directory of the run above it finds `com/example/purse.antl` and passes.
+
+A module of the run without a `tests` block gets no runner. The totals count it among the modules, with its zero tests.
 
 ### A failed assertion
 
@@ -433,10 +450,10 @@ The standard error holds three lines.
 ```text
 FAIL com.example.change.seven_is_three_twos
 com/example/change.anti:17: assertion failed: n == 4
-antic: build/tests/com_example_change.runner ended by signal 6
+anti: build/tests/com_example_change.runner ended by signal 6
 ```
 
-The first line names the test and the second the file, the line and the condition. The file is the path under the root. The third line reports the `abort` of the runner, and its prefix is `antic` although the tool is `anti`. The third test did not run. The totals count the tests the modules declare, three here, and not the tests that ran.
+The first line names the test and the second the file, the line and the condition. The file is the path under the root. The third line reports the `abort` of the runner. The third test did not run. The totals count the tests the modules declare, three here, and not the tests that ran.
 
 A run of two modules starts one process per module, so the failure of one module leaves the tests of the other running. The run below reports the failure of `change` and all three tests of `purse`.
 
@@ -489,7 +506,7 @@ The dev run stops at the bounds check of `pick`. The standard error holds the me
 
 ```text
 com/example/shelf.anti:5: index out of bounds: index 3, length 3
-antic: build/tests/com_example_shelf.runner ended by signal 6
+anti: build/tests/com_example_shelf.runner ended by signal 6
 ```
 
 With `half(3)` in the first test, the error reaches `fatal`. The run prints the origin and the text of the error, `com/example/shelf.anti:11:3: odd`. A dev run adds the raw frames of the stack trace, which `anti symbols resolve` of [chapter 18]({{% relref "18-the-tool" %}}) reads. The runner exits with a status other than 0, and the module counts as failed.
