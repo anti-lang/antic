@@ -251,7 +251,7 @@ fn end(n: int)
 
 ### How antic builds it
 
-A pointer is the type `ptr` of LLVM in both forms. `alloc T { }` is a call of `malloc` with the size of `T`, a test of the result and the stores of the literal. A type that `align(N)` raises above 16 takes its memory from `anti_rt_alloc_aligned` at `N` instead, with the same test.
+A pointer is the type `ptr` of LLVM in both forms. `alloc T { }` is a call of `malloc` with the size of `T`, a test of the result and the stores of the literal. A type that `align(N)` raises above 16 takes its memory from `anti_rt_alloc_aligned` instead, with the same test, as `alloc(T, n)` below does.
 
 ```llvm excerpt=ptrs target=linux-x86_64 mode=release
 define internal noundef nonnull ptr @make(i64 noundef %p0)
@@ -283,7 +283,7 @@ b2:
   ret ptr %v1
 ```
 
-- `i64 8` is the size of an `int` and `i64 16` the alignment of `malloc`. A type that `align(N)` raises above 16 passes `N`, and the runtime then takes the aligned memory of the platform, `posix_memalign` on macOS and Linux and `_aligned_malloc` on Windows.
+- `i64 8` is the size of an `int` and `i64 16` the alignment of `malloc`. A type that `align(N)` raises above 16 passes `N`, and the runtime then takes the memory of `posix_memalign` on macOS and Linux. Windows has no aligned memory that `free` gives back, so a Windows program gets the memory of `malloc` there, aligned to 16 alone.
 - The last argument asks for zeroed memory. A class takes it, and so does a type that `=` tears down, such as a struct that holds a class value or an `own` pointer. The runtime then calls `calloc`, or clears the aligned memory with `memset`.
 - The runtime multiplies, and a count below zero or a product past 64 bits gives `none` with no call of the allocator.
 - The call stays a call in a release build. A `malloc` in the program, whose memory goes to `free` alone, is one LLVM removes, and it takes the result as memory. The release build would then get memory where the dev build gets `none`.
@@ -320,7 +320,7 @@ Where it lives: the cases `EXPR_ALLOC` and `EXPR_FREE` of `lower_expr` in `src/a
 | `*p` and `p.f` | one load or store | the same |
 | `p[i]` | one load or store, no check | the same |
 | `alloc T { }` | one `malloc`, one compare, one branch, one store per field. Above an alignment of 16, one call of `anti_rt_alloc_aligned` in place of `malloc` | the same |
-| `alloc(T, n)` | one call of the runtime, one compare of the count, one multiplication, one `malloc` or `calloc`. Above an alignment of 16, the aligned memory of the platform | the same |
+| `alloc(T, n)` | one call of the runtime, one compare of the count, one multiplication, one `malloc` or `calloc`. Above an alignment of 16, `posix_memalign` on macOS and Linux | the same |
 | `free(p)` | one `free` | the same |
 | Checks inserted | none | none |
 | Atomic operations and locks | 0 | 0 |
