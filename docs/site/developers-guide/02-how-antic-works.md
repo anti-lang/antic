@@ -225,7 +225,7 @@ A function is named by its module and its name, `walk.area`, with no mangling. `
 
 `mulov` multiplies and records whether the signed product left the range of `i64`. `branchov` reads that record and goes to `b1` on overflow. Block `b1` is the failure arm of an overflow check. It calls `anti_rt_check_failed` of `src/rt/check.c` with a text, its length of 26 bytes, the kind of the check and the two operands. The text is the global `walk.0`, which names the file, the line and the operation.
 
-Lowering writes that check in every mode, and the same holds for a bounds check, a division check and an assertion. The dev and the release IR after lowering are the same text. The step after the whole-program pass removes the failure arms the mode leaves out.
+Lowering writes that check in every mode, and the same holds for a bounds check, a division check and an assertion. The dev and the release IR of `walk` after lowering are the same text. The step after the whole-program pass removes the failure arms the mode leaves out. Three checks of dev mode stand in the dev IR alone: the test of the table pointer before a call through the table of a class, the lock calls of `sync` that record the line of the lock, and the test of a second `join`. `lower_load_table` of `src/antic/lower_expr.c`, `src/antic/lower_sync.c` and `src/antic/lower_worker.c` write them when the mode is dev.
 
 The parameter of `main` is `agg []str`, an aggregate that travels as a pointer in the IR. A `[]str` is the struct `{ ptr: ptr, len: i64 }`. `args.len` is a `ptradd` to the field and a `load`.
 
