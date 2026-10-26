@@ -1,13 +1,13 @@
 ---
 title: "Generics"
-description: "Generic functions and classes, constraints, one copy per use, what can be generic and the size of the code."
-summary: "Generic functions and classes with their type parameters, constraints checked where the generic is written and at each use, one compiled copy per use, what can be generic, and the size of the code, each with how antic builds it and what it costs."
+description: "Generic functions and classes, constraints, constant parameters, one copy per use, what can be generic, generics of library files and the size of the code."
+summary: "Generic functions and classes with their type parameters, constraints checked where the generic is written and at each use, constant parameters, one compiled copy per use, what can be generic, generics of library files, and the size of the code, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 100
 tags: [compilers, programming-languages]
-keywords: [generics, type parameters, constraints, monomorphization, templates, code size]
+keywords: [generics, type parameters, constraints, constant parameters, monomorphization, templates, library files, code size]
 ---
 
 A generic is checked once, where it is written, against the constraints of its type parameters. Each use with concrete type arguments then compiles a copy of its own, with the arguments in place. A copy is the code a programmer would have written by hand for those types. It has no boxing, no table of types and no test at run time. A release build merges copies whose code is identical.
@@ -40,6 +40,8 @@ A use names its arguments, or the compiler infers them.
 In an expression, `<` after a name opens type arguments when a list of types closed by `>` follows it. The token after that `>` must be `(`, `.` or `{`. So `m < 9 && 2 > 1` stays two comparisons. `>>` closes two lists.
 
 Two uses with the same arguments are one type, in every module. A generic that nothing uses compiles to nothing.
+
+A union and a `type` alias take no type parameters. A struct holds the generic field where a union would.
 
 A value of a type parameter moves. A parameter that the function keeps, returns or passes on is marked `own`, and `dup(x)` copies one. [Chapter 11]({{% relref "11-ownership" %}}) gives the rule and its reason.
 
@@ -157,7 +159,149 @@ sizes: Pair<int, str> 24, Pair<f32, f32> 8, Pair<u8, bool> 2, Ring<u8, 4> 16, Ri
 
 Each copy of a type has the layout of its arguments. `Pair<u8, bool>` is 2 bytes and `Pair<int, str>` is 24. `Ring<u8, 4>` holds four bytes inline, and `Ring<int, 8>` holds 64.
 
+Inference through the base classes follows `inherits` up the chain. `Longer` below inherits `Countdown`, which inherits `Source<int>`, so `sum(&l, 0)` finds `T = int` two levels up. `Letters` names `Source<char>` in an `implements` line, which gives no type argument, and its call writes `count<char>(&w)`.
+
+```anti
+//! name: bases
+import anti.io;
+import anti.text;
+
+abstract class Source<T>
+{
+	abstract fn next(self) -> ?T;
+}
+
+class Countdown inherits Source<int>
+{
+	pub left: int = 3,
+
+	concrete fn next(self) -> ?int
+	{
+		if self.left == 0 {
+			return none;
+		}
+		self.left -= 1;
+		return self.left;
+	}
+}
+
+class Longer inherits Countdown { }
+
+class Letters
+{
+	implements src: Source<char>,
+
+	pub left: int = 2,
+
+	concrete fn next(self) -> ?char
+	{
+		if self.left == 0 {
+			return none;
+		}
+		self.left -= 1;
+		return 'a';
+	}
+}
+
+fn sum<T: add>(s: *Source<T>, own zero: T) -> T
+{
+	let total = zero;
+	let v = s.next();
+	while v != none do {
+		total = total + v;
+		v = s.next();
+	}
+	return total;
+}
+
+fn count<T>(s: *Source<T>) -> int
+{
+	let n = 0;
+	while s.next() != none do {
+		n += 1;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let c = Countdown { };
+	let l = Longer { left: 4 };
+	let w = Letters { };
+	let line = f"sum {sum(&c, 0)} {sum(&l, 0)}, count {count<char>(&w)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+sum 3 6, count 2
+```
+
+```ir excerpt=bases target=linux-x86_64 mode=release
+    %18 = call i64 @bases.sum<int>(%0, 0)
+...
+    %23 = call i64 @bases.sum<int>(%1, 0)
+...
+    %28 = ptradd %2, offset_of bases.Letters.src
+    %29 = call i64 @bases.count<char>(%28)
+...
+fn bases.sum<int>(%0: ptr nonnull deref(size_of bases.Source<int>), %1: i64) -> i64 {
+```
+
+The two calls of `sum` reach one copy, `sum<int>`, with the address of each object. A class that inherits `Source<int>` holds it at offset 0, so the address needs no change. The call of `count` adds the offset of the part `src` first, since `Letters` holds `Source<char>` as a sub-object.
+
 The checker refuses each of the following.
+
+```anti refused
+//! error: `s` of `count` takes `*Source<T>`, found `*Letters`
+abstract class Source<T>
+{
+	abstract fn next(self) -> ?T;
+}
+
+class Letters
+{
+	implements src: Source<char>,
+
+	concrete fn next(self) -> ?char { return none; }
+}
+
+fn count<T>(s: *Source<T>) -> int
+{
+	return 0;
+}
+
+fn letters() -> int
+{
+	let w = Letters { };
+	return count(&w);
+}
+```
+
+```anti refused
+//! error: `items` of `first` takes `[]T`, found `int`
+fn first<T>(items: []T) -> T
+{
+	return items[0];
+}
+
+fn one(n: int) -> int
+{
+	return first(n);
+}
+```
+
+```anti refused
+//! error: a union takes no type parameters
+union Bits<T> { whole: T, raw: u64 }
+```
+
+```anti refused
+//! error: a `type` alias takes no type parameters
+type Items<T> = []T;
+```
 
 ```anti refused
 //! error: nothing in the arguments gives `T` of `width`, so the call writes it out after the name
@@ -237,7 +381,7 @@ fn keep<T>(a: T) -> T
 
 ### How antic builds it
 
-The checker checks the generic with its parameters open and keeps its syntax tree. A use with concrete arguments clones that tree, puts the arguments into every type and checks the clone as written code. Lowering sees only the clones. The IR holds no type parameter.
+At run time a generic does not exist. Each use with concrete arguments is a function or a type of its own, as if the program had written it out for those types. A call reaches it directly. No value carries a type at run time, nothing is boxed, and no table of types is passed. The checker makes each copy from the checked syntax tree of the generic, with the arguments in every type, and checks it as written code. The IR of antic and the LLVM module hold the copies alone, with no type parameter left.
 
 ```ir excerpt=gen target=linux-x86_64 mode=release
 type gen.Cell<float> = struct { super: anti.lang.Object, value: f64, reads: i64 }
@@ -276,7 +420,7 @@ define weak_odr hidden noundef i64 @gen.largest$3cint$3e(i64 noundef %p0, i64 no
 
 `$3c` is `<` and `$3e` is `>`, each byte outside letters, digits, `_` and `.` as `$` and two hex digits. A debugger and a stack trace show the name as the program writes it, `gen.largest<int>`. The call is direct, to the one copy the arguments chose. `weak_odr` is the linkage of a copy in a dev object, which the section on copies explains.
 
-A library file stores a `pub` generic as its checked syntax tree with the parameters open. A module that uses it makes its copies from that tree, under the path of the module that declares the generic.
+A library file stores a `pub` generic as its checked syntax tree with the parameters open. A module that uses it makes its copies from that tree, under the path of the module that declares the generic. The section on library files at the end of this chapter shows it.
 
 Where it lives: `sema_generic_call` and `sema_subst` of `src/antic/sema_generic.c` infer and substitute. `sema_compile_copies` of `src/antic/sema_copies.c` clones the tree of each copy. `types_symbol_name` of `src/antic/types.c` writes the name, and `target_mangle` of `src/antic/target.c` the escapes. `docs/notes/generics.md` holds the choices of the passes.
 
@@ -294,6 +438,13 @@ Where it lives: `sema_generic_call` and `sema_subst` of `src/antic/sema_generic.
 | Read-only data per copy of a class | one table and one descriptor | the same |
 
 The cost of a generic is its code size and nothing at run time. The section on copies counts the functions of a program.
+
+The choice among the forms that serve more than one type:
+
+- A generic makes one copy per distinct set of arguments, and each copy runs as the hand-written function: `largest<int>` is the two instructions of `largest_int`. Its cost is code, and a release build merges copies whose IR is the same.
+- A function over an interface pointer, `*Source<int>` or `*Shape`, has one body for every class, and each call through it is two loads and an indirect call. It suits code that holds objects of more than one class at once, and code whose size matters more than the call.
+- A function written once per type is what a generic writes for the program, with the same code. It is the form when the bodies differ, since a generic has one body and no specialisation.
+- A `*byte` with a size in the style of C loses the type, and the checker no longer checks the body. No form of Anti needs it for a container.
 
 ### Pitfalls
 
@@ -515,6 +666,59 @@ fn measure() -> int
 constraint Key = eq + missing;
 ```
 
+```anti refused
+//! error: no operand of `operator fn add` names `T`, which no use of the operator can give
+struct Money { cents: int }
+
+operator fn add<T>(a: Money, b: Money) -> Money
+{
+	return a;
+}
+```
+
+The receiver of a function of an interface constraint needs one path to the interface. A class that reaches `Closable` through two of its parts leaves the copy two sub-objects to choose from. The checker refuses the call in the copy.
+
+```anti refused
+//! error: `t` converts to `*Closable` through `ser` and through `w`, name one
+abstract class Closable
+{
+	abstract fn close(self) -> int;
+}
+
+abstract class Serializable inherits Closable
+{
+	abstract fn write(self) -> int;
+}
+
+abstract class Writer inherits Closable
+{
+	abstract fn flush(self) -> int;
+}
+
+class Both
+{
+	implements ser: Serializable,
+	implements w: Writer,
+
+	concrete fn close(self) -> int { return 1; }
+
+	concrete fn write(self) -> int { return 2; }
+
+	concrete fn flush(self) -> int { return 3; }
+}
+
+fn close_of<T: Closable>(t: *T) -> int
+{
+	return t.close();
+}
+
+fn main() -> int
+{
+	let b = Both { };
+	return close_of(&b);
+}
+```
+
 ### How antic builds it
 
 A constraint is a rule of the checker and leaves no code. In a copy, an operator on a value of the type argument is checked again with the concrete type. It becomes what that type gives it.
@@ -560,12 +764,18 @@ Where it lives: `sema_meets_hook` and `sema_meets_param` of `src/antic/sema_gene
 | Heap allocations, calls into the runtime | 0 | 0 |
 | Work of the checker | the body once, and each use once | the same |
 
+The choice among the constraints:
+
+- An operator constraint, `T: lt` or `T: add`, costs an instruction for a built-in type. For a struct or a class it costs a direct call of the `operator fn`, with no dispatch. It is the form for arithmetic and comparison over many types.
+- An interface constraint, `S: Shape`, makes a copy per class that still calls through the table of the interface part, as `area_of<cons.Square>` shows. Its gain over a plain `*Shape` parameter is the type: a result or a second parameter of type `S` keeps the class.
+- No constraint at all gives a container that stores, moves and measures its values. Every collection of [chapter 16]({{% relref "16-collections" %}}) starts there and adds `eq`, `hash` or `lt` where an operation needs it.
+
 ### Pitfalls
 
 For a Java programmer:
 
 - A constraint names an operator, `T: lt`, where Java names an interface with a method. `a < b` is then written on values of `T`.
-- An interface constraint, `S: Shape`, needs no object behind an interface reference. The copy knows the class.
+- An interface constraint, `S: Shape`, takes a pointer to the class itself. The copy still calls the functions of the interface through its table, as a call through a `Shape` would.
 
 For a C programmer:
 
@@ -577,6 +787,167 @@ For a C++ programmer:
 - A constraint is checked at each use by name. No substitution failure silently removes a candidate.
 - A struct has no `<` unless its module declares `operator fn lt`, so `Ordered` is not met by a struct by default.
 - A simd struct meets `add` but not `Number`. A generic that compares its values with `<` takes no simd struct.
+
+## Constant parameters
+
+### What you know
+
+C++ takes a value as a template argument, as `std::array<T, N>` takes its length, and each value gives a type and code of its own. Java has no such parameter: the length of an array is a field of the object, read at run time. C writes a length into a type with a macro or keeps it beside a pointer.
+
+### The feature
+
+`N: int` in the list of a generic is a constant parameter. Its argument is a number that the compiler knows, and in the body `N` reads as a constant of type `int`.
+
+- The argument is an integer literal or the name of a constant, `Row<3>` or `Row<SIDE>`. An argument that is no constant is refused, and so is a type where `N` stands.
+- `N` serves where a constant may stand: the length of an array, `[N]int`, the default of a field and a constant of a class, `N * 2`.
+- A call infers `N` from the length of an array argument, as it infers a type: `total([1, 2, 3])` is `total<3>`.
+- A default of a field that names `N`, as `[0; N]` or `N + 1`, takes the argument of each copy. So does a constant of the class, so `Row<5>.WIDTH` is 10.
+- A copy runs the checks that a constant expression runs. `N <<% (N - 4)` with `N = 3` is refused in the copy, as `3 <<% -1` is.
+- The check that a constant expression stays in the range of its type is made once, in the generic, where `N` has no value. A copy whose default leaves the range takes what the back end computes. `pub n: i8 = (N + 100) as i8` gives -56 in `Row<100>`.
+- The parameter is `int`. `N: i8`, a float and a `bool` are refused.
+
+```anti
+//! name: rows
+import anti.io;
+import anti.text;
+
+const SIDE: int = 4;
+
+class Row<N: int>
+{
+	pub cells: [N]int = [0; N],
+	pub n: int = N + 1,
+	pub const WIDTH: int = N * 2;
+
+	pub fn width(self) -> int
+	{
+		return Row.WIDTH;
+	}
+}
+
+fn total<N: int>(a: [N]int) -> int
+{
+	let t = 0;
+	for x in a {
+		t += x;
+	}
+	return t + N;
+}
+
+fn main() -> int
+{
+	let r = Row<3> { };
+	let s = Row<SIDE> { };
+	r.cells[2] = 7;
+	let line = f"n {r.n} {s.n}, cell {r.cells[2]}, width {r.width()} {s.width()} {Row<5>.WIDTH}, total {total([1, 2, 3])}, sizes {size_of(Row<3>)} {size_of(Row<SIDE>)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+n 4 5, cell 7, width 6 8 10, total 9, sizes 40 48
+```
+
+`Row<3>` is its table pointer, three `int` cells and `n`, 40 bytes. `Row<4>` holds one cell more.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: a constant parameter is written `N: int`
+struct Row<N: i8> { cells: [N]int }
+```
+
+```anti refused
+//! error: `n` must be a constant for `N`
+struct Ring<T, N: int> { items: [N]T, head: int }
+
+fn make(n: int) -> int
+{
+	let r: Ring<u8, n> = Ring<u8, n> { items: [0; 4], head: 0 };
+	return r.head;
+}
+```
+
+```anti refused
+//! error: `3 <<% -1` shifts out of range
+fn cells<N: int>() -> int
+{
+	let a: [N <<% (N - 4)]int = [0; N <<% (N - 4)];
+	return a.len;
+}
+
+fn main() -> int
+{
+	return cells<3>();
+}
+```
+
+### How antic builds it
+
+Each value of `N` is a copy of its own, and in the copy `N` is a number. Nothing reads `N` at run time: an array of the copy has its length in its type, and a default or a constant that names `N` is a number in the code.
+
+```ir excerpt=rows target=linux-x86_64 mode=release
+type rows.Row<3> = struct { super: anti.lang.Object, cells: [3]int, n: i64 }
+...
+type rows.Row<4> = struct { super: anti.lang.Object, cells: [4]int, n: i64 }
+...
+b1:
+    %6 = slt i8 %5, 3
+...
+    store i64 4, %10
+...
+fn rows.Row<3>.width(%0: ptr nonnull deref(size_of rows.Row<3>)) -> i64 {
+b0:
+    ret i64 6
+...
+fn rows.total<3>(%0: agg [3]int) -> i64 {
+```
+
+- `Row<3>` and `Row<4>` are two classes with two layouts, two tables and two descriptors. `Row<SIDE>` is `Row<4>`, since the name stands for its value.
+- The default `[0; N]` of `r` is a loop over the three cells, `slt i8 %5, 3`, that stores 0 into each. The default `N + 1` is the store of 4.
+- `width` returns the constant `WIDTH` of its copy, 6 in `Row<3>`.
+- `total<3>` takes an array of three `int` by value. The length came from the argument.
+
+`Row<5>.WIDTH` makes the copy `Row<5>`, its table and its functions, although `main` holds no value of it. A dev object keeps all of them. A release build folds the constant to 10 where it stands and drops the copy, since nothing reaches its table.
+
+Where it lives: `sema_compile_copies` of `src/antic/sema_copies.c` makes the copies, and `sema_subst` and `sema_subst_const` of `src/antic/sema_generic.c` put the number in place of `N`. `lower_class_init` of `src/antic/lower_class.c` writes the defaults of each copy.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| Bytes of a copy | the layout with `N` in place: `Row<3>` 40, `Row<4>` 48 | the same |
+| A read of `N` | a constant | a constant |
+| A default `[0; N]` | a loop of `N` stores | the same loop before `opt` |
+| Code | one copy of each function per distinct value of `N` | the same, less merged copies and copies nothing reaches |
+| Read-only data | one table and one descriptor per copy of a class | the same, for the copies something reaches |
+| Heap allocations, calls into the runtime | 0 | 0 |
+| Checks inserted | the bounds of an index into `[N]T`, as for any array | none |
+
+The choice among the forms that hold a count:
+
+- A constant parameter puts the count into the type. The array lies inline, with no pointer and no allocation, and each distinct count is one more copy of the code. It suits a few counts known when the program is written, as `Ring<T, N>` of [chapter 16]({{% relref "16-collections" %}}) does for a buffer that never allocates.
+- A slice, `[]int`, carries its count at run time in its second word. One function serves every count, and the elements lie wherever the slice points.
+- A collection such as `List<T>` holds its count and grows on the heap. It suits a count that changes while the program runs.
+
+### Pitfalls
+
+For a Java programmer:
+
+- `Row<3>` and `Row<4>` are two types with two layouts. A function that takes a `Row<3>` refuses a `Row<4>`.
+- Each count adds code. A program that uses 50 lengths has 50 copies of each function it calls.
+
+For a C programmer:
+
+- The length belongs to the type and travels with it, where C passes it beside a pointer.
+- An argument is a literal or the name of a constant. `Row<2 + 1>` does not parse as an argument.
+
+For a C++ programmer:
+
+- The parameter is `int`. No `bool`, enum, pointer or type of a class is a constant parameter.
+- A constant in a copy is not checked again for its range. A default computed from an argument at the edge of its type wraps, and no message names it.
 
 ## Copies per use
 
@@ -593,6 +964,8 @@ Every use of a generic with concrete arguments has a compiled copy, and two uses
 - A dev build compiles one module at a time. Each object carries the copies its module uses, and the linker keeps one of each name.
 - A release build compiles the whole program, so each copy exists once. It then merges the copies whose code is identical and keeps the first.
 - `export type PersonList = List<Person>;` writes a copy into the C header of a library as an exported class. A generic `export fn` is refused, since C has no open generic.
+- Every build checks every copy, `antic --front-end` and `anti check` included. An error that a copy alone shows, such as a worker rule broken by one argument, stands in their output as in a build.
+- A generic whose copies name ever deeper copies of it, as `deep<T>` calling `deep<Tag<T>>`, would make copies without end, and the checker refuses it.
 
 ```anti
 //! name: copies
@@ -661,13 +1034,31 @@ picked 30 12 5 7, slots 30 12 9
 
 The program uses `pick` with four type arguments and `Slot` with three.
 
-The checker refuses the following.
+The checker refuses each of the following.
 
 ```anti refused
 //! error: an `export fn` cannot be generic. Export a named copy with `export type`
 export fn id<T>(own a: T) -> T
 {
 	return a;
+}
+```
+
+```anti refused
+//! error: the copies of `deep` name ever deeper copies of it
+struct Tag<T>
+{
+	v: T,
+}
+
+fn deep<T>(n: int) -> int
+{
+	return deep<Tag<T>>(n);
+}
+
+fn main() -> int
+{
+	return deep<int>(1);
 }
 ```
 
@@ -806,11 +1197,7 @@ The generic forms combine with the other features of the language.
 - A generic type declares operators and language hooks, so `for x in list` works for every copy of a list with `operator fn iter`.
 - A function type is a type argument, as in `List<fn(int) -> int>`.
 
-A library file carries the tree of a generic function and of a generic class. It carries neither a function with type parameters of its own inside a class nor a type nested in a generic class. A module that uses such a class from a library file is refused with the message below. Both forms compile for the module that declares them.
-
-```text
-error: antic compiles no copy of `Stack` yet, which names a type its arguments do not settle
-```
+A library file carries neither a function with type parameters of its own inside a class nor a type nested in a generic class. Both forms compile for the module that declares them, and the section on library files below gives the messages another module gets.
 
 ```anti
 //! name: forms
@@ -1002,12 +1389,18 @@ Where it lives: `sema_compile_copies` of `src/antic/sema_copies.c` makes the cop
 | A generic `may fail` function | the out pointer and the error result of [chapter 6]({{% relref "06-errors" %}}) | the same |
 | Table entries | none for a function with type parameters of its own | none |
 
+The choice among the forms that add a type to a member:
+
+- A function with type parameters of its own is a direct call, one copy per set of arguments, and no entry of the table. It suits a helper such as `top<U>` whose result type each caller chooses. A derived class cannot replace it.
+- A `pub` function of the class with fixed types has one body and an entry of the table. A derived class replaces it, and a call may dispatch.
+- A type nested in a generic class follows its copies, one `Node` per copy of `Stack`. A type at module level with parameters of its own, `Node<T>`, serves the same and reaches other modules through a library file.
+
 ### Pitfalls
 
 For a Java programmer:
 
 - A function with its own type parameters is never dispatched. A derived class cannot replace it.
-- A class that nests a type and takes type parameters cannot be used from a library file. It is used inside the module that declares it.
+- A class that nests a type and takes type parameters cannot be used from a library file. It is used inside the module that declares it, or its nested type moves to module level.
 
 For a C programmer:
 
@@ -1017,3 +1410,159 @@ For a C++ programmer:
 
 - A function with type parameters of its own cannot be `abstract`, as a member template cannot be virtual.
 - A generic worker is checked per copy. A copy whose argument holds a pointer is refused, although the generic compiles.
+
+## Generics of library files
+
+### What you know
+
+A C++ template ships as source in a header, and every translation unit that includes it compiles its instantiations. A Java generic ships in a `.class` file as one erased body. C ships a macro in a header, or a function over `void *` in a library.
+
+### The feature
+
+`antic -c` writes the library file of a module, `<module>.antl`, which [chapter 18]({{% relref "18-the-tool" %}}) describes. For every `pub` generic of the module, a function, a struct, a class, a variant, a `constraint` or a `type`, it carries the checked syntax tree with the type parameters open. It carries no source text.
+
+- A module that imports the library makes its copies from that tree with its own arguments. A copy has the path of the module that declares the generic, `com.example.shelf.largest<int>`. Two modules that make one copy therefore make one type and one symbol.
+- A copy reaches what the body of the generic reaches, the private functions and constants of the library module among them. `counted` below calls the private `clamp`.
+- The library file carries every constant of a generic class that another module may name. Its type and its value keep the type parameters open, and a copy computes the constant with its own arguments. `shelf.Slot<u8>.BYTES` is 1 and `shelf.Slot<i32>.BYTES` is 4.
+- The library file carries no function with type parameters of its own inside a class, and no type nested in a generic class. Another module that calls such a function is refused with `` `Plain` has no function `pick` ``. One that makes a copy of a class whose nested type its arguments do not settle is refused with `` antic compiles no copy of `Stack` yet, which names a type its arguments do not settle ``. Both forms compile in the module that declares them.
+
+The library `com/example/shelf.anti`:
+
+```anti
+//! name: shelf
+const LIMIT: int = 100;
+
+fn clamp(n: int) -> int
+{
+	if n > LIMIT {
+		return LIMIT;
+	}
+	return n;
+}
+
+pub fn largest<T: lt>(own a: T, own b: T) -> T
+{
+	if a < b {
+		return b;
+	}
+	return a;
+}
+
+pub fn counted<T>(items: []T) -> int
+{
+	return clamp(items.len);
+}
+
+pub class Slot<T>
+{
+	pub const COUNT: int = 3;
+	pub const BYTES: int = size_of(T) as int;
+
+	pub value: T,
+
+	pub fn get(self) -> T
+	{
+		return self.value;
+	}
+}
+```
+
+A program `client.anti` beside it, which needs the library file to compile and so stands in a `text` block:
+
+```text
+import anti.io;
+import anti.text;
+import com.example.shelf;
+
+fn main() -> int
+{
+	let s = shelf.Slot<u8> { value: 7 };
+	let w = shelf.Slot<i32> { value: 9 };
+	let items: [3]f64 = [1.0, 2.0, 3.0];
+	let line = f"largest {shelf.largest(3, 7)} {shelf.largest(2.5, 1.5)}, counted {shelf.counted(items[0..3])}, get {s.get()} {w.get()}, constants {shelf.Slot<u8>.COUNT} {shelf.Slot<u8>.BYTES} {shelf.Slot<i32>.BYTES}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+The library file goes under `out/`, and the program finds it there with `-I`:
+
+```sh
+antic -c -I . -o out/com/example/shelf.antl com/example/shelf.anti
+antic -I out -o out/client client.anti out/com/example/shelf.antl
+out/client
+```
+
+```text
+largest 7 2.5, counted 3, get 7 9, constants 3 1 4
+```
+
+The tests `modules_generics_release`, `modules_generics_dev`, `modules_generic_constant_release` and `modules_generic_constant_dev` build the same forms in both modes. The tests `error_modules_generic_function_of_a_class` and `error_modules_type_nested_in_a_generic_class` hold the two refusals.
+
+### How antic builds it
+
+A library file holds two kinds of code. Ordinary code is IR, ready to compile. A generic is its checked tree, since no single IR stands for an open body. `a < b` is a signed compare for an `int`, a float compare for an `f64` and a call for a struct. The module that uses a generic compiles its copy from the tree, as if the generic stood in its own source. It names the copy after the module of the generic.
+
+`antic --dump-ir` of the release build of `client.anti`, cut to the lines that matter:
+
+```text
+type com.example.shelf.Slot<byte> = struct { super: anti.lang.Object, value: i8 }
+type com.example.shelf.Slot<i32> = struct { super: anti.lang.Object, value: i32 }
+...
+fn com.example.shelf.clamp(%0: i64) -> i64 {
+...
+    %58 = copy i64 size_of i8
+...
+    %62 = copy i64 size_of i32
+...
+fn com.example.shelf.largest<int>(%0: i64, %1: i64) -> i64 {
+...
+fn com.example.shelf.counted<float>(%0: agg []float) -> i64 {
+b0:
+    %1 = ptradd inbounds %0, offset_of []float.len
+    %2 = load i64 %1 !type i64
+    %3 = call i64 @com.example.shelf.clamp(%2)
+```
+
+- The two copies of `Slot` are classes of the program under the path of the library, each with the layout of its argument.
+- `clamp` is the IR of the library file. A release build compiles the whole program in one call, so the library's own code joins the module of the program.
+- `shelf.Slot<u8>.BYTES` is `size_of i8`, the constant `size_of(T) as int` with `u8` in place. The back end folds it to 1, and `Slot<i32>.BYTES` to 4. `COUNT` is the number 3.
+- `counted<float>` is the copy that the program made. Its call of the private `clamp` is a direct call of the library's function.
+
+A dev build compiles each module to an object of its own. The object of the library defines `com.example.shelf.clamp` and no copy. The object of the program defines each copy as a weak symbol, `.weak com.example.shelf.largest$3cint$3e`, and calls `clamp` by its symbol. The link keeps one definition of each copy that more than one module made.
+
+Where it lives: `src/antic/antl_tree.c` writes and reads the tree of a generic, and `carried_value` of `src/antic/antl_write.c` the constants of a generic class. `sema_compile_copies` of `src/antic/sema_copies.c` makes the copies of a module and refuses the copy whose nested type it cannot make. `sema_strip_generics` of `src/antic/sema_generic.c` takes the generics out of a module before lowering, so its IR holds copies alone.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| Bytes of a library file | the IR of the module and the trees of its generics: `shelf.antl` is 2871 bytes | the same |
+| Code of a copy | one copy per module that uses it, kept once by the link | one copy per program |
+| Code of the library's own functions | once, in the object of the library | once, in the program |
+| A constant of a generic class | a number in place | a number in place |
+| A call from a copy into the library | a direct call | a direct call, or inlined |
+| Work of the build | each module checks and compiles the copies it uses | the same, once for the program |
+| Run-time cost | none beyond that of the code | none |
+
+The choice among the forms of a library that serves many types:
+
+- A generic in a library costs each user a copy and nothing at run time. It suits containers and algorithms whose speed depends on the type.
+- A function of the library over an interface pointer is compiled once, into the library, and every user calls the same code through the table. It suits behaviour whose cost lies in the work and not in the call. It also suits a plugin boundary of [chapter 15]({{% relref "15-hooks" %}}), where code that the library does not know joins later.
+- `export type IntList = List<int>;` puts one named copy into a library for C, as the section on copies shows, since C has no open generic.
+
+### Pitfalls
+
+For a Java programmer:
+
+- A library file holds no compiled body for a generic. Each user compiles its copies, so the generic of a library adds to the build time of its users.
+
+For a C programmer:
+
+- A library ships its generics without a header and without source. The tree in the library file is checked and holds no text.
+
+For a C++ programmer:
+
+- An error in the body of a library generic was reported when the library was built. A user sees an error at its own use, that the argument lacks a constraint, and never one inside the body.
+- A function with type parameters of its own inside a class, and a type nested in a generic class, stay inside their module. A C++ member template in a header has no such limit.
