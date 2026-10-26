@@ -103,3 +103,20 @@ No defect was recorded. Every probe did what `docs/decisions.md` and the specifi
 - The docs-style checker reports nothing on the 22 pages, in `build/drive/logs/grevf-style-all.log`, and on this report.
 - `git grep` finds no TODO, FIXME or placeholder text in the pages. Its one hit for `tbd` is the file `libSystem.tbd`.
 - No suite ran, since the step changed `.md` files under `docs/` alone.
+
+## State after the push of the report
+
+`git log --oneline -3`:
+
+```text
+bd91fb3b Report the review of the whole developer's guide
+e580e6dd Name the base-qualified concrete fn in chapter 9
+48a25cc3 Say in chapter 16 when map and sort_by need their type arguments
+```
+
+`git status --short` printed nothing, and `git rev-parse HEAD origin/main` printed one hash twice:
+
+```text
+bd91fb3b86006016654d7825c49ef967bab680d7
+bd91fb3b86006016654d7825c49ef967bab680d7
+```
