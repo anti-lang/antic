@@ -231,7 +231,7 @@ A dev build of `com.example.hello` on macos-arm64 writes these files.
 | `dist/macos-arm64/dev/hello` | the program, copied for delivery |
 | `dist/macos-arm64/dev/NOTICE.txt` | the licence notice of what the program links |
 
-The library file and each object under `obj/` have a file with the suffix `.key` beside them. The first line of a key holds the SHA-256 of the input, the version of antic, the target, the processor level and `g` or `no-g`, whether the output carries debug lines. The word `strict` follows in a build that refuses warnings, and `memory-checks` in a build with `--memory-checks`. The next lines hold the options the manifest gives the compile: the package and its version, the licence, the dependencies, the injections and `--strip-docs`. Last come the lines `import <path> <digest>`, one per library file the module reads, so a change of an imported module compiles the importer again. This is the key of the library file of `com.example.hello`. A build compiles a module again only when its key changes.
+The library file and each object under `obj/` have a file with the suffix `.key` beside them. The first line of a key holds the SHA-256 of the input, the version of antic, the target, the processor level and `g` or `no-g`, whether the output carries debug lines. The word `strict` follows in a build that refuses warnings, and `memory-checks` in a build with `--memory-checks`. The next lines hold the options the manifest gives the compile: the package and its version, the licence, the dependencies, the injections and `--strip-docs`. Last come the lines `import <path> <digest>`, one per library file the module reads, so a change of an imported module compiles the importer again. This is the key of the library file of `com.example.hello`, with `<runtime>` in place of the directory of the package. A build compiles a module again only when its key changes.
 
 ```text
 4e202596e117f4eeaa3c351e089cc05c1a659eacc73ad5dee3f05392e117b74b 0.2.0 macos-arm64 armv8.5 no-g
@@ -282,7 +282,7 @@ the product wrapped
 
 The output above is the release build. `args.len` is 1 without arguments, and 2 times 2 to the power 62 is one past the largest `int`. The release build wraps to the least `int`, which is negative.
 
-A dev build of the same file stops at the multiplication. Saved as `grow.anti` without the `//!` line, which marks the block for the test of the guide, it prints `grow.anti:5: overflow in *: left 2, right 4611686018427387904` to the standard error and aborts. The text stands in the dev module as a constant.
+A dev build of the same file stops at the multiplication. Saved as `grow.anti` without the `//!` line, which marks the block for the test of the guide, and built with `antic --dev grow.anti io.o`, it prints `grow.anti:5: overflow in *: left 2, right 4611686018427387904` to the standard error and aborts with status 134. A dev program links the dev object of every module it imports, and `antic --dev -o io <package>/std/anti/io.antl` writes `io.o`, the one of `anti.io`. `anti build` writes these objects itself. The text stands in the dev module as a constant.
 
 ```llvm excerpt=grow target=linux-x86_64 mode=dev
 overflow in *\00"
