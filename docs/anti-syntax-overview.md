@@ -1840,6 +1840,11 @@ Not built yet: the variables of `-g`, the symbols archive of a shared library an
 
 A level is a code-generation setting, not a target. `--cpu` takes `v1`, `v2` or `v3` on x86_64 and `armv8.0`, `armv8.2` or `armv8.5` on ARM64, and each target has a default.
 
+```sh
+antic --target linux-x86_64 --cpu v2 -o server server.anti
+antic --cpu armv8.2 -o server server.anti
+```
+
 | Target | Default level |
 |---|---|
 | linux-x86_64, macos-x86_64, windows-x86_64 | `v3`, x86-64-v3 |
