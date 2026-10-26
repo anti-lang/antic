@@ -1588,7 +1588,17 @@ trace class Renderer
 
 Every hook site calls the installed handler and then dispatches the object's own hook. `leave` reverses the two, so the handler and the object's hook nest around the call. A class that replaced a hook does not silence the handler, and the handler does not replace the class's hook. A hook site is one call of the runtime.
 
-`trace` is a contextual word before `class` and before `fn` in a class body. `--trace` and `--no-trace` decide instead of the mode, `--trace <pattern>` reaches a class that did not ask, and `--trace writes` turns `changed` on. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`. `trace.start` reads the runtime key `trace` and installs the handler it names, and `trace.install` takes the same text from a program.
+`trace` is a contextual word before `class` and before `fn` in a class body. `--trace` and `--no-trace` decide instead of the mode, `--trace <pattern>` reaches a class that did not ask, and `--trace writes` turns `changed` on. `anti.trace` ships `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal` and `Composite`. `trace.start` reads the runtime key `trace` and installs the handler it names, and `trace.install` takes the same text from a program. The names are `leaks`, `profile`, `calls`, `errors`, `threads` and `writes`, for the six handlers in that order, and a list with commas between them installs a `Composite` of those handlers. A name that names no handler prints one line to the standard error and is passed over.
+
+```anti
+import anti.trace;
+
+fn main() -> int
+{
+	let handler = trace.install("leaks,calls");
+	return 0;
+}
+```
 
 `--no-hooks` drops every site, the five always-on ones as well. Instrumentation is a build option and never a change to an object's layout. A program that loads plugins cannot be built with `--no-hooks`, since `unload` counts a library's objects in the hooks. antic refuses the combination with a message that names both. A plugin cannot be built with it either, because its own classes call those hooks. Not built yet: the cost of one load and one compare at a site without a handler.
 
