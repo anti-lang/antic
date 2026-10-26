@@ -175,7 +175,7 @@ let word: [size_of(i64)]byte = [0; size_of(i64)];
 
 ## Literals
 
-Integers in decimal and hex with `_` separators, and no `0b` or `0o` prefix. Floats with digits on both sides of `.` and an optional exponent, `1.0e9`, so `1e9` is no literal. Characters `'q'` with the escapes of a string. Strings `"..."` with the escapes `\n \r \t \\ \" \' \0 \xHH \u{H}`, where `\u{}` takes one to six hex digits. In a `str` or a `char` `\xHH` stops at 7F and `\0` is refused, and a byte string takes both. `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes. Hash delimiters `#"..."#` on every form but `x"..."`, for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. A pattern literal `re"..."`, see [Regular expressions](#regular-expressions). The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, one meaning each. Arrays `[1, 2, 3]` and the repeat `[v; n]`, which copies `v` into `n` elements. A slice from a pointer `[]T { ptr: p, len: n }`. `true`, `false`, `none`. Literals take their type from context.
+Integers in decimal and hex with `_` separators, and no `0b` or `0o` prefix. A decimal literal other than `0` does not start with `0`. Floats with digits on both sides of `.` and an optional exponent, `1.0e9`, so `1e9` is no literal. Characters `'q'` with the escapes of a string. Strings `"..."` with the escapes `\n \r \t \\ \" \' \0 \xHH \u{H}`, where `\u{}` takes one to six hex digits. In a `str` or a `char` `\xHH` stops at 7F and `\0` is refused, and a byte string takes both. `r"..."` raw, `b"..."` bytes, `br"..."` raw bytes. Hash delimiters `#"..."#` on every form but `x"..."`, for quotes inside. Interpolation `f"..."` with format specifications, and `rf"..."` for interpolation without escapes. The text of an `f"..."` is memory of the C library, freed with `free(s.ptr)`, and text that should live in an `ArenaAllocator` is built with `anti.text.Builder`, whose `take_in(from)` takes the allocator. Bytes in hex `x"00 AB CC"`. A pattern literal `re"..."`, see [Regular expressions](#regular-expressions). The prefixes are `r`, `b`, `br`, `f`, `rf`, `x` and `re`, one meaning each, and `fr"` is refused with a message that names `rf"`. Arrays `[1, 2, 3]` and the repeat `[v; n]`, which copies `v` into `n` elements. A slice from a pointer `[]T { ptr: p, len: n }`. `true`, `false`, `none`. Literals take their type from context, and without one an integer literal is an `int` and a float literal a `float`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -200,6 +200,35 @@ let j = br#"raw "bytes""#;
 let x: i8 = -128;
 let zeros = [0; 16];
 let pair = [1, 2];
+```
+
+A format specification after a colon is `[align][0][width][.precision][kind]`, each part optional and in that order. The alignment is `<`, `>` or `^`, and a width without one puts a number on the right and other text on the left. A `0` pads a numeric value to its width with zeros and stands without an alignment. The kinds `x`, `X`, `b` and `o` write an integer in hex, in upper-case hex, in binary and in octal, and `e` and `f` a float with an exponent and without one, with 6 digits unless a precision is given. A precision takes a float alone. `{{` and `}}` write a brace. A value in `{expr}` is a number, a `bool`, a `char`, a `str`, a class or a `*T` of a class, which writes itself through `to_text`, and every other type, an enum and a `?*T` among them, is refused. An `f"..."` is no constant expression.
+
+```anti
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let n = 255;
+	let x = 3.14159;
+	let s = "ab";
+	io.println(f"{n:x} {n:X} {n:b} {n:o} {n:08}");
+	io.println(f"[{s:<5}] [{s:>5}] [{s:^6}]");
+	io.println(f"{x:.2} {x:e} [{x:10.3f}] {{n}}");
+	return 0;
+}
+```
+
+```text
+ff FF 11111111 377 00000255
+[ab   ] [   ab] [  ab  ]
+3.14 3.141590e+00 [     3.142] {n}
+```
+
+```anti refused
+//! error: `fr"` is not a prefix, write `rf"`
+let path = fr"C:\tools";
 ```
 
 ## Variables and constants
