@@ -631,6 +631,7 @@ An anonymous struct with C layout, for a function with two answers and no name f
 <!-- overview: context, docs-style:ignore
 ```anti
 let items: [3]str = ["a", "b", "c"];
+let pairs: [2](int, str) = [(1, "a"), (2, "b")];
 ```
 -->
 ```anti
@@ -640,9 +641,10 @@ let t = divmod(7, 2);
 let q = t.0;
 let (d, r) = divmod(7, 2);
 for i, x in items { }
+for (n, name) in pairs { }
 ```
 
-Elements are `t.0`, `t.1` and on. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested. Two tuple types are the same when their element types are the same in order. A tuple of more than three elements, or one that crosses a module boundary, is a struct that has not been named yet.
+Elements are `t.0`, `t.1` and on. Destructuring is `let (a, b) = e;` and `for (a, b) in items`, which takes each element apart, and nowhere else: not in a parameter list, not in an assignment and not nested. `for i, x in items` binds the index beside the element, and `(r, f) = e;` is the flags form of [Operators](#operators) alone. Two tuple types are the same when their element types are the same in order. A tuple of more than three elements, or one that crosses a module boundary, is a struct that has not been named yet.
 
 ## Errors
 
