@@ -142,3 +142,21 @@ say, so no row went into `docs/audit/tests-findings.md` and no line into
 - A `git grep` for the three marker words the gates name finds none in
   the overview and in this report.
 - No suite ran, since every changed file is a `.md` file under `docs/`.
+
+## State after the push of the report
+
+`git log --oneline -3`:
+
+```text
+7a2a4986 Report the update of the syntax overview
+f8a118eb Give the processor levels of the overview an example
+9dbebd94 Give the checks of the overview an example
+```
+
+`git status --short` printed nothing, and `git rev-parse HEAD
+origin/main` printed one hash twice:
+
+```text
+7a2a49866a4a6354072e8905a16a26a823964116
+7a2a49866a4a6354072e8905a16a26a823964116
+```
