@@ -453,3 +453,20 @@ No defect showed. Every probe did what `docs/decisions.md` and the specification
 - `guide_examples` and `overview_examples` passed, 2 of 2, before the report and again after it, in `build/drive/logs/guide-plan-examples-start.log` and `build/drive/logs/guide-plan-examples-gate.log`. The guide ran 133 blocks, 96 programs, 458 refusals and 246 excerpts. The overview ran 63 blocks, 7 programs and 16 refusals, with 9 skipped as not built.
 - The docs-style checker reports nothing on this report.
 - No suite ran, since this report is the one changed file.
+
+## State after the push of the report
+
+`git log --oneline -3`:
+
+```text
+8c49ad45 Plan the developer's guide against the code
+e87b42f7 Record the state after the push of the overview update report
+7a2a4986 Report the update of the syntax overview
+```
+
+`git status --short` printed nothing, and `git rev-parse HEAD origin/main` printed one hash twice:
+
+```text
+8c49ad453d1e00d5c11dd2ddfca39e0f3bdee1c9
+8c49ad453d1e00d5c11dd2ddfca39e0f3bdee1c9
+```
