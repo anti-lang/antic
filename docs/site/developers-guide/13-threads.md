@@ -1,16 +1,16 @@
 ---
 title: "Threads"
-description: "Threads, dispatch and join, parallel, channels and select, atomics, locks, and what the checker refuses."
-summary: "`worker fn`, `dispatch` and `join`, `parallel`, channels and `select`, atomics and locks, and what the checker refuses of each, with how antic builds it and what it costs."
+description: "Threads, dispatch and join, parallel, channels and select, atomics, locks, waits under a lock, and what the checker refuses."
+summary: "`worker fn`, `dispatch` and `join`, `parallel`, channels and `select`, atomics, locks and the warning `blocking-under-lock`, and what the checker refuses of each, with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 130
 tags: [compilers, programming-languages]
-keywords: [threads, workers, thread pool, parallel, channels, select, atomics, mutex]
+keywords: [threads, workers, thread pool, parallel, channels, select, atomics, mutex, blocking under a lock]
 ---
 
-A program starts no thread by name. It marks a function `worker fn` and hands work to one pool of threads. `dispatch` hands over one object, and `parallel` the chunks of a slice. Each is one call of the runtime. A channel is a bounded queue behind a lock, and an atomic operation is one instruction of the processor. A `Mutex` is one word of the program's memory.
+A program starts no thread by name. It marks a function `worker fn` and hands work to one pool of threads. `dispatch` hands over one object, and `parallel` the chunks of a slice. Each is one call of the runtime. A channel is a bounded queue behind a lock, and an atomic operation is one instruction of the processor. A `Mutex` is one word of the program's memory. The checker warns of a thread that may wait while it holds a lock.
 
 ## Threads, dispatch and join
 
@@ -32,6 +32,8 @@ A marker and three forms run a function on another thread.
 
 `worker` stands directly before `fn`, after `pub` or `export`. A worker is an ordinary function as well, and a plain call `f(obj, args)` runs it on the calling thread.
 
+The arrow names the worker as a call names a function: `f` of the module, a name of a direct import, or `m.f` of a module the file imports. A `dispatch` fills in the default value of every parameter the call leaves out, as a call does, and `parallel` does the same.
+
 The object of a `dispatch` is a pointer to a class, and its type is the type of the first parameter of the worker. A pointer to a derived class is refused where the worker names the base.
 
 Every other argument and the result hold no pointer. The checker reads that off the types:
@@ -44,13 +46,17 @@ Every other argument and the result hold no pointer. The checker reads that off 
 - A pointer to a thread-safe object passes: a `*Mutex` and a pointer to a `synchronized class` or a `concurrent class` of [chapter 14]({{% relref "14-concurrent-classes" %}}).
 - A parameter of function type takes a named function. It takes a closure only when it is marked `concurrent`, which [chapter 5]({{% relref "05-functions" %}}) describes.
 
-A job has no type a program can write. A `let` infers it from a `dispatch`, and an array literal of jobs has it as its element. `job.handle` reads its one field, a `?*byte`. A job therefore never stands in a field, a parameter or a result.
+A job has no type a program can write. A `let` infers it from a `dispatch`, an array literal and a tuple literal of jobs hold it as an element, and a closure that captures a job may join it. `job.handle` reads its one field, a `?*byte`. A job therefore never stands in a field, a parameter or a result.
+
+The job holds its arguments as a call holds its own. A local passed to an `own` parameter of the worker moves into the job, and the function that wrote the `dispatch` tears it down no more. A fresh value passed to a parameter that is not `own` is torn down after the worker returns, on the thread that ran it.
+
+The safety check `escaping-local` reads the object and every argument of a `dispatch`. The address of a local and a slice of a local array are references, and the job may keep one after the block ends. The check refuses it unless a later statement of the same block joins the job on every path. [Chapter 11]({{% relref "11-ownership#references-to-locals-and-uses-after-the-end" %}}) gives the rule.
 
 A `dispatch` is an expression whose value must be bound. A statement that is a `dispatch` alone is refused.
 
 The pool holds each object from its `dispatch` until its worker returns. That time is the flight of the object. A `dispatch` of an object in flight starts nothing: its job has the handle `none`, and `join` of that job gives a result of zero bytes. Two workers therefore never hold one object.
 
-The checker walks every function a worker reaches. It refuses a `delete` of an object or a channel there, since another worker may hold it. It refuses a read or a write of a `mutable` field of a singleton as well.
+The checker walks every function a worker reaches. It refuses a `delete` of an object or a channel there, since another worker may hold it. It refuses a read or a write of a `mutable` field of a singleton as well. The walk follows the calls by name through the functions of the module and does not enter a closure the worker receives, so a closure that a `dispatch` passes on may `delete`.
 
 A worker that `parallel` or `dispatch` runs cannot fail, since a job has no handler. A `worker fn` that may fail is called directly, with a handler.
 
@@ -131,6 +137,95 @@ after clear: 0 0, start gives 3, a plain call of fill gives 5
 ```
 
 `twice` runs on `a` and dispatches `a` again. The object is in flight, so the inner job is empty, `fill` does not run, and the sum of `a` stays 15.
+
+The second program shows the defaults, the arguments a job holds and the places a job may stand.
+
+```anti
+//! name: jobs
+import anti.io;
+import anti.text;
+
+class Cell { pub n: int = 0, }
+
+class Key
+{
+	pub id: int = 0,
+
+	fn destruct(self)
+	{
+		let line = f"key {self.id} torn down";
+		io.println(line);
+		free(line.ptr);
+	}
+}
+
+worker fn add(c: *Cell, k: int, times: int = 3) -> int
+{
+	for 0..times {
+		c.n += k;
+	}
+	return c.n;
+}
+
+worker fn keep(c: *Cell, own k: Key) -> int
+{
+	return k.id;
+}
+
+worker fn look(c: *Cell, k: Key) -> int
+{
+	return k.id + c.n;
+}
+
+worker fn apply(c: *Cell, concurrent f: fn(int) -> int) -> int
+{
+	return f(c.n);
+}
+
+fn main() -> int
+{
+	let a = alloc Cell { };
+	let b = alloc Cell { n: 100 };
+	let pair = (dispatch a -> add(2), dispatch b -> add(1, 1));
+	let first = join(pair.0);
+	let second = join(pair.1);
+	let line = f"defaults: {first} {second}";
+	io.println(line);
+	free(line.ptr);
+
+	let k = Key { id: 7 };
+	let moved = dispatch a -> keep(k);
+	let kept = join(moved);
+	let fresh = dispatch a -> look(Key { id: 9 });
+	let looked = join(fresh);
+	line = f"keys: {kept} {looked}";
+	io.println(line);
+	free(line.ptr);
+
+	let factor = 3;
+	let job = dispatch b -> apply(fn(v) { return v * factor; });
+	let wait = fn() -> int { return join(job); };
+	line = f"a closure joins the job it captured: {wait()}";
+	io.println(line);
+	free(line.ptr);
+	free(a);
+	free(b);
+	return 0;
+}
+```
+
+```text output
+defaults: 6 101
+key 7 torn down
+key 9 torn down
+keys: 7 15
+a closure joins the job it captured: 303
+```
+
+- `add(2)` leaves out `times`, so the job runs three turns, and `add(1, 1)` runs one.
+- `k` moves into the job of `keep`. The worker tears it down at its end, on a thread of the pool, and `main` tears it down no more.
+- The `Key` literal passed to `look` is fresh. The job tears it down after `look` returns, before `join` gives the result.
+- The two jobs of the tuple are joined through its elements, and the anonymous function `wait` joins the job it captured.
 
 The checker refuses each of the following.
 
@@ -321,6 +416,37 @@ fn run(c: *Cell)
 worker struct Point { x: int }
 ```
 
+```anti refused
+//! error: `k` was moved into `keep` on line
+class Cell { pub n: int = 0, }
+
+class Key { pub id: int = 0, fn destruct(self) { } }
+
+worker fn keep(c: *Cell, own k: Key) -> int { return k.id; }
+
+fn run(c: *Cell) -> int
+{
+	let k = Key { id: 7 };
+	let job = dispatch c -> keep(k);
+	let n = join(job);
+	return n + k.id;
+}
+```
+
+```anti refused
+//! error: a reference to `c` is passed to `dispatch`
+class Cell { pub n: int = 0, }
+
+worker fn bump(c: *Cell, k: int) { c.n += k; }
+
+fn start() -> int
+{
+	let c = Cell { };
+	let job = dispatch &c -> bump(1);
+	return c.n;
+}
+```
+
 ### How antic builds it
 
 A `dispatch` is one call of `anti_rt_dispatch`, and a `join` one call of `anti_rt_join_hooked`. The module below is `start` of the example after opt.
@@ -366,15 +492,29 @@ define hidden void @workers.dispatch.1(ptr noundef %p0, ptr noundef %p1, ptr nou
 
 A release build inlines the worker into its thunk, so the pool calls the loop of `fill` directly.
 
-The runtime keeps the rest. `anti_rt_dispatch` allocates the job and a copy of the context, takes the lock of the pool and walks the list of the objects in flight. It returns no job when it finds the object there. Otherwise it puts the job on a queue and wakes the threads of the pool. A thread of the pool takes the job, calls the thunk and marks the job done. `anti_rt_join` waits for that mark. A job that no thread took yet is run by the joining thread itself, so a pool of no threads still finishes every job.
+A worker with a fresh argument of a parameter that is not `own` has a thunk that tears the argument down after the call. The thunk of `look` of the second example calls the teardown of the `Key` in the job's copy of the context.
+
+```llvm excerpt=jobs target=linux-x86_64 mode=dev
+define hidden void @jobs.dispatch.3(ptr noundef %p0, ptr noundef %p1, ptr noundef %p2) #0 {
+...
+  %v7 = call i64 (ptr, i64, i64) @jobs.look(ptr %v2, i64 %v4, i64 %v6)
+...
+  call void (ptr, ptr) @jobs.Key.destroy(ptr %v18, ptr null)
+  ret void
+```
+
+- The call passes the object and then the `Key` by value, its 16 bytes as two words copied out of the context. arm64 passes the two words as one `[2 x i64]`.
+- `jobs.Key.destroy` runs after the worker returned, on the thread of the pool that ran the job. It is the teardown that calls `destruct`.
+
+The runtime keeps the rest. `anti_rt_dispatch` allocates the job, a copy of the context and the room of the result. It takes the lock of the pool and walks the list of the objects in flight. It returns no job when it finds the object there. Otherwise it puts the job on a queue and wakes the threads of the pool. A thread of the pool takes the job, calls the thunk and marks the job done. `anti_rt_join` waits for that mark, copies the result out and frees the three blocks. A job that no thread took yet is run by the joining thread itself, so a pool of no threads still finishes every job.
 
 The pool starts at the first `dispatch` or `parallel` of the program. Its threads run until the program ends, and nothing joins them.
 
-The arguments of a job stand in the frame of the function that wrote the `dispatch`, one slot per `dispatch` in the source. The worker reads them when it starts. The pitfalls below name the two consequences.
+The arguments of a job live in the job from the `dispatch` to the `join`. The next turn of a loop writes the slot of the frame again, and a return ends it. Neither reaches a job that has started.
 
 arm64 passes the same four arguments in `x0` to `x3`, and nothing else differs.
 
-Where it lives: `sema_check_dispatch`, `sema_check_join` and `worker_args` of `src/antic/sema_thread.c`, `sema_walk_worker` of `src/antic/sema_stmt.c`, `types_pointer_free` of `src/antic/types.c`, `lower_dispatch` and `lower_join` of `src/antic/lower_worker.c`, and `anti_rt_dispatch` and `anti_rt_join` of `src/rt/threads.c`.
+Where it lives: `sema_check_dispatch`, `sema_check_join`, `worker_callee` and `worker_args` of `src/antic/sema_thread.c`, `sema_walk_worker` of `src/antic/sema_stmt.c`, `types_pointer_free` of `src/antic/types.c`, `lower_dispatch`, `dispatch_thunk` and `lower_join` of `src/antic/lower_worker.c`, and `anti_rt_dispatch` and `anti_rt_join` of `src/rt/threads.c`.
 
 ### What it costs
 
@@ -384,9 +524,10 @@ The costs are the same in dev and in release.
 |---|---|
 | Bytes of a job | 8, the one pointer `anti_rt_dispatch` returns |
 | `dispatch` | one call of the runtime and one of `anti_rt_hook` |
-| Allocations of a `dispatch` | one `calloc` of 56 bytes for the job, and one `malloc` of the result when the worker returns a value |
+| Allocations of a `dispatch` | one `calloc` of 56 bytes for the job, one `malloc` of the context when the worker takes arguments beside the object, and one `malloc` of the result when the worker returns a value |
+| Copies of a `dispatch` | the context, once into the job |
 | Locks of a `dispatch` | the lock of the pool, taken once |
-| `join` | one call of the runtime, the lock of the pool, one copy of the result, two calls of `free`, and the hook `joined` |
+| `join` | one call of the runtime, the lock of the pool, one copy of the result, three calls of `free`, and the hook `joined` |
 | Atomic operations | one atomic load per hook call, of the installed trace handler: one for a `dispatch` and one for a `join`. 0 with `--no-hooks` |
 | Threads | the processors of the machine less one, or the key `threads` less one, started once |
 | Checks | the test for an object in flight, in both modes |
@@ -395,6 +536,16 @@ The costs are the same in dev and in release.
 The walk of the objects in flight is linear in their number.
 
 `--no-hooks` drops the call of `anti_rt_hook` after a `dispatch` and makes a `join` a call of `anti_rt_join`. A program built that way gives up the hooks `dispatched` and `joined`, and with them the `ThreadMonitor` of [chapter 15]({{% relref "15-hooks" %}}).
+
+Three forms run code of a function somewhere, and the counts above choose between them.
+
+| Form | Allocations | Locks | Use it for |
+|---|---|---|---|
+| A plain call `f(obj, args)` | 0 | 0 | work that is short beside a `calloc`, a lock and the wake of a thread |
+| `dispatch obj -> f(args)` | 2 or 3 per job | the pool's, at the `dispatch` and at the `join` | separate objects, each with work of its own, and a result per object |
+| `parallel s -> f` | 1 per call, whatever the count of chunks | the pool's, once and twice per chunk | one slice split into parts that take the same work |
+
+Each `dispatch` pays its allocations and its lock again, so a thousand small jobs cost a thousand of each. One `parallel` over a slice of a thousand elements pays one allocation for the results.
 
 ### Pitfalls
 
@@ -436,11 +587,13 @@ Java splits work with parallel streams or a `ForkJoinPool`. C and C++ write `#pr
 
 The expression has the type `[]R`, one result per chunk in the order of the chunks. The results are memory of the heap that the program frees with `free(r.ptr)`.
 
-The chunks are contiguous, disjoint and cover the slice. With `count` elements and `n` chunks, the first `count % n` chunks hold one element more than the others. A count of chunks above the count of elements becomes the count of elements. An empty slice gives an empty result and does not touch the pool. `by n` with `n` of zero or less takes the count of the workers.
+The chunks are contiguous, disjoint and cover the slice. With `count` elements and `n` chunks, the first `count % n` chunks hold one element more than the others. A count of chunks above the count of elements becomes the count of elements. An empty slice gives an empty result and does not touch the pool. `by 0` takes the count of the machine: the key `threads`, or the count of its processors. A constant count below zero is refused. A dev build stops the program at a count below zero that it computes, and a release build takes one as zero.
 
 `by` sets the count of the chunks and never the count of the threads. The thread that wrote `parallel` takes chunks beside the pool and returns when every chunk is done.
 
 A worker may write the elements of its chunk. No other worker reaches them.
+
+Every chunk reads the same arguments. A fresh value passed to a parameter that is not `own` is torn down by the function that wrote the `parallel`, once every chunk has run.
 
 Only one `parallel` uses the pool at a time. A `parallel` that finds the pool busy, from a worker or from another thread, runs its chunks one after the other on its own thread.
 
@@ -631,6 +784,23 @@ fn run(a: []int)
 }
 ```
 
+```anti refused
+//! error: the count of chunks -1 is below zero
+worker fn sum(chunk: []int) -> int { return chunk.len; }
+
+fn run(a: []int)
+{
+	let r = parallel a by -1 -> sum;
+	free(r.ptr);
+}
+```
+
+A count that the checker cannot compute passes, and a dev build stops at it with a line such as the one below. The release build of the same program runs the slice in as many chunks as the machine has threads.
+
+```text
+main.anti:8: count of chunks below zero: value -2
+```
+
 ### How antic builds it
 
 A `parallel` is one call of `anti_rt_parallel`. The module below is `count` of the example after opt.
@@ -680,9 +850,9 @@ define hidden void @chunks.parallel.1(ptr noundef %p0, ptr noundef %p1, i64 noun
 
 `anti_rt_parallel` allocates the block of results with one `malloc`, takes the lock of the pool and wakes its threads. Each thread, the caller among them, takes the next chunk number under the lock and calls the thunk outside it. The caller sleeps on a condition of the pool until the count of finished chunks reaches the count of chunks.
 
-The context is in the frame of the caller, as for `dispatch`. Here the caller waits in that frame until every chunk is done, so every worker reads a live context.
+The context stays in the frame of the caller, where `dispatch` copies it into the job. The caller waits in that frame until every chunk is done, so every worker reads a live context, and no copy is made.
 
-Where it lives: `sema_check_parallel` of `src/antic/sema_thread.c`, `lower_parallel` and `parallel_thunk` of `src/antic/lower_worker.c`, and `anti_rt_parallel`, `slice_of` and `worker_main` of `src/rt/threads.c`.
+Where it lives: `sema_check_parallel` and `chunks_below_zero` of `src/antic/sema_thread.c`, `lower_parallel`, `parallel_thunk`, `chunk_count` and `drop_context` of `src/antic/lower_worker.c`, and `anti_rt_parallel`, `slice_of` and `worker_main` of `src/rt/threads.c`.
 
 ### What it costs
 
@@ -695,12 +865,14 @@ The costs are the same in dev and in release.
 | Calls per chunk | one indirect call of the thunk, and in a dev build one call of the worker from it |
 | Locks | the lock of the pool, taken once at the start and twice per chunk |
 | Atomic operations | 0 |
-| Checks | the bound of the results, in both modes |
+| Checks | the bound of the results, in both modes. In a dev build, a count of chunks below zero that the checker could not compute |
 | Copies of code | one thunk per `parallel` in the source |
 
 The bound of the results stops the program when the chunks times the bytes of a result pass `INT64_MAX / 2`.
 
 A worker that returns a struct writes it into the block of results in place. The `Span` of the example is 16 bytes per chunk.
+
+The thread that wrote `parallel` returns when the slowest chunk is done, and a chunk runs on one thread from its start to its end. A larger `by` makes smaller chunks, which balance uneven work. Each chunk more costs one indirect call and two takes of the lock of the pool. `dispatch` is the form for work that is not one slice, as the choice of the section before shows. A plain loop costs none of the above. It is the form for a slice whose work is shorter than the wake of the threads of the pool.
 
 ### Pitfalls
 
@@ -1059,6 +1231,15 @@ A `send` that finds the channel full and a `recv` that finds it empty sleep in t
 
 Every `send` and every `close` of the program wakes every waiting `select`, whatever channels it waits on. Each looks at its channels and sleeps again when none is ready.
 
+Three other forms move values between threads, each for a narrower case.
+
+| Form | Per value | Use it for |
+|---|---|---|
+| A channel | one call, the lock of the channel, one copy | any count of senders and receivers, waits when full or empty, and `select` over more than one |
+| The result of `join` or of `parallel` | one copy out of the job or the block | one value per job or per chunk, handed back once at the end |
+| `SpscRing<T, N>` of [chapter 14]({{% relref "14-concurrent-classes" %}}) | one atomic load and one atomic store, no call | one producing thread and one consuming thread that may poll in place of a wait |
+| A field under a `Mutex` | one lock call and one unlock call | a state that threads read and change in place, with no queue |
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1094,7 +1275,7 @@ Java has `AtomicInteger` and `AtomicReference` as objects with methods. C++ has 
 | A static field of a class | `static atomic total: int = 0;` |
 | A local | `let seen: atomic int = 0;` |
 
-An atomic holds an integer of 8, 16, 32 or 64 bits, a `bool`, a `char` or a pointer. A struct takes no atomic field, and neither a parameter nor a result is atomic.
+An atomic local holds an integer of 8, 16, 32 or 64 bits, a `bool`, a `char` or a pointer. An atomic field holds the same, an `f16` and a plain function value as well, which is one C function pointer. A struct takes no atomic field, and neither a parameter nor a result is atomic.
 
 Every static field is atomic. The parser refuses one without the word, since a static field is a global that every thread reaches. [Chapter 9]({{% relref "09-classes" %}}) describes static fields.
 
@@ -1112,6 +1293,17 @@ Eight operations exist, written as calls on the variable.
 | `x.compare_swap(old, new)` | a `bool` | writes `new` when the value is `old`, and says whether it did |
 
 Every operation is sequentially consistent. No form names a weaker order.
+
+Not every type takes all eight.
+
+| Type | Operations |
+|---|---|
+| An integer, a `char` | all eight |
+| `bool` | `load`, `store`, `swap`, `and`, `or` and `compare_swap` |
+| A pointer, a nullable pointer, a function value | `load`, `store`, `swap` and `compare_swap` |
+| `f16` | `load`, `store`, `swap` and `compare_swap`, which move its 16 bits |
+
+A `bool` has no arithmetic, so `and` and `or` keep it 0 or 1. A pointer has none either, so it never holds an address the program did not take, nor `none` where its type holds none.
 
 A plain read, an assignment and `&x` of an atomic are refused. `add` and `sub` wrap in both modes and have no overflow check.
 
@@ -1256,6 +1448,41 @@ fn next(s: *Stats) -> int
 fn run()
 {
 	let n: atomic f64 = 0.0;
+}
+```
+
+```anti refused
+//! error: an atomic field holds an integer, a `bool`, a `char` or a pointer, found `f64`
+class Gauge { pub atomic level: f64 = 0.0, }
+```
+
+```anti refused
+//! error: `add` takes an atomic integer, and `on` holds `bool`
+class Flags { pub atomic on: bool = false, }
+
+fn flip(f: *Flags) -> bool
+{
+	return f.on.add(true);
+}
+```
+
+```anti refused
+//! error: `add` takes an atomic integer, and `last` holds `?*int`
+class Slot { pub atomic last: ?*int = none, }
+
+fn bump(s: *Slot, p: *int)
+{
+	s.last.add(p);
+}
+```
+
+```anti refused
+//! error: `f16` has no arithmetic, convert with `as f32`
+class Gauge { pub atomic level: f16 = 0.0 as f16, }
+
+fn raise(g: *Gauge)
+{
+	g.level.add(1.0 as f16);
 }
 ```
 
@@ -1419,6 +1646,8 @@ The costs are the same in dev and in release.
 
 A dev build adds its overflow check to a plain `+` and none to `add` of an atomic.
 
+An atomic is the cheapest shared state for one word that each operation changes alone, such as a counter, a flag or a pointer published once. Two words that must change together need one lock around both: a `Mutex` field with a `sync` of the next section costs two calls of the runtime, and a free lock on Linux one compare-and-swap and one exchange inside them. A run of `load` and `store` is two operations, and another thread may run between them. A `compare_swap` loop in a `concurrent class` of [chapter 14]({{% relref "14-concurrent-classes" %}}) is the form for a change that reads the value first.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1435,7 +1664,7 @@ For a C++ programmer:
 
 - No operation takes a memory order. A counter that would take `memory_order_relaxed` pays for a full barrier on every `add`.
 - `compare_swap` gives a `bool` and does not hand back the value it found. A retry loop calls `load` again.
-- The checker holds a local to the list of types. It does not hold a field to it, and an atomic field of `f64` fails in opt with an error of LLVM.
+- No atomic holds an `f64` or an `f32`. A float that threads share goes under a `Mutex`, or into an atomic integer as a scaled value.
 
 ## Locks
 
@@ -1757,11 +1986,21 @@ Where it lives: `sema_check_mutex_new` and `sema_check_mutex_destroy` of `src/an
 | A lock another thread holds | a wait in the system | the same |
 | The record of the order | a push and a pop on a list of the thread, and a table under a lock when the thread holds another lock | 0 |
 | `m.destroy()` | one call and one atomic load | the same |
-| Checks | the order of the locks | 0 |
+| Checks | a search of the stack of the thread for the `Mutex` it takes, which stops the program when the thread holds it already, and the order of the locks | 0 |
 
 The copies of code are the unlock calls: one per exit of the block in the source.
 
 The record of the order belongs to dev mode. No flag of antic turns it on in a release build or off in a dev build.
+
+A `Mutex` field leaves the pairing of the lock with its fields to the program, and the checker holds no field to it. Two forms of [chapter 14]({{% relref "14-concurrent-classes" %}}) put the pairing under the checker.
+
+| Form | Bytes of the lock | Taken | What the checker holds |
+|---|---|---|---|
+| A `Mutex` field and `sync` | 4, or 8 on Windows | by each `sync` the program writes | the `sync` of one place inside another, the copies, the order of `lock-order` |
+| `synchronized class` | 24, hidden | at the entry of every function that is not private, again by its own thread | every field reached from the functions of the class alone |
+| `concurrent class` with `guarded by` | 4, or 8 on Windows, per `Mutex` it names | by each `sync` the program writes | every read and write of a guarded field inside a `sync` on its lock |
+
+The `Mutex` field is the smallest and the least checked. A class whose every function changes its state is a synchronized class. A class with more than one lock, atomic counters and fields fixed at `construct` is a concurrent class.
 
 ### Pitfalls
 
@@ -1780,3 +2019,272 @@ For a C++ programmer:
 - `sync m` through a copied pointer inside `sync m` compiles. The checker compares places as written and does not follow the pointer. A dev build stops the thread there, and in a release build it waits for itself.
 - No `try_lock`, no timed lock and no shared lock exist. `Mutex` is exclusive and blocks.
 - A `Mutex` field does not make its class thread-safe for the checker. A worker takes a pointer to the `Mutex` itself, or to a class declared `synchronized` or `concurrent`.
+
+## Waits under a lock
+
+### What you know
+
+A Java thread that calls `take` of a `BlockingQueue` inside a `synchronized` block keeps the monitor while it waits. C and C++ have one wait built for a lock, `pthread_cond_wait` and `std::condition_variable`, which give the mutex back while they wait. A `read` of a pipe or a `join` of a thread under a mutex keeps it, and no compiler of the three says so.
+
+### The feature
+
+The warning `blocking-under-lock` names a wait where the code holds a lock. Five operations wait.
+
+| Wait | Why it may block |
+|---|---|
+| `recv(c)` | the channel may be empty and open |
+| `send(c, v)` | every channel has room for a bounded count of values, so any `send` may find it full |
+| `select { }` | a `select` has no `else` and waits until one of its channels is ready |
+| `join(job)` | the job may still run |
+| `join_all(jobs)` | the same, for each job |
+
+Code holds a lock in two places.
+
+- Inside a `sync` block, on any operand: a `Mutex` field, a `Mutex` local or parameter, a synchronized object and `sync a, b`.
+- In a function of a synchronized class that takes the hidden lock: a function with `self` that is not private, `construct` and `destruct` apart. [Chapter 14]({{% relref "14-concurrent-classes" %}}) describes the hidden lock.
+
+A call of a function that reaches a wait gets the warning as well, where the call stands under the lock. The checker follows the calls a program names. It reads a function of the module, and the library file of a library records the first wait each of its functions reaches. It does not follow a call through a table. That is a call through an interface, a function value or a plugin. It is also a call through a pointer of a `pub` function that is not `final`, of a class that is not `final`. The function that runs there is not known. The body of an anonymous function and a worker hold no lock at their start, since they run later or on another thread.
+
+The message names the innermost lock the code holds, in one of three forms.
+
+| Where the code stands | Message |
+|---|---|
+| A wait inside a `sync` | `` `recv` may wait while the `sync` of line 10 holds its lock `` |
+| A wait in a function of a synchronized class | `` `recv` may wait while `Queue.take` holds the lock of its object `` |
+| A call of a function that waits | `` `pull` may wait in `recv` on line 23 while the `sync` of line 33 holds its lock `` |
+
+For a call the message names the first wait the callee reaches in the order of its text, with the module of a library function. A warning prints in a dev build, which goes on, and refuses a release build, as every warning does. `--warnings-as-errors` refuses a dev build too. `allow(blocking-under-lock, "reason")` before the statement, or last in the header of the function, silences it.
+
+The fix is the order of the code. The thread takes the value first, and holds the lock for the state it guards alone. Some waits cannot block for long, such as a `recv` on a channel that the function made, filled and closed. `allow` is the form there, and its reason says why.
+
+```anti
+//! name: waits
+import anti.io;
+import anti.text;
+
+class Inbox
+{
+	pub lock: Mutex,
+	pub total: int = 0,
+	pub count: int = 0,
+}
+
+class Feeder
+{
+	pub first: int = 0,
+}
+
+worker fn feed(f: *Feeder, out: chan int) -> int
+{
+	for i in 0..4 {
+		send(out, f.first + i);
+	}
+	close(out);
+	return 4;
+}
+
+fn drain(box: *Inbox, c: chan int)
+{
+	while true do {
+		let v = recv(c) else {
+			break;
+		};
+		let n = *v;
+		sync box.lock {
+			box.total += n;
+			box.count += 1;
+		}
+	}
+}
+
+fn replay(box: *Inbox, first: int) -> int
+{
+	let local = chan int(2);
+	send(local, first);
+	send(local, first + 1);
+	close(local);
+	sync box.lock {
+		allow(blocking-under-lock, "the channel is local, closed and full")
+		if let v = recv(local) {
+			box.total += *v;
+			box.count += 1;
+		}
+	}
+	delete(local);
+	return 1;
+}
+
+fn main() -> int
+{
+	let box = alloc Inbox { lock: Mutex.new() };
+	let f = alloc Feeder { first: 10 };
+	let c = chan int(2);
+	let job = dispatch f -> feed(c);
+	drain(box, c);
+	let sent = join(job);
+	let replayed = replay(box, 100);
+	let line = f"sent {sent}, replayed {replayed}, count {box.count}, total {box.total}";
+	io.println(line);
+	free(line.ptr);
+	delete(c);
+	box.lock.destroy();
+	free(box);
+	free(f);
+	return 0;
+}
+```
+
+```text output
+sent 4, replayed 1, count 5, total 146
+```
+
+`drain` waits in `recv` with no lock and takes the lock of the inbox for the two additions alone. `feed` sends on a channel of two values from the pool and waits while it is full, and `drain` empties it. `replay` waits under the lock on a channel that holds its two values and is closed, and its `allow` says so.
+
+The checker gives the warning, and the release build refuses, in each of the following.
+
+```anti refused
+//! error: `recv` may wait while the `sync` of line 10 holds its lock [blocking-under-lock]
+struct Inbox
+{
+	lock: Mutex,
+	count: int,
+}
+
+fn take(box: *Inbox, c: chan int)
+{
+	sync box.lock {
+		let v = recv(c) else {
+			return;
+		};
+		box.count += *v;
+	}
+}
+
+fn main() -> int
+{
+	let box = Inbox { count: 0 };
+	let c = chan int(1);
+	send(c, 4);
+	take(&box, c);
+	delete(c);
+	return box.count - 4;
+}
+```
+
+```anti refused
+//! error: `recv` may wait while `Queue.take` holds the lock of its object [blocking-under-lock]
+synchronized class Queue
+{
+	count: int = 0,
+
+	pub fn take(self, c: chan int) -> int
+	{
+		let v = recv(c) else {
+			return 0;
+		};
+		self.count += 1;
+		return *v;
+	}
+}
+```
+
+```anti refused
+//! error: `pull` may wait in `recv` on line
+class Box { pub lock: Mutex, pub n: int = 0, }
+
+fn pull(c: chan int) -> int
+{
+	let v = recv(c) else {
+		return 0;
+	};
+	return *v;
+}
+
+fn under(b: *Box, c: chan int)
+{
+	sync b.lock {
+		b.n += pull(c);
+	}
+}
+```
+
+```anti refused
+//! error: `join` may wait while the `sync` of line
+class Box { pub lock: Mutex, pub n: int = 0, }
+
+class Cell { pub n: int = 0, }
+
+worker fn work(c: *Cell) -> int { return c.n; }
+
+fn under(b: *Box, cell: *Cell)
+{
+	sync b.lock {
+		let job = dispatch cell -> work;
+		b.n += join(job);
+	}
+}
+```
+
+A `parallel` waits for its chunks and is none of the five, so it gets no warning. Neither does a call through a table that reaches a wait.
+
+### How antic builds it
+
+The check runs in the compiler and adds nothing to the program. Once the checker has checked every function of the module, a pass reads each body once. It keeps the waits and the calls of each function in the order of the text, with the locks the code holds at each. It then marks every function that reaches a wait, itself or through a call. A walk of the calls of each in that order finds its first wait. Each wait or call that stands under a lock gets the warning.
+
+The library file of a module carries the first wait of each of its functions that waits: the kind, the line and the module. A module that imports the library warns at a call of such a function without its body.
+
+The code of `replay` shows that `allow` changes no code. The `recv` stands between the lock and the unlock, as written.
+
+```llvm excerpt=waits target=linux-x86_64 mode=dev
+define hidden noundef i64 @waits.replay(ptr noundef nonnull dereferenceable(32) %p0, i64 noundef %p1) #0 {
+...
+  call void (ptr) @anti_rt_chan_close(ptr %v25)
+...
+  call void (ptr, ptr) @anti_rt_mutex_lock_at(ptr %v28, ptr %v29)
+...
+  %v34 = call ptr (ptr, ptr) @anti_rt_chan_recv(ptr %v32, ptr %v33)
+...
+  call void (ptr) @anti_rt_mutex_unlock_at(ptr %v68)
+...
+  call void (ptr) @anti_rt_chan_delete(ptr %v71)
+```
+
+- `anti_rt_chan_close` ends the channel before the lock is taken.
+- `anti_rt_mutex_lock_at` takes `box.lock`, and `anti_rt_chan_recv` runs while it is held. The channel holds a value, so the call returns at once.
+- `anti_rt_mutex_unlock_at` gives the lock back, and the channel is deleted after it.
+
+Where it lives: `read_function`, `find_waits`, `first_wait`, `warn_waits` and `warn_wait` of `src/antic/sema_lock.c`, and `keep_facts` there for the record of the library file.
+
+### What it costs
+
+| Cost | Dev | Release |
+|---|---|---|
+| Code, checks and calls at run time | 0 | 0 |
+| A wait under a lock that the checker sees | a warning, and the build goes on | the build is refused |
+| `allow(blocking-under-lock, "reason")` | no code, and the warning is gone | the same |
+| A library file | one record per function that waits | the same |
+
+`allow` gives up the warning for its statement or function and nothing else. A wait that `allow` covers holds the lock for as long as it waits, and every thread that needs the lock waits with it.
+
+Three forms keep the wait out of the lock.
+
+- The wait first: `recv` into a local, then `sync` for the state the value changes, as `drain` does.
+- The state out of the lock: copy what the `send` needs inside the `sync`, and `send` after the block.
+- No wait: `push` of an `SpscRing` of [chapter 14]({{% relref "14-concurrent-classes" %}}) gives `false` when the ring is full and never waits, for one producing thread and one consuming thread.
+
+### Pitfalls
+
+For a Java programmer:
+
+- No `wait` and no `notify` give the lock back during a wait. A thread that waits for a state waits on a channel, outside the lock.
+- The warning is a compile-time reading of the code. It names a wait that may block, and a wait that never blocks in a run gets it as well.
+
+For a C programmer:
+
+- A `send` on a channel with room is a wait for the checker. The capacity of a channel is a value of the run, and the checker proves no room.
+- A call through a function value is not followed. A callback that waits, called under a lock, gets no warning.
+
+For a C++ programmer:
+
+- The hidden lock of a synchronized class is held in every function that is not private, so a `join` or a `recv` there gets the warning. A private function of the class called from one does as well.
+- The warning stops a release build. A program that ships with a wait under a lock writes `allow` with its reason.
