@@ -240,7 +240,7 @@ define internal noundef i64 @decl.main() #5 {
 
 Only two functions of the example are left. `opt` inlined `area`, `clamp`, `moved`, `widen`, `width`, `first` and `consume` into `main` and removed them, which `internal` allows. `twice` stays, since C may call it. `opt` also found that its result lies between 0 and 200, the `range` on its result.
 
-On the two Windows targets a function has no `hidden` marking, since COFF has none, and its name is written without dots.
+On the two Windows targets a function has no `hidden` marking, since COFF has none. Its symbol holds no dot: `_A`, the length and the text of each segment of the module path, `_` and the name, so `decl.area` is `_A4decl_area`. `target_mangle` of `src/antic/target.c` writes it.
 
 Where it lives: `parser_item.c` and `parser_decl.c` of `src/antic/` parse a function, and `sema_check_main` and the `return` rules of `src/antic/sema_stmt.c` check it. `lower_function` of `src/antic/lower_function.c` writes its IR. `llvm_emit_linkage` and `param_facts` of `src/antic/llvm_emit_call.c` write the line of the module.
 
@@ -841,7 +841,7 @@ The convention is fixed, and the choice is the shape of the values a hot functio
 
 - Up to 16 bytes of integers and pointers, or of one float type, travel in registers on five targets. Two scalar parameters cost the same as one struct of both.
 - A struct above 16 bytes is copied at every call on all six. A `*T` parameter passes 8 bytes in its place.
-- A result above 16 bytes is written through the hidden pointer, with no copy after the return. Returning a large struct costs no more than filling one through a pointer parameter.
+- A result above 16 bytes is written through the hidden pointer into a slot of the caller. `let b = grow(...)` then copies the slot into `b`, a `memcopy` of the IR, which `opt` may remove in a release build. A pointer parameter that the callee fills makes no such copy.
 - A function that may fail takes one pointer more and stores its value through it. [Chapter 6]({{% relref "06-errors" %}}) gives the rest of that cost.
 
 ### Pitfalls
@@ -968,7 +968,7 @@ retq
 
 The function is four instructions and has no frame.
 
-Under `-g` a release build records an inlined call in the debug information, so a debugger and a stack trace with line numbers still name `square`. [Chapter 20]({{% relref "20-targets" %}}) describes that.
+Under `-g` a release build records an inlined call in the debug information, so a debugger still names `square` in a frame marked `[inlined]`. The lldb session of [chapter 20]({{% relref "20-targets" %}}) shows such a frame.
 
 Where it lives: `llvm_opt_options` and `run_opt` of `src/antic/llvm_run.c` hold the pipeline and the threshold, which `LLVM_INLINE_THRESHOLD` of `src/antic/llvm_run.h` names. `src/antic/linker.c` passes the same threshold to the LTO link. `llvm_emit_frames_kept` of `src/antic/llvm_emit_facts.c` and `main_kept` of `src/antic/llvm_emit.c` mark the functions that stay.
 
@@ -988,7 +988,7 @@ No form of the language asks for inlining, so the choice is between the kinds of
 
 - A direct call of a function of the program is inlined in a release build when the callee is small. A small helper costs nothing there, and the dev build keeps it visible to a debugger.
 - A call through a function value or a table is inlined only when `opt` proves the target, as for `each` in the next section. A generic function of [chapter 10]({{% relref "10-generics" %}}) gets a copy per type, whose calls are direct.
-- A call into the runtime is inlined under the default `--lto full` alone.
+- A call into the runtime can be inlined by an LTO link alone, and `--lto full` is the default. `--lto none` keeps every call.
 
 ### Pitfalls
 
@@ -1504,7 +1504,7 @@ fn caller()
 
 A snapshot is a record: its size in bytes first, then one field per captured variable. The function reads its captures from that record, which it receives as its context.
 
-For an `own fn` the record lives on the heap. Lowering computes the size of the record plus the length of every captured `str` and one byte for its NUL, and calls `anti_rt_snapshot_new` for the block. It copies each `str` and a NUL behind the record with `anti_rt_snapshot_text`. The snapshot therefore owns the bytes of its texts and does not depend on the `str` it was made from, and the `ptr` of each text is a C string, as for every `str`.
+For an `own fn` the record lives on the heap. Lowering computes the size of the record plus the length of every captured `str` and one byte for its NUL, and calls `anti_rt_snapshot_new` for the block. It copies each `str` and a NUL behind the record with `anti_rt_snapshot_text`. The snapshot therefore owns the bytes of its texts and does not depend on the `str` it was made from, and the `ptr` of each text is a C string.
 
 ```ir excerpt=snap target=linux-x86_64 mode=release
     %16 = add i64 size_of main.0.snapshot, %15
@@ -1541,7 +1541,7 @@ Where it lives: `check_snapshot` of `src/antic/sema_closure.c` and `require_owne
 | Calling it | one indirect call with the snapshot as the last argument | the same |
 | Checks inserted | none | none |
 
-For the snapshot of the example the block is 8 bytes of size, 16 for the `str`, 8 for the `int` and 6 for the text `report`, which is 38 bytes.
+For the snapshot of the example the block is 39 bytes: 8 of size, 16 for the `str`, 8 for the `int` and 7 for the text `report` with its NUL.
 
 A snapshot costs a block of the heap only where it is kept. The choice:
 
@@ -1775,7 +1775,7 @@ Where it lives: `types_fn_form` of `src/antic/types.c` holds the forms of a func
 | Heap allocations | 0 | 0 |
 | Checks inserted | none | none |
 
-An indirect call is not inlined unless `opt` learns the target. A table of function values, such as the `ops` of the example, is called through the pointer in both modes.
+An indirect call is not inlined unless `opt` learns the target. A dev build calls each entry of `ops` through its pointer. In the release module of the example `opt` sees the array literal, unrolls the loop over it and calls no function value at all. A table that the program fills at run time keeps the indirect call in a release build as well. So does one that comes from a function `opt` did not inline.
 
 The forms that choose code at run time:
 
@@ -1946,7 +1946,7 @@ b0:
 
 `opt` removes the arithmetic, whose result nothing reads, and the call, whose declaration says that it reads memory alone and returns. Those are the facts the warning reads. A function of the program has no such row, so antic does not warn of its call. `opt` may still remove that call when it inlines the body.
 
-Where it lives: `warn_unused_result` of `src/antic/sema_stmt.c` gives the warning, with `sema_hash_without_effects` for the hash. `rt_without_effects` of `src/antic/rt_abi.c` reads the rows of the runtime functions in `src/antic/rt_abi.h`. `NAME_UNUSED_RESULT` of `src/antic/warnings.c` holds the name.
+Where it lives: `warn_unused_result` of `src/antic/sema_stmt.c` gives the warning, with `sema_hash_without_effects` of `src/antic/sema_hash.c` for the hash. `rt_without_effects` of `src/antic/rt_abi.c` reads the rows of the runtime functions in `src/antic/rt_abi.h`. `NAME_UNUSED_RESULT` of `src/antic/warnings.c` holds the name.
 
 ### What it costs
 
