@@ -814,6 +814,7 @@ A function of a class body takes `self`, a `*Class`, as its first parameter. A f
 - `fn` without a marker is private to the class, and `protected fn` reaches the classes below. Neither has a table entry, and both are called directly.
 - `abstract fn f(self) -> R;` has no body and is `pub`. It takes `self`, since an object reaches it through its table. A class with one is an `abstract class`.
 - `concrete fn f(self)` replaces an inherited entry. The word is required: a function that matches an inherited one without it is refused, and so is a `concrete fn` that matches nothing.
+- `concrete fn Animal::speak(self)` names the base whose entry it replaces, for the reader. A name that is no base and no interface of the class is refused. The interfaces of the next section take the same form, where it chooses one table.
 - `pub final fn` cannot be replaced, so every call of it is direct.
 - A function without `self` is static and is called as `Circle.unit()`.
 - `const NAME: T = e;` is a constant of the class. Inside the class its bare name `UNIT` reaches it: in another constant, the type and the default of a field, a type nested in the class and every function. Outside the class, and in a class that inherits it, it is `Shape.UNIT`. A local or a parameter of the same name wins, and the constant hides an item of the module of the same name. `self.UNIT` is refused.
@@ -991,6 +992,40 @@ class Animal
 class Loud inherits Animal
 {
 	pub fn speak(self) -> int { return 2; }
+}
+```
+
+The qualified form compiles as the plain one does.
+
+```anti
+class Animal
+{
+	pub fn speak(self) -> int { return 1; }
+}
+
+class Loud inherits Animal
+{
+	concrete fn Animal::speak(self) -> int { return 2; }
+}
+
+fn talk(a: *Animal) -> int
+{
+	return a.speak();
+}
+```
+
+```anti refused
+//! error: `Other` is no base and no interface of `Loud`
+class Animal
+{
+	pub fn speak(self) -> int { return 1; }
+}
+
+class Other { pub n: int = 0, }
+
+class Loud inherits Animal
+{
+	concrete fn Other::speak(self) -> int { return 2; }
 }
 ```
 
