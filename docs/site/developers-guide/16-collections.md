@@ -494,7 +494,7 @@ The choice among the sequences follows from these counts.
 - `Deque<T>` adds and removes at both ends and moves no element there. It has no `[]`, and reads its ends with `front` and `back`.
 - `Ring<T, N>` holds at most `N` elements, allocates once when it is made and never grows. A known bound makes it the queue without growth.
 - `Pool<T>` keeps each element in its slot through every removal, and a `Handle<T>` finds it. A list renumbers the elements behind a removal.
-- An array `[T; N]` or a slice from `alloc(T, n)` has no header of 136 bytes, no record of changes and no walk check. A buffer whose size never changes needs none of them.
+- An array `[N]T` or a slice from `alloc(T, n)` has no header of 136 bytes, no record of changes and no walk check. A buffer whose size never changes needs none of them.
 
 ### Pitfalls
 
@@ -727,7 +727,7 @@ Where it lives: `src/std/anti/collection/ring.anti` and `src/std/anti/collection
 | Atomic operations and locks | none |
 | Copies of code | one copy per pair of `T` and `N` of a ring, and one per `T` of a grid |
 
-A `Ring<T, N>` beside a `Deque<T>`: the ring allocates once and refuses an element when full, and the deque allocates on each growth and takes every element. A `Grid<T>` beside a `List<T>` of `width * height` elements: the grid adds 16 bytes and one slot, checks both coordinates in dev mode and never changes its size. A fixed array `[[T; W]; H]` of [chapter 8]({{% relref "08-structs-enums" %}}) stands inline in its owner with no heap block, when both sizes are constants.
+A `Ring<T, N>` beside a `Deque<T>`: the ring allocates once and refuses an element when full, and the deque allocates on each growth and takes every element. A `Grid<T>` beside a `List<T>` of `width * height` elements: the grid adds 16 bytes and one slot, checks both coordinates in dev mode and never changes its size. A fixed array `[H][W]T` of [chapter 12]({{% relref "12-memory#slices-and-views" %}}) stands inline in its owner with no heap block, when both sizes are constants.
 
 ### Pitfalls
 
