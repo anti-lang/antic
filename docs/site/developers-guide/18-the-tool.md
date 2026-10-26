@@ -428,7 +428,7 @@ The interface in the file carries what another module may name, and what the che
 - the value of each constant, and the default of each field, a function it names included;
 - each class with its `pub` and protected functions, its constants and static fields, the mark of a singleton, and the name alone of each private function;
 - the checked tree of each generic function and type, with every function of its body. A function of a class with type parameters of its own, and a type nested in a generic class, are not carried yet;
-- the locks each function takes, the edges of the lock order its code adds and the first wait each function may reach. `lock-order` and `blocking-under-lock` of [chapter 14]({{% relref "14-concurrent-classes" %}}) follow them across modules;
+- the locks each function takes, the edges of the lock order its code adds and the first wait each function may reach. `lock-order` of [chapter 14]({{% relref "14-concurrent-classes#lock-order-at-compile-time" %}}) and `blocking-under-lock` of [chapter 13]({{% relref "13-threads#waits-under-a-lock" %}}) follow them across modules;
 - the imports, the `link` lines and the doc text of the module.
 
 A file of another format version is refused when a module imports it.
@@ -603,7 +603,7 @@ Where it lives: `src/anti/manifest.c` reads the manifest with the TOML parser of
 
 ## Dependencies and the lock file
 
-A dependency is a package of library files. A library file, `<module>.antl`, holds the public interface of one module, its checked generics and its IR. A project that depends on a package never sees its source.
+A dependency is a package of library files, the form that "Library files" above describes. A project that depends on a package never sees its source.
 
 `[dependencies]` maps a package name to an inline table of one of three shapes.
 
@@ -738,7 +738,6 @@ The file `index.toml.checked` is the stamp of the last check. The tool reads an 
 | no `repo`, and no repository of the manifest has the package | `anti: no repository of the manifest has a version of com.example.units that satisfies every constraint on it` |
 | `path = "../nowhere"` | `anti: ./../nowhere holds no library file of the package com.example.units` |
 | `version = "=2.0.0"` beside a path that holds 1.2.0 | `anti: ./../../units/dist/macos-arm64/dev holds com.example.units 1.2.0, which no constraint on the package takes` |
-
 | no `repo`, the first repository holds 1.1.0 alone and the second 1.2.0 | the second answers. A file missing there is named: `anti: file:///home/ann/second/com.example.units/1.2.0/com.example.units.antl: the repository holds no such file` |
 | no `repo`, and two repositories hold a version that fits | `anti: file:///home/ann/repo and file:///home/ann/second both hold com.example.units, so the dependency names which one` |
 | `local = "file:///C:/repo"` on macOS or Linux | `anti: file:///C:/repo/com.example.units/index.toml: a file:// URL names C:/repo/com.example.units/index.toml, which is a path of another system` |
@@ -1080,7 +1079,8 @@ A fence of a doc comment that nothing closes gives a warning, and the page is wr
 ```text
 anti: one.anti: warning: the doc comment of `one` holds a fence that nothing closes
 ```
- The Markdown page closes the open code block at the end of the comment, so the rest of the page stays text.
+
+The Markdown page closes the open code block at the end of the comment, so the rest of the page stays text.
 
 Where it lives: `src/anti/doc.c`, and `src/antic/docpage.c` for the page of one module.
 
