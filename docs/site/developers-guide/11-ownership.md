@@ -498,7 +498,7 @@ Where it lives: `sema_lent_form` of `src/antic/sema.c`. `sema_check_take` of `sr
 | Teardown of an `own` slice of bytes | one `anti_rt_give`, one `free`, one store of `none` | the same |
 | `take(x.f)` | one load, one store of `none` | the same |
 | Checks | the test for a zero table in `anti_rt_delete_from` | the same |
-| Atomic operations | two loads in the `anti_rt_hook` of each object torn down, and what a `destruct` of the program does | the same |
+| Atomic operations | one load of the trace handler in the `anti_rt_hook` of each object torn down, one load of the count of loaded libraries for each object that a delete frees, and what a `destruct` of the program does | the same |
 | Locks | 0 | 0 |
 
 `size_of(Sprite)` is 56: the table pointer, 16 bytes of `pixels`, 8 of `shadow`, 8 of `atlas` and 16 of `name`. The same class without the two words `own` has the same 56 bytes.
@@ -1636,7 +1636,7 @@ The lowering is the same in dev and in release, and both keep the test for a zer
 | A temporary argument | the same sequence, once, after the call |
 | A statement temporary | one slot of 8 bytes in the frame, one store when made, one load and one test at the end of the statement |
 | `delete(p)` | one `anti_rt_delete`, one indirect call of the teardown, one `free` |
-| Atomic operations | two loads in each `anti_rt_hook` |
+| Atomic operations | one load of the trace handler in each `anti_rt_hook`, and one load of the count of loaded libraries per `delete` |
 | Heap allocations, locks | 0 |
 
 A value that owns nothing has no teardown, and its block emits no code for it. `--no-hooks` drops the call of `anti_rt_hook`, with the hooks of [chapter 15]({{% relref "15-hooks" %}}).
@@ -2483,7 +2483,7 @@ The checks cost compile time alone. What they let pass, the run-time tools find 
 | A reference to a local read after its block ends | nothing | nothing, since the checks cover the heap alone |
 | A read or a write of an object after `delete` | nothing | reported as a use after free |
 | A second `delete` | nothing | reported as a double free |
-| A node that the half-dead `own` field of `halfdead` leaks | nothing | reported as a leak at exit |
+| A node that the half-dead `own` field of `halfdead` leaks | nothing | reported as a leak at exit, on macOS and Linux. The runtime of AddressSanitizer of Windows has no leak check |
 | A `Handle<T>` of a `Pool<T>` whose element is gone | `none` from `get`, in every mode | the same |
 
 A refusal leaves two choices. The first is a change of the code: a value that must outlive its block goes to the heap with `alloc` and into an `own` field, a function returns a value in place of its address, a `dispatch` gets its `join` on every path, and an object reached from many places goes into a `Pool<T>` or under `Shared<T>`. Each costs what its section counts, and the checks then hold for it. The second is `unchecked` with its reason, which costs nothing at run time and leaves the program's correctness to the reason. It is the form for code that the check cannot follow but that is correct, such as a reference stored into memory that ends before the local does.
@@ -2788,7 +2788,7 @@ The costs are the same in dev and in release.
 | `read(f)` and `modify(f)` | one test for `none`, one indirect call of `f`, no atomic operation, no lock |
 | The teardown of a handle | one `anti_rt_hook`, one atomic subtract, one `anti_rt_delete_from` of a field that holds `none` |
 | The teardown of the last handle | one `anti_rt_delete` on top: the teardown of the value and one `free` |
-| Atomic loads inside the hooks | two in each `anti_rt_hook`, one in `anti_rt_hook_copied` |
+| Atomic loads inside the hooks | one in each `anti_rt_hook` and `anti_rt_hook_copied`, and one more when the cell is made on the heap and when it is freed |
 | Locks | 0 |
 | Copies of code | one copy of `Shared<T>` and of `Cell<T>` per type argument, as [chapter 10]({{% relref "10-generics" %}}) counts |
 
