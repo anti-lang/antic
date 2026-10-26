@@ -797,6 +797,41 @@ let m = 2 as Kind;
 if k != m { }
 ```
 
+An enum without values compiles, with the size of `c_int`. Two values may share a number, and a `switch` refuses two arms that name them both. An enum body takes functions and constants after its values. A function there takes `self` as a pointer to the enum and is called as `Speed.rank(&s)`, since method-call sugar does not reach it, and a constant is `Speed.LIMIT`.
+
+```anti
+import anti.io;
+import anti.text;
+
+enum Empty { }
+enum Code { Ok = 0, Success = 0, Failed = 1 }
+
+enum Speed
+{
+	Fast,
+	Slow,
+
+	fn rank(self) -> int
+	{
+		if *self == Speed.Fast { return 1; }
+		return 2;
+	}
+
+	const LIMIT: int = 3;
+}
+
+fn main() -> int
+{
+	let s = Speed.Slow;
+	io.println(f"{size_of(Empty)} {Code.Ok == Code.Success} {Speed.rank(&s)} {Speed.LIMIT}");
+	return 0;
+}
+```
+
+```text
+4 true 2 3
+```
+
 ## Variants
 
 A tagged union with C layout: a tag and a union of the cases. `switch` binds the case's fields and must cover every case.
