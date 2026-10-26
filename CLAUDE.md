@@ -254,6 +254,10 @@ not re-open a settled decision without asking Eddie.
   432 s, 258 s and 269 s. It ran each sanitizer suite in the six parts
   of `asan`: `asan` 243 s, 187 s, 250 s, 186 s, 436 s and 341 s, `ubsan`
   247 s, 189 s, 246 s, 200 s, 458 s and 358 s.
+  The step of the defects T201 and T202 measured `host` in the same
+  three parts: 370 s, 260 s and 268 s. It ran each sanitizer suite in
+  the six parts of `asan`: `asan` 242 s, 187 s, 246 s, 183 s, 447 s and
+  353 s, `ubsan` 248 s, 187 s, 246 s, 200 s, 460 s and 346 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -856,10 +860,8 @@ reports what it finished.
   `docs/notes/trace-handlers.md`.
 - 6759 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  Five of them are expected failures there, the three modes of
-  `matrix_ownership_local_of_a_defer_moves` of T201 and the two of
-  `modules_generic_constant` of T202. Of the seven lines of
-  `tests/known-failures.txt`, those of T136 and T138 carry
+  None of them is an expected failure there. The two lines of
+  `tests/known-failures.txt`, those of T136 and T138, carry
   `host=windows`. The ASan and the UBSan builds run 6757 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
