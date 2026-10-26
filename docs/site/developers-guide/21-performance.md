@@ -18,6 +18,7 @@ A row gives the counts of a release build unless it names dev mode. "0" in a col
 
 | Feature | Bytes | Heap allocations | Calls into the runtime | Atomic operations and locks | Checks | Copies of code |
 |---|---|---|---|---|---|---|
+| [Source text]({{% relref "02-how-antic-works#source-text" %}}) | 0 in the program. The text of `///` and `//!` in the library file, which `--strip-docs` leaves out | 0 | 0 | 0 | none | none |
 | [Types and literals]({{% relref "03-values#types-and-literals" %}}) | `bool` 1, `i16` 2, `i32` 4, `int` 8, `char` 4, a pointer 8 | 0 | 0 | 0 | dev: the range of a narrowing `as` | none |
 | [Variables and constants]({{% relref "03-values#variables-and-constants" %}}) | a local: one stack slot in dev, a register in release. A scalar constant: 0 | 0 | 0 | 0 | none | none |
 | [Operators]({{% relref "03-values#operators" %}}) | 0 | 0 | 0, apart from `==` and `<` on a `str`, and an `f16` below `v3` | 0 | none | none |
@@ -120,6 +121,7 @@ A row gives the counts of a release build unless it names dev mode. "0" in a col
 | [Library files]({{% relref "18-the-tool#library-files" %}}) | 0 in the program. The file of the example: 828 bytes, 676 with `--strip-docs`, one file for all six targets | 0 | 0 | 0 | none | a generic of the file is compiled again in each module that makes a copy |
 | [tests and fixtures blocks]({{% relref "19-tests#tests-and-fixtures-blocks" %}}) | 0 in a build without `--tests`. 16 in the runtime for the name of the running test | 0 by the runner | per test one `anti_rt_test_running` | one lock of the runtime taken and given back per test | the assertions of a dev run. A run with `--release` has none | one function per test and per fixture, in a test build alone |
 | [The processor levels]({{% relref "20-targets#the-processor-levels" %}}) | a level changes no size and no layout | 0 | one check of the processor at start | an atomic operation is one instruction at `armv8.2` and above | at start, in every build: the level of the machine | one runtime per target and level in the archive |
+| [-g and debugging]({{% relref "20-targets#-g-and-debugging" %}}) | the debug sections of the file: 112,496 bytes against 108,144 in the example. No instruction changes | 0 | 0 | 0 | none | none |
 
 ## Measuring with tests/bench
 
