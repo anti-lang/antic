@@ -36,6 +36,7 @@ Contents:
 - [Hooks and tracing](#hooks-and-tracing)
 - [Injection](#injection)
 - [Plugins](#plugins)
+- [Runtime configuration](#runtime-configuration)
 - [Tests](#tests)
 - [C interop](#c-interop)
 - [Compile-time targets](#compile-time-targets)
@@ -1667,7 +1668,41 @@ let logger = lib.instance(log.Logger) catch fatal;
 
 Versions are checked at load. Every class descriptor carries the version of the package that declared it, `--package-version` and `0.0.0` without one. An abstract class carries the chain of its structural hashes and the floor a `compatible <version>;` line names, and a plugin carries the chain, the fields, the size and the version of each interface it was built against. The load compares the two chains at the length of the shorter, refuses a field added between the two versions, refuses a slot the program's calls reach and the library lacks, and fills a slot that `reflect.call` alone may reach with a stub that names the plugin.
 
+## Runtime configuration
+
+A program takes its runtime configuration at start. A TOML file, when one is named, and the `--anti.` options of the command line set the same keys.
+
+```toml
+include = ["base.toml"]
+
+[runtime]
+threads = 4
+trace = "leaks,calls"
+backtrace = true
+
+[injections]
+"anti.log.Logger" = "lib/CISOLogger.so"
+```
+
 `--anti.conf=<path>`, `ANTI_CONF` and `rt.configure(path)` of `anti.runtime` name the configuration file, which holds `include`, `[runtime]` and `[injections]`. The includes run first and in order, so the including file wins per key. Every key of `[runtime]` is an option of the same name, `--anti.inspect` prints the effective value of each with the layer it came from and the version and the used slots of each injectable interface, and `--anti.help` lists the options. Precedence per key is the command line, the file, the build. The `--anti.` options are the runtime's and are consumed before `main`, and `rt.get(key)` gives the effective value of a key. Injections are fixed at start, so `rt.configure` refuses a table `[injections]`, in its file and in every file that file includes, and names `--anti.conf` and `ANTI_CONF` instead.
+
+The six keys of `[runtime]` are `threads`, the size of the worker pool, `logger`, the TOML file of `anti.log`, `plugins`, the directories that discovery reads, separated by `:`, or by `;` on Windows, `trace`, the handlers of [Hooks and tracing](#hooks-and-tracing), `backtrace`, the frames of an error in a release build, and `hash_seed`, the seed of the hashing collections. A key the runtime does not know, a value a key does not take, a file that cannot be read and a cycle of includes end the program with status 70 and a message that names the file and the line, and so does a line of `[injections]` that names no injectable interface of the program.
+
+```anti
+import anti.io;
+import anti.runtime as rt;
+
+fn main() -> int
+{
+	let threads = rt.get("threads") ?? "the default";
+	io.println(threads);
+	return 0;
+}
+```
+
+```text
+the default
+```
 
 ## Tests
 
