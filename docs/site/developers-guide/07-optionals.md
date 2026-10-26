@@ -1,9 +1,9 @@
 ---
 title: "Optionals"
-description: "Nullable pointers, ?T and its layout, if let, ?? and the refusals of the checker."
+description: "Nullable pointers, ?T of any type and its layout, narrowing, if let, let ... else, ??, ?. and the refusals of the checker."
 summary: "`*T` and `?*T`, narrowing, `?T` of any type with its layout, and the forms that read an optional, `if let`, `let ... else`, `??`, `?.` and the guards of `catch`, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 70
 tags: [compilers, programming-languages]
@@ -210,6 +210,8 @@ Where it lives: `types_with_none` and `types_is_nullable` of `src/antic/types.c`
 
 The cost of safety is the tests the program writes, each once. A function that takes `*T` moves the test to its callers, and a chain of such functions tests once at the top.
 
+The choice of a parameter type follows from where the test belongs. `*T` is the form wherever the function needs the object: it tests nothing, and the optimizer may read through it early. `?*T` is the form where absence is a valid input, as for the head of a list, and the function tests it once.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -246,7 +248,9 @@ Two `?T` values compare with `==` when `T` has `==`. They are equal when both ar
 
 `none` means that nothing is there, which is an ordinary answer. A lookup that finds no entry gives `none`. A failure that the caller should hear about is an error of [chapter 6]({{% relref "06-errors" %}}). The standard library follows that line: `map.get(key)` gives a `?V`, and `text.parse_int(s)` may fail.
 
-A `?T` whose `T` is a pointer or a function type is that pointer, with `none` as 0. `??T` is an optional of an optional, with two flags.
+A `?T` whose `T` is a pointer or a function type is that pointer, with `none` as 0. `??T` is an optional of an optional, with two flags. A `?U` passes where a `??U` is expected, as the value of the outer optional, and so does `none`. `o ?? b` on a `??U` with a `?U` on the right gives a `?U`, which may itself be `none`.
+
+`dup` of a `?T` is refused before a test, as every other read is, and after the test it gives a `T`. No `as` converts to an optional value: `n as ?int` is refused, and its message names `as? int`, which is the checked downcast of a class pointer. A value becomes a `?T` where one is expected, and `p as ?*T` stays the conversion of a pointer to one that may be `none`.
 
 ```anti
 //! name: opts
@@ -302,6 +306,46 @@ got 6, b none true, same false, equal true, cx 3
 sizes: ?int 16, ?bool 2, ?u8 2, ?f32 8, ?Point 24, ?str 24, ??int 24, ?*Point 8
 ```
 
+```anti
+//! name: twice
+import anti.io;
+import anti.text;
+
+fn inner(n: int) -> ?int
+{
+	if n > 0 {
+		return n;
+	}
+	return none;
+}
+
+fn outer(n: int) -> ??int
+{
+	if n == 0 {
+		return none;
+	}
+	return inner(n);
+}
+
+fn main() -> int
+{
+	let fallback: ?int = 9;
+	let x: ?int = outer(5) ?? fallback;
+	let y: ?int = outer(-5) ?? fallback;
+	let z: ?int = outer(0) ?? fallback;
+	let line = f"{x ?? -1} {y ?? -1} {z ?? -1}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+5 -1 9
+```
+
+`outer(-5)` is a `??int` that holds a `?int`, and that `?int` is `none`. `??` gives the inner `none` and not the fallback, so `y` prints -1. Only `outer(0)`, whose outer flag is 0, takes the fallback.
+
 The checker refuses each of the following.
 
 ```anti refused
@@ -318,6 +362,27 @@ fn plain(v: ?int) -> int
 {
 	let n: int = v;
 	return n;
+}
+```
+
+```anti refused
+//! error: `b` may be `none`, test it before reading it
+class Box
+{
+	pub n: int = 0,
+}
+
+fn copy(b: ?Box) -> Box
+{
+	return dup(b);
+}
+```
+
+```anti refused
+//! error: `as` takes no `?` before its type, write `as? int`
+fn wrap(n: int) -> ?int
+{
+	return n as ?int;
 }
 ```
 
@@ -383,6 +448,17 @@ Where it lives: `TYPE_OPTIONAL` and `types_with_none` of `src/antic/types.c` mak
 
 The sizes are those the example prints. The flag costs the alignment of `T`: 8 bytes for a `?int`, 4 for a `?f32`, 1 for a `?bool`. An array of a million `?int` is 16 megabytes where an array of `int` is 8. A struct that holds four optionals of 8-byte types takes 64 bytes. With one field of flags, or with a sentinel where the range of the values allows one, it takes 40 or 32.
 
+The forms that say a value may be missing:
+
+| Form | Bytes for an `int` | A missing value | The checker |
+|---|---|---|---|
+| `?int` | 16 | the flag 0, no allocation | refuses a read before a test |
+| a sentinel such as -1 | 8 | a value of the range | knows nothing of it |
+| `?*T` to a value elsewhere | 8, and the value | the pointer 0 | refuses a read before a test |
+| `may fail` | the result, and an error on failure | an error object on the heap | requires a handler at each call |
+
+`?T` is the form for a missing value that is an ordinary answer, at the cost of the flag. A sentinel saves the flag where memory decides, and gives up the check. `may fail` is the form where the caller needs to know why, and it allocates only when the value is missing.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -425,7 +501,7 @@ Five forms read a `?*T` or a `?T`. Each evaluates the optional once.
 
 `?.` reaches a pointer alone. A field or a result of another type is refused, since the result must itself be able to hold `none`. A chain continues with `?.`: `n?.next?.next`.
 
-`try` is no sixth form. antic 0.2.0 accepts `let x = try e;` on an optional and narrows `x` to the value, and the code it writes makes no test. A `none` then reaches the next statement as a value. A function that forwards a missing value writes `let x = e else { fail "missing"; };`.
+`try` is no sixth form. It forwards an error, and a value that may be `none` carries none, so the checker refuses `try` on an optional and names the two forms that fit. A function that forwards a missing value as an error writes `let x = e else { fail "missing"; };`.
 
 `e catch` on an optional turns `none` into an error of the class `anti.lang.NoneDereference`. Its code is 1, and its message is `the pointer is none` for a `?*T` and `the value is none` for a `?T` of a value. `catch fatal` prints it and ends the program. `catch err { }` binds it, and the handler ends with `yield v` or leaves, as the handler of a failing call does.
 
@@ -559,6 +635,26 @@ fn value_of(n: ?*Node) -> int
 ```
 
 ```anti refused
+//! error: `try` forwards an error, and a value that may be `none` has none: use `let ... else` or `??`
+fn find(n: int) -> ?int
+{
+	if n > 0 {
+		return n;
+	}
+	return none;
+}
+
+fn read(n: int) -> int may fail
+{
+	if n == 0 {
+		fail "zero";
+	}
+	let x = try find(n);
+	return x;
+}
+```
+
+```anti refused
 //! error: `catch none` counts a failure as `none`, and a `catch` on a pointer guards no failure
 fn read(p: ?*int) -> int
 {
@@ -682,6 +778,14 @@ Where it lives: `check_optional` of `src/antic/sema_expr.c` checks `?.`, and `se
 `if let` and `let ... else` copy the value into the new name. For a `?int` that is 8 bytes. For a `?T` of a large struct it is the size of the struct. A test of the name with narrowing reads the value in place.
 
 `e catch err { }` allocates an error object of at least 128 bytes on the `none` path. Where `none` is expected, `??`, `if let` and `let ... else` handle it without an allocation.
+
+The choice among the forms follows what the code does on `none`:
+
+- A default value is `??`, one test and often a conditional move.
+- An early exit from the function or the loop is `let ... else`, which leaves a plain name for the rest of the block.
+- Two paths that both go on are `if let` with an `else`.
+- A missing value that is a defect of the program is `catch fatal`, which costs nothing until it happens.
+- A walk through a chain of pointers is `?.`, one test per link.
 
 ### Pitfalls
 
