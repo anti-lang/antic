@@ -1366,7 +1366,14 @@ The string literals have seven prefixes.
 | `br"..."` | `[]byte` | bytes with every backslash kept |
 | `x"00 AB CC"` | `[]byte` | bytes written as hex pairs |
 
-`re"..."` is a pattern literal of type `Regex`. The guide has no chapter on regular expressions, and "Regular expressions" of `docs/anti-syntax-overview.md` lists their forms. Every form but `x"..."` takes hash delimiters, `#"a "quoted" word"#`, for a text that holds quotes.
+`re"..."` is a pattern literal of type `Regex`, which "Pattern literals" below describes. Every form but `x"..."` takes hash delimiters, `#"a "quoted" word"#`, for a text that holds quotes. `fr"` is no prefix, and the lexer names the right one.
+
+```anti refused
+//! error: `fr"` is not a prefix, write `rf"`
+import anti.text;
+let n = 1;
+let s = fr"{n}";
+```
 
 The escapes are `\n \r \t \\ \" \' \0`, `\xHH` and `\u{H}` with one to six hex digits. In a `str` and a `char`, `\xHH` stops at `\x7F` and `\0` is refused, so a `str` literal is always valid UTF-8 without a NUL inside. A byte string takes both.
 
@@ -1513,7 +1520,32 @@ let line = f"{key == "k"}";
 
 A `"` ends an `f"..."` inside an `{expr}` too. A value that needs a quote is bound to a name first, as `equal` is above, or the literal takes hash delimiters.
 
+An `{expr}` writes a number, a `bool`, a `char`, a `str` or an object. An enum, a pointer and an optional have no text of their own, so each is refused there. An `f"..."` is built at run time, so it is no constant expression.
+
+```anti refused
+//! error: `f"..."` cannot write a `?*int`
+import anti.text;
+let p: ?*int = none;
+let s = f"{p}";
+```
+
+```anti refused
+//! error: `f"..."` cannot write a `Color`
+import anti.text;
+enum Color { Red, Green }
+let c = Color.Red;
+let s = f"{c}";
+```
+
+```anti refused
+//! error: `f"..."` is not a constant expression
+import anti.text;
+const S: str = f"a";
+```
+
 ### How antic builds it
+
+A `str` is two words that point at bytes stored elsewhere: in the read-only data for a literal, on the heap for the text of an `f"..."`, or inside another text for a slice. Copying a `str` copies the two words, and no operation of the language writes through one. An `f"..."` is a row of calls on a builder, which grows one block of the heap and hands it to the program.
 
 A `str` is a struct of 16 bytes: the pointer at offset 0 and the length at offset 8. A `[]T` has the same layout. The calling conventions of the targets pass it as the table shows.
 
@@ -1584,7 +1616,11 @@ Where it lives: `src/antic/lexer.c` reads the literal forms and the pieces of an
 | `text.slice`, `text.from_bytes` | no allocation | no allocation |
 | `text.to_bytes` | one heap block of the length | the same |
 
-An `f"..."` whose text and NUL fit in 32 bytes takes one allocation. A longer one calls `realloc` again each time an append passes the room, which then doubles until it holds the bytes. The program frees the block, and a text that is never freed is a leak that `--memory-checks` reports.
+An `f"..."` whose text and NUL fit in 32 bytes takes one allocation. A longer one calls `realloc` again each time an append passes the room, which then doubles until it holds the bytes. The program frees the block, and a text that is never freed is a leak that `--memory-checks` reports. Memory that runs out in a builder ends the program with `anti: out of memory for <n> bytes` on the standard error, so an `f"..."` never gives a partial text.
+
+`Builder` is a class of `anti.text`. Making one calls `anti_rt_hook` once, the site of the hook `created`. With no trace handler installed, and no hook of its own in the class, the call reads the handler with one atomic load and the entry of the hook in the table of the class, and returns. [Chapter 15]({{% relref "15-hooks" %}}) describes the hooks.
+
+The form of a text follows from the counts. A literal and a slice cost no allocation and no copy, so a text that exists already is passed as a `str` or cut with `s[lo..hi]` and `text.slice`. An `f"..."` costs a block of the heap and one call per piece, which pays for a text built once, such as a line of output. A loop that builds one long text calls `append` on one `Builder` and takes the text once at the end. It then grows one block by doubling, where an `f"..."` per turn would allocate and free a block each turn. Comparing two texts with `==` costs one call and no allocation.
 
 No operation on a `str` takes a lock or an atomic operation. The bounds check of `s[i]` follows `--checks` and `--no-checks` as every check of dev mode does. Without it an index past the end reads memory outside the text.
 
@@ -1610,6 +1646,230 @@ For a C++ programmer:
 - A `str` is a `std::string_view`, not a `std::string`. It owns nothing and no destructor runs for it.
 - The text of an `f"..."` has no owner type. The program frees it once, by hand.
 - A `str` has no buffer of its own for a short text. An `f"..."` of one byte takes a heap block of 32 bytes.
+
+## Pattern literals
+
+### What you know
+
+Java compiles a regular expression with `Pattern.compile` at run time, and a malformed one throws `PatternSyntaxException` when that line runs. `String.matches` requires the whole text to match. C has `regcomp` and `regexec` of POSIX, whose compiled pattern the program frees with `regfree`. C++ has `std::regex`, compiled at run time from the ECMAScript grammar by default. In all three a pattern is a string until the program runs.
+
+### The feature
+
+`re"..."` is a pattern literal. It is raw, so a backslash stands for itself, and it takes hash delimiters as every string literal does. Its type is `Regex`, a struct of `anti.lang` that the compiler declares. A module that writes a pattern imports `anti.regex`, and the engine is PCRE2.
+
+The compiler compiles every literal while it checks the module. A malformed literal is refused at the byte PCRE2 names, so no program runs with a pattern that does not compile. The compiler also knows the groups of a literal, and checks each use of a group and each template against them.
+
+`str` has four methods that take a pattern. Each finds a match anywhere in the text, and none needs the pattern to cover the whole text.
+
+| Method | Result |
+|---|---|
+| `s.matches(r)` | the first match, a `?Match`, or `none` |
+| `s.find_all(r, limit)` | an iterator over the matches, from left to right |
+| `s.split(r, limit)` | an iterator over the pieces between the matches |
+| `s.replace(r, with, limit)` | a new text with each match replaced by the template `with` |
+
+`limit` takes that many matches from the start, or from the end when it is below zero, and 0 takes every match. `to_slice()` collects an iterator into a slice in new memory. A template names groups with `$1` and `${name}`, and `$$` writes one `$`.
+
+A `?Match` behaves as a `?*T` does. It stands alone as a condition, in `if`, `while`, `&&`, `||` and `!`, and `if let` and `let ... else` bind the match. A match has the fields `all`, `pre` and `post`, the texts of the match and of what stands before and after it, and `count`, the number of groups. `m.group(n)` and `m.took_part(n)` read a group by number. For a literal a group is a field as well: `m.1` by its number and `m.year` by its name.
+
+A call with a literal at the call never fails. A search that reaches the match limit of PCRE2 stops the program with the pattern and the line. A pattern is a literal only where it stands in the call. A `Regex` bound to a local first, and one that `Regex.compile(text)` gives at run time, make the call one that may fail, with `regex.TooExpensive` or `regex.MissingGroup`. `Regex.compile` itself fails with `regex.BadPattern`, which holds the message and the position of PCRE2.
+
+The same methods work on `[]byte`, where `.` matches any byte and nothing needs to be valid UTF-8. A literal takes its mode from where it stands, so `re"\xFFa"` searched in bytes is a `ByteRegex` and its match a `ByteMatch`, whose texts are slices of the searched bytes. `ByteRegex.compile(text)` compiles a byte pattern at run time.
+
+`\d`, `\w` and `\s` mean their ASCII sets, and a pattern that starts with `(*UCP)` gives them their Unicode meaning. The flags are the inline flags of PCRE2, as `(?i)`.
+
+```anti
+//! name: pats
+import anti.io;
+import anti.regex;
+import anti.text;
+
+fn say(line: str)
+{
+	io.println(line);
+	free(line.ptr);
+}
+
+fn main() -> int
+{
+	let line = "on 2026-09-23, 7, 8";
+	if let d = line.matches(re"(?<year>\d{4})-(?<month>\d\d)") {
+		say(f"{d.year} / {d.month}, all {d.all}, pre {d.pre}|, groups {d.count}");
+	}
+	if line.matches(re"\d") {
+		io.println("has a digit");
+	}
+	let n = 0;
+	for x in line.find_all(re"\d+") {
+		n += 1;
+	}
+	say(f"numbers {n}");
+	let parts = line.split(re",\s*").to_slice();
+	say(f"parts {parts.len}, last {parts[2]}");
+	free(parts.ptr);
+	say("2026-09-23".replace(re"(?<y>\d{4})-(?<m>\d\d)-(?<d>\d\d)", "${d}/${m}/${y}"));
+	let raw = x"00 FF 61 62";
+	if let b = raw.matches(re"\xFFa") {
+		say(f"bytes found {b.all.len} at {b.pre.len}");
+	}
+	let r = Regex.compile(r"\d+") catch fatal;
+	let k = line.matches(r) catch none;
+	if let hit = k {
+		say(f"compiled {hit.all}");
+	}
+	say(f"Regex {size_of(Regex)}, Match {size_of(Match)}, ?Match {size_of(?Match)}");
+	return 0;
+}
+```
+
+```text output
+2026 / 09, all 2026-09, pre on |, groups 2
+has a digit
+numbers 5
+parts 3, last 8
+23/09/2026
+bytes found 2 at 1
+compiled 2026
+Regex 8, Match 96, ?Match 104
+```
+
+`replace` and `to_slice` give new memory, which `say` and `free(parts.ptr)` give back. The pieces of `split` are slices of `line` and own nothing. `catch none` turns a failure of the compiled pattern into no match.
+
+The checker refuses each of the following.
+
+```anti refused
+//! error: malformed pattern: missing closing parenthesis
+import anti.regex;
+let m = "a".matches(re"(ab");
+```
+
+```anti refused
+//! error: the pattern has no group `nope`
+import anti.regex;
+if let m = "a".matches(re"(?<x>a)") {
+	let y = m.nope;
+}
+```
+
+```anti refused
+//! error: the template names group 2, and the pattern has 1 group
+import anti.regex;
+let s = "2026".replace(re"(\d+)", "$2");
+```
+
+```anti refused
+//! error: `matches` may fail and its error is not handled
+import anti.regex;
+let r = re"\d+";
+let m = "7 of 9".matches(r);
+```
+
+```anti refused
+//! error: a pattern literal is not a constant expression
+import anti.regex;
+const R: Regex = re"a+";
+```
+
+The safety check `exponential-pattern` refuses nested repeats over text that overlaps, such as `(a+)+`. PCRE2 backtracks through every way to split the text between the two repeats, so a text that fails to match costs time exponential in its length. The message names the fixes, a possessive quantifier and an atomic group, which forbid the backtracking. The check lets `(a+\b)+` and `(a+(?=b))+` pass, since the assertion after the inner repeat stops the split. `unchecked(exponential-pattern, "reason")` overrules the check where the input is known to be short.
+
+```anti refused
+//! error: the repeat `a+` inside `(a+)+` can take exponential time
+import anti.regex;
+let m = "aaaa".matches(re"(a+)+b");
+```
+
+### How antic builds it
+
+A `Regex` is one pointer to a compiled pattern on the heap. A literal is a global of its module that holds that pointer, one per distinct pattern and mode. A constructor of the module compiles every literal before `main` runs, so a use reads the global and never compiles. A method of `str` is a call of a function of `anti.regex`, which calls the runtime, which calls PCRE2. A `Match` is a value of 96 bytes that records where the search started and what it found, and it owns no memory. A group other than the whole match is found by running the search again.
+
+The program below tests a literal.
+
+```anti
+//! name: tested
+import anti.io;
+import anti.regex;
+
+fn main() -> int
+{
+	if "on 2026".matches(re"\d+") {
+		io.println("digits");
+	}
+	return 0;
+}
+```
+
+```text output
+digits
+```
+
+This is its constructor in release mode, and the start of `main`.
+
+```llvm excerpt=tested target=linux-x86_64 mode=release
+define internal noundef i64 @tested.main() #0 {
+b0:
+  %a1.sroa.0.0.copyload = load i64, ptr @tested.pattern.0, align 8
+  %0 = inttoptr i64 %a1.sroa.0.0.copyload to ptr
+  %v13.i = tail call i64 @anti_rt_regex_test(ptr %0, ptr nonnull @tested.0, i64 7)
+...
+define internal void @tested.patterns.start() #1 {
+b0:
+  %v1 = tail call ptr @anti_rt_regex_literal(ptr nonnull @tested.1, i64 3)
+  store ptr %v1, ptr @tested.pattern.0, align 8
+  ret void
+}
+```
+
+Line by line:
+
+- `load ... @tested.pattern.0` reads the pointer of the compiled pattern from the global of the literal.
+- `anti_rt_regex_test` searches the 7 bytes of `"on 2026"` at `@tested.0`. A match that stands as a condition alone needs no groups, so the checker calls `matched_literal` of `anti.regex`, which `opt` inlined, and that calls the test of the runtime.
+- `@tested.patterns.start` is the constructor, which `@llvm.global_ctors` of the module names. It compiles the 3 bytes of `\d+` at `@tested.1` and stores the pointer.
+
+A failed search gives a value below zero, and the left-out lines branch to `anti_rt_regex_stop_limit`, which prints the pattern and the line and ends the program. A call with a compiled pattern goes to `matches` in place of `matches_literal`, which fails with `TooExpensive` there.
+
+A field of a match is a call. `m.year` calls `group_named` of `anti.regex` with the name, and `m.1` calls `group`. The runtime runs the search of the match again with room for every group and takes the group from it. A `Match` therefore stays a value of fixed size that a function returns and copies freely. `Match` holds the pattern, the three texts `all`, `pre` and `post`, `count`, the searched text, the start of the search and its options, `struct anti_match` of `src/rt/regex.h`. A `?Match` adds the flag byte and its padding.
+
+Where it lives: `src/antic/pattern.c` compiles a literal in the checker with PCRE2. `src/antic/sema_pattern.c` checks the groups, the templates and `exponential-pattern`, and `lower_pattern` and `lower_patterns_start` of `src/antic/lower_pattern.c` write the globals and the constructor. `src/std/anti/regex.anti` holds the functions the methods call, and `src/rt/regex.c` and `src/rt/patterns.c` hold the runtime over PCRE2.
+
+### What it costs
+
+| Cost | Count |
+|---|---|
+| `size_of(Regex)` | 8 bytes |
+| `size_of(Match)`, `size_of(?Match)` | 96 and 104 bytes |
+| a literal at the start of the program | one compile by PCRE2 and three blocks of the heap, kept for the life of the program: the handle, a copy of the text and the code |
+| a literal at a use | one load of its global |
+| a search, a test, a step of `find_all` or `split` | one call into the runtime and PCRE2, and two blocks of the heap that the search frees before it returns: the match data of PCRE2 and its frames, at least 20 KiB |
+| reading a group other than `all` | one more search, with the same two blocks |
+| `replace`, `to_slice` | the result in new memory, which the program frees |
+| `Regex.compile` | one compile by PCRE2 and the same three blocks as a literal. No form of the language gives them back, and `--memory-checks` reports them as a leak |
+| a check of dev mode | none. A dev and a release build make the same calls |
+| locks and atomic operations | none in a search |
+| the executable | PCRE2 links when a program uses a pattern: 576,456 bytes against 228,768 for the same program with `text.find_byte`, release for linux-x86_64 at commit `ed280bc0` |
+
+A match takes no lock and reads no global apart from the pattern, so threads search with one `Regex` at once. PCRE2 runs without its JIT and matches by backtracking, with its frames in the second block of a search.
+
+The choice follows from the counts. A fixed text is cheaper as a `str` than as a pattern: `==`, `text.find_byte`, `text.equal` and `switch` on a `str` cost no PCRE2, no heap block and no 347,688 bytes of code. A pattern pays where the text has a shape. Then a literal is the better form wherever the pattern is known when the program is written: it is checked, its calls cannot fail, and its compile happens once at the start. `Regex.compile` serves a pattern that the user gives, and its calls take a handler. Each group read is a search of its own, so a group that a loop uses is read into a local once, before the loop.
+
+### Pitfalls
+
+For a Java programmer:
+
+- `matches` finds a match anywhere, as `Matcher.find` does. A test of the whole text anchors the pattern, `re"^\d+$"`.
+- A malformed literal is a compile error. `Regex.compile` is the run-time form, and its failure is an error value, not an exception.
+- A group is a field, `m.year`, and its name is checked at compile time.
+
+For a C programmer:
+
+- The syntax is that of PCRE2, not POSIX. `\d` and `(?<name>...)` work, and `[[:digit:]]` stands beside them.
+- A literal is compiled once by the program and never freed. A pattern of `Regex.compile` is never freed either.
+- A `str` of a match points into the searched text. Freeing that text leaves the match pointing at freed memory.
+
+For a C++ programmer:
+
+- The grammar is that of PCRE2, not ECMAScript, and the engine backtracks. `exponential-pattern` refuses the nested repeats that make it slow.
+- A `Match` owns no memory and holds no positions of its groups. Each group read runs the search again.
+- `re"..."` is raw, so `re"\d"` is the `R"(\d)"` of C++.
 
 ## Tuples
 
