@@ -111,7 +111,17 @@ let s = text.equal(a, b);
 out.println("renamed");
 ```
 
-`pub` exports to every module, `internal` to modules under the same package root, none to the file. `internal` marks an item of a module, and `protected` a member of a class. `import x as y` renames the local name. The `import` lines come first in a file, after an `allow` or `unchecked` clause for the whole file. Paths under `anti.` are the language's. Third parties use a root they own.
+`pub` exports to every module, `internal` to modules under the same package root, none to the file. `internal` marks an item of a module, and `protected` a member of a class. `import x as y` renames the local name. The `import` lines come first in a file, and an `allow` or `unchecked` clause for the whole file stands before them or among them. Paths under `anti.` are the language's. Third parties use a root they own. A segment of a path is an identifier and never a keyword, so a module `app.here` cannot be imported.
+
+An import reads the library file that `antic -c` wrote for the module. `-I <dir>` names a search root, under which module `a.b` is `a/b.anti` and its library file `a/b.antl`, and the standard library is the last root. Two modules that import each other are refused, and the message names the cycle. A module is imported once in a file, so a plain import and a direct import of the same module are refused:
+
+```anti refused
+//! error: `text` is already declared
+import anti.text;
+import anti.text.{equal};
+```
+
+Some forms of the language need a module of the standard library, and the message of each names the import. `may fail`, `here` and `catch` on a `?*T` need `anti.lang`. `f"..."` and a `switch` on a `str` need `anti.text`, a pattern literal needs `anti.regex`, and `Object.deserialize` and an allocator argument of `destroy` and `delete` need `anti.mem`.
 
 `import anti.collection.map.{Map, HashMap};` makes the listed names of a module visible in the file without the module's name, so code writes `Map<str, int>` rather than `map.Map<str, int>`. Each listed name is a public item of that module, and one that clashes with a name already visible in the file is refused, naming both. The module stays reachable by its name, as with a plain `import`. `anti fmt` keeps the list sorted. `import anti.regex.{Regex};` is refused, since `Regex` is declared in `anti.lang` and is no item of `anti.regex`.
 
