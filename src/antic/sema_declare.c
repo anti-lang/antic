@@ -1774,18 +1774,6 @@ void sema_declare_body_constants(struct checker *c)
     }
 }
 
-/* Whether it has type parameters, or is a type nested in a body that
-   has them. */
-static bool in_generic_body(const struct item *it)
-{
-    for (; it != NULL; it = it->outer) {
-        if (it->type_param_count > 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* The members of every body, the export mark of every type and the
    constants of the module. */
 void sema_declare_all_members(struct checker *c)
@@ -1835,12 +1823,14 @@ void sema_declare_all_members(struct checker *c)
        checked whether or not code reads them, by T057 of
        docs/audit/tests-findings.md, so a default that is no constant
        expression is refused in a field that nothing reads. A body of a
-       generic type checks them in each copy. */
+       generic type folds them with its type parameters open, as its
+       first copy did, and each copy puts its arguments into the value.
+       A library file then carries them, by T202 of
+       docs/audit/tests-findings.md. */
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
         size_t j;
-        if (it->symbol == NULL || it->symbol->type == NULL ||
-            in_generic_body(it)) {
+        if (it->symbol == NULL || it->symbol->type == NULL) {
             continue;
         }
         for (j = 0; j < it->member_count; j++) {

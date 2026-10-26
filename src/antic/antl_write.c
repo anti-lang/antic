@@ -103,14 +103,17 @@ static const struct symbol *default_fn(const struct struct_field *f)
    body that another module may name, `pub` or `protected`, by T076,
    with its type and its value. The global of a static field is data of
    the module of the class, and the checker reads the value of each
-   member it names. A generic carries none,
-   since no copy reaches one through a library file yet. */
+   member it names. A generic carries them too, with the type
+   parameters open in the type and the value, so a copy made in another
+   module names one as `lib.Gen<u8>.SIZE` and computes `size_of(T)` with
+   its argument, as a copy of its own module does, by T202 of
+   docs/audit/tests-findings.md. A copy carries none: it has those of
+   its generic. */
 static bool carried_value(const struct type *t, const struct item *m)
 {
     return m->kind == ITEM_CONST && m->vis != VIS_PRIVATE &&
            m->symbol != NULL && m->symbol->type != NULL &&
-           t->generic == NULL && t->type_param_count == 0 &&
-           m->symbol->value != NULL;
+           t->generic == NULL && m->symbol->value != NULL;
 }
 
 static size_t carried_values(const struct type *t)
