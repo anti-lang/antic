@@ -2049,7 +2049,7 @@ fn words(l: *List<str>) -> int
 
 ### How antic builds it
 
-The checker turns `for x in c` into three calls: `c.iter()` once before the loop, `next()` in the test and `value()` at the head of the body. The iterator is a hidden local of the frame, and no walk of a collection allocates.
+The checker turns `for x in c` into three calls: `c.iter()` once before the loop, `next()` in the test and `value()` at the head of the body. The iterator is a hidden local of the frame, and no walk of a plain collection allocates. The thread-safe collections of [chapter 14]({{% relref "14-concurrent-classes" %}}) are the exception: their `iter` copies the elements into a `Snapshot<T>`, whose block is memory of the heap.
 
 The iterator of a list is an `IndexedWalk<T>` of 64 bytes. It holds the block, the capacity, the head and the count of the list as they were when the loop began, a position, and a `Watch`. A `Watch` is a pointer to the `changes` of the collection and the count of changes it saw when the walk began.
 
@@ -2105,7 +2105,7 @@ Where it lives: `sema_iterate` and `watch_changes` of `src/antic/sema_expr.c`, `
 |---|---|---|
 | Bytes of the iterator of a list, in the frame | 64 | 64, or none after inlining |
 | Bytes of `changes` in every collection | 72 | 72 |
-| Heap allocations of a walk | none | none |
+| Heap allocations of a walk | none for a plain collection | the same |
 | Calls per element | `next()` and `value()` | none after inlining |
 | The call of `iter` | one dispatch through the table | one direct call, or none after inlining |
 | The walk check | one compare per turn | none |
