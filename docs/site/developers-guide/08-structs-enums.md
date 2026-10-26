@@ -3,7 +3,7 @@ title: "Structs and enums"
 description: "Structs and their layout, packed and align, unions and bitfields, simd structs, enums, variants with their tag and payload, and pattern matching."
 summary: "Structs with C layout, `packed` and `align`, unions and bitfields, simd structs, enums, variants as a tag and a union of their cases, and the `switch` that takes a variant apart, each with how antic builds it and what it costs."
 date: 2026-10-11T08:10:24+02:00
-lastmod: 2026-10-11T20:23:44+02:00
+lastmod: 2026-10-26T12:00:00+01:00
 draft: true
 weight: 80
 tags: [compilers, programming-languages]
@@ -33,7 +33,42 @@ A struct is a value. `let copy = r;` copies every byte, an argument of struct ty
 
 The method-call form works on a struct. `r.area()` is `area(&r)`, and `r.widen(2.0)` is `widen(r, 2.0)`, when `area` and `widen` are free functions of the module that declares `Rect`. The first parameter decides between the address and the copy. The struct does not know the functions exist.
 
-`==` and `!=` compare two structs field by field, each field by its kind. A number compares by its value, a `str` by its bytes, a pointer by its address and an inline struct by these rules again. `x.hash()` gives a `u64` over the same fields in the same order, so two structs that are equal hash alike. A struct has no default `<`. An `operator fn` at module level replaces a default or adds an operator, as the section on operators of [chapter 9]({{% relref "09-classes" %}}) shows.
+A field of function type wins over a free function of the same name. `c.step(5)` below calls the field `step`, and the free function `step` stays reachable by its plain call.
+
+```anti
+//! name: callfield
+import anti.io;
+import anti.text;
+
+struct Counter { step: fn(int) -> int, n: int }
+
+fn step(c: *Counter, by: int) -> int
+{
+	return c.n + by * 100;
+}
+
+fn twice(x: int) -> int
+{
+	return x * 2;
+}
+
+fn main() -> int
+{
+	let c = Counter { step: twice, n: 1 };
+	let line = f"field {c.step(5)}, function {step(&c, 5)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+field 10, function 501
+```
+
+`==` and `!=` compare two structs field by field, each field by its kind. A number compares by its value, a `str` by its bytes, a pointer by its address and an inline struct by these rules again. `x.hash()` gives a `u64` over the same fields in the same order, so two structs that are equal hash alike. A field that holds a `Mutex` takes no part in either: the default `==` and hash pass over the lock. A field of a simd struct has no `==`, since a comparison of a simd struct gives a mask, so a struct that holds one has no default `==`. "Order and equality" of [chapter 16]({{% relref "16-collections" %}}) gives the rule for every kind of part.
+
+A struct has no default `<`. An `operator fn` at module level replaces a default or adds an operator, as the section on operators of [chapter 9]({{% relref "09-classes" %}}) shows. With `operator fn lt` declared, `>`, `<=` and `>=` follow from it.
 
 The default `x.hash()` computes a value and changes nothing. A call of it whose result nothing takes does nothing, and the warning `unused-result` names it. A dev build prints the warning and a release build refuses it. `mul_high(a, b)` gets the same warning. A hash that reaches an `operator fn hash` of the program or the `hash` of a class gets none, since antic does not read the effects of a function body.
 
@@ -185,6 +220,18 @@ fn smaller(a: Size, b: Size) -> bool
 ```
 
 ```anti refused
+//! error: `==` is not defined on `Particle`, whose field `at` has no `eq`
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+struct Particle { at: Vec4, mass: f32 }
+
+fn same(a: Particle, b: Particle) -> bool
+{
+	return a == b;
+}
+```
+
+```anti refused
 //! error: the parameter `s` of export fn `width` has type `*Size`, and `Size` is not exported
 struct Size { w: int, h: int }
 
@@ -300,6 +347,12 @@ Where it lives: `compute` of `src/antic/layout.c` lays out every aggregate, and 
 
 The padding is part of the cost. Reordering the fields of `Mixed` as `total`, `count`, `last`, `tag`, `flag` gives 16 bytes. The compiler never reorders, because the layout is the C layout.
 
+The choice among the forms that group values:
+
+- A struct costs its fields and nothing else. It is the form for data that a function computes on, that an array holds by the thousand, and that crosses to C.
+- A class value costs 8 more bytes for its table pointer, and every value made runs one store of that pointer and one call of `anti_rt_hook` for the `created` hook. In return it has defaults, private fields, `construct` and `destruct` and functions that dispatch. [Chapter 9]({{% relref "09-classes" %}}) counts each. A type without behaviour is a struct.
+- A tuple of [chapter 3]({{% relref "03-values" %}}) has the layout of a struct with the same fields and no name. It suits a result of two or three values that no other function names.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -391,6 +444,53 @@ sizes: Loose 24, Tight 14, Cell 64, Frame 8, Pair 28
 
 `&t.total` is a `*u64` to byte 6 of the struct, an address that is no multiple of 8. The write through it works on all six targets, whose processors read and write an integer at any address.
 
+`packed` keeps the padding before two kinds of field. One is an `atomic` field of a class. The other is a field that holds a `Mutex`, the hidden lock of [chapter 14]({{% relref "14-concurrent-classes" %}}) included. Each keeps the alignment of its type, and the packed type takes the largest such alignment as its own. An atomic instruction on arm64 refuses an address that crosses a multiple of 16 bytes. The lock word of every system is read by atomic instructions too, so these fields stay where an atomic access reaches them.
+
+```anti
+//! name: shared
+import anti.io;
+import anti.text;
+
+packed class Stats { pub tag: u8 = 0, pub atomic hits: u64 = 0, pub last: u8 = 0, }
+
+packed class Plain { pub tag: u8 = 0, pub hits: u64 = 0, pub last: u8 = 0, }
+
+packed struct Held { tag: u8, lock: Mutex, n: u8 }
+
+export fn held_size() -> int
+{
+	return size_of(Held);
+}
+
+fn main() -> int
+{
+	let s = Stats { };
+	s.hits.add(5);
+	let line = f"hits {s.hits.load()}, sizes: Stats {size_of(Stats)}, Plain {size_of(Plain)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+hits 5, sizes: Stats 32, Plain 18
+```
+
+`Plain` is its table pointer and 10 bytes of fields without a gap, 18 bytes. In `Stats` the atomic `hits` keeps its alignment of 8 and stands at offset 16, and the class rounds its 25 bytes up to 32. A `Mutex` is 4 bytes on Linux and macOS and 8 on Windows, so `Held` differs by target.
+
+```llvm excerpt=shared target=linux-x86_64 mode=dev
+define internal noundef i64 @held_size() #0 {
+b0:
+  ret i64 12
+```
+
+```llvm excerpt=shared target=windows-x86_64 mode=dev
+define dso_local noundef i64 @held_size() #0
+b0:
+  ret i64 24
+```
+
 The checker refuses each of the following.
 
 ```anti refused
@@ -407,6 +507,13 @@ struct Cell align(width) { hits: u64 }
 //! error: a `simd struct` takes its alignment from its size and has no `align(N)`
 simd struct Vec4 align(32) { x: f32, y: f32, z: f32, w: f32 }
 ```
+
+```anti refused
+//! error: `packed` stands before `struct`, `union`, `class` or `variant`
+packed enum Mode { Read, Write }
+```
+
+The same message refuses `packed` before `simd struct` and before `synchronized class`. A simd struct takes its layout from its lanes, and a synchronized class holds the hidden lock that `packed` would move.
 
 An `align(N)` below the alignment that the fields give is refused by the back end, once it has laid the struct out for the target. `struct Low align(2) { a: u64 }` ends the build with this message.
 
@@ -463,7 +570,7 @@ retq
 
 Both reads are one `movq`. On arm64 the aligned read is `ldr x0, [x0, #0x10]` and the packed one is `ldur x0, [x0, #0x6]`. The second is the form of the load that takes an offset that is no multiple of 8.
 
-Where it lives: `item_level`, `struct_item`, `class_item` and `variant_item` of `src/antic/parser_item.c` read the two words. `compute` of `src/antic/layout.c` applies `t->packed` and `t->align`. `src/antic/header.c` writes `#pragma pack(push, 1)` and `ANTI_ALIGNAS(N)` into the C header. The header defines that macro as `_Alignas(n)` for C and `alignas(n)` for C++.
+Where it lives: `item_level`, `struct_item`, `class_item` and `variant_item` of `src/antic/parser_item.c` read the two words. `compute` of `src/antic/layout.c` applies `t->packed` and `t->align`. `src/antic/header.c` writes `#pragma pack(push, 1)` around a packed type in the C header. The `align(N)` of a struct, a union or a variant that is not packed is `ANTI_ALIGNAS(N)` on its first field, a macro that the header defines as `_Alignas(n)` for C and `alignas(n)` for C++. A `#pragma pack` caps such an `_Alignas`, so the `align(N)` of a packed type, and of every class, stands on the type itself as `ANTI_ALIGNED(N)`, which is `__attribute__((aligned(n)))`, or `__declspec(align(n))` for MSVC. `aligned_on_type` of the same file decides between the two.
 
 ### What it costs
 
@@ -475,6 +582,7 @@ Where it lives: `item_level`, `struct_item`, `class_item` and `variant_item` of 
 | A read of a packed field | one load, the same count as an aligned one | one instruction on x86-64 and arm64 |
 | A frame that holds an `align(64)` local | realigned on entry, `andq $-0x40, %rsp` | the same while the local stays in memory |
 | Heap allocations, calls into the runtime | 0 | 0 |
+| An atomic field or a `Mutex` in a packed type | the padding before it, as without `packed` | the same |
 | Checks inserted | none | none |
 
 `packed` saves 10 of 24 bytes here and costs no instruction. A read that crosses a cache line or a page is slower on the processor, which no count of instructions shows. `align(64)` gives a value a cache line of its own and costs 56 bytes per value.
@@ -506,7 +614,42 @@ A `union` of C and C++ overlays its members at offset 0, and nothing records whi
 
 `union` declares fields that share their bytes. Its size is the size of its largest field, rounded up to its alignment. A literal names exactly one field. Reading any field reads the bytes as that type, whatever was written.
 
-A union has no default `==`, since no field says which bytes hold the value. A struct with a union field has none either. `u.hash()` hashes the bytes of the union.
+A union has no default `==`, since no field says which bytes hold the value. A struct with a union field has none either. A module may declare `operator fn eq` for its union. `==` on two such unions then calls it, and the default `==` of a struct that holds the union compares that field through it. `u.hash()` hashes the bytes of the union.
+
+The method-call form does not reach a union. `w.low()` is refused with `` `Word` has no field `low` ``, and `low(w)` is the call.
+
+```anti
+//! name: wordeq
+import anti.io;
+import anti.text;
+
+union Word { whole: u64, halves: [2]u32 }
+
+operator fn eq(a: Word, b: Word) -> bool
+{
+	return a.whole == b.whole;
+}
+
+struct Cell { w: Word, n: int }
+
+fn main() -> int
+{
+	let a = Word { whole: 5 };
+	let b = Word { halves: [5, 0] };
+	let c = Cell { w: a, n: 1 };
+	let d = Cell { w: b, n: 1 };
+	let line = f"words {a == b}, cells {c == d}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+words true, cells true
+```
+
+The two words are written through different fields and hold the same 8 bytes on a little-endian target, which all six are.
 
 A bitfield is a field with a width in bits after its type, `kind: u8 : 4`. The type is an integer of a fixed width, and its signedness decides how a read widens. The width is from 1 to the bits of the type.
 
@@ -730,6 +873,13 @@ Where it lives: `compute` and `bit_unit` of `src/antic/layout.c`. `lower_place` 
 | Atomic operations and locks | 0, the write is not atomic | 0 |
 | Checks inserted | one comparison and one branch per write of a value that is no constant | none, a write truncates |
 
+The choice among the forms that share or pack bytes:
+
+- A union reads the same bytes as another type and costs nothing beyond the access. It suits a C layout and the reinterpretation of bytes, as `Word` shows.
+- A value that holds one of a fixed set of kinds of data is a variant of this chapter. It costs the tag, one byte padded to the alignment of the cases. In return the checker refuses a read of the wrong case.
+- A bitfield saves bytes and costs three instructions per read and five per write in place of one. Its write is a load and a store of the whole unit, so two threads cannot write two bitfields of one unit. A field written often, or by more than one thread, is a plain field of its own width.
+- A set of flags whose count is known at run time alone is a `BitSet` of [chapter 16]({{% relref "16-collections" %}}).
+
 ### Pitfalls
 
 For a Java programmer:
@@ -857,7 +1007,74 @@ sum 10, min 1, max 4, dot 20, r 4 1, j 5 17, items 3 6, p 2, arr 3
 sizes: Vec4 16, F32x8 32, I32x4 16, F64x2 16
 ```
 
+A simd struct meets the constraints of [chapter 10]({{% relref "10-generics" %}}) that its built-in operators give: `add`, `sub`, `mul` and `div` where its lanes are numbers, and `neg` where they are signed integers or floats. A generic with those constraints then computes lane by lane. A comparison gives a mask and no `bool`, so a simd struct meets neither `lt` nor `eq`, and not `Number`, which holds `lt`.
+
+```anti
+//! name: lanegen
+import anti.io;
+import anti.text;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+simd struct U32x4 { a: u32, b: u32, c: u32, d: u32 }
+
+fn twice<T: add>(a: T) -> T
+{
+	return a + a;
+}
+
+fn flip<T: neg>(a: T) -> T
+{
+	return -a;
+}
+
+fn main() -> int
+{
+	let v = twice(Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 });
+	let n = flip(v);
+	let u = twice(U32x4.splat(3));
+	let line = f"twice {v.x} {v.w}, flip {n.y}, lanes {u.d}, int {twice(21)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+twice 2 8, flip -4, lanes 6, int 42
+```
+
 The checker refuses each of the following.
+
+```anti refused
+//! error: `Vec4` has no `lt`, which `mean` needs for `T`. A comparison of a simd struct gives a mask of its lanes
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+fn mean<T: Number>(a: T, b: T, two: T) -> T
+{
+	return (a + b) / two;
+}
+
+fn middle(a: Vec4) -> Vec4
+{
+	return mean(a, a, Vec4.splat(2.0));
+}
+```
+
+```anti refused
+//! error: `U32x4` has no `neg`, which `flip` needs for `T`
+simd struct U32x4 { a: u32, b: u32, c: u32, d: u32 }
+
+fn flip<T: neg>(a: T) -> T
+{
+	return -a;
+}
+
+fn negated(a: U32x4) -> U32x4
+{
+	return flip(a);
+}
+```
 
 ```anti refused
 //! error: a `simd struct` has a power of two of lanes, and `Three` has 3
@@ -1021,6 +1238,13 @@ Where it lives: `check_simd_struct` of `src/antic/sema_declare.c` and `src/antic
 
 A dev build tests the first and the last element that `T.load(slice, i)` and `v.store(slice, i)` reach, and ends the program with `index out of bounds`. A release build has no such test, as it has none for an index into a slice.
 
+The choice among the forms that hold lanes:
+
+- A simd struct does one operation on all its lanes with one instruction where the target has the width. That is one `vaddps` for 16 bytes, and for 32 bytes at x86-64-v3. A value of 16 bytes passes in one vector register.
+- A plain struct of the same fields, such as `Rect` of the first section, has no operators, and the program writes one statement per field. It passes as the C convention passes a struct, two `<2 x float>` for `Rect`. `v as Plain` and back cost nothing, so a program computes on the simd struct and stores the plain one.
+- An array or a slice holds a count of elements that is not fixed by the type. A loop over it loads the lanes with `T.load` and computes on the simd struct.
+- A simd struct above 256 bytes is a loop over its lanes. A smaller simd struct in a loop over an array is the form that keeps each operation one instruction.
+
 ### Pitfalls
 
 For a Java programmer:
@@ -1057,7 +1281,51 @@ An `enum` of C is an `int` with names, and any integer converts to it without a 
 - `as` converts an enum to a number and an integer to an enum. A float and a value of another enum are refused, and the program converts them through an integer, `x as int as Mode`. A dev build tests a conversion to an enum against the declared values. Any other number ends the program with `value not declared by Mode`. A release build does not test.
 - `switch` takes an enum. Its arms name the values with their type, and a `switch` without `else` covers every value.
 - `k.hash()` hashes the value as its integer.
+- An enum without values compiles and has the size of `c_int`.
+- Two values may share a number, `Ok = 0, Success = 0`. They are then equal, and a `switch` refuses two arms that name them both.
+- The value after `=` is a constant of the underlying type. A value computed from `size_of` is refused, and so is a conversion `n as E`, which is no constant expression, in a value and in a `const`.
 - A class body may declare an enum, which only that class names.
+
+An enum body takes functions and constants after its values. A function there takes `self`, a pointer to the enum, and is called as `Speed.rank(&s)`, since the method-call form does not reach an enum. A constant is `Speed.LIMIT`. Neither changes the size of the enum.
+
+```anti
+//! name: speeds
+import anti.io;
+import anti.text;
+
+enum Empty { }
+
+enum Code: u8 { Ok = 0, Success = 0, Failed = 1 }
+
+enum Speed
+{
+	Fast,
+	Slow,
+
+	fn rank(self) -> int
+	{
+		if *self == Speed.Fast {
+			return 1;
+		}
+		return 2;
+	}
+
+	const LIMIT: int = 3;
+}
+
+fn main() -> int
+{
+	let s = Speed.Slow;
+	let line = f"empty {size_of(Empty)}, same {Code.Ok == Code.Success}, rank {Speed.rank(&s)}, limit {Speed.LIMIT}, speed {size_of(Speed)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+empty 4, same true, rank 2, limit 3, speed 4
+```
 
 ```anti
 //! name: kinds
@@ -1183,6 +1451,48 @@ enum Mode: f32 { Read }
 enum Kind { Circle, Circle }
 ```
 
+```anti refused
+//! error: this value already has an arm
+enum Code { Ok = 0, Success = 0, Failed = 1 }
+
+fn number(c: Code) -> int
+{
+	switch c {
+		Code.Ok => { return 0; },
+		Code.Success => { return 1; },
+		Code.Failed => { return 2; },
+	}
+}
+```
+
+```anti refused
+//! error: a value of an enum is a constant, not a value computed from `size_of`
+enum Size: i64 { Small = size_of(int) as i64 }
+```
+
+```anti refused
+//! error: a conversion to an enum is not a constant expression
+enum Mode { Read, Write }
+
+const DEFAULT: Mode = 1 as Mode;
+```
+
+```anti refused
+//! error: `Speed` has no field `rank`
+enum Speed
+{
+	Fast,
+	Slow,
+
+	fn rank(self) -> int { return 1; }
+}
+
+fn rank_of(s: Speed) -> int
+{
+	return s.rank();
+}
+```
+
 ### How antic builds it
 
 An enum is its underlying integer from lowering on. The IR has no enum type, and a value is a constant. What remains of the type is the range of its values, which antic hands to LLVM.
@@ -1226,6 +1536,21 @@ retq
 
 The C header of a library writes an exported enum as an `enum` of C.
 
+A function of an enum body is an ordinary function of the module whose `self` points at the integer.
+
+```ir excerpt=speeds target=linux-x86_64 mode=release
+fn speeds.Speed.rank(%0: ptr nonnull deref(size_of i32)) -> i64 {
+b0:
+    %1 = load i32 %0 range 0, 2 !type i32
+    %2 = eq i8 %1, 0
+...
+    %19 = addr @speeds.Speed.rank
+    %20 = call i64 %19 via @speeds.fn.1(%0)
+```
+
+- `deref(size_of i32)` is the size of `c_int`, the underlying type of `Speed`. The load carries the range of the two values.
+- `Speed.rank(&s)` takes the address of the function and calls it with `&s`. The address is a constant, so `opt` turns the call into a direct one or inlines it, and the constant `LIMIT` is a number in place.
+
 Where it lives: `sema_declare_enums_and_variants` of `src/antic/sema_declare.c` gives each value its number. `enum_check` of `src/antic/lower_check.c` writes the dev check, and `lower_switch` of `src/antic/lower_stmt.c` the chain of compares.
 
 ### What it costs
@@ -1243,6 +1568,12 @@ Where it lives: `sema_declare_enums_and_variants` of `src/antic/sema_declare.c` 
 | Checks inserted | the test of `as` to an enum | none |
 
 A release build trusts a number converted to an enum. A value outside the declared ones then breaks the `range` that LLVM was told, which is undefined behaviour.
+
+The choice among the forms that name a set of values:
+
+- An enum is its underlying integer: one byte for `Mode`, a compare for `==`, and a `switch` that the checker holds complete. It is the form for a closed set of states without data.
+- A variant of the next section carries data per case. A variant whose cases all lack fields, as `Signal`, has the size of its tag, one byte. Its tag converts to a number with `as`, so it does the work of an enum that may grow data later.
+- A `const` of an integer type names a number without a type of its own. It suits flags that the program combines with `|`, where an enum value of a combination would be a value of its own.
 
 ### Pitfalls
 
@@ -1282,6 +1613,35 @@ C writes a sum type by hand: a struct with a tag and a union, and a `switch` on 
 - A declaration takes `packed` and `align(N)`. `packed` reaches the fields of the cases as well.
 - Another module names a case as `geo.Shape.Circle { r: 2.0 }` and tests it as `v is geo.Shape.Circle`.
 - A variant with a case that owns something follows the value rules of [chapter 11]({{% relref "11-ownership" %}}). It is torn down by its tag, and `=` of an existing one is refused.
+- A case declared with empty braces, `Blank { }`, is a case without fields, and its literal is `Shape.Blank` or `Shape.Blank { }`.
+- No arm of a `switch` names the number of a tag. `switch v.tag` takes the values of its tag type alone, and `v.tag as int` gives the number.
+- A variant is not a constant expression. No `const` has a variant type, and no default of a parameter is a case.
+- A case of a generic variant names its arguments, `v is Maybe<int>.Some`, as its literal does. [Chapter 10]({{% relref "10-generics" %}}) covers generics.
+
+```anti
+//! name: cases
+import anti.io;
+import anti.text;
+
+variant Shape { Circle { r: f32 }, Empty, Blank { } }
+
+variant Maybe<T> { Some { value: T }, Nothing }
+
+fn main() -> int
+{
+	let e = Shape.Empty { };
+	let b = Shape.Blank { };
+	let m = Maybe<int>.Some { value: 3 };
+	let line = f"empty {e is Shape.Empty}, blank {b.tag as int}, some {m is Maybe<int>.Some}, nothing {m is Maybe<int>.Nothing}, sizes {size_of(Shape)} {size_of(Maybe<int>)}";
+	io.println(line);
+	free(line.ptr);
+	return 0;
+}
+```
+
+```text output
+empty true, blank 2, some true, nothing false, sizes 8 16
+```
 
 ```anti
 //! name: shapes
@@ -1409,6 +1769,29 @@ variant Shape { }
 variant Tree { Leaf { value: int }, Pair { left: Tree, right: Tree } }
 ```
 
+```anti refused
+//! error: a variant is not a constant expression
+variant Shape { Circle { r: f32 }, Empty }
+
+fn draw(s: Shape = Shape.Empty) -> int
+{
+	return 0;
+}
+```
+
+```anti refused
+//! error: expected `Shape.tag`, found an integer literal
+variant Shape { Circle { r: f32 }, Empty }
+
+fn round(s: Shape) -> bool
+{
+	switch s.tag {
+		0 => { return true; },
+		else => { return false; },
+	}
+}
+```
+
 ### How antic builds it
 
 The checker builds four kinds of types for a variant. Each case with fields is a struct, and a union holds those structs. The tags are an enum. The variant is a struct of the tag and the union.
@@ -1499,6 +1882,12 @@ Where it lives: `declare_cases` of `src/antic/sema_declare.c` and `types_set_cas
 | Checks inserted | none | none |
 
 Every value of a variant has the size of its largest case. A variant with one large case and many small ones pays for the large one in each value. A pointer in that case moves the large part elsewhere.
+
+The choice among the forms that hold one of a set of kinds:
+
+- A variant is a value of the size of its largest case and its tag. It lives in the frame, in an array or inline in its owner. A `switch` is one load of the tag and a compare per arm, and the checker holds it complete. The set of cases is closed: a new case is a change of the declaration and of every `switch` without `else`.
+- An abstract class of [chapter 9]({{% relref "09-classes" %}}) with one class per kind is open. Another module, or a plugin, adds a kind without a change of the base. Each object costs its table pointer, and an allocation when it lives on the heap behind a pointer. Each use is a call through the table, two loads and an indirect call.
+- A struct with a union and a tag field written by hand costs the same bytes as a variant and has none of its checks. It suits a layout that C fixes.
 
 ### Pitfalls
 
@@ -1772,6 +2161,13 @@ Where it lives: `check_variant_arm` of `src/antic/sema_stmt.c` checks an arm and
 | Heap allocations | 0 for a case that owns nothing | 0 |
 | Calls into the runtime | 0 for a case that owns nothing | 0 |
 | Checks inserted | none, coverage is a rule of the checker | none |
+
+The choice among the forms that read a variant:
+
+- `switch` reads the tag once and tests the arms in order. Without `else` it is complete, and a new case breaks the build where an arm is missing. It is the form for code that handles every case.
+- `if let` is a `switch` of one arm with the same load and compare. It suits code that handles one case and passes over the rest, and each link of an `else if let` chain is a `switch` of its own, which loads the tag again in the IR of antic, where one `switch` loads it once.
+- `v is Shape.Circle` is the load and the compare without a binding. It suits a condition, a filter or an assertion.
+- A binding that is only read costs nothing in a release build. A binding that is written is a copy, and a change that must reach the variant goes through a new literal assigned to it.
 
 ### Pitfalls
 
