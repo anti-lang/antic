@@ -560,6 +560,30 @@ static void libraries(void)
               "/rt/lib/macos-arm64/libpcre2-8.a "
               "/rt/lib/macos-arm64/armv8.5/libanti_rt.a");
     text_free(&line);
+    /* A library that holds anti.raylib names raylib, miniaudio and the
+       system libraries of raylib after the line, as the link of a program
+       takes them: the `link` lines of the binding on macOS and Linux and
+       the import libraries of raylib on Windows. */
+    link_line_raylib(&line, TARGET_LINUX_X86_64, "/rt", "GL\nX11\n",
+                     "Cocoa\n");
+    CHECK_STR(text_cstr(&line),
+              " /rt/lib/linux-x86_64/libraylib.a "
+              "/rt/lib/linux-x86_64/libminiaudio.a -lGL -lX11");
+    text_free(&line);
+    link_line_raylib(&line, TARGET_MACOS_ARM64, "/rt", "GL\n",
+                     "Cocoa\nIOKit\n");
+    CHECK_STR(text_cstr(&line),
+              " /rt/lib/macos-arm64/libraylib.a "
+              "/rt/lib/macos-arm64/libminiaudio.a -framework Cocoa "
+              "-framework IOKit");
+    text_free(&line);
+    link_line_raylib(&line, TARGET_WINDOWS_X86_64, "C:/rt", "GL\n",
+                     "Cocoa\n");
+    CHECK_STR(text_cstr(&line),
+              " C:/rt/lib/windows-x86_64/raylib.lib "
+              "C:/rt/lib/windows-x86_64/miniaudio.lib gdi32.lib user32.lib "
+              "shell32.lib winmm.lib");
+    text_free(&line);
 }
 
 /* A macOS program that names no framework links against the stubs of the

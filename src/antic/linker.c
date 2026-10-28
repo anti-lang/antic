@@ -197,6 +197,14 @@ static const char *const platform_windows_libraries[] = {
 };
 #define WINDOWS_STATIC_CRT "libcmt.lib"
 
+void link_windows_import_library(struct text *out, const char *runtime,
+                                 enum target t, const char *name)
+{
+    text_appendf(out, "%s/%s/", runtime, RUNTIME_SYSROOT_DIR);
+    link_target_dir(out, t, false);
+    text_appendf(out, "/%s/%s.lib", SYSROOT_WINDOWS_LIB, name);
+}
+
 void link_sysroot_marker(struct text *out, enum target t, bool glibc)
 {
     switch (target_info(t)->os) {
@@ -1170,6 +1178,48 @@ void link_relocatable_command(struct link_command *c, enum target t,
     add(c, output);
     for (i = 0; i < count; i++) {
         add(c, objects[i]);
+    }
+}
+
+/* DESIGN: the import libraries of the DLLs that raylib calls on Windows,
+   as "The system libraries of raylib and miniaudio" in docs/decisions.md
+   names them. The language has no `link` line for Windows, so the binding
+   names none, and a link takes them from lib/ of the sysroot of the
+   target. */
+const char *const link_raylib_windows[LINK_RAYLIB_WINDOWS_COUNT] = {
+    "gdi32", "user32", "shell32", "winmm"
+};
+
+/* Append " <prefix><name>" for each line of names. */
+static void name_lines(struct text *out, const char *prefix,
+                       const char *names)
+{
+    const char *p = names;
+
+    while (*p != '\0') {
+        size_t n = strcspn(p, "\n");
+        text_appendf(out, " %s%.*s", prefix, (int)n, p);
+        p += n + (p[n] == '\n');
+    }
+}
+
+void link_line_raylib(struct text *out, enum target t, const char *runtime,
+                      const char *linux_libraries, const char *frameworks)
+{
+    size_t i;
+
+    text_append(out, " ");
+    link_native_library(out, runtime, t, NATIVE_RAYLIB);
+    text_append(out, " ");
+    link_native_library(out, runtime, t, NATIVE_MINIAUDIO);
+    switch (target_info(t)->os) {
+    case OS_LINUX: name_lines(out, "-l", linux_libraries); break;
+    case OS_MACOS: name_lines(out, "-framework ", frameworks); break;
+    case OS_WINDOWS:
+        for (i = 0; i < LINK_RAYLIB_WINDOWS_COUNT; i++) {
+            text_appendf(out, " %s.lib", link_raylib_windows[i]);
+        }
+        break;
     }
 }
 

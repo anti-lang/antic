@@ -630,6 +630,27 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
   files of the 22 X11 and GL packages must be added there if the glibc sysroot ever
   ships in the runtime archive. The script copies them to `licenses/` of the sysroot.
 
+- [provisional] `anti.raylib` is the library file `std/anti/raylib.antl` of the runtime
+  archive, in the package `anti` of the standard library with its licence 0BSD. Its
+  source is written below `build/` and ships nowhere. The build binds `raylib.h` for the
+  host, since the binding of each of the six targets is the same text. Reason: no entry
+  names the package of a binding, and the notice of a module that binds a C library of
+  the archive names the standard library alone.
+- [provisional] A program links raylib when the library file of `anti.raylib` stands in
+  its import closure, whether it calls a function of it or not, so a Linux program of it
+  links in the glibc mode. The system libraries are the `link framework` and `link linux`
+  lines of the binding, which the table of `src/anti/bindmodel.c` gives: `Cocoa`,
+  `CoreVideo`, `IOKit` and `OpenGL` on macOS, and `GL`, `m`, `pthread`, `dl`, `rt` and
+  `X11` on Linux, which add `GL` and `rt` to the table below. A Windows program takes
+  `gdi32`, `user32`, `shell32` and `winmm` from `lib/` of the sysroot. antic reads the
+  names from the library file. Reason: the binding names what it links, and "Bundled
+  libraries" in `docs/tooling.md` finds the module without an entry of the manifest. A
+  Linux program of `anti.raylib` then needs `libGL.so.1` at start.
+- [provisional] A library for C that imports `anti.raylib` names raylib, miniaudio and
+  the system libraries of its target after the line it prints. Reason: "Static library"
+  in `docs/libraries-for-c.md` names the bundled native libraries on that line, as T146
+  added PCRE2 for `anti.regex`.
+
 ### The system libraries of raylib and miniaudio
 
 A program links these beyond the C library, which antic links for every program. The
@@ -1085,7 +1106,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - `src/rt/start.c` always calls `anti.rt.main` with `args` and `env`. All six conventions pass both slices in registers or as pointers in registers, so a `main` with fewer parameters ignores them. The runtime allocates the slices and strings with `malloc` and never frees them.
 - On Linux and macOS the runtime reads `argv` and the POSIX variable `environ`. `src/rt/utf.c` replaces each maximal subpart of an ill-formed UTF-8 sequence with U+FFFD, the practice of section 3.9.6 of the Unicode Standard.
 - On Windows the runtime splits `GetCommandLineW` by the rules of Microsoft's page "Parsing C command-line arguments" and reads `GetEnvironmentStringsW`. It converts UTF-16 to UTF-8 with U+FFFD for an unpaired surrogate. The conversions have unit tests on the development Mac. The Windows code of the start stands in `src/rt/platform_windows.c`, which the cross build compiles for both Windows targets.
-- Decided and not implemented: the `anti` tool, with `anti syntax`, the resolver, the cache, publishing and the two GitHub templates, and the standard library modules `anti.net`, `anti.raylib` and `anti.miniaudio`, which wait for the native libraries of the runtime archive. `anti.regex` holds the failures of a pattern, `compile` and the functions behind the methods of `str`. The tests of `docs/tooling.md` that need those parts wait for them: header consistency with `anti.toml`, highlighter coverage, the resolver and the offline build. `anti fmt`, `anti check`, `anti test` and `anti doc` are built. The format stability of the table is the test `anti_fmt` and the doc equivalence is the test `anti_doc`.
+- Decided and not implemented: the `anti` tool, with `anti syntax`, the resolver, the cache, publishing and the two GitHub templates, and the standard library modules `anti.net` and `anti.miniaudio`, which wait for the native libraries of the runtime archive. `anti.regex` holds the failures of a pattern, `compile` and the functions behind the methods of `str`. The tests of `docs/tooling.md` that need those parts wait for them: header consistency with `anti.toml`, highlighter coverage, the resolver and the offline build. `anti fmt`, `anti check`, `anti test` and `anti doc` are built. The format stability of the table is the test `anti_fmt` and the doc equivalence is the test `anti_doc`.
 - The platform command lines come from the GNU ld manual, the glibc sources and Microsoft's linker and CRT pages. The lld command lines come from the ld.lld manual and the musl and xwin sources. Unit tests pin both. Whether `link.exe` needs `kernel32.lib` or other libraries beside the CRT ones is unknown, because lld-link is what runs. The runtime objects are compiled for the dynamic Universal CRT, `/MD` in the terms of MSVC, which matches the `msvcrt.lib` and `ucrt.lib` of the link line. The executables that lld writes for Linux and Windows now run on the two virtual machines, and all 22 program tests pass on Windows ARM64.
 - macos-x86_64 programs link on the development Mac with lld against the runtime library that clang builds for macos-x86_64, which the test `cross_link_macos-x86_64` checks by format. The next item covers running them.
 - The development Mac runs a macos-x86_64 program through Rosetta. Every program of `tests/programs` therefore runs for macos-arm64 and for macos-x86_64, and `program_abi_structs`, `program_abi_wchar` and `program_abi_raymath` run for both as well. The earlier claim that Rosetta hangs on a new x86_64 binary was wrong. The two VMs run linux-x86_64 and windows-x86_64 under emulation, as the entry on `docs/vm-setup.md` says.

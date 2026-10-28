@@ -1,0 +1,10 @@
+//! raylib and miniaudio are built for the default level of their target alone,
+//! so a program below that level that imports `anti.raylib` is refused at link
+//! with the two levels.
+
+import anti.raylib;
+
+fn main() -> int
+{
+	return raylib.IsWindowReady() as int;
+}

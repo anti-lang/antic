@@ -157,6 +157,22 @@ void link_runtime_bitcode(struct text *out, const char *runtime, enum target t,
    beside it. */
 #define NATIVE_PCRE2 "pcre2-8"
 #define NATIVE_REGEX_GLUE "anti_rt_regex"
+/* The native libraries of `anti.raylib`, as src/native/ names them.
+   raylib calls miniaudio, so miniaudio follows it on a link. */
+#define NATIVE_RAYLIB "raylib"
+#define NATIVE_MINIAUDIO "miniaudio"
+/* The import libraries of the DLLs that raylib calls on Windows, without
+   their suffix .lib. */
+extern const char *const link_raylib_windows[];
+#define LINK_RAYLIB_WINDOWS_COUNT 4
+
+/* Append what the line of link_line names after it for a library that
+   holds anti.raylib: raylib and miniaudio of the runtime archive, then
+   the frameworks on macOS and the linux libraries on Linux, each a list
+   of names one per line, and the import libraries of
+   link_raylib_windows on Windows. Each item starts with a space. */
+void link_line_raylib(struct text *out, enum target t, const char *runtime,
+                      const char *linux_libraries, const char *frameworks);
 
 /* DESIGN: the runtime archive carries the runtime of AddressSanitizer
    of the pinned clang in lib/<target>/, under the names compiler-rt
@@ -215,6 +231,11 @@ void link_memcheck_file(struct text *out, const char *runtime, enum target t,
    which stays at the default level of the target. */
 void link_native_library(struct text *out, const char *runtime, enum target t,
                          const char *name);
+
+/* Append the path of the import library name.lib in the sysroot of the
+   Windows target t below runtime. */
+void link_windows_import_library(struct text *out, const char *runtime,
+                                 enum target t, const char *name);
 
 /* Append the directory name of target t below the runtime's lib/ and
    sysroot/, with LINUX_GLIBC_SUFFIX in the glibc mode. */

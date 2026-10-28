@@ -3,8 +3,8 @@
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
-#   CASE      header, clang, escaped_path, raymath, raylib, api, refusals,
-#             api_malformed, clang_malformed, ast_malformed,
+#   CASE      header, clang, escaped_path, raymath, raylib, raylib_shipped,
+#             api, refusals, api_malformed, clang_malformed, ast_malformed,
 #             api_typedef_chain, clang_typedef_chain, clang_of_the_tree or
 #             clang_of_the_tree_relative
 #   SOURCES   tests/clib, for the case header
@@ -370,6 +370,18 @@ elseif(CASE STREQUAL "raylib")
         endif()
     endforeach()
     compile_binding(raylib anti.raylib --anti-internal)
+    compare_probes(raylib "${RAYLIB}/src")
+elseif(CASE STREQUAL "raylib_shipped")
+    # anti.raylib of the runtime archive, which the build wrote, against
+    # C. The probe of Anti names the module without -I, so it reads
+    # std/anti/raylib.antl of the archive, and the two probes agree over
+    # all 35 structs.
+    tool_run("" "${ANTI}" bind --clang "${RAYLIB}/src/raylib.h" --probe
+                -o "${WORK}/out" --runtime "${RUNTIME}")
+    if(NOT EXISTS "${RUNTIME}/std/anti/raylib.antl")
+        message(FATAL_ERROR "the runtime archive holds no anti.raylib")
+    endif()
+    file(MAKE_DIRECTORY "${WORK}/lib")
     compare_probes(raylib "${RAYLIB}/src")
 elseif(CASE STREQUAL "api")
     # A description in the format of rlparser, a part of raylib_api.json,

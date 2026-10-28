@@ -1,0 +1,32 @@
+//! A module whose tests call anti.raylib of the runtime archive. The runner
+//! links raylib, miniaudio and the system libraries of raylib with no option of
+//! `anti test`, and the calls open no window.
+
+import anti.raylib;
+
+pub fn packed(c: raylib.Color) -> c_int
+{
+	return raylib.ColorToInt(c);
+}
+
+tests
+{
+	fn colour_packs_as_raylib_packs_it()
+	{
+		assert(packed(raylib.RAYWHITE) == -168430081);
+	}
+
+	fn image_reads_back_its_colour()
+	{
+		let image = raylib.GenImageColor(4, 3, raylib.SKYBLUE);
+		let c = raylib.GetImageColor(image, 2, 1);
+		raylib.UnloadImage(image);
+		assert(c.r == 102 && c.g == 191 && c.b == 255 && c.a == 255);
+	}
+
+	fn no_window_is_ready()
+	{
+		assert(!raylib.IsWindowReady());
+		assert(!raylib.IsAudioDeviceReady());
+	}
+}

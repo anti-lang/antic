@@ -1,0 +1,40 @@
+//! anti.raylib of the runtime archive, imported with no option of antic and no
+//! binding of the program's own. The calls pass and return structs by value and
+//! open no window, so the program runs where no display is. A colour packs as
+//! raylib packs it and fades, two rectangles overlap, an image of one colour
+//! reads back that colour and normalises, and no mouse button, window or audio
+//! device is ready.
+
+import anti.raylib;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	raylib.SetTraceLogLevel(raylib.TraceLogLevel.LOG_NONE as c_int);
+	printf("RAYWHITE packs as %d\n".ptr, raylib.ColorToInt(raylib.RAYWHITE));
+	let faded = raylib.Fade(raylib.RED, 0.5);
+	printf("RED at half: %d %d %d %d\n".ptr, faded.r as c_int, faded.g as c_int,
+		faded.b as c_int, faded.a as c_int);
+	let a = raylib.Rectangle { x: 0.0, y: 0.0, width: 10.0, height: 10.0 };
+	let b = raylib.Rectangle { x: 5.0, y: 4.0, width: 10.0, height: 10.0 };
+	let both = raylib.GetCollisionRec(a, b);
+	printf("overlap %d: %d %d %d %d\n".ptr,
+		raylib.CheckCollisionRecs(a, b) as c_int, both.x as c_int,
+		both.y as c_int, both.width as c_int, both.height as c_int);
+	let image = raylib.GenImageColor(4, 3, raylib.SKYBLUE);
+	let c = raylib.GetImageColor(image, 2, 1);
+	printf("image %d by %d: %d %d %d %d\n".ptr, image.width, image.height,
+		c.r as c_int, c.g as c_int, c.b as c_int, c.a as c_int);
+	raylib.UnloadImage(image);
+	let v = raylib.ColorNormalize(raylib.GOLD);
+	printf("GOLD per mille: %d %d %d %d\n".ptr, (v.x * 1000.0) as c_int,
+		(v.y * 1000.0) as c_int, (v.z * 1000.0) as c_int,
+		(v.w * 1000.0) as c_int);
+	let button = raylib.MouseButton.MOUSE_BUTTON_LEFT as c_int;
+	printf("mouse pressed: %d\n".ptr,
+		raylib.IsMouseButtonPressed(button) as c_int);
+	printf("window ready: %d\n".ptr, raylib.IsWindowReady() as c_int);
+	printf("audio ready: %d\n".ptr, raylib.IsAudioDeviceReady() as c_int);
+	return 0;
+}

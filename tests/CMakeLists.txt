@@ -711,7 +711,7 @@ function(antic_dev_object module)
     set_tests_properties(dev_object_${name} PROPERTIES
         FIXTURES_SETUP ${name}_dev_object)
 endfunction()
-foreach(module lang regex mem text reflect runtime collection
+foreach(module lang regex raylib mem text reflect runtime collection
         collection/pool collection/tree collection/queue collection/list
         collection/deque collection/ring collection/grid collection/sorted
         collection/map collection/set collection/concurrent
@@ -1161,6 +1161,14 @@ foreach(source IN LISTS std_sources)
         ${expected}
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std")
 endforeach()
+# anti.raylib in dev mode, where the link names the dev object of the
+# binding and takes raylib, miniaudio and the system libraries of raylib
+# as the release build does.
+antic_program_test(std_raylib_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/raylib.anti"
+    OPTIONS "--dev"
+    DEV lang raylib
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 
 # The cases of fault injection of tests/programs/ and tests/std/. A file
 # <name>.faults beside <name>.anti holds one case per line, its name and
@@ -1599,6 +1607,22 @@ add_expect_test(clib_regex_link_line STATUS 0
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/libmatcher.a"
             "${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/matcher.anti")
+
+# A module that imports `anti.raylib` needs raylib, miniaudio and the
+# system libraries of raylib after it, as the link of a program takes them.
+if(ANTIC_HOST_OS STREQUAL "macos")
+    set(clib_raylib_system "-framework Cocoa")
+elseif(ANTIC_HOST_OS STREQUAL "linux")
+    set(clib_raylib_system "-lX11")
+else()
+    set(clib_raylib_system "user32\\.lib")
+endif()
+add_expect_test(clib_raylib_link_line STATUS 0
+    PATTERN "^(cc main\\.c )?.*libwindow\\.a .*raylib\\.(a|lib) .*miniaudio\\.(a|lib) .*${clib_raylib_system}"
+    COMMAND "$<TARGET_FILE:antic>" --lib static
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/libwindow.a"
+            "${CMAKE_CURRENT_SOURCE_DIR}/clib/com/example/window.anti")
 
 # The five behaviours of `assert`: a release build without it, a forced
 # build with it, dev mode keeping it and --no-asserts dropping it.
@@ -2105,6 +2129,17 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
             -P "${ANTIC_RUNNERS}/run_program.cmake")
     set_tests_properties(std_builder_room_memory_checks PROPERTIES TIMEOUT 120)
+    # anti.raylib under --memory-checks, whose link takes the runtime of
+    # AddressSanitizer beside raylib, miniaudio and their system libraries.
+    add_test(NAME std_raylib_memory_checks
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/raylib.anti"
+            "-DOPTIONS=--memory-checks"
+            "-DOBJECTS="
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
+            -P "${ANTIC_RUNNERS}/run_program.cmake")
+    set_tests_properties(std_raylib_memory_checks PROPERTIES TIMEOUT 120)
 endif()
 # DESIGN: the runtime of AddressSanitizer for x86_64 stops under
 # qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
@@ -5003,6 +5038,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "pattern_exponential_assertions|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_exponential_assertions.s,pattern_exponential_assertions.anti"
         "pattern_import|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_import.s,pattern_import.anti"
         "pattern_level|--target,linux-x86_64,--cpu,v1,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_level,pattern_level.anti"
+        "raylib_level|--target,linux-x86_64,--cpu,v1,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/raylib_level,raylib_level.anti"
         "pattern_methods|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_methods.s,pattern_methods.anti"
         "pattern_bytes|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/pattern_bytes.s,pattern_bytes.anti"
         "generics|--front-end,generics.anti"
@@ -6281,6 +6317,17 @@ add_test(NAME anti_test_flow
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-flow"
         -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
 
+# A module whose tests call anti.raylib, which `anti test` links with
+# raylib, miniaudio and the system libraries of raylib by itself.
+add_test(NAME anti_test_media
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DMODULES=${CMAKE_CURRENT_SOURCE_DIR}/anti-test"
+        "-DMODULE=com/example/media"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-media"
+        -P "${ANTIC_RUNNERS}/run_anti_test_module.cmake")
+
 # The constructs of the values area in a `tests` block and in a `fixtures`
 # block, as anti_test_flow holds those of the flow area.
 add_test(NAME anti_test_values
@@ -6755,6 +6802,18 @@ if(ANTIC_HOST_OS STREQUAL "windows")
             -P "${ANTIC_RUNNERS}/run_anti_build_rerun.cmake")
 endif()
 
+# A project that imports anti.raylib, with no dependency and no binding
+# of its own, builds and runs in both modes.
+add_test(NAME anti_build_raylib
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/raylib.anti"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/std/raylib.expected"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-raylib"
+        -P "${ANTIC_RUNNERS}/run_anti_build_raylib.cmake")
+
 # A program that runs from dist/ while `anti build` builds it again. The
 # build replaces it, the running program ends as it began, and the new
 # program runs. Linux refuses a write into a running program.
@@ -6933,7 +6992,8 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
 endforeach()
 
 # anti bind --header writes the header that antic --lib writes for the
-# same module, from the library file alone. The other cases bind
+# same module, from the library file alone. raylib_shipped compares the
+# probes of C and of anti.raylib of the runtime archive. The other cases bind
 # tests/bind/layout.h and raymath through clang and a part of
 # raylib_api.json, and check the refusals. forms binds tests/bind/forms.h
 # and values the macros of tests/bind/values.h. functions binds the
@@ -6952,7 +7012,7 @@ set(anti_bind_cc ${ANTIC_TEST_CC})
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
-set(anti_bind_cases header clang escaped_path raymath raylib api
+set(anti_bind_cases header clang escaped_path raymath raylib raylib_shipped api
     api_malformed clang_malformed forms values functions huge_enum
     nested_enum api_parts api_callbacks api_literals api_types
     api_words words unsigned_bitfield fixed_enum api_typedef_chain

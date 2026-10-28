@@ -50,6 +50,39 @@ static void extras_free(struct extras *e)
     text_free(&e->exports);
     text_free(&e->provides);
     text_free(&e->host_names);
+    text_free(&e->frameworks);
+    text_free(&e->linux_libraries);
+}
+
+/* DESIGN: a program that loads the library file of anti.raylib links
+   raylib, miniaudio and the system libraries that the `link` lines of
+   that file name, with no option of the user, as a program of
+   anti.regex links PCRE2. Eddie decided this on 2026-10-28 under
+   "Feature freeze of 2026-10-14" in docs/decisions.md. The file stands in
+   the import closure of the program, so a module that imports anti.raylib
+   only through another module links it as well. */
+static void note_raylib(struct extras *extras,
+                        const struct interface *const *libraries,
+                        size_t count)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < count; i++) {
+        const struct interface *library = libraries[i];
+        if (strcmp(library->module, RAYLIB_MODULE) != 0) {
+            continue;
+        }
+        extras->raylib = true;
+        for (j = 0; j < library->framework_count; j++) {
+            text_appendf(&extras->frameworks, "%s\n",
+                         library->frameworks[j]);
+        }
+        for (j = 0; j < library->linux_library_count; j++) {
+            text_appendf(&extras->linux_libraries, "%s\n",
+                         library->linux_libraries[j]);
+        }
+    }
 }
 
 static bool ends_with(const char *s, const char *suffix)
@@ -1430,6 +1463,7 @@ static int compile(const struct options *o, struct text *source,
         extras->own = &own;
         extras->libraries = libraries;
         extras->library_count = paths.count;
+        note_raylib(extras, libraries, paths.count);
         if (o->lib != LIB_NONE) {
             memcpy((void *)all, (void *)libraries,
                    paths.count * sizeof *all);

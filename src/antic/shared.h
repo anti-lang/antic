@@ -120,6 +120,9 @@ struct package {
 /* The module of the patterns, which a program that holds a pattern
    literal links with its native library. */
 #define REGEX_MODULE "anti.regex"
+/* The binding of raylib, which a program that loads it links with raylib,
+   miniaudio and the system libraries of raylib. */
+#define RAYLIB_MODULE "anti.raylib"
 /* `Object.deserialize` takes its memory from an allocator of this
    class, and `delete(p, from)` and `destroy(p, from)` give memory back
    to one. */

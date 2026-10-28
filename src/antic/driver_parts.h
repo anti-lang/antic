@@ -50,6 +50,14 @@ struct extras {
     struct text host_names;
     /* The program holds `anti.regex`, so the link adds PCRE2. */
     bool regex;
+    /* The program loads the library file of `anti.raylib`, so the link
+       adds raylib, miniaudio and the system libraries of raylib. The
+       names of the `link framework` and the `link linux` lines of that
+       file follow, one per line, since the file is freed before the
+       link. */
+    bool raylib;
+    struct text frameworks;
+    struct text linux_libraries;
     /* The packages of the licence notice: the interface of the compiled
        module and the library files it loaded. own is NULL where nothing
        links. The back end writes the notice once the program's link mode
@@ -74,6 +82,21 @@ struct link_facts {
     struct text sysroot;
     struct text lld_dir;
     struct text rpath;
+    /* The frameworks and the `link linux` libraries of the link: those of
+       the command line, then those of the bundled modules, each once.
+       The names of the modules stand in the two texts. */
+    struct text framework_names;
+    struct text linux_names;
+    const char **frameworks;
+    const char **linux_libraries;
+};
+
+/* The libraries a link takes after its objects for the bundled modules
+   the program holds, with the texts of their paths. */
+#define DRIVER_NATIVE_MAX 8
+struct native_inputs {
+    struct text files[DRIVER_NATIVE_MAX];
+    size_t count;
 };
 
 /* DESIGN: a Windows link runs in the directory of its output. The object
@@ -129,8 +152,9 @@ void driver_windows_link_free(struct windows_link *w);
 bool driver_run_link(const struct windows_link *w,
                      const struct link_command *c);
 bool driver_native_inputs(const struct options *o, const struct extras *extras,
-                          struct text *glue, struct text *pcre2,
-                          const char ***out, size_t *count);
+                          struct native_inputs *natives, const char ***out,
+                          size_t *count);
+void driver_native_free(struct native_inputs *natives);
 bool driver_link_program(const struct options *o, const char *object,
                          const char *executable, const struct extras *extras);
 

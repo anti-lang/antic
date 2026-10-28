@@ -1,7 +1,7 @@
-# raylib, a library of the runtime archive that no module binds yet, built
-# for every target of ANTIC_MEDIA_TARGETS as lib/<target>/libraylib.a, or
-# raylib.lib on Windows. anti bind --clang writes a binding of it, and the
-# module anti.raylib of docs/decisions.md is not built.
+# raylib, a library of the runtime archive, built for every target of
+# ANTIC_MEDIA_TARGETS as lib/<target>/libraylib.a, or raylib.lib on
+# Windows, and the module anti.raylib that binds it, std/anti/raylib.antl
+# of the runtime archive.
 #
 # The source is the release that tools/raylib-pin names, which
 # raylib-source.cmake fetches as ANTIC_RAYLIB_SOURCE.
@@ -12,6 +12,39 @@ antic_native_license(raylib "${ANTIC_RAYLIB_SOURCE}/LICENSE")
 # release.
 antic_native_headers(raylib "${ANTIC_RAYLIB_SOURCE}/src" raylib.h rcamera.h
     rlgl.h raymath.h)
+
+# DESIGN: anti.raylib is no file of the tree. anti bind --clang writes it
+# from raylib.h of the pinned raylib with the pinned clang of
+# ANTIC_CLANG_DIR, which stands alone on PATH, where anti looks outside a
+# development tree. A tree of ANTI_DEPS_DIR has no deps/clang beside it,
+# and a VM may keep its clang elsewhere. antic compiles the module into
+# std/anti/ of the runtime archive in the package of the standard library,
+# where a program finds it without -I. Eddie decided this on 2026-10-28
+# under "Feature freeze of 2026-10-14" in docs/decisions.md, after
+# "Bindings" there. raylib.h names the same items on all six targets, so
+# the build binds it for the host alone. It holds no inline function, so
+# anti bind writes no shim, and a shim that no library of the archive
+# holds would fail the tests raylib_module_link_<target>.
+set(ANTIC_RAYLIB_BINDING "${ANTIC_RAYLIB_WORK}/binding")
+set(antic_raylib_module "${ANTIC_RAYLIB_BINDING}/anti/raylib.anti")
+set(antic_raylib_library "${ANTIC_RUNTIME_DIR}/std/anti/raylib.antl")
+add_custom_command(OUTPUT "${antic_raylib_module}"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ANTIC_RAYLIB_BINDING}"
+    COMMAND "${CMAKE_COMMAND}" -E env "PATH=${ANTIC_CLANG_DIR}/bin"
+        "$<TARGET_FILE:anti>" bind --clang "${ANTIC_RAYLIB_SOURCE}/src/raylib.h"
+        --runtime "${ANTIC_RUNTIME_DIR}" -o "${ANTIC_RAYLIB_BINDING}/anti"
+    DEPENDS anti "${ANTIC_RAYLIB_SOURCE}/src/raylib.h"
+    VERBATIM)
+add_custom_command(OUTPUT "${antic_raylib_library}"
+    COMMAND antic -c --anti-internal -I "${ANTIC_RAYLIB_BINDING}"
+        -I "${ANTIC_RUNTIME_DIR}/std"
+        --package-name anti --package-version "${PROJECT_VERSION}"
+        --license 0BSD --license-text "${PROJECT_SOURCE_DIR}/src/std/LICENSE"
+        -o "${antic_raylib_library}" "${antic_raylib_module}"
+    DEPENDS antic "${antic_raylib_module}"
+    VERBATIM)
+add_custom_target(raylib_module ALL DEPENDS "${antic_raylib_library}")
+add_dependencies(raylib_module anti_std)
 
 # The seven modules of the library. rglfw.c holds GLFW, and raudio.c the
 # audio module over miniaudio.
@@ -208,6 +241,20 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         OBJECTS "${probe}" "${libraries}"
         WORK "${ANTIC_RAYLIB_WORK}/media_audio"
         OPTIONS "${options}")
+endforeach()
+
+# A program that imports anti.raylib links for every target with no
+# option beyond the target, and loads the system libraries of raylib.
+foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
+    add_test(NAME raylib_module_link_${target}
+        COMMAND "${CMAKE_COMMAND}" "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/std/raylib.anti"
+            "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}"
+            "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}"
+            "-DTARGET=${target}"
+            "-DWORK=${ANTIC_RAYLIB_WORK}/module/${target}"
+            -P "${ANTIC_RUNNERS}/run_raylib_module.cmake")
 endforeach()
 
 add_test(NAME raylib_miniaudio_pin

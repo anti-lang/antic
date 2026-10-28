@@ -680,8 +680,8 @@ The two guards and the lists of the matrix:
     miniaudio and raylib build for all six targets, as "Libraries and runtime"
     in `docs/decisions.md` records, and their headers stand in
     `include/<library>/` of the runtime archive. The build of Mbed TLS carries
-    no `lib/cacert.pem`. `anti.regex` binds PCRE2, and no module binds the
-    other four. `docs/reports/2026-10-09-dist-headers.md` reports the headers.
+    no `lib/cacert.pem`. `anti.regex` binds PCRE2, `anti.raylib` binds
+    raylib, and no module binds the other three. `docs/reports/2026-10-09-dist-headers.md` reports the headers.
 17. Done. The LLVM text writes every atomic operation as an LLVM atomic
     instruction, and the runtime keeps its functions for C.
     `docs/reports/2026-10-07-inline-atomics.md` reports it.
@@ -841,7 +841,8 @@ reports what it finished.
   `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
   `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
   `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex`, and the
-  collection modules under `anti.collection`.
+  collection modules under `anti.collection`. The build adds `anti.raylib`
+  to `std/` of the runtime archive.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
@@ -1306,6 +1307,13 @@ reports what it finished.
   `plugins` and `[injections]`, and match every binary to an archive by its
   build id. See "The symbols command" in `docs/decisions.md` and
   `docs/notes/symbols.md`.
+- `anti.raylib` is built. The build runs `anti bind --clang` on `raylib.h`
+  of the pinned raylib and compiles the module into `std/anti/raylib.antl`
+  of the runtime archive, so the tree holds no file of it. A program whose
+  import closure holds it links raylib, miniaudio and the system libraries
+  of the binding's `link` lines with no option, in the glibc mode on Linux,
+  and on Windows the import libraries of gdi32, user32, shell32 and winmm.
+  It links for all six targets from the Mac and runs there.
 - `anti bind` is built. `anti bind raylib_api.json` and `anti bind --clang
   <header>` write a binding module, a shim for the inline functions and, with
   `--probe`, the ABI probe in C and in Anti. `--clang` runs clang with

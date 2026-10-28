@@ -25,11 +25,11 @@
 # rule of user_runtime_archive in src/antic/userdirs.c, as a user's call does.
 #
 # DESIGN: the raylib program asks for a mouse button, which pulls in rcore
-# and GLFW and opens no window, since neither VM has a display. It imports
-# the binding that anti bind writes from tests/bind/raylib_api.json and
-# links the library of raylib from lib/<host>/ of the archive. The plugin
-# is the one of tests/plugin, and the host prints what the test
-# plugin_host expects.
+# and GLFW and opens no window, since a machine of a release check may have
+# no display. It imports anti.raylib of the archive, and antic links raylib,
+# miniaudio and the system libraries of raylib with no option, as a user's
+# program does. The plugin is the one of tests/plugin, and the host prints
+# what the test plugin_host expects.
 cmake_minimum_required(VERSION 3.21)
 
 foreach(name BIN ARCHIVE ROOT HOST WORK)
@@ -49,13 +49,11 @@ if(NOT HOST IN_LIST targets)
 endif()
 set(exe "")
 set(shared ".dylib")
-set(raylib "libraylib.a")
 if(HOST MATCHES "^linux-")
     set(shared ".so")
 elseif(HOST MATCHES "^windows-")
     set(exe ".exe")
     set(shared ".dll")
-    set(raylib "raylib.lib")
 endif()
 foreach(program antic anti)
     if(NOT EXISTS "${BIN}/${program}${exe}")
@@ -63,7 +61,7 @@ foreach(program antic anti)
                             "so it is no install")
     endif()
 endforeach()
-set(raylib "${ARCHIVE}/lib/${HOST}/${raylib}")
+set(raylib "${ARCHIVE}/std/anti/raylib.antl")
 set(readobj "${ARCHIVE}/bin/llvm-readobj${exe}")
 foreach(file "${raylib}" "${readobj}")
     if(NOT EXISTS "${file}")
@@ -91,50 +89,15 @@ file(MAKE_DIRECTORY "${WORK}")
 set(antic "${BIN}/antic${exe}")
 set(anti "${BIN}/anti${exe}")
 
-# The raylib program. The binding names what the library needs of each
-# system: the frameworks of a macOS program and the libraries of a Linux
-# one, which the link takes as options. The language has no such line for
-# Windows, so the link of a Windows program takes the import libraries of
-# the four DLLs that raylib reaches by their paths in the sysroot of the
-# archive, where a C object would name them in a directive.
+# The raylib program.
 set(game "${WORK}/raylib")
-file(MAKE_DIRECTORY "${game}/lib/game")
-alone("anti bind of raylib_api.json" "${WORK}" "${anti}" bind
-      "${ROOT}/tests/bind/raylib_api.json" --module game.raylib
-      -o "${game}/src/game")
-alone("antic -c of the raylib binding" "${game}" "${antic}" -c
-      -I "${game}/src" -o "${game}/lib/game/raylib.antl"
-      "${game}/src/game/raylib.anti")
-set(link_options "")
-if(HOST MATCHES "^linux-")
-    file(STRINGS "${game}/src/game/raylib.anti" rows
-         REGEX "^link linux \"[^\"]+\";$")
-    foreach(row IN LISTS rows)
-        string(REGEX REPLACE "^link linux \"([^\"]+)\";$" "\\1" name "${row}")
-        list(APPEND link_options --linux-lib "${name}")
-    endforeach()
-elseif(HOST MATCHES "^macos-")
-    file(STRINGS "${game}/src/game/raylib.anti" rows
-         REGEX "^link framework \"[^\"]+\";$")
-    foreach(row IN LISTS rows)
-        string(REGEX REPLACE "^link framework \"([^\"]+)\";$" "\\1" name
-               "${row}")
-        list(APPEND link_options --framework "${name}")
-    endforeach()
-endif()
-set(link_inputs "${raylib}")
-if(HOST MATCHES "^windows-")
-    foreach(name gdi32 user32 shell32 winmm)
-        list(APPEND link_inputs "${ARCHIVE}/sysroot/${HOST}/lib/${name}.lib")
-    endforeach()
-endif()
+file(MAKE_DIRECTORY "${game}")
 file(WRITE "${game}/game.anti"
-     "import anti.io;\nimport game.raylib;\n\nfn main() -> int\n{\n"
+     "import anti.io;\nimport anti.raylib;\n\nfn main() -> int\n{\n"
      "    if !raylib.IsMouseButtonPressed(0) {\n"
      "        io.println(\"no click\");\n    }\n    return 0;\n}\n")
 alone("the link of a raylib program for ${HOST}" "${game}" "${antic}"
-      --target "${HOST}" -I "${game}/lib" ${link_options}
-      -o "${WORK}/game${exe}" "${game}/game.anti" ${link_inputs})
+      --target "${HOST}" -o "${WORK}/game${exe}" "${game}/game.anti")
 alone("the raylib program" "${WORK}" "${WORK}/game${exe}")
 if(NOT alone_out MATCHES "no click\n$")
     message(FATAL_ERROR "check-offline: the raylib program prints "

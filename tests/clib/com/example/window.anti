@@ -1,0 +1,11 @@
+//! A library for C that asks raylib whether a window is ready, so a C program
+//! links raylib, miniaudio and the system libraries of raylib beside the
+//! runtime.
+
+import anti.raylib;
+
+/// 1 when raylib has opened a window, and 0 otherwise.
+export fn window_ready() -> int
+{
+	return raylib.IsWindowReady() as int;
+}

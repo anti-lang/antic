@@ -431,7 +431,7 @@ The sources are downloaded under `build/deps/` and never tracked.
 | `src/native/pcre2-source.cmake` | Fetches PCRE2, writes its generated files and builds the copy antic links. |
 | `src/native/pcre2.cmake` | Builds PCRE2 and the regex code of the runtime for every target, with their tests. |
 | `src/native/raylib-source.cmake` | Fetches the pinned raylib source as `ANTIC_RAYLIB_SOURCE` before `tests/` and `src/native/` read it. |
-| `src/native/raylib.cmake` | Builds raylib for every media target, with its tests and the audio link test. |
+| `src/native/raylib.cmake` | Builds raylib for every media target and writes `anti.raylib` into the runtime archive, with their tests and the audio link test. |
 | `src/native/sqlite.cmake` | Builds SQLite for every target, with its tests. |
 | `src/native/warnings.cmake` | Holds the warning flags of each third-party library. |
 
@@ -600,6 +600,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_anti_build_deps.cmake` | Drives `anti build` over a path dependency and a `file://` repository. |
 | `tests/runners/run_anti_build_framework.cmake` | Builds a project that names a framework and checks the program loads it. |
 | `tests/runners/run_anti_build_inputs.cmake` | Feeds `anti build` a malformed index and lock file. |
+| `tests/runners/run_anti_build_raylib.cmake` | Builds and runs a project that imports `anti.raylib` in both modes, with no dependency. |
 | `tests/runners/run_anti_build_rerun.cmake` | Runs and rebuilds a program in turns on a Windows host. |
 | `tests/runners/run_anti_build_resolve.cmake` | Checks the resolver and the search over more than one repository. |
 | `tests/runners/run_anti_build_running.cmake` | Builds a changed program while the old one runs. |
@@ -774,6 +775,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_program.cmake` | Compiles one program, runs it and compares with the expected file. |
 | `tests/runners/run_raw_output.cmake` | Checks the raw bytes rule and scans every runner for it. |
 | `tests/runners/run_raylib_miniaudio_pin.cmake` | Checks that the miniaudio raylib bundles is the pinned one. |
+| `tests/runners/run_raylib_module.cmake` | Links a program of `anti.raylib` for one target with no option and checks what it loads. |
 | `tests/runners/run_release_dry_run.cmake` | Runs `./r --dry-run` on the copy of `tests/release_copy.cmake` with stand-in tools and checks what each step wrote. |
 | `tests/runners/run_release_dry_run_self.cmake` | Tests that `run_release_dry_run.cmake` fails and prints the output when a fixture does not compile or link. |
 | `tests/runners/run_release_key.cmake` | Checks that both installers hold the public key and that a package carries none. |
@@ -844,7 +846,7 @@ the data the scripts read.
 | `tools/check-cpu.cmake` | Refuses a package whose runtime levels are not those of `tools/cpu-levels`. |
 | `tools/check-libc.cmake` | Refuses a Linux program that needs a glibc above 2.35. |
 | `tools/check-llvm.cmake` | Checks that the LLVM tools of a directory are the release of `tools/llvm-version`. |
-| `tools/check-offline.cmake` | Builds a raylib program, a plugin host and five cross links from an install alone. |
+| `tools/check-offline.cmake` | Builds a program of `anti.raylib`, a plugin host and five cross links from an install alone. |
 | `tools/check-pdb.cmake` | Checks the CodeView record of a Windows executable against the GUID of its PDB. |
 | `tools/check-release.cmake` | Checks the directory of a release: the files its signed manifest names, with their digests, and nothing else. |
 | `tools/clang-release.cmake` | Gives the version, the tag and the release page of the pinned clang to the build of `anti`. |

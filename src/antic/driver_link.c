@@ -94,6 +94,57 @@ void driver_link_facts_free(struct link_facts *f)
     text_free(&f->sysroot);
     text_free(&f->lld_dir);
     text_free(&f->rpath);
+    text_free(&f->framework_names);
+    text_free(&f->linux_names);
+    free((void *)f->frameworks);
+    free((void *)f->linux_libraries);
+}
+
+/* Append name to the n names of list unless it stands there. */
+static void add_name(const char **list, size_t *n, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < *n; i++) {
+        if (strcmp(list[i], name) == 0) {
+            return;
+        }
+    }
+    list[(*n)++] = name;
+}
+
+/* The count names of given and the lines of more, each once, in a new
+   list at *out that the caller frees. storage takes a copy of the lines,
+   and the list points into it, so nothing appends to it after. */
+static size_t merge_names(const char *const *given, size_t count,
+                          const struct text *more, struct text *storage,
+                          const char ***out)
+{
+    const char **list;
+    size_t lines = 0;
+    size_t n = 0;
+    size_t start = 0;
+    size_t i;
+
+    if (more->length > 0) {
+        text_append_bytes(storage, more->data, more->length);
+    }
+    for (i = 0; i < storage->length; i++) {
+        lines += storage->data[i] == '\n';
+    }
+    list = alloc_zeroed(count + lines + 1, sizeof *list);
+    for (i = 0; i < count; i++) {
+        add_name(list, &n, given[i]);
+    }
+    for (i = 0; i < storage->length; i++) {
+        if (storage->data[i] == '\n') {
+            storage->data[i] = '\0';
+            add_name(list, &n, storage->data + start);
+            start = i + 1;
+        }
+    }
+    *out = list;
+    return n;
 }
 
 /* DESIGN: a program that names a framework links against Apple's SDK,
@@ -103,7 +154,8 @@ void driver_link_facts_free(struct link_facts *f)
    as "Binary distribution" in docs/decisions.md says. */
 /* Set f->sdk_path and f->sdk_version to Apple's SDK, which a program that
    names a framework links against, or explain where it comes from. */
-static bool apple_sdk(const struct options *o, struct link_facts *f)
+static bool apple_sdk(const struct options *o, const struct link_inputs *in,
+                      struct link_facts *f)
 {
     struct text marker = {0};
     struct text version = {0};
@@ -134,8 +186,8 @@ static bool apple_sdk(const struct options *o, struct link_facts *f)
     text_appendf(&f->sdk_path, "%s/%s", text_cstr(&f->sysroot),
                  SYSROOT_APPLE_SDK_DIR);
     say_antic("the frameworks");
-    for (i = 0; i < o->framework_count; i++) {
-        fprintf(stderr, "%s %s", i > 0 ? "," : "", o->frameworks[i]);
+    for (i = 0; i < in->framework_count; i++) {
+        fprintf(stderr, "%s %s", i > 0 ? "," : "", in->frameworks[i]);
     }
     fprintf(stderr, " link for %s against Apple's SDK, which no package holds "
                     "and %s lacks. A Mac keeps the SDK in " APPLE_CLT_SDKS
@@ -208,7 +260,7 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     }
     in->sysroot = text_cstr(&f->sysroot);
     if (os == OS_MACOS && in->framework_count > 0) {
-        if (!apple_sdk(o, f)) {
+        if (!apple_sdk(o, in, f)) {
             return false;
         }
         in->sdk_path = text_cstr(&f->sdk_path);
@@ -223,12 +275,14 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
 }
 
 /* DESIGN: the runtime of AddressSanitizer is built against glibc, so a
-   Linux link of --memory-checks takes the glibc mode. */
+   Linux link of --memory-checks takes the glibc mode. So does a program
+   of anti.raylib, whose libraries are built against glibc, by the entry
+   on the two link modes of Linux in docs/decisions.md. */
 static bool links_glibc(const struct options *o, const struct extras *extras)
 {
     return target_info(o->target)->os == OS_LINUX &&
-           (o->linux_library_count > 0 || extras->hosts_plugins ||
-            o->memory_checks);
+           (o->linux_library_count > 0 || extras->raylib ||
+            extras->hosts_plugins || o->memory_checks);
 }
 
 bool driver_links_musl(const struct options *o, const struct extras *extras)
@@ -260,10 +314,14 @@ bool driver_link_inputs_of(const struct options *o, const struct extras *extras,
     in->runtime = o->runtime;
     in->extra = o->objects;
     in->extra_count = o->object_count;
-    in->frameworks = o->frameworks;
-    in->framework_count = o->framework_count;
-    in->linux_libraries = o->linux_libraries;
-    in->linux_library_count = o->linux_library_count;
+    in->framework_count = merge_names(o->frameworks, o->framework_count,
+                                      &extras->frameworks,
+                                      &f->framework_names, &f->frameworks);
+    in->frameworks = f->frameworks;
+    in->linux_library_count = merge_names(
+        o->linux_libraries, o->linux_library_count, &extras->linux_libraries,
+        &f->linux_names, &f->linux_libraries);
+    in->linux_libraries = f->linux_libraries;
     in->exports = extras->hosts_plugins;
     in->glibc = links_glibc(o, extras);
     in->memory_checks = o->memory_checks;
@@ -430,43 +488,89 @@ static bool host_exports(const struct options *o, const char *object,
     return ok;
 }
 
-/* DESIGN: a program that holds `anti.regex` links the glue of the patterns
-   and PCRE2 from lib/<target>/ of the runtime archive after its own
-   objects. Both are built for the default level of the target alone. A
-   program below that level is refused with the level of each, in the
-   words of "CPU levels" in docs/anti-language-additions.md. *out is a new
-   list of the objects of the command line, and of the two libraries when
-   the program holds `anti.regex`. The caller frees it with free, whether
-   the call succeeded or not. */
-bool driver_native_inputs(const struct options *o, const struct extras *extras,
-                          struct text *glue, struct text *pcre2,
-                          const char ***out, size_t *count)
+/* Whether the native libraries of module, built for the default level of
+   the target alone, link into a program at the level of o. One below it
+   is refused with both levels, in the words of "CPU levels" in
+   docs/anti-language-additions.md. */
+static bool native_level(const struct options *o, const char *module)
 {
     enum cpu_level level = cpu_default(o->target);
-    const char **list = alloc_zeroed(o->object_count + 2, sizeof *list);
 
+    if (cpu_arch(o->cpu) == cpu_arch(level) && o->cpu < level) {
+        say_antic("%s is built for %s%s, this program targets %s\n", module,
+                  target_info(o->target)->arch == ARCH_X86_64 ? "x86-64-" : "",
+                  cpu_name(level), cpu_name(o->cpu));
+        return false;
+    }
+    return true;
+}
+
+/* Add the native library name of lib/<target>/ to natives. */
+static void native_library(const struct options *o,
+                           struct native_inputs *natives, const char *name)
+{
+    link_native_library(&natives->files[natives->count++], o->runtime,
+                        o->target, name);
+}
+
+/* DESIGN: a program that holds `anti.regex` links the glue of the patterns
+   and PCRE2 from lib/<target>/ of the runtime archive after its own
+   objects. One that loads `anti.raylib` links raylib and then miniaudio,
+   which raylib calls, and on Windows the import libraries of
+   link_raylib_windows. The native libraries are built for the default level
+   of the target alone, and a program below that level is refused. *out
+   is a new list of the objects of the command line and the libraries of
+   natives. The caller frees it with free and natives with
+   driver_native_free, whether the call succeeded or not. */
+bool driver_native_inputs(const struct options *o, const struct extras *extras,
+                          struct native_inputs *natives, const char ***out,
+                          size_t *count)
+{
+    const char **list = alloc_zeroed(o->object_count + DRIVER_NATIVE_MAX,
+                                     sizeof *list);
+    size_t i;
+
+    memset(natives, 0, sizeof *natives);
     /* memcpy takes no null pointer, even for no bytes. */
     if (o->object_count > 0) {
         memcpy(list, o->objects, o->object_count * sizeof *list);
     }
     *out = list;
     *count = o->object_count;
-    if (!extras->regex) {
-        return true;
-    }
-    if (cpu_arch(o->cpu) == cpu_arch(level) && o->cpu < level) {
-        say_antic(REGEX_MODULE " is built for %s%s, this "
-                  "program targets %s\n",
-                  target_info(o->target)->arch == ARCH_X86_64 ? "x86-64-" : "",
-                  cpu_name(level), cpu_name(o->cpu));
+    if ((extras->regex && !native_level(o, REGEX_MODULE)) ||
+        (extras->raylib && !native_level(o, RAYLIB_MODULE))) {
         return false;
     }
-    link_native_library(glue, o->runtime, o->target, NATIVE_REGEX_GLUE);
-    link_native_library(pcre2, o->runtime, o->target, NATIVE_PCRE2);
-    list[o->object_count] = text_cstr(glue);
-    list[o->object_count + 1] = text_cstr(pcre2);
-    *count = o->object_count + 2;
+    if (extras->regex) {
+        native_library(o, natives, NATIVE_REGEX_GLUE);
+        native_library(o, natives, NATIVE_PCRE2);
+    }
+    if (extras->raylib) {
+        native_library(o, natives, NATIVE_RAYLIB);
+        native_library(o, natives, NATIVE_MINIAUDIO);
+        for (i = 0; target_info(o->target)->os == OS_WINDOWS &&
+                    i < LINK_RAYLIB_WINDOWS_COUNT;
+             i++) {
+            link_windows_import_library(&natives->files[natives->count++],
+                                        o->runtime, o->target,
+                                        link_raylib_windows[i]);
+        }
+    }
+    for (i = 0; i < natives->count; i++) {
+        list[o->object_count + i] = text_cstr(&natives->files[i]);
+    }
+    *count = o->object_count + natives->count;
     return true;
+}
+
+void driver_native_free(struct native_inputs *natives)
+{
+    size_t i;
+
+    for (i = 0; i < natives->count; i++) {
+        text_free(&natives->files[i]);
+    }
+    natives->count = 0;
 }
 
 const char *driver_memcheck_companion(enum target t)
@@ -502,8 +606,7 @@ static bool copy_memcheck_dll(const struct options *o, const char *executable)
 bool driver_link_program(const struct options *o, const char *object,
                          const char *executable, const struct extras *extras)
 {
-    struct text glue = {0};
-    struct text pcre2 = {0};
+    struct native_inputs natives;
     const char **extra = NULL;
     size_t extra_count;
     struct link_inputs in;
@@ -515,10 +618,9 @@ bool driver_link_program(const struct options *o, const char *object,
     enum target_os os = target_info(o->target)->os;
     bool ok;
 
-    if (!driver_native_inputs(o, extras, &glue, &pcre2, &extra, &extra_count)) {
+    if (!driver_native_inputs(o, extras, &natives, &extra, &extra_count)) {
         free(extra);
-        text_free(&glue);
-        text_free(&pcre2);
+        driver_native_free(&natives);
         return false;
     }
     memset(&w, 0, sizeof w);
@@ -556,7 +658,6 @@ bool driver_link_program(const struct options *o, const char *object,
     text_free(&def);
     text_free(&implib);
     free(extra);
-    text_free(&glue);
-    text_free(&pcre2);
+    driver_native_free(&natives);
     return ok;
 }

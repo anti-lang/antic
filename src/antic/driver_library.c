@@ -325,6 +325,14 @@ static bool build_static(const struct options *o, const char *object,
         struct text line = {0};
         link_line(&line, o->target, path, o->runtime, o->cpu,
                   o->bundle_runtime, extras->regex);
+        /* raylib calls no function of the runtime, so its libraries
+           follow the line, by "Static library" of
+           docs/libraries-for-c.md. */
+        if (extras->raylib) {
+            link_line_raylib(&line, o->target, o->runtime,
+                             text_cstr(&extras->linux_libraries),
+                             text_cstr(&extras->frameworks));
+        }
         printf("%s\n", text_cstr(&line));
         text_free(&line);
     }
@@ -433,18 +441,18 @@ static bool build_shared(const struct options *o, const char *object,
     struct text versioned = {0};
     struct text def = {0};
     struct text exported = {0};
-    struct text glue = {0};
-    struct text pcre2 = {0};
+    struct native_inputs natives;
     const char *const *extra = o->objects;
     const char **owned = NULL;
     size_t extra_count = o->object_count;
     bool ok = true;
 
-    /* A library for C links PCRE2 as a program does. A plugin links no
-       runtime, and the glue it calls is the host's. */
+    /* A library for C links the native libraries as a program does. A
+       plugin links no runtime, and the libraries it calls are the
+       host's. */
+    memset(&natives, 0, sizeof natives);
     if (!s.plugin) {
-        ok = driver_native_inputs(o, extras, &glue, &pcre2, &owned,
-                                  &extra_count);
+        ok = driver_native_inputs(o, extras, &natives, &owned, &extra_count);
         extra = owned;
     }
     memset(&in, 0, sizeof in);
@@ -483,8 +491,7 @@ static bool build_shared(const struct options *o, const char *object,
     text_free(&def);
     text_free(&exported);
     free(owned);
-    text_free(&glue);
-    text_free(&pcre2);
+    driver_native_free(&natives);
     return ok;
 }
 
