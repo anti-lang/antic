@@ -262,6 +262,11 @@ not re-open a settled decision without asking Eddie.
   372 s, 260 s and 285 s. It ran each sanitizer suite in the six parts
   of `asan`: `asan` 241 s, 188 s, 252 s, 187 s, 446 s and 440 s, `ubsan`
   250 s, 191 s, 249 s, 203 s, 463 s and 438 s.
+  The step of `anti.raylib` measured `host` as `ctest -I 1,2100`,
+  `ctest -I 2101,4300` and `ctest -I 4301,6900`: 378 s, 261 s and 276 s.
+  It ran each sanitizer suite in the six parts of `asan`: `asan` 243 s,
+  189 s, 256 s, 188 s, 443 s and 418 s, `ubsan` 249 s, 191 s, 252 s,
+  205 s, 456 s and 427 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -865,11 +870,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6764 ctest tests pass on the development Mac, and two of them, the
+- 6780 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   None of them is an expected failure there. The two lines of
   `tests/known-failures.txt`, those of T136 and T138, carry
-  `host=windows`. The ASan and the UBSan builds run 6762 each
+  `host=windows`. The ASan and the UBSan builds run 6778 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
