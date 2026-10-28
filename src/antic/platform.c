@@ -728,6 +728,7 @@ static bool self_path(struct text *out)
 {
     uint32_t size = 0;
     char *path;
+    char *real;
 
     _NSGetExecutablePath(NULL, &size);
     if (size == 0) {
@@ -738,8 +739,17 @@ static bool self_path(struct text *out)
         free(path);
         return false;
     }
-    text_append(out, path);
+    /* DESIGN: _NSGetExecutablePath gives the path as the command line
+       spelled it, `../anti` for a program run from a directory below its
+       own. The other two systems give the absolute path, and the caller
+       cuts directories off it, so it is resolved here (T208). */
+    real = realpath(path, NULL);
     free(path);
+    if (real == NULL) {
+        return false;
+    }
+    text_append(out, real);
+    free(real);
     return true;
 }
 

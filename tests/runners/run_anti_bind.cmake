@@ -5,7 +5,8 @@
 #   WORK      a directory for the output
 #   CASE      header, clang, escaped_path, raymath, raylib, api, refusals,
 #             api_malformed, clang_malformed, ast_malformed,
-#             api_typedef_chain, clang_typedef_chain or clang_of_the_tree
+#             api_typedef_chain, clang_typedef_chain, clang_of_the_tree or
+#             clang_of_the_tree_relative
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -727,6 +728,35 @@ elseif(CASE STREQUAL "clang_of_the_tree")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti of the tree took no pinned clang: "
                             "${status}\n${out}${err}")
+    endif()
+elseif(CASE STREQUAL "clang_of_the_tree_relative")
+    # The same copy of anti run by a relative path from a directory below
+    # its own, as the build runs anti from src/native/ of a tree. macOS
+    # gave the path of the running program as the command line spelled
+    # it, so the directory above `../anti` was the one of the command, and
+    # anti took the first clang on PATH (T208).
+    if(CLANG_DIR)
+        set(pinned "${CLANG_DIR}")
+    else()
+        get_filename_component(pinned "${ANTI}" DIRECTORY)
+        set(pinned "${pinned}/../deps/clang")
+    endif()
+    get_filename_component(pinned "${pinned}" REALPATH)
+    get_filename_component(name "${ANTI}" NAME)
+    file(MAKE_DIRECTORY "${WORK}/tree/host/below" "${WORK}/tree/deps"
+         "${WORK}/empty")
+    file(COPY_FILE "${ANTI}" "${WORK}/tree/host/${name}")
+    file(CREATE_LINK "${pinned}" "${WORK}/tree/deps/clang" SYMBOLIC)
+    file(WRITE "${WORK}/api.h" "int count(void);\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${WORK}/empty"
+        "../${name}" bind --clang "${WORK}/api.h" -o "${WORK}/out"
+        --runtime "${RUNTIME}"
+        WORKING_DIRECTORY "${WORK}/tree/host/below"
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err
+        ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "anti of the tree run as ../${name} took no "
+                            "pinned clang: ${status}\n${out}${err}")
     endif()
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
