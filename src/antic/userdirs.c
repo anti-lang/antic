@@ -169,26 +169,33 @@ static bool holds_runtime(const char *dir)
     return found;
 }
 
-bool user_runtime_archive(struct text *out)
+void user_runtime_places(struct text *above, struct text *data)
 {
     struct text bin = {0};
-    struct text found = {0};
 
-    if (platform_self_directory(&bin) && parent_of(&found, &bin) &&
-        holds_runtime(text_cstr(&found))) {
-        text_append_bytes(out, found.data, found.length);
-        text_free(&bin);
-        text_free(&found);
-        return true;
+    if (platform_self_directory(&bin)) {
+        parent_of(above, &bin);
     }
     text_free(&bin);
-    text_free(&found);
-    if (user_dir(&found, USER_DIR_DATA, USER_DIR_APP) &&
-        holds_runtime(text_cstr(&found))) {
-        text_append_bytes(out, found.data, found.length);
-        text_free(&found);
-        return true;
+    user_dir(data, USER_DIR_DATA, USER_DIR_APP);
+}
+
+bool user_runtime_archive(struct text *out)
+{
+    struct text above = {0};
+    struct text data = {0};
+    const struct text *found = NULL;
+
+    user_runtime_places(&above, &data);
+    if (above.length > 0 && holds_runtime(text_cstr(&above))) {
+        found = &above;
+    } else if (data.length > 0 && holds_runtime(text_cstr(&data))) {
+        found = &data;
     }
-    text_free(&found);
-    return false;
+    if (found != NULL) {
+        text_append_bytes(out, found->data, found->length);
+    }
+    text_free(&above);
+    text_free(&data);
+    return found != NULL;
 }

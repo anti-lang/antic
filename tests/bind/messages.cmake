@@ -151,11 +151,25 @@ anti_message(clang_no_sysroot
     FILES api.h "int count(void);\n" archive/notes.txt "No sysroot.\n"
     ARGS bind --clang api.h -o "${WORK}/out" --target linux-x86_64 --runtime archive
     ERR "anti: the runtime archive holds no sysroot for linux-x86_64, whose headers clang reads. Pass --runtime.")
-# No --runtime, and no runtime archive beside the anti of the tree.
+# No --runtime, and no runtime archive in either place that anti looks:
+# the directory above the one of the anti of the tree, and the data
+# directory of the user, which XDG_DATA_HOME names, or LOCALAPPDATA on
+# Windows. The message names both, by Q5 of "Answers of 2026-11-01".
+set(anti_above "")
+set(user_data "${WORK}/data/anti")
+if(DEFINED ANTI)
+    get_filename_component(anti_above "${ANTI}" DIRECTORY)
+    get_filename_component(anti_above "${anti_above}" DIRECTORY)
+endif()
+if(CMAKE_HOST_WIN32)
+    file(TO_NATIVE_PATH "${anti_above}" anti_above)
+    set(user_data "${WORK}/cache\\anti")
+endif()
 anti_message(clang_no_runtime
     FILES api.h "int count(void);\n"
+    ENV "XDG_DATA_HOME=${WORK}/data"
     ARGS bind --clang api.h -o "${WORK}/out" --target linux-x86_64
-    ERR "anti: the runtime archive holds no sysroot for linux-x86_64, whose headers clang reads. Pass --runtime.")
+    ERR "anti: found no runtime archive in ${anti_above}, above the directory of anti, or in ${user_data}, the data directory of the user. `--runtime <dir>` names one.")
 # clang writes its own lines on the header before the one of anti.
 anti_message(clang_refuses_the_header
     FILES api.h "int count(;\n"

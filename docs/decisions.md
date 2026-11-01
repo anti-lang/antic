@@ -1917,6 +1917,7 @@ antic had two native back ends, x86_64 and ARM64, until the step `switch` of `do
 - [provisional] `anti bind --clang` counts every line in `int64_t` and refuses a line marker of `clang -E` that names a line above 4294967295, with a message that names the marker and says it is out of range. Reason: clang keeps a line in an unsigned of 32 bits and writes no higher marker, and the bound keeps the count of the lines after a marker far inside its type. `#line 2147483647`, the last line C allows, binds.
 - [provisional] An enumerator without a value after `INT64_MAX` takes the bits of 2^63, through the unsigned sum, as an enumerator written above `INT64_MAX` does.
 - [provisional] An enum with a fixed base of C23, as `enum Small : unsigned char`, takes that base on every target, and `int` stays the default. Reason: C lays the enum out as its fixed base, which the reader passed over. The enum then took `c_int` and 4 bytes where C gives 1, and on Windows `unsigned long long` gave an int, by T137.
+- `anti bind --clang` without `--runtime`, where neither place of `user_runtime_archive` holds an archive, says that it found none. The message names the directory above the one of `anti` and the data directory of the user, and says that `--runtime <dir>` names an archive. Eddie decided this by Q5 of "Answers of 2026-11-01". The test `anti_bind_message_clang_no_runtime` holds the message. An archive without the sysroot of the target keeps the message that names the target.
 
 ## Regular expressions
 

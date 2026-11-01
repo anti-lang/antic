@@ -19,6 +19,7 @@
 #include "platform.h"
 #include "say.h"
 #include "target.h"
+#include "userdirs.h"
 
 /* DESIGN: anti bind accepts the major version of clang it was tested
    against, which is the major version of the pinned clang,
@@ -157,6 +158,32 @@ static void arg_add(struct arg_list *list, const char *arg)
     list->items[list->count++] = arg;
 }
 
+/* Q5 of "Answers of 2026-11-01" in docs/decisions.md: without
+   --runtime and without an archive in either place anti looks, the
+   message names both places and the option. */
+static void say_no_runtime(void)
+{
+    struct text above = {0};
+    struct text data = {0};
+    struct text where = {0};
+
+    user_runtime_places(&above, &data);
+    if (above.length > 0) {
+        text_appendf(&where, "%s, above the directory of anti",
+                     text_cstr(&above));
+    }
+    if (data.length > 0) {
+        text_appendf(&where, "%s%s, the data directory of the user",
+                     where.length > 0 ? ", or in " : "", text_cstr(&data));
+    }
+    say_anti("found no runtime archive in %s. `--runtime <dir>` names "
+             "one.\n", where.length > 0 ? text_cstr(&where)
+                                         : "any place this system names");
+    text_free(&above);
+    text_free(&data);
+    text_free(&where);
+}
+
 /* The options that aim clang at a target and at the headers of its
    sysroot in the runtime archive. The build compiles the runtime of that
    target with the same ones. */
@@ -168,9 +195,12 @@ static bool target_options(const char *clang, enum target t,
     const char *name = target_name(t);
     bool ok = true;
 
-    text_appendf(&sysroot, "%s/%s/%s", runtime != NULL ? runtime : ".",
-                 RUNTIME_SYSROOT_DIR, name);
-    if (runtime == NULL || !platform_directory_exists(text_cstr(&sysroot))) {
+    if (runtime == NULL) {
+        say_no_runtime();
+        return false;
+    }
+    text_appendf(&sysroot, "%s/%s/%s", runtime, RUNTIME_SYSROOT_DIR, name);
+    if (!platform_directory_exists(text_cstr(&sysroot))) {
         say_anti("the runtime archive holds no sysroot for %s, "
                  "whose headers clang reads. Pass --runtime.\n", name);
         text_free(&sysroot);

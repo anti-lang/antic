@@ -49,4 +49,10 @@ bool user_dir(struct text *out, enum user_dir which, const char *app);
    Returns false when neither does, and out is then untouched. */
 bool user_runtime_archive(struct text *out);
 
+/* Append to above the directory above the running executable, and to
+   data the user's data directory: the two places user_runtime_archive
+   looks in, for a message that names them. A place the system does not
+   name leaves its text untouched. */
+void user_runtime_places(struct text *above, struct text *data);
+
 #endif
