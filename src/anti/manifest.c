@@ -482,6 +482,14 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
                  "the package that requires them\n", path);
         goto done;
     }
+    /* Q3 of "Answers of 2026-11-02": a published package needs a name,
+       so `publish` of [package] needs one, although `anti publish` is
+       not built. */
+    if (out->name.length == 0 && value_of(doc, "package.publish") != NULL) {
+        say_anti("%s: [package] publish needs a `name`, the package it "
+                 "publishes\n", path);
+        goto done;
+    }
     /* The program is a file of dist/, so its name stands in no other
        directory and is a file name on every target. */
     if (out->program.length > 0 &&

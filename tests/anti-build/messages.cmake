@@ -27,6 +27,13 @@ anti_message(manifest_dependencies_without_package
     FILES anti.toml "[dependencies]\n\"com.example.units\" = { path = \"../units\" }\n"
     ARGS build
     ERR "anti: ./anti.toml: [dependencies] needs a [package] with a `name`, the package that requires them")
+# Q3 of "Answers of 2026-11-02": a published package needs its name, so
+# a [package] that names publish without it is refused, although anti
+# publish is not built.
+anti_message(manifest_publish_without_name
+    FILES anti.toml "[package]\npublish = \"ff\"\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a `name`, the package it publishes")
 anti_message(manifest_version
     FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"1.x\"\n"
     ARGS build

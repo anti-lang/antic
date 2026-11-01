@@ -243,10 +243,11 @@ ff = "https://anti.foundingfuture.com/repo"
 - `license`, `license_text`, `attribution` and `publish` are described in
   `docs/distribution.md`.
 - `[package]` is optional for a project that requires no packages, so an empty
-  `anti.toml` is a manifest. Every field but `name` stands without `name`, and a
-  project without it is the package of its root module: the module that holds `main`,
-  or the last module of the order in a library project. A manifest with
+  `anti.toml` is a manifest. Every field but `name` and `publish` stands without
+  `name`, and a project without it is the package of its root module: the module that
+  holds `main`, or the last module of the order in a library project. A manifest with
   `[dependencies]` needs `[package]` and its `name`, and so does a published package.
+  A `[package]` that names `publish` without `name` is refused.
 - A program takes the name `program` gives. Without it a program takes the last
   segment of `name`, and without either the name of the project directory, the
   directory that holds `anti.toml`. The copy of a project in a directory
