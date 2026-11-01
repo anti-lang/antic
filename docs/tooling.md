@@ -240,6 +240,12 @@ ff = "https://anti.foundingfuture.com/repo"
   refuses an older compiler and a version of another form, which satisfies nothing.
 - `license`, `license_text`, `attribution` and `publish` are described in
   `docs/distribution.md`.
+- `[package]` is optional for a project that requires no packages, so an empty
+  `anti.toml` is a manifest. Such a project is the package of its root module: the
+  module that holds `main`, or the last module of the order in a library project. A
+  program takes the last segment of that path as its name. A manifest with
+  `[dependencies]` needs `[package]` and its `name`, and so does a `[package]` that
+  names any other field.
 
 `[targets]`:
 

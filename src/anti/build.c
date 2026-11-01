@@ -687,6 +687,23 @@ static size_t root_module(const struct build *b)
     return b->unit_count > 0 ? b->order[b->unit_count - 1] : 0;
 }
 
+/* [provisional] DESIGN: a project whose manifest has no [package] is the
+   package of its root module: the module that holds main, or the root
+   module of a library project, which is the last of the order. Its path
+   is the package name that every compile carries, so the modules of the
+   project share their internal items, and the program takes the last
+   segment as its name, as antic names one without -o. Q3 of "Answers of
+   2026-11-01" in docs/decisions.md makes [package] optional. */
+static void name_project(struct build *b)
+{
+    size_t at = linking_module(b);
+
+    if (at == b->unit_count) {
+        at = root_module(b);
+    }
+    text_append(&b->m.name, text_cstr(&b->units[at].path));
+}
+
 /* Dev mode: one object per module, cached by digest, and one link that
    takes them all. */
 static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
@@ -1491,6 +1508,9 @@ static int build_project(const struct build_request *r,
     text_appendf(&b.src, "%s/%s", r->root, text_cstr(&b.m.src));
     if (!read_units(&b)) {
         goto done;
+    }
+    if (b.m.name.length == 0) {
+        name_project(&b);
     }
     /* R168 of "Rules of 2026-10-13": a library project names its root
        module by its package name, and one without it builds from the

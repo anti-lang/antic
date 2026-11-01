@@ -422,9 +422,22 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     if (!read_tables(path, doc, out)) {
         goto done;
     }
-    if (out->name.length == 0) {
+    /* Q3 of "Answers of 2026-11-01" in docs/decisions.md: [package] is
+       optional for a project that requires no packages. A [package] that
+       names another field still names the package, and a project with
+       dependencies is the package that requires them. The build names a
+       project without one after its root module. */
+    if (out->name.length == 0 &&
+        (out->version.length > 0 || out->antic.length > 0 ||
+         out->license.length > 0 || out->license_text.length > 0 ||
+         out->attribution_count > 0)) {
         say_anti("%s: [package] names no `name`, the root module "
                  "path of the package\n", path);
+        goto done;
+    }
+    if (out->name.length == 0 && out->dependency_count > 0) {
+        say_anti("%s: [dependencies] needs a [package] with a `name`, "
+                 "the package that requires them\n", path);
         goto done;
     }
     /* The version goes into every class descriptor, where the loader of a

@@ -99,7 +99,9 @@ struct manifest_dependency {
    not name is empty, and the four directories carry the defaults of
    docs/tooling.md. */
 struct manifest {
-    struct text name;           /* [package] name, the root module path */
+    /* [package] name, the root module path, and empty without
+       [package], which a project with no dependency may leave out */
+    struct text name;
     struct text version;
     struct text antic;          /* the minimum compiler version */
     struct text license;

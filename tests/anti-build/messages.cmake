@@ -15,6 +15,12 @@ anti_message(manifest_no_name
     FILES anti.toml "[package]\nversion = \"0.1.0\"\n"
     ARGS build
     ERR "anti: ./anti.toml: [package] names no `name`, the root module path of the package")
+# Q3 of "Answers of 2026-11-01": [package] is optional for a project
+# that requires no packages, and one with dependencies needs it.
+anti_message(manifest_dependencies_without_package
+    FILES anti.toml "[dependencies]\n\"com.example.units\" = { path = \"../units\" }\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [dependencies] needs a [package] with a `name`, the package that requires them")
 anti_message(manifest_version
     FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"1.x\"\n"
     ARGS build

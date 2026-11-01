@@ -1,10 +1,11 @@
 # `anti build` of a project that imports anti.raylib, in dev mode and in
-# release mode. The manifest holds the lines of [package] alone, with no
-# dependency and no option of a link, and the project holds no binding of
-# its own: the module of the runtime archive and its libraries are found
-# without them. The program of each mode is tests/std/raylib.anti, which
-# runs where no display is, and prints what tests/std/raylib.expected
-# holds. Run with cmake -P and these values:
+# release mode. The manifest is empty, as "Bundled libraries" in
+# docs/tooling.md and Q3 of "Answers of 2026-11-01" in docs/decisions.md
+# give it, and the project holds no binding of its own: the module of the
+# runtime archive and its libraries are found without them. The program
+# is named after its module com.example.game. The program of each mode is
+# tests/std/raylib.anti, which runs where no display is, and prints what
+# tests/std/raylib.expected holds. Run with cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
 #   SOURCE   tests/std/raylib.anti
@@ -19,8 +20,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/../program_output.cmake")
 file(REMOVE_RECURSE "${WORK}")
 set(project "${WORK}/game")
 file(MAKE_DIRECTORY "${project}/src/com/example")
-write_bytes("${project}/anti.toml"
-            "[package]\nname = \"com.example.game\"\nversion = \"0.1.0\"\n")
+write_bytes("${project}/anti.toml" "")
 file(COPY_FILE "${SOURCE}" "${project}/src/com/example/game.anti")
 set(exe "")
 if(HOST MATCHES "^windows-")

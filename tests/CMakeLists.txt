@@ -6802,8 +6802,8 @@ if(ANTIC_HOST_OS STREQUAL "windows")
             -P "${ANTIC_RUNNERS}/run_anti_build_rerun.cmake")
 endif()
 
-# A project that imports anti.raylib, with no dependency and no binding
-# of its own, builds and runs in both modes.
+# A project that imports anti.raylib, with an empty manifest and no
+# binding of its own, builds and runs in both modes.
 add_test(NAME anti_build_raylib
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
@@ -6813,6 +6813,21 @@ add_test(NAME anti_build_raylib
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-raylib"
         -P "${ANTIC_RUNNERS}/run_anti_build_raylib.cmake")
+
+# A project whose manifest is empty is the package of its root module,
+# as a program and as a library project. The header of
+# tests/runners/run_anti_build_no_package.cmake names what each case shows.
+foreach(case program library)
+    add_test(NAME anti_build_no_package_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DCASE=${case}"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-no-package-${case}"
+            -P "${ANTIC_RUNNERS}/run_anti_build_no_package.cmake")
+endforeach()
 
 # A program that runs from dist/ while `anti build` builds it again. The
 # build replaces it, the running program ends as it began, and the new
