@@ -2,7 +2,8 @@
 # target and the runtime archive, and read what the executable loads. The
 # program imports anti.raylib, so the link takes libraylib and libminiaudio
 # of lib/<target>/ and the system libraries of raylib by itself. A Linux
-# program links dynamically against glibc and loads libX11, a macOS one
+# program links dynamically against glibc and loads libX11 and libGL, by
+# Q1 of "Answers of 2026-11-01" in docs/decisions.md, a macOS one
 # loads the frameworks Cocoa and IOKit, and a Windows one imports
 # user32.dll and gdi32.dll. Run with cmake -P and these values:
 #   ANTIC     the antic executable
@@ -31,7 +32,8 @@ endif()
 
 if("${TARGET}" MATCHES "^linux-")
     set(command "${READOBJ}" --needed-libs --program-headers "${exe}")
-    set(wanted pt_interp libx11\\.so\\.6 libm\\.so\\.6 libc\\.so\\.6)
+    set(wanted pt_interp libx11\\.so\\.6 libgl\\.so\\.1 libm\\.so\\.6
+        libc\\.so\\.6)
 elseif("${TARGET}" MATCHES "^macos-")
     set(command "${OBJDUMP}" --macho --dylibs-used "${exe}")
     set(wanted cocoa\\.framework iokit\\.framework)

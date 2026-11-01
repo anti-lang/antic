@@ -636,16 +636,18 @@ The target of what Anti delivers, recorded on 2026-09-27. The steps of `docs/wor
   host, since the binding of each of the six targets is the same text. Reason: no entry
   names the package of a binding, and the notice of a module that binds a C library of
   the archive names the standard library alone.
-- [provisional] A program links raylib when the library file of `anti.raylib` stands in
-  its import closure, whether it calls a function of it or not, so a Linux program of it
-  links in the glibc mode. The system libraries are the `link framework` and `link linux`
-  lines of the binding, which the table of `src/anti/bindmodel.c` gives: `Cocoa`,
-  `CoreVideo`, `IOKit` and `OpenGL` on macOS, and `GL`, `m`, `pthread`, `dl`, `rt` and
-  `X11` on Linux, which add `GL` and `rt` to the table below. A Windows program takes
-  `gdi32`, `user32`, `shell32` and `winmm` from `lib/` of the sysroot. antic reads the
-  names from the library file. Reason: the binding names what it links, and "Bundled
-  libraries" in `docs/tooling.md` finds the module without an entry of the manifest. A
-  Linux program of `anti.raylib` then needs `libGL.so.1` at start.
+- A program links raylib when the library file of `anti.raylib` stands in its import
+  closure, whether it calls a function of it or not, so a Linux program of it links in
+  the glibc mode. The system libraries are the `link framework` and `link linux` lines
+  of the binding, which the table of `src/anti/bindmodel.c` gives: `Cocoa`, `CoreVideo`,
+  `IOKit` and `OpenGL` on macOS, and `GL`, `m`, `pthread`, `dl`, `rt` and `X11` on
+  Linux, the table below. A Windows program takes `gdi32`, `user32`, `shell32` and
+  `winmm` from `lib/` of the sysroot. antic reads the names from the library file.
+  Reason: the binding names what it links, and "Bundled libraries" in `docs/tooling.md`
+  finds the module without an entry of the manifest. A Linux program of `anti.raylib`
+  needs `libGL.so.1` at start. Eddie decided by Q1 of "Answers of 2026-11-01" that it
+  keeps `GL` and `rt`, and the test `raylib_module_link_<target>` reads `libGL.so.1`
+  among the libraries a Linux program loads.
 - [provisional] A library for C that imports `anti.raylib` names raylib, miniaudio and
   the system libraries of its target after the line it prints. Reason: "Static library"
   in `docs/libraries-for-c.md` names the bundled native libraries on that line, as T146
@@ -658,15 +660,19 @@ libraries named "at run time" are loaded by the library itself and need no link.
 
 | Library | Linux, glibc | macOS | Windows |
 |---|---|---|---|
-| raylib | `X11`, `m`, `pthread`, `dl` | the frameworks `Cocoa` and `IOKit` | `gdi32`, `user32`, `shell32`, `winmm` |
-| raylib, at run time | libGL, libGLX and the X11 extensions, through GLFW | `OpenGL`, through GLFW | `opengl32.dll`, through GLFW |
+| raylib | `GL`, `m`, `pthread`, `dl`, `rt`, `X11` | the frameworks `Cocoa` and `IOKit` | `gdi32`, `user32`, `shell32`, `winmm` |
+| raylib, at run time | libGLX and the X11 extensions, through GLFW | `OpenGL`, through GLFW | `opengl32.dll`, through GLFW |
 | raylib's audio | `libminiaudio.a` of the runtime tree and its libraries below | the same | the same |
 | miniaudio | `m`, `pthread`, `dl` | none | none |
 | miniaudio, at run time | ALSA, PulseAudio or JACK | `CoreAudio`, `AudioToolbox` | WASAPI, DirectSound or WinMM |
 
-- `libX11` is linked, since `rcore.c` calls it for the clipboard. GLFW loads the rest of
-  X11. Since glibc 2.34 `pthread` and `dl` lie in `libc.so.6`, and the two names stay on
-  the link line as raylib's Makefile gives them, for an older loader.
+- The libraries of Linux are the `link linux` lines of the binding, by Q1 of "Answers of
+  2026-11-01". `libX11` is linked, since `rcore.c` calls it for the clipboard, and
+  `libGL` is linked, so a program needs `libGL.so.1` at start. GLFW loads the rest of
+  X11. Since glibc 2.34 `pthread`, `dl` and `rt` lie in `libc.so.6`, and the three names
+  stay on the link line as raylib's Makefile gives them, for an older loader. The probes
+  of the native tests link the same six as `ANTIC_RAYLIB_LIBS_linux` of
+  `src/native/raylib.cmake`.
 - On macOS `Cocoa` and `IOKit` resolve every symbol. The table of `src/anti/bindmodel.c`
   names `Cocoa`, `CoreVideo`, `IOKit` and `OpenGL` for raylib, and the test links all
   four. It names `AudioToolbox`, `CoreAudio` and `CoreFoundation` for miniaudio, which

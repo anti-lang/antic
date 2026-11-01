@@ -79,12 +79,13 @@ set(ANTIC_RAYLIB_DEFINES -DPLATFORM_DESKTOP_GLFW -DGRAPHICS_API_OPENGL_33)
 set(ANTIC_RAYLIB_OPTIONS -fno-strict-aliasing -fwrapv-pointer)
 
 # The system libraries a program of <target> links for raylib, beyond the
-# C library that antic links for every program. GLFW loads the extensions
-# of X11 at run time, and rlgl takes the functions of OpenGL through GLFW.
-# libX11 itself is linked, since rcore.c calls it for the clipboard. On
-# macOS Cocoa and IOKit resolve every symbol, and GLFW loads OpenGL at run
-# time. The frameworks below are the ones anti bind names for raylib.
-set(ANTIC_RAYLIB_LIBS_linux X11,m,pthread,dl)
+# C library that antic links for every program. On Linux they are the
+# link linux lines of the binding, so a program needs libGL.so.1 at
+# start, by Q1 of "Answers of 2026-11-01" in docs/decisions.md. GLFW loads
+# the extensions of X11 at run time. On macOS Cocoa and IOKit resolve
+# every symbol, and GLFW loads OpenGL at run time. The frameworks below
+# are the ones anti bind names for raylib.
+set(ANTIC_RAYLIB_LIBS_linux GL,m,pthread,dl,rt,X11)
 set(ANTIC_RAYLIB_FRAMEWORKS Cocoa IOKit CoreVideo OpenGL)
 
 set(antic_raylib_probe "${PROJECT_SOURCE_DIR}/tests/abi/raylib_probe.c")
