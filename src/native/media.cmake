@@ -67,9 +67,9 @@ function(antic_media_glibc out_sysroot out_libdir target)
     set(${out_libdir} "${sysroot}/usr/lib/${multiarch}" PARENT_SCOPE)
 endfunction()
 
-# The target triple and the compile flags of a media library for <target>,
-# with ANTIC_NATIVE_FP_OPTIONS of CMakeLists.txt. Windows takes the flags
-# of every native library.
+# The target triple and the compile flags of a media library for
+# <target>, with ANTIC_FP_OPTIONS of the top-level CMakeLists.txt. Windows
+# takes the flags of every native library.
 function(antic_media_target out_triple out_flags target)
     antic_cpu_level(level "${target}")
     antic_cpu_march(march "${level}")
@@ -78,11 +78,11 @@ function(antic_media_target out_triple out_flags target)
         antic_target_triple(triple "${target}-glibc")
         antic_linux_code_options(code_options "${target}")
         set(flags -fPIC "--sysroot=${sysroot}" "${march}" ${code_options}
-            ${ANTIC_NATIVE_FP_OPTIONS})
+            ${ANTIC_FP_OPTIONS})
     elseif(target MATCHES "^macos-")
         antic_target_triple(triple "${target}")
         set(flags -isysroot "${ANTIC_MEDIA_APPLE_SDK}" "${march}"
-            ${ANTIC_NATIVE_FP_OPTIONS})
+            ${ANTIC_FP_OPTIONS})
     else()
         antic_native_target(triple flags "${target}")
     endif()

@@ -326,10 +326,11 @@ endfunction()
 # DESIGN: antic never fuses a multiply and an add, so the C that a test
 # compiles as the reference of an Anti result fuses none either. Otherwise
 # the test compares two arithmetics. clang fuses by default on arm64 Linux.
-# MSVC fuses nothing by default and knows no such option.
+# MSVC fuses nothing by default and knows no such option. The flag is
+# ANTIC_FP_OPTIONS, which the runtime and the native libraries take.
 set(ANTIC_REFERENCE_C_FLAGS "")
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-    set(ANTIC_REFERENCE_C_FLAGS -ffp-contract=off)
+    set(ANTIC_REFERENCE_C_FLAGS ${ANTIC_FP_OPTIONS})
 endif()
 set(ANTIC_TEST_CC "${CMAKE_C_COMPILER}" ${ANTIC_REFERENCE_C_FLAGS})
 if(ANTIC_HOST_OS STREQUAL "macos")

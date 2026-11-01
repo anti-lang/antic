@@ -675,6 +675,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_float_digits.cmake` | Checks that three runtime members name no printf or scanf function. |
 | `tests/runners/run_fmt_canonical.cmake` | Runs `anti fmt --check` over the sources of the tree. |
 | `tests/runners/run_fmt_canonical_self.cmake` | Tests that `run_fmt_canonical.cmake` fails when `anti fmt --check` ends by a signal. |
+| `tests/runners/run_fp_contract.cmake` | Refuses a compile of a native library or of the runtime without `-ffp-contract=off`. |
 | `tests/runners/run_framework.cmake` | Links a program with a framework, or expects the refusal without an SDK. |
 | `tests/runners/run_front_end.cmake` | Runs `antic --front-end` on a good and a bad program. |
 | `tests/runners/run_fuzz_reduce.cmake` | Shrinks a find of the fuzzer that the checker refuses with the reducer of `tools/fuzz/`. |
@@ -729,9 +730,8 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_modules.cmake` | Builds library modules and a program in one mode and compares the output. |
 | `tests/runners/run_musl_allocator.cmake` | Reads the symbols of a musl program for the allocator. |
 | `tests/runners/run_mutex_size.cmake` | Reads the size of a Mutex for six targets. |
-| `tests/runners/run_names_once.cmake` | Refuses four shared names outside their header. |
+| `tests/runners/run_names_once.cmake` | Refuses four shared names outside their header, and a flag of the build outside its CMake file. |
 | `tests/runners/run_native_back_end_gone.cmake` | Refuses a comment of antic that gives a reason of the native back end, and the loop depth of a block of the IR. |
-| `tests/runners/run_native_fp_contract.cmake` | Refuses a compile of a native library without `-ffp-contract=off`. |
 | `tests/runners/run_native_frames.cmake` | Refuses a function of a native library of Linux that calls another and keeps no frame record. |
 | `tests/runners/run_native_hosts.cmake` | Refuses a call of a helper of the outline atomics in the native libraries of linux-arm64. |
 | `tests/runners/run_native_licenses.cmake` | Compares the licence texts of the repository with those of the runtime tree. |

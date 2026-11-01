@@ -24,16 +24,13 @@ if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
     return()
 endif()
 
-# DESIGN: every compile of a native library takes
-# ANTIC_NATIVE_FP_OPTIONS, on every target and at every level it is built
-# for. -ffp-contract=off fuses no multiply and add into one instruction,
-# so a library gives the same results everywhere, as antic does, which
-# never fuses them. Eddie decided this by Q7 of "Answers of 2026-11-01"
-# in docs/decisions.md. It is no warning flag, so warnings.cmake does not
-# hold it. antic_native_target and antic_media_target of media.cmake add
-# it to the flags of a target, which the probes and the glue of
-# anti.regex share. The test native_fp_contract reads every compile.
-set(ANTIC_NATIVE_FP_OPTIONS -ffp-contract=off)
+# DESIGN: every compile of a native library takes ANTIC_FP_OPTIONS of
+# the top-level CMakeLists.txt, the one definition the runtime takes as
+# well, on every target and at every level it is built for. Eddie decided
+# this by Q7 of "Answers of 2026-11-01" in docs/decisions.md.
+# antic_native_target and antic_media_target of media.cmake add it to the
+# flags of a target, which the probes and the glue of anti.regex share.
+# The test native_fp_contract reads every compile.
 
 # The target triple and the flags of a compile for <target>, with the
 # headers of its sysroot in the runtime tree: those of antic_target_triple
@@ -43,7 +40,7 @@ set(ANTIC_NATIVE_FP_OPTIONS -ffp-contract=off)
 #
 # The code options of antic_linux_code_options of the top-level file go
 # with them, as the runtime of the same target takes them, and
-# ANTIC_NATIVE_FP_OPTIONS.
+# ANTIC_FP_OPTIONS.
 function(antic_native_target out_triple out_flags target)
     antic_target_triple(triple "${target}")
     antic_target_c_options(flags "${target}"
@@ -51,7 +48,7 @@ function(antic_native_target out_triple out_flags target)
     antic_cpu_level(level "${target}")
     antic_cpu_march(march "${level}")
     antic_linux_code_options(code_options "${target}")
-    list(APPEND flags "${march}" ${code_options} ${ANTIC_NATIVE_FP_OPTIONS})
+    list(APPEND flags "${march}" ${code_options} ${ANTIC_FP_OPTIONS})
     set(${out_triple} "${triple}" PARENT_SCOPE)
     set(${out_flags} "${flags}" PARENT_SCOPE)
 endfunction()
@@ -153,4 +150,43 @@ add_test(NAME native_fp_contract
             "-DCOMPILES=${CMAKE_CURRENT_BINARY_DIR}/compiles.txt"
             "-DNAMES=${antic_native_licenses}"
             "-DTARGETS=${antic_native_target_list}"
-            -P "${ANTIC_RUNNERS}/run_native_fp_contract.cmake")
+            -P "${ANTIC_RUNNERS}/run_fp_contract.cmake")
+
+# Every compile of the runtime carries -ffp-contract=off as well, by Q1 of
+# "Answers of 2026-11-02": anti_rt and its stub at every level of every
+# target, its bitcode of each mode of LTO, the glue of anti.regex and the
+# runtime of the fault tests. The test stands here, after the glue of
+# pcre2.cmake has recorded its compiles.
+set(antic_runtime_names anti_rt anti_rt_license_stub anti_rt_regex)
+foreach(mode IN LISTS ANTIC_LTO_MODES)
+    list(APPEND antic_runtime_names anti_rt_bitcode_${mode})
+endforeach()
+if(ANTIC_FAULTS)
+    list(APPEND antic_runtime_names anti_rt_faults anti_rt_regex_faults)
+endif()
+set(antic_runtime_targets "")
+set(antic_runtime_levels "")
+foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
+    if(NOT EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
+        continue()
+    endif()
+    list(APPEND antic_runtime_targets "${target}")
+    antic_cpu_levels(levels "${target}")
+    foreach(level IN LISTS levels)
+        list(APPEND antic_runtime_levels "${target}/${level}")
+    endforeach()
+endforeach()
+get_property(antic_runtime_compiles GLOBAL PROPERTY ANTIC_RUNTIME_COMPILES)
+list(JOIN antic_runtime_compiles "\n" antic_runtime_compiles)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/runtime-compiles.txt"
+    "${antic_runtime_compiles}\n")
+list(JOIN antic_runtime_names "," antic_runtime_names)
+list(JOIN antic_runtime_targets "," antic_runtime_targets)
+list(JOIN antic_runtime_levels "," antic_runtime_levels)
+add_test(NAME runtime_fp_contract
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCOMPILES=${CMAKE_CURRENT_BINARY_DIR}/runtime-compiles.txt"
+            "-DNAMES=${antic_runtime_names}"
+            "-DTARGETS=${antic_runtime_targets}"
+            "-DLEVELS=${antic_runtime_levels}"
+            -P "${ANTIC_RUNNERS}/run_fp_contract.cmake")

@@ -372,6 +372,15 @@ function(antic_runtime_sections out target)
     endif()
 endfunction()
 
+# Note that the runtime library <name> compiles one object for <target> at
+# <level> with the command <argument>..., which the test
+# runtime_fp_contract reads.
+function(antic_runtime_compiled name target level)
+    list(JOIN ARGN " " command)
+    set_property(GLOBAL APPEND PROPERTY ANTIC_RUNTIME_COMPILES
+        "${name}|${target}/${level}|${command}")
+endfunction()
+
 # DESIGN: one runtime library per target and level, so that a second root
 # can hold the same target at a lower level. The archive that ships holds
 # the default level of each target, which antic_cross_runtime builds.
@@ -407,14 +416,16 @@ function(antic_cross_runtime_at target triple level root)
     endif()
     foreach(source IN LISTS sources)
         set(object "${work}/${source}.o")
+        set(command "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+            ${ANTIC_C_WARNINGS} ${sections} ${align}
+            "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
+            "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+            ${coverage_flags} -MMD -MF "${object}.d"
+            -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}")
+        antic_runtime_compiled(anti_rt "${target}" "${level}" ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                ${ANTIC_C_WARNINGS} ${sections} ${align}
-                "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
-                "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                ${coverage_flags} -MMD -MF "${object}.d"
-                -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
             DEPFILE "${object}.d"
             VERBATIM)
@@ -425,13 +436,16 @@ function(antic_cross_runtime_at target triple level root)
     else()
         set(stub "${out}/anti_rt_license_stub.o")
     endif()
+    set(command "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+        ${ANTIC_C_WARNINGS} ${sections} ${align}
+        "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+        -MMD -MF "${stub}.d"
+        -c "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c" -o "${stub}")
+    antic_runtime_compiled(anti_rt_license_stub "${target}" "${level}"
+        ${command})
     add_custom_command(OUTPUT "${stub}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
-        COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-            ${ANTIC_C_WARNINGS} ${sections} ${align}
-            "${march}" "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-            -MMD -MF "${stub}.d"
-            -c "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c" -o "${stub}"
+        COMMAND ${command}
         DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/license_stub.c"
         DEPFILE "${stub}.d"
         VERBATIM)
@@ -523,15 +537,20 @@ function(antic_cross_runtime_at target triple level root)
                 string(REPLACE "${mode_work}/msvc.o" "${object}"
                     retriple_one "${retriple_one}")
             endif()
+            # The step that writes the IR again for the msvc triple
+            # compiles no C, so the test reads the compile before it.
+            set(command "${CMAKE_C_COMPILER}" --target=${bitcode_triple}
+                -std=c11 -O2 -flto=${mode} ${bitcode_unwind}
+                ${ANTIC_C_WARNINGS}
+                "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
+                "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+                ${coverage_flags} -MMD -MF "${object}.d"
+                -c "src/rt/${source}.c" -o "${compiled}")
+            antic_runtime_compiled(anti_rt_bitcode_${mode} "${target}"
+                "${level}" ${command})
             add_custom_command(OUTPUT "${object}"
                 COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_work}"
-                COMMAND "${CMAKE_C_COMPILER}" --target=${bitcode_triple}
-                    -std=c11 -O2 -flto=${mode} ${bitcode_unwind}
-                    ${ANTIC_C_WARNINGS}
-                    "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
-                    "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                    ${coverage_flags} -MMD -MF "${object}.d"
-                    -c "src/rt/${source}.c" -o "${compiled}"
+                COMMAND ${command}
                 ${retriple_one}
                 WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
                 DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
@@ -639,6 +658,19 @@ function(antic_linux_code_options out target)
     set(${out} "${options}" PARENT_SCOPE)
 endfunction()
 
+# DESIGN: every compile of the runtime and of a native library of
+# src/native/ takes ANTIC_FP_OPTIONS, on all six targets, at every level
+# and in the bitcode of the runtime. -ffp-contract=off fuses no multiply
+# and add into one instruction, so each gives the same results on every
+# target, as antic does, which never fuses them. Eddie decided this by Q7
+# of "Answers of 2026-11-01" for the native libraries and by Q1 of
+# "Answers of 2026-11-02" for the runtime, in docs/decisions.md. It is no
+# warning flag, so tools/warnings.cmake does not hold it. The C that a
+# test compiles as the reference of an Anti result takes it as well. The
+# tests native_fp_contract and runtime_fp_contract read every compile,
+# and names_once refuses the flag spelled in another CMake file.
+set(ANTIC_FP_OPTIONS -ffp-contract=off)
+
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
@@ -649,7 +681,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         antic_target_triple(triple "${target}")
         antic_target_c_options(c_options "${target}" "${sysroot}"
             "${ANTIC_CLANG_RESOURCE_DIR}")
-        antic_cross_runtime(${target} ${triple} ${c_options} ${code_options})
+        antic_cross_runtime(${target} ${triple} ${c_options} ${code_options}
+            ${ANTIC_FP_OPTIONS})
     endforeach()
 endif()
 

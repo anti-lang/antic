@@ -112,15 +112,18 @@ function(antic_faults_runtime target triple)
     set(objects "")
     foreach(source IN LISTS sources)
         set(object "${work}/${source}.o")
+        set(command "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+            ${ANTIC_C_WARNINGS} ${sections} ${align}
+            "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
+            -DANTI_FAULTS=1
+            "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
+            ${coverage_flags} -MMD -MF "${object}.d"
+            -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}")
+        antic_runtime_compiled(anti_rt_faults "${target}" "${level}"
+            ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                ${ANTIC_C_WARNINGS} ${sections} ${align}
-                "${march}" "-DANTI_CPU_LEVEL_ID=${ANTIC_CPU_ID_${level}}"
-                -DANTI_FAULTS=1
-                "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." ${ARGN}
-                ${coverage_flags} -MMD -MF "${object}.d"
-                -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
             DEPFILE "${object}.d"
             VERBATIM)
@@ -167,13 +170,16 @@ function(antic_faults_glue target triple)
     set(objects "")
     foreach(source regex patterns)
         set(object "${work}/rt_${source}.o")
+        set(command "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+            ${ANTIC_C_WARNINGS} ${ARGN} ${sections} -DANTI_FAULTS=1
+            "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=." ${coverage_flags}
+            -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
+            -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}")
+        antic_runtime_compiled(anti_rt_regex_faults "${target}"
+            "${ANTIC_CPU_LEVEL_${target}}" ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                ${ANTIC_C_WARNINGS} ${ARGN} ${sections} -DANTI_FAULTS=1
-                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=." ${coverage_flags}
-                -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
-                -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
                 "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
             DEPFILE "${object}.d"

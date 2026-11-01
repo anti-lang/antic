@@ -1852,7 +1852,7 @@ antic --cpu armv8.2 -o server server.anti
 | windows-arm64 | `armv8.2` |
 | linux-arm64 | `armv8.0` |
 
-x86-64-v3 writes the VEX forms of the scalar float instructions, and an atomic operation is one instruction at `armv8.2` and above. The runtime archive holds one runtime per target and level in `lib/<target>/<level>/`, so a program below the default links a runtime of its own level. Every program checks the processor at start against the level of the runtime it linked, and refuses a machine below it. The native libraries are built for the default level alone, and a program below it that imports one is refused at link. They compile with `-ffp-contract=off`, so they fuse no multiply and add, as antic does not. `antic --print-cpu-levels` prints the table.
+x86-64-v3 writes the VEX forms of the scalar float instructions, and an atomic operation is one instruction at `armv8.2` and above. The runtime archive holds one runtime per target and level in `lib/<target>/<level>/`, so a program below the default links a runtime of its own level. Every program checks the processor at start against the level of the runtime it linked, and refuses a machine below it. The native libraries are built for the default level alone, and a program below it that imports one is refused at link. They and the runtime compile with `-ffp-contract=off`, so they fuse no multiply and add, as antic does not. `antic --print-cpu-levels` prints the table.
 
 ## Warnings and safety checks
 

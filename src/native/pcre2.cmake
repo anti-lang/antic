@@ -76,13 +76,16 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         "${ANTIC_PROFILE_RUNTIME_${target}}")
     foreach(source regex patterns)
         set(object "${work}/rt_${source}.o")
+        set(command "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
+            ${ANTIC_C_WARNINGS} ${flags} ${sections}
+            "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=." ${coverage_flags}
+            -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
+            -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}")
+        antic_runtime_compiled(anti_rt_regex "${target}"
+            "${ANTIC_CPU_LEVEL_${target}}" ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND "${CMAKE_C_COMPILER}" --target=${triple} -std=c11 -O2
-                ${ANTIC_C_WARNINGS} ${flags} ${sections}
-                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=." ${coverage_flags}
-                -isystem "${ANTIC_PCRE2_INCLUDE}" -MMD -MF "${object}.d"
-                -c "${PROJECT_SOURCE_DIR}/src/rt/${source}.c" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${PROJECT_SOURCE_DIR}/src/rt/${source}.c"
                 "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
             DEPFILE "${object}.d"
