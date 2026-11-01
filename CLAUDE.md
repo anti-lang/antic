@@ -272,6 +272,11 @@ not re-open a settled decision without asking Eddie.
   ran each sanitizer suite in the six parts of `asan`: `asan` 248 s,
   194 s, 251 s, 187 s, 451 s and 419 s, `ubsan` 276 s, 213 s, 260 s,
   218 s, 494 s and 486 s.
+  The step of the program name and the native flags of the same answers
+  measured `host` in the three parts of the step of `anti.raylib`:
+  381 s, 269 s and 255 s. It ran each sanitizer suite in the six parts
+  of `asan`: `asan` 249 s, 194 s, 261 s, 196 s, 438 s and 409 s, `ubsan`
+  252 s, 222 s, 259 s, 205 s, 458 s and 424 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
