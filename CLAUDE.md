@@ -267,6 +267,11 @@ not re-open a settled decision without asking Eddie.
   It ran each sanitizer suite in the six parts of `asan`: `asan` 243 s,
   189 s, 256 s, 188 s, 443 s and 418 s, `ubsan` 249 s, 191 s, 252 s,
   205 s, 456 s and 427 s.
+  The step of the answers of 2026-11-01 ran the whole `host` suite once
+  per commit, as `ctest -j14`: 925 s, 935 s, 930 s, 911 s and 872 s. It
+  ran each sanitizer suite in the six parts of `asan`: `asan` 248 s,
+  194 s, 251 s, 187 s, 451 s and 419 s, `ubsan` 276 s, 213 s, 260 s,
+  218 s, 494 s and 486 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -300,8 +305,10 @@ not re-open a settled decision without asking Eddie.
   form the freeze lets in by name, and Q4 lets in the setters of
   `anti.log.Logger`. `take` and the setters are built. On 2026-10-28
   Eddie lifted the freeze for `anti.raylib`, and for `anti.graphics`
-  after a design he approves, both on all six targets. See "Feature
-  freeze of 2026-10-14" in `docs/decisions.md`.
+  after a design he approves, both on all six targets. On 2026-11-01 he
+  answered the five questions of that step, under "Answers of
+  2026-11-01", and each answer lets its change in. See "Feature freeze
+  of 2026-10-14" in `docs/decisions.md`.
 - The gap procedure. Where a specification is silent, take the smallest option
   that keeps every struct C layout and the IR free of sizes. Record one
   `[provisional]` line in `docs/decisions.md` with its reason, and continue.
@@ -870,11 +877,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6780 ctest tests pass on the development Mac, and two of them, the
+- 6795 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   None of them is an expected failure there. The two lines of
   `tests/known-failures.txt`, those of T136 and T138, carry
-  `host=windows`. The ASan and the UBSan builds run 6778 each
+  `host=windows`. The ASan and the UBSan builds run 6793 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
@@ -1306,15 +1313,19 @@ reports what it finished.
   `--project` builds the project to print its notice. `anti build` writes
   `NOTICE.txt` beside a program from `anti.lock` and the bundled modules the
   project imports, and the notice of a program of musl names musl and
-  mimalloc.
+  mimalloc. The notice names PCRE2, raylib and miniaudio where the program
+  links them, by Q2 of "Answers of 2026-11-01".
 - `anti symbols inventory`, `check` and `resolve` are built. They read the
   runtime configuration, find the program beside it and the libraries of
   `plugins` and `[injections]`, and match every binary to an archive by its
   build id. See "The symbols command" in `docs/decisions.md` and
   `docs/notes/symbols.md`.
-- `anti.raylib` is built. The build runs `anti bind --clang` on `raylib.h`
-  of the pinned raylib and compiles the module into `std/anti/raylib.antl`
-  of the runtime archive, so the tree holds no file of it. A program whose
+- `anti.raylib` is built. The build runs `anti bind --clang` on `raylib.h`,
+  `rlgl.h`, `raymath.h` and `rcamera.h` of the pinned raylib, one module
+  by Q4 of "Answers of 2026-11-01", and compiles it into
+  `std/anti/raylib.antl` of the runtime archive, so the tree holds no file
+  of it. Every function resolves through the export of `libraylib.a`, and
+  the binding needs no shim. A program whose
   import closure holds it links raylib, miniaudio and the system libraries
   of the binding's `link` lines with no option, in the glibc mode on Linux,
   and on Windows the import libraries of gdi32, user32, shell32 and winmm.
@@ -1331,7 +1342,8 @@ reports what it finished.
   See "The bind command" in `docs/decisions.md` and `docs/notes/bind.md`.
   `anti fmt` writes the canonical form of the formatter rules, and `src/std/` and
   `tests/` stand in it.
-- `anti build` is built. It reads `anti.toml`, resolves the dependencies into
+- `anti build` is built. It reads `anti.toml`, which a project that
+  requires no packages may leave empty, resolves the dependencies into
   `anti.lock`, fetches every library file from a `file://` or `https://`
   repository into the cache of the user and compiles the project. Dev mode
   writes one object per module, cached by the digest of its input, the compiler
