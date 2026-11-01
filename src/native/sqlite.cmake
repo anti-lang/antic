@@ -53,11 +53,12 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
         "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=.")
     set(object "${work}/sqlite3.o")
+    set(command ${compile} ${ANTIC_SQLITE_WARNINGS}
+        -c "${ANTIC_SQLITE_SOURCE}/sqlite3.c" -o "${object}")
+    antic_native_compiled(sqlite "${target}" ${command})
     add_custom_command(OUTPUT "${object}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} ${ANTIC_SQLITE_WARNINGS}
-            -c "${ANTIC_SQLITE_SOURCE}/sqlite3.c"
-            -o "${object}"
+        COMMAND ${command}
         DEPENDS "${ANTIC_SQLITE_SOURCE}/sqlite3.c"
             "${ANTIC_SQLITE_SOURCE}/sqlite3.h"
         VERBATIM)

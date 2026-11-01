@@ -39,10 +39,12 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
         "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
         "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=.")
     set(object "${work}/miniaudio.o")
+    set(command ${compile} ${ANTIC_MINIAUDIO_WARNINGS}
+        -c "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.c" -o "${object}")
+    antic_native_compiled(miniaudio "${target}" ${command})
     add_custom_command(OUTPUT "${object}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-        COMMAND ${compile} ${ANTIC_MINIAUDIO_WARNINGS}
-            -c "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.c" -o "${object}"
+        COMMAND ${command}
         DEPENDS "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.c"
             "${ANTIC_MINIAUDIO_SOURCE}/miniaudio.h"
         VERBATIM)

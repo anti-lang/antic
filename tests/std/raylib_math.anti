@@ -2,11 +2,11 @@
 //! raylib.h in one module, so their vectors, matrices and cameras are the types
 //! of raylib. The calls pass and return structs by value and open no window.
 //! The values of raymath are those of `tests/abi/abi_raymath.expected`, which
-//! the hand-written binding prints. Two differ in the last place, since
-//! `libraylib.a` compiles with the default of clang, which fuses a multiply and
-//! an add, and that test compiles raymath without. A camera that looks down the
-//! negative z axis faces it, and rlgl gives the version of OpenGL raylib is
-//! built for.
+//! the hand-written binding prints, since `libraylib.a` compiles with
+//! `-ffp-contract=off` as that test compiles raymath, and neither fuses a
+//! multiply and an add, by Q7 of "Answers of 2026-11-01". A camera that looks
+//! down the negative z axis faces it, and rlgl gives the version of OpenGL
+//! raylib is built for.
 
 import anti.raylib;
 

@@ -81,16 +81,18 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         set(work "${ANTIC_MIMALLOC_WORK}/${target}-${level}")
         set(object "${work}/mimalloc.o")
         set(library "${ANTIC_RUNTIME_DIR}/lib/${target}/${level}/libmimalloc.a")
+        set(command "${CMAKE_C_COMPILER}" --target=${triple}
+            ${ANTIC_MIMALLOC_FLAGS} ${flags} "${march}" ${sections}
+            ${ANTIC_MIMALLOC_WARNINGS} ${ANTIC_MIMALLOC_DEFINES}
+            "-ffile-prefix-map=${ANTIC_MIMALLOC_SOURCE}=."
+            "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
+            "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+            -I "${ANTIC_MIMALLOC_SOURCE}/include"
+            -c "${ANTIC_MIMALLOC_SOURCE}/src/static.c" -o "${object}")
+        antic_native_compiled(mimalloc "${target}/${level}" ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND "${CMAKE_C_COMPILER}" --target=${triple}
-                ${ANTIC_MIMALLOC_FLAGS} ${flags} "${march}" ${sections}
-                ${ANTIC_MIMALLOC_WARNINGS} ${ANTIC_MIMALLOC_DEFINES}
-                "-ffile-prefix-map=${ANTIC_MIMALLOC_SOURCE}=."
-                "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
-                "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
-                -I "${ANTIC_MIMALLOC_SOURCE}/include"
-                -c "${ANTIC_MIMALLOC_SOURCE}/src/static.c" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${ANTIC_MIMALLOC_SOURCE}/src/static.c"
             VERBATIM)
         add_custom_command(OUTPUT "${library}"

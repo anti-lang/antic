@@ -25,11 +25,13 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     foreach(input IN LISTS ANTIC_PCRE2_FILES)
         get_filename_component(source "${input}" NAME_WE)
         set(object "${work}/${source}.o")
+        set(command ${compile} ${ANTIC_PCRE2_WARNINGS} ${ANTIC_PCRE2_DEFINES}
+            -I "${ANTIC_PCRE2_INCLUDE}" -I "${ANTIC_PCRE2_SOURCE}/src"
+            -c "${input}" -o "${object}")
+        antic_native_compiled(pcre2 "${target}" ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND ${compile} ${ANTIC_PCRE2_WARNINGS} ${ANTIC_PCRE2_DEFINES}
-                -I "${ANTIC_PCRE2_INCLUDE}" -I "${ANTIC_PCRE2_SOURCE}/src"
-                -c "${input}" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${input}" "${ANTIC_PCRE2_INCLUDE}/config.h"
                 "${ANTIC_PCRE2_INCLUDE}/pcre2.h"
             VERBATIM)

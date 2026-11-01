@@ -141,13 +141,15 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
             set(module -x objective-c
                 -fno-objc-msgsend-class-selector-stubs)
         endif()
+        set(command ${compile} ${ANTIC_RAYLIB_WARNINGS} ${ANTIC_RAYLIB_OPTIONS}
+            ${ANTIC_RAYLIB_DEFINES} ${platform}
+            -I "${ANTIC_RAYLIB_SOURCE}/src"
+            -I "${ANTIC_RAYLIB_SOURCE}/src/external/glfw/include"
+            ${module} -c "${input}" -o "${object}")
+        antic_native_compiled(raylib "${target}" ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND ${compile} ${ANTIC_RAYLIB_WARNINGS} ${ANTIC_RAYLIB_OPTIONS}
-                ${ANTIC_RAYLIB_DEFINES} ${platform}
-                -I "${ANTIC_RAYLIB_SOURCE}/src"
-                -I "${ANTIC_RAYLIB_SOURCE}/src/external/glfw/include"
-                ${module} -c "${input}" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${input}"
             VERBATIM)
         list(APPEND objects "${object}")

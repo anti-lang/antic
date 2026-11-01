@@ -3,7 +3,7 @@ Vector3Add x 1.5
 Vector3Add y -2
 Vector3Add z 11
 Vector2Rotate x -1.34078383
-Vector2Rotate y 6.1044898
+Vector2Rotate y 6.10449028
 Vector3CrossProduct x 2.5
 Vector3CrossProduct y -14
 Vector3CrossProduct z 8.5
@@ -14,7 +14,7 @@ MatrixMultiply m13 -1
 Vector3Transform x 8.88593674
 Vector3Transform y -13.9462633
 Vector3Transform z 10.5
-QuaternionMultiply w 0.820994437
+QuaternionMultiply w 0.820994496
 GetCameraForward z -1
 CameraMoveForward z -2
 rlGetVersion 3

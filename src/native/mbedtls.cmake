@@ -71,12 +71,13 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
     foreach(source IN LISTS ANTIC_MBEDTLS_SOURCES)
         set(input "${ANTIC_MBEDTLS_SOURCE}/library/${source}.c")
         set(object "${work}/${source}.o")
+        set(command ${compile} ${ANTIC_MBEDTLS_WARNINGS}
+            -I "${ANTIC_MBEDTLS_INCLUDE}" -I "${ANTIC_MBEDTLS_SOURCE}/library"
+            -c "${input}" -o "${object}")
+        antic_native_compiled(mbedtls "${target}" ${command})
         add_custom_command(OUTPUT "${object}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${work}"
-            COMMAND ${compile} ${ANTIC_MBEDTLS_WARNINGS}
-                -I "${ANTIC_MBEDTLS_INCLUDE}"
-                -I "${ANTIC_MBEDTLS_SOURCE}/library"
-                -c "${input}" -o "${object}"
+            COMMAND ${command}
             DEPENDS "${input}"
             VERBATIM)
         list(APPEND objects "${object}")

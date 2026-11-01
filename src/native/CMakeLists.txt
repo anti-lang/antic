@@ -24,6 +24,16 @@ if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
     return()
 endif()
 
+# DESIGN: every compile of a native library takes
+# ANTIC_NATIVE_FP_OPTIONS, on every target and at every level it is built
+# for. -ffp-contract=off fuses no multiply and add into one instruction,
+# so a library gives the same results everywhere, as antic does, which
+# never fuses them. Eddie decided this by Q7 of "Answers of 2026-11-01"
+# in docs/decisions.md. It is no warning flag, so warnings.cmake does not
+# hold it. antic_native_target and antic_media_target of media.cmake add
+# it to the flags of a target, which the probes and the glue of
+# anti.regex share. The test native_fp_contract reads every compile.
+set(ANTIC_NATIVE_FP_OPTIONS -ffp-contract=off)
 
 # The target triple and the flags of a compile for <target>, with the
 # headers of its sysroot in the runtime tree: those of antic_target_triple
@@ -32,7 +42,8 @@ endif()
 # default level.
 #
 # The code options of antic_linux_code_options of the top-level file go
-# with them, as the runtime of the same target takes them.
+# with them, as the runtime of the same target takes them, and
+# ANTIC_NATIVE_FP_OPTIONS.
 function(antic_native_target out_triple out_flags target)
     antic_target_triple(triple "${target}")
     antic_target_c_options(flags "${target}"
@@ -40,7 +51,7 @@ function(antic_native_target out_triple out_flags target)
     antic_cpu_level(level "${target}")
     antic_cpu_march(march "${level}")
     antic_linux_code_options(code_options "${target}")
-    list(APPEND flags "${march}" ${code_options})
+    list(APPEND flags "${march}" ${code_options} ${ANTIC_NATIVE_FP_OPTIONS})
     set(${out_triple} "${triple}" PARENT_SCOPE)
     set(${out_flags} "${flags}" PARENT_SCOPE)
 endfunction()
@@ -95,6 +106,15 @@ function(antic_native_headers name base)
     endforeach()
 endfunction()
 
+# Note that the native library <name> compiles one object for <target>
+# with the command <argument>..., which the test native_fp_contract reads.
+# <target> may name a level after a `/`.
+function(antic_native_compiled name target)
+    list(JOIN ARGN " " command)
+    set_property(GLOBAL APPEND PROPERTY ANTIC_NATIVE_COMPILES
+        "${name}|${target}|${command}")
+endfunction()
+
 set(ANTIC_NATIVE_TARGETS "")
 foreach(target IN LISTS ANTIC_TARGETS)
     if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
@@ -119,3 +139,18 @@ add_test(NAME native_licenses
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DNAMES=${antic_native_licenses}"
             -P "${ANTIC_RUNNERS}/run_native_licenses.cmake")
+
+# Every compile of every library above carries -ffp-contract=off, by Q7 of
+# "Answers of 2026-11-01" in docs/decisions.md. The configure step writes
+# the commands, one per line, and the test reads them.
+get_property(antic_native_compiles GLOBAL PROPERTY ANTIC_NATIVE_COMPILES)
+list(JOIN antic_native_compiles "\n" antic_native_compiles)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/compiles.txt"
+    "${antic_native_compiles}\n")
+list(JOIN ANTIC_NATIVE_TARGETS "," antic_native_target_list)
+add_test(NAME native_fp_contract
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCOMPILES=${CMAKE_CURRENT_BINARY_DIR}/compiles.txt"
+            "-DNAMES=${antic_native_licenses}"
+            "-DTARGETS=${antic_native_target_list}"
+            -P "${ANTIC_RUNNERS}/run_native_fp_contract.cmake")
