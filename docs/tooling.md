@@ -146,7 +146,7 @@ and cross-builds a program for every other target.
 | `anti publish [--to <target>] [--dry-run]` | Stage, upload through the target's transport, verify over HTTPS |
 | `anti fmt [--check]` | Format source files in place, or report unformatted files |
 | `anti doc [--dev] [--private] [--markdown] [-o <dir>] [<file.antl>]` | Generate user docs or dev docs |
-| `anti bind <api.json>\|--clang <header>` | Write a binding module and, when needed, a shim |
+| `anti bind <api.json>\|--clang <header>...` | Write a binding module and, when needed, a shim |
 | `anti bind --header <name>.antl` | Write a C header from a library file without the source |
 | `anti license [--project [--notice]] [--from <exe>] [--from-archive <lib>]` | Print or write licence and attribution text |
 | `anti html <file>` | Print a highlighted HTML fragment |

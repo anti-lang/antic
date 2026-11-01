@@ -404,7 +404,7 @@ generator writes shim and binding in one run, so they cannot drift.
   column of the fault.
 
 `--clang` does not use libclang. It runs clang with
-`-Xclang -ast-dump=json -fsyntax-only` on the header and reads the JSON with the JSON
+`-Xclang -ast-dump=json -fsyntax-only` on the headers and reads the JSON with the JSON
 scanner that `anti` already has. It runs the pinned clang in a development tree, and
 otherwise the first `clang` on `PATH`. It accepts the major version of the pinned clang
 alone. When clang is missing or of another major, it names the major it needs, the

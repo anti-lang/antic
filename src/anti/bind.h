@@ -14,10 +14,14 @@
 int bind_header(const char *library, const char *out_dir,
                 const char *runtime, const char *const *roots, size_t root_count);
 
-/* `anti bind <api.json>` and `anti bind --clang <header>`. */
+/* `anti bind <api.json>` and `anti bind --clang <header>...`. */
 struct bind_request {
-    const char *input;          /* the API description or the header */
+    const char *input;          /* the API description or the first header */
     bool clang;                 /* input is a header */
+    /* With clang, the headers after the first, which clang reads after
+       it in one translation unit into the one module. */
+    const char *const *more_headers;
+    size_t more_header_count;
     const char *module;         /* NULL: anti.<name of the input> */
     const char *out_dir;
     const char *runtime;
@@ -30,7 +34,7 @@ struct bind_request {
 };
 
 /* Write <library>.anti into out_dir, with shim_<library>.c when a
-   function of the header is inline. Returns the exit status of the
+   function of a header is inline. Returns the exit status of the
    command. */
 int bind_run(const struct bind_request *request);
 

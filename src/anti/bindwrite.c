@@ -365,9 +365,17 @@ void bind_write_module(const struct bind_module *b, struct text *out)
     size_t linux_count = bind_linux_libraries(b->library, &libraries);
     size_t i;
 
-    text_appendf(out, "//! The binding of %s, which `anti bind` wrote from "
-                 "`%s`.\n//! Nothing in it is written by hand. Run `anti "
-                 "bind` again to change it.\n", b->library, b->source);
+    text_appendf(out, "//! The binding of %s, which `anti bind` wrote from ",
+                 b->library);
+    for (i = 0; i < b->header_count; i++) {
+        text_appendf(out, "%s`%s`",
+                     i == 0                       ? ""
+                     : i + 1 == b->header_count ? " and "
+                                                : ", ",
+                     b->header_count > 1 ? b->headers[i] : b->source);
+    }
+    text_append(out, ".\n//! Nothing in it is written by hand. Run `anti "
+                "bind` again to change it.\n");
     if (count + linux_count > 0) {
         text_append(out, "\n");
         for (i = 0; i < count; i++) {
@@ -449,6 +457,16 @@ static void declare(const char *c_type, const char *name, struct text *out)
     }
 }
 
+/* Include every header of b in order, as the binding read them. */
+static void write_includes(const struct bind_module *b, struct text *out)
+{
+    size_t i;
+
+    for (i = 0; i < b->header_count; i++) {
+        text_appendf(out, "#include \"%s\"\n", b->headers[i]);
+    }
+}
+
 static void write_defines(const struct bind_module *b, struct text *out)
 {
     size_t i;
@@ -478,7 +496,7 @@ void bind_write_shim(const struct bind_module *b, struct text *out)
     text_appendf(out, "/* The shim of %s, which anti bind wrote from %s. It "
                  "gives every\n   inline function of the header a symbol. "
                  "Nothing in it is written by\n   hand. */\n", b->library,
-                 b->source);
+                 b->sources);
     write_defines(b, out);
     for (i = 0; i < b->functions.count; i++) {
         const struct bind_function *f = b->functions.items[i];
@@ -487,7 +505,7 @@ void bind_write_shim(const struct bind_module *b, struct text *out)
                          f->name);
         }
     }
-    text_appendf(out, "#include \"%s\"\n", b->header);
+    write_includes(b, out);
     for (i = 0; i < b->functions.count; i++) {
         const struct bind_function *f = b->functions.items[i];
         if (f->bound && f->shim == SHIM_STATIC) {
@@ -708,10 +726,11 @@ void bind_write_probe_c(const struct bind_module *b, struct text *out)
                  "For every\n   struct and union it prints the size, the "
                  "alignment and the bytes\n   of an object cleared and given "
                  "one field. probe_%s.anti prints\n   the same from the "
-                 "binding. */\n", b->library, b->source, b->library);
+                 "binding. */\n", b->library, b->sources, b->library);
     text_append(out, "#include <stdio.h>\n#include <string.h>\n\n");
     write_defines(b, out);
-    text_appendf(out, "#include \"%s\"\n\n", b->header);
+    write_includes(b, out);
+    text_append(out, "\n");
     text_append(out,
                 "static void dump(const char *name, const void *value, "
                 "size_t size)\n{\n    const unsigned char *p = value;\n"
@@ -752,7 +771,7 @@ void bind_write_probe_anti(const struct bind_module *b, struct text *out)
 
     text_appendf(out, "//! The ABI probe of %s, which `anti bind` wrote from "
                  "`%s`. It prints\n//! what `probe_%s.c` prints, from the "
-                 "binding.\n\nimport %s;\n\n", b->library, b->source,
+                 "binding.\n\nimport %s;\n\n", b->library, b->sources,
                  b->library, b->module);
     text_append(out, "extern fn printf(format: ?*byte, ...) -> c_int;\n");
     for (i = 0; i < b->records.count; i++) {

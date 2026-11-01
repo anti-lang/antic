@@ -55,7 +55,7 @@ static int usage(FILE *out)
           "                [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
           "                [<file.anti>|<file.antl>...]\n"
           "       anti fmt [--check] [<file.anti>...]\n"
-          "       anti bind <api.json>|--clang <header> [-o <dir>]\n"
+          "       anti bind <api.json>|--clang <header>... [-o <dir>]\n"
           "                 [--module <path>] [--probe] [--target <t>]\n"
           "                 [-I <dir>] [-D <name>[=<value>]] [--runtime <dir>]\n"
           "       anti bind --header <file.antl> [-o <dir>] [-I <dir>]\n"
@@ -137,13 +137,14 @@ static int usage(FILE *out)
           "type-check on all six.\n",
           out);
     fputs("\n"
-          "bind writes a binding module from raylib_api.json, or from a C\n"
-          "header with --clang, which runs clang on it. The module is\n"
-          "anti.<name of the file> unless --module names another, and it\n"
-          "goes to <dir>/<last segment>.anti with shim_<name>.c beside it\n"
-          "when the header has inline functions. --probe writes the ABI\n"
-          "probe in C and in Anti as well. -I and -D reach clang and the\n"
-          "shim. The layout of every struct is antic's, never clang's.\n"
+          "bind writes a binding module from raylib_api.json, or from C\n"
+          "headers with --clang, which runs clang on them in order. The\n"
+          "module is anti.<name of the first file> unless --module names\n"
+          "another, and it goes to <dir>/<last segment>.anti with\n"
+          "shim_<name>.c beside it when a header has inline functions.\n"
+          "--probe writes the ABI probe in C and in Anti as well. -I and\n"
+          "-D reach clang and the shim. The layout of every struct is\n"
+          "antic's, never clang's.\n"
           "bind --header writes <name>.h from the public interface of the\n"
           "library file <name>.antl, the header that antic --lib writes for\n"
           "the same module.\n"
@@ -814,6 +815,7 @@ static int bind_command(int argc, char **argv)
 {
     const char **roots = files_array((size_t)argc, sizeof *roots);
     const char **defines = files_array((size_t)argc, sizeof *defines);
+    const char **more = NULL;
     const char *header = NULL;
     struct bind_request request;
     struct text home = {0};
@@ -847,6 +849,14 @@ static int bind_command(int argc, char **argv)
             defines[request.define_count++] = argv[++i];
         } else if (argv[i][0] != '-' && request.input == NULL) {
             request.input = argv[i];
+        } else if (argv[i][0] != '-' && request.clang) {
+            /* Q4 of "Answers of 2026-11-01" in docs/decisions.md: the
+               headers after the first go into the same module. */
+            if (more == NULL) {
+                more = files_array((size_t)argc, sizeof *more);
+                request.more_headers = more;
+            }
+            more[request.more_header_count++] = argv[i];
         } else {
             status = usage(stderr);
             goto done;
@@ -870,6 +880,7 @@ static int bind_command(int argc, char **argv)
 done:
     free((void *)roots);
     free((void *)defines);
+    free((void *)more);
     text_free(&home);
     return status;
 }

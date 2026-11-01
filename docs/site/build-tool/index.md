@@ -37,7 +37,7 @@ The table holds every command that `anti --help` lists, and the test `build_tool
 | `anti check [--warn-undocumented] [--targets all]` | Front end, doc blocks, doc warnings and formatting |
 | `anti fmt [--check]` | Format source files in place, or list the files that differ |
 | `anti doc [--dev] [--private] [--markdown] [<file.antl>...]` | Write user docs or developer docs |
-| `anti bind <api.json>\|--clang <header>` | Write a binding module and, when needed, a shim |
+| `anti bind <api.json>\|--clang <header>...` | Write a binding module and, when needed, a shim |
 | `anti bind --header <file.antl>` | Write a C header from a library file without the source |
 | `anti license [--project [--notice]] [--from <binary>] [--from-archive <library>]` | Print or write licence and attribution text |
 | `anti symbols inventory --conf <config.toml>` | Fold the symbols archives of a deployment into one |
@@ -319,9 +319,9 @@ The output is one HTML page per module with an index page, or Markdown with `--m
 
 ## Bindings
 
-The command `anti bind` writes an ordinary `.anti` module from a C API description. The command `anti bind <api>.json` reads a JSON description in the format of raylib's rlparser. The command `anti bind --clang <header>` runs clang with `-fsyntax-only -Xclang -ast-dump=json` on the header and reads the JSON that clang writes. It uses the pinned clang in a development tree and otherwise the first clang on `PATH`, and it refuses a clang whose major version differs from the pinned one. The package ships no clang, so a user needs one for `--clang` alone, and a binding is generated once and committed.
+The command `anti bind` writes an ordinary `.anti` module from a C API description. The command `anti bind <api>.json` reads a JSON description in the format of raylib's rlparser. The command `anti bind --clang <header>` runs clang with `-fsyntax-only -Xclang -ast-dump=json` on the header and reads the JSON that clang writes. More headers after the first are read after it in one translation unit, and their declarations go into the same module. It uses the pinned clang in a development tree and otherwise the first clang on `PATH`, and it refuses a clang whose major version differs from the pinned one. The package ships no clang, so a user needs one for `--clang` alone, and a binding is generated once and committed.
 
-The module is `anti.<name of the file>` unless `--module <path>` names another, and it goes to `<dir>/<last segment>.anti` under the directory of `-o`. The options `-I` and `-D` reach clang and the shim. The layout of a bound struct is computed by antic, as for every struct, and never read from clang.
+The module is `anti.<name of the first file>` unless `--module <path>` names another, and it goes to `<dir>/<last segment>.anti` under the directory of `-o`. The options `-I` and `-D` reach clang and the shim. The layout of a bound struct is computed by antic, as for every struct, and never read from clang.
 
 A binding uses the C types of Anti, such as `c_int` and `c_char`, so it reads like the header. A typedef of the C library stands for the Anti type of its meaning on every target, so `int64_t` is `i64`. A declaration that has no Anti type, such as one that names `long double`, is left out with a warning that says why, and the command goes on.
 

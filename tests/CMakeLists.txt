@@ -7023,7 +7023,8 @@ endforeach()
 # same module, from the library file alone. raylib_shipped compares the
 # probes of C and of anti.raylib of the runtime archive. The other cases bind
 # tests/bind/layout.h and raymath through clang and a part of
-# raylib_api.json, and check the refusals. forms binds tests/bind/forms.h
+# raylib_api.json, and check the refusals. headers binds two headers of
+# tests/bind into one module. forms binds tests/bind/forms.h
 # and values the macros of tests/bind/values.h. functions binds the
 # functions of tests/bind/functions.h, and huge_enum and nested_enum each
 # bind a header of one enum. api_parts, api_callbacks, api_literals,
@@ -7040,7 +7041,8 @@ set(anti_bind_cc ${ANTIC_TEST_CC})
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
 endif()
-set(anti_bind_cases header clang escaped_path raymath raylib raylib_shipped api
+set(anti_bind_cases header clang headers escaped_path raymath raylib
+    raylib_shipped api
     api_malformed clang_malformed forms values functions huge_enum
     nested_enum api_parts api_callbacks api_literals api_types
     api_words words unsigned_bitfield fixed_enum api_typedef_chain

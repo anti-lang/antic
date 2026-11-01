@@ -2209,7 +2209,7 @@ The `anti` tool has twelve commands.
 | `anti check` | The front end on every source, the `anti` blocks of the doc comments, the doc warnings and the formatting, in that order. `--targets all` and `--warn-undocumented`. |
 | `anti doc` | One page per module and an index, as HTML or with `--markdown`. `--dev` and `--private` read the syntax tree for the private items and the notes. |
 | `anti fmt` | Writes the canonical form of each file, and `--check` reports a file that differs. |
-| `anti bind` | `anti bind <api.json>` and `anti bind --clang <header>` write a binding module, with `--probe` the ABI probe. `anti bind --header <file.antl>` writes the C header of a library. |
+| `anti bind` | `anti bind <api.json>` and `anti bind --clang <header>...` write a binding module, with `--probe` the ABI probe. `anti bind --header <file.antl>` writes the C header of a library. |
 | `anti symbols` | `inventory`, `check` and `resolve` over the symbols archives of a deployment, see [Checks and debugging](#checks-and-debugging). |
 | `anti license` | Prints the licence texts of the package. `--project` and `--project --notice` print those of a project, `--from <binary>` reads a binary and `--from-archive <library>` a library. |
 

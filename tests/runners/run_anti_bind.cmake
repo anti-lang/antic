@@ -3,8 +3,9 @@
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory
 #   WORK      a directory for the output
-#   CASE      header, clang, escaped_path, raymath, raylib, raylib_shipped,
-#             api, refusals, api_malformed, clang_malformed, ast_malformed,
+#   CASE      header, clang, headers, escaped_path, raymath, raylib,
+#             raylib_shipped, api, refusals, api_malformed, clang_malformed,
+#             ast_malformed,
 #             api_typedef_chain, clang_typedef_chain, clang_of_the_tree or
 #             clang_of_the_tree_relative
 #   SOURCES   tests/clib, for the case header
@@ -251,6 +252,26 @@ elseif(CASE STREQUAL "functions")
     expect_file("${WORK}/warnings" "${BIND}/functions.warnings")
     compile_binding(functions bindtest.functions)
     compare_probes(functions "${BIND}")
+elseif(CASE STREQUAL "headers")
+    # Two headers into one module, by Q4 of "Answers of 2026-11-01" in
+    # docs/decisions.md: tests/bind/pair_first.h and pair_second.h, read
+    # in order in one translation unit. The module holds the struct of the
+    # first once and the functions and the constant of both, the comment
+    # of the module and the line of the command name both headers, a
+    # warning names the header of its macro, the shim and the probe of C
+    # include both, the module compiles and the two probes agree.
+    tool_run("" "${ANTI}" bind --clang "${BIND}/pair_first.h"
+                "${BIND}/pair_second.h" --module bindtest.pair --probe
+                -o "${WORK}/out" --runtime "${RUNTIME}")
+    if(NOT tool_stdout STREQUAL "bind: bindtest.pair from pair_first.h and pair_second.h, 3 functions and a shim, 3 warnings\n")
+        message(FATAL_ERROR "anti bind of two headers printed\n${tool_stdout}")
+    endif()
+    file(WRITE "${WORK}/warnings" "${tool_stderr}")
+    expect_file("${WORK}/out/pair.anti" "${BIND}/pair.anti.expected")
+    expect_file("${WORK}/out/shim_pair.c" "${BIND}/shim_pair.c.expected")
+    expect_file("${WORK}/warnings" "${BIND}/pair.warnings")
+    compile_binding(pair bindtest.pair)
+    compare_probes(pair "${BIND}")
 elseif(CASE STREQUAL "huge_enum")
     # An enum with a value above the range of a signed 64-bit integer and
     # one with values below zero and above INT_MAX, in a struct. The two

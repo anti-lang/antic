@@ -116,6 +116,10 @@ int bind_run(const struct bind_request *q)
     struct text bytes = {0};
     struct text out = {0};
     struct text name = {0};
+    struct text sources = {0};
+    const char **headers = NULL;
+    const char **names = NULL;
+    size_t header_count = 1 + q->more_header_count;
     size_t i;
     size_t bound = 0;
     int status = 1;
@@ -131,11 +135,32 @@ int bind_run(const struct bind_request *q)
     b.source = files_base_name(q->input);
     b.defines = q->defines;
     b.define_count = q->define_count;
+    b.sources = b.source;
     if (q->clang) {
         struct bind_clang_request c;
+        /* Every header in order, and their file names, which the shim,
+           the probe and the comment of the module name. */
+        headers = files_array(header_count, sizeof *headers);
+        names = files_array(header_count, sizeof *names);
+        headers[0] = q->input;
+        for (i = 0; i < q->more_header_count; i++) {
+            headers[i + 1] = q->more_headers[i];
+        }
+        for (i = 0; i < header_count; i++) {
+            names[i] = files_base_name(headers[i]);
+            text_appendf(&sources, "%s%s",
+                         i == 0                    ? ""
+                         : i + 1 == header_count ? " and "
+                                                 : ", ",
+                         names[i]);
+        }
+        b.sources = text_cstr(&sources);
         b.header = b.source;
+        b.headers = names;
+        b.header_count = header_count;
         memset(&c, 0, sizeof c);
-        c.header = q->input;
+        c.headers = headers;
+        c.header_count = header_count;
         c.runtime = q->runtime;
         c.target = q->target;
         c.includes = q->includes;
@@ -149,6 +174,8 @@ int bind_run(const struct bind_request *q)
         struct text header = {0};
         text_appendf(&header, "%s.h", b.library);
         b.header = bind_strdup(&b, text_cstr(&header));
+        b.headers = &b.header;
+        b.header_count = 1;
         text_free(&header);
         if (!files_read_reported(q->input, &bytes) ||
             !bind_read_api(&b, (const unsigned char *)bytes.data,
@@ -195,7 +222,7 @@ int bind_run(const struct bind_request *q)
         bound += f->bound ? 1 : 0;
     }
     printf("bind: %s from %s, %zu functions%s, %zu warning%s\n", b.module,
-           b.source, bound, bind_needs_shim(&b) ? " and a shim" : "",
+           b.sources, bound, bind_needs_shim(&b) ? " and a shim" : "",
            b.warnings, b.warnings == 1 ? "" : "s");
     status = 0;
 
@@ -209,5 +236,8 @@ done:
     text_free(&bytes);
     text_free(&out);
     text_free(&name);
+    text_free(&sources);
+    free((void *)headers);
+    free((void *)names);
     return status;
 }

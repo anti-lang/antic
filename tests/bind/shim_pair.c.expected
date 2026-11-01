@@ -1,0 +1,7 @@
+/* The shim of pair, which anti bind wrote from pair_first.h and pair_second.h. It gives every
+   inline function of the header a symbol. Nothing in it is written by
+   hand. */
+#include "pair_first.h"
+#include "pair_second.h"
+
+extern __typeof__(pair_twice) pair_twice;

@@ -1,0 +1,17 @@
+//! The binding of pair, which `anti bind` wrote from `pair_first.h` and
+//! `pair_second.h`. Nothing in it is written by hand. Run `anti bind` again to
+//! change it.
+
+pub const PAIR_LIMIT: c_int = 7;
+
+pub struct PairPoint
+{
+	x: c_int,
+	y: c_int,
+}
+
+pub extern fn pair_sum(p: PairPoint) -> c_int;
+
+pub extern fn pair_scale(p: PairPoint, by: c_int) -> PairPoint;
+
+pub extern fn pair_twice(v: c_int) -> c_int;

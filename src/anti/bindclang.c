@@ -297,6 +297,7 @@ struct enum_entry {
 
 struct macro {
     const char *name;
+    const char *source;         /* the header that defines it */
     const char *text;           /* NULL once the header undefines it */
     int state;                  /* 0 not read, 1 reading, 2 done, 3 failed */
     struct bind_eval value;
@@ -311,12 +312,14 @@ struct fn_macro {
 };
 
 struct pack {
+    size_t header;              /* the index of its header */
     int64_t line;
     int value;                  /* 0: no pack */
 };
 
 struct fn_entry {
     struct bind_function *f;
+    const char *source;         /* the header of its declaration */
     bool body;
     bool any_plain;             /* a declaration without inline */
     bool any_extern;
@@ -326,7 +329,11 @@ struct fn_entry {
 
 struct reader {
     struct bind_module *b;
-    const char *header;
+    /* The headers as clang names them in its locations and line markers,
+       and the index of the one that the last location named. */
+    const char *const *headers;
+    size_t header_count;
+    size_t at;
     struct bind_list tags;      /* struct tag * */
     struct bind_list typedefs;  /* struct typedef_entry * */
     struct bind_list enums;     /* struct enum_entry * */
@@ -406,9 +413,32 @@ static void track(struct reader *r, const struct json_value *v)
     }
 }
 
-static bool in_header(const struct reader *r)
+/* The index of the header that file names, or header_count for a file
+   that is no header of the binding. */
+static size_t header_of(const struct reader *r, const char *file)
 {
-    return r->file != NULL && strcmp(r->file, r->header) == 0;
+    size_t i;
+
+    for (i = 0; file != NULL && i < r->header_count; i++) {
+        if (strcmp(file, r->headers[i]) == 0) {
+            return i;
+        }
+    }
+    return r->header_count;
+}
+
+/* Whether the last location stands in a header of the binding. A message
+   about the declaration there names that header. */
+static bool in_header(struct reader *r)
+{
+    size_t i = header_of(r, r->file);
+
+    if (i == r->header_count) {
+        return false;
+    }
+    r->at = i;
+    r->b->source = r->b->headers[i];
+    return true;
 }
 
 static struct tag *tag_named(struct reader *r, const char *name, bool is_union)
@@ -662,15 +692,15 @@ static bool has_attribute(const struct json_value *node, const char *kind,
     return false;
 }
 
-/* The value of `#pragma pack` at a line of the header. */
-static int pack_at(const struct reader *r, int64_t line)
+/* The value of `#pragma pack` at a line of the header of index header. */
+static int pack_at(const struct reader *r, size_t header, int64_t line)
 {
     int value = 0;
     size_t i;
 
     for (i = 0; i < r->packs.count; i++) {
         const struct pack *p = r->packs.items[i];
-        if (p->line <= line) {
+        if (p->header == header && p->line <= line) {
             value = p->value;
         }
     }
@@ -847,7 +877,7 @@ static struct bind_record *declare_record(struct reader *r,
         rec->packed = true;
     }
     if (has_attribute(node, "MaxFieldAlignmentAttr", NULL)) {
-        int pack = pack_at(r, r->line);
+        int pack = pack_at(r, r->at, r->line);
         if (pack == 1) {
             rec->packed = true;
         } else {
@@ -1132,6 +1162,7 @@ static void declare_function(struct reader *r, const struct json_value *node)
         }
         e = arena_alloc(&r->b->arena, sizeof *e);
         e->f = f;
+        e->source = r->b->source;
         bind_list_add(&r->fns, e);
         bind_list_add(&r->b->functions, f);
     }
@@ -1157,6 +1188,7 @@ static void settle_functions(struct reader *r)
         if (e->is_static && e->body) {
             e->f->shim = SHIM_STATIC;
         } else if (e->is_static) {
+            r->b->source = e->source;
             bind_warn(r->b, "`%s` is static without a body and is left out",
                       e->f->name);
             e->f->left_out = true;
@@ -1347,6 +1379,7 @@ static void read_define(struct reader *r, const char *name)
             m->name = macro_name;
             bind_list_add(&r->macros, m);
         }
+        m->source = r->b->source;
         /* A macro defined again takes its last value. */
         m->text = bind_strdup(r->b, name[n] == ' ' ? name + n + 1
                                                    : name + n);
@@ -1383,7 +1416,11 @@ static void read_preprocessed(struct reader *r, char *text)
                 file = marker_file(r, quote + 1, close);
             }
         } else {
-            bool here = file != NULL && strcmp(file, r->header) == 0;
+            size_t at_header = header_of(r, file);
+            bool here = at_header < r->header_count;
+            if (here) {
+                r->b->source = r->b->headers[at_header];
+            }
             if (here && strncmp(at, "#define ", 8) == 0) {
                 read_define(r, at + 8);
             } else if (here && strncmp(at, "#undef ", 7) == 0) {
@@ -1395,6 +1432,7 @@ static void read_preprocessed(struct reader *r, char *text)
                 pack = pragma_pack(at, &stack, pack);
                 if (here) {
                     struct pack *p = arena_alloc(&r->b->arena, sizeof *p);
+                    p->header = at_header;
                     p->line = line;
                     p->value = pack;
                     bind_list_add(&r->packs, p);
@@ -1500,6 +1538,7 @@ static void read_macros(struct reader *r)
         if (m->text == NULL) {
             continue;
         }
+        r->b->source = m->source;
         if (m->text[0] == '\0') {
             bind_warn(r->b, "the macro `%s` has no value and is skipped",
                       m->name);
@@ -1557,13 +1596,17 @@ static void settle_enums(struct reader *r)
     }
 }
 
-/* The two argument vectors of clang for the header of q on target t:
-   ast reads it as C into the JSON of its AST, and pre preprocesses it
-   with its macros. Both share the target, the language, the include
-   directories and the definitions. */
+/* The two argument vectors of clang for the headers of q on target t:
+   ast reads them as C into the JSON of its AST, and pre preprocesses
+   them with their macros. Both share the target, the language, the
+   include directories and the definitions. The last header is the file
+   clang reads, and every other one comes before it with -include, in
+   order. headers are the names clang gives the headers in its locations
+   and line markers. */
 static bool clang_arguments(struct bind_module *b,
                             const struct bind_clang_request *q,
                             const char *clang, enum target t,
+                            const char *const *headers,
                             struct arg_list *ast, struct arg_list *pre)
 {
     struct arg_list common = {0};
@@ -1592,15 +1635,45 @@ static bool clang_arguments(struct bind_module *b,
         arg_add(ast, "-fsyntax-only");
         arg_add(ast, "-Xclang");
         arg_add(ast, "-ast-dump=json");
-        arg_add(ast, q->header);
-        arg_add(ast, NULL);
         arg_add(pre, "-E");
         arg_add(pre, "-dD");
-        arg_add(pre, q->header);
+        for (i = 0; i + 1 < q->header_count; i++) {
+            arg_add(ast, "-include");
+            arg_add(ast, headers[i]);
+            arg_add(pre, "-include");
+            arg_add(pre, headers[i]);
+        }
+        arg_add(ast, headers[q->header_count - 1]);
+        arg_add(ast, NULL);
+        arg_add(pre, headers[q->header_count - 1]);
         arg_add(pre, NULL);
     }
     free(common.items);
     return ok;
+}
+
+/* DESIGN: clang names a header of -include by the path it opened, and a
+   relative one as ./<path>. Each header before the last goes to clang as
+   an absolute path, which clang names as written, and the last keeps the
+   spelling of the command line, which clang names as written as well. */
+static const char *const *clang_headers(struct bind_module *b,
+                                        const struct bind_clang_request *q)
+{
+    const char **headers =
+        arena_alloc(&b->arena, q->header_count * sizeof *headers);
+    size_t i;
+
+    for (i = 0; i < q->header_count; i++) {
+        struct text path = {0};
+        if (i + 1 == q->header_count ||
+            !platform_absolute_path(q->headers[i], &path)) {
+            headers[i] = q->headers[i];
+        } else {
+            headers[i] = bind_strdup(b, text_cstr(&path));
+        }
+        text_free(&path);
+    }
+    return headers;
 }
 
 bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
@@ -1621,7 +1694,8 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     memset(&r, 0, sizeof r);
     memset(&tree, 0, sizeof tree);
     r.b = b;
-    r.header = q->header;
+    r.headers = clang_headers(b, q);
+    r.header_count = q->header_count;
     if (q->target != NULL ? !target_from_name(q->target, &t) : !target_host(&t)) {
         say_anti("unknown target %s\n",
                  q->target != NULL ? q->target : "of this host");
@@ -1632,7 +1706,7 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     if (!check_version(text_cstr(&clang))) {
         goto done;
     }
-    if (!clang_arguments(b, q, text_cstr(&clang), t, &ast, &pre)) {
+    if (!clang_arguments(b, q, text_cstr(&clang), t, r.headers, &ast, &pre)) {
         goto done;
     }
     if (!run(&pre, &text, "preprocess the header") ||
@@ -1714,6 +1788,7 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
     settle_enums(&r);
     read_macros(&r);
     ok = !r.failed;
+    b->source = b->headers[0];
 
 done:
     json_free(&tree);

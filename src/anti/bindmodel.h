@@ -130,8 +130,18 @@ struct bind_module {
     struct arena arena;
     const char *module;         /* anti.raylib */
     const char *library;        /* raylib, the last segment */
-    const char *source;         /* the name of the file it was read from */
+    /* The name of the file it was read from. While clang's output is
+       read, the header of the declaration a message names. */
+    const char *source;
+    /* The names of every file it was read from, in order, as the comment
+       of the module lists them. */
+    const char *sources;
     const char *header;         /* the header the shim and the probe include */
+    /* Every header the shim and the probe include, in order: header
+       alone for a description, and the file name of each header of
+       --clang. */
+    const char *const *headers;
+    size_t header_count;
     struct bind_list records;
     struct bind_list enums;
     struct bind_list functions;
@@ -243,7 +253,10 @@ bool bind_read_api(struct bind_module *b, const unsigned char *bytes,
 /* What bind_read_clang reads: the header, the runtime archive that holds
    the sysroot of its target, and the -I and -D options of the command. */
 struct bind_clang_request {
-    const char *header;
+    /* The headers, read in order in one translation unit. The binding
+       holds the declarations of each. */
+    const char *const *headers;
+    size_t header_count;
     const char *runtime;
     const char *target;         /* NULL for the host */
     const char *const *includes;
@@ -252,8 +265,8 @@ struct bind_clang_request {
     size_t define_count;
 };
 
-/* Read the AST and the macros of the header of r into b through clang.
-   clang reads it for the target of r against the headers of that
+/* Read the AST and the macros of the headers of r into b through clang.
+   clang reads them for the target of r against the headers of that
    target's sysroot in the runtime archive. Returns false after a message
    for an unknown target, a request without runtime or a runtime archive
    that holds no such sysroot, a clang it cannot run or of another major

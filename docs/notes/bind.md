@@ -42,6 +42,14 @@ order of the document and keeps the last of each, which gives the file of
 every declaration. A declaration of the header is bound. A typedef of any
 file resolves a name.
 
+More than one header reads as one translation unit. Every header before the
+last reaches clang through `-include` as an absolute path. clang names a
+relative one `./<path>`. The last is the file clang reads, under the name of
+the command line. A location or a line marker that names any of them holds a
+declaration of the binding. The value of `#pragma pack` is kept per header
+and line. A message names the header of the declaration it is about, which
+the reader tracks with the location.
+
 `#pragma pack` leaves no value in the AST, only an attribute. The line
 markers of `-E` count the lines of the header. The reader keeps the value
 of the pack at each line and reads it at the line of the record.
