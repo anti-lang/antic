@@ -29,8 +29,6 @@
 #define OWN_LICENSE "MIT"
 #define OWN_COMPILER "antic"
 #define OWN_TOOL "anti"
-/* The version of a component that no record gives one. */
-#define NO_VERSION "-"
 
 static const char notice_head[] = ANTI_NOTICE_BEGIN ANTI_NOTICE_BUILD;
 
@@ -308,7 +306,7 @@ static bool component_package(const char *path, const char *component,
         out->name = pooled(arena, &field);
         field.length = 0;
         if (!licensing_source_version(sources, component, &field)) {
-            text_append(&field, NO_VERSION);
+            text_append(&field, RUNTIME_NO_VERSION);
         }
         out->version = pooled(arena, &field);
         field.length = 0;
@@ -369,8 +367,8 @@ int licensing_plain(const char *runtime)
             packages[i].license = OWN_LICENSE;
             packages[i].license_text = pooled(&arena, &own);
         }
-        ok = driver_runtime_packages(runtime, false, &arena, &packages[2],
-                                     &count);
+        ok = driver_runtime_packages(runtime, false, 0, &arena,
+                                     &packages[2], &count);
         count += 2;
         for (i = 0; ok && i < found.count; i++) {
             struct text name = {0};
@@ -418,8 +416,8 @@ bool licensing_project(const struct licensing_project *p, struct text *out)
     size_t archived = 0;
     size_t n = 0;
     size_t i;
-    bool ok = driver_runtime_packages(p->runtime, p->musl, &arena, archive,
-                                      &archived);
+    bool ok = driver_runtime_packages(p->runtime, p->musl, p->natives,
+                                      &arena, archive, &archived);
 
     for (i = 0; i < archived; i++) {
         list[n++] = &archive[i];

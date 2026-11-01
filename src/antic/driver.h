@@ -141,6 +141,10 @@ struct options {
        here, so `anti` names in NOTICE.txt what the link took and decides
        nothing a second time. NULL: nobody asks. */
     bool *links_musl;
+    /* The native libraries of the runtime archive that the link takes,
+       DRIVER_NATIVE_* bits, written by the same call for the same
+       reason. NULL: nobody asks. */
+    unsigned *links_natives;
     const char *package_name;   /* --package-name, of the header. */
     const char *package_version;
     const char *const *dependencies;  /* --dependency <name>,<constraint>,<url> */
@@ -178,21 +182,27 @@ int driver_run(const struct options *options);
 struct arena;
 struct package;
 
+/* The native libraries of the runtime archive that a link takes:
+   PCRE2 for `anti.regex`, and raylib with miniaudio for `anti.raylib`. */
+enum { DRIVER_NATIVE_PCRE2 = 1u, DRIVER_NATIVE_RAYLIB = 2u };
+
 /* The most packages that driver_runtime_packages gives. */
-enum { DRIVER_RUNTIME_PACKAGES = 3 };
+enum { DRIVER_RUNTIME_PACKAGES = 6 };
 
 /* The packages that the runtime archive puts into a binary, in the order
-   of its notice: the runtime, and after it musl and mimalloc where musl
-   says that the link takes the C library of musl. Each carries the
-   identifier of notice_component_license and the text of licenses/ of
-   the archive at runtime, in the memory pool, and an empty text where
-   runtime is NULL. Stores the count in *count. Returns false after a
-   text that cannot be read, which the message names. The notice of
-   antic and the one `anti` writes from a project both start with
+   of its notice: the runtime, then musl and mimalloc where musl says that
+   the link takes the C library of musl, then PCRE2, raylib and miniaudio
+   where natives holds their bits. Each carries the identifier of
+   notice_component_license and the text of licenses/ of the archive at
+   runtime, in the memory pool, and an empty text where runtime is NULL.
+   A native library takes the version of its line of the record of
+   upstream sources there. Stores the count in *count. Returns false
+   after a file that cannot be read, which the message names. The notice
+   of antic and the one `anti` writes from a project both start with
    these. */
 bool driver_runtime_packages(const char *runtime, bool musl,
-                             struct arena *arena, struct package *out,
-                             size_t *count);
+                             unsigned natives, struct arena *arena,
+                             struct package *out, size_t *count);
 
 /* The library files that options->libraries needs: those files, every
    module each of them imports, and every module below those. The paths

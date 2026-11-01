@@ -694,6 +694,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_known_failures.cmake` | Compares `tests/known-failures.txt` with the table of `docs/audit/tests-findings.md` and with the build tree. |
 | `tests/runners/run_known_failures_self.cmake` | Tests `run_known_failures.cmake` on made-up lists. |
 | `tests/runners/run_license_forms.cmake` | Checks one form of `anti license`. |
+| `tests/runners/run_license_native.cmake` | Checks that a notice names the native libraries of the runtime archive that a program links. |
 | `tests/runners/run_license_notice.cmake` | Checks the notice of three programs against `NOTICE.txt`. |
 | `tests/runners/run_licenses.cmake` | Finds the licence notice in the bytes of a program. |
 | `tests/runners/run_line_endings.cmake` | Requires LF in the programs and expected files. |

@@ -64,6 +64,9 @@ struct licensing_project {
     /* Whether the link of the program took the C library of musl, and
        mimalloc with it, as the driver reports it in links_musl. */
     bool musl;
+    /* The native libraries of the runtime archive that the link took, as
+       the driver reports them in links_natives. */
+    unsigned natives;
     /* The library files of every package of anti.lock, then those of
        the bundled modules the project imports. */
     const char *const *libraries;
@@ -72,8 +75,9 @@ struct licensing_project {
 };
 
 /* Append the notice of a project to out: the runtime, musl and mimalloc
-   where the program links them, the package of every library file once,
-   and the package of the project last, as the notice of a binary has it.
+   where the program links them, the native libraries of the archive it
+   links, the package of every library file once and the package of the
+   project last, as the notice of a binary has it.
    Returns false, after a message, when a library file or the record of
    upstream sources cannot be read. */
 bool licensing_project(const struct licensing_project *p, struct text *out);

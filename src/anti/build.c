@@ -100,6 +100,9 @@ struct build {
        of musl, which the driver writes through links_musl of its
        options. */
     bool links_musl;
+    /* The native libraries of the runtime archive that the same link
+       took, DRIVER_NATIVE_* bits, which it writes through links_natives. */
+    unsigned natives;
 };
 
 /* What decides one output of the cache beside its input. The addendum
@@ -571,7 +574,9 @@ static bool own_package(const struct build *b, struct text *text,
 
 /* [provisional] DESIGN: the notice of a project comes from the project
    and not from the binary. It names the runtime, musl and mimalloc where
-   the link of the program took them, every package of anti.lock, the
+   the link of the program took them, the native libraries of the runtime
+   archive that the link took, by Q2 of "Answers of 2026-11-01" in
+   docs/decisions.md, every package of anti.lock, the
    package of every bundled module the project imports and the package of
    the project, in the lines of the notice of a binary, with the upstream
    source of each component of the runtime archive after its text. The
@@ -626,6 +631,7 @@ static bool deliver_notice(struct build *b, enum target t, enum cpu_level cpu,
     }
     project.runtime = text_cstr(&b->runtime);
     project.musl = b->links_musl;
+    project.natives = b->natives;
     project.libraries = libraries.items;
     project.library_count = libraries.count;
     project.own = &own;
@@ -777,6 +783,7 @@ static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
     o.objects = objects.items;
     o.object_count = objects.count;
     o.links_musl = &b->links_musl;
+    o.links_natives = &b->natives;
     ok = driver_run(&o) == 0;
 done:
     for (i = 0; paths != NULL && i < count; i++) {
@@ -815,6 +822,7 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     o.profile_use = b->r->profile_use;
     release_lto(b, &o);
     o.links_musl = &b->links_musl;
+    o.links_natives = &b->natives;
     return driver_run(&o) == 0;
 }
 
@@ -1072,6 +1080,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     b->obj_dir.length = 0;
     b->name.length = 0;
     b->links_musl = false;
+    b->natives = 0;
     target_dir(b->r->root, &b->m.build, t, b->r->release, &b->build_dir);
     target_dir(b->r->root, &b->m.dist, t, b->r->release, &b->dist_dir);
     text_appendf(&b->lib_dir, "%s/lib", text_cstr(&b->build_dir));

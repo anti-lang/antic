@@ -526,8 +526,8 @@ the text of the component names. A text that holds the notices of more than one
 licence, as the copyright file of a package of Ubuntu does, has `LicenseRef-<name>`.
 
 `--project` builds the project as `anti build` does and takes its options. The notice
-names the runtime, then musl and mimalloc where the program links them, every package of
-`anti.lock`, the package of every bundled module the project imports, and the package of
+names the runtime, then musl and mimalloc where the program links them, then the native
+libraries of the runtime archive that the program links, every package of `anti.lock`, the package of every bundled module the project imports, and the package of
 the project last. Without `--notice` it prints the notice of one target, the one of
 `--target` or the host. With `--notice` it writes `NOTICE.txt` for every target of the
 build, beside whatever the build wrote. `anti build` writes the same file beside a
@@ -557,9 +557,11 @@ executable carries its licence with it:
 | mimalloc, in every program of musl | MIT | Include the copyright and permission notice with the binary |
 | CA bundle | MPL 2.0 | None. The file is loaded from the archive, not shipped |
 
-A program that imports `anti.raylib` and `anti.miniaudio` owes nobody anything. A
-program that imports `anti.net` or `anti.regex` owes an attribution, and `anti_licenses`
-plus `NOTICE.txt` supply it. Every program of musl carries the notices of musl and
+A program that imports `anti.raylib` and `anti.miniaudio` owes nobody anything, and its
+notice names raylib and miniaudio all the same. A program that imports `anti.net` or
+`anti.regex` owes an attribution, and `anti_licenses` plus `NOTICE.txt` supply it. A
+program of `anti.regex` names PCRE2 in both, with its text and the line of
+`licenses/sources.txt`. Every program of musl carries the notices of musl and
 mimalloc in `anti_licenses` and `NOTICE.txt`, and a program of the glibc mode or of any
 other target carries neither. This section is a statement of how the licences read, not legal advice.
 

@@ -46,11 +46,11 @@ static const struct {
     {"compiler-rt", "Apache-2.0 WITH LLVM-exception"},
     {"glibc", "LGPL-2.1-or-later"},
     {"linux-headers", "GPL-2.0-only"},
-    {"pcre2", "BSD-3-Clause WITH PCRE2-exception"},
+    {PCRE2_PACKAGE, "BSD-3-Clause WITH PCRE2-exception"},
     {"sqlite", "blessing"},
     {"mbedtls", "Apache-2.0 OR GPL-2.0-or-later"},
-    {"miniaudio", "Unlicense OR MIT-0"},
-    {"raylib", "Zlib"},
+    {MINIAUDIO_PACKAGE, "Unlicense OR MIT-0"},
+    {RAYLIB_PACKAGE, "Zlib"},
 };
 
 void notice_component_license(const char *component, struct text *out)

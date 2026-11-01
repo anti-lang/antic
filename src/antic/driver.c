@@ -993,9 +993,72 @@ static bool archive_package(const char *runtime, const char *name,
     return ok;
 }
 
+/* The version that the record of upstream sources of the runtime archive
+   gives the component, the second word of its line `<component>
+   <version> <url>`, in the memory pool. RUNTIME_NO_VERSION stands where
+   runtime is NULL or the record names no such component. Returns false
+   after a record that cannot be read. */
+static bool source_version(const char *runtime, const char *component,
+                           struct arena *arena, const char **out)
+{
+    struct text path = {0};
+    struct text record = {0};
+    size_t length = strlen(component);
+    const char *at;
+    const char *end;
+    bool ok = true;
+
+    *out = RUNTIME_NO_VERSION;
+    if (runtime == NULL) {
+        return true;
+    }
+    text_appendf(&path, "%s/%s/%s", runtime, RUNTIME_LICENSES_DIR,
+                 RUNTIME_SOURCES_FILE);
+    ok = read_text(text_cstr(&path), &record);
+    at = text_cstr(&record);
+    end = at + record.length;
+    while (ok && at < end) {
+        const char *stop = memchr(at, '\n', (size_t)(end - at));
+        const char *line_end = stop != NULL ? stop : end;
+        if ((size_t)(line_end - at) > length + 1 && at[0] != '#' &&
+            at[length] == ' ' && memcmp(at, component, length) == 0) {
+            const char *version = at + length + 1;
+            const char *space =
+                memchr(version, ' ', (size_t)(line_end - version));
+            size_t n = (size_t)((space != NULL ? space : line_end) - version);
+            char *copy = arena_alloc(arena, n + 1);
+            memcpy(copy, version, n);
+            copy[n] = '\0';
+            *out = copy;
+            break;
+        }
+        at = stop != NULL ? stop + 1 : end;
+    }
+    text_free(&path);
+    text_free(&record);
+    return ok;
+}
+
+/* The package of a native library of the runtime archive, its component
+   named by its licence text, with the version of the record. */
+static bool native_package(const char *runtime, const char *component,
+                           struct arena *arena, struct package *out)
+{
+    const char *version = RUNTIME_NO_VERSION;
+
+    return source_version(runtime, component, arena, &version) &&
+           archive_package(runtime, component, component, version, arena,
+                           out);
+}
+
+/* DESIGN: the notice names every native library of the runtime archive
+   that the link takes, with its text and its version from licenses/ of
+   the archive, as it names musl and mimalloc. Eddie decided this by Q2
+   of "Answers of 2026-11-01" in docs/decisions.md. raylib calls
+   miniaudio, so both follow anti.raylib, in the order of the link. */
 bool driver_runtime_packages(const char *runtime, bool musl,
-                             struct arena *arena, struct package *out,
-                             size_t *count)
+                             unsigned natives, struct arena *arena,
+                             struct package *out, size_t *count)
 {
     size_t n = 0;
     bool ok = archive_package(runtime, RUNTIME_MODULE, RUNTIME_LICENSE_NAME,
@@ -1009,13 +1072,23 @@ bool driver_runtime_packages(const char *runtime, bool musl,
         ok = archive_package(runtime, MIMALLOC_PACKAGE, MIMALLOC_PACKAGE,
                              ANTIC_MIMALLOC_VERSION, arena, &out[n++]);
     }
+    if (ok && (natives & DRIVER_NATIVE_PCRE2) != 0) {
+        ok = native_package(runtime, PCRE2_PACKAGE, arena, &out[n++]);
+    }
+    if (ok && (natives & DRIVER_NATIVE_RAYLIB) != 0) {
+        ok = native_package(runtime, RAYLIB_PACKAGE, arena, &out[n++]);
+    }
+    if (ok && (natives & DRIVER_NATIVE_RAYLIB) != 0) {
+        ok = native_package(runtime, MINIAUDIO_PACKAGE, arena, &out[n++]);
+    }
     *count = n;
     return ok;
 }
 
 /* The licence notice of a linked binary: the runtime, musl and mimalloc
-   in a program of musl, every package of the loaded libraries once, and
-   the package of the compiled module.
+   in a program of musl, the native libraries of the runtime archive that
+   the link takes, every package of the loaded libraries once, and the
+   package of the compiled module.
 
    DESIGN: musl and mimalloc are MIT, whose notice travels with the
    binary, and every program of musl links both. Eddie decided on
@@ -1031,6 +1104,8 @@ static bool build_notice(const struct options *o,
     const struct package **list;
     struct package archive[DRIVER_RUNTIME_PACKAGES];
     bool musl = driver_links_musl(o, extras);
+    unsigned natives = (extras->regex ? DRIVER_NATIVE_PCRE2 : 0u) |
+                       (extras->raylib ? DRIVER_NATIVE_RAYLIB : 0u);
     size_t archived = 0;
     size_t n = 0;
     size_t i;
@@ -1039,7 +1114,10 @@ static bool build_notice(const struct options *o,
     if (o->links_musl != NULL) {
         *o->links_musl = musl;
     }
-    if (!driver_runtime_packages(o->runtime, musl, arena, archive,
+    if (o->links_natives != NULL) {
+        *o->links_natives = natives;
+    }
+    if (!driver_runtime_packages(o->runtime, musl, natives, arena, archive,
                                  &archived)) {
         return false;
     }
@@ -1117,11 +1195,12 @@ static int back_end(const struct options *o, struct module *tree,
                 o->input);
         return 1;
     }
+    /* The notice names PCRE2 where the link takes it. */
+    extras->regex = holds_module(program, REGEX_MODULE);
     if (extras->own != NULL &&
         !build_notice(o, extras, program->arena, &extras->notice)) {
         return 1;
     }
-    extras->regex = holds_module(program, REGEX_MODULE);
     for (i = 0; driver_is_plugin(o) && i < program->class_count; i++) {
         const struct ir_class *c = program->classes[i];
         size_t j;

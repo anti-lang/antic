@@ -56,6 +56,16 @@
    notice of a program of musl. */
 #define MUSL_PACKAGE "musl"
 #define MIMALLOC_PACKAGE "mimalloc"
+/* The packages of the native libraries of the runtime archive in the
+   notice of a program that links them, which are the names of their
+   licence texts in RUNTIME_LICENSES_DIR and of their lines in
+   RUNTIME_SOURCES_FILE. */
+#define PCRE2_PACKAGE "pcre2"
+#define RAYLIB_PACKAGE "raylib"
+#define MINIAUDIO_PACKAGE "miniaudio"
+/* The version of a component that the record of upstream sources does not
+   name, in a notice and in the plain form of `anti license`. */
+#define RUNTIME_NO_VERSION "-"
 /* The object beside the runtime library that a bundled archive carries
    instead of the licence text of src/rt/license.c. */
 #define RUNTIME_LICENSE_STUB "anti_rt_license_stub"

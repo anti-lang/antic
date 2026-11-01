@@ -6567,6 +6567,19 @@ add_test(NAME license_notice
 set_tests_properties(license_notice PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
+# A program of anti.regex names PCRE2 in its notice, one of anti.raylib
+# names raylib and miniaudio, and one of neither names none of them.
+add_test(NAME license_notice_native
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
+        "-DRAYLIB=${CMAKE_CURRENT_SOURCE_DIR}/std/raylib.anti"
+        "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-notice-native"
+        -P "${ANTIC_RUNNERS}/run_license_native.cmake")
+set_tests_properties(license_notice_native PROPERTIES TIMEOUT 180)
+
 # The four forms of `anti license` beside --from, one test each: the
 # plain form over licenses/ of the runtime archive, --project over a
 # project that links two packages, --project --notice and the NOTICE.txt
