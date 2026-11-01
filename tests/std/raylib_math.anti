@@ -1,0 +1,63 @@
+//! raymath, rcamera and rlgl through anti.raylib, which binds them beside
+//! raylib.h in one module, so their vectors, matrices and cameras are the types
+//! of raylib. The calls pass and return structs by value and open no window.
+//! The values of raymath are those of `tests/abi/abi_raymath.expected`, which
+//! the hand-written binding prints. Two differ in the last place, since
+//! `libraylib.a` compiles with the default of clang, which fuses a multiply and
+//! an add, and that test compiles raymath without. A camera that looks down the
+//! negative z axis faces it, and rlgl gives the version of OpenGL raylib is
+//! built for.
+
+import anti.raylib;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn line(label: str, v: f32)
+{
+	printf("%.*s %.9g\n".ptr, label.len as c_int, label.ptr, v as f64);
+}
+
+fn main() -> int
+{
+	let sum = raylib.Vector3Add(raylib.Vector3 { x: 1.0, y: 2.0, z: 3.0 },
+		raylib.Vector3 { x: 0.5, y: -4.0, z: 8.0 });
+	line("Vector3Add x", sum.x);
+	line("Vector3Add y", sum.y);
+	line("Vector3Add z", sum.z);
+	let a = raylib.Vector2Add(raylib.Vector2 { x: 1.5, y: -2.0 },
+		raylib.Vector2 { x: 0.25, y: 8.0 });
+	let r = raylib.Vector2Rotate(a, 0.5);
+	line("Vector2Rotate x", r.x);
+	line("Vector2Rotate y", r.y);
+	let c = raylib.Vector3CrossProduct(raylib.Vector3 { x: 1.0, y: 2.0, z: 3.0 },
+		raylib.Vector3 { x: -4.0, y: 0.5, z: 2.0 });
+	line("Vector3CrossProduct x", c.x);
+	line("Vector3CrossProduct y", c.y);
+	line("Vector3CrossProduct z", c.z);
+	let m = raylib.MatrixMultiply(raylib.MatrixRotateZ(0.25),
+		raylib.MatrixTranslate(3.0, -1.0, 2.0));
+	line("MatrixMultiply m0", m.m0);
+	line("MatrixMultiply m4", m.m4);
+	line("MatrixMultiply m12", m.m12);
+	line("MatrixMultiply m13", m.m13);
+	let t = raylib.Vector3Transform(c, m);
+	line("Vector3Transform x", t.x);
+	line("Vector3Transform y", t.y);
+	line("Vector3Transform z", t.z);
+	let q = raylib.QuaternionMultiply(raylib.QuaternionFromEuler(0.1, 0.2, 0.3),
+		raylib.QuaternionFromEuler(-0.4, 0.5, 0.6));
+	line("QuaternionMultiply w", q.w);
+	let camera = raylib.Camera3D {
+		position: raylib.Vector3 { x: 0.0, y: 0.0, z: 0.0 },
+		target: raylib.Vector3 { x: 0.0, y: 0.0, z: -5.0 },
+		up: raylib.Vector3 { x: 0.0, y: 1.0, z: 0.0 },
+		fovy: 45.0,
+		projection: raylib.CameraProjection.CAMERA_PERSPECTIVE as c_int,
+	};
+	let forward = raylib.GetCameraForward(&camera);
+	line("GetCameraForward z", forward.z);
+	raylib.CameraMoveForward(&camera, 2.0, true);
+	line("CameraMoveForward z", camera.position.z);
+	printf("rlGetVersion %d\n".ptr, raylib.rlGetVersion());
+	return 0;
+}

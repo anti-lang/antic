@@ -778,6 +778,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_raw_output.cmake` | Checks the raw bytes rule and scans every runner for it. |
 | `tests/runners/run_raylib_miniaudio_pin.cmake` | Checks that the miniaudio raylib bundles is the pinned one. |
 | `tests/runners/run_raylib_module.cmake` | Links a program of `anti.raylib` for one target with no option and checks what it loads. |
+| `tests/runners/run_raylib_symbols.cmake` | Checks that the libraries of every target define each function of `anti.raylib`. |
 | `tests/runners/run_release_dry_run.cmake` | Runs `./r --dry-run` on the copy of `tests/release_copy.cmake` with stand-in tools and checks what each step wrote. |
 | `tests/runners/run_release_dry_run_self.cmake` | Tests that `run_release_dry_run.cmake` fails and prints the output when a fixture does not compile or link. |
 | `tests/runners/run_release_key.cmake` | Checks that both installers hold the public key and that a package carries none. |

@@ -13,6 +13,9 @@
 #   BIND      tests/bind, the fixtures of the other cases
 #   ABI       tests/abi, whose abi_raymath.expected the case raymath reads
 #   RAYLIB    the pinned raylib source
+#   RAYLIB_HEADERS, RAYLIB_DEFINES
+#             the headers of src/ of RAYLIB and the definitions under which
+#             the build binds anti.raylib, separated by commas
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CLANG_DIR the pinned clang of the build
@@ -35,6 +38,17 @@ string(REPLACE "." "\\." clang_page "${CLANG_PAGE}")
 string(REPLACE "." "\\." clang_asset "clang-${CLANG_TAG}-${HOST}.tar.xz")
 set(clang_where "needs clang ${clang_major}\\. Get ${clang_asset} from ${clang_page}, or another clang ${clang_major}, and put it first on PATH")
 include("${CMAKE_CURRENT_LIST_DIR}/../../tools/warnings.cmake")
+
+# The arguments with which the build binds anti.raylib.
+set(raylib_bind "")
+string(REPLACE "," ";" raylib_headers "${RAYLIB_HEADERS}")
+string(REPLACE "," ";" raylib_defines "${RAYLIB_DEFINES}")
+foreach(header IN LISTS raylib_headers)
+    list(APPEND raylib_bind "${RAYLIB}/src/${header}")
+endforeach()
+foreach(define IN LISTS raylib_defines)
+    list(APPEND raylib_bind -D "${define}")
+endforeach()
 
 # Fail unless file holds the bytes of expected.
 function(expect_file file expected)
@@ -375,16 +389,24 @@ elseif(CASE STREQUAL "raymath")
     expect_calls(raymath "${RAYLIB}/src" "${BIND}/raymath_calls.anti"
                  "${WORK}/raymath_calls.expected")
 elseif(CASE STREQUAL "raylib")
-    # anti.raylib comes from raylib.h of the pinned raylib, the header that
-    # raylib compiles. It compiles, names its frameworks and its Linux
-    # libraries, turns the colour macros into constants of Color, and its
-    # two probes agree.
-    tool_run("" "${ANTI}" bind --clang "${RAYLIB}/src/raylib.h" --probe
+    # anti.raylib comes from the headers of the pinned raylib that raylib
+    # compiles, bound as the build binds them. It compiles, names its
+    # frameworks and its Linux libraries, turns the colour macros into
+    # constants of Color, holds the functions of raymath, rcamera and rlgl
+    # and no shim, and its two probes agree.
+    tool_run("" "${ANTI}" bind --clang ${raylib_bind} --probe
                 -o "${WORK}/out" --runtime "${RUNTIME}")
+    if(EXISTS "${WORK}/out/shim_raylib.c")
+        message(FATAL_ERROR "anti.raylib needs a shim, which no library of "
+                            "the runtime archive holds")
+    endif()
     file(READ "${WORK}/out/raylib.anti" module)
     foreach(line "link framework \"Cocoa\";" "link linux \"X11\";"
             "pub const RAYWHITE: Color = Color { r: 245, g: 245, b: 245, a: 255 };"
-            "pub extern fn SetConfigFlags(flags: c_uint);")
+            "pub extern fn SetConfigFlags(flags: c_uint);"
+            "pub extern fn Vector3Add(v1: Vector3, v2: Vector3) -> Vector3;"
+            "pub extern fn GetCameraForward(camera: ?*Camera3D) -> Vector3;"
+            "pub extern fn rlGetVersion() -> c_int;")
         string(FIND "${module}" "${line}" at)
         if(at EQUAL -1)
             message(FATAL_ERROR "raylib.anti holds no line `${line}`")
@@ -396,8 +418,8 @@ elseif(CASE STREQUAL "raylib_shipped")
     # anti.raylib of the runtime archive, which the build wrote, against
     # C. The probe of Anti names the module without -I, so it reads
     # std/anti/raylib.antl of the archive, and the two probes agree over
-    # all 35 structs.
-    tool_run("" "${ANTI}" bind --clang "${RAYLIB}/src/raylib.h" --probe
+    # every struct of the four headers.
+    tool_run("" "${ANTI}" bind --clang ${raylib_bind} --probe
                 -o "${WORK}/out" --runtime "${RUNTIME}")
     if(NOT EXISTS "${RUNTIME}/std/anti/raylib.antl")
         message(FATAL_ERROR "the runtime archive holds no anti.raylib")

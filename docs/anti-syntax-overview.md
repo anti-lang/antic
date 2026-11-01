@@ -2172,7 +2172,7 @@ The 24 modules, with their public items and the functions among them that may fa
 | `anti.simd` | nothing of its own: the compiler knows `select`, `any` and `all` by name | |
 | `anti.trace` | `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal`, `Composite`, `start`, `install`, `PROFILE_SLOTS`, `JOURNAL_SLOTS`, `MESSAGE_BYTES`, `COMPOSITE_SLOTS` | |
 | `anti.plugin` | `Library` with `instance_at`, `supports_at`, `live` and `unload`, which the forms `lib.instance(I)` and `lib.supports(I, "f")` call, `load`, `NOT_LOADED`, `IN_USE` | `load`, `instance_at`, `unload` |
-| `anti.raylib` | every function, struct, enum and constant of `raylib.h` of raylib 6.0, which `anti bind --clang` writes during the build. A program that imports it links raylib, miniaudio and the system libraries of raylib with no option | |
+| `anti.raylib` | every function, struct, enum and constant of `raylib.h`, `rlgl.h`, `raymath.h` and `rcamera.h` of raylib 6.0, one module in which raymath and rcamera take the types of raylib, which `anti bind --clang` writes during the build. A program that imports it links raylib, miniaudio and the system libraries of raylib with no option | |
 | `anti.regex` | `Error`, `BadPattern`, `TooExpensive`, `MissingGroup`, `LengthMismatch`, `compile`, `compile_bytes`, `Cursor`, `Matches`, `Pieces`, `ByteMatches`, `BytePieces`, and the functions behind the methods of `str` and `[]byte` | `compile`, `compile_bytes`, and a method with a compiled pattern |
 
 The 12 modules under `anti.collection`, each with the `operator fn eq` and `operator fn hash` of its classes:

@@ -395,9 +395,10 @@ generator writes shim and binding in one run, so they cannot drift.
 
 `anti bind` writes an ordinary `.anti` module from a C API description:
 
-- `anti bind --clang raylib.h` for raylib, as the module `anti.raylib`. The header is
-  what raylib compiles, and the `raylib_api.json` of the pinned release is not valid
-  JSON.
+- `anti bind --clang raylib.h rlgl.h raymath.h rcamera.h` for raylib, as the module
+  `anti.raylib`. The headers are what raylib compiles, and the `raylib_api.json` of the
+  pinned release is not valid JSON. clang reads them in order in one translation unit,
+  and the declarations of each go into the one module.
 - `anti bind --clang miniaudio.h` for miniaudio, as the module `anti.miniaudio`.
 - `anti bind <api>.json` for a library whose JSON description in the format of
   raylib's rlparser is valid. A file that is not JSON is refused with the line and the

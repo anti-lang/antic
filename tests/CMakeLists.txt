@@ -1169,6 +1169,13 @@ antic_program_test(std_raylib_dev
     OPTIONS "--dev"
     DEV lang raylib
     WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
+# raymath, rcamera and rlgl of anti.raylib in dev mode, by Q4 of "Answers
+# of 2026-11-01" in docs/decisions.md.
+antic_program_test(std_raylib_math_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/std/raylib_math.anti"
+    OPTIONS "--dev"
+    DEV lang raylib
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
 
 # The cases of fault injection of tests/programs/ and tests/std/. A file
 # <name>.faults beside <name>.anti holds one case per line, its name and
@@ -2140,6 +2147,17 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
             -P "${ANTIC_RUNNERS}/run_program.cmake")
     set_tests_properties(std_raylib_memory_checks PROPERTIES TIMEOUT 120)
+    # raymath, rcamera and rlgl of anti.raylib under --memory-checks.
+    add_test(NAME std_raylib_math_memory_checks
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/raylib_math.anti"
+            "-DOPTIONS=--memory-checks"
+            "-DOBJECTS="
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
+            -P "${ANTIC_RUNNERS}/run_program.cmake")
+    set_tests_properties(std_raylib_math_memory_checks PROPERTIES
+        TIMEOUT 120)
 endif()
 # DESIGN: the runtime of AddressSanitizer for x86_64 stops under
 # qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
@@ -7053,6 +7071,10 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
     # shell script in for clang.
     list(APPEND anti_bind_cases refusals ast_malformed clang_typedef_chain)
 endif()
+# The headers and the definitions under which the build binds anti.raylib,
+# from src/native/raylib-source.cmake.
+list(JOIN ANTIC_RAYLIB_BIND_HEADERS "," anti_bind_raylib_headers)
+list(JOIN ANTIC_RAYLIB_BIND_DEFINES "," anti_bind_raylib_defines)
 foreach(case IN LISTS anti_bind_cases)
     add_test(NAME anti_bind_${case}
         COMMAND "${CMAKE_COMMAND}"
@@ -7063,6 +7085,8 @@ foreach(case IN LISTS anti_bind_cases)
             "-DBIND=${CMAKE_CURRENT_SOURCE_DIR}/bind"
             "-DABI=${CMAKE_CURRENT_SOURCE_DIR}/abi"
             "-DRAYLIB=${ANTIC_RAYLIB_SOURCE}"
+            "-DRAYLIB_HEADERS=${anti_bind_raylib_headers}"
+            "-DRAYLIB_DEFINES=${anti_bind_raylib_defines}"
             "-DCC=${anti_bind_cc}"
             "-DHOST_LINK=${ANTIC_HOST_LINK_OPTIONS}"
             "-DCLANG_DIR=${ANTIC_CLANG_DIR}"

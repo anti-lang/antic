@@ -14,26 +14,37 @@ antic_native_headers(raylib "${ANTIC_RAYLIB_SOURCE}/src" raylib.h rcamera.h
     rlgl.h raymath.h)
 
 # DESIGN: anti.raylib is no file of the tree. anti bind --clang writes it
-# from raylib.h of the pinned raylib with the pinned clang of
-# ANTIC_CLANG_DIR, which stands alone on PATH, where anti looks outside a
-# development tree. A tree of ANTI_DEPS_DIR has no deps/clang beside it,
-# and a VM may keep its clang elsewhere. antic compiles the module into
-# std/anti/ of the runtime archive in the package of the standard library,
-# where a program finds it without -I. Eddie decided this on 2026-10-28
-# under "Feature freeze of 2026-10-14" in docs/decisions.md, after
-# "Bindings" there. raylib.h names the same items on all six targets, so
-# the build binds it for the host alone. It holds no inline function, so
-# anti bind writes no shim, and a shim that no library of the archive
-# holds would fail the tests raylib_module_link_<target>.
+# from the headers of ANTIC_RAYLIB_BIND_HEADERS of the pinned raylib with
+# the pinned clang of ANTIC_CLANG_DIR, which stands alone on PATH, where
+# anti looks outside a development tree. A tree of ANTI_DEPS_DIR has no
+# deps/clang beside it, and a VM may keep its clang elsewhere. antic
+# compiles the module into std/anti/ of the runtime archive in the
+# package of the standard library, where a program finds it without -I.
+# Eddie decided this on 2026-10-28 under "Feature freeze of 2026-10-14"
+# in docs/decisions.md, after "Bindings" there, and added rlgl.h,
+# raymath.h and rcamera.h by Q4 of "Answers of 2026-11-01". The headers
+# name the same items on all six targets, so the build binds them for
+# the host alone. Under ANTIC_RAYLIB_BIND_DEFINES no function of them
+# needs a shim, and a shim that no library of the archive holds would
+# fail the test raylib_module_symbols.
 set(ANTIC_RAYLIB_BINDING "${ANTIC_RAYLIB_WORK}/binding")
 set(antic_raylib_module "${ANTIC_RAYLIB_BINDING}/anti/raylib.anti")
 set(antic_raylib_library "${ANTIC_RUNTIME_DIR}/std/anti/raylib.antl")
+set(antic_raylib_headers "")
+foreach(header IN LISTS ANTIC_RAYLIB_BIND_HEADERS)
+    list(APPEND antic_raylib_headers "${ANTIC_RAYLIB_SOURCE}/src/${header}")
+endforeach()
+set(antic_raylib_defines "")
+foreach(define IN LISTS ANTIC_RAYLIB_BIND_DEFINES)
+    list(APPEND antic_raylib_defines -D "${define}")
+endforeach()
 add_custom_command(OUTPUT "${antic_raylib_module}"
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ANTIC_RAYLIB_BINDING}"
     COMMAND "${CMAKE_COMMAND}" -E env "PATH=${ANTIC_CLANG_DIR}/bin"
-        "$<TARGET_FILE:anti>" bind --clang "${ANTIC_RAYLIB_SOURCE}/src/raylib.h"
+        "$<TARGET_FILE:anti>" bind --clang ${antic_raylib_headers}
+        ${antic_raylib_defines}
         --runtime "${ANTIC_RUNTIME_DIR}" -o "${ANTIC_RAYLIB_BINDING}/anti"
-    DEPENDS anti "${ANTIC_RAYLIB_SOURCE}/src/raylib.h"
+    DEPENDS anti ${antic_raylib_headers}
     VERBATIM)
 add_custom_command(OUTPUT "${antic_raylib_library}"
     COMMAND antic -c --anti-internal -I "${ANTIC_RAYLIB_BINDING}"
@@ -66,10 +77,14 @@ set(ANTIC_RAYLIB_SOURCES rcore rshapes rtextures rtext rmodels raudio rglfw)
 set(ANTIC_RAYLIB_AUDIO -Dminiaudio_c)
 
 # DESIGN: the desktop back end over GLFW with OpenGL 3.3, the default of
-# raylib's own Makefile, with its flags. On Linux GLFW takes X11 alone and
-# Wayland stays out, as docs/decisions.md records. The
-# configuration is raylib's config.h, unchanged.
-set(ANTIC_RAYLIB_DEFINES -DPLATFORM_DESKTOP_GLFW -DGRAPHICS_API_OPENGL_33)
+# raylib's own Makefile, with its flags, ANTIC_RAYLIB_CONFIGURATION of
+# raylib-source.cmake. On Linux GLFW takes X11 alone and Wayland stays
+# out, as docs/decisions.md records. The configuration is raylib's
+# config.h, unchanged.
+set(ANTIC_RAYLIB_DEFINES "")
+foreach(define IN LISTS ANTIC_RAYLIB_CONFIGURATION)
+    list(APPEND ANTIC_RAYLIB_DEFINES "-D${define}")
+endforeach()
 
 # DESIGN: raylib compiles with the warnings of its own Makefile,
 # ANTIC_RAYLIB_WARNINGS of src/native/warnings.cmake. -fwrapv-pointer
@@ -246,17 +261,36 @@ endforeach()
 
 # A program that imports anti.raylib links for every target with no
 # option beyond the target, and loads the system libraries of raylib.
+# raylib_math_link_<target> links one that calls into raymath, rcamera
+# and rlgl, by Q4 of "Answers of 2026-11-01" in docs/decisions.md.
 foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
-    add_test(NAME raylib_module_link_${target}
-        COMMAND "${CMAKE_COMMAND}" "-DANTIC=$<TARGET_FILE:antic>"
-            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/std/raylib.anti"
-            "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}"
-            "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}"
-            "-DTARGET=${target}"
-            "-DWORK=${ANTIC_RAYLIB_WORK}/module/${target}"
-            -P "${ANTIC_RUNNERS}/run_raylib_module.cmake")
+    foreach(test "raylib_module_link|raylib" "raylib_math_link|raylib_math")
+        string(REPLACE "|" ";" parts "${test}")
+        list(GET parts 0 name)
+        list(GET parts 1 program)
+        add_test(NAME ${name}_${target}
+            COMMAND "${CMAKE_COMMAND}" "-DANTIC=$<TARGET_FILE:antic>"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/std/${program}.anti"
+                "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}"
+                "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}"
+                "-DTARGET=${target}"
+                "-DWORK=${ANTIC_RAYLIB_WORK}/${program}/${target}"
+                -P "${ANTIC_RUNNERS}/run_raylib_module.cmake")
+    endforeach()
 endforeach()
+
+# Every function of anti.raylib resolves at the link on every target, by
+# Q4 of "Answers of 2026-11-01": libraylib or libminiaudio of lib/<target>/
+# defines it, so the module needs no shim.
+list(JOIN ANTIC_MEDIA_TARGETS "," antic_raylib_targets)
+add_test(NAME raylib_module_symbols
+    COMMAND "${CMAKE_COMMAND}"
+        "-DMODULE=${antic_raylib_module}"
+        "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}"
+        "-DTARGETS=${antic_raylib_targets}"
+        -P "${ANTIC_RUNNERS}/run_raylib_symbols.cmake")
 
 add_test(NAME raylib_miniaudio_pin
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"

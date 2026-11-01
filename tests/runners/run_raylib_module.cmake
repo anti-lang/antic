@@ -1,6 +1,6 @@
-# Link tests/std/raylib.anti for TARGET with antic and no option beyond the
-# target and the runtime archive, and read what the executable loads. The
-# program imports anti.raylib, so the link takes libraylib and libminiaudio
+# Link a program of tests/std/ for TARGET with antic and no option beyond
+# the target and the runtime archive, and read what the executable loads.
+# The program imports anti.raylib, so the link takes libraylib and libminiaudio
 # of lib/<target>/ and the system libraries of raylib by itself. A Linux
 # program links dynamically against glibc and loads libX11 and libGL, by
 # Q1 of "Answers of 2026-11-01" in docs/decisions.md, a macOS one
@@ -8,7 +8,8 @@
 # user32.dll and gdi32.dll. Run with cmake -P and these values:
 #   ANTIC     the antic executable
 #   RUNTIME   the runtime directory
-#   SOURCE    tests/std/raylib.anti
+#   SOURCE    tests/std/raylib.anti, or tests/std/raylib_math.anti, which
+#             calls into raymath, rcamera and rlgl
 #   OBJDUMP   llvm-objdump of the runtime archive
 #   READOBJ   llvm-readobj of the runtime archive
 #   TARGET    the target name
