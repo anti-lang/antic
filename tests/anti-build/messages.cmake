@@ -11,10 +11,16 @@ anti_message(manifest_no_toml
     FILES anti.toml "[package\n"
     ARGS build
     ERR "anti: ./anti.toml is no TOML that anti reads")
-anti_message(manifest_no_name
-    FILES anti.toml "[package]\nversion = \"0.1.0\"\n"
+# Q6 of "Answers of 2026-11-01": `program` of [package] names the
+# program, and is refused where it is no file name on every target.
+anti_message(manifest_program_blank
+    FILES anti.toml "[package]\nprogram = \"my tree\"\n"
     ARGS build
-    ERR "anti: ./anti.toml: [package] names no `name`, the root module path of the package")
+    ERR "anti: ./anti.toml: [package] program `my tree` is no file name on every target")
+anti_message(manifest_program_path
+    FILES anti.toml "[package]\nprogram = \"../tree\"\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] program `../tree` is no file name on every target")
 # Q3 of "Answers of 2026-11-01": [package] is optional for a project
 # that requires no packages, and one with dependencies needs it.
 anti_message(manifest_dependencies_without_package
@@ -52,6 +58,13 @@ set(app_text "//! The smallest program.\n\nfn main() -> int\n{\n\treturn 0;\n}\n
 set(library_text "//! The smallest library.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
 set(tools --runtime "${RUNTIME}")
 
+# Q6 of "Answers of 2026-11-01": a library project has no program, so
+# `program` names nothing there.
+anti_message(program_library
+    FILES anti.toml "[package]\nprogram = \"tree\"\n"
+          src/com/example/lib.anti "${library_text}"
+    ARGS build ${tools}
+    ERR "anti: ./anti.toml: [package] names the program `tree`, and the project holds no `main`")
 anti_message(antic_version
     FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\nantic = \"99.0.0\"\n"
           ${app_source} "${app_text}"

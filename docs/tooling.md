@@ -235,17 +235,25 @@ ff = "https://anti.foundingfuture.com/repo"
 
 - `name` is a module path, the root of every module in the package. Each segment is a
   lowercase ASCII identifier.
+- `program` is the file name of the program, without the suffix of an executable. It
+  holds letters, digits, `.`, `_` and `-`, and is a file name on every target.
 - `version` is a semantic version `major.minor.patch`.
 - `antic` is the minimum compiler version, one to three parts of digits. `anti build`
   refuses an older compiler and a version of another form, which satisfies nothing.
 - `license`, `license_text`, `attribution` and `publish` are described in
   `docs/distribution.md`.
 - `[package]` is optional for a project that requires no packages, so an empty
-  `anti.toml` is a manifest. Such a project is the package of its root module: the
-  module that holds `main`, or the last module of the order in a library project. A
-  program takes the last segment of that path as its name. A manifest with
-  `[dependencies]` needs `[package]` and its `name`, and so does a `[package]` that
-  names any other field.
+  `anti.toml` is a manifest. Every field but `name` stands without `name`, and a
+  project without it is the package of its root module: the module that holds `main`,
+  or the last module of the order in a library project. A manifest with
+  `[dependencies]` needs `[package]` and its `name`, and so does a published package.
+- A program takes the name `program` gives. Without it a program takes the last
+  segment of `name`, and without either the name of the project directory, the
+  directory that holds `anti.toml`. The copy of a project in a directory
+  `pythagoras-tree` builds `dist/<target>/<mode>/pythagoras-tree`, with the suffix of
+  an executable of the target. A directory name that is no file name on every target
+  is refused, and `program` then names the program. A library project has no program
+  and refuses `program`.
 
 `[targets]`:
 

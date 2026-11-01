@@ -92,6 +92,9 @@ struct build {
     struct text lib_dir;
     struct text obj_dir;
     struct text name;
+    /* The file name of the program without the suffix of its target, and
+       empty in a library project. */
+    struct text program;
     /* The frameworks and the Linux libraries of every library file the
        program reaches, in framework_arena. */
     struct arena framework_arena;
@@ -693,13 +696,13 @@ static size_t root_module(const struct build *b)
     return b->unit_count > 0 ? b->order[b->unit_count - 1] : 0;
 }
 
-/* [provisional] DESIGN: a project whose manifest has no [package] is the
-   package of its root module: the module that holds main, or the root
-   module of a library project, which is the last of the order. Its path
-   is the package name that every compile carries, so the modules of the
-   project share their internal items, and the program takes the last
-   segment as its name, as antic names one without -o. Q3 of "Answers of
-   2026-11-01" in docs/decisions.md makes [package] optional. */
+/* [provisional] DESIGN: a project whose manifest names no package is
+   the package of its root module: the module that holds main, or the
+   root module of a library project, which is the last of the order. Its
+   path is the package name that every compile carries, so the modules of
+   the project share their internal items. Q3 and Q6 of "Answers of
+   2026-11-01" in docs/decisions.md make [package] and its `name`
+   optional. The program takes its name from name_program. */
 static void name_project(struct build *b)
 {
     size_t at = linking_module(b);
@@ -708,6 +711,62 @@ static void name_project(struct build *b)
         at = root_module(b);
     }
     text_append(&b->m.name, text_cstr(&b->units[at].path));
+}
+
+/* DESIGN: Q6 of "Answers of 2026-11-01" in docs/decisions.md names the
+   program. `program` of [package] names it, a `name` of the manifest
+   gives its last segment, and without either the program takes the name
+   of the project directory, the one that holds anti.toml. unnamed says
+   the manifest named no package.
+   [provisional] A library project has no program, so one that names
+   `program` is refused. A directory name that is no file name on every
+   target, a blank or a name of a device of Windows, is refused and asks
+   for `program`. On POSIX the directory is the one realpath gives, after
+   its links. */
+static bool name_program(struct build *b, const char *manifest_path,
+                         bool unnamed)
+{
+    const char *program = text_cstr(&b->m.program);
+    struct text directory = {0};
+    const char *last;
+    bool ok = true;
+
+    if (linking_module(b) == b->unit_count) {
+        if (b->m.program.length > 0) {
+            say_anti("%s: [package] names the program `%s`, and the "
+                     "project holds no `main`\n", manifest_path, program);
+            return false;
+        }
+        return true;
+    }
+    if (b->m.program.length > 0) {
+        text_append(&b->program, program);
+        return true;
+    }
+    if (!unnamed) {
+        text_append(&b->program, modpath_last(text_cstr(&b->m.name)));
+        return true;
+    }
+    if (!platform_absolute_path(b->r->root, &directory)) {
+        text_append(&directory, b->r->root);
+    }
+    while (directory.length > 1 &&
+           directory.data[directory.length - 1] == '/') {
+        directory.length--;
+        directory.data[directory.length] = '\0';
+    }
+    last = strrchr(text_cstr(&directory), '/');
+    last = last != NULL ? last + 1 : text_cstr(&directory);
+    if (manifest_file_name_valid(last)) {
+        text_append(&b->program, last);
+    } else {
+        say_anti("the project directory `%s` is no file name on every "
+                 "target, and `program` of [package] names the program\n",
+                 last);
+        ok = false;
+    }
+    text_free(&directory);
+    return ok;
 }
 
 /* Dev mode: one object per module, cached by digest, and one link that
@@ -938,11 +997,11 @@ static void target_dir(const char *root, const struct text *dir,
                  release ? "release" : "dev");
 }
 
-/* The file name of the program of the package m on a target. */
-static void program_name(const struct manifest *m, enum target t,
+/* The file name of the program of the build b on a target. */
+static void program_name(const struct build *b, enum target t,
                          struct text *out)
 {
-    text_appendf(out, "%s%s", modpath_last(text_cstr(&m->name)),
+    text_appendf(out, "%s%s", text_cstr(&b->program),
                  target_info(t)->executable_suffix);
 }
 
@@ -1129,7 +1188,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
         library_name(t, b->r->lib == BUILD_LIB_SHARED,
                      modpath_last(text_cstr(&b->m.name)), &deliverable);
     } else {
-        program_name(&b->m, t, &deliverable);
+        program_name(b, t, &deliverable);
     }
     text_appendf(&b->name, "%s/%s", text_cstr(&b->build_dir),
                  text_cstr(&deliverable));
@@ -1379,6 +1438,7 @@ static void build_free(struct build *b)
         unit_free(&b->units[i]);
     }
     free(b->units);
+    text_free(&b->program);
     files_list_free(&b->sources);
     free(b->order);
     for (i = 0; i < b->spec_count; i++) {
@@ -1416,7 +1476,7 @@ static int run_built(const struct build *b)
     }
     target_dir(r->root, &b->m.dist, host, r->release, &program);
     text_append(&program, "/");
-    program_name(&b->m, host, &program);
+    program_name(b, host, &program);
     if (!files_exists(text_cstr(&program))) {
         say_anti("%s was not built, so there is nothing "
                  "to run\n", text_cstr(&program));
@@ -1440,6 +1500,7 @@ static int build_project(const struct build_request *r,
     enum cpu_level cpus[TARGET_COUNT];
     size_t target_count = 0;
     size_t i;
+    bool unnamed;
     int status = 1;
 
     memset(&b, 0, sizeof b);
@@ -1518,8 +1579,12 @@ static int build_project(const struct build_request *r,
     if (!read_units(&b)) {
         goto done;
     }
-    if (b.m.name.length == 0) {
+    unnamed = b.m.name.length == 0;
+    if (unnamed) {
         name_project(&b);
+    }
+    if (!name_program(&b, text_cstr(&manifest_path), unnamed)) {
+        goto done;
     }
     /* R168 of "Rules of 2026-10-13": a library project names its root
        module by its package name, and one without it builds from the

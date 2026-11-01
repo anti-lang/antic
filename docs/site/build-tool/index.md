@@ -98,6 +98,7 @@ ff = "https://anti.foundingfuture.com/repo"
 A package is a set of modules named by a module path, the path of its root. Every module of the package has a path under that root, and each module compiles to its own `.antl` file. The table `[package]` holds these fields.
 
 - `name` is the module path of the package, with segments of lowercase ASCII letters, digits and `_`.
+- `program` is the file name of the program, without the suffix of an executable. A program without it takes the last segment of `name`, and without either the name of the project directory.
 - `version` is a version of one to three parts of digits, as `1.2.0`.
 - `antic` is the lowest compiler version the project builds with, and `anti build` refuses an older compiler.
 - `license`, `license_text` and `attribution` belong to the licences, described below.

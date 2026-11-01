@@ -2201,7 +2201,7 @@ The `anti` tool has twelve commands.
 | Command | What it does |
 |---|---|
 | `anti new <name>` | Writes a starter project: `anti.toml`, `src/` with one module and `test/`. |
-| `anti build` | Reads `anti.toml`, resolves the dependencies into `anti.lock`, fetches every library file and compiles the project. Dev mode writes one object per module, cached by digest, with `-g` on. `--release` compiles the whole program in one call and writes the symbols archive beside it. `--target`, `--cpu`, `--offline`, `--strip-docs`, `--lto`, `--memory-checks`, `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--profile-generate` and `--profile-use`. It writes `NOTICE.txt` beside a program. |
+| `anti build` | Reads `anti.toml`, resolves the dependencies into `anti.lock`, fetches every library file and compiles the project. Dev mode writes one object per module, cached by digest, with `-g` on. `--release` compiles the whole program in one call and writes the symbols archive beside it. `--target`, `--cpu`, `--offline`, `--strip-docs`, `--lto`, `--memory-checks`, `--lib static\|shared`, `--bundle-runtime`, `--soname`, `--profile-generate` and `--profile-use`. It writes `NOTICE.txt` beside a program. An empty `anti.toml` is a manifest, and the program takes its name from `program` of `[package]`, from the last segment of `name` or from the project directory. |
 | `anti run` | Builds for the host and runs what it wrote, with the options of `build` that apply to the host. |
 | `anti sdk export` | Packs the stubs and the version of Apple's SDK into `apple-sdk-<version>.tar.xz`, on a Mac. |
 | `anti sdk import <bundle>` | Unpacks that bundle into the sysroot of Anti on any host, for a program that names a framework. |

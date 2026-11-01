@@ -39,6 +39,13 @@ enum { MANIFEST_VERSION_DIGITS = 9 };
    nowhere in a path or in the comparison. */
 bool manifest_version_valid(const char *version);
 
+/* Whether name is the file name of a program on every target: letters,
+   digits, `.`, `_` and `-`, neither first a `.` nor a `-`, nor last a
+   `.`, and no name of a device of Windows before its first `.`, compared
+   without case. A directory name of the project and `program` of
+   [package] name a program only in this form. */
+bool manifest_file_name_valid(const char *name);
+
 /* Whether digest is a SHA-256 digest in 64 lowercase hex digits. */
 bool manifest_digest_valid(const char *digest);
 
@@ -102,6 +109,9 @@ struct manifest {
     /* [package] name, the root module path, and empty without
        [package], which a project with no dependency may leave out */
     struct text name;
+    /* [package] program, the file name of the program, and empty
+       without it */
+    struct text program;
     struct text version;
     struct text antic;          /* the minimum compiler version */
     struct text license;

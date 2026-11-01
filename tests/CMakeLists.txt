@@ -6845,10 +6845,17 @@ add_test(NAME anti_build_raylib
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-build-raylib"
         -P "${ANTIC_RUNNERS}/run_anti_build_raylib.cmake")
 
-# A project whose manifest is empty is the package of its root module,
-# as a program and as a library project. The header of
-# tests/runners/run_anti_build_no_package.cmake names what each case shows.
-foreach(case program library)
+# A project whose manifest is empty, or whose [package] has no `name`, is
+# the package of its root module, as a program and as a library project.
+# The header of tests/runners/run_anti_build_no_package.cmake names what
+# each case shows. Windows makes no directory named after a device, so the
+# case of one runs on the other hosts.
+set(antic_no_package_cases program named version license library
+    directory_space)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    list(APPEND antic_no_package_cases directory_device)
+endif()
+foreach(case IN LISTS antic_no_package_cases)
     add_test(NAME anti_build_no_package_${case}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"

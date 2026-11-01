@@ -42,6 +42,55 @@ bool manifest_name_valid(const char *name)
     }
 }
 
+/* [provisional] DESIGN: a program takes the name of the project
+   directory or of `program` only where that name is a file name on all
+   six targets. The bytes are the portable file name set of POSIX. A first
+   `-` reads as an option and a first `.` hides the file, and Windows drops
+   a last `.` and refuses the names of its devices, also before a suffix.
+   "The build command" in docs/decisions.md holds the entry. */
+bool manifest_file_name_valid(const char *name)
+{
+    static const char *const devices[] = {
+        "con", "prn", "aux", "nul",
+        "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+        "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+    };
+    size_t length = strlen(name);
+    size_t stem = strcspn(name, ".");
+    size_t i;
+
+    if (length == 0 || name[0] == '.' || name[0] == '-' ||
+        name[length - 1] == '.') {
+        return false;
+    }
+    for (i = 0; i < length; i++) {
+        char c = name[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) {
+            return false;
+        }
+    }
+    for (i = 0; i < sizeof devices / sizeof devices[0]; i++) {
+        size_t j;
+        if (strlen(devices[i]) != stem) {
+            continue;
+        }
+        for (j = 0; j < stem; j++) {
+            char c = name[j];
+            if (c >= 'A' && c <= 'Z') {
+                c = (char)(c - 'A' + 'a');
+            }
+            if (c != devices[i][j]) {
+                break;
+            }
+        }
+        if (j == stem) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool manifest_digest_valid(const char *digest)
 {
     size_t i;
@@ -407,6 +456,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     }
     layout_of(doc, &out->src, &out->test, &out->build);
     text_of_key(doc, "package.name", &out->name);
+    text_of_key(doc, "package.program", &out->program);
     text_of_key(doc, "package.version", &out->version);
     text_of_key(doc, "package.antic", &out->antic);
     text_of_key(doc, "package.license", &out->license);
@@ -422,22 +472,22 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
     if (!read_tables(path, doc, out)) {
         goto done;
     }
-    /* Q3 of "Answers of 2026-11-01" in docs/decisions.md: [package] is
-       optional for a project that requires no packages. A [package] that
-       names another field still names the package, and a project with
-       dependencies is the package that requires them. The build names a
-       project without one after its root module. */
-    if (out->name.length == 0 &&
-        (out->version.length > 0 || out->antic.length > 0 ||
-         out->license.length > 0 || out->license_text.length > 0 ||
-         out->attribution_count > 0)) {
-        say_anti("%s: [package] names no `name`, the root module "
-                 "path of the package\n", path);
-        goto done;
-    }
+    /* Q3 and Q6 of "Answers of 2026-11-01" in docs/decisions.md:
+       [package] is optional for a project that requires no packages, and
+       every field of it but `name` stands without `name`. A project with
+       dependencies is the package that requires them, so it needs one.
+       The build names a project without one after its root module. */
     if (out->name.length == 0 && out->dependency_count > 0) {
         say_anti("%s: [dependencies] needs a [package] with a `name`, "
                  "the package that requires them\n", path);
+        goto done;
+    }
+    /* The program is a file of dist/, so its name stands in no other
+       directory and is a file name on every target. */
+    if (out->program.length > 0 &&
+        !manifest_file_name_valid(text_cstr(&out->program))) {
+        say_anti("%s: [package] program `%s` is no file name on every "
+                 "target\n", path, text_cstr(&out->program));
         goto done;
     }
     /* The version goes into every class descriptor, where the loader of a
@@ -544,6 +594,7 @@ void manifest_free(struct manifest *m)
     }
     free(m->dependencies);
     text_free(&m->name);
+    text_free(&m->program);
     text_free(&m->version);
     text_free(&m->antic);
     text_free(&m->license);

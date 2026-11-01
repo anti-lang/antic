@@ -208,8 +208,9 @@ static void manifest_layout(void)
 
 /* The three refusals: a dependency of a repository and a path, one with
    no version and one naming a repository that `[repositories]` does not.
-   A file without `[package] name` is no manifest either, and neither is
-   one whose `[package] version` the resolver would not read: the loader
+   A file whose dependencies stand without `[package] name` is no
+   manifest either, by Q6 of "Answers of 2026-11-01", and neither is one
+   whose `[package] version` the resolver would not read: the loader
    of a plugin compared `1.0.0.1` above `1.0.0`, and the resolver equal. */
 static void manifest_refusals(void)
 {
@@ -228,7 +229,9 @@ static void manifest_refusals(void)
         "[package]\nname = \"com.example.app\"\n"
         "[dependencies]\n"
         "\"com.example.tree\" = { version = \"1.0.0\", repo = \"nowhere\" }\n";
-    static const char no_name[] = "[package]\nversion = \"1.0.0\"\n";
+    static const char no_name[] =
+        "[package]\nversion = \"1.0.0\"\n"
+        "[dependencies]\n\"com.example.tree\" = { path = \"../libs\" }\n";
     static const char four_parts[] =
         "[package]\nname = \"com.example.app\"\nversion = \"1.0.0.1\"\n";
     static const char not_digits[] =

@@ -600,7 +600,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_anti_build_deps.cmake` | Drives `anti build` over a path dependency and a `file://` repository. |
 | `tests/runners/run_anti_build_framework.cmake` | Builds a project that names a framework and checks the program loads it. |
 | `tests/runners/run_anti_build_inputs.cmake` | Feeds `anti build` a malformed index and lock file. |
-| `tests/runners/run_anti_build_no_package.cmake` | Builds a project whose manifest is empty, as a program and as a library project. |
+| `tests/runners/run_anti_build_no_package.cmake` | Builds a project whose manifest names no package, as a program and as a library project, and checks the name of its program. |
 | `tests/runners/run_anti_build_raylib.cmake` | Builds and runs a project that imports `anti.raylib` in both modes, with an empty manifest. |
 | `tests/runners/run_anti_build_rerun.cmake` | Runs and rebuilds a program in turns on a Windows host. |
 | `tests/runners/run_anti_build_resolve.cmake` | Checks the resolver and the search over more than one repository. |
