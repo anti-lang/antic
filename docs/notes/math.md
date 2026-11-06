@@ -40,7 +40,10 @@ The scalar helpers of raymath, under its names without the prefix:
 | `wrap(x, lo, hi)` | `Wrap` | `x` wrapped into `lo..hi` |
 
 The constants are `PI`, `TAU`, `E`, `DEG2RAD` and `RAD2DEG`, as raylib's
-`PI`, `DEG2RAD` and `RAD2DEG`. Angles are radians, as in C and raymath.
+`PI`, `DEG2RAD` and `RAD2DEG`, in `f32`. `PI_F64`, `TAU_F64`, `E_F64`,
+`DEG2RAD_F64` and `RAD2DEG_F64` hold the same values with the digits of an
+`f64`, by Q1 of "Answers of 2026-11-06, third set". Angles are radians, as
+in C and raymath.
 
 A domain error gives NaN, as C gives it. No function fails or sets `errno`.
 

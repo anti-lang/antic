@@ -1011,5 +1011,14 @@ fn main() -> int
 	one_f32_line("PI and TAU", math.PI, math.TAU);
 	one_f32_line("E", math.E, math.E);
 	one_f32_line("DEG2RAD and RAD2DEG", math.DEG2RAD, math.RAD2DEG);
+	one_f64_line("PI_F64 and TAU_F64", math.PI_F64, math.TAU_F64);
+	one_f64_line("E_F64", math.E_F64, math.E_F64);
+	one_f64_line("DEG2RAD_F64 and RAD2DEG_F64", math.DEG2RAD_F64,
+		math.RAD2DEG_F64);
+	let widened = math.PI as f64;
+	let wider = math.PI_F64 != widened;
+	let line = f"PI_F64 holds more digits than PI {wider}";
+	io.println(line);
+	free(line.ptr);
 	return 0;
 }

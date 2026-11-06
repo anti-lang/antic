@@ -89,6 +89,21 @@ pub const DEG2RAD: f32 = 0.01745329251994329577;
 /// The degrees of one radian, `180 / PI`.
 pub const RAD2DEG: f32 = 57.2957795130823208768;
 
+/// `PI` with the digits of an `f64`.
+pub const PI_F64: f64 = 3.14159265358979323846;
+
+/// `TAU` with the digits of an `f64`.
+pub const TAU_F64: f64 = 6.28318530717958647692;
+
+/// `E` with the digits of an `f64`.
+pub const E_F64: f64 = 2.71828182845904523536;
+
+/// `DEG2RAD` with the digits of an `f64`.
+pub const DEG2RAD_F64: f64 = 0.01745329251994329577;
+
+/// `RAD2DEG` with the digits of an `f64`.
+pub const RAD2DEG_F64: f64 = 57.2957795130823208768;
+
 /// The sine of `x`.
 pub fn sin<T: Float>(x: T) -> T
 {
