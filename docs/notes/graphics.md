@@ -93,9 +93,11 @@ the display takes.
 
 - raylib's named colours are constants of the module: `PINK`, `LIME`,
   `RAYWHITE` and the rest.
-- `Color.hex(0xFF1493FF)` is `GetColor`, `Color.hsv(h, s, v)` is
+- `graphics.hex(0xFF1493FF)` is `GetColor`, `graphics.hsv(h, s, v)` is
   `ColorFromHSV`, `c.fade(0.3)` is `Fade`, `a.lerp(b, t)` is `ColorLerp`
-  and `c.brightness(k)` is `ColorBrightness`.
+  and `c.brightness(k)` is `ColorBrightness`. A struct holds fields alone,
+  so the two that make a colour are functions of the module, and the other
+  three are functions of the module that a colour calls as its own.
 
 ## Shapes
 
@@ -132,17 +134,18 @@ fn branch(c: graphics.Canvas, level: int, a: f32)
 A canvas's square stands on its bottom edge. The left child stands on the
 first part of the top edge of its parent, turned up by `a` degrees. The right
 child stands on the rest, turned a quarter further.
-The builder checks the geometry of this sketch with a test of the Recorder
-below.
+The test `std_graphics_tree` checks the geometry of this sketch through the
+Recorder below at 30, 45 and 60 degrees, and found it right.
 
 ## Text, fonts and images
 
 - `f.text(at, size, s, color)` is `DrawTextEx` with raylib's default font, and
   `Font.load(path, size)` is `LoadFontEx` for a TTF the program ships.
+  `f.text_ex(font, at, size, s, color)` writes in that font.
 - A frame of a game shows a score without allocating. raylib's `TextFormat`
   writes into a static buffer it reuses, and the window owns an
-  `anti.text.Builder` the same way, cleared at each frame:
-  `f.text(at, size, w.say().add("Score ").add_int(score), color)`.
+  `anti.text.Builder` the same way, cleared at each call of `say`:
+  `f.text(at, size, w.say().add("Score ").add_int(score).text(), color)`.
 - `Texture.load(path) may fail` is `LoadTexture`, and `f.texture(t, at,
   width, tint)` is `DrawTexturePro`.
 
@@ -163,11 +166,14 @@ a second provider that opens no window and records every call. In
 a display:
 
 ```anti
-tests {
-	test "the tree draws every square" {
+tests
+{
+	fn the_tree_draws_every_square()
+	{
 		let r = graphics.Recorder.new(16.0 / 9.0);
 		branch(r.canvas(), 0, BASE_ANGLE);
-		assert r.count(graphics.Shape.Square) == SQUARES;
+		let squares = r.count(graphics.Shape.Square);
+		assert(squares == SQUARES);
 	}
 }
 ```

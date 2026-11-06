@@ -1,0 +1,27 @@
+//! A window under `anti test`. `[inject.test]` of the manifest gives it the
+//! Recorder, so the test runs without a display, and the window closes after
+//! the frames the Recorder allows.
+import anti.graphics.{xy};
+
+fn draw(f: graphics.Canvas, t: f64)
+{
+	f.clear(graphics.RAYWHITE);
+	f.circle(xy(0.5, 0.5), 0.25, graphics.PINK);
+	f.move(0.5, 0.5).turn(t as f32 * 90.0).scale(0.1).square(graphics.LIME);
+}
+
+tests
+{
+	fn a_window_draws_without_a_display()
+	{
+		let r = graphics.Recorder.shared();
+		r.frames = 3;
+		let w = graphics.open("Window") catch fatal;
+		for f in w.frames() {
+			draw(f, w.time());
+		}
+		let circles = r.count(graphics.Shape.Circle);
+		let squares = r.count(graphics.Shape.Square);
+		assert(r.drawn == 3 && circles == 1 && squares == 1);
+	}
+}

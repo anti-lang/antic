@@ -869,9 +869,10 @@ reports what it finished.
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
   `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
-  `anti.simd`, `anti.trace`, `anti.plugin`, `anti.regex` and `anti.math`,
-  and the collection modules under `anti.collection`. The build adds `anti.raylib`
-  to `std/` of the runtime archive.
+  `anti.simd`, `anti.trace`, `anti.plugin`, `anti.regex`, `anti.math`
+  and `anti.graphics`, and the collection modules under `anti.collection`.
+  The build adds `anti.raylib` to `std/` of the runtime archive, and
+  compiles `anti.graphics` after it.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
   holds `SystemError`, `on_fatal` and `check`. The compiler declares
@@ -1222,8 +1223,20 @@ reports what it finished.
   `anti_rt_libm_`, so every target gives the same bits. The exact
   functions of `src/rt/libm.c` are one instruction where the level has it.
   A program of `anti.math` names musl in its notice on every target. See
-  `docs/notes/math.md`. `anti.graphics` is designed in
-  `docs/notes/graphics.md` and not built yet.
+  `docs/notes/math.md`.
+- `anti.graphics` is built, as `docs/notes/graphics.md` designs it. A
+  program draws with `import anti.graphics;` and no manifest entry, in
+  units of the largest square that fits the window, and links raylib
+  through `anti.raylib`. `graphics.open` opens the window, `for f in
+  w.frames()` is the loop of raylib and `f.move`, `f.turn` and `f.scale`
+  give a canvas over the matrix of rlgl. `Display` is the abstract class
+  behind the window, `RaylibDisplay` its default provider, and `Recorder`
+  records every call without a window, which `[inject.test]` selects with
+  `anti.graphics.Recorder.shared`. No raylib type stands in a public
+  signature, a frame allocates nothing, which
+  `std_graphics_allocations_memory_checks` counts, and `open` fails on any
+  thread but the main one, through `anti_rt_main_thread` of the runtime.
+  The examples of the note link for all six targets.
 - `f16` is built: sixteen bits in a field, an array, a slice or a variable.
   A read gives an `f32`, a write takes `as f16`, and no operator takes one.
   ARM64 and x86-64-v3 convert in one instruction, and `v1` and `v2` call the

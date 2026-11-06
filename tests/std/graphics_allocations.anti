@@ -1,0 +1,112 @@
+//! A frame allocates nothing after the window opens. The build injects the
+//! Recorder and takes `--memory-checks`, whose runtime calls a hook of the
+//! program at every allocation of the process, the runtime and the C library
+//! among them. The hook counts them across a thousand frames that draw every
+//! shape, move, turn and scale canvases down a recursion, write a score with
+//! `say` and read the input and the clock.
+import anti.graphics.{LIME, PINK, xy};
+import anti.io;
+import anti.math;
+import anti.text;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+// Add the text of an f"..." to b and free it.
+fn put(b: *text.Builder, s: str)
+{
+	b.append(s);
+	free(s.ptr);
+}
+
+extern fn __sanitizer_install_malloc_and_free_hooks(on_alloc: ?fn(?*byte, c_size_t),
+	on_free: ?fn(?*byte)) -> c_int;
+
+class Count
+{
+	pub static atomic allocations: int = 0;
+}
+
+fn counted(p: ?*byte, size: c_size_t)
+{
+	Count.allocations.add(1);
+}
+
+fn freed(p: ?*byte)
+{
+}
+
+const LEVELS: int = 6;
+
+fn branch(c: graphics.Canvas, level: int, a: f32)
+{
+	c.square(PINK.lerp(LIME, level as f32 / LEVELS as f32));
+	if level == LEVELS { return; }
+	let r = a * math.DEG2RAD;
+	let left = c.turn(-a).scale(math.cos(r)).move(0.0, -1.0);
+	branch(left, level + 1, a);
+	branch(left.move(1.0, 1.0).turn(90.0).scale(math.tan(r)).move(0.0, -1.0),
+		level + 1, a);
+}
+
+fn draw(w: *graphics.Window, f: graphics.Canvas, t: *graphics.Texture,
+	font: *graphics.Font, score: int)
+{
+	f.clear(graphics.RAYWHITE);
+	f.rect_gradient_v(f.bounds, graphics.SKYBLUE, graphics.DARKBLUE);
+	branch(f.move(0.45, 0.8).scale(0.1), 0, 45.0 + 10.0 * math.sin(w.time() as f32));
+	f.rect(graphics.Rect { x: 0.1, y: 0.1, width: 0.2, height: 0.1 }, graphics.RED);
+	f.rect_lines(graphics.Rect { x: 0.1, y: 0.1, width: 0.2, height: 0.1 }, f.pixel,
+		graphics.BLACK);
+	f.circle(xy(0.5, 0.5), 0.1, graphics.LIME);
+	f.circle_gradient(xy(0.5, 0.4), 0.3, graphics.fade(LIME, 0.1), graphics.BLANK);
+	f.circle_lines(xy(0.5, 0.5), 0.12, graphics.MAROON);
+	f.ellipse(xy(0.2, 0.8), 0.1, 0.05, graphics.VIOLET);
+	f.line(xy(0.0, 0.0), xy(1.0, 1.0), 2.0 * f.pixel, graphics.BLACK);
+	f.triangle(xy(0.9, 0.1), xy(0.8, 0.2), xy(1.0, 0.2), graphics.ORANGE);
+	f.poly(xy(0.8, 0.8), 6, 0.05, 30.0, graphics.PURPLE);
+	f.text(xy(0.02, 0.02), 0.04, w.say().add("Score ").add_int(score).add(" at ")
+		.add_float(w.time() as f32).text(), graphics.DARKGRAY);
+	f.text_ex(font, xy(0.02, 0.92), 0.04, "Pythagoras", graphics.BROWN);
+	f.texture(t, xy(0.85, 0.85), 0.1, graphics.WHITE);
+	let input = w.key_pressed(graphics.Key.F) || w.key_down(graphics.Key.SPACE)
+		|| w.mouse_pressed(graphics.Mouse.LEFT) || w.gamepad_button_down(0, graphics.Pad.A);
+	if input {
+		w.toggle_borderless();
+	}
+	let m = w.mouse();
+	if m.x > 2.0 || w.mouse_wheel() > 0.0 || w.touch(0).y > 2.0 {
+		w.set_target_fps(30);
+	}
+}
+
+fn main() -> int
+{
+	let r = graphics.Recorder.shared();
+	r.frames = 1000;
+	let w = graphics.open("Allocations", graphics.Window { vsync: false }) catch e {
+		e.fatal();
+	};
+	let t = graphics.Texture.load("sprite.png") catch e {
+		e.fatal();
+	};
+	let font = graphics.Font.load("font.ttf", 32) catch e {
+		e.fatal();
+	};
+	let installed = __sanitizer_install_malloc_and_free_hooks(counted, freed);
+	let score = 0;
+	let calls = 0;
+	for f in w.frames() {
+		draw(&w, f, &t, &font, score);
+		score += 7;
+		calls += r.len();
+	}
+	let allocations = Count.allocations.load();
+	line(f"hooks installed: {installed != 0}");
+	line(f"{r.drawn} frames, {calls} calls, {allocations} allocations");
+	return 0;
+}

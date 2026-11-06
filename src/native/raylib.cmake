@@ -57,6 +57,24 @@ add_custom_command(OUTPUT "${antic_raylib_library}"
 add_custom_target(raylib_module ALL DEPENDS "${antic_raylib_library}")
 add_dependencies(raylib_module anti_std)
 
+# DESIGN: anti.graphics is a module of src/std/ that imports anti.raylib,
+# so it compiles after the binding, here, and not in the list of the
+# standard library of CMakeLists.txt. It is Anti classes over raylib, by
+# "Standard interfaces" in docs/anti-language-additions.md, and a program
+# finds it in std/anti/ of the runtime archive as it finds anti.raylib.
+set(antic_graphics_library "${ANTIC_RUNTIME_DIR}/std/anti/graphics.antl")
+add_custom_command(OUTPUT "${antic_graphics_library}"
+    COMMAND antic -c --anti-internal -I "${PROJECT_SOURCE_DIR}/src/std"
+        -I "${ANTIC_RUNTIME_DIR}/std"
+        --package-name anti --package-version "${PROJECT_VERSION}"
+        --license 0BSD --license-text "${PROJECT_SOURCE_DIR}/src/std/LICENSE"
+        -o "${antic_graphics_library}" "${ANTIC_STD_SOURCE_DIR}/graphics.anti"
+    DEPENDS antic "${ANTIC_STD_SOURCE_DIR}/graphics.anti"
+        "${antic_raylib_library}"
+    VERBATIM)
+add_custom_target(graphics_module ALL DEPENDS "${antic_graphics_library}")
+add_dependencies(graphics_module raylib_module)
+
 # The seven modules of the library. rglfw.c holds GLFW, and raudio.c the
 # audio module over miniaudio.
 set(ANTIC_RAYLIB_SOURCES rcore rshapes rtextures rtext rmodels raudio rglfw)
@@ -280,6 +298,19 @@ foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
                 "-DWORK=${ANTIC_RAYLIB_WORK}/${program}/${target}"
                 -P "${ANTIC_RUNNERS}/run_raylib_module.cmake")
     endforeach()
+endforeach()
+
+# Every example of docs/notes/graphics.md links for every target:
+# graphics_hello is its first program and graphics_tree holds the sketch of
+# the tree, which the test graphics_note_examples finds word for word.
+foreach(target IN LISTS ANTIC_MEDIA_TARGETS)
+    add_test(NAME graphics_link_${target}
+        COMMAND "${CMAKE_COMMAND}" "-DANTIC=$<TARGET_FILE:antic>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DSOURCES=${PROJECT_SOURCE_DIR}/tests/std/graphics_hello.anti,${PROJECT_SOURCE_DIR}/tests/std/graphics_tree.anti"
+            "-DTARGET=${target}"
+            "-DWORK=${ANTIC_RAYLIB_WORK}/graphics/${target}"
+            -P "${ANTIC_RUNNERS}/run_graphics_link.cmake")
 endforeach()
 
 # Every function of anti.raylib resolves at the link on every target, by

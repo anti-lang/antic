@@ -398,6 +398,7 @@ The modules of the standard library, in Anti. The header of a module is its
 | `src/std/anti/debug.anti` | `backtrace`, the short form of `StackTrace.capture`. |
 | `src/std/anti/error.anti` | `SystemError`, `on_fatal` and `check`, beside the `Error` of `anti.lang`. |
 | `src/std/anti/fs.anti` | Files by handle and by whole file, and the interface `FileSystem` with its default. |
+| `src/std/anti/graphics.anti` | Drawing in a window over raylib in units of a square: the window, the canvas, the interface `Display`, raylib and the Recorder. |
 | `src/std/anti/io.anti` | Console output and the exit of a program. |
 | `src/std/anti/json.anti` | Writing and reading the members of the JSON that `serialize` writes. |
 | `src/std/anti/lang.anti` | The root that imports nothing: the types the compiler knows by name, `Error` with its text, the trace of a stack, the hook handler and the hash seed. |
@@ -688,6 +689,8 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_function_alignment.cmake` | Checks the 16-byte alignment of ARM64 functions. |
 | `tests/runners/run_glibc_link.cmake` | Links a C probe of a native library against the glibc sysroot. |
 | `tests/runners/run_glibc_sysroot.cmake` | Checks the glibc pins and runs the sysroot script on stand-in packages. |
+| `tests/runners/run_graphics_link.cmake` | Links the examples of `docs/notes/graphics.md` for one target. |
+| `tests/runners/run_graphics_signatures.cmake` | Refuses a public item of `anti.graphics` that names a raylib type. |
 | `tests/runners/run_hash_seed.cmake` | Runs a program twice and expects two seeds. |
 | `tests/runners/run_header_names.cmake` | Refuses one of our headers included with angle brackets. |
 | `tests/runners/run_header_sections.cmake` | Checks that each function under a section of a shared header is defined in that file, and that no file outside its family includes the header. |
@@ -752,6 +755,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_note_claims.cmake` | Refuses a claim of `docs/notes/` or `docs/decisions.md` that names a C file as the place of a function the file does not hold. |
 | `tests/runners/run_note_claims_self.cmake` | Tests `run_note_claims.cmake` on made-up trees. |
 | `tests/runners/run_no_workflows.cmake` | Refuses a file under `.github/workflows/`. |
+| `tests/runners/run_note_examples.cmake` | Checks that every `anti` block of a note stands word for word in a file the suite builds. |
 | `tests/runners/run_one_allocator.cmake` | Refuses an allocation outside `src/antic/alloc.c`. |
 | `tests/runners/run_options_covered.cmake` | Refuses an option of antic or a command or option of `anti` that no test passes and `tests/options-open.txt` does not list. |
 | `tests/runners/run_options_covered_self.cmake` | Tests `run_options_covered.cmake` on made-up trees. |

@@ -1,0 +1,66 @@
+//! The colours of anti.graphics are raylib's. Each named colour holds the bytes
+//! of the one of anti.raylib, and `hex`, `hsv`, `fade`, `lerp` and `brightness`
+//! give what `GetColor`, `ColorFromHSV`, `Fade`, `ColorLerp` and
+//! `ColorBrightness` give. No window opens.
+import anti.graphics.{PINK, SKYBLUE};
+import anti.io;
+import anti.raylib;
+import anti.text;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn same(name: str, c: graphics.Color, r: raylib.Color)
+{
+	let equal = c.r == r.r as u8 && c.g == r.g as u8 && c.b == r.b as u8 && c.a == r.a as u8;
+	if !equal {
+		line(f"{name} differs from raylib's");
+	}
+}
+
+fn show(name: str, c: graphics.Color)
+{
+	line(f"{name}: {c.r} {c.g} {c.b} {c.a}");
+}
+
+fn main() -> int
+{
+	same("LIGHTGRAY", graphics.LIGHTGRAY, raylib.LIGHTGRAY);
+	same("GRAY", graphics.GRAY, raylib.GRAY);
+	same("DARKGRAY", graphics.DARKGRAY, raylib.DARKGRAY);
+	same("YELLOW", graphics.YELLOW, raylib.YELLOW);
+	same("GOLD", graphics.GOLD, raylib.GOLD);
+	same("ORANGE", graphics.ORANGE, raylib.ORANGE);
+	same("PINK", graphics.PINK, raylib.PINK);
+	same("RED", graphics.RED, raylib.RED);
+	same("MAROON", graphics.MAROON, raylib.MAROON);
+	same("GREEN", graphics.GREEN, raylib.GREEN);
+	same("LIME", graphics.LIME, raylib.LIME);
+	same("DARKGREEN", graphics.DARKGREEN, raylib.DARKGREEN);
+	same("SKYBLUE", graphics.SKYBLUE, raylib.SKYBLUE);
+	same("BLUE", graphics.BLUE, raylib.BLUE);
+	same("DARKBLUE", graphics.DARKBLUE, raylib.DARKBLUE);
+	same("PURPLE", graphics.PURPLE, raylib.PURPLE);
+	same("VIOLET", graphics.VIOLET, raylib.VIOLET);
+	same("DARKPURPLE", graphics.DARKPURPLE, raylib.DARKPURPLE);
+	same("BEIGE", graphics.BEIGE, raylib.BEIGE);
+	same("BROWN", graphics.BROWN, raylib.BROWN);
+	same("DARKBROWN", graphics.DARKBROWN, raylib.DARKBROWN);
+	same("WHITE", graphics.WHITE, raylib.WHITE);
+	same("BLACK", graphics.BLACK, raylib.BLACK);
+	same("BLANK", graphics.BLANK, raylib.BLANK);
+	same("MAGENTA", graphics.MAGENTA, raylib.MAGENTA);
+	same("RAYWHITE", graphics.RAYWHITE, raylib.RAYWHITE);
+	io.println("26 named colours");
+	show("hex 0xFF1493FF", graphics.hex(0xFF1493FF));
+	show("hsv 120 1 0.5", graphics.hsv(120.0, 1.0, 0.5));
+	show("PINK faded to 0.3", PINK.fade(0.3));
+	show("PINK to LIME at 0.25", PINK.lerp(graphics.LIME, 0.25));
+	show("SKYBLUE brighter by 0.5", SKYBLUE.brightness(0.5));
+	show("SKYBLUE darker by 0.5", graphics.brightness(graphics.SKYBLUE, -0.5));
+	return 0;
+}

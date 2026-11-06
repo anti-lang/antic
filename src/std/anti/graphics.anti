@@ -1,0 +1,1848 @@
+//! Drawing in a window over raylib, in units of a square that every window
+//! shows whole.
+//!
+//! `graphics.open(title)` opens the window, and `for f in w.frames()` draws one
+//! frame per turn on the canvas `f`. Every position and size is in units of the
+//! largest square that fits the window, from 0.0 to 1.0 on both axes, with y
+//! pointing down from its top left corner. A rotation is in degrees and turns
+//! clockwise. A program names no pixel size, colour depth or pixel format.
+//!
+//! Each part stands on raylib under the name of its function without the
+//! prefix: the window on `InitWindow`, the loop on `BeginDrawing` and
+//! `EndDrawing`, the square on `Camera2D`, the transforms of a canvas on the
+//! matrix of rlgl, and the colours, shapes, text and input on the functions of
+//! the same name. No raylib type stands in a public signature.
+//!
+//! `Display` is the abstract class behind the window and the canvas, and
+//! `RaylibDisplay` its default provider. `Recorder` opens no window and records
+//! every call, so a test runs drawing code without a display, with
+//! `"anti.graphics.Display" = "anti.graphics.Recorder.shared"` in
+//! `[inject.test]`.
+//!
+//! A frame allocates nothing after the window opens: `frames`, `Canvas`, `say`
+//! and every shape. `open` is called from the main thread, which macOS
+//! requires, and fails on any other.
+
+import anti.lang;
+import anti.math;
+import anti.raylib as rl;
+import anti.text;
+
+extern fn anti_rt_main_thread() -> c_int;
+extern fn anti_rt_out_of_memory(size: int) -> never;
+
+/// A point or a size in units of the square.
+pub struct Vec2
+{
+	x: f32,
+	y: f32,
+}
+
+/// The point `x`, `y`.
+pub fn xy(x: f32, y: f32) -> Vec2
+{
+	return Vec2 { x: x, y: y };
+}
+
+/// A rectangle in units of the square, from its top left corner.
+pub struct Rect
+{
+	x: f32,
+	y: f32,
+	width: f32,
+	height: f32,
+}
+
+/// A colour of raylib: red, green, blue and alpha in sRGB, one byte each.
+pub struct Color
+{
+	r: u8,
+	g: u8,
+	b: u8,
+	a: u8,
+}
+
+// The named colours of raylib, whose values the test std_graphics_colors
+// compares with those of anti.raylib.
+/// `LIGHTGRAY` of raylib.
+pub const LIGHTGRAY: Color = Color { r: 200, g: 200, b: 200, a: 255 };
+/// `GRAY` of raylib.
+pub const GRAY: Color = Color { r: 130, g: 130, b: 130, a: 255 };
+/// `DARKGRAY` of raylib.
+pub const DARKGRAY: Color = Color { r: 80, g: 80, b: 80, a: 255 };
+/// `YELLOW` of raylib.
+pub const YELLOW: Color = Color { r: 253, g: 249, b: 0, a: 255 };
+/// `GOLD` of raylib.
+pub const GOLD: Color = Color { r: 255, g: 203, b: 0, a: 255 };
+/// `ORANGE` of raylib.
+pub const ORANGE: Color = Color { r: 255, g: 161, b: 0, a: 255 };
+/// `PINK` of raylib.
+pub const PINK: Color = Color { r: 255, g: 109, b: 194, a: 255 };
+/// `RED` of raylib.
+pub const RED: Color = Color { r: 230, g: 41, b: 55, a: 255 };
+/// `MAROON` of raylib.
+pub const MAROON: Color = Color { r: 190, g: 33, b: 55, a: 255 };
+/// `GREEN` of raylib.
+pub const GREEN: Color = Color { r: 0, g: 228, b: 48, a: 255 };
+/// `LIME` of raylib.
+pub const LIME: Color = Color { r: 0, g: 158, b: 47, a: 255 };
+/// `DARKGREEN` of raylib.
+pub const DARKGREEN: Color = Color { r: 0, g: 117, b: 44, a: 255 };
+/// `SKYBLUE` of raylib.
+pub const SKYBLUE: Color = Color { r: 102, g: 191, b: 255, a: 255 };
+/// `BLUE` of raylib.
+pub const BLUE: Color = Color { r: 0, g: 121, b: 241, a: 255 };
+/// `DARKBLUE` of raylib.
+pub const DARKBLUE: Color = Color { r: 0, g: 82, b: 172, a: 255 };
+/// `PURPLE` of raylib.
+pub const PURPLE: Color = Color { r: 200, g: 122, b: 255, a: 255 };
+/// `VIOLET` of raylib.
+pub const VIOLET: Color = Color { r: 135, g: 60, b: 190, a: 255 };
+/// `DARKPURPLE` of raylib.
+pub const DARKPURPLE: Color = Color { r: 112, g: 31, b: 126, a: 255 };
+/// `BEIGE` of raylib.
+pub const BEIGE: Color = Color { r: 211, g: 176, b: 131, a: 255 };
+/// `BROWN` of raylib.
+pub const BROWN: Color = Color { r: 127, g: 106, b: 79, a: 255 };
+/// `DARKBROWN` of raylib.
+pub const DARKBROWN: Color = Color { r: 76, g: 63, b: 47, a: 255 };
+/// `WHITE` of raylib.
+pub const WHITE: Color = Color { r: 255, g: 255, b: 255, a: 255 };
+/// `BLACK` of raylib.
+pub const BLACK: Color = Color { r: 0, g: 0, b: 0, a: 255 };
+/// `BLANK` of raylib.
+pub const BLANK: Color = Color { r: 0, g: 0, b: 0, a: 0 };
+/// `MAGENTA` of raylib.
+pub const MAGENTA: Color = Color { r: 255, g: 0, b: 255, a: 255 };
+/// `RAYWHITE` of raylib.
+pub const RAYWHITE: Color = Color { r: 245, g: 245, b: 245, a: 255 };
+
+/// The colour of `value`, written 0xRRGGBBAA, as `GetColor`.
+pub fn hex(value: u32) -> Color
+{
+	return cooked(rl.GetColor(value as c_uint));
+}
+
+/// The colour of hue `h` in degrees, saturation `s` and value `v`, both from
+/// 0.0 to 1.0, as `ColorFromHSV`.
+pub fn hsv(h: f32, s: f32, v: f32) -> Color
+{
+	return cooked(rl.ColorFromHSV(h, s, v));
+}
+
+/// `c` with the alpha `alpha`, from 0.0 to 1.0, as `Fade`.
+pub fn fade(c: Color, alpha: f32) -> Color
+{
+	return cooked(rl.Fade(raw(c), alpha));
+}
+
+/// The colour `t` of the way from `c` to `to`, as `ColorLerp`.
+pub fn lerp(c: Color, to: Color, t: f32) -> Color
+{
+	return cooked(rl.ColorLerp(raw(c), raw(to), t));
+}
+
+/// `c` lighter for a `k` above 0.0 and darker below it, from -1.0 to 1.0, as
+/// `ColorBrightness`.
+pub fn brightness(c: Color, k: f32) -> Color
+{
+	return cooked(rl.ColorBrightness(raw(c), k));
+}
+
+fn raw(c: Color) -> rl.Color
+{
+	return rl.Color {
+		r: c.r as c_uchar, g: c.g as c_uchar, b: c.b as c_uchar,
+		a: c.a as c_uchar
+	};
+}
+
+fn cooked(c: rl.Color) -> Color
+{
+	return Color { r: c.r as u8, g: c.g as u8, b: c.b as u8, a: c.a as u8 };
+}
+
+fn vector(p: Vec2) -> rl.Vector2
+{
+	return rl.Vector2 { x: p.x, y: p.y };
+}
+
+fn rectangle(r: Rect) -> rl.Rectangle
+{
+	return rl.Rectangle { x: r.x, y: r.y, width: r.width, height: r.height };
+}
+
+/// The keys of the keyboard, with the values of raylib's `KeyboardKey`.
+pub enum Key
+{
+	NULL = 0,
+	APOSTROPHE = 39,
+	COMMA = 44,
+	MINUS = 45,
+	PERIOD = 46,
+	SLASH = 47,
+	ZERO = 48,
+	ONE = 49,
+	TWO = 50,
+	THREE = 51,
+	FOUR = 52,
+	FIVE = 53,
+	SIX = 54,
+	SEVEN = 55,
+	EIGHT = 56,
+	NINE = 57,
+	SEMICOLON = 59,
+	EQUAL = 61,
+	A = 65,
+	B = 66,
+	C = 67,
+	D = 68,
+	E = 69,
+	F = 70,
+	G = 71,
+	H = 72,
+	I = 73,
+	J = 74,
+	K = 75,
+	L = 76,
+	M = 77,
+	N = 78,
+	O = 79,
+	P = 80,
+	Q = 81,
+	R = 82,
+	S = 83,
+	T = 84,
+	U = 85,
+	V = 86,
+	W = 87,
+	X = 88,
+	Y = 89,
+	Z = 90,
+	LEFT_BRACKET = 91,
+	BACKSLASH = 92,
+	RIGHT_BRACKET = 93,
+	GRAVE = 96,
+	SPACE = 32,
+	ESCAPE = 256,
+	ENTER = 257,
+	TAB = 258,
+	BACKSPACE = 259,
+	INSERT = 260,
+	DELETE = 261,
+	RIGHT = 262,
+	LEFT = 263,
+	DOWN = 264,
+	UP = 265,
+	PAGE_UP = 266,
+	PAGE_DOWN = 267,
+	HOME = 268,
+	END = 269,
+	CAPS_LOCK = 280,
+	SCROLL_LOCK = 281,
+	NUM_LOCK = 282,
+	PRINT_SCREEN = 283,
+	PAUSE = 284,
+	F1 = 290,
+	F2 = 291,
+	F3 = 292,
+	F4 = 293,
+	F5 = 294,
+	F6 = 295,
+	F7 = 296,
+	F8 = 297,
+	F9 = 298,
+	F10 = 299,
+	F11 = 300,
+	F12 = 301,
+	LEFT_SHIFT = 340,
+	LEFT_CONTROL = 341,
+	LEFT_ALT = 342,
+	LEFT_SUPER = 343,
+	RIGHT_SHIFT = 344,
+	RIGHT_CONTROL = 345,
+	RIGHT_ALT = 346,
+	RIGHT_SUPER = 347,
+	KB_MENU = 348,
+	KP_0 = 320,
+	KP_1 = 321,
+	KP_2 = 322,
+	KP_3 = 323,
+	KP_4 = 324,
+	KP_5 = 325,
+	KP_6 = 326,
+	KP_7 = 327,
+	KP_8 = 328,
+	KP_9 = 329,
+	KP_DECIMAL = 330,
+	KP_DIVIDE = 331,
+	KP_MULTIPLY = 332,
+	KP_SUBTRACT = 333,
+	KP_ADD = 334,
+	KP_ENTER = 335,
+	KP_EQUAL = 336,
+	BACK = 4,
+	MENU = 5,
+	VOLUME_UP = 24,
+	VOLUME_DOWN = 25,
+}
+
+/// The buttons of the mouse, with the values of raylib's `MouseButton`.
+pub enum Mouse
+{
+	LEFT = 0,
+	RIGHT = 1,
+	MIDDLE = 2,
+	SIDE = 3,
+	EXTRA = 4,
+	FORWARD = 5,
+	BACK = 6,
+}
+
+/// The buttons of a gamepad, with the values of raylib's `GamepadButton`.
+pub enum Pad
+{
+	UNKNOWN = 0,
+	LEFT_FACE_UP = 1,
+	LEFT_FACE_RIGHT = 2,
+	LEFT_FACE_DOWN = 3,
+	LEFT_FACE_LEFT = 4,
+	RIGHT_FACE_UP = 5,
+	RIGHT_FACE_RIGHT = 6,
+	RIGHT_FACE_DOWN = 7,
+	RIGHT_FACE_LEFT = 8,
+	LEFT_TRIGGER_1 = 9,
+	LEFT_TRIGGER_2 = 10,
+	RIGHT_TRIGGER_1 = 11,
+	RIGHT_TRIGGER_2 = 12,
+	MIDDLE_LEFT = 13,
+	MIDDLE = 14,
+	MIDDLE_RIGHT = 15,
+	LEFT_THUMB = 16,
+	RIGHT_THUMB = 17,
+	/// The four buttons of the right face by the layout of an Xbox pad.
+	A = 7,
+	B = 6,
+	X = 8,
+	Y = 5,
+}
+
+/// The kind of a call that a `Recorder` records.
+pub enum Shape
+{
+	Clear,
+	Square,
+	Rect,
+	RectLines,
+	RectGradient,
+	Circle,
+	CircleGradient,
+	CircleLines,
+	Ellipse,
+	Line,
+	Triangle,
+	Poly,
+	Text,
+	Texture,
+}
+
+/// The number of values of `Shape`.
+const SHAPES: int = 14;
+
+/// The frame of reference of a canvas. The point (u, v) of its square stands at
+/// (a u + c v + x, b u + d v + y) of the square of the frame.
+pub struct Transform
+{
+	a: f32,
+	b: f32,
+	c: f32,
+	d: f32,
+	x: f32,
+	y: f32,
+}
+
+/// The frame of reference of the frame itself.
+const IDENTITY: Transform = Transform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, x: 0.0, y: 0.0 };
+
+/// The point `p` of the square of `m` in the square of the frame.
+pub fn apply(m: *Transform, p: Vec2) -> Vec2
+{
+	return Vec2 { x: m.a * p.x + m.c * p.y + m.x, y: m.b * p.x + m.d * p.y + m.y };
+}
+
+/// The length in the frame of one unit of `m`.
+pub fn stretch(m: *Transform) -> f32
+{
+	return math.sqrt(math.abs(m.a * m.d - m.b * m.c));
+}
+
+/// The window failed to open, on a machine without a display or where the
+/// system refused it.
+pub class NoDisplay inherits lang.Error
+{
+}
+
+/// `open` was called from a thread other than the main thread.
+pub class NotMainThread inherits lang.Error
+{
+}
+
+/// The backend behind the window and the canvas.
+///
+/// `RaylibDisplay` is the default provider. `Recorder` opens no window and
+/// records every call. A position and a size reach a shape in the units of the
+/// canvas that draws it, with the frame of reference of that canvas.
+pub abstract class Display
+{
+	/// Open the window with the config flags of raylib. It fails where the
+	/// system gives no window.
+	abstract fn open(self, title: str, flags: u32) may fail;
+
+	/// Close the window.
+	abstract fn close(self);
+
+	/// Whether the window asks to close, as `WindowShouldClose`.
+	abstract fn should_close(self) -> bool;
+
+	/// Start a frame and give its canvas, as `BeginDrawing` and `BeginMode2D`.
+	abstract fn begin(self) -> Canvas;
+
+	/// End the frame, as `EndMode2D` and `EndDrawing`.
+	abstract fn end(self);
+
+	/// Fill the whole window with `color`, as `ClearBackground`.
+	abstract fn clear(self, color: Color);
+
+	/// Fill the unit square of `m` with `color`.
+	abstract fn square(self, m: *Transform, color: Color);
+
+	/// Fill `r` with `color`, as `DrawRectangleRec`.
+	abstract fn rect(self, m: *Transform, r: Rect, color: Color);
+
+	/// Draw the edges of `r` `thickness` wide, as `DrawRectangleLinesEx`.
+	abstract fn rect_lines(self, m: *Transform, r: Rect, thickness: f32, color: Color);
+
+	/// Fill `r` from `top` to `bottom`, as `DrawRectangleGradientEx`.
+	abstract fn rect_gradient_v(self, m: *Transform, r: Rect, top: Color, bottom: Color);
+
+	/// Fill a circle, as `DrawCircleV`, with the segments raylib gives the
+	/// circle in pixels.
+	abstract fn circle(self, m: *Transform, at: Vec2, radius: f32, color: Color);
+
+	/// Fill a circle from `inner` to `outer`, as `DrawCircleGradient`.
+	abstract fn circle_gradient(self, m: *Transform, at: Vec2, radius: f32, inner: Color,
+		outer: Color);
+
+	/// Draw the edge of a circle, as `DrawCircleLinesV`, with the segments
+	/// raylib gives the circle in pixels.
+	abstract fn circle_lines(self, m: *Transform, at: Vec2, radius: f32, color: Color);
+
+	/// Fill an ellipse, as `DrawEllipseV`.
+	abstract fn ellipse(self, m: *Transform, at: Vec2, rx: f32, ry: f32, color: Color);
+
+	/// Draw a line `thickness` wide, as `DrawLineEx`.
+	abstract fn line(self, m: *Transform, from: Vec2, to: Vec2, thickness: f32,
+		color: Color);
+
+	/// Fill a triangle, its corners in either order, as `DrawTriangle`.
+	abstract fn triangle(self, m: *Transform, p: Vec2, q: Vec2, r: Vec2, color: Color);
+
+	/// Fill a regular polygon, as `DrawPoly`.
+	abstract fn poly(self, m: *Transform, at: Vec2, sides: int, radius: f32, rotation: f32,
+		color: Color);
+
+	/// Write `s` in `font`, or the default font where it is `none`, as
+	/// `DrawTextEx`.
+	abstract fn text(self, m: *Transform, font: ?*Font, at: Vec2, size: f32, s: str,
+		color: Color);
+
+	/// Draw `t` `width` wide from `at`, as `DrawTexturePro`.
+	abstract fn texture(self, m: *Transform, t: *Texture, at: Vec2, width: f32, tint: Color);
+
+	/// Load the image at `path` into `t`, as `LoadTexture`. It fails where the
+	/// image does not load.
+	abstract fn load_texture(self, path: str, t: *Texture) may fail;
+
+	/// Give back what `load_texture` took for `t`, as `UnloadTexture`.
+	abstract fn unload_texture(self, t: *Texture);
+
+	/// Load the TTF at `path` at `size` pixels into `f`, as `LoadFontEx`. It
+	/// fails where the font does not load.
+	abstract fn load_font(self, path: str, size: int, f: *Font) may fail;
+
+	/// Give back what `load_font` took for `f`, as `UnloadFont`.
+	abstract fn unload_font(self, f: *Font);
+
+	/// Whether `k` went down since the frame before, as `IsKeyPressed`.
+	abstract fn key_pressed(self, k: Key) -> bool;
+
+	/// Whether `k` is down, as `IsKeyDown`.
+	abstract fn key_down(self, k: Key) -> bool;
+
+	/// Whether `k` came up since the frame before, as `IsKeyReleased`.
+	abstract fn key_released(self, k: Key) -> bool;
+
+	/// Where the mouse stands in units of the square, as `GetMousePosition`.
+	abstract fn mouse(self) -> Vec2;
+
+	/// Whether `b` went down since the frame before, as `IsMouseButtonPressed`.
+	abstract fn mouse_pressed(self, b: Mouse) -> bool;
+
+	/// Whether `b` is down, as `IsMouseButtonDown`.
+	abstract fn mouse_down(self, b: Mouse) -> bool;
+
+	/// Whether `b` came up since the frame before, as `IsMouseButtonReleased`.
+	abstract fn mouse_released(self, b: Mouse) -> bool;
+
+	/// The turn of the wheel since the frame before, as `GetMouseWheelMove`.
+	abstract fn mouse_wheel(self) -> f32;
+
+	/// Where touch `i` stands in units of the square, as `GetTouchPosition`.
+	abstract fn touch(self, i: int) -> Vec2;
+
+	/// Whether `b` of gamepad `pad` is down, as `IsGamepadButtonDown`.
+	abstract fn gamepad_button_down(self, pad: int, b: Pad) -> bool;
+
+	/// The seconds since the window opened, as `GetTime`.
+	abstract fn time(self) -> f64;
+
+	/// The seconds of the frame before, as `GetFrameTime`.
+	abstract fn frame_time(self) -> f32;
+
+	/// The frames per second, as `GetFPS`.
+	abstract fn fps(self) -> int;
+
+	/// Aim at `n` frames per second, as `SetTargetFPS`.
+	abstract fn set_target_fps(self, n: int);
+
+	/// Switch to a borderless window the size of the monitor and back, as
+	/// `ToggleBorderlessWindowed`.
+	abstract fn toggle_borderless(self);
+
+	/// Switch to the full screen and back, as `ToggleFullscreen`.
+	abstract fn toggle_fullscreen(self);
+
+	/// The provider the link takes where the build names none, which is raylib.
+	pub fn default() -> *Display
+	{
+		return RaylibDisplay.get();
+	}
+}
+
+/// What a frame draws on: the unit square of the frame, or one moved, turned or
+/// scaled from it.
+///
+/// A canvas is a small value. `move`, `turn` and `scale` give a new one and
+/// leave this one as it is, so a recursion gives each call its own frame of
+/// reference, and nothing is pushed by hand or allocated.
+pub final class Canvas
+{
+	display: *Display,
+	at: Transform,
+	/// The part of the square of the frame that the window shows, wider than
+	/// the square on a landscape window and higher on a portrait one.
+	pub bounds: Rect,
+	/// The length of one physical pixel in units of this canvas.
+	pub pixel: f32,
+
+	/// The canvas of the unit square of a frame on `display`.
+	pub fn new(display: *Display, bounds: Rect, pixel: f32) -> Canvas
+	{
+		return Canvas { display: display, at: IDENTITY, bounds: bounds, pixel: pixel };
+	}
+
+	/// The frame of reference of this canvas.
+	pub fn transform(self) -> Transform
+	{
+		return self.at;
+	}
+
+	/// The canvas whose square is this one moved by `x`, `y`, as
+	/// `rlTranslatef`.
+	pub fn move(self, x: f32, y: f32) -> Canvas
+	{
+		let m = self.at;
+		m.x = self.at.a * x + self.at.c * y + self.at.x;
+		m.y = self.at.b * x + self.at.d * y + self.at.y;
+		return Canvas { display: self.display, at: m, bounds: self.bounds, pixel: self.pixel };
+	}
+
+	/// The canvas whose square is this one turned clockwise by `degrees` about
+	/// its top left corner, as `rlRotatef`.
+	pub fn turn(self, degrees: f32) -> Canvas
+	{
+		let r = degrees * math.DEG2RAD;
+		let cs = math.cos(r);
+		let sn = math.sin(r);
+		let m = self.at;
+		m.a = self.at.a * cs + self.at.c * sn;
+		m.b = self.at.b * cs + self.at.d * sn;
+		m.c = self.at.c * cs - self.at.a * sn;
+		m.d = self.at.d * cs - self.at.b * sn;
+		return Canvas { display: self.display, at: m, bounds: self.bounds, pixel: self.pixel };
+	}
+
+	/// The canvas whose square is this one scaled by `k` from its top left
+	/// corner, as `rlScalef`.
+	pub fn scale(self, k: f32) -> Canvas
+	{
+		let m = self.at;
+		m.a = self.at.a * k;
+		m.b = self.at.b * k;
+		m.c = self.at.c * k;
+		m.d = self.at.d * k;
+		return Canvas { display: self.display, at: m, bounds: self.bounds, pixel: self.pixel / k };
+	}
+
+	/// Fill the whole window with `color`, as `ClearBackground`.
+	pub fn clear(self, color: Color)
+	{
+		self.display.clear(color);
+	}
+
+	/// Fill the unit square of this canvas with `color`.
+	pub fn square(self, color: Color)
+	{
+		self.display.square(&self.at, color);
+	}
+
+	/// Fill `r` with `color`, as `DrawRectangleRec`.
+	pub fn rect(self, r: Rect, color: Color)
+	{
+		self.display.rect(&self.at, r, color);
+	}
+
+	/// Draw the edges of `r` `thickness` wide, as `DrawRectangleLinesEx`.
+	pub fn rect_lines(self, r: Rect, thickness: f32, color: Color)
+	{
+		self.display.rect_lines(&self.at, r, thickness, color);
+	}
+
+	/// Fill `r` from `top` at its top edge to `bottom` at its bottom edge, as
+	/// `DrawRectangleGradientV`.
+	pub fn rect_gradient_v(self, r: Rect, top: Color, bottom: Color)
+	{
+		self.display.rect_gradient_v(&self.at, r, top, bottom);
+	}
+
+	/// Fill the circle of `radius` about `at`, as `DrawCircleV`.
+	pub fn circle(self, at: Vec2, radius: f32, color: Color)
+	{
+		self.display.circle(&self.at, at, radius, color);
+	}
+
+	/// Fill the circle of `radius` about `at` from `inner` at its centre to
+	/// `outer` at its edge, as `DrawCircleGradient`.
+	pub fn circle_gradient(self, at: Vec2, radius: f32, inner: Color, outer: Color)
+	{
+		self.display.circle_gradient(&self.at, at, radius, inner, outer);
+	}
+
+	/// Draw the edge of the circle of `radius` about `at`, as
+	/// `DrawCircleLinesV`.
+	pub fn circle_lines(self, at: Vec2, radius: f32, color: Color)
+	{
+		self.display.circle_lines(&self.at, at, radius, color);
+	}
+
+	/// Fill the ellipse of radii `rx` and `ry` about `at`, as `DrawEllipseV`.
+	pub fn ellipse(self, at: Vec2, rx: f32, ry: f32, color: Color)
+	{
+		self.display.ellipse(&self.at, at, rx, ry, color);
+	}
+
+	/// Draw the line from `from` to `to` `thickness` wide, as `DrawLineEx`.
+	pub fn line(self, from: Vec2, to: Vec2, thickness: f32, color: Color)
+	{
+		self.display.line(&self.at, from, to, thickness, color);
+	}
+
+	/// Fill the triangle of `p`, `q` and `r`, whatever order its corners take,
+	/// as `DrawTriangle`.
+	pub fn triangle(self, p: Vec2, q: Vec2, r: Vec2, color: Color)
+	{
+		self.display.triangle(&self.at, p, q, r, color);
+	}
+
+	/// Fill the regular polygon of `sides` corners on the circle of `radius`
+	/// about `at`, turned by `rotation` degrees, as `DrawPoly`.
+	pub fn poly(self, at: Vec2, sides: int, radius: f32, rotation: f32, color: Color)
+	{
+		self.display.poly(&self.at, at, sides, radius, rotation, color);
+	}
+
+	/// Write `s` from `at`, `size` high, in raylib's default font, as
+	/// `DrawTextEx`.
+	pub fn text(self, at: Vec2, size: f32, s: str, color: Color)
+	{
+		self.display.text(&self.at, none, at, size, s, color);
+	}
+
+	/// Write `s` from `at`, `size` high, in `font`, as `DrawTextEx`.
+	pub fn text_ex(self, font: *Font, at: Vec2, size: f32, s: str, color: Color)
+	{
+		self.display.text(&self.at, font, at, size, s, color);
+	}
+
+	/// Draw `t` from `at`, `width` wide and as high as its shape gives, as
+	/// `DrawTexturePro`.
+	pub fn texture(self, t: *Texture, at: Vec2, width: f32, tint: Color)
+	{
+		self.display.texture(&self.at, t, at, width, tint);
+	}
+}
+
+/// The text a frame writes, in a buffer the window owns and reuses, as raylib's
+/// `TextFormat` does.
+pub final class Say
+{
+	b: text.Builder,
+
+	/// An empty text whose buffer holds a line of a game already.
+	pub fn new() -> *Say
+	{
+		// PERF DECISION: the room for 256 bytes is taken here, before the
+		// window opens, so that a frame that writes a score and a few words
+		// allocates nothing. A longer text grows the buffer once, and the
+		// buffer keeps its room from then on.
+		let s = alloc Say { b: text.Builder.new() };
+		for 0..256 {
+			s.b.append_byte(32);
+		}
+		s.b.clear();
+		return s;
+	}
+
+	/// Forget the text and keep the room.
+	pub fn clear(self) -> *Say
+	{
+		self.b.clear();
+		return self;
+	}
+
+	/// Add `s` to the end.
+	pub fn add(self, s: str) -> *Say
+	{
+		self.b.append(s);
+		return self;
+	}
+
+	/// Add `n` in decimal to the end.
+	pub fn add_int(self, n: int) -> *Say
+	{
+		self.b.append_int(n);
+		return self;
+	}
+
+	/// Add `v` with `precision` digits after the point to the end.
+	pub fn add_float(self, v: f32, precision: int = 2) -> *Say
+	{
+		self.b.append_f32(v, precision);
+		return self;
+	}
+
+	/// The text so far, which the buffer still holds.
+	pub fn text(self) -> str
+	{
+		return self.b.text();
+	}
+}
+
+/// An image on the display, as raylib's `Texture2D`.
+pub final class Texture
+{
+	inject display: *Display,
+	/// The name the display gives the texture, 0 for none.
+	pub id: u32 = 0,
+	/// The width of the image in pixels.
+	pub width: int = 0,
+	/// The height of the image in pixels.
+	pub height: int = 0,
+	/// The mipmap levels of the texture.
+	pub mipmaps: int = 0,
+	/// The pixel format of the display, as raylib numbers it.
+	pub format: int = 0,
+
+	/// The image at `path`, as `LoadTexture`. The window must be open. It fails
+	/// where the image does not load.
+	pub fn load(path: str) -> Texture may fail
+	{
+		let t = Texture { };
+		try t.display.load_texture(path, &t);
+		return t;
+	}
+
+	fn destruct(self)
+	{
+		if self.id != 0 {
+			self.display.unload_texture(self);
+		}
+	}
+}
+
+/// A font of a TTF file the program ships, as raylib's `Font`.
+pub final class Font
+{
+	inject display: *Display,
+	/// The size in pixels the glyphs were made at.
+	pub size: int = 0,
+	/// What the display keeps of the font. A program leaves it alone.
+	pub handle: ?*byte = none,
+
+	/// The font of the TTF at `path` with glyphs of `size` pixels, as
+	/// `LoadFontEx`. The window must be open. It fails where the font does not
+	/// load.
+	pub fn load(path: str, size: int) -> Font may fail
+	{
+		let f = Font { };
+		try f.display.load_font(path, size, &f);
+		return f;
+	}
+
+	fn destruct(self)
+	{
+		if self.handle != none {
+			self.display.unload_font(self);
+		}
+	}
+}
+
+/// A window and its config flags, as raylib's `SetConfigFlags` takes them.
+///
+/// Each field is a flag with its default, so a literal names what it changes:
+/// `Window { vsync: false }`. The window opens two thirds of the monitor in
+/// size, in its centre. Escape closes it, as raylib's default exit key.
+pub class Window
+{
+	/// `FLAG_VSYNC_HINT`.
+	pub vsync: bool = true,
+	/// `FLAG_FULLSCREEN_MODE`.
+	pub fullscreen: bool = false,
+	/// `FLAG_WINDOW_RESIZABLE`.
+	pub resizable: bool = true,
+	/// `FLAG_WINDOW_UNDECORATED`.
+	pub undecorated: bool = false,
+	/// `FLAG_WINDOW_HIDDEN`.
+	pub hidden: bool = false,
+	/// `FLAG_WINDOW_MINIMIZED`.
+	pub minimized: bool = false,
+	/// `FLAG_WINDOW_MAXIMIZED`.
+	pub maximized: bool = false,
+	/// `FLAG_WINDOW_UNFOCUSED`.
+	pub unfocused: bool = false,
+	/// `FLAG_WINDOW_TOPMOST`.
+	pub topmost: bool = false,
+	/// `FLAG_WINDOW_ALWAYS_RUN`.
+	pub always_run: bool = false,
+	/// `FLAG_WINDOW_TRANSPARENT`.
+	pub transparent: bool = false,
+	/// `FLAG_WINDOW_HIGHDPI`.
+	pub highdpi: bool = true,
+	/// `FLAG_WINDOW_MOUSE_PASSTHROUGH`.
+	pub mouse_passthrough: bool = false,
+	/// `FLAG_BORDERLESS_WINDOWED_MODE`.
+	pub borderless: bool = false,
+	/// `FLAG_MSAA_4X_HINT`.
+	pub msaa: bool = true,
+	/// `FLAG_INTERLACED_HINT`.
+	pub interlaced: bool = false,
+	inject display: *Display,
+	opened: bool = false,
+	drawing: bool = false,
+	own words: ?*Say = none,
+
+	fn construct(self)
+	{
+		self.words = Say.new();
+	}
+
+	fn destruct(self)
+	{
+		if self.drawing {
+			self.display.end();
+		}
+		if self.opened {
+			self.display.close();
+		}
+	}
+
+	/// Open the window with the title `title`, which `graphics.open` calls.
+	///
+	/// It fails with `NotMainThread` on any thread but the main one and with
+	/// `NoDisplay` where the system gives no window.
+	pub fn start(self, title: str) may fail
+	{
+		if anti_rt_main_thread() == 0 {
+			fail alloc NotMainThread { message: "a window opens on the main thread alone" };
+		}
+		if self.opened {
+			fail "the window is open already";
+		}
+		try self.display.open(title, self.flags());
+		self.opened = true;
+	}
+
+	/// The config flags of raylib that the fields name.
+	fn flags(self) -> u32
+	{
+		let f: u32 = 0;
+		if self.vsync { f = f | rl.ConfigFlags.FLAG_VSYNC_HINT as u32; }
+		if self.fullscreen { f = f | rl.ConfigFlags.FLAG_FULLSCREEN_MODE as u32; }
+		if self.resizable { f = f | rl.ConfigFlags.FLAG_WINDOW_RESIZABLE as u32; }
+		if self.undecorated { f = f | rl.ConfigFlags.FLAG_WINDOW_UNDECORATED as u32; }
+		if self.hidden { f = f | rl.ConfigFlags.FLAG_WINDOW_HIDDEN as u32; }
+		if self.minimized { f = f | rl.ConfigFlags.FLAG_WINDOW_MINIMIZED as u32; }
+		if self.maximized { f = f | rl.ConfigFlags.FLAG_WINDOW_MAXIMIZED as u32; }
+		if self.unfocused { f = f | rl.ConfigFlags.FLAG_WINDOW_UNFOCUSED as u32; }
+		if self.topmost { f = f | rl.ConfigFlags.FLAG_WINDOW_TOPMOST as u32; }
+		if self.always_run { f = f | rl.ConfigFlags.FLAG_WINDOW_ALWAYS_RUN as u32; }
+		if self.transparent { f = f | rl.ConfigFlags.FLAG_WINDOW_TRANSPARENT as u32; }
+		if self.highdpi { f = f | rl.ConfigFlags.FLAG_WINDOW_HIGHDPI as u32; }
+		if self.mouse_passthrough {
+			f = f | rl.ConfigFlags.FLAG_WINDOW_MOUSE_PASSTHROUGH as u32;
+		}
+		if self.borderless { f = f | rl.ConfigFlags.FLAG_BORDERLESS_WINDOWED_MODE as u32; }
+		if self.msaa { f = f | rl.ConfigFlags.FLAG_MSAA_4X_HINT as u32; }
+		if self.interlaced { f = f | rl.ConfigFlags.FLAG_INTERLACED_HINT as u32; }
+		return f;
+	}
+
+	/// The frames of the window, one per turn of `for f in w.frames()`, until
+	/// the window asks to close.
+	pub fn frames(self) -> *Window
+	{
+		return self;
+	}
+
+	/// End the frame before, and start the next one unless the window asks to
+	/// close.
+	operator fn next(self) -> bool
+	{
+		if self.drawing {
+			self.display.end();
+			self.drawing = false;
+		}
+		if !self.opened || self.display.should_close() {
+			return false;
+		}
+		self.drawing = true;
+		return true;
+	}
+
+	/// The canvas of the frame.
+	operator fn value(self) -> Canvas
+	{
+		return self.display.begin();
+	}
+
+	/// The text of the window, empty, to write a line into without allocating:
+	/// `w.say().add("Score ").add_int(score).text()`.
+	pub fn say(self) -> *Say
+	{
+		if self.words == none {
+			self.words = Say.new();
+		}
+		let s = self.words else {
+			anti_rt_out_of_memory(size_of(Say));
+		};
+		return s.clear();
+	}
+
+	/// Whether `k` went down since the frame before, as `IsKeyPressed`.
+	pub fn key_pressed(self, k: Key) -> bool
+	{
+		return self.display.key_pressed(k);
+	}
+
+	/// Whether `k` is down, as `IsKeyDown`.
+	pub fn key_down(self, k: Key) -> bool
+	{
+		return self.display.key_down(k);
+	}
+
+	/// Whether `k` came up since the frame before, as `IsKeyReleased`.
+	pub fn key_released(self, k: Key) -> bool
+	{
+		return self.display.key_released(k);
+	}
+
+	/// Where the mouse stands in units of the square, as `GetMousePosition`.
+	pub fn mouse(self) -> Vec2
+	{
+		return self.display.mouse();
+	}
+
+	/// Whether `b` went down since the frame before, as `IsMouseButtonPressed`.
+	pub fn mouse_pressed(self, b: Mouse) -> bool
+	{
+		return self.display.mouse_pressed(b);
+	}
+
+	/// Whether `b` is down, as `IsMouseButtonDown`.
+	pub fn mouse_down(self, b: Mouse) -> bool
+	{
+		return self.display.mouse_down(b);
+	}
+
+	/// Whether `b` came up since the frame before, as `IsMouseButtonReleased`.
+	pub fn mouse_released(self, b: Mouse) -> bool
+	{
+		return self.display.mouse_released(b);
+	}
+
+	/// The turn of the wheel since the frame before, as `GetMouseWheelMove`.
+	pub fn mouse_wheel(self) -> f32
+	{
+		return self.display.mouse_wheel();
+	}
+
+	/// Where touch `i` stands in units of the square, as `GetTouchPosition`.
+	pub fn touch(self, i: int) -> Vec2
+	{
+		return self.display.touch(i);
+	}
+
+	/// Whether `b` of gamepad `pad` is down, as `IsGamepadButtonDown`.
+	pub fn gamepad_button_down(self, pad: int, b: Pad) -> bool
+	{
+		return self.display.gamepad_button_down(pad, b);
+	}
+
+	/// The seconds since the window opened, as `GetTime`.
+	pub fn time(self) -> f64
+	{
+		return self.display.time();
+	}
+
+	/// The seconds of the frame before, as `GetFrameTime`.
+	pub fn frame_time(self) -> f32
+	{
+		return self.display.frame_time();
+	}
+
+	/// The frames per second, as `GetFPS`.
+	pub fn fps(self) -> int
+	{
+		return self.display.fps();
+	}
+
+	/// Aim at `n` frames per second, as `SetTargetFPS`.
+	pub fn set_target_fps(self, n: int)
+	{
+		self.display.set_target_fps(n);
+	}
+
+	/// Switch to a borderless window the size of the monitor and back, as
+	/// `ToggleBorderlessWindowed`.
+	pub fn toggle_borderless(self)
+	{
+		self.display.toggle_borderless();
+	}
+
+	/// Switch to the full screen and back, as `ToggleFullscreen`.
+	pub fn toggle_fullscreen(self)
+	{
+		self.display.toggle_fullscreen();
+	}
+}
+
+/// Open a window with the title `title` and the flags of `window`, as
+/// `SetConfigFlags` and `InitWindow`. The end of the window it gives is
+/// `CloseWindow`.
+///
+/// It fails with `NoDisplay` on a machine without a display and with
+/// `NotMainThread` on any thread but the main one.
+pub fn open(title: str, own window: Window = Window { }) -> Window may fail
+{
+	try window.start(title);
+	return window;
+}
+
+/// The share of the monitor a window takes on each axis when it opens.
+const MONITOR_SHARE: int = 3;
+
+/// The display of raylib, which is the default of `Display`.
+///
+/// raylib holds one window, so the display is a singleton. A canvas reaches
+/// rlgl through the matrix of its frame of reference, which `rlPushMatrix`,
+/// `rlMultMatrixf` and `rlPopMatrix` lay around each shape. raylib applies it
+/// to every vertex as it batches, so a canvas costs no draw call of its own.
+pub singleton class RaylibDisplay inherits Display
+{
+	mutable camera: rl.Camera2D = rl.Camera2D {
+		offset: rl.Vector2 { x: 0.0, y: 0.0 },
+		target: rl.Vector2 { x: 0.0, y: 0.0 },
+		rotation: 0.0,
+		zoom: 1.0,
+	},
+
+	concrete fn open(self, title: str, flags: u32) may fail
+	{
+		if rl.IsWindowReady() {
+			fail "a window is open already";
+		}
+		let hidden = rl.ConfigFlags.FLAG_WINDOW_HIDDEN as u32;
+		rl.SetConfigFlags((flags | hidden) as c_uint);
+		rl.InitWindow(640, 360, title.ptr);
+		if !rl.IsWindowReady() {
+			fail alloc NoDisplay { message: "no display to open a window on" };
+		}
+		let sized = rl.ConfigFlags.FLAG_FULLSCREEN_MODE as u32
+			| rl.ConfigFlags.FLAG_WINDOW_MAXIMIZED as u32
+			| rl.ConfigFlags.FLAG_BORDERLESS_WINDOWED_MODE as u32;
+		if (flags & sized) == 0 {
+			let monitor = rl.GetCurrentMonitor();
+			let mw = rl.GetMonitorWidth(monitor);
+			let mh = rl.GetMonitorHeight(monitor);
+			let w = mw * 2 / MONITOR_SHARE as c_int;
+			let h = mh * 2 / MONITOR_SHARE as c_int;
+			let at = rl.GetMonitorPosition(monitor);
+			rl.SetWindowSize(w, h);
+			rl.SetWindowPosition(at.x as c_int + (mw - w) / 2, at.y as c_int + (mh - h) / 2);
+		}
+		if (flags & hidden) == 0 {
+			rl.ClearWindowState(hidden as c_uint);
+		}
+	}
+
+	concrete fn close(self)
+	{
+		rl.CloseWindow();
+	}
+
+	concrete fn should_close(self) -> bool
+	{
+		return rl.WindowShouldClose();
+	}
+
+	concrete fn begin(self) -> Canvas
+	{
+		rl.BeginDrawing();
+		// DESIGN: BeginMode2D of raylib 6.0 sets the camera in the pixels of
+		// the framebuffer, the render size, and leaves the scale of a HiDPI
+		// screen out. The zoom is therefore the shorter side of the render
+		// size, and one unit over the zoom is one physical pixel.
+		let w = math.max(rl.GetRenderWidth() as f32, 1.0);
+		let h = math.max(rl.GetRenderHeight() as f32, 1.0);
+		let side = math.min(w, h);
+		self.camera = rl.Camera2D {
+			offset: rl.Vector2 { x: (w - side) / 2.0, y: (h - side) / 2.0 },
+			target: rl.Vector2 { x: 0.0, y: 0.0 },
+			rotation: 0.0,
+			zoom: side,
+		};
+		rl.BeginMode2D(self.camera);
+		let bounds = Rect {
+			x: -(w - side) / 2.0 / side,
+			y: -(h - side) / 2.0 / side,
+			width: w / side,
+			height: h / side,
+		};
+		return Canvas.new(self, bounds, 1.0 / side);
+	}
+
+	concrete fn end(self)
+	{
+		rl.EndMode2D();
+		rl.EndDrawing();
+	}
+
+	concrete fn clear(self, color: Color)
+	{
+		rl.ClearBackground(raw(color));
+	}
+
+	concrete fn square(self, m: *Transform, color: Color)
+	{
+		push(m);
+		rl.DrawRectangleRec(rl.Rectangle { x: 0.0, y: 0.0, width: 1.0, height: 1.0 },
+			raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn rect(self, m: *Transform, r: Rect, color: Color)
+	{
+		push(m);
+		rl.DrawRectangleRec(rectangle(r), raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn rect_lines(self, m: *Transform, r: Rect, thickness: f32, color: Color)
+	{
+		push(m);
+		rl.DrawRectangleLinesEx(rectangle(r), thickness, raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn rect_gradient_v(self, m: *Transform, r: Rect, top: Color, bottom: Color)
+	{
+		push(m);
+		rl.DrawRectangleGradientEx(rectangle(r), raw(top), raw(bottom), raw(bottom),
+			raw(top));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn circle(self, m: *Transform, at: Vec2, radius: f32, color: Color)
+	{
+		push(m);
+		rl.DrawCircleSector(vector(at), radius, 0.0, 360.0, self.segments(m, radius),
+			raw(color));
+		rl.rlPopMatrix();
+	}
+
+	/// The segments of a circle of `radius` units of `m`, by the rule of
+	/// raylib's `DrawCircleSector` for a radius in pixels. raylib takes the
+	/// radius it is given as pixels, and a radius of units would give the least
+	/// count.
+	fn segments(self, m: *Transform, radius: f32) -> c_int
+	{
+		let r = radius * stretch(m) * self.camera.zoom;
+		if r <= SMOOTH_CIRCLE_ERROR_RATE {
+			return 4;
+		}
+		let k = 1.0 - SMOOTH_CIRCLE_ERROR_RATE / r;
+		let th = math.acos(2.0 * k * k - 1.0);
+		let n = math.ceil(2.0 * math.PI / math.max(th, 0.001));
+		return math.clamp(n, 4.0, 1024.0) as c_int;
+	}
+
+	concrete fn circle_gradient(self, m: *Transform, at: Vec2, radius: f32, inner: Color,
+		outer: Color)
+	{
+		push(m);
+		rl.DrawCircleGradient(vector(at), radius, raw(inner), raw(outer));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn circle_lines(self, m: *Transform, at: Vec2, radius: f32, color: Color)
+	{
+		push(m);
+		rl.DrawCircleSectorLines(vector(at), radius, 0.0, 360.0, self.segments(m, radius),
+			raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn ellipse(self, m: *Transform, at: Vec2, rx: f32, ry: f32, color: Color)
+	{
+		push(m);
+		rl.DrawEllipseV(vector(at), rx, ry, raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn line(self, m: *Transform, from: Vec2, to: Vec2, thickness: f32,
+		color: Color)
+	{
+		push(m);
+		rl.DrawLineEx(vector(from), vector(to), thickness, raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn triangle(self, m: *Transform, p: Vec2, q: Vec2, r: Vec2, color: Color)
+	{
+		push(m);
+		if turns_clockwise(p, q, r) {
+			rl.DrawTriangle(vector(p), vector(r), vector(q), raw(color));
+		} else {
+			rl.DrawTriangle(vector(p), vector(q), vector(r), raw(color));
+		}
+		rl.rlPopMatrix();
+	}
+
+	concrete fn poly(self, m: *Transform, at: Vec2, sides: int, radius: f32, rotation: f32,
+		color: Color)
+	{
+		push(m);
+		rl.DrawPoly(vector(at), sides as c_int, radius, rotation, raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn text(self, m: *Transform, font: ?*Font, at: Vec2, size: f32, s: str,
+		color: Color)
+	{
+		push(m);
+		let face = rl.GetFontDefault();
+		if let f = font {
+			if let h = f.handle {
+				face = *(h as *rl.Font);
+			}
+		}
+		let spacing = size / math.max(face.baseSize as f32, 1.0);
+		rl.DrawTextEx(face, s.ptr, vector(at), size, spacing, raw(color));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn texture(self, m: *Transform, t: *Texture, at: Vec2, width: f32, tint: Color)
+	{
+		push(m);
+		let w = math.max(t.width as f32, 1.0);
+		let h = t.height as f32;
+		let image = rl.Texture {
+			id: t.id as c_uint,
+			width: t.width as c_int,
+			height: t.height as c_int,
+			mipmaps: t.mipmaps as c_int,
+			format: t.format as c_int,
+		};
+		let from = rl.Rectangle { x: 0.0, y: 0.0, width: w, height: h };
+		let to = rl.Rectangle { x: at.x, y: at.y, width: width, height: width * h / w };
+		rl.DrawTexturePro(image, from, to, rl.Vector2 { x: 0.0, y: 0.0 }, 0.0, raw(tint));
+		rl.rlPopMatrix();
+	}
+
+	concrete fn load_texture(self, path: str, t: *Texture) may fail
+	{
+		let image = rl.LoadTexture(path.ptr);
+		if !rl.IsTextureValid(image) {
+			fail "the image does not load";
+		}
+		t.id = image.id as u32;
+		t.width = image.width as int;
+		t.height = image.height as int;
+		t.mipmaps = image.mipmaps as int;
+		t.format = image.format as int;
+	}
+
+	concrete fn unload_texture(self, t: *Texture)
+	{
+		rl.UnloadTexture(rl.Texture {
+			id: t.id as c_uint,
+				width: t.width as c_int,
+				height: t.height as c_int,
+				mipmaps: t.mipmaps as c_int,
+				format: t.format as c_int,
+		});
+		t.id = 0;
+	}
+
+	concrete fn load_font(self, path: str, size: int, f: *Font) may fail
+	{
+		let face = rl.LoadFontEx(path.ptr, size as c_int, none, 0);
+		if !rl.IsFontValid(face) || face.texture.id == rl.GetFontDefault().texture.id {
+			fail "the font does not load";
+		}
+		let kept = alloc(rl.Font, 1) else {
+			anti_rt_out_of_memory(size_of(rl.Font));
+		};
+		*kept = face;
+		f.size = size;
+		f.handle = kept as *byte;
+	}
+
+	concrete fn unload_font(self, f: *Font)
+	{
+		if let h = f.handle {
+			let face = h as *rl.Font;
+			rl.UnloadFont(*face);
+			free(h);
+		}
+		f.handle = none;
+	}
+
+	concrete fn key_pressed(self, k: Key) -> bool
+	{
+		return rl.IsKeyPressed(k as c_int);
+	}
+
+	concrete fn key_down(self, k: Key) -> bool
+	{
+		return rl.IsKeyDown(k as c_int);
+	}
+
+	concrete fn key_released(self, k: Key) -> bool
+	{
+		return rl.IsKeyReleased(k as c_int);
+	}
+
+	concrete fn mouse(self) -> Vec2
+	{
+		return self.unit(rl.GetMousePosition());
+	}
+
+	/// The point `p` of the screen, in the logical pixels raylib gives a
+	/// position of the mouse or a touch in, in units of the square.
+	fn unit(self, p: rl.Vector2) -> Vec2
+	{
+		let sw = math.max(rl.GetScreenWidth() as f32, 1.0);
+		let sh = math.max(rl.GetScreenHeight() as f32, 1.0);
+		let rendered = rl.Vector2 {
+			x: p.x * rl.GetRenderWidth() as f32 / sw,
+			y: p.y * rl.GetRenderHeight() as f32 / sh,
+		};
+		let at = rl.GetScreenToWorld2D(rendered, self.camera);
+		return Vec2 { x: at.x, y: at.y };
+	}
+
+	concrete fn mouse_pressed(self, b: Mouse) -> bool
+	{
+		return rl.IsMouseButtonPressed(b as c_int);
+	}
+
+	concrete fn mouse_down(self, b: Mouse) -> bool
+	{
+		return rl.IsMouseButtonDown(b as c_int);
+	}
+
+	concrete fn mouse_released(self, b: Mouse) -> bool
+	{
+		return rl.IsMouseButtonReleased(b as c_int);
+	}
+
+	concrete fn mouse_wheel(self) -> f32
+	{
+		return rl.GetMouseWheelMove();
+	}
+
+	concrete fn touch(self, i: int) -> Vec2
+	{
+		return self.unit(rl.GetTouchPosition(i as c_int));
+	}
+
+	concrete fn gamepad_button_down(self, pad: int, b: Pad) -> bool
+	{
+		return rl.IsGamepadButtonDown(pad as c_int, b as c_int);
+	}
+
+	concrete fn time(self) -> f64
+	{
+		return rl.GetTime();
+	}
+
+	concrete fn frame_time(self) -> f32
+	{
+		return rl.GetFrameTime();
+	}
+
+	concrete fn fps(self) -> int
+	{
+		return rl.GetFPS() as int;
+	}
+
+	concrete fn set_target_fps(self, n: int)
+	{
+		rl.SetTargetFPS(n as c_int);
+	}
+
+	concrete fn toggle_borderless(self)
+	{
+		rl.ToggleBorderlessWindowed();
+	}
+
+	concrete fn toggle_fullscreen(self)
+	{
+		rl.ToggleFullscreen();
+	}
+}
+
+/// The greatest distance in pixels between a circle and the polygon that draws
+/// it, as `SMOOTH_CIRCLE_ERROR_RATE` of raylib.
+const SMOOTH_CIRCLE_ERROR_RATE: f32 = 0.5;
+
+/// Lay the frame of reference `m` over the matrix of rlgl for one shape, which
+/// `rlPopMatrix` takes off again.
+fn push(m: *Transform)
+{
+	let f: [16]f32 = [m.a, m.b, 0.0, 0.0, m.c, m.d, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, m.x, m.y,
+		0.0, 1.0];
+	rl.rlPushMatrix();
+	rl.rlMultMatrixf(&f[0]);
+}
+
+/// Whether `p`, `q`, `r` turn clockwise on the screen, where y points down.
+/// raylib fills a triangle whose corners turn the other way alone.
+fn turns_clockwise(p: Vec2, q: Vec2, r: Vec2) -> bool
+{
+	return (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x) > 0.0;
+}
+
+/// One call that a `Recorder` recorded, in units of the square of the frame.
+///
+/// `points` holds the corners of a square, a rectangle and a triangle, the ends
+/// of a line, the centre of a circle, an ellipse and a polygon and the start of
+/// a text and a texture, with the frame of reference of the canvas applied.
+/// `size` holds a radius, a thickness, the height of a text or the width of a
+/// texture in the same units, and the radius across of an ellipse stands in
+/// `points[1].x`. `color` is the colour of the call and `other` the second
+/// colour of a gradient.
+pub struct Call
+{
+	shape: Shape,
+	points: [4]Vec2,
+	count: int,
+	size: f32,
+	color: Color,
+	other: Color,
+}
+
+/// A display that opens no window and records every call, for the tests of
+/// drawing code.
+///
+/// `Recorder.new(aspect)` gives one whose `canvas` draws a frame of a window
+/// `aspect` times as wide as it is high. `Recorder.shared()` is the provider
+/// for `[inject.test]`: a window over it runs `frames` frames, each of which
+/// starts the record afresh, so the record holds the last one. A call past the
+/// room of the record is counted and not kept. Every key and button is up, and
+/// the mouse stands at the top left corner of the square. A frame lasts 1/60 of
+/// a second.
+pub class Recorder inherits Display
+{
+	/// The width of the window over its height.
+	pub aspect: f32 = 1.7777778,
+	/// The frames a window over the recorder runs before it closes.
+	pub frames: int = 1,
+	/// The frames begun since the window opened.
+	pub drawn: int = 0,
+	/// Whether a window over the recorder is open.
+	pub opened: bool = false,
+	own room: ?*Call = none,
+	capacity: int = 0,
+	used: int = 0,
+	counts: [SHAPES]int = [0; SHAPES],
+	static atomic one: ?*Recorder = none;
+
+	/// A recorder of a window `aspect` times as wide as it is high, with room
+	/// for `capacity` calls.
+	pub fn new(aspect: f32, capacity: int = 65536) -> Recorder
+	{
+		let r = Recorder { aspect: aspect };
+		r.reserve(capacity);
+		return r;
+	}
+
+	/// The recorder of the program, for `[inject.test]`, made at the first call
+	/// and kept until the end of the program.
+	pub fn shared() -> *Recorder
+	{
+		let kept = Recorder.one.load();
+		if kept != none {
+			return kept;
+		}
+		let made = alloc Recorder { };
+		made.reserve(65536);
+		if Recorder.one.compare_swap(none, made) {
+			return made;
+		}
+		delete(made);
+		let other = Recorder.one.load() else {
+			anti_rt_out_of_memory(0);
+		};
+		return other;
+	}
+
+	fn reserve(self, capacity: int)
+	{
+		if capacity <= 0 {
+			return;
+		}
+		let room = alloc(Call, capacity) else {
+			anti_rt_out_of_memory(capacity *| size_of(Call));
+		};
+		self.room = room;
+		self.capacity = capacity;
+	}
+
+	/// The canvas of a frame of the window.
+	pub fn canvas(self) -> Canvas
+	{
+		let a = math.max(self.aspect, 0.001);
+		let bounds = Rect { x: (1.0 - a) / 2.0, y: 0.0, width: a, height: 1.0 };
+		if a < 1.0 {
+			bounds = Rect { x: 0.0, y: (1.0 - 1.0 / a) / 2.0, width: 1.0, height: 1.0 / a };
+		}
+		return Canvas.new(self, bounds, 1.0 / PIXELS);
+	}
+
+	/// The number of calls of `shape` since the record started.
+	pub fn count(self, shape: Shape) -> int
+	{
+		return self.counts[shape as int];
+	}
+
+	/// The number of calls the record keeps.
+	pub fn len(self) -> int
+	{
+		return self.used;
+	}
+
+	/// The call `i` of the record, from 0.
+	pub fn call(self, i: int) -> Call
+	{
+		let room = self.room else {
+			anti_rt_out_of_memory(0);
+		};
+		assert(i >= 0 && i < self.used, "the record holds no such call");
+		return room[i];
+	}
+
+	/// Start the record afresh.
+	pub fn reset(self)
+	{
+		self.used = 0;
+		for i in 0..SHAPES {
+			self.counts[i] = 0;
+		}
+	}
+
+	fn record(self, shape: Shape, m: *Transform, points: [4]Vec2, count: int, size: f32,
+		color: Color, other: Color)
+	{
+		self.counts[shape as int] += 1;
+		if self.used >= self.capacity {
+			return;
+		}
+		if let room = self.room {
+			let c = Call {
+				shape: shape,
+				points: points,
+				count: count,
+				size: size * stretch(m),
+				color: color,
+				other: other,
+			};
+			for i in 0..count {
+				c.points[i] = apply(m, points[i]);
+			}
+			room[self.used] = c;
+			self.used += 1;
+		}
+	}
+
+	fn corners(self, shape: Shape, m: *Transform, r: Rect, size: f32, color: Color,
+		other: Color)
+	{
+		let points: [4]Vec2 = [
+			xy(r.x, r.y),
+			xy(r.x + r.width, r.y),
+			xy(r.x + r.width, r.y + r.height),
+			xy(r.x, r.y + r.height),
+			];
+		self.record(shape, m, points, 4, size, color, other);
+	}
+
+	fn point(self, shape: Shape, m: *Transform, at: Vec2, size: f32, color: Color,
+		other: Color)
+	{
+		let points: [4]Vec2 = [at, at, at, at];
+		self.record(shape, m, points, 1, size, color, other);
+	}
+
+	concrete fn open(self, title: str, flags: u32) may fail
+	{
+		if self.opened {
+			fail "a window is open already";
+		}
+		if self.capacity == 0 {
+			self.reserve(65536);
+		}
+		self.opened = true;
+		self.drawn = 0;
+	}
+
+	concrete fn close(self)
+	{
+		self.opened = false;
+	}
+
+	concrete fn should_close(self) -> bool
+	{
+		return self.drawn >= self.frames;
+	}
+
+	concrete fn begin(self) -> Canvas
+	{
+		self.reset();
+		self.drawn += 1;
+		return self.canvas();
+	}
+
+	concrete fn end(self)
+	{
+	}
+
+	concrete fn clear(self, color: Color)
+	{
+		let m = IDENTITY;
+		self.point(Shape.Clear, &m, xy(0.0, 0.0), 0.0, color, color);
+	}
+
+	concrete fn square(self, m: *Transform, color: Color)
+	{
+		self.corners(Shape.Square, m, Rect { x: 0.0, y: 0.0, width: 1.0, height: 1.0 }, 0.0,
+			color, color);
+	}
+
+	concrete fn rect(self, m: *Transform, r: Rect, color: Color)
+	{
+		self.corners(Shape.Rect, m, r, 0.0, color, color);
+	}
+
+	concrete fn rect_lines(self, m: *Transform, r: Rect, thickness: f32, color: Color)
+	{
+		self.corners(Shape.RectLines, m, r, thickness, color, color);
+	}
+
+	concrete fn rect_gradient_v(self, m: *Transform, r: Rect, top: Color, bottom: Color)
+	{
+		self.corners(Shape.RectGradient, m, r, 0.0, top, bottom);
+	}
+
+	concrete fn circle(self, m: *Transform, at: Vec2, radius: f32, color: Color)
+	{
+		self.point(Shape.Circle, m, at, radius, color, color);
+	}
+
+	concrete fn circle_gradient(self, m: *Transform, at: Vec2, radius: f32, inner: Color,
+		outer: Color)
+	{
+		self.point(Shape.CircleGradient, m, at, radius, inner, outer);
+	}
+
+	concrete fn circle_lines(self, m: *Transform, at: Vec2, radius: f32, color: Color)
+	{
+		self.point(Shape.CircleLines, m, at, radius, color, color);
+	}
+
+	concrete fn ellipse(self, m: *Transform, at: Vec2, rx: f32, ry: f32, color: Color)
+	{
+		let points: [4]Vec2 = [at, xy(ry * stretch(m), 0.0), at, at];
+		self.record(Shape.Ellipse, m, points, 1, rx, color, color);
+	}
+
+	concrete fn line(self, m: *Transform, from: Vec2, to: Vec2, thickness: f32,
+		color: Color)
+	{
+		let points: [4]Vec2 = [from, to, to, to];
+		self.record(Shape.Line, m, points, 2, thickness, color, color);
+	}
+
+	concrete fn triangle(self, m: *Transform, p: Vec2, q: Vec2, r: Vec2, color: Color)
+	{
+		let points: [4]Vec2 = [p, q, r, r];
+		self.record(Shape.Triangle, m, points, 3, 0.0, color, color);
+	}
+
+	concrete fn poly(self, m: *Transform, at: Vec2, sides: int, radius: f32, rotation: f32,
+		color: Color)
+	{
+		self.point(Shape.Poly, m, at, radius, color, color);
+	}
+
+	concrete fn text(self, m: *Transform, font: ?*Font, at: Vec2, size: f32, s: str,
+		color: Color)
+	{
+		self.point(Shape.Text, m, at, size, color, color);
+	}
+
+	concrete fn texture(self, m: *Transform, t: *Texture, at: Vec2, width: f32, tint: Color)
+	{
+		self.point(Shape.Texture, m, at, width, tint, tint);
+	}
+
+	concrete fn load_texture(self, path: str, t: *Texture) may fail
+	{
+		if path.len == 0 {
+			fail "the image does not load";
+		}
+		t.id = 0;
+		t.width = 1;
+		t.height = 1;
+	}
+
+	concrete fn unload_texture(self, t: *Texture)
+	{
+		t.id = 0;
+	}
+
+	concrete fn load_font(self, path: str, size: int, f: *Font) may fail
+	{
+		if path.len == 0 {
+			fail "the font does not load";
+		}
+		f.size = size;
+	}
+
+	concrete fn unload_font(self, f: *Font)
+	{
+		f.handle = none;
+	}
+
+	concrete fn key_pressed(self, k: Key) -> bool
+	{
+		return false;
+	}
+
+	concrete fn key_down(self, k: Key) -> bool
+	{
+		return false;
+	}
+
+	concrete fn key_released(self, k: Key) -> bool
+	{
+		return false;
+	}
+
+	concrete fn mouse(self) -> Vec2
+	{
+		return xy(0.0, 0.0);
+	}
+
+	concrete fn mouse_pressed(self, b: Mouse) -> bool
+	{
+		return false;
+	}
+
+	concrete fn mouse_down(self, b: Mouse) -> bool
+	{
+		return false;
+	}
+
+	concrete fn mouse_released(self, b: Mouse) -> bool
+	{
+		return false;
+	}
+
+	concrete fn mouse_wheel(self) -> f32
+	{
+		return 0.0;
+	}
+
+	concrete fn touch(self, i: int) -> Vec2
+	{
+		return xy(0.0, 0.0);
+	}
+
+	concrete fn gamepad_button_down(self, pad: int, b: Pad) -> bool
+	{
+		return false;
+	}
+
+	concrete fn time(self) -> f64
+	{
+		return self.drawn as f64 / 60.0;
+	}
+
+	concrete fn frame_time(self) -> f32
+	{
+		return 1.0 / 60.0;
+	}
+
+	concrete fn fps(self) -> int
+	{
+		return 60;
+	}
+
+	concrete fn set_target_fps(self, n: int)
+	{
+	}
+
+	concrete fn toggle_borderless(self)
+	{
+	}
+
+	concrete fn toggle_fullscreen(self)
+	{
+	}
+}
+
+/// The pixels on the shorter side of the window of a `Recorder`, as on a
+/// monitor of 1080 lines.
+const PIXELS: f32 = 1080.0;

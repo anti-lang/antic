@@ -1,0 +1,31 @@
+exit 0
+texture 1 by 1, font of 32 pixels
+frame 1 at 0.0167, the record holds 0 calls
+  bounds -0.389 0 1.778 1, pixel 1 / 1080
+frame 2 at 0.0333, the record holds 0 calls
+  bounds -0.389 0 1.778 1, pixel 1 / 1080
+frame 3 at 0.0500, the record holds 0 calls
+  bounds -0.389 0 1.778 1, pixel 1 / 1080
+3 frames of 1 / 60 s, 60 per second
+mouse (0, 0), wheel 0, touch (0, 0)
+keys false false false
+buttons false false false false
+the last frame holds 15 calls
+  clear size 0 colour 245 245 245 255 (0, 0)
+  rect size 0 colour 230 41 55 255 (0.1, 0.2) (0.4, 0.2) (0.4, 0.6) (0.1, 0.6)
+  square size 0 colour 0 121 241 255 (0.5, 0.5) (0.5, 1) (0, 1) (0, 0.5)
+  rect_lines size 0.05 colour 255 203 0 255 (0.5, 0.5) (0.5, 1) (0.25, 1) (0.25, 0.5)
+  rect_gradient_v size 0 colour 102 191 255 255 (0.5, 0.5) (0.5, 0.75) (0.25, 0.75) (0.25, 0.5)
+  circle size 0.1 colour 0 158 47 255 (0.5, 1)
+  circle_gradient size 0.2 colour 255 255 255 255 (0, 0.5)
+  circle_lines size 0.1 colour 190 33 55 255 (0, 1)
+  ellipse size 0.2 colour 135 60 190 255 (0.25, 0.75)
+  line size 0.001 colour 0 0 0 255 (0, 0) (1, 1)
+  triangle size 0 colour 255 161 0 255 (0, 0) (1, 0) (0, 1)
+  poly size 0.1 colour 200 122 255 255 (0.5, 0.5)
+  text size 0.05 colour 80 80 80 255 (0.05, 0.05)
+  text size 0.04 colour 127 106 79 255 (0.05, 0.9)
+  texture size 0.1 colour 255 255 255 255 (0.8, 0.8)
+squares 1, texts 2, textures 1
+say: x1.50 -3
+after reset: 0 calls, 0 squares

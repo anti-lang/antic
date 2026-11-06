@@ -16,12 +16,18 @@ static int64_t ready;
 
 int anti_rt_option_backtrace = -1;
 
+/* DESIGN: the thread of the first anti_rt_init marks itself, since main
+   calls it before the program starts a thread. A flag of the thread asks
+   the system nothing, so the one answer holds on all six targets. */
+static _Thread_local int main_thread;
+
 void anti_rt_init(void)
 {
     if (anti_rt_atomic_compare_swap(&started, (int64_t)sizeof started, 0,
                                     1) == 0) {
         return;
     }
+    main_thread = 1;
     anti_rt_hash_seed_start();
     anti_rt_atomic_store(&ready, (int64_t)sizeof ready, 1);
 }
@@ -29,4 +35,9 @@ void anti_rt_init(void)
 int anti_rt_ready(void)
 {
     return (int)anti_rt_atomic_load(&ready, (int64_t)sizeof ready);
+}
+
+int anti_rt_main_thread(void)
+{
+    return main_thread;
 }

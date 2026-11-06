@@ -1,0 +1,4 @@
+exit 0
+a worker: a window opens on the main thread alone, NotMainThread true
+the worker ran 1 time
+the main thread: open, 1 frame

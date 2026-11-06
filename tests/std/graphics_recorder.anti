@@ -1,0 +1,118 @@
+//! A window over the Recorder, which the build injects with `--inject
+//! anti.graphics.Display=anti.graphics.Recorder.shared`. The window runs the
+//! frames the recorder allows, each frame starts the record afresh, and every
+//! shape lands in the record in units of the square of the frame, with the
+//! frame of reference of its canvas applied. A texture and a font load over the
+//! recorder, the text of the window is reused, and the clock of the recorder
+//! moves one sixtieth of a second per frame.
+import anti.graphics.{xy};
+import anti.io;
+import anti.math;
+import anti.text;
+
+// A number rounded to three places, with no negative zero.
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+// Add the text of an f"..." to b and free it.
+fn put(b: *text.Builder, s: str)
+{
+	b.append(s);
+	free(s.ptr);
+}
+
+fn round(v: f32) -> f32
+{
+	return math.round(v * 1000.0) / 1000.0 + 0.0;
+}
+
+fn name(s: graphics.Shape) -> str
+{
+	switch s {
+		graphics.Shape.Clear => { return "clear"; },
+		graphics.Shape.Square => { return "square"; },
+		graphics.Shape.Rect => { return "rect"; },
+		graphics.Shape.RectLines => { return "rect_lines"; },
+		graphics.Shape.RectGradient => { return "rect_gradient_v"; },
+		graphics.Shape.Circle => { return "circle"; },
+		graphics.Shape.CircleGradient => { return "circle_gradient"; },
+		graphics.Shape.CircleLines => { return "circle_lines"; },
+		graphics.Shape.Ellipse => { return "ellipse"; },
+		graphics.Shape.Line => { return "line"; },
+		graphics.Shape.Triangle => { return "triangle"; },
+		graphics.Shape.Poly => { return "poly"; },
+		graphics.Shape.Text => { return "text"; },
+		graphics.Shape.Texture => { return "texture"; },
+	}
+}
+
+fn draw(w: *graphics.Window, f: graphics.Canvas, t: *graphics.Texture, font: *graphics.Font)
+{
+	f.clear(graphics.RAYWHITE);
+	f.rect(graphics.Rect { x: 0.1, y: 0.2, width: 0.3, height: 0.4 }, graphics.RED);
+	let c = f.move(0.5, 0.5).turn(90.0).scale(0.5);
+	c.square(graphics.BLUE);
+	c.rect_lines(graphics.Rect { x: 0.0, y: 0.0, width: 1.0, height: 0.5 }, 0.1,
+		graphics.GOLD);
+	c.rect_gradient_v(graphics.Rect { x: 0.0, y: 0.0, width: 0.5, height: 0.5 },
+		graphics.SKYBLUE, graphics.DARKBLUE);
+	c.circle(xy(1.0, 0.0), 0.2, graphics.LIME);
+	c.circle_gradient(xy(0.0, 1.0), 0.4, graphics.WHITE, graphics.BLANK);
+	c.circle_lines(xy(1.0, 1.0), 0.2, graphics.MAROON);
+	c.ellipse(xy(0.5, 0.5), 0.4, 0.2, graphics.VIOLET);
+	f.line(xy(0.0, 0.0), xy(1.0, 1.0), f.pixel, graphics.BLACK);
+	f.triangle(xy(0.0, 0.0), xy(1.0, 0.0), xy(0.0, 1.0), graphics.ORANGE);
+	f.poly(xy(0.5, 0.5), 6, 0.1, 30.0, graphics.PURPLE);
+	f.text(xy(0.05, 0.05), 0.05, w.say().add("Score ").add_int(42).text(),
+		graphics.DARKGRAY);
+	f.text_ex(font, xy(0.05, 0.9), 0.04, "font", graphics.BROWN);
+	f.texture(t, xy(0.8, 0.8), 0.1, graphics.WHITE);
+}
+
+fn main() -> int
+{
+	let r = graphics.Recorder.shared();
+	r.frames = 3;
+	let w = graphics.open("Recorder") catch e {
+		e.fatal();
+	};
+	let t = graphics.Texture.load("sprite.png") catch e {
+		e.fatal();
+	};
+	let font = graphics.Font.load("font.ttf", 32) catch e {
+		e.fatal();
+	};
+	line(f"texture {t.width} by {t.height}, font of {font.size} pixels");
+	let n = 0;
+	for f in w.frames() {
+		n += 1;
+		line(f"frame {n} at {w.time():.4f}, the record holds {r.len()} calls");
+		line(f"  bounds {round(f.bounds.x)} {round(f.bounds.y)} {round(f.bounds.width)} {round(f.bounds.height)}, pixel {round(f.pixel * 1080.0)} / 1080");
+		draw(&w, f, &t, &font);
+	}
+	line(f"{n} frames of {round(w.frame_time() * 60.0)} / 60 s, {w.fps()} per second");
+	line(f"mouse ({w.mouse().x}, {w.mouse().y}), wheel {w.mouse_wheel()}, touch ({w.touch(0).x}, {w.touch(0).y})");
+	line(f"keys {w.key_pressed(graphics.Key.F)} {w.key_down(graphics.Key.ESCAPE)} {w.key_released(graphics.Key.SPACE)}");
+	line(f"buttons {w.mouse_pressed(graphics.Mouse.LEFT)} {w.mouse_down(graphics.Mouse.RIGHT)} {w.mouse_released(graphics.Mouse.MIDDLE)} {w.gamepad_button_down(0, graphics.Pad.A)}");
+	line(f"the last frame holds {r.len()} calls");
+	for i in 0..r.len() {
+		let c = r.call(i);
+		let b = text.Builder.new();
+		put(&b, f"  {name(c.shape)} size {round(c.size)} colour {c.color.r} {c.color.g} {c.color.b} {c.color.a}");
+		for k in 0..c.count {
+			put(&b, f" ({round(c.points[k].x)}, {round(c.points[k].y)})");
+		}
+		io.println(b.text());
+	}
+	line(f"squares {r.count(graphics.Shape.Square)}, texts {r.count(graphics.Shape.Text)}, textures {r.count(graphics.Shape.Texture)}");
+	let again = w.say().add("x").add_float(1.5).add(" ").add_int(-3).text();
+	line(f"say: {again}");
+	r.reset();
+	line(f"after reset: {r.len()} calls, {r.count(graphics.Shape.Square)} squares");
+	return 0;
+}

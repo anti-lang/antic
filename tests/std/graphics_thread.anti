@@ -1,0 +1,63 @@
+//! `graphics.open` refuses any thread but the main one, which macOS requires of
+//! a window, and opens on the main thread. The build injects the Recorder, so
+//! no window opens: the refusal stands in `open` before the display. The main
+//! thread waits until a thread of the pool has taken the job, since `join` runs
+//! a job that no thread took on the thread that joins.
+import anti.graphics;
+import anti.io;
+import anti.text;
+import anti.time;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+// Add the text of an f"..." to b and free it.
+fn put(b: *text.Builder, s: str)
+{
+	b.append(s);
+	free(s.ptr);
+}
+
+class Attempt
+{
+	pub tries: int = 0,
+	pub atomic started: int = 0,
+}
+
+worker fn elsewhere(a: *Attempt) -> int
+{
+	a.started.store(1);
+	let w = graphics.open("Elsewhere") catch e {
+		let refused = e is *graphics.NotMainThread;
+		line(f"a worker: {e.message}, NotMainThread {refused}");
+		yield graphics.Window { };
+	};
+	return a.tries + 1;
+}
+
+fn main() -> int
+{
+	let a = alloc Attempt { };
+	let job = dispatch a -> elsewhere;
+	let waited = 0;
+	while a.started.load() == 0 && waited < 10000 do {
+		time.sleep(time.milliseconds(1));
+		waited += 1;
+	}
+	let tries = join(job);
+	delete(a);
+	line(f"the worker ran {tries} time");
+	let w = graphics.open("Here") catch e {
+		e.fatal();
+	};
+	let frames = 0;
+	for f in w.frames() {
+		frames += 1;
+	}
+	line(f"the main thread: open, {frames} frame");
+	return 0;
+}

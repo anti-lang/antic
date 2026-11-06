@@ -1,0 +1,15 @@
+//! The first program of docs/notes/graphics.md, as the note writes it. It opens
+//! a window, so the suite links it for every target and never runs it.
+import anti.graphics.{xy};
+
+fn main() -> int
+{
+	let w = graphics.open("Hello") catch e {
+		e.fatal();
+	};
+	for f in w.frames() {
+		f.clear(graphics.RAYWHITE);
+		f.circle(xy(0.5, 0.5), 0.25, graphics.PINK);
+	}
+	return 0;
+}

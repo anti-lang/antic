@@ -1,0 +1,8 @@
+[package]
+name = "com.example"
+version = "0.1.0"
+
+# The build takes the default provider of anti.graphics.Display, raylib, and
+# `anti test` lays the Recorder over it, so the tests draw without a display.
+[inject.test]
+"anti.graphics.Display" = "anti.graphics.Recorder.shared"

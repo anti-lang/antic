@@ -1,0 +1,30 @@
+//! The Pythagoras tree of docs/notes/graphics.md, with the sketch and the
+//! `tests` block of the note as the note writes them.
+import anti.graphics.{LIME, PINK};
+import anti.math;
+
+const LEVELS: int = 6;
+const SQUARES: int = 127;
+const BASE_ANGLE: f32 = 45.0;
+
+fn branch(c: graphics.Canvas, level: int, a: f32)
+{
+	c.square(PINK.lerp(LIME, level as f32 / LEVELS as f32));
+	if level == LEVELS { return; }
+	let r = a * math.DEG2RAD;
+	let left = c.turn(-a).scale(math.cos(r)).move(0.0, -1.0);
+	branch(left, level + 1, a);
+	branch(left.move(1.0, 1.0).turn(90.0).scale(math.tan(r)).move(0.0, -1.0),
+		level + 1, a);
+}
+
+tests
+{
+	fn the_tree_draws_every_square()
+	{
+		let r = graphics.Recorder.new(16.0 / 9.0);
+		branch(r.canvas(), 0, BASE_ANGLE);
+		let squares = r.count(graphics.Shape.Square);
+		assert(squares == SQUARES);
+	}
+}

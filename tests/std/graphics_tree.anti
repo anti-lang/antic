@@ -1,0 +1,123 @@
+//! The Pythagoras tree of docs/notes/graphics.md, as the note writes it,
+//! through a Recorder. The squares of two levels stand where the note says:
+//! each child on its part of the top edge of its parent, the two meeting at a
+//! right angle above it. The tree of every level has one square per node.
+import anti.graphics.{LIME, PINK, xy};
+import anti.io;
+import anti.math;
+import anti.text;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+// Add the text of an f"..." to b and free it.
+fn put(b: *text.Builder, s: str)
+{
+	b.append(s);
+	free(s.ptr);
+}
+
+const LEVELS: int = 2;
+
+fn branch(c: graphics.Canvas, level: int, a: f32)
+{
+	c.square(PINK.lerp(LIME, level as f32 / LEVELS as f32));
+	if level == LEVELS { return; }
+	let r = a * math.DEG2RAD;
+	let left = c.turn(-a).scale(math.cos(r)).move(0.0, -1.0);
+	branch(left, level + 1, a);
+	branch(left.move(1.0, 1.0).turn(90.0).scale(math.tan(r)).move(0.0, -1.0),
+		level + 1, a);
+}
+
+// A number rounded to three places, with no negative zero.
+fn round(v: f32) -> f32
+{
+	return math.round(v * 1000.0) / 1000.0 + 0.0;
+}
+
+fn near(p: graphics.Vec2, q: graphics.Vec2) -> bool
+{
+	return math.abs(p.x - q.x) < 0.0001 && math.abs(p.y - q.y) < 0.0001;
+}
+
+fn length(p: graphics.Vec2, q: graphics.Vec2) -> f32
+{
+	return math.hypot(q.x - p.x, q.y - p.y);
+}
+
+// The corners of square i of the record: 0 and 1 are its top edge, 3 and 2
+// its bottom edge, both from left to right as seen from inside.
+fn corner(r: *graphics.Recorder, i: int, k: int) -> graphics.Vec2
+{
+	let c = r.call(i);
+	return c.points[k];
+}
+
+// The record holds the squares depth first: the parent at p, its left child
+// at l and its right child at q.
+fn fork(label: str, r: *graphics.Recorder, p: int, l: int, q: int, a: f32)
+{
+	let apex = corner(r, l, 2);
+	let edge = near(corner(r, l, 3), corner(r, p, 0)) && near(corner(r, q, 3), apex)
+		&& near(corner(r, q, 2), corner(r, p, 1));
+	let side = length(corner(r, p, 0), corner(r, p, 1));
+	let rad = a * math.DEG2RAD;
+	let sides = math.abs(length(corner(r, l, 3), apex) - side * math.cos(rad)) < 0.0001
+		&& math.abs(length(apex, corner(r, q, 2)) - side * math.sin(rad)) < 0.0001;
+	let ux = apex.x - corner(r, l, 3).x;
+	let uy = apex.y - corner(r, l, 3).y;
+	let vx = corner(r, q, 2).x - apex.x;
+	let vy = corner(r, q, 2).y - apex.y;
+	let right = math.abs(ux * vx + uy * vy) < 0.0001;
+	// Above the parent's top edge, which runs from left to right: the cross
+	// product of that edge and the way to the apex turns the other way than
+	// the edge and the way down to the parent's bottom.
+	let ex = corner(r, p, 1).x - corner(r, p, 0).x;
+	let ey = corner(r, p, 1).y - corner(r, p, 0).y;
+	let o = corner(r, p, 0);
+	let b = corner(r, p, 3);
+	let up = ex * (apex.y - o.y) - ey * (apex.x - o.x);
+	let down = ex * (b.y - o.y) - ey * (b.x - o.x);
+	let outside = up * down < 0.0;
+	line(f"  {label}: edges {edge} sides {sides} right angle {right} outside {outside}");
+}
+
+fn show(r: *graphics.Recorder, a: f32)
+{
+	line(f"{a} degrees: {r.count(graphics.Shape.Square)} squares");
+	for i in 0..r.len() {
+		let c = r.call(i);
+		let b = text.Builder.new();
+		put(&b, f"  {c.color.r} {c.color.g} {c.color.b}");
+		for k in 0..4 {
+			put(&b, f" ({round(c.points[k].x)}, {round(c.points[k].y)})");
+		}
+		io.println(b.text());
+	}
+	fork("trunk", r, 0, 1, 4, a);
+	fork("left", r, 1, 2, 3, a);
+	fork("right", r, 4, 5, 6, a);
+}
+
+fn main() -> int
+{
+	let degrees: [3]f32 = [45.0, 30.0, 60.0];
+	for a in degrees {
+		let r = graphics.Recorder.new(16.0 / 9.0);
+		branch(r.canvas(), 0, a);
+		show(&r, a);
+	}
+	let wide = graphics.Recorder.new(1.0);
+	let c = wide.canvas().move(0.5, 0.5).scale(0.1);
+	c.square(PINK);
+	let top = wide.call(0);
+	line(f"moved and scaled: ({round(top.points[0].x)}, {round(top.points[0].y)}) to ({round(top.points[2].x)}, {round(top.points[2].y)})");
+	let x = xy(0.25, 0.75);
+	line(f"xy: {x.x} {x.y}");
+	return 0;
+}

@@ -73,6 +73,12 @@ function(antic_dev_imports out source)
             if(module IN_LIST modules)
                 continue()
             endif()
+            # anti.raylib has no source in the tree. The build writes it
+            # from the headers of raylib, and it imports nothing of anti.
+            if(module STREQUAL "raylib")
+                list(APPEND modules "${module}")
+                continue()
+            endif()
             set(module_source "${PROJECT_SOURCE_DIR}/src/std/anti/${module}.anti")
             if(NOT EXISTS "${module_source}")
                 message(FATAL_ERROR "${file} imports `${found}`, and "
@@ -712,7 +718,7 @@ function(antic_dev_object module)
     set_tests_properties(dev_object_${name} PROPERTIES
         FIXTURES_SETUP ${name}_dev_object)
 endfunction()
-foreach(module lang regex raylib mem text reflect runtime collection
+foreach(module lang regex raylib graphics mem text reflect runtime collection
         collection/pool collection/tree collection/queue collection/list
         collection/deque collection/ring collection/grid collection/sorted
         collection/map collection/set collection/concurrent
@@ -1156,6 +1162,11 @@ file(GLOB std_sources CONFIGURE_DEPENDS
 # the inlining of release mode in docs/decisions.md says.
 foreach(source IN LISTS std_sources)
     get_filename_component(name "${source}" NAME_WE)
+    # The programs of anti.graphics stand in a list of their own below,
+    # since most of them build with an option and one opens a window.
+    if(name MATCHES "^graphics_")
+        continue()
+    endif()
     set(expected "")
     set(win32_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.win32.expected")
     set(lto_expected "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.lto.expected")
@@ -1202,6 +1213,35 @@ foreach(name math math_constant)
         OPTIONS "--dev"
         DEV ${modules}
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
+endforeach()
+
+# anti.graphics through the Recorder, in release mode and in dev mode, with
+# --memory-checks below. graphics_hello opens a window, so the suite links it
+# alone, as graphics_link_<target> of src/native/raylib.cmake does for every
+# target. graphics_tree and graphics_colors draw without a window. The
+# others open one, and the build gives it the Recorder with --inject, as
+# `[inject.test]` gives it to `anti test`.
+set(ANTIC_GRAPHICS_RECORDER
+    "--inject,anti.graphics.Display=anti.graphics.Recorder.shared")
+set(antic_graphics_programs tree colors recorder thread)
+set(antic_graphics_injected recorder thread allocations)
+foreach(name IN LISTS antic_graphics_programs)
+    set(source "${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_${name}.anti")
+    set(options "")
+    if(name IN_LIST antic_graphics_injected)
+        set(options "${ANTIC_GRAPHICS_RECORDER}")
+    endif()
+    antic_dev_imports(modules "${source}")
+    foreach(module IN LISTS modules)
+        antic_dev_object(${module})
+    endforeach()
+    antic_program_test(std_graphics_${name} "${source}"
+        OPTIONS ${options}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-graphics")
+    antic_program_test(std_graphics_${name}_dev "${source}"
+        OPTIONS "--dev" ${options}
+        DEV ${modules}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-graphics-dev")
 endforeach()
 
 # The cases of fault injection of tests/programs/ and tests/std/. A file
@@ -2197,6 +2237,25 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
                 -P "${ANTIC_RUNNERS}/run_program.cmake")
         set_tests_properties(std_${name}_memory_checks PROPERTIES TIMEOUT 120)
     endforeach()
+    # anti.graphics under --memory-checks. graphics_allocations runs here
+    # alone: the runtime of AddressSanitizer calls a hook of the program at
+    # every allocation, and the hook counts those of a thousand frames.
+    foreach(name IN LISTS antic_graphics_programs ITEMS allocations)
+        set(options "--memory-checks")
+        if(name IN_LIST antic_graphics_injected)
+            set(options "--memory-checks,${ANTIC_GRAPHICS_RECORDER}")
+        endif()
+        add_test(NAME std_graphics_${name}_memory_checks
+            COMMAND "${CMAKE_COMMAND}"
+                ${ANTIC_AND_RUNTIME}
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_${name}.anti"
+                "-DOPTIONS=${options}"
+                "-DOBJECTS="
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-graphics-memory-checks"
+                -P "${ANTIC_RUNNERS}/run_program.cmake")
+        set_tests_properties(std_graphics_${name}_memory_checks PROPERTIES
+            TIMEOUT 120)
+    endforeach()
 endif()
 # DESIGN: the runtime of AddressSanitizer for x86_64 stops under
 # qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
@@ -2642,6 +2701,41 @@ foreach(mode dev release)
                 -I src --runtime "${ANTIC_RUNTIME_DIR}"
  src/com/example/standard.anti)
 endforeach()
+
+# anti.graphics under `anti test`. The build takes raylib, the default
+# provider of anti.graphics.Display, and `[inject.test]` lays the Recorder
+# over it, so the test of tree.anti draws the Pythagoras tree of
+# docs/notes/graphics.md without a display, and the test of window.anti
+# draws in a window over the Recorder.
+foreach(mode dev release)
+    set(extra "")
+    if(mode STREQUAL "release")
+        set(extra --release)
+    endif()
+    add_expect_test(inject_graphics_${mode} STATUS 0
+        DIRECTORY "${INJECT}/graphics"
+        PATTERN "2 tests in 2 modules, 0 modules failed"
+        COMMAND "$<TARGET_FILE:anti>" test ${extra}
+                --work "${CMAKE_CURRENT_BINARY_DIR}/inject-graphics-${mode}"
+                -I src --runtime "${ANTIC_RUNTIME_DIR}"
+ src/com/example/tree.anti src/com/example/window.anti)
+endforeach()
+
+# Every `anti` block of docs/notes/graphics.md stands word for word in a
+# program the suite builds: the first in graphics_hello, the sketch of the
+# tree in graphics_tree and in the module of tests/inject/graphics, and its
+# `tests` block in that module.
+add_test(NAME graphics_note_examples
+    COMMAND "${CMAKE_COMMAND}"
+        "-DNOTE=${PROJECT_SOURCE_DIR}/docs/notes/graphics.md"
+        "-DFILES=${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_hello.anti,${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_tree.anti,${INJECT}/graphics/src/com/example/tree.anti"
+        -P "${ANTIC_RUNNERS}/run_note_examples.cmake")
+
+# No raylib type stands in a public signature of anti.graphics.
+add_test(NAME graphics_signatures
+    COMMAND "${CMAKE_COMMAND}"
+        "-DSOURCE=${ANTIC_STD_SOURCE_DIR}/graphics.anti"
+        -P "${ANTIC_RUNNERS}/run_graphics_signatures.cmake")
 
 # Plugins. The library of tests/plugin is built with --lib shared
 # --no-runtime, so it carries no runtime and is bound against the host

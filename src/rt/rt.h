@@ -15,6 +15,11 @@ void anti_rt_init(void);
    the C programs of the test ask it whether the start ran. */
 int anti_rt_ready(void);
 
+/* 1 on the thread that ran the first anti_rt_init, the main thread of an
+   executable, else 0. `open` of anti.graphics asks it, since macOS takes
+   a window from the main thread alone. */
+int anti_rt_main_thread(void);
+
 /* The key `backtrace` of the runtime configuration: 1 on, 0 off and -1
    when no layer named it. set_key of src/rt/conf.c writes it, from the
    command line, the file and rt.configure. */

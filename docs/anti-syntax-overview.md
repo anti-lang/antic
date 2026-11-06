@@ -2174,6 +2174,7 @@ The 25 modules, with their public items and the functions among them that may fa
 | `anti.plugin` | `Library` with `instance_at`, `supports_at`, `live` and `unload`, which the forms `lib.instance(I)` and `lib.supports(I, "f")` call, `load`, `NOT_LOADED`, `IN_USE` | `load`, `instance_at`, `unload` |
 | `anti.raylib` | every function, struct, enum and constant of `raylib.h`, `rlgl.h`, `raymath.h` and `rcamera.h` of raylib 6.0, one module in which raymath and rcamera take the types of raylib, which `anti bind --clang` writes during the build. A program that imports it links raylib, miniaudio and the system libraries of raylib with no option | |
 | `anti.math` | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`, `tanh`, `sqrt`, `cbrt`, `pow`, `exp`, `exp2`, `log`, `log2`, `log10`, `hypot`, `floor`, `ceil`, `round`, `trunc`, `fmod`, `abs`, `min`, `max`, `copysign`, `is_nan`, `is_inf`, `clamp`, `lerp`, `normalize`, `remap`, `wrap`, `PI`, `TAU`, `E`, `DEG2RAD`, `RAD2DEG` | |
+| `anti.graphics` | `open`, `Window`, `Canvas`, `Say`, `Texture`, `Font`, `Display`, `RaylibDisplay`, `Recorder`, `Call`, `Shape`, `Vec2`, `xy`, `Rect`, `Transform`, `apply`, `stretch`, `Color`, `hex`, `hsv`, `fade`, `lerp`, `brightness`, the named colours of raylib, `Key`, `Mouse`, `Pad`, `NoDisplay`, `NotMainThread` | `open`, `Window.start`, `Texture.load`, `Font.load` |
 | `anti.regex` | `Error`, `BadPattern`, `TooExpensive`, `MissingGroup`, `LengthMismatch`, `compile`, `compile_bytes`, `Cursor`, `Matches`, `Pieces`, `ByteMatches`, `BytePieces`, and the functions behind the methods of `str` and `[]byte` | `compile`, `compile_bytes`, and a method with a compiled pattern |
 
 The 12 modules under `anti.collection`, each with the `operator fn eq` and `operator fn hash` of its classes:
@@ -2195,9 +2196,24 @@ The 12 modules under `anti.collection`, each with the `operator fn eq` and `oper
 
 `anti.math` gives the functions of the C library, the scalar helpers of raymath and the constants `PI`, `TAU`, `E`, `DEG2RAD` and `RAD2DEG`. Each function has one generic name over the constraint `Float` of `anti.lang`, which `f32` and `f64` meet, so `math.sin(a)` takes the type of `a`. A domain error gives NaN, and no function fails. Every function gives the result of the libm of musl, which the runtime carries for all six targets, so every target gives the same bits. A program that links it names musl in its notice.
 
-`anti.graphics` draws in units of the largest square that fits the window, over raylib, with no raylib type in a `pub` signature. `graphics.open` opens the window, `for f in w.frames()` draws one frame per turn, and `f.move`, `f.turn` and `f.scale` give a canvas of its own. `Display` is the abstract class behind it, with `RaylibDisplay` as its default provider and `Recorder` for tests without a display.
+`anti.graphics` draws in units of the largest square that fits the window, over raylib, with no raylib type in a `pub` signature. `graphics.open` opens the window, `for f in w.frames()` draws one frame per turn, and `f.move`, `f.turn` and `f.scale` give a canvas of its own. `Display` is the abstract class behind it, with `RaylibDisplay` as its default provider and `Recorder` for tests without a display, which `"anti.graphics.Display" = "anti.graphics.Recorder.shared"` in `[inject.test]` selects. A frame allocates nothing, and `open` refuses any thread but the main one.
 
-Not built yet: `anti.graphics`, the modules over the other native libraries of the runtime archive, `anti.net` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+```anti
+import anti.graphics.{LIME, PINK, xy};
+
+let w = graphics.open("Hello") catch e {
+	e.fatal();
+};
+for f in w.frames() {
+	f.clear(graphics.RAYWHITE);
+	f.circle(xy(0.5, 0.5), 0.25, PINK);
+	f.move(0.5, 0.5).turn(45.0).scale(0.1).square(LIME);
+	f.text(xy(0.0, 0.0), 0.05, w.say().add("t = ").add_float(w.time() as f32).text(),
+		graphics.DARKGRAY);
+}
+```
+
+Not built yet: the modules over the other native libraries of the runtime archive, `anti.net` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
 
 ## Tools
 
