@@ -1,0 +1,18 @@
+//! A function of a module called on a struct constant of that module, the
+//! constant named with the name of the module, as `graphics.PINK.fade(0.5)`.
+//! Method-call sugar reaches a function of the module that declares the struct,
+//! as it does for the same constant bound to a local or imported by its name.
+
+import anti.graphics;
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let c = graphics.PINK.fade(0.5);
+	let d = graphics.PINK.lerp(graphics.LIME, 1.0);
+	let s = f"PINK at half: {c.r} {c.g} {c.b} {c.a}, PINK to LIME: {d.r} {d.g} {d.b}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

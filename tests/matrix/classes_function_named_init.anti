@@ -1,0 +1,29 @@
+//! A function of a class body named `init`, called on a value of the class and
+//! on a pointer to one. The compiler writes an init function of its own for
+//! every class, and the name of the class's own function is no other.
+
+import anti.io;
+import anti.text;
+
+class Counter
+{
+	pub n: int = 1,
+
+	pub fn init(self) -> int
+	{
+		return self.n + 1;
+	}
+}
+
+fn main() -> int
+{
+	let c = Counter { };
+	let p = alloc Counter { n: 5 };
+	let a = c.init();
+	let b = p.init();
+	delete(p);
+	let s = f"init of a value: {a}, of a pointer: {b}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}
