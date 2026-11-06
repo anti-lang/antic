@@ -299,6 +299,13 @@ not re-open a settled decision without asking Eddie.
   267 s and 278 s before the commit of `anti test`. It ran each sanitizer
   suite in the six parts of `asan`: `asan` 245 s, 189 s, 259 s, 193 s,
   442 s and 433 s, `ubsan` 250 s, 187 s, 258 s, 201 s, 458 s and 452 s.
+  The step of the third set of answers of 2026-11-06 measured `host` in
+  the same three parts: 385 s, 271 s and 292 s before the commit of the
+  `f64` constants, 380 s, 287 s and 275 s before the commit of `anti test
+  --release`, 353 s, 273 s and 281 s before the commit of the design of
+  one NaN. It ran each sanitizer suite in the six parts of `asan`: `asan`
+  250 s, 188 s, 273 s, 193 s, 433 s and 447 s, `ubsan` 255 s, 193 s,
+  258 s, 199 s, 453 s and 467 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
