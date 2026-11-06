@@ -294,6 +294,11 @@ not re-open a settled decision without asking Eddie.
   and 342 s before the commit of T209 and T210. It ran each sanitizer
   suite in the six parts of `asan`: `asan` 255 s, 196 s, 262 s, 195 s,
   462 s and 491 s, `ubsan` 265 s, 197 s, 260 s, 205 s, 474 s and 509 s.
+  The step of the answers to `anti.graphics` measured `host` in the same
+  three parts: 375 s, 268 s and 277 s before the commit of T210, 376 s,
+  267 s and 278 s before the commit of `anti test`. It ran each sanitizer
+  suite in the six parts of `asan`: `asan` 245 s, 189 s, 259 s, 193 s,
+  442 s and 433 s, `ubsan` 250 s, 187 s, 258 s, 201 s, 458 s and 452 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -900,11 +905,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6868 ctest tests pass on the development Mac, and two of them, the
+- 6886 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  Six of them are the expected failures of T209 and T210. The two other
+  Three of them are the expected failures of T209. The two other
   lines of `tests/known-failures.txt`, those of T136 and T138, carry
-  `host=windows`. The ASan and the UBSan builds run 6866 each
+  `host=windows`. The ASan and the UBSan builds run 6884 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
@@ -1423,7 +1428,10 @@ reports what it finished.
   command" in `docs/decisions.md` and `docs/notes/doc.md`.
 - `tests { }` and `fixtures { }` compile under `antic --tests` alone, and
   `anti test` writes the runner, links it and runs it. Every other build drops
-  both blocks after parsing.
+  both blocks after parsing. In a project without `-I`, `anti test` writes
+  or reuses the library files of the modules of `src/` as a dev build does,
+  and without a file it tests every module there that declares a test, by
+  Q4 of "Answers of 2026-11-06, second set".
 - The processor levels are built. `--cpu` takes `v1`, `v2` or `v3` on x86_64 and
   `armv8.0`, `armv8.2` or `armv8.5` on ARM64, and each target has a default:
   x86-64-v3 on both x86_64 targets, `armv8.5` on macos-arm64, `armv8.2` on
