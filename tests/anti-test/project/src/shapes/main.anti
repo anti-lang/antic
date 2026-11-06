@@ -1,0 +1,8 @@
+//! The program of the shapes.
+
+import shapes.area;
+
+fn main() -> int
+{
+	return area.padded(0) - 1;
+}

@@ -1,0 +1,24 @@
+//! The geometry of the shapes, over the numbers of `shapes.tuning`.
+
+import shapes.tuning;
+
+/// `n` times the factor of the tuning.
+pub fn scaled(n: int) -> int
+{
+	return n * tuning.FACTOR;
+}
+
+tests
+{
+	fn scales_by_the_factor()
+	{
+		let n = scaled(3);
+		assert(n == 6);
+	}
+
+	fn scales_zero()
+	{
+		let n = scaled(0);
+		assert(n == 0);
+	}
+}

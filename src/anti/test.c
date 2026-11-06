@@ -28,6 +28,10 @@
    path anti.test.<module> of a runner names. */
 #define TEST_RUNNER_DIR "anti/test"
 
+/* The directory of the library files of a run over a project, under the
+   work directory. */
+#define TEST_LIBRARY_DIR "lib"
+
 /* One module of the run and the object a dev build writes for it. */
 struct test_unit {
     struct unit unit;
@@ -124,6 +128,23 @@ static void imports_free(struct imports *list)
     list->count = 0;
 }
 
+/* The library file of u and the library files of the dependency graph
+   of base, which seed a walk of the imports. The graph stands under no
+   root, so a walk from u alone would not reach it. The caller frees the
+   array. */
+static const char **unit_seed(const struct test_unit *u,
+                              const struct options *base)
+{
+    const char **seed = files_array(base->library_count + 1, sizeof *seed);
+    size_t i;
+
+    seed[0] = text_cstr(&u->unit.library);
+    for (i = 0; i < base->library_count; i++) {
+        seed[i + 1] = base->libraries[i];
+    }
+    return seed;
+}
+
 /* DESIGN: a dev build compiles one module into its own object and links
    the objects of the modules it imports. The run therefore writes an
    object of every library file the module under test needs, its own
@@ -139,15 +160,15 @@ static bool compile_imports(const struct test_unit *u,
     struct arena arena = {0};
     struct options search = *base;
     struct text directory = {0};
-    const char *seed[1];
+    const char **seed = unit_seed(u, base);
+    const char **rest = files_array(base->library_count + 1, sizeof *rest);
     const char **paths = NULL;
     size_t count = 0;
     size_t i;
     bool ok = true;
 
-    seed[0] = text_cstr(&u->unit.library);
     search.libraries = seed;
-    search.library_count = 1;
+    search.library_count = base->library_count + 1;
     search.input = NULL;
     if (!driver_libraries(&search, &arena, &paths, &count)) {
         ok = false;
@@ -163,9 +184,19 @@ static bool compile_imports(const struct test_unit *u,
         struct options one = *base;
         struct text base_path = {0};
         struct text object = {0};
+        size_t kept = 0;
+        size_t j;
         int status;
         if (strcmp(paths[i], seed[0]) == 0) {
             continue;
+        }
+        /* antic refuses a module that stands twice on its command line,
+           so a library file of the graph leaves the list when it is the
+           input, as module_object of build.c leaves it. */
+        for (j = 0; j < base->library_count; j++) {
+            if (strcmp(base->libraries[j], paths[i]) != 0) {
+                rest[kept++] = base->libraries[j];
+            }
         }
         text_appendf(&base_path, "%s/%zu", text_cstr(&directory), i);
         text_appendf(&object, "%s%s", text_cstr(&base_path),
@@ -173,6 +204,8 @@ static bool compile_imports(const struct test_unit *u,
         one.input = paths[i];
         one.output = text_cstr(&base_path);
         one.dev = true;
+        one.libraries = rest;
+        one.library_count = kept;
         /* A module without `main` stops at its object. */
         status = driver_run(&one);
         ok = status == 0 || status == DRIVER_OBJECT_ONLY;
@@ -190,6 +223,8 @@ static bool compile_imports(const struct test_unit *u,
 done:
     text_free(&directory);
     arena_free(&arena);
+    free((void *)seed);
+    free((void *)rest);
     return ok;
 }
 
@@ -240,17 +275,18 @@ static bool runner_frameworks(const struct test_unit *u,
 {
     struct options search = *base;
     struct unit_links links;
-    const char *seed[1];
+    const char **seed = unit_seed(u, base);
+    bool ok;
 
-    seed[0] = text_cstr(&u->unit.library);
     search.libraries = seed;
-    search.library_count = 1;
+    search.library_count = base->library_count + 1;
     search.input = NULL;
-    if (!unit_links_read(&search, arena, &links)) {
-        return false;
+    ok = unit_links_read(&search, arena, &links);
+    if (ok) {
+        unit_links_apply(&links, o);
     }
-    unit_links_apply(&links, o);
-    return true;
+    free((void *)seed);
+    return ok;
 }
 
 /* Build the runner of one module and run it. */
@@ -331,6 +367,9 @@ int test_run(const struct test_request *r)
     struct options base;
     const char **search;
     struct test_unit *units;
+    struct text libraries = {0};
+    const char *library_dir = r->work;
+    size_t count = 0;
     size_t total = 0;
     size_t failed = 0;
     size_t i;
@@ -343,12 +382,30 @@ int test_run(const struct test_request *r)
     if (!files_make_dirs_or_say(r->work)) {
         return 1;
     }
+    /* [provisional] DESIGN: a run over a project finds the modules it
+       leaves out among the library files of the dev build, which stand
+       behind the files of the run. A library file that an earlier run
+       wrote of such a module would stand before them, so the files of
+       the run stand in a directory of their own, emptied first. */
+    if (r->project) {
+        text_appendf(&libraries, "%s/" TEST_LIBRARY_DIR, r->work);
+        library_dir = text_cstr(&libraries);
+        if (!files_remove_tree(library_dir)) {
+            say_anti("cannot replace %s\n", library_dir);
+            text_free(&libraries);
+            return 1;
+        }
+        if (!files_make_dirs_or_say(library_dir)) {
+            text_free(&libraries);
+            return 1;
+        }
+    }
     units = files_array(r->source_count, sizeof *units);
     search = files_array(r->root_count + 1, sizeof *search);
     /* The work directory holds the library files this run wrote, and the
        user's roots hold the sources. Both are search roots of every call,
        the work directory first, so a module of the run wins. */
-    search[0] = r->work;
+    search[0] = library_dir;
     for (i = 0; i < r->root_count; i++) {
         search[i + 1] = r->roots[i];
     }
@@ -362,22 +419,36 @@ int test_run(const struct test_request *r)
        one. Every compile of the run carries the same table. */
     base.inject = r->inject;
     base.inject_count = r->inject_count;
+    /* The library files of the graph stand under no root, so every
+       compile of the run names them, as every compile of `anti build`
+       does. */
+    base.libraries = r->libraries;
+    base.library_count = r->library_count;
     for (i = 0; i < r->source_count; i++) {
-        if (!read_unit(r->sources[i], r->roots, r->root_count, r->work,
-                       &units[i])) {
+        bool read = read_unit(r->sources[i], r->roots, r->root_count,
+                              library_dir, &units[count]);
+        if (!read) {
+            count++;
             goto done;
         }
-        total += units[i].unit.test_count;
+        /* A module without a test has nothing to run, and the library
+           file of the dev build stands for it. */
+        if (r->tested_only && units[count].unit.test_count == 0) {
+            unit_free(&units[count].unit);
+            continue;
+        }
+        total += units[count].unit.test_count;
+        count++;
     }
     /* Every library file first, so a module that imports another of the
        run finds it however the files were ordered. */
-    for (i = 0; i < r->source_count; i++) {
+    for (i = 0; i < count; i++) {
         if (!compile_library(&units[i], &base) ||
             (!r->release && !compile_object(&units[i], &base, r->work))) {
             goto done;
         }
     }
-    for (i = 0; i < r->source_count; i++) {
+    for (i = 0; i < count; i++) {
         if (units[i].unit.test_count == 0) {
             continue;
         }
@@ -386,14 +457,15 @@ int test_run(const struct test_request *r)
         }
     }
     printf("anti test: %zu tests in %zu modules, %zu module%s failed\n",
-           total, r->source_count, failed, failed == 1 ? "" : "s");
+           total, count, failed, failed == 1 ? "" : "s");
     status = failed == 0 ? 0 : 1;
 done:
-    for (i = 0; i < r->source_count; i++) {
+    for (i = 0; i < count; i++) {
         unit_free(&units[i].unit);
         text_free(&units[i].object);
     }
     free(units);
     free(search);
+    text_free(&libraries);
     return status;
 }

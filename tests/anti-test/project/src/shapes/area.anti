@@ -1,0 +1,19 @@
+//! The area of a square, over `shapes.geometry` and `shapes.tuning`.
+
+import shapes.geometry;
+import shapes.tuning;
+
+/// The scaled side `n` with the padding of the tuning.
+pub fn padded(n: int) -> int
+{
+	return geometry.scaled(n) + tuning.padding();
+}
+
+tests
+{
+	fn pads_the_scaled_side()
+	{
+		let n = padded(2);
+		assert(n == 5);
+	}
+}

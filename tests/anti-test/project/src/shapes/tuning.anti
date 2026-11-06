@@ -1,0 +1,10 @@
+//! The numbers of the shapes.
+
+/// The factor that `geometry.scaled` multiplies by.
+pub const FACTOR: int = 2;
+
+/// What `area.padded` adds, which the modules of the package alone reach.
+internal fn padding() -> int
+{
+	return 1;
+}

@@ -16,7 +16,14 @@
    memory_checks passes --memory-checks to every compile and runs each
    runner through Anti's symbolizer. inject holds the `Interface=Provider`
    entries of the manifest, which every compile of the run passes to
-   antic. */
+   antic.
+
+   project marks a run over a project without -I, after the dev build of
+   its modules. The library files of the run then stand in lib/ of the
+   work directory, which the run empties first. libraries holds the
+   library files of the dependency graph, which every compile of the run
+   takes. tested_only leaves out of the run a module that declares no
+   test, which a run over every module of the project asks for. */
 struct test_request {
     const char *const *sources;
     size_t source_count;
@@ -29,6 +36,10 @@ struct test_request {
     bool memory_checks;
     const char *const *inject;
     size_t inject_count;
+    bool project;
+    const char *const *libraries;
+    size_t library_count;
+    bool tested_only;
 };
 
 /* Compile each module of r with its `tests` and `fixtures` blocks, write

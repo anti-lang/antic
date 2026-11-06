@@ -628,6 +628,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_anti_symbols_input.cmake` | Checks that `anti symbols resolve` refuses numbers beyond 64 bits. |
 | `tests/runners/run_anti_test.cmake` | Drives `anti test` over fixture modules. |
 | `tests/runners/run_anti_test_module.cmake` | Runs `anti test` over one module of `tests/anti-test/` in dev mode. |
+| `tests/runners/run_anti_test_project.cmake` | Runs `anti test` in a copy of the project `tests/anti-test/project/` without `-I`. |
 | `tests/runners/run_antic_calls.cmake` | Refuses a runner that runs antic in an `execute_process` of its own instead of `antic_run` or `antic_build`. |
 | `tests/runners/run_antic_options.cmake` | Runs antic with one option beside the run without it, and names what differs. |
 | `tests/runners/run_antic_stack.cmake` | Compiles the deepest accepted expression on a small stack. |

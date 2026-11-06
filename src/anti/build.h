@@ -4,6 +4,24 @@
 /* The interface of build.c: `anti build` and `anti run`. */
 
 #include <stdbool.h>
+#include <stddef.h>
+
+#include "text.h"
+
+/* What a test run of a project takes from the dev build of its modules:
+   the package name that every compile carries, the source directory, the
+   directory of the library files of the modules and the library files of
+   the dependency graph, which stand under no root. */
+struct build_tested {
+    struct text package;
+    struct text src;
+    struct text lib_dir;
+    struct text *libraries;
+    size_t library_count;
+};
+
+/* Free what a build wrote into t, and leave t empty. */
+void build_tested_free(struct build_tested *t);
 
 /* What `anti build` and `anti run` were asked for. A field that names
    nothing is NULL, and the manifest or the host decides in its place. */
@@ -38,6 +56,12 @@ struct build_request {
        whether the program links musl, so no second command decides
        it. */
     enum { BUILD_NOTICE_BUILD, BUILD_NOTICE_WRITE, BUILD_NOTICE_PRINT } notice;
+    /* DESIGN: Q4 of "Answers of 2026-11-06, second set" in
+       docs/decisions.md. `anti test` of a project writes or reuses the
+       library file of every module of the project, as a dev build does,
+       and links nothing. The build then fills tested. NULL for every
+       other build. */
+    struct build_tested *tested;
 };
 
 /* Build the project and return the exit status of anti. */

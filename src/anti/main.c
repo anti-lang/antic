@@ -47,7 +47,7 @@ static int usage(FILE *out)
           "       anti sdk import <bundle> [--sysroot <dir>]\n"
           "       anti test [--release] [--memory-checks] [--work <dir>]\n"
           "                 [-I <dir>] [--runtime <dir>]\n"
-          "                 <file.anti>...\n"
+          "                 [<file.anti>...]\n"
           "       anti check [--warn-undocumented] [--targets all]\n"
           "                  [--work <dir>] [-I <dir>] [--runtime <dir>]\n"
           "                  [<file.anti>...]\n"
@@ -106,7 +106,11 @@ static int usage(FILE *out)
           "runs it. Every other build drops both blocks. --release runs the\n"
           "same tests with the checks and the assertions off. It reads the\n"
           "`[inject]` and `[inject.test]` tables of anti.toml in the current\n"
-          "directory and passes each provider to antic.\n"
+          "directory and passes each provider to antic. In a project and\n"
+          "without -I it first writes or reuses the library file of every\n"
+          "module of the source directory, as a dev build does, and finds\n"
+          "the modules there. Without a file it then tests every module of\n"
+          "the source directory that declares a test.\n"
           "\n"
           "fmt writes every source in the canonical form of the formatter\n"
           "rules: one tab per level, an item body whose brace opens on its own\n"
@@ -724,6 +728,26 @@ done:
     return status;
 }
 
+/* The dev build of the modules of the project in the current directory
+   for the host, which writes or reuses the library file of each and links
+   nothing, into tested. */
+static bool build_for_tests(const char *runtime, struct build_tested *tested)
+{
+    struct build_request request;
+    enum target host;
+
+    if (!target_host(&host)) {
+        say_anti("this host is no target of Anti\n");
+        return false;
+    }
+    memset(&request, 0, sizeof request);
+    request.root = ".";
+    request.target = target_name(host);
+    request.runtime = runtime;
+    request.tested = tested;
+    return build_run(&request) == 0;
+}
+
 /* `anti test`. */
 static int test_command(int argc, char **argv)
 {
@@ -733,16 +757,23 @@ static int test_command(int argc, char **argv)
     const char *work = NULL;
     const char *runtime = NULL;
     struct manifest_inject inject = {0};
+    struct build_tested tested = {0};
+    struct files_list found = {0};
     struct text src = {0};
     struct text test = {0};
     struct text build = {0};
     struct text work_text = {0};
     struct text package = {0};
     struct text home = {0};
+    const char *project_roots[2];
+    const char **listed = NULL;
+    const char **libraries = NULL;
     size_t count = 0;
     size_t root_count = 0;
+    size_t j;
     bool release = false;
     bool memory_checks = false;
+    bool project;
     int status;
     int i;
 
@@ -789,6 +820,48 @@ static int test_command(int argc, char **argv)
     request.root_count = root_count;
     request.work = work;
     request.package = package.length > 0 ? text_cstr(&package) : NULL;
+    /* DESIGN: Q4 of "Answers of 2026-11-06, second set" in
+       docs/decisions.md. In a project, a run without -I writes or reuses
+       the library file of every module of the source directory as a dev
+       build of `anti build` does, and finds the modules there. The work
+       directory is made first, so a layout that has no room for it is
+       the first message, as it is outside a project. The package name is
+       the one of the build, which names a project without one. With -I,
+       and outside a project, the run takes its files and its roots
+       alone. */
+    project = root_count == 0 && files_exists(MANIFEST_FILE);
+    if (project) {
+        if (!files_make_dirs_or_say(work) ||
+            !build_for_tests(runtime, &tested)) {
+            status = 1;
+            goto done;
+        }
+        project_roots[0] = text_cstr(&tested.src);
+        project_roots[1] = text_cstr(&tested.lib_dir);
+        request.roots = project_roots;
+        request.root_count = 2;
+        request.package = text_cstr(&tested.package);
+        libraries = files_array(tested.library_count + 1, sizeof *libraries);
+        for (j = 0; j < tested.library_count; j++) {
+            libraries[j] = text_cstr(&tested.libraries[j]);
+        }
+        request.project = true;
+        request.libraries = libraries;
+        request.library_count = tested.library_count;
+        /* [provisional] Without a file the run takes every module of the
+           source directory that declares a test, as `anti build` takes
+           the modules of that directory alone. */
+        if (count == 0) {
+            if (!project_sources(text_cstr(&tested.src), NULL, &found)) {
+                status = found.count == 0 ? 2 : 1;
+                goto done;
+            }
+            listed = sources_of(&found);
+            request.sources = listed;
+            request.source_count = found.count;
+            request.tested_only = true;
+        }
+    }
     request.runtime = runtime;
     request.release = release;
     request.memory_checks = memory_checks;
@@ -798,6 +871,10 @@ static int test_command(int argc, char **argv)
 
 done:
     manifest_inject_free(&inject);
+    build_tested_free(&tested);
+    files_list_free(&found);
+    free((void *)listed);
+    free((void *)libraries);
     text_free(&src);
     text_free(&test);
     text_free(&build);

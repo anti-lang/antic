@@ -6467,6 +6467,22 @@ add_test(NAME anti_test
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test"
         -P "${ANTIC_RUNNERS}/run_anti_test.cmake")
 
+# `anti test` in a project finds the library files of its modules without
+# -I, by Q4 of "Answers of 2026-11-06, second set" in docs/decisions.md.
+# The header of the runner states each case.
+foreach(case all_dev all_release file_dev file_release import_changed
+             earlier_run include_roots outside dependency_dev
+             dependency_release)
+    add_test(NAME anti_test_project_${case}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DPROJECT=${CMAKE_CURRENT_SOURCE_DIR}/anti-test/project"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-project-${case}"
+            "-DCASE=${case}"
+            -P "${ANTIC_RUNNERS}/run_anti_test_project.cmake")
+endforeach()
+
 # The constructs of the flow area in a `tests` block and in a `fixtures`
 # block, which no program of tests/matrix reaches: every build but
 # `anti test` drops both blocks. docs/notes/test-matrix.md names the cells.

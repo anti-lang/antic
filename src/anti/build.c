@@ -1120,6 +1120,40 @@ static bool write_library_files(const struct build *b,
     return true;
 }
 
+/* Write what a test run takes from this build into its request:
+   the package name, the source directory, the library directory and the
+   library files of the dependency graph in shared. */
+static void record_tested(const struct build *b, const struct strings *shared)
+{
+    struct build_tested *t = b->r->tested;
+    size_t i;
+
+    build_tested_free(t);
+    text_append(&t->package, text_cstr(&b->m.name));
+    text_append(&t->src, text_cstr(&b->src));
+    text_append(&t->lib_dir, text_cstr(&b->lib_dir));
+    t->libraries = files_array(shared->count + 1, sizeof *t->libraries);
+    for (i = 0; i < shared->count; i++) {
+        text_append(&t->libraries[i], shared->items[i]);
+    }
+    t->library_count = shared->count;
+}
+
+void build_tested_free(struct build_tested *t)
+{
+    size_t i;
+
+    text_free(&t->package);
+    text_free(&t->src);
+    text_free(&t->lib_dir);
+    for (i = 0; i < t->library_count; i++) {
+        text_free(&t->libraries[i]);
+    }
+    free(t->libraries);
+    t->libraries = NULL;
+    t->library_count = 0;
+}
+
 /* Build one target in one mode. */
 static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
 {
@@ -1144,8 +1178,10 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     target_dir(b->r->root, &b->m.dist, t, b->r->release, &b->dist_dir);
     text_appendf(&b->lib_dir, "%s/lib", text_cstr(&b->build_dir));
     text_appendf(&b->obj_dir, "%s/obj", text_cstr(&b->build_dir));
+    /* A test run delivers nothing, so it makes no directory in dist/. */
     if (!files_make_dirs_or_say(text_cstr(&b->build_dir)) ||
-        !files_make_dirs_or_say(text_cstr(&b->dist_dir))) {
+        (b->r->tested == NULL &&
+         !files_make_dirs_or_say(text_cstr(&b->dist_dir)))) {
         goto done;
     }
     graph_libraries(b, &shared);
@@ -1164,6 +1200,11 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
                             &files[b->order[i]])) {
             goto done;
         }
+    }
+    if (b->r->tested != NULL) {
+        record_tested(b, &shared);
+        ok = true;
+        goto done;
     }
     main_at = linking_module(b);
     if (b->r->lib == BUILD_PROGRAM && main_at == b->unit_count) {
@@ -1336,6 +1377,9 @@ static bool path_dependency(void *context, const char *directory,
     sub.lib = BUILD_PROGRAM;
     sub.run = false;
     sub.notice = BUILD_NOTICE_BUILD;
+    /* A path dependency is built whole, since its dist directory holds
+       the library files that the test run reads. */
+    sub.tested = NULL;
     if (build_project(&sub, c) == 0) {
         target_dir(directory, &m.dist, host, c->r->release, out);
         ok = true;
