@@ -245,6 +245,8 @@ One file per command, and the code the commands share. Every file but
 | `src/anti/bindwrite.c` | The choice of what a module holds, and the writer of the module, the shim and the two probes. |
 | `src/anti/build.c` | `anti build` and `anti run`: a manifest into the files of `build/` and the deliverable of `dist/`. |
 | `src/anti/build.h` | The interface of `build.c`. |
+| `src/anti/cache.c` | The keys of the files that `anti build` and `anti test` keep in the build directory of a mode between runs. |
+| `src/anti/cache.h` | The interface of `cache.c`. |
 | `src/anti/check.c` | `anti check`, the four classes that write no artifact of a program. |
 | `src/anti/check.h` | The interface of `check.c`. |
 | `src/anti/cursor.c` | The cursor over one line of text from another machine. |
@@ -623,6 +625,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_anti_memory_dll.cmake` | Cross builds for windows-x86_64 with memory checks and looks for the DLL. |
 | `tests/runners/run_anti_messages.cmake` | Runs one case of a table of messages of `anti` or of the driver of antic, and compares the whole standard error. |
 | `tests/runners/run_anti_options.cmake` | Runs `anti` with one option beside the run without it, and names what differs. |
+| `tests/runners/run_anti_reuse.cmake` | Runs `anti build` or `anti test` twice in a copy of `tests/anti-test/project/` and reads which cached files the second run wrote. |
 | `tests/runners/run_anti_sdk.cmake` | Checks `anti sdk export` and `anti sdk import`. |
 | `tests/runners/run_anti_symbols.cmake` | Drives `anti symbols inventory`, `check` and `resolve`. |
 | `tests/runners/run_anti_symbols_input.cmake` | Checks that `anti symbols resolve` refuses numbers beyond 64 bits. |

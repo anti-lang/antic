@@ -816,7 +816,7 @@ anti_message(fault_key_not_written
 # puts it in place.
 anti_message(fault_program_not_copied
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:29:EACCES
+    FAULT open:34:EACCES
     ARGS build ${tools}
     ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
 anti_message(fault_program_not_replaced
@@ -826,12 +826,12 @@ anti_message(fault_program_not_replaced
     ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
 anti_message(fault_sources_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:33:EACCES
+    FAULT open:38:EACCES
     ARGS build ${tools}
     ERR "anti: cannot read ${RUNTIME}/licenses/sources.txt")
 anti_message(fault_notice_not_written
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:34:EACCES
+    FAULT open:39:EACCES
     ARGS build ${tools}
     ERR "anti: cannot write ./dist/${HOST}/dev/NOTICE.txt")
 # own_package of build.c reads the licence file again for the notice,
@@ -839,7 +839,7 @@ anti_message(fault_notice_not_written
 anti_message(fault_license_text_unread_for_the_notice
     FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\nlicense_text = \"LICENSE\"\n"
           LICENSE "MIT\n" ${app_source} "${app_text}"
-    FAULT open:35:EACCES
+    FAULT open:41:EACCES
     ARGS build ${tools}
     ERR "anti: cannot read ./LICENSE")
 # deliver_soname of build.c: the link that dist/ of a Linux library of
@@ -894,7 +894,7 @@ anti_message(fault_symbols_not_written
     ERR "anti: cannot write ./dist/${HOST}/release/app-symbols.zip")
 anti_message(fault_debug_text_not_created
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:43:EACCES
+    FAULT open:46:EACCES
     ARGS build --release ${tools}
     ERR "antic: cannot create ${release_dir}/app.debug.ll")
 # A library project copies each library file into dist/, build.c.
@@ -920,7 +920,7 @@ anti_message(fault_run_not_waited
     ERR "anti: waiting for ./dist/${HOST}/dev/app${EXE}: Invalid argument")
 anti_message(fault_run_program_missing
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT stat:22:EACCES
+    FAULT stat:23:EACCES
     ARGS run ${tools}
     ERR "anti: ./dist/${HOST}/dev/app${EXE} was not built, so there is nothing to run")
 # The symbols archive of a release build reads the program for its build
@@ -929,12 +929,12 @@ anti_message(fault_run_program_missing
 # with the forty-ninth to the fifty-fourth open of the build.
 anti_message(fault_program_unread_for_id
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:49:EACCES
+    FAULT open:52:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app${EXE}")
 anti_message(fault_debug_program_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:50:EACCES
+    FAULT open:53:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
 anti_message(fault_archive_entry_unread
@@ -944,7 +944,7 @@ anti_message(fault_archive_entry_unread
     ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
 anti_message(fault_archive_map_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:54:EACCES
+    FAULT open:57:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.map")
 # The map of a Mach-O program takes the lines of its functions from the
@@ -955,7 +955,7 @@ if(CMAKE_HOST_APPLE)
     string(REGEX REPLACE "^macos-" "" debug_arch "${HOST}")
     anti_message(fault_debug_object_unread
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-        FAULT open:51:EACCES
+        FAULT open:54:EACCES
         ARGS build --release ${tools}
         ERR "anti: cannot read ${PROJECT}/${release_dir}/app.debug.lto/0.${debug_arch}.lto.o")
 endif()

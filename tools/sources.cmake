@@ -139,6 +139,7 @@ set(ANTI_CORE_SOURCES
     src/anti/bindtype.c
     src/anti/bindwrite.c
     src/anti/build.c
+    src/anti/cache.c
     src/anti/check.c
     src/anti/cursor.c
     src/anti/deps.c

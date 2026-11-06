@@ -36,8 +36,9 @@ Dev mode is the default for `anti build`, `anti run` and `anti test`:
 - Each module produces `build/<os>-<cpu>/dev/<module>.o`.
 - The cache key of a module is the SHA-256 of its input bytes, the `antic` version and
   the target name. The options of the manifest and the digests of the library files it
-  imports join them. `anti build` recompiles a module when its key changes. Every build
-  relinks.
+  imports join them. `anti build` recompiles a module when its key changes. A build
+  links again when the key of the program changes, which names every object it links.
+  `anti test` takes the objects of the modules it does not test from the same cache.
 - Cross-module calls are symbol references through the mangled names. No cross-module
   inlining.
 

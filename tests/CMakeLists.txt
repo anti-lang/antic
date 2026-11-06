@@ -6483,6 +6483,27 @@ foreach(case all_dev all_release file_dev file_release import_changed
             -P "${ANTIC_RUNNERS}/run_anti_test_project.cmake")
 endforeach()
 
+# A second run of `anti build` and of `anti test` in each mode reuses what
+# the first compiled, and compiles again what a change reaches, by Q2 of
+# "Answers of 2026-11-06, fourth set" in docs/decisions.md. The header of
+# the runner states each case.
+foreach(command build test)
+    foreach(mode dev release)
+        foreach(case unchanged source import option compiler)
+            add_test(NAME anti_reuse_${command}_${mode}_${case}
+                COMMAND "${CMAKE_COMMAND}"
+                    "-DANTI=$<TARGET_FILE:anti>"
+                    "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                    "-DPROJECT=${CMAKE_CURRENT_SOURCE_DIR}/anti-test/project"
+                    "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-reuse-${command}-${mode}-${case}"
+                    "-DTOOL=${command}"
+                    "-DMODE=${mode}"
+                    "-DCASE=${case}"
+                    -P "${ANTIC_RUNNERS}/run_anti_reuse.cmake")
+        endforeach()
+    endforeach()
+endforeach()
+
 # The constructs of the flow area in a `tests` block and in a `fixtures`
 # block, which no program of tests/matrix reaches: every build but
 # `anti test` drops both blocks. docs/notes/test-matrix.md names the cells.

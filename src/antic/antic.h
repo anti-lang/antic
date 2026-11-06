@@ -21,13 +21,16 @@
 #include <stdint.h>
 
 #include "arena.h"
+#include "cpu.h"
 #include "lexer.h"
 #include "shared.h"
+#include "target.h"
 #include "text.h"
 
-/* The three functions of the names of a link, which linker.c defines.
-   They stand here, since anti reads the option --lto and names the PDB
-   of a Windows program as the link does. The word of --lto that names
+/* The four functions of the names of a link, which linker.c defines.
+   They stand here, since anti reads the option --lto, names the PDB of a
+   Windows program as the link does and keys a cached program by the
+   runtime it links. The word of --lto that names
    mode, which names its directory of the
    runtime as bitcode as well. anti reads the option with the same
    words. */
@@ -40,6 +43,11 @@ bool link_lto_from_name(const char *name, enum lto *mode);
    executable: the output with its suffix replaced by `.pdb`, beside it.
    The link and the symbols archive of anti build both name it so. */
 void link_pdb_path(struct text *out, const char *executable);
+
+/* Append the path of the runtime library of target t at level cpu below
+   runtime. */
+void link_runtime_library(struct text *out, const char *runtime, enum target t,
+                          enum cpu_level cpu);
 
 /* Read the package header and the module path of the library file in
    data. Both lie in the memory pool. Returns false and writes a message

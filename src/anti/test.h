@@ -6,6 +6,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "build.h"
+
 /* One run of `anti test`. sources are the modules to test, and roots
    are the -I search roots, which also give each module its path. work
    holds the library files, the objects and the runner. package is the
@@ -23,7 +25,11 @@
    work directory, which the run empties first. libraries holds the
    library files of the dependency graph, which every compile of the run
    takes. tested_only leaves out of the run a module that declares no
-   test, which a run over every module of the project asks for. */
+   test, which a run over every module of the project asks for. tested
+   is what the build of the project recorded, and NULL outside a
+   project. The run then caches its own files in obj/ of the build of its
+   mode and takes the objects of the modules it does not test from
+   build_object. */
 struct test_request {
     const char *const *sources;
     size_t source_count;
@@ -40,6 +46,7 @@ struct test_request {
     const char *const *libraries;
     size_t library_count;
     bool tested_only;
+    const struct build_tested *tested;
 };
 
 /* Compile each module of r with its `tests` and `fixtures` blocks, write

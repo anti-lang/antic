@@ -17,6 +17,7 @@
 
 #include "antic.h"
 #include "arena.h"
+#include "cache.h"
 #include "cpu.h"
 #include "deps.h"
 #include "digest.h"
@@ -37,9 +38,9 @@
 #include "userdirs.h"
 #include "zip.h"
 
-/* The key of a cached output stands beside it, under its name and this
-   suffix. */
-#define BUILD_KEY_SUFFIX ".key"
+/* What the link of a program took beside its inputs, which the notice
+   names, stands beside a cached program under its name and this suffix. */
+#define BUILD_LINKS_SUFFIX ".links"
 
 struct path_context;
 static int build_project(const struct build_request *r,
@@ -106,81 +107,11 @@ struct build {
     /* The native libraries of the runtime archive that the same link
        took, DRIVER_NATIVE_* bits, which it writes through links_natives. */
     unsigned natives;
+    /* The key of the program of this target, and whether the program of
+       an earlier build had it, so this build links nothing. */
+    struct text program_key;
+    bool program_reused;
 };
-
-/* What decides one output of the cache beside its input. The addendum
-   names the version of the compiler and the target. The level joins them
-   because it decides the instructions, and debug because it decides the
-   lines. strict is --warnings-as-errors, which decides whether a warning
-   stops the file, and checked is --memory-checks, which decides whether
-   the object carries the checks. */
-struct cache_flags {
-    enum target target;
-    enum cpu_level cpu;
-    bool debug;
-    bool strict;
-    bool checked;
-};
-
-/* The cache key of one output: the digest of input, the version of the
-   compiler and the flags f. */
-static void cache_key(const char *input, const struct cache_flags *f,
-                      struct text *out)
-{
-    struct anti_sha256 digest;
-    struct text bytes = {0};
-    char hex[65];
-
-    anti_rt_sha256_init(&digest);
-    if (files_read(input, &bytes)) {
-        anti_rt_sha256_update(&digest, bytes.data, bytes.length);
-    }
-    anti_rt_sha256_hex(&digest, hex);
-    text_appendf(out, "%s %s %s %s %s%s%s\n", hex, ANTIC_VERSION,
-                 target_name(f->target), cpu_name(f->cpu),
-                 f->debug ? "g" : "no-g", f->strict ? " strict" : "",
-                 f->checked ? " memory-checks" : "");
-    text_free(&bytes);
-}
-
-/* Whether the output stands and the key beside it is the one this build
-   would write. */
-static bool cached(const char *output, const struct text *key)
-{
-    struct text path = {0};
-    struct text stored = {0};
-    bool same;
-
-    text_appendf(&path, "%s%s", output, BUILD_KEY_SUFFIX);
-    same = files_exists(output) && files_read(text_cstr(&path), &stored) &&
-           stored.length == key->length &&
-           memcmp(stored.data, key->data, key->length) == 0;
-    text_free(&path);
-    text_free(&stored);
-    return same;
-}
-
-/* Forget the key of an output, so a compile that fails halfway leaves no
-   key that the next build would trust. */
-static void drop_key(const char *output)
-{
-    struct text path = {0};
-
-    text_appendf(&path, "%s%s", output, BUILD_KEY_SUFFIX);
-    platform_remove(text_cstr(&path));
-    text_free(&path);
-}
-
-static bool write_key(const char *output, const struct text *key)
-{
-    struct text path = {0};
-    bool ok;
-
-    text_appendf(&path, "%s%s", output, BUILD_KEY_SUFFIX);
-    ok = files_write(text_cstr(&path), key);
-    text_free(&path);
-    return ok;
-}
 
 /* Append to out the options of o that decide an output beside its input
    and the flags of the cache: the package with its version, its licence,
@@ -300,50 +231,29 @@ static void graph_libraries(const struct build *b, struct strings *out)
    dependency graph, apart from library itself. Returns false when one
    cannot be read.
 
-   DESIGN: decision 15 of "Decisions of 2026-10-11", by defect 10 of
-   docs/audit/anti-tool.md. The key of a library file was over its own
-   source, so a module whose import changed its interface was not checked
-   again, and its object kept the layout of a struct that had grown. The
-   search finds a module of the project under lib/ of the build and one
-   of the standard library in the runtime archive. A library file of the
-   graph stands under no root its module path names, so every one of them
-   is in the key. A new version of a dependency then builds every module
-   again, which the lock file makes rare. */
+   DESIGN: decision 15 of "Decisions of 2026-10-11", which cache_imports
+   holds. The search finds a module of the project under lib/ of the
+   build and one of the standard library in the runtime archive. A
+   library file of the graph stands under no root its module path names,
+   so every one of them is in the key. A new version of a dependency then
+   builds every module again, which the lock file makes rare. */
 static bool imports_key(const struct build *b, enum target t,
                         enum cpu_level cpu, const char *library,
                         struct text *out)
 {
-    struct arena arena = {0};
     struct options search;
-    struct strings seed = {0};
+    struct strings graph = {0};
     const char *roots[1];
-    const char **closure = NULL;    /* the memory pool holds the list */
-    size_t count = 0;
-    size_t i;
     bool ok;
 
-    strings_add(&seed, library);
-    graph_libraries(b, &seed);
+    graph_libraries(b, &graph);
     roots[0] = text_cstr(&b->lib_dir);
     unit_options(&search, text_cstr(&b->m.name), text_cstr(&b->runtime), roots,
                  1, t, cpu);
-    search.libraries = seed.items;
-    search.library_count = seed.count;
-    ok = driver_libraries(&search, &arena, &closure, &count);
-    for (i = 0; ok && i < count; i++) {
-        char hex[65];
-        if (strcmp(closure[i], library) == 0) {
-            continue;
-        }
-        ok = sha256_file(closure[i], hex);
-        if (!ok) {
-            say_anti("cannot read %s\n", closure[i]);
-        } else {
-            text_appendf(out, "import %s %s\n", closure[i], hex);
-        }
-    }
-    strings_free(&seed);
-    arena_free(&arena);
+    search.libraries = graph.items;
+    search.library_count = graph.count;
+    ok = cache_imports(&search, library, out);
+    strings_free(&graph);
     return ok;
 }
 
@@ -408,76 +318,19 @@ static bool module_library(struct build *b, const struct unit *u,
     text_append(&key, text_cstr(&base));
     if (library_readable(text_cstr(output)) &&
         imports_key(b, t, cpu, text_cstr(output), &key) &&
-        cached(text_cstr(output), &key)) {
+        cache_holds(text_cstr(output), &key)) {
         ok = true;
         goto done;
     }
-    drop_key(text_cstr(output));
+    cache_drop(text_cstr(output));
     if (driver_run(&o) != 0) {
         goto done;
     }
     key.length = 0;
     text_append(&key, text_cstr(&base));
     ok = imports_key(b, t, cpu, text_cstr(output), &key) &&
-         write_key(text_cstr(output), &key);
+         cache_store(text_cstr(output), &key);
 done:
-    text_free(&base);
-    text_free(&key);
-    return ok;
-}
-
-/* Write the object of one library file, unless the cache holds it. A
-   module without `main` stops at its object, which antic reports as
-   status 3. */
-static bool module_object(struct build *b, const char *library,
-                          const char *module, enum target t,
-                          enum cpu_level cpu, const struct strings *libraries,
-                          struct text *out)
-{
-    struct options o;
-    struct cache_flags flags = {0};
-    struct strings rest = {0};
-    struct text base = {0};
-    struct text key = {0};
-    size_t i;
-    int status;
-    bool ok = false;
-
-    if (!unit_file(text_cstr(&b->obj_dir), module, "", &base)) {
-        goto done;
-    }
-    text_appendf(out, "%s%s", text_cstr(&base), target_info(t)->object_suffix);
-    /* The input is one of the library files of the build, and antic
-       refuses a module that stands twice on its command line. */
-    for (i = 0; i < libraries->count; i++) {
-        if (strcmp(libraries->items[i], library) != 0) {
-            strings_add(&rest, libraries->items[i]);
-        }
-    }
-    base_options(b, &o, t, cpu);
-    o.input = library;
-    o.output = text_cstr(&base);
-    o.dev = true;
-    o.libraries = rest.items;
-    o.library_count = rest.count;
-    flags.target = t;
-    flags.cpu = cpu;
-    flags.debug = build_debug(b);
-    flags.checked = b->r->memory_checks;
-    cache_key(library, &flags, &key);
-    if (!options_key(&o, &key) ||
-        !imports_key(b, t, cpu, library, &key)) {
-        goto done;
-    }
-    if (cached(text_cstr(out), &key)) {
-        ok = true;
-        goto done;
-    }
-    drop_key(text_cstr(out));
-    status = driver_run(&o);
-    ok = (status == 0 || status == DRIVER_OBJECT_ONLY) && write_key(text_cstr(out), &key);
-done:
-    strings_free(&rest);
     text_free(&base);
     text_free(&key);
     return ok;
@@ -497,6 +350,131 @@ static bool library_module(const char *file, struct text *out)
     }
     arena_free(&arena);
     return ok;
+}
+
+/* What the dev object of one library file is compiled with: the options
+   of a project compile, the library files every such compile names and
+   the roots of the walk of its key. A build fills it from itself, and a
+   test run from what the dev build of its project recorded, so both
+   write and reuse the same object under the same key. */
+struct object_context {
+    const char *package;
+    const char *version;
+    const char *runtime;
+    const char *src;
+    const char *lib_dir;
+    const char *obj_dir;
+    const char *llvm_ar;
+    enum target target;
+    enum cpu_level cpu;
+    bool debug;
+    bool checked;
+    const char *const *inject;
+    size_t inject_count;
+    const char *const *graph;       /* the library files of the graph */
+    size_t graph_count;
+    const char *const *libraries;   /* the library files of every compile */
+    size_t library_count;
+};
+
+/* Write the object of one library file into obj/ of c, unless the cache
+   holds it, and its path into out. A module without `main` stops at its
+   object, which antic reports as status 3. */
+static bool object_compile(const struct object_context *c, const char *library,
+                           struct text *out)
+{
+    struct options o;
+    struct options search;
+    struct cache_flags flags = {0};
+    struct strings rest = {0};
+    struct text module = {0};
+    struct text base = {0};
+    struct text key = {0};
+    size_t i;
+    int status;
+    bool ok = false;
+
+    if (!library_module(library, &module) ||
+        !unit_file(c->obj_dir, text_cstr(&module), "", &base)) {
+        goto done;
+    }
+    text_appendf(out, "%s%s", text_cstr(&base),
+                 target_info(c->target)->object_suffix);
+    /* The input is one of the library files of the build, and antic
+       refuses a module that stands twice on its command line. */
+    for (i = 0; i < c->library_count; i++) {
+        if (strcmp(c->libraries[i], library) != 0) {
+            strings_add(&rest, c->libraries[i]);
+        }
+    }
+    unit_options(&o, c->package, c->runtime, &c->src, 1, c->target, c->cpu);
+    o.llvm_ar = c->llvm_ar;
+    o.inject = c->inject;
+    o.inject_count = c->inject_count;
+    o.package_version = c->version;
+    o.debug = c->debug;
+    o.memory_checks = c->checked;
+    o.input = library;
+    o.output = text_cstr(&base);
+    o.dev = true;
+    o.libraries = rest.items;
+    o.library_count = rest.count;
+    flags.target = c->target;
+    flags.cpu = c->cpu;
+    flags.debug = c->debug;
+    flags.checked = c->checked;
+    cache_key(library, &flags, &key);
+    unit_options(&search, c->package, c->runtime, &c->lib_dir, 1, c->target,
+                 c->cpu);
+    search.libraries = c->graph;
+    search.library_count = c->graph_count;
+    if (!options_key(&o, &key) || !cache_imports(&search, library, &key)) {
+        goto done;
+    }
+    if (cache_holds(text_cstr(out), &key)) {
+        ok = true;
+        goto done;
+    }
+    cache_drop(text_cstr(out));
+    status = driver_run(&o);
+    ok = (status == 0 || status == DRIVER_OBJECT_ONLY) &&
+         cache_store(text_cstr(out), &key);
+done:
+    strings_free(&rest);
+    text_free(&module);
+    text_free(&base);
+    text_free(&key);
+    return ok;
+}
+
+/* Write the object of one library file of the build b, unless the cache
+   holds it. libraries are the library files every compile names, and
+   graph those of the dependency graph. */
+static bool module_object(struct build *b, const char *library, enum target t,
+                          enum cpu_level cpu, const struct strings *libraries,
+                          const struct strings *graph, struct text *out)
+{
+    struct object_context c;
+
+    memset(&c, 0, sizeof c);
+    c.package = text_cstr(&b->m.name);
+    c.version = b->m.version.length > 0 ? text_cstr(&b->m.version) : NULL;
+    c.runtime = text_cstr(&b->runtime);
+    c.src = b->roots[0];
+    c.lib_dir = text_cstr(&b->lib_dir);
+    c.obj_dir = text_cstr(&b->obj_dir);
+    c.llvm_ar = b->r->llvm_ar;
+    c.target = t;
+    c.cpu = cpu;
+    c.debug = build_debug(b);
+    c.checked = b->r->memory_checks;
+    c.inject = b->m.inject.entries;
+    c.inject_count = b->m.inject.count;
+    c.graph = graph->items;
+    c.graph_count = graph->count;
+    c.libraries = libraries->items;
+    c.library_count = libraries->count;
+    return object_compile(&c, library, out);
 }
 
 /* Copy the file from into the directory to, under the name it carries. */
@@ -769,6 +747,121 @@ static bool name_program(struct build *b, const char *manifest_path,
     return ok;
 }
 
+/* The facts of the link of the program of b that the notice reads,
+   beside the cached program. */
+static void links_path(const struct build *b, struct text *out)
+{
+    text_appendf(out, "%s%s", text_cstr(&b->name), BUILD_LINKS_SUFFIX);
+}
+
+/* Read what the link of the cached program took into b. Returns false
+   when the file is missing or malformed, and the program is then linked
+   again. */
+static bool links_read(struct build *b)
+{
+    struct text path = {0};
+    struct text text = {0};
+    unsigned musl = 0;
+    unsigned natives = 0;
+    bool ok;
+
+    links_path(b, &path);
+    ok = files_read(text_cstr(&path), &text) &&
+         sscanf(text_cstr(&text), "musl %u natives %u", &musl, &natives) == 2;
+    if (ok) {
+        b->links_musl = musl != 0;
+        b->natives = natives;
+    }
+    text_free(&path);
+    text_free(&text);
+    return ok;
+}
+
+/* Whether the file of the symbols of a release program stands, at the
+   path that build_symbols writes it to. */
+static bool symbols_stand(const struct build *b, enum target t);
+
+static void program_name(const struct build *b, enum target t,
+                         struct text *out);
+
+/* DESIGN: Q2 of "Answers of 2026-11-06, fourth set" in docs/decisions.md.
+   The key of a program holds what its link reads: the key of the source
+   of the module with `main`, the options of the manifest, the digest of
+   every library file that module reaches, the key of every object of a
+   dev link, the digest of the runtime of the target and level and the
+   options of the link. When the program that stands has the same key,
+   and the facts of its link and, in release mode, its symbols stand
+   beside it, the build links nothing. Sets b->program_key and
+   b->program_reused. library is the library file of the module with
+   `main`. Returns false when an input of the key cannot be read. */
+static bool program_reuse(struct build *b, enum target t, enum cpu_level cpu,
+                          const struct options *o, const char *library)
+{
+    struct cache_flags flags = {0};
+    size_t i;
+
+    b->program_key.length = 0;
+    b->program_reused = false;
+    flags.target = t;
+    flags.cpu = cpu;
+    flags.debug = o->debug;
+    flags.checked = o->memory_checks;
+    cache_key(o->input, &flags, &b->program_key);
+    text_appendf(&b->program_key, "program %s\n",
+                 b->r->release ? "release" : "dev");
+    if (!options_key(o, &b->program_key) ||
+        !imports_key(b, t, cpu, library, &b->program_key)) {
+        return false;
+    }
+    for (i = 0; i < o->object_count; i++) {
+        if (!cache_key_of(o->objects[i], &b->program_key)) {
+            return false;
+        }
+    }
+    cache_runtime(o->runtime, t, cpu, &b->program_key);
+    for (i = 0; i < o->framework_count; i++) {
+        text_appendf(&b->program_key, "framework %s\n", o->frameworks[i]);
+    }
+    for (i = 0; i < o->linux_library_count; i++) {
+        text_appendf(&b->program_key, "linux %s\n", o->linux_libraries[i]);
+    }
+    if (o->lto_given) {
+        text_appendf(&b->program_key, "lto %s\n", link_lto_name(o->lto));
+    }
+    if (o->profile_generate) {
+        text_append(&b->program_key, "profile-generate\n");
+    }
+    if (o->profile_use != NULL &&
+        !cache_file("profile-use", o->profile_use, &b->program_key)) {
+        return false;
+    }
+    b->program_reused = cache_holds(text_cstr(&b->name), &b->program_key) &&
+                        links_read(b) &&
+                        (!b->r->release || symbols_stand(b, t));
+    if (!b->program_reused) {
+        cache_drop(text_cstr(&b->name));
+    }
+    return true;
+}
+
+/* Write the facts of the link and the key of the program b linked, once
+   everything the key stands for is written. */
+static bool program_store(const struct build *b)
+{
+    struct text path = {0};
+    struct text text = {0};
+    bool ok;
+
+    links_path(b, &path);
+    text_appendf(&text, "musl %u natives %u\n", b->links_musl ? 1u : 0u,
+                 b->natives);
+    ok = files_write(text_cstr(&path), &text) &&
+         cache_store(text_cstr(&b->name), &b->program_key);
+    text_free(&path);
+    text_free(&text);
+    return ok;
+}
+
 /* Dev mode: one object per module, cached by digest, and one link that
    takes them all. */
 static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
@@ -780,6 +873,7 @@ static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
     struct options search;
     struct strings seed = {0};
     struct strings objects = {0};
+    struct strings graph = {0};
     struct text *paths = NULL;
     const char **closure = NULL;    /* the memory pool holds the list */
     size_t count = 0;
@@ -808,30 +902,24 @@ static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
     if (!driver_libraries(&search, &arena, &closure, &count)) {
         goto done;
     }
+    graph_libraries(b, &graph);
     paths = files_array(count + 1, sizeof *paths);
     for (i = 0; i < count; i++) {
-        struct text module = {0};
-        bool written;
         if (strcmp(closure[i], text_cstr(&files[main_at])) == 0) {
             continue;
         }
-        if (!library_module(closure[i], &module)) {
-            text_free(&module);
-            goto done;
-        }
-        written = module_object(b, closure[i], text_cstr(&module), t, cpu,
-                                libraries, &paths[at]);
-        text_free(&module);
-        if (!written) {
+        if (!module_object(b, closure[i], t, cpu, libraries, &graph,
+                           &paths[at])) {
             goto done;
         }
         strings_add(&objects, text_cstr(&paths[at]));
         at++;
     }
     /* DESIGN: antic stops a dev build of a library file at its object,
-       so the module that links is compiled from its source. It is the
-       one module of a dev build that every build compiles again. The
-       link it carries is the relink that every build runs. */
+       so the module that links is compiled from its source, together
+       with the link. By Q2 of "Answers of 2026-11-06, fourth set" the
+       build links nothing when the key of the program is the one of the
+       program that stands, which names the key of every object. */
     base_options(b, &o, t, cpu);
     header_options(b, &o);
     o.input = b->units[main_at].source;
@@ -843,7 +931,11 @@ static bool build_dev(struct build *b, enum target t, enum cpu_level cpu,
     o.object_count = objects.count;
     o.links_musl = &b->links_musl;
     o.links_natives = &b->natives;
-    ok = driver_run(&o) == 0;
+    if (!program_reuse(b, t, cpu, &o, text_cstr(&files[main_at]))) {
+        goto done;
+    }
+    ok = b->program_reused ||
+         (driver_run(&o) == 0 && program_store(b));
 done:
     for (i = 0; paths != NULL && i < count; i++) {
         text_free(&paths[i]);
@@ -851,6 +943,7 @@ done:
     free(paths);
     strings_free(&seed);
     strings_free(&objects);
+    strings_free(&graph);
     arena_free(&arena);
     return ok;
 }
@@ -867,7 +960,8 @@ static void release_lto(const struct build *b, struct options *o)
 /* Release mode: one call with every module, so the optimizer sees the
    whole program. */
 static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
-                          size_t main_at, const struct strings *libraries)
+                          size_t main_at, const struct strings *libraries,
+                          const char *library)
 {
     struct options o;
 
@@ -882,7 +976,12 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     release_lto(b, &o);
     o.links_musl = &b->links_musl;
     o.links_natives = &b->natives;
-    return driver_run(&o) == 0;
+    /* The key is stored after the link of the symbols, which reads the
+       same inputs. */
+    if (!program_reuse(b, t, cpu, &o, library)) {
+        return false;
+    }
+    return b->program_reused || driver_run(&o) == 0;
 }
 
 /* The name of the deliverable without the suffix of an executable, which
@@ -942,12 +1041,13 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     o.profile_generate = b->r->profile_generate;
     o.profile_use = b->r->profile_use;
     release_lto(b, &o);
-    if (driver_run(&o) != 0) {
-        goto done;
-    }
-    if (!symmap_build_id(text_cstr(&b->name), &id) ||
-        !symmap_write(text_cstr(&debug_path), t, text_cstr(&id),
-                      text_cstr(&map_path))) {
+    /* A program of an earlier build has its symbols beside it, which
+       symbols_stand checked. */
+    if (!b->program_reused &&
+        (driver_run(&o) != 0 ||
+         !symmap_build_id(text_cstr(&b->name), &id) ||
+         !symmap_write(text_cstr(&debug_path), t, text_cstr(&id),
+                       text_cstr(&map_path)))) {
         goto done;
     }
     entries[count].name = text_cstr(&debug_name);
@@ -973,7 +1073,8 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     entries[count].file = text_cstr(&map_path);
     entries[count].executable = false;
     count++;
-    ok = zip_write(text_cstr(&archive), entries, count);
+    ok = zip_write(text_cstr(&archive), entries, count) &&
+         (b->program_reused || program_store(b));
 done:
     text_free(&stem);
     text_free(&debug_path);
@@ -984,6 +1085,29 @@ done:
     text_free(&pdb_name);
     text_free(&archive);
     text_free(&id);
+    return ok;
+}
+
+static bool symbols_stand(const struct build *b, enum target t)
+{
+    struct text deliverable = {0};
+    struct text stem = {0};
+    struct text path = {0};
+    bool ok;
+
+    program_name(b, t, &deliverable);
+    archive_stem(t, text_cstr(&deliverable), &stem);
+    text_appendf(&path, "%s/%s" SYMS_DEBUG_SUFFIX "%s", text_cstr(&b->build_dir),
+                 text_cstr(&stem),
+                 target_info(t)->format == FORMAT_COFF ? ".exe" : "");
+    ok = files_exists(text_cstr(&path));
+    path.length = 0;
+    text_appendf(&path, "%s/%s" SYMS_MAP_SUFFIX, text_cstr(&b->build_dir),
+                 text_cstr(&stem));
+    ok = ok && files_exists(text_cstr(&path));
+    text_free(&deliverable);
+    text_free(&stem);
+    text_free(&path);
     return ok;
 }
 
@@ -1120,38 +1244,134 @@ static bool write_library_files(const struct build *b,
     return true;
 }
 
-/* Write what a test run takes from this build into its request:
-   the package name, the source directory, the library directory and the
-   library files of the dependency graph in shared. */
-static void record_tested(const struct build *b, const struct strings *shared)
+/* Copy the count strings of items into a new array of texts. */
+static struct text *texts_of(const char *const *items, size_t count)
 {
-    struct build_tested *t = b->r->tested;
+    struct text *out = files_array(count + 1, sizeof *out);
     size_t i;
 
-    build_tested_free(t);
-    text_append(&t->package, text_cstr(&b->m.name));
-    text_append(&t->src, text_cstr(&b->src));
-    text_append(&t->lib_dir, text_cstr(&b->lib_dir));
-    t->libraries = files_array(shared->count + 1, sizeof *t->libraries);
-    for (i = 0; i < shared->count; i++) {
-        text_append(&t->libraries[i], shared->items[i]);
+    for (i = 0; i < count; i++) {
+        text_append(&out[i], items[i]);
     }
-    t->library_count = shared->count;
+    return out;
+}
+
+static void texts_free(struct text *items, size_t count)
+{
+    size_t i;
+
+    for (i = 0; items != NULL && i < count; i++) {
+        text_free(&items[i]);
+    }
+    free(items);
+}
+
+/* Write what a test run takes from this build of target t at level cpu
+   into its request: the package name, the source directory, the library
+   directory and the library files of the dependency graph in shared, and
+   what build_object compiles with. files[i] is the library file of unit
+   i, and every object compile names all of them but the one of the
+   module with `main`, as build_dev names them. */
+static void record_tested(const struct build *b, enum target t,
+                          enum cpu_level cpu, const struct strings *shared,
+                          const struct text *files)
+{
+    struct build_tested *tested = b->r->tested;
+    struct strings compiled = {0};
+    size_t main_at = linking_module(b);
+    size_t i;
+
+    build_tested_free(tested);
+    text_append(&tested->package, text_cstr(&b->m.name));
+    text_append(&tested->version, text_cstr(&b->m.version));
+    text_append(&tested->src, text_cstr(&b->src));
+    text_append(&tested->lib_dir, text_cstr(&b->lib_dir));
+    text_append(&tested->obj_dir, text_cstr(&b->obj_dir));
+    tested->libraries = texts_of(shared->items, shared->count);
+    tested->library_count = shared->count;
+    text_append(&tested->runtime, text_cstr(&b->runtime));
+    tested->target = t;
+    tested->cpu = cpu;
+    tested->debug = build_debug(b);
+    tested->memory_checks = b->r->memory_checks;
+    tested->inject = texts_of(b->m.inject.entries, b->m.inject.count);
+    tested->inject_count = b->m.inject.count;
+    for (i = 0; i < shared->count; i++) {
+        strings_add(&compiled, shared->items[i]);
+    }
+    for (i = 0; i < b->unit_count; i++) {
+        if (b->order[i] != main_at) {
+            strings_add(&compiled, text_cstr(&files[b->order[i]]));
+        }
+    }
+    tested->compiled = texts_of(compiled.items, compiled.count);
+    tested->compiled_count = compiled.count;
+    strings_free(&compiled);
 }
 
 void build_tested_free(struct build_tested *t)
 {
-    size_t i;
-
     text_free(&t->package);
+    text_free(&t->version);
     text_free(&t->src);
     text_free(&t->lib_dir);
-    for (i = 0; i < t->library_count; i++) {
-        text_free(&t->libraries[i]);
-    }
-    free(t->libraries);
+    text_free(&t->obj_dir);
+    texts_free(t->libraries, t->library_count);
+    text_free(&t->runtime);
+    texts_free(t->inject, t->inject_count);
+    texts_free(t->compiled, t->compiled_count);
     t->libraries = NULL;
     t->library_count = 0;
+    t->inject = NULL;
+    t->inject_count = 0;
+    t->compiled = NULL;
+    t->compiled_count = 0;
+}
+
+/* The C strings of count texts, in an array the caller frees. */
+static const char **cstrs_of(const struct text *items, size_t count)
+{
+    const char **out = files_array(count + 1, sizeof *out);
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        out[i] = text_cstr(&items[i]);
+    }
+    return out;
+}
+
+bool build_object(const struct build_tested *t, const char *library,
+                  struct text *out)
+{
+    struct object_context c;
+    const char *src = text_cstr(&t->src);
+    const char **graph = cstrs_of(t->libraries, t->library_count);
+    const char **inject = cstrs_of(t->inject, t->inject_count);
+    const char **compiled = cstrs_of(t->compiled, t->compiled_count);
+    bool ok;
+
+    memset(&c, 0, sizeof c);
+    c.package = text_cstr(&t->package);
+    c.version = t->version.length > 0 ? text_cstr(&t->version) : NULL;
+    c.runtime = text_cstr(&t->runtime);
+    c.src = src;
+    c.lib_dir = text_cstr(&t->lib_dir);
+    c.obj_dir = text_cstr(&t->obj_dir);
+    c.target = t->target;
+    c.cpu = t->cpu;
+    c.debug = t->debug;
+    c.checked = t->memory_checks;
+    c.inject = inject;
+    c.inject_count = t->inject_count;
+    c.graph = graph;
+    c.graph_count = t->library_count;
+    c.libraries = compiled;
+    c.library_count = t->compiled_count;
+    ok = object_compile(&c, library, out);
+    free((void *)graph);
+    free((void *)inject);
+    free((void *)compiled);
+    return ok;
 }
 
 /* Build one target in one mode. */
@@ -1174,6 +1394,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     b->name.length = 0;
     b->links_musl = false;
     b->natives = 0;
+    b->program_reused = false;
     target_dir(b->r->root, &b->m.build, t, b->r->release, &b->build_dir);
     target_dir(b->r->root, &b->m.dist, t, b->r->release, &b->dist_dir);
     text_appendf(&b->lib_dir, "%s/lib", text_cstr(&b->build_dir));
@@ -1202,7 +1423,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
         }
     }
     if (b->r->tested != NULL) {
-        record_tested(b, &shared);
+        record_tested(b, t, cpu, &shared, files);
         ok = true;
         goto done;
     }
@@ -1239,7 +1460,8 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
     if (b->r->lib != BUILD_PROGRAM) {
         ok = build_c_library(b, t, cpu, &libraries);
     } else if (b->r->release) {
-        ok = build_release(b, t, cpu, main_at, &libraries);
+        ok = build_release(b, t, cpu, main_at, &libraries,
+                           text_cstr(&files[main_at]));
     } else {
         ok = build_dev(b, t, cpu, files, main_at, &libraries);
     }
@@ -1502,6 +1724,7 @@ static void build_free(struct build *b)
     text_free(&b->lib_dir);
     text_free(&b->obj_dir);
     text_free(&b->name);
+    text_free(&b->program_key);
 }
 
 /* `anti run`: run the program the build of b wrote for the host, and

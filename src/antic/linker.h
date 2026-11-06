@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "antic.h"
 #include "cpu.h"
 #include "shared.h"
 #include "target.h"
@@ -141,11 +142,6 @@ void link_line(struct text *out, enum target t, const char *library,
 
 /* Whether path names an object file or an archive for the linker. */
 bool link_is_input(const char *path);
-
-/* Append the path of the runtime library of target t at level cpu below
-   runtime. */
-void link_runtime_library(struct text *out, const char *runtime, enum target t,
-                          enum cpu_level cpu);
 
 /* Append the path of the runtime as bitcode of mode for target t at level
    cpu below runtime. */

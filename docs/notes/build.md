@@ -36,10 +36,11 @@ which is what a dependency of a path reads.
 
 The key of an output is the SHA-256 of its input, the version of antic, the
 target and the processor level, with a mark for `-g`, `strict` and
-`memory-checks`, in `cache_key` of `src/anti/build.c`. `options_key` adds every
-option the compile takes from the manifest and the command. `imports_key` adds
-the digest of every library file the input reaches through its imports and of
-every library file of the graph. That is decision 15 of "Decisions of
+`memory-checks`, in `cache_key` of `src/anti/cache.c`. `options_key` of
+`src/anti/build.c` adds every option the compile takes from the manifest and
+the command. `imports_key` adds the digest of every library file the input
+reaches through its imports and of every library file of the graph, through
+`cache_imports`. That is decision 15 of "Decisions of
 2026-10-11".
 It stands in a file
 beside the output, under the name of the output and `.key`. A compile drops the
@@ -64,8 +65,22 @@ way.
 
 antic stops a dev build of a library file at its object and never links one.
 The module that carries `main` is therefore compiled from its source, and it
-links in the same call. It is the one module of a dev build that every build
-compiles again, and the link it carries is the relink of that build.
+links in the same call. By Q2 of "Answers of 2026-11-06, fourth set" the
+build skips that call when the key of the program stands beside it.
+`program_reuse` writes the key. It holds the key of the source, the options
+and the digests of the library files the module reaches. The key of every
+object, the runtime and the options of the link follow. A release build keys its one call the
+same way, and keeps the program and its symbols together. `<program>.links`
+records what the link took for the notice.
+
+## The objects of `anti test`
+
+A dev run of `anti test` in a project links, for every module it does not
+test, the object that a dev build of `anti build` writes from the same library
+file. `build_object` compiles it under the key of `anti build`, from what the
+build of the run records in `struct build_tested`. A module under test has an
+object of its own with `--tests`, at `obj/<module>.tests.o`, and the run caches
+its library file and its runner beside it.
 
 ## Resolution
 

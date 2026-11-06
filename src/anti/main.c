@@ -730,10 +730,11 @@ done:
 
 /* The build of the modules of the project in the current directory for
    the host, in release mode when release is true and in dev mode
-   otherwise, which writes or reuses the library file of each and links
-   nothing, into tested. */
+   otherwise, and with --memory-checks when memory_checks is true. It
+   writes or reuses the library file of each, links nothing and records
+   itself into tested. */
 static bool build_for_tests(const char *runtime, bool release,
-                            struct build_tested *tested)
+                            bool memory_checks, struct build_tested *tested)
 {
     struct build_request request;
     enum target host;
@@ -747,6 +748,7 @@ static bool build_for_tests(const char *runtime, bool release,
     request.target = target_name(host);
     request.runtime = runtime;
     request.release = release;
+    request.memory_checks = memory_checks;
     request.tested = tested;
     return build_run(&request) == 0;
 }
@@ -831,13 +833,15 @@ static int test_command(int argc, char **argv)
        third set", and a dev run the dev build. The work
        directory is made first, so a layout that has no room for it is
        the first message, as it is outside a project. The package name is
-       the one of the build, which names a project without one. With -I,
-       and outside a project, the run takes its files and its roots
-       alone. */
+       the one of the build, which names a project without one. By Q2 of
+       "Answers of 2026-11-06, fourth set" the run reuses the objects of
+       that build and caches its own files beside them, so the build
+       carries --memory-checks of the run. With -I, and outside a
+       project, the run takes its files and its roots alone. */
     project = root_count == 0 && files_exists(MANIFEST_FILE);
     if (project) {
         if (!files_make_dirs_or_say(work) ||
-            !build_for_tests(runtime, release, &tested)) {
+            !build_for_tests(runtime, release, memory_checks, &tested)) {
             status = 1;
             goto done;
         }
@@ -851,6 +855,7 @@ static int test_command(int argc, char **argv)
             libraries[j] = text_cstr(&tested.libraries[j]);
         }
         request.project = true;
+        request.tested = &tested;
         request.libraries = libraries;
         request.library_count = tested.library_count;
         /* [provisional] Without a file the run takes every module of the

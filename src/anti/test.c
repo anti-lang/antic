@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "cache.h"
 #include "cpu.h"
 #include "driver.h"
 #include "files.h"
@@ -32,11 +33,56 @@
    work directory. */
 #define TEST_LIBRARY_DIR "lib"
 
+/* The suffixes of the files a run over a project caches in obj/ of the
+   build of its mode, after the module path as directories. No module
+   path names such a file, since every dot of a path is a directory. */
+#define TEST_CACHED_LIBRARY ".tests" ANTL_SUFFIX
+#define TEST_CACHED_OBJECT ".tests"
+#define TEST_CACHED_RUNNER ".runner"
+
 /* One module of the run and the object a dev build writes for it. */
 struct test_unit {
     struct unit unit;
     struct text object;         /* the .o of a dev build */
 };
+
+/* The flags of the key of a file of the run. */
+static struct cache_flags test_flags(const struct options *base, bool tests,
+                                     bool debug)
+{
+    struct cache_flags f = {0};
+
+    f.target = base->target;
+    f.cpu = base->cpu;
+    f.debug = debug;
+    f.checked = base->memory_checks;
+    f.tests = tests;
+    return f;
+}
+
+/* Append to key the options of base that decide a file of the run beside
+   its input and its flags: the package with its version and the
+   injections, which `[inject.test]` lays over `[inject]`. */
+static void test_options_key(const struct options *base, struct text *key)
+{
+    size_t i;
+
+    text_appendf(key, "package %s %s\n",
+                 base->package_name != NULL ? base->package_name : "",
+                 base->package_version != NULL ? base->package_version : "");
+    for (i = 0; i < base->inject_count; i++) {
+        text_appendf(key, "inject %s\n", base->inject[i]);
+    }
+}
+
+/* The path of the file of module u with suffix in obj/ of the build that
+   r->tested records, into out. */
+static bool cached_path(const struct test_request *r, const struct test_unit *u,
+                        const char *suffix, struct text *out)
+{
+    return unit_file(text_cstr(&r->tested->obj_dir), text_cstr(&u->unit.path),
+                     suffix, out);
+}
 
 /* Read one module of the run. A module the parser refuses has been
    reported, and fails the run. */
@@ -75,39 +121,106 @@ static bool base_options(struct options *o, const char *package,
     return true;
 }
 
-/* Write the library file of a module, which the runner imports. */
-static bool compile_library(const struct test_unit *u,
+/* Write the library file of a module, which the runner imports. A run
+   over a project takes it from obj/ of the build when the key beside it
+   holds, and copies it into the library directory of the run. */
+static bool compile_library(const struct test_request *r,
+                            const struct test_unit *u,
                             const struct options *base)
 {
     struct options o = *base;
+    struct cache_flags flags = test_flags(base, true, false);
+    struct text cached = {0};
+    struct text start = {0};
+    struct text key = {0};
+    bool ok = false;
 
     o.input = u->unit.source;
     o.output = text_cstr(&u->unit.library);
     o.library = true;
-    return driver_run(&o) == 0;
+    if (r->tested == NULL) {
+        return driver_run(&o) == 0;
+    }
+    if (!cached_path(r, u, TEST_CACHED_LIBRARY, &cached)) {
+        goto done;
+    }
+    o.output = text_cstr(&cached);
+    cache_key(u->unit.source, &flags, &start);
+    test_options_key(base, &start);
+    /* The imports of the library file that stands are those of its
+       source, which the digest of the source holds, as in build.c. */
+    text_append(&key, text_cstr(&start));
+    if (!(files_exists(text_cstr(&cached)) &&
+          cache_imports(base, text_cstr(&cached), &key) &&
+          cache_holds(text_cstr(&cached), &key))) {
+        cache_drop(text_cstr(&cached));
+        if (driver_run(&o) != 0) {
+            goto done;
+        }
+        key.length = 0;
+        text_append(&key, text_cstr(&start));
+        if (!cache_imports(base, text_cstr(&cached), &key) ||
+            !cache_store(text_cstr(&cached), &key)) {
+            goto done;
+        }
+    }
+    ok = files_copy(text_cstr(&cached), text_cstr(&u->unit.library));
+    if (!ok) {
+        say_anti("cannot write %s\n", text_cstr(&u->unit.library));
+    }
+done:
+    text_free(&cached);
+    text_free(&start);
+    text_free(&key);
+    return ok;
 }
 
-/* Write the object of a module, which a dev build links. */
-static bool compile_object(struct test_unit *u, const struct options *base,
-                           const char *work)
+/* Write the object of a module, which a dev build links. A run over a
+   project writes it into obj/ of the build, unless the key beside it
+   holds. */
+static bool compile_object(const struct test_request *r, struct test_unit *u,
+                           const struct options *base)
 {
     struct options o = *base;
+    struct cache_flags flags = test_flags(base, true, base->debug);
     struct text base_path = {0};
+    struct text key = {0};
     int status;
+    bool ok = false;
 
     /* DESIGN: antic takes -o as the base of a dev build and adds the
        suffix of each file it writes. The suffix of an object is the
        target's, `.obj` on Windows and `.o` everywhere else. */
-    text_appendf(&base_path, "%s/%s", work, text_cstr(&u->unit.path));
+    if (r->tested == NULL) {
+        text_appendf(&base_path, "%s/%s", r->work, text_cstr(&u->unit.path));
+    } else if (!cached_path(r, u, TEST_CACHED_OBJECT, &base_path)) {
+        goto done;
+    }
     text_appendf(&u->object, "%s%s", text_cstr(&base_path),
                  target_info(base->target)->object_suffix);
     o.input = u->unit.source;
     o.output = text_cstr(&base_path);
     o.dev = true;
+    if (r->tested != NULL) {
+        cache_key(u->unit.source, &flags, &key);
+        test_options_key(base, &key);
+        if (!cache_imports(base, text_cstr(&u->unit.library), &key)) {
+            goto done;
+        }
+        if (cache_holds(text_cstr(&u->object), &key)) {
+            ok = true;
+            goto done;
+        }
+        cache_drop(text_cstr(&u->object));
+    }
     /* A module without `main` stops at its object. */
     status = driver_run(&o);
+    ok = (status == 0 || status == DRIVER_OBJECT_ONLY) &&
+         (r->tested == NULL || cache_store(text_cstr(&u->object), &key));
+done:
     text_free(&base_path);
-    return status == 0 || status == DRIVER_OBJECT_ONLY;
+    text_free(&key);
+    return ok;
 }
 
 /* The objects of the modules a unit imports, for a dev link. */
@@ -146,17 +259,20 @@ static const char **unit_seed(const struct test_unit *u,
 }
 
 /* DESIGN: a dev build compiles one module into its own object and links
-   the objects of the modules it imports. The run therefore writes an
+   the objects of the modules it imports. The run therefore needs an
    object of every library file the module under test needs, its own
    excepted. Those objects go on the link line of the runner. That is
-   what lets a module of the standard library carry a `tests` block. The
-   release run takes the whole program from the library files and needs
-   none of this. */
-static bool compile_imports(const struct test_unit *u,
-                            const struct options *base,
-                            const char *work, const char *flat,
+   what lets a module of the standard library carry a `tests` block. A
+   run over a project takes them from the build, and any other run writes
+   them into the work directory. The release run takes the whole program
+   from the library files and needs none of this. */
+static bool compile_imports(const struct test_request *r,
+                            const struct test_unit *units, size_t unit_count,
+                            const struct test_unit *u,
+                            const struct options *base, const char *flat,
                             struct imports *out)
 {
+    const char *work = r->work;
     struct arena arena = {0};
     struct options search = *base;
     struct text directory = {0};
@@ -188,6 +304,32 @@ static bool compile_imports(const struct test_unit *u,
         size_t j;
         int status;
         if (strcmp(paths[i], seed[0]) == 0) {
+            continue;
+        }
+        /* DESIGN: Q2 of "Answers of 2026-11-06, fourth set" in
+           docs/decisions.md. An import has no `tests` block to keep, so
+           its object is the one a dev build of `anti build` writes from
+           the same library file, and a run over a project takes it from
+           there. A module of the run is the exception: the import names
+           the library file of the run, whose object the run wrote with
+           --tests already. */
+        for (j = 0; j < unit_count; j++) {
+            if (strcmp(paths[i], text_cstr(&units[j].unit.library)) == 0) {
+                break;
+            }
+        }
+        if (j < unit_count) {
+            text_append(&object, text_cstr(&units[j].object));
+            out->items[out->count++] = object;
+            continue;
+        }
+        if (r->tested != NULL) {
+            ok = build_object(r->tested, paths[i], &object);
+            if (ok) {
+                out->items[out->count++] = object;
+            } else {
+                text_free(&object);
+            }
             continue;
         }
         /* antic refuses a module that stands twice on its command line,
@@ -289,9 +431,45 @@ static bool runner_frameworks(const struct test_unit *u,
     return ok;
 }
 
-/* Build the runner of one module and run it. */
-static bool run_unit(const struct test_unit *u, const struct options *base,
-                     const char *work, bool release)
+/* The key of the runner of u that the compile with the options o writes,
+   into key: the key of its source, the options of the run, the digest of
+   the library file of u and of every library file it reaches, the key of
+   every object of a dev link, the runtime and the links. */
+static bool runner_key(const struct test_unit *u, const struct options *base,
+                       const struct options *o, bool release,
+                       struct text *key)
+{
+    struct cache_flags flags = test_flags(base, false, o->debug);
+    size_t i;
+
+    cache_key(o->input, &flags, key);
+    text_appendf(key, "runner %s\n", release ? "release" : "dev");
+    test_options_key(base, key);
+    if (!cache_file("library", text_cstr(&u->unit.library), key) ||
+        !cache_imports(base, text_cstr(&u->unit.library), key)) {
+        return false;
+    }
+    for (i = 0; i < o->object_count; i++) {
+        if (!cache_key_of(o->objects[i], key)) {
+            return false;
+        }
+    }
+    cache_runtime(o->runtime, o->target, o->cpu, key);
+    for (i = 0; i < o->framework_count; i++) {
+        text_appendf(key, "framework %s\n", o->frameworks[i]);
+    }
+    for (i = 0; i < o->linux_library_count; i++) {
+        text_appendf(key, "linux %s\n", o->linux_libraries[i]);
+    }
+    return true;
+}
+
+/* Build the runner of one module and run it. units are the modules of the
+   run. A run over a project links the runner into obj/ of the build,
+   unless the key beside the runner that stands holds. */
+static bool run_unit(const struct test_request *r,
+                     const struct test_unit *units, size_t unit_count,
+                     const struct test_unit *u, const struct options *base)
 {
     struct options o = *base;
     struct text source = {0};
@@ -299,10 +477,12 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
     struct text program = {0};
     struct text directory = {0};
     struct text flat = {0};
+    struct text key = {0};
     struct imports imports = {0};
     struct arena framework_arena = {0};
     const char **objects = NULL;
     const char *argv[2];
+    bool linked = false;
     bool ok = false;
     size_t i;
 
@@ -311,20 +491,24 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
        module under test could take. Each dot of that module becomes an
        `_`, since a dot in the file name is a segment of its own. */
     write_runner(u, &source);
-    text_appendf(&directory, "%s/%s", work, TEST_RUNNER_DIR);
+    text_appendf(&directory, "%s/%s", r->work, TEST_RUNNER_DIR);
     if (!files_make_dirs_or_say(text_cstr(&directory))) {
         goto done;
     }
     unit_flat_path(text_cstr(&u->unit.path), &flat);
     text_appendf(&path, "%s/%s%s", text_cstr(&directory), text_cstr(&flat),
                  SOURCE_SUFFIX);
-    text_appendf(&program, "%s/%s.runner", work, text_cstr(&flat));
+    if (r->tested == NULL) {
+        text_appendf(&program, "%s/%s.runner", r->work, text_cstr(&flat));
+    } else if (!cached_path(r, u, TEST_CACHED_RUNNER, &program)) {
+        goto done;
+    }
     if (!files_write(text_cstr(&path), &source)) {
         goto done;
     }
     o.input = text_cstr(&path);
     o.output = text_cstr(&program);
-    if (release) {
+    if (r->release) {
         /* DESIGN: release mode runs the tests with the checks and the
            assertions off, which is the specification's second run. The
            whole program comes from the library file of the module. */
@@ -332,7 +516,8 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
         o.checks = CHECKS_OFF;
     } else {
         o.dev = true;
-        if (!compile_imports(u, base, work, text_cstr(&flat), &imports)) {
+        if (!compile_imports(r, units, unit_count, u, base,
+                             text_cstr(&flat), &imports)) {
             goto done;
         }
         objects = files_array(imports.count + 1, sizeof *objects);
@@ -343,9 +528,23 @@ static bool run_unit(const struct test_unit *u, const struct options *base,
         o.objects = objects;
         o.object_count = imports.count + 1;
     }
-    if (!runner_frameworks(u, base, &framework_arena, &o) ||
-        driver_run(&o) != 0) {
+    if (!runner_frameworks(u, base, &framework_arena, &o)) {
         goto done;
+    }
+    if (r->tested != NULL) {
+        if (!runner_key(u, base, &o, r->release, &key)) {
+            goto done;
+        }
+        linked = cache_holds(text_cstr(&program), &key);
+        if (!linked) {
+            cache_drop(text_cstr(&program));
+        }
+    }
+    if (!linked) {
+        if (driver_run(&o) != 0 ||
+            (r->tested != NULL && !cache_store(text_cstr(&program), &key))) {
+            goto done;
+        }
     }
     argv[0] = text_cstr(&program);
     argv[1] = NULL;
@@ -359,6 +558,7 @@ done:
     text_free(&program);
     text_free(&directory);
     text_free(&flat);
+    text_free(&key);
     return ok;
 }
 
@@ -424,6 +624,11 @@ int test_run(const struct test_request *r)
        does. */
     base.libraries = r->libraries;
     base.library_count = r->library_count;
+    /* The compiles of a run over a project carry the version of the
+       manifest, as the build of the project does. */
+    if (r->tested != NULL && r->tested->version.length > 0) {
+        base.package_version = text_cstr(&r->tested->version);
+    }
     for (i = 0; i < r->source_count; i++) {
         bool read = read_unit(r->sources[i], r->roots, r->root_count,
                               library_dir, &units[count]);
@@ -443,8 +648,8 @@ int test_run(const struct test_request *r)
     /* Every library file first, so a module that imports another of the
        run finds it however the files were ordered. */
     for (i = 0; i < count; i++) {
-        if (!compile_library(&units[i], &base) ||
-            (!r->release && !compile_object(&units[i], &base, r->work))) {
+        if (!compile_library(r, &units[i], &base) ||
+            (!r->release && !compile_object(r, &units[i], &base))) {
             goto done;
         }
     }
@@ -452,7 +657,7 @@ int test_run(const struct test_request *r)
         if (units[i].unit.test_count == 0) {
             continue;
         }
-        if (!run_unit(&units[i], &base, r->work, r->release)) {
+        if (!run_unit(r, units, count, &units[i], &base)) {
             failed++;
         }
     }
