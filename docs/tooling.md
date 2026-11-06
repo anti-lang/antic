@@ -247,7 +247,9 @@ ff = "https://anti.foundingfuture.com/repo"
   `name`, and a project without it is the package of its root module: the module that
   holds `main`, or the last module of the order in a library project. A manifest with
   `[dependencies]` needs `[package]` and its `name`, and so does a published package.
-  A `[package]` that names `publish` without `name` is refused.
+  A `[package]` that names `publish` without `name` is refused, whether `publish` is a
+  string, an array or a table. `publish` names a publication target, so a `publish`
+  that is no string is refused with `name` as well.
 - A program takes the name `program` gives. Without it a program takes the last
   segment of `name`, and without either the name of the project directory, the
   directory that holds `anti.toml`. The copy of a project in a directory

@@ -264,6 +264,59 @@ static void string_forms(void)
     CHECK(read_toml("mixed = \"a'\n") == NULL);
 }
 
+/* The shape of the value at a path: a string, another plain value, an
+   array or a table, empty or not, and none for a path the document does
+   not name. */
+static int64_t shape_of(const struct anti_toml *doc, const char *path)
+{
+    return anti_rt_toml_shape(doc, (const unsigned char *)path,
+                              (int64_t)strlen(path));
+}
+
+static void value_shapes(void)
+{
+    static const char text[] =
+        "text = \"a\"\n"
+        "number = 3\n"
+        "flag = true\n"
+        "list = [1, 2]\n"
+        "empty_list = []\n"
+        "inline = { a = 1 }\n"
+        "empty_inline = {}\n"
+        "[header]\n"
+        "b = 2\n"
+        "[empty_header]\n"
+        "[[entries]]\n"
+        "c = 3\n"
+        "[last]\n";
+    struct anti_toml *doc = read_toml(text);
+
+    CHECK(doc != NULL);
+    if (doc == NULL) {
+        return;
+    }
+    CHECK(shape_of(doc, "text") == ANTI_TOML_STRING);
+    CHECK(shape_of(doc, "number") == ANTI_TOML_VALUE);
+    CHECK(shape_of(doc, "flag") == ANTI_TOML_VALUE);
+    CHECK(shape_of(doc, "list") == ANTI_TOML_ARRAY);
+    CHECK(shape_of(doc, "empty_list") == ANTI_TOML_ARRAY);
+    CHECK(shape_of(doc, "inline") == ANTI_TOML_TABLE);
+    CHECK(shape_of(doc, "empty_inline") == ANTI_TOML_TABLE);
+    CHECK(shape_of(doc, "header") == ANTI_TOML_TABLE);
+    CHECK(shape_of(doc, "empty_header") == ANTI_TOML_TABLE);
+    CHECK(shape_of(doc, "entries") == ANTI_TOML_ARRAY);
+    CHECK(shape_of(doc, "last") == ANTI_TOML_TABLE);
+    CHECK(shape_of(doc, "missing") == ANTI_TOML_NONE);
+    CHECK(shape_of(doc, "tex") == ANTI_TOML_NONE);
+    /* An empty array or table adds no key, so a walk of the keys finds
+       the document as it did before. */
+    CHECK(!has_key(doc, "empty_list"));
+    CHECK(!has_key(doc, "empty_inline"));
+    CHECK(!has_key(doc, "empty_header"));
+    CHECK(anti_rt_toml_count(doc) == 8);
+    anti_rt_toml_free(doc);
+}
+
 void test_toml(void)
 {
     inline_table();
@@ -274,4 +327,5 @@ void test_toml(void)
     table_repeat_cost();
     key_length();
     string_forms();
+    value_shapes();
 }

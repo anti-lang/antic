@@ -37,6 +37,7 @@ struct pair {
     int64_t key_length;
     int64_t value_length;
     int64_t line;
+    int64_t shape;      /* an enum anti_toml_shape */
 };
 
 /* A path that keys stand under, the first length bytes of the key of the
@@ -51,11 +52,15 @@ struct under {
 
 /* names is a table of open addressing of room slots, a power of two, and
    holds the paths of the first indexed pairs. A slot of length 0 is
-   free. */
+   free. empties holds the path and the shape of every empty array and
+   table, which no pair stands under. */
 struct anti_toml {
     struct pair *pairs;
     size_t count;
     size_t capacity;
+    struct pair *empties;
+    size_t empty_count;
+    size_t empty_capacity;
     struct under *names;
     size_t room;
     size_t names_count;
@@ -69,6 +74,11 @@ struct reader {
     int64_t line;
     char table[256];
     size_t table_length;
+    /* The pairs and empties the document held when the table of the
+       last header opened, so its end tells an empty table. */
+    size_t table_start;
+    /* Whether the last value read stood in quotes. */
+    int quoted;
     int failed;
 };
 
@@ -127,35 +137,68 @@ static char *keep(const char *text, int64_t length)
     return copy;
 }
 
-static void add(struct anti_toml *doc, struct reader *r, const char *key,
-                int64_t key_length, const char *value, int64_t value_length)
+/* The next free pair of a list that holds count of capacity pairs. */
+static struct pair *next_pair(struct pair **pairs, size_t count,
+                              size_t *capacity)
 {
-    struct pair *pair;
-
-    if (doc->count == doc->capacity) {
-        size_t capacity;
+    if (count == *capacity) {
+        size_t room;
         struct pair *grown;
         /* A room whose double does not fit a size_t in bytes counts as
            memory that ran out. */
-        if (doc->capacity > SIZE_MAX / 2 / sizeof *grown) {
+        if (*capacity > SIZE_MAX / 2 / sizeof *grown) {
             anti_rt_out_of_memory(INT64_MAX);
         }
-        capacity = doc->capacity == 0 ? 16 : doc->capacity * 2;
-        grown = ANTI_FAULT(ALLOC, NULL,
-                           realloc(doc->pairs, capacity * sizeof *grown));
+        room = *capacity == 0 ? 16 : *capacity * 2;
+        grown = ANTI_FAULT(ALLOC, NULL, realloc(*pairs, room * sizeof *grown));
         if (grown == NULL) {
-            anti_rt_out_of_memory((int64_t)(capacity * sizeof *grown));
+            anti_rt_out_of_memory((int64_t)(room * sizeof *grown));
         }
-        doc->pairs = grown;
-        doc->capacity = capacity;
+        *pairs = grown;
+        *capacity = room;
     }
-    pair = &doc->pairs[doc->count];
+    return &(*pairs)[count];
+}
+
+static void add(struct anti_toml *doc, struct reader *r, const char *key,
+                int64_t key_length, const char *value, int64_t value_length)
+{
+    struct pair *pair = next_pair(&doc->pairs, doc->count, &doc->capacity);
+
     pair->key = keep(key, key_length);
     pair->value = keep(value, value_length);
     pair->key_length = key_length;
     pair->value_length = value_length;
     pair->line = r->line;
+    pair->shape = r->quoted ? ANTI_TOML_STRING : ANTI_TOML_VALUE;
     doc->count++;
+}
+
+/* Note the empty array or table at path, which holds no pair. */
+static void add_empty(struct anti_toml *doc, struct reader *r,
+                      const char *path, int64_t length, int64_t shape)
+{
+    struct pair *pair = next_pair(&doc->empties, doc->empty_count,
+                                  &doc->empty_capacity);
+
+    pair->key = keep(path, length);
+    pair->value = keep("", 0);
+    pair->key_length = length;
+    pair->value_length = 0;
+    pair->line = r->line;
+    pair->shape = shape;
+    doc->empty_count++;
+}
+
+/* Note the table of the last header as empty when nothing stands under
+   it. */
+static void end_table(struct anti_toml *doc, struct reader *r)
+{
+    if (r->table_length > 0 &&
+        doc->count + doc->empty_count == r->table_start) {
+        add_empty(doc, r, r->table, (int64_t)r->table_length,
+                  ANTI_TOML_TABLE);
+    }
 }
 
 /* The hash of FNV-1a over length more bytes at bytes, from h. */
@@ -284,6 +327,7 @@ static void read_header(struct reader *r, struct anti_toml *doc)
     int64_t next;
     int written;
 
+    end_table(doc, r);
     r->pos++;
     if (peek(r) == '[') {
         array = 1;
@@ -329,6 +373,7 @@ static void read_header(struct reader *r, struct anti_toml *doc)
         }
         r->table_length += (size_t)written;
     }
+    r->table_start = doc->count + doc->empty_count;
 }
 
 /* The bytes in quotes at the read position, without them. */
@@ -390,7 +435,8 @@ static void read_value(struct reader *r, const char *stops, const char **value,
     int64_t start;
 
     skip_spaces(r);
-    if (peek(r) == '"' || peek(r) == '\'') {
+    r->quoted = peek(r) == '"' || peek(r) == '\'';
+    if (r->quoted) {
         read_quoted(r, value, length);
         return;
     }
@@ -421,6 +467,8 @@ static void read_array(struct reader *r, struct anti_toml *doc,
 static void read_inline_table(struct reader *r, struct anti_toml *doc,
                               const char *path)
 {
+    size_t start = doc->count + doc->empty_count;
+
     r->pos++;
     while (!r->failed) {
         char key[PATH_ROOM];
@@ -432,6 +480,10 @@ static void read_inline_table(struct reader *r, struct anti_toml *doc,
         skip_blank(r);
         if (peek(r) == '}') {
             r->pos++;
+            if (doc->count + doc->empty_count == start) {
+                add_empty(doc, r, path, (int64_t)strlen(path),
+                          ANTI_TOML_TABLE);
+            }
             return;
         }
         if (at_end(r)) {
@@ -496,6 +548,10 @@ static void read_array(struct reader *r, struct anti_toml *doc,
         skip_blank(r);
         if (peek(r) == ']') {
             r->pos++;
+            if (index == 0) {
+                add_empty(doc, r, path, (int64_t)strlen(path),
+                          ANTI_TOML_ARRAY);
+            }
             return;
         }
         if (at_end(r) || peek(r) == '[') {
@@ -587,6 +643,7 @@ struct anti_toml *anti_rt_toml_read(const unsigned char *bytes, int64_t len)
     while (!r.failed) {
         skip_blank(&r);
         if (at_end(&r)) {
+            end_table(doc, &r);
             return doc;
         }
         if (peek(&r) == '[') {
@@ -648,6 +705,51 @@ int64_t anti_rt_toml_find(const struct anti_toml *doc,
     return -1;
 }
 
+/* The shape that the key of a pair at path or under it gives: its own
+   shape where the key is path, an array where a number follows path and
+   a dot, a table where another part follows, and none otherwise. */
+static int64_t shape_in(const struct pair *pairs, size_t count,
+                        const unsigned char *path, int64_t len)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        const struct pair *p = &pairs[i];
+        const char *rest;
+        if (p->key_length < len || memcmp(p->key, path, (size_t)len) != 0) {
+            continue;
+        }
+        if (p->key_length == len) {
+            return p->shape;
+        }
+        if (p->key[len] != '.') {
+            continue;
+        }
+        rest = p->key + len + 1;
+        while (*rest >= '0' && *rest <= '9') {
+            rest++;
+        }
+        return rest != p->key + len + 1 && (*rest == '.' || *rest == '\0')
+                   ? ANTI_TOML_ARRAY
+                   : ANTI_TOML_TABLE;
+    }
+    return ANTI_TOML_NONE;
+}
+
+int64_t anti_rt_toml_shape(const struct anti_toml *doc,
+                           const unsigned char *path, int64_t len)
+{
+    int64_t shape;
+
+    if (doc == NULL) {
+        return ANTI_TOML_NONE;
+    }
+    shape = shape_in(doc->pairs, doc->count, path, len);
+    return shape != ANTI_TOML_NONE
+               ? shape
+               : shape_in(doc->empties, doc->empty_count, path, len);
+}
+
 int64_t anti_rt_toml_line(const struct anti_toml *doc, int64_t index)
 {
     if (doc == NULL || index < 0 || index >= (int64_t)doc->count) {
@@ -668,6 +770,11 @@ void anti_rt_toml_free(struct anti_toml *doc)
         free(doc->pairs[i].value);
     }
     free(doc->pairs);
+    for (i = 0; i < doc->empty_count; i++) {
+        free(doc->empties[i].key);
+        free(doc->empties[i].value);
+    }
+    free(doc->empties);
     free(doc->names);
     free(doc);
 }

@@ -133,6 +133,9 @@ bool manifest_version_valid(const char *version)
 #define DEFAULT_SRC "src"
 #define DEFAULT_TEST "test"
 
+/* The key of the publication target of a package. */
+#define PUBLISH_KEY "package.publish"
+
 /* What reading the manifest at path gave. */
 enum opened { OPENED, OPENED_MISSING, OPENED_NO_TOML };
 
@@ -439,6 +442,7 @@ static bool read_tables(const char *path, const struct anti_toml *doc,
 bool manifest_read(const char *path, bool tests, struct manifest *out)
 {
     struct anti_toml *doc = NULL;
+    int64_t publish;
     enum opened opened;
     size_t i;
     size_t j;
@@ -482,12 +486,21 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
                  "the package that requires them\n", path);
         goto done;
     }
-    /* Q3 of "Answers of 2026-11-02": a published package needs a name,
-       so `publish` of [package] needs one, although `anti publish` is
-       not built. */
-    if (out->name.length == 0 && value_of(doc, "package.publish") != NULL) {
+    /* Q3 of "Answers of 2026-11-02" and of "Answers of 2026-11-06": a
+       published package needs a name, so `publish` of [package] in any
+       form needs one, although `anti publish` is not built. It names a
+       publication target, so a value that is no string is refused with
+       a name as well. */
+    publish = anti_rt_toml_shape(doc, (const unsigned char *)PUBLISH_KEY,
+                                 (int64_t)strlen(PUBLISH_KEY));
+    if (out->name.length == 0 && publish != ANTI_TOML_NONE) {
         say_anti("%s: [package] publish needs a `name`, the package it "
                  "publishes\n", path);
+        goto done;
+    }
+    if (publish != ANTI_TOML_NONE && publish != ANTI_TOML_STRING) {
+        say_anti("%s: [package] publish needs a string, the publication "
+                 "target, as publish = \"ff\"\n", path);
         goto done;
     }
     /* The program is a file of dist/, so its name stands in no other

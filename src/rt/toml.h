@@ -40,6 +40,21 @@ struct anti_text anti_rt_toml_value(const struct anti_toml *doc,
 int64_t anti_rt_toml_find(const struct anti_toml *doc,
                           const unsigned char *path, int64_t len);
 
+/* The shape of the value at a path, which anti_rt_toml_shape gives. */
+enum anti_toml_shape {
+    ANTI_TOML_NONE,     /* the document names nothing at the path */
+    ANTI_TOML_STRING,   /* a string in quotes */
+    ANTI_TOML_VALUE,    /* an integer, a float or a boolean */
+    ANTI_TOML_ARRAY,    /* an array or a `[[path]]` table, empty or not */
+    ANTI_TOML_TABLE     /* an inline table or a `[path]` table, or keys
+                           under the path */
+};
+
+/* The shape of the value at `path`, an enum anti_toml_shape. An empty
+   array or table holds no key, and its shape is still found. */
+int64_t anti_rt_toml_shape(const struct anti_toml *doc,
+                           const unsigned char *path, int64_t len);
+
 /* The line the value of the key at index came from, counting from 1. */
 int64_t anti_rt_toml_line(const struct anti_toml *doc, int64_t index);
 

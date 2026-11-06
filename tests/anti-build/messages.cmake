@@ -34,6 +34,40 @@ anti_message(manifest_publish_without_name
     FILES anti.toml "[package]\npublish = \"ff\"\n"
     ARGS build
     ERR "anti: ./anti.toml: [package] publish needs a `name`, the package it publishes")
+# Q3 of "Answers of 2026-11-06": publish in any form without name is
+# refused, and a publish that is no string is refused with name as well.
+anti_message(manifest_publish_empty_without_name
+    FILES anti.toml "[package]\npublish = \"\"\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a `name`, the package it publishes")
+anti_message(manifest_publish_array_without_name
+    FILES anti.toml "[package]\npublish = [\"ff\"]\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a `name`, the package it publishes")
+anti_message(manifest_publish_table_without_name
+    FILES anti.toml "[package]\npublish = { to = \"ff\" }\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a `name`, the package it publishes")
+anti_message(manifest_publish_empty_array_without_name
+    FILES anti.toml "[package]\npublish = []\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a `name`, the package it publishes")
+anti_message(manifest_publish_header_without_name
+    FILES anti.toml "[package.publish]\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a `name`, the package it publishes")
+anti_message(manifest_publish_array
+    FILES anti.toml "${manifest_package}publish = [\"ff\"]\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a string, the publication target, as publish = \"ff\"")
+anti_message(manifest_publish_table
+    FILES anti.toml "${manifest_package}publish = { to = \"ff\" }\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a string, the publication target, as publish = \"ff\"")
+anti_message(manifest_publish_number
+    FILES anti.toml "${manifest_package}publish = 3\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] publish needs a string, the publication target, as publish = \"ff\"")
 anti_message(manifest_version
     FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"1.x\"\n"
     ARGS build
