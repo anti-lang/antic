@@ -108,8 +108,8 @@ static int usage(FILE *out)
           "`[inject]` and `[inject.test]` tables of anti.toml in the current\n"
           "directory and passes each provider to antic. In a project and\n"
           "without -I it first writes or reuses the library file of every\n"
-          "module of the source directory, as a dev build does, and finds\n"
-          "the modules there. Without a file it then tests every module of\n"
+          "module of the source directory, as a build of the same mode\n"
+          "does, and finds the modules there. Without a file it then tests every module of\n"
           "the source directory that declares a test.\n"
           "\n"
           "fmt writes every source in the canonical form of the formatter\n"
@@ -728,10 +728,12 @@ done:
     return status;
 }
 
-/* The dev build of the modules of the project in the current directory
-   for the host, which writes or reuses the library file of each and links
+/* The build of the modules of the project in the current directory for
+   the host, in release mode when release is true and in dev mode
+   otherwise, which writes or reuses the library file of each and links
    nothing, into tested. */
-static bool build_for_tests(const char *runtime, struct build_tested *tested)
+static bool build_for_tests(const char *runtime, bool release,
+                            struct build_tested *tested)
 {
     struct build_request request;
     enum target host;
@@ -744,6 +746,7 @@ static bool build_for_tests(const char *runtime, struct build_tested *tested)
     request.root = ".";
     request.target = target_name(host);
     request.runtime = runtime;
+    request.release = release;
     request.tested = tested;
     return build_run(&request) == 0;
 }
@@ -822,8 +825,10 @@ static int test_command(int argc, char **argv)
     request.package = package.length > 0 ? text_cstr(&package) : NULL;
     /* DESIGN: Q4 of "Answers of 2026-11-06, second set" in
        docs/decisions.md. In a project, a run without -I writes or reuses
-       the library file of every module of the source directory as a dev
-       build of `anti build` does, and finds the modules there. The work
+       the library file of every module of the source directory as a build
+       of `anti build` does, and finds the modules there. A run with
+       --release takes the release build, by Q3 of "Answers of 2026-11-06,
+       third set", and a dev run the dev build. The work
        directory is made first, so a layout that has no room for it is
        the first message, as it is outside a project. The package name is
        the one of the build, which names a project without one. With -I,
@@ -832,7 +837,7 @@ static int test_command(int argc, char **argv)
     project = root_count == 0 && files_exists(MANIFEST_FILE);
     if (project) {
         if (!files_make_dirs_or_say(work) ||
-            !build_for_tests(runtime, &tested)) {
+            !build_for_tests(runtime, release, &tested)) {
             status = 1;
             goto done;
         }

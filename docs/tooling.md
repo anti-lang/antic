@@ -175,8 +175,9 @@ waits for `anti build`.
 
 `anti test` reads `anti.toml` of the directory it runs in, as `anti build` does. In a
 project, a run without `-I` first writes or reuses the library file of every module of
-`src/` for the host, as a dev build of `anti build` does, and finds the modules under
-test and their imports there. `anti test <file>...` tests those modules, and `anti test`
+`src/` for the host, as a build of `anti build` in the same mode does, and finds the
+modules under test and their imports there. `anti test --release` takes the release
+build, and a dev run the dev build. `anti test <file>...` tests those modules, and `anti test`
 without a file tests every module of `src/` that declares a test. Outside a project, and
 with `-I`, the run takes the files and the roots it is given and builds nothing else.
 

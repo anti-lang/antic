@@ -78,12 +78,23 @@ if(CASE STREQUAL "all_dev" OR CASE STREQUAL "all_release")
     expect("${text}" "ok shapes.area.pads_the_scaled_side" "the test of area")
     expect("${text}" "anti test: 3 tests in 2 modules, 0 modules failed"
            "the count of the modules with a tests block")
-    # The library files stand where a dev build of `anti build` writes
-    # them.
-    file(GLOB written "${here}/build/*/dev/lib/shapes/tuning.antl")
+    # The library files stand where a build of `anti build` in the mode
+    # of the run writes them, by Q3 of "Answers of 2026-11-06, third set",
+    # and the run writes none of the other mode.
+    set(mode dev)
+    set(other release)
+    if(CASE STREQUAL "all_release")
+        set(mode release)
+        set(other dev)
+    endif()
+    file(GLOB written "${here}/build/*/${mode}/lib/shapes/tuning.antl")
     if(NOT written)
-        message(FATAL_ERROR "no build/<target>/dev/lib/shapes/tuning.antl\n"
+        message(FATAL_ERROR "no build/<target>/${mode}/lib/shapes/tuning.antl\n"
                 "${text}")
+    endif()
+    file(GLOB written "${here}/build/*/${other}")
+    if(written)
+        message(FATAL_ERROR "the run wrote ${written}\n${text}")
     endif()
 elseif(CASE STREQUAL "file_dev" OR CASE STREQUAL "file_release")
     set(extra "")

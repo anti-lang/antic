@@ -383,7 +383,7 @@ int test_run(const struct test_request *r)
         return 1;
     }
     /* [provisional] DESIGN: a run over a project finds the modules it
-       leaves out among the library files of the dev build, which stand
+       leaves out among the library files of the build, which stand
        behind the files of the run. A library file that an earlier run
        wrote of such a module would stand before them, so the files of
        the run stand in a directory of their own, emptied first. */
@@ -432,7 +432,7 @@ int test_run(const struct test_request *r)
             goto done;
         }
         /* A module without a test has nothing to run, and the library
-           file of the dev build stands for it. */
+           file of the build stands for it. */
         if (r->tested_only && units[count].unit.test_count == 0) {
             unit_free(&units[count].unit);
             continue;

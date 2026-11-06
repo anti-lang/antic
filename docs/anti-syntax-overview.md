@@ -1751,7 +1751,7 @@ tests
 }
 ```
 
-`setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test` compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. The dev run links an object of every module the one under test imports, so a module of the standard library carries a `tests` block too. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off. In a project, `anti test` without `-I` finds the library files of the modules of the project itself, as a dev build of `anti build` writes them, and without a file it tests every module of `src/` that declares a test.
+`setup` and `teardown` in `fixtures` run before and after every test of the module. `anti test` compiles each module with `--tests`, writes a runner that calls its tests, links it and runs it. The dev run links an object of every module the one under test imports, so a module of the standard library carries a `tests` block too. It prints `ok <module>.<test>` for a test that returned, and a failed assertion prints `FAIL <module>.<test>` and then the file and the line. `anti test --release` runs the same tests with the checks and the assertions off. In a project, `anti test` without `-I` finds the library files of the modules of the project itself, as a build of `anti build` in the same mode writes them, and without a file it tests every module of `src/` that declares a test. `anti test --release` reads the release library files.
 
 ## C interop
 
@@ -2226,7 +2226,7 @@ The `anti` tool has twelve commands.
 | `anti run` | Builds for the host and runs what it wrote, with the options of `build` that apply to the host. |
 | `anti sdk export` | Packs the stubs and the version of Apple's SDK into `apple-sdk-<version>.tar.xz`, on a Mac. |
 | `anti sdk import <bundle>` | Unpacks that bundle into the sysroot of Anti on any host, for a program that names a framework. |
-| `anti test` | Compiles each module with `--tests`, writes the runner, links it and runs it. `--release` and `--memory-checks`. In a project without `-I` it writes or reuses the library files of the modules of the project first, and without a file it tests every module of `src/` that declares a test. |
+| `anti test` | Compiles each module with `--tests`, writes the runner, links it and runs it. `--release` and `--memory-checks`. In a project without `-I` it writes or reuses the library files of the modules of the project first, of the release build with `--release`, and without a file it tests every module of `src/` that declares a test. |
 | `anti check` | The front end on every source, the `anti` blocks of the doc comments, the doc warnings and the formatting, in that order. `--targets all` and `--warn-undocumented`. |
 | `anti doc` | One page per module and an index, as HTML or with `--markdown`. `--dev` and `--private` read the syntax tree for the private items and the notes. |
 | `anti fmt` | Writes the canonical form of each file, and `--check` reports a file that differs. |

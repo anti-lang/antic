@@ -58,8 +58,8 @@ struct build_request {
     enum { BUILD_NOTICE_BUILD, BUILD_NOTICE_WRITE, BUILD_NOTICE_PRINT } notice;
     /* DESIGN: Q4 of "Answers of 2026-11-06, second set" in
        docs/decisions.md. `anti test` of a project writes or reuses the
-       library file of every module of the project, as a dev build does,
-       and links nothing. The build then fills tested. NULL for every
+       library file of every module of the project, as a build of its mode
+       does, and links nothing. The build then fills tested. NULL for every
        other build. */
     struct build_tested *tested;
 };
