@@ -10,6 +10,12 @@
 #   tests/bench/ablate/run.py map_work --table D
 #   tests/bench/ablate/run.py mixed_work -- --no-hooks
 #   tests/bench/ablate/run.py map_work -- --lto=full --lto=thin
+#   tests/bench/ablate/run.py float_work opt_nan_ops.py \
+#       --option=--target --option=macos-x86_64
+#
+# The program is a name of tests/bench or of this directory, or the path
+# of an .anti file. --option gives one word of antic that every build
+# takes, the baseline among them, such as a target or a search root.
 #
 # A build is a list of words. A word that starts with `-` is an option of
 # antic, and `--name=value` passes `--name` and `value`, for an option
@@ -83,7 +89,7 @@ class Build:
         self.times = []
 
     def compile(self, args, source, output):
-        command = [args.antic] + self.options
+        command = [args.antic] + args.option + self.options
         env = dict(os.environ)
         if self.wrappers:
             command += ["--opt", self.wrappers[0]]
@@ -123,6 +129,8 @@ def size(path):
 
 
 def find_program(name):
+    if name.endswith(".anti") and os.path.isfile(name):
+        return os.path.abspath(name)
     for directory in (BENCH, HERE):
         path = os.path.join(directory, name + ".anti")
         if os.path.isfile(path):
@@ -147,6 +155,9 @@ def main():
     parser.add_argument("--twin", action="append", default=[],
                         help="another C program bench_<name> to time")
     parser.add_argument("--work", help="a directory under build/ for builds")
+    parser.add_argument("--option", action="append", default=[],
+                        help="an option of antic that every build takes, "
+                             "the baseline among them, one word each")
     parser.add_argument("--runs", type=int, default=15)
     parser.add_argument("--compiles", type=int, default=3)
     parser.add_argument("--output", help="a file that receives the tables")
@@ -154,8 +165,9 @@ def main():
     args.antic = os.path.abspath(args.antic)
     args.runtime = os.path.abspath(args.runtime)
     source = find_program(args.program)
+    name = os.path.splitext(os.path.basename(args.program))[0]
     work = os.path.abspath(args.work or os.path.join(
-        ROOT, "build", "ablate", args.program))
+        ROOT, "build", "ablate", name))
     os.makedirs(work, exist_ok=True)
 
     specs = list(args.builds)
@@ -169,12 +181,12 @@ def main():
     outputs = {}
     for _ in range(args.compiles):
         for b in builds:
-            output = os.path.join(work, "%d" % b.index, args.program)
+            output = os.path.join(work, "%d" % b.index, name)
             os.makedirs(os.path.dirname(output), exist_ok=True)
             b.compile(args, source, output)
             outputs[b.index] = output
 
-    twin_path = os.path.join(args.c_dir, "bench_" + args.program + EXE)
+    twin_path = os.path.join(args.c_dir, "bench_" + name + EXE)
     has_twin = os.path.isfile(twin_path)
     others = [("C twin", twin_path, [])] if has_twin else []
     for name in twins:
@@ -207,7 +219,7 @@ def main():
     base = builds[0].times
     c_times = others[0][2] if has_twin else None
     lines = ["%s, %d runs each, prints %s" % (
-        args.program, args.runs, reference.decode().strip()), ""]
+        name, args.runs, reference.decode().strip()), ""]
     if c_times is not None:
         lines += ["| Build | Median | Anti / C | To baseline |",
                   "|---|---:|---:|---:|"]

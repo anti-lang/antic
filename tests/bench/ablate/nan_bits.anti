@@ -1,0 +1,81 @@
+//! The bits of the NaN that each kind of operation makes, one line per
+//! operation, for "One NaN on every target" in docs/notes/math.md. Every input
+//! is read at run time, so the compiler computes no line from constants,
+//! although it may drop an operation such as `n * 1`.
+
+import anti.math;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Bits32
+{
+	f: f32,
+	u: u32,
+}
+
+union Bits64
+{
+	f: f64,
+	u: u64,
+}
+
+fn show32(name: str, x: f32)
+{
+	let b = Bits32 { f: x };
+	printf("%-28.*s %08x\n".ptr, name.len as c_int, name.ptr, b.u);
+}
+
+fn show64(name: str, x: f64)
+{
+	let b = Bits64 { f: x };
+	printf("%-28.*s %016llx\n".ptr, name.len as c_int, name.ptr, b.u);
+}
+
+fn from32(u: u32) -> f32
+{
+	let b = Bits32 { u: u };
+	return b.f;
+}
+
+fn main(args: []str) -> int
+{
+	let zero: f32 = args.len as f32 - 1.0;
+	let inf: f32 = 1.0 / zero;
+	let k = args.len as u32;
+	let p = from32(0x7fc00000 + k);
+	let n = from32(0xffc00001 + k);
+	show32("0/0", zero / zero);
+	show32("inf - inf", inf - inf);
+	show32("0 * inf", zero * inf);
+	show32("sqrt(-1)", math.sqrt(zero - 1.0));
+	show32("log(-1)", math.log(zero - 1.0));
+	show32("sin(inf)", math.sin(inf));
+	show32("asin(2)", math.asin(zero + 2.0));
+	show32("pow(-1, 0.5)", math.pow(zero - 1.0, 0.5));
+	show32("fmod(1, 0)", math.fmod(zero + 1.0, zero));
+	show32("p + n", p + n);
+	show32("n + p", n + p);
+	show32("p + 1", p + 1.0);
+	show32("n * 1", n * 1.0);
+	show32("min(p, n)", math.min(p, n));
+	show32("max(n, p)", math.max(n, p));
+	show32("-p", -p);
+	show32("abs(n)", math.abs(n));
+	show32("sin(n)", math.sin(n));
+	show32("floor(n)", math.floor(n));
+	show64("0/0 as f64", (zero / zero) as f64);
+	show64("n as f64", n as f64);
+	let d: f64 = zero as f64;
+	show32("(0/0 f64) as f32", (d / d) as f32);
+	show64("0/0 f64", d / d);
+	let q = zero / zero;
+	let i = q as i32;
+	printf("%-28s %d\n".ptr, "0/0 as i32".ptr, i);
+	let one: f32 = 1.0;
+	let c = math.copysign(one, q);
+	show32("copysign(1, 0/0)", c);
+	let h: f16 = (zero / zero) as f16;
+	let back: f32 = h;
+	show32("0/0 as f16 as f32", back);
+	return 0;
+}

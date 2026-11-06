@@ -1,0 +1,110 @@
+//! The frames of the swaying Pythagoras tree over the Recorder of
+//! anti.graphics, for the measurement of one NaN on every target in
+//! docs/notes/math.md. It is main.anti of pythagoras-tree at 204489d, the copy
+//! in build/pythagoras-tree, with 6000 frames and a printed sum. It needs the
+//! library files of tree.geometry and tree.tuning of that copy under -I, and
+//! `--inject anti.graphics.Display=anti.graphics.Recorder.shared`.
+
+import anti.graphics.{xy};
+import tree.geometry;
+import tree.tuning;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+// PERF DECISION: the frame allocates nothing. The buffer of squares and the
+// colours of every level are made once before the loop, and a frame rewrites
+// the squares in place. The tree is a function of the time alone, so a frame
+// computes it once and needs no fixed step. The layout changes with the shape
+// of the window alone, so a frame computes it only when the visible part of
+// the square differs from the one it was computed for.
+
+// DESIGN: the layout is computed in units of the visible rectangle, which
+// `f.bounds` gives in units of the square, and drawn on the canvas moved to
+// its top left corner. The tree then fills the window as it did in pixels.
+// F switches to a borderless window the size of the monitor.
+
+fn color(c: tuning.Rgb, alpha: u8) -> graphics.Color
+{
+	return graphics.Color { r: c.r, g: c.g, b: c.b, a: alpha };
+}
+
+fn v(p: geometry.Point) -> graphics.Vec2
+{
+	return xy(p.x, p.y);
+}
+
+// a, b, c, d of a square run counter-clockwise on the screen, and the
+// canvas fills a triangle whatever order its corners take.
+fn draw(f: graphics.Canvas, s: *geometry.Square, fill: graphics.Color,
+	edge: graphics.Color, outline: f32)
+{
+	f.triangle(v(s.a), v(s.b), v(s.c), fill);
+	f.triangle(v(s.a), v(s.c), v(s.d), fill);
+	if outline > 0.0 {
+		f.line(v(s.a), v(s.b), outline, edge);
+		f.line(v(s.b), v(s.c), outline, edge);
+		f.line(v(s.c), v(s.d), outline, edge);
+		f.line(v(s.d), v(s.a), outline, edge);
+	}
+}
+
+fn main() -> int
+{
+	let squares: [tuning.SQUARES]geometry.Square = [geometry.blank(); tuning.SQUARES];
+	let angles: [tuning.LEVELS]f32 = [0.0; tuning.LEVELS];
+	let black = graphics.Color { r: 0, g: 0, b: 0, a: 0 };
+	let fills: [tuning.LEVELS + 1]graphics.Color = [black; tuning.LEVELS + 1];
+	let edges: [tuning.LEVELS + 1]graphics.Color = [black; tuning.LEVELS + 1];
+	for k in 0..tuning.LEVELS + 1 {
+		let shade = geometry.shade(k, tuning.LEVELS);
+		fills[k] = color(shade, 255);
+		edges[k] = color(geometry.darker(shade, tuning.OUTLINE_DARKNESS), 255);
+	}
+	let sky_top = color(tuning.SKY_TOP, 255);
+	let sky_bottom = color(tuning.SKY_BOTTOM, 255);
+	let glow = color(tuning.GREEN, tuning.GLOW_ALPHA);
+	let clear = color(tuning.GREEN, 0);
+
+	let r = graphics.Recorder.shared();
+	r.frames = 6000;
+	let total: f64 = 0.0;
+	let w = graphics.open("Pythagoras tree") catch e {
+		e.fatal();
+	};
+	w.set_target_fps(60);
+
+	let shown = graphics.Rect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 };
+	let layout = geometry.fit(1.0, 1.0);
+	for f in w.frames() {
+		if w.key_pressed(graphics.Key.F) {
+			w.toggle_borderless();
+		}
+		if f.bounds.width != shown.width || f.bounds.height != shown.height {
+			shown = f.bounds;
+			layout = geometry.fit(shown.width, shown.height);
+		}
+
+		let t = w.time() as f32;
+		for k in 0..tuning.LEVELS {
+			angles[k] = geometry.sway(k, t);
+		}
+		let n = geometry.grow(squares[0..tuning.SQUARES], angles[0..tuning.LEVELS],
+			layout.base, layout.trunk);
+
+		f.rect_gradient_v(f.bounds, sky_top, sky_bottom);
+		let c = f.move(f.bounds.x, f.bounds.y);
+		c.circle_gradient(v(layout.glow), layout.glow_radius, glow, clear);
+		let outline = tuning.OUTLINE_WIDTH * f.pixel;
+		for i in 0..n {
+			let depth = squares[i].depth;
+			let edge: f32 = 0.0;
+			if depth < tuning.OUTLINED {
+				edge = outline;
+			}
+			draw(c, &squares[i], fills[depth], edges[depth], edge);
+			total = total + squares[i].c.x as f64 + squares[i].c.y as f64;
+		}
+	}
+	printf("%lld %.3f\n".ptr, r.count(graphics.Shape.Triangle), total);
+	return 0;
+}

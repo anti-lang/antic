@@ -1,0 +1,70 @@
+//! Float work for the measurement of one NaN on every target, which "One NaN on
+//! every target" in docs/notes/math.md reports. Particles fall towards the
+//! origin in `f32`, with a square root and a division per particle and step,
+//! and a series of `f64` calls `math.sin` and `math.cos`. Every step stores its
+//! results in memory, and the program prints a sum of each part.
+
+import anti.math;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Fill `s` with numbers from -1 to 1 of a xorshift generator.
+fn fill(s: []f32, seed: u64)
+{
+	let x = seed;
+	for i in 0..s.len {
+		x = x ^ (x <<% 13);
+		x = x ^ (x >> 7);
+		x = x ^ (x <<% 17);
+		s[i] = ((x >> 40) as f32) / 8388608.0 - 1.0;
+	}
+}
+
+/// One step of `dt` of every particle towards the origin.
+fn step(px: []f32, py: []f32, vx: []f32, vy: []f32, dt: f32)
+{
+	for i in 0..px.len {
+		let x = px[i];
+		let y = py[i];
+		let r2 = x * x + y * y + 0.01;
+		let inv = 1.0 / (r2 * math.sqrt(r2));
+		let ax = vx[i] - x * inv * dt;
+		let ay = vy[i] - y * inv * dt;
+		vx[i] = ax;
+		vy[i] = ay;
+		px[i] = x + ax * dt;
+		py[i] = y + ay * dt;
+	}
+}
+
+/// The sum of `sin(k x) cos(x) / (1 + k)` for k below `n`.
+fn series(n: int, x: f64) -> f64
+{
+	let total: f64 = 0.0;
+	for k in 0..n {
+		let kf = k as f64;
+		total = total + math.sin(kf * x) * math.cos(x + kf) / (1.0 + kf);
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let n = 4096;
+	let px: [4096]f32 = [0.0; 4096];
+	let py: [4096]f32 = [0.0; 4096];
+	let vx: [4096]f32 = [0.0; 4096];
+	let vy: [4096]f32 = [0.0; 4096];
+	fill(px[0..n], 88172645463325252);
+	fill(py[0..n], 1442695040888963407);
+	for s in 0..12000 {
+		step(px[0..n], py[0..n], vx[0..n], vy[0..n], 0.0005);
+	}
+	let sum: f64 = 0.0;
+	for i in 0..n {
+		sum = sum + (px[i] as f64) + (py[i] as f64);
+	}
+	let wave = series(12000000, 0.001);
+	printf("%.6f %.9f\n".ptr, sum, wave);
+	return 0;
+}

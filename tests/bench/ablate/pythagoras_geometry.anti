@@ -1,0 +1,31 @@
+//! The computation of the swaying Pythagoras tree without a window, for the
+//! measurement of one NaN on every target in docs/notes/math.md. Every frame
+//! sways the twelve levels and grows the 8191 squares, as main.anti of
+//! pythagoras-tree does. It needs the library files of tree.geometry and
+//! tree.tuning of the copy in build/pythagoras-tree under -I.
+
+import tree.geometry;
+import tree.tuning;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let squares: [tuning.SQUARES]geometry.Square = [geometry.blank(); tuning.SQUARES];
+	let angles: [tuning.LEVELS]f32 = [0.0; tuning.LEVELS];
+	let layout = geometry.fit(1.7777778, 1.0);
+	let total: f64 = 0.0;
+	for frame in 0..6000 {
+		let t = frame as f32 / 60.0;
+		for k in 0..tuning.LEVELS {
+			angles[k] = geometry.sway(k, t);
+		}
+		let n = geometry.grow(squares[0..tuning.SQUARES], angles[0..tuning.LEVELS],
+			layout.base, layout.trunk);
+		for i in 0..n {
+			total = total + squares[i].c.x as f64 + squares[i].c.y as f64;
+		}
+	}
+	printf("%.3f\n".ptr, total);
+	return 0;
+}
