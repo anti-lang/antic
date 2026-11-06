@@ -7,13 +7,18 @@
 # of licenses/sources.txt of the runtime archive, and the text of
 # licenses/ follows `text for <name>` with the line of the record after it
 # as `source <line>`. `anti license --from` prints the notice of the
-# program, and NOTICE.txt beside it in dist/ holds the same. Run with
-# cmake -P and these values:
+# program, and NOTICE.txt beside it in dist/ holds the same. A program of
+# anti.math names musl, whose libm the runtime carries, for every target,
+# by Q2 of "Answers of 2026-11-06", with the version of MUSL_VERSION and
+# the text of licenses/musl.txt. On macOS and Windows the app names no
+# musl. Run with cmake -P and these values:
 #   ANTI     the anti executable
 #   RUNTIME  the runtime archive
 #   FIXTURE  tests/anti-build
 #   RAYLIB   tests/std/raylib.anti, a program of anti.raylib
 #   HOST     the target name of this host
+#   TARGETS  the targets of the runtime archive, separated by commas
+#   MUSL_VERSION  the version of musl of tools/sysroot-pins
 #   WORK     a directory this run writes into
 
 cmake_minimum_required(VERSION 3.21)
@@ -47,7 +52,18 @@ fn main() -> int
 	return 1;
 }
 ")
+write_bytes("${WORK}/sine.anti" "//! A program of anti.math.
+
+import anti.math;
+
+fn main() -> int
+{
+	let x: f32 = 0.0;
+	return math.sin(x) as int;
+}
+")
 project_of(pattern "${WORK}/pattern.anti")
+project_of(sine "${WORK}/sine.anti")
 project_of(game "${RAYLIB}")
 
 set(identifier_pcre2 "BSD-3-Clause WITH PCRE2-exception")
@@ -118,3 +134,45 @@ endfunction()
 check_notice(pattern pcre2)
 check_notice(game raylib miniaudio)
 check_notice(app)
+
+# The notice of a program of anti.math for every target names musl with
+# its text. Without anti.math only a program of musl names it.
+file(READ "${RUNTIME}/licenses/musl.txt" text_musl)
+if(NOT text_musl MATCHES "\n$")
+    string(APPEND text_musl "\n")
+endif()
+string(REPLACE "," ";" targets "${TARGETS}")
+foreach(target IN LISTS targets)
+    foreach(project sine app)
+        anti_run(status out err "${WORK}/${project}" build --runtime
+                 "${RUNTIME}" --target "${target}")
+        if(NOT status EQUAL 0)
+            message(FATAL_ERROR "anti build of ${project} for ${target} "
+                                "failed with ${status}\n${out}${err}")
+        endif()
+        set(program "${WORK}/${project}/dist/${target}/dev/${project}")
+        if(target MATCHES "^windows-")
+            string(APPEND program ".exe")
+        endif()
+        execute_process(COMMAND "${ANTI}" license --from "${program}"
+                                --runtime "${RUNTIME}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE notice ERROR_VARIABLE err
+            ENCODING NONE)
+        if(NOT status EQUAL 0)
+            message(FATAL_ERROR "anti license --from ${program} failed with "
+                                "${status}\n${notice}${err}")
+        endif()
+        string(FIND "${notice}" "\npackage musl ${MUSL_VERSION} MIT\n" line_at)
+        string(FIND "${notice}" "\ntext for musl\n${text_musl}" text_at)
+        if(project STREQUAL "sine" OR target MATCHES "^linux-")
+            if(line_at EQUAL -1 OR text_at EQUAL -1)
+                message(FATAL_ERROR "the notice of ${project} for ${target} "
+                                    "lacks `package musl ${MUSL_VERSION} MIT` "
+                                    "or its text\n${notice}")
+            endif()
+        elseif(NOT line_at EQUAL -1)
+            message(FATAL_ERROR "the notice of ${project} for ${target} names "
+                                "musl, which it does not link\n${notice}")
+        endif()
+    endforeach()
+endforeach()

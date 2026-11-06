@@ -1,0 +1,1 @@
+generics_float_refuses_a_conversion_to_bool.anti:6:9: error: cannot convert `T` to `bool`

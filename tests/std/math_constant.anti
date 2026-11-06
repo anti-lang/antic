@@ -1,0 +1,74 @@
+//! A function of anti.math on a constant gives the bits it gives on the same
+//! value read at run time. The value at run time comes from the length of the
+//! arguments, which no build knows, so neither antic nor LLVM folds the call
+//! there, while a build may fold the call on the constant.
+import anti.io;
+import anti.math;
+
+union Bits32
+{
+	value: f32,
+	bits: u32,
+}
+
+union Bits64
+{
+	value: f64,
+	bits: u64,
+}
+
+fn same32(name: str, folded: f32, computed: f32)
+{
+	let a = Bits32 { value: folded };
+	let b = Bits32 { value: computed };
+	if a.bits == b.bits {
+		io.print(name);
+		io.println(" f32 same");
+	} else {
+		io.print(name);
+		io.println(" f32 differs");
+	}
+}
+
+fn same64(name: str, folded: f64, computed: f64)
+{
+	let a = Bits64 { value: folded };
+	let b = Bits64 { value: computed };
+	if a.bits == b.bits {
+		io.print(name);
+		io.println(" f64 same");
+	} else {
+		io.print(name);
+		io.println(" f64 differs");
+	}
+}
+
+fn main(argv: []str) -> int
+{
+	// One at run time: the length less itself less one.
+	let one64 = argv.len as f64 - (argv.len - 1) as f64;
+	let one32 = argv.len as f32 - (argv.len - 1) as f32;
+	let x32 = one32 * 0.7;
+	let x64 = one64 * 0.7;
+	let c32: f32 = 0.7;
+	let c64: f64 = 0.7;
+	same32("sin", math.sin(c32), math.sin(x32));
+	same64("sin", math.sin(c64), math.sin(x64));
+	same32("cos", math.cos(c32), math.cos(x32));
+	same64("cos", math.cos(c64), math.cos(x64));
+	same32("tan", math.tan(c32), math.tan(x32));
+	same64("tan", math.tan(c64), math.tan(x64));
+	same32("exp", math.exp(c32), math.exp(x32));
+	same64("exp", math.exp(c64), math.exp(x64));
+	same32("log", math.log(c32), math.log(x32));
+	same64("log", math.log(c64), math.log(x64));
+	same32("pow", math.pow(c32, c32), math.pow(x32, x32));
+	same64("pow", math.pow(c64, c64), math.pow(x64, x64));
+	same32("sqrt", math.sqrt(c32), math.sqrt(x32));
+	same64("sqrt", math.sqrt(c64), math.sqrt(x64));
+	same32("atan2", math.atan2(c32, c32), math.atan2(x32, x32));
+	same64("atan2", math.atan2(c64, c64), math.atan2(x64, x64));
+	same32("floor", math.floor(c32), math.floor(x32));
+	same64("floor", math.floor(c64), math.floor(x64));
+	return 0;
+}

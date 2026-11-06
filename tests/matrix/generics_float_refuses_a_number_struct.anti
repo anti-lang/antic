@@ -1,0 +1,26 @@
+//! A struct with the hooks of `Number` meets `Number` and is no `Float`, whose
+//! set is closed.
+
+struct Fixed
+{
+	raw: int,
+}
+
+operator fn add(a: Fixed, b: Fixed) -> Fixed { return Fixed { raw: a.raw + b.raw }; }
+operator fn sub(a: Fixed, b: Fixed) -> Fixed { return Fixed { raw: a.raw - b.raw }; }
+operator fn mul(a: Fixed, b: Fixed) -> Fixed { return Fixed { raw: a.raw * b.raw }; }
+operator fn div(a: Fixed, b: Fixed) -> Fixed { return Fixed { raw: a.raw / b.raw }; }
+operator fn neg(a: Fixed) -> Fixed { return Fixed { raw: -a.raw }; }
+operator fn lt(a: Fixed, b: Fixed) -> bool { return a.raw < b.raw; }
+operator fn eq(a: Fixed, b: Fixed) -> bool { return a.raw == b.raw; }
+
+fn twice<T: Float>(x: T) -> T
+{
+	return x + x;
+}
+
+fn main() -> int
+{
+	let f = twice(Fixed { raw: 2 });
+	return f.raw as int;
+}

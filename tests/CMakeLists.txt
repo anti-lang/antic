@@ -1041,6 +1041,18 @@ if(ANTIC_EMULATED_TARGET)
             ${emulator}
             WORK "${CMAKE_CURRENT_BINARY_DIR}/programs-x86_64")
     endforeach()
+    # anti.math on the emulated target, against the expected file of the
+    # host, so both processors give the same bits for every function, by
+    # Q2 of "Answers of 2026-11-06". On the Mac that is macos-x86_64 at v1
+    # under Rosetta, where the four roundings call the libm of musl.
+    foreach(name math math_constant)
+        antic_program_test(std_${name}_${emulated}
+            "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+            OPTIONS "${ANTIC_X86_64_OPTIONS}"
+            EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.expected"
+            ${emulator}
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/std-x86_64")
+    endforeach()
     # The programs of dev mode above, and those of the wide operations.
     foreach(name IN ITEMS return42 return_pieces deep_nesting long_float simd
             flags saturating mul_high carry_chain wrapping)
@@ -1177,6 +1189,20 @@ antic_program_test(std_raylib_math_dev
     OPTIONS "--dev"
     DEV lang raylib
     WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
+# anti.math in dev mode, where every call is the call of a copy in the
+# program, against the reference values of the release build. The libm of
+# musl stands in the runtime, which the dev link takes as well.
+foreach(name math math_constant)
+    set(source "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti")
+    antic_dev_imports(modules "${source}")
+    foreach(module IN LISTS modules)
+        antic_dev_object(${module})
+    endforeach()
+    antic_program_test(std_${name}_dev "${source}"
+        OPTIONS "--dev"
+        DEV ${modules}
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-dev")
+endforeach()
 
 # The cases of fault injection of tests/programs/ and tests/std/. A file
 # <name>.faults beside <name>.anti holds one case per line, its name and
@@ -2159,6 +2185,18 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
             -P "${ANTIC_RUNNERS}/run_program.cmake")
     set_tests_properties(std_raylib_math_memory_checks PROPERTIES
         TIMEOUT 120)
+    # anti.math under --memory-checks, against the reference values.
+    foreach(name math math_constant)
+        add_test(NAME std_${name}_memory_checks
+            COMMAND "${CMAKE_COMMAND}"
+                ${ANTIC_AND_RUNTIME}
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.anti"
+                "-DOPTIONS=--memory-checks"
+                "-DOBJECTS="
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
+                -P "${ANTIC_RUNNERS}/run_program.cmake")
+        set_tests_properties(std_${name}_memory_checks PROPERTIES TIMEOUT 120)
+    endforeach()
 endif()
 # DESIGN: the runtime of AddressSanitizer for x86_64 stops under
 # qemu-x86_64, in its allocator, and under the x64 emulation of Windows,
@@ -6587,7 +6625,15 @@ set_tests_properties(license_notice PROPERTIES TIMEOUT 120
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # A program of anti.regex names PCRE2 in its notice, one of anti.raylib
-# names raylib and miniaudio, and one of neither names none of them.
+# names raylib and miniaudio, and one of neither names none of them. A
+# program of anti.math names musl for every target of the archive.
+set(antic_notice_targets "")
+foreach(target IN LISTS ANTIC_TARGETS)
+    if(EXISTS "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
+        list(APPEND antic_notice_targets "${target}")
+    endif()
+endforeach()
+list(JOIN antic_notice_targets "," antic_notice_targets)
 add_test(NAME license_notice_native
     COMMAND "${CMAKE_COMMAND}"
         "-DANTI=$<TARGET_FILE:anti>"
@@ -6595,9 +6641,11 @@ add_test(NAME license_notice_native
         "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-build"
         "-DRAYLIB=${CMAKE_CURRENT_SOURCE_DIR}/std/raylib.anti"
         "-DHOST=${ANTIC_HOST_TARGET}"
+        "-DTARGETS=${antic_notice_targets}"
+        "-DMUSL_VERSION=${ANTIC_MUSL_VERSION}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/license-notice-native"
         -P "${ANTIC_RUNNERS}/run_license_native.cmake")
-set_tests_properties(license_notice_native PROPERTIES TIMEOUT 180)
+set_tests_properties(license_notice_native PROPERTIES TIMEOUT 400)
 
 # The four forms of `anti license` beside --from, one test each: the
 # plain form over licenses/ of the runtime archive, --project over a

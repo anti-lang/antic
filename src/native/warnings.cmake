@@ -43,3 +43,16 @@ set(ANTIC_RAYLIB_WARNINGS_macos -DGL_SILENCE_DEPRECATION)
 # also its C++ compiler here.
 set(ANTIC_MIMALLOC_WARNINGS -Wall -Wextra -Wpedantic -Wno-deprecated
     -Wno-unknown-pragmas -Wstrict-prototypes -Wno-static-in-inline)
+
+# The libm of musl. The warnings of CFLAGS_AUTO that its configure adds
+# for clang, which tests each flag and keeps the ones clang takes: -w
+# first, then the errors and the warnings after it. clang refuses
+# -Werror=discarded-qualifiers and -Werror=discarded-array-qualifiers,
+# which configure therefore leaves out.
+set(ANTIC_LIBM_WARNINGS -w -Wno-pointer-to-int-cast
+    -Werror=implicit-function-declaration -Werror=implicit-int
+    -Werror=pointer-sign -Werror=pointer-arith -Werror=int-conversion
+    -Werror=incompatible-pointer-types -Waddress -Warray-bounds
+    -Wchar-subscripts -Wduplicate-decl-specifier -Winit-self -Wreturn-type
+    -Wsequence-point -Wstrict-aliasing -Wunused-function -Wunused-label
+    -Wunused-variable)

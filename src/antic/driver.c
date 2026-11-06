@@ -1064,7 +1064,7 @@ bool driver_runtime_packages(const char *runtime, bool musl,
     bool ok = archive_package(runtime, RUNTIME_MODULE, RUNTIME_LICENSE_NAME,
                               ANTIC_VERSION, arena, &out[n++]);
 
-    if (ok && musl) {
+    if (ok && (musl || (natives & DRIVER_NATIVE_LIBM) != 0)) {
         ok = archive_package(runtime, MUSL_PACKAGE, MUSL_PACKAGE,
                              ANTIC_MUSL_VERSION, arena, &out[n++]);
     }
@@ -1094,7 +1094,9 @@ bool driver_runtime_packages(const char *runtime, bool musl,
    binary, and every program of musl links both. Eddie decided on
    2026-10-08 that its notice names them, each with the version of its
    pin and the text of the runtime archive. A program of the glibc mode
-   and of any other target links neither and names neither. */
+   and of any other target links neither and names neither. A program of
+   anti.math names musl on every target, since the runtime carries the
+   libm of musl, by Q2 of "Answers of 2026-11-06". */
 static bool build_notice(const struct options *o,
                          const struct extras *extras, struct arena *arena,
                          struct text *out)
@@ -1105,7 +1107,8 @@ static bool build_notice(const struct options *o,
     struct package archive[DRIVER_RUNTIME_PACKAGES];
     bool musl = driver_links_musl(o, extras);
     unsigned natives = (extras->regex ? DRIVER_NATIVE_PCRE2 : 0u) |
-                       (extras->raylib ? DRIVER_NATIVE_RAYLIB : 0u);
+                       (extras->raylib ? DRIVER_NATIVE_RAYLIB : 0u) |
+                       (extras->math ? DRIVER_NATIVE_LIBM : 0u);
     size_t archived = 0;
     size_t n = 0;
     size_t i;
@@ -1195,8 +1198,10 @@ static int back_end(const struct options *o, struct module *tree,
                 o->input);
         return 1;
     }
-    /* The notice names PCRE2 where the link takes it. */
+    /* The notice names PCRE2 where the link takes it, and musl where
+       the program holds anti.math, by Q2 of "Answers of 2026-11-06". */
     extras->regex = holds_module(program, REGEX_MODULE);
+    extras->math = holds_module(program, MATH_MODULE);
     if (extras->own != NULL &&
         !build_notice(o, extras, program->arena, &extras->notice)) {
         return 1;

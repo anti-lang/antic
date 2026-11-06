@@ -157,12 +157,17 @@ add_test(NAME native_fp_contract
 # target, its bitcode of each mode of LTO, the glue of anti.regex and the
 # runtime of the fault tests. The test stands here, after the glue of
 # pcre2.cmake has recorded its compiles.
-set(antic_runtime_names anti_rt anti_rt_license_stub anti_rt_regex)
+# The libm of musl in the runtime, by Q2 of "Answers of 2026-11-06", is
+# one more library of the runtime in each of the three.
+set(antic_runtime_names anti_rt anti_rt_license_stub anti_rt_regex
+    anti_rt_libm)
 foreach(mode IN LISTS ANTIC_LTO_MODES)
-    list(APPEND antic_runtime_names anti_rt_bitcode_${mode})
+    list(APPEND antic_runtime_names anti_rt_bitcode_${mode}
+        anti_rt_libm_bitcode_${mode})
 endforeach()
 if(ANTIC_FAULTS)
-    list(APPEND antic_runtime_names anti_rt_faults anti_rt_regex_faults)
+    list(APPEND antic_runtime_names anti_rt_faults anti_rt_regex_faults
+        anti_rt_libm_faults)
 endif()
 set(antic_runtime_targets "")
 set(antic_runtime_levels "")
@@ -190,3 +195,51 @@ add_test(NAME runtime_fp_contract
             "-DTARGETS=${antic_runtime_targets}"
             "-DLEVELS=${antic_runtime_levels}"
             -P "${ANTIC_RUNNERS}/run_fp_contract.cmake")
+
+# Every symbol of the libm of musl in the library of the runtime has the
+# prefix anti_rt_libm_, at every level of every target, and so does every
+# symbol that the exact functions of src/rt/libm.c name, by Q2 of
+# "Answers of 2026-11-06" in docs/decisions.md.
+set(antic_libm_libraries "")
+string(REPLACE "," ";" antic_libm_levels "${antic_runtime_levels}")
+foreach(level IN LISTS antic_libm_levels)
+    string(REPLACE "/" ";" parts "${level}")
+    list(GET parts 0 target)
+    antic_static_library(library_name anti_rt "${target}")
+    list(APPEND antic_libm_libraries
+        "${ANTIC_RUNTIME_DIR}/lib/${level}/${library_name}")
+endforeach()
+list(JOIN antic_libm_libraries "," antic_libm_libraries)
+add_test(NAME libm_symbols
+    COMMAND "${CMAKE_COMMAND}"
+        "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}"
+        "-DLIBRARIES=${antic_libm_libraries}"
+        -P "${ANTIC_RUNNERS}/run_libm_symbols.cmake")
+
+# A program of anti.math links for every target, and at v1 for both
+# x86_64 targets, where the four roundings call the libm of musl, and
+# takes no function of a libm of the system.
+foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
+    set(levels "default")
+    if(target MATCHES "x86_64")
+        list(APPEND levels v1)
+    endif()
+    foreach(level IN LISTS levels)
+        set(name math_link_${target})
+        set(option "")
+        if(NOT level STREQUAL "default")
+            set(name math_link_${target}_${level})
+            set(option "-DLEVEL=${level}")
+        endif()
+        add_test(NAME ${name}
+            COMMAND "${CMAKE_COMMAND}" "-DANTIC=$<TARGET_FILE:antic>"
+                "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+                "-DSOURCE=${PROJECT_SOURCE_DIR}/tests/std/math.anti"
+                "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}"
+                "-DREADOBJ=${ANTIC_RUNTIME_DIR}/bin/llvm-readobj${CMAKE_EXECUTABLE_SUFFIX}"
+                "-DTARGET=${target}" ${option}
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/math/${target}-${level}"
+                -P "${ANTIC_RUNNERS}/run_math_link.cmake")
+        set_tests_properties(${name} PROPERTIES TIMEOUT 180)
+    endforeach()
+endforeach()

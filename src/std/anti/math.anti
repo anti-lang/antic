@@ -1,0 +1,398 @@
+//! The functions of the C library, the scalar helpers of raymath and five
+//! constants, for `f32` and `f64`.
+//!
+//! Each function has one generic name over `Float`, which `f32` and `f64` meet,
+//! so `math.sin(a)` takes the type of `a`. Every function gives the result of
+//! the libm of musl, which the runtime carries for all six targets, so every
+//! target gives the same bits. An angle is in radians, as in C and raymath. A
+//! domain error gives NaN, as C gives it, and no function fails or sets errno.
+//! The functions are pure: they allocate nothing, take no lock and may run in a
+//! worker.
+//!
+//! `sqrt`, `floor`, `ceil`, `trunc`, `round`, `abs`, `copysign`, `min` and
+//! `max` are exact in IEEE. Each is one instruction where the target has it,
+//! and the function of musl where it does not.
+
+// DESIGN: the body of each function takes the `f32` function of the
+// runtime where `T` is four bytes and the `f64` one otherwise, since
+// `Float` holds the two alone. The test of `size_of(T)` is a constant of
+// each copy, so a release build keeps the one call.
+extern fn anti_rt_libm_sinf(x: f32) -> f32;
+extern fn anti_rt_libm_sin(x: f64) -> f64;
+extern fn anti_rt_libm_cosf(x: f32) -> f32;
+extern fn anti_rt_libm_cos(x: f64) -> f64;
+extern fn anti_rt_libm_tanf(x: f32) -> f32;
+extern fn anti_rt_libm_tan(x: f64) -> f64;
+extern fn anti_rt_libm_asinf(x: f32) -> f32;
+extern fn anti_rt_libm_asin(x: f64) -> f64;
+extern fn anti_rt_libm_acosf(x: f32) -> f32;
+extern fn anti_rt_libm_acos(x: f64) -> f64;
+extern fn anti_rt_libm_atanf(x: f32) -> f32;
+extern fn anti_rt_libm_atan(x: f64) -> f64;
+extern fn anti_rt_libm_atan2f(y: f32, x: f32) -> f32;
+extern fn anti_rt_libm_atan2(y: f64, x: f64) -> f64;
+extern fn anti_rt_libm_sinhf(x: f32) -> f32;
+extern fn anti_rt_libm_sinh(x: f64) -> f64;
+extern fn anti_rt_libm_coshf(x: f32) -> f32;
+extern fn anti_rt_libm_cosh(x: f64) -> f64;
+extern fn anti_rt_libm_tanhf(x: f32) -> f32;
+extern fn anti_rt_libm_tanh(x: f64) -> f64;
+extern fn anti_rt_libm_cbrtf(x: f32) -> f32;
+extern fn anti_rt_libm_cbrt(x: f64) -> f64;
+extern fn anti_rt_libm_powf(x: f32, y: f32) -> f32;
+extern fn anti_rt_libm_pow(x: f64, y: f64) -> f64;
+extern fn anti_rt_libm_expf(x: f32) -> f32;
+extern fn anti_rt_libm_exp(x: f64) -> f64;
+extern fn anti_rt_libm_exp2f(x: f32) -> f32;
+extern fn anti_rt_libm_exp2(x: f64) -> f64;
+extern fn anti_rt_libm_logf(x: f32) -> f32;
+extern fn anti_rt_libm_log(x: f64) -> f64;
+extern fn anti_rt_libm_log2f(x: f32) -> f32;
+extern fn anti_rt_libm_log2(x: f64) -> f64;
+extern fn anti_rt_libm_log10f(x: f32) -> f32;
+extern fn anti_rt_libm_log10(x: f64) -> f64;
+extern fn anti_rt_libm_hypotf(x: f32, y: f32) -> f32;
+extern fn anti_rt_libm_hypot(x: f64, y: f64) -> f64;
+extern fn anti_rt_libm_fmodf(x: f32, y: f32) -> f32;
+extern fn anti_rt_libm_fmod(x: f64, y: f64) -> f64;
+extern fn anti_rt_sqrtf(x: f32) -> f32;
+extern fn anti_rt_sqrt(x: f64) -> f64;
+extern fn anti_rt_floorf(x: f32) -> f32;
+extern fn anti_rt_floor(x: f64) -> f64;
+extern fn anti_rt_ceilf(x: f32) -> f32;
+extern fn anti_rt_ceil(x: f64) -> f64;
+extern fn anti_rt_truncf(x: f32) -> f32;
+extern fn anti_rt_trunc(x: f64) -> f64;
+extern fn anti_rt_roundf(x: f32) -> f32;
+extern fn anti_rt_round(x: f64) -> f64;
+extern fn anti_rt_fabsf(x: f32) -> f32;
+extern fn anti_rt_fabs(x: f64) -> f64;
+extern fn anti_rt_copysignf(x: f32, y: f32) -> f32;
+extern fn anti_rt_copysign(x: f64, y: f64) -> f64;
+extern fn anti_rt_fminf(x: f32, y: f32) -> f32;
+extern fn anti_rt_fmin(x: f64, y: f64) -> f64;
+extern fn anti_rt_fmaxf(x: f32, y: f32) -> f32;
+extern fn anti_rt_fmax(x: f64, y: f64) -> f64;
+
+/// The ratio of the circumference of a circle to its diameter.
+pub const PI: f32 = 3.14159265358979323846;
+
+/// Twice `PI`, the angle of a whole turn.
+pub const TAU: f32 = 6.28318530717958647692;
+
+/// The base of the natural logarithm.
+pub const E: f32 = 2.71828182845904523536;
+
+/// The radians of one degree, `PI / 180`.
+pub const DEG2RAD: f32 = 0.01745329251994329577;
+
+/// The degrees of one radian, `180 / PI`.
+pub const RAD2DEG: f32 = 57.2957795130823208768;
+
+/// The sine of `x`.
+pub fn sin<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_sinf(x as f32) as T;
+	}
+	return anti_rt_libm_sin(x as f64) as T;
+}
+
+/// The cosine of `x`.
+pub fn cos<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_cosf(x as f32) as T;
+	}
+	return anti_rt_libm_cos(x as f64) as T;
+}
+
+/// The tangent of `x`.
+pub fn tan<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_tanf(x as f32) as T;
+	}
+	return anti_rt_libm_tan(x as f64) as T;
+}
+
+/// The arc sine of `x`, from `-PI / 2` to `PI / 2`, and NaN outside `-1..1`.
+pub fn asin<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_asinf(x as f32) as T;
+	}
+	return anti_rt_libm_asin(x as f64) as T;
+}
+
+/// The arc cosine of `x`, from 0 to `PI`, and NaN outside `-1..1`.
+pub fn acos<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_acosf(x as f32) as T;
+	}
+	return anti_rt_libm_acos(x as f64) as T;
+}
+
+/// The arc tangent of `x`, from `-PI / 2` to `PI / 2`.
+pub fn atan<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_atanf(x as f32) as T;
+	}
+	return anti_rt_libm_atan(x as f64) as T;
+}
+
+/// The angle of the point `(x, y)`, from `-PI` to `PI`.
+pub fn atan2<T: Float>(y: T, x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_atan2f(y as f32, x as f32) as T;
+	}
+	return anti_rt_libm_atan2(y as f64, x as f64) as T;
+}
+
+/// The hyperbolic sine of `x`.
+pub fn sinh<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_sinhf(x as f32) as T;
+	}
+	return anti_rt_libm_sinh(x as f64) as T;
+}
+
+/// The hyperbolic cosine of `x`.
+pub fn cosh<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_coshf(x as f32) as T;
+	}
+	return anti_rt_libm_cosh(x as f64) as T;
+}
+
+/// The hyperbolic tangent of `x`.
+pub fn tanh<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_tanhf(x as f32) as T;
+	}
+	return anti_rt_libm_tanh(x as f64) as T;
+}
+
+/// The square root of `x`, and NaN below zero.
+pub fn sqrt<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_sqrtf(x as f32) as T;
+	}
+	return anti_rt_sqrt(x as f64) as T;
+}
+
+/// The cube root of `x`.
+pub fn cbrt<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_cbrtf(x as f32) as T;
+	}
+	return anti_rt_libm_cbrt(x as f64) as T;
+}
+
+/// `x` to the power `y`.
+pub fn pow<T: Float>(x: T, y: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_powf(x as f32, y as f32) as T;
+	}
+	return anti_rt_libm_pow(x as f64, y as f64) as T;
+}
+
+/// `E` to the power `x`.
+pub fn exp<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_expf(x as f32) as T;
+	}
+	return anti_rt_libm_exp(x as f64) as T;
+}
+
+/// 2 to the power `x`.
+pub fn exp2<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_exp2f(x as f32) as T;
+	}
+	return anti_rt_libm_exp2(x as f64) as T;
+}
+
+/// The natural logarithm of `x`, and NaN below zero.
+pub fn log<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_logf(x as f32) as T;
+	}
+	return anti_rt_libm_log(x as f64) as T;
+}
+
+/// The logarithm of `x` to base 2, and NaN below zero.
+pub fn log2<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_log2f(x as f32) as T;
+	}
+	return anti_rt_libm_log2(x as f64) as T;
+}
+
+/// The logarithm of `x` to base 10, and NaN below zero.
+pub fn log10<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_log10f(x as f32) as T;
+	}
+	return anti_rt_libm_log10(x as f64) as T;
+}
+
+/// The length of the vector `(x, y)`, without an overflow on the way.
+pub fn hypot<T: Float>(x: T, y: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_hypotf(x as f32, y as f32) as T;
+	}
+	return anti_rt_libm_hypot(x as f64, y as f64) as T;
+}
+
+/// The largest whole number not above `x`.
+pub fn floor<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_floorf(x as f32) as T;
+	}
+	return anti_rt_floor(x as f64) as T;
+}
+
+/// The smallest whole number not below `x`.
+pub fn ceil<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_ceilf(x as f32) as T;
+	}
+	return anti_rt_ceil(x as f64) as T;
+}
+
+/// The whole number nearest to `x`, with a half away from zero.
+pub fn round<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_roundf(x as f32) as T;
+	}
+	return anti_rt_round(x as f64) as T;
+}
+
+/// `x` without its fraction, the whole number toward zero.
+pub fn trunc<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_truncf(x as f32) as T;
+	}
+	return anti_rt_trunc(x as f64) as T;
+}
+
+/// The remainder of `x / y` with the sign of `x`, and NaN where `y` is 0.
+pub fn fmod<T: Float>(x: T, y: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_libm_fmodf(x as f32, y as f32) as T;
+	}
+	return anti_rt_libm_fmod(x as f64, y as f64) as T;
+}
+
+/// `x` without its sign.
+pub fn abs<T: Float>(x: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_fabsf(x as f32) as T;
+	}
+	return anti_rt_fabs(x as f64) as T;
+}
+
+/// The smaller of `x` and `y`, where -0 is below +0.
+///
+/// A NaN gives the other value, and two NaN give NaN.
+pub fn min<T: Float>(x: T, y: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_fminf(x as f32, y as f32) as T;
+	}
+	return anti_rt_fmin(x as f64, y as f64) as T;
+}
+
+/// The larger of `x` and `y`, where +0 is above -0.
+///
+/// A NaN gives the other value, and two NaN give NaN.
+pub fn max<T: Float>(x: T, y: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_fmaxf(x as f32, y as f32) as T;
+	}
+	return anti_rt_fmax(x as f64, y as f64) as T;
+}
+
+/// `x` with the sign of `y`.
+pub fn copysign<T: Float>(x: T, y: T) -> T
+{
+	if size_of(T) == 4 {
+		return anti_rt_copysignf(x as f32, y as f32) as T;
+	}
+	return anti_rt_copysign(x as f64, y as f64) as T;
+}
+
+/// Whether `x` is NaN.
+pub fn is_nan<T: Float>(x: T) -> bool
+{
+	return x != x;
+}
+
+/// Whether `x` is infinite, of either sign.
+pub fn is_inf<T: Float>(x: T) -> bool
+{
+	// x - x is NaN for an infinity and 0 for every finite value.
+	let d = x - x;
+	return x == x && d != d;
+}
+
+/// `x` limited to `lo..hi`, as Clamp of raymath.
+pub fn clamp<T: Float>(x: T, lo: T, hi: T) -> T
+{
+	let result = dup(x);
+	if x < lo {
+		result = dup(lo);
+	}
+	if result > hi {
+		result = dup(hi);
+	}
+	return result;
+}
+
+/// The value a part `t` of the way from `a` to `b`, as Lerp of raymath.
+pub fn lerp<T: Float>(a: T, b: T, t: T) -> T
+{
+	return a + t * (b - a);
+}
+
+/// Where `x` stands in `lo..hi`, from 0 to 1, as Normalize of raymath.
+pub fn normalize<T: Float>(x: T, lo: T, hi: T) -> T
+{
+	return (x - lo) / (hi - lo);
+}
+
+/// `x` moved from the range `a0..a1` to the range `b0..b1`, as Remap of
+/// raymath.
+pub fn remap<T: Float>(x: T, a0: T, a1: T, b0: T, b1: T) -> T
+{
+	return (x - a0) / (a1 - a0) * (b1 - b0) + b0;
+}
+
+/// `x` wrapped into `lo..hi`, as Wrap of raymath.
+pub fn wrap<T: Float>(x: T, lo: T, hi: T) -> T
+{
+	return x - (hi - lo) * floor((x - lo) / (hi - lo));
+}

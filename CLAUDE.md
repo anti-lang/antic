@@ -863,8 +863,8 @@ reports what it finished.
   `anti.error`, `anti.time`, `anti.os`, `anti.fs`, `anti.reflect`,
   `anti.random`, `anti.collection`, `anti.toml`, `anti.config`, `anti.args`,
   `anti.json`, `anti.log`, `anti.debug`, `anti.mem`, `anti.runtime`,
-  `anti.simd`, `anti.trace`, `anti.plugin` and `anti.regex`, and the
-  collection modules under `anti.collection`. The build adds `anti.raylib`
+  `anti.simd`, `anti.trace`, `anti.plugin`, `anti.regex` and `anti.math`,
+  and the collection modules under `anti.collection`. The build adds `anti.raylib`
   to `std/` of the runtime archive.
   `anti.lang` is the root and imports nothing. It holds `Error`,
   `NoneDereference`, `SourceLocation` and `StackTrace`, and `anti.error`
@@ -1207,6 +1207,17 @@ reports what it finished.
   the arguments of the call, and the text is memory of its own that the
   program frees with `free(s.ptr)`. See "Interpolation" in
   `docs/decisions.md`.
+- `anti.math` is built, by Q1 and Q2 of "Answers of 2026-11-06". Each
+  function of the C library and helper of raymath is one generic name over
+  the constraint `Float` of `anti.lang`, which `f32` and `f64` meet, and
+  `PI`, `TAU`, `E`, `DEG2RAD` and `RAD2DEG` are `f32`. The runtime carries
+  the libm of musl at every level of every target, built by
+  `src/native/libm.cmake` with `ANTIC_FP_OPTIONS` under the prefix
+  `anti_rt_libm_`, so every target gives the same bits. The exact
+  functions of `src/rt/libm.c` are one instruction where the level has it.
+  A program of `anti.math` names musl in its notice on every target. See
+  `docs/notes/math.md`. `anti.graphics` is designed in
+  `docs/notes/graphics.md` and not built yet.
 - `f16` is built: sixteen bits in a field, an array, a slice or a variable.
   A read gives an `f32`, a write takes `as f16`, and no operator takes one.
   ARM64 and x86-64-v3 convert in one instruction, and `v1` and `v2` call the

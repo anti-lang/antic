@@ -321,7 +321,7 @@ static struct type *read_param_type(struct reader *r, uint32_t at)
         return NULL;
     }
     t->hooks = antl_get_u32(r);
-    if (t->hooks >> HOOK_BITS != 0) {
+    if ((t->hooks & ~TYPE_PARAM_FLOAT) >> HOOK_BITS != 0) {
         antl_damaged(r);
     }
     n = antl_get_count(r, 4);

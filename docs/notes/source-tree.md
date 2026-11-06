@@ -325,6 +325,8 @@ reads as well says so in its row.
 | `src/rt/io.c` | The write and the exit of `anti.io` through the C streams. |
 | `src/rt/json.c` | A scanner of JSON text at the level of tokens, which builds nothing. |
 | `src/rt/json.h` | A scanner of JSON text at the level of tokens and positions. |
+| `src/rt/libm.c` | The exact functions of `anti.math`, one instruction where the level has it and the libm of musl where it does not. |
+| `src/rt/libm.h` | The exact functions of `anti.math` and the four roundings of musl that they call. |
 | `src/rt/license.c` | The licence text and the runtime version, read from the notice of the program. |
 | `src/rt/license.h` | The markers of the notice and its build id line, shared with antic and `anti`. |
 | `src/rt/license_stub.c` | The empty licence text and version of a bundled static library. |
@@ -401,6 +403,7 @@ The modules of the standard library, in Anti. The header of a module is its
 | `src/std/anti/lang.anti` | The root that imports nothing: the types the compiler knows by name, `Error` with its text, the trace of a stack, the hook handler and the hash seed. |
 | `src/std/anti/license.anti` | The licence notice of the program. |
 | `src/std/anti/log.anti` | Levelled logging: sinks, the interface `Logger`, the logger of the program and the file that configures it. |
+| `src/std/anti/math.anti` | The functions of the C library, the scalar helpers of raymath and five constants, generic over `Float`. |
 | `src/std/anti/mem.anti` | The interface `Allocator`, its two implementations, and `Shared<T>`. |
 | `src/std/anti/os.anti` | Signals, and the three per-user directories of the platform. |
 | `src/std/anti/plugin.anti` | Loading a shared library and asking it for the class it provides. |
@@ -423,6 +426,9 @@ The sources are downloaded under `build/deps/` and never tracked.
 |---|---|
 | `src/native/CMakeLists.txt` | Builds the third-party libraries of the runtime archive for every target from the pinned sources with the pinned clang, one recipe after another. |
 | `src/native/get-source.cmake` | `antic_get_source`, the fetch of a pinned source of the runtime archive, checked against the digest of its pin and unpacked. |
+| `src/native/libm-names.h` | The names of the libm of musl in the runtime, each with the prefix `anti_rt_libm_`. |
+| `src/native/libm-types.h` | The four definitions of `bits/alltypes.h` that the libm of musl needs, copied there for its compiles. |
+| `src/native/libm.cmake` | Fetches the source of musl and compiles its libm into the runtime of every target and level. |
 | `src/native/mbedtls.cmake` | Builds Mbed TLS for every target, with its tests. |
 | `src/native/media.cmake` | Holds the targets, the flags and the glibc link test of miniaudio and raylib. |
 | `src/native/mimalloc.cmake` | Builds mimalloc for both musl targets at every level. |
@@ -695,6 +701,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_known_failures.cmake` | Compares `tests/known-failures.txt` with the table of `docs/audit/tests-findings.md` and with the build tree. |
 | `tests/runners/run_known_failures_self.cmake` | Tests `run_known_failures.cmake` on made-up lists. |
 | `tests/runners/run_license_forms.cmake` | Checks one form of `anti license`. |
+| `tests/runners/run_libm_symbols.cmake` | Checks that every symbol of the libm of musl in the runtime carries the prefix `anti_rt_libm_`. |
 | `tests/runners/run_license_native.cmake` | Checks that a notice names the native libraries of the runtime archive that a program links. |
 | `tests/runners/run_license_notice.cmake` | Checks the notice of three programs against `NOTICE.txt`. |
 | `tests/runners/run_licenses.cmake` | Finds the licence notice in the bytes of a program. |
@@ -720,6 +727,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_macos_sdk_self.cmake` | Tests that `run_macos_sdk.cmake` skips without the pinned SDK and fails for one that changed. |
 | `tests/runners/run_macos_sysroot.cmake` | Checks the Zig pin and runs the sysroot script on stand-ins. |
 | `tests/runners/run_manifest_signature.cmake` | Runs the installer against a signed, a wrong, an unsigned and a staging manifest. |
+| `tests/runners/run_math_link.cmake` | Links the program of `anti.math` for one target and refuses one that takes a function of a libm of the system. |
 | `tests/runners/run_matrix_files.cmake` | Refuses a file of `tests/matrix/` that registers no test. |
 | `tests/runners/run_may_fail_only.cmake` | Refuses a function written by hand with an error result. |
 | `tests/runners/run_memory_checks.cmake` | Checks what `--memory-checks` adds and reports per target. |

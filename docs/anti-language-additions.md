@@ -1027,6 +1027,7 @@ fn find<K: eq + hash, V>(m: Map<K, V>, k: K) -> V { ... }
 - An interface is a constraint: `T: Serializable` requires a class that declares it implements `Serializable`.
 - Constraints combine with `+`.
 - `constraint Ordered = eq + lt;` names a set for reuse, used as `T: Ordered`. `anti.lang` ships `constraint Number = add + sub + mul + div + neg + lt;` for numeric code. A user's own number type joins it by having those hooks, so the set is open.
+- `anti.lang` ships `Float`, which `f32` and `f64` meet and no other type, by Q1 of "Answers of 2026-11-06". The set is closed, unlike `Number`. It gives the hooks of `Number` and `eq`, and a value of a parameter it constrains converts with `as` to and from an integer, `f32` and `f64`. A use with another type gives: `` `int` is no `Float`, which `twice` needs for `T`: `Float` takes `f32` and `f64` alone ``.
 - A type parameter without constraints can be stored, moved, passed on, copied with `dup` and measured with `size_of`. That is what a container needs, so containers usually take unconstrained parameters.
 - A constraint violation at a call gives: `` `Circle` has no `lt`, which `max` needs for `T` ``.
 

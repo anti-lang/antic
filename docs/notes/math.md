@@ -74,3 +74,11 @@ results on every target for the native libraries and the runtime. By Q2 of
 libm of musl, MIT, built with `ANTIC_FP_OPTIONS`. Every function of the
 module gives its result on every target, and no target takes the libm of its
 system.
+
+## How it is built
+
+- `src/std/anti/math.anti` declares every function as `fn sin<T: Float>(x: T) -> T`. The body calls the `f32` function of the runtime where `size_of(T) == 4` and the `f64` one otherwise, and converts with `as`.
+- `src/native/libm.cmake` compiles the generic C of `src/math/` of musl into anti_rt at every level of every target, in its objects and its bitcode. It takes the flags of the build of musl and `ANTIC_FP_OPTIONS`. The source is the release that `tools/sysroot-pins` names.
+- `src/native/libm-names.h` gives every function and table of that libm the prefix `anti_rt_libm_`. LLVM knows no such name, so it folds no call with the libm of the host. No call binds to the libm of a system either.
+- `src/rt/libm.c` holds the nine exact functions. Each writes the LLVM intrinsic, and the four roundings call musl at x86-64-v1, which has no instruction for them.
+- `std_math` holds the reference values of every function in `f32` and `f64`, in release, dev and `--memory-checks`. `std_math_macos-x86_64` runs the same program at `v1` under Rosetta against the same file. `std_math_constant` compares a call on a constant with one on a value of run time. `math_link_<target>` links the program for every target and refuses a function of a libm of the system, and `libm_symbols` reads every symbol of the libm in the runtime.

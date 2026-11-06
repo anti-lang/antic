@@ -183,8 +183,14 @@ struct arena;
 struct package;
 
 /* The native libraries of the runtime archive that a link takes:
-   PCRE2 for `anti.regex`, and raylib with miniaudio for `anti.raylib`. */
-enum { DRIVER_NATIVE_PCRE2 = 1u, DRIVER_NATIVE_RAYLIB = 2u };
+   PCRE2 for `anti.regex`, and raylib with miniaudio for `anti.raylib`.
+   DRIVER_NATIVE_LIBM marks the libm of musl in the runtime, which a
+   program of `anti.math` links on every target. */
+enum {
+    DRIVER_NATIVE_PCRE2 = 1u,
+    DRIVER_NATIVE_RAYLIB = 2u,
+    DRIVER_NATIVE_LIBM = 4u
+};
 
 /* The most packages that driver_runtime_packages gives. */
 enum { DRIVER_RUNTIME_PACKAGES = 6 };
@@ -192,7 +198,8 @@ enum { DRIVER_RUNTIME_PACKAGES = 6 };
 /* The packages that the runtime archive puts into a binary, in the order
    of its notice: the runtime, then musl and mimalloc where musl says that
    the link takes the C library of musl, then PCRE2, raylib and miniaudio
-   where natives holds their bits. Each carries the identifier of
+   where natives holds their bits. musl stands without mimalloc where
+   natives holds DRIVER_NATIVE_LIBM alone. Each carries the identifier of
    notice_component_license and the text of licenses/ of the archive at
    runtime, in the memory pool, and an empty text where runtime is NULL.
    A native library takes the version of its line of the record of

@@ -1,0 +1,12 @@
+//! `Float` takes `f32` and `f64` alone, so a copy for `int` is refused,
+//! although `int` has every hook of `Number`.
+
+fn twice<T: Float>(x: T) -> T
+{
+	return x + x;
+}
+
+fn main() -> int
+{
+	return twice(21);
+}

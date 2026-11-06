@@ -133,6 +133,9 @@ struct package {
 /* The binding of raylib, which a program that loads it links with raylib,
    miniaudio and the system libraries of raylib. */
 #define RAYLIB_MODULE "anti.raylib"
+/* The module of the functions of the C library and raymath, whose
+   program links the libm of musl of the runtime on every target. */
+#define MATH_MODULE "anti.math"
 /* `Object.deserialize` takes its memory from an allocator of this
    class, and `delete(p, from)` and `destroy(p, from)` give memory back
    to one. */

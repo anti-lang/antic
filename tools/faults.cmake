@@ -129,6 +129,9 @@ function(antic_faults_runtime target triple)
             VERBATIM)
         list(APPEND objects "${object}")
     endforeach()
+    antic_libm_objects(libm_objects anti_rt_libm_faults "${target}"
+        "${triple}" "${level}" "${work}/libm")
+    list(APPEND objects ${libm_objects})
     set(library "${out}/${library_name}")
     add_custom_command(OUTPUT "${library}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"

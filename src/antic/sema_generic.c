@@ -31,9 +31,18 @@ static const char *const hook_names[] = {
 
 #define HOOK_COUNT (sizeof hook_names / sizeof hook_names[0])
 
+_Static_assert(HOOK_COUNT == TYPE_PARAM_FLOAT_BIT,
+               "TYPE_PARAM_FLOAT stands after the bits of the hook table");
+
 /* The hooks of `anti.lang.Number`. */
 static const char *const number_hooks[] = {
     "add", "sub", "mul", "div", "neg", "lt"
+};
+
+/* The hooks of `anti.lang.Float` beside TYPE_PARAM_FLOAT: those of
+   `Number` and `eq`. */
+static const char *const float_hooks[] = {
+    "add", "sub", "mul", "div", "neg", "lt", "eq"
 };
 
 /* The hooks of `anti.lang.Ordered`, which the source of `anti.lang`
@@ -381,6 +390,13 @@ static void add_constraint(struct checker *c, struct type *p,
                  i++) {
                 p->hooks |= 1u << hook_of(number_hooks[i]);
             }
+            return;
+        }
+        if (sym == NULL && sema_name_is(&r->name, LANG_FLOAT)) {
+            for (i = 0; i < sizeof float_hooks / sizeof float_hooks[0]; i++) {
+                p->hooks |= 1u << hook_of(float_hooks[i]);
+            }
+            p->hooks |= TYPE_PARAM_FLOAT;
             return;
         }
         if (sym == NULL && sema_name_is(&r->name, LANG_ORDERED)) {
@@ -738,6 +754,23 @@ static bool meets_iface(struct checker *c, struct type *t,
                                      sema_implemented_in(t, iface));
 }
 
+/* Whether t meets the closed set of `Float` where p asks for it: an
+   `f32`, an `f64` or a parameter that `Float` constrains. */
+static bool meets_float(const struct type *t, const struct type *p)
+{
+    if ((p->hooks & TYPE_PARAM_FLOAT) == 0) {
+        return true;
+    }
+    return t->kind == TYPE_F32 || t->kind == TYPE_F64 ||
+           sema_float_param(t);
+}
+
+bool sema_float_param(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_PARAM &&
+           (t->hooks & TYPE_PARAM_FLOAT) != 0;
+}
+
 /* Check the argument t of the parameter p of the generic named by
    generic at pos, and report the first hook or interface it lacks. */
 static void check_meets(struct checker *c, struct type *t,
@@ -747,6 +780,13 @@ static void check_meets(struct checker *c, struct type *t,
     size_t i;
 
     if (sema_is_error(t)) {
+        return;
+    }
+    if (!meets_float(t, p)) {
+        sema_error_at(c, pos, "`%s` is no `%s`, which `%.*s` needs for "
+                      "`%.*s`: `%s` takes `f32` and `f64` alone", sema_tn(t),
+                      LANG_FLOAT, (int)generic->length, generic->text,
+                      (int)p->name.length, p->name.text, LANG_FLOAT);
         return;
     }
     for (i = 0; i < HOOK_COUNT; i++) {
@@ -796,6 +836,9 @@ bool sema_meets_param(struct checker *c, struct type *t, const struct type *p)
 {
     size_t i;
 
+    if (!meets_float(t, p)) {
+        return false;
+    }
     for (i = 0; i < HOOK_COUNT; i++) {
         if ((p->hooks & (1u << i)) != 0 && !meets_hook(c, t, hook_names[i])) {
             return false;

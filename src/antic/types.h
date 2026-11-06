@@ -322,7 +322,7 @@ struct type {
        in a TYPE_PARAM as well. */
     const struct type_param *param;
     const struct item *declared_by;
-    uint32_t hooks;
+    uint32_t hooks;                 /* and TYPE_PARAM_FLOAT */
     struct type **ifaces;
     size_t iface_count;
     /* TYPE_PARAM: the value a walk of it gives and the value `e[i]`
@@ -544,6 +544,20 @@ struct type *types_object(struct types *types);
    `Number`. A constraint, type or function named `Ordered` in the module
    wins over it. */
 #define LANG_ORDERED "Ordered"
+/* DESIGN: `Float` is the constraint of anti.math, which `f32` and `f64`
+   meet and no other type, by Q1 of "Answers of 2026-11-06" in
+   docs/decisions.md. The compiler declares it as it does `Number`. It
+   gives the hooks of `Number` and `eq`, and a value of a parameter it
+   constrains converts with `as` as an `f32` or an `f64` does. The set is
+   closed, so the bit TYPE_PARAM_FLOAT of the hooks of the parameter marks
+   it, above the bits of the hook table. A constraint, type or function
+   named `Float` in the module wins over it. */
+#define LANG_FLOAT "Float"
+/* The bit of the hooks of a TYPE_PARAM that `Float` sets. The hook table
+   of sema_generic.c holds 20 entries, bits 0 to 19, so the bit stands
+   after them, and a library file carries it with the hooks. */
+#define TYPE_PARAM_FLOAT_BIT 20
+#define TYPE_PARAM_FLOAT (1u << TYPE_PARAM_FLOAT_BIT)
 /* DESIGN: `ByteRegex` is the built-in struct of a pattern of bytes, in
    the form of `Regex`, which searches a `[]byte`. A pattern literal takes
    its mode from where it stands, so it is a `ByteRegex` where one is

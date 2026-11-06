@@ -14,17 +14,31 @@
 # written, so one that holds it is not unpacked again. antic_download of
 # tools/download.cmake downloads the archive.
 #
+# PINS <file> FIELDS <url> <digest> read the URL and the digest from the
+# rows <url> and <digest> of tools/<file> in place of tools/<name>-pin,
+# whose <NAME>_VERSION <file> then holds. libm.cmake fetches the
+# source of musl so, from the pins of tools/sysroot-pins.
+#
 # CMakeLists.txt at the top includes this file, for the recipes of this
-# directory and the source of raylib.
+# directory and the sources of raylib and musl.
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../tools/download.cmake")
 
 function(antic_get_source out name dest algorithm marker)
+    cmake_parse_arguments(PARSE_ARGV 5 arg "" "PINS" "FIELDS")
     set(tools "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../tools")
     include("${tools}/pins.cmake")
     string(TOUPPER "${name}" key)
-    antic_read_pins("${tools}/${name}-pin")
+    if(arg_PINS)
+        antic_read_pins("${tools}/${arg_PINS}")
+        list(GET arg_FIELDS 0 url_field)
+        list(GET arg_FIELDS 1 digest_field)
+        set(${key}_URL "${${url_field}}")
+        set(${key}_DIGEST "${${digest_field}}")
+    else()
+        antic_read_pins("${tools}/${name}-pin")
+    endif()
     if("${${key}_DIGEST}" STREQUAL "")
         message(FATAL_ERROR "tools/${name}-pin has no ${key}_DIGEST")
     endif()

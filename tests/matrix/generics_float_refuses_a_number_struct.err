@@ -1,0 +1,1 @@
+generics_float_refuses_a_number_struct.anti:24:10: error: `Fixed` is no `Float`, which `twice` needs for `T`: `Float` takes `f32` and `f64` alone

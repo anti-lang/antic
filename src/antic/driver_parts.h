@@ -50,6 +50,9 @@ struct extras {
     struct text host_names;
     /* The program holds `anti.regex`, so the link adds PCRE2. */
     bool regex;
+    /* The program holds `anti.math`, so its notice names musl, whose
+       libm the runtime carries. */
+    bool math;
     /* The program loads the library file of `anti.raylib`, so the link
        adds raylib, miniaudio and the system libraries of raylib. The
        names of the `link framework` and the `link linux` lines of that

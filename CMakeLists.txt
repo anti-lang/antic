@@ -225,7 +225,7 @@ set(ANTIC_RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 # which link_identity_macos-arm64 pins, and as bitcode the entry would take
 # main into itself under LTO, and the weak printf family would be strong.
 set(ANTIC_RUNTIME_SOURCES assert atomic backtrace call cast check conf cpu digest
-    errno f16 fs hash hooks init inject io json license loaded lock mem object
+    errno f16 fs hash hooks init inject io json libm license loaded lock mem object
     platform_entry platform_posix platform_stdio platform_windows plugin
     reflect registry signal snapshot start
     symbols sync text threads toml trace utf)
@@ -431,6 +431,10 @@ function(antic_cross_runtime_at target triple level root)
             VERBATIM)
         list(APPEND objects "${object}")
     endforeach()
+    # The libm of musl, which the runtime carries for every target, by Q2
+    # of "Answers of 2026-11-06". src/native/libm.cmake compiles it.
+    antic_libm_objects(libm_objects anti_rt_libm "${target}" "${triple}"
+        "${level}" "${work}/libm")
     if(target MATCHES "^windows")
         set(stub "${out}/anti_rt_license_stub.obj")
     else()
@@ -453,8 +457,8 @@ function(antic_cross_runtime_at target triple level root)
     add_custom_command(OUTPUT "${library}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${out}"
         COMMAND "${ANTIC_LLVM_AR}" rcs "${library}" ${objects}
-            ${coverage_members}
-        DEPENDS ${objects} ${coverage_members}
+            ${libm_objects} ${coverage_members}
+        DEPENDS ${objects} ${libm_objects} ${coverage_members}
         VERBATIM)
     # The same sources as bitcode, once per mode of --lto, with the flags
     # of the objects above. The stub stays an object. DESIGN: clang runs
@@ -558,6 +562,10 @@ function(antic_cross_runtime_at target triple level root)
                 VERBATIM)
             list(APPEND mode_objects "${object}")
         endforeach()
+        antic_libm_objects(libm_bitcode anti_rt_libm_bitcode_${mode}
+            "${target}" "${bitcode_triple}" "${level}" "${mode_work}/libm"
+            MODE ${mode} RETRIPLE "${retriple}")
+        list(APPEND mode_objects ${libm_bitcode})
         get_filename_component(mode_out "${mode_library}" DIRECTORY)
         add_custom_command(OUTPUT "${mode_library}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${mode_out}"
@@ -671,6 +679,11 @@ endfunction()
 # and names_once refuses the flag spelled in another CMake file.
 set(ANTIC_FP_OPTIONS -ffp-contract=off)
 
+# The libm of musl that the runtime of every target carries.
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    include(src/native/libm.cmake)
+endif()
+
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     foreach(target IN LISTS ANTIC_TARGETS ANTIC_GLIBC_TARGETS)
         set(sysroot "${ANTIC_RUNTIME_DIR}/sysroot/${target}")
@@ -730,7 +743,7 @@ add_custom_target(llvm_tools ALL
 
 # The standard library in src/std/, written as library files into std/ of the
 # runtime archive, where antic finds the modules under anti. without -I.
-set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection toml config args json log simd trace plugin)
+set(ANTIC_STD_MODULES lang runtime mem debug io text license error regex time os fs reflect random collection toml config args json log simd trace plugin math)
 set(ANTIC_STD_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/std/anti")
 # Every .anti file under src/std/anti/collection/ is a module of its own,
 # found here and never listed. They compile after anti.collection, each

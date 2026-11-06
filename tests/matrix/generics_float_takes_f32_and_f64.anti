@@ -1,0 +1,43 @@
+//! A parameter that `Float` constrains takes an `f32` and an `f64`, adds,
+//! compares and converts with `as` to and from an integer and either float, and
+//! each copy gives the values of its own type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice<T: Float>(x: T) -> T
+{
+	return x + x;
+}
+
+fn below<T: Float>(x: T, y: T) -> bool
+{
+	return x < y && x != y;
+}
+
+fn widened<T: Float>(x: T) -> f64
+{
+	return x as f64;
+}
+
+fn from_int<T: Float>(n: int) -> T
+{
+	return n as T;
+}
+
+fn to_int<T: Float>(x: T) -> int
+{
+	return x as int;
+}
+
+fn main() -> int
+{
+	let a: f32 = 1.25;
+	let b: f64 = 2.5;
+	printf("twice: %g %g\n".ptr, widened(twice(a)), twice(b));
+	printf("below: %d %d\n".ptr, below(a, a) as c_int, below(b, 3.0) as c_int);
+	printf("a third of an f32: %.9g\n".ptr, widened(a / 3.0));
+	printf("from an int: %g %g\n".ptr, widened(from_int<f32>(7)),
+		from_int<f64>(-7));
+	printf("to an int: %d %d\n".ptr, to_int(a) as c_int, to_int(b) as c_int);
+	return 0;
+}

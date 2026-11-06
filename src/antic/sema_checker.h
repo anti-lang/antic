@@ -967,6 +967,10 @@ struct type *sema_member_type_in(struct checker *c, struct type *fn,
 /* Whether t meets the constraints of the type parameter p, reporting
    nothing. */
 bool sema_meets_param(struct checker *c, struct type *t, const struct type *p);
+
+/* Whether t is a type parameter that `Float` constrains, an `f32` or an
+   `f64` in every copy. */
+bool sema_float_param(const struct type *t);
 void sema_refuse_type_args(struct checker *c, const struct expr *e,
                            const struct name *name);
 struct type *sema_generic_named(struct checker *c, struct expr *e,

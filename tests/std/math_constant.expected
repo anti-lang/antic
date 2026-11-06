@@ -1,0 +1,19 @@
+exit 0
+sin f32 same
+sin f64 same
+cos f32 same
+cos f64 same
+tan f32 same
+tan f64 same
+exp f32 same
+exp f64 same
+log f32 same
+log f64 same
+pow f32 same
+pow f64 same
+sqrt f32 same
+sqrt f64 same
+atan2 f32 same
+atan2 f64 same
+floor f32 same
+floor f64 same

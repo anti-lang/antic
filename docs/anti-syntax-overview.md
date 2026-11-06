@@ -148,7 +148,7 @@ Sized numbers `i8 i16 i32 i64 u8 u16 u32 u64 f32 f64`, with `int` for `i64`, `ui
 
 A slice and a `str` have `.len`, an `int`, and `.ptr`, a `?*T` or a `?*byte`, both read-only. An array has `.len` alone. The length `N` of `[N]T` is a constant `int` of at least 1. A length computed from `size_of` stands in the type of a field or a local alone, and the `.len` of such an array is no constant. `s[i]` on a `str` is a `byte`, and `s[lo..hi]` is a `[]byte`. `a[lo..hi]` on an array or a slice is a `[]T`, and both bounds are required.
 
-The compiler declares `Object`, `Job`, `Flags`, `Mutex`, `chan T`, `Regex`, `ByteRegex`, `Match`, `ByteMatch`, `FieldDescriptor` and the constraint `Number` in `anti.lang`, and the source of `anti.lang` declares the rest of the root. The C types for bindings are `c_char c_uchar c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong c_size_t c_float c_double c_wchar`. `c_long`, `c_ulong` and `c_wchar` take the width of the target. A `void *` of C is a `*byte`, and a `?*byte` where it may be `NULL`.
+The compiler declares `Object`, `Job`, `Flags`, `Mutex`, `chan T`, `Regex`, `ByteRegex`, `Match`, `ByteMatch`, `FieldDescriptor` and the constraints `Number` and `Float` in `anti.lang`, and the source of `anti.lang` declares the rest of the root. The C types for bindings are `c_char c_uchar c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong c_size_t c_float c_double c_wchar`. `c_long`, `c_ulong` and `c_wchar` take the width of the target. A `void *` of C is a `*byte`, and a `?*byte` where it may be `NULL`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -998,7 +998,7 @@ s.serialize(&b);
 
 ## Generics
 
-Functions, structs, classes, variants and interfaces take type parameters between `<` and `>`. A constraint after `:` states what the generic needs from a type: a hook of the operator table such as `lt`, `add`, `iter` or `hash`, an interface, or a set named with `constraint`, combined with `+`. The compiler checks the body against the constraints where the generic is written and every use where it is used, so an error lands in the code that made it. A parameter without constraints can be stored, copied, moved, passed on and measured with `size_of`, which is what a container needs. `N: int` takes an integer constant instead of a type, such as the length of a fixed array, and reads as a value in the body. The compiler declares `constraint Number = add + sub + mul + div + neg + lt;` in `anti.lang`, and the source of `anti.lang` declares `constraint Ordered = eq + lt;`. `hash` is the constraint that `x.hash()` on a value of `T` needs. A simd struct meets `add`, `sub`, `mul`, `div` and `neg` through its operators, and neither `lt` nor `Number`.
+Functions, structs, classes, variants and interfaces take type parameters between `<` and `>`. A constraint after `:` states what the generic needs from a type: a hook of the operator table such as `lt`, `add`, `iter` or `hash`, an interface, or a set named with `constraint`, combined with `+`. The compiler checks the body against the constraints where the generic is written and every use where it is used, so an error lands in the code that made it. A parameter without constraints can be stored, copied, moved, passed on and measured with `size_of`, which is what a container needs. `N: int` takes an integer constant instead of a type, such as the length of a fixed array, and reads as a value in the body. The compiler declares `constraint Number = add + sub + mul + div + neg + lt;` in `anti.lang`, and the source of `anti.lang` declares `constraint Ordered = eq + lt;`. The compiler declares `Float` as well, which `f32` and `f64` meet and no other type. It gives the hooks of `Number` and `eq`, and a value of its parameter converts with `as` as an `f32` or an `f64` does. `hash` is the constraint that `x.hash()` on a value of `T` needs. A simd struct meets `add`, `sub`, `mul`, `div` and `neg` through its operators, and neither `lt` nor `Number`.
 
 <!-- overview: context, docs-style:ignore
 ```anti
@@ -2146,7 +2146,7 @@ fs.close(f) catch fatal;
 log.logger().set_level(log.Level.Warn);
 ```
 
-The 24 modules, with their public items and the functions among them that may fail:
+The 25 modules, with their public items and the functions among them that may fail:
 
 | Module | Public items | May fail |
 |---|---|---|
@@ -2173,6 +2173,7 @@ The 24 modules, with their public items and the functions among them that may fa
 | `anti.trace` | `LeakTracker`, `Profiler`, `CallLogger`, `ErrorMonitor`, `ThreadMonitor`, `ChangeJournal`, `Composite`, `start`, `install`, `PROFILE_SLOTS`, `JOURNAL_SLOTS`, `MESSAGE_BYTES`, `COMPOSITE_SLOTS` | |
 | `anti.plugin` | `Library` with `instance_at`, `supports_at`, `live` and `unload`, which the forms `lib.instance(I)` and `lib.supports(I, "f")` call, `load`, `NOT_LOADED`, `IN_USE` | `load`, `instance_at`, `unload` |
 | `anti.raylib` | every function, struct, enum and constant of `raylib.h`, `rlgl.h`, `raymath.h` and `rcamera.h` of raylib 6.0, one module in which raymath and rcamera take the types of raylib, which `anti bind --clang` writes during the build. A program that imports it links raylib, miniaudio and the system libraries of raylib with no option | |
+| `anti.math` | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`, `tanh`, `sqrt`, `cbrt`, `pow`, `exp`, `exp2`, `log`, `log2`, `log10`, `hypot`, `floor`, `ceil`, `round`, `trunc`, `fmod`, `abs`, `min`, `max`, `copysign`, `is_nan`, `is_inf`, `clamp`, `lerp`, `normalize`, `remap`, `wrap`, `PI`, `TAU`, `E`, `DEG2RAD`, `RAD2DEG` | |
 | `anti.regex` | `Error`, `BadPattern`, `TooExpensive`, `MissingGroup`, `LengthMismatch`, `compile`, `compile_bytes`, `Cursor`, `Matches`, `Pieces`, `ByteMatches`, `BytePieces`, and the functions behind the methods of `str` and `[]byte` | `compile`, `compile_bytes`, and a method with a compiled pattern |
 
 The 12 modules under `anti.collection`, each with the `operator fn eq` and `operator fn hash` of its classes:
@@ -2196,7 +2197,7 @@ The 12 modules under `anti.collection`, each with the `operator fn eq` and `oper
 
 `anti.graphics` draws in units of the largest square that fits the window, over raylib, with no raylib type in a `pub` signature. `graphics.open` opens the window, `for f in w.frames()` draws one frame per turn, and `f.move`, `f.turn` and `f.scale` give a canvas of its own. `Display` is the abstract class behind it, with `RaylibDisplay` as its default provider and `Recorder` for tests without a display.
 
-Not built yet: `anti.math` and `Float`, `anti.graphics`, the modules over the other native libraries of the runtime archive, `anti.net` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+Not built yet: `anti.graphics`, the modules over the other native libraries of the runtime archive, `anti.net` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
 
 ## Tools
 

@@ -1,8 +1,10 @@
 # Rule 1 of docs/c-guidelines.md for the runtime: a compiler extension
 # stands only in a file that exists to hold one. That is the platform
 # layer, src/rt/platform.h with platform_posix.c, platform_windows.c and
-# platform_stdio.c, and src/rt/atomic.c, which holds the atomic
-# operations of every compiler. Every other file of src/rt is C11 alone. The spellings below
+# platform_stdio.c, src/rt/atomic.c, which holds the atomic operations of
+# every compiler, and src/rt/libm.c, which holds the elementwise built-ins
+# of clang that write the exact functions of anti.math as instructions.
+# Every other file of src/rt is C11 alone. The spellings below
 # are those of the extensions of clang, gcc and MSVC the runtime has
 # used. Decision 14 of "Decisions of 2026-10-11" has every host build the
 # runtime with the pinned clang, so no file of src/rt holds a form of
@@ -14,7 +16,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 set(holders "platform.h" "platform_posix.c" "platform_windows.c"
-    "platform_stdio.c" "atomic.c")
+    "platform_stdio.c" "atomic.c" "libm.c")
 set(extensions "__attribute__|__asm__|__asm[ (]|__atomic_|__sync_|__builtin_|__declspec|__int128|__typeof__|__extension__|_Interlocked|__iso_volatile|__cpuid|_xgetbv|__dmb|^[ ]*#[ ]*pragma")
 set(microsoft "_MSC_VER|_Interlocked|<intrin[.]h>|_M_X64|_M_ARM64")
 set(failures "")

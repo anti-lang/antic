@@ -1535,6 +1535,20 @@ static struct type *check_cast(struct checker *c, struct expr *e)
     if (types_is_simd(from) || types_is_simd(to)) {
         return sema_check_simd_cast(c, e, from, to);
     }
+    /* DESIGN: a value of a parameter that `Float` constrains is an `f32`
+       or an `f64` in every copy, so `as` converts it to and from an
+       integer and either float, as both convert. Every copy converts
+       between built-in types, which lowering takes as written. */
+    if (sema_float_param(from) || sema_float_param(to)) {
+        const struct type *other = sema_float_param(from) ? to : from;
+        if (sema_float_param(other) || types_is_integer(other) ||
+            other->kind == TYPE_F32 || other->kind == TYPE_F64) {
+            return to;
+        }
+        sema_error_at(c, e->pos, "cannot convert `%s` to `%s`", sema_tn(from),
+                      sema_tn(to));
+        return sema_builtin(c, TYPE_ERROR);
+    }
     /* DESIGN: a value of an enum is one of the numbers it declares. A
        float is none of them, and the values of another enum carry
        another meaning, so R055 of "Rules of 2026-10-13" asks the program

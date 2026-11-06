@@ -1,0 +1,1 @@
+generics_float_refuses_an_int.anti:11:9: error: `int` is no `Float`, which `twice` needs for `T`: `Float` takes `f32` and `f64` alone
