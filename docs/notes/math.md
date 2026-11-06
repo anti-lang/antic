@@ -1,8 +1,10 @@
 # anti.math
 
-Draft of 2026-11-02 for Eddie. Nothing on this page is decided until
-`docs/decisions.md` records it. Eddie let the module in on 2026-11-01, beside
-`anti.graphics`, whose design is in `docs/notes/graphics.md`.
+The design of the module. Eddie let it in on 2026-11-01, beside
+`anti.graphics`, whose design is in `docs/notes/graphics.md`. He approved both
+designs for building on 2026-11-06, and answered the two questions of the
+draft. "Answers of 2026-11-06" in `docs/decisions.md` records them, and
+"Standard interfaces" in `docs/anti-language-additions.md` holds the rules.
 
 ## Intent
 
@@ -50,28 +52,25 @@ A domain error gives NaN, as C gives it. No function fails or sets `errno`.
   each compares results with reference values, in release, dev and
   `--memory-checks`.
 
-## Open for Eddie
+## One name for f32 and f64
 
-1. `f32` and `f64`. Anti has no overloading by signature, so one name cannot
-   take both by its parameter alone.
-   - A. One generic name per function, `sin<T: Float>(x: T) -> T`, compiled
-     to the LLVM intrinsic of its type, `llvm.sin.f32` or `llvm.sin.f64`.
-     `sqrt`, `floor`, `abs`, `min` and `max` then become one instruction. It
-     needs a constraint `Float` in `anti.lang` and the compiler to know the
-     functions. `math.sin(a)` takes the type of `a`.
-   - B. The names of C, `sin` for `f64` and `sinf` for `f32`, as a plain Anti
-     module over the C library. No change to the compiler, and the names a
-     raylib program already writes.
-   - Recommended: A, since a graphics program computes in `f32` and should
-     write `math.sin` as any other program does.
-2. The same result on every target. musl, glibc, Apple's libm and the UCRT
-   of Windows give different last bits for `sin`, `pow` and the rest. A
-   program then computes other values on each system. On 2026-11-01 and
-   2026-11-02 Eddie chose identical results on every target for the native
-   libraries and the runtime.
-   - A. The runtime carries one implementation for all six targets, the libm
-     of musl, MIT, which the Linux sysroots hold already, built with
-     `ANTIC_FP_OPTIONS`.
-   - B. Each target takes the libm of its system, which costs nothing and
-     differs in the last bits.
-   - Recommended: A, for the reason of those two answers.
+Anti has no overloading by signature, so one name cannot take both types by
+its parameter alone. Each function is one generic name,
+`sin<T: Float>(x: T) -> T`, by Q1 of "Answers of 2026-11-06". The constraint
+`Float` stands in `anti.lang`, and `f32` and `f64` meet it. `math.sin(a)`
+takes the type of `a`, so a graphics program computes in `f32` and writes
+`math.sin` as any other program does.
+
+`sqrt`, `floor`, `ceil`, `trunc`, `round`, `abs`, `copysign`, `min` and `max`
+are exact in IEEE. Each may become the LLVM intrinsic of its type, one
+instruction where the target has it.
+
+## The same result on every target
+
+musl, glibc, Apple's libm and the UCRT of Windows give different last bits for
+`sin`, `pow` and the rest. On 2026-11-01 and 2026-11-02 Eddie chose identical
+results on every target for the native libraries and the runtime. By Q2 of
+"Answers of 2026-11-06" the runtime carries one libm for all six targets, the
+libm of musl, MIT, built with `ANTIC_FP_OPTIONS`. Every function of the
+module gives its result on every target, and no target takes the libm of its
+system.

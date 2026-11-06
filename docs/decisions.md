@@ -3081,6 +3081,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 - On 2026-11-01 Eddie answered the five questions of the step of `anti.raylib`, under "Answers of 2026-11-01". Each answer lets its change in: the link lines of Linux, the native libraries in the notice of a program, a manifest without `[package]`, raymath, rcamera and rlgl in `anti.raylib`, and the message of `anti bind --clang` without a runtime archive.
 - Q6 of the same answers lets in the field `program` of `[package]`, which names the program of a project, and Q7 the flag `-ffp-contract=off` of the native libraries.
 - On 2026-11-02 Eddie answered the three questions of the step that built Q6 and Q7, under "Answers of 2026-11-02". Q1 lets in the flag `-ffp-contract=off` of the runtime, and Q3 the refusal of a `[package]` that names `publish` without `name`.
+- On 2026-11-06 Eddie answered the two questions of `docs/notes/math.md` and the question of the step that built the answers of 2026-11-02, under "Answers of 2026-11-06". They let in `anti.math`, the constraint `Float` of `anti.lang` and the libm of musl in the runtime. They also let in the refusal of a `publish` of any form without `name`, and of a `publish` that is no string. Eddie approved the designs of `anti.math` and `anti.graphics` on the same day, and a later step builds `anti.graphics`.
 
 ## What the solid run decided
 
@@ -3268,6 +3269,15 @@ Eddie took these decisions on 2026-11-02. They answer the three questions of "Qu
 - Q1. The runtime of `src/rt/` compiles with `-ffp-contract=off` as well, on all six targets, at every level and in its bitcode of LTO. The reason is that of Q7 of "Answers of 2026-11-01": the runtime then gives the same results on every target, as antic does, which never fuses a multiply and an add. The runtime and the native libraries take the flag from one definition, which no other file spells, and a test refuses a compile of the runtime without it. The runtime archive is built again in `host`, `asan` and `ubsan`.
 - Q2. The scope of Q7 of "Answers of 2026-11-01" stays as it is, and the code does not change. mimalloc keeps the flag. The copy of PCRE2 that antic links to check pattern literals builds with the flags of antic and does not take it.
 - Q3. A `[package]` that names `publish` without `name` is refused now, although `anti publish` is not built. A case of `tests/anti-build/messages.cmake` holds the message.
+
+## Answers of 2026-11-06
+
+Eddie took these decisions on 2026-11-06. Q1 and Q2 answer the two questions of "Open for Eddie" in `docs/notes/math.md` of commit `8a8eebf8`, numbered as there. Q3 answers the question of "Questions for Eddie" in `docs/reports/2026-11-02-fp-and-publish.md`. None of the three is provisional.
+
+- Q1. Each function of `anti.math` has one generic name, as `sin<T: Float>(x: T) -> T`. The constraint `Float` stands in `anti.lang`, and `f32` and `f64` meet it. `math.sin(a)` takes the type of `a`, so a program of `f32` and one of `f64` write the same name.
+- Q2. The runtime carries one libm for all six targets, the libm of musl, under the MIT licence. It builds with `ANTIC_FP_OPTIONS`, so every target gives the same results. A target takes no libm of its system for a function of `anti.math`.
+- Q3. A `[package]` that names `publish` without `name` is refused in any form, a string, an array or a table. A `publish` that is no string is refused as malformed, with `name` as well. A case of `tests/anti-build/messages.cmake` holds each message.
+- Eddie approved both designs for building, `docs/notes/math.md` and `docs/notes/graphics.md`. The two notes are the design notes of their modules, and "Standard interfaces" in `docs/anti-language-additions.md` holds their rules. The step that builds `anti.math` builds no part of `anti.graphics`.
 
 ## Open
 

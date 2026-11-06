@@ -2192,7 +2192,11 @@ The 12 modules under `anti.collection`, each with the `operator fn eq` and `oper
 | `anti.collection.synchronized` | `SyncList<T>`, `SyncMap<K, V>`, `SyncSet<T>`, `SyncPool<T>`, `sort`, `sort_by`, `map` |
 | `anti.collection.concurrent` | `ConcurrentMap<K, V>`, `SpscRing<T, N>` |
 
-Not built yet: the modules over the other native libraries of the runtime archive, `anti.net` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
+`anti.math` gives the functions of the C library, the scalar helpers of raymath and the constants `PI`, `TAU`, `E`, `DEG2RAD` and `RAD2DEG`. Each function has one generic name over the constraint `Float` of `anti.lang`, which `f32` and `f64` meet, so `math.sin(a)` takes the type of `a`. A domain error gives NaN, and no function fails. Every function gives the result of the libm of musl, which the runtime carries for all six targets, so every target gives the same bits. A program that links it names musl in its notice.
+
+`anti.graphics` draws in units of the largest square that fits the window, over raylib, with no raylib type in a `pub` signature. `graphics.open` opens the window, `for f in w.frames()` draws one frame per turn, and `f.move`, `f.turn` and `f.scale` give a canvas of its own. `Display` is the abstract class behind it, with `RaylibDisplay` as its default provider and `Recorder` for tests without a display.
+
+Not built yet: `anti.math` and `Float`, `anti.graphics`, the modules over the other native libraries of the runtime archive, `anti.net` and `anti.miniaudio`, the interfaces for services with `anti.db` over SQLite, and `anti.binary`, which the code of a wire format uses.
 
 ## Tools
 

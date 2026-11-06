@@ -1,8 +1,9 @@
 # anti.graphics
 
-Draft of 2026-11-02 for Eddie. Nothing on this page is decided until
-`docs/decisions.md` records it. The decision of 2026-10-28 under "Feature
-freeze of 2026-10-14" sends the design to Eddie before it is built.
+The design of the module. The decision of 2026-10-28 under "Feature freeze
+of 2026-10-14" sent it to Eddie before it is built, and he approved it for
+building on 2026-11-06, under "Answers of 2026-11-06" in `docs/decisions.md`.
+"Standard interfaces" in `docs/anti-language-additions.md` holds its rules.
 `anti.math`, which the module uses, is designed in `docs/notes/math.md`.
 
 ## Intent
