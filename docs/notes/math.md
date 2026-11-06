@@ -84,8 +84,8 @@ By Q2 of "Answers of 2026-11-06, third set" a program sees the same bits of a
 NaN on all six targets. The canonical NaN below is the quiet NaN with a clear
 sign and no payload: `0x7fc00000` in `f32` and `0x7ff8000000000000` in `f64`.
 It is the default NaN of ARM64 and the NaN that LLVM folds a constant to.
-This section is the design. Eddie chooses one of the three options before a
-step builds it, so the code still gives the NaN of the processor.
+This section is the design. Eddie chose option B by Q1 of "Answers of
+2026-11-06, fourth set".
 
 ### Where the bits differ
 
@@ -228,5 +228,5 @@ the list of the places that read bits to be held by a test, as
 - `src/std/anti/math.anti` declares every function as `fn sin<T: Float>(x: T) -> T`. The body calls the `f32` function of the runtime where `size_of(T) == 4` and the `f64` one otherwise, and converts with `as`.
 - `src/native/libm.cmake` compiles the generic C of `src/math/` of musl into anti_rt at every level of every target, in its objects and its bitcode. It takes the flags of the build of musl and `ANTIC_FP_OPTIONS`. The source is the release that `tools/sysroot-pins` names.
 - `src/native/libm-names.h` gives every function and table of that libm the prefix `anti_rt_libm_`. LLVM knows no such name, so it folds no call with the libm of the host. No call binds to the libm of a system either.
-- `src/rt/libm.c` holds the nine exact functions. Each writes the LLVM intrinsic, and the four roundings call musl at x86-64-v1, which has no instruction for them.
+- `src/rt/libm.c` holds the nine exact functions. Each writes the LLVM intrinsic, and the four roundings call musl at x86-64-v1, which has no instruction for them. Dev mode and `--lto none` keep each one a call of the runtime, by Q3 of "Answers of 2026-11-06, fourth set".
 - `std_math` holds the reference values of every function in `f32` and `f64`, in release, dev and `--memory-checks`. `std_math_macos-x86_64` runs the same program at `v1` under Rosetta against the same file. `std_math_constant` compares a call on a constant with one on a value of run time. `math_link_<target>` links the program for every target and refuses a function of a libm of the system, and `libm_symbols` reads every symbol of the libm in the runtime.

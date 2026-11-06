@@ -3112,6 +3112,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 - On 2026-11-06 Eddie answered the two questions of `docs/notes/math.md` and the question of the step that built the answers of 2026-11-02, under "Answers of 2026-11-06". They let in `anti.math`, the constraint `Float` of `anti.lang` and the libm of musl in the runtime. They also let in the refusal of a `publish` of any form without `name`, and of a `publish` that is no string. Eddie approved the designs of `anti.math` and `anti.graphics` on the same day, and a later step builds `anti.graphics`.
 - On 2026-11-06 Eddie answered the four questions of the step that built `anti.graphics`, under "Answers of 2026-11-06, second set". Q4 lets in `anti test` of a project without `-I` and without a file. The run reads the manifest and writes or reuses the library files of the modules of the project. Q1 and Q2 keep what is built, and Q3 is a fix.
 - On 2026-11-06 Eddie answered three more questions, under "Answers of 2026-11-06, third set". Q1 lets in the five `f64` constants of `anti.math`, and Q3 the release library files of `anti test --release`. Q2 lets in one NaN on every target, which a later step builds once Eddie has chosen its form.
+- On 2026-11-06 Eddie answered the three questions of the step that built the third set, under "Answers of 2026-11-06, fourth set". Q1 lets in form B of one NaN on every target, and Q2 the reuse of the objects and the library files of `anti build` by `anti test`. Q3 keeps the code as it is.
 
 ## What the solid run decided
 
@@ -3326,6 +3327,14 @@ Eddie took these decisions on 2026-11-06. Q1 and Q2 answer questions 1 and 2 of 
 - Q2. Every target gives one NaN. A program sees the same bits of a NaN on all six targets. No program meets a NaN whose sign or payload follows the processor. The rule replaces the provisional entry under "Standard interfaces" that let the sign of a NaN follow the processor. It changes the language and costs time per float operation. `docs/notes/math.md` therefore sets out the options with their measured cost, and Eddie chooses one before a step builds it.
 - Q3. `anti test --release` of a project reads the library files of the release build of `anti build`, in `build/<target>/release/lib/`. A dev run reads those of the dev build.
 - Two questions stay open. Question 1 of `docs/reports/2026-11-06-graphics-answers.md` asks whether a dev run of `anti test` takes the objects of `anti build`. Question 3 of `docs/reports/2026-11-06-math.md` asks whether dev mode calls the runtime for the exact functions of `anti.math`.
+
+## Answers of 2026-11-06, fourth set
+
+Eddie took these decisions on 2026-11-06. They answer the three questions of "Questions for Eddie" in `docs/reports/2026-11-06-math-answers.md`, numbered as there. None of the three is provisional. The steps that build Q1 and Q2 change the code, and until they do, the code and the tests stand as they are. Q3 changes no code.
+
+- Q1. One NaN on every target takes option B of "One NaN on every target" in `docs/notes/math.md`. antic writes the canonical NaN, `0x7fc00000` in `f32` and `0x7ff8000000000000` in `f64`, at every place a program can see the bits of a float: a store to memory that a view or C can reach, a write of a union, a float argument of a C function and a result of an exported one, `hash`, the sign operand of `copysign`, a test of the sign bit and a conversion to `f16`. A NaN in a register may keep the bits of the processor, which no operation of the language can tell. A test holds the list of those places, and a feature that reads bits joins the list in the commit that builds it.
+- Q2. A dev run of `anti test` reuses the dev objects of `anti build` in `build/<target>/dev/`, and a release run reuses the release library files of `build/<target>/release/`, whenever their input did not change. Eddie gave the reason: the two modes have directories of their own, so the compile times go down. An object that a test run needs in another form than `anti build` writes stands in the same cache under a key that names the difference.
+- Q3. Dev mode keeps the exact functions of `anti.math` as calls of the runtime, and so does `--lto none`. A release build of full LTO makes each one instruction where the level has it, as `docs/notes/math.md` gives it. antic writes no intrinsic of its own for them.
 
 ## Open
 
