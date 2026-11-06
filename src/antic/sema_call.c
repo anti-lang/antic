@@ -695,6 +695,7 @@ static struct type *check_qualified(struct checker *c, struct expr *e,
     e->kind = EXPR_NAME;
     e->as.name = name;
     e->symbol = item;
+    e->qualified = true;
     return item->type;
 }
 

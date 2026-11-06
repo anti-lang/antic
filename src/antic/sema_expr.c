@@ -1979,7 +1979,10 @@ static struct type *check_name(struct checker *c, struct expr *e)
 {
     struct symbol *sym;
 
-    sym = sema_lookup(c, &e->as.name);
+    /* T210 of docs/audit/tests-findings.md: `graphics.PINK.fade(0.5)`
+       checks `graphics.PINK` twice, and the second check reads the name
+       that the first wrote. */
+    sym = e->qualified ? e->symbol : sema_lookup(c, &e->as.name);
     e->symbol = sym;
     if (sym == NULL && sema_later_enum_value(c, e)) {
         return sema_builtin(c, TYPE_ERROR);

@@ -1,0 +1,16 @@
+//! A library that names the constants of `tone` with the name of their module,
+//! followed by a call and by a field.
+
+import com.example.tone;
+
+/// The level of `LOW` raised by `by`, and the level of the corner of `BOX`.
+pub fn mixed(by: int) -> int
+{
+	return tone.LOW.raise(by).level + tone.BOX.corner.level * 10;
+}
+
+/// The corner of `BOX` raised by `by`.
+pub fn corner(by: int) -> tone.Tone
+{
+	return tone.BOX.corner.raise(by);
+}

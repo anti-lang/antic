@@ -1602,6 +1602,13 @@ hold what stands in a function.
   of a module. The second holds the calls of an `extern fn`, a variadic one
   and one held as a function value. The third holds the exported items of
   a module used by the module itself.
+- `matrix/modules_constant_named_with_its_module_in_contexts` holds a
+  constant of another module named with its module and followed by a call,
+  a field and the hook `hash`, as `graphics.PINK.fade(0.5)`, in the same
+  fifteen places. `modules_constant_named_with_its_module_at_module_level`
+  holds the field in a constant and in the defaults of a field and of a
+  parameter, where a call is no constant expression. T210 of
+  `docs/audit/tests-findings.md` refused the call.
 - A worker builds no `text.Builder` in these programs. The places "worker"
   and "dispatch" of `modules_qualified_names` therefore hold the three
   functions alone.
@@ -1624,6 +1631,10 @@ hold what stands in a function.
 
 Across a library file, each as `<name>_modules_release` and `_dev`:
 
+- `modules_qualified_constants`: a constant of a library named with its
+  module or an alias of it, in the client and in a second library. A
+  call, a field, a field and a call, `hash` and a method of a `str`
+  follow it.
 - `modules_items`: every kind of item a module makes public, reached by
   the name of the module, by an alias and by a direct import.
   `modules_items_stripped` runs it with a library file written with

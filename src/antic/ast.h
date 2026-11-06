@@ -260,6 +260,11 @@ struct expr {
     struct token_text spelling;     /* source text of a literal */
     struct type *type;              /* set by semantic analysis */
     struct symbol *symbol;          /* EXPR_NAME, set by semantic analysis. */
+    /* EXPR_NAME: a name the checker rewrote from `module.name`, whose
+       symbol is the item of that module. A second check of the node, as
+       the probe of an atomic call makes of its base, takes the symbol as
+       it stands, since the name alone names nothing of this module. */
+    bool qualified;
     /* EXPR_NAME: an argument that moves the error a `catch` binds into
        an `own` parameter, so the handler holds it no longer. */
     bool moves;

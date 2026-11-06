@@ -1,0 +1,29 @@
+//! A field of a constant of another module named with its module, as
+//! `graphics.PINK.r`, at module level: in a constant, in the default of a field
+//! and in the default of a parameter. A call is no constant expression, so
+//! `graphics.PINK.fade(0.5)` has no place there.
+
+import anti.graphics;
+import anti.io;
+import anti.text;
+
+const RED: u8 = graphics.PINK.r;
+
+class Paint
+{
+	pub green: u8 = graphics.PINK.g,
+}
+
+fn blue(b: u8 = graphics.PINK.b) -> u8
+{
+	return b;
+}
+
+fn main() -> int
+{
+	let p = Paint { };
+	let s = f"PINK {RED} {p.green} {blue()}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

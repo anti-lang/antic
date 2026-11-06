@@ -22,6 +22,3 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 matrix_classes_function_named_init_dev T209 A function of a class named `init` takes the name of the init function the compiler writes for the class, and antic stops with an internal error.
 matrix_classes_function_named_init_release T209 A function of a class named `init` takes the name of the init function the compiler writes for the class, and antic stops with an internal error.
 matrix_classes_function_named_init_memory_checks T209 A function of a class named `init` takes the name of the init function the compiler writes for the class, and antic stops with an internal error.
-matrix_modules_function_of_a_constant_named_with_its_module_dev T210 Method-call sugar on a struct constant named with its module, `graphics.PINK.fade(0.5)`, is refused with `unknown name`.
-matrix_modules_function_of_a_constant_named_with_its_module_release T210 Method-call sugar on a struct constant named with its module, `graphics.PINK.fade(0.5)`, is refused with `unknown name`.
-matrix_modules_function_of_a_constant_named_with_its_module_memory_checks T210 Method-call sugar on a struct constant named with its module, `graphics.PINK.fade(0.5)`, is refused with `unknown name`.

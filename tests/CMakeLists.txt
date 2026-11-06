@@ -4093,6 +4093,17 @@ antic_modules_test(constant_argument
     PROGRAM argument
     WORK "${CMAKE_CURRENT_BINARY_DIR}/constant-argument-modules")
 
+# A constant of a library named with its module and followed by a call, a
+# field, a field and a call, the hook `hash` and a method of a `str`, in a
+# client and in a library that imports it. T210 of
+# docs/audit/tests-findings.md.
+antic_modules_test(qualified_constants
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/qualified_constants"
+    LIBRARIES tone mix
+    PROGRAM client
+    STD text regex
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/qualified-constants")
+
 # The items library once more, written with --strip-docs. A library file
 # without its doc text gives the client the same program.
 antic_modules_test(items_stripped

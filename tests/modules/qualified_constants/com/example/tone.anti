@@ -1,0 +1,30 @@
+//! Constants that a client and another library name with the name of this
+//! module and follow with a call or a field, as `tone.LOW.raise(2)`.
+
+pub struct Tone
+{
+	level: int,
+}
+
+pub struct Box
+{
+	corner: Tone,
+	label: str,
+}
+
+pub const LOW: Tone = Tone { level: 3 };
+pub const BOX: Box = Box { corner: Tone { level: 7 }, label: "box" };
+pub const NAME: str = "tone";
+pub const COUNT: int = 3;
+
+/// `t` raised by `by`.
+pub fn raise(t: Tone, by: int) -> Tone
+{
+	return Tone { level: t.level + by };
+}
+
+/// The level of `t` and of `with` together.
+pub fn joined(t: Tone, with: Tone) -> int
+{
+	return t.level + with.level;
+}

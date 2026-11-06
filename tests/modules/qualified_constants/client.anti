@@ -1,0 +1,36 @@
+//! The client of `tone` and `mix`. A constant of `tone` named with its module,
+//! or with an alias of it, is followed by a call of a function of `tone`, by a
+//! field, by a field and a call, by the hook `hash` and by a method of a `str`.
+
+import anti.regex;
+import anti.text;
+import com.example.mix;
+import com.example.tone;
+import com.example.tone as tn;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let three = 3;
+	let name = "tone";
+	printf("call %d %d\n".ptr, tone.LOW.raise(2).level as c_int,
+		tone.LOW.joined(tone.BOX.corner) as c_int);
+	printf("field %d %d\n".ptr, tone.LOW.level as c_int,
+		tone.BOX.corner.level as c_int);
+	printf("field and call %d\n".ptr,
+		tone.BOX.corner.raise(1).level as c_int);
+	printf("alias %d %d\n".ptr, tn.LOW.raise(5).level as c_int,
+		tn.BOX.corner.raise(5).level as c_int);
+	printf("hash %d %d\n".ptr, (tone.COUNT.hash() == three.hash()) as c_int,
+		(tone.NAME.hash() == name.hash()) as c_int);
+	let found = 0;
+	if tone.NAME.matches(re"^to") {
+		found = 1;
+	}
+	printf("text %d %d\n".ptr, tone.NAME.len as c_int, found as c_int);
+	printf("label %d\n".ptr, text.equal(tone.BOX.label, "box") as c_int);
+	printf("library %d %d\n".ptr, mix.mixed(4) as c_int,
+		mix.corner(2).level as c_int);
+	return 0;
+}

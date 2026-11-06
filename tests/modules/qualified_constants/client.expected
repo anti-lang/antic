@@ -1,0 +1,8 @@
+call 5 10
+field 3 7
+field and call 8
+alias 8 12
+hash 1 1
+text 4 1
+label 1
+library 77 9
