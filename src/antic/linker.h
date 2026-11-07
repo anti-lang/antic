@@ -140,9 +140,6 @@ void link_line(struct text *out, enum target t, const char *library,
                const char *runtime, enum cpu_level cpu, bool bundled,
                bool regex);
 
-/* Whether path names an object file or an archive for the linker. */
-bool link_is_input(const char *path);
-
 /* Append the path of the runtime as bitcode of mode for target t at level
    cpu below runtime. */
 void link_runtime_bitcode(struct text *out, const char *runtime, enum target t,
@@ -232,10 +229,6 @@ void link_native_library(struct text *out, const char *runtime, enum target t,
    Windows target t below runtime. */
 void link_windows_import_library(struct text *out, const char *runtime,
                                  enum target t, const char *name);
-
-/* Append the directory name of target t below the runtime's lib/ and
-   sysroot/, with LINUX_GLIBC_SUFFIX in the glibc mode. */
-void link_target_dir(struct text *out, enum target t, bool glibc);
 
 /* The flavour of lld that links for target t, a program of
    <runtime>/RUNTIME_BIN_DIR/ without the suffix of the host. */

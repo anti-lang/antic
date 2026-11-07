@@ -82,6 +82,8 @@ static atomic_int state;
 static struct fault faults[FAULTS_MAX];
 static int fault_count;
 static _Atomic int64_t counts[ANTI_RT_FAULT_KINDS];
+/* The depth of anti_rt_fault_hold, above 0 while the calls go uncounted. */
+static atomic_int holds;
 
 /* The streams whose read or write failed, until fclose. */
 #define STREAMS_MAX 8
@@ -210,13 +212,19 @@ static void ready(void)
     }
 }
 
+void anti_rt_fault_hold(bool hold)
+{
+    atomic_fetch_add_explicit(&holds, hold ? 1 : -1, memory_order_relaxed);
+}
+
 bool anti_rt_fault(enum anti_rt_fault_kind kind)
 {
     int64_t n;
     int i;
 
     ready();
-    if (fault_count == 0) {
+    if (fault_count == 0 ||
+        atomic_load_explicit(&holds, memory_order_relaxed) > 0) {
         return false;
     }
     n = atomic_fetch_add_explicit(&counts[kind], 1, memory_order_relaxed) + 1;

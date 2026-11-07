@@ -788,10 +788,10 @@ static void program_name(const struct build *b, enum target t,
    The key of a program holds what its link reads: the key of the source
    of the module with `main`, the options of the manifest, the digest of
    every library file that module reaches, the key of every object of a
-   dev link, the digest of the runtime of the target and level and the
-   options of the link. When the program that stands has the same key,
-   and the facts of its link and, in release mode, its symbols stand
-   beside it, the build links nothing. Sets b->program_key and
+   dev link, the digest of every archive of the runtime archive the link
+   may take and the options of the link. When the program that stands
+   has the same key, and the facts of its link and, in release mode, its
+   symbols stand beside it, the build links nothing. Sets b->program_key and
    b->program_reused. library is the library file of the module with
    `main`. Returns false when an input of the key cannot be read. */
 static bool program_reuse(struct build *b, enum target t, enum cpu_level cpu,
@@ -818,7 +818,9 @@ static bool program_reuse(struct build *b, enum target t, enum cpu_level cpu,
             return false;
         }
     }
-    cache_runtime(o->runtime, t, cpu, &b->program_key);
+    if (!cache_runtime(o->runtime, t, cpu, &b->program_key)) {
+        return false;
+    }
     for (i = 0; i < o->framework_count; i++) {
         text_appendf(&b->program_key, "framework %s\n", o->frameworks[i]);
     }

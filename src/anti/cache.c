@@ -19,6 +19,7 @@
 #include "antic.h"
 #include "arena.h"
 #include "digest.h"
+#include "fault.h"
 #include "files.h"
 #include "platform.h"
 #include "say.h"
@@ -138,21 +139,70 @@ bool cache_imports(const struct options *search, const char *library,
     return ok;
 }
 
-void cache_runtime(const char *runtime, enum target t, enum cpu_level cpu,
+/* Append `archive <path> <digest>` for every file of the list that the
+   link takes, with the path below the runtime archive at runtime. */
+static bool archive_lines(const char *runtime, const struct files_list *list,
+                          struct text *out)
+{
+    size_t skip = strlen(runtime);
+    size_t i;
+    char hex[65];
+
+    for (i = 0; i < list->count; i++) {
+        const char *path = text_cstr(&list->items[i]);
+        if (!link_is_input(path)) {
+            continue;
+        }
+        if (!sha256_file(path, hex)) {
+            say_anti("cannot read %s\n", path);
+            return false;
+        }
+        text_appendf(out, "archive %s %s\n",
+                     path + skip + (path[skip] == '/'), hex);
+    }
+    return true;
+}
+
+/* The files of the runtime archive that a link of target t at level cpu
+   may take, in the mode of glibc as well. */
+static bool target_archives(const char *runtime, enum target t,
+                            enum cpu_level cpu, bool glibc,
+                            struct files_list *list)
+{
+    struct text dir = {0};
+    bool ok;
+
+    text_appendf(&dir, "%s/%s/", runtime, RUNTIME_LIB_DIR);
+    link_target_dir(&dir, t, glibc);
+    ok = files_list_dir(text_cstr(&dir), list);
+    text_appendf(&dir, "/%s", cpu_name(cpu));
+    ok = ok && files_list_tree(text_cstr(&dir), "", list);
+    dir.length = 0;
+    text_appendf(&dir, "%s/%s/", runtime, RUNTIME_SYSROOT_DIR);
+    link_target_dir(&dir, t, glibc);
+    text_append(&dir, "/");
+    link_sysroot_libraries(&dir, t);
+    ok = ok && files_list_tree(text_cstr(&dir), "", list);
+    text_free(&dir);
+    return ok;
+}
+
+bool cache_runtime(const char *runtime, enum target t, enum cpu_level cpu,
                    struct text *out)
 {
-    struct text path = {0};
-    char hex[65];
+    struct files_list list = {0};
+    bool ok;
 
     if (runtime == NULL) {
         text_append(out, "runtime none\n");
-        return;
+        return true;
     }
-    link_runtime_library(&path, runtime, t, cpu);
-    if (sha256_file(text_cstr(&path), hex)) {
-        text_appendf(out, "runtime %s\n", hex);
-    } else {
-        text_append(out, "runtime none\n");
-    }
-    text_free(&path);
+    ANTI_FAULT_HOLD(true);
+    ok = target_archives(runtime, t, cpu, false, &list) &&
+         (target_info(t)->os != OS_LINUX ||
+          target_archives(runtime, t, cpu, true, &list)) &&
+         archive_lines(runtime, &list, out);
+    files_list_free(&list);
+    ANTI_FAULT_HOLD(false);
+    return ok;
 }

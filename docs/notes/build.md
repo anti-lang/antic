@@ -69,9 +69,13 @@ links in the same call. By Q2 of "Answers of 2026-11-06, fourth set" the
 build skips that call when the key of the program stands beside it.
 `program_reuse` writes the key. It holds the key of the source, the options
 and the digests of the library files the module reaches. The key of every
-object, the runtime and the options of the link follow. A release build keys its one call the
-same way, and keeps the program and its symbols together. `<program>.links`
-records what the link took for the notice.
+object and the options of the link follow. By Q2 of "Answers of 2026-11-07",
+`cache_runtime` adds the digest of every archive of the runtime archive the
+link may take: the native libraries of the target, the runtime of the level
+with its bitcode, and the libraries of the sysroot, in both modes of Linux.
+The fault seam counts none of those reads. A release build keys its one
+call the same way, and keeps the program and its symbols together.
+`<program>.links` records what the link took for the notice.
 
 ## The objects of `anti test`
 

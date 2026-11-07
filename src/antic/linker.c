@@ -205,6 +205,12 @@ void link_windows_import_library(struct text *out, const char *runtime,
     text_appendf(out, "/%s/%s.lib", SYSROOT_WINDOWS_LIB, name);
 }
 
+void link_sysroot_libraries(struct text *out, enum target t)
+{
+    text_append(out, target_info(t)->os == OS_WINDOWS ? SYSROOT_WINDOWS_LIB
+                                                      : SYSROOT_LIB);
+}
+
 void link_sysroot_marker(struct text *out, enum target t, bool glibc)
 {
     switch (target_info(t)->os) {

@@ -68,10 +68,22 @@ bool cache_key_of(const char *output, struct text *out);
 bool cache_imports(const struct options *search, const char *library,
                    struct text *out);
 
-/* Append the line `runtime <digest>` of the runtime of target t at level
-   cpu in the runtime archive at runtime to out, or `runtime none` where
-   the archive holds none. A program links it, so its key names it. */
-void cache_runtime(const char *runtime, enum target t, enum cpu_level cpu,
+/* Append to out the line `archive <path> <digest>` of every archive and
+   object of the runtime archive at runtime that a link of target t at
+   level cpu may take, with the path below the archive, or the line
+   `runtime none` where runtime is NULL. A program links them, so its key
+   names them. Returns false with a message when one cannot be read.
+
+   DESIGN: Q2 of "Answers of 2026-11-07" in docs/decisions.md. The key
+   named the runtime by the digest of libanti_rt.a alone, and the native
+   libraries by the version of the compiler, so a changed pin of raylib
+   kept a program linked against the old libraylib.a. The files are those
+   of lib/<target>/ itself, the native libraries among them, of
+   lib/<target>/<level>/ and below it, the runtime, its bitcode and
+   mimalloc, and of the library directory of the sysroot of the target,
+   in the glibc mode of Linux as well. Which of them a link takes is known
+   after the link alone, so the key names every one the link may take. */
+bool cache_runtime(const char *runtime, enum target t, enum cpu_level cpu,
                    struct text *out);
 
 #endif

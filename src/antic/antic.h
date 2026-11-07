@@ -27,10 +27,10 @@
 #include "target.h"
 #include "text.h"
 
-/* The four functions of the names of a link, which linker.c defines.
-   They stand here, since anti reads the option --lto, names the PDB of a
+/* The functions of the names of a link, which linker.c defines. They
+   stand here, since anti reads the option --lto, names the PDB of a
    Windows program as the link does and keys a cached program by the
-   runtime it links. The word of --lto that names
+   archives of the runtime archive it may link. The word of --lto that names
    mode, which names its directory of the
    runtime as bitcode as well. anti reads the option with the same
    words. */
@@ -48,6 +48,18 @@ void link_pdb_path(struct text *out, const char *executable);
    runtime. */
 void link_runtime_library(struct text *out, const char *runtime, enum target t,
                           enum cpu_level cpu);
+
+/* Whether path names an object file or an archive for the linker. */
+bool link_is_input(const char *path);
+
+/* Append the directory name of target t below the runtime's lib/ and
+   sysroot/, with LINUX_GLIBC_SUFFIX in the glibc mode. */
+void link_target_dir(struct text *out, enum target t, bool glibc);
+
+/* Append the path, relative to the sysroot of target t, of the directory
+   that holds the libraries and the start files its links take, in either
+   mode of Linux. */
+void link_sysroot_libraries(struct text *out, enum target t);
 
 /* Read the package header and the module path of the library file in
    data. Both lie in the memory pool. Returns false and writes a message

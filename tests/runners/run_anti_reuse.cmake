@@ -11,6 +11,7 @@
 #   TOOL      build or test
 #   MODE      dev or release
 #   CASE      one of the cases below
+#   HOST      the target of the host, as macos-arm64
 #
 # Cases, each between the first run and the second:
 #   unchanged  nothing changes, and the second run writes no file
@@ -21,6 +22,12 @@
 #              those of shapes.tuning stay
 #   option     the manifest names a version, which every file carries
 #   compiler   every key names another version of the compiler
+#   native     a native library of the runtime archive gains a member. No
+#              module is compiled again, and the program, or each runner
+#              of `anti test`, is linked again, by Q2 of "Answers of
+#              2026-11-07" in docs/decisions.md. Both runs take a stand-in
+#              runtime archive of links into RUNTIME, whose lib/HOST/
+#              holds a copy of libraylib.a, or raylib.lib on Windows
 #
 # A file counts as written when its time of change moved. The run waits
 # more than a second before the second run, since CMake reads the time in
@@ -35,6 +42,50 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 file(COPY "${PROJECT}/" DESTINATION "${here}")
 
+# DESIGN: the case native changes a library of the runtime archive, so it
+# runs against a stand-in of links, whose library of raylib is a copy of
+# its own. The library of every other target stays a link.
+set(runtime "${RUNTIME}")
+set(native "")
+if(CASE STREQUAL "native")
+    set(runtime "${WORK}/runtime")
+    file(MAKE_DIRECTORY "${runtime}/lib/${HOST}")
+    file(GLOB parts RELATIVE "${RUNTIME}" "${RUNTIME}/*")
+    foreach(part IN LISTS parts)
+        if(NOT part STREQUAL "lib")
+            file(CREATE_LINK "${RUNTIME}/${part}" "${runtime}/${part}"
+                 SYMBOLIC)
+        endif()
+    endforeach()
+    file(GLOB targets RELATIVE "${RUNTIME}/lib" "${RUNTIME}/lib/*")
+    foreach(target IN LISTS targets)
+        if(NOT target STREQUAL HOST)
+            file(CREATE_LINK "${RUNTIME}/lib/${target}"
+                 "${runtime}/lib/${target}" SYMBOLIC)
+        endif()
+    endforeach()
+    set(name "libraylib.a")
+    if(HOST MATCHES "^windows-")
+        set(name "raylib.lib")
+    endif()
+    file(GLOB entries RELATIVE "${RUNTIME}/lib/${HOST}"
+         "${RUNTIME}/lib/${HOST}/*")
+    foreach(entry IN LISTS entries)
+        if(entry STREQUAL name)
+            file(COPY_FILE "${RUNTIME}/lib/${HOST}/${entry}"
+                 "${runtime}/lib/${HOST}/${entry}")
+        else()
+            file(CREATE_LINK "${RUNTIME}/lib/${HOST}/${entry}"
+                 "${runtime}/lib/${HOST}/${entry}" SYMBOLIC)
+        endif()
+    endforeach()
+    set(native "${runtime}/lib/${HOST}/${name}")
+    set(LLVM_AR "${RUNTIME}/bin/llvm-ar")
+    if(CMAKE_HOST_WIN32)
+        set(LLVM_AR "${RUNTIME}/bin/llvm-ar.exe")
+    endif()
+endif()
+
 set(extra "")
 if(MODE STREQUAL "release")
     set(extra --release)
@@ -42,7 +93,7 @@ endif()
 
 function(run what)
     anti_run(status out err "${here}" ${TOOL} ${extra}
-             --runtime "${RUNTIME}")
+             --runtime "${runtime}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "${what} failed with ${status}\n${out}${err}")
     endif()
@@ -172,6 +223,15 @@ elseif(CASE STREQUAL "compiler")
         file(WRITE "${key}" "${text}")
     endforeach()
     snapshot(before)
+elseif(CASE STREQUAL "native")
+    # A member the link never takes, so the library still links.
+    file(WRITE "${WORK}/note.txt" "a member of no object\n")
+    execute_process(COMMAND "${LLVM_AR}" r "${native}" "${WORK}/note.txt"
+                    RESULT_VARIABLE code ERROR_VARIABLE ar_err
+                    ENCODING NONE)
+    if(NOT code EQUAL 0)
+        message(FATAL_ERROR "llvm-ar failed with ${code}\n${ar_err}")
+    endif()
 elseif(NOT CASE STREQUAL "unchanged")
     message(FATAL_ERROR "no case ${CASE}")
 endif()
@@ -190,11 +250,27 @@ elseif(CASE STREQUAL "source")
 elseif(CASE STREQUAL "import")
     expect_modules("${written}" OFF tuning)
     expect_modules("${written}" ON geometry area)
+elseif(CASE STREQUAL "native")
+    # The library files and the objects stay, and the link of each runner
+    # of `anti test` is written again.
+    foreach(m tuning geometry area main)
+        module_files(${m} files)
+        foreach(file IN LISTS files)
+            string(REGEX REPLACE "\\.o$" "${object_suffix}" file "${file}")
+            if(file MATCHES "\\.runner$")
+                if(NOT file IN_LIST written)
+                    message(FATAL_ERROR "the second run kept ${file}")
+                endif()
+            elseif(file IN_LIST written)
+                message(FATAL_ERROR "the second run wrote ${file} again")
+            endif()
+        endforeach()
+    endforeach()
 else()
     expect_modules("${written}" ON tuning geometry area main)
 endif()
-# A program the build links is written again exactly when a module
-# changed.
+# A program the build links is written again exactly when a module or
+# the runtime archive changed.
 if(TOOL STREQUAL "build")
     set(program "project")
     if(CMAKE_HOST_WIN32)

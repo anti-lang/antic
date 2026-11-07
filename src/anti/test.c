@@ -454,7 +454,9 @@ static bool runner_key(const struct test_unit *u, const struct options *base,
             return false;
         }
     }
-    cache_runtime(o->runtime, o->target, o->cpu, key);
+    if (!cache_runtime(o->runtime, o->target, o->cpu, key)) {
+        return false;
+    }
     for (i = 0; i < o->framework_count; i++) {
         text_appendf(key, "framework %s\n", o->frameworks[i]);
     }

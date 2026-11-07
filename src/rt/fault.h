@@ -108,6 +108,16 @@ int anti_rt_fault_fclose(FILE *f);
    the seam failed. */
 unsigned long anti_rt_fault_system_error(void);
 
+/* With hold true, no call of any kind is counted or fails until a call
+   with hold false. The calls nest.
+
+   DESIGN: the key of a program in anti reads every archive that the link
+   of its target may take, and their number follows the host, as the
+   size of the environment does for the kind env. Those reads go
+   uncounted, so a count of a test names the same call on every host.
+   Each other thread goes uncounted for the time as well. */
+void anti_rt_fault_hold(bool hold);
+
 #define ANTI_FAULT(kind, failed, call) \
     (anti_rt_fault(ANTI_RT_FAULT_##kind) ? (failed) : (call))
 #define ANTI_FREAD anti_rt_fault_fread
@@ -115,6 +125,7 @@ unsigned long anti_rt_fault_system_error(void);
 #define ANTI_FERROR anti_rt_fault_ferror
 #define ANTI_FFLUSH anti_rt_fault_fflush
 #define ANTI_FCLOSE anti_rt_fault_fclose
+#define ANTI_FAULT_HOLD(hold) anti_rt_fault_hold(hold)
 
 #elif defined(ANTI_COVERAGE)
 
@@ -133,6 +144,7 @@ unsigned long anti_rt_fault_system_error(void);
 #define ANTI_FERROR ferror
 #define ANTI_FFLUSH fflush
 #define ANTI_FCLOSE fclose
+#define ANTI_FAULT_HOLD(hold) ((void)0)
 
 #else
 
@@ -142,6 +154,7 @@ unsigned long anti_rt_fault_system_error(void);
 #define ANTI_FERROR ferror
 #define ANTI_FFLUSH fflush
 #define ANTI_FCLOSE fclose
+#define ANTI_FAULT_HOLD(hold) ((void)0)
 
 #endif
 

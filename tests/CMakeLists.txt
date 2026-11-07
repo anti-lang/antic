@@ -6536,11 +6536,12 @@ endforeach()
 
 # A second run of `anti build` and of `anti test` in each mode reuses what
 # the first compiled, and compiles again what a change reaches, by Q2 of
-# "Answers of 2026-11-06, fourth set" in docs/decisions.md. The header of
-# the runner states each case.
+# "Answers of 2026-11-06, fourth set" in docs/decisions.md. The case native
+# links again after a change of a native library, by Q2 of "Answers of
+# 2026-11-07". The header of the runner states each case.
 foreach(command build test)
     foreach(mode dev release)
-        foreach(case unchanged source import option compiler)
+        foreach(case unchanged source import option compiler native)
             add_test(NAME anti_reuse_${command}_${mode}_${case}
                 COMMAND "${CMAKE_COMMAND}"
                     "-DANTI=$<TARGET_FILE:anti>"
@@ -6550,6 +6551,7 @@ foreach(command build test)
                     "-DTOOL=${command}"
                     "-DMODE=${mode}"
                     "-DCASE=${case}"
+                    "-DHOST=${ANTIC_HOST_TARGET}"
                     -P "${ANTIC_RUNNERS}/run_anti_reuse.cmake")
         endforeach()
     endforeach()
