@@ -313,6 +313,12 @@ not re-open a settled decision without asking Eddie.
   parts of `asan`, the last up to test 7000: `asan` 252 s, 189 s, 259 s,
   196 s, 428 s and 442 s, `ubsan` 256 s, 191 s, 261 s, 209 s, 472 s and
   454 s.
+  The step of the answers of 2026-11-07 measured `host` in the parts
+  `ctest -I 1,2100`, `-I 2101,4300` and `-I 4301,6942`: 376 s, 270 s and
+  313 s before the commit of the key. It ran each sanitizer suite in the
+  six parts of `asan`, the last up to test 6940: `asan` 249 s, 188 s,
+  257 s, 194 s, 445 s and 456 s, `ubsan` 257 s, 189 s, 259 s, 201 s,
+  471 s and 509 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -919,11 +925,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6938 ctest tests pass on the development Mac, and two of them, the
+- 6942 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   Three of them are the expected failures of T209. The two other
   lines of `tests/known-failures.txt`, those of T136 and T138, carry
-  `host=windows`. The ASan and the UBSan builds run 6936 each
+  `host=windows`. The ASan and the UBSan builds run 6940 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
@@ -1257,7 +1263,9 @@ reports what it finished.
 - `anti build` and `anti test` reuse what an earlier run of the mode
   compiled, by Q2 of the same answers, with the keys of `src/anti/cache.c`.
   A build links nothing when the key of its program holds, and a dev run of
-  `anti test` links the objects of `anti build`. See `docs/notes/build.md`.
+  `anti test` links the objects of `anti build`. The key names the digest
+  of every archive of the runtime archive the link may take, by Q2 of
+  "Answers of 2026-11-07". See `docs/notes/build.md`.
 - `anti.graphics` is built, as `docs/notes/graphics.md` designs it. A
   program draws with `import anti.graphics;` and no manifest entry, in
   units of the largest square that fits the window, and links raylib
