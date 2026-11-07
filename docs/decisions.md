@@ -3387,6 +3387,12 @@ Eddie took these decisions on 2026-11-07. They answer the two questions of "Ques
 - Q1. T211 takes route (a). A new release of `anti-lang/llvm-tools` adds `llvm-objcopy`, also as `llvm-strip`, and `dsymutil`, and both travel in every package. A release program is then the one LTO link with `-g`, with its debug information stripped, and its symbols archive is written from that same link. This replaces route (b) of Q1 of the third set, whose second link did not give the code of the debug link on four of the six targets. Another session makes the release of the tools, and nothing is built before it stands. T211 stays open, and `symbols_moved_frame` stays on the list of known failures until then.
 - Q2. The thunk that wraps a callback of C at the entry of an exported function gives its float result no select of the canonical NaN. The result is a value C produced, and the thunk hands it on to Anti as it came. The select of form B applies wherever Anti code makes its bits visible. That is memory that a view or C reaches, a union, an argument of C and the result of an exported function. Every other function whose address the module takes keeps the select on its result. The thunk keeps the select on each float argument.
 
+## Answers of 2026-11-07, fifth set
+
+Eddie took this decision on 2026-11-07. It answers the question of "Questions for Eddie" in `docs/reports/2026-11-07-thunk-result.md`. It is not provisional, and the code builds it already.
+
+- Q1. A float from a callback of C can go back to C, as the result of an exported function or an argument of C. It takes the select of form B there like every other float. C receives the canonical NaN, not the bits C made. Every float Anti hands to C is canonical.
+
 ## Open
 
 - Enums used as bit flags want a form of their own, to be designed later. A binding writes such a parameter with the integer type of C, and the caller converts each value with `as`.
