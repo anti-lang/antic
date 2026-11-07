@@ -1,0 +1,183 @@
+//! One NaN on every target in an f16, by Q1 of "Answers of 2026-11-06, fourth
+//! set". `as f16` rounds a NaN to the sixteen bits, which keep its sign and the
+//! top of its payload, and an f16 is bits in memory. Each context is a function
+//! of its own that stores a NaN as an f16 and reads its bits. Each line holds
+//! the bits of three NaNs: 0/0 of a zero read at run time, whose sign follows
+//! the processor, its negation and a negative NaN with a payload. Every target
+//! gives the canonical NaN of an f16, 7e00, for all three. x86_64 below v3
+//! rounds through the runtime.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Bits32
+{
+	f: f32,
+	u: u32,
+}
+
+union Bits64
+{
+	f: f64,
+	u: u64,
+}
+
+/// NaN number `kind` of the three, from the zero `z`.
+fn make(z: f32, kind: int) -> f32
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits32 { u: 0xffd00000 };
+	return b.f + z;
+}
+
+fn make64(z: f64, kind: int) -> f64
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits64 { u: 0xfffa000000000000 };
+	return b.f + z;
+}
+struct Tone
+{
+	level: f16,
+	gain: f16,
+}
+
+fn half_in_function(z: f32, kind: int) -> u32
+{
+	let h: f16 = make(z, kind) as f16;
+	return *(&h as *u16) as u32;
+}
+
+fn half64_in_function(z: f64, kind: int) -> u32
+{
+	let h: f16 = (make64(z, kind) as f32) as f16;
+	return *(&h as *u16) as u32;
+}
+
+class Holder
+{
+	pub level: f16 = 0.0 as f16,
+
+	pub fn run(self, z: f32, kind: int) -> u32
+	{
+		self.level = make(z, kind) as f16;
+		return *(&self.level as *u16) as u32;
+	}
+}
+
+fn half_in_loop(z: f32, kind: int) -> u32
+{
+	let hs = [0.0 as f16, 0.0 as f16];
+	let bits: u32 = 0;
+	for i in 0..2 {
+		hs[i] = make(z, kind) as f16;
+		bits = *(&hs[i] as *u16) as u32;
+	}
+	return bits;
+}
+
+fn half_in_arm(z: f32, kind: int) -> u32
+{
+	let bits: u32 = 0;
+	switch kind {
+		9 => bits = 1,
+		else => {
+			let t = Tone { level: 1.0 as f16, gain: make(z, kind) as f16 };
+			bits = *(&t.gain as *u16) as u32;
+		},
+	}
+	return bits;
+}
+
+fn held(kind: int) -> ?int
+{
+	if kind == 9 {
+		return none;
+	}
+	return kind;
+}
+
+fn half_in_if_let(z: f32, kind: int) -> u32
+{
+	let bits: u32 = 0;
+	if let k = held(kind) {
+		let h: f16 = make(z, k) as f16;
+		let back: f32 = h;
+		bits = *(&back as *u32) >> 16;
+	} else {
+		bits = 1;
+	}
+	return bits;
+}
+
+fn half_in_defer(z: f32, kind: int, out: *u32)
+{
+	defer {
+		let h: f16 = make(z, kind) as f16;
+		*out = *(&h as *u16) as u32;
+	}
+	*out = 1;
+}
+
+fn apply(z: f32, f: fn(f32) -> u32) -> u32
+{
+	return f(z);
+}
+
+fn half_in_closure(z: f32, kind: int) -> u32
+{
+	return apply(z, fn(v) {
+		let h: f16 = make(v, kind) as f16;
+		return *(&h as *u16) as u32;
+	});
+}
+
+fn half_in_generic<T>(z: f32, kind: int) -> u32
+{
+	let h: f16 = make(z, kind) as f16;
+	return *(&h as *u16) as u32 + (size_of(T) - size_of(T)) as u32;
+}
+
+fn line(context: str, a: u32, b: u32, c: u32)
+{
+	printf("f16 %.*s %04x %04x %04x\n".ptr, context.len as c_int, context.ptr,
+		a, b, c);
+}
+
+fn main(args: []str) -> int
+{
+	let z: f32 = args.len as f32 - 1.0;
+	let z64: f64 = args.len as f64 - 1.0;
+	line("function", half_in_function(z, 0), half_in_function(z, 1),
+		half_in_function(z, 2));
+	let holder = alloc Holder { };
+	line("method", holder.run(z, 0), holder.run(z, 1), holder.run(z, 2));
+	delete(holder);
+	line("loop", half_in_loop(z, 0), half_in_loop(z, 1), half_in_loop(z, 2));
+	line("arm", half_in_arm(z, 0), half_in_arm(z, 1), half_in_arm(z, 2));
+	line("if_let", half_in_if_let(z, 0), half_in_if_let(z, 1),
+		half_in_if_let(z, 2));
+	let d0: u32 = 0;
+	let d1: u32 = 0;
+	let d2: u32 = 0;
+	half_in_defer(z, 0, &d0);
+	half_in_defer(z, 1, &d1);
+	half_in_defer(z, 2, &d2);
+	line("defer", d0, d1, d2);
+	line("closure", half_in_closure(z, 0), half_in_closure(z, 1),
+		half_in_closure(z, 2));
+	line("generic", half_in_generic<int>(z, 0), half_in_generic<int>(z, 1),
+		half_in_generic<int>(z, 2));
+	line("f64", half64_in_function(z64, 0), half64_in_function(z64, 1),
+		half64_in_function(z64, 2));
+	return 0;
+}

@@ -1,0 +1,10 @@
+exit 0
+reflect function 7fc00000 7fc00000 7fc00000
+reflect method 7fc00000 7fc00000 7fc00000
+reflect loop 7fc00000 7fc00000 7fc00000
+reflect arm 7fc00000 7fc00000 7fc00000
+reflect f16 7e00 7e00 7e00
+reflect defer 7fc00000 7fc00000 7fc00000
+reflect closure 7fc00000 7fc00000 7fc00000
+reflect generic 7fc00000 7fc00000 7fc00000
+reflect f64 7ff8000000000000 7ff8000000000000 7ff8000000000000

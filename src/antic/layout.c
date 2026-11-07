@@ -5,6 +5,7 @@
 #include "layout.h"
 
 #include <inttypes.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -733,7 +734,10 @@ static void write_const(struct layouts *l, struct ir_module *m,
         write_int(g, base, size, c->integer);
         break;
     case IR_CONST_FLOAT:
-        if (size == 4) {
+        /* One NaN on every target, whichever host folded the constant. */
+        if (isnan(c->floating)) {
+            bits = size == 4 ? 0x7fc00000u : 0x7ff8000000000000u;
+        } else if (size == 4) {
             single = arith_to_f32(c->floating);
             memcpy(&bits, &single, sizeof single);
         } else {

@@ -1,0 +1,204 @@
+//! One NaN on every target in the default hash, by Q1 of "Answers of
+//! 2026-11-06, fourth set". `x.hash()` keeps the bits of a NaN, so each context
+//! hashes a NaN of another kind of value and compares the hash with the one of
+//! the same value that holds the canonical NaN, written as bits. Each line
+//! holds three answers, for 0/0 of a zero read at run time, whose sign follows
+//! the processor, its negation and a negative NaN with a payload. Every target
+//! answers 1 for all three.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Bits32
+{
+	f: f32,
+	u: u32,
+}
+
+union Bits64
+{
+	f: f64,
+	u: u64,
+}
+
+/// NaN number `kind` of the three, from the zero `z`.
+fn make(z: f32, kind: int) -> f32
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits32 { u: 0xffd00000 };
+	return b.f + z;
+}
+
+fn make64(z: f64, kind: int) -> f64
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits64 { u: 0xfffa000000000000 };
+	return b.f + z;
+}
+/// The canonical NaN, written as bits.
+fn canonical() -> f32
+{
+	let b = Bits32 { u: 0x7fc00000 };
+	return b.f;
+}
+
+fn canonical64() -> f64
+{
+	let b = Bits64 { u: 0x7ff8000000000000 };
+	return b.f;
+}
+
+struct Pair
+{
+	x: f32,
+	y: f32,
+}
+
+variant Shape
+{
+	Circle { r: f32 },
+	Empty,
+}
+
+fn hash_in_function(z: f32, kind: int) -> int
+{
+	let x = make(z, kind);
+	return (x.hash() == canonical().hash()) as int;
+}
+
+fn hash64_in_function(z: f64, kind: int) -> int
+{
+	let x = make64(z, kind);
+	return (x.hash() == canonical64().hash()) as int;
+}
+
+class Holder
+{
+	pub value: f32 = 0.0,
+
+	pub fn run(self, z: f32, kind: int) -> int
+	{
+		self.value = make(z, kind);
+		return (self.value.hash() == canonical().hash()) as int;
+	}
+}
+
+fn hash_in_loop(z: f32, kind: int) -> int
+{
+	let same = 0;
+	for i in 0..2 {
+		let xs = [make(z, kind), i as f32];
+		let ys = [canonical(), i as f32];
+		same = (xs.hash() == ys.hash()) as int;
+	}
+	return same;
+}
+
+fn hash_in_arm(z: f32, kind: int) -> int
+{
+	let same = 0;
+	switch kind {
+		9 => same = 2,
+		else => {
+			let p = Pair { x: 1.0, y: make(z, kind) };
+			let q = Pair { x: 1.0, y: canonical() };
+			same = (p.hash() == q.hash()) as int;
+		},
+	}
+	return same;
+}
+
+fn held(kind: int) -> ?int
+{
+	if kind == 9 {
+		return none;
+	}
+	return kind;
+}
+
+fn hash_in_if_let(z: f32, kind: int) -> int
+{
+	let same = 0;
+	if let k = held(kind) {
+		let t = (make(z, k), 3);
+		let u = (canonical(), 3);
+		same = (t.hash() == u.hash()) as int;
+	} else {
+		same = 2;
+	}
+	return same;
+}
+
+fn hash_in_defer(z: f32, kind: int, out: *int)
+{
+	defer {
+		let a: ?f32 = make(z, kind);
+		let b: ?f32 = canonical();
+		*out = (a.hash() == b.hash()) as int;
+	}
+	*out = 2;
+}
+
+fn apply(z: f32, f: fn(f32) -> int) -> int
+{
+	return f(z);
+}
+
+fn hash_in_closure(z: f32, kind: int) -> int
+{
+	return apply(z, fn(v) {
+		let s = Shape.Circle { r: make(v, kind) };
+		let c = Shape.Circle { r: canonical() };
+		return (s.hash() == c.hash()) as int;
+	});
+}
+
+fn hash_in_generic<T: hash>(x: T, y: T) -> int
+{
+	return (x.hash() == y.hash()) as int;
+}
+
+fn line(context: str, a: int, b: int, c: int)
+{
+	printf("hash %.*s %d %d %d\n".ptr, context.len as c_int, context.ptr,
+		a as c_int, b as c_int, c as c_int);
+}
+
+fn main(args: []str) -> int
+{
+	let z: f32 = args.len as f32 - 1.0;
+	let z64: f64 = args.len as f64 - 1.0;
+	line("function", hash_in_function(z, 0), hash_in_function(z, 1),
+		hash_in_function(z, 2));
+	let holder = alloc Holder { };
+	line("method", holder.run(z, 0), holder.run(z, 1), holder.run(z, 2));
+	delete(holder);
+	line("loop", hash_in_loop(z, 0), hash_in_loop(z, 1), hash_in_loop(z, 2));
+	line("arm", hash_in_arm(z, 0), hash_in_arm(z, 1), hash_in_arm(z, 2));
+	line("if_let", hash_in_if_let(z, 0), hash_in_if_let(z, 1),
+		hash_in_if_let(z, 2));
+	let d0 = 0;
+	let d1 = 0;
+	let d2 = 0;
+	hash_in_defer(z, 0, &d0);
+	hash_in_defer(z, 1, &d1);
+	hash_in_defer(z, 2, &d2);
+	line("defer", d0, d1, d2);
+	line("closure", hash_in_closure(z, 0), hash_in_closure(z, 1),
+		hash_in_closure(z, 2));
+	line("generic", hash_in_generic(make(z, 0), canonical()),
+		hash_in_generic(make(z, 1), canonical()),
+		hash_in_generic(make(z, 2), canonical()));
+	line("f64", hash64_in_function(z64, 0), hash64_in_function(z64, 1),
+		hash64_in_function(z64, 2));
+	return 0;
+}

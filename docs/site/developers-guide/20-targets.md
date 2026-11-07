@@ -172,7 +172,13 @@ The release build at `v1` writes `blend` with the SSE forms and `widen` as a cal
 <blend>:
 subsd %xmm0, %xmm1
 mulsd %xmm2, %xmm1
-addsd %xmm1, %xmm0
+addsd %xmm0, %xmm1
+movapd %xmm1, %xmm2
+cmpunordsd %xmm1, %xmm2
+movsd (%rip), %xmm0
+andpd %xmm2, %xmm0
+andnpd %xmm1, %xmm2
+orpd %xmm2, %xmm0
 retq
 ...
 <widen>:
@@ -181,6 +187,7 @@ jmp
 ```
 
 - `subsd`, `mulsd` and `addsd` take two operands, and the second is also the destination.
+- `blend` is exported, so its result takes the canonical NaN. `v1` has no blend instruction, so `cmpunordsd` makes a mask and `andpd`, `andnpd` and `orpd` choose by it.
 - `widen` loads the 16 bits of the `f16` into `%edi` and jumps to `anti_rt_f16_to_f32`, a tail call. The disassembly shows the jump without the name of its target.
 
 At `v3`, the default of both x86_64 targets, the same source gives the VEX forms and no call.
@@ -190,6 +197,8 @@ At `v3`, the default of both x86_64 targets, the same source gives the VEX forms
 vsubsd %xmm0, %xmm1, %xmm1
 vmulsd %xmm2, %xmm1, %xmm1
 vaddsd %xmm1, %xmm0, %xmm0
+vcmpunordsd %xmm0, %xmm0, %xmm1
+vblendvpd %xmm1, (%rip), %xmm0, %xmm0
 retq
 ...
 <widen>:
@@ -199,6 +208,7 @@ retq
 ```
 
 - A VEX instruction takes three operands, the last one the destination.
+- `vblendvpd` of AVX chooses the canonical NaN in one instruction, where `v1` took four.
 - `vcvtph2ps` is the F16C conversion from half to single precision. `vpinsrw` puts the 16 bits into the register first.
 - `blend` is a multiply and an add at `v3` as well. The LLVM text carries no flag that lets LLVM contract the two, so the FMA of the level does not fuse them. The result is the same on every level.
 

@@ -110,14 +110,17 @@ double anti_rt_fabs(double x)
     return __builtin_elementwise_abs(x);
 }
 
+/* DESIGN: Q1 of "Answers of 2026-11-06, fourth set". The sign of a NaN
+   follows the processor, so a NaN gives its sign as the canonical NaN
+   does, the sign of 0x7fc00000, on every target. */
 float anti_rt_copysignf(float x, float y)
 {
-    return __builtin_elementwise_copysign(x, y);
+    return __builtin_elementwise_copysign(x, __builtin_isnan(y) ? 1.0f : y);
 }
 
 double anti_rt_copysign(double x, double y)
 {
-    return __builtin_elementwise_copysign(x, y);
+    return __builtin_elementwise_copysign(x, __builtin_isnan(y) ? 1.0 : y);
 }
 
 /* DESIGN: minimumnum and maximumnum of LLVM are minimumNumber and

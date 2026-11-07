@@ -1,0 +1,10 @@
+exit 0
+f16 function 7e00 7e00 7e00
+f16 method 7e00 7e00 7e00
+f16 loop 7e00 7e00 7e00
+f16 arm 7e00 7e00 7e00
+f16 if_let 7fc0 7fc0 7fc0
+f16 defer 7e00 7e00 7e00
+f16 closure 7e00 7e00 7e00
+f16 generic 7e00 7e00 7e00
+f16 f64 7e00 7e00 7e00

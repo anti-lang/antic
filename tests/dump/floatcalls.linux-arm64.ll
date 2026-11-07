@@ -15,30 +15,50 @@ b0:
   store double %p1, ptr %t1, align 8
   %v0 = load ptr, ptr %t0, align 8
   %v1 = load double, ptr %t1, align 8
-  %v2 = call i32 (ptr, ...) @printf(ptr %v0, double %v1, i64 3)
-  store i32 %v2, ptr %t2, align 4
-  %v3 = load double, ptr %t1, align 8
-  %v4 = call double (i64, double, i64, float) @mix(i64 1, double %v3, i64 2, float 0x3FE0000000000000)
-  store double %v4, ptr %t3, align 8
+  %v2 = fcmp uno double %v1, 0.0
+  %v3 = select i1 %v2, double 0x7FF8000000000000, double %v1
+  %v4 = call i32 (ptr, ...) @printf(ptr %v0, double %v3, i64 3)
+  store i32 %v4, ptr %t2, align 4
   %v5 = load double, ptr %t1, align 8
-  %v6 = load double, ptr %t1, align 8
-  %v7 = load double, ptr %t1, align 8
-  %v8 = load double, ptr %t1, align 8
+  %v6 = fcmp uno double %v5, 0.0
+  %v7 = select i1 %v6, double 0x7FF8000000000000, double %v5
+  %v8 = call double (i64, double, i64, float) @mix(i64 1, double %v7, i64 2, float 0x3FE0000000000000)
+  store double %v8, ptr %t3, align 8
   %v9 = load double, ptr %t1, align 8
-  %v10 = load double, ptr %t1, align 8
-  %v11 = load double, ptr %t1, align 8
+  %v10 = fcmp uno double %v9, 0.0
+  %v11 = select i1 %v10, double 0x7FF8000000000000, double %v9
   %v12 = load double, ptr %t1, align 8
-  %v13 = call float (double, double, double, double, double, double, double, double, float, float) @nine(double %v5, double %v6, double %v7, double %v8, double %v9, double %v10, double %v11, double %v12, float 0x3FF0000000000000, float 0x4000000000000000)
-  store float %v13, ptr %t4, align 4
-  %v14 = load float, ptr %t4, align 4
-  %v15 = fpext float %v14 to double
-  store double %v15, ptr %t5, align 8
-  %v16 = load double, ptr %t3, align 8
-  %v17 = load double, ptr %t5, align 8
-  %v18 = fadd double %v16, %v17
-  store double %v18, ptr %t6, align 8
-  %v19 = load double, ptr %t6, align 8
-  ret double %v19
+  %v13 = fcmp uno double %v12, 0.0
+  %v14 = select i1 %v13, double 0x7FF8000000000000, double %v12
+  %v15 = load double, ptr %t1, align 8
+  %v16 = fcmp uno double %v15, 0.0
+  %v17 = select i1 %v16, double 0x7FF8000000000000, double %v15
+  %v18 = load double, ptr %t1, align 8
+  %v19 = fcmp uno double %v18, 0.0
+  %v20 = select i1 %v19, double 0x7FF8000000000000, double %v18
+  %v21 = load double, ptr %t1, align 8
+  %v22 = fcmp uno double %v21, 0.0
+  %v23 = select i1 %v22, double 0x7FF8000000000000, double %v21
+  %v24 = load double, ptr %t1, align 8
+  %v25 = fcmp uno double %v24, 0.0
+  %v26 = select i1 %v25, double 0x7FF8000000000000, double %v24
+  %v27 = load double, ptr %t1, align 8
+  %v28 = fcmp uno double %v27, 0.0
+  %v29 = select i1 %v28, double 0x7FF8000000000000, double %v27
+  %v30 = load double, ptr %t1, align 8
+  %v31 = fcmp uno double %v30, 0.0
+  %v32 = select i1 %v31, double 0x7FF8000000000000, double %v30
+  %v33 = call float (double, double, double, double, double, double, double, double, float, float) @nine(double %v11, double %v14, double %v17, double %v20, double %v23, double %v26, double %v29, double %v32, float 0x3FF0000000000000, float 0x4000000000000000)
+  store float %v33, ptr %t4, align 4
+  %v34 = load float, ptr %t4, align 4
+  %v35 = fpext float %v34 to double
+  store double %v35, ptr %t5, align 8
+  %v36 = load double, ptr %t3, align 8
+  %v37 = load double, ptr %t5, align 8
+  %v38 = fadd double %v36, %v37
+  store double %v38, ptr %t6, align 8
+  %v39 = load double, ptr %t6, align 8
+  ret double %v39
 }
 
 define internal noundef float @floatcalls.last(double noundef %p0, double noundef %p1, double noundef %p2, double noundef %p3, double noundef %p4, double noundef %p5, double noundef %p6, double noundef %p7, float noundef %p8, float noundef %p9) #0 {

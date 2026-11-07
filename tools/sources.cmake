@@ -47,6 +47,7 @@ set(ANTIC_CORE_SOURCES
     src/antic/llvm_emit_call.c
     src/antic/llvm_emit_facts.c
     src/antic/llvm_emit_function.c
+    src/antic/llvm_emit_nan.c
     src/antic/llvm_run.c
     src/antic/llvm_target.c
     src/antic/lower.c

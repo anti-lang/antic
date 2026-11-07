@@ -1284,7 +1284,9 @@ define internal noundef double @scale(double noundef %p0, double noundef %p1) #4
 b0:
   %v2 = fmul double %p0, %p1
   %v4 = fadd double %v2, 5.000000e-01
-  ret double %v4
+  %v6 = fcmp uno double %v4, 0.000000e+00
+  %v7 = select i1 %v6, double +qnan, double %v4
+  ret double %v7
 }
 ...
   %v2 = fcmp olt double %p0, %p1
@@ -1294,6 +1296,8 @@ b0:
 
 `fmul` and `fadd` stay two instructions, `vmulsd` and `vaddsd`, on a processor of level `v3` that has a fused one. The result of `x * y + 0.5` is therefore the same bits on all six targets. `fcmp olt` is the ordered less-than, false for a NaN. The other comparisons are `oeq`, `ole`, `ogt` and `oge`, and `!=` is `une`. `llvm.fptosi.sat` is the saturating conversion to a signed integer, and `llvm.fptoui.sat` the one to an unsigned integer.
 
+`scale` is exported, so C reads the bits of its result. The `fcmp uno` and the `select` give a NaN the canonical bits there, `+qnan` in the text of `opt`, so C sees one NaN on every target. A float that stays in the registers of the program takes no select.
+
 An `f16` is an `i16` of its bits in the IR of antic. The LLVM text loads the `i16`, casts it to a `half` and widens it, or narrows a `float` to a `half` and stores its bits. In release mode `opt` folds the load and the cast into a `load half`.
 
 ```llvm excerpt=floats target=linux-x86_64 mode=release
@@ -1302,11 +1306,15 @@ An `f16` is an `i16` of its bits in the IR of antic. The LLVM text loads the `i1
   %v6 = getelementptr inbounds nuw i8, ptr %p0, i64 4
   %v8 = load float, ptr %v6, align 4, !tbaa !22
   %v11 = fmul float %v8, %v4
-  ret float %v11
+  %v13 = fcmp uno float %v11, 0.000000e+00
+  %v14 = select i1 %v13, float +qnan, float %v11
+  ret float %v14
 }
 ...
-  %v1 = fptrunc float %p1 to half
-  store half %v1, ptr %p0, align 2, !tbaa !18
+  %v1 = fcmp uno float %p1, 0.000000e+00
+  %v2 = select i1 %v1, float +qnan, float %p1
+  %v3 = fptrunc float %v2 to half
+  store half %v3, ptr %p0, align 2, !tbaa !18
 ```
 
 `load half` reads the two bytes of `level` at offset 0, and `fpext` widens them. `gain` stands at offset 4, after two bytes of padding. `fptrunc` rounds the `f32` to a half before the store.
@@ -1318,8 +1326,13 @@ At `v3` the conversion is one instruction, `vcvtph2ps` or `vcvtps2ph`.
 vpinsrw $0x0, (%rdi), %xmm0, %xmm0
 vcvtph2ps %xmm0, %xmm0
 vmulss 0x4(%rdi), %xmm0, %xmm0
+vcmpunordss %xmm0, %xmm0, %xmm1
+vbroadcastss (%rip), %xmm2
+vblendvps %xmm1, %xmm2, %xmm0, %xmm0
 retq
 ```
+
+`level` is exported, so the select of the canonical NaN closes it: `vcmpunordss` finds a NaN, and `vblendvps` puts the canonical one in its place.
 
 arm64 converts with `fcvt s0, h0` and `fcvt h0, s0` at every level. The x86_64 levels `v1` and `v2` have no such instruction. There the LLVM text calls `anti_rt_f16_to_f32` and `anti_rt_f32_to_f16` of `src/rt/f16.c`, which take and give the half in the low 16 bits of an integer register.
 

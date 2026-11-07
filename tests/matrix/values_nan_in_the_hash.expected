@@ -1,0 +1,10 @@
+exit 0
+hash function 1 1 1
+hash method 1 1 1
+hash loop 1 1 1
+hash arm 1 1 1
+hash if_let 1 1 1
+hash defer 1 1 1
+hash closure 1 1 1
+hash generic 1 1 1
+hash f64 1 1 1

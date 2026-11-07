@@ -857,10 +857,14 @@ static void conversions(void)
                      "  %v1 = bitcast i16 %v0 to half\n"
                      "  %v2 = fpext half %v1 to float\n"
                      "  store float %v2, ptr %t1, align 4\n"));
+    /* One NaN on every target: the rounding takes the canonical NaN. */
     CHECK(translates(IR_HTRUNC, IR_F32, IR_I16, true,
-                     "  %v1 = fptrunc float %v0 to half\n"
-                     "  %v2 = bitcast half %v1 to i16\n"
-                     "  store i16 %v2, ptr %t1, align 2\n"));
+                     "  %v1 = fcmp uno float %v0, 0.0\n"
+                     "  %v2 = select i1 %v1, float 0x7FF8000000000000, float "
+                     "%v0\n"
+                     "  %v3 = fptrunc float %v2 to half\n"
+                     "  %v4 = bitcast half %v3 to i16\n"
+                     "  store i16 %v4, ptr %t1, align 2\n"));
 
     /* Each intrinsic is declared once, after the definitions. */
     begin(&x);
@@ -1721,14 +1725,19 @@ static void vectors(void)
                     "  %v6 = load <4 x float>, ptr %v4, align 16\n"
                     "  %v7 = load <4 x float>, ptr %v5, align 16\n"
                     "  %v8 = fadd <4 x float> %v6, %v7\n"
-                    "  store <4 x float> %v8, ptr %v3, align 16\n"));
-    CHECK(holds(&x, "  %v14 = fcmp olt <4 x float> %v12, %v13\n"
-                    "  %v15 = zext <4 x i1> %v14 to <4 x i8>\n"
-                    "  store <4 x i8> %v15, ptr %v9, align 1\n"));
-    CHECK(holds(&x, "  %v21 = and <4 x i32> %v20, <i32 31, i32 31, i32 31, "
+                    "  %v9 = fcmp uno <4 x float> %v8, zeroinitializer\n"
+                    "  %v10 = select <4 x i1> %v9, "
+                    "<4 x float> <float 0x7FF8000000000000, float 0x7FF8000000000000, "
+                    "float 0x7FF8000000000000, float 0x7FF8000000000000>, "
+                    "<4 x float> %v8\n"
+                    "  store <4 x float> %v10, ptr %v3, align 16\n"));
+    CHECK(holds(&x, "  %v16 = fcmp olt <4 x float> %v14, %v15\n"
+                    "  %v17 = zext <4 x i1> %v16 to <4 x i8>\n"
+                    "  store <4 x i8> %v17, ptr %v11, align 1\n"));
+    CHECK(holds(&x, "  %v23 = and <4 x i32> %v22, <i32 31, i32 31, i32 31, "
                     "i32 31>\n"
-                    "  %v22 = shl <4 x i32> %v19, %v21\n"
-                    "  store <4 x i32> %v22, ptr %v16, align 16\n"));
+                    "  %v24 = shl <4 x i32> %v21, %v23\n"
+                    "  store <4 x i32> %v24, ptr %v18, align 16\n"));
     end(&x);
 }
 
@@ -2098,15 +2107,20 @@ static void vector_moves(void)
                     "  %v1 = load ptr, ptr %t1, align 8\n"
                     "  %v2 = load <4 x float>, ptr %v1, align 16\n"
                     "  %v3 = fneg <4 x float> %v2\n"
-                    "  store <4 x float> %v3, ptr %v0, align 16\n"));
-    CHECK(holds(&x, "  %v7 = sub <4 x i32> zeroinitializer, %v6\n"
-                    "  store <4 x i32> %v7, ptr %v4, align 16\n"));
-    CHECK(holds(&x, "  %v11 = xor <4 x i32> %v10, <i32 -1, i32 -1, i32 -1, "
+                    "  %v4 = fcmp uno <4 x float> %v3, zeroinitializer\n"
+                    "  %v5 = select <4 x i1> %v4, "
+                    "<4 x float> <float 0x7FF8000000000000, float 0x7FF8000000000000, "
+                    "float 0x7FF8000000000000, float 0x7FF8000000000000>, "
+                    "<4 x float> %v3\n"
+                    "  store <4 x float> %v5, ptr %v0, align 16\n"));
+    CHECK(holds(&x, "  %v9 = sub <4 x i32> zeroinitializer, %v8\n"
+                    "  store <4 x i32> %v9, ptr %v6, align 16\n"));
+    CHECK(holds(&x, "  %v13 = xor <4 x i32> %v12, <i32 -1, i32 -1, i32 -1, "
                     "i32 -1>\n"));
-    CHECK(holds(&x, "  %v14 = load <4 x float>, ptr %v13, align 16\n"
-                    "  %v15 = shufflevector <4 x float> %v14, <4 x float> "
+    CHECK(holds(&x, "  %v16 = load <4 x float>, ptr %v15, align 16\n"
+                    "  %v17 = shufflevector <4 x float> %v16, <4 x float> "
                     "poison, <4 x i32> <i32 3, i32 2, i32 1, i32 0>\n"
-                    "  store <4 x float> %v15, ptr %v12, align 16\n"));
+                    "  store <4 x float> %v17, ptr %v14, align 16\n"));
     end(&x);
 }
 

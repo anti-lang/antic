@@ -178,15 +178,17 @@ b0:
   %t2 = alloca float, align 4
   store float %p0, ptr %t0, align 4
   %v0 = load float, ptr %t0, align 4
-  %v1 = call i32 @anti_rt_f32_to_f16(float %v0)
-  %v2 = trunc i32 %v1 to i16
-  store i16 %v2, ptr %t1, align 2
-  %v3 = load i16, ptr %t1, align 2
-  %v4 = zext i16 %v3 to i32
-  %v5 = call float @anti_rt_f16_to_f32(i32 %v4)
-  store float %v5, ptr %t2, align 4
-  %v6 = load float, ptr %t2, align 4
-  ret float %v6
+  %v1 = fcmp uno float %v0, 0.0
+  %v2 = select i1 %v1, float 0x7FF8000000000000, float %v0
+  %v3 = call i32 @anti_rt_f32_to_f16(float %v2)
+  %v4 = trunc i32 %v3 to i16
+  store i16 %v4, ptr %t1, align 2
+  %v5 = load i16, ptr %t1, align 2
+  %v6 = zext i16 %v5 to i32
+  %v7 = call float @anti_rt_f16_to_f32(i32 %v6)
+  store float %v7, ptr %t2, align 4
+  %v8 = load float, ptr %t2, align 4
+  ret float %v8
 }
 
 define hidden { i64, i64 } @effects.collect() #0 {

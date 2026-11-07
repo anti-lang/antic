@@ -252,7 +252,9 @@ b0:
   %v1 = tail call i64 @strlen(ptr nonnull dereferenceable(1) %p0)
   ret i64 %v1
 ...
-  %v3 = tail call i32 (ptr, ...) @printf(ptr nonnull dereferenceable(1) @tocee.
+  %v3 = fcmp uno double %p1, 0.000000e+00
+  %v4 = select i1 %v3, double +qnan, double %p1
+  %v5 = tail call i32 (ptr, ...) @printf(ptr nonnull dereferenceable(1) @tocee.
 ...
   tail call void @qsort(ptr %p0, i64 4, i64 4, ptr nonnull @tocee.by_value)
 ...
@@ -262,6 +264,7 @@ declare noundef i64 @strlen(ptr noundef captures(none))
 - `length` is one call of `strlen` and a return. The call is a tail call, so the machine code is a jump.
 - LLVM knows `strlen` by its name and marks its argument as a pointer to at least one byte. An `extern fn` of the C library gets the attributes LLVM keeps for that name.
 - The call of `printf` carries its type `i32 (ptr, ...)`, which marks the variadic call.
+- C reads the bits of a float it takes, so `ratio` takes the canonical NaN first. `fcmp uno` finds a NaN, and the `select` puts the canonical one in its place.
 - The last argument of `qsort` is the address of `tocee.by_value`. A function passes to C as one pointer.
 - The `declare` line is all that the module holds of `strlen`.
 
@@ -269,6 +272,8 @@ The machine code of `report` shows the one rule of a variadic call on x86-64.
 
 ```asm excerpt=tocee target=linux-x86_64 mode=release
 <report>:
+vcmpunordsd %xmm0, %xmm0, %xmm1
+vblendvpd %xmm1, (%rip), %xmm0, %xmm0
 movl %edi, %esi
 leaq (%rip), %rdi
 movb $0x1, %al
@@ -276,7 +281,7 @@ jmp
 ```
 
 - `n` arrives in `edi` and moves to `esi`, the second integer argument of `printf`. The `leaq` puts the address of the format into `rdi`.
-- `ratio` arrives in `xmm0` and stays there.
+- `ratio` arrives in `xmm0` and stays there. `vcmpunordsd` and `vblendvpd` give a NaN the canonical bits before C reads it.
 - `movb $0x1, %al` is the count of vector registers a variadic call uses, which System V asks for.
 - The `jmp` is the tail call of `printf`.
 
@@ -811,13 +816,16 @@ export fn far(x: f32, y: f32) -> bool
 ```llvm excerpt=bound target=linux-x86_64 mode=release
 define dso_local noundef zeroext range(i8 0, 2) i8 @far(float noundef %p0, float noundef %p1)
 ...
-  %v8 = tail call float @point_length_squared(<2 x float>
+  %2 = fcmp uno <2 x float> %1, zeroinitializer
+  %3 = select <2 x i1> %2, <2 x float> splat (float +qnan), <2 x float> %1
+  %v12 = tail call float @point_length_squared(<2 x float> %3)
 ...
 declare noundef float @point_length_squared(<2 x float>)
 ```
 
 - A `Point` of two `float` fields is 8 bytes of class SSE, so System V passes it in one vector register. antic writes that as `<2 x float>`.
 - The call goes to the function of the shim. The inline body of the header stays in C, behind one call.
+- The fields stand in the memory of the struct, so a NaN in either takes the canonical bits before C reads it. `opt` makes one vector `select` of the two stores.
 
 Where it lives: `src/anti/bind.c` holds the command, `bindclang.c` reads a header, `bindapi.c` a description, `bindtype.c` parses a C type, `bindexpr.c` evaluates a constant, and `bindwrite.c` writes the module, the shim and the probes.
 
@@ -827,7 +835,7 @@ A binding is declarations. It adds no code to a program, in dev or in release.
 
 | Cost | Count |
 |---|---|
-| A bound function | one `declare` in each module that calls it, and one `call` per call |
+| A bound function | one `declare` in each module that calls it, and one `call` per call, with the select of the canonical NaN for a float argument |
 | A bound inline function | one more call, into the shim, since its body is C |
 | A bound struct | its C layout. `size_of` in Anti equals `sizeof` in C, which the probe prints |
 | A bound constant | a constant of the module, folded where it is used |

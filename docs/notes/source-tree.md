@@ -181,6 +181,7 @@ and the driver that runs a compilation.
 | `src/antic/llvm_emit_call.c` | The C convention of the LLVM text: the classification, the parameters and the prologue of a function, the arguments and the result of a call, the atomic calls, the signature and the linkage. |
 | `src/antic/llvm_emit_facts.c` | The facts for opt: the ranges of the loads, the `!tbaa` tree, the facts of the tables, the weights of a cold branch and the functions whose frame a stack trace keeps. |
 | `src/antic/llvm_emit_function.c` | The text of a function: the operands and constants, the scalar, memory, wide and simd operations, the flags, each instruction and the definition. |
+| `src/antic/llvm_emit_nan.c` | One NaN on every target: the slots no view reaches, the floats that need no canonical NaN, the functions code outside Anti calls and the select of the canonical NaN. |
 | `src/antic/llvm_emit_parts.h` | What the files of the LLVM text share, `struct emitter` and the functions of more than one file, each under the file that defines it. |
 | `src/antic/llvm_run.c` | The runs of opt and llc on the text, with the options of each mode. |
 | `src/antic/llvm_run.h` | The interface of `llvm_run.c`. |

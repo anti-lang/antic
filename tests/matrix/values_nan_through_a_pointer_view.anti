@@ -1,0 +1,201 @@
+//! One NaN on every target through a pointer that reads the bytes of a float as
+//! an integer, by Q1 of "Answers of 2026-11-06, fourth set". Each context is a
+//! function of its own that stores a NaN and reads the same bytes through a
+//! view: a local whose address is taken, a field of a struct, an element of an
+//! array, a field of an object and memory behind a pointer. Each line holds the
+//! bits of three NaNs: 0/0 of a zero read at run time, whose sign follows the
+//! processor, its negation and a negative NaN with a payload. Every target
+//! gives the canonical NaN for all three. The line `bytes` reads the two bytes
+//! that hold the sign and the top of the payload.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Bits32
+{
+	f: f32,
+	u: u32,
+}
+
+union Bits64
+{
+	f: f64,
+	u: u64,
+}
+
+/// NaN number `kind` of the three, from the zero `z`.
+fn make(z: f32, kind: int) -> f32
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits32 { u: 0xffd00000 };
+	return b.f + z;
+}
+
+fn make64(z: f64, kind: int) -> f64
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits64 { u: 0xfffa000000000000 };
+	return b.f + z;
+}
+struct Pair
+{
+	x: f32,
+	y: f32,
+}
+
+fn view_in_function(z: f32, kind: int) -> u32
+{
+	let x: f32 = make(z, kind);
+	return *(&x as *u32);
+}
+
+fn view64_in_function(z: f64, kind: int) -> u64
+{
+	let x: f64 = make64(z, kind);
+	return *(&x as *u64);
+}
+
+fn bytes_in_function(z: f32, kind: int) -> u32
+{
+	let x: f32 = make(z, kind);
+	let bytes = &x as *[4]byte;
+	return ((*bytes)[3] as u32) << 8 | (*bytes)[2] as u32;
+}
+
+class Holder
+{
+	pub value: f32 = 0.0,
+
+	pub fn run(self, z: f32, kind: int) -> u32
+	{
+		self.value = make(z, kind);
+		return *(&self.value as *u32);
+	}
+}
+
+fn view_in_loop(z: f32, kind: int) -> u32
+{
+	let xs: [4]f32 = [0.0, 0.0, 0.0, 0.0];
+	let bits: u32 = 0;
+	for i in 0..4 {
+		xs[i] = make(z, kind);
+		bits = *(&xs[i] as *u32);
+	}
+	return bits;
+}
+
+fn view_in_arm(z: f32, kind: int) -> u32
+{
+	let bits: u32 = 0;
+	switch kind {
+		9 => bits = 1,
+		else => {
+			let p = Pair { x: 1.0, y: make(z, kind) };
+			bits = *(&p.y as *u32);
+		},
+	}
+	return bits;
+}
+
+fn held(kind: int) -> ?int
+{
+	if kind == 9 {
+		return none;
+	}
+	return kind;
+}
+
+fn store(at: *f32, v: f32)
+{
+	*at = v;
+}
+
+fn view_in_if_let(z: f32, kind: int) -> u32
+{
+	let bits: u32 = 0;
+	if let k = held(kind) {
+		let x: f32 = 0.0;
+		store(&x, make(z, k));
+		bits = *(&x as *u32);
+	} else {
+		bits = 1;
+	}
+	return bits;
+}
+
+fn view_in_defer(z: f32, kind: int, out: *u32)
+{
+	defer {
+		if let xs = alloc(f32, 2) {
+			xs[1] = make(z, kind);
+			*out = *(&xs[1] as *u32);
+			free(xs);
+		}
+	}
+	*out = 1;
+}
+
+fn apply(z: f32, f: fn(f32) -> u32) -> u32
+{
+	return f(z);
+}
+
+fn view_in_closure(z: f32, kind: int) -> u32
+{
+	return apply(z, fn(v) {
+		let x: f32 = make(v, kind);
+		return *(&x as *u32);
+	});
+}
+
+fn view_in_generic<T>(z: f32, kind: int) -> u32
+{
+	let x: f32 = make(z, kind);
+	return *(&x as *u32) + (size_of(T) - size_of(T)) as u32;
+}
+
+fn line(context: str, a: u32, b: u32, c: u32)
+{
+	printf("view %.*s %08x %08x %08x\n".ptr, context.len as c_int,
+		context.ptr, a, b, c);
+}
+
+fn main(args: []str) -> int
+{
+	let z: f32 = args.len as f32 - 1.0;
+	let z64: f64 = args.len as f64 - 1.0;
+	line("function", view_in_function(z, 0), view_in_function(z, 1),
+		view_in_function(z, 2));
+	let holder = alloc Holder { };
+	line("method", holder.run(z, 0), holder.run(z, 1), holder.run(z, 2));
+	delete(holder);
+	line("loop", view_in_loop(z, 0), view_in_loop(z, 1), view_in_loop(z, 2));
+	line("arm", view_in_arm(z, 0), view_in_arm(z, 1), view_in_arm(z, 2));
+	line("if_let", view_in_if_let(z, 0), view_in_if_let(z, 1),
+		view_in_if_let(z, 2));
+	let d0: u32 = 0;
+	let d1: u32 = 0;
+	let d2: u32 = 0;
+	view_in_defer(z, 0, &d0);
+	view_in_defer(z, 1, &d1);
+	view_in_defer(z, 2, &d2);
+	line("defer", d0, d1, d2);
+	line("closure", view_in_closure(z, 0), view_in_closure(z, 1),
+		view_in_closure(z, 2));
+	line("generic", view_in_generic<int>(z, 0), view_in_generic<int>(z, 1),
+		view_in_generic<int>(z, 2));
+	line("bytes", bytes_in_function(z, 0), bytes_in_function(z, 1),
+		bytes_in_function(z, 2));
+	printf("view f64 %016llx %016llx %016llx\n".ptr, view64_in_function(z64, 0),
+		view64_in_function(z64, 1), view64_in_function(z64, 2));
+	return 0;
+}

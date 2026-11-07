@@ -1003,12 +1003,14 @@ if(ANTIC_EMULATED_TARGET)
         abi_x86_64_object(abi_structs_x86_64 abi/structs.c)
         abi_x86_64_object(abi_wchar_x86_64 abi/wchar.c)
         abi_x86_64_object(abi_simd_x86_64 abi/simd.c)
+        abi_x86_64_object(abi_nan_x86_64 abi/nan.c)
         abi_wchar_expected(abi_wchar_x86_64_expected _X86_64
             ${emulated_c_flags})
         set(abi_structs_x86_64_options "")
         set(abi_simd_x86_64_options "")
+        set(abi_nan_x86_64_options "")
         set(abi_wchar_x86_64_options EXPECTED "${abi_wchar_x86_64_expected}")
-        foreach(case structs wchar simd)
+        foreach(case structs wchar simd nan)
             antic_program_test(program_abi_${case}_${emulated}
                 "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
                 OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
@@ -1058,6 +1060,22 @@ if(ANTIC_EMULATED_TARGET)
             EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/std/${name}.expected"
             ${emulator}
             WORK "${CMAKE_CURRENT_BINARY_DIR}/std-x86_64")
+    endforeach()
+    # One NaN on every target, by Q1 of "Answers of 2026-11-06, fourth
+    # set". The programs of tests/matrix that read the bits of a NaN run on
+    # the emulated target as well, against the expected file of the host.
+    # On the Mac that is macos-x86_64 at v1 under Rosetta, whose NaN of an
+    # invalid operation has the sign the canonical one lacks.
+    file(GLOB nan_sources CONFIGURE_DEPENDS
+         "${CMAKE_CURRENT_SOURCE_DIR}/matrix/values_nan_*.anti")
+    foreach(source IN LISTS nan_sources)
+        get_filename_component(name "${source}" NAME_WE)
+        antic_program_test(matrix_${name}_release_${emulated}
+            "${source}"
+            OPTIONS "${ANTIC_X86_64_OPTIONS}"
+            EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/matrix/${name}.expected"
+            ${emulator}
+            WORK "${CMAKE_CURRENT_BINARY_DIR}/matrix-x86_64")
     endforeach()
     # The programs of dev mode above, and those of the wide operations.
     foreach(name IN ITEMS return42 return_pieces deep_nesting long_float simd
@@ -1614,6 +1632,39 @@ antic_program_test(program_abi_ctypes_memory_checks
     OPTIONS --memory-checks
     OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_ctypes>,,>"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-memory-checks")
+
+# One NaN on every target across the boundary to C, by Q1 of "Answers of
+# 2026-11-06, fourth set": tests/abi/nan.c reads the bits of every float
+# the program hands it and of every float the program gives back to it.
+# The program runs as a release build, as a dev build and under
+# --memory-checks, with one expected output.
+add_library(abi_nan OBJECT abi/nan.c)
+set_target_properties(abi_nan PROPERTIES MSVC_RUNTIME_LIBRARY "")
+target_compile_options(abi_nan PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
+if(ANTIC_HOST_OS STREQUAL "macos")
+    target_compile_options(abi_nan PRIVATE -mmacosx-version-min=11.0)
+endif()
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(abi_nan PRIVATE -fno-sanitize=all)
+endif()
+antic_program_test(program_abi_nan
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_nan.anti"
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_nan>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
+antic_program_test(program_abi_nan_dev
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_nan.anti"
+    OPTIONS --dev
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_nan>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-dev")
+antic_program_test(program_abi_nan_memory_checks
+    "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_nan.anti"
+    OPTIONS --memory-checks
+    OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_nan>,,>"
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/abi-memory-checks")
+if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
+    set_tests_properties(program_abi_nan_memory_checks PROPERTIES
+        DISABLED TRUE)
+endif()
 
 # The `tests` block of a module of the standard library. The module
 # imports other modules, so the dev run links an object of each.

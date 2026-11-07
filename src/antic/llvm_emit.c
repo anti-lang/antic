@@ -860,6 +860,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
                     o->spans);
     e.keeps_frame = alloc_zeroed(m->function_count + 1, sizeof *e.keeps_frame);
     llvm_emit_frames_kept(m, e.keeps_frame);
+    llvm_emit_nan_module(&e);
     head(out, o->target, o->module);
     for (i = 0; i < m->global_count; i++) {
         const struct ir_global *g = m->globals[i];
@@ -936,6 +937,7 @@ bool llvm_emit_module(struct text *out, const struct llvm_emit_options *o,
     text_free(&e.places);
     text_free(&e.imports);
     free(e.keeps_frame);
+    llvm_emit_nan_free(&e);
     free(e.ranges);
     free(e.tbaa_aggs);
     free(e.tbaa_fields);

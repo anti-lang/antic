@@ -1,0 +1,127 @@
+//! One NaN on every target across the boundary to C, by Q1 of "Answers of
+//! 2026-11-06, fourth set". The program passes a NaN to the functions of
+//! tests/abi/nan.c as an argument, among the variadic arguments and in a struct
+//! by value, and C reads its bits. C then calls a function the program exports
+//! and a callback the program passes, and reads the bits of the NaN each
+//! returns. Each line holds the bits of three NaNs: 0/0 of a zero read at run
+//! time, whose sign follows the processor, its negation and a negative NaN with
+//! a payload. Every target gives the canonical NaN for all three.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn nan_bits32(v: c_float) -> c_uint;
+extern fn nan_bits64(v: c_double) -> c_ulonglong;
+extern fn nan_pair_y(p: NanPair) -> c_uint;
+extern fn nan_wide_y(p: NanWide) -> c_ulonglong;
+extern fn nan_variadic(count: c_int, ...) -> c_ulonglong;
+extern fn nan_exported(z: c_float, kind: c_int) -> c_uint;
+extern fn nan_exported64(z: c_double, kind: c_int) -> c_ulonglong;
+extern fn nan_callback(f: fn(c_float, c_int) -> c_float, z: c_float, kind: c_int) -> c_uint;
+
+struct NanPair
+{
+	x: c_float,
+	y: c_float,
+}
+
+struct NanWide
+{
+	x: c_double,
+	y: c_double,
+}
+
+union Bits32
+{
+	f: f32,
+	u: u32,
+}
+
+union Bits64
+{
+	f: f64,
+	u: u64,
+}
+
+/// NaN number `kind` of the three, from the zero `z`.
+fn make(z: f32, kind: int) -> f32
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits32 { u: 0xffd00000 };
+	return b.f + z;
+}
+
+fn make64(z: f64, kind: int) -> f64
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits64 { u: 0xfffa000000000000 };
+	return b.f + z;
+}
+
+export fn anti_nan_make(z: c_float, kind: c_int) -> c_float
+{
+	return make(z, kind as int);
+}
+
+export fn anti_nan_make64(z: c_double, kind: c_int) -> c_double
+{
+	return make64(z, kind as int);
+}
+
+fn made(z: c_float, kind: c_int) -> c_float
+{
+	return make(z, kind as int);
+}
+
+fn pair_y(z: f32, kind: int) -> c_uint
+{
+	let p = NanPair { x: 1.0, y: make(z, kind) };
+	return nan_pair_y(p);
+}
+
+fn wide_y(z: f64, kind: int) -> c_ulonglong
+{
+	let p = NanWide { x: 1.0, y: make64(z, kind) };
+	return nan_wide_y(p);
+}
+
+fn line(context: str, a: c_uint, b: c_uint, c: c_uint)
+{
+	printf("c %.*s %08x %08x %08x\n".ptr, context.len as c_int, context.ptr, a,
+		b, c);
+}
+
+fn line64(context: str, a: c_ulonglong, b: c_ulonglong, c: c_ulonglong)
+{
+	printf("c %.*s %016llx %016llx %016llx\n".ptr, context.len as c_int,
+		context.ptr, a, b, c);
+}
+
+fn main(args: []str) -> int
+{
+	let z: f32 = args.len as f32 - 1.0;
+	let z64: f64 = args.len as f64 - 1.0;
+	line("argument", nan_bits32(make(z, 0)), nan_bits32(make(z, 1)),
+		nan_bits32(make(z, 2)));
+	line64("argument64", nan_bits64(make64(z64, 0)), nan_bits64(make64(z64, 1)),
+		nan_bits64(make64(z64, 2)));
+	line("struct", pair_y(z, 0), pair_y(z, 1), pair_y(z, 2));
+	line64("struct64", wide_y(z64, 0), wide_y(z64, 1), wide_y(z64, 2));
+	line64("variadic", nan_variadic(1, make64(z64, 0)),
+		nan_variadic(1, make64(z64, 1)), nan_variadic(1, make64(z64, 2)));
+	line("exported", nan_exported(z, 0), nan_exported(z, 1), nan_exported(z, 2));
+	line64("exported64", nan_exported64(z64, 0), nan_exported64(z64, 1),
+		nan_exported64(z64, 2));
+	line("callback", nan_callback(made, z, 0), nan_callback(made, z, 1),
+		nan_callback(made, z, 2));
+	return 0;
+}

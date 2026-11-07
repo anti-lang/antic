@@ -30,42 +30,44 @@ b0:
   store float %v6, ptr %t5, align 4
   %v7 = load float, ptr %t5, align 4
   %v8 = load ptr, ptr %t0, align 8
-  store float %v7, ptr %v8, align 4, !tbaa !16
-  %v9 = load double, ptr %t1, align 8
-  %v10 = fcmp olt double %v9, 0x3FF8000000000000
-  %v11 = zext i1 %v10 to i8
-  store i8 %v11, ptr %t6, align 1
-  %v12 = load i8, ptr %t6, align 1
-  %v13 = trunc i8 %v12 to i1
-  br i1 %v13, label %b1, label %b3
+  %v9 = fcmp uno float %v7, 0.0
+  %v10 = select i1 %v9, float 0x7FF8000000000000, float %v7
+  store float %v10, ptr %v8, align 4, !tbaa !16
+  %v11 = load double, ptr %t1, align 8
+  %v12 = fcmp olt double %v11, 0x3FF8000000000000
+  %v13 = zext i1 %v12 to i8
+  store i8 %v13, ptr %t6, align 1
+  %v14 = load i8, ptr %t6, align 1
+  %v15 = trunc i8 %v14 to i1
+  br i1 %v15, label %b1, label %b3
 
 b1:
-  %v14 = load double, ptr %t1, align 8
-  %v15 = fneg double %v14
-  store double %v15, ptr %t7, align 8
-  %v16 = load double, ptr %t7, align 8
-  ret double %v16
+  %v16 = load double, ptr %t1, align 8
+  %v17 = fneg double %v16
+  store double %v17, ptr %t7, align 8
+  %v18 = load double, ptr %t7, align 8
+  ret double %v18
 
 b2:
-  %v17 = load float, ptr %t2, align 4
-  %v18 = fpext float %v17 to double
-  store double %v18, ptr %t8, align 8
-  %v19 = load double, ptr %t1, align 8
-  %v20 = load double, ptr %t8, align 8
-  %v21 = fdiv double %v19, %v20
-  store double %v21, ptr %t9, align 8
-  %v22 = load double, ptr %t9, align 8
-  ret double %v22
+  %v19 = load float, ptr %t2, align 4
+  %v20 = fpext float %v19 to double
+  store double %v20, ptr %t8, align 8
+  %v21 = load double, ptr %t1, align 8
+  %v22 = load double, ptr %t8, align 8
+  %v23 = fdiv double %v21, %v22
+  store double %v23, ptr %t9, align 8
+  %v24 = load double, ptr %t9, align 8
+  ret double %v24
 
 b3:
-  %v23 = load double, ptr %t1, align 8
-  %v24 = load double, ptr %t1, align 8
-  %v25 = fcmp une double %v23, %v24
-  %v26 = zext i1 %v25 to i8
-  store i8 %v26, ptr %t10, align 1
-  %v27 = load i8, ptr %t10, align 1
-  %v28 = trunc i8 %v27 to i1
-  br i1 %v28, label %b1, label %b2
+  %v25 = load double, ptr %t1, align 8
+  %v26 = load double, ptr %t1, align 8
+  %v27 = fcmp une double %v25, %v26
+  %v28 = zext i1 %v27 to i8
+  store i8 %v28, ptr %t10, align 1
+  %v29 = load i8, ptr %t10, align 1
+  %v30 = trunc i8 %v29 to i1
+  br i1 %v30, label %b1, label %b2
 }
 
 define internal noundef i64 @floats.convert(i8 signext noundef %p0, i64 noundef %p1, double noundef %p2, float noundef %p3) #0 {

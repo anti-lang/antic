@@ -295,12 +295,15 @@ The last line is cut from the global `@anti_Circle_vtable`, which holds 19 point
 <fresh>:
 ...
 movl $0x28, %edi
-callq 0x15 <fresh+0x15>
+callq 0x18 <fresh+0x18>
 testq %rax, %rax
-je 0x5c <fresh+0x5c>
+je 0x73 <fresh+0x73>
 leaq (%rip), %rcx
 movq %rcx, (%rax)
-vmovss -0xc(%rbp), %xmm0
+vmovaps -0x20(%rbp), %xmm2
+vcmpunordss %xmm2, %xmm2, %xmm0
+vbroadcastss (%rip), %xmm1
+vblendvps %xmm0, %xmm1, %xmm2, %xmm0
 vmovss %xmm0, 0x18(%rax)
 ...
 <is_box>:
@@ -309,11 +312,9 @@ movq (%rax), %rax
 cmpq $0x2, 0x20(%rax)
 jl 0x20 <is_box+0x20>
 movq 0x28(%rax), %rax
-leaq (%rip), %rcx
-cmpq %rcx, 0x10(%rax)
 ```
 
-`fresh` asks `malloc` for `0x28` bytes, 40, and tests the result. It stores the address of the table at offset 0 and `r` at offset `0x18`, which is 24. The stores of the defaults follow.
+`fresh` asks `malloc` for `0x28` bytes, 40, and tests the result. It stores the address of the table at offset 0 and `r` at offset `0x18`, which is 24. The heap is memory a view reaches, so `vcmpunordss` and `vblendvps` give a NaN in `r` the canonical bits before the store. The stores of the defaults follow.
 
 `is_box` is `s is *Box` on a `*Shape`. It loads the table, then entry 0, the descriptor. The descriptor holds the depth of the class in its chain at offset `0x20` and an array of its ancestors at `0x28`. `Box` has depth 2, so the test reads ancestor 2 of the object's class and compares it with the descriptor of `Box`. The cost is the same for a chain of any length.
 
@@ -1152,19 +1153,19 @@ A release build runs the whole-program pass over the IR of every module. A call 
 
 ```asm excerpt=calls target=linux-x86_64 mode=release
 <any_area>:
+...
 movq (%rdi), %rax
-jmpq *0x88(%rax)
+callq *0x88(%rax)
 ...
 <twice>:
 vmovss 0x8(%rdi), %xmm0
 vaddss %xmm0, %xmm0, %xmm0
-retq
 ...
 <circle_area>:
 vmovss 0x10(%rdi), %xmm0
 vmulss %xmm0, %xmm0, %xmm0
 vmulss (%rip), %xmm0, %xmm0
-retq
+vcmpunordss %xmm0, %xmm0, %xmm1
 ...
 <advance>:
 movq 0x8(%rdi), %rax
@@ -1173,9 +1174,9 @@ movq %rax, 0x8(%rdi)
 retq
 ```
 
-- `any_area` keeps its dispatch, since `Circle` and `Box` both fill `area`. It is two instructions: the load of the table and a jump through the entry at `0x88`, which is 17 times 8.
+- `any_area` keeps its dispatch, since `Circle` and `Box` both fill `area`. It loads the table and calls through the entry at `0x88`, which is 17 times 8. The function is exported, so its float result takes the canonical NaN after the call, `vcmpunordss` and `vblendvps`, and the call is no jump.
 - `twice` has the body of `doubled` in place.
-- `circle_area` calls `area` on a `*Circle`. No class below `Circle` replaces it, so the call is direct, and `opt` inlines `area` and the private `square` into three instructions.
+- `circle_area` calls `area` on a `*Circle`. No class below `Circle` replaces it, so the call is direct, and `opt` inlines `area` and the private `square` into three instructions before the select of the canonical NaN.
 - `advance` calls `step` on a `*Counter`, an abstract class. `Up` is the only class of the program that fills `step`, so the pass binds the call to `Up.step`, and the increment stands in place.
 
 This step of the pass runs in release mode alone, by `whole_program` of `src/antic/whole.c`. A dev build compiles one module at a time and relies on `final`. It also leaves the calls alone in a plugin and in a program that loads a plugin or injects a provider. A class the compiler never saw may fill an entry there. `--closed` builds a program that loads no plugin, and the pass runs for it.

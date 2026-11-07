@@ -6,7 +6,7 @@ UnwindInformation [
     Function: _A4anti2rt_main (0x0)
     ExceptionRecord: .xdata (0x0)
     ExceptionData {
-      FunctionLength: 196
+      FunctionLength: 208
       Version: 0
       ExceptionData: No
       EpiloguePacked: Yes

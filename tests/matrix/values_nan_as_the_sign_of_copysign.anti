@@ -1,0 +1,167 @@
+//! One NaN on every target as the sign of `copysign`, by Q1 of "Answers of
+//! 2026-11-06, fourth set". `math.copysign(1, x)` gives the sign bit of `x`, so
+//! a NaN whose sign follows the processor gives 1 on one target and -1 on
+//! another. Each context is a function of its own. Each line holds the result
+//! for three NaNs: 0/0 of a zero read at run time, its negation and a negative
+//! NaN with a payload. Every target gives 1 for all three.
+
+import anti.math;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Bits32
+{
+	f: f32,
+	u: u32,
+}
+
+union Bits64
+{
+	f: f64,
+	u: u64,
+}
+
+/// NaN number `kind` of the three, from the zero `z`.
+fn make(z: f32, kind: int) -> f32
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits32 { u: 0xffd00000 };
+	return b.f + z;
+}
+
+fn make64(z: f64, kind: int) -> f64
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits64 { u: 0xfffa000000000000 };
+	return b.f + z;
+}
+/// The magnitude of every result.
+const ONE: f32 = 1.0;
+
+fn sign_in_function(z: f32, kind: int) -> f32
+{
+	return math.copysign(ONE, make(z, kind));
+}
+
+fn sign64_in_function(z: f64, kind: int) -> f64
+{
+	return math.copysign(1.0, make64(z, kind));
+}
+
+class Holder
+{
+	pub value: f32 = 0.0,
+
+	pub fn run(self, z: f32, kind: int) -> f32
+	{
+		self.value = make(z, kind);
+		return math.copysign(ONE, self.value);
+	}
+}
+
+fn sign_in_loop(z: f32, kind: int) -> f32
+{
+	let sign: f32 = 0.0;
+	for i in 0..2 {
+		sign = math.copysign(ONE + i as f32 - i as f32, make(z, kind));
+	}
+	return sign;
+}
+
+fn sign_in_arm(z: f32, kind: int) -> f32
+{
+	let sign: f32 = 0.0;
+	switch kind {
+		9 => sign = 2.0,
+		else => sign = math.copysign(ONE, make(z, kind)),
+	}
+	return sign;
+}
+
+fn held(kind: int) -> ?int
+{
+	if kind == 9 {
+		return none;
+	}
+	return kind;
+}
+
+fn sign_in_if_let(z: f32, kind: int) -> f32
+{
+	let sign: f32 = 0.0;
+	if let k = held(kind) {
+		sign = math.copysign(ONE, make(z, k));
+	} else {
+		sign = 2.0;
+	}
+	return sign;
+}
+
+fn sign_in_defer(z: f32, kind: int, out: *f32)
+{
+	defer *out = math.copysign(ONE, make(z, kind));
+	*out = 2.0;
+}
+
+fn apply(z: f32, f: fn(f32) -> f32) -> f32
+{
+	return f(z);
+}
+
+fn sign_in_closure(z: f32, kind: int) -> f32
+{
+	return apply(z, fn(v) {
+		return math.copysign(ONE, make(v, kind));
+	});
+}
+
+fn sign_in_generic<T: Float>(one: T, x: T) -> T
+{
+	return math.copysign(one, x);
+}
+
+fn line(context: str, a: f32, b: f32, c: f32)
+{
+	printf("copysign %.*s %g %g %g\n".ptr, context.len as c_int, context.ptr,
+		a as f64, b as f64, c as f64);
+}
+
+fn main(args: []str) -> int
+{
+	let z: f32 = args.len as f32 - 1.0;
+	let z64: f64 = args.len as f64 - 1.0;
+	line("function", sign_in_function(z, 0), sign_in_function(z, 1),
+		sign_in_function(z, 2));
+	let holder = alloc Holder { };
+	line("method", holder.run(z, 0), holder.run(z, 1), holder.run(z, 2));
+	delete(holder);
+	line("loop", sign_in_loop(z, 0), sign_in_loop(z, 1), sign_in_loop(z, 2));
+	line("arm", sign_in_arm(z, 0), sign_in_arm(z, 1), sign_in_arm(z, 2));
+	line("if_let", sign_in_if_let(z, 0), sign_in_if_let(z, 1),
+		sign_in_if_let(z, 2));
+	let d0: f32 = 0.0;
+	let d1: f32 = 0.0;
+	let d2: f32 = 0.0;
+	sign_in_defer(z, 0, &d0);
+	sign_in_defer(z, 1, &d1);
+	sign_in_defer(z, 2, &d2);
+	line("defer", d0, d1, d2);
+	line("closure", sign_in_closure(z, 0), sign_in_closure(z, 1),
+		sign_in_closure(z, 2));
+	let one: f32 = 1.0;
+	line("generic", sign_in_generic(one, make(z, 0)),
+		sign_in_generic(one, make(z, 1)), sign_in_generic(one, make(z, 2)));
+	printf("copysign f64 %g %g %g\n".ptr, sign64_in_function(z64, 0),
+		sign64_in_function(z64, 1), sign64_in_function(z64, 2));
+	return 0;
+}

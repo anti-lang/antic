@@ -304,6 +304,23 @@ check. The forms that file reads:
 | `*`, `+`, `?`, `{n}`, `{n,m}`, each lazy with `?` or possessive with `+` | `NODE_REPEAT` |
 | `\Q...\E`, a back reference `\g`, `\k`, the extended mode with `#` | read past |
 
+The rows of one NaN on every target follow. Q1 of "Answers of 2026-11-06, fourth set" gives a NaN the canonical bits at
+every place where a program sees them. Each row below runs in release mode,
+in dev mode and with `--memory-checks` on the host, and in release mode at
+`v1` under Rosetta. Each line holds three NaNs. `abi/abi_nan` holds the
+boundary to C: an argument, a variadic argument, a struct by value, the
+result of an exported function and of a callback.
+
+| Construct | Held, with the first source that holds it | Open |
+|---|---|---|
+| a NaN through a union | function, method, loop body, switch arm, `if let`, `defer`, closure and generic body `matrix/values_nan_through_a_union` | none |
+| a NaN through a pointer view and in bytes | function, method, loop body, switch arm, `if let`, `defer`, closure and generic body `matrix/values_nan_through_a_pointer_view` | none |
+| a NaN in the default hash | function, method, loop body, switch arm, `if let`, `defer`, closure and generic body `matrix/values_nan_in_the_hash` | none |
+| a NaN as the sign of `copysign` | function, method, loop body, switch arm, `if let`, `defer`, closure and generic body `matrix/values_nan_as_the_sign_of_copysign` | none |
+| a NaN in an `f16` | function, method, loop body, switch arm, `if let`, `defer`, closure and generic body `matrix/values_nan_in_an_f16` | none |
+| a NaN in a simd struct | function, method, loop body, switch arm, `if let`, `defer`, closure and generic body `matrix/values_nan_in_a_simd_struct` | none |
+| a NaN through `reflect.set` | function, method, loop body, switch arm, `if let`, `defer`, closure and generic body `matrix/values_nan_through_reflection` | none |
+
 ### Types
 
 `parser_type.c` builds the kinds of `enum type_expr_kind`:

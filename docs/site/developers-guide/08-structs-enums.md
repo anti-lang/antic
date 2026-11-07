@@ -1166,7 +1166,9 @@ b0:
   %v3 = load <4 x float>, ptr %v1, align 16
   %v4 = load <4 x float>, ptr %v2, align 16
   %v5 = fadd <4 x float> %v3, %v4
-  store <4 x float> %v5, ptr %v0, align 16
+  %v6 = fcmp uno <4 x float> %v5, zeroinitializer
+  %v7 = select <4 x i1> %v6, <4 x float> <float 0x7FF8000000000000, float 0x7FF8000000000000, float 0x7FF8000000000000, float 0x7FF8000000000000>, <4 x float> %v5
+  store <4 x float> %v7, ptr %v0, align 16
 ...
 define internal void @add8(ptr noundef nonnull dereferenceable(32) %p0, ptr noundef nonnull dereferenceable(32) %p1, ptr noundef nonnull dereferenceable(32) %p2) #0 {
 ...
@@ -1176,18 +1178,18 @@ define internal void @add8(ptr noundef nonnull dereferenceable(32) %p0, ptr noun
 - `add4` takes and returns `<4 x float>`. A simd struct of 16 bytes is the vector type of C and passes in one vector register. The Windows x64 convention passes a pointer to a copy and returns the vector in `xmm0`.
 - The slot of a `Vec4` is 16 bytes aligned to 16.
 - Each operation loads its operands as vectors, computes with one instruction of LLVM and stores the result. `opt` keeps the values in registers.
+- The lanes of the result stand in memory, so a float lane that holds a NaN takes the canonical one before the store. `fcmp uno` finds the NaN lanes and the `select` replaces each, so every target writes the same bits.
 - An `F32x8` is 32 bytes, so it passes as the struct of its lanes, here behind three pointers. Its add is one `fadd <8 x float>`.
 
 The code generator of LLVM splits a vector at the native width of the target and its processor level.
 
 ```asm excerpt=lanes target=linux-x86_64 mode=release
-<add4>:
-vaddps %xmm1, %xmm0, %xmm0
-retq
-...
 <add8>:
 vmovups (%rdi), %ymm0
 vaddps (%rsi), %ymm0, %ymm0
+vcmpunordps %ymm0, %ymm0, %ymm1
+vbroadcastss (%rip), %ymm2
+vblendvps %ymm1, %ymm2, %ymm0, %ymm0
 vmovups %ymm0, (%rdx)
 vzeroupper
 retq
@@ -1203,17 +1205,25 @@ vmovshdup %xmm0, %xmm1
 vaddss %xmm1, %xmm0, %xmm0
 ```
 
-At x86-64-v3, the default level of linux-x86_64, the eight lanes of `add8` are one `vaddps` on a `ymm` register. `clamp` is a comparison and a `simd.select` in the source, and `opt` reduces the pair to one `vminps`. `total` folds the upper two lanes onto the lower two and then the second lane onto the first.
+At x86-64-v3, the default level of linux-x86_64, the eight lanes of `add8` are one `vaddps` on a `ymm` register. `vcmpunordps` and `vblendvps` give a NaN lane the canonical bits. `clamp` is a comparison and a `simd.select` in the source, and `opt` reduces the pair to one `vminps`. `total` folds the upper two lanes onto the lower two and then the second lane onto the first.
 
 ```asm excerpt=lanes target=linux-arm64 mode=release
 <add8>:
 ldp q3, q0, [x1]
 ldp q2, q1, [x0]
 fadd v0.4s, v1.4s, v0.4s
-fadd v1.4s, v2.4s, v3.4s
+fadd v2.4s, v2.4s, v3.4s
+mvni v1.4s, #0x3f, msl #16
+fneg v1.4s, v1.4s
+fcmeq v3.4s, v0.4s, v0.4s
+fcmeq v4.4s, v2.4s, v2.4s
+bif v0.16b, v1.16b, v3.16b
+bit v1.16b, v2.16b, v4.16b
 stp q1, q0, [x2]
 ret
 ```
+
+`mvni` and `fneg` make the canonical NaN in every lane, and `fcmeq` of a lane with itself is false for a NaN alone, so `bif` and `bit` put the canonical NaN where a lane holds one.
 
 A register of arm64 holds 16 bytes, so the same `fadd <8 x float>` is two `fadd` instructions there. The lane count belongs to the program and the instruction count to the target.
 
@@ -2132,20 +2142,23 @@ The switch has no test for a tag outside the cases. The `range` on the load says
 <area>:
 movzbl (%rdi), %eax
 cmpl $0x1, %eax
-je 0x22 <area+0x22>
+je 0x23 <area+0x23>
 vxorps %xmm0, %xmm0, %xmm0
 testl %eax, %eax
-jne 0x21 <area+0x21>
+jne 0x2d <area+0x2d>
 vmovss 0x4(%rdi), %xmm0
 vmulss (%rip), %xmm0, %xmm1
 vmulss %xmm1, %xmm0, %xmm0
-retq
+jmp 0x2d <area+0x2d>
 vmovss 0x4(%rdi), %xmm0
 vmulss 0x8(%rdi), %xmm0, %xmm0
+vcmpunordss %xmm0, %xmm0, %xmm1
+vbroadcastss (%rip), %xmm2
+vblendvps %xmm1, %xmm2, %xmm0, %xmm0
 retq
 ```
 
-A release build keeps the one load of the tag and two compares. The copies are gone: `vmovss 0x4(%rdi)` reads `r` and `w` from the variant itself, and `vmulss 0x8(%rdi)` reads `h`. `opt` removes a copy that is only read.
+A release build keeps the one load of the tag and two compares. The three arms meet at the end, where the result of the exported function takes the canonical NaN. The copies are gone: `vmovss 0x4(%rdi)` reads `r` and `w` from the variant itself, and `vmulss 0x8(%rdi)` reads `h`. `opt` removes a copy that is only read.
 
 Where it lives: `check_variant_arm` of `src/antic/sema_stmt.c` checks an arm and the coverage. `lower_switch`, `arm_test` and `bind_case_fields` of `src/antic/lower_stmt.c` write the tests and the copies. `if_let` of `src/antic/parser_stmt.c` turns `if let` into a `switch` of one arm.
 

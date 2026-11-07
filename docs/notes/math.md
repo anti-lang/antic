@@ -85,7 +85,7 @@ NaN on all six targets. The canonical NaN below is the quiet NaN with a clear
 sign and no payload: `0x7fc00000` in `f32` and `0x7ff8000000000000` in `f64`.
 It is the default NaN of ARM64 and the NaN that LLVM folds a constant to.
 This section is the design. Eddie chose option B by Q1 of "Answers of
-2026-11-06, fourth set".
+2026-11-06, fourth set", and "The built form" below gives what is built.
 
 ### Where the bits differ
 
@@ -222,6 +222,31 @@ frames of the tree. A gives the same guarantee at 2.2 to 3.5 times the time
 of the geometry of the tree. C is not complete, as its gap shows. B needs
 the list of the places that read bits to be held by a test, as
 `diagnostics_covered` holds the messages.
+
+### The built form
+
+`src/antic/llvm_emit_nan.c` writes form B into the LLVM text. The entries of
+"Standard interfaces" in `docs/decisions.md` give the rule. The gap of the
+prototype is closed. A union, a local whose address is taken and any slot
+read with a second type are memory a view reaches. A NaN that folding gives
+is the canonical one in the text and in the bytes of a constant. `copysign`
+of the runtime gives a NaN the canonical sign.
+
+`tests/bench/ablate/opt_nan_off.py` takes every select of the canonical NaN
+out of the text, so the measurement compares the built form with the same
+program without it. Each figure is the median of 21 runs to that program, in
+release mode on the Apple M4 Pro on 2026-11-07. x86_64 ran at `v1` under
+Rosetta.
+
+| Program | B arm64 | B x86_64 | Prototype arm64 | Prototype x86_64 |
+|---|---:|---:|---:|---:|
+| `float_work` | 1.01 | 1.00 | 1.01 | 1.03 |
+| `pythagoras_geometry` | 1.10 | 1.22 | 1.10 | 1.22 |
+| `pythagoras_frames` | 1.04 | none | 1.04 | none |
+
+`pythagoras_frames` runs over the Recorder with `--option=--inject
+--option=anti.graphics.Display=anti.graphics.Recorder.shared`, and without it
+the program opens a window.
 
 ## How it is built
 

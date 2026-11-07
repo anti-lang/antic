@@ -3,6 +3,7 @@
    the arithmetic, each instruction and the definition of a function. */
 
 #include <inttypes.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -200,7 +201,13 @@ void llvm_emit_operand(struct emitter *e, const struct ir_operand *o,
         }
         return;
     case IR_FLOAT:
-        float_constant(value, type, o->as.floating);
+        /* One NaN on every target: a NaN that folding gave is the
+           canonical one, whichever host folded it. */
+        if (isnan(o->as.floating)) {
+            llvm_emit_nan_constant(value);
+        } else {
+            float_constant(value, type, o->as.floating);
+        }
         return;
     case IR_GLOBAL:
         llvm_emit_global_symbol(value, e->o->target,
@@ -547,7 +554,14 @@ static void conversion(struct emitter *e, const struct ir_inst *inst)
         break;
     }
     case IR_HTRUNC: {
-        uint32_t half = llvm_emit_fresh(e);
+        uint32_t half;
+        /* The sixteen bits of an f16 are memory, and the rounding keeps
+           the sign and the top of the payload of a NaN, of one that came
+           as bits as well. */
+        if (inst->a.kind == IR_TEMP) {
+            llvm_emit_canonical(e, from, &a);
+        }
+        half = llvm_emit_fresh(e);
         if (llvm_emit_f16_calls(e)) {
             llvm_emit_runtime_function(e, "i32", RT_FN_F32_TO_F16, "float");
             text_appendf(e->out, "  %%v%" PRIu32 " = call i32 @%s(%s %s)\n",
@@ -656,6 +670,9 @@ static void load_store(struct emitter *e, const struct ir_inst *inst)
     if (inst->op == IR_STORE) {
         llvm_emit_operand(e, &inst->a, inst->type, &value);
         llvm_emit_operand(e, &inst->b, IR_PTR, &pointer);
+        if (!e->failed && llvm_emit_nan_store(e, inst)) {
+            llvm_emit_canonical(e, inst->type, &value);
+        }
         if (!e->failed) {
             text_appendf(e->out, "  store %s %s, ptr %s, align %" PRIu64,
                          name, text_cstr(&value), text_cstr(&pointer),
@@ -898,6 +915,10 @@ static void vsplat(struct emitter *e, const struct ir_inst *inst)
     llvm_emit_operand(e, &inst->a, IR_PTR, &dst);
     llvm_emit_operand(e, &inst->b, inst->type, &value);
     if (!e->failed && lane != NULL) {
+        /* The lanes stand in memory, so a NaN takes the canonical bits. */
+        if (llvm_emit_nan_value(e, &inst->b, inst->type)) {
+            llvm_emit_canonical(e, inst->type, &value);
+        }
         vector_of(e, inst, lane, vector, sizeof vector);
         one = llvm_emit_fresh(e);
         all = llvm_emit_fresh(e);
@@ -987,6 +1008,9 @@ static void vbinary(struct emitter *e, const struct ir_inst *inst)
                      : op == IR_SHR_S         ? "ashr"
                                               : "lshr",
                      vector, a, b);
+        if (llvm_emit_nan_lanes(inst->type)) {
+            r = llvm_emit_canonical_lanes(e, vector, lane, lanes, r);
+        }
         text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
                              PRIu64 "\n",
                      vector, r, text_cstr(&dst), align);
@@ -1526,6 +1550,9 @@ static void vunary(struct emitter *e, const struct ir_inst *inst)
             }
             text_append(e->out, ">\n");
         }
+        if (op == IR_FNEG && llvm_emit_nan_lanes(inst->type)) {
+            r = llvm_emit_canonical_lanes(e, vector, lane, lanes, r);
+        }
         text_appendf(e->out, "  store %s %%v%" PRIu32 ", ptr %s, align %"
                              PRIu64 "\n",
                      vector, r, text_cstr(&dst), align);
@@ -1839,6 +1866,9 @@ static void instruction(struct emitter *e, const struct ir_inst *inst)
             break;
         }
         llvm_emit_operand(e, &inst->a, inst->type, &value);
+        if (!e->failed && llvm_emit_nan_return(e, inst)) {
+            llvm_emit_canonical(e, inst->type, &value);
+        }
         if (!e->failed) {
             text_appendf(e->out, "  ret %s %s\n",
                          llvm_emit_value_type(e, inst->type),
@@ -1906,6 +1936,7 @@ void llvm_emit_definition(struct emitter *e, const struct ir_function *f)
     e->value = 0;
     e->slots = 0;
     e->frame = 0;
+    llvm_emit_nan_function(e, f);
     text_append(out, "define ");
     llvm_emit_linkage(e, f);
     if (!llvm_emit_signature(e, f, true,

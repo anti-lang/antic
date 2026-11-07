@@ -304,6 +304,11 @@ static void argument(struct emitter *e, const struct abi_param *p,
 
     if (p->kind == ABI_DIRECT) {
         llvm_emit_operand(e, o, param->type, &value);
+        /* One NaN on every target: C reads the bits of a float. */
+        if (!e->failed && e->nan_args &&
+            llvm_emit_nan_value(e, o, param->type)) {
+            llvm_emit_canonical(e, param->type, &value);
+        }
         separate(args);
         separate(types);
         text_appendf(args, "%s%s %s", p->types[0],
@@ -650,6 +655,7 @@ void llvm_emit_call(struct emitter *e, const struct ir_inst *inst)
                      c.result.size, c.result.align, sret);
         text_append(&types, "ptr");
     }
+    e->nan_args = llvm_emit_nan_call(e, inst);
     for (i = 0; i < inst->arg_count && !e->failed; i++) {
         struct ir_param extra;
         struct text unnamed = {0};
@@ -673,6 +679,7 @@ void llvm_emit_call(struct emitter *e, const struct ir_inst *inst)
         }
         text_free(&unnamed);
     }
+    e->nan_args = false;
     if (callee->variadic) {
         separate(&types);
         text_append(&types, "...");

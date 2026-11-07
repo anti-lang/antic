@@ -8,8 +8,9 @@
    a function and each instruction. llvm_emit_call.c holds the C
    convention: the parameters, the prologue, the calls and the signature
    of a function. llvm_emit_facts.c collects the facts for opt, the ranges,
-   the !tbaa tree, the cold branches and the frames a trace keeps. No other
-   file includes this one. */
+   the !tbaa tree, the cold branches and the frames a trace keeps.
+   llvm_emit_nan.c finds where a float needs the canonical NaN and writes
+   its select. No other file includes this one. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -101,6 +102,15 @@ struct emitter {
     size_t tbaa_agg_count;
     struct tbaa_field *tbaa_fields;
     size_t tbaa_field_count;
+    /* One NaN on every target, see llvm_emit_nan.c. Per temporary of the
+       function, whether it addresses a slot that no view reaches and
+       whether its float needs no canonical NaN. Per function of the
+       module, whether code outside Anti calls it. nan_args marks the
+       arguments of a call into C while they are written. */
+    bool *nan_private;
+    bool *nan_known;
+    bool *nan_reached;
+    bool nan_args;
 };
 
 /* llvm_emit.c */
@@ -157,5 +167,22 @@ bool llvm_emit_names_table(const struct ir_module *m);
 void llvm_emit_branch_weights(struct emitter *e, uint32_t then_block,
                               uint32_t else_block);
 void llvm_emit_frames_kept(const struct ir_module *m, bool *kept);
+
+/* llvm_emit_nan.c */
+void llvm_emit_nan_module(struct emitter *e);
+void llvm_emit_nan_function(struct emitter *e, const struct ir_function *f);
+void llvm_emit_nan_free(struct emitter *e);
+bool llvm_emit_nan_value(const struct emitter *e, const struct ir_operand *o,
+                         enum ir_type type);
+bool llvm_emit_nan_store(const struct emitter *e, const struct ir_inst *inst);
+bool llvm_emit_nan_call(const struct emitter *e, const struct ir_inst *inst);
+bool llvm_emit_nan_return(const struct emitter *e, const struct ir_inst *inst);
+void llvm_emit_canonical(struct emitter *e, enum ir_type type,
+                         struct text *value);
+uint32_t llvm_emit_canonical_lanes(struct emitter *e, const char *vector,
+                                   const char *lane, size_t lanes,
+                                   uint32_t value);
+bool llvm_emit_nan_lanes(enum ir_type lane);
+void llvm_emit_nan_constant(struct text *out);
 
 #endif

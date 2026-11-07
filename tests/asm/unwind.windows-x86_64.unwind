@@ -4,7 +4,7 @@ AddressSize: 64bit
 UnwindInformation [
   RuntimeFunction {
     StartAddress: _A4anti2rt_main (0x0)
-    EndAddress: _A4anti2rt_main +0xDF (0x4)
+    EndAddress: _A4anti2rt_main +0xEE (0x4)
     UnwindInfoAddress: .xdata (0x8)
     UnwindInfo {
       Version: 1

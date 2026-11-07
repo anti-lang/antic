@@ -1,0 +1,10 @@
+exit 0
+copysign function 1 1 1
+copysign method 1 1 1
+copysign loop 1 1 1
+copysign arm 1 1 1
+copysign if_let 1 1 1
+copysign defer 1 1 1
+copysign closure 1 1 1
+copysign generic 1 1 1
+copysign f64 1 1 1

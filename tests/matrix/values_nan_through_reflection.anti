@@ -1,0 +1,190 @@
+//! One NaN on every target through `reflect.set`, by Q1 of "Answers of
+//! 2026-11-06, fourth set". The runtime writes the float of a `Value` into the
+//! field of an object, an `f32`, an `f64` or an `f16`, and each context is a
+//! function of its own that reads the bits of that field. Each line holds the
+//! bits of three NaNs: 0/0 of a zero read at run time, whose sign follows the
+//! processor, its negation and a negative NaN with a payload. Every target
+//! gives the canonical NaN for all three.
+
+import anti.reflect;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+union Bits32
+{
+	f: f32,
+	u: u32,
+}
+
+union Bits64
+{
+	f: f64,
+	u: u64,
+}
+
+/// NaN number `kind` of the three, from the zero `z`.
+fn make(z: f32, kind: int) -> f32
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits32 { u: 0xffd00000 };
+	return b.f + z;
+}
+
+fn make64(z: f64, kind: int) -> f64
+{
+	if kind == 0 {
+		return z / z;
+	}
+	if kind == 1 {
+		return -(z / z);
+	}
+	let b = Bits64 { u: 0xfffa000000000000 };
+	return b.f + z;
+}
+class Sample
+{
+	pub single: f32 = 0.0,
+	pub double: f64 = 0.0,
+	pub half: f16 = 0.0 as f16,
+}
+
+/// The bits of field `index` of a new Sample after `reflect.set` wrote `x`.
+fn written(x: f64, index: int) -> u64
+{
+	let s = alloc Sample { };
+	let d = reflect.describe(s as *byte) else {
+		delete(s);
+		return 1;
+	};
+	reflect.set(s as *byte, d, index, reflect.of_float(x)) catch fatal;
+	let bits: u64 = 0;
+	if index == 0 {
+		bits = *(&s.single as *u32) as u64;
+	} else if index == 1 {
+		bits = *(&s.double as *u64);
+	} else {
+		bits = *(&s.half as *u16) as u64;
+	}
+	delete(s);
+	return bits;
+}
+
+fn set_in_function(z: f32, kind: int) -> u64
+{
+	return written(make(z, kind) as f64, 0);
+}
+
+fn set64_in_function(z: f64, kind: int) -> u64
+{
+	return written(make64(z, kind), 1);
+}
+
+class Holder
+{
+	pub index: int = 0,
+
+	pub fn run(self, z: f32, kind: int) -> u64
+	{
+		return written(make(z, kind) as f64, self.index);
+	}
+}
+
+fn set_in_loop(z: f32, kind: int) -> u64
+{
+	let bits: u64 = 0;
+	for i in 0..2 {
+		bits = written(make(z, kind) as f64, i * 0);
+	}
+	return bits;
+}
+
+fn set_in_arm(z: f32, kind: int) -> u64
+{
+	let bits: u64 = 0;
+	switch kind {
+		9 => bits = 1,
+		else => bits = written(make(z, kind) as f64, 0),
+	}
+	return bits;
+}
+
+fn held(kind: int) -> ?int
+{
+	if kind == 9 {
+		return none;
+	}
+	return kind;
+}
+
+fn set_in_if_let(z: f32, kind: int) -> u64
+{
+	let bits: u64 = 0;
+	if let k = held(kind) {
+		bits = written(make(z, k) as f64, 2);
+	} else {
+		bits = 1;
+	}
+	return bits;
+}
+
+fn set_in_defer(z: f32, kind: int, out: *u64)
+{
+	defer *out = written(make(z, kind) as f64, 0);
+	*out = 1;
+}
+
+fn apply(z: f32, f: fn(f32) -> u64) -> u64
+{
+	return f(z);
+}
+
+fn set_in_closure(z: f32, kind: int) -> u64
+{
+	return apply(z, fn(v) {
+		return written(make(v, kind) as f64, 0);
+	});
+}
+
+fn set_in_generic<T>(z: f32, kind: int) -> u64
+{
+	return written(make(z, kind) as f64, 0) + (size_of(T) - size_of(T)) as u64;
+}
+
+fn line(context: str, a: u64, b: u64, c: u64)
+{
+	printf("reflect %.*s %llx %llx %llx\n".ptr, context.len as c_int,
+		context.ptr, a, b, c);
+}
+
+fn main(args: []str) -> int
+{
+	let z: f32 = args.len as f32 - 1.0;
+	let z64: f64 = args.len as f64 - 1.0;
+	line("function", set_in_function(z, 0), set_in_function(z, 1),
+		set_in_function(z, 2));
+	let holder = alloc Holder { };
+	line("method", holder.run(z, 0), holder.run(z, 1), holder.run(z, 2));
+	delete(holder);
+	line("loop", set_in_loop(z, 0), set_in_loop(z, 1), set_in_loop(z, 2));
+	line("arm", set_in_arm(z, 0), set_in_arm(z, 1), set_in_arm(z, 2));
+	line("f16", set_in_if_let(z, 0), set_in_if_let(z, 1), set_in_if_let(z, 2));
+	let d0: u64 = 0;
+	let d1: u64 = 0;
+	let d2: u64 = 0;
+	set_in_defer(z, 0, &d0);
+	set_in_defer(z, 1, &d1);
+	set_in_defer(z, 2, &d2);
+	line("defer", d0, d1, d2);
+	line("closure", set_in_closure(z, 0), set_in_closure(z, 1),
+		set_in_closure(z, 2));
+	line("generic", set_in_generic<int>(z, 0), set_in_generic<int>(z, 1),
+		set_in_generic<int>(z, 2));
+	line("f64", set64_in_function(z64, 0), set64_in_function(z64, 1),
+		set64_in_function(z64, 2));
+	return 0;
+}
