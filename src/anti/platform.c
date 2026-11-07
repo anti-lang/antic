@@ -325,6 +325,41 @@ int platform_run_symbolized(const char *const argv[], const char *name,
     return platform_run(argv);
 }
 
+/* The time of change is that of the last write in units of 100
+   nanoseconds, and the file index with the serial number of the volume
+   names the file. */
+bool platform_identity(const char *path, struct platform_identity *out)
+{
+    wchar_t *wide = platform_widen(path);
+    BY_HANDLE_FILE_INFORMATION info;
+    HANDLE handle;
+    BOOL known;
+
+    if (wide == NULL) {
+        return false;
+    }
+    handle = CreateFileW(wide, 0,
+                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                         NULL, OPEN_EXISTING, 0, NULL);
+    free(wide);
+    if (handle == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    known = ANTI_FAULT_SYSTEM(STAT, FALSE,
+                              GetFileInformationByHandle(handle, &info));
+    CloseHandle(handle);
+    if (!known || (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return false;
+    }
+    out->size = (uint64_t)info.nFileSizeHigh << 32 | info.nFileSizeLow;
+    out->changed = (int64_t)((uint64_t)info.ftLastWriteTime.dwHighDateTime
+                                 << 32 |
+                             info.ftLastWriteTime.dwLowDateTime);
+    out->device = info.dwVolumeSerialNumber;
+    out->file = (uint64_t)info.nFileIndexHigh << 32 | info.nFileIndexLow;
+    return true;
+}
+
 #else
 
 #include <fcntl.h>
@@ -402,6 +437,28 @@ FILE *platform_open_file(const char *path)
         close(fd);
     }
     return f;
+}
+
+/* DESIGN: the time of change comes in nanoseconds: st_mtim of POSIX 2008
+   on Linux, and st_mtime with st_mtimensec on macOS, whose header gives
+   those two under _POSIX_C_SOURCE in place of st_mtim. */
+bool platform_identity(const char *path, struct platform_identity *out)
+{
+    struct stat st;
+
+    if (ANTI_FAULT(STAT, -1, stat(path, &st)) != 0 || !S_ISREG(st.st_mode)) {
+        return false;
+    }
+    out->size = (uint64_t)st.st_size;
+#if defined(__APPLE__)
+    out->changed = (int64_t)st.st_mtime * 1000000000 + st.st_mtimensec;
+#else
+    out->changed = (int64_t)st.st_mtim.tv_sec * 1000000000 +
+                   st.st_mtim.tv_nsec;
+#endif
+    out->device = (uint64_t)st.st_dev;
+    out->file = (uint64_t)st.st_ino;
+    return true;
 }
 
 bool platform_copy_permissions(const char *from, const char *to)

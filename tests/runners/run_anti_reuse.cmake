@@ -28,6 +28,15 @@
 #              2026-11-07" in docs/decisions.md. Both runs take a stand-in
 #              runtime archive of links into RUNTIME, whose lib/HOST/
 #              holds a copy of libraylib.a, or raylib.lib on Windows
+#   same_size  the native library of the case native holds a member that
+#              the second run gives other bytes of the same length, so the
+#              library keeps its size. The program, or each runner, is
+#              linked again, by Q4 of "Answers of 2026-11-07, second set"
+#   unreadable the native library of the case native cannot be read after
+#              the first run. The second run writes no file, since the key
+#              takes the digest the first run kept for a library whose
+#              size, time and identity did not change. Not on Windows,
+#              which keeps no permission bits
 #
 # A file counts as written when its time of change moved. The run waits
 # more than a second before the second run, since CMake reads the time in
@@ -47,7 +56,7 @@ file(COPY "${PROJECT}/" DESTINATION "${here}")
 # its own. The library of every other target stays a link.
 set(runtime "${RUNTIME}")
 set(native "")
-if(CASE STREQUAL "native")
+if(CASE MATCHES "^(native|same_size|unreadable)$")
     set(runtime "${WORK}/runtime")
     file(MAKE_DIRECTORY "${runtime}/lib/${HOST}")
     file(GLOB parts RELATIVE "${RUNTIME}" "${RUNTIME}/*")
@@ -84,6 +93,22 @@ if(CASE STREQUAL "native")
     if(CMAKE_HOST_WIN32)
         set(LLVM_AR "${RUNTIME}/bin/llvm-ar.exe")
     endif()
+endif()
+
+# Put the member note.txt with text into the native library.
+function(note text)
+    file(WRITE "${WORK}/note.txt" "${text}")
+    execute_process(COMMAND "${LLVM_AR}" r "${native}" "${WORK}/note.txt"
+                    RESULT_VARIABLE code ERROR_VARIABLE ar_err
+                    ENCODING NONE)
+    if(NOT code EQUAL 0)
+        message(FATAL_ERROR "llvm-ar failed with ${code}\n${ar_err}")
+    endif()
+endfunction()
+
+if(CASE STREQUAL "same_size")
+    note("a member of no object\n")
+    file(SIZE "${native}" size_before)
 endif()
 
 set(extra "")
@@ -225,13 +250,16 @@ elseif(CASE STREQUAL "compiler")
     snapshot(before)
 elseif(CASE STREQUAL "native")
     # A member the link never takes, so the library still links.
-    file(WRITE "${WORK}/note.txt" "a member of no object\n")
-    execute_process(COMMAND "${LLVM_AR}" r "${native}" "${WORK}/note.txt"
-                    RESULT_VARIABLE code ERROR_VARIABLE ar_err
-                    ENCODING NONE)
-    if(NOT code EQUAL 0)
-        message(FATAL_ERROR "llvm-ar failed with ${code}\n${ar_err}")
+    note("a member of no object\n")
+elseif(CASE STREQUAL "same_size")
+    note("b member of no object\n")
+    file(SIZE "${native}" size_after)
+    if(NOT size_after EQUAL size_before)
+        message(FATAL_ERROR "the library went from ${size_before} to "
+                            "${size_after} bytes")
     endif()
+elseif(CASE STREQUAL "unreadable")
+    file(CHMOD "${native}" PERMISSIONS OWNER_WRITE)
 elseif(NOT CASE STREQUAL "unchanged")
     message(FATAL_ERROR "no case ${CASE}")
 endif()
@@ -239,7 +267,7 @@ run("the second run")
 snapshot(after)
 compare("${before}" "${after}" written)
 
-if(CASE STREQUAL "unchanged")
+if(CASE STREQUAL "unchanged" OR CASE STREQUAL "unreadable")
     if(written)
         message(FATAL_ERROR "the second run wrote ${written}")
     endif()
@@ -250,7 +278,7 @@ elseif(CASE STREQUAL "source")
 elseif(CASE STREQUAL "import")
     expect_modules("${written}" OFF tuning)
     expect_modules("${written}" ON geometry area)
-elseif(CASE STREQUAL "native")
+elseif(CASE STREQUAL "native" OR CASE STREQUAL "same_size")
     # The library files and the objects stay, and the link of each runner
     # of `anti test` is written again.
     foreach(m tuning geometry area main)
@@ -279,10 +307,14 @@ if(TOOL STREQUAL "build")
     if(NOT EXISTS "${mode_dir}/${program}")
         message(FATAL_ERROR "the build wrote no ${program}")
     endif()
-    if(CASE STREQUAL "unchanged" AND program IN_LIST written)
+    set(kept OFF)
+    if(CASE STREQUAL "unchanged" OR CASE STREQUAL "unreadable")
+        set(kept ON)
+    endif()
+    if(kept AND program IN_LIST written)
         message(FATAL_ERROR "the second build linked ${program} again")
     endif()
-    if(NOT CASE STREQUAL "unchanged" AND NOT program IN_LIST written)
+    if(NOT kept AND NOT program IN_LIST written)
         message(FATAL_ERROR "the second build kept ${program}")
     endif()
 endif()

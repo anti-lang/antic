@@ -9,6 +9,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 /* The platform layer of antic, which anti calls as well. */
@@ -71,6 +72,22 @@ bool platform_replace_program(const char *from, const char *to);
 /* The suffix of the name a program that platform_replace_program
    replaces on Windows takes for a moment. */
 #define PLATFORM_OLD_SUFFIX ".old"
+
+/* What tells one state of a file from another without reading it: its
+   size, its time of change in nanoseconds and the identity of the file,
+   the device and the inode on POSIX and the volume and the file index on
+   Windows. */
+struct platform_identity {
+    uint64_t size;
+    int64_t changed;
+    uint64_t device;
+    uint64_t file;
+};
+
+/* Fill out with the identity of the regular file path, through every
+   link. Returns false when path names no regular file or the system does
+   not say. */
+bool platform_identity(const char *path, struct platform_identity *out);
 
 /* Give the file to the permissions of the file from. Windows keeps no
    permission bits, so there it does nothing. */

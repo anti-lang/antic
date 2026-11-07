@@ -73,7 +73,14 @@ object and the options of the link follow. By Q2 of "Answers of 2026-11-07",
 `cache_runtime` adds the digest of every archive of the runtime archive the
 link may take: the native libraries of the target, the runtime of the level
 with its bitcode, and the libraries of the sysroot, in both modes of Linux.
-The fault seam counts none of those reads. A release build keys its one
+The fault seam counts none of those reads. By Q4 of "Answers of 2026-11-07,
+second set", `archive-digests.txt` in the cache of the user keeps the digest
+of each archive beside its size, its time of change in nanoseconds, its
+device and its file. `archive_digest` hashes an archive again only when one
+of the four differs, and the file is written beside itself and renamed into
+place when a digest changed. A build with nothing changed then took 0.027 s
+for macos-arm64 and 0.032 s for linux-arm64 with the release `anti`, against
+0.049 s and 0.134 s before. A release build keys its one
 call the same way, and keeps the program and its symbols together.
 `<program>.links` records what the link took for the notice.
 

@@ -6546,10 +6546,17 @@ endforeach()
 # the first compiled, and compiles again what a change reaches, by Q2 of
 # "Answers of 2026-11-06, fourth set" in docs/decisions.md. The case native
 # links again after a change of a native library, by Q2 of "Answers of
-# 2026-11-07". The header of the runner states each case.
+# 2026-11-07", and the cases same_size and unreadable hold the digests the
+# key keeps, by Q4 of "Answers of 2026-11-07, second set". The header of
+# the runner states each case.
+set(anti_reuse_cases unchanged source import option compiler native
+    same_size)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    list(APPEND anti_reuse_cases unreadable)
+endif()
 foreach(command build test)
     foreach(mode dev release)
-        foreach(case unchanged source import option compiler native)
+        foreach(case IN LISTS anti_reuse_cases)
             add_test(NAME anti_reuse_${command}_${mode}_${case}
                 COMMAND "${CMAKE_COMMAND}"
                     "-DANTI=$<TARGET_FILE:anti>"
