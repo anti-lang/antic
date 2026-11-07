@@ -273,5 +273,13 @@ bool driver_library_header(const struct options *options, struct text *out);
    program finds its runtime by itself. */
 const char *driver_memcheck_companion(enum target t);
 
+/* Write program, the link at linked with its debug information stripped,
+   with the tools of bin/ of the runtime archive of options. A Mach-O
+   link gives its debug information to <linked>.dSYM first. A COFF link
+   keeps its own in the PDB, so program is the link and nothing runs.
+   Returns false with a message when a tool is missing or fails. */
+bool driver_strip_debug(const struct options *options, const char *linked,
+                        const char *program);
+
 
 #endif

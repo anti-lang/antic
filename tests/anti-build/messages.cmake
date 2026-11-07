@@ -879,24 +879,48 @@ anti_message(fault_library_read_partway
     FAULT read:26:EACCES
     ARGS build ${tools}
     ERR "antic: cannot read ${dev_dir}/lib/com/example/app.antl")
-# The release build writes the map of the sections, the symbols archive
-# and the text of its link with debug information.
+# The release build writes the text of its one link, which takes -g, the
+# twin of the program, the map of the sections and the symbols archive.
 set(release_dir "./build/${HOST}/release")
 anti_message(fault_map_not_written
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT write:10:ENOSPC
+    FAULT write:12:ENOSPC
     ARGS build --release ${tools}
     ERR "anti: cannot write ${release_dir}/app.map")
 anti_message(fault_symbols_not_written
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT write:11:ENOSPC
+    FAULT write:13:ENOSPC
     ARGS build --release ${tools}
     ERR "anti: cannot write ./dist/${HOST}/release/app-symbols.zip")
 anti_message(fault_debug_text_not_created
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:45:EACCES
+    FAULT open:26:EACCES
     ARGS build --release ${tools}
-    ERR "antic: cannot create ${release_dir}/app.debug.ll")
+    ERR "antic: cannot create ${release_dir}/app.ll")
+# The link stays in the build directory as the twin of the program, which
+# build_release of build.c copies before it strips the program.
+anti_message(fault_debug_twin_not_copied
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT write:5:ENOSPC
+    ARGS build --release ${tools}
+    ERR "anti: cannot write ${release_dir}/app.debug${EXE}")
+# On macOS dsymutil, the third program of the run, gathers the debug
+# information of the link, and llvm-strip, the fourth, writes the program,
+# driver_strip_debug of driver_link.c.
+if(CMAKE_HOST_APPLE)
+    anti_message(fault_dsymutil_not_run
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT run:3:EACCES
+        ARGS build --release ${tools}
+        ERR "anti: cannot run ${RUNTIME}/bin/dsymutil: Permission denied"
+            "antic: dsymutil failed")
+    anti_message(fault_strip_not_run
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT run:4:EACCES
+        ARGS build --release ${tools}
+        ERR "anti: cannot run ${RUNTIME}/bin/llvm-strip: Permission denied"
+            "antic: llvm-strip failed")
+endif()
 # A library project copies each library file into dist/, build.c.
 anti_message(fault_library_not_copied
     FILES anti.toml "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n"
@@ -924,27 +948,29 @@ anti_message(fault_run_program_missing
     ARGS run ${tools}
     ERR "anti: ./dist/${HOST}/dev/app${EXE} was not built, so there is nothing to run")
 # The symbols archive of a release build reads the program for its build
-# id, the program with debug information for the map of its sections,
-# and the map and that program again for the archive, symmap.c and zip.c,
-# with the forty-ninth to the fifty-fourth open of the build.
+# id, its twin with debug information for the map of its sections, and
+# that twin and the map again for the archive, symmap.c and zip.c. On
+# macOS these are the forty-second to the forty-seventh open of the
+# build, with the LTO object of the debug map and the map itself between
+# them.
 anti_message(fault_program_unread_for_id
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:51:EACCES
+    FAULT open:42:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app${EXE}")
 anti_message(fault_debug_program_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:52:EACCES
+    FAULT open:43:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
 anti_message(fault_archive_entry_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:52:EACCES
+    FAULT open:46:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
 anti_message(fault_archive_map_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:56:EACCES
+    FAULT open:47:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.map")
 # The map of a Mach-O program takes the lines of its functions from the
@@ -955,9 +981,9 @@ if(CMAKE_HOST_APPLE)
     string(REGEX REPLACE "^macos-" "" debug_arch "${HOST}")
     anti_message(fault_debug_object_unread
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-        FAULT open:53:EACCES
+        FAULT open:44:EACCES
         ARGS build --release ${tools}
-        ERR "anti: cannot read ${PROJECT}/${release_dir}/app.debug.lto/0.${debug_arch}.lto.o")
+        ERR "anti: cannot read ${PROJECT}/${release_dir}/app.lto/0.${debug_arch}.lto.o")
 endif()
 # anti run --memory-checks runs the program with its standard error on a
 # pipe, which anti reads for the report of AddressSanitizer,

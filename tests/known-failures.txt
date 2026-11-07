@@ -22,4 +22,3 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 matrix_classes_function_named_init_dev T209 A function of a class named `init` takes the name of the init function the compiler writes for the class, and antic stops with an internal error.
 matrix_classes_function_named_init_release T209 A function of a class named `init` takes the name of the init function the compiler writes for the class, and antic stops with an internal error.
 matrix_classes_function_named_init_memory_checks T209 A function of a class named `init` takes the name of the init function the compiler writes for the class, and antic stops with an internal error.
-symbols_moved_frame T211 The map of the symbols archive comes from the debug link, whose code differs from the program's, so a frame of a moved function resolves to its neighbour. host=macos

@@ -6796,6 +6796,24 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             -P "${ANTIC_RUNNERS}/run_symbols_moved.cmake")
 endif()
 
+# A release program is the link of its symbols archive with the debug
+# information stripped, so every section it loads holds the bytes of that
+# link at the same address, on every target, by Q1 of "Answers of
+# 2026-11-07, fourth set".
+foreach(target IN LISTS ANTIC_TARGETS)
+    add_test(NAME symbols_same_code_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DOBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-same-code-${target}"
+            -P "${ANTIC_RUNNERS}/run_symbols_same_code.cmake")
+    set_tests_properties(symbols_same_code_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # `anti symbols resolve` reads the names and the lines of a Linux program
 # from its debug link, on every host, when the archive holds no map.
 add_test(NAME symbols_resolve_elf

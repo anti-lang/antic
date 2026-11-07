@@ -661,3 +661,66 @@ bool driver_link_program(const struct options *o, const char *object,
     driver_native_free(&natives);
     return ok;
 }
+
+/* Run argv, whose program is the tool name of bin/ of the runtime
+   archive. */
+static bool run_tool(const char *const argv[], const char *name)
+{
+    if (platform_run(argv) != 0) {
+        say_antic("%s failed\n", name);
+        return false;
+    }
+    return true;
+}
+
+/* DESIGN: a release program is the one LTO link with -g, with its debug
+   information stripped, and its symbols archive is written from that
+   same link, by Q1 of "Answers of 2026-11-07, fourth set". Route (b) of
+   the third set linked the program a second time, and that link did not
+   give the code of the first on four of the six targets. A strip rewrites
+   the symbol table and the debug data alone, so every section the
+   program loads keeps the bytes of the link, which the tests
+   symbols_same_code_<target> check. ELF drops its DWARF sections with
+   llvm-strip --strip-debug, as --strip-debug of ld.lld did for a link
+   without -g, and keeps the symbol table. Mach-O keeps its line tables
+   in the LTO object that the debug map of the link names, so dsymutil
+   gathers them into <linked>.dSYM first, and llvm-strip -S then drops
+   the debug map. A COFF link writes its debug information to the PDB, so
+   the executable is the program as it stands and nothing runs. */
+bool driver_strip_debug(const struct options *o, const char *linked,
+                        const char *program)
+{
+    struct text strip = {0};
+    struct text dsymutil = {0};
+    struct text bundle = {0};
+    enum object_format format = target_info(o->target)->format;
+    bool ok = true;
+
+    if (format == FORMAT_COFF) {
+        return true;
+    }
+    if (driver_archive_tool(o, "llvm-strip", &strip) == NULL) {
+        return false;
+    }
+    if (format == FORMAT_MACHO) {
+        const char *argv[] = {NULL, NULL, "-o", NULL, NULL};
+        ok = driver_archive_tool(o, "dsymutil", &dsymutil) != NULL;
+        text_appendf(&bundle, "%s.dSYM", linked);
+        argv[0] = text_cstr(&dsymutil);
+        argv[1] = linked;
+        argv[3] = text_cstr(&bundle);
+        ok = ok && run_tool(argv, "dsymutil");
+    }
+    if (ok) {
+        const char *argv[] = {NULL, NULL, "-o", NULL, NULL, NULL};
+        argv[0] = text_cstr(&strip);
+        argv[1] = format == FORMAT_MACHO ? "-S" : "--strip-debug";
+        argv[3] = program;
+        argv[4] = linked;
+        ok = run_tool(argv, "llvm-strip");
+    }
+    text_free(&strip);
+    text_free(&dsymutil);
+    text_free(&bundle);
+    return ok;
+}

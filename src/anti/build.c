@@ -784,6 +784,11 @@ static bool symbols_stand(const struct build *b, enum target t);
 static void program_name(const struct build *b, enum target t,
                          struct text *out);
 
+/* Append to out the path of the twin of the release program of b on t
+   in the build directory, <stem>.debug, with .exe on Windows. */
+static void debug_twin(const struct build *b, enum target t,
+                       struct text *out);
+
 /* DESIGN: Q2 of "Answers of 2026-11-06, fourth set" in docs/decisions.md.
    The key of a program holds what its link reads: the key of the source
    of the module with `main`, the options of the manifest, the digest of
@@ -960,30 +965,55 @@ static void release_lto(const struct build *b, struct options *o)
 }
 
 /* Release mode: one call with every module, so the optimizer sees the
-   whole program. */
+   whole program.
+   DESIGN: the call links with -g, and that one link is both the twin of
+   the symbols archive and, with its debug information stripped, the
+   program, by Q1 of "Answers of 2026-11-07, fourth set". The program and
+   its archive then hold the same code at every address, which T211 of
+   docs/audit/tests-findings.md showed a second link with -g does not
+   give. driver_strip_debug says what each format strips. */
 static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
                           size_t main_at, const struct strings *libraries,
                           const char *library)
 {
     struct options o;
+    struct text twin = {0};
+    bool lines;
+    bool ok;
 
     base_options(b, &o, t, cpu);
+    /* A program of --memory-checks keeps its lines for its reports, by
+       the rule of base_options, so nothing strips it. */
+    lines = o.debug;
     header_options(b, &o);
     o.input = b->units[main_at].source;
     o.output = text_cstr(&b->name);
     o.libraries = libraries->items;
     o.library_count = libraries->count;
+    o.debug = true;
     o.profile_generate = b->r->profile_generate;
     o.profile_use = b->r->profile_use;
     release_lto(b, &o);
     o.links_musl = &b->links_musl;
     o.links_natives = &b->natives;
-    /* The key is stored after the link of the symbols, which reads the
-       same inputs. */
+    /* The key is stored after the symbols archive, which the link
+       writes. */
     if (!program_reuse(b, t, cpu, &o, library)) {
         return false;
     }
-    return b->program_reused || driver_run(&o) == 0;
+    if (b->program_reused) {
+        return true;
+    }
+    debug_twin(b, t, &twin);
+    ok = driver_run(&o) == 0;
+    if (ok && !files_copy_program(text_cstr(&b->name), text_cstr(&twin))) {
+        say_anti("cannot write %s\n", text_cstr(&twin));
+        ok = false;
+    }
+    ok = ok && (lines || driver_strip_debug(&o, text_cstr(&twin),
+                                            text_cstr(&b->name)));
+    text_free(&twin);
+    return ok;
 }
 
 /* The name of the deliverable without the suffix of an executable, which
@@ -994,21 +1024,36 @@ static void archive_stem(enum target t, const char *name, struct text *out)
     files_cut_suffix(out, target_info(t)->executable_suffix);
 }
 
+static void debug_twin(const struct build *b, enum target t,
+                       struct text *out)
+{
+    struct text deliverable = {0};
+    struct text stem = {0};
+
+    program_name(b, t, &deliverable);
+    archive_stem(t, text_cstr(&deliverable), &stem);
+    text_appendf(out, "%s/%s" SYMS_DEBUG_SUFFIX "%s", text_cstr(&b->build_dir),
+                 text_cstr(&stem),
+                 target_info(t)->format == FORMAT_COFF ? ".exe" : "");
+    text_free(&deliverable);
+    text_free(&stem);
+}
+
 /* DESIGN: a release binary carries no symbol data, so the build writes
    the archive that names it. It holds the same link with the debug
    sections kept and the map of that program. All three carry the build
    id of the binary, because the digest leaves what `-g` added out. That
    id is what ties a frame of a trace to this archive. A Windows link
    writes the symbols to a PDB. The archive holds the PDB of the release
-   link, whose GUID the shipped program carries. Eddie decided this. The
-   debug link of Windows is named <stem>.debug.exe, so its own PDB is
-   <stem>.debug.pdb and leaves the one of the release link alone. Named
-   <stem>.debug, it wrote <stem>.pdb over it. */
-static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
-                          size_t main_at, const struct strings *libraries,
+   link, whose GUID the shipped program carries. Eddie decided this. By
+   Q1 of "Answers of 2026-11-07, fourth set" the link with its debug
+   sections kept is the link of the program itself, which build_release
+   keeps as <stem>.debug before it strips the program. A Windows program
+   is that link as it stands, so its twin is a copy of it, named
+   <stem>.debug.exe. */
+static bool build_symbols(struct build *b, enum target t,
                           const char *deliverable)
 {
-    struct options o;
     struct zip_entry entries[3];
     struct text stem = {0};
     struct text debug_path = {0};
@@ -1026,28 +1071,15 @@ static bool build_symbols(struct build *b, enum target t, enum cpu_level cpu,
     archive_stem(t, deliverable, &stem);
     text_appendf(&debug_name, "%s" SYMS_DEBUG_SUFFIX, text_cstr(&stem));
     text_appendf(&map_name, "%s" SYMS_MAP_SUFFIX, text_cstr(&stem));
-    text_appendf(&debug_path, "%s/%s%s", text_cstr(&b->build_dir),
-                 text_cstr(&debug_name),
-                 target_info(t)->format == FORMAT_COFF ? ".exe" : "");
+    debug_twin(b, t, &debug_path);
     text_appendf(&map_path, "%s/%s", text_cstr(&b->build_dir),
                  text_cstr(&map_name));
     text_appendf(&archive, "%s/%s%s", text_cstr(&b->dist_dir),
                  text_cstr(&stem), SYMS_ARCHIVE_SUFFIX);
-    base_options(b, &o, t, cpu);
-    header_options(b, &o);
-    o.input = b->units[main_at].source;
-    o.output = text_cstr(&debug_path);
-    o.libraries = libraries->items;
-    o.library_count = libraries->count;
-    o.debug = true;
-    o.profile_generate = b->r->profile_generate;
-    o.profile_use = b->r->profile_use;
-    release_lto(b, &o);
     /* A program of an earlier build has its symbols beside it, which
        symbols_stand checked. */
     if (!b->program_reused &&
-        (driver_run(&o) != 0 ||
-         !symmap_build_id(text_cstr(&b->name), &id) ||
+        (!symmap_build_id(text_cstr(&b->name), &id) ||
          !symmap_write(text_cstr(&debug_path), t, text_cstr(&id),
                        text_cstr(&map_path)))) {
         goto done;
@@ -1099,9 +1131,7 @@ static bool symbols_stand(const struct build *b, enum target t)
 
     program_name(b, t, &deliverable);
     archive_stem(t, text_cstr(&deliverable), &stem);
-    text_appendf(&path, "%s/%s" SYMS_DEBUG_SUFFIX "%s", text_cstr(&b->build_dir),
-                 text_cstr(&stem),
-                 target_info(t)->format == FORMAT_COFF ? ".exe" : "");
+    debug_twin(b, t, &path);
     ok = files_exists(text_cstr(&path));
     path.length = 0;
     text_appendf(&path, "%s/%s" SYMS_MAP_SUFFIX, text_cstr(&b->build_dir),
@@ -1490,8 +1520,7 @@ static bool build_target(struct build *b, enum target t, enum cpu_level cpu)
         text_free(&companion);
     }
     if (ok && b->r->release && b->r->lib == BUILD_PROGRAM) {
-        ok = build_symbols(b, t, cpu, main_at, &libraries,
-                           text_cstr(&deliverable));
+        ok = build_symbols(b, t, text_cstr(&deliverable));
     }
 done:
     for (i = 0; files != NULL && i < b->unit_count; i++) {
