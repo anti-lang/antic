@@ -3393,6 +3393,14 @@ Eddie took this decision on 2026-11-07. It answers the question of "Questions fo
 
 - Q1. A float from a callback of C can go back to C, as the result of an exported function or an argument of C. It takes the select of form B there like every other float. C receives the canonical NaN, not the bits C made. Every float Anti hands to C is canonical.
 
+## Answers of 2026-11-07, sixth set
+
+Eddie took these decisions on 2026-11-07 and 2026-11-08. Q1 and Q2 answer the two questions of "Questions for Eddie" in `docs/reports/2026-11-07-t211-trial.md`, which he answered with "go ahead" on the recommendations. Q3 answers the question of a host whose package lacks the new tools. They are not provisional.
+
+- Q1. The symbols archive of a macOS release program carries the DWARF of the dSYM that dsymutil writes from the one link with `-g`, as the entry `<stem>.dwarf`. `anti symbols resolve` reads the file and the line of a frame from it, and the map of the archive takes the lines of its functions from it. A frame then resolves on any machine, without the LTO object of the build directory that the debug map names.
+- Q2. A macOS release program stays independent of the directory it was built in. The one link names its LTO object in the debug map relative to the build directory, through `-oso_prefix` of ld64.lld, and dsymutil finds it through `--oso-prepend-path`. The UUID and the signature then do not depend on the directory, and two builds of one project in two directories give the same bytes. A link that keeps its debug information, as `antic -g` and `--memory-checks` write, keeps the absolute path, so a debugger finds the object.
+- Q3. A release build on a host whose package lacks llvm-strip or dsymutil refuses. antic says "llvm-strip is missing" or "dsymutil is missing" and names the path in `bin/` of the package. It has no fallback. Today these are the Linux and Windows hosts, whose release stays `23.1.1-anti.8`. The refusal reaches every target but the two Windows ones, whose program is the link as it stands. Reason: Linux and Windows build `23.1.1-anti.10` first when the VMs return.
+
 ## Open
 
 - Enums used as bit flags want a form of their own, to be designed later. A binding writes such a parameter with the integer type of C, and the caller converts each value with `as`.
