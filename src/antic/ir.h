@@ -407,6 +407,9 @@ struct ir_function {
     /* Code outside the program reaches the function by its name alone,
        so the link keeps it although nothing refers to it. */
     bool by_name;
+    /* The function returns what a callback of C returned, as it came: the
+       thunk of lower_c_callback. Its result takes no canonical NaN. */
+    bool result_of_c;
     bool worker;                    /* a worker fn */
     /* The function ends the program on every path. Each call of it ends
        its block with IR_UNREACHABLE. */

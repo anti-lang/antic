@@ -6189,7 +6189,8 @@ antic_dump_test(llvm closure_floats
 # The LLVM text of an exported function with a parameter of two words, by
 # Q3 of "Answers of 2026-11-07, third set": C's callback and context in a
 # slot of the frame, and the thunk that takes the canonical NaN of each
-# float it passes on.
+# float it passes on. By Q2 of "Answers of 2026-11-07, fourth set" the
+# thunk returns the callback's result without a select.
 antic_dump_test(llvm c_callback
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/c_callback.macos-arm64.ll"
     TARGET macos-arm64

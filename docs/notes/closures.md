@@ -78,7 +78,8 @@ choices of `snapshot fn` and `own fn`.
   `lower_c_callback` writes one thunk per signature. The thunk loads the
   callback and its context from the slot. Its call of the callback is an
   ordinary call through an address, which takes the canonical NaN of each
-  float.
+  float. It returns the result as the callback gave it, by Q2 of "Answers
+  of 2026-11-07, fourth set", and `result_of_c` marks it in the IR.
 - `anti fmt` keeps the brace of an anonymous function on the line of its
   signature. The frame of its body keeps the indent, the continuation and the
   open brackets of the line it interrupts.

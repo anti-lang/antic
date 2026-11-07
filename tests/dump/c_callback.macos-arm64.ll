@@ -80,9 +80,7 @@ b0:
   %v11 = call float (float, ptr) %v6(float %v9, ptr %v10)
   store float %v11, ptr %t5, align 4
   %v12 = load float, ptr %t5, align 4
-  %v13 = fcmp uno float %v12, 0.0
-  %v14 = select i1 %v13, float 0x7FF8000000000000, float %v12
-  ret float %v14
+  ret float %v12
 }
 
 @anti.rt.main = alias i64 (), ptr @c_callback.main

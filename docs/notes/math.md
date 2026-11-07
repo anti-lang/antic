@@ -252,15 +252,18 @@ holds the form, and the lines `context` and `context-apply` of
 `program_abi_nan` the calls from C.
 
 opt inlines the thunk into the exported function, since the slot is local,
-so no call is added. What it costs is a select on each float argument and
-one on a float result. The thunk returns the canonical NaN as every function
-whose address the module takes does. A loop of C calls an exported function that
-calls a callback of C 200 million times, each argument the result of the
-last call. The median of 11 runs went from 2.15 to 4.34 ns per call on arm64
-and from 2.39 to 9.21 ns at `v1` under Rosetta. That is the latency of two
-selects on a chain of dependent floats. Neither program of the table calls
-an exported function, and measured again on 2026-11-07 `float_work` gave 1.01
-and 1.00 and `pythagoras_geometry` 1.10 and 1.22.
+so no call is added. What it costs is a select on each float argument. The
+thunk returns the result of the callback as it came, by Q2 of "Answers of
+2026-11-07, fourth set", and the exported function gives the canonical NaN
+of what it returns. A loop of C calls an exported function that calls a
+callback of C 200 million times, each argument the result of the last call.
+The median of 11 runs went from 2.15 to 4.34 ns per call on arm64 and from
+2.39 to 9.21 ns at `v1` under Rosetta, with the select on the result of the
+thunk. Without it the same loop gave 3.33 ns on arm64 and 5.57 ns at `v1`,
+against 4.63 and 9.20 ns for the build with it, measured again on the same
+day while no other build ran. Neither program of the table calls an exported function, and measured
+again on 2026-11-07 `float_work` gave 1.01 and 1.00 and `pythagoras_geometry`
+1.10 and 1.22.
 
 `tests/bench/ablate/opt_nan_off.py` takes every select of the canonical NaN
 out of the text, so the measurement compares the built form with the same

@@ -412,8 +412,11 @@ void llvm_emit_nan_module(struct emitter *e)
                     if (inst->op == IR_CALL && k < 2) {
                         continue;
                     }
+                    /* The thunk of a callback of C goes to Anti alone,
+                       see lower_c_callback. */
                     if (o->kind == IR_FUNC &&
-                        o->as.index < m->function_count) {
+                        o->as.index < m->function_count &&
+                        !m->functions[o->as.index]->result_of_c) {
                         e->nan_reached[o->as.index] = true;
                     }
                 }

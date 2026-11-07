@@ -2,7 +2,10 @@
 //! of "Answers of 2026-11-07, third set". C may pass a callback with a context
 //! of its own. The function keeps both words in a slot of its frame and holds
 //! the thunk `callback.0` and the address of that slot instead. The thunk takes
-//! the canonical NaN of `x` and calls the callback with the context of C.
+//! the canonical NaN of `x` and calls the callback with the context of C. It
+//! returns the result as the callback gave it, by Q2 of "Answers of 2026-11-07,
+//! fourth set", and `run` takes the canonical NaN of it, as every exported
+//! function does.
 
 export fn run(f: fn(f32) -> f32, x: f32) -> f32
 {

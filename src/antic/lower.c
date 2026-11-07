@@ -700,7 +700,13 @@ const struct ir_function *lower_context_signature(struct lowerer *l,
    outlives the call: the checker refuses to store it, to return it, to
    own it, to snapshot it and to hand it to a `keep` parameter. The thunk
    allocates nothing. One thunk serves every function type of one
-   signature, named callback.N after the signature fn.N. */
+   signature, named callback.N after the signature fn.N.
+
+   DESIGN: Q2 of "Answers of 2026-11-07, fourth set". The thunk returns
+   the result of C's callback as it came, without the canonical NaN that
+   every other function whose address the module takes gives. The result
+   is a value C produced and the thunk hands it to Anti alone, which takes
+   the canonical NaN wherever it makes the bits visible. */
 struct ir_function *lower_c_callback(struct lowerer *l, const struct type *t)
 {
     const struct ir_function *sig = lower_context_signature(l, t);
@@ -726,6 +732,7 @@ struct ir_function *lower_c_callback(struct lowerer *l, const struct type *t)
                         sig->result_agg);
     text_free(&name);
     f->result_agg = sig->result_agg;
+    f->result_of_c = true;
     for (i = 0; i < sig->param_count; i++) {
         const struct ir_param *from = &sig->params[i];
         struct ir_param *p;

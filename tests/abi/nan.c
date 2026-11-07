@@ -7,7 +7,8 @@
    context and through a pointer of one word that nan_keeper fills.
    nan_context passes a callback of C with a context of its own to a
    function the program exports, by Q3 of "Answers of 2026-11-07, third
-   set". */
+   set". nan_result passes one that returns a NaN of C, by Q2 of "Answers
+   of 2026-11-07, fourth set". */
 #include "../binary_stdio.h"
 #include <stdarg.h>
 #include <stdint.h>
@@ -116,4 +117,37 @@ unsigned nan_context(float z, int kind, int through)
 
     anti_nan_pass(nan_record, &bits, z, kind, through);
     return bits;
+}
+
+unsigned anti_nan_result(float (*f)(float, void *), void *f_context,
+                         float kind, int how, float *out);
+
+/* NaN number kind of the three, from the zero that context points at: 0/0,
+   its negation and a negative NaN with a payload. */
+static float nan_produce(float kind, void *context)
+{
+    float z;
+    float v;
+    uint32_t bits = 0xffd00000u;
+
+    memcpy(&z, context, sizeof z);
+    if (kind == 0.0f) {
+        return z / z;
+    }
+    if (kind == 1.0f) {
+        return -(z / z);
+    }
+    memcpy(&v, &bits, sizeof v);
+    return v + z;
+}
+
+/* The bits of NaN number kind that nan_produce returns to the program,
+   which hands them to C when how is 0, writes them into a union when it is
+   1 and stores them into out otherwise. */
+unsigned nan_result(float z, int kind, int how)
+{
+    float out = 0.0f;
+    unsigned bits = anti_nan_result(nan_produce, &z, (float)kind, how, &out);
+
+    return how == 2 ? nan_bits32(out) : bits;
 }

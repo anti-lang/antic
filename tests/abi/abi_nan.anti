@@ -8,10 +8,13 @@
 //! passes it on, by Q1 of "Answers of 2026-11-07, second set". C passes a
 //! callback with a context of its own to a function the program exports, which
 //! passes a NaN to it directly and through `apply`, by Q3 of "Answers of
-//! 2026-11-07, third set". Each line holds the bits of three NaNs: 0/0 of a
-//! zero read at run time, whose sign follows the processor, its negation and a
-//! negative NaN with a payload. Every target gives the canonical NaN for all
-//! three.
+//! 2026-11-07, third set". Such a callback returns a NaN of C, which the thunk
+//! hands on as it came, by Q2 of "Answers of 2026-11-07, fourth set". The
+//! exported function hands it to C, writes it into a union and stores it
+//! through a pointer of C, and each gives the canonical NaN. Each line holds
+//! the bits of three NaNs: 0/0 of a zero read at run time, whose sign follows
+//! the processor, its negation and a negative NaN with a payload. Every target
+//! gives the canonical NaN for all three.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -27,6 +30,7 @@ extern fn nan_keep(v: c_float) -> c_float;
 extern fn nan_kept() -> c_uint;
 extern fn nan_keeper() -> ?fn(c_float) -> c_float;
 extern fn nan_context(z: c_float, kind: c_int, through: c_int) -> c_uint;
+extern fn nan_result(z: c_float, kind: c_int, how: c_int) -> c_uint;
 
 struct NanPair
 {
@@ -152,6 +156,23 @@ export fn anti_nan_pass(f: fn(c_float) -> c_float, z: c_float, kind: c_int,
 	return apply(f, make(z, kind as int));
 }
 
+/// The bits of NaN number `kind` that `f`, a callback of C with a context of
+/// its own, returns. They are handed to C when `how` is 0, written into a union
+/// when it is 1 and stored through `out` of C otherwise.
+export fn anti_nan_result(f: fn(c_float) -> c_float, kind: c_float, how: c_int,
+	out: *c_float) -> c_uint
+{
+	if how == 0 {
+		return nan_bits32(f(kind));
+	}
+	if how == 1 {
+		let b = Bits32 { f: f(kind) };
+		return b.u;
+	}
+	*out = f(kind);
+	return 0;
+}
+
 fn line(context: str, a: c_uint, b: c_uint, c: c_uint)
 {
 	printf("c %.*s %08x %08x %08x\n".ptr, context.len as c_int, context.ptr, a,
@@ -188,5 +209,11 @@ fn main(args: []str) -> int
 		nan_context(z, 2, 0));
 	line("context-apply", nan_context(z, 0, 1), nan_context(z, 1, 1),
 		nan_context(z, 2, 1));
+	line("result-argument", nan_result(z, 0, 0), nan_result(z, 1, 0),
+		nan_result(z, 2, 0));
+	line("result-union", nan_result(z, 0, 1), nan_result(z, 1, 1),
+		nan_result(z, 2, 1));
+	line("result-store", nan_result(z, 0, 2), nan_result(z, 1, 2),
+		nan_result(z, 2, 2));
 	return 0;
 }
