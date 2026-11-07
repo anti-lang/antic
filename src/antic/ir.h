@@ -237,6 +237,14 @@ enum {
     IR_INBOUNDS = 1
 };
 
+/* The field of an IR_CALL through the table of a class holds its slot,
+   which c names with the descriptor. The field of any other indirect call
+   holds IR_CALL_CONTEXT when the call goes through a function with its
+   context, whose last argument is the context. */
+enum {
+    IR_CALL_CONTEXT = 1
+};
+
 /* The flags IR_FLAG reads, in the order of the fields of Flags. */
 enum ir_flag {
     IR_FLAG_OVERFLOW,   /* the signed result does not fit */

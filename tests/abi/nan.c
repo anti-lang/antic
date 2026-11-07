@@ -2,7 +2,9 @@
    fourth set": C reads the bits of every float the program hands it. The
    program passes a NaN as an argument, among the variadic arguments and in a
    struct by value, and C calls a function the program exports and a callback
-   the program passes, each of which returns a NaN. */
+   the program passes, each of which returns a NaN. nan_keep records the bits
+   of what it takes, through a function value of two words with a null
+   context and through a pointer of one word that nan_keeper fills. */
 #include "../binary_stdio.h"
 #include <stdarg.h>
 #include <stdint.h>
@@ -70,4 +72,24 @@ unsigned long long nan_exported64(double z, int kind)
 unsigned nan_callback(float (*f)(float, int), float z, int kind)
 {
     return nan_bits32(f(z, kind));
+}
+
+static uint32_t kept_bits;
+
+/* Record the bits of v, which nan_kept gives, and return v. */
+float nan_keep(float v)
+{
+    memcpy(&kept_bits, &v, sizeof kept_bits);
+    return v;
+}
+
+unsigned nan_kept(void)
+{
+    return kept_bits;
+}
+
+/* nan_keep, as a function pointer that C fills. */
+float (*nan_keeper(void))(float)
+{
+    return nan_keep;
 }

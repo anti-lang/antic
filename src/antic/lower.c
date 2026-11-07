@@ -662,7 +662,9 @@ const struct ir_function *lower_signature(struct lowerer *l,
    closure takes it there. A named function, whose context is `none`, has
    no parameter there and never reads it. On each of the six conventions
    the caller removes what it pushed. The extra word is then harmless,
-   and no call tests the context. */
+   and no call tests it to choose the function. The call marks itself
+   IR_CALL_CONTEXT, and the LLVM text tests the context for the floats
+   alone, see llvm_emit_nan_context. */
 const struct ir_function *lower_context_signature(struct lowerer *l,
                                                   const struct type *t)
 {

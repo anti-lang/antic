@@ -232,6 +232,15 @@ read with a second type are memory a view reaches. A NaN that folding gives
 is the canonical one in the text and in the bytes of a constant. `copysign`
 of the runtime gives a NaN the canonical sign.
 
+A call through a function value of two words tests its context word once, by
+Q1 of "Answers of 2026-11-07, second set". The selects stand in the branch of
+a null context, and a phi gives each float to the one call. A closure takes
+the other branch, and opt folds the test where the context is the address of
+a frame. In a loop that calls a closure through `apply`, the release code of
+arm64 lost its `fcmp` there. Neither program of the table calls through a
+value of two words, so the figures stand: measured again on 2026-11-07,
+`float_work` gave 1.01 and 1.00 and `pythagoras_geometry` 1.10 and 1.23.
+
 `tests/bench/ablate/opt_nan_off.py` takes every select of the canonical NaN
 out of the text, so the measurement compares the built form with the same
 program without it. Each figure is the median of 21 runs to that program, in

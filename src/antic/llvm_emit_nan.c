@@ -460,13 +460,28 @@ bool llvm_emit_nan_call(const struct emitter *e, const struct ir_inst *inst)
 
     if (inst->a.kind != IR_FUNC) {
         /* A call through an address may reach C, apart from a call
-           through the table of a class. */
+           through the table of a class. A call through a function with
+           its context reaches C only where the context is null, which
+           llvm_emit_nan_context gives. */
         return inst->c.kind == IR_NONE;
     }
     callee = e->m->functions[inst->a.as.index];
     return callee->module == NULL &&
            strncmp(callee->name, NAN_RUNTIME_PREFIX,
                    strlen(NAN_RUNTIME_PREFIX)) != 0;
+}
+
+/* DESIGN: Q1 of "Answers of 2026-11-07, second set" in docs/decisions.md.
+   A call through a function with its context tests the context word. A
+   context that is not null comes from a closure, which C never makes, so
+   that path hands its floats on as they are. A null context may come with
+   a function of C, such as `apply(fabsf, x)`, and that path takes the
+   canonical NaN. llvm_emit_call writes the one comparison and the selects
+   in the branch of the null context. */
+bool llvm_emit_nan_context(const struct ir_inst *inst)
+{
+    return inst->a.kind != IR_FUNC && inst->c.kind == IR_NONE &&
+           inst->field == IR_CALL_CONTEXT && inst->arg_count > 0;
 }
 
 bool llvm_emit_nan_return(const struct emitter *e, const struct ir_inst *inst)

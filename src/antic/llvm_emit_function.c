@@ -1970,12 +1970,14 @@ void llvm_emit_definition(struct emitter *e, const struct ir_function *f)
        temporaries, and the body after all of them, in the entry block. */
     e->out = &body;
     e->allocas = &allocas;
+    text_format_name(e->label, sizeof e->label, "b0");
     llvm_emit_classify(e, f, &e->signature);
     llvm_emit_prologue(e, f, &e->signature);
     for (b = 0; b < f->block_count && !e->failed; b++) {
         const struct ir_block *block = f->blocks[b];
         if (b > 0) {
             text_appendf(&body, "\nb%zu:\n", b);
+            text_format_name(e->label, sizeof e->label, "b%zu", b);
         }
         for (i = 0; i < block->count && !e->failed; i++) {
             size_t from = body.length;

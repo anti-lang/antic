@@ -292,23 +292,29 @@ void llvm_emit_return_aggregate(struct emitter *e, const struct ir_operand *a)
 
 /* Append to args the argument o for parameter p, after the instructions
    that make it, and its type to types. An aggregate argument is the
-   address of the value. */
+   address of the value. A direct argument that made holds is that value,
+   which context_floats wrote. */
 static void argument(struct emitter *e, const struct abi_param *p,
                      const struct ir_param *param, const struct ir_operand *o,
-                     struct text *args, struct text *types)
+                     const struct text *made, struct text *args,
+                     struct text *types)
 {
     struct text value = {0};
     uint32_t words[2];
     uint32_t slot;
     size_t k;
 
-    if (p->kind == ABI_DIRECT) {
+    if (p->kind == ABI_DIRECT && made != NULL && made->length > 0) {
+        text_append_bytes(&value, made->data, made->length);
+    } else if (p->kind == ABI_DIRECT) {
         llvm_emit_operand(e, o, param->type, &value);
         /* One NaN on every target: C reads the bits of a float. */
         if (!e->failed && e->nan_args &&
             llvm_emit_nan_value(e, o, param->type)) {
             llvm_emit_canonical(e, param->type, &value);
         }
+    }
+    if (p->kind == ABI_DIRECT) {
         separate(args);
         separate(types);
         text_appendf(args, "%s%s %s", p->types[0],
@@ -614,6 +620,89 @@ done:
     return true;
 }
 
+/* Whether argument i of the call goes direct as a float that C would
+   read as the processor wrote it. */
+static bool raw_float(const struct emitter *e, const struct ir_inst *inst,
+                      const struct ir_function *callee,
+                      const struct classified *c, size_t i)
+{
+    return i < callee->param_count && c->params[i].kind == ABI_DIRECT &&
+           llvm_emit_nan_value(e, &inst->args[i], callee->params[i].type);
+}
+
+/* The floats of a call through a function with its context, by
+   llvm_emit_nan_context. Each float that needs the canonical NaN is read
+   before one test of the context word. The branch of a null context takes
+   the select of each, and a phi where the two paths meet gives the value
+   that made holds for the call. A call with no such float tests nothing,
+   and a context the text knows takes the selects alone where it is null.
+   Returns whether the arguments still take the selects themselves. */
+static bool context_floats(struct emitter *e, const struct ir_inst *inst,
+                           const struct ir_function *callee,
+                           const struct classified *c, struct text *made)
+{
+    const struct ir_operand *context = &inst->args[inst->arg_count - 1];
+    struct text word = {0};
+    struct text *chosen;
+    char from[24];
+    uint32_t id;
+    uint32_t null;
+    size_t i;
+    bool any = false;
+
+    for (i = 0; i < inst->arg_count; i++) {
+        any = any || raw_float(e, inst, callee, c, i);
+    }
+    if (!any || context->kind == IR_INT) {
+        return any && context->as.integer == 0;
+    }
+    for (i = 0; i < inst->arg_count && !e->failed; i++) {
+        if (raw_float(e, inst, callee, c, i)) {
+            llvm_emit_operand(e, &inst->args[i], callee->params[i].type,
+                              &made[i]);
+        }
+    }
+    llvm_emit_operand(e, context, IR_PTR, &word);
+    if (e->failed) {
+        text_free(&word);
+        return false;
+    }
+    chosen = alloc_zeroed(inst->arg_count, sizeof *chosen);
+    id = llvm_emit_fresh(e);
+    null = llvm_emit_fresh(e);
+    text_format_name(from, sizeof from, "%s", e->label);
+    text_appendf(e->out, "  %%v%" PRIu32 " = icmp eq ptr %s, null\n", null,
+                 text_cstr(&word));
+    text_appendf(e->out, "  br i1 %%v%" PRIu32 ", label %%n%" PRIu32
+                         ", label %%j%" PRIu32 "\n",
+                 null, id, id);
+    text_appendf(e->out, "\nn%" PRIu32 ":\n", id);
+    for (i = 0; i < inst->arg_count; i++) {
+        if (made[i].length > 0) {
+            text_append_bytes(&chosen[i], made[i].data, made[i].length);
+            llvm_emit_canonical(e, callee->params[i].type, &chosen[i]);
+        }
+    }
+    text_appendf(e->out, "  br label %%j%" PRIu32 "\n", id);
+    text_appendf(e->out, "\nj%" PRIu32 ":\n", id);
+    text_format_name(e->label, sizeof e->label, "j%" PRIu32, id);
+    for (i = 0; i < inst->arg_count; i++) {
+        if (made[i].length > 0) {
+            uint32_t phi = llvm_emit_fresh(e);
+            text_appendf(e->out, "  %%v%" PRIu32 " = phi %s [ %s, %%n%" PRIu32
+                                 " ], [ %s, %%%s ]\n",
+                         phi, llvm_emit_value_type(e, callee->params[i].type),
+                         text_cstr(&chosen[i]), id, text_cstr(&made[i]), from);
+            made[i].length = 0;
+            text_appendf(&made[i], "%%v%" PRIu32, phi);
+        }
+        text_free(&chosen[i]);
+    }
+    free(chosen);
+    text_free(&word);
+    return false;
+}
+
 /* DESIGN: a call names its function type, which abi_classify gives for
    the callee, or for the signature of an indirect call. An argument past
    the parameters of the callee, the variadic part of a C function or the
@@ -633,6 +722,7 @@ void llvm_emit_call(struct emitter *e, const struct ir_inst *inst)
     struct text types = {0};
     struct text result = {0};
     struct text facts = {0};
+    struct text *made;
     uint32_t sret = 0;
     uint32_t value;
     size_t i;
@@ -656,12 +746,16 @@ void llvm_emit_call(struct emitter *e, const struct ir_inst *inst)
         text_append(&types, "ptr");
     }
     e->nan_args = llvm_emit_nan_call(e, inst);
+    made = alloc_zeroed(inst->arg_count + 1, sizeof *made);
+    if (e->nan_args && llvm_emit_nan_context(inst)) {
+        e->nan_args = context_floats(e, inst, callee, &c, made);
+    }
     for (i = 0; i < inst->arg_count && !e->failed; i++) {
         struct ir_param extra;
         struct text unnamed = {0};
         if (i < callee->param_count) {
             argument(e, &c.params[i], &callee->params[i], &inst->args[i],
-                     &args, &types);
+                     &made[i], &args, &types);
             continue;
         }
         memset(&extra, 0, sizeof extra);
@@ -674,12 +768,16 @@ void llvm_emit_call(struct emitter *e, const struct ir_inst *inst)
             text_format_name(p.types[0], sizeof p.types[0], "%s",
                              llvm_emit_value_type(e, extra.type));
             /* The variadic part of a C function stays out of its type. */
-            argument(e, &p, &extra, &inst->args[i], &args,
+            argument(e, &p, &extra, &inst->args[i], NULL, &args,
                      callee->variadic ? &unnamed : &types);
         }
         text_free(&unnamed);
     }
     e->nan_args = false;
+    for (i = 0; i < inst->arg_count; i++) {
+        text_free(&made[i]);
+    }
+    free(made);
     if (callee->variadic) {
         separate(&types);
         text_append(&types, "...");

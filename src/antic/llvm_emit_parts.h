@@ -111,6 +111,9 @@ struct emitter {
     bool *nan_known;
     bool *nan_reached;
     bool nan_args;
+    /* The label of the block the text writes into, which a phi after a
+       branch inside one block of the IR names. */
+    char label[24];
 };
 
 /* llvm_emit.c */
@@ -176,6 +179,7 @@ bool llvm_emit_nan_value(const struct emitter *e, const struct ir_operand *o,
                          enum ir_type type);
 bool llvm_emit_nan_store(const struct emitter *e, const struct ir_inst *inst);
 bool llvm_emit_nan_call(const struct emitter *e, const struct ir_inst *inst);
+bool llvm_emit_nan_context(const struct ir_inst *inst);
 bool llvm_emit_nan_return(const struct emitter *e, const struct ir_inst *inst);
 void llvm_emit_canonical(struct emitter *e, enum ir_type type,
                          struct text *value);

@@ -6178,6 +6178,14 @@ foreach(target linux-x86_64 windows-x86_64)
         ARGS --dev "${CMAKE_CURRENT_SOURCE_DIR}/dump/control_flow.anti")
 endforeach()
 
+# The LLVM text of calls through a function with its context, by Q1 of
+# "Answers of 2026-11-07, second set": one test of the context word, and
+# the select of the canonical NaN in the branch of a null context alone.
+antic_dump_test(llvm closure_floats
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/closure_floats.macos-arm64.ll"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/closure_floats.anti")
+
 # main.opt is the optimized IR listing that antic prints for main.anti.
 antic_dump_test(opt main
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"

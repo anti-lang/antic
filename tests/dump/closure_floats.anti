@@ -1,0 +1,25 @@
+//! The LLVM text of calls through a function with its context, by Q1 of
+//! "Answers of 2026-11-07, second set". `apply` tests the context word once. A
+//! null context may come with a function of C, so that branch takes the
+//! canonical NaN of `x`, and a closure passes `x` as it is. `count` passes no
+//! float and tests nothing.
+
+fn apply(f: fn(f32) -> f32, x: f32) -> f32
+{
+	return f(x);
+}
+
+fn count(f: fn(int) -> int, n: int) -> int
+{
+	return f(n);
+}
+
+fn scaled(x: f32, by: f32) -> f32
+{
+	return apply(fn(v) { return v * by; }, x);
+}
+
+fn main() -> int
+{
+	return count(fn(n) { return n + 1; }, scaled(2.0, 3.0) as int) - 7;
+}

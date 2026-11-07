@@ -3,9 +3,12 @@
 //! tests/abi/nan.c as an argument, among the variadic arguments and in a struct
 //! by value, and C reads its bits. C then calls a function the program exports
 //! and a callback the program passes, and reads the bits of the NaN each
-//! returns. Each line holds the bits of three NaNs: 0/0 of a zero read at run
-//! time, whose sign follows the processor, its negation and a negative NaN with
-//! a payload. Every target gives the canonical NaN for all three.
+//! returns. A NaN reaches C through a function value of two words whose context
+//! is null, through a function pointer that C filled and through a closure that
+//! passes it on, by Q1 of "Answers of 2026-11-07, second set". Each line holds
+//! the bits of three NaNs: 0/0 of a zero read at run time, whose sign follows
+//! the processor, its negation and a negative NaN with a payload. Every target
+//! gives the canonical NaN for all three.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -17,6 +20,9 @@ extern fn nan_variadic(count: c_int, ...) -> c_ulonglong;
 extern fn nan_exported(z: c_float, kind: c_int) -> c_uint;
 extern fn nan_exported64(z: c_double, kind: c_int) -> c_ulonglong;
 extern fn nan_callback(f: fn(c_float, c_int) -> c_float, z: c_float, kind: c_int) -> c_uint;
+extern fn nan_keep(v: c_float) -> c_float;
+extern fn nan_kept() -> c_uint;
+extern fn nan_keeper() -> ?fn(c_float) -> c_float;
 
 struct NanPair
 {
@@ -94,6 +100,43 @@ fn wide_y(z: f64, kind: int) -> c_ulonglong
 	return nan_wide_y(p);
 }
 
+/// The value of f at x, through a parameter of two words.
+fn apply(f: fn(c_float) -> c_float, x: c_float) -> c_float
+{
+	return f(x);
+}
+
+/// The bits C reads of NaN number `kind`, passed to `nan_keep` of C as a
+/// function value of two words with a null context.
+fn two_words(z: f32, kind: int) -> c_uint
+{
+	apply(nan_keep, make(z, kind));
+	return nan_kept();
+}
+
+/// The bits C reads of NaN number `kind`, passed through the pointer of one
+/// word that `nan_keeper` of C gives.
+fn one_word(z: f32, kind: int) -> c_uint
+{
+	let keep = nan_keeper() else {
+		return 0;
+	};
+	keep(make(z, kind));
+	return nan_kept();
+}
+
+/// The bits C reads of NaN number `kind`, which a closure takes and hands on to
+/// C.
+fn closure(z: f32, kind: int) -> c_uint
+{
+	let bits: c_uint = 0;
+	apply(fn(v) {
+		bits = nan_bits32(v);
+		return v;
+	}, make(z, kind));
+	return bits;
+}
+
 fn line(context: str, a: c_uint, b: c_uint, c: c_uint)
 {
 	printf("c %.*s %08x %08x %08x\n".ptr, context.len as c_int, context.ptr, a,
@@ -123,5 +166,8 @@ fn main(args: []str) -> int
 		nan_exported64(z64, 2));
 	line("callback", nan_callback(made, z, 0), nan_callback(made, z, 1),
 		nan_callback(made, z, 2));
+	line("two-words", two_words(z, 0), two_words(z, 1), two_words(z, 2));
+	line("one-word", one_word(z, 0), one_word(z, 1), one_word(z, 2));
+	line("closure", closure(z, 0), closure(z, 1), closure(z, 2));
 	return 0;
 }

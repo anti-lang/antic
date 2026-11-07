@@ -1878,6 +1878,8 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
             call->c = ir_global_op(lower_class_descriptor(l,
                                                           e->as.call.dispatch));
             call->field = slot;
+        } else if (to.context.kind != IR_NONE) {
+            l->b->insts[l->b->count - 1].field = IR_CALL_CONTEXT;
         }
     }
     free(args);
