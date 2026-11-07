@@ -7855,7 +7855,8 @@ add_test(NAME native_pin_self
 # than taking it from the search path or from LIB.
 add_test(NAME own_tools
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
-            "-DANTIC=$<TARGET_FILE:antic>" "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DANTIC=$<TARGET_FILE:antic>" "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
             "-DOPT=${ANTIC_OPT}" "-DLLC=${ANTIC_LLC}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/own_tools"
             -P "${ANTIC_RUNNERS}/run_own_tools.cmake")

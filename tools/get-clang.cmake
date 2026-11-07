@@ -5,8 +5,8 @@
 #
 #   cmake [-DDEST=<dir>] [-DARCHIVE=<file>] -P tools/get-clang.cmake
 #
-# clang comes from the release that tools/clang-pin names, whose recipe
-# builds it from the LLVM source of tools/llvm-version.
+# clang comes from the release that tools/clang-pin names for this host,
+# whose recipe builds it from the LLVM source of tools/llvm-version.
 # tools/fetch-release.cmake downloads the archive of this host and checks
 # it against the pin, SHA256SUMS and its signature. DEST defaults to
 # build/deps/clang of the repository, and the configure step of CMakeLists.txt

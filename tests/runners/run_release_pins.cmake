@@ -1,9 +1,10 @@
 # tools/llvm-pin and tools/clang-pin name the release of anti-lang/llvm-tools
-# that the LLVM tools and the pinned clang come from: its tag, where it
-# lies, the name of an asset and the digest of the asset of each of the six
-# hosts. Both pins name one release. The version stands in
+# that the LLVM tools and the pinned clang come from: where it lies, the
+# name of an asset, and the tag and the digest of the asset of each of the
+# six hosts. Both pins name one tag for each host. The version stands in
 # tools/llvm-version alone and the rest in the pins alone, and no
-# installer names a pin or the version. tools/get-llvm.cmake and
+# installer names a pin or the version. antic_release_pin of
+# tools/pins.cmake alone reads the rows of a host. tools/get-llvm.cmake and
 # tools/get-clang.cmake install into the directories that
 # tools/pinned-compiler.cmake reads, each spelled once.
 #
@@ -24,12 +25,11 @@ endif()
 
 
 foreach(name llvm clang)
-    antic_pin_value(tag "${ROOT}/tools/${name}-pin" tag)
-    if(NOT tag MATCHES "^@VERSION@-anti\\.[1-9][0-9]*$")
-        message(FATAL_ERROR "the tag of tools/${name}-pin is `${tag}`, not "
-                            "@VERSION@-anti.<build>")
+    file(READ "${ROOT}/tools/${name}-pin" text)
+    if(text MATCHES "(^|\n)tag=")
+        message(FATAL_ERROR "tools/${name}-pin names one tag for every host, "
+                            "and each host names its own")
     endif()
-    set(${name}_tag "${tag}")
     antic_pin_value(release "${ROOT}/tools/${name}-pin" release)
     if(NOT release STREQUAL "https://github.com/anti-lang/llvm-tools/releases/download/@TAG@")
         message(FATAL_ERROR "tools/${name}-pin lies at `${release}`")
@@ -43,11 +43,22 @@ foreach(name llvm clang)
         message(FATAL_ERROR "the asset of tools/${name}-pin is `${file}`")
     endif()
     foreach(host IN LISTS hosts)
-        antic_pin_value(digest "${ROOT}/tools/${name}-pin" "${host}-digest")
-        string(LENGTH "${digest}" length)
-        if(NOT digest MATCHES "^[0-9a-f]+$" OR NOT length EQUAL 64)
+        antic_release_pin(pinned "${ROOT}/tools/${name}-pin" "${host}")
+        if(NOT pinned_TAG MATCHES "^${version}-anti\\.[1-9][0-9]*$")
+            message(FATAL_ERROR "${host} in tools/${name}-pin has the tag "
+                                "`${pinned_TAG}`, not @VERSION@-anti.<build>")
+        endif()
+        set(${name}_${host}_tag "${pinned_TAG}")
+        string(LENGTH "${pinned_DIGEST}" length)
+        if(NOT pinned_DIGEST MATCHES "^[0-9a-f]+$" OR NOT length EQUAL 64)
             message(FATAL_ERROR "${host} in tools/${name}-pin has the digest "
-                                "`${digest}`")
+                                "`${pinned_DIGEST}`")
+        endif()
+        set(asset "${prefix}-${pinned_TAG}-${host}.tar.xz")
+        if(NOT pinned_ASSET STREQUAL asset OR NOT pinned_RELEASE STREQUAL
+           "https://github.com/anti-lang/llvm-tools/releases/download/${pinned_TAG}")
+            message(FATAL_ERROR "${host} in tools/${name}-pin gives the asset "
+                                "${pinned_RELEASE}/${pinned_ASSET}")
         endif()
     endforeach()
     file(READ "${ROOT}/tools/${name}-pin" text)
@@ -56,9 +67,41 @@ foreach(name llvm clang)
                             "in tools/llvm-version alone")
     endif()
 endforeach()
-if(NOT llvm_tag STREQUAL clang_tag)
-    message(FATAL_ERROR "tools/llvm-pin names ${llvm_tag} and tools/clang-pin "
-                        "${clang_tag}. Every archive comes from one release.")
+foreach(host IN LISTS hosts)
+    if(NOT llvm_${host}_tag STREQUAL clang_${host}_tag)
+        message(FATAL_ERROR "tools/llvm-pin names ${llvm_${host}_tag} for "
+                            "${host} and tools/clang-pin "
+                            "${clang_${host}_tag}. The tools and clang of a "
+                            "host come from one release.")
+    endif()
+endforeach()
+
+# The rows of a host are read through antic_release_pin alone, so the
+# format of the two pins stands in tools/pins.cmake. A line of another
+# script that spells the row of a host, or reads a row of either pin
+# itself, is refused. Comments are prose and stay out of the search.
+file(GLOB scripts RELATIVE "${ROOT}" "${ROOT}/tools/*.cmake"
+     "${ROOT}/tools/*.sh" "${ROOT}/tests/*.cmake" "${ROOT}/tests/runners/*.cmake"
+     "${ROOT}/src/native/*.cmake")
+list(APPEND scripts CMakeLists.txt tests/CMakeLists.txt
+     src/native/CMakeLists.txt)
+list(REMOVE_ITEM scripts tools/pins.cmake tests/runners/run_release_pins.cmake)
+set(found "")
+foreach(script IN LISTS scripts)
+    file(STRINGS "${ROOT}/${script}" lines)
+    foreach(line IN LISTS lines)
+        if(line MATCHES "^[ \t]*#")
+            continue()
+        endif()
+        if(line MATCHES "(\\\${[A-Za-z_]+}|(linux|macos|windows)-[a-z0-9_]+)-(tag|digest)" OR
+           line MATCHES "antic_(pin_value|read_pins)\\([^)]*(llvm|clang)-pin")
+            string(APPEND found "\n  ${script}: ${line}")
+        endif()
+    endforeach()
+endforeach()
+if(NOT found STREQUAL "")
+    message(FATAL_ERROR "these lines read the release pins outside "
+                        "antic_release_pin of tools/pins.cmake:${found}")
 endif()
 
 foreach(script get-llvm.cmake get-clang.cmake fetch-release.cmake install.sh

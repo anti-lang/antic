@@ -20,7 +20,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/../package_tree.cmake")
 # package holds no tools/. VERSION in the root names the version of the
 # package.
 include("${ROOT}/tools/pinned-tools.cmake")
-antic_llvm_archive_tools(tools)
+antic_llvm_archive_tools(tools "${HOST}")
 set(expected anti/bin/antic${suffix}
              anti/bin/anti${suffix} anti/bin/llvm-version anti/VERSION
              anti/sysroot/macos-arm64/usr/lib/libSystem.tbd

@@ -1,10 +1,10 @@
 # Check that the LLVM tools in LLVM_BIN are the LLVM release of
 # tools/llvm-version, and fail otherwise. The tools are those of
-# tools/pinned-tools.cmake: the nine of ANTIC_LLVM_TOOLS and the names of
-# lld in a directory that tools/get-llvm.cmake installed, and those of
-# antic_llvm_archive_tools in bin/ of the runtime archive. The target
-# llvm_tools of CMakeLists.txt runs it before tools/copy-llvm.cmake, which
-# lays out that directory. Run with cmake -P and these values:
+# tools/pinned-tools.cmake for this machine: those of
+# antic_llvm_host_tools and the names of lld in a directory that
+# tools/get-llvm.cmake installed, and those of antic_llvm_archive_tools in
+# bin/ of the runtime archive. The target llvm_tools of CMakeLists.txt runs
+# it before tools/copy-llvm.cmake, which lays out that directory. Run with cmake -P and these values:
 #   LLVM_BIN         the directory of the installed tools
 #   RUNTIME_ARCHIVE  set when LLVM_BIN is bin/ of the runtime archive
 #
@@ -34,9 +34,10 @@ if(RUNTIME_ARCHIVE)
                                 "package carries ${tool}")
         endif()
     endforeach()
-    antic_llvm_archive_tools(names)
+    antic_llvm_archive_tools(names "${machine}")
 else()
-    set(names ${ANTIC_LLVM_TOOLS} ${ANTIC_LLD_NAMES})
+    antic_llvm_host_tools(names "${machine}")
+    list(APPEND names ${ANTIC_LLD_NAMES})
 endif()
 antic_llvm_tool_problems(problems "${LLVM_BIN}" "${pin}" "${os}" ${names})
 if(problems)

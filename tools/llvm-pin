@@ -1,15 +1,23 @@
-# The release of anti-lang/llvm-tools that the LLVM tools of every host come
-# from. The version stands in tools/llvm-version alone, and @VERSION@ takes
-# it. The tag adds the counter of the rebuilds of that version. An asset is
-# named after the tag and the host, which @TAG@ and @HOST@ take. Each digest
-# is the SHA-256 of the asset of that host. tools/clang-pin names the same
-# release.
-tag=@VERSION@-anti.8
+# The release of anti-lang/llvm-tools that the LLVM tools of each host
+# come from. Each host names its tag in its row <host>-tag, since Eddie
+# released the rebuild anti.9 for the two macOS hosts first, on 2026-11-07.
+# The version stands in tools/llvm-version alone, and @VERSION@ takes it.
+# The tag adds the counter of the rebuilds of that version. An asset is
+# named after the tag and the host, which @TAG@ and @HOST@ take. Each
+# digest is the SHA-256 of the asset of that host. tools/clang-pin names
+# the same tag for each host, and antic_release_pin of tools/pins.cmake
+# reads both pins.
 release=https://github.com/anti-lang/llvm-tools/releases/download/@TAG@
 file=llvm-tools-@TAG@-@HOST@.tar.xz
+linux-x86_64-tag=@VERSION@-anti.8
 linux-x86_64-digest=72fadd3e98f3d927662ede88350e53a3792b1e926ffd945bbd6a1d8258e01344
+linux-arm64-tag=@VERSION@-anti.8
 linux-arm64-digest=c1926fd1436972ac297f55be75612e52f3a6e9fce118c159a892ee24647b23a2
-macos-arm64-digest=6384758bfe98ccc413115aa3aed7d7c8c42d42fb9cc5ee86903b491709338c54
-macos-x86_64-digest=5b02de3cc62d83ec5f00a6533c61e6f03ef106fd5057bbe61fe52371f2c93d8e
+macos-arm64-tag=@VERSION@-anti.9
+macos-arm64-digest=bdc961c0238abd95403d283824e61f2806b37236a09993f57c3f271f1c1a42fb
+macos-x86_64-tag=@VERSION@-anti.9
+macos-x86_64-digest=050c3f82f7cb5cc96dcb342fdab9312e392d6a2d98e20e1f68498e0a8c94a43d
+windows-x86_64-tag=@VERSION@-anti.8
 windows-x86_64-digest=6fbf1a296c2e8185a0252339db1d5ccc754296e02e67f011f02b3f9c998309cd
+windows-arm64-tag=@VERSION@-anti.8
 windows-arm64-digest=5b194e04a666e4cc9631a5753b9fa1a6b0453080cac2b21b6e8298af948f8f34

@@ -90,6 +90,7 @@ string(STRIP "${version}" version)
 # every machine it installs on. llvm-version of each directory has to
 # name the pin, so a directory of an earlier release is refused as well.
 include("${tools_dir}/host.cmake")
+include("${tools_dir}/pinned-tools.cmake")
 antic_machine_host(machine)
 foreach(host IN LISTS HOSTS)
     if(host STREQUAL machine)
@@ -113,6 +114,17 @@ foreach(host IN LISTS HOSTS)
         message(FATAL_ERROR "${host}: ${dir} holds LLVM ${found}, and "
                             "tools/llvm-version names ${llvm_version}")
     endif()
+    # The tag of a host decides its tools, so a directory of an earlier
+    # tag of the same version lacks the tools a later one added.
+    antic_llvm_archive_tools(names "${host}")
+    antic_executable_suffix(tool_suffix "${host}")
+    foreach(tool IN LISTS names)
+        if(NOT EXISTS "${dir}/${tool}${tool_suffix}")
+            message(FATAL_ERROR "${host}: ${dir} lacks "
+                                "${tool}${tool_suffix}, which the release "
+                                "of ${host} in tools/llvm-pin carries")
+        endif()
+    endforeach()
     set("tools_of_${host}" "${dir}")
 endforeach()
 

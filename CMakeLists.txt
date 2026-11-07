@@ -165,7 +165,8 @@ target_compile_definitions(antic_core PRIVATE
 # The pinned clang that anti bind --clang names, from
 # tools/clang-release.cmake.
 include(tools/clang-release.cmake)
-antic_clang_release(ANTI_CLANG_VERSION ANTI_CLANG_TAG ANTI_CLANG_PAGE)
+antic_clang_release(ANTI_CLANG_VERSION ANTI_CLANG_TAG ANTI_CLANG_PAGE
+                    "${ANTIC_HOST_TARGET}")
 target_compile_definitions(anti_core PRIVATE
     ANTI_CLANG_VERSION="${ANTI_CLANG_VERSION}"
     ANTI_CLANG_TAG="${ANTI_CLANG_TAG}"

@@ -1,6 +1,7 @@
-# Install the nine LLVM tools llvm-mc, lld, llvm-ar, llvm-objdump,
-# llvm-readobj, opt, llc, llvm-profdata and llvm-cov for this host into
-# <dir>/bin.
+# Install the LLVM tools of this host into <dir>/bin: the nine llvm-mc,
+# lld, llvm-ar, llvm-objdump, llvm-readobj, opt, llc, llvm-profdata and
+# llvm-cov, and llvm-objcopy, llvm-strip and dsymutil where the release of
+# the host has them.
 # llvm-mc assembles the output of `antic -S` for the tests, lld links
 # under the names ld.lld, ld64.lld and lld-link, and llvm-ar writes static
 # libraries. llvm-objdump reads the format and architecture of an output,
@@ -8,13 +9,14 @@
 # it to an object, for the LLVM back end. llvm-profdata merges the raw
 # profiles of a --profile-generate run into the file --profile-use reads.
 # llvm-cov reads such a profile against a program built for coverage, which
-# measures what the tests of this tree reach.
+# measures what the tests of this tree reach. llvm-strip and dsymutil
+# write a release program from its link with -g.
 #
 #   cmake [-DDEST=<dir>] [-DARCHIVE=<file>] -P tools/get-llvm.cmake
 #   cmake -DHOST=<host> -DDEST=<dir> -P tools/get-llvm.cmake
 #
-# The tools come from the release that tools/llvm-pin names, whose recipe
-# builds them from the LLVM source of tools/llvm-version.
+# The tools come from the release that tools/llvm-pin names for the host,
+# whose recipe builds them from the LLVM source of tools/llvm-version.
 # tools/fetch-release.cmake downloads the archive of this host and checks
 # it against the pin, SHA256SUMS and its signature. DEST defaults to
 # build/deps/llvm of the repository, and the configure step of CMakeLists.txt

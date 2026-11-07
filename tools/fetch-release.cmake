@@ -12,8 +12,10 @@
 # who cloned it trusts. The archive unpacks into <dest>, and <dest>/.installed
 # names its digest. An archive whose digest is there already is left as it
 # is, so a configure that finds it downloads nothing. ARCHIVE names an
-# archive already downloaded, which is checked all the same. The function
-# sets fetched_host and fetched_version in the scope of the caller.
+# archive already downloaded, which is checked all the same. The release is
+# the tag that the pin names for the host, read by antic_release_pin of
+# tools/pins.cmake. The function sets fetched_host and fetched_version in
+# the scope of the caller.
 cmake_minimum_required(VERSION 3.21)
 
 set(fetch_release_root "${CMAKE_CURRENT_LIST_DIR}/..")
@@ -35,25 +37,15 @@ function(fetch_release pin dest)
     set(fetched_host "${host}" PARENT_SCOPE)
     set(fetched_version "${version}" PARENT_SCOPE)
 
-    # Read the row <key> of the pin, with the tag, the version and the host
-    # in place of their markers. The digest of a host may be missing, and
-    # the message below names the reason.
-    set(tag "")
-    foreach(key tag release file "${host}-digest")
-        set(optional "")
-        if(key STREQUAL "${host}-digest")
-            set(optional OPTIONAL)
-        endif()
-        antic_pin_value(value "${pin}" "${key}" ${optional})
-        string(REPLACE "@TAG@" "${tag}" value "${value}")
-        string(REPLACE "@VERSION@" "${version}" value "${value}")
-        string(REPLACE "@HOST@" "${host}" value "${value}")
-        set("${key}" "${value}")
-    endforeach()
-    set(asset "${file}")
-    set(digest "${${host}-digest}")
+    # The digest of a host may be missing, and the message below names the
+    # reason.
+    antic_release_pin(pinned "${pin}" "${host}")
+    set(tag "${pinned_TAG}")
+    set(release "${pinned_RELEASE}")
+    set(asset "${pinned_ASSET}")
+    set(digest "${pinned_DIGEST}")
     get_filename_component(pin_name "${pin}" NAME)
-    if(digest STREQUAL "")
+    if(digest STREQUAL "" OR tag STREQUAL "")
         message(FATAL_ERROR
                 "tools/${pin_name} names no archive for ${host}. Every host "
                 "antic runs on has one, so this is a host antic does not run "

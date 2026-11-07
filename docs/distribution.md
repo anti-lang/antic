@@ -114,7 +114,8 @@ move a signature onto the host that serves the binaries.
 
 Every package carries the LLVM tools of its host in `bin/` beside antic and anti:
 lld under its four names, llvm-ar, llvm-objdump, llvm-readobj, opt, llc and
-llvm-profdata, with `llvm-version`. They are not served from the download area on their
+llvm-profdata, with `llvm-version`. A host whose release has them adds llvm-objcopy,
+llvm-strip and dsymutil, which a release build runs. They are not served from the download area on their
 own. The repository `anti-lang/llvm-tools` builds them
 from the pinned LLVM source and publishes one archive per host as an asset of a GitHub
 release, tagged `<version>-anti.<build>` as in `23.1.1-anti.8`. Beside the archives stand `SHA256SUMS` and its signature
@@ -182,9 +183,12 @@ installs `llvm-cov` in `build/deps/llvm/bin`, and no package carries it:
 `no_llvm_cov_packed` holds both. `tools/copy-llvm.cmake` does that copy since step 23 of
 the fixes of `docs/audit/summary.md`.
 
-`tools/llvm-pin` names the tag, the address of the release, the name of an asset and
-the digest of the archive of each of the six hosts. `tools/clang-pin` names the archives
-of clang in the same release. `tools/get-llvm.cmake` takes the
+`tools/llvm-pin` names the address of the release and the name of an asset, and for
+each of the six hosts its tag and the digest of its archive. `tools/clang-pin` names the
+archives of clang under the same tag of each host. The two macOS hosts take
+`23.1.1-anti.9`, and the four Linux and Windows hosts keep `23.1.1-anti.8` until
+anti.10. anti.9 adds llvm-objcopy, llvm-strip and dsymutil to the tools archive, and the
+package of a host whose release has them carries them in `bin/`. `tools/get-llvm.cmake` takes the
 archive of the host into `build/deps/llvm`, and checks the digest of the pin, the line
 of `SHA256SUMS` and the signature. A toolchain bump is a new release there and a new
 pin here. Every package carries the LLVM tools of its platform, as "Binary

@@ -16,7 +16,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${ROOT}/tools/pinned-tools.cmake")
-antic_llvm_archive_tools(tools)
+antic_llvm_archive_tools(tools linux-arm64)
 file(READ "${ROOT}/tools/llvm-version" llvm_version)
 file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")

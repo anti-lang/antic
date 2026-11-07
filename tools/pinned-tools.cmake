@@ -14,6 +14,8 @@
 # finds nm, strip, objcopy, mt and rc of the host, and no rule of this
 # build runs them.
 
+include("${CMAKE_CURRENT_LIST_DIR}/pins.cmake")
+
 # The options of the clang driver that make it link with the pinned
 # linker, for a host of the operating system os (macos, linux, windows).
 # The Mac and Linux name the linker with --ld-path. clang ignores
@@ -42,10 +44,11 @@ function(antic_pinned_linker out llvm os)
 endfunction()
 
 # The nine LLVM tools of the pinned release, which tools/get-llvm.cmake
-# installs. lld runs under the three names of ANTIC_LLD_NAMES, which
-# tools/get-llvm.cmake writes beside it. Every list of the tools is made
-# from these two, and the test llvm_tool_list refuses one spelled anywhere
-# else.
+# installs, and the three of ANTIC_LLVM_STRIP_TOOLS where the release of
+# the host has them. lld runs under the three names of ANTIC_LLD_NAMES,
+# which tools/get-llvm.cmake writes beside it. Every list of the tools is
+# made from these, and the test llvm_tool_list refuses one spelled
+# anywhere else.
 #
 # DESIGN: llvm-cov measures what the tests of this tree reach, and
 # llvm-mc assembles the output of `antic -S` for the tests. No package
@@ -57,12 +60,37 @@ set(ANTIC_LLVM_TOOLS llvm-mc lld llvm-ar llvm-objdump llvm-readobj opt llc
 set(ANTIC_LLD_NAMES ld.lld ld64.lld lld-link)
 set(ANTIC_LLVM_UNPACKED llvm-mc llvm-cov)
 
-# The names of the tools in bin/ of the runtime archive, which
-# tools/copy-llvm.cmake copies there and tools/pack-anti.cmake copies into
-# the package of the host: every tool of ANTIC_LLVM_TOOLS but those of
-# ANTIC_LLVM_UNPACKED, and the names of lld.
-function(antic_llvm_archive_tools out)
-    set(names ${ANTIC_LLVM_TOOLS} ${ANTIC_LLD_NAMES})
+# DESIGN: llvm-objcopy, its second name llvm-strip and dsymutil write a
+# release program from its one link with -g, by Q1 of "Answers of
+# 2026-11-07, fourth set" in docs/decisions.md. The rebuild anti.9 of the
+# pinned release added them, so the archive of a host carries them when
+# its tag in tools/llvm-pin counts ANTIC_LLVM_STRIP_SINCE or more.
+set(ANTIC_LLVM_STRIP_TOOLS llvm-objcopy llvm-strip dsymutil)
+set(ANTIC_LLVM_STRIP_SINCE 9)
+
+# The tools of the archive of host in tools/llvm-pin: ANTIC_LLVM_TOOLS,
+# and ANTIC_LLVM_STRIP_TOOLS when the tag of the host has them.
+function(antic_llvm_host_tools out host)
+    antic_release_pin(pinned "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/llvm-pin"
+                      "${host}")
+    if(pinned_BUILD STREQUAL "")
+        message(FATAL_ERROR "tools/llvm-pin names no release for ${host}")
+    endif()
+    set(names ${ANTIC_LLVM_TOOLS})
+    if(NOT pinned_BUILD LESS ANTIC_LLVM_STRIP_SINCE)
+        list(APPEND names ${ANTIC_LLVM_STRIP_TOOLS})
+    endif()
+    set(${out} "${names}" PARENT_SCOPE)
+endfunction()
+
+# The names of the tools in bin/ of the runtime archive and of the package
+# of host, which tools/copy-llvm.cmake copies there for this machine and
+# tools/pack-anti.cmake copies into the package: every tool of
+# antic_llvm_host_tools but those of ANTIC_LLVM_UNPACKED, and the names of
+# lld.
+function(antic_llvm_archive_tools out host)
+    antic_llvm_host_tools(names "${host}")
+    list(APPEND names ${ANTIC_LLD_NAMES})
     list(REMOVE_ITEM names ${ANTIC_LLVM_UNPACKED})
     set(${out} "${names}" PARENT_SCOPE)
 endfunction()

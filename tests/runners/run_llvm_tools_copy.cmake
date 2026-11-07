@@ -1,6 +1,6 @@
 # tools/copy-llvm.cmake lays out bin/ of the runtime archive: every tool
-# that antic_llvm_archive_tools of tools/pinned-tools.cmake names, and
-# llvm-version. A tool missing from the directory of the LLVM tools is an
+# that antic_llvm_archive_tools of tools/pinned-tools.cmake names for this
+# machine, and llvm-version. A tool missing from the directory of the LLVM tools is an
 # error that names it. The copy of check-llvm.cmake took a tool only if it
 # was there, so a missing llvm-objdump left a runtime archive without it
 # and no error. The tools of ANTIC_LLVM_UNPACKED stay out of the copy,
@@ -13,7 +13,9 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${ROOT}/tools/pinned-tools.cmake")
-antic_llvm_archive_tools(names)
+include("${ROOT}/tools/host.cmake")
+antic_machine_host(machine)
+antic_llvm_archive_tools(names "${machine}")
 if(CMAKE_HOST_WIN32)
     set(exe ".exe")
 endif()

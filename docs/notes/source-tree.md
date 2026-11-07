@@ -921,11 +921,11 @@ A pin or a data file has no code. Its row says what it holds.
 
 | File | Purpose |
 |---|---|
-| `tools/clang-pin` | The release, the asset names and the digests of the pinned clang of every host. |
+| `tools/clang-pin` | The release, the asset names, and the tag and the digest of the pinned clang of each host. |
 | `tools/cpu-levels` | The processor levels and the default level of each target. |
 | `tools/cpu-levels.cmake` | Reads `tools/cpu-levels` into the targets and the levels of each. |
 | `tools/keys/release.pem` | The public key that checks the signature of the LLVM tools. |
-| `tools/llvm-pin` | The release, the asset names and the digests of the pinned LLVM tools of every host. |
+| `tools/llvm-pin` | The release, the asset names, and the tag and the digest of the pinned LLVM tools of each host. |
 | `tools/llvm-version` | The LLVM version, one line. |
 | `tools/macos-sdk-pin` | The version, the name and the digest of the Apple SDK. |
 | `tools/mbedtls-pin` | The pin of Mbed TLS. |

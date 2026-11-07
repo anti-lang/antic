@@ -11,8 +11,9 @@
 # archive here is a directory of links into the real one, with a bin/ or
 # a sysroot/ of its own.
 #
-#   cmake -DROOT=<repository> -DANTIC=<antic> -DRUNTIME=<dir> -DOPT=<opt>
-#         -DLLC=<llc> -DWORK=<dir> -P tests/runners/run_own_tools.cmake
+#   cmake -DROOT=<repository> -DANTIC=<antic> -DANTI=<anti> -DRUNTIME=<dir>
+#         -DOPT=<opt> -DLLC=<llc> -DWORK=<dir>
+#         -P tests/runners/run_own_tools.cmake
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -78,6 +79,48 @@ foreach(name no-opt no-lld no-lld-link.exe no-ar.a)
     if(EXISTS "${WORK}/${name}")
         message(FATAL_ERROR "antic wrote ${name} with a tool of the search "
                             "path")
+    endif()
+endforeach()
+
+# A release build of anti writes the program from its one link with -g
+# through llvm-strip of the archive, and a macOS one runs dsymutil first,
+# by Q1 of "Answers of 2026-11-07, fourth set". An archive without either
+# refuses the build by the path of the tool, with the tool on the search
+# path, by Q3 of the sixth set, and dist/ holds no program then. Each
+# stand-in bin/ links every tool of the real one but the missing one.
+file(GLOB real_tools RELATIVE "${RUNTIME}/bin" "${RUNTIME}/bin/*")
+foreach(pair "llvm-strip=linux-x86_64" "dsymutil=macos-arm64")
+    string(REPLACE "=" ";" pair "${pair}")
+    list(GET pair 0 tool)
+    list(GET pair 1 target)
+    set(archive "${WORK}/no-${tool}")
+    stand_in("${archive}" sysroot)
+    file(MAKE_DIRECTORY "${archive}/bin")
+    foreach(name IN LISTS real_tools)
+        if(NOT name MATCHES "^${tool}(\\.exe)?$")
+            file(CREATE_LINK "${RUNTIME}/bin/${name}" "${archive}/bin/${name}"
+                 SYMBOLIC)
+        endif()
+    endforeach()
+    set(project "${WORK}/project-${tool}")
+    file(WRITE "${project}/anti.toml"
+         "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\n")
+    file(WRITE "${project}/src/com/example/app.anti"
+         "//! The smallest program.\n\nfn main() -> int\n{\n\treturn 0;\n}\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${RUNTIME}/bin"
+                            "${ANTI}" build --release --target "${target}"
+                            --runtime "${archive}"
+                    WORKING_DIRECTORY "${project}"
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    set(pattern "antic: [^\n]*[/\\\\]no-${tool}[/\\\\]bin[/\\\\]${tool}(\\.exe)? is missing")
+    if(NOT status EQUAL 1 OR NOT err MATCHES "${pattern}")
+        message(FATAL_ERROR "anti build --release for ${target} without "
+                            "${tool} ended with ${status}:\n${out}${err}")
+    endif()
+    if(EXISTS "${project}/dist/${target}/release/app")
+        message(FATAL_ERROR "anti build --release for ${target} without "
+                            "${tool} left a program in dist/")
     endif()
 endforeach()
 

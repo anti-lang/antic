@@ -259,7 +259,9 @@ each of the five tests of `./r`, which then run the script again as each needs.
 - One suite per build tree at a time. Two `ctest` runs in one tree fail each other's
   tests. A command started with `&` in a tool call keeps running after the call returns.
 
-- The toolchain is frozen at `23.1.1-anti.8`. `23.1.1-anti.5` added opt, llc and
+- The toolchain is frozen at `23.1.1-anti.8` on Linux and Windows and at
+  `23.1.1-anti.9` on macOS, whose tools add llvm-objcopy, llvm-strip and dsymutil.
+  `23.1.1-anti.5` added opt, llc and
   `libunwind.a` to `23.1.1-anti.3` for the LLVM back end, anti.6 added
   llvm-profdata and the profile runtime for profile-guided optimisation,
   anti.7 gave every static musl tool a thread stack of 8 MiB, and anti.8 added

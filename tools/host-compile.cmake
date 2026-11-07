@@ -22,7 +22,7 @@ function(antic_host_compile_options out host root sysroot resource macos_sdk
                                     version)
     antic_target_triple(triple "${host}")
     include("${root}/tools/clang-release.cmake")
-    antic_clang_release(clang_version clang_tag clang_page)
+    antic_clang_release(clang_version clang_tag clang_page "${host}")
     include("${root}/tools/libc-versions.cmake")
     antic_libc_versions(musl_version mimalloc_version)
     set(options --target=${triple} -std=c11 -O2 "-ffile-prefix-map=${root}=."

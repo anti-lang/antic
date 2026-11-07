@@ -18,6 +18,14 @@
 # src/native/get-source.cmake and the record of
 # tools/upstream-sources.cmake take the URL from here, so each pin holds
 # it once.
+#
+# antic_release_pin(<prefix> <pin> <host>) reads the release of
+# anti-lang/llvm-tools that tools/llvm-pin or tools/clang-pin names for
+# <host>. It sets <prefix>_TAG, <prefix>_BUILD, the counter at the end of
+# the tag, <prefix>_RELEASE, where the assets lie, <prefix>_PAGE, the page
+# of the release, <prefix>_ASSET and <prefix>_DIGEST. @VERSION@, @TAG@ and
+# @HOST@ stand filled in. A host the pin has no row for gives an empty tag
+# and digest.
 
 function(antic_read_pins file)
     file(STRINGS "${file}" pins REGEX "^[A-Z]")
@@ -79,4 +87,35 @@ function(antic_pin_url out name)
                             "${url}")
     endif()
     set(${out} "${url}" PARENT_SCOPE)
+endfunction()
+
+# DESIGN: each host names its own tag in the rows <host>-tag and
+# <host>-digest, because Eddie released anti.9 for the two macOS hosts
+# first, on 2026-11-07, under "Scope and toolchain" in docs/decisions.md.
+# This function alone spells the rows, and the test release_pins refuses
+# them spelled anywhere else.
+function(antic_release_pin prefix pin host)
+    file(READ "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/llvm-version" version)
+    string(STRIP "${version}" version)
+    antic_pin_value(tag "${pin}" "${host}-tag" OPTIONAL)
+    antic_pin_value(digest "${pin}" "${host}-digest" OPTIONAL)
+    antic_pin_value(release "${pin}" release)
+    antic_pin_value(asset "${pin}" file)
+    string(REPLACE "@VERSION@" "${version}" tag "${tag}")
+    set(build "")
+    if(tag MATCHES "-anti\\.([0-9]+)$")
+        set(build "${CMAKE_MATCH_1}")
+    endif()
+    foreach(name release asset)
+        string(REPLACE "@TAG@" "${tag}" ${name} "${${name}}")
+        string(REPLACE "@VERSION@" "${version}" ${name} "${${name}}")
+        string(REPLACE "@HOST@" "${host}" ${name} "${${name}}")
+    endforeach()
+    string(REPLACE "/releases/download/" "/releases/tag/" page "${release}")
+    set(${prefix}_TAG "${tag}" PARENT_SCOPE)
+    set(${prefix}_BUILD "${build}" PARENT_SCOPE)
+    set(${prefix}_RELEASE "${release}" PARENT_SCOPE)
+    set(${prefix}_PAGE "${page}" PARENT_SCOPE)
+    set(${prefix}_ASSET "${asset}" PARENT_SCOPE)
+    set(${prefix}_DIGEST "${digest}" PARENT_SCOPE)
 endfunction()

@@ -12,8 +12,10 @@
 # of it with a tool of the host in each place. Then the linker's own mark
 # in each program: `Linker: LLD` in the .comment of an ELF file, the tool
 # lld in the build version of a Mach-O file, and no Rich header, which
-# link.exe writes and lld-link does not, in a PE file. Last the nine LLVM
-# tools of the pinned directory, each of the version of tools/llvm-version.
+# link.exe writes and lld-link does not, in a PE file. Last the LLVM tools
+# of this host in the pinned directory, each of the version of
+# tools/llvm-version. They hold llvm-objcopy, llvm-strip and dsymutil
+# where the release of the host has them.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -56,14 +58,30 @@ expect_refused(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=bfd")
 get_filename_component(tools "${CHECK}" DIRECTORY)
 file(READ "${tools}/llvm-version" version)
 string(STRIP "${version}" version)
+include("${tools}/host.cmake")
+antic_machine_host(machine)
+antic_llvm_host_tools(host_tools "${machine}")
 antic_llvm_tool_problems(problems "${LLVM_DIR}/bin" "${version}" "${OS}"
-                         ${ANTIC_LLVM_TOOLS} ${ANTIC_LLD_NAMES})
+                         ${host_tools} ${ANTIC_LLD_NAMES})
 if(problems)
     list(JOIN problems "\n" text)
     message(FATAL_ERROR "the pinned LLVM tools are not complete:\n${text}")
 endif()
-list(LENGTH ANTIC_LLVM_TOOLS count)
-message(STATUS "${count} LLVM tools of ${version}: ${ANTIC_LLVM_TOOLS}")
+list(LENGTH host_tools count)
+message(STATUS "${count} LLVM tools of ${version}: ${host_tools}")
+
+# DESIGN: a release build of a macOS target runs dsymutil and llvm-strip,
+# by Q1 of "Answers of 2026-11-07, fourth set", and the release of the two
+# macOS hosts carries them since anti.9. The tools of a macOS host hold
+# all three, so the check above read them.
+if(OS STREQUAL "macos")
+    foreach(tool IN LISTS ANTIC_LLVM_STRIP_TOOLS)
+        if(NOT tool IN_LIST host_tools)
+            message(FATAL_ERROR "the tools of ${machine} lack ${tool}, which a "
+                                "release build for macOS runs")
+        endif()
+    endforeach()
+endif()
 
 string(REPLACE "," ";" programs "${PROGRAMS}")
 foreach(program IN LISTS programs)

@@ -317,20 +317,19 @@ preflight() {
     # other five hosts come from the same release, into llvm-tools/<host>
     # beside the llvm/ of the downloads, through tools/get-llvm.cmake,
     # which checks each archive against the pin, the manifest and the
-    # signature. A host whose directory is in place is not fetched again,
+    # signature. Each host names its own tag, so the script runs for every
+    # host. It downloads nothing when the digest of the pin is installed,
     # and step 3 hands the directory to the packer.
     tools_dir=$(dirname "$llvm_dir")/llvm-tools
     machine=macos-$(uname -m)
     mkdir -p "$dist"
     for host in $hosts; do
         [ "$host" != "$machine" ] || continue
-        if [ ! -f "$tools_dir/$host/bin/llvm-version" ]; then
-            cmake -DHOST="$host" -DDEST="$tools_dir/$host" \
-                -P "$root/tools/get-llvm.cmake" > "$dist/tools-$host.log" 2>&1 ||
-                die "the LLVM tools of $host did not download, and $dist/tools-$host.log holds the output"
-            [ -f "$tools_dir/$host/bin/llvm-version" ] ||
-                die "tools/get-llvm.cmake laid out no $tools_dir/$host/bin"
-        fi
+        cmake -DHOST="$host" -DDEST="$tools_dir/$host" \
+            -P "$root/tools/get-llvm.cmake" > "$dist/tools-$host.log" 2>&1 ||
+            die "the LLVM tools of $host did not download, and $dist/tools-$host.log holds the output"
+        [ -f "$tools_dir/$host/bin/llvm-version" ] ||
+            die "tools/get-llvm.cmake laid out no $tools_dir/$host/bin"
         say "the LLVM tools of $host are in $tools_dir/$host"
     done
 }
