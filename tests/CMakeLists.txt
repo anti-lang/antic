@@ -6756,6 +6756,21 @@ foreach(target linux-x86_64 linux-arm64)
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 
+# A frame of a release program resolves to its own function and line
+# through the symbols archive, where the debug link lays that function out
+# at another address. A Windows program keeps its functions in the PDB,
+# which only DbgHelp reads, so the test runs on the other hosts.
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME symbols_moved_frame
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-moved"
+            -P "${ANTIC_RUNNERS}/run_symbols_moved.cmake")
+endif()
+
 # `anti symbols resolve` reads the names and the lines of a Linux program
 # from its debug link, on every host, when the archive holds no map.
 add_test(NAME symbols_resolve_elf

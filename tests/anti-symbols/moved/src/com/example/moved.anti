@@ -1,0 +1,33 @@
+//! A release program that prints the raw trace of a function the debug link
+//! lays out at another address. `stop` returns `never`, so it stands among the
+//! cold code after the runtime. The class with an `inject` field exports every
+//! function, and the `-g` link of such a program folds the empty functions of
+//! `anti.log` with those of the runtime. On macOS that moves the code after
+//! them by 64 bytes.
+
+import anti.io;
+import anti.lang;
+import anti.log;
+
+class Holder
+{
+	inject sink: *log.Logger,
+}
+
+/// Print the raw trace of the calls that lead here, and end the program.
+fn stop(status: int) -> never
+{
+	let t = lang.StackTrace.capture();
+	io.println(t.text());
+	delete(t);
+	io.exit(status);
+}
+
+fn main(args: []str) -> int
+{
+	let h = Holder { };
+	if args.len < 5 {
+		stop(0);
+	}
+	return 1;
+}

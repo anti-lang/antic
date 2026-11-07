@@ -478,7 +478,7 @@ The data files of a directory have no row of their own.
 | `tests/abi/` | C sources, Anti programs and expected outputs that compare the layouts and the calls of C with those of Anti, and the link probes of the native libraries. |
 | `tests/asm/` | Sources of the tests that read the code antic writes for a target and a level: the atomics, `f16`, the width of a simd operation, the size of a Mutex and the unwind data of Windows. |
 | `tests/anti-build/` | The projects that `anti build`, `anti run` and `anti license` run over. |
-| `tests/anti-symbols/` | The project `tracer` of `anti symbols`. |
+| `tests/anti-symbols/` | The projects `tracer` and `moved` of `anti symbols`. |
 | `tests/anti-test/` | The modules that `anti test` runs. |
 | `tests/bench/` | The benchmark programs with their C twins, outside the suite, and `ablate/`, the measurement of `docs/work-order-llvm-optimization.md`. |
 | `tests/bind/` | C headers, `raylib_api.json` and the expected binding modules of `anti bind`. |
@@ -835,6 +835,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_std_tests.cmake` | Runs `anti test` on one module in both modes. |
 | `tests/runners/run_symbols.cmake` | Looks up two functions in a program built with `-g`. |
 | `tests/runners/run_symbols_layout.cmake` | Compares the sections of a shipped program with those of its debug link. |
+| `tests/runners/run_symbols_moved.cmake` | Resolves the frame of a release program in a function its debug link lays out elsewhere. |
 | `tests/runners/run_symbols_resolve_elf.cmake` | Resolves a trace of a Linux program through its debug link alone. |
 | `tests/runners/run_sysroot_links.cmake` | Checks that the sysroot script turns an absolute link relative. |
 | `tests/runners/run_target_lists.cmake` | Refuses the six targets spelled outside `tools/cpu-levels`. |
