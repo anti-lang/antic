@@ -306,6 +306,13 @@ not re-open a settled decision without asking Eddie.
   one NaN. It ran each sanitizer suite in the six parts of `asan`: `asan`
   250 s, 188 s, 273 s, 193 s, 433 s and 447 s, `ubsan` 255 s, 193 s,
   258 s, 199 s, 453 s and 467 s.
+  The step of the fourth set of answers of 2026-11-06 measured `host` in
+  the parts `ctest -I 1,2100`, `-I 2101,4300` and `-I 4301,7000`: 387 s,
+  277 s and 316 s before the commit of the reuse, 391 s, 285 s and 333 s
+  before the commit of one NaN. It ran each sanitizer suite in the six
+  parts of `asan`, the last up to test 7000: `asan` 252 s, 189 s, 259 s,
+  196 s, 428 s and 442 s, `ubsan` 256 s, 191 s, 261 s, 209 s, 472 s and
+  454 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -912,11 +919,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6886 ctest tests pass on the development Mac, and two of them, the
+- 6938 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   Three of them are the expected failures of T209. The two other
   lines of `tests/known-failures.txt`, those of T136 and T138, carry
-  `host=windows`. The ASan and the UBSan builds run 6884 each
+  `host=windows`. The ASan and the UBSan builds run 6936 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
@@ -1241,6 +1248,16 @@ reports what it finished.
   functions of `src/rt/libm.c` are one instruction where the level has it.
   A program of `anti.math` names musl in its notice on every target. See
   `docs/notes/math.md`.
+- One NaN on every target is built, form B of Q1 of "Answers of
+  2026-11-06, fourth set". `src/antic/llvm_emit_nan.c` writes the select of
+  `0x7fc00000` or `0x7ff8000000000000` wherever a program sees the bits of
+  a float: memory a view or C reaches, C arguments, results C reads, simd
+  lanes and `as f16`. A slot no view reaches takes none. See "One NaN on
+  every target" in `docs/notes/math.md`.
+- `anti build` and `anti test` reuse what an earlier run of the mode
+  compiled, by Q2 of the same answers, with the keys of `src/anti/cache.c`.
+  A build links nothing when the key of its program holds, and a dev run of
+  `anti test` links the objects of `anti build`. See `docs/notes/build.md`.
 - `anti.graphics` is built, as `docs/notes/graphics.md` designs it. A
   program draws with `import anti.graphics;` and no manifest entry, in
   units of the largest square that fits the window, and links raylib
