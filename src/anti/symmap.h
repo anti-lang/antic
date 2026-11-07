@@ -32,8 +32,10 @@ void symmap_readable_name(struct text *out, const char *name, size_t length);
 bool symmap_build_id(const char *program, struct text *out);
 
 /* Write the map of program at path. id is its build id, which the map
-   names so that a trace of that program finds its own map. */
-bool symmap_write(const char *program, enum target t, const char *id,
-                  const char *path);
+   names so that a trace of that program finds its own map. dwarf names
+   the DWARF file of the dSYM of a Mach-O program, which then gives the
+   lines, or NULL for the objects of its debug map. */
+bool symmap_write(const char *program, const char *dwarf, enum target t,
+                  const char *id, const char *path);
 
 #endif

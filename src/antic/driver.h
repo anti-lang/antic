@@ -63,8 +63,18 @@ struct options {
                                    class descriptor. */
     /* DESIGN: -g writes the source positions of the program and keeps the
        debug sections of the link. anti build passes it in dev mode, and
-       release mode never does. */
+       in release mode for the one link that the stripped program and its
+       symbols archive come from, by Q1 of "Answers of 2026-11-07, fourth
+       set". */
     bool debug;
+    /* DESIGN: the directory of output, which the debug map of a Mach-O
+       link with LTO and -g names its LTO object against, or NULL for the
+       absolute path. anti build sets it for the link of a release program
+       that it strips, so the UUID and the signature do not depend on the
+       build directory, by Q2 of "Answers of 2026-11-07, sixth set". A
+       link that keeps its debug information keeps the absolute path, so
+       a debugger finds the object. */
+    const char *debug_map_root;
     /* DESIGN: --memory-checks puts a check of AddressSanitizer before
        every load and store and links its runtime from the runtime
        archive. It is off by default in every mode, and windows-arm64,
@@ -280,6 +290,10 @@ const char *driver_memcheck_companion(enum target t);
    Returns false with a message when a tool is missing or fails. */
 bool driver_strip_debug(const struct options *options, const char *linked,
                         const char *program);
+
+/* Append to out the path of the DWARF file in the dSYM that
+   driver_strip_debug writes beside the Mach-O link at linked. */
+void driver_dsym_dwarf(const char *linked, struct text *out);
 
 
 #endif

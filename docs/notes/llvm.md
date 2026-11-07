@@ -124,10 +124,12 @@ rules, and the tests named there pin each fact.
   `--lto none` the link of objects below. Dev mode, `-S`, `-c`, `--lib`,
   `--linker platform`, `--memory-checks` and a Windows program that hosts
   plugins keep the objects.
-- The runtime as bitcode of a Linux target carries no unwind tables. The link
-  with `-g` that a symbols archive holds then lays the program out as the
-  release link does. The runtime of ARM64 Linux takes no outline atomics on
-  any host.
+- The runtime as bitcode of a Linux target carries no unwind tables. A release
+  program is the one link with `-g` that its symbols archive holds. It is
+  stripped by `llvm-strip`, so both hold the same code. A macOS link of that
+  kind names its LTO object in the debug map relative to its directory, with
+  `-oso_prefix`. Its UUID then does not depend on the directory. The runtime
+  of ARM64 Linux takes no outline atomics on any host.
 - Every link drops what nothing reaches: `-dead_strip`, `--gc-sections` or
   `/OPT:REF`. What only a name reaches stands in `llvm.used`.
 - Every link of lld folds identical code in the safe form, `--icf=safe` or

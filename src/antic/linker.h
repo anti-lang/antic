@@ -61,6 +61,10 @@ struct link_inputs {
     /* --profile-generate: link the profile runtime that the runtime
        archive holds beside the native libraries. */
     bool profile_generate;
+    /* Mach-O: the absolute directory of the executable, which -oso_prefix
+       removes from the path of the LTO object in the debug map, or NULL.
+       driver.h gives the reason. */
+    const char *debug_map_root;
 };
 
 /* DESIGN: a macOS link of --lto with -g keeps the objects that the LTO of

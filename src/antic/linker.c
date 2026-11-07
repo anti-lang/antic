@@ -421,9 +421,27 @@ static void macos(struct link_command *c, enum target t,
     lto_level(c, t, in);
     if (in->lto != LTO_NONE && in->debug) {
         struct text *objects = next(c);
-        text_appendf(objects, "%s%s", in->executable, LINK_LTO_OBJECTS_SUFFIX);
+        /* ld64.lld writes the path of the object as it stands against
+           the directory of the link, so the object stands below the
+           root here with no `.` that the prefix would not match. */
+        if (in->debug_map_root != NULL) {
+            text_appendf(objects, "%s/%s%s", in->debug_map_root,
+                         platform_file_name(in->executable),
+                         LINK_LTO_OBJECTS_SUFFIX);
+        } else {
+            text_appendf(objects, "%s%s", in->executable,
+                         LINK_LTO_OBJECTS_SUFFIX);
+        }
         add(c, "-object_path_lto");
         add(c, text_cstr(objects));
+        /* The trailing separator makes ld64.lld remove it too, so the
+           debug map names the object relative to the directory. */
+        if (in->debug_map_root != NULL) {
+            struct text *prefix = next(c);
+            text_appendf(prefix, "%s/", in->debug_map_root);
+            add(c, "-oso_prefix");
+            add(c, text_cstr(prefix));
+        }
     }
     /* DESIGN: a plugin is bound against the host at load, so the host
        keeps every name its own objects define in its export table. */

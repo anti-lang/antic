@@ -6,11 +6,16 @@
 #   FIXTURE  tests/anti-symbols
 #   HOST     the target name of this host
 #   WORK     a directory this run writes into
+#   CLEAN    set to remove the build directory of the project before the
+#            resolve, so the archive answers alone
 #
 # The frame lies in `stop`, at the line of its call of
 # `lang.StackTrace.capture`. The map of the archive must name that function
 # and that line at the address the shipped program holds them, whatever the
-# debug link of the archive lays out.
+# debug link of the archive lays out. With CLEAN the LTO object that the
+# debug map of a Mach-O link names is gone, and the line comes from the
+# DWARF of the dSYM in the archive, by Q1 of "Answers of 2026-11-07, sixth
+# set". A frame then resolves on a machine that did not build the program.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -41,6 +46,9 @@ if(capture EQUAL 0)
 endif()
 
 set(dist "${project}/dist/${HOST}/release")
+if(CLEAN)
+    file(REMOVE_RECURSE "${project}/build")
+endif()
 program_expect("trace" COMMAND "${dist}/${name}" ANY_OUT)
 file(WRITE "${WORK}/trace.txt" "${program_stdout}")
 anti_run(status out err "${WORK}" symbols resolve trace.txt

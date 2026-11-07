@@ -100,14 +100,20 @@ static void elf_lines(struct map *m, const struct text *bytes)
    debug map, so each object is read and relocated once. An object that
    cannot be read ends the map with false, since a map without its lines
    would leave `anti symbols resolve` without them, T154 of
-   docs/audit/tests-findings.md. */
-static bool macho_lines(struct map *m, const struct anti_macho_table *t)
+   docs/audit/tests-findings.md. The DWARF file of a dSYM, when dwarf
+   names one, holds the lines of every object at the addresses of the
+   link under the same symbols, and is read in their place. */
+static bool macho_lines(struct map *m, const struct anti_macho_table *t,
+                        const char *dwarf)
 {
     struct text object_path = {0};
     struct text object = {0};
     size_t i;
     bool ok = true;
 
+    if (dwarf != NULL) {
+        ok = files_read_reported(dwarf, &object);
+    }
     for (i = 0; ok && i < m->count; i++) {
         struct anti_found found;
         const char *path;
@@ -118,7 +124,7 @@ static bool macho_lines(struct map *m, const struct anti_macho_table *t)
                                      &start)) {
             continue;
         }
-        if (strcmp(text_cstr(&object_path), path) != 0) {
+        if (dwarf == NULL && strcmp(text_cstr(&object_path), path) != 0) {
             object.length = 0;
             object_path.length = 0;
             text_append(&object_path, path);
@@ -171,8 +177,8 @@ bool symmap_build_id(const char *program, struct text *out)
     return found;
 }
 
-bool symmap_write(const char *program, enum target t, const char *id,
-                  const char *path)
+bool symmap_write(const char *program, const char *dwarf, enum target t,
+                  const char *id, const char *path)
 {
     const struct target_info *info = target_info(t);
     struct map m = {0};
@@ -196,7 +202,7 @@ bool symmap_write(const char *program, enum target t, const char *id,
                                    false, 0, &table)) {
         anti_rt_macho_functions(&table, add_function, &m);
         sort_map(&m);
-        ok = macho_lines(&m, &table);
+        ok = macho_lines(&m, &table, dwarf);
     }
     text_append(&out, "# The map of a symbols archive of Anti.\n");
     text_appendf(&out, "%s%s\n", SYMMAP_BUILD_LINE, id);

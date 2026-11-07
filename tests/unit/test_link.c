@@ -22,39 +22,39 @@ static const char *const extra_windows[] = {"shapes.obj"};
 static const struct link_inputs unix_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/x86_64-linux-gnu",
     NULL, 0, LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false, NULL
 };
 
 static const struct link_inputs windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, NULL, 0,
     LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false, NULL
 };
 
 static const struct link_inputs extra_inputs = {
     "prog.o", "prog", "/rt", "/sdk", "15.4", "/usr/lib/aarch64-linux-gnu",
     extra_unix, 2, LINKER_PLATFORM, CPU_ARMV8_5, NULL, NULL, NULL, 0, false,
     false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false, NULL
 };
 
 static const struct link_inputs extra_windows_inputs = {
     "prog.obj", "prog.exe", "C:/rt", NULL, NULL, NULL, extra_windows, 1,
     LINKER_PLATFORM, CPU_V3, NULL, NULL, NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false, NULL
 };
 
 /* lld of the runtime archive with the sysroot of the target. */
 static const struct link_inputs lld_inputs = {
     "prog.o", "prog", "/rt", NULL, "26.5", NULL, extra_unix, 1, LINKER_LLD,
     CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false, NULL
 };
 
 static const struct link_inputs lld_windows_inputs = {
     "prog.obj", "prog.exe", "/rt", NULL, NULL, NULL, NULL, 0, LINKER_LLD,
     CPU_V3, "/rt/sysroot/t", "/rt/bin", NULL, 0, false, false,
-    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false
+    NULL, 0, false, NULL, NULL, false, NULL, LTO_NONE, false, NULL
 };
 
 /* Build the command line of target t and compare it, joined by spaces.
@@ -785,7 +785,8 @@ static void memory_checks_links(void)
 /* --lto links the bitcode of the program with the runtime as bitcode of
    its mode, at the level of opt in release mode. A macOS link with -g
    keeps the objects of the LTO, which hold the debug information, in a
-   directory beside the program. */
+   directory beside the program, and names them relative to it when it
+   has a root. */
 static void lto_links(void)
 {
     struct link_inputs in = lld_inputs;
@@ -806,6 +807,18 @@ static void lto_links(void)
           "-mllvm -inline-threshold=225 -object_path_lto prog.lto prog.o "
           "shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/thin/libanti_rt.a "
           "-lSystem");
+    /* The link of a program that anti build strips names the objects
+       relative to the directory of the program, by Q2 of "Answers of
+       2026-11-07, sixth set". */
+    in.debug_map_root = "/b/release";
+    links(TARGET_MACOS_ARM64, &in,
+          "/rt/bin/ld64.lld -arch arm64 -platform_version macos 11.0 26.5 "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe --lto-O3 "
+          "-mllvm -inline-threshold=225 -object_path_lto "
+          "/b/release/prog.lto -oso_prefix /b/release/ prog.o "
+          "shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/thin/libanti_rt.a "
+          "-lSystem");
+    in.debug_map_root = NULL;
     in.debug = false;
     links(TARGET_LINUX_ARM64, &in,
           "/rt/bin/ld.lld -static -pie --no-dynamic-linker --strip-debug "

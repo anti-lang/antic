@@ -40,6 +40,16 @@ link starts at the address of `__TEXT`, which the load commands of the
 debug link give. The lookup takes the byte before the return address,
 which lies in the call and names its line, as `symbolize` does.
 
+The line of a Mach-O frame comes from the DWARF of the dSYM that the
+archive carries as `<stem>.dwarf`, by Q1 of "Answers of 2026-11-07, sixth
+set". The debug map of the twin names the symbol and the start of the
+function. The dSYM holds the line table at the addresses of the link
+under the same symbols. The LTO object of the build directory is then not
+read, so a frame resolves on any machine. An archive without the entry
+reads the objects the debug map names, where they stand. The test
+`symbols_moved_frame_without_build` removes the build directory before it
+resolves.
+
 An archive without the debug link answers through its map alone, by R183
 of "Rules of 2026-10-13". The map of a Mach-O program names the address of
 `__TEXT` on a line `# text`, so its offsets count from there. A map without

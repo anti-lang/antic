@@ -6796,6 +6796,38 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             -P "${ANTIC_RUNNERS}/run_symbols_moved.cmake")
 endif()
 
+# The same frame resolves after the build directory is gone, so a frame of
+# a macOS program resolves on any machine from the DWARF of the dSYM in its
+# archive, by Q1 of "Answers of 2026-11-07, sixth set". The program runs
+# here, so the test runs on a macOS host.
+if(ANTIC_HOST_OS STREQUAL "macos")
+    add_test(NAME symbols_moved_frame_without_build
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            -DCLEAN=ON
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-moved-without-build"
+            -P "${ANTIC_RUNNERS}/run_symbols_moved.cmake")
+endif()
+
+# A macOS release program is the same bytes whichever directory it was
+# built in, its UUID and its signature included, by Q2 of "Answers of
+# 2026-11-07, sixth set".
+foreach(target macos-arm64 macos-x86_64)
+    add_test(NAME symbols_same_bytes_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DTARGET=${target}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-same-bytes-${target}"
+            -P "${ANTIC_RUNNERS}/run_symbols_same_bytes.cmake")
+    set_tests_properties(symbols_same_bytes_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+endforeach()
+
 # A release program is the link of its symbols archive with the debug
 # information stripped, so every section it loads holds the bytes of that
 # link at the same address, on every target, by Q1 of "Answers of

@@ -950,9 +950,9 @@ anti_message(fault_run_program_missing
 # The symbols archive of a release build reads the program for its build
 # id, its twin with debug information for the map of its sections, and
 # that twin and the map again for the archive, symmap.c and zip.c. On
-# macOS these are the forty-second to the forty-seventh open of the
-# build, with the LTO object of the debug map and the map itself between
-# them.
+# macOS these are the forty-second to the forty-eighth open of the build.
+# The DWARF of the dSYM stands between them twice, read for the map and
+# for the archive, with the map itself.
 anti_message(fault_program_unread_for_id
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     FAULT open:42:EACCES
@@ -970,20 +970,25 @@ anti_message(fault_archive_entry_unread
     ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
 anti_message(fault_archive_map_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:47:EACCES
+    FAULT open:48:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.map")
-# The map of a Mach-O program takes the lines of its functions from the
-# objects its debug map names, macho_lines of symmap.c. T154: anti says
-# it cannot read the object and writes the map without those lines, and
-# ends with status 0.
+# The map of a stripped Mach-O program takes the lines of its functions
+# from the DWARF of the dSYM, macho_lines of symmap.c, and the archive
+# carries that DWARF, by Q1 of "Answers of 2026-11-07, sixth set". T154:
+# a file that cannot be read stops the build.
 if(CMAKE_HOST_APPLE)
-    string(REGEX REPLACE "^macos-" "" debug_arch "${HOST}")
-    anti_message(fault_debug_object_unread
+    set(dwarf "${release_dir}/app.debug.dSYM/Contents/Resources/DWARF/app.debug")
+    anti_message(fault_dsym_unread_for_map
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
         FAULT open:44:EACCES
         ARGS build --release ${tools}
-        ERR "anti: cannot read ${PROJECT}/${release_dir}/app.lto/0.${debug_arch}.lto.o")
+        ERR "anti: cannot read ${dwarf}")
+    anti_message(fault_archive_dsym_unread
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT open:47:EACCES
+        ARGS build --release ${tools}
+        ERR "anti: cannot read ${dwarf}")
 endif()
 # anti run --memory-checks runs the program with its standard error on a
 # pipe, which anti reads for the report of AddressSanitizer,

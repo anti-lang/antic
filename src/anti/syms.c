@@ -947,7 +947,8 @@ static bool map_lookup(const struct text *map, uint64_t vaddr,
                            &out->where);
 }
 
-bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
+bool syms_resolve_binary(const struct text *binary, const struct text *dwarf,
+                         uint64_t vaddr,
                          struct text *function, struct text *where)
 {
     const uint8_t *bytes = (const uint8_t *)binary->data;
@@ -981,20 +982,25 @@ bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
         }
         /* The link of Mach-O leaves the line table in the objects that
            its debug map names, which stand where it was built. The
-           archive names the path, so only a regular file is read. */
+           archive names the path, so only a regular file is read. The
+           DWARF of the dSYM in the archive holds the same table at the
+           addresses of the link, under the same symbols, so a frame
+           resolves where the build directory is gone, by Q1 of "Answers
+           of 2026-11-07, sixth set". */
         if (anti_rt_macho_debug_map(&t, vaddr, &object, &symbol, &start)) {
             struct text file = {0};
-            if (files_read_file(object, &file)) {
+            const struct text *lines = dwarf;
+            if (lines == NULL && files_read_file(object, &file)) {
                 anti_rt_macho_relocate((uint8_t *)file.data, file.length);
-                if (anti_rt_macho_object_line((const uint8_t *)file.data,
-                                              file.length, symbol,
-                                              vaddr - start, &found) &&
-                    found.file != NULL) {
-                    text_append_bytes(where, found.file,
-                                      found.file_length);
-                    text_appendf(where, ":%lld",
-                                 (long long)found.line);
-                }
+                lines = &file;
+            }
+            if (lines != NULL &&
+                anti_rt_macho_object_line((const uint8_t *)lines->data,
+                                          lines->length, symbol,
+                                          vaddr - start, &found) &&
+                found.file != NULL) {
+                text_append_bytes(where, found.file, found.file_length);
+                text_appendf(where, ":%lld", (long long)found.line);
             }
             text_free(&file);
         }
@@ -1010,6 +1016,7 @@ static bool resolve_frame(const struct symbol_unit *u, uint64_t offset,
 {
     const struct text *twin = symbol_unit_entry(u, SYMS_DEBUG_SUFFIX);
     const struct text *map = symbol_unit_entry(u, SYMS_MAP_SUFFIX);
+    const struct text *dwarf = symbol_unit_entry(u, SYMS_DWARF_SUFFIX);
     struct mapped mapped;
     uint64_t base = 0;
     uint64_t vaddr;
@@ -1039,7 +1046,8 @@ static bool resolve_frame(const struct symbol_unit *u, uint64_t offset,
     /* A return address follows the call, so the lookup takes the byte
        before it, which is the call and names its line. */
     vaddr = base + offset - 1;
-    if (!syms_resolve_binary(twin, vaddr, &out->function, &out->where)) {
+    if (!syms_resolve_binary(twin, dwarf, vaddr, &out->function,
+                             &out->where)) {
         return false;
     }
     if ((out->function.length == 0 || out->where.length == 0) && map != NULL &&

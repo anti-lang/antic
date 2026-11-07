@@ -789,6 +789,12 @@ static void program_name(const struct build *b, enum target t,
 static void debug_twin(const struct build *b, enum target t,
                        struct text *out);
 
+/* Append to out the path of the DWARF file of the dSYM of the twin of the
+   release program of b on t, and give true, when the program is a
+   stripped Mach-O one. Give false with out untouched otherwise. */
+static bool dsym_dwarf(const struct build *b, enum target t,
+                       struct text *out);
+
 /* DESIGN: Q2 of "Answers of 2026-11-06, fourth set" in docs/decisions.md.
    The key of a program holds what its link reads: the key of the source
    of the module with `main`, the options of the manifest, the digest of
@@ -991,6 +997,11 @@ static bool build_release(struct build *b, enum target t, enum cpu_level cpu,
     o.libraries = libraries->items;
     o.library_count = libraries->count;
     o.debug = true;
+    /* The program that is stripped names no directory of this build, by
+       Q2 of "Answers of 2026-11-07, sixth set". */
+    if (!lines) {
+        o.debug_map_root = text_cstr(&b->build_dir);
+    }
     o.profile_generate = b->r->profile_generate;
     o.profile_use = b->r->profile_use;
     release_lto(b, &o);
@@ -1039,6 +1050,20 @@ static void debug_twin(const struct build *b, enum target t,
     text_free(&stem);
 }
 
+static bool dsym_dwarf(const struct build *b, enum target t,
+                       struct text *out)
+{
+    struct text twin = {0};
+
+    if (target_info(t)->format != FORMAT_MACHO || build_debug(b)) {
+        return false;
+    }
+    debug_twin(b, t, &twin);
+    driver_dsym_dwarf(text_cstr(&twin), out);
+    text_free(&twin);
+    return true;
+}
+
 /* DESIGN: a release binary carries no symbol data, so the build writes
    the archive that names it. It holds the same link with the debug
    sections kept and the map of that program. All three carry the build
@@ -1054,9 +1079,12 @@ static void debug_twin(const struct build *b, enum target t,
 static bool build_symbols(struct build *b, enum target t,
                           const char *deliverable)
 {
-    struct zip_entry entries[3];
+    struct zip_entry entries[4];
     struct text stem = {0};
     struct text debug_path = {0};
+    struct text dwarf_path = {0};
+    struct text dwarf_name = {0};
+    bool dwarf;
     struct text debug_name = {0};
     struct text map_path = {0};
     struct text map_name = {0};
@@ -1072,6 +1100,7 @@ static bool build_symbols(struct build *b, enum target t,
     text_appendf(&debug_name, "%s" SYMS_DEBUG_SUFFIX, text_cstr(&stem));
     text_appendf(&map_name, "%s" SYMS_MAP_SUFFIX, text_cstr(&stem));
     debug_twin(b, t, &debug_path);
+    dwarf = dsym_dwarf(b, t, &dwarf_path);
     text_appendf(&map_path, "%s/%s", text_cstr(&b->build_dir),
                  text_cstr(&map_name));
     text_appendf(&archive, "%s/%s%s", text_cstr(&b->dist_dir),
@@ -1080,8 +1109,9 @@ static bool build_symbols(struct build *b, enum target t,
        symbols_stand checked. */
     if (!b->program_reused &&
         (!symmap_build_id(text_cstr(&b->name), &id) ||
-         !symmap_write(text_cstr(&debug_path), t, text_cstr(&id),
-                       text_cstr(&map_path)))) {
+         !symmap_write(text_cstr(&debug_path),
+                       dwarf ? text_cstr(&dwarf_path) : NULL, t,
+                       text_cstr(&id), text_cstr(&map_path)))) {
         goto done;
     }
     entries[count].name = text_cstr(&debug_name);
@@ -1103,6 +1133,16 @@ static bool build_symbols(struct build *b, enum target t,
         entries[count].executable = false;
         count++;
     }
+    /* The DWARF of the dSYM of a macOS program, by Q1 of "Answers of
+       2026-11-07, sixth set", so a frame resolves without the LTO object
+       that the debug map names. */
+    if (dwarf) {
+        text_appendf(&dwarf_name, "%s" SYMS_DWARF_SUFFIX, text_cstr(&stem));
+        entries[count].name = text_cstr(&dwarf_name);
+        entries[count].file = text_cstr(&dwarf_path);
+        entries[count].executable = false;
+        count++;
+    }
     entries[count].name = text_cstr(&map_name);
     entries[count].file = text_cstr(&map_path);
     entries[count].executable = false;
@@ -1112,6 +1152,8 @@ static bool build_symbols(struct build *b, enum target t,
 done:
     text_free(&stem);
     text_free(&debug_path);
+    text_free(&dwarf_path);
+    text_free(&dwarf_name);
     text_free(&debug_name);
     text_free(&map_path);
     text_free(&map_name);
@@ -1137,6 +1179,10 @@ static bool symbols_stand(const struct build *b, enum target t)
     text_appendf(&path, "%s/%s" SYMS_MAP_SUFFIX, text_cstr(&b->build_dir),
                  text_cstr(&stem));
     ok = ok && files_exists(text_cstr(&path));
+    path.length = 0;
+    if (ok && dsym_dwarf(b, t, &path)) {
+        ok = files_exists(text_cstr(&path));
+    }
     text_free(&deliverable);
     text_free(&stem);
     text_free(&path);

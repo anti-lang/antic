@@ -188,7 +188,7 @@ static void report_line(void *context, const char *line, size_t length)
             colon != NULL ? colon + 1 : plus,
             colon != NULL ? (size_t)(plus - colon - 1) : 0);
         if (cursor_hex(&o, &offset) && o.at == o.end && module->length > 0 &&
-            syms_resolve_binary(module, offset, &function, &where) &&
+            syms_resolve_binary(module, NULL, offset, &function, &where) &&
             function.length > 0) {
             fwrite(line, 1, (size_t)(stop - line), stderr);
             fprintf(stderr, " in %s", text_cstr(&function));

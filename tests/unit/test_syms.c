@@ -82,7 +82,7 @@ static void program_without_functions(void)
     size_t n;
 
     write_file(PROGRAM, "no program");
-    CHECK(symmap_write(PROGRAM, TARGET_LINUX_X86_64, "-", MAP));
+    CHECK(symmap_write(PROGRAM, NULL, TARGET_LINUX_X86_64, "-", MAP));
     f = platform_open(MAP, false);
     if (f != NULL) {
         while ((n = fread(buffer, 1, sizeof buffer, f)) > 0) {

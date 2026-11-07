@@ -127,9 +127,27 @@ com.example.app`. That is R165 of "Rules of 2026-10-13".
 
 ## The symbols archive
 
-A release binary carries no symbol data. The build therefore links the program
-a second time with the debug sections kept, and writes
-`<program>-symbols.zip` beside the binary in `dist/`. `src/anti/zip.c` writes
+A release binary carries no symbol data. The build links the program once,
+with `-g`, by route (a) of Q1 of "Answers of 2026-11-07, fourth set", and
+keeps that link as `<stem>.debug`, the twin. `driver_strip_debug` of
+`src/antic/driver_link.c` writes the program from the twin with
+`llvm-strip --strip-debug` on ELF. On Mach-O `dsymutil` writes
+`<stem>.debug.dSYM` first and `llvm-strip -S` follows. A Windows program is the
+link as it stands, whose PDB holds the debug information. A program of
+`--memory-checks` keeps its lines and is not stripped. The build writes
+`<program>-symbols.zip` beside the binary in `dist/`.
+
+The archive of a macOS program carries the DWARF file of the dSYM as
+`<stem>.dwarf`, by Q1 of "Answers of 2026-11-07, sixth set". The map takes the
+lines of its functions from it, and so does `anti symbols resolve`, so a frame
+resolves without the LTO object of the build directory. The link names that
+object in its debug map relative to the build directory, through
+`-oso_prefix` of ld64.lld, by Q2 of the same set, and `dsymutil` finds it with
+`--oso-prepend-path`. A macOS release program is then the same bytes in any
+directory, its UUID and its signature included, which the tests
+`symbols_same_bytes_<target>` check for both macOS targets. A host whose
+package lacks `llvm-strip` or `dsymutil` refuses the build, by Q3 of the same
+set. Linux and Windows stay without them until `23.1.1-anti.10`. `src/anti/zip.c` writes
 the archive. Its entries are stored and never compressed, so the tool needs no
 library. Every field that would carry a clock or a machine is fixed.
 
@@ -143,10 +161,11 @@ whole symbol table for this.
 
 The binary, the debug link and the map all carry one build id, which is what
 ties a frame of a trace to this archive. The digest of an id leaves out what
-`-g` added, so a `-g` link carries the id of the plain link beside it.
-"Build ids" in `docs/decisions.md` holds the rule and `src/antic/llvm_debug.c`
-records the ranges. Both links place every function at the same address, so the one map
-answers for either of them.
+`-g` added, so the twin and the stripped program carry one id. "Build ids" in
+`docs/decisions.md` holds the rule and `src/antic/llvm_debug.c` records the
+ranges. The program is the twin stripped, so every function stands at the same
+address in both, and the tests `symbols_same_code_<target>` compare every
+section the program loads on all six targets.
 
 A Windows program carries no symbol table, because lld-link writes the symbols
 to a PDB. The archive holds that PDB, and the map says so.

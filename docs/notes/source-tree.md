@@ -835,7 +835,8 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_std_tests.cmake` | Runs `anti test` on one module in both modes. |
 | `tests/runners/run_symbols.cmake` | Looks up two functions in a program built with `-g`. |
 | `tests/runners/run_symbols_layout.cmake` | Compares the sections of a shipped program with those of its debug link. |
-| `tests/runners/run_symbols_moved.cmake` | Resolves the frame of a release program in a function its debug link lays out elsewhere. |
+| `tests/runners/run_symbols_moved.cmake` | Resolves the frame of a release program in a function its debug link lays out elsewhere, with or without its build directory. |
+| `tests/runners/run_symbols_same_bytes.cmake` | Builds a macOS release program in two directories and compares the two byte for byte. |
 | `tests/runners/run_symbols_same_code.cmake` | Compares every byte that a release program loads with the link of its symbols archive. |
 | `tests/runners/run_symbols_resolve_elf.cmake` | Resolves a trace of a Linux program through its debug link alone. |
 | `tests/runners/run_sysroot_links.cmake` | Checks that the sysroot script turns an absolute link relative. |

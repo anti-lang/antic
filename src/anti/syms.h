@@ -16,12 +16,13 @@
 #define SYMS_ARCHIVE_SUFFIX "-symbols.zip"
 
 /* The ends of the names of the entries of a symbols archive: the twin of
-   a binary with its debug information, the map of its functions and the
-   PDB of a Windows program. `anti build --release` writes them and `anti
-   symbols` reads them. */
+   a binary with its debug information, the map of its functions, the PDB
+   of a Windows program and the DWARF of the dSYM of a macOS program.
+   `anti build --release` writes them and `anti symbols` reads them. */
 #define SYMS_DEBUG_SUFFIX ".debug"
 #define SYMS_MAP_SUFFIX ".map"
 #define SYMS_PDB_SUFFIX ".pdb"
+#define SYMS_DWARF_SUFFIX ".dwarf"
 
 /* Read the runtime configuration at conf. Find the program beside it,
    the libraries of the `plugins` directories and those of
@@ -54,9 +55,12 @@ bool syms_map_lookup(const char *map, uint64_t vaddr, struct text *function,
 
 /* Append to function the name of the function at vaddr in binary, an
    ELF or a Mach-O file or a debug twin of one, and to where its
-   `file:line` when the debug information gives one. Returns false for a
-   file of neither kind. */
-bool syms_resolve_binary(const struct text *binary, uint64_t vaddr,
+   `file:line` when the debug information gives one. dwarf is the DWARF
+   file of the dSYM of a Mach-O binary, which gives the line, or NULL for
+   the objects of its debug map. Returns false for a file of neither
+   kind. */
+bool syms_resolve_binary(const struct text *binary, const struct text *dwarf,
+                         uint64_t vaddr,
                          struct text *function, struct text *where);
 
 #endif

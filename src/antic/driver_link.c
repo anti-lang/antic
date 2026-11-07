@@ -96,6 +96,7 @@ void driver_link_facts_free(struct link_facts *f)
     text_free(&f->rpath);
     text_free(&f->framework_names);
     text_free(&f->linux_names);
+    text_free(&f->debug_map_root);
     free((void *)f->frameworks);
     free((void *)f->linux_libraries);
 }
@@ -212,6 +213,13 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     in->linker = o->linker;
     in->cpu = o->cpu;
     in->debug = o->debug;
+    if (o->debug_map_root != NULL) {
+        if (!platform_absolute_path(o->debug_map_root, &f->debug_map_root)) {
+            say_antic("cannot find the directory of %s\n", o->output);
+            return false;
+        }
+        in->debug_map_root = text_cstr(&f->debug_map_root);
+    }
     if (o->linker == LINKER_PLATFORM) {
         if (os == OS_MACOS) {
             if (!xcrun("--show-sdk-path", &f->sdk_path) ||
@@ -673,6 +681,17 @@ static bool run_tool(const char *const argv[], const char *name)
     return true;
 }
 
+/* The bundle that dsymutil writes beside a link, and the place of the
+   DWARF file in it, which dsymutil names after the link. */
+#define DSYM_SUFFIX ".dSYM"
+#define DSYM_DWARF_DIR "Contents/Resources/DWARF"
+
+void driver_dsym_dwarf(const char *linked, struct text *out)
+{
+    text_appendf(out, "%s" DSYM_SUFFIX "/" DSYM_DWARF_DIR "/%s", linked,
+                 platform_file_name(linked));
+}
+
 /* DESIGN: a release program is the one LTO link with -g, with its debug
    information stripped, and its symbols archive is written from that
    same link, by Q1 of "Answers of 2026-11-07, fourth set". Route (b) of
@@ -685,8 +704,10 @@ static bool run_tool(const char *const argv[], const char *name)
    without -g, and keeps the symbol table. Mach-O keeps its line tables
    in the LTO object that the debug map of the link names, so dsymutil
    gathers them into <linked>.dSYM first, and llvm-strip -S then drops
-   the debug map. A COFF link writes its debug information to the PDB, so
-   the executable is the program as it stands and nothing runs. */
+   the debug map. The debug map names the object against debug_map_root
+   of the options, which dsymutil then prepends, by Q2 of the sixth set.
+   A COFF link writes its debug information to the PDB, so the
+   executable is the program as it stands and nothing runs. */
 bool driver_strip_debug(const struct options *o, const char *linked,
                         const char *program)
 {
@@ -703,12 +724,16 @@ bool driver_strip_debug(const struct options *o, const char *linked,
         return false;
     }
     if (format == FORMAT_MACHO) {
-        const char *argv[] = {NULL, NULL, "-o", NULL, NULL};
+        const char *argv[] = {NULL, NULL, "-o", NULL, NULL, NULL, NULL};
         ok = driver_archive_tool(o, "dsymutil", &dsymutil) != NULL;
-        text_appendf(&bundle, "%s.dSYM", linked);
+        text_appendf(&bundle, "%s" DSYM_SUFFIX, linked);
         argv[0] = text_cstr(&dsymutil);
         argv[1] = linked;
         argv[3] = text_cstr(&bundle);
+        if (o->debug_map_root != NULL) {
+            argv[4] = "--oso-prepend-path";
+            argv[5] = o->debug_map_root;
+        }
         ok = ok && run_tool(argv, "dsymutil");
     }
     if (ok) {

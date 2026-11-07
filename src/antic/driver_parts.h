@@ -85,6 +85,9 @@ struct link_facts {
     struct text sysroot;
     struct text lld_dir;
     struct text rpath;
+    /* The absolute form of debug_map_root of the options, by the rule of
+       ld64.lld, which resolves the links of -oso_prefix. */
+    struct text debug_map_root;
     /* The frameworks and the `link linux` libraries of the link: those of
        the command line, then those of the bundled modules, each once.
        The names of the modules stand in the two texts. */
