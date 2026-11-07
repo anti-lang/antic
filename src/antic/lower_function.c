@@ -167,10 +167,17 @@ static void store_params(struct lowerer *l, const struct item *it,
     for (i = 0; i < it->param_count; i++) {
         const struct symbol *sym = it->params[i].symbol;
         if (lower_is_context(sym->type)) {
-            ir_store(l->f, entry, IR_PTR, lower_temp(l, l->f->params[at].temp),
-                     lower_temp(l, sym->ir));
-            ir_store(l->f, entry, IR_PTR,
-                     lower_temp(l, l->f->params[at + 1].temp),
+            struct ir_operand code = lower_temp(l, l->f->params[at].temp);
+            struct ir_operand context =
+                lower_temp(l, l->f->params[at + 1].temp);
+            /* C may pass a context of its own, see lower_c_callback. */
+            if (it->exported) {
+                struct ir_function *thunk = lower_c_callback(l, sym->type);
+                context = lower_pair(l, sym->type, code, context);
+                code = lower_temp(l, ir_addr(l->f, entry, ir_func_op(thunk)));
+            }
+            ir_store(l->f, entry, IR_PTR, code, lower_temp(l, sym->ir));
+            ir_store(l->f, entry, IR_PTR, context,
                      lower_offset_address(
                          l, lower_temp(l, sym->ir),
                          ir_sym_operand(l->m,

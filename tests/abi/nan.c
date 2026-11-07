@@ -4,7 +4,10 @@
    struct by value, and C calls a function the program exports and a callback
    the program passes, each of which returns a NaN. nan_keep records the bits
    of what it takes, through a function value of two words with a null
-   context and through a pointer of one word that nan_keeper fills. */
+   context and through a pointer of one word that nan_keeper fills.
+   nan_context passes a callback of C with a context of its own to a
+   function the program exports, by Q3 of "Answers of 2026-11-07, third
+   set". */
 #include "../binary_stdio.h"
 #include <stdarg.h>
 #include <stdint.h>
@@ -92,4 +95,25 @@ unsigned nan_kept(void)
 float (*nan_keeper(void))(float)
 {
     return nan_keep;
+}
+
+float anti_nan_pass(float (*f)(float, void *), void *f_context, float z,
+                    int kind, int through);
+
+/* Record the bits of v in the word that context points at, and return v. */
+static float nan_record(float v, void *context)
+{
+    memcpy(context, &v, sizeof(uint32_t));
+    return v;
+}
+
+/* The bits nan_record takes of NaN number kind, which the program passes
+   to it directly when through is 0 and through a function of its own
+   otherwise. The context is the address of a local, never NULL. */
+unsigned nan_context(float z, int kind, int through)
+{
+    uint32_t bits = 0;
+
+    anti_nan_pass(nan_record, &bits, z, kind, through);
+    return bits;
 }

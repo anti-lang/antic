@@ -5,10 +5,13 @@
 //! and a callback the program passes, and reads the bits of the NaN each
 //! returns. A NaN reaches C through a function value of two words whose context
 //! is null, through a function pointer that C filled and through a closure that
-//! passes it on, by Q1 of "Answers of 2026-11-07, second set". Each line holds
-//! the bits of three NaNs: 0/0 of a zero read at run time, whose sign follows
-//! the processor, its negation and a negative NaN with a payload. Every target
-//! gives the canonical NaN for all three.
+//! passes it on, by Q1 of "Answers of 2026-11-07, second set". C passes a
+//! callback with a context of its own to a function the program exports, which
+//! passes a NaN to it directly and through `apply`, by Q3 of "Answers of
+//! 2026-11-07, third set". Each line holds the bits of three NaNs: 0/0 of a
+//! zero read at run time, whose sign follows the processor, its negation and a
+//! negative NaN with a payload. Every target gives the canonical NaN for all
+//! three.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -23,6 +26,7 @@ extern fn nan_callback(f: fn(c_float, c_int) -> c_float, z: c_float, kind: c_int
 extern fn nan_keep(v: c_float) -> c_float;
 extern fn nan_kept() -> c_uint;
 extern fn nan_keeper() -> ?fn(c_float) -> c_float;
+extern fn nan_context(z: c_float, kind: c_int, through: c_int) -> c_uint;
 
 struct NanPair
 {
@@ -137,6 +141,17 @@ fn closure(z: f32, kind: int) -> c_uint
 	return bits;
 }
 
+/// Pass NaN number `kind` to `f`, a callback of C with a context of its own,
+/// directly when `through` is 0 and through `apply` otherwise.
+export fn anti_nan_pass(f: fn(c_float) -> c_float, z: c_float, kind: c_int,
+	through: c_int) -> c_float
+{
+	if through == 0 {
+		return f(make(z, kind as int));
+	}
+	return apply(f, make(z, kind as int));
+}
+
 fn line(context: str, a: c_uint, b: c_uint, c: c_uint)
 {
 	printf("c %.*s %08x %08x %08x\n".ptr, context.len as c_int, context.ptr, a,
@@ -169,5 +184,9 @@ fn main(args: []str) -> int
 	line("two-words", two_words(z, 0), two_words(z, 1), two_words(z, 2));
 	line("one-word", one_word(z, 0), one_word(z, 1), one_word(z, 2));
 	line("closure", closure(z, 0), closure(z, 1), closure(z, 2));
+	line("context", nan_context(z, 0, 0), nan_context(z, 1, 0),
+		nan_context(z, 2, 0));
+	line("context-apply", nan_context(z, 0, 1), nan_context(z, 1, 1),
+		nan_context(z, 2, 1));
 	return 0;
 }

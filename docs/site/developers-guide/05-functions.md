@@ -1740,12 +1740,12 @@ A call through a value of one word is an indirect call with the arguments of the
 ```llvm excerpt=fnval target=linux-x86_64 mode=release
 define internal noundef i64 @call_it(ptr nofree noundef readonly captures(none) %p0, ptr noundef %p1, i64 noundef %p2, i64 noundef %p3) #0 {
 b0:
-  %v4 = tail call i64 %p0(i64 %p2, i64 %p3, ptr %p1) #6
-  ret i64 %v4
+  %v10.i = tail call noundef i64 %p0(i64 %p2, i64 %p3, ptr %p1) #6, !inline_history !18
+  ret i64 %v10.i
 }
 ```
 
-`call_it` receives the code as `%p0` and the context as `%p1`. The call goes through `%p0` and passes `a`, `b` and the context. It is a tail call, so the function builds no frame.
+`call_it` receives the code as `%p0` and the context as `%p1`. The call goes through `%p0` and passes `a`, `b` and the context. It is a tail call, so the function builds no frame. `call_it` is exported, so C may pass a context of its own. Its entry keeps the two words in a slot of its frame and calls them through a thunk, which takes the canonical NaN of each float. `opt` inlines the thunk and the slot, and with no float to take, the call is the one above.
 
 ```asm excerpt=fnval target=linux-x86_64 mode=release
 <call_it>:

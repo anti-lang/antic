@@ -6186,6 +6186,15 @@ antic_dump_test(llvm closure_floats
     TARGET macos-arm64
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/closure_floats.anti")
 
+# The LLVM text of an exported function with a parameter of two words, by
+# Q3 of "Answers of 2026-11-07, third set": C's callback and context in a
+# slot of the frame, and the thunk that takes the canonical NaN of each
+# float it passes on.
+antic_dump_test(llvm c_callback
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/c_callback.macos-arm64.ll"
+    TARGET macos-arm64
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/c_callback.anti")
+
 # main.opt is the optimized IR listing that antic prints for main.anti.
 antic_dump_test(opt main
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/main.opt"

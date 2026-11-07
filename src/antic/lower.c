@@ -685,6 +685,87 @@ const struct ir_function *lower_context_signature(struct lowerer *l,
     return f;
 }
 
+/* DESIGN: Q3 of "Answers of 2026-11-07, third set" in docs/decisions.md.
+   C calls an exported function with a callback and a `void *` of its own,
+   which may be any address. A call through a function with its context
+   takes the canonical NaN of its floats where the context is null alone,
+   see llvm_emit_nan_context, so C's callback would get the NaN of the
+   processor. The exported function therefore stores C's two words in a
+   slot of its own frame and holds this thunk and the address of that slot
+   instead. The thunk reads both words back and calls C's callback with
+   its own context. Its call is an ordinary call through an address, which
+   takes the canonical NaN of each float it passes. Inside Anti the
+   context is never null then, and the rule of the call stands. The frame
+   is enough, since a parameter that does not keep its argument never
+   outlives the call: the checker refuses to store it, to return it, to
+   own it, to snapshot it and to hand it to a `keep` parameter. The thunk
+   allocates nothing. One thunk serves every function type of one
+   signature, named callback.N after the signature fn.N. */
+struct ir_function *lower_c_callback(struct lowerer *l, const struct type *t)
+{
+    const struct ir_function *sig = lower_context_signature(l, t);
+    struct ir_function *outer_f = l->f;
+    struct ir_block *outer_b = l->b;
+    struct ir_function *f;
+    struct ir_operand *args;
+    struct ir_operand pair;
+    struct ir_operand target;
+    uint32_t agg = lower_agg_of(l, t);
+    uint32_t value;
+    struct text name = {0};
+    size_t last;
+    size_t i;
+
+    text_appendf(&name, "callback.%s", sig->name + 3);
+    f = lower_find_function(l->m, l->module_name, text_cstr(&name));
+    if (f != NULL) {
+        text_free(&name);
+        return f;
+    }
+    f = ir_function_add(l->m, l->module_name, text_cstr(&name), sig->result,
+                        sig->result_agg);
+    text_free(&name);
+    f->result_agg = sig->result_agg;
+    for (i = 0; i < sig->param_count; i++) {
+        const struct ir_param *from = &sig->params[i];
+        struct ir_param *p;
+        ir_param_add(f, from->type, from->agg);
+        p = &f->params[f->param_count - 1];
+        p->ext = from->ext;
+        p->nonnull = from->nonnull;
+        p->deref_size = from->deref_size;
+    }
+    /* The context is the address of the slot, which holds two words. */
+    last = f->param_count - 1;
+    l->f = f;
+    l->b = ir_block_add(f);
+    pair = lower_temp(l, f->params[last].temp);
+    args = alloc_zeroed(f->param_count, sizeof *args);
+    for (i = 0; i < last; i++) {
+        args[i] = lower_temp(l, f->params[i].temp);
+    }
+    target = lower_temp(l, ir_load(l->f, l->b, IR_PTR, pair));
+    args[last] = lower_temp(
+        l, ir_load(l->f, l->b, IR_PTR,
+                   lower_offset_address(
+                       l, pair,
+                       ir_sym_operand(l->m, ir_sym_offset_of(l->m, agg, 1)))));
+    value = ir_call_indirect(l->f, l->b, sig->result, target, sig, args,
+                             f->param_count);
+    free(args);
+    if (sig->result == IR_VOID) {
+        ir_ret(l->f, l->b, IR_VOID, lower_none());
+    } else {
+        /* An aggregate result travels as the address of its storage,
+           which is what the callback already returned. */
+        ir_ret(l->f, l->b, sig->result == IR_AGG ? IR_PTR : sig->result,
+               lower_temp(l, value));
+    }
+    l->f = outer_f;
+    l->b = outer_b;
+    return f;
+}
+
 static bool fits_provider(struct lowerer *l, const struct ir_function *g,
                           const struct type *t)
 {

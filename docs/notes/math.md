@@ -241,6 +241,27 @@ arm64 lost its `fcmp` there. Neither program of the table calls through a
 value of two words, so the figures stand: measured again on 2026-11-07,
 `float_work` gave 1.01 and 1.00 and `pythagoras_geometry` 1.10 and 1.23.
 
+C may pass a callback with a context of its own to an exported function, by
+Q3 of "Answers of 2026-11-07, third set". The function stores the callback
+and the context in a slot of its frame at its entry and holds the thunk
+`callback.N` of its module and the address of the slot in their place. The
+thunk loads both words and calls the callback through its address, so each
+float takes the select there. A context that is not null then never reaches
+C, and the test of the context word stands. `dump_llvm_c_callback_macos-arm64`
+holds the form, and the lines `context` and `context-apply` of
+`program_abi_nan` the calls from C.
+
+opt inlines the thunk into the exported function, since the slot is local,
+so no call is added. What it costs is a select on each float argument and
+one on a float result. The thunk returns the canonical NaN as every function
+whose address the module takes does. A loop of C calls an exported function that
+calls a callback of C 200 million times, each argument the result of the
+last call. The median of 11 runs went from 2.15 to 4.34 ns per call on arm64
+and from 2.39 to 9.21 ns at `v1` under Rosetta. That is the latency of two
+selects on a chain of dependent floats. Neither program of the table calls
+an exported function, and measured again on 2026-11-07 `float_work` gave 1.01
+and 1.00 and `pythagoras_geometry` 1.10 and 1.22.
+
 `tests/bench/ablate/opt_nan_off.py` takes every select of the canonical NaN
 out of the text, so the measurement compares the built form with the same
 program without it. Each figure is the median of 21 runs to that program, in

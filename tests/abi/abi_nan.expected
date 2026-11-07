@@ -10,3 +10,5 @@ c callback 7fc00000 7fc00000 7fc00000
 c two-words 7fc00000 7fc00000 7fc00000
 c one-word 7fc00000 7fc00000 7fc00000
 c closure 7fc00000 7fc00000 7fc00000
+c context 7fc00000 7fc00000 7fc00000
+c context-apply 7fc00000 7fc00000 7fc00000

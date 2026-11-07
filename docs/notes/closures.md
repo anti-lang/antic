@@ -72,6 +72,13 @@ choices of `snapshot fn` and `own fn`.
 
 - The header writes a parameter of two words as the callback with a `void *`
   after its parameters and a `void *<name>_context` after it.
+- An exported function keeps both words in a slot of its frame, by Q3 of
+  "Answers of 2026-11-07, third set". It holds the thunk `callback.N` of its
+  module and the address of that slot instead. The function
+  `lower_c_callback` writes one thunk per signature. The thunk loads the
+  callback and its context from the slot. Its call of the callback is an
+  ordinary call through an address, which takes the canonical NaN of each
+  float.
 - `anti fmt` keeps the brace of an anonymous function on the line of its
   signature. The frame of its body keeps the indent, the continuation and the
   open brackets of the line it interrupts.

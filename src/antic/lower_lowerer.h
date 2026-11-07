@@ -344,6 +344,10 @@ void lower_set_optional(struct lowerer *l, const struct type *t,
                         int flag);
 const struct ir_function *lower_context_signature(struct lowerer *l,
                                                   const struct type *t);
+/* The thunk through which an exported function calls a callback of C
+   with the context C gave it, whose context is the address of a slot of
+   two words: the callback and that context. */
+struct ir_function *lower_c_callback(struct lowerer *l, const struct type *t);
 void lower_push_argument(struct lowerer *l, struct ir_operand *args,
                          size_t *count, struct ir_operand value,
                          const struct type *param);
