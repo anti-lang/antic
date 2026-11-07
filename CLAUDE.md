@@ -294,6 +294,12 @@ not re-open a settled decision without asking Eddie.
   and 342 s before the commit of T209 and T210. It ran each sanitizer
   suite in the six parts of `asan`: `asan` 255 s, 196 s, 262 s, 195 s,
   462 s and 491 s, `ubsan` 265 s, 197 s, 260 s, 205 s, 474 s and 509 s.
+  The step of the result of the thunk measured `host` in the same three
+  parts: 399 s, 277 s and 327 s, while an LLVM build of another session
+  may have run beside it, so these are not comparable. It ran each
+  sanitizer suite in the six parts of `asan`, with no such build: `asan`
+  251 s, 191 s, 258 s, 194 s, 451 s and 456 s, `ubsan` 259 s, 189 s,
+  258 s, 208 s, 469 s and 481 s.
   The step of the answers to `anti.graphics` measured `host` in the same
   three parts: 375 s, 268 s and 277 s before the commit of T210, 376 s,
   267 s and 278 s before the commit of `anti test`. It ran each sanitizer
