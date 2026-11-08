@@ -818,6 +818,15 @@ static void lto_links(void)
           "/b/release/prog.lto -oso_prefix /b/release/ prog.o "
           "shapes.o /rt/lib/macos-arm64/armv8.5/bitcode/thin/libanti_rt.a "
           "-lSystem");
+    /* Under --lto none the object of the program is named relative to
+       the root as well, by the second answer of "Answers of 2026-11-08". */
+    in.lto = LTO_NONE;
+    links(TARGET_MACOS_ARM64, &in,
+          "/rt/bin/ld64.lld -arch arm64 -platform_version macos 11.0 26.5 "
+          "-syslibroot /rt/sysroot/t -o prog -dead_strip --icf=safe "
+          "-oso_prefix /b/release/ prog.o shapes.o "
+          "/rt/lib/macos-arm64/armv8.5/libanti_rt.a -lSystem");
+    in.lto = LTO_THIN;
     in.debug_map_root = NULL;
     in.debug = false;
     links(TARGET_LINUX_ARM64, &in,

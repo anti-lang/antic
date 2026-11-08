@@ -88,6 +88,9 @@ struct link_facts {
     /* The absolute form of debug_map_root of the options, by the rule of
        ld64.lld, which resolves the links of -oso_prefix. */
     struct text debug_map_root;
+    /* The object of a link of --lto none with a debug_map_root, in the
+       same absolute form. */
+    struct text object;
     /* The frameworks and the `link linux` libraries of the link: those of
        the command line, then those of the bundled modules, each once.
        The names of the modules stand in the two texts. */

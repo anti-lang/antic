@@ -419,6 +419,16 @@ static void macos(struct link_command *c, enum target t,
     add(c, in->executable);
     drop_unused(c, t, in);
     lto_level(c, t, in);
+    if (in->lto == LTO_NONE && in->debug && in->debug_map_root != NULL) {
+        /* The object of the program stands below the root by the path
+           link_facts gives it, so the debug map names it relative to the
+           root under --lto none as well, by the second answer of
+           "Answers of 2026-11-08". */
+        struct text *prefix = next(c);
+        text_appendf(prefix, "%s/", in->debug_map_root);
+        add(c, "-oso_prefix");
+        add(c, text_cstr(prefix));
+    }
     if (in->lto != LTO_NONE && in->debug) {
         struct text *objects = next(c);
         /* ld64.lld writes the path of the object as it stands against

@@ -8,6 +8,7 @@
 #   WORK     a directory this run writes into
 #   CLEAN    set to remove the build directory of the project before the
 #            resolve, so the archive answers alone
+#   LTO      the word of --lto of the build, or nothing for its default
 #
 # The frame lies in `stop`, at the line of its call of
 # `lang.StackTrace.capture`. The map of the archive must name that function
@@ -26,7 +27,12 @@ set(project "${WORK}/${name}")
 set(source "${project}/src/com/example/${name}.anti")
 file(REMOVE_RECURSE "${WORK}")
 file(COPY "${FIXTURE}/${name}" DESTINATION "${WORK}")
-anti_run(status out err "${project}" build --release --runtime "${RUNTIME}")
+set(lto "")
+if(DEFINED LTO)
+    set(lto --lto "${LTO}")
+endif()
+anti_run(status out err "${project}" build --release ${lto}
+         --runtime "${RUNTIME}")
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "anti build --release failed with ${status}\n${out}${err}")
 endif()

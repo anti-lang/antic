@@ -97,6 +97,7 @@ void driver_link_facts_free(struct link_facts *f)
     text_free(&f->framework_names);
     text_free(&f->linux_names);
     text_free(&f->debug_map_root);
+    text_free(&f->object);
     free((void *)f->frameworks);
     free((void *)f->linux_libraries);
 }
@@ -219,6 +220,21 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
             return false;
         }
         in->debug_map_root = text_cstr(&f->debug_map_root);
+        /* DESIGN: under --lto none the debug map names the object of the
+           program as the command line spells it, made absolute against
+           the directory of the link with its `.` kept, which -oso_prefix
+           does not match. Its absolute form, whose links are resolved as
+           those of the root are, stands below the root, by the second
+           answer of "Answers of 2026-11-08". T213 of
+           docs/audit/tests-findings.md: the dSYM of such a program held
+           no line. */
+        if (o->lto == LTO_NONE && in->object != NULL) {
+            if (!platform_absolute_path(in->object, &f->object)) {
+                say_antic("cannot find the directory of %s\n", in->object);
+                return false;
+            }
+            in->object = text_cstr(&f->object);
+        }
     }
     if (o->linker == LINKER_PLATFORM) {
         if (os == OS_MACOS) {

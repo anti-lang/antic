@@ -147,7 +147,12 @@ object in its debug map relative to the build directory, through
 directory, its UUID and its signature included, which the tests
 `symbols_same_bytes_<target>` check for both macOS targets. A host whose
 package lacks `llvm-strip` or `dsymutil` refuses the build, by Q3 of the same
-set. Linux and Windows stay without them until `23.1.1-anti.10`. `src/anti/zip.c` writes
+set. Linux and Windows stay without them until `23.1.1-anti.10`.
+
+Under `--lto none` the link names the object of the program by its absolute
+path below the build directory and passes `-oso_prefix` as well, by the second
+answer of "Answers of 2026-11-08". Since `f2c8d50f` such a program had shipped a
+symbols archive without lines, T213. `src/anti/zip.c` writes
 the archive. Its entries are stored and never compressed, so the tool needs no
 library. Every field that would carry a clock or a machine is fixed.
 

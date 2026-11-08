@@ -6810,6 +6810,18 @@ if(ANTIC_HOST_OS STREQUAL "macos")
             -DCLEAN=ON
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-moved-without-build"
             -P "${ANTIC_RUNNERS}/run_symbols_moved.cmake")
+    # The same with --lto none, whose object the debug map names below
+    # the build directory as well, by the second answer of "Answers of
+    # 2026-11-08". T213: the archive of such a program held no line.
+    add_test(NAME symbols_moved_frame_without_build_lto_none
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DHOST=${ANTIC_HOST_TARGET}"
+            -DCLEAN=ON -DLTO=none
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-moved-without-build-lto-none"
+            -P "${ANTIC_RUNNERS}/run_symbols_moved.cmake")
 endif()
 
 # A macOS release program is the same bytes whichever directory it was
@@ -6825,6 +6837,18 @@ foreach(target macos-arm64 macos-x86_64)
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-same-bytes-${target}"
             -P "${ANTIC_RUNNERS}/run_symbols_same_bytes.cmake")
     set_tests_properties(symbols_same_bytes_${target} PROPERTIES
+        SKIP_REGULAR_EXPRESSION "SKIP: ")
+    # The same with --lto none, by the second answer of "Answers of
+    # 2026-11-08".
+    add_test(NAME symbols_same_bytes_lto_none_${target}
+        COMMAND "${CMAKE_COMMAND}"
+            "-DANTI=$<TARGET_FILE:anti>"
+            "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/anti-symbols"
+            "-DTARGET=${target}" -DLTO=none
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/symbols-same-bytes-lto-none-${target}"
+            -P "${ANTIC_RUNNERS}/run_symbols_same_bytes.cmake")
+    set_tests_properties(symbols_same_bytes_lto_none_${target} PROPERTIES
         SKIP_REGULAR_EXPRESSION "SKIP: ")
 endforeach()
 

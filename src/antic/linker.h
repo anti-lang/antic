@@ -62,8 +62,8 @@ struct link_inputs {
        archive holds beside the native libraries. */
     bool profile_generate;
     /* Mach-O: the absolute directory of the executable, which -oso_prefix
-       removes from the path of the LTO object in the debug map, or NULL.
-       driver.h gives the reason. */
+       removes from the path of the LTO object in the debug map, or of the
+       object under --lto none, or NULL. driver.h gives the reason. */
     const char *debug_map_root;
 };
 

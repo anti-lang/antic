@@ -10,6 +10,7 @@
 #   FIXTURE   tests/anti-symbols
 #   TARGET    the target to build for
 #   WORK      a directory this run writes into
+#   LTO       the word of --lto of the build, or nothing for its default
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -22,11 +23,15 @@ endif()
 set(name moved)
 file(REMOVE_RECURSE "${WORK}")
 set(programs "")
+set(lto "")
+if(DEFINED LTO)
+    set(lto --lto "${LTO}")
+endif()
 foreach(place a another-directory)
     file(MAKE_DIRECTORY "${WORK}/${place}")
     file(COPY "${FIXTURE}/${name}" DESTINATION "${WORK}/${place}")
     anti_run(status out err "${WORK}/${place}/${name}" build --release
-             --target "${TARGET}" --runtime "${RUNTIME}")
+             ${lto} --target "${TARGET}" --runtime "${RUNTIME}")
     if(NOT status EQUAL 0)
         message(FATAL_ERROR "anti build --release in ${place} failed with "
                             "${status}\n${out}${err}")

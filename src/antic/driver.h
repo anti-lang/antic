@@ -68,10 +68,12 @@ struct options {
        set". */
     bool debug;
     /* DESIGN: the directory of output, which the debug map of a Mach-O
-       link with LTO and -g names its LTO object against, or NULL for the
-       absolute path. anti build sets it for the link of a release program
-       that it strips, so the UUID and the signature do not depend on the
-       build directory, by Q2 of "Answers of 2026-11-07, sixth set". A
+       link with -g names its objects against, or NULL for the absolute
+       path. That is the LTO object, and the object of the program under
+       --lto none, by the second answer of "Answers of 2026-11-08". anti
+       build sets it for the link of a release program that it strips, so
+       the UUID and the signature do not depend on the build directory, by
+       Q2 of "Answers of 2026-11-07, sixth set". A
        link that keeps its debug information keeps the absolute path, so
        a debugger finds the object. */
     const char *debug_map_root;
