@@ -150,9 +150,21 @@ package lacks `llvm-strip` or `dsymutil` refuses the build, by Q3 of the same
 set. Linux and Windows stay without them until `23.1.1-anti.10`.
 
 Under `--lto none` the link names the object of the program by its absolute
-path below the build directory and passes `-oso_prefix` as well, by the second
+path below the build directory. It passes `-oso_prefix` as well, by the second
 answer of "Answers of 2026-11-08". Since `f2c8d50f` such a program had shipped a
-symbols archive without lines, T213. `src/anti/zip.c` writes
+symbols archive without lines, T213.
+
+`dsymutil` exits with 0 when it cannot open an object of the debug map, and
+the dSYM then holds no line, T212. The build refuses both, by the first answer
+of "Answers of 2026-11-08". It reads the standard error of `dsymutil` and
+refuses a line `warning: (<arch>) <object> unable to open object file:
+<reason>`, naming the object. It then reads the file and the line of
+`anti.rt.main` from the dSYM through the debug map of the twin, with
+`anti_rt_macho_object_line`. A dSYM that gives none is refused.
+`src/rt/symbols.c` stands in `antic_core` for that. The tests
+`anti_build_message_dsymutil_object_not_opened` and
+`anti_build_message_dsym_without_lines` run a stand-in `dsymutil` for each
+case. Neither check runs for ELF or COFF. `src/anti/zip.c` writes
 the archive. Its entries are stored and never compressed, so the tool needs no
 library. Every field that would carry a clock or a machine is fixed.
 

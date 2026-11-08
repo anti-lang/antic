@@ -904,22 +904,96 @@ anti_message(fault_debug_twin_not_copied
     FAULT write:5:ENOSPC
     ARGS build --release ${tools}
     ERR "anti: cannot write ${release_dir}/app.debug${EXE}")
-# On macOS dsymutil, the third program of the run, gathers the debug
-# information of the link, and llvm-strip, the fourth, writes the program,
-# driver_strip_debug of driver_link.c.
+# On macOS dsymutil gathers the debug information of the link, with its
+# standard error on a pipe, and llvm-strip writes the program,
+# driver_strip_debug of driver_link.c. The pipe is the third program of
+# the run, dsymutil the fourth and llvm-strip the fifth. Between the two
+# tools the build reads the link and the DWARF of the dSYM for its lines,
+# the thirty-sixth and the thirty-seventh open, by check 2 of "Answers of
+# 2026-11-08".
 if(CMAKE_HOST_APPLE)
-    anti_message(fault_dsymutil_not_run
+    anti_message(fault_dsymutil_no_pipe
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
         FAULT run:3:EACCES
+        ARGS build --release ${tools}
+        ERR "anti: pipe: Permission denied"
+            "antic: dsymutil failed")
+    anti_message(fault_dsymutil_not_run
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT run:4:EACCES
         ARGS build --release ${tools}
         ERR "anti: cannot run ${RUNTIME}/bin/dsymutil: Permission denied"
             "antic: dsymutil failed")
     anti_message(fault_strip_not_run
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-        FAULT run:4:EACCES
+        FAULT run:5:EACCES
         ARGS build --release ${tools}
         ERR "anti: cannot run ${RUNTIME}/bin/llvm-strip: Permission denied"
             "antic: llvm-strip failed")
+    anti_message(fault_link_unread_for_lines
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT open:36:EACCES
+        ARGS build --release ${tools}
+        ERR "antic: cannot open ${release_dir}/app.debug")
+    anti_message(fault_dsym_unread_for_lines
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT open:37:EACCES
+        ARGS build --release ${tools}
+        ERR "antic: cannot open ${release_dir}/app.debug.dSYM/Contents/Resources/DWARF/app.debug")
+endif()
+# T212: dsymutil exits with 0 when it cannot open an object of the debug
+# map, and the dSYM it writes then holds no line. A release build refuses
+# both by "Answers of 2026-11-08". Each case runs a stand-in archive that
+# links every part of the real one, with a dsymutil of its own.
+if(CMAKE_HOST_APPLE)
+    set(stand_in "${WORK}/runtime")
+    string(REGEX REPLACE "^macos-" "" host_arch "${HOST}")
+    function(stand_in_dsymutil script)
+        file(MAKE_DIRECTORY "${stand_in}/bin")
+        file(GLOB parts RELATIVE "${RUNTIME}" "${RUNTIME}/*")
+        foreach(part IN LISTS parts)
+            if(NOT part STREQUAL "bin")
+                file(CREATE_LINK "${RUNTIME}/${part}" "${stand_in}/${part}"
+                     SYMBOLIC)
+            endif()
+        endforeach()
+        file(GLOB tools RELATIVE "${RUNTIME}/bin" "${RUNTIME}/bin/*")
+        foreach(tool IN LISTS tools)
+            if(NOT tool STREQUAL "dsymutil")
+                file(CREATE_LINK "${RUNTIME}/bin/${tool}"
+                     "${stand_in}/bin/${tool}" SYMBOLIC)
+            endif()
+        endforeach()
+        file(WRITE "${stand_in}/bin/dsymutil" "#!/bin/sh\n${script}")
+        file(CHMOD "${stand_in}/bin/dsymutil"
+             PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+    endfunction()
+    # The dsymutil of the archive, after the LTO object that the debug map
+    # names is removed. Its first argument is the link.
+    function(dsymutil_without_object)
+        stand_in_dsymutil("rm -f \"$(dirname \"$1\")\"/*.lto/*.o\nexec \"${RUNTIME}/bin/dsymutil\" \"$@\"\n")
+    endfunction()
+    set(lto_object "${release_dir}/app.lto/0.${host_arch}.lto.o")
+    anti_message(dsymutil_object_not_opened
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        SETUP dsymutil_without_object
+        ARGS build --release --runtime "${stand_in}"
+        ERR "warning: (${host_arch}) ${lto_object} unable to open object file: No such file or directory"
+            "warning: no debug symbols in executable (-arch ${host_arch})"
+            "antic: dsymutil could not open ${lto_object}, an object of the debug map of ${release_dir}/app")
+    # A dsymutil that finds no object of the debug map and says nothing:
+    # it runs without --oso-prepend-path, from the project, where the
+    # relative path of the debug map names no file, and drops its
+    # standard error. The link, -o and the dSYM are its first three
+    # arguments.
+    function(dsymutil_without_lines)
+        stand_in_dsymutil("exec \"${RUNTIME}/bin/dsymutil\" \"$1\" -o \"$3\" 2>/dev/null\n")
+    endfunction()
+    anti_message(dsym_without_lines
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        SETUP dsymutil_without_lines
+        ARGS build --release --runtime "${stand_in}"
+        ERR "antic: dsymutil wrote no line table for the code of ${release_dir}/app")
 endif()
 # A library project copies each library file into dist/, build.c.
 anti_message(fault_library_not_copied
@@ -950,27 +1024,36 @@ anti_message(fault_run_program_missing
 # The symbols archive of a release build reads the program for its build
 # id, its twin with debug information for the map of its sections, and
 # that twin and the map again for the archive, symmap.c and zip.c. On
-# macOS these are the forty-second to the forty-eighth open of the build.
+# macOS these are the forty-fourth to the fiftieth open of the build, after
+# the two reads of the check of the dSYM, which no other host makes.
 # The DWARF of the dSYM stands between them twice, read for the map and
 # for the archive, with the map itself.
+set(dsym_opens 0)
+if(CMAKE_HOST_APPLE)
+    set(dsym_opens 2)
+endif()
+math(EXPR open_id "42 + ${dsym_opens}")
+math(EXPR open_twin "43 + ${dsym_opens}")
+math(EXPR open_entry "46 + ${dsym_opens}")
+math(EXPR open_map "48 + ${dsym_opens}")
 anti_message(fault_program_unread_for_id
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:42:EACCES
+    FAULT open:${open_id}:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app${EXE}")
 anti_message(fault_debug_program_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:43:EACCES
+    FAULT open:${open_twin}:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
 anti_message(fault_archive_entry_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:46:EACCES
+    FAULT open:${open_entry}:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.debug${EXE}")
 anti_message(fault_archive_map_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-    FAULT open:48:EACCES
+    FAULT open:${open_map}:EACCES
     ARGS build --release ${tools}
     ERR "anti: cannot read ${release_dir}/app.map")
 # The map of a stripped Mach-O program takes the lines of its functions
@@ -981,12 +1064,12 @@ if(CMAKE_HOST_APPLE)
     set(dwarf "${release_dir}/app.debug.dSYM/Contents/Resources/DWARF/app.debug")
     anti_message(fault_dsym_unread_for_map
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-        FAULT open:44:EACCES
+        FAULT open:46:EACCES
         ARGS build --release ${tools}
         ERR "anti: cannot read ${dwarf}")
     anti_message(fault_archive_dsym_unread
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
-        FAULT open:47:EACCES
+        FAULT open:49:EACCES
         ARGS build --release ${tools}
         ERR "anti: cannot read ${dwarf}")
 endif()

@@ -466,9 +466,11 @@ static wchar_t *program_in(const char *directory, const char *program)
 
 /* Start argv[0] with the command line that argv spells, in directory or
    in the current one. Without an application name CreateProcessW searches
-   PATH and appends .exe, as a shell does. */
+   PATH and appends .exe, as a shell does. output, when it is not NULL,
+   takes the place of the standard error when errors is set and of the
+   standard output otherwise. */
 static int start(const char *directory, const char *const argv[],
-                 HANDLE output, PROCESS_INFORMATION *info)
+                 HANDLE output, bool errors, PROCESS_INFORMATION *info)
 {
     struct text line = {0};
     STARTUPINFOW startup;
@@ -500,8 +502,9 @@ static int start(const char *directory, const char *const argv[],
     if (output != NULL) {
         startup.dwFlags = STARTF_USESTDHANDLES;
         startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-        startup.hStdOutput = output;
-        startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        startup.hStdOutput =
+            errors ? GetStdHandle(STD_OUTPUT_HANDLE) : output;
+        startup.hStdError = errors ? output : GetStdHandle(STD_ERROR_HANDLE);
     }
     application = program_in(directory, argv[0]);
     started = ANTI_FAULT_SYSTEM(
@@ -524,7 +527,7 @@ int platform_run_in(const char *directory, const char *const argv[])
     PROCESS_INFORMATION info;
     int status;
 
-    if (start(directory, argv, NULL, &info) != 0) {
+    if (start(directory, argv, NULL, false, &info) != 0) {
         return -1;
     }
     status = wait_for(info.hProcess, argv[0]);
@@ -538,7 +541,9 @@ int platform_run(const char *const argv[])
     return platform_run_in(NULL, argv);
 }
 
-int platform_capture(const char *const argv[], struct text *out)
+/* Run argv with the standard error or the standard output on a pipe, and
+   append what it writes there to out. */
+static int capture(const char *const argv[], bool errors, struct text *out)
 {
     SECURITY_ATTRIBUTES attributes;
     PROCESS_INFORMATION info;
@@ -559,7 +564,7 @@ int platform_capture(const char *const argv[], struct text *out)
     }
     /* The child writes into the pipe and never reads from it. */
     SetHandleInformation(reader, HANDLE_FLAG_INHERIT, 0);
-    if (start(NULL, argv, writer, &info) != 0) {
+    if (start(NULL, argv, writer, errors, &info) != 0) {
         CloseHandle(reader);
         CloseHandle(writer);
         return -1;
@@ -577,6 +582,16 @@ int platform_capture(const char *const argv[], struct text *out)
     CloseHandle(info.hProcess);
     CloseHandle(info.hThread);
     return status;
+}
+
+int platform_capture(const char *const argv[], struct text *out)
+{
+    return capture(argv, false, out);
+}
+
+int platform_capture_errors(const char *const argv[], struct text *out)
+{
+    return capture(argv, true, out);
 }
 
 static DWORD WINAPI stack_start(LPVOID context)
@@ -876,7 +891,9 @@ int platform_run_in(const char *directory, const char *const argv[])
     return wait_for(pid, argv[0]);
 }
 
-int platform_capture(const char *const argv[], struct text *out)
+/* Run argv with the standard error or the standard output on a pipe, and
+   append what it writes there to out. */
+static int capture(const char *const argv[], bool errors, struct text *out)
 {
     posix_spawn_file_actions_t actions;
     int fds[2];
@@ -890,7 +907,8 @@ int platform_capture(const char *const argv[], struct text *out)
         return -1;
     }
     posix_spawn_file_actions_init(&actions);
-    posix_spawn_file_actions_adddup2(&actions, fds[1], STDOUT_FILENO);
+    posix_spawn_file_actions_adddup2(&actions, fds[1],
+                                     errors ? STDERR_FILENO : STDOUT_FILENO);
     posix_spawn_file_actions_addclose(&actions, fds[0]);
     posix_spawn_file_actions_addclose(&actions, fds[1]);
     started = spawn(argv, &actions, &pid);
@@ -907,6 +925,16 @@ int platform_capture(const char *const argv[], struct text *out)
     }
     close(fds[0]);
     return wait_for(pid, argv[0]);
+}
+
+int platform_capture(const char *const argv[], struct text *out)
+{
+    return capture(argv, false, out);
+}
+
+int platform_capture_errors(const char *const argv[], struct text *out)
+{
+    return capture(argv, true, out);
 }
 
 /* The environment of the tool with name set to value: a copy of environ

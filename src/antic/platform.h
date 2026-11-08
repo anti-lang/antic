@@ -113,6 +113,10 @@ int platform_run_in(const char *directory, const char *const argv[]);
    out. */
 int platform_capture(const char *const argv[], struct text *out);
 
+/* Run a program as platform_run does and append its standard error to
+   out. The program inherits standard output. */
+int platform_capture_errors(const char *const argv[], struct text *out);
+
 /* DESIGN: antic and anti run their work on a thread with a stack of 64 MB
    on every host, so the compiler owns its stack. The main thread has 8 MB
    on Linux and 1 MB on Windows, and a tree as deep as the library format

@@ -15,6 +15,7 @@
 #include "platform.h"
 #include "say.h"
 #include "shared.h"
+#include "../rt/symbols.h"
 
 /* Run xcrun and keep its output without the final newline. */
 static bool xcrun(const char *query, struct text *out)
@@ -708,6 +709,114 @@ void driver_dsym_dwarf(const char *linked, struct text *out)
                  platform_file_name(linked));
 }
 
+/* The line dsymutil 23.1.1 writes to its standard error for an object of
+   the debug map that it cannot open or read, a file that is missing,
+   that it may not read, or that is no object or a truncated one:
+       warning: (arm64) <object> unable to open object file: <reason>
+   It exits with 0 after it, and the dSYM holds no line of that object,
+   T212 of docs/audit/tests-findings.md. */
+#define DSYMUTIL_WARNING "warning: ("
+#define DSYMUTIL_UNOPENED " unable to open object file: "
+
+/* Append to object the path of the first object that a line of errors,
+   the standard error of dsymutil, says it could not open. */
+static bool dsymutil_unopened(const char *errors, struct text *object)
+{
+    struct text line = {0};
+    bool found = false;
+
+    while (!found && *errors != '\0') {
+        const char *end = strchr(errors, '\n');
+        size_t length = end != NULL ? (size_t)(end - errors) : strlen(errors);
+        const char *path;
+        const char *cut;
+        line.length = 0;
+        text_append_bytes(&line, errors, length);
+        errors += end != NULL ? length + 1 : length;
+        if (strncmp(text_cstr(&line), DSYMUTIL_WARNING,
+                    strlen(DSYMUTIL_WARNING)) != 0) {
+            continue;
+        }
+        path = strstr(text_cstr(&line), ") ");
+        cut = path != NULL ? strstr(path + 2, DSYMUTIL_UNOPENED) : NULL;
+        if (cut != NULL) {
+            text_append_bytes(object, path + 2, (size_t)(cut - (path + 2)));
+            found = true;
+        }
+    }
+    text_free(&line);
+    return found;
+}
+
+/* DESIGN: dsymutil warns and exits with 0 for an object of the debug map
+   that it cannot open, so its standard error is read, by check 1 of
+   "Answers of 2026-11-08". It goes on to the standard error of antic as
+   dsymutil wrote it, and such a warning refuses the build with the object
+   named. */
+static bool run_dsymutil(const char *const argv[], const char *program)
+{
+    struct text errors = {0};
+    struct text object = {0};
+    int status = platform_capture_errors(argv, &errors);
+    bool ok = true;
+
+    fputs(text_cstr(&errors), stderr);
+    if (status != 0) {
+        say_antic("dsymutil failed\n");
+        ok = false;
+    } else if (dsymutil_unopened(text_cstr(&errors), &object)) {
+        say_antic("dsymutil could not open %s, an object of the debug map "
+                  "of %s\n",
+                  text_cstr(&object), program);
+        ok = false;
+    }
+    text_free(&errors);
+    text_free(&object);
+    return ok;
+}
+
+/* DESIGN: the dSYM holds the lines of the program's own code when the
+   entry of the program, anti.rt.main, which is the main of its main
+   module, has a file and a line there, by check 2 of "Answers of
+   2026-11-08". The debug map of the link gives the symbol and the start
+   of the function, and anti_rt_macho_object_line reads the DWARF of the
+   dSYM, as the map of the symbols archive and `anti symbols resolve`
+   read it. */
+static bool dsym_has_lines(const char *linked, const char *program)
+{
+    struct text link = {0};
+    struct text dwarf_path = {0};
+    struct text dwarf = {0};
+    struct anti_macho_table table;
+    struct anti_found found;
+    const char *object;
+    const char *symbol;
+    uint64_t entry;
+    uint64_t start;
+    bool ok;
+
+    driver_dsym_dwarf(linked, &dwarf_path);
+    ok = driver_read_bytes(linked, &link) &&
+         driver_read_bytes(text_cstr(&dwarf_path), &dwarf);
+    memset(&found, 0, sizeof found);
+    if (ok &&
+        !(anti_rt_macho_table((const uint8_t *)link.data, link.length, false,
+                              0, &table) &&
+          anti_rt_macho_symbol(&table, "anti.rt.main", &entry) &&
+          anti_rt_macho_debug_map(&table, entry, &object, &symbol, &start) &&
+          anti_rt_macho_object_line((const uint8_t *)dwarf.data, dwarf.length,
+                                    symbol, entry - start, &found) &&
+          found.file != NULL)) {
+        say_antic("dsymutil wrote no line table for the code of %s\n",
+                  program);
+        ok = false;
+    }
+    text_free(&link);
+    text_free(&dwarf_path);
+    text_free(&dwarf);
+    return ok;
+}
+
 /* DESIGN: a release program is the one LTO link with -g, with its debug
    information stripped, and its symbols archive is written from that
    same link, by Q1 of "Answers of 2026-11-07, fourth set". Route (b) of
@@ -722,6 +831,8 @@ void driver_dsym_dwarf(const char *linked, struct text *out)
    gathers them into <linked>.dSYM first, and llvm-strip -S then drops
    the debug map. The debug map names the object against debug_map_root
    of the options, which dsymutil then prepends, by Q2 of the sixth set.
+   The build is refused when dsymutil could not open an object or the
+   dSYM holds no line of the program, by "Answers of 2026-11-08".
    A COFF link writes its debug information to the PDB, so the
    executable is the program as it stands and nothing runs. */
 bool driver_strip_debug(const struct options *o, const char *linked,
@@ -750,7 +861,8 @@ bool driver_strip_debug(const struct options *o, const char *linked,
             argv[4] = "--oso-prepend-path";
             argv[5] = o->debug_map_root;
         }
-        ok = ok && run_tool(argv, "dsymutil");
+        ok = ok && run_dsymutil(argv, program) &&
+             dsym_has_lines(linked, program);
     }
     if (ok) {
         const char *argv[] = {NULL, NULL, "-o", NULL, NULL, NULL};
