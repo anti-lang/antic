@@ -18,6 +18,7 @@ set(FUZZ_KIND_NAME "kind")
 set(FUZZ_DETAIL_NAME "detail.txt")
 set(FUZZ_REDUCED_NAME "reduced.anti")
 set(FUZZ_LANG_OBJECT_NAME "anti_lang_dev")
+set(FUZZ_LANG_KEY_NAME "${FUZZ_LANG_OBJECT_NAME}.key")
 
 # The directory of the fuzzer under the root, and the finds in it.
 set(FUZZ_HOME "${FUZZ_ROOT}/${FUZZ_BUILD_NAME}/${FUZZ_DIR_NAME}")
@@ -51,16 +52,30 @@ macro(fuzz_default_tools)
     endforeach()
 endmacro()
 
-# Write the dev object of anti.lang into <dir> unless it stands there, and
-# set <out> to its path. Every generated program imports anti.lang alone,
-# and a dev build links the dev object of each module it imports.
+# Write the dev object of anti.lang into <dir> unless it stands there with
+# the key of this antic and this library file, and set <out> to its path.
+# Every generated program imports anti.lang alone, and a dev build links
+# the dev object of each module it imports.
+# DESIGN: the key is the SHA-256 of antic and of lang.antl, written beside
+# the object. An object that antic or the library file of another build
+# wrote names other symbols, and a work directory outlives the build that
+# filled it (T214). A digest holds where a time of a file does not, after
+# a checkout or a copy of the tree.
 function(fuzz_lang_object out dir)
     set(base "${dir}/${FUZZ_LANG_OBJECT_NAME}")
-    if(NOT EXISTS "${base}.o")
+    set(library "${RUNTIME}/std/anti/lang.antl")
+    file(SHA256 "${ANTIC}" antic_digest)
+    file(SHA256 "${library}" library_digest)
+    set(key "antic ${antic_digest}\nlibrary ${library_digest}\n")
+    set(kept "")
+    if(EXISTS "${base}.o" AND EXISTS "${dir}/${FUZZ_LANG_KEY_NAME}")
+        file(READ "${dir}/${FUZZ_LANG_KEY_NAME}" kept)
+    endif()
+    if(NOT kept STREQUAL key)
         file(MAKE_DIRECTORY "${dir}")
+        file(REMOVE "${base}.o" "${dir}/${FUZZ_LANG_KEY_NAME}")
         execute_process(COMMAND "${ANTIC}" --runtime "${RUNTIME}" --dev
-                                -I "${RUNTIME}/std" -o "${base}"
-                                "${RUNTIME}/std/anti/lang.antl"
+                                -I "${RUNTIME}/std" -o "${base}" "${library}"
                         RESULT_VARIABLE status
                         OUTPUT_FILE "${dir}/lang-object.out"
                         ERROR_FILE "${dir}/lang-object.out")
@@ -68,6 +83,7 @@ function(fuzz_lang_object out dir)
             message(FATAL_ERROR "the dev object of anti.lang failed: see "
                                 "${dir}/lang-object.out")
         endif()
+        file(WRITE "${dir}/${FUZZ_LANG_KEY_NAME}" "${key}")
     endif()
     set(${out} "${base}.o" PARENT_SCOPE)
 endfunction()

@@ -120,6 +120,13 @@ and with `--memory-checks`, runs each and gives one kind:
 | `differs` | two modes printed other bytes or ended with other statuses |
 | `status` | the three modes agree and end with a status other than 0 |
 
+The dev build links the dev object of `anti.lang`, which
+`fuzz_lang_object` writes once into the work directory. The file
+`anti_lang_dev.key` beside it holds the SHA-256 of antic and of
+`lang.antl`, and an object without that key, or with another one, is
+written again. Before T214 the object stayed whatever antic ran, so a
+change of the symbols of a class failed every dev build of `fuzz_smoke`.
+
 A find is saved under `build/fuzz/finds/<seed>/` with the program, the
 files `seed`, `kind` and `detail.txt`, and what antic and each program
 wrote. A find of a defect of antic gets a row of
@@ -152,6 +159,11 @@ builds in that mode, and a difference builds all three.
   line the checker refuses and saves the two as a find. The reducer must
   shrink it to at most 10 lines that keep the line and give its one
   message. `tests/runners/run_fuzz_reduce.cmake` holds it.
+- `fuzz_lang_object_without_key`, `fuzz_lang_object_other_key` and
+  `fuzz_lang_object_same_key` put a file in the place of the dev object
+  of `anti.lang`. The fuzzer must write it again when no key or another
+  key stands beside it, and keep it under its own key.
+  `tests/runners/run_fuzz_lang_object.cmake` holds them.
 
 ## The campaigns of 2026-10-22
 

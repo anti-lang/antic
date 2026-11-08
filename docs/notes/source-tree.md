@@ -690,6 +690,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_fp_contract.cmake` | Refuses a compile of a native library or of the runtime without `-ffp-contract=off`. |
 | `tests/runners/run_framework.cmake` | Links a program with a framework, or expects the refusal without an SDK. |
 | `tests/runners/run_front_end.cmake` | Runs `antic --front-end` on a good and a bad program. |
+| `tests/runners/run_fuzz_lang_object.cmake` | Puts a file of an earlier antic in the place of the dev object of anti.lang that the fuzzer keeps, and checks that the fuzzer writes it again or keeps it by its key. |
 | `tests/runners/run_fuzz_reduce.cmake` | Shrinks a find of the fuzzer that the checker refuses with the reducer of `tools/fuzz/`. |
 | `tests/runners/run_function_alignment.cmake` | Checks the 16-byte alignment of ARM64 functions. |
 | `tests/runners/run_glibc_link.cmake` | Links a C probe of a native library against the glibc sysroot. |

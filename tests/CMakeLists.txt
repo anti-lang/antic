@@ -3455,6 +3455,15 @@ add_test(NAME fuzz_reduce
         ${ANTIC_AND_RUNTIME}
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fuzz/reduce"
         -P "${ANTIC_RUNNERS}/run_fuzz_reduce.cmake")
+# The dev object of anti.lang that the fuzzer keeps is written again for
+# another antic or another library file, and kept for the same.
+foreach(case without_key other_key same_key)
+    add_test(NAME fuzz_lang_object_${case}
+        COMMAND "${CMAKE_COMMAND}" "-DROOT=${PROJECT_SOURCE_DIR}"
+            ${ANTIC_AND_RUNTIME} "-DCASE=${case}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fuzz/lang-object-${case}"
+            -P "${ANTIC_RUNNERS}/run_fuzz_lang_object.cmake")
+endforeach()
 
 # Programs of the classes area once more under an option that takes a part
 # of the class away. --no-reflect drops the field lists, and the default
