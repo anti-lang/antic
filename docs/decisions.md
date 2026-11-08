@@ -3402,6 +3402,16 @@ Eddie took these decisions on 2026-11-07 and 2026-11-08. Q1 and Q2 answer the tw
 - Q2. A macOS release program stays independent of the directory it was built in. The one link names its LTO object in the debug map relative to the build directory, through `-oso_prefix` of ld64.lld, and dsymutil finds it through `--oso-prepend-path`. The UUID and the signature then do not depend on the directory, and two builds of one project in two directories give the same bytes. A link that keeps its debug information, as `antic -g` and `--memory-checks` write, keeps the absolute path, so a debugger finds the object.
 - Q3. A release build on a host whose package lacks llvm-strip or dsymutil refuses. antic says "llvm-strip is missing" or "dsymutil is missing" and names the path in `bin/` of the package. It has no fallback. Today these are the Linux and Windows hosts, whose release stays `23.1.1-anti.8`. The refusal reaches every target but the two Windows ones, whose program is the link as it stands. Reason: Linux and Windows build `23.1.1-anti.10` first when the VMs return.
 
+## Answers of 2026-11-08
+
+Eddie took these decisions on 2026-11-08. The first answers the question of `docs/reports/2026-11-07-anti9-pin-t211.md`, whether a release build should refuse a dSYM without lines. The second answers the question of the defect the first check found. They are not provisional.
+
+- A macOS release build makes both checks, after dsymutil and before llvm-strip. Reason: dsymutil 23.1.1 exits with 0 when it cannot open an object of the debug map, and writes a dSYM without lines. The build then succeeded with a symbols archive that resolves no line, T212 of `docs/audit/tests-findings.md`.
+  1. antic reads the standard error of dsymutil, which it writes on as dsymutil wrote it. A line `warning: (<arch>) <object> unable to open object file: <reason>` refuses the build. The message is "dsymutil could not open <object>, an object of the debug map of <program>". dsymutil 23.1.1 writes that line for an object that is missing, that it may not read, that is no object and that is truncated.
+  2. antic then reads the DWARF of the dSYM with `anti_rt_macho_object_line`, the reader of `anti symbols resolve`. `anti.rt.main`, the main of the main module, must have a file and a line there. The debug map of the link names its symbol and its start. A dSYM without them refuses the build with "dsymutil wrote no line table for the code of <program>".
+- The two messages fix T212, so the feature freeze lets them in. No option comes with them. Nothing changes for ELF or COFF.
+- Q2 of "Answers of 2026-11-07, sixth set" holds for every macOS release program, `--lto none` included. The link of such a program names the object of the program by its absolute path below the build directory and passes `-oso_prefix`, as the link with LTO does. Reason: under `--lto none` the debug map named the object by its absolute path, to which dsymutil put the build directory in front. Since `f2c8d50f` such a program shipped a symbols archive with no lines, T213 of `docs/audit/tests-findings.md`, which check 1 found.
+
 ## Open
 
 - Enums used as bit flags want a form of their own, to be designed later. A binding writes such a parameter with the integer type of C, and the caller converts each value with `as`.
