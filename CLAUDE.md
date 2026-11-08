@@ -339,6 +339,12 @@ not re-open a settled decision without asking Eddie.
   of `asan`, the last up to test 6951: `asan` 250 s, 190 s, 261 s,
   194 s, 447 s and 448 s, `ubsan` 252 s, 187 s, 260 s, 211 s, 465 s and
   468 s.
+  The step of the answers of 2026-11-08 measured `host` in the same three
+  parts: 378 s, 265 s and 305 s before the commit of T213, 378 s, 273 s
+  and 337 s before the commit of T212. It ran each sanitizer suite in the
+  six parts of `asan`, the last up to test 7000: `asan` 257 s, 188 s,
+  258 s, 196 s, 436 s and 476 s, `ubsan` 261 s, 192 s, 256 s, 209 s,
+  457 s and 510 s.
   The step of the pin of anti.9 and of T211 measured `host` in the same
   three parts: 394 s, 274 s and 338 s before the commit of the pin, up
   to test 6962, and 389 s, 273 s and 338 s before the commit of the
