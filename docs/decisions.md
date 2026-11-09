@@ -3138,6 +3138,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 - On 2026-11-07 Eddie answered the two questions of the step that built the third set, under "Answers of 2026-11-07, fourth set". Q1 is the fix of the symbols archive by route (a), which waits for a release of `anti-lang/llvm-tools` with `llvm-objcopy` and `dsymutil`. Q2 lets in a thunk of a callback of C that returns the result of the callback as it came.
 - On 2026-11-09 Eddie answered the two gaps that the port of the Pythagoras tree to `anti.graphics` found, under "Answers of 2026-11-09". Q2 is a fix, T217. Q3 lets in the fields `width` and `height` of `graphics.Window`, and Q4 the four functions of a window that give the sizes of the monitor and of the window in points.
 - On 2026-11-09 Eddie answered the two questions of the step that built those answers, under "Answers of 2026-11-09, second set". Q1 keeps the two tests of a hidden window in the suite of the Mac. Q2 lets in the failure of `start` for a flag of a window that changes after a query of the monitor.
+- On 2026-11-09 Eddie answered the three questions of the first phase of coverage, under "Answers of 2026-11-09, third set". The three answers remove code, test a guard and correct the name of a tool in a message. The freeze needs no change for them.
 
 ## What the solid run decided
 
@@ -3438,6 +3439,14 @@ Eddie took these decisions on 2026-11-09. They answer the two questions of "Ques
 
 - Q1. `std_graphics_hidpi_off` and `std_graphics_window_points` stay in the host suite of the Mac. Each opens a hidden window of raylib, and nothing shows on the screen.
 - Q2. A flag field of `graphics.Window` that changes after a query of the monitor opened the window of raylib hidden is refused. `w.start(title)` fails with a text that names the field, and `graphics.open` fails through it, instead of opening the window with the flags of the query. `width` and `height` are no flags. A program sets them after the query, as the example `half()` of "The window" in `docs/notes/graphics.md` does, and that stays allowed. `Recorder` follows the same rule, so a test checks the refusal without a window. The failure is a text and no new type, so the feature freeze needs no change for it.
+
+## Answers of 2026-11-09, third set
+
+Eddie took these decisions on 2026-11-09. They answer the three questions of "Questions for Eddie" in `docs/reports/2026-11-09-coverage-phase-1.md`, numbered as there, with the recommendations of that step. None is provisional. `docs/reports/2026-11-09-coverage-phase-2a.md` reports the step that builds them.
+
+- Q1. Three functions without a caller go: `diagnostics_check` of the diagnostics of antic, `lower_calloc_function` of the lowering and `anti_rt_fault_fflush` of the seam of fault injection, with the macro `ANTI_FFLUSH`.
+- Q2. `stub` of `src/rt/plugin.c` stays as a guard. No program reaches it, since `reflect.call` calls through the table of the object and never through the table of the sub-object. A C test calls the slot it fills directly and checks what it does.
+- Q3. Memory that runs out in the code of antic names the tool that runs, antic or anti. The name comes from the setting of the platform layer, which `platform_set_tool` gives by R163 of "Rules of 2026-10-13". anti then says `anti: out of memory for N bytes` where it said `antic: out of memory for N bytes`.
 
 ## Open
 
