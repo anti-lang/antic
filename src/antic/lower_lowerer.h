@@ -556,6 +556,17 @@ uint32_t lower_class_depth(const struct type *t);
 /* Append to out the name of the part `part` of class t. */
 void lower_class_part(struct text *out, const struct type *t,
                       const char *part);
+/* DESIGN: a part of the sub-object of the interface field `s` of a class
+   is `<Class>.s:<part>`: its table `Circle.dr:table:written`, its
+   descriptor and the thunk `Circle.dr:draw.thunk`. A type nested in the
+   class may take the name of the field, `Circle.dr`, and its own parts are
+   `Circle.dr.<part>:written`, so the `:` after the field keeps the two
+   apart (T216). An export class keeps the C name `Circle_dr_table` of the
+   table and the descriptor it exports. */
+#define LOWER_SUB_PART ":"
+/* Append to out `<field>:`, which every part of the sub-object of the
+   field sub starts with. */
+void lower_sub_object(struct text *out, const struct struct_field *sub);
 struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
                                      const char *suffix, char **module_out,
                                      char **name_out);

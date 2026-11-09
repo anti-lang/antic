@@ -314,11 +314,11 @@ static void finds_entries(void)
                   "Tile.area");
     check_entries(w, &p.ir,
                   global_named(&p.ir, "main", "Named.descriptor:written"), 17,
-                  "Square.n.label.thunk Tile.n.label.thunk");
+                  "Square.n:label.thunk Tile.n:label.thunk");
     check_entries(w, &p.ir,
                   global_named(&p.ir, "main", "anti_lang_Object_descriptor"), 1,
-                  "anti_lang_Object_type_name Square.n.type_name.thunk "
-                  "Tile.n.type_name.thunk");
+                  "anti_lang_Object_type_name Square.n:type_name.thunk "
+                  "Tile.n:type_name.thunk");
     whole_free(w);
     close_program(&p);
 }
@@ -346,8 +346,8 @@ static void joins_modules(void)
     w = whole_build(&p.ir);
     check_entries(w, &p.ir,
                   global_named(&p.ir, "shapes", "Named.descriptor:written"), 17,
-                  "Square.n.label.thunk Tile.n.label.thunk "
-                  "Tag.n.label.thunk");
+                  "Square.n:label.thunk Tile.n:label.thunk "
+                  "Tag.n:label.thunk");
     whole_free(w);
     close_program(&p);
 }

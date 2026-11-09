@@ -1441,7 +1441,7 @@ b0:
     %1 = ptradd %0, offset_of faces.Circle.nm
     ret ptr %1
 ...
-fn faces.Circle.dr.draw.thunk(%0: ptr nonnull) -> i64 {
+fn faces.Circle.dr:draw.thunk(%0: ptr nonnull) -> i64 {
 b0:
     %1 = sub i64 0, offset_of faces.Circle.dr
     %2 = ptradd %0, %1
@@ -1456,7 +1456,7 @@ b0:
 Each class has one table per interface it implements, beside its own.
 
 ```llvm excerpt=faces target=linux-x86_64 mode=dev
-define hidden noundef i64 @faces.Circle.dr.draw.thunk(ptr noundef nonnull %p0) #0 {
+define hidden noundef i64 @faces.Circle.dr$3adraw.thunk(ptr noundef nonnull %p0) #0 {
 ...
   %v1 = getelementptr i8, ptr %v0, i64 -8
 ...
@@ -1483,7 +1483,7 @@ retq
 leaq 0x18(%rdi), %rax
 retq
 ...
-<faces.Circle.dr.draw.thunk>:
+<faces.Circle.dr$3adraw.thunk>:
 movq 0x18(%rdi), %rax
 addq %rax, %rax
 retq

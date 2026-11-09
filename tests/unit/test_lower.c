@@ -230,7 +230,7 @@ static void fills_param_facts(void)
     CHECK(body_holds(source, "main.plain", "(%0: i64) -> i64 {"));
     CHECK(body_holds(source, "main.Node.get",
                      "(%0: ptr nonnull deref(size_of main.Node)) -> i64 {"));
-    CHECK(body_holds(source, "main.Tag.named.label.thunk",
+    CHECK(body_holds(source, "main.Tag.named:label.thunk",
                      "(%0: ptr nonnull) -> i64 {"));
     lowered_run(&l, source);
     CHECK(l.ok);
@@ -525,7 +525,7 @@ static void records_classes(void)
             CHECK_STR(global_name(&l.ir, square->subtables[0].interface),
                       "Named.descriptor:written");
             CHECK_STR(global_name(&l.ir, square->subtables[0].table),
-                      "Square.n.table:written");
+                      "Square.n:table:written");
         }
         CHECK(square->mutable_count == 0);
     }

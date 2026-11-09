@@ -132,6 +132,12 @@ void lower_class_part(struct text *out, const struct type *t,
     text_appendf(out, ".%s" LOWER_WRITTEN, part);
 }
 
+void lower_sub_object(struct text *out, const struct struct_field *sub)
+{
+    text_appendf(out, "%.*s" LOWER_SUB_PART, (int)sub->name.length,
+                 sub->name.text);
+}
+
 /* A global of the module named `<class>.<suffix>:written`, or NULL when
    the module has none. Every class builds its data once. On NULL,
    *module_out and *name_out receive the module and the name to give the
@@ -158,9 +164,11 @@ struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
         text_appendf(&name, "anti_%.*s_%s", (int)c.length, c.text,
                      strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
     } else if (t->item_exported && t->kind == TYPE_CLASS &&
-               strchr(suffix, '.') != NULL) {
+               strstr(suffix, LOWER_SUB_PART) != NULL) {
+        size_t at = strcspn(suffix, LOWER_SUB_PART);
         types_symbol_name(&name, t);
-        text_appendf(&name, ".%s", suffix);
+        text_appendf(&name, ".%.*s.%s", (int)at, suffix,
+                     suffix + at + strlen(LOWER_SUB_PART));
     } else {
         lower_class_part(&name, t, suffix);
     }
@@ -1360,8 +1368,8 @@ static struct ir_global *interface_descriptor(struct lowerer *l,
     char *module;
     char *name;
 
-    text_appendf(&label, "%.*s.descriptor", (int)sub->name.length,
-                 sub->name.text);
+    lower_sub_object(&label, sub);
+    text_append(&label, "descriptor");
     g = lower_class_global(l, t, text_cstr(&label), &module, &name);
     text_free(&label);
     if (g != NULL) {
@@ -1548,8 +1556,8 @@ struct ir_global *lower_interface_table(struct lowerer *l,
     struct text label = {0};
     size_t i;
 
-    text_appendf(&label, "%.*s.table", (int)sub->name.length,
-                 sub->name.text);
+    lower_sub_object(&label, sub);
+    text_append(&label, "table");
     g = lower_class_global(l, t, text_cstr(&label), &module, &name);
     text_free(&label);
     if (g != NULL) {
