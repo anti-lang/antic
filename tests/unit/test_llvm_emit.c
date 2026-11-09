@@ -5,8 +5,9 @@
    function, the entry of the runtime, the globals, the sections and the
    constructors, the module flags, and the wide operations: overflow,
    flags, saturation, the upper half of a product and the simd
-   operations. The expected texts follow the sections "Types and layout",
-   "Calling convention", "Attributes and metadata", "Instruction mapping",
+   operations. An operand it has no translation of fails the module. The
+   expected texts follow the sections "Types and layout", "Calling
+   convention", "Attributes and metadata", "Instruction mapping",
    "Defined results in release mode" and "Globals, sections and
    constructors" of docs/work-order-llvm-back-end.md. */
 
@@ -2124,6 +2125,25 @@ static void vector_moves(void)
     end(&x);
 }
 
+/* An operand that the lowering never writes, here one of kind IR_NONE in
+   a return, fails the translation with a message that names the
+   function, unexpected of llvm_emit_function.c. */
+static void untranslated(void)
+{
+    struct fixture x;
+    struct ir_operand none;
+
+    begin(&x);
+    memset(&none, 0, sizeof none);
+    none.kind = IR_NONE;
+    none.type = IR_I64;
+    returns(&x, "f", IR_I64, none);
+    CHECK(!run(&x, TARGET_MACOS_ARM64));
+    CHECK(strcmp(x.error, "the LLVM back end cannot translate this "
+                          "operand, in main.f") == 0);
+    end(&x);
+}
+
 void test_llvm_emit(void)
 {
     module_text();
@@ -2168,4 +2188,5 @@ void test_llvm_emit(void)
     coff_plugin();
     coff_names();
     frames_kept();
+    untranslated();
 }

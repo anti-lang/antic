@@ -4,7 +4,10 @@
    and the message, and never comes back with NULL. The program asks one
    helper, named by its argument, for more memory than any host gives, and
    tests/runners/run_alloc_oom.cmake checks the exit. A helper that comes back
-   prints what it returned and ends with status 0. */
+   prints what it returned and ends with status 0. The helper runtime is
+   anti_rt_out_of_memory of src/antic/rt_memory.c, through which
+   src/rt/toml.c and src/rt/regex.c stop antic and anti, and which ends the
+   run through alloc_out_of_memory_for with the size. */
 
 #include <stdint.h>
 #include <stdio.h>
@@ -15,6 +18,7 @@
 #include "alloc.h"
 #include "arena.h"
 #include "text.h"
+#include "../../src/rt/std.h"
 
 /* AddressSanitizer stops the program at an allocation it cannot give,
    unless this option tells it to answer NULL as the C library does. The
@@ -40,7 +44,8 @@ int main(int argc, char **argv)
 
     if (argc != 2) {
         fputs("usage: alloc_oom_tests "
-              "zeroed|resize|grow|product|sum|arena|text\n", stderr);
+              "zeroed|resize|grow|product|sum|arena|text|runtime\n",
+              stderr);
         return 2;
     }
     helper = argv[1];
@@ -65,6 +70,8 @@ int main(int argc, char **argv)
         text_append(&text, "x");
         text_append_bytes(&text, "x", SIZE_MAX - 1);
         items = text.data;
+    } else if (strcmp(helper, "runtime") == 0) {
+        anti_rt_out_of_memory((int64_t)TOO_MANY);
     } else {
         fprintf(stderr, "alloc_oom_tests: no helper %s\n", helper);
         return 2;

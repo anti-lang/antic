@@ -1,7 +1,8 @@
 # M03 of the second audit. Each allocation helper of antic, the memory pool and
 # the text buffer exit through alloc_out_of_memory when the C library refuses
 # the memory or a size overflows, with status 70 and the message, and never
-# come back with NULL. Run with cmake -P and these values:
+# come back with NULL. The end through the runtime names the size. Run with
+# cmake -P and these values:
 #   PROGRAM  alloc_oom_tests, built from tests/unit/test_alloc_oom.c
 #   WORK     a directory this run writes into
 # The C library of macOS writes a line of its own about the refused
@@ -17,3 +18,7 @@ foreach(helper zeroed resize grow product sum arena text)
     program_expect("alloc_${helper}" COMMAND "${PROGRAM}" ${helper}
                    STATUS 70 ERR_MATCH "antic: out of memory\n$")
 endforeach()
+# The end of a run whose memory ran out in a file of the runtime that antic
+# builds in names the size, src/antic/rt_memory.c.
+program_expect("alloc_runtime" COMMAND "${PROGRAM}" runtime
+               STATUS 70 ERR_MATCH "antic: out of memory for [0-9]+ bytes\n$")
