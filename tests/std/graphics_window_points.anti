@@ -1,0 +1,39 @@
+//! The sizes of a hidden window of raylib in screen points, which the suite
+//! opens on the screen of the Mac alone. The monitor answers before `start`,
+//! which opens the window of raylib hidden, the window has no size until it
+//! opens, and then it has the size its fields ask for.
+import anti.graphics;
+import anti.io;
+import anti.raylib as rl;
+import anti.text;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	// raylib writes its log to the standard output.
+	rl.SetTraceLogLevel(rl.TraceLogLevel.LOG_WARNING as c_int);
+	let w = graphics.Window { hidden: true };
+	let mw = w.monitor_width();
+	let mh = w.monitor_height();
+	let monitor = rl.GetCurrentMonitor();
+	let raylib = mw == rl.GetMonitorWidth(monitor) as int && mh == rl.GetMonitorHeight(monitor) as int;
+	line(f"monitor before start as raylib gives it: {raylib && mw > 0 && mh > 0}");
+	line(f"window before start: {w.screen_width()} by {w.screen_height()}");
+	w.width = mw / 2;
+	w.height = mh / 2;
+	w.start("Points") catch e {
+		e.fatal();
+	};
+	for f in w.frames() {
+		let half = w.screen_width() == mw / 2 && w.screen_height() == mh / 2;
+		line(f"window half the monitor: {half}");
+		break;
+	}
+	return 0;
+}

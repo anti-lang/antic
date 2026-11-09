@@ -1241,8 +1241,8 @@ endforeach()
 # `[inject.test]` gives it to `anti test`.
 set(ANTIC_GRAPHICS_RECORDER
     "--inject,anti.graphics.Display=anti.graphics.Recorder.shared")
-set(antic_graphics_programs tree colors recorder thread)
-set(antic_graphics_injected recorder thread allocations)
+set(antic_graphics_programs tree colors recorder thread window)
+set(antic_graphics_injected recorder thread allocations window)
 foreach(name IN LISTS antic_graphics_programs)
     set(source "${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_${name}.anti")
     set(options "")
@@ -1268,6 +1268,11 @@ endforeach()
 if(ANTIC_HOST_OS STREQUAL "macos")
     antic_program_test(std_graphics_hidpi_off
         "${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_hidpi_off.anti"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-graphics")
+    # The sizes in screen points that raylib gives a hidden window, with the
+    # query of the monitor before the window opens.
+    antic_program_test(std_graphics_window_points
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_window_points.anti"
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-graphics")
 endif()
 
@@ -2788,7 +2793,7 @@ endforeach()
 add_test(NAME graphics_note_examples
     COMMAND "${CMAKE_COMMAND}"
         "-DNOTE=${PROJECT_SOURCE_DIR}/docs/notes/graphics.md"
-        "-DFILES=${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_hello.anti,${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_tree.anti,${INJECT}/graphics/src/com/example/tree.anti"
+        "-DFILES=${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_hello.anti,${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_tree.anti,${INJECT}/graphics/src/com/example/tree.anti,${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_window.anti"
         -P "${ANTIC_RUNNERS}/run_note_examples.cmake")
 
 # No raylib type stands in a public signature of anti.graphics.

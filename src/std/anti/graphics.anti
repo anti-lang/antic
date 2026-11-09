@@ -5,7 +5,9 @@
 //! frame per turn on the canvas `f`. Every position and size is in units of the
 //! largest square that fits the window, from 0.0 to 1.0 on both axes, with y
 //! pointing down from its top left corner. A rotation is in degrees and turns
-//! clockwise. A program names no pixel size, colour depth or pixel format.
+//! clockwise. A program names no pixel size, colour depth or pixel format. The
+//! one size it may name is that of its window when it opens, in screen points,
+//! and the window gives the sizes of the monitor and of itself in points.
 //!
 //! Each part stands on raylib under the name of its function without the
 //! prefix: the window on `InitWindow`, the loop on `BeginDrawing` and
@@ -394,9 +396,17 @@ pub class NotMainThread inherits lang.Error
 /// canvas that draws it, with the frame of reference of that canvas.
 pub abstract class Display
 {
-	/// Open the window with the config flags of raylib. It fails where the
-	/// system gives no window.
-	abstract fn open(self, title: str, flags: u32) may fail;
+	/// Open the window with the config flags of raylib, `width` by `height`
+	/// screen points, as `side` gives them. It fails where the system gives no
+	/// window.
+	abstract fn open(self, title: str, flags: u32, width: int, height: int) may fail;
+
+	/// Open the window hidden with the config flags of raylib, so that the
+	/// monitors answer before `open`. It gives whether the window stands.
+	abstract fn prepare(self, flags: u32) -> bool;
+
+	/// Whether a window of the display stands, as `IsWindowReady`.
+	abstract fn ready(self) -> bool;
 
 	/// Close the window.
 	abstract fn close(self);
@@ -521,6 +531,19 @@ pub abstract class Display
 
 	/// Switch to the full screen and back, as `ToggleFullscreen`.
 	abstract fn toggle_fullscreen(self);
+
+	/// The width of the current monitor in screen points, as `GetMonitorWidth`.
+	abstract fn monitor_width(self) -> int;
+
+	/// The height of the current monitor in screen points, as
+	/// `GetMonitorHeight`.
+	abstract fn monitor_height(self) -> int;
+
+	/// The width of the window in screen points, as `GetScreenWidth`.
+	abstract fn screen_width(self) -> int;
+
+	/// The height of the window in screen points, as `GetScreenHeight`.
+	abstract fn screen_height(self) -> int;
 
 	/// The provider the link takes where the build names none, which is raylib.
 	pub fn default() -> *Display
@@ -810,8 +833,9 @@ pub final class Font
 /// A window and its config flags, as raylib's `SetConfigFlags` takes them.
 ///
 /// Each field is a flag with its default, so a literal names what it changes:
-/// `Window { vsync: false }`. The window opens two thirds of the monitor in
-/// size, in its centre. Escape closes it, as raylib's default exit key.
+/// `Window { vsync: false }`. The window opens in the centre of the monitor,
+/// `width` by `height` screen points or two thirds of the monitor in size.
+/// Escape closes it, as raylib's default exit key.
 pub class Window
 {
 	/// `FLAG_VSYNC_HINT`.
@@ -846,8 +870,15 @@ pub class Window
 	pub msaa: bool = true,
 	/// `FLAG_INTERLACED_HINT`.
 	pub interlaced: bool = false,
+	/// The width of the window in screen points when it opens. 0 takes two
+	/// thirds of the monitor, and a width above the monitor's takes the
+	/// monitor's. `fullscreen`, `maximized` and `borderless` leave it aside.
+	pub width: int = 0,
+	/// The height of the window in screen points when it opens, as `width`.
+	pub height: int = 0,
 	inject display: *Display,
 	opened: bool = false,
+	prepared: bool = false,
 	drawing: bool = false,
 	own words: ?*Say = none,
 
@@ -861,7 +892,7 @@ pub class Window
 		if self.drawing {
 			self.display.end();
 		}
-		if self.opened {
+		if self.opened || self.prepared {
 			self.display.close();
 		}
 	}
@@ -878,7 +909,11 @@ pub class Window
 		if self.opened {
 			fail "the window is open already";
 		}
-		try self.display.open(title, self.flags());
+		// A window that a query of this one opened hidden is its own.
+		if !self.prepared && self.display.ready() {
+			fail "a window is open already";
+		}
+		try self.display.open(title, self.flags(), self.width, self.height);
 		self.opened = true;
 	}
 
@@ -1044,6 +1079,64 @@ pub class Window
 	{
 		self.display.toggle_fullscreen();
 	}
+
+	/// The width of the current monitor in screen points, as `GetMonitorWidth`.
+	/// Before `start` the first query opens the window hidden with the flags
+	/// the fields hold then, since raylib reads the monitors after `InitWindow`
+	/// alone. It gives 0 on a thread other than the main one and where the
+	/// system gives no window.
+	pub fn monitor_width(self) -> int
+	{
+		if !self.answers() {
+			return 0;
+		}
+		return self.display.monitor_width();
+	}
+
+	/// The height of the current monitor in screen points, as
+	/// `GetMonitorHeight`, as `monitor_width` gives the width.
+	pub fn monitor_height(self) -> int
+	{
+		if !self.answers() {
+			return 0;
+		}
+		return self.display.monitor_height();
+	}
+
+	/// The width of the window in screen points, as `GetScreenWidth`. It gives
+	/// 0 before the window opens and on a thread other than the main one.
+	pub fn screen_width(self) -> int
+	{
+		if !self.opened || anti_rt_main_thread() == 0 {
+			return 0;
+		}
+		return self.display.screen_width();
+	}
+
+	/// The height of the window in screen points, as `GetScreenHeight`, as
+	/// `screen_width` gives the width.
+	pub fn screen_height(self) -> int
+	{
+		if !self.opened || anti_rt_main_thread() == 0 {
+			return 0;
+		}
+		return self.display.screen_height();
+	}
+
+	/// Whether the display answers for the monitor. Before `start` the window
+	/// opens hidden. A window of the display that another `Window` opened
+	/// answers as well, and this one does not close it.
+	fn answers(self) -> bool
+	{
+		if anti_rt_main_thread() == 0 {
+			return false;
+		}
+		if self.opened || self.prepared || self.display.ready() {
+			return true;
+		}
+		self.prepared = self.display.prepare(self.flags());
+		return self.prepared;
+	}
 }
 
 /// Open a window with the title `title` and the flags of `window`, as
@@ -1061,6 +1154,25 @@ pub fn open(title: str, own window: Window = Window { }) -> Window may fail
 /// The share of the monitor a window takes on each axis when it opens.
 const MONITOR_SHARE: int = 3;
 
+/// The side of a window on an axis where it asks for `asked` screen points and
+/// the monitor holds `monitor`: two thirds of the monitor for 0 or less, and
+/// the monitor for more than it holds.
+fn side(asked: int, monitor: int) -> int
+{
+	if asked <= 0 {
+		return monitor * 2 / MONITOR_SHARE;
+	}
+	if asked > monitor {
+		return monitor;
+	}
+	return asked;
+}
+
+/// The config flags of raylib that give a window its size themselves.
+const SIZED: u32 = rl.ConfigFlags.FLAG_FULLSCREEN_MODE as u32
+	| rl.ConfigFlags.FLAG_WINDOW_MAXIMIZED as u32
+	| rl.ConfigFlags.FLAG_BORDERLESS_WINDOWED_MODE as u32;
+
 /// The display of raylib, which is the default of `Display`.
 ///
 /// raylib holds one window, so the display is a singleton. A canvas reaches
@@ -1076,26 +1188,35 @@ pub singleton class RaylibDisplay inherits Display
 		zoom: 1.0,
 	},
 
-	concrete fn open(self, title: str, flags: u32) may fail
+	concrete fn prepare(self, flags: u32) -> bool
 	{
 		if rl.IsWindowReady() {
-			fail "a window is open already";
+			return true;
 		}
 		let hidden = rl.ConfigFlags.FLAG_WINDOW_HIDDEN as u32;
 		rl.SetConfigFlags((flags | hidden) as c_uint);
-		rl.InitWindow(640, 360, title.ptr);
-		if !rl.IsWindowReady() {
+		rl.InitWindow(640, 360, "".ptr);
+		return rl.IsWindowReady();
+	}
+
+	concrete fn ready(self) -> bool
+	{
+		return rl.IsWindowReady();
+	}
+
+	concrete fn open(self, title: str, flags: u32, width: int, height: int) may fail
+	{
+		if !self.prepare(flags) {
 			fail alloc NoDisplay { message: "no display to open a window on" };
 		}
-		let sized = rl.ConfigFlags.FLAG_FULLSCREEN_MODE as u32
-			| rl.ConfigFlags.FLAG_WINDOW_MAXIMIZED as u32
-			| rl.ConfigFlags.FLAG_BORDERLESS_WINDOWED_MODE as u32;
-		if (flags & sized) == 0 {
+		rl.SetWindowTitle(title.ptr);
+		let hidden = rl.ConfigFlags.FLAG_WINDOW_HIDDEN as u32;
+		if (flags & SIZED) == 0 {
 			let monitor = rl.GetCurrentMonitor();
 			let mw = rl.GetMonitorWidth(monitor);
 			let mh = rl.GetMonitorHeight(monitor);
-			let w = mw * 2 / MONITOR_SHARE as c_int;
-			let h = mh * 2 / MONITOR_SHARE as c_int;
+			let w = side(width, mw as int) as c_int;
+			let h = side(height, mh as int) as c_int;
 			let at = rl.GetMonitorPosition(monitor);
 			rl.SetWindowSize(w, h);
 			if (flags & rl.ConfigFlags.FLAG_WINDOW_HIGHDPI as u32) == 0 {
@@ -1434,6 +1555,28 @@ pub singleton class RaylibDisplay inherits Display
 	{
 		rl.ToggleFullscreen();
 	}
+
+	concrete fn monitor_width(self) -> int
+	{
+		let monitor = rl.GetCurrentMonitor();
+		return rl.GetMonitorWidth(monitor) as int;
+	}
+
+	concrete fn monitor_height(self) -> int
+	{
+		let monitor = rl.GetCurrentMonitor();
+		return rl.GetMonitorHeight(monitor) as int;
+	}
+
+	concrete fn screen_width(self) -> int
+	{
+		return rl.GetScreenWidth() as int;
+	}
+
+	concrete fn screen_height(self) -> int
+	{
+		return rl.GetScreenHeight() as int;
+	}
 }
 
 /// The frames a window without HiDPI draws at most until its size settles.
@@ -1509,7 +1652,9 @@ pub struct Call
 /// starts the record afresh, so the record holds the last one. A call past the
 /// room of the record is counted and not kept. Every key and button is up, and
 /// the mouse stands at the top left corner of the square. A frame lasts 1/60 of
-/// a second.
+/// a second. The monitor holds 1920 by 1080 screen points. A window opens at
+/// the size it asks for within the monitor, or at 1280 by 720, and `aspect`
+/// takes the width of the window over its height.
 pub class Recorder inherits Display
 {
 	/// The width of the window over its height.
@@ -1520,6 +1665,13 @@ pub class Recorder inherits Display
 	pub drawn: int = 0,
 	/// Whether a window over the recorder is open.
 	pub opened: bool = false,
+	/// The width of the window over the recorder in screen points, 0 until a
+	/// window opens.
+	pub width: int = 0,
+	/// The height of the window over the recorder in screen points, 0 until a
+	/// window opens.
+	pub height: int = 0,
+	prepared: bool = false,
 	own room: ?*Call = none,
 	capacity: int = 0,
 	used: int = 0,
@@ -1652,7 +1804,7 @@ pub class Recorder inherits Display
 		self.record(shape, m, points, 1, size, color, other);
 	}
 
-	concrete fn open(self, title: str, flags: u32) may fail
+	concrete fn open(self, title: str, flags: u32, width: int, height: int) may fail
 	{
 		if self.opened {
 			fail "a window is open already";
@@ -1662,11 +1814,30 @@ pub class Recorder inherits Display
 		}
 		self.opened = true;
 		self.drawn = 0;
+		self.width = MONITOR_WIDTH;
+		self.height = MONITOR_HEIGHT;
+		if (flags & SIZED) == 0 {
+			self.width = side(width, MONITOR_WIDTH);
+			self.height = side(height, MONITOR_HEIGHT);
+		}
+		self.aspect = self.width as f32 / self.height as f32;
+	}
+
+	concrete fn prepare(self, flags: u32) -> bool
+	{
+		self.prepared = true;
+		return true;
+	}
+
+	concrete fn ready(self) -> bool
+	{
+		return self.opened || self.prepared;
 	}
 
 	concrete fn close(self)
 	{
 		self.opened = false;
+		self.prepared = false;
 	}
 
 	concrete fn should_close(self) -> bool
@@ -1868,8 +2039,34 @@ pub class Recorder inherits Display
 	concrete fn toggle_fullscreen(self)
 	{
 	}
+
+	concrete fn monitor_width(self) -> int
+	{
+		return MONITOR_WIDTH;
+	}
+
+	concrete fn monitor_height(self) -> int
+	{
+		return MONITOR_HEIGHT;
+	}
+
+	concrete fn screen_width(self) -> int
+	{
+		return self.width;
+	}
+
+	concrete fn screen_height(self) -> int
+	{
+		return self.height;
+	}
 }
 
 /// The pixels on the shorter side of the window of a `Recorder`, as on a
 /// monitor of 1080 lines.
 const PIXELS: f32 = 1080.0;
+
+/// The width of the monitor of a `Recorder` in screen points.
+const MONITOR_WIDTH: int = 1920;
+
+/// The height of the monitor of a `Recorder` in screen points.
+const MONITOR_HEIGHT: int = 1080;

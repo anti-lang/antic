@@ -1,0 +1,92 @@
+//! The size of a window over the Recorder, which the build injects with
+//! `--inject anti.graphics.Display=anti.graphics.Recorder.shared`. The monitor
+//! of the recorder holds 1920 by 1080 screen points. A window opens at the size
+//! its fields ask for within the monitor, or at two thirds of it on an axis
+//! that asks for none, and the frames take its shape. The monitor answers
+//! before the window opens, and the window has no size until then.
+import anti.graphics;
+import anti.io;
+import anti.text;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+// Open `w`, draw one frame and print the sizes it reports.
+fn show(label: str, w: *graphics.Window)
+{
+	w.start(label) catch e {
+		e.fatal();
+	};
+	for f in w.frames() {
+		let b = f.bounds;
+		line(f"{label}: window {w.screen_width()} by {w.screen_height()}, bounds {b.x} {b.y} {b.width} {b.height}");
+	}
+}
+
+fn half()
+{
+	let w = graphics.Window { };
+	w.width = w.monitor_width() / 2;
+	w.height = w.monitor_height() / 2;
+	w.start("Half") catch e {
+		e.fatal();
+	};
+	for f in w.frames() {
+		f.clear(graphics.RAYWHITE);
+	}
+}
+
+fn before()
+{
+	let w = graphics.Window { };
+	line(f"before start: monitor {w.monitor_width()} by {w.monitor_height()}, window {w.screen_width()} by {w.screen_height()}");
+}
+
+fn square()
+{
+	let w = graphics.Window { width: 800, height: 800 };
+	show("square", &w);
+}
+
+fn two_thirds()
+{
+	let w = graphics.Window { };
+	show("default", &w);
+}
+
+fn wide()
+{
+	let w = graphics.Window { width: 800 };
+	show("width alone", &w);
+}
+
+fn large()
+{
+	let w = graphics.Window { width: 4000, height: 3000 };
+	show("larger than the monitor", &w);
+}
+
+fn maximized()
+{
+	let w = graphics.Window { maximized: true, width: 800, height: 800 };
+	show("maximized", &w);
+}
+
+fn main() -> int
+{
+	let r = graphics.Recorder.shared();
+	before();
+	half();
+	line(f"half: the recorder keeps {r.width} by {r.height} and {r.count(graphics.Shape.Clear)} clear");
+	square();
+	two_thirds();
+	wide();
+	large();
+	maximized();
+	line(f"the recorder keeps {r.width} by {r.height} and the aspect {r.aspect}");
+	return 0;
+}

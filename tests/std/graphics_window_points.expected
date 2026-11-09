@@ -1,0 +1,4 @@
+exit 0
+monitor before start as raylib gives it: true
+window before start: 0 by 0
+window half the monitor: true

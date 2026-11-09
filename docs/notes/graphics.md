@@ -80,6 +80,23 @@ the size of its window or lays out by the screen:
   `GetScreenHeight`, the size of the window now. They give 0 before the
   window opens.
 
+A window half the size of the monitor:
+
+```anti
+fn half()
+{
+	let w = graphics.Window { };
+	w.width = w.monitor_width() / 2;
+	w.height = w.monitor_height() / 2;
+	w.start("Half") catch e {
+		e.fatal();
+	};
+	for f in w.frames() {
+		f.clear(graphics.RAYWHITE);
+	}
+}
+```
+
 A window with `highdpi: false` works in points. On a Retina Mac GLFW reports
 the framebuffer of a new window in pixels until the window has drawn. raylib
 6.0 took that doubled size at the first change of the size, and the window

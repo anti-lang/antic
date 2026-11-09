@@ -1,0 +1,9 @@
+exit 0
+before start: monitor 1920 by 1080, window 0 by 0
+half: the recorder keeps 960 by 540 and 1 clear
+square: window 800 by 800, bounds 0 0 1 1
+default: window 1280 by 720, bounds -0.3888889 0 1.7777778 1
+width alone: window 800 by 720, bounds -0.055555582 0 1.1111112 1
+larger than the monitor: window 1920 by 1080, bounds -0.3888889 0 1.7777778 1
+maximized: window 1920 by 1080, bounds -0.3888889 0 1.7777778 1
+the recorder keeps 1920 by 1080 and the aspect 1.7777778
