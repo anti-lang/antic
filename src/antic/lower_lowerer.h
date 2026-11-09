@@ -541,6 +541,21 @@ struct ir_operand lower_entry_offset(struct lowerer *l, size_t index);
 uint32_t lower_fields_agg(struct lowerer *l, size_t n);
 uint32_t lower_descriptor_agg(struct lowerer *l);
 uint32_t lower_class_depth(const struct type *t);
+/* DESIGN: the end of the name of a part the compiler writes for a class,
+   `<Class>.<part>:written`. The init of the class, its table, its
+   descriptor and the rest of its data carry it, apart from the data an
+   export class exports under a C name. A function and a static
+   of the class are `<Class>.<name>`, and a name a program writes holds a
+   `:` only as `<operator>:<Type>` of an operator at module level, with no
+   `.` before it. No member of a class then takes the name of a part, as
+   `pub fn init(self)` took that of the init before (T209). The teardown,
+   the copy, `equals` and `hash` keep `<Class>.<entry>`: each fills the
+   entry of the root's table of its name, which a class declares only as
+   that entry, and a chain that declares `copy` gets `copy:written`. */
+#define LOWER_WRITTEN ":written"
+/* Append to out the name of the part `part` of class t. */
+void lower_class_part(struct text *out, const struct type *t,
+                      const char *part);
 struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
                                      const char *suffix, char **module_out,
                                      char **name_out);

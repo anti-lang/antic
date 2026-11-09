@@ -1227,7 +1227,7 @@ The object of a plugin is the object of one module. The function a host reaches 
 ```llvm excerpt=plugs target=linux-x86_64 mode=dev
 define hidden void @plugs.Fancy.greet(ptr noundef nonnull dereferenceable(8) %p0, i64 %p1.0, i64 %p1.1)
 ...
-@plugs.Fancy.table = hidden constant <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @plugs.Fancy.descriptor, ptr @anti_lang_Object_type_name, ptr @anti_lang_Object_to_text,
+@plugs.Fancy.table$3awritten = hidden constant <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @plugs.Fancy.descriptor$3awritten, ptr @anti_lang_Object_type_name, ptr @anti_lang_Object_to_text,
 ...
 declare void @anti_lang_Object_created(ptr noundef nonnull dereferenceable(8))
 ```

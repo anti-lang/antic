@@ -1218,7 +1218,7 @@ b2:
     %6 = mul i64 17, size_of ptr
     %7 = ptradd %3, %6
     %8 = load ptr %7 !entry
-    %9 = call ptr %8 via @pools.fn.1(%0, size_of pools.Point, 8) table @anti.mem.Allocator.descriptor 17
+    %9 = call ptr %8 via @pools.fn.1(%0, size_of pools.Point, 8) table @anti.mem.Allocator.descriptor:written 17
 ```
 
 - `%0` is the allocator, and `%3` its table pointer.

@@ -871,7 +871,7 @@ The slot is a global of the runtime module, one pointer, named `anti.rt.inject.`
 An `inject` field is filled where the defaults of the class are written: in a literal, and in the function that prepares an object for `construct`. The lines below are `alloc Service { }` in `main` of the example.
 
 ```llvm excerpt=wiring target=linux-x86_64 mode=release
-  store ptr @wiring.Service.table, ptr %v0, align 8
+  store ptr @"wiring.Service.table$3awritten", ptr %v0, align 8
   %v9 = getelementptr i8, ptr %v0, i64 8
   %v11 = load ptr, ptr @anti.rt.inject.wiring.Greeter, align 8
   %v13 = tail call ptr %v11()
@@ -1360,10 +1360,10 @@ A plugin carries the list of the modules it reaches, as the constant `anti_rt_pl
 `lib.instance(Interface)` is rewritten by the checker into a call that passes the address of the descriptor of the interface. The lines below are that call in `speak` of the host above, in a dev build.
 
 ```ir excerpt=host target=linux-x86_64 mode=dev
-    %7 = addr @anti.log.Logger.descriptor
+    %7 = addr @anti.log.Logger.descriptor:written
 ...
     %13 = load ptr %12 !entry
-    %14 = call ptr %13 via @host.fn.0(%6, %7, %2) table @anti.plugin.Library.descriptor 17
+    %14 = call ptr %13 via @host.fn.0(%6, %7, %2) table @anti.plugin.Library.descriptor:written 17
     %15 = eq i8 %14, 0
     branch %15, b6, b5
 b5:
@@ -1372,7 +1372,7 @@ b6:
     %16 = load ptr %2 !type ptr
 ```
 
-- `addr @anti.log.Logger.descriptor` stands where the source names the type `log.Logger`. It is the descriptor of the interface in the host, the same address the loader compared at `plugin.load`.
+- `addr @anti.log.Logger.descriptor:written` stands where the source names the type `log.Logger`. It is the descriptor of the interface in the host, the same address the loader compared at `plugin.load`.
 - The call goes through entry 17 of the table of the `Library`. That entry is `instance_at` of `anti.plugin`, which hands the handle of the library and the descriptor to `anti_rt_plugin_instance`. The third argument, `%2`, is the slot the object is written to, since `instance_at` may fail.
 - The compare with 0 is the test of a call that may fail. `b5` is the `try`, which hands the error of a library that provides no class for the interface to the caller. `b6` reads the object from the slot.
 

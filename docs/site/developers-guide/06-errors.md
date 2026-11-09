@@ -319,7 +319,7 @@ b1:
     %6 = load i64 %5 !type anti.lang.Error.code
 ...
     store i64 -1, %1
-    %12 = addr @anti.lang.Error.descriptor
+    %12 = addr @anti.lang.Error.descriptor:written
     call void @anti_rt_delete(%4, %12)
     jump b2
 ```

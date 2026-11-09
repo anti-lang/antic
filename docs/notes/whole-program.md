@@ -52,8 +52,9 @@ tools can observe.
 ## The registry
 
 - Lowering gives every complete class that is not a singleton an init function,
-  `<Class>.init`. An export class keeps its C name `anti_<Class>_init`. The class record
-  names it.
+  `<Class>.init:written`, so a function of the class named `init` keeps its own name, by
+  `LOWER_WRITTEN` of `src/antic/lower_lowerer.h`. An export class keeps its C name
+  `anti_<Class>_init`. The class record names it.
 - The pass asks what the entries of the program reach, the way the optimizer's removal of
   unused functions marks them. When `anti_rt_reflect_new`,
   `anti_lang_Object_deserialize` or the plugin loader `anti_rt_plugin_load` is among

@@ -6137,7 +6137,7 @@ add_test(NAME ir_inject_marks
     COMMAND "${CMAKE_COMMAND}"
         "-DANTIC=$<TARGET_FILE:antic>"
         "-DCOMMAND=--runtime,${ANTIC_RUNTIME_DIR},${CMAKE_CURRENT_SOURCE_DIR}/dump/ir_marks.anti"
-        "-DLINE=class ir_marks.Holder descriptor @ir_marks.Holder.descriptor base @anti_lang_Object_descriptor table @ir_marks.Holder.table init @ir_marks.Holder.init inject final alloc anti.mem.Allocator by @anti.mem.Allocator.descriptor inject clock anti.time.Clock by @anti.time.Clock.descriptor"
+        "-DLINE=class ir_marks.Holder descriptor @ir_marks.Holder.descriptor:written base @anti_lang_Object_descriptor table @ir_marks.Holder.table:written init @ir_marks.Holder.init:written inject final alloc anti.mem.Allocator by @anti.mem.Allocator.descriptor:written inject clock anti.time.Clock by @anti.time.Clock.descriptor:written"
         -P "${ANTIC_RUNNERS}/run_ir_line.cmake")
 add_test(NAME ir_effects_may_free
     COMMAND "${CMAKE_COMMAND}"

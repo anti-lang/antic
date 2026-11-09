@@ -1310,8 +1310,12 @@ static bool known_copy(struct lowerer *l, const struct item *it)
         return false;
     }
     t = it->symbol->type;
-    types_symbol_name(&name, t);
-    text_append(&name, ".descriptor");
+    if (it->kind == ITEM_CLASS) {
+        lower_class_part(&name, t, "descriptor");
+    } else {
+        types_symbol_name(&name, t);
+        text_append(&name, ".descriptor");
+    }
     g = lower_find_global(l->m, it->home_module, text_cstr(&name));
     text_free(&name);
     return g != NULL && g->index < l->first_global && !g->is_extern;

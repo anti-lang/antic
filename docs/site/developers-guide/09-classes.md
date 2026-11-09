@@ -289,7 +289,7 @@ The last line is cut from the global `@anti_Circle_vtable`, which holds 19 point
 - Entries 8 to 16 are the nine hooks of [chapter 15]({{% relref "15-hooks" %}}), and the first is `created`.
 - Entries 17 and 18, at the end of the line, are `Circle_area` and `Shape_move`, the `pub` functions of the chain in the order of their declaration.
 
-`%s0` is the local `c`, 40 bytes in the frame of `main`. A class value is its bytes, with no header before them and no allocation, and the literal stores the same table pointer into it. A class that is not exported names its table `objects.Dot.table`. An exported one has the name its C header declares.
+`%s0` is the local `c`, 40 bytes in the frame of `main`. A class value is its bytes, with no header before them and no allocation, and the literal stores the same table pointer into it. A class that is not exported names its table `objects.Dot.table:written`. An exported one has the name its C header declares.
 
 ```asm excerpt=objects target=linux-x86_64 mode=release
 <fresh>:
@@ -713,7 +713,7 @@ b0:
     call void @build.Base.destruct(%0)
     %2 = ptradd %0, offset_of build.Named.buffer
     %3 = load ptr %2
-    %4 = addr @build.Part.descriptor
+    %4 = addr @build.Part.descriptor:written
     call void @anti_rt_delete_from(%3, %4, %1)
     store ptr 0, %2
     %5 = ptradd %0, offset_of build.Named.part
@@ -1845,12 +1845,12 @@ define internal noundef i64 @issue() #0 {
 ...
 @statics.Ticket.issued = hidden global <{ [8 x i8] }> zeroinitializer, align 8
 ...
-@statics.Config.instance = hidden global <{ [8 x i8] }> zeroinitializer, align 8
+@statics.Config.instance$3awritten = hidden global <{ [8 x i8] }> zeroinitializer, align 8
 ```
 
 - `Ticket.issued` is 8 bytes, zero at start, the one mutable global that `Ticket` adds.
 - `load()` is `load atomic` and `add(1)` is `atomicrmw add`, both `seq_cst`. The IR of antic writes the two as calls of `anti_rt_atomic_load` and `anti_rt_atomic_add`, which the emitter replaces with the instructions. The runtime keeps the functions for C code.
-- A singleton has a second kind of global, `Config.instance`, one pointer that is null until the first `Config.get()`.
+- A singleton has a second kind of global, `Config.instance:written`, one pointer that is null until the first `Config.get()`.
 
 ```asm excerpt=statics target=linux-x86_64 mode=release
 <issued>:
@@ -1871,7 +1871,7 @@ The compiler writes `Config.get()` for the singleton.
 ```ir excerpt=statics target=linux-x86_64 mode=release
 fn statics.Config.get() -> ptr {
 b0:
-    %0 = addr @statics.Config.instance
+    %0 = addr @statics.Config.instance:written
     %1 = call ptr @anti_rt_atomic_load(%0, size_of ptr)
     %2 = copy ptr %1
     %3 = eq i8 %1, 0

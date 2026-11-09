@@ -303,7 +303,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 93, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 94, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -1648,9 +1648,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 94;
+    copy[4] = 95;
     refuses_file(copy, sizeof copy,
-                 "has format version 94, and antic reads version 93");
+                 "has format version 95, and antic reads version 94");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -2659,8 +2659,8 @@ static void keeps_classes(void)
     }
     CHECK(strstr(text_cstr(&before), "class shapes.Square") != NULL);
     CHECK(strstr(text_cstr(&before), "worker fn shapes.tally") != NULL);
-    CHECK(strstr(text_cstr(&before), " table @shapes.Shape.descriptor 17") !=
-          NULL);
+    CHECK(strstr(text_cstr(&before),
+                 " table @shapes.Shape.descriptor:written 17") != NULL);
     compilation_open(&b);
     ir_module_init(&program, &b.arena, "");
     CHECK(compilation_read(&b, (const uint8_t *)bytes.data, bytes.length,

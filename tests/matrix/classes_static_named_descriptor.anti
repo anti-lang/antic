@@ -1,0 +1,23 @@
+//! A static atomic of a class named `descriptor`, read and written. The
+//! compiler writes data of that name for every class, and the static of the
+//! class is no other.
+
+import anti.io;
+import anti.text;
+
+class Counter
+{
+	pub n: int = 1,
+	pub static atomic descriptor: int = 7;
+}
+
+fn main() -> int
+{
+	let c = Counter { };
+	let before = Counter.descriptor.load();
+	Counter.descriptor.store(before + c.n);
+	let s = f"descriptor: {before} {Counter.descriptor.load()}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

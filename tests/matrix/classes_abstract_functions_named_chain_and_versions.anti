@@ -1,0 +1,46 @@
+//! Functions of an abstract class named `chain` and `versions`, called through
+//! a pointer to the class. The compiler writes data of those names for every
+//! abstract class, and the name of the class's own function is no other.
+
+import anti.io;
+import anti.text;
+
+abstract class Shape
+{
+	pub fn chain(self) -> int
+	{
+		return 5;
+	}
+
+	pub fn versions(self) -> int
+	{
+		return 6;
+	}
+
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	pub side: int = 3,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn report(s: *Shape) -> int
+{
+	return s.chain() * 100 + s.versions() * 10 + s.area();
+}
+
+fn main() -> int
+{
+	let q = alloc Square { };
+	let s = f"chain, versions and area: {report(q)}";
+	delete(q);
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

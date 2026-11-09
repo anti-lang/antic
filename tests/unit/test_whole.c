@@ -303,15 +303,18 @@ static void finds_entries(void)
     open_program(&p);
     compile(&p, "main", shapes, &p.ir);
     w = whole_build(&p.ir);
-    shape = global_named(&p.ir, "main", "Shape.descriptor");
+    shape = global_named(&p.ir, "main", "Shape.descriptor:written");
     check_entries(w, &p.ir, shape, 17, "Square.area Tile.area");
     check_entries(w, &p.ir, shape, 18, "Shape.name");
-    check_entries(w, &p.ir, global_named(&p.ir, "main", "Square.descriptor"),
-                  17, "Square.area Tile.area");
-    check_entries(w, &p.ir, global_named(&p.ir, "main", "Tile.descriptor"), 17,
+    check_entries(w, &p.ir,
+                  global_named(&p.ir, "main", "Square.descriptor:written"), 17,
+                  "Square.area Tile.area");
+    check_entries(w, &p.ir,
+                  global_named(&p.ir, "main", "Tile.descriptor:written"), 17,
                   "Tile.area");
-    check_entries(w, &p.ir, global_named(&p.ir, "main", "Named.descriptor"),
-                  17, "Square.n.label.thunk Tile.n.label.thunk");
+    check_entries(w, &p.ir,
+                  global_named(&p.ir, "main", "Named.descriptor:written"), 17,
+                  "Square.n.label.thunk Tile.n.label.thunk");
     check_entries(w, &p.ir,
                   global_named(&p.ir, "main", "anti_lang_Object_descriptor"), 1,
                   "anti_lang_Object_type_name Square.n.type_name.thunk "
@@ -341,9 +344,10 @@ static void joins_modules(void)
                  "    }\n"
                  "}\n");
     w = whole_build(&p.ir);
-    check_entries(w, &p.ir, global_named(&p.ir, "shapes", "Named.descriptor"),
-                  17, "Square.n.label.thunk Tile.n.label.thunk "
-                     "Tag.n.label.thunk");
+    check_entries(w, &p.ir,
+                  global_named(&p.ir, "shapes", "Named.descriptor:written"), 17,
+                  "Square.n.label.thunk Tile.n.label.thunk "
+                  "Tag.n.label.thunk");
     whole_free(w);
     close_program(&p);
 }
@@ -417,7 +421,7 @@ static void devirtualises(void)
            "    %4 = mul i64 17, size_of ptr\n"
            "    %5 = ptradd %3, %4\n"
            "    %6 = load ptr %5 !entry\n"
-           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 17\n"
+           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor:written 17\n"
            "    %8 = load ptr %0 !table\n"
            "    %9 = mul i64 18, size_of ptr\n"
            "    %10 = ptradd %8, %9\n"
@@ -434,7 +438,7 @@ static void devirtualises(void)
            "    %16 = mul i64 17, size_of ptr\n"
            "    %17 = ptradd %15, %16\n"
            "    %18 = load ptr %17 !entry\n"
-           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 17\n"
+           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor:written 17\n"
            "    %20 = addov nsw i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
            "b3:\n"
@@ -463,12 +467,12 @@ static void devirtualises(void)
            "    %4 = mul i64 17, size_of ptr\n"
            "    %5 = ptradd %3, %4\n"
            "    %6 = load ptr %5 !entry\n"
-           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor 17\n"
+           "    %7 = call i64 %6 via @main.fn.0(%0) table @main.Shape.descriptor:written 17\n"
            "    %8 = load ptr %0 !table\n"
            "    %9 = mul i64 18, size_of ptr\n"
            "    %10 = ptradd %8, %9\n"
            "    %11 = load ptr %10 !entry\n"
-           "    %12 = call i64 %11 via @main.fn.0(%0) table @main.Shape.descriptor 18\n"
+           "    %12 = call i64 %11 via @main.fn.0(%0) table @main.Shape.descriptor:written 18\n"
            "    %13 = addov nsw i64 %7, %12\n"
            "    branchov %13, b1, b2\n"
            "b1:\n"
@@ -480,7 +484,7 @@ static void devirtualises(void)
            "    %16 = mul i64 17, size_of ptr\n"
            "    %17 = ptradd %15, %16\n"
            "    %18 = load ptr %17 !entry\n"
-           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor 17\n"
+           "    %19 = call i64 %18 via @main.fn.0(%1) table @main.Named.descriptor:written 17\n"
            "    %20 = addov nsw i64 %13, %19\n"
            "    branchov %20, b3, b4\n"
            "b3:\n"
@@ -492,7 +496,7 @@ static void devirtualises(void)
            "    %23 = mul i64 17, size_of ptr\n"
            "    %24 = ptradd %22, %23\n"
            "    %25 = load ptr %24 !entry\n"
-           "    %26 = call i64 %25 via @main.fn.0(%2) table @main.Tile.descriptor 17\n"
+           "    %26 = call i64 %25 via @main.fn.0(%2) table @main.Tile.descriptor:written 17\n"
            "    %27 = addov nsw i64 %20, %26\n"
            "    branchov %27, b5, b6\n"
            "b5:\n"
@@ -574,10 +578,10 @@ static void writes_registry(void)
     registry(true, true, false,
              "global anti.rt.registry.0 size 5 align 1 bytes 6d 61 69 6e 00\n"
              "global anti.rt.registry.classes [2]anti.rt.Class { "
-             "anti.rt.Class { @main.Square.descriptor, @main.Square.init, "
-             "@anti.rt.registry.0, i64 4, i64 0 }, "
-             "anti.rt.Class { @main.Tile.descriptor, @main.Tile.init, "
-             "@anti.rt.registry.0, i64 4, i64 0 } }\n"
+             "anti.rt.Class { @main.Square.descriptor:written, "
+             "@main.Square.init:written, @anti.rt.registry.0, i64 4, i64 0 }, "
+             "anti.rt.Class { @main.Tile.descriptor:written, "
+             "@main.Tile.init:written, @anti.rt.registry.0, i64 4, i64 0 } }\n"
              "global anti_rt_registry anti.rt.Registry { i64 2, "
              "@anti.rt.registry.classes }\n");
     registry(true, false, false,
@@ -704,9 +708,9 @@ static void records_slots(void)
               "global anti.rt.slots.0 size 3 align 1 bytes 04 00 02\n"
               "global anti.rt.slots.1 size 3 align 1 bytes 04 00 02\n"
               "global anti.rt.slots.list [2]anti.rt.Slots { "
-              "anti.rt.Slots { @main.Shape.descriptor, i64 18, "
+              "anti.rt.Slots { @main.Shape.descriptor:written, i64 18, "
               "@anti.rt.slots.0 }, "
-              "anti.rt.Slots { @main.Named.descriptor, i64 18, "
+              "anti.rt.Slots { @main.Named.descriptor:written, i64 18, "
               "@anti.rt.slots.1 } }\n"
               "global anti_rt_slots anti.rt.SlotTable { i64 2, "
               "@anti.rt.slots.list, i64 0 }\n");
@@ -916,8 +920,8 @@ static void provides_from_library(enum damage damage)
     open_program(&p);
     load_library(&p, "greet", greet);
     compile(&p, "fancy", fancy, &p.ir);
-    versions = value_named(&p.ir, "Greeter.versions");
-    descriptor = value_named(&p.ir, "Greeter.descriptor");
+    versions = value_named(&p.ir, "Greeter.versions:written");
+    descriptor = value_named(&p.ir, "Greeter.descriptor:written");
     if (versions == NULL || descriptor == NULL) {
         close_program(&p);
         return;

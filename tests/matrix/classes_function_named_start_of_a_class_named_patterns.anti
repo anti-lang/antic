@@ -1,0 +1,31 @@
+//! A function named `start` of a class named `patterns`, in a module that holds
+//! a pattern literal. The compiler writes a function of the module that
+//! compiles its pattern literals before `main`, and the name of the class's own
+//! function is no other.
+
+import anti.io;
+import anti.regex;
+import anti.text;
+
+class patterns
+{
+	pub n: int = 1,
+
+	pub fn start(self) -> int
+	{
+		return self.n + 1;
+	}
+}
+
+fn main() -> int
+{
+	let p = patterns { };
+	let found = 0;
+	if "abc".matches(re"b") {
+		found = 1;
+	}
+	let s = f"start: {p.start()}, found: {found}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

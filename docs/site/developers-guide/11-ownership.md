@@ -450,7 +450,7 @@ b0:
   %v1.i = atomicrmw sub ptr @owners.Sprite.live, i64 1 seq_cst, align 8
   %v3 = getelementptr i8, ptr %p0, i64 24
   %v5 = load ptr, ptr %v3, align 8
-  tail call void @anti_rt_delete_from(ptr %v5, ptr nonnull @owners.Sprite.descriptor, ptr %p1)
+  tail call void @anti_rt_delete_from(ptr %v5, ptr nonnull @"owners.Sprite.descriptor$3awritten", ptr %p1)
   store ptr null, ptr %v3, align 8
   %v11 = getelementptr i8, ptr %p0, i64 8
   %v13 = load ptr, ptr %v11, align 8
@@ -1197,7 +1197,7 @@ A move into an array literal and a move into an `own` field follow the same mode
     branch %24, b3, b4
 b3:
     %25 = load ptr %22
-    %26 = addr @places.Box.descriptor
+    %26 = addr @places.Box.descriptor:written
     call void @anti_rt_delete_from(%25, %26, 0)
     store ptr 0, %22
     jump b4
@@ -2454,7 +2454,7 @@ b0:
 
 ```ir excerpt=escape target=linux-x86_64 mode=dev
     %4 = copy ptr %0
-    %5 = addr @escape.Node.descriptor
+    %5 = addr @escape.Node.descriptor:written
     call void @anti_rt_delete(%4, %5)
     %6 = ptradd inbounds %4, offset_of escape.Node.n
     %7 = load i64 %6 !type escape.Node.n
@@ -2707,7 +2707,7 @@ b0:
 b2:
   %v16 = getelementptr inbounds nuw i8, ptr %v3, i64 8
   %v18 = atomicrmw add ptr %v16, i64 1 seq_cst, align 8
-  store ptr @"anti.mem.Shared$3cshared.Circle$3e.table", ptr %s2, align 8
+  store ptr @"anti.mem.Shared$3cshared.Circle$3e.table$3awritten", ptr %s2, align 8
   %v22 = getelementptr inbounds nuw i8, ptr %s2, i64 8
   store ptr %v3, ptr %v22, align 8
   call void @anti_rt_hook(ptr nonnull %s2, i64 0)
@@ -2731,7 +2731,7 @@ b2:
   br i1 %v17, label %b3, label %common.ret
 
 b3:
-  tail call void @anti_rt_delete(ptr nonnull %v3, ptr nonnull @"anti.mem.Cell$3cshared.Circle$3e.descriptor")
+  tail call void @anti_rt_delete(ptr nonnull %v3, ptr nonnull @"anti.mem.Cell$3cshared.Circle$3e.descriptor$3awritten")
 ```
 
 - The `store` writes `none` into the handle, so the teardown of its `own` field, which follows `destruct`, frees nothing.

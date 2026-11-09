@@ -511,20 +511,21 @@ static void records_classes(void)
         CHECK_STR(shape->module, "main");
         CHECK(shape->flags == IR_CLASS_ABSTRACT);
         CHECK(shape->table == IR_NO_INDEX);
-        CHECK_STR(global_name(&l.ir, shape->descriptor), "Shape.descriptor");
+        CHECK_STR(global_name(&l.ir, shape->descriptor),
+                  "Shape.descriptor:written");
         CHECK_STR(global_name(&l.ir, shape->base),
                   "anti_lang_Object_descriptor");
     }
     if (square != NULL) {
         CHECK(square->flags == IR_CLASS_FINAL);
-        CHECK_STR(global_name(&l.ir, square->table), "Square.table");
-        CHECK_STR(global_name(&l.ir, square->base), "Shape.descriptor");
+        CHECK_STR(global_name(&l.ir, square->table), "Square.table:written");
+        CHECK_STR(global_name(&l.ir, square->base), "Shape.descriptor:written");
         CHECK(square->subtable_count == 1);
         if (square->subtable_count == 1) {
             CHECK_STR(global_name(&l.ir, square->subtables[0].interface),
-                      "Named.descriptor");
+                      "Named.descriptor:written");
             CHECK_STR(global_name(&l.ir, square->subtables[0].table),
-                      "Square.n.table");
+                      "Square.n.table:written");
         }
         CHECK(square->mutable_count == 0);
     }
@@ -551,7 +552,8 @@ static void records_classes(void)
     CHECK(call != NULL);
     if (call != NULL) {
         CHECK(call->c.kind == IR_GLOBAL);
-        CHECK_STR(global_name(&l.ir, call->c.as.index), "Shape.descriptor");
+        CHECK_STR(global_name(&l.ir, call->c.as.index),
+                  "Shape.descriptor:written");
         CHECK(call->field == 17);
     }
     lowered_release(&l);
@@ -633,7 +635,7 @@ static void records_hook_entries(void)
             "}\n"
             "fn main() -> int { let c = alloc Cell { }; return c.get(); }\n");
     CHECK(l.ok);
-    table = global_of(&l.ir, "Cell.table");
+    table = global_of(&l.ir, "Cell.table:written");
     CHECK(table != NULL && table->value != NULL);
     if (table == NULL || table->value == NULL) {
         lowered_release(&l);
@@ -736,10 +738,10 @@ static void records_type_ids(void)
         {ANTI_TYPE_STRUCT, "Size.descriptor"},
         {ANTI_TYPE_UNION, "(none)"},
         {ANTI_TYPE_ENUM | ANTI_TYPE_U8 << 8, "(none)"},
-        {ANTI_TYPE_CLASS, "Inner.descriptor"},
+        {ANTI_TYPE_CLASS, "Inner.descriptor:written"},
         {ANTI_TYPE_PTR | ANTI_TYPE_STRUCT << 8, "Size.descriptor"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_STRUCT << 8, "Size.descriptor"},
-        {ANTI_TYPE_PTR | ANTI_TYPE_CLASS << 8, "Inner.descriptor"},
+        {ANTI_TYPE_PTR | ANTI_TYPE_CLASS << 8, "Inner.descriptor:written"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_U8 << 8, "(none)"},
         {ANTI_TYPE_F16, "(none)"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_F16 << 8, "(none)"},
@@ -786,7 +788,7 @@ static void records_type_ids(void)
         "    own run: fn(i32) -> i32, pair: (i32, str),\n"
         "}\n");
     CHECK(l.ok);
-    check_field_records(&l.ir, "Holder.fields", holder,
+    check_field_records(&l.ir, "Holder.fields:written", holder,
                         sizeof holder / sizeof *holder);
     check_field_records(&l.ir, "Size.fields", size,
                         sizeof size / sizeof *size);

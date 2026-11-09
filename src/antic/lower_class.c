@@ -52,8 +52,9 @@ bool lower_has_default(const struct struct_field *field)
    default of every field of the chain, as a literal of the class does.
    Then it runs construct when that takes no arguments. An export
    class gives it to C as `anti_<Class>_init`. The registry that
-   `reflect.new` reads names it for the others as `<Class>.init`. An
-   abstract class has no complete value and therefore none. */
+   `reflect.new` reads names it for the others as `<Class>.init:written`,
+   by LOWER_WRITTEN, so a function of the class named `init` keeps its
+   own name. An abstract class has no complete value and therefore none. */
 void lower_init_name(const struct type *t, bool exported, struct text *out)
 {
     if (exported) {
@@ -61,8 +62,7 @@ void lower_init_name(const struct type *t, bool exported, struct text *out)
                      types_c_name(t).text);
         return;
     }
-    types_symbol_name(out, t);
-    text_append(out, ".init");
+    lower_class_part(out, t, "init");
 }
 
 /* The init function of class t, declared in the module that declares t

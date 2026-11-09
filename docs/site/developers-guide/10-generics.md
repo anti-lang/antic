@@ -741,7 +741,7 @@ b0:
     %3 = mul i64 17, size_of ptr
     %4 = ptradd %2, %3
     %5 = load ptr %4 !entry
-    %6 = call i64 %5 via @cons.fn.1(%1) table @cons.Shape.descriptor 17
+    %6 = call i64 %5 via @cons.fn.1(%1) table @cons.Shape.descriptor:written 17
 ```
 
 - In `largest<cons.Money>` the `<` of the body is a direct call of `cons.lt`, the `operator fn` of the struct. No table of operators is passed, and nothing is looked up at run time.

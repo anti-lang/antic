@@ -1,0 +1,27 @@
+//! A function of a generic class named `type_args`, called on a copy of the
+//! class. The compiler writes data of that name for every copy of a generic
+//! class, and the name of the class's own function is no other.
+
+import anti.io;
+import anti.text;
+
+class Box<T>
+{
+	pub v: T,
+
+	pub fn type_args(self) -> int
+	{
+		return 4;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box<int> { v: 1 };
+	let p = alloc Box<int> { v: 2 };
+	let s = f"type_args: {b.type_args()} {p.type_args()}";
+	delete(p);
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

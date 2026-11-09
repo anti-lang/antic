@@ -1,0 +1,43 @@
+//! A nested class with the name of the field of an interface its class
+//! implements. The compiler writes the descriptor of the nested class and the
+//! descriptor of the sub-object of the interface, and the one is no other.
+
+import anti.io;
+import anti.text;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Circle
+{
+	implements s: Shape,
+	pub n: int = 2,
+
+	class s
+	{
+		pub k: int = 3,
+	}
+
+	concrete fn area(self) -> int
+	{
+		let q = s { };
+		return self.n * 10 + q.k;
+	}
+}
+
+fn measure(shape: *Shape) -> int
+{
+	return shape.area();
+}
+
+fn main() -> int
+{
+	let c = alloc Circle { };
+	let s = f"area: {measure(c)}";
+	delete(c);
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

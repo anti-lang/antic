@@ -12,7 +12,7 @@
 
 /* The part of the name of the copy the compiler writes for a class whose
    chain declares `copy`. */
-#define COPY_WRITTEN "copy:written"
+#define COPY_WRITTEN "copy" LOWER_WRITTEN
 
 bool lower_same_name(const struct name *a, const struct name *b)
 {
@@ -125,8 +125,15 @@ bool lower_defines(const struct lowerer *l, const struct type *t,
     return strcmp(module, l->module_name) == 0 || t->generic != NULL;
 }
 
-/* A global of the module named `<class>.<suffix>`, or NULL when the
-   module has none. Every class builds its data once. On NULL,
+void lower_class_part(struct text *out, const struct type *t,
+                      const char *part)
+{
+    types_symbol_name(out, t);
+    text_appendf(out, ".%s" LOWER_WRITTEN, part);
+}
+
+/* A global of the module named `<class>.<suffix>:written`, or NULL when
+   the module has none. Every class builds its data once. On NULL,
    *module_out and *name_out receive the module and the name to give the
    global, and the caller frees both with free. */
 struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
@@ -139,17 +146,23 @@ struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
     struct ir_global *g;
 
     /* DESIGN: an export class gives its table and its descriptor the C
-       names the generated header declares, so C code reads them. Every
-       other class, and every struct, keeps the name `Type.part` of its
-       module. */
+       names the generated header declares, so C code reads them. It
+       exports the table and the descriptor of each sub-object of an
+       interface as well, and their symbols are C names, `Circle_dr_table`,
+       which a `:` would make no C identifier. They keep `Class.part`. Every
+       other part keeps the name `Class.part:written` of its module, by
+       LOWER_WRITTEN. */
     if (t->item_exported && t->kind == TYPE_CLASS &&
         (strcmp(suffix, "table") == 0 || strcmp(suffix, "descriptor") == 0)) {
         struct name c = types_c_name(t);
         text_appendf(&name, "anti_%.*s_%s", (int)c.length, c.text,
                      strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
-    } else {
+    } else if (t->item_exported && t->kind == TYPE_CLASS &&
+               strchr(suffix, '.') != NULL) {
         types_symbol_name(&name, t);
         text_appendf(&name, ".%s", suffix);
+    } else {
+        lower_class_part(&name, t, suffix);
     }
     g = lower_find_global(m, module, text_cstr(&name));
     /* DESIGN: a class's table and descriptor belong to the module that
@@ -1385,7 +1398,7 @@ bool lower_has_body(const struct item *fn)
    the field list, which --no-reflect drops. A chain that declares `copy`
    gets a written copy as well, which calls that function last. Its name
    is `Class.copy:written`, since the declared one is `Class.copy`, and
-   no program writes a `:` in a name. The
+   no member of a class takes it, by LOWER_WRITTEN. The
    teardown takes the anti.mem.Allocator that the memory the object owns
    goes back to, which is zero for the C library. */
 struct ir_function *lower_class_function(struct lowerer *l,
