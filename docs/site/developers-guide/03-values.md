@@ -1964,7 +1964,7 @@ b0:
   %0 = inttoptr i64 %a1.sroa.0.0.copyload to ptr
   %v13.i = tail call i64 @anti_rt_regex_test(ptr %0, ptr nonnull @tested.0, i64 7)
 ...
-define internal void @tested.patterns.start() #1 {
+define internal void @"tested.patterns.start$3awritten"() #1 {
 b0:
   %v1 = tail call ptr @anti_rt_regex_literal(ptr nonnull @tested.1, i64 3)
   store ptr %v1, ptr @tested.pattern.0, align 8
@@ -1976,7 +1976,7 @@ Line by line:
 
 - `load ... @tested.pattern.0` reads the pointer of the compiled pattern from the global of the literal.
 - `anti_rt_regex_test` searches the 7 bytes of `"on 2026"` at `@tested.0`. A match that stands as a condition alone needs no groups, so the checker calls `matched_literal` of `anti.regex`, which `opt` inlined, and that calls the test of the runtime.
-- `@tested.patterns.start` is the constructor, which `@llvm.global_ctors` of the module names. It compiles the 3 bytes of `\d+` at `@tested.1` and stores the pointer.
+- `@"tested.patterns.start$3awritten"` is the constructor, which `@llvm.global_ctors` of the module names. It compiles the 3 bytes of `\d+` at `@tested.1` and stores the pointer.
 
 A failed search gives a value below zero, and the left-out lines branch to `anti_rt_regex_stop_limit`, which prints the pattern and the line and ends the program. A call with a compiled pattern goes to `matches` in place of `matches_literal`, which fails with `TooExpensive` there.
 

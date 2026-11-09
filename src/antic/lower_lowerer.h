@@ -552,7 +552,7 @@ uint32_t lower_class_depth(const struct type *t);
    the copy, `equals` and `hash` keep `<Class>.<entry>`: each fills the
    entry of the root's table of its name, which a class declares only as
    that entry, and a chain that declares `copy` gets `copy:written`. */
-#define LOWER_WRITTEN ":written"
+#define LOWER_WRITTEN IR_WRITTEN
 /* Append to out the name of the part `part` of class t. */
 void lower_class_part(struct text *out, const struct type *t,
                       const char *part);

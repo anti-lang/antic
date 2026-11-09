@@ -1168,7 +1168,7 @@ static void constructors(void)
     CHECK(holds(&x, "@llvm.global_ctors = appending global "
                     "[2 x { i32, ptr, ptr }] "
                     "[{ i32, ptr, ptr } { i32 65535, "
-                    "ptr @main.patterns.start, ptr null }, "
+                    "ptr @main.patterns.start$3awritten, ptr null }, "
                     "{ i32, ptr, ptr } { i32 65535, ptr @anti_rt_init, "
                     "ptr null }]\n"));
     CHECK(holds(&x, "declare void @anti_rt_init() #1\n"));
@@ -1177,7 +1177,7 @@ static void constructors(void)
     CHECK(holds(&x, "@llvm.global_ctors = appending global "
                     "[1 x { i32, ptr, ptr }] "
                     "[{ i32, ptr, ptr } { i32 65535, "
-                    "ptr @main.patterns.start, ptr null }]\n"));
+                    "ptr @main.patterns.start$3awritten, ptr null }]\n"));
     end(&x);
 
     /* A module without either has no list. */

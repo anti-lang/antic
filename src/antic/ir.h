@@ -708,11 +708,18 @@ uint32_t ir_sym_op(struct ir_module *m, enum ir_op op, enum ir_type type,
    else a symbolic operand. */
 struct ir_operand ir_sym_operand(const struct ir_module *m, uint32_t sym);
 
+/* DESIGN: the mark of a name the compiler writes beside the names of a
+   program. A name a program writes holds a `:` only in `<operator>:<Type>`
+   of an operator at module level, so no program spells `:written`. */
+#define IR_WRITTEN ":written"
+
 /* DESIGN: the function of a module that compiles its pattern literals
    before main. The back end writes it as a constructor of the object, and
-   the removal of unused code keeps it, since nothing calls it. The name
-   holds a dot, so no function of a program has it. */
-#define IR_PATTERNS_START "patterns.start"
+   the removal of unused code keeps it, since nothing calls it. Its name
+   carries IR_WRITTEN, which no program spells. A dot alone did not keep it
+   apart: a function `start` of a class `patterns` is `patterns.start`
+   (T215). Eddie chose the name on 2026-11-09. */
+#define IR_PATTERNS_START "patterns.start" IR_WRITTEN
 
 /* Whether f is the IR_PATTERNS_START of its module, defined here. */
 bool ir_is_patterns_start(const struct ir_function *f);

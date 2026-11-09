@@ -2042,14 +2042,17 @@ antic had two native back ends, x86_64 and ARM64, until the step `switch` of `do
 - [provisional] A pattern literal is no constant expression, and `const R: Regex = re"a";`
   is refused with `a pattern literal is not a constant expression`. Reason: the pattern
   is compiled at start into memory of the runtime.
-- [provisional] Each module that holds a pattern literal gets the function
-  `patterns.start`, which compiles its literals into one global per distinct pattern. The
+- Each module that holds a pattern literal gets the function
+  `patterns.start:written`, which compiles its literals into one global per distinct pattern. The
   back end writes it as a constructor of the object: `.init_array` on Linux,
   `__mod_init_func` on macOS and `.CRT$XCU` on Windows. It runs before `main` in a program,
   in dev mode and in release mode alike, and when a shared library loads. The runtime
   checks the processor before the first compile, since a constructor runs before `main`
   does. Reason: a constructor per object needs no table of the whole program, so one
-  object per module in dev mode compiles its own literals.
+  object per module in dev mode compiles its own literals. Eddie chose the name on
+  2026-11-09, by T215 of `docs/audit/tests-findings.md`. The name `patterns.start` before
+  it was that of a function `start` of a class `patterns`, and no program spells the mark
+  `:written`.
 - [provisional] The glue of the patterns, `src/rt/regex.c` and `src/rt/patterns.c`, is the
   library `anti_rt_regex` in `lib/<target>/` beside `libpcre2-8.a`, at the default level of
   the target, and no part of `anti_rt`. A program or a library for C that holds
