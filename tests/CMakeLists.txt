@@ -644,6 +644,21 @@ target_compile_definitions(rt_plugin_table_tests PRIVATE
     "PLUGIN_BAD=\"$<TARGET_FILE:plugin_bad>\"")
 add_dependencies(rt_plugin_table_tests plugin_bad)
 add_test(NAME unit_plugin_table COMMAND rt_plugin_table_tests)
+# The stub of the loader in a slot that only `reflect.call` may reach, by
+# Q2 of "Answers of 2026-11-09, third set", in a program of its own, since
+# each case ends the process. It loads plugin_bad against an interface of
+# one function more than the library was built with.
+add_executable(rt_plugin_stub_tests unit/test_plugin_stub.c ${plugin_sources})
+target_link_libraries(rt_plugin_stub_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
+target_compile_definitions(rt_plugin_stub_tests PRIVATE
+    "PLUGIN_BAD=\"$<TARGET_FILE:plugin_bad>\"")
+add_dependencies(rt_plugin_stub_tests plugin_bad)
+add_test(NAME unit_plugin_stub
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROGRAM=$<TARGET_FILE:rt_plugin_stub_tests>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-stub"
+        -P "${ANTIC_RUNNERS}/run_plugin_stub.cmake")
 # S312 and M301. The text builder, the copy of an object and the copy of
 # an owned buffer when the C library refuses their memory, in a program of
 # its own, since each case ends the process. The files of the runtime it
@@ -689,7 +704,8 @@ add_test(NAME unit_hash_draw COMMAND rt_hash_draw_tests)
 # The programs of the runtime above compile its files themselves, so a
 # coverage tree measures src/rt/ through them.
 antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
-    rt_platform_tests rt_plugin_table_tests rt_oom_runtime rt_oom_tests
+    rt_platform_tests rt_plugin_table_tests rt_plugin_stub_tests
+    rt_oom_runtime rt_oom_tests
     rt_hash_draw_runtime rt_hash_draw_tests)
 
 # Programs that antic builds and runs: tests/programs/, tests/std/, the

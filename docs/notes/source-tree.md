@@ -529,7 +529,7 @@ Each holds one case per message of a command, which
 | `tests/unit/path_rules.h` | The cases of the path rules that both platform layers are run over. |
 | `tests/unit/pipeline.c` | The stages that `pipeline.h` declares. |
 | `tests/unit/pipeline.h` | The stages the unit tests run a source through, for one module or a compilation of more than one, and the IR print without the types of the runtime. |
-| `tests/unit/plugin_bad.c` | A shared library with a writable plugin table, which `test_plugin_table.c` damages and loads. |
+| `tests/unit/plugin_bad.c` | A shared library with a writable plugin table, which `test_plugin_table.c` damages and loads and `test_plugin_stub.c` binds to a larger interface. |
 | `tests/unit/plugin_table.c` | A shared library with an empty plugin table, which `test_plugin_race.c` and `test_platform.c` load. |
 | `tests/unit/syms.err` | The standard error that the group `syms` of `test_syms.c` writes, which `unit_syms_messages` compares. |
 | `tests/unit/test_abi.c` | `abi_classify`, one case per rule of the calling conventions. |
@@ -571,6 +571,7 @@ Each holds one case per message of a command, which
 | `tests/unit/test_pattern.c` | The reader of a pattern literal of `src/antic/pattern.c`: the fewest bytes a match or a group can take. |
 | `tests/unit/test_platform.c` | The platform layer of the runtime on the host. |
 | `tests/unit/test_plugin_race.c` | The table of open libraries under threads that load and unload at once. |
+| `tests/unit/test_plugin_stub.c` | A program that calls the stub of the loader of plugins in a slot a library lacks, for `run_plugin_stub.cmake`. |
 | `tests/unit/test_plugin_table.c` | The loader of the runtime against a damaged plugin table and a damaged index. |
 | `tests/unit/test_project.c` | `anti new` and the sources of a project, of `src/anti/project.c`. |
 | `tests/unit/test_regex.c` | The rewriter of a byte pattern of `src/rt/regex.c` on every prefix of one pattern, and a group named by a text that holds a NUL. |
@@ -787,6 +788,7 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_platform_layer.cmake` | Refuses a host `#if` outside the platform files. |
 | `tests/runners/run_plugin.cmake` | Builds a plugin and its hosts and checks loading and injection. |
 | `tests/runners/run_plugin_kinds.cmake` | Builds a host and a plugin whose interface takes and gives every kind of value, and runs the host. |
+| `tests/runners/run_plugin_stub.cmake` | Runs each case of `test_plugin_stub.c` and expects the stop of the stub with its message. |
 | `tests/runners/run_plugin_versions.cmake` | Loads libraries of one interface, each built against another version of it, into hosts of other versions, to check the version rules. |
 | `tests/runners/run_presets.cmake` | Reads the settings of `CMakePresets.json` that the answers of 2026-10-24 decide. |
 | `tests/runners/run_pre_commit.cmake` | Drives the pre-commit hook in a scratch repository. |
