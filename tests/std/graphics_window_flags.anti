@@ -1,0 +1,95 @@
+//! A flag of a window that changes after a query of the monitor, over the
+//! Recorder, which the build injects with `--inject
+//! anti.graphics.Display=anti.graphics.Recorder.shared`. The query opens the
+//! window hidden with the flags it holds then, so `start` refuses a flag that
+//! changed since and names its field, by Q2 of "Answers of 2026-11-09, second
+//! set". `width` and `height` are no flags, and a flag that comes back to its
+//! value or changes before the query opens.
+import anti.graphics;
+import anti.io;
+import anti.text;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+// Start `w` and print whether it opened or the text of its failure.
+fn try_start(label: str, w: *graphics.Window)
+{
+	w.start(label) catch e {
+		line(f"{label}: {e.message}");
+		return;
+	};
+	line(f"{label}: open, window {w.screen_width()} by {w.screen_height()}");
+}
+
+// Ask for the monitor, which opens the window hidden.
+fn query(w: *graphics.Window)
+{
+	if w.monitor_width() == 0 {
+		io.println("no monitor");
+	}
+}
+
+fn vsync_after()
+{
+	let w = graphics.Window { };
+	query(&w);
+	w.vsync = false;
+	try_start("vsync after the query", &w);
+}
+
+fn hidden_after()
+{
+	let w = graphics.Window { };
+	query(&w);
+	w.hidden = true;
+	try_start("hidden after the query", &w);
+}
+
+fn interlaced_after()
+{
+	let w = graphics.Window { highdpi: false };
+	query(&w);
+	w.interlaced = true;
+	try_start("interlaced after the query", &w);
+}
+
+fn size_after()
+{
+	let w = graphics.Window { };
+	w.width = w.monitor_width() / 2;
+	w.height = w.monitor_height() / 2;
+	try_start("the size after the query", &w);
+}
+
+fn back_after()
+{
+	let w = graphics.Window { };
+	query(&w);
+	w.msaa = false;
+	w.msaa = true;
+	try_start("a flag back to its value", &w);
+}
+
+fn before()
+{
+	let w = graphics.Window { };
+	w.resizable = false;
+	query(&w);
+	try_start("a flag before the query", &w);
+}
+
+fn main() -> int
+{
+	vsync_after();
+	hidden_after();
+	interlaced_after();
+	size_after();
+	back_after();
+	before();
+	return 0;
+}

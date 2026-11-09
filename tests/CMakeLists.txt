@@ -1241,8 +1241,8 @@ endforeach()
 # `[inject.test]` gives it to `anti test`.
 set(ANTIC_GRAPHICS_RECORDER
     "--inject,anti.graphics.Display=anti.graphics.Recorder.shared")
-set(antic_graphics_programs tree colors recorder thread window)
-set(antic_graphics_injected recorder thread allocations window)
+set(antic_graphics_programs tree colors recorder thread window window_flags)
+set(antic_graphics_injected recorder thread allocations window window_flags)
 foreach(name IN LISTS antic_graphics_programs)
     set(source "${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_${name}.anti")
     set(options "")
@@ -1264,7 +1264,9 @@ endforeach()
 
 # A hidden window of raylib with FLAG_WINDOW_HIGHDPI off, on the screen of
 # the Mac alone, T217 of docs/audit/tests-findings.md. The Linux and Windows
-# hosts of the suite may have no display.
+# hosts of the suite may have no display. Both tests of a hidden window stay
+# in the suite, by Q1 of "Answers of 2026-11-09, second set" in
+# docs/decisions.md.
 if(ANTIC_HOST_OS STREQUAL "macos")
     antic_program_test(std_graphics_hidpi_off
         "${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_hidpi_off.anti"

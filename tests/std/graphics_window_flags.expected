@@ -1,0 +1,7 @@
+exit 0
+vsync after the query: the field vsync of the window changed after a query of the monitor opened it
+hidden after the query: the field hidden of the window changed after a query of the monitor opened it
+interlaced after the query: the field interlaced of the window changed after a query of the monitor opened it
+the size after the query: open, window 960 by 540
+a flag back to its value: open, window 1280 by 720
+a flag before the query: open, window 1280 by 720

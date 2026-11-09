@@ -879,6 +879,8 @@ pub class Window
 	inject display: *Display,
 	opened: bool = false,
 	prepared: bool = false,
+	/// The flags of the hidden window that a query of the monitor opened.
+	prepared_flags: u32 = 0,
 	drawing: bool = false,
 	own words: ?*Say = none,
 
@@ -900,7 +902,9 @@ pub class Window
 	/// Open the window with the title `title`, which `graphics.open` calls.
 	///
 	/// It fails with `NotMainThread` on any thread but the main one and with
-	/// `NoDisplay` where the system gives no window.
+	/// `NoDisplay` where the system gives no window. After a query of the
+	/// monitor opened the window hidden, a flag field changed since makes it
+	/// fail with a text that names the field. `width` and `height` may change.
 	pub fn start(self, title: str) may fail
 	{
 		if anti_rt_main_thread() == 0 {
@@ -913,7 +917,16 @@ pub class Window
 		if !self.prepared && self.display.ready() {
 			fail "a window is open already";
 		}
-		try self.display.open(title, self.flags(), self.width, self.height);
+		// DESIGN: raylib takes the flags before InitWindow alone, so the
+		// hidden window of a query keeps the flags of that moment. A flag
+		// changed since is refused, by Q2 of "Answers of 2026-11-09, second
+		// set" in docs/decisions.md, rather than lost.
+		let flags = self.flags();
+		if self.prepared && flags != self.prepared_flags {
+			let name = changed_field(flags ^ self.prepared_flags);
+			fail f"the field {name} of the window changed after a query of the monitor opened it";
+		}
+		try self.display.open(title, flags, self.width, self.height);
 		self.opened = true;
 	}
 
@@ -1134,9 +1147,37 @@ pub class Window
 		if self.opened || self.prepared || self.display.ready() {
 			return true;
 		}
-		self.prepared = self.display.prepare(self.flags());
+		let flags = self.flags();
+		self.prepared = self.display.prepare(flags);
+		self.prepared_flags = flags;
 		return self.prepared;
 	}
+}
+
+/// The name of the first field of `Window`, in the order of the fields, whose
+/// flag `changed` holds.
+fn changed_field(changed: u32) -> str
+{
+	if (changed & rl.ConfigFlags.FLAG_VSYNC_HINT as u32) != 0 { return "vsync"; }
+	if (changed & rl.ConfigFlags.FLAG_FULLSCREEN_MODE as u32) != 0 { return "fullscreen"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_RESIZABLE as u32) != 0 { return "resizable"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_UNDECORATED as u32) != 0 { return "undecorated"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_HIDDEN as u32) != 0 { return "hidden"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_MINIMIZED as u32) != 0 { return "minimized"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_MAXIMIZED as u32) != 0 { return "maximized"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_UNFOCUSED as u32) != 0 { return "unfocused"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_TOPMOST as u32) != 0 { return "topmost"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_ALWAYS_RUN as u32) != 0 { return "always_run"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_TRANSPARENT as u32) != 0 { return "transparent"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_HIGHDPI as u32) != 0 { return "highdpi"; }
+	if (changed & rl.ConfigFlags.FLAG_WINDOW_MOUSE_PASSTHROUGH as u32) != 0 {
+		return "mouse_passthrough";
+	}
+	if (changed & rl.ConfigFlags.FLAG_BORDERLESS_WINDOWED_MODE as u32) != 0 {
+		return "borderless";
+	}
+	if (changed & rl.ConfigFlags.FLAG_MSAA_4X_HINT as u32) != 0 { return "msaa"; }
+	return "interlaced";
 }
 
 /// Open a window with the title `title` and the flags of `window`, as
