@@ -1,5 +1,6 @@
 /* The checked allocation of antic, which ends the run on a failure or an
-   overflow. */
+   overflow. The message names the tool that runs, antic or anti, which
+   the platform layer holds. */
 
 #include "alloc.h"
 
@@ -7,18 +8,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "say.h"
+#include "platform.h"
 #include "../rt/fault.h"
 
 void alloc_out_of_memory(void)
 {
-    say_antic("out of memory\n");
+    fprintf(stderr, "%s: out of memory\n", platform_tool());
     exit(70);
 }
 
 void alloc_out_of_memory_for(long long size)
 {
-    say_antic("out of memory for %lld bytes\n", size);
+    fprintf(stderr, "%s: out of memory for %lld bytes\n", platform_tool(),
+            size);
     exit(70);
 }
 

@@ -792,6 +792,22 @@ anti_message(fault_out_of_memory
     STATUS 70
     ARGS build ${tools}
     ERR "anti: out of memory")
+# Q3 of "Answers of 2026-11-09, third set": memory that runs out in the
+# code of antic that anti runs names anti, in alloc.c. The fourth
+# allocation is one of the reader of TOML of the runtime, which reads the
+# manifest and names the bytes, and the tenth one of antic itself.
+anti_message(fault_out_of_memory_in_the_manifest_reader
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT alloc:4:ENOMEM
+    STATUS 70
+    ARGS build ${tools}
+    ERR "anti: out of memory for 80 bytes")
+anti_message(fault_out_of_memory_in_the_code_of_antic
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT alloc:10:ENOMEM
+    STATUS 70
+    ARGS build ${tools}
+    ERR "anti: out of memory")
 anti_message(fault_lock_not_written
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     FAULT open:3:EACCES

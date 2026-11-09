@@ -61,6 +61,11 @@ void platform_set_tool(const char *name)
     tool = name;
 }
 
+const char *platform_tool(void)
+{
+    return tool;
+}
+
 /* DESIGN: by the raw-bytes rule under "Program entry" in
    docs/decisions.md output is the bytes written on every host. The C
    streams of Windows start in text mode, which writes CRLF for each LF,

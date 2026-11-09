@@ -93,6 +93,11 @@ bool platform_absolute_path(const char *path, struct text *out);
    of the layer that names antic itself. */
 void platform_set_tool(const char *name);
 
+/* The tool that platform_set_tool named. The end of a run whose memory
+   ran out in alloc.c names it as well, by Q3 of "Answers of 2026-11-09,
+   third set", since anti runs the code of antic in its own process. */
+const char *platform_tool(void);
+
 /* Put the standard output into binary mode on Windows. Elsewhere it does
    nothing. */
 void platform_binary_stdout(void);

@@ -11,7 +11,8 @@
    memory from these functions, and no other file calls malloc, calloc or
    realloc. The compiler cannot continue after an allocation fails, so
    these functions then write "antic: out of memory" and end the run with
-   status 70, and never return NULL. A size whose sum or product overflows
+   status 70, and never return NULL. anti runs the same code, and the
+   message then names anti, the tool platform_set_tool names. A size whose sum or product overflows
    size_t fails the same way. The test one_allocator holds the rule. */
 
 /* Write the message of a failed allocation and end the run with status
