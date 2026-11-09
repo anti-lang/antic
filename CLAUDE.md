@@ -363,6 +363,13 @@ not re-open a settled decision without asking Eddie.
   suite in the six parts of `asan`, the last up to test 7000: `asan`
   247 s, 187 s, 262 s, 195 s, 429 s and 442 s, `ubsan` 254 s, 187 s,
   261 s, 206 s, 447 s and 467 s.
+  The step of the window of `anti.graphics` measured `host` in the same
+  three parts: 382 s, 270 s and 337 s before the commit of T217, up to
+  test 6999, and 402 s, 275 s and 324 s before the commit of the size of
+  the window, up to test 7003. It ran each sanitizer suite in the six
+  parts of `asan`, the last up to test 7003: `asan` 254 s, 189 s, 265 s,
+  196 s, 441 s and 456 s, `ubsan` 260 s, 189 s, 261 s, 206 s, 464 s and
+  476 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -969,10 +976,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 6998 ctest tests pass on the development Mac, and two of them, the
+- 7003 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   The two lines of `tests/known-failures.txt`, those of T136 and T138,
-  carry `host=windows`. The ASan and the UBSan builds run 6996 each
+  carry `host=windows`. The ASan and the UBSan builds run 7001 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
@@ -1322,6 +1329,10 @@ reports what it finished.
   `std_graphics_allocations_memory_checks` counts, and `open` fails on any
   thread but the main one, through `anti_rt_main_thread` of the runtime.
   The examples of the note link for all six targets.
+  `Window { width, height }` gives the size of a window in screen points,
+  and `w.monitor_width()`, `w.monitor_height()`, `w.screen_width()` and
+  `w.screen_height()` give the sizes of the monitor and of the window in
+  points, by "Answers of 2026-11-09".
 - `f16` is built: sixteen bits in a field, an array, a slice or a variable.
   A read gives an `f32`, a write takes `as f16`, and no operator takes one.
   ARM64 and x86-64-v3 convert in one instruction, and `v1` and `v2` call the
