@@ -370,6 +370,14 @@ not re-open a settled decision without asking Eddie.
   parts of `asan`, the last up to test 7003: `asan` 254 s, 189 s, 265 s,
   196 s, 441 s and 456 s, `ubsan` 260 s, 189 s, 261 s, 206 s, 464 s and
   476 s.
+  The step of the second answers of 2026-11-09 and the first phase of
+  coverage measured `host` in the same three parts, up to test 7006:
+  384 s, 271 s and 325 s before the commit of the flags of a window,
+  385 s, 269 s and 320 s before the commit of `libm_symbols`, and 384 s,
+  276 s and 334 s before the commit of the two unit tests. It ran each
+  sanitizer suite in the six parts of `asan`, the last up to test 7004:
+  `asan` 252 s, 188 s, 262 s, 197 s, 453 s and 469 s, `ubsan` 256 s,
+  188 s, 261 s, 208 s, 472 s and 499 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -976,10 +984,10 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7003 ctest tests pass on the development Mac, and two of them, the
+- 7006 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   The two lines of `tests/known-failures.txt`, those of T136 and T138,
-  carry `host=windows`. The ASan and the UBSan builds run 7001 each
+  carry `host=windows`. The ASan and the UBSan builds run 7004 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
@@ -1332,7 +1340,9 @@ reports what it finished.
   `Window { width, height }` gives the size of a window in screen points,
   and `w.monitor_width()`, `w.monitor_height()`, `w.screen_width()` and
   `w.screen_height()` give the sizes of the monitor and of the window in
-  points, by "Answers of 2026-11-09".
+  points, by "Answers of 2026-11-09". A flag field changed after a query
+  of the monitor makes `w.start(title)` fail, by the second set of the
+  same day.
 - `f16` is built: sixteen bits in a field, an array, a slice or a variable.
   A read gives an `f32`, a write takes `as f16`, and no operator takes one.
   ARM64 and x86-64-v3 convert in one instruction, and `v1` and `v2` call the
