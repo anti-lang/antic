@@ -3137,6 +3137,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 - On 2026-11-07 Eddie answered the four questions of the step that measured those answers, under "Answers of 2026-11-07, second set". Q2 is a fix of the symbols archive of a release program. Q1 lets in the test of the context word at a call through a value of two words. Q3 lets in the two release calls at once, and Q4 a digest of an archive kept by its size, its time and its identity. Each holds under the conditions of its answer.
 - On 2026-11-07 Eddie answered the two questions of the step that built the third set, under "Answers of 2026-11-07, fourth set". Q1 is the fix of the symbols archive by route (a), which waits for a release of `anti-lang/llvm-tools` with `llvm-objcopy` and `dsymutil`. Q2 lets in a thunk of a callback of C that returns the result of the callback as it came.
 - On 2026-11-09 Eddie answered the two gaps that the port of the Pythagoras tree to `anti.graphics` found, under "Answers of 2026-11-09". Q2 is a fix, T217. Q3 lets in the fields `width` and `height` of `graphics.Window`, and Q4 the four functions of a window that give the sizes of the monitor and of the window in points.
+- On 2026-11-09 Eddie answered the two questions of the step that built those answers, under "Answers of 2026-11-09, second set". Q1 keeps the two tests of a hidden window in the suite of the Mac. Q2 lets in the failure of `start` for a flag of a window that changes after a query of the monitor.
 
 ## What the solid run decided
 
@@ -3426,9 +3427,17 @@ Eddie took these decisions on 2026-11-09. They answer the two gaps that the port
 - Q4. A program asks for the size of the monitor and for the current size of its window, both in points. The query works before `open`, where a program chooses the size of its window, unless raylib makes that impossible. `Recorder` answers every query with values a test sets or knows. The names stay close to raylib and follow the module.
 - `w.monitor_width()` and `w.monitor_height()` are `GetMonitorWidth` and `GetMonitorHeight` of the current monitor. `w.screen_width()` and `w.screen_height()` are `GetScreenWidth` and `GetScreenHeight`, the size of the window. Each gives an `int`, and each is a function of `Display` that `Window` calls.
 - [provisional] The first query of the monitor before `w.start(title)` opens the window of raylib hidden, with the flags that the fields of `w` hold at that moment. `start` then gives it its title, its size and its place, and shows it. Reason: raylib reads the monitors after `InitWindow` alone, and it takes the flags before `InitWindow`.
+- A flag of `w` that changes after that query makes `start` fail, by Q2 of "Answers of 2026-11-09, second set". `width` and `height` are no flags and may change.
 - [provisional] `w.screen_width()` and `w.screen_height()` give 0 before the window opens. Every query gives 0 on a thread other than the main one and where the system gives no window. Reason: a query cannot fail, and 0 is no size a window has.
 - [provisional] A `width` or a `height` of 0 or less keeps two thirds of the monitor on its own axis, so `Window { width: 800 }` is 800 points wide and two thirds of the monitor high. `fullscreen`, `maximized` and `borderless` size the window themselves and leave both fields aside. Reason: each axis is a field of its own, and the three flags sized the window before.
 - [provisional] `Recorder` stands for a monitor of 1920 by 1080 points, as `PIXELS` stands for a screen of 1080 lines. A window over it opens at its `width` and `height` within that monitor, or at two thirds of it, 1280 by 720, and the `aspect` of the recorder becomes the width over the height. Before it opens, the window has 0 by 0 points. Reason: the defaults of the recorder were a window of 16:9, and a test knows the size it asks for.
+
+## Answers of 2026-11-09, second set
+
+Eddie took these decisions on 2026-11-09. They answer the two questions of "Questions for Eddie" in `docs/reports/2026-11-09-graphics-window.md`, numbered as there. Neither is provisional. `docs/reports/2026-11-09-coverage-phase-1.md` reports the step that builds Q2.
+
+- Q1. `std_graphics_hidpi_off` and `std_graphics_window_points` stay in the host suite of the Mac. Each opens a hidden window of raylib, and nothing shows on the screen.
+- Q2. A flag field of `graphics.Window` that changes after a query of the monitor opened the window of raylib hidden is refused. `w.start(title)` fails with a text that names the field, and `graphics.open` fails through it, instead of opening the window with the flags of the query. `width` and `height` are no flags. A program sets them after the query, as the example `half()` of "The window" in `docs/notes/graphics.md` does, and that stays allowed. `Recorder` follows the same rule, so a test checks the refusal without a window. The failure is a text and no new type, so the feature freeze needs no change for it.
 
 ## Open
 

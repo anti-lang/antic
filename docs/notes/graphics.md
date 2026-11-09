@@ -75,7 +75,11 @@ the size of its window or lays out by the screen:
   `GetMonitorHeight` of the current monitor. raylib reads the monitors after
   `InitWindow` alone, so the first of them before `w.start(title)` opens the
   window hidden, with the flags the fields of `w` hold then. `start` gives it
-  its title, its size and its place, and shows it.
+  its title, its size and its place, and shows it. A flag field changed
+  after that query makes `start` fail with a text that names the field, by
+  Q2 of "Answers of 2026-11-09, second set" in `docs/decisions.md`.
+  `width` and `height` are no flags, and a program sets them after the
+  query, as `half()` below does. The recorder follows the same rule.
 - `w.screen_width()` and `w.screen_height()` are `GetScreenWidth` and
   `GetScreenHeight`, the size of the window now. They give 0 before the
   window opens.
