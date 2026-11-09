@@ -1864,9 +1864,8 @@ Two tests hold what the matrix cannot: the messages and the options.
 `diagnostics_covered` runs `tests/runners/run_diagnostics_covered.cmake`:
 
 - It reads every message that `src/antic/` gives through `diagnostics_add`,
-  `diagnostics_warn`, `diagnostics_check` and `diagnostics_doc`. Seven
-  functions hand a text on to those four, and the table `TEXTS_ANTIC` of the
-  runner names them.
+  `diagnostics_warn` and `diagnostics_doc`. Seven functions hand a text on
+  to those three, and the table `TEXTS_ANTIC` of the runner names them.
 - It reads every text that `src/anti/` writes to stderr with `fprintf`,
   `fputs` and `vfprintf`, and through the three functions of `TEXTS_ANTI`.
 - A message is its format. A conditional gives one message per branch, and

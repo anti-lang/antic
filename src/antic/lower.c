@@ -477,19 +477,6 @@ struct ir_function *lower_c_function(struct lowerer *l, const char *name,
     return f;
 }
 
-/* calloc of C, which takes a count and a size. */
-struct ir_function *lower_calloc_function(struct lowerer *l)
-{
-    struct ir_function *f = lower_find_function(l->m, NULL, "calloc");
-
-    if (f == NULL) {
-        f = ir_extern_add(l->m, "calloc", IR_PTR, false);
-        ir_param_add(f, IR_I64, IR_NO_AGG);
-        ir_param_add(f, IR_I64, IR_NO_AGG);
-    }
-    return f;
-}
-
 /* The IR function of a function symbol. An imported function is found by
    its module and name, or declared at its first call. */
 struct ir_function *lower_callee_function(struct lowerer *l,

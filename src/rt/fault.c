@@ -297,17 +297,6 @@ int anti_rt_fault_ferror(FILE *f)
     return ferror(f) || marked(f, false);
 }
 
-int anti_rt_fault_fflush(FILE *f)
-{
-    if (anti_rt_fault(ANTI_RT_FAULT_WRITE)) {
-        if (f != NULL) {
-            mark(f);
-        }
-        return EOF;
-    }
-    return fflush(f);
-}
-
 /* The stream is closed in either case, as fclose closes it when it
    fails, so no test leaks it. */
 int anti_rt_fault_fclose(FILE *f)

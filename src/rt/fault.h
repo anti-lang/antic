@@ -24,7 +24,7 @@
    call, NULL, -1 or errno for a call that gives its error. A call of
    Windows that reports its error through GetLastError goes through
    ANTI_FAULT_SYSTEM, which sets that error as well. A stream of C goes
-   through the five ANTI_F macros, since a failed read or write sets the
+   through the four ANTI_F macros, since a failed read or write sets the
    error flag of the stream, which ANTI_FERROR then reads. */
 
 #ifndef ANTI_RT_FAULT_H
@@ -44,7 +44,7 @@ enum anti_rt_fault_kind {
     ANTI_RT_FAULT_OPEN,
     /* fread, read and readdir. */
     ANTI_RT_FAULT_READ,
-    /* fwrite, write and fflush. */
+    /* fwrite and write. */
     ANTI_RT_FAULT_WRITE,
     /* fclose and close. */
     ANTI_RT_FAULT_CLOSE,
@@ -95,10 +95,6 @@ size_t anti_rt_fault_fwrite(const void *p, size_t size, size_t n, FILE *f);
    seam. */
 int anti_rt_fault_ferror(FILE *f);
 
-/* fflush through the seam of the kind write. A flush that fails flushes
-   nothing, marks the stream and gives EOF. */
-int anti_rt_fault_fflush(FILE *f);
-
 /* fclose through the seam of the kind close, which forgets the mark of
    the stream. A close that fails closes the stream all the same, as
    fclose does, and gives EOF. */
@@ -123,7 +119,6 @@ void anti_rt_fault_hold(bool hold);
 #define ANTI_FREAD anti_rt_fault_fread
 #define ANTI_FWRITE anti_rt_fault_fwrite
 #define ANTI_FERROR anti_rt_fault_ferror
-#define ANTI_FFLUSH anti_rt_fault_fflush
 #define ANTI_FCLOSE anti_rt_fault_fclose
 #define ANTI_FAULT_HOLD(hold) anti_rt_fault_hold(hold)
 
@@ -142,7 +137,6 @@ void anti_rt_fault_hold(bool hold);
 #define ANTI_FREAD fread
 #define ANTI_FWRITE fwrite
 #define ANTI_FERROR ferror
-#define ANTI_FFLUSH fflush
 #define ANTI_FCLOSE fclose
 #define ANTI_FAULT_HOLD(hold) ((void)0)
 
@@ -152,7 +146,6 @@ void anti_rt_fault_hold(bool hold);
 #define ANTI_FREAD fread
 #define ANTI_FWRITE fwrite
 #define ANTI_FERROR ferror
-#define ANTI_FFLUSH fflush
 #define ANTI_FCLOSE fclose
 #define ANTI_FAULT_HOLD(hold) ((void)0)
 

@@ -82,8 +82,8 @@ void diagnostics_add(struct diagnostics *d, int line, int column,
 void diagnostics_vadd(struct diagnostics *d, int line, int column,
                       const char *format, va_list args)
     ATTRIBUTE_PRINTF(4, 0);
-/* diagnostics_check with the arguments as a va_list, as
-   diagnostics_vadd. */
+/* A safety check, an error with a name, which `unchecked` overrules,
+   with the arguments as a va_list, as diagnostics_vadd. */
 void diagnostics_vcheck(struct diagnostics *d, enum diag_name name, int line,
                         int column, const char *format, va_list args)
     ATTRIBUTE_PRINTF(5, 0);
@@ -92,10 +92,6 @@ void diagnostics_vcheck(struct diagnostics *d, enum diag_name name, int line,
    follow diagnostics_add. */
 void diagnostics_warn(struct diagnostics *d, enum diag_name name, int line,
                       int column, const char *format, ...)
-    ATTRIBUTE_PRINTF(5, 6);
-/* A safety check, an error with a name, which `unchecked` overrules. */
-void diagnostics_check(struct diagnostics *d, enum diag_name name, int line,
-                       int column, const char *format, ...)
     ATTRIBUTE_PRINTF(5, 6);
 /* A warning about documentation, which belongs to the doc class of
    `anti check`. */

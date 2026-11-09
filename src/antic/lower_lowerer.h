@@ -324,7 +324,6 @@ void lower_add_params(struct lowerer *l, struct ir_function *f,
 void lower_mark_allocates(struct ir_function *f);
 struct ir_function *lower_c_function(struct lowerer *l, const char *name,
                                      enum ir_type result, enum ir_type param);
-struct ir_function *lower_calloc_function(struct lowerer *l);
 struct ir_function *lower_callee_function(struct lowerer *l,
                                           const struct symbol *sym);
 const struct ir_function *lower_signature(struct lowerer *l,

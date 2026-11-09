@@ -5,7 +5,7 @@
 #
 # The messages are read from the sources:
 #   - of src/antic/, the text every call of diagnostics_add,
-#     diagnostics_warn, diagnostics_check and diagnostics_doc gives, and
+#     diagnostics_warn and diagnostics_doc gives, and
 #     the text of every function that hands one on to them
 #   - of src/anti/, the text every fprintf, fputs and vfprintf writes to
 #     stderr, and the text of every function that hands one on to them
@@ -44,7 +44,6 @@ cmake_minimum_required(VERSION 3.21)
 set(TEXTS_ANTIC
     "diagnostics_add::3:"
     "diagnostics_warn::4:"
-    "diagnostics_check::4:"
     "diagnostics_doc::4:"
     "sema_error_at::2:"
     "sema_check_at::3:"
