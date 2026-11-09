@@ -5171,6 +5171,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "layout_sum|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_sum.s,layout_sum.anti"
         "layout_span|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_span.s,layout_span.anti"
         "frame_limit|-S,--runtime,${ANTIC_RUNTIME_DIR},--target,linux-x86_64,-o,${LISTINGS}/frame_limit.s,frame_limit.anti"
+        "frame_limit_arm64|-S,--runtime,${ANTIC_RUNTIME_DIR},--target,macos-arm64,-o,${LISTINGS}/frame_limit_arm64.s,frame_limit_arm64.anti"
         "sizeof|-S,-o,${LISTINGS}/sizeof.s,sizeof.anti"
         "modifiers|-S,-o,${LISTINGS}/modifiers.s,modifiers.anti"
         "geo|-S,-o,${LISTINGS}/geo.s,geo.anti"

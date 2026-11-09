@@ -27,6 +27,7 @@ struct fixture {
     char error[200];
     const char *constructor;        /* the option of the same name */
     bool debug;                     /* -g */
+    bool unresolved;                /* no layout_resolve before the text */
     struct debug_spans spans;       /* what -g added, after a run */
 };
 
@@ -65,7 +66,7 @@ static bool run_with(struct fixture *x, enum target t, bool one_module,
     llvm_debug_spans_free(&x->spans);
     ok = layout_init(&l, t, &x->m, x->error, sizeof x->error) &&
          layout_data(&l, &x->m);
-    for (i = 0; ok && i < x->m.function_count; i++) {
+    for (i = 0; ok && !x->unresolved && i < x->m.function_count; i++) {
         bool resolved = false;
         ok = layout_resolve(&l, x->m.functions[i], &resolved);
     }
@@ -2144,6 +2145,301 @@ static void untranslated(void)
     end(&x);
 }
 
+/* An operand of a kind that the lowering never writes where it stands. */
+static struct ir_operand odd_operand(enum ir_operand_kind kind,
+                                     enum ir_type type)
+{
+    struct ir_operand o;
+
+    memset(&o, 0, sizeof o);
+    o.kind = kind;
+    o.type = type;
+    return o;
+}
+
+/* Whether the translation of x for macos-arm64 fails with the message of
+   unexpected of llvm_emit_function.c on what, in main.f. Ends x. */
+static bool untranslated_as(struct fixture *x, const char *what)
+{
+    char want[160];
+    bool ok;
+
+    snprintf(want, sizeof want,
+             "the LLVM back end cannot translate %s, in main.f", what);
+    ok = !run(x, TARGET_MACOS_ARM64) && strcmp(x->error, want) == 0;
+    if (!ok) {
+        fprintf(stderr, "expected the failure `%s`, got `%s`\n", want,
+                x->error);
+    }
+    end(x);
+    return ok;
+}
+
+/* main.f(p: type, q: type) -> type, whose one block is still empty. */
+static struct ir_function *two_params(struct fixture *x, enum ir_type type,
+                                      uint32_t *p, uint32_t *q)
+{
+    struct ir_function *f = ir_function_add(&x->m, "main", "f", type,
+                                            IR_NO_AGG);
+
+    *p = ir_param_add(f, type, IR_NO_AGG);
+    *q = ir_param_add(f, type, IR_NO_AGG);
+    ir_block_add(f);
+    return f;
+}
+
+/* The operation op of type on the two parameters of main.f, or on the
+   first alone when unary is set, whose result main.f returns. The
+   instruction of the operation then gives its type as `type`, which no
+   temporary holds. */
+static bool aggregate_operation(enum ir_op op, enum ir_type type, bool unary)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    uint32_t p;
+    uint32_t q;
+    uint32_t t;
+
+    begin(&x);
+    f = two_params(&x, type, &p, &q);
+    b = f->blocks[0];
+    if (op == IR_LOAD) {
+        t = ir_load(f, b, type, ir_temp_op(f, p));
+    } else if (op == IR_SEXT) {
+        t = ir_unary(f, b, IR_SEXT, IR_I64, ir_temp_op(f, p));
+    } else if (op == IR_ADD_FL) {
+        t = ir_flag_op(f, b, IR_ADD_FL, type, ir_temp_op(f, p),
+                       ir_temp_op(f, q), odd_operand(IR_NONE, IR_I8));
+    } else if (unary) {
+        t = ir_unary(f, b, op, type, ir_temp_op(f, p));
+    } else {
+        t = ir_binary(f, b, op, type, ir_temp_op(f, p), ir_temp_op(f, q));
+    }
+    ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+    b->insts[0].type = IR_AGG;
+    return untranslated_as(&x, "an aggregate value");
+}
+
+/* An operation whose own type is an aggregate, which no form of the text
+   takes, fails at the type of each kind of operation. So does a copy,
+   which reads its operand as a value of that type. */
+static void aggregate_operations(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    uint32_t p;
+    uint32_t q;
+    uint32_t t;
+
+    CHECK(aggregate_operation(IR_ADD, IR_I64, false));
+    CHECK(aggregate_operation(IR_NEG, IR_I64, true));
+    CHECK(aggregate_operation(IR_SEXT, IR_I32, true));
+    CHECK(aggregate_operation(IR_LOAD, IR_PTR, true));
+    CHECK(aggregate_operation(IR_ADD_FL, IR_I64, false));
+    CHECK(aggregate_operation(IR_ADD_OV, IR_I64, false));
+
+    begin(&x);
+    f = two_params(&x, IR_I64, &p, &q);
+    t = ir_temp(f, IR_I64);
+    ir_assign(f, f->blocks[0], t, ir_temp_op(f, p));
+    ir_ret(f, f->blocks[0], IR_I64, ir_temp_op(f, t));
+    f->blocks[0]->insts[0].type = IR_AGG;
+    CHECK(untranslated_as(&x, "an aggregate value"));
+}
+
+/* An operand of kind IR_NONE, or IR_BLOCK where a value stands, fails
+   each kind of operation that reads one, and the first message stays
+   when a second operand fails as well. */
+static void operands_untranslated(void)
+{
+    static const enum ir_op ops[] = {IR_ADD, IR_SEXT, IR_NEG, IR_MULH_S,
+                                     IR_MUL_SAT_S};
+    struct ir_operand none = odd_operand(IR_NONE, IR_I64);
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_block *then_block;
+    uint32_t agg;
+    uint32_t p;
+    uint32_t q;
+    uint32_t t;
+    size_t i;
+
+    for (i = 0; i < sizeof ops / sizeof ops[0]; i++) {
+        begin(&x);
+        f = two_params(&x, IR_I64, &p, &q);
+        b = f->blocks[0];
+        t = ops[i] == IR_SEXT
+                ? ir_unary(f, b, ops[i], IR_I64, odd_operand(IR_NONE, IR_I32))
+            : ops[i] == IR_NEG ? ir_unary(f, b, ops[i], IR_I64, none)
+                               : ir_binary(f, b, ops[i], IR_I64, none, none);
+        ir_ret(f, b, IR_I64, ir_temp_op(f, t));
+        CHECK(untranslated_as(&x, "this operand"));
+    }
+
+    begin(&x);
+    agg = bit_record(&x);
+    f = two_params(&x, IR_PTR, &p, &q);
+    t = ir_bitload(f, f->blocks[0], IR_I32, none, agg, 1);
+    ir_ret(f, f->blocks[0], IR_I32, ir_temp_op(f, t));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    begin(&x);
+    agg = simd4(&x, "main.I4", IR_I32);
+    f = two_params(&x, IR_PTR, &p, &q);
+    ir_vbinary(f, f->blocks[0], IR_ADD, IR_I32, none, ir_temp_op(f, p),
+               ir_temp_op(f, q), agg);
+    ir_ret(f, f->blocks[0], IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    begin(&x);
+    agg = simd4(&x, "main.I4", IR_I32);
+    f = two_params(&x, IR_PTR, &p, &q);
+    t = ir_vreduce(f, f->blocks[0], IR_ADD, IR_I32, none, agg);
+    ir_ret(f, f->blocks[0], IR_I32, ir_temp_op(f, t));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    /* The carry of a flag operation. */
+    begin(&x);
+    f = two_params(&x, IR_I64, &p, &q);
+    t = ir_flag_op(f, f->blocks[0], IR_ADD_FL, IR_I64, ir_temp_op(f, p),
+                   ir_temp_op(f, q), odd_operand(IR_BLOCK, IR_I8));
+    ir_ret(f, f->blocks[0], IR_I64, ir_temp_op(f, t));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    /* The condition of a branch. */
+    begin(&x);
+    f = two_params(&x, IR_I64, &p, &q);
+    then_block = ir_block_add(f);
+    ir_branch(f, f->blocks[0], odd_operand(IR_NONE, IR_I8), then_block,
+              then_block);
+    ir_ret(f, then_block, IR_I64, ir_temp_op(f, p));
+    CHECK(untranslated_as(&x, "this operand"));
+}
+
+/* The forms of the IR that only the order the lowering writes makes
+   sound: a lane operation of vbinary, a flag read and a branchov right
+   after their operation, here of the second parameter, since the first
+   temporary is the one the emitter starts from, a vselect with its second operand and a fold of
+   vreduce. */
+static void forms_untranslated(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+    struct ir_block *then_block;
+    uint32_t agg;
+    uint32_t p;
+    uint32_t q;
+    uint32_t t;
+
+    begin(&x);
+    agg = simd4(&x, "main.I4", IR_I32);
+    f = two_params(&x, IR_PTR, &p, &q);
+    ir_vbinary(f, f->blocks[0], IR_NEG, IR_I32, ir_temp_op(f, p),
+               ir_temp_op(f, p), ir_temp_op(f, q), agg);
+    ir_ret(f, f->blocks[0], IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(untranslated_as(&x, "this lane operation of vbinary"));
+
+    begin(&x);
+    f = two_params(&x, IR_I64, &p, &q);
+    t = ir_flag(f, f->blocks[0], IR_FLAG_ZERO, ir_temp_op(f, q));
+    ir_ret(f, f->blocks[0], IR_I8, ir_temp_op(f, t));
+    CHECK(untranslated_as(&x, "a flag apart from its flag operation"));
+
+    begin(&x);
+    f = two_params(&x, IR_I64, &p, &q);
+    then_block = ir_block_add(f);
+    ir_branch_ov(f, f->blocks[0], ir_temp_op(f, q), then_block, then_block);
+    ir_ret(f, then_block, IR_I64, ir_temp_op(f, p));
+    CHECK(untranslated_as(&x,
+                          "a branchov apart from its overflow operation"));
+
+    begin(&x);
+    agg = simd4(&x, "main.F4", IR_F32);
+    f = two_params(&x, IR_PTR, &p, &q);
+    b = f->blocks[0];
+    ir_vselect(f, b, IR_F32, ir_temp_op(f, p), ir_temp_op(f, q),
+               ir_temp_op(f, p), ir_temp_op(f, q), agg);
+    b->insts[0].arg_count = 0;
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(untranslated_as(&x, "a vselect without its second operand"));
+
+    begin(&x);
+    agg = simd4(&x, "main.I4", IR_I32);
+    f = two_params(&x, IR_PTR, &p, &q);
+    t = ir_vreduce(f, f->blocks[0], IR_MUL, IR_I32, ir_temp_op(f, p), agg);
+    ir_ret(f, f->blocks[0], IR_I32, ir_temp_op(f, t));
+    CHECK(untranslated_as(&x, "this fold of vreduce"));
+}
+
+/* The lane shifts to the right of vbinary, which the lowering writes as
+   checked lanes alone: ashr for a signed lane and lshr for an unsigned
+   one, each on counts masked to the width of a lane. A fold of vreduce
+   on float lanes by an integer operation names the float type in its
+   intrinsic. */
+static void vector_rest(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    uint32_t agg;
+    uint32_t p;
+    uint32_t q;
+    uint32_t t;
+
+    begin(&x);
+    agg = simd4(&x, "main.I4", IR_I32);
+    f = two_params(&x, IR_PTR, &p, &q);
+    ir_vbinary(f, f->blocks[0], IR_SHR_S, IR_I32, ir_temp_op(f, p),
+               ir_temp_op(f, p), ir_temp_op(f, q), agg);
+    ir_vbinary(f, f->blocks[0], IR_SHR_U, IR_I32, ir_temp_op(f, p),
+               ir_temp_op(f, p), ir_temp_op(f, q), agg);
+    ir_ret(f, f->blocks[0], IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "  %v6 = ashr <4 x i32> %v3, %v5\n"));
+    CHECK(holds(&x, "  %v13 = lshr <4 x i32> %v10, %v12\n"));
+    end(&x);
+
+    begin(&x);
+    agg = simd4(&x, "main.F4", IR_F32);
+    f = two_params(&x, IR_PTR, &p, &q);
+    t = ir_vreduce(f, f->blocks[0], IR_ADD, IR_F32, ir_temp_op(f, p), agg);
+    ir_ret(f, f->blocks[0], IR_F32, ir_temp_op(f, t));
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "call float @llvm.vector.reduce.add.v4f32(<4 x float> "));
+    end(&x);
+}
+
+/* The types of a temporary that the layouts leave alone. A temporary of
+   void is the type void. c_long, c_wchar and the word of a Mutex take the integer of their
+   width where layout_resolve has not replaced them: 8, 4 and 4 bytes on
+   macos-arm64 and 2 for c_wchar on Windows. */
+static void temporaries_unresolved(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_block *b;
+
+    begin(&x);
+    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
+    ir_temp(f, IR_VOID);
+    ir_temp(f, IR_CLONG);
+    ir_temp(f, IR_CWCHAR);
+    ir_temp(f, IR_LOCK);
+    b = ir_block_add(f);
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    x.unresolved = true;
+    CHECK(run(&x, TARGET_MACOS_ARM64));
+    CHECK(holds(&x, "  %t0 = alloca void, align 8\n"
+                    "  %t1 = alloca i64, align 8\n"
+                    "  %t2 = alloca i32, align 4\n"
+                    "  %t3 = alloca i32, align 4\n"));
+    CHECK(run(&x, TARGET_WINDOWS_X86_64));
+    CHECK(holds(&x, "  %t2 = alloca i16, align 2\n"));
+    end(&x);
+}
+
 void test_llvm_emit(void)
 {
     module_text();
@@ -2189,4 +2485,9 @@ void test_llvm_emit(void)
     coff_names();
     frames_kept();
     untranslated();
+    aggregate_operations();
+    operands_untranslated();
+    forms_untranslated();
+    vector_rest();
+    temporaries_unresolved();
 }
