@@ -11,7 +11,9 @@ building on 2026-11-06, under "Answers of 2026-11-06" in `docs/decisions.md`.
 A program draws with `import anti.graphics;` and nothing else. It names no
 pixel size, colour depth or pixel format and needs no manifest entry. The same
 program looks the same on a laptop, a 4K monitor, a portrait screen and a
-display without HiDPI, on all six targets.
+display without HiDPI, on all six targets. The one size a program may name is
+that of its window when it opens, in screen points, by Eddie's decision of
+2026-11-09. Drawing stays in units of the square.
 
 Eddie's rule for the design: stay close to what raylib offers. Every part
 below names the raylib function or concept it stands on. A program that knows
@@ -52,7 +54,11 @@ fn main() -> int
 fields are the config flags of raylib, each with a default, so a literal
 names only what it changes: `Window { vsync: false }`. The defaults:
 
-- two thirds of the monitor, from `GetMonitorWidth` and `GetMonitorHeight`;
+- two thirds of the monitor, from `GetMonitorWidth` and `GetMonitorHeight`,
+  unless `width` and `height` name the size in screen points, the unit of the
+  window sizes of macOS and of `InitWindow`. A field left out keeps two
+  thirds of the monitor on its axis, and a size larger than the monitor
+  takes the size of the monitor;
 - `FLAG_WINDOW_RESIZABLE`, `FLAG_WINDOW_HIGHDPI`, `FLAG_VSYNC_HINT` and
   `FLAG_MSAA_4X_HINT` on;
 - Escape closes, as raylib's default exit key.
@@ -61,6 +67,24 @@ The window object carries the rest of raylib's window and timing functions
 under their own names without the prefix: `w.time()` is `GetTime`,
 `w.frame_time()` is `GetFrameTime`, `w.toggle_borderless()` is
 `ToggleBorderlessWindowed`, `w.set_target_fps(n)` is `SetTargetFPS`.
+
+Four functions give sizes in points, as `int`, for a program that chooses
+the size of its window or lays out by the screen:
+
+- `w.monitor_width()` and `w.monitor_height()` are `GetMonitorWidth` and
+  `GetMonitorHeight` of the current monitor. raylib reads the monitors after
+  `InitWindow` alone, so the first of them before `w.start(title)` opens the
+  window hidden, with the flags the fields of `w` hold then. `start` gives it
+  its title, its size and its place, and shows it.
+- `w.screen_width()` and `w.screen_height()` are `GetScreenWidth` and
+  `GetScreenHeight`, the size of the window now. They give 0 before the
+  window opens.
+
+A window with `highdpi: false` works in points. On a Retina Mac GLFW reports
+the framebuffer of a new window in pixels until the window has drawn. raylib
+6.0 took that doubled size at the first change of the size, and the window
+drew at twice its size, T217 of `docs/audit/tests-findings.md`. Such a window
+now draws frames while it is hidden until raylib holds its points.
 
 ## Coordinates: the unit square
 
@@ -161,7 +185,10 @@ the module with raylib's values.
 
 `anti.graphics.Display` is the abstract class behind the window and the
 canvas, with `RaylibDisplay` as its default provider. `graphics.Recorder` is
-a second provider that opens no window and records every call. In
+a second provider that opens no window and records every call. It stands
+for a monitor of 1920 by 1080 points, and a window over it opens at the size
+it asks for within that monitor, or at 1280 by 720. The `aspect` of its
+frames follows the size of the window. In
 `[inject.test]`, `anti test` then runs the drawing code of a program without
 a display:
 
