@@ -8484,7 +8484,9 @@ file(WRITE "${KNOWN_FAILURES_WORK}/marked.txt" "${known_marked}\n")
 # gates among them. The two cases of anti build that make the map and the
 # symbols archive fail count the writes before them, and anti copies the
 # program in writes of 64 KiB, so the counters, which make the program
-# larger, move the write a case names.
+# larger, move the write a case names. libm_symbols of
+# src/native/CMakeLists.txt, a directory the configure step reads after
+# this one, takes the same property there.
 if(ANTIC_COVERAGE)
     get_property(coverage_tests DIRECTORY PROPERTY TESTS)
     set(coverage_bytes no_paths rt_names)

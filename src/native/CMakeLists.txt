@@ -215,6 +215,13 @@ add_test(NAME libm_symbols
         "-DOBJDUMP=${ANTIC_RUNTIME_DIR}/bin/llvm-objdump${CMAKE_EXECUTABLE_SUFFIX}"
         "-DLIBRARIES=${antic_libm_libraries}"
         -P "${ANTIC_RUNNERS}/run_libm_symbols.cmake")
+# The runtime of a coverage tree carries the profile runtime, whose symbol
+# ___llvm_profile_runtime libm.o names there, so that tree does not run
+# the test, as it runs none of the tests of tests/CMakeLists.txt that read
+# the bytes of the runtime as a package ships it. Every other tree runs it.
+if(ANTIC_COVERAGE)
+    set_tests_properties(libm_symbols PROPERTIES DISABLED TRUE)
+endif()
 
 # A program of anti.math links for every target, and at v1 for both
 # x86_64 targets, where the four roundings call the libm of musl, and
