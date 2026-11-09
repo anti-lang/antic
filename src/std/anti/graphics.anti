@@ -1098,6 +1098,9 @@ pub singleton class RaylibDisplay inherits Display
 			let h = mh * 2 / MONITOR_SHARE as c_int;
 			let at = rl.GetMonitorPosition(monitor);
 			rl.SetWindowSize(w, h);
+			if (flags & rl.ConfigFlags.FLAG_WINDOW_HIGHDPI as u32) == 0 {
+				settle(w, h);
+			}
 			rl.SetWindowPosition(at.x as c_int + (mw - w) / 2, at.y as c_int + (mh - h) / 2);
 		}
 		if (flags & hidden) == 0 {
@@ -1430,6 +1433,30 @@ pub singleton class RaylibDisplay inherits Display
 	concrete fn toggle_fullscreen(self)
 	{
 		rl.ToggleFullscreen();
+	}
+}
+
+/// The frames a window without HiDPI draws at most until its size settles.
+const SETTLE_FRAMES: int = 30;
+
+// DESIGN: GLFW 3.4 of raylib 6.0 on macOS reports the framebuffer of a new
+// window in the pixels of a Retina screen until the window has drawn, also
+// where FLAG_WINDOW_HIGHDPI is off and the framebuffer holds the points of the
+// window. The first change of the size gives raylib that doubled size as its
+// screen and render size, and a frame then draws twice as large from the
+// bottom left corner, T217 of docs/audit/tests-findings.md. A window without
+// HiDPI therefore draws frames while it is hidden, and a change of the size
+// away and back gives raylib the size again, until it is no larger than asked.
+// The system makes a window smaller than asked and never larger.
+fn settle(w: c_int, h: c_int)
+{
+	let tries = 0;
+	while (rl.GetRenderWidth() > w || rl.GetRenderHeight() > h) && tries < SETTLE_FRAMES do {
+		rl.BeginDrawing();
+		rl.EndDrawing();
+		rl.SetWindowSize(w + 1, h);
+		rl.SetWindowSize(w, h);
+		tries += 1;
 	}
 }
 

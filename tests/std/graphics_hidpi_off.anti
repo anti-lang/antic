@@ -1,0 +1,37 @@
+//! A hidden window of `Window { highdpi: false }`, which the suite opens on the
+//! screen of the Mac alone. raylib then works in the points of the window, so
+//! its screen size and its render size are the two thirds of the monitor that
+//! `graphics.open` asks for. On a Retina screen raylib 6.0 took twice as many
+//! from GLFW when the window changed its size before its first frame, T217 of
+//! docs/audit/tests-findings.md.
+import anti.graphics;
+import anti.io;
+import anti.raylib as rl;
+import anti.text;
+
+// Print the text of an f"..." and free it.
+fn line(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	// raylib writes its log to the standard output.
+	rl.SetTraceLogLevel(rl.TraceLogLevel.LOG_WARNING as c_int);
+	let w = graphics.open("Points", graphics.Window { hidden: true, highdpi: false }) catch e {
+		e.fatal();
+	};
+	let monitor = rl.GetCurrentMonitor();
+	let width = rl.GetMonitorWidth(monitor) * 2 / 3;
+	let height = rl.GetMonitorHeight(monitor) * 2 / 3;
+	for f in w.frames() {
+		let screen = rl.GetScreenWidth() == width && rl.GetScreenHeight() == height;
+		let render = rl.GetRenderWidth() == width && rl.GetRenderHeight() == height;
+		line(f"screen size two thirds of the monitor: {screen}");
+		line(f"render size two thirds of the monitor: {render}");
+		break;
+	}
+	return 0;
+}

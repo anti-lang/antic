@@ -1262,6 +1262,15 @@ foreach(name IN LISTS antic_graphics_programs)
         WORK "${CMAKE_CURRENT_BINARY_DIR}/std-graphics-dev")
 endforeach()
 
+# A hidden window of raylib with FLAG_WINDOW_HIGHDPI off, on the screen of
+# the Mac alone, T217 of docs/audit/tests-findings.md. The Linux and Windows
+# hosts of the suite may have no display.
+if(ANTIC_HOST_OS STREQUAL "macos")
+    antic_program_test(std_graphics_hidpi_off
+        "${CMAKE_CURRENT_SOURCE_DIR}/std/graphics_hidpi_off.anti"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/std-graphics")
+endif()
+
 # The cases of fault injection of tests/programs/ and tests/std/. A file
 # <name>.faults beside <name>.anti holds one case per line, its name and
 # the value of ANTI_FAULT, which makes a call of the system fail in the
