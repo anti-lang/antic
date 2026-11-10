@@ -2063,6 +2063,13 @@ int driver_run(const struct options *given)
     if (!library_options_usable(o)) {
         return 2;
     }
+    /* -c compiles the source of a module into its library file, and a
+       library file holds no source, by Q8 of "Answers of 2026-11-10". */
+    if (o->library && ends_with(o->input, ANTL_SUFFIX)) {
+        say_antic("-c compiles a source, and %s is a library file\n",
+                  o->input);
+        return 2;
+    }
     memset(&extras, 0, sizeof extras);
 
     if (!ends_with(o->input, SOURCE_SUFFIX) &&
