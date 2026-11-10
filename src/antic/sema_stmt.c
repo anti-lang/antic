@@ -1543,6 +1543,7 @@ static void check_flags_assign(struct checker *c, struct stmt *s)
 static void check_destructuring_let(struct checker *c, struct stmt *s)
 {
     const struct expr *outer;
+    const struct expr *let_value;
     struct symbol *value;
     struct context sized;
     struct type *t;
@@ -1556,7 +1557,10 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
        whose operands are integers is the flags form. */
     outer = c->flags_value;
     c->flags_value = flags_shape ? s->as.let.value : NULL;
+    let_value = c->let_value;
+    c->let_value = s->as.let.value;
     t = sema_check_expr(c, s->as.let.value, NULL);
+    c->let_value = let_value;
     c->flags_value = outer;
     sema_leave(c, &sized);
     if (flags_shape && !sema_is_error(t) && t->kind != TYPE_TUPLE) {
@@ -1987,10 +1991,30 @@ static void mark_let_symbol(struct checker *c, struct stmt *s,
     }
 }
 
+/* Refuse the tuple t of a `let` whose element is a value of an abstract
+   class, with the message of the local of `let s = *sp;`, by Q6 of
+   "Answers of 2026-11-10" in docs/decisions.md. */
+static bool refuse_abstract_element(struct checker *c, struct pos pos,
+                                    const struct type *t)
+{
+    size_t i;
+
+    if (sema_is_error(t) || t->kind != TYPE_TUPLE) {
+        return false;
+    }
+    for (i = 0; i < t->param_count; i++) {
+        if (sema_refuse_abstract_value(c, pos, "this local", t->params[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* `let name = value;` and `let name: T = value;`. */
 static void check_let(struct checker *c, struct stmt *s)
 {
     const struct expr *taker;
+    const struct expr *let_value;
     struct type *declared;
     struct context sized;
     struct type *t;
@@ -2009,6 +2033,8 @@ static void check_let(struct checker *c, struct stmt *s)
     c->guard_taker = s->as.let.value->kind == EXPR_OPTIONAL
                          ? s->as.let.value->as.optional.access
                          : s->as.let.value;
+    let_value = c->let_value;
+    c->let_value = s->as.let.value;
     if (s->as.let.otherwise != NULL && declared != NULL &&
         (declared->kind == TYPE_POINTER || declared->kind == TYPE_FN) &&
         !declared->nullable) {
@@ -2018,6 +2044,7 @@ static void check_let(struct checker *c, struct stmt *s)
         t = sema_check_expr(c, s->as.let.value, declared);
     }
     c->guard_taker = taker;
+    c->let_value = let_value;
     sema_leave(c, &sized);
     /* `let m = p catch fatal` and `let m = p catch e { }` guard the
        pointer with the error forms. A call that gives a `?*T` keeps
@@ -2087,7 +2114,8 @@ static void check_let(struct checker *c, struct stmt *s)
         sema_bind_value(c, s->as.let.value, s->as.let.name, t);
     }
     if (sema_refuse_abstract_value(c, s->as.let.name_pos, "this local",
-                                   t)) {
+                                   t) ||
+        refuse_abstract_element(c, s->as.let.name_pos, t)) {
         t = sema_builtin(c, TYPE_ERROR);
     }
     sym = sema_declare(c, SYMBOL_LOCAL, &s->as.let.name, s->as.let.name_pos,

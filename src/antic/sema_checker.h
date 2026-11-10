@@ -200,6 +200,10 @@ struct checker {
     const struct expr *discarded;
     /* The value checked now that a new owner takes over, or NULL. */
     const struct expr *keeper;
+    /* The value of the `let` checked now, or NULL. A tuple literal there
+       leaves a value of an abstract class to the `let`, which names its
+       local as `let s = *sp;` does, by Q6 of "Answers of 2026-11-10". */
+    const struct expr *let_value;
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct stmt *deferred;    /* the innermost of them, or NULL */
     int deferred_loops;         /* loop_depth where deferred began */

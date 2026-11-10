@@ -2692,6 +2692,21 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             struct type *element =
                 want != NULL ? want->params[i] : NULL;
             elements[i] = sema_check_kept(c, item, element, true);
+            /* An element holds a value, as a `let` does, by Q6 of
+               "Answers of 2026-11-10" in docs/decisions.md: a call of
+               `void` gives none, and an abstract class has no complete
+               one. The context names no such element type, since a
+               declaration refuses it. The `let` that takes the literal
+               refuses an abstract element itself, as its local. */
+            if (element == NULL && !sema_is_error(elements[i]) &&
+                elements[i]->kind == TYPE_VOID) {
+                sema_require(c, item, elements[i], sema_builtin(c, TYPE_I64));
+                elements[i] = sema_builtin(c, TYPE_ERROR);
+            } else if (e != c->let_value &&
+                       sema_refuse_abstract_value(c, item->pos, "a tuple",
+                                                  elements[i])) {
+                elements[i] = sema_builtin(c, TYPE_ERROR);
+            }
             if (element != NULL) {
                 ok = sema_require(c, item, elements[i], element) && ok;
                 elements[i] = element;
