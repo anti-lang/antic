@@ -389,6 +389,17 @@ not re-open a settled decision without asking Eddie.
   each sanitizer suite in the six parts of `asan`, the last up to test
   7017: `asan` 250 s, 187 s, 260 s, 185 s, 435 s and 456 s, `ubsan`
   254 s, 184 s, 259 s, 200 s, 467 s and 465 s.
+  The second batch of coverage measured `host` in the same three parts:
+  376 s, 261 s and 296 s before the commit of `object.c`, up to test
+  7029, 380 s, 266 s and 297 s before the fix of T218, 375 s, 264 s and
+  295 s before the commit of `plugin.c`, up to test 7031, 370 s, 264 s
+  and 297 s before the fix of T220, 381 s, 260 s and 298 s before the
+  commit of `sema_stmt.c`, up to test 7100, 378 s, 262 s and 298 s
+  before the commit of `driver.c`, up to test 7113, and 376 s, 262 s and
+  299 s before the last commit, up to test 7114. It ran each sanitizer
+  suite in the six parts of `asan`, the last up to test 7112: `asan`
+  247 s, 185 s, 265 s, 186 s, 448 s and 439 s, `ubsan` 249 s, 187 s,
+  264 s, 199 s, 469 s and 468 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -995,10 +1006,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7019 ctest tests pass on the development Mac, and two of them, the
+- 7114 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The two lines of `tests/known-failures.txt`, those of T136 and T138,
-  carry `host=windows`. The ASan and the UBSan builds run 7017 each
+  The two lines of `tests/known-failures.txt` of T136 and T138 carry
+  `host=windows`, and the five lines of T219 and T221 fail on every host.
+  The ASan and the UBSan builds run 7112 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
