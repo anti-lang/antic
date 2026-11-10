@@ -566,6 +566,7 @@ Each holds one case per message of a command, which
 | `tests/unit/test_memcheck.c` | The checks of AddressSanitizer that `--memory-checks` puts before a load and a store, and the declarations they need. |
 | `tests/unit/test_modules.c` | The library file written, read back and damaged, the imports across modules and the module paths. |
 | `tests/unit/test_nullable.c` | The rules of nullable pointers in the checker. |
+| `tests/unit/test_object.c` | The walks of `src/rt/object.c` over records that antic does not write. |
 | `tests/unit/test_optimize.c` | The passes of `optimize.c` over the IR of a source. |
 | `tests/unit/test_parser.c` | The tree the parser builds, its errors and its depth limit. |
 | `tests/unit/test_pattern.c` | The reader of a pattern literal of `src/antic/pattern.c`: the fewest bytes a match or a group can take. |

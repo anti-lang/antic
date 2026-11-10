@@ -1,0 +1,18 @@
+//! `serialize` of a collection writes each element as `serialize` writes a
+//! field of its type, by the entry on `to_text` under "Generics and
+//! collections" in `docs/decisions.md`. A field that is an array of two levels
+//! is a JSON array of arrays, so a list of one such array holds one.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let grids = List<[2][2]int>.new();
+	grids.push([[1, 2], [3, 4]]);
+	let out = text.Builder.new();
+	grids.serialize(&out);
+	io.println(out.text());
+	return 0;
+}

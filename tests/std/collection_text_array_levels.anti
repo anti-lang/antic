@@ -1,0 +1,14 @@
+//! `to_text` of a collection writes an array as a list, by the entry on
+//! `to_text` under "Generics and collections" in `docs/decisions.md`. An
+//! element that is an array of two levels is a list of lists.
+
+import anti.collection.list.{List};
+import anti.io;
+
+fn main() -> int
+{
+	let grids = List<[2][2]int>.new();
+	grids.push([[1, 2], [3, 4]]);
+	io.println(grids.to_text());
+	return 0;
+}

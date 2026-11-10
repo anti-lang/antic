@@ -582,6 +582,15 @@ target_link_libraries(rt_deserialize_tests PRIVATE Threads::Threads
     ${CMAKE_DL_LIBS})
 add_test(NAME unit_deserialize COMMAND rt_deserialize_tests)
 
+# The walks of src/rt/object.c over records that antic does not write, in
+# a program of its own with stand-ins for the loader.
+antic_rt_sources(object_sources object json utf f16 text cast hash mem assert
+    atomic fs platform_posix platform_windows)
+add_executable(rt_object_tests unit/test_object.c ${object_sources})
+target_link_libraries(rt_object_tests PRIVATE Threads::Threads
+    ${CMAKE_DL_LIBS})
+add_test(NAME unit_object COMMAND rt_object_tests)
+
 # The loader of the runtime under threads that load at once, in a program
 # of its own with stand-ins for the rest of the runtime. It loads two
 # libraries that each carry an empty table of a plugin.
@@ -703,7 +712,7 @@ target_link_libraries(rt_hash_draw_tests PRIVATE Threads::Threads
 add_test(NAME unit_hash_draw COMMAND rt_hash_draw_tests)
 # The programs of the runtime above compile its files themselves, so a
 # coverage tree measures src/rt/ through them.
-antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests
+antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests rt_object_tests
     rt_platform_tests rt_plugin_table_tests rt_plugin_stub_tests
     rt_oom_runtime rt_oom_tests
     rt_hash_draw_runtime rt_hash_draw_tests)

@@ -1,0 +1,24 @@
+//! The default `==` of a struct compares a `Regex` field by its text. Two
+//! patterns compiled from the empty text are equal, and two of texts of
+//! different lengths are not.
+
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Rule
+{
+	r: Regex,
+}
+
+fn main() -> int
+{
+	let empty = Regex.compile("") catch fatal;
+	let again = Regex.compile("") catch fatal;
+	let longer = Regex.compile("ab") catch fatal;
+	printf("empty texts: %d\n".ptr,
+		(Rule { r: empty } == Rule { r: again }) as c_int);
+	printf("other lengths: %d\n".ptr,
+		(Rule { r: empty } == Rule { r: longer }) as c_int);
+	return 0;
+}

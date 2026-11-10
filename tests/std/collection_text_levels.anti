@@ -1,0 +1,45 @@
+//! The text of a collection whose element is a slice of floats, a struct with
+//! an array of two levels and a struct with an array of class values. Each
+//! float stands as `serialize` writes it, each level of an array as a list and
+//! each class value by its own `to_text`.
+
+import anti.collection.list.{List};
+import anti.io;
+
+class Tag
+{
+	pub n: int = 1,
+}
+
+struct Grid
+{
+	cells: [2][2]int,
+}
+
+struct Tags
+{
+	tags: [2]Tag,
+}
+
+fn main() -> int
+{
+	let singles: [2]f32 = [1.5, 2.5];
+	let a = List<[]f32>.new();
+	a.push(singles[0..2]);
+	io.println(a.to_text());
+	let doubles: [1]f64 = [3.5];
+	let b = List<[]f64>.new();
+	b.push(doubles[0..1]);
+	io.println(b.to_text());
+	let halves: [1]f16 = [0.5 as f16];
+	let c = List<[]f16>.new();
+	c.push(halves[0..1]);
+	io.println(c.to_text());
+	let grids = List<Grid>.new();
+	grids.push(Grid { cells: [[1, 2], [3, 4]] });
+	io.println(grids.to_text());
+	let tags = List<Tags>.new();
+	tags.push(Tags { tags: [Tag { n: 3 }, Tag { n: 4 }] });
+	io.println(tags.to_text());
+	return 0;
+}

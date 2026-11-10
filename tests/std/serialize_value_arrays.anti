@@ -1,0 +1,58 @@
+//! The default `serialize` of a class whose fields are arrays and `own` slices
+//! of variants, of `?T` values, of tuples, of unions and of class values. Each
+//! element of a variant, a `?T` or a tuple is written as a field of its type, a
+//! class value as an object and an array or a slice of unions as `null`.
+
+import anti.io;
+import anti.text;
+
+union Bits
+{
+	i: int,
+	f: f64,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Tag
+{
+	pub n: int = 1,
+}
+
+class Parts
+{
+	pub shapes: [2]Shape,
+	pub maybe: [2] ?int = [none, 5],
+	pub pairs: [1](int, bool) = [(7, true)],
+	pub bits: [2]Bits,
+	pub tags: [2]Tag,
+	pub own more_shapes: []Shape,
+	pub own more_maybe: [] ?int,
+	pub own more_pairs: [](int, bool),
+	pub own more_bits: []Bits,
+}
+
+fn main() -> int
+{
+	let p = alloc Parts {
+		shapes: [Shape.Empty, Shape.Circle { r: 3 }],
+		bits: [Bits { i: 1 }, Bits { i: 2 }],
+		tags: [Tag { n: 1 }, Tag { n: 2 }],
+		more_shapes: []Shape { ptr: alloc(Shape, 1), len: 1 },
+		more_maybe: [] ?int { ptr: alloc(?int, 1), len: 1 },
+		more_pairs: [](int, bool) { ptr: alloc((int, bool), 1), len: 1 },
+		more_bits: []Bits { ptr: alloc(Bits, 1), len: 1 },
+	};
+	p.more_shapes[0] = Shape.Circle { r: 4 };
+	p.more_maybe[0] = 6;
+	p.more_pairs[0] = (8, false);
+	let out = text.Builder.new();
+	p.serialize(&out);
+	io.println(out.text());
+	delete(p);
+	return 0;
+}

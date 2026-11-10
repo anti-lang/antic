@@ -1,0 +1,24 @@
+//! `serialize` of a collection writes each element as `serialize` writes a
+//! field of its type, by the entry on `to_text` under "Generics and
+//! collections" in `docs/decisions.md`. An array of unions is `null` there, so
+//! a list of one such array is `[null]`.
+
+import anti.collection.list.{List};
+import anti.io;
+import anti.text;
+
+union Bits
+{
+	i: int,
+	f: f64,
+}
+
+fn main() -> int
+{
+	let arrays = List<[2]Bits>.new();
+	arrays.push([Bits { i: 1 }, Bits { i: 2 }]);
+	let out = text.Builder.new();
+	arrays.serialize(&out);
+	io.println(out.text());
+	return 0;
+}

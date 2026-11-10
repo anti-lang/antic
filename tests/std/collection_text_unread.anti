@@ -1,0 +1,48 @@
+//! The text of a collection whose element holds a type that no walk reads. A
+//! pointer to a union, a slice and an array of unions, a bitfield, a channel
+//! and an array of unions in a struct each stand as `?`, by the entry on
+//! `to_text` under "Generics and collections" in `docs/decisions.md`.
+
+import anti.collection.list.{List};
+import anti.io;
+
+union Bits
+{
+	i: int,
+	f: f64,
+}
+
+struct Flags
+{
+	low: u8 : 3,
+	high: u8 : 5,
+}
+
+struct Unread
+{
+	u: [2]Bits,
+	c: chan int,
+}
+
+fn main() -> int
+{
+	let b = Bits { i: 4 };
+	let pointers = List<?*Bits>.new();
+	pointers.push(&b);
+	io.println(pointers.to_text());
+	let row: [1]Bits = [Bits { i: 1 }];
+	let slices = List<[]Bits>.new();
+	slices.push(row[0..1]);
+	io.println(slices.to_text());
+	let arrays = List<[2]Bits>.new();
+	arrays.push([Bits { i: 1 }, Bits { i: 2 }]);
+	io.println(arrays.to_text());
+	let flags = List<Flags>.new();
+	flags.push(Flags { low: 1, high: 2 });
+	io.println(flags.to_text());
+	let c = chan int(1);
+	let parts = List<Unread>.new();
+	parts.push(Unread { u: [Bits { i: 1 }, Bits { i: 2 }], c: c });
+	io.println(parts.to_text());
+	return 0;
+}

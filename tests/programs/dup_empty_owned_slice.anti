@@ -1,0 +1,20 @@
+//! `dup` of an `own` slice that holds memory but no element gives the copy an
+//! empty slice with no memory, as a buffer that is `none` or empty gives
+//! `none`.
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+class Holder
+{
+	pub own counts: []int,
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { counts: []int { ptr: alloc(int, 1), len: 0 } };
+	let copy = dup(h);
+	printf("%d %d\n".ptr, copy.counts.len as c_int,
+		(copy.counts.ptr == none) as c_int);
+	delete(copy);
+	delete(h);
+	return 0;
+}
