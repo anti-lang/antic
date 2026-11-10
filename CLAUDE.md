@@ -421,6 +421,13 @@ not re-open a settled decision without asking Eddie.
   ran each sanitizer suite in the six parts of `asan`, the last up to
   test 7170: `asan` 243 s, 183 s, 260 s, 182 s, 437 s and 442 s, `ubsan`
   261 s, 186 s, 257 s, 215 s, 474 s and 499 s.
+  The step of the second answers of 2026-11-10 measured `host` in the
+  same three parts, up to test 7174: 388 s, 270 s and 337 s before the
+  commit of the file of expected output, and 390 s, 267 s and 326 s
+  before the commit of `rt_deserialize_tests`. It ran each sanitizer
+  suite in the six parts of `asan`, the last up to test 7172: `asan`
+  252 s, 192 s, 283 s, 197 s, 480 s and 482 s, `ubsan` 255 s, 188 s,
+  264 s, 195 s, 469 s and 474 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -568,6 +575,8 @@ it are disabled in that tree alone.
   and `tools/coverage-report.cmake` writes the report.
 - The measurement was built and run on the development Mac alone.
   `docs/reports/2026-10-12-tests-coverage-baseline.md` holds the first one.
+- `docs/notes/unreached-guards.md` names the guards that no input reaches
+  and that Eddie kept, with the reason for each.
 
 `tools/fuzz/` holds the fuzzer, after Csmith, in CMake scripts.
 `cmake -DFIRST=1 -DCOUNT=200 -P tools/fuzz/run.cmake` writes the program
@@ -687,7 +696,9 @@ Where a test goes:
   of `anti`.
 - `messages.cmake` in each of those seven directories: one case per message
   of the command, `anti_<command>_message_<case>`. A case writes its files,
-  runs anti and holds the whole standard error. `tests/anti_messages.cmake`
+  runs anti and holds the whole standard error. An output with empty
+  lines stands in `<command>_message_<case>.out` beside its table, which
+  the case names with `OUT_FILE`. `tests/anti_messages.cmake`
   holds the cases of `anti new`, `anti license` and `anti sdk`, which have
   no directory. `tests/antic_messages.cmake` holds the messages of the
   driver of antic that stand at no position of a source, as
@@ -1027,11 +1038,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7172 ctest tests pass on the development Mac, and two of them, the
+- 7174 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   The two lines of `tests/known-failures.txt`, of T136 and T138, carry
   `host=windows`.
-  The ASan and the UBSan builds run 7170 each
+  The ASan and the UBSan builds run 7172 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
