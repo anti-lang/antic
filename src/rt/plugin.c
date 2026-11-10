@@ -161,13 +161,14 @@ static void version_part(const unsigned char **at, int64_t *left,
     }
 }
 
-/* Whether version a is below version b, part by part. */
+/* Whether version a is below version b, part by part, through every
+   part of the longer, T220 of docs/audit/tests-findings.md. Each turn
+   takes at least one byte of a version that has bytes left, so the
+   loop ends. */
 static int version_below(const unsigned char *a, int64_t a_length,
                          const unsigned char *b, int64_t b_length)
 {
-    int i;
-
-    for (i = 0; i < 8; i++) {
+    for (;;) {
         const unsigned char *one;
         const unsigned char *two;
         int64_t one_count;
@@ -183,10 +184,9 @@ static int version_below(const unsigned char *a, int64_t a_length,
             return order < 0;
         }
         if (a_length <= 0 && b_length <= 0) {
-            break;
+            return 0;
         }
     }
-    return 0;
 }
 
 const struct anti_slots *anti_rt_plugin_slots(const struct anti_descriptor *d)
