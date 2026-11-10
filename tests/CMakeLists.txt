@@ -3170,9 +3170,15 @@ add_test(NAME float_digits
 foreach(case static shared exports two loader header bundle classes
         failing tuples flags variants nested simd names handlers ledger
         generics optional forms views never never_cpp ctypes
-        ctypes_shared ctypes_bundle tight tight_aligned callbacks)
+        ctypes_shared ctypes_bundle tight tight_aligned callbacks
+        forged_notice)
     # The C program of ledger starts its threads with pthreads.
     if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
+        continue()
+    endif()
+    # A trace on Windows reads the notice of a module that exports it, and
+    # the program of forged_notice exports none.
+    if(case STREQUAL "forged_notice" AND ANTIC_HOST_OS STREQUAL "windows")
         continue()
     endif()
     add_test(NAME clib_${case}

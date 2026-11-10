@@ -1,11 +1,24 @@
 //! A trace whose frames lie outside every module. `text` writes such a frame as
 //! its address and `-` and names no module for it, and `symbolize` names no
 //! function for it. A frame of the program between them keeps its module and
-//! its name, and the second frame of the same module names no module again.
+//! its name, and the second frame of the same module names no module again. The
+//! runtime gives the raw frame of an address outside every module, and of the
+//! address 0, no module, no build id and the base 0.
 
 import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_trace_frame(address: u64, out: ?*lang.RawFrame);
+
+/// The raw frame the runtime gives for address, on one line.
+fn show_raw(address: u64)
+{
+	let raw = lang.RawFrame { address: 1, module: "m", build_id: "b", base: 1 };
+	anti_rt_trace_frame(address, &raw);
+	printf("%llx [%.*s] [%.*s] %llx\n".ptr, raw.address,
+		raw.module.len as c_int, raw.module.ptr, raw.build_id.len as c_int,
+		raw.build_id.ptr, raw.base);
+}
 
 fn main() -> int
 {
@@ -29,5 +42,7 @@ fn main() -> int
 		printf("%llx [%.*s] %lld\n".ptr, f.address, f.function.len as c_int,
 			f.function.ptr, f.line);
 	}
+	show_raw(16);
+	show_raw(0);
 	return 0;
 }

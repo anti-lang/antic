@@ -11,7 +11,7 @@
 #             simd, classes, failing, tuples, flags, ledger, variants,
 #             nested, names, handlers, generics, optional, forms, views,
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
-#             tight, tight_aligned or callbacks
+#             tight, tight_aligned, callbacks or forged_notice
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -431,6 +431,20 @@ elseif(CASE STREQUAL "callbacks")
             SOURCES "${SOURCES}/callbacks.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/callbacks${EXE}" "${SOURCES}/callbacks.expected")
+elseif(CASE STREQUAL "forged_notice")
+    # A trace reads the build id of a module from its notice
+    # anti_licenses, here the one a C program carries. A notice in the
+    # form antic writes gives its id, and one without the begin marker or
+    # without the line feed after its build line gives none.
+    library(witness shared "${dir}")
+    foreach(form 1 2 3)
+        program("${dir}/forged_notice_${form}${EXE}"
+                OPTIONS -std=c11 -I "${dir}" -DFORM=${form}
+                SOURCES "${SOURCES}/forged_notice.c" INPUTS "${library_link}")
+    endforeach()
+    expect_printed("[1234]\n" "${dir}/forged_notice_1${EXE}")
+    expect_printed("[]\n" "${dir}/forged_notice_2${EXE}")
+    expect_printed("[]\n" "${dir}/forged_notice_3${EXE}")
 elseif(CASE STREQUAL "names")
     # The header gives two fields whose names share a long prefix one C
     # name each, writes a whole float constant as a float of its type, and

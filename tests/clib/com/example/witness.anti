@@ -1,0 +1,20 @@
+//! A library for C that prints the build id of the module of its caller, which
+//! a trace reads from the notice `anti_licenses` of that module.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Print the build id of the module that called this function, in brackets, and
+/// nothing between them where the module carries none.
+export fn caller_build_id()
+{
+	let t = lang.StackTrace.capture();
+	defer delete(t);
+	if t.frames.len < 2 {
+		printf("no caller\n".ptr);
+		return;
+	}
+	let caller = t.frames[1];
+	printf("[%.*s]\n".ptr, caller.build_id.len as c_int, caller.build_id.ptr);
+}
