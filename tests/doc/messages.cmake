@@ -23,6 +23,16 @@ foreach(items dev private)
         ARGS doc --${items} -o "${WORK}/pages" --runtime "${RUNTIME}" one.antl
         ERR "anti: one.antl: --${items} needs the source")
 endforeach()
+# Q8 of "Answers of 2026-11-10": a file whose name is its suffix alone has
+# no name, and anti doc takes the kind of a file from its suffix.
+anti_message(library_file_named_by_its_suffix
+    FILES .antl "A library file, which holds the public interface alone.\n"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" .antl
+    ERR "anti: .antl: the file has no name, only its suffix")
+anti_message(source_named_by_its_suffix
+    FILES .anti "//! One.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" .anti
+    ERR "anti: .anti: the file has no name, only its suffix")
 # A library file is read as the driver of antic reads one.
 anti_message(library_damaged
     FILES one.antl "A text where the library file belongs.\n"

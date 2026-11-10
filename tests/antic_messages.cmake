@@ -61,6 +61,26 @@ anti_message(library_no_library_file
           junk.antl "A text where the library file belongs.\n"
     ARGS ${tools} main.anti junk.antl
     ERR "antic: junk.antl is not a library file")
+# Q8 of "Answers of 2026-11-10": a file whose name is its suffix alone has
+# no name, wherever antic takes the kind of a file from its suffix.
+anti_message(source_named_by_its_suffix STATUS 2
+    FILES .anti "${program}"
+    ARGS ${tools} -o main .anti
+    ERR "antic: .anti: the file has no name, only its suffix")
+anti_message(library_file_named_by_its_suffix STATUS 2
+    FILES main.anti "${program}"
+          .antl "A text where the library file belongs.\n"
+    ARGS ${tools} main.anti .antl
+    ERR "antic: .antl: the file has no name, only its suffix")
+anti_message(dev_library_file_named_by_its_suffix STATUS 2
+    FILES .antl "A text where the library file belongs.\n"
+    ARGS ${tools} --dev .antl
+    ERR "antic: .antl: the file has no name, only its suffix")
+anti_message(object_named_by_its_suffix STATUS 2
+    FILES main.anti "${program}"
+          lib/.o "A text where the object belongs.\n"
+    ARGS ${tools} main.anti lib/.o
+    ERR "antic: lib/.o: the file has no name, only its suffix")
 anti_message(library_of_a_root_no_library_file
     FILES main.anti "import com.example.bad;\n\n${program}"
           com/example/bad.antl "A text where the library file belongs.\n"
@@ -82,6 +102,13 @@ anti_message(library_of_the_module_compiled
     ARGS ${tools} -c -I "${PROJECT}" "${PROJECT}/com/example/lib.anti"
          com/example/lib.antl
     ERR "antic: com/example/lib.antl holds module `com.example.lib`, which this command compiles")
+# Q8 of "Answers of 2026-11-10": a library file holds no source, so -c,
+# which compiles one, refuses it in dev mode as well.
+anti_message(library_file_compiled_with_c STATUS 2
+    FILES com/example/lib.anti "${library}"
+    SETUP compile_the_library
+    ARGS ${tools} --dev -c com/example/lib.antl
+    ERR "antic: -c compiles a source, and com/example/lib.antl is a library file")
 # R147 of "Rules of 2026-10-13": the module path is the path of the source
 # under the search root once both are absolute and normalised, so a root
 # and a source written in two forms agree. The library each setup writes
@@ -185,6 +212,14 @@ anti_message(library_static_in_dev_mode STATUS 2
     ARGS ${tools} --lib static --dev -I "${PROJECT}" -o lib.a
          "${PROJECT}/com/example/lib.anti"
     ERR "antic: --lib static builds in release mode, without --dev")
+# Q8 of "Answers of 2026-11-10": a library for C is a release build, and
+# dev mode writes the object of one module, so --lib shared refuses --dev
+# as --lib static does.
+anti_message(library_shared_in_dev_mode STATUS 2
+    FILES com/example/lib.anti "${exporting}"
+    ARGS ${tools} --lib shared --dev -I "${PROJECT}" -o libone.so
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: --lib shared builds in release mode, without --dev")
 
 # A build that links, without the runtime archive.
 anti_message(lib_without_runtime
