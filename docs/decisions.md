@@ -3139,6 +3139,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 - On 2026-11-09 Eddie answered the two gaps that the port of the Pythagoras tree to `anti.graphics` found, under "Answers of 2026-11-09". Q2 is a fix, T217. Q3 lets in the fields `width` and `height` of `graphics.Window`, and Q4 the four functions of a window that give the sizes of the monitor and of the window in points.
 - On 2026-11-09 Eddie answered the two questions of the step that built those answers, under "Answers of 2026-11-09, second set". Q1 keeps the two tests of a hidden window in the suite of the Mac. Q2 lets in the failure of `start` for a flag of a window that changes after a query of the monitor.
 - On 2026-11-09 Eddie answered the three questions of the first phase of coverage, under "Answers of 2026-11-09, third set". The three answers remove code, test a guard and correct the name of a tool in a message. The freeze needs no change for them.
+- On 2026-11-10 Eddie answered five questions of the second phase of coverage, under "Answers of 2026-11-10". Each answer is a fix of a defect, and the freeze lets the fixes in as fixes. The refusals and the message they add come with no option and no form.
 
 ## What the solid run decided
 
@@ -3447,6 +3448,16 @@ Eddie took these decisions on 2026-11-09. They answer the three questions of "Qu
 - Q1. Three functions without a caller go: `diagnostics_check` of the diagnostics of antic, `lower_calloc_function` of the lowering and `anti_rt_fault_fflush` of the seam of fault injection, with the macro `ANTI_FFLUSH`.
 - Q2. `stub` of `src/rt/plugin.c` stays as a guard. No program reaches it, since `reflect.call` calls through the table of the object and never through the table of the sub-object. A C test calls the slot it fills directly and checks what it does.
 - Q3. Memory that runs out in the code of antic names the tool that runs, antic or anti. The name comes from the setting of the platform layer, which `platform_set_tool` gives by R163 of "Rules of 2026-10-13". anti then says `anti: out of memory for N bytes` where it said `antic: out of memory for N bytes`.
+
+## Answers of 2026-11-10
+
+Eddie took these decisions on 2026-11-10. They answer questions 1, 2, 6, 8 and 11 of "Questions for Eddie" in `docs/reports/2026-11-10-coverage-phase-2b.md`, numbered as there. None is provisional. `docs/reports/2026-11-10-defects-of-coverage.md` reports the step that builds them.
+
+- Q1. T219 of `docs/audit/tests-findings.md`. The record of a type argument that is an array carries the descriptor of the array with all its levels, as a field record does. `to_text` and `serialize` of `List<[2][2]int>` then write the nested arrays as a field of that type writes them.
+- Q2. T221. An `&&` chain narrows any number of names, with no limit and no new message. The checker keeps the names a condition proves in storage that grows with them.
+- Q6. Two defects. `let t = (*sp, 1);`, where `sp: *Shape` points to an abstract class, and `(nothing(), 1)` with a call of `void`, are refused with the messages that `let s = *sp;` and a `let` of a `void` value give. A tuple literal is refused the same way in every other context it stands in: an argument, a `return` and an assignment.
+- Q8. Three defects. `--lib shared --dev` exits with 0 and writes `<base>.o` alone, `--dev -c lib.antl` writes an object, and `anti doc .antl` reads a library file named `.antl` as a source. `--dev -c` of a library file is refused, since a library file has no source to compile. A file whose name is its suffix alone is refused as a file with no name, wherever antic or anti decides the kind of a file by its suffix. `--lib shared --dev` writes the library where the specifications let a dev build make one, and is refused where they do not or say nothing.
+- Q11. `if let Circle c = p`, where `p: ?*Shape` is no variant, says that a case needs a variant and names the type found, as `` `if let Circle c` takes a variant, found `?*Shape` ``.
 
 ## Open
 
