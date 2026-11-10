@@ -24,3 +24,4 @@ std_collection_serialize_array_levels T219 serialize of a List of arrays of two 
 matrix_flow_narrowing_of_nine_names_dev T221 An && chain narrows its first eight names alone, so the read of the ninth is refused.
 matrix_flow_narrowing_of_nine_names_release T221 An && chain narrows its first eight names alone, so the read of the ninth is refused.
 matrix_flow_narrowing_of_nine_names_memory_checks T221 An && chain narrows its first eight names alone, so the read of the ninth is refused.
+antic_message_fault_memory_checks_runtime_not_found T222 A macOS link of --memory-checks whose runtime directory cannot be made absolute fails without a message. host=macos

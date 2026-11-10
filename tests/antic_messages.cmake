@@ -709,3 +709,13 @@ anti_message(fault_memory_dll_not_written
     FAULT write:2:EACCES
     ARGS ${tools} ${windows_host} --memory-checks -o main.exe main.anti
     ERR "antic: cannot write clang_rt.asan_dynamic.dll")
+# A macOS program of --memory-checks names the runtime directory of its
+# target in its rpath, driver_link_inputs_of of driver_link.c, which the
+# third and the fourth stat make absolute. T222.
+if(CMAKE_HOST_APPLE)
+    anti_message(fault_memory_checks_runtime_not_found
+        FILES main.anti "${program}"
+        FAULT stat:3:EACCES,stat:4:EACCES
+        ARGS ${tools} --memory-checks main.anti
+        ERR "antic: cannot find the directory of ${RUNTIME}/lib/${HOST}")
+endif()
