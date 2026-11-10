@@ -228,8 +228,7 @@ void test_variant(void)
             "    if let Circle c = n { }\n"
             "}\n",
             2, 23,
-            "`if let` takes a variant or a value that may be `none`, found "
-            "`int`");
+            "`if let Circle c` takes a variant, found `int`");
     /* The name an arm binds lives in the arm alone. */
     rejects(SHAPE
             "fn f(s: Shape) -> f32 {\n"

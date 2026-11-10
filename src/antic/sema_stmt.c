@@ -1822,8 +1822,22 @@ static void check_switch(struct checker *c, struct stmt *s)
         sema_if_let_none(c, s, over);
         return;
     }
+    /* A case that binds its fields needs a variant, by Q11 of "Answers
+       of 2026-11-10" in docs/decisions.md, so its message names the case
+       and no `none`. A bare name binds a value that may be `none` or
+       names a case of a variant. */
     if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
-        over->kind != TYPE_VARIANT) {
+        over->kind != TYPE_VARIANT &&
+        s->as.switch_stmt.arms[0].binds.length > 0) {
+        const struct switch_arm *arm = &s->as.switch_stmt.arms[0];
+        sema_error_at(c, s->as.switch_stmt.value->pos,
+                      "`if let %.*s %.*s` takes a variant, found `%s`",
+                      (int)arm->value->as.name.length,
+                      arm->value->as.name.text, (int)arm->binds.length,
+                      arm->binds.text, sema_tn(over));
+        over = sema_builtin(c, TYPE_ERROR);
+    } else if (s->as.switch_stmt.if_let && !sema_is_error(over) &&
+               over->kind != TYPE_VARIANT) {
         sema_error_at(c, s->as.switch_stmt.value->pos, "`if let` takes a "
                       "variant or a value that may be `none`, found `%s`",
                       sema_tn(over));

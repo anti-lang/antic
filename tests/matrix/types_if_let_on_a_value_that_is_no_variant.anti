@@ -1,0 +1,11 @@
+//! `if let m = n` binds a value that may be `none`, and the `int` `n` is no
+//! such value and no variant.
+
+fn main() -> int
+{
+	let n = 1;
+	if let m = n {
+		return 1;
+	}
+	return 0;
+}
