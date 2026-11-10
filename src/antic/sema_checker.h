@@ -286,8 +286,14 @@ struct generic_call {
     struct type **prechecked;
 };
 
-/* The most names one condition proves. */
-#define PROVED_MAX 8
+/* The names one condition proves, as many as it holds, by Q2 of
+   "Answers of 2026-11-10" in docs/decisions.md. The list grows on the
+   heap, and sema_proved_free gives it back. A zero value is empty. */
+struct proved {
+    struct symbol **names;
+    size_t count;
+    size_t capacity;
+};
 
 /* Copy the spelling of an operator without its backticks into buffer.
    The longest is `mul_high`. */
@@ -744,8 +750,9 @@ bool sema_refuse_write(struct checker *c, const struct expr *target);
 void sema_walk_worker(struct checker *c, const struct item *worker);
 bool sema_fills(const struct type *t, const struct type *abstract);
 bool sema_filled_somewhere(const struct checker *c, const struct type *t);
-size_t sema_proved_names(const struct expr *cond, bool want_true,
-                         struct symbol **out, size_t count);
+void sema_proved_names(const struct expr *cond, bool want_true,
+                       struct proved *out);
+void sema_proved_free(struct proved *p);
 struct type *sema_proved_type(struct checker *c, const struct symbol *sym);
 void sema_check_block(struct checker *c, struct block *b);
 /* e[i] = v in the statement s, which a copy reads again with the type of

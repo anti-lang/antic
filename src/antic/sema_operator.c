@@ -620,19 +620,18 @@ static struct type *check_logical(struct checker *c, struct expr *e)
     /* The right operand runs only where the left one decided it, so it
        sees the names the left proved. `p != none && p.n > 0` and
        `p == none || p.n > 0` both read `p` as checked. */
-    struct symbol *proved[PROVED_MAX];
-    size_t count;
+    struct proved proved = {0};
     struct scope narrowed;
     size_t i;
     struct type *left = sema_check_test(c, e->as.binary.left);
     struct type *right;
 
-    count = sema_proved_names(e->as.binary.left, op == TOKEN_AND_AND,
-                              proved, 0);
+    sema_proved_names(e->as.binary.left, op == TOKEN_AND_AND, &proved);
     sema_enter_scope(c, &narrowed);
-    for (i = 0; i < count; i++) {
-        sema_narrow(c, proved[i], sema_proved_type(c, proved[i]));
+    for (i = 0; i < proved.count; i++) {
+        sema_narrow(c, proved.names[i], sema_proved_type(c, proved.names[i]));
     }
+    sema_proved_free(&proved);
     right = sema_check_test(c, e->as.binary.right);
     sema_leave_scope(c, &narrowed);
     if (sema_is_error(left) || sema_is_error(right)) {

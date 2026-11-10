@@ -527,39 +527,49 @@ static struct symbol *checked_against_none(const struct expr *cond,
    when it is false, because either side may have failed. `a || b` is the
    mirror of it. That is why the narrowing of an `&&` chain reaches the
    body of the `if` and the narrowing of an `||` chain does not. */
-size_t sema_proved_names(const struct expr *cond, bool want_true,
-                         struct symbol **out, size_t count)
+void sema_proved_names(const struct expr *cond, bool want_true,
+                       struct proved *out)
 {
     struct symbol *one;
     size_t i;
 
     if (cond == NULL) {
-        return count;
+        return;
     }
     if (cond->kind == EXPR_UNARY && cond->as.unary.op == TOKEN_BANG) {
-        return sema_proved_names(cond->as.unary.operand, !want_true, out,
-                                 count);
+        sema_proved_names(cond->as.unary.operand, !want_true, out);
+        return;
     }
     if (cond->kind == EXPR_BINARY &&
         (cond->as.binary.op == TOKEN_AND_AND ||
          cond->as.binary.op == TOKEN_OR_OR)) {
         if ((cond->as.binary.op == TOKEN_AND_AND) != want_true) {
-            return count;
+            return;
         }
-        count = sema_proved_names(cond->as.binary.left, want_true, out, count);
-        return sema_proved_names(cond->as.binary.right, want_true, out, count);
+        sema_proved_names(cond->as.binary.left, want_true, out);
+        sema_proved_names(cond->as.binary.right, want_true, out);
+        return;
     }
     one = checked_against_none(cond, want_true ? TOKEN_NE : TOKEN_EQ);
-    if (one == NULL || count >= PROVED_MAX) {
-        return count;
+    if (one == NULL) {
+        return;
     }
-    for (i = 0; i < count; i++) {
-        if (out[i] == one) {
-            return count;
+    for (i = 0; i < out->count; i++) {
+        if (out->names[i] == one) {
+            return;
         }
     }
-    out[count++] = one;
-    return count;
+    out->names = alloc_grow(out->names, &out->capacity, out->count,
+                            sizeof *out->names);
+    out->names[out->count++] = one;
+}
+
+void sema_proved_free(struct proved *p)
+{
+    free(p->names);
+    p->names = NULL;
+    p->count = 0;
+    p->capacity = 0;
 }
 
 /* The `*T` that a check proved of sym. */
@@ -2456,51 +2466,54 @@ static void check_stmt_kind(struct checker *c, struct stmt *s)
         }
         return;
     case STMT_IF: {
-        struct symbol *leaves[PROVED_MAX];
-        size_t leave_count = 0;
+        struct proved leaves = {0};
         for (i = 0; i < s->as.if_chain.count; i++) {
             struct expr *cond = s->as.if_chain.branches[i].cond;
-            struct symbol *proved[PROVED_MAX];
-            size_t count;
+            struct proved proved = {0};
             check_condition(c, cond);
-            count = sema_proved_names(cond, true, proved, 0);
-            check_block_narrowing(c, s->as.if_chain.branches[i].body, proved,
-                                  count);
+            sema_proved_names(cond, true, &proved);
+            check_block_narrowing(c, s->as.if_chain.branches[i].body,
+                                  proved.names, proved.count);
+            sema_proved_free(&proved);
             /* `if p == none { return; }` proves the rest of the
                enclosing block runs with p bound, so the narrowing
                outlives the branch. One branch alone can prove it, and
                only when it leaves. */
-            if (s->as.if_chain.count == 1 && leave_count == 0 &&
+            if (s->as.if_chain.count == 1 && leaves.count == 0 &&
                 block_leaves(s->as.if_chain.branches[i].body)) {
-                leave_count = sema_proved_names(cond, false, leaves, 0);
+                sema_proved_names(cond, false, &leaves);
             }
         }
         if (s->as.if_chain.else_body != NULL) {
             /* The `else` of `if p == none` runs with p bound. */
-            struct symbol *bound[PROVED_MAX];
-            size_t count =
-                s->as.if_chain.count == 1
-                    ? sema_proved_names(s->as.if_chain.branches[0].cond, false,
-                                        bound, 0)
-                    : 0;
-            check_block_narrowing(c, s->as.if_chain.else_body, bound, count);
+            struct proved bound = {0};
+            if (s->as.if_chain.count == 1) {
+                sema_proved_names(s->as.if_chain.branches[0].cond, false,
+                                  &bound);
+            }
+            check_block_narrowing(c, s->as.if_chain.else_body, bound.names,
+                                  bound.count);
+            sema_proved_free(&bound);
         }
         if (s->as.if_chain.else_body == NULL) {
-            for (i = 0; i < leave_count; i++) {
-                sema_narrow(c, leaves[i], sema_proved_type(c, leaves[i]));
+            for (i = 0; i < leaves.count; i++) {
+                sema_narrow(c, leaves.names[i],
+                            sema_proved_type(c, leaves.names[i]));
             }
         }
+        sema_proved_free(&leaves);
         return;
     }
     case STMT_WHILE:
     case STMT_DO_WHILE:
         sema_loop_opens(c, s);
         if (s->kind == STMT_WHILE) {
-            struct symbol *proved[PROVED_MAX];
-            size_t count;
+            struct proved proved = {0};
             check_condition(c, s->as.loop.cond);
-            count = sema_proved_names(s->as.loop.cond, true, proved, 0);
-            check_block_narrowing(c, s->as.loop.body, proved, count);
+            sema_proved_names(s->as.loop.cond, true, &proved);
+            check_block_narrowing(c, s->as.loop.body, proved.names,
+                                  proved.count);
+            sema_proved_free(&proved);
         } else {
             sema_check_block(c, s->as.loop.body);
             check_condition(c, s->as.loop.cond);
