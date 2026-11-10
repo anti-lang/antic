@@ -811,6 +811,12 @@ void anti_rt_element_serialize(void *out, void *bytes,
     }
     if (t == ANTI_TYPE_ARRAY) {
         size_t size = anti_rt_element_size(arg->type, arg->descriptor);
+        /* An array whose elements no walk reads is null, as a field of
+           its type is, T218 of docs/audit/tests-findings.md. */
+        if (array_length(arg) == 0) {
+            put(b, "null");
+            return;
+        }
         put(b, "[");
         for (i = 0; i < array_length(arg); i++) {
             char *at = (char *)bytes + (size_t)i * size;
