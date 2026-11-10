@@ -1,0 +1,5 @@
+antic: cannot open none
+lexes.anti:2:26: error: unexpected character `$`
+parses.anti:1:10: error: expected identifier
+antic: `Bad-Name` in Bad-Name.anti is not a lowercase identifier
+checks.anti:6:9: error: expected `int`, found `bool`

@@ -12,8 +12,11 @@
 #include "../binary_stdio.h"
 #include "check.h"
 #include <stdlib.h>
+#include <string.h>
 
 #include "cpu.h"
+#include "driver.h"
+#include "target.h"
 
 static void set_level(const char *name)
 {
@@ -149,6 +152,20 @@ static void refusal(void)
     clear_level();
 }
 
+/* A level of another architecture than that of the target, which main.c
+   and anti refuse before the driver runs. The message goes to the
+   standard error, which unit_cpu_messages compares. */
+static void driver_refusal(void)
+{
+    struct options o;
+
+    memset(&o, 0, sizeof o);
+    o.input = "main.anti";
+    o.target = TARGET_LINUX_X86_64;
+    o.cpu = CPU_ARMV8_0;
+    CHECK(driver_run(&o) == 2);
+}
+
 void test_cpu(void)
 {
     defaults();
@@ -156,4 +173,5 @@ void test_cpu(void)
     features();
     ids();
     refusal();
+    driver_refusal();
 }

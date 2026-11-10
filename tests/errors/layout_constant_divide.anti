@@ -1,0 +1,11 @@
+//! An element of a constant array divides by a value that is zero on one
+//! target. The bytes of the constant are written for the target, so the back
+//! end refuses it there.
+
+const K: int = 8 / (size_of(c_long) - 8);
+const TABLE: [2]int = [1, K];
+
+fn main() -> int
+{
+	return TABLE[1];
+}

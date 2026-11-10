@@ -176,6 +176,42 @@ static void doc_pages(void)
     antic_doc_page_free(&page);
 }
 
+/* A doc page of a source that is missing, that does not lex, parse or
+   check, or whose file name is no module name. The first `anti doc`
+   compiles every source, so no command reaches these. Each message goes
+   to the standard error, which unit_interface_messages compares. */
+static void doc_page_refused(const char *path, const char *source)
+{
+    struct options o;
+    struct doc_page page = {0};
+
+    if (source != NULL) {
+        FILE *f = platform_open(path, true);
+        CHECK(f != NULL);
+        if (f == NULL) {
+            return;
+        }
+        CHECK(fwrite(source, 1, strlen(source), f) == strlen(source));
+        CHECK(fclose(f) == 0);
+    }
+    memset(&o, 0, sizeof o);
+    o.input = path;
+    CHECK(target_host(&o.target));
+    o.cpu = cpu_default(o.target);
+    CHECK(!antic_doc_page(&o, DOC_ITEMS_PUBLIC, &page));
+    antic_doc_page_free(&page);
+}
+
+static void doc_page_refusals(void)
+{
+    doc_page_refused("none", NULL);
+    doc_page_refused("lexes.anti", "//! A.\nfn f() -> int { return 1 $ 2; }\n");
+    doc_page_refused("parses.anti", "fn main( -> int\n{\n\treturn 0;\n}\n");
+    doc_page_refused("Bad-Name.anti", "//! A.\n");
+    doc_page_refused("checks.anti",
+                     "//! A.\n\n/// F.\npub fn f() -> int\n{\n\treturn true;\n}\n");
+}
+
 void test_interface(void)
 {
     identifiers();
@@ -183,4 +219,5 @@ void test_interface(void)
     outlines();
     library_headers();
     doc_pages();
+    doc_page_refusals();
 }

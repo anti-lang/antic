@@ -45,7 +45,10 @@
 #                         without a directory
 #   output_shared         -o beside --lib shared, for the targets this
 #                         host links: the name of the library without it
-#   output_dev_library    -o beside --dev with a library file as the input
+#   output_dev_library    -o beside --dev with a library file as the input,
+#                         and the library file of a module with main,
+#                         whose dev build writes its object and links no
+#                         program
 #   output_plugin         -o of a plugin without a directory: the index
 #                         stands beside the library and names it
 #   output_native_library -o with the separators of the host, `\` on
@@ -681,6 +684,20 @@ if(CASE STREQUAL "output_dev_library")
                  "named.antl named.o")
     expect_files("the directory of the build with -o" "${option}"
                  "named.antl other.o")
+    file(MAKE_DIRECTORY "${WORK}/program")
+    file(COPY_FILE "${SOURCES}/programs/return42.anti"
+         "${WORK}/program/named.anti")
+    antic_run(status out err IN "${WORK}/program" COMMAND ${tools} -c named.anti)
+    if(NOT status EQUAL 0 OR NOT out STREQUAL "")
+        message(FATAL_ERROR "antic -c ended with ${status}\n${out}${err}")
+    endif()
+    expect_same_text("the standard error of antic -c" "${said}" "${err}")
+    file(REMOVE "${WORK}/program/named.anti")
+    antic_in(program --dev named.antl)
+    files_of("${WORK}/program" program)
+    string(REGEX REPLACE "\\.obj( |$)" ".o\\1" program "${program}")
+    expect_files("the directory of the build of a module with main"
+                 "${program}" "named.antl named.o")
     return()
 endif()
 

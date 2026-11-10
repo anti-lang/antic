@@ -508,10 +508,10 @@ foreach(source IN LISTS unit_sources)
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
     endif()
 endforeach()
-# The messages two groups write to the standard error, which the group
-# itself does not read: the zip reader and writer, and the build id of a
-# program.
-foreach(group zip syms)
+# The messages four groups write to the standard error, which the group
+# itself does not read: the zip reader and writer, the build id of a
+# program, the refused doc pages and the refused level of the driver.
+foreach(group zip syms interface cpu)
     add_test(NAME unit_${group}_messages
         COMMAND "${CMAKE_COMMAND}"
             "-DPROGRAM=$<TARGET_FILE:antic_unit_tests>"
@@ -4391,8 +4391,16 @@ add_expect_test(error_modules_extern_function_with_another_signature_than_a_libr
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_extern_function_with_another_signature_than_a_library.s"
             modules_extern_function_with_another_signature_than_a_library.anti)
+# --dump-ir reaches the same check of the program and prints no IR.
+add_expect_test(error_modules_extern_function_with_another_signature_than_a_library_dump STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/modules_extern_function_with_another_signature_than_a_library.err"
+    COMMAND "$<TARGET_FILE:antic>" --dump-ir -I "${LIBS}/externs"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            modules_extern_function_with_another_signature_than_a_library.anti)
 set_tests_properties(error_modules_extern_function_with_two_signatures
     error_modules_extern_function_with_another_signature_than_a_library
+    error_modules_extern_function_with_another_signature_than_a_library_dump
     PROPERTIES FIXTURES_REQUIRED externs_antl)
 
 # A library file whose own import no search root holds. The command names
@@ -4734,6 +4742,9 @@ add_antic_refusal(target_value "antic: unknown target plan9"
     --runtime "${ANTIC_RUNTIME_DIR}" --target plan9 return42.anti)
 add_antic_refusal(input_suffix "antic: return42.expected: expected a .anti file"
     --runtime "${ANTIC_RUNTIME_DIR}" return42.expected)
+add_antic_refusal(input_suffix_dev
+    "antic: return42.expected: expected a .anti file"
+    --runtime "${ANTIC_RUNTIME_DIR}" --dev return42.expected)
 add_antic_refusal(lto_memory_checks_macos
     "antic: --lto links no macOS program of --memory-checks"
     --runtime "${ANTIC_RUNTIME_DIR}" --target macos-arm64 --lto full
@@ -5145,6 +5156,20 @@ add_expect_test(error_foreign_link STATUS 2
             --runtime "${ANTIC_RUNTIME_DIR}"
             -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42"
             "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+# A dev build compiles the module first and refuses the link after it,
+# with the status of a failed build. A library refuses before it.
+add_expect_test(error_foreign_link_dev STATUS 1
+    PATTERN "^antic: linking for ${foreign_target} with the platform linker needs a host with the same operating system"
+    COMMAND "$<TARGET_FILE:antic>" --target ${foreign_target} --linker platform
+            --dev --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/return42_dev"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
+add_expect_test(error_foreign_link_library STATUS 2
+    PATTERN "^antic: linking for ${foreign_target} with the platform linker needs a host with the same operating system"
+    COMMAND "$<TARGET_FILE:antic>" --target ${foreign_target} --linker platform
+            --lib shared --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/errors/libr42"
+            "${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti")
 
 # The back end folds an array length from size_of and names the target.
 add_expect_test(error_array_length STATUS 1
@@ -5199,6 +5224,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "layout_size|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_size.s,layout_size.anti"
         "layout_shift|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_shift.s,layout_shift.anti"
         "layout_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_divide.s,layout_divide.anti"
+        "layout_constant_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_constant_divide.s,layout_constant_divide.anti"
         "generic_length_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_divide.s,generic_length_divide.anti"
         "generic_length_shift|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_shift.s,generic_length_shift.anti"
         "generic_length_least|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_least.s,generic_length_least.anti"

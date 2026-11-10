@@ -89,6 +89,13 @@ if("${REFUSALS}")
             --profile-use "${WORK}/missing.profdata")
     refused("empty.profdata is no profile of llvm-profdata merge"
             --profile-use "${WORK}/empty.profdata")
+    # A file of eight bytes and more that does not start with the magic
+    # of an indexed profile.
+    file(WRITE "${WORK}/text.profdata" "A text where the profile belongs.\n")
+    refused("text.profdata is no profile of llvm-profdata merge"
+            --profile-use "${WORK}/text.profdata")
+    refused("--profile-generate links a program" --profile-generate
+            --linker platform)
 endif()
 
 # Fail unless the object at path is bitcode where the build links through

@@ -69,6 +69,13 @@ anti_message(library_of_a_root_no_library_file
 function(compile_the_library)
     antic_runs(-c -I "${PROJECT}" "${PROJECT}/com/example/lib.anti")
 endfunction()
+# The dev build of a library file lays out its constants for the target,
+# and a size that is zero on Linux divides by zero there.
+anti_message(dev_library_layout
+    FILES com/example/lib.anti "//! A size that is zero on Linux.\n\nconst K: int = 8 / (size_of(c_long) - 8);\n\n/// K.\npub fn k() -> int\n{\n\treturn K;\n}\n"
+    SETUP compile_the_library
+    ARGS ${tools} --dev --target linux-x86_64 com/example/lib.antl
+    ERR "antic: a size expression divides by zero on linux-x86_64")
 anti_message(library_of_the_module_compiled
     FILES com/example/lib.anti "${library}"
     SETUP compile_the_library
@@ -189,6 +196,13 @@ anti_message(dev_without_runtime
     FILES main.anti "${program}"
     ARGS --dev main.anti
     ERR "antic: linking needs --runtime <dir>, the directory that holds lib/<target>/")
+# A program of anti.regex writes the notice of PCRE2, which it builds
+# without a runtime archive before the link refuses.
+set(pattern_program "import anti.regex;\n\nfn main() -> int\n{\n\tif \"abc\".matches(re\"b\") {\n\t\treturn 1;\n\t}\n\treturn 0;\n}\n")
+anti_message(dev_without_runtime_regex
+    FILES main.anti "${pattern_program}"
+    ARGS --dev -I "${RUNTIME}/std" main.anti
+    ERR "antic: linking needs --runtime <dir>, the directory that holds lib/<target>/")
 
 # A library file as the input of --dev.
 anti_message(dev_library_missing
@@ -210,6 +224,11 @@ anti_message(opt_does_not_start
     FILES main.anti "${program}"
     ARGS --runtime "${RUNTIME}" --opt ./none -o main main.anti
     ERR_MATCH "antic: cannot run \\./none: [^\n]*\nantic: opt failed\n")
+# -S without a runtime archive finds no llc, and opt does not start.
+anti_message(llc_without_runtime
+    FILES main.anti "${program}"
+    ARGS -S --opt ./none main.anti
+    ERR "antic: no runtime archive holds llc. The package holds it in bin/ beside antic.")
 anti_message(llc_does_not_start
     FILES main.anti "${program}"
     ARGS --runtime "${RUNTIME}" --lto none --llc ./none -o main main.anti
@@ -288,6 +307,14 @@ anti_message(fault_output_not_created
     ARGS ${tools} -c -I "${PROJECT}" -o lib.antl
          "${PROJECT}/com/example/lib.anti"
     ERR "antic: cannot create lib.antl")
+# An output in the top directory, whose directory is the separator
+# alone. The fault keeps the file from being written there.
+anti_message(fault_output_in_the_top_directory
+    FILES com/example/lib.anti "${library}"
+    FAULT open:2:EACCES
+    ARGS ${tools} -c -I "${PROJECT}" -o /lib.antl
+         "${PROJECT}/com/example/lib.anti"
+    ERR "antic: cannot create /lib.antl")
 anti_message(fault_output_not_written
     FILES com/example/lib.anti "${library}"
     FAULT write:1:ENOSPC
@@ -441,6 +468,19 @@ endif()
 # The linker of the Mac, which xcrun names, platform_capture of
 # platform.c and xcrun of driver_link.c. opt and llc run first.
 if(CMAKE_HOST_APPLE)
+    # The record of the upstream sources and the licence of PCRE2, which
+    # the notice of a program of anti.regex reads. A program of musl on
+    # Linux opens the texts of musl and mimalloc first.
+    anti_message(fault_runtime_sources_unread
+        FILES main.anti "${pattern_program}"
+        FAULT open:11:EACCES
+        ARGS ${tools} main.anti
+        ERR "antic: cannot open ${RUNTIME}/licenses/sources.txt")
+    anti_message(fault_native_license_unread
+        FILES main.anti "${pattern_program}"
+        FAULT open:12:EACCES
+        ARGS ${tools} main.anti
+        ERR "antic: cannot open ${RUNTIME}/licenses/pcre2.txt")
     anti_message(fault_xcrun_no_pipe
         FILES main.anti "${program}"
         FAULT run:3:EACCES

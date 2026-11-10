@@ -79,6 +79,16 @@ antic(--profile-generate --lto none -o "${WORK}/profile-none${exe}"
       "${SOURCE}")
 expect_bitcode("${WORK}/profile-none${exe}${object}" NOT)
 
+# Without --lto a program of --memory-checks keeps its objects on every
+# target, and --lto full links one for Linux through LTO. macOS refuses
+# the option there.
+antic(--target linux-x86_64 --memory-checks -o "${WORK}/checks"
+      "${SOURCE}")
+expect_bitcode("${WORK}/checks.o" NOT)
+antic(--target linux-x86_64 --memory-checks --lto full
+      -o "${WORK}/checks-full" "${SOURCE}")
+expect_bitcode("${WORK}/checks-full.o")
+
 # The .def file of a Windows host lists the COFF symbols of its object.
 if(EXISTS "${RUNTIME}/sysroot/windows-x86_64")
     antic(--target windows-x86_64 -o "${WORK}/host.exe" "${HOSTING}")

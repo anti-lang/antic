@@ -526,6 +526,8 @@ Each holds one case per message of a command, which
 |---|---|
 | `tests/unit/` | The C unit tests that link the code of antic, `anti` and the runtime. |
 | `tests/unit/check.h` | The two assertion macros, which count a failure and go on. |
+| `tests/unit/cpu.err` | The standard error that the group `cpu` of `test_cpu.c` writes, which `unit_cpu_messages` compares. |
+| `tests/unit/interface.err` | The standard error of the doc pages that `test_interface.c` refuses, which `unit_interface_messages` compares. |
 | `tests/unit/path_rules.h` | The cases of the path rules that both platform layers are run over. |
 | `tests/unit/pipeline.c` | The stages that `pipeline.h` declares. |
 | `tests/unit/pipeline.h` | The stages the unit tests run a source through, for one module or a compilation of more than one, and the IR print without the types of the runtime. |
