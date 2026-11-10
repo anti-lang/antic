@@ -4745,6 +4745,8 @@ add_antic_refusal(input_suffix "antic: return42.expected: expected a .anti file"
 add_antic_refusal(input_suffix_dev
     "antic: return42.expected: expected a .anti file"
     --runtime "${ANTIC_RUNTIME_DIR}" --dev return42.expected)
+add_antic_refusal(input_shorter_than_a_suffix_dev "antic: x: expected a .anti file"
+    --runtime "${ANTIC_RUNTIME_DIR}" --dev x)
 add_antic_refusal(lto_memory_checks_macos
     "antic: --lto links no macOS program of --memory-checks"
     --runtime "${ANTIC_RUNTIME_DIR}" --target macos-arm64 --lto full
