@@ -1083,6 +1083,13 @@ const char *platform_file_name(const char *path)
     return cut != NULL ? cut + 1 : path;
 }
 
+bool platform_suffix_alone(const char *path)
+{
+    const char *name = platform_file_name(path);
+
+    return name[0] == '.' && strchr(name + 1, '.') == NULL;
+}
+
 bool platform_self_directory(struct text *out)
 {
     struct text path = {0};

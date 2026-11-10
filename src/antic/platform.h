@@ -60,6 +60,13 @@ const char *platform_last_separator(const char *path);
    Windows path splits at `\` everywhere, M335. */
 const char *platform_file_name(const char *path);
 
+/* Whether the file name of path is a suffix alone, as `.antl` is: a dot
+   that starts the name and no other dot. A file of that name has no
+   name, and every part of antic and anti that takes the kind of a file
+   from its suffix refuses it, by Q8 of "Answers of 2026-11-10" in
+   docs/decisions.md. */
+bool platform_suffix_alone(const char *path);
+
 /* The separator of the paths the host's own programs read: `\` on
    Windows and `/` elsewhere. */
 char platform_separator(void);

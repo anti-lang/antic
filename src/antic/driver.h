@@ -191,6 +191,11 @@ struct options {
    0, DRIVER_OBJECT_ONLY, 2 after a dump or a refused option and 1 after
    an error. */
 int driver_run(const struct options *options);
+
+/* Whether path, whose suffix gave the kind of its file, names a file
+   with a name before that suffix. Otherwise writes the message of a file
+   with no name and returns false. */
+bool driver_file_named(const char *path);
 struct arena;
 struct package;
 

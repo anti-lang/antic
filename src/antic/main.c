@@ -487,9 +487,15 @@ static int run(int argc, char **argv, const struct lists *l)
             say_antic("unknown option %s\n", arg);
             return usage(stderr);
         } else if (ends_with(arg, ANTL_SUFFIX)) {
+            if (!driver_file_named(arg)) {
+                return 2;
+            }
             l->libraries[options.library_count++] = arg;
             continue;
         } else if (link_is_input(arg)) {
+            if (!driver_file_named(arg)) {
+                return 2;
+            }
             l->objects[options.object_count++] = arg;
             continue;
         } else if (options.input == NULL) {

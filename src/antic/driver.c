@@ -2015,6 +2015,15 @@ static bool library_options_usable(const struct options *o)
     return true;
 }
 
+bool driver_file_named(const char *path)
+{
+    if (!platform_suffix_alone(path)) {
+        return true;
+    }
+    say_antic("%s: the file has no name, only its suffix\n", path);
+    return false;
+}
+
 int driver_run(const struct options *given)
 {
     struct options resolved = *given;
@@ -2072,6 +2081,11 @@ int driver_run(const struct options *given)
     }
     memset(&extras, 0, sizeof extras);
 
+    if ((ends_with(o->input, SOURCE_SUFFIX) ||
+         ends_with(o->input, ANTL_SUFFIX)) &&
+        !driver_file_named(o->input)) {
+        return 2;
+    }
     if (!ends_with(o->input, SOURCE_SUFFIX) &&
         !(o->dev && ends_with(o->input, ANTL_SUFFIX))) {
         say_antic("%s: expected a %s file\n", o->input,
