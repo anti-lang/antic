@@ -713,7 +713,7 @@ add_test(NAME unit_hash_draw COMMAND rt_hash_draw_tests)
 # The programs of the runtime above compile its files themselves, so a
 # coverage tree measures src/rt/ through them.
 antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests rt_object_tests
-    rt_platform_tests rt_plugin_table_tests rt_plugin_stub_tests
+    rt_deserialize_tests rt_platform_tests rt_plugin_table_tests rt_plugin_stub_tests
     rt_oom_runtime rt_oom_tests
     rt_hash_draw_runtime rt_hash_draw_tests)
 
