@@ -1,0 +1,27 @@
+//! A tuple literal holds no value of an abstract class, as a `let` holds none,
+//! by Q6 of "Answers of 2026-11-10".
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn count(sp: *Shape) -> int
+{
+	let t = (*sp, 1);
+	return t.1;
+}
+
+fn main() -> int
+{
+	let s = Square { };
+	return count(&s);
+}

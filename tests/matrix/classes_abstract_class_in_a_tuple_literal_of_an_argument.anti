@@ -1,0 +1,31 @@
+//! A tuple literal as an argument holds no value of an abstract class, by Q6 of
+//! "Answers of 2026-11-10".
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn take<T>(x: T) -> int
+{
+	return 1;
+}
+
+fn count(sp: *Shape) -> int
+{
+	return take((*sp, 1));
+}
+
+fn main() -> int
+{
+	let s = Square { };
+	return count(&s);
+}

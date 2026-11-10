@@ -1,0 +1,13 @@
+//! A tuple literal in an assignment holds no value of a call that returns none,
+//! by Q6 of "Answers of 2026-11-10".
+
+fn nothing()
+{
+}
+
+fn main() -> int
+{
+	let t = (2, 1);
+	t = (nothing(), 1);
+	return t.1;
+}

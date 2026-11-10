@@ -1,0 +1,1 @@
+flow_tuple_literal_of_a_call_without_a_result_in_a_return.anti:10:10: error: `nothing` returns no value

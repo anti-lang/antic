@@ -1,0 +1,12 @@
+//! A tuple literal holds no value of a call that returns none, as a `let` holds
+//! none, by Q6 of "Answers of 2026-11-10".
+
+fn nothing()
+{
+}
+
+fn main() -> int
+{
+	let t = (nothing(), 1);
+	return t.1;
+}
