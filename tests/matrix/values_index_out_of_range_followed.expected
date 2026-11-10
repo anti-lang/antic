@@ -1,0 +1,14 @@
+exit 0
+a difference: 3
+a copy: 3
+a literal: c
+a sum on the right: 5
+a step over a length: 4
+times zero: 3
+a product past the bound: 0
+a difference past the bound: 0
+unknown on both sides: 0
+with a carry: 3
+with a try: 9
+with a walk: 24
+a walked body: 20

@@ -1,0 +1,13 @@
+//! An index past the length of a slice parameter by a number, which the message
+//! writes as the length plus that number.
+
+fn second_after(s: []int) -> int
+{
+	return s[s.len + 1];
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	return second_after(xs[0..3]);
+}

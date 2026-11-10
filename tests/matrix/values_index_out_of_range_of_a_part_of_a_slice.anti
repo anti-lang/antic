@@ -1,0 +1,15 @@
+//! A part of a slice parameter without its first two elements, indexed at its
+//! own length, which the message writes as the length of the parameter less
+//! two.
+
+fn after_the_part(s: []int) -> int
+{
+	let t = s[2..s.len];
+	return t[s.len - 2];
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	return after_the_part(xs[0..3]);
+}

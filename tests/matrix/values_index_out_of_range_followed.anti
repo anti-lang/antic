@@ -1,0 +1,188 @@
+//! The values that the safety check `index-out-of-range` follows through forms
+//! of their own, each in an index that the check proves in range or cannot
+//! prove out of range, so it refuses none. A difference of an unknown from
+//! itself, a copy of a slice, a literal `str`, a loop variable on the right of
+//! a sum, a step over an unknown length, a product by zero, a product and a
+//! difference that leave the bound the check follows, an unknown on both sides
+//! of a sum, a carry, a loop body that a `try` or a walk of a collection may
+//! leave, and a loop body whose every statement the check walks. A dev build
+//! checks each index the check allows.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const NEAR_BOUND: int = 1099511627775;
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn difference(k: int) -> int
+{
+	let xs = [1, 2, 3];
+	return xs[k - k + 2];
+}
+
+fn copied(s: []int) -> int
+{
+	let t = s;
+	return t[t.len - 1];
+}
+
+fn literal_text() -> byte
+{
+	return "abc"[2];
+}
+
+fn sum_on_the_right() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len - 1 {
+		total += xs[1 + i];
+	}
+	return total;
+}
+
+fn step_over_a_length(s: []int) -> int
+{
+	let total = 0;
+	for i in 0..s.len + 1 by 2 {
+		total += s[i];
+	}
+	return total;
+}
+
+fn times_zero() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len {
+		total += xs[i * 0];
+	}
+	return total;
+}
+
+fn product_past_the_bound(s: []int) -> int
+{
+	let total = 0;
+	for i in 0..2000 {
+		if opaque(i) < s.len {
+			total += s[i * 1000000000];
+		}
+	}
+	return total;
+}
+
+fn difference_past_the_bound(s: []int) -> int
+{
+	let total = 0;
+	for i in -2..0 {
+		if opaque(i) > 0 {
+			total += s[NEAR_BOUND - i];
+		}
+	}
+	return total;
+}
+
+fn unknown_on_both_sides(n: int, s: []int) -> int
+{
+	let total = 0;
+	for i in 0..s.len + 1 {
+		if opaque(i) < 0 {
+			total += s[n + i] + s[5 - i];
+		}
+	}
+	return total;
+}
+
+fn with_a_carry(a: int, b: int) -> int
+{
+	let xs = [1, 2, 3];
+	let (sum, f) = a + b;
+	return xs[a + b + f.carry] + sum;
+}
+
+fn checked(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn with_a_try() -> int may fail
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len {
+		total += try checked(i);
+		total += xs[i];
+	}
+	return total;
+}
+
+fn with_a_walk() -> int
+{
+	let xs = [1, 2, 3];
+	let total = 0;
+	for i in 0..xs.len {
+		for x in xs {
+			total += x;
+		}
+		total += xs[i];
+	}
+	return total;
+}
+
+fn walked_body() -> int
+{
+	let xs = [1, 2, 3];
+	let m = Mutex.new();
+	let total = 0;
+	for i in 0..xs.len {
+		let pair = (xs[i], 0);
+		let three = [xs[i], 0, 0];
+		let part = xs[0..xs[i] - xs[i] + 1];
+		{
+			total += xs[i];
+		}
+		sync m {
+			total += xs[i];
+		}
+		switch xs[i] {
+			1 => total += pair.0,
+			else => total += three[0] + part[0],
+		}
+		defer total += 0;
+	}
+	return total;
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	printf("a difference: %d\n".ptr, difference(5) as c_int);
+	printf("a copy: %d\n".ptr, copied(xs[0..3]) as c_int);
+	printf("a literal: %c\n".ptr, literal_text() as c_int);
+	printf("a sum on the right: %d\n".ptr, sum_on_the_right() as c_int);
+	printf("a step over a length: %d\n".ptr,
+		step_over_a_length(xs[0..3]) as c_int);
+	printf("times zero: %d\n".ptr, times_zero() as c_int);
+	printf("a product past the bound: %d\n".ptr,
+		product_past_the_bound(xs[0..0]) as c_int);
+	printf("a difference past the bound: %d\n".ptr,
+		difference_past_the_bound(xs[0..3]) as c_int);
+	printf("unknown on both sides: %d\n".ptr,
+		unknown_on_both_sides(4, xs[0..3]) as c_int);
+	printf("with a carry: %d\n".ptr, with_a_carry(0, 1) as c_int);
+	let tried = with_a_try() catch e {
+		return 1;
+	};
+	printf("with a try: %d\n".ptr, tried as c_int);
+	printf("with a walk: %d\n".ptr, with_a_walk() as c_int);
+	printf("a walked body: %d\n".ptr, walked_body() as c_int);
+	return 0;
+}

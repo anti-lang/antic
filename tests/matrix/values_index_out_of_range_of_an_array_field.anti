@@ -1,0 +1,17 @@
+//! A loop one turn too long over an array field, which has no name of its own
+//! as a base, so the message names its kind.
+
+struct Board
+{
+	cells: [4]int,
+}
+
+fn main() -> int
+{
+	let b = Board { cells: [1, 2, 3, 4] };
+	let total = 0;
+	for i in 0..5 {
+		total += b.cells[i];
+	}
+	return total;
+}

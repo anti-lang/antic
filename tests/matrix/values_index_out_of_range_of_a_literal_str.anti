@@ -1,0 +1,7 @@
+//! An index at the length of a literal `str`, which has no name, so the message
+//! names its kind.
+
+fn main() -> int
+{
+	return "abc"[3] as int;
+}
