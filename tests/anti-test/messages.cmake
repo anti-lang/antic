@@ -177,6 +177,27 @@ anti_message(project_library_not_copied
     FAULT write:10:EACCES
     ARGS test --runtime "${RUNTIME}"
     ERR "anti: cannot write build/tests/lib/com/example/twice.antl")
+# A second run finds the library file of the module that the first one
+# cached, and reads the library files it imports for the key. When that
+# read fails, the forty-first open, the run says so, compiles the library
+# file again and passes.
+function(write_project_and_run)
+    write_project()
+    execute_process(COMMAND "${ANTI}" test --runtime "${RUNTIME}"
+                    WORKING_DIRECTORY "${PROJECT}"
+                    RESULT_VARIABLE status OUTPUT_VARIABLE out
+                    ERROR_VARIABLE err ENCODING NONE)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the first run ended with ${status}\n${out}${err}")
+    endif()
+endfunction()
+anti_message(project_cached_library_imports_unread STATUS 0
+    SETUP write_project_and_run
+    FAULT open:41:EACCES
+    OUT "ok com.example.twice.doubles"
+        "anti test: 1 tests in 1 modules, 0 modules failed"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot read ${built}/lib/com/example/half.antl")
 # The object of the module, compile_object of test.c: the directory of its
 # cache, the library files it imports and the key beside it.
 anti_message(project_object_cache_not_made
