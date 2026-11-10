@@ -23,6 +23,12 @@ if(CMAKE_HOST_WIN32)
 endif()
 program_expect("plugin_stub_named" COMMAND "${PROGRAM}" named ${ends}
                ERR "anti: `Impl` 1.0.0 carries no such function of `host.Service`\n")
+# A second object of the library shares the table of stubs of the first,
+# and a table of three entries gives stubs to the first and the last.
+foreach(case second_object three_entries)
+    program_expect("plugin_stub_${case}" COMMAND "${PROGRAM}" ${case} ${ends}
+                   ERR "anti: `Impl` 1.0.0 carries no such function of `host.Service`\n")
+endforeach()
 foreach(case no_object no_table other_table)
     program_expect("plugin_stub_${case}" COMMAND "${PROGRAM}" ${case} ${ends}
                    ERR "anti: a library carries no such function of its interface\n")

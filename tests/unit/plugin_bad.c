@@ -67,3 +67,7 @@ EXPORTED struct anti_provided anti_rt_provides = {
     1, &anti_bad_entry, (const unsigned char *)"0.0.0", 5, 1,
     anti_bad_classes
 };
+
+/* Room for a table of three entries, which a test fills from
+   anti_bad_entry, so the entries lie in the image of the library. */
+EXPORTED struct anti_provides anti_bad_entries[3];

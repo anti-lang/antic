@@ -104,6 +104,9 @@ static void *symbol(void *library, const char *name)
 #endif
 }
 
+/* The handle the load of sub_object gave. */
+static void *handle_of_sub;
+
 /* The library, bound to the interface of the host as the loader of a
    program binds it, and the sub-object of a new object of its class.
    NULL with the reason on standard error. */
@@ -133,6 +136,7 @@ static struct anti_object *sub_object(void)
         fprintf(stderr, "the load refused: %.*s\n", (int)why.len, why.ptr);
         return NULL;
     }
+    handle_of_sub = handle;
     sub = anti_rt_plugin_instance(handle, &service);
     if (sub == NULL) {
         fprintf(stderr, "the library built no object\n");
@@ -144,6 +148,61 @@ static struct anti_object *sub_object(void)
         return NULL;
     }
     return sub;
+}
+
+/* An interface of the host that the library carries whole, so its
+   entry needs no stubs. */
+static const struct anti_descriptor whole = {
+    (const unsigned char *)"Whole", 5, NULL, 16, 0, NULL, 0, NULL, NULL,
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL
+};
+
+/* A load of a table of three entries, the first and the last with
+   stubs and the one between without, and its unload, which gives the
+   two tables of stubs back. Gives 0 with the reason on standard error.
+   The table of the library then has its one entry again. */
+static int three_entries(void)
+{
+#if defined(_WIN32)
+    void *library = LoadLibraryA(PLUGIN_BAD);
+#else
+    void *library = dlopen(PLUGIN_BAD, RTLD_NOW | RTLD_LOCAL);
+#endif
+    struct anti_provided *table;
+    struct anti_provides *entry;
+    struct anti_provides *entries;
+    struct anti_provided kept;
+    void *handle;
+    int8_t given;
+
+    table = library != NULL ? symbol(library, "anti_rt_provides") : NULL;
+    entry = library != NULL ? symbol(library, "anti_bad_entry") : NULL;
+    entries = library != NULL ? symbol(library, "anti_bad_entries") : NULL;
+    if (table == NULL || entry == NULL || entries == NULL) {
+        fprintf(stderr, "cannot open %s\n", PLUGIN_BAD);
+        return 0;
+    }
+    entry->descriptor = &service;
+    entry->init = init;
+    sub_offset = entry->offset;
+    entries[0] = *entry;
+    entries[1] = *entry;
+    entries[1].descriptor = &whole;
+    entries[2] = *entry;
+    kept = *table;
+    table->entries = entries;
+    table->count = 3;
+    handle = anti_rt_plugin_load((const unsigned char *)PLUGIN_BAD,
+                                 (int64_t)strlen(PLUGIN_BAD));
+    given = handle != NULL ? anti_rt_plugin_unload(handle) : 0;
+    *table = kept;
+    if (handle == NULL || given != 1) {
+        struct anti_text why = anti_rt_plugin_message();
+        fprintf(stderr, "the table of three entries: %.*s\n", (int)why.len,
+                why.ptr);
+        return 0;
+    }
+    return 1;
 }
 
 /* A function of the table of an object. */
@@ -175,14 +234,27 @@ int main(int argc, char **argv)
         return 2;
     }
     name = argv[1];
+    if (strcmp(name, "three_entries") == 0 && !three_entries()) {
+        return 1;
+    }
     sub = sub_object();
     if (sub == NULL) {
         return 1;
     }
-    if (strcmp(name, "named") == 0) {
+    if (strcmp(name, "named") == 0 || strcmp(name, "three_entries") == 0) {
         /* The slot of `asked` through the sub-object names the class, its
            version and the interface. */
         entry_at(sub, 1)(sub);
+    } else if (strcmp(name, "second_object") == 0) {
+        /* A second object of the class takes the table of stubs the first
+           filled. */
+        struct anti_object *second = anti_rt_plugin_instance(handle_of_sub,
+                                                             &service);
+        if (second == NULL || second->table != sub->table) {
+            fprintf(stderr, "the second object has another table\n");
+            return 1;
+        }
+        entry_at(second, 1)(second);
     } else if (strcmp(name, "no_object") == 0) {
         entry_at(sub, 1)(NULL);
     } else if (strcmp(name, "no_table") == 0) {

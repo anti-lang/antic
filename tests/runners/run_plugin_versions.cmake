@@ -17,6 +17,9 @@
 #             through reflection against it alone and loads the older
 #             library while an allocation of the loader fails, which
 #             stops the program
+#   PARTS     optional. The run then builds the interface of a floor of
+#             nine parts alone and loads a library built for a version
+#             below it, which the check of the floor refuses
 #
 # A Windows library links against the import library of its host, so
 # each host there takes a library of its own.
@@ -58,6 +61,25 @@ endfunction()
 
 set(versions "${SOURCES}/versions")
 file(REMOVE_RECURSE "${WORK}")
+
+# `compatible 1.0.0.0.0.0.0.0.2;` refuses a library built for
+# 1.0.0.0.0.0.0.0.1, since the comparison takes every part, T220 of
+# docs/audit/tests-findings.md.
+if(DEFINED PARTS)
+    foreach(version 1 2)
+        file(MAKE_DIRECTORY "${WORK}/parts-${version}/net/example")
+        antic_build(-c --package-version "1.0.0.0.0.0.0.0.${version}"
+                    -I "${versions}/parts"
+                    -o "${WORK}/parts-${version}/net/example/greet.antl"
+                    "${versions}/parts/net/example/greet.anti")
+    endforeach()
+    set(root_parts-1 "${versions}/parts")
+    antic_build(--runtime "${RUNTIME}"
+                -I "${versions}" -I "${SOURCES}" -I "${WORK}/parts-2"
+                -o "${WORK}/parts${EXE}" "${versions}/reader.anti")
+    loads(parts parts-1 no "this program takes 1.0.0.0.0.0.0.0.2 and above")
+    return()
+endif()
 
 # The interface of the program, and one library file per version of it.
 # Each stands in a directory of its own, so a search root names one.

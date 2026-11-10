@@ -26,6 +26,8 @@
 #include <windows.h>
 #else
 #include <dlfcn.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #endif
 
@@ -33,7 +35,11 @@ int check_failures;
 
 /* The stand-ins of what src/rt/plugin.c calls outside itself. */
 
-const struct anti_slot_table anti_rt_slots = {0, NULL, 0};
+/* The slots the calls of this program reach through the interface a
+   case names, none until one does. */
+static unsigned char reached_bits[1];
+static struct anti_slots reached = {NULL, 0, reached_bits};
+const struct anti_slot_table anti_rt_slots = {1, &reached, 0};
 
 struct anti_text anti_rt_runtime_version(void)
 {
@@ -903,6 +909,440 @@ static void nul_in_path(void)
           strstr((const char *)why.ptr, "holds a NUL byte") != NULL);
 }
 
+/* A length below zero names no path, as one past the room of a path
+   does, and an empty path names no library. */
+static void path_lengths(void)
+{
+    void *handle = anti_rt_plugin_load((const unsigned char *)PLUGIN_BAD, -1);
+
+    CHECK(handle == NULL);
+    says(__LINE__, "the path of a library is at most 4095 bytes");
+    handle = anti_rt_plugin_load((const unsigned char *)"", 0);
+    CHECK(handle == NULL);
+    if (handle != NULL) {
+        anti_rt_plugin_unload(handle);
+    }
+}
+
+/* A handle given back is no open library to any call, and supports
+   answers for an interface the library provides alone. */
+static void closed_handle(void)
+{
+    void *handle = load();
+
+    CHECK(handle != NULL);
+    if (handle == NULL) {
+        return;
+    }
+    CHECK(anti_rt_plugin_supports(handle, &service,
+                                  (const unsigned char *)"words", 5) == 1);
+    CHECK(anti_rt_plugin_supports(handle, &other,
+                                  (const unsigned char *)"words", 5) == 0);
+    CHECK(anti_rt_plugin_unload(handle) == 1);
+    CHECK(anti_rt_plugin_instance(handle, &service) == NULL);
+    says(__LINE__, "the library is not open");
+    CHECK(anti_rt_plugin_supports(handle, &service,
+                                  (const unsigned char *)"words", 5) == 0);
+    CHECK(anti_rt_plugin_live(handle) == 0);
+    CHECK(anti_rt_plugin_unload(handle) == 0);
+    says(__LINE__, "the library is not open");
+}
+
+/* A version compares part by part. A part counts its digits and passes
+   over what follows them, a missing part is zero, and two parts of as
+   many digits compare by their digits. */
+static void versions_by_parts(void)
+{
+    entry->built = (const unsigned char *)"1.0rc";
+    entry->built_length = 5;
+    versions.floor = (const unsigned char *)"1.0";
+    versions.floor_length = 3;
+    LOADED();
+    entry->built = (const unsigned char *)"1";
+    entry->built_length = 1;
+    versions.floor = (const unsigned char *)"1.0";
+    versions.floor_length = 3;
+    LOADED();
+    entry->built = (const unsigned char *)"1.1.0.0.0.0.0.0.1";
+    entry->built_length = 17;
+    versions.floor = (const unsigned char *)"1.1";
+    versions.floor_length = 3;
+    LOADED();
+    entry->built = (const unsigned char *)"1.2.0";
+    entry->built_length = 5;
+    versions.floor = (const unsigned char *)"1.3";
+    versions.floor_length = 3;
+    refused_with(__LINE__, "was built for `host.Service` 1.2.0, and this "
+                           "program takes 1.3 and above");
+}
+
+/* The interface of the host without a chain, and with an empty one. */
+static const int64_t no_chain[1] = {1};
+static struct anti_versions empty_versions = {no_chain, 0, NULL, 0};
+static const struct anti_descriptor unversioned = {
+    (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, NULL, 0, NULL
+};
+static const struct anti_descriptor chainless = {
+    (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &empty_versions, 0, NULL
+};
+
+/* An interface of the host that carries no version, and one whose size
+   is not the one the library was built with. */
+static void unversioned_host(void)
+{
+    entry->descriptor = &unversioned;
+    refused_with(__LINE__, "provides `host.Service`, and this program "
+                           "carries no version of it");
+    entry->descriptor = &chainless;
+    refused_with(__LINE__, "provides `host.Service`, and this program "
+                           "carries no version of it");
+    entry->size = 24;
+    refused_with(__LINE__, "a field was added to `host.Service`");
+}
+
+/* The interface of the host with one function at slot 1, and a program
+   that calls slot 2 alone, which no function of the descriptor names. */
+static const struct anti_function grown_functions[1] = {
+    {(const unsigned char *)"words", 5, 1, 0, NULL, 0}
+};
+static const struct anti_descriptor grown = {
+    (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
+    0, 1, grown_functions, (const unsigned char *)"1.0.0", 5, &versions, 0,
+    NULL
+};
+
+static void slot_without_name(void)
+{
+    entry->descriptor = &grown;
+    reached.descriptor = &grown;
+    reached.slot_count = 3;
+    reached_bits[0] = 0x04;
+    refused_with(__LINE__, "this program calls `slot 2` of `host.Service`");
+    reached.descriptor = NULL;
+    reached.slot_count = 0;
+    reached_bits[0] = 0;
+}
+
+/* The type id of an array of arrays of the element, whose lengths stand
+   in the records of its descriptor. */
+static int64_t nested_of(int64_t element)
+{
+    return ANTI_TYPE_ARRAY | ANTI_TYPE_ARRAY << 8 | element << 16;
+}
+
+/* The records of the levels of an array of arrays. */
+static struct anti_field levels[2];
+
+/* The records of the levels of an array lie in an image, and so does
+   the descriptor of its element. The bytes of the array stay below
+   INT64_MAX. An array without the descriptor of its element, or without
+   records of its levels, takes no bytes, and no walk writes it. */
+static void damaged_arrays(void)
+{
+    void *heap = malloc(64);
+
+    CHECK(heap != NULL);
+    if (heap == NULL) {
+        return;
+    }
+    fields->type = array_of(ANTI_TYPE_CLASS, 2);
+    LOADED();
+    fields->type = nested_of(ANTI_TYPE_I32);
+    LOADED();
+    fields->type = array_of(ANTI_TYPE_I32, 0);
+    LOADED();
+    fields->type = nested_of(ANTI_TYPE_I32);
+    fields->descriptor = part;
+    part->field_count = 0;
+    REFUSED();
+    fields->type = nested_of(ANTI_TYPE_I32);
+    fields->descriptor = part;
+    part->field_count = ANTI_ARRAY_LEVELS + 1;
+    REFUSED();
+    fields->type = nested_of(ANTI_TYPE_I32);
+    fields->descriptor = part;
+    part->field_count = 2;
+    part->fields = heap;
+    REFUSED();
+    levels[0].owned = 1;
+    levels[1].owned = 1;
+    levels[1].descriptor = heap;
+    fields->type = nested_of(ANTI_TYPE_STRUCT);
+    fields->descriptor = part;
+    part->field_count = 2;
+    part->fields = levels;
+    REFUSED();
+    levels[0].owned = -1;
+    levels[1].descriptor = NULL;
+    fields->type = nested_of(ANTI_TYPE_I32);
+    fields->descriptor = part;
+    part->field_count = 2;
+    part->fields = levels;
+    REFUSED();
+    memset(levels, 0, sizeof levels);
+    fields->type = array_of(ANTI_TYPE_STRUCT, 2);
+    fields->descriptor = part;
+    part->size = -8;
+    REFUSED();
+    fields->type = array_of(ANTI_TYPE_STRUCT, (int64_t)1 << 30);
+    fields->descriptor = part;
+    part->size = (int64_t)1 << 40;
+    REFUSED();
+    free(heap);
+}
+
+/* The descriptor of a field lies in an image. A pointer to an array
+   reaches no descriptor, and a struct without one takes no bytes. */
+static void damaged_descriptors(void)
+{
+    void *heap = malloc(64);
+
+    CHECK(heap != NULL);
+    if (heap == NULL) {
+        return;
+    }
+    fields->type = ANTI_TYPE_STRUCT;
+    fields->descriptor = heap;
+    REFUSED();
+    fields->type = ANTI_TYPE_PTR | ANTI_TYPE_ARRAY << 8;
+    fields->descriptor = part;
+    LOADED();
+    fields->type = ANTI_TYPE_STRUCT;
+    fields->descriptor = NULL;
+    LOADED();
+    free(heap);
+}
+
+/* Seventeen types, each reached through a pointer of the one before,
+   which the list of the types to check holds past its first room. */
+static struct anti_descriptor reached_types[17];
+static struct anti_field reached_fields[17];
+
+static void many_types(void)
+{
+    int i;
+
+    for (i = 0; i < 17; i++) {
+        reached_types[i] = part_good;
+        reached_fields[i] = part_fields_good;
+        if (i + 1 < 17) {
+            reached_fields[i].type = ANTI_TYPE_PTR | ANTI_TYPE_STRUCT << 8;
+            reached_fields[i].descriptor = &reached_types[i + 1];
+        }
+        reached_types[i].fields = &reached_fields[i];
+    }
+    fields->type = ANTI_TYPE_PTR | ANTI_TYPE_STRUCT << 8;
+    fields->descriptor = &reached_types[0];
+    LOADED();
+}
+
+/* A type argument of a size below zero, a function of a count of
+   parameters below zero, and a signature outside every image. */
+static const struct anti_field type_argument = {
+    (const unsigned char *)"T", 1, -1, ANTI_TYPE_I64, 0, NULL
+};
+
+static void damaged_records(void)
+{
+    void *heap = malloc(64);
+
+    CHECK(heap != NULL);
+    if (heap == NULL) {
+        return;
+    }
+    class_of->type_arg_count = 1;
+    class_of->type_args = &type_argument;
+    REFUSED();
+    functions->param_count = -1;
+    REFUSED();
+    functions->signature = heap;
+    functions->signature_length = 3;
+    REFUSED();
+    free(heap);
+}
+
+/* A depth that leaves no room for the class itself, a list of ancestors
+   that does not end in the class, and a parent of no bytes. */
+static struct anti_descriptor empty_parent;
+
+static void damaged_chain(void)
+{
+    static const struct anti_descriptor *const wrong[1] = {&service};
+
+    class_of->depth = INT64_MAX;
+    REFUSED();
+    class_of->ancestors = wrong;
+    REFUSED();
+    empty_parent = part_good;
+    empty_parent.size = 0;
+    empty_parent.field_count = 0;
+    class_of->parent = &empty_parent;
+    class_of->depth = 1;
+    REFUSED();
+}
+
+/* The texts of an entry fit an int, and an entry names its interface. */
+static void damaged_entry(void)
+{
+    entry->path_length = (int64_t)INT32_MAX + 1;
+    REFUSED();
+    entry->descriptor = NULL;
+    REFUSED();
+}
+
+/* A runtime longer than a path, and a library whose path does not fit
+   beside its directory, are passed over. No directories search none. */
+static void passed_over(void)
+{
+    static char runtime[4200];
+    static char dir[4100];
+    static char name[64];
+    void *sub;
+
+    memset(runtime, '9', 4100);
+    runtime[4100] = '\0';
+    DISCOVERS(entry_of_index(plugin_name, runtime, plugin_digest,
+                             "['host.Service']"), NONE);
+    memset(dir, 'd', 4070);
+    dir[4070] = '\0';
+    memset(name, 'n', 40);
+    name[40] = '\0';
+    search_dirs = dir;
+    snprintf(index_path, sizeof index_path, "%s/anti-plugins.toml", dir);
+    DISCOVERS(entry_of_index(name, "0.0.0", plugin_digest,
+                             "['host.Service']"), NONE);
+    search_dirs = plugin_dir;
+    snprintf(index_path, sizeof index_path, "%s/anti-plugins.toml",
+             plugin_dir);
+    sub = anti_rt_plugin_provider((const unsigned char *)"host.Service", 12,
+                                  (const unsigned char *)"", 0, NULL);
+    CHECK(sub == NULL);
+    says(__LINE__, NONE);
+}
+
+/* A reason cut to the room of the message ends in `...`. */
+static void long_reason(void)
+{
+    char path[601];
+    struct anti_text why;
+    void *handle;
+
+    memset(path, 'p', 600);
+    path[0] = '/';
+    path[600] = '\0';
+    handle = anti_rt_plugin_load((const unsigned char *)path, 600);
+    why = anti_rt_plugin_message();
+    CHECK(handle == NULL);
+    CHECK(why.len == 511 && memcmp(why.ptr + 508, "...", 3) == 0);
+}
+
+#if !defined(_WIN32)
+/* The reason of the system names the path it could not open. A path
+   that holds a form of a missing symbol is read as one, up to the byte
+   that ends the symbol, and the loader then reads the file for the list
+   of the modules of the library. The file is no library, so its load
+   fails. Windows names hold no colon. */
+static char reasons_dir[4300];
+
+/* Make the directory of the files of these cases beside plugin_bad. */
+static void reasons_ready(void)
+{
+    snprintf(reasons_dir, sizeof reasons_dir, "%s/plugin-reasons",
+             plugin_dir);
+    mkdir(reasons_dir, 0755);
+}
+
+#define USES "uses `net.example`, which this program does not import"
+
+/* Write list into dir/name, load the file and expect a reason that holds
+   want. */
+static void reason_is(int line, const char *name, const char *list,
+                      const char *want)
+{
+    char path[4400];
+    void *handle;
+    FILE *f;
+
+    snprintf(path, sizeof path, "%s/%s", reasons_dir, name);
+    f = fopen(path, "wb");
+    if (f == NULL || fwrite(list, 1, strlen(list), f) != strlen(list)) {
+        check_failures++;
+        fprintf(stderr, "line %d: cannot write %s\n", line, path);
+        if (f != NULL) {
+            fclose(f);
+        }
+        return;
+    }
+    fclose(f);
+    handle = anti_rt_plugin_load((const unsigned char *)path,
+                                 (int64_t)strlen(path));
+    CHECK(handle == NULL);
+    if (handle != NULL) {
+        anti_rt_plugin_unload(handle);
+    }
+    says(line, want);
+    remove(path);
+}
+
+/* The list ends at the end of the file, and its first module is the
+   start of the symbol without the dot after it. */
+static void reasons_with_paths(void)
+{
+    static const char list[] = "anti-plugin-modules: net.ex net.example";
+    char longer[301];
+    char path[4400];
+    void *handle;
+
+    reasons_ready();
+    reason_is(__LINE__, "undefined symbol: net.example.f", list, USES);
+    reason_is(__LINE__, "undefined symbol: net.example.f x", list, USES);
+    reason_is(__LINE__, "undefined symbol: net.example.f\nx", list, USES);
+    reason_is(__LINE__, "symbol not found in flat namespace 'net.example.f'",
+              list, USES);
+    reason_is(__LINE__, "undefined symbol: ", list, "undefined symbol: : ");
+    /* A symbol longer than the loader keeps names no module. */
+    memset(longer, 'n', 300);
+    memcpy(longer, "undefined symbol: ", 18);
+    longer[150] = '/';
+    longer[300] = '\0';
+    snprintf(path, sizeof path, "%s/%s", reasons_dir, longer);
+    handle = anti_rt_plugin_load((const unsigned char *)path,
+                                 (int64_t)strlen(path));
+    CHECK(handle == NULL);
+    says(__LINE__, "nnn: ");
+}
+
+/* The loader reads at most 1 GiB of a library for the list. The file
+   holds no data past its first bytes, so it takes no room on disk. */
+static void huge_library(void)
+{
+    static const char list[] = "anti-plugin-modules: net.example";
+    char path[4400];
+    void *handle;
+    FILE *f;
+
+    reasons_ready();
+    snprintf(path, sizeof path, "%s/undefined symbol: net.example.f",
+             reasons_dir);
+    f = fopen(path, "wb");
+    CHECK(f != NULL);
+    if (f == NULL) {
+        return;
+    }
+    CHECK(fwrite(list, 1, sizeof list, f) == sizeof list);
+    CHECK(fseeko(f, ((off_t)1 << 30) + 4096, SEEK_SET) == 0);
+    CHECK(fputc('x', f) == 'x');
+    fclose(f);
+    handle = anti_rt_plugin_load((const unsigned char *)path,
+                                 (int64_t)strlen(path));
+    CHECK(handle == NULL);
+    says(__LINE__, USES);
+    remove(path);
+}
+#endif
+
 int main(void)
 {
     if (!open_bad()) {
@@ -917,6 +1357,18 @@ int main(void)
     damaged_lists();
     damaged_widths();
     damaged_parents();
+    path_lengths();
+    closed_handle();
+    versions_by_parts();
+    unversioned_host();
+    slot_without_name();
+    damaged_arrays();
+    damaged_descriptors();
+    many_types();
+    damaged_records();
+    damaged_chain();
+    damaged_entry();
+    long_reason();
     other_program();
     unload_waits_for_build();
     long_versions();
@@ -930,6 +1382,11 @@ int main(void)
     second_directory();
     long_directory();
     nul_in_path();
+    passed_over();
+#if !defined(_WIN32)
+    reasons_with_paths();
+    huge_library();
+#endif
     good_table_loads();
     if (check_failures != 0) {
         fprintf(stderr, "%d check(s) failed\n", check_failures);

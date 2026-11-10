@@ -3074,9 +3074,30 @@ add_test(NAME plugin_versions
         "-DEXE=${plugin_exe}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions"
         -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
+# T220. A floor of nine parts.
+add_test(NAME plugin_versions_parts
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DPARTS=yes"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions-parts"
+        -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
 # The table of stubs of a load when memory runs out, as the cases of
 # <host>.faults above.
 if(ANTIC_FAULTS AND NOT ANTIC_HOST_OS STREQUAL "windows")
+    add_test(NAME plugin_host_fault_index_memory
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DFAULT_RUNTIME=${ANTIC_FAULTS_RUNTIME_DIR}"
+            "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+            "-DSUFFIX=${plugin_suffix}"
+            "-DEXE=${plugin_exe}"
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-faults-index"
+            "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/host.expected"
+            "-DPROVIDED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/provided.expected"
+            -P "${ANTIC_RUNNERS}/run_plugin.cmake")
     add_test(NAME plugin_versions_fault_stubs_memory
         COMMAND "${CMAKE_COMMAND}"
             ${ANTIC_AND_RUNTIME}

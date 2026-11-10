@@ -16,6 +16,10 @@
 #   WORK      a directory for the objects and the executables
 #   EXPECTED  the output of the host
 #   PROVIDED  the output of a program whose provider is the library
+#   FAULT_RUNTIME optional, the runtime of the fault tests of a tree of
+#             ANTIC_FAULTS. The run then builds the program that discovers
+#             the library against it alone and runs it while the
+#             allocation of the index fails, which stops the program
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -67,6 +71,28 @@ endfunction()
 # The interface is a library file that both sides import.
 antic_build(-c -I "${SOURCES}" -o "${WORK}/net/example/greet.antl"
             "${SOURCES}/net/example/greet.anti")
+
+# Discovery reads the index beside the library into memory of its own.
+# The ninth allocation of the program holds its bytes, and memory that
+# runs out there stops the program, by decision 4 of "Decisions of
+# 2026-10-11". The program and the library build against the runtime of
+# the fault tests, with --lto none, since that runtime carries no
+# bitcode.
+if(DEFINED FAULT_RUNTIME)
+    set(RUNTIME "${FAULT_RUNTIME}")
+    antic_build(--runtime "${RUNTIME}" --lto none -I "${SOURCES}"
+                -I "${WORK}" --inject "${interface}=discover"
+                -o "${WORK}/found${EXE}" "${SOURCES}/user.anti")
+    plugin(found)
+    library_dir(found dir)
+    set(ENV{ANTI_FAULT} "alloc:9:ENOMEM")
+    program_expect("discovery, allocation 9 failing"
+                   COMMAND "${WORK}/found${EXE}" "--anti.plugins=${dir}"
+                   ABORTS OUT ""
+                   ERR_MATCH "^anti: out of memory for the index [^\n]*/anti-plugins\\.toml\n$")
+    unset(ENV{ANTI_FAULT})
+    return()
+endif()
 
 # The host loads the library, asks it for the interface and closes it.
 antic_build(--runtime "${RUNTIME}" -I "${SOURCES}"
