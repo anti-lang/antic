@@ -3140,6 +3140,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 - On 2026-11-09 Eddie answered the two questions of the step that built those answers, under "Answers of 2026-11-09, second set". Q1 keeps the two tests of a hidden window in the suite of the Mac. Q2 lets in the failure of `start` for a flag of a window that changes after a query of the monitor.
 - On 2026-11-09 Eddie answered the three questions of the first phase of coverage, under "Answers of 2026-11-09, third set". The three answers remove code, test a guard and correct the name of a tool in a message. The freeze needs no change for them.
 - On 2026-11-10 Eddie answered five questions of the second phase of coverage, under "Answers of 2026-11-10". Each answer is a fix of a defect, and the freeze lets the fixes in as fixes. The refusals and the message they add come with no option and no form.
+- On 2026-11-10 Eddie answered the questions of the guards of the second phase of coverage and two questions of its tests, under "Answers of 2026-11-10, second set". The answers keep code, give a runner of the tests a file of expected output and add a program to the coverage report. None of them reaches antic, anti, the runtime or the standard library, so the freeze needs no change for them.
 
 ## What the solid run decided
 
@@ -3459,6 +3460,16 @@ Eddie took these decisions on 2026-11-10. They answer questions 1, 2, 6, 8 and 1
 - Q8. Three defects. `--lib shared --dev` exits with 0 and writes `<base>.o` alone, `--dev -c lib.antl` writes an object, and `anti doc .antl` reads a library file named `.antl` as a source. `--dev -c` of a library file is refused, since a library file has no source to compile. A file whose name is its suffix alone is refused as a file with no name, wherever antic or anti decides the kind of a file by its suffix. `--lib shared --dev` writes the library where the specifications let a dev build make one, and is refused where they do not or say nothing.
 - Q11. `if let Circle c = p`, where `p: ?*Shape` is no variant, says that a case needs a variant and names the type found, as `` `if let Circle c` takes a variant, found `?*Shape` ``.
 - [provisional] Q8 refuses `--lib shared --dev` with `` --lib shared builds in release mode, without --dev ``, the message of `--lib static --dev`. Reason: no specification lets a dev build make a shared library. "Compiler behaviour" builds a library for C and the objects of dev mode by other calls of antic, dev mode writes an object per module, and `anti build --lib shared` compiles the library without `--dev`.
+
+## Answers of 2026-11-10, second set
+
+Eddie took these decisions on 2026-11-10, with the recommendations of the steps that asked them. They answer questions 1 to 5 of "Questions for Eddie" in `docs/reports/2026-11-09-coverage-phase-2a.md`, numbered as there. They also answer questions 3, 4, 5, 7, 9 and 10 of the same section in `docs/reports/2026-11-10-coverage-phase-2b.md`. None is provisional. `docs/reports/2026-11-10-coverage-batch-5.md` reports the step that builds them.
+
+- Q1 to Q5 of the report of 2a. The guards stay: `llvm_emit_frame_add` after a failure and with the alignment 0, the return of `llvm_emit_definition` after a signature that fails, the paths of `sema_index.c` that take no input, `image_slide` and `symbolize_macho` for an image without `__TEXT` or without a symbol table, and `add_line`, the start of `add`, the three returns of NULL in `anti_rt_trace_text` and the last line of `module_number`.
+- Q3, Q4, Q5 and Q9 of the report of 2b. The guards of `object.c`, `plugin.c`, `sema_stmt.c` and `driver.c` that the report lists as reached by no input stay.
+- `docs/notes/unreached-guards.md` names every guard that these answers and Q2 of "Answers of 2026-11-09, third set" keep. It gives the file and the function of each, what it guards against and why no input reaches it.
+- Q7 of the report of 2b. `tests/runners/run_anti_messages.cmake` takes an optional file of the expected standard output. A case then holds an output with empty lines, such as a licence text. The header of the runner states the form. Two cases then test the reader of `licenses/sources.txt` in the notice of a project. One record lacks its last line feed, and the other lacks the library.
+- Q10 of the report of 2b. `rt_deserialize_tests` joins the programs that the coverage report measures, as `rt_object_tests` did in the step of that report. It compiles `object.c` and `registry.c` of the runtime as well.
 
 ## Open
 
