@@ -1,0 +1,35 @@
+//! A `switch` on a `u8` with the arm `size_of(Pair) as u8` before the arm `16`.
+//! The target lays out a struct, so the checker reads no size of it and both
+//! arms stay, by R010 of the rules of 2026-10-13. On every target the size is
+//! 16, and the first arm takes the value.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: i64,
+	b: i64,
+}
+
+fn kind(n: u8) -> int
+{
+	let k = 0;
+	switch n {
+		size_of(Pair) as u8 => {
+			k = 1;
+		},
+		16 => {
+			k = 2;
+		},
+		else => {
+			k = 3;
+		},
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, kind(16) as c_int, kind(9) as c_int);
+	return 0;
+}

@@ -1,0 +1,1 @@
+closures_local_of_another_function_type_given_a_closure.anti:10:26: error: expected `fn(int) -> int`, found `fn() -> int`

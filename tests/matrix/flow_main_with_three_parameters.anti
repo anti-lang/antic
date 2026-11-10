@@ -1,0 +1,7 @@
+//! `main` with a third parameter beside `args` and `env`. The language has
+//! three forms of `main`, and none takes three parameters.
+
+fn main(args: []str, env: []str, more: []str) -> int
+{
+	return 0;
+}

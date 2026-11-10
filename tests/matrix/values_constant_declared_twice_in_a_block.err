@@ -1,0 +1,1 @@
+values_constant_declared_twice_in_a_block.anti:6:8: error: `A` is already declared in this block

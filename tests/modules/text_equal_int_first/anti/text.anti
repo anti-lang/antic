@@ -1,0 +1,6 @@
+//! An `anti.text` of another version, whose `equal` takes an `int` first.
+
+pub fn equal(a: int, b: str) -> bool
+{
+	return false;
+}

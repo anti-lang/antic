@@ -1,0 +1,12 @@
+//! A local of type `fn(int) -> int` given a local that holds a closure of type
+//! `fn() -> int`. The two types differ.
+
+fn main() -> int
+{
+	let n = 1;
+	let f = fn() -> int {
+		return n;
+	};
+	let g: fn(int) -> int = f;
+	return 0;
+}

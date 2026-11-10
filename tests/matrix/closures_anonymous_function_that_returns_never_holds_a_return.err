@@ -1,0 +1,1 @@
+closures_anonymous_function_that_returns_never_holds_a_return.anti:12:3: error: the anonymous function returns `never` and holds no `return`

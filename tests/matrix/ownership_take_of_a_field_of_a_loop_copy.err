@@ -1,0 +1,1 @@
+ownership_take_of_a_field_of_a_loop_copy.anti:21:16: error: `h` is a copy of each element of `holders`. Walk with `&holders` to change the elements

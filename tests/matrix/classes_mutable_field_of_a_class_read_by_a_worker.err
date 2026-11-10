@@ -1,0 +1,1 @@
+classes_mutable_field_of_a_class_read_by_a_worker.anti:6:2: error: `mutable` marks a field of a singleton, and `Task` is none

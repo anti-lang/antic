@@ -1,0 +1,9 @@
+//! `if let Circle c = nope`, whose value names nothing. The one message is that
+//! of the name.
+
+fn main() -> int
+{
+	if let Circle c = nope {
+	}
+	return 0;
+}

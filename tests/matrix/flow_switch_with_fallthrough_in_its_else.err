@@ -1,0 +1,1 @@
+flow_switch_with_fallthrough_in_its_else.anti:11:4: error: `fallthrough` in the last arm

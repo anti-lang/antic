@@ -1,0 +1,1 @@
+values_compound_assignment_to_an_optional_pointer.anti:7:7: error: expected `?*int`, found an integer literal

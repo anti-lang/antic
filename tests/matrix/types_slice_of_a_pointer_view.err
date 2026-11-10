@@ -1,0 +1,1 @@
+types_slice_of_a_pointer_view.anti:8:14: error: cannot slice `*u8`

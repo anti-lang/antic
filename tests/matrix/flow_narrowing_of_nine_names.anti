@@ -1,0 +1,22 @@
+//! An `&&` chain that checks nine `?*int` parameters against `none`. Each check
+//! narrows its name in the body of the `if`, the ninth as the first.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn sum(a: ?*int, b: ?*int, c: ?*int, d: ?*int, e: ?*int, f: ?*int, g: ?*int,
+	h: ?*int, i: ?*int) -> int
+{
+	if a != none && b != none && c != none && d != none && e != none &&
+		f != none && g != none && h != none && i != none {
+		return *a + *b + *c + *d + *e + *f + *g + *h + *i;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let n = 1;
+	printf("%d %d\n".ptr, sum(&n, &n, &n, &n, &n, &n, &n, &n, &n) as c_int,
+		sum(&n, &n, &n, &n, &n, &n, &n, &n, none) as c_int);
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! A `while true` whose body holds a `do ... while` with a `break`. The `break`
+//! leaves the inner loop alone, so the outer loop never goes on to the end of
+//! the function, which needs no `return` after it, by R003 of the rules of
+//! 2026-10-13.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn spin(n: int) -> int
+{
+	let i = 0;
+	while true do {
+		do {
+			i += 1;
+			if i > n {
+				break;
+			}
+		} while true
+		if i > n {
+			return i;
+		}
+	}
+}
+
+fn main() -> int
+{
+	printf("spin %d %d\n".ptr, spin(0) as c_int, spin(3) as c_int);
+	return 0;
+}

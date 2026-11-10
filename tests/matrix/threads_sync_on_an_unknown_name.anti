@@ -1,0 +1,9 @@
+//! A `sync` on a name that nothing declares. The one message is that of the
+//! name.
+
+fn main() -> int
+{
+	sync nope {
+	}
+	return 0;
+}

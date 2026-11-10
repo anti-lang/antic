@@ -1,0 +1,23 @@
+//! `take(r.head)` of an `own` field of a singleton outside its `construct`. A
+//! field of a singleton is read-only after creation, and `take` writes `none`
+//! into it.
+
+import anti.lang;
+
+class Node
+{
+	pub value: int = 0,
+}
+
+singleton class Registry
+{
+	own head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let r = Registry.get();
+	let n = take(r.head);
+	delete(n);
+	return 0;
+}

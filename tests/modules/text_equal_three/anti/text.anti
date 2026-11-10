@@ -1,0 +1,6 @@
+//! An `anti.text` of another version, whose `equal` takes three parameters.
+
+pub fn equal(a: str, b: str, c: int) -> bool
+{
+	return false;
+}

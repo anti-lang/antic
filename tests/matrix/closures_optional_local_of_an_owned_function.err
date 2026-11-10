@@ -1,0 +1,1 @@
+closures_optional_local_of_an_owned_function.anti:8:24: error: an `own fn` value owns its snapshot and does not pass as one C function pointer

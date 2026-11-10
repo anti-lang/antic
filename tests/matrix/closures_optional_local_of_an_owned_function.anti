@@ -1,0 +1,22 @@
+//! A local of type `?fn() -> int` given a `keep own` parameter. A `?fn(...)`
+//! stays one pointer, and an `own fn` does not pass as one C function pointer.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn run(keep own f: fn() -> int) -> int
+{
+	let g: ?fn() -> int = f;
+	if g != none {
+		return g();
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let n = 41;
+	printf("%d\n".ptr, run(snapshot fn() -> int {
+		return n + 1;
+	}) as c_int);
+	return 0;
+}

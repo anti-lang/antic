@@ -1,0 +1,10 @@
+//! `for (a, b, c) in &pairs` over an array of pairs. Each element is lent
+//! whole, and the pattern names three parts of a tuple of two.
+
+fn main() -> int
+{
+	let pairs = [(1, 2), (3, 4)];
+	for (a, b, c) in &pairs {
+	}
+	return 0;
+}

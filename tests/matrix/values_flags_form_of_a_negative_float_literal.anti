@@ -1,0 +1,8 @@
+//! The flags form of `-2.5`. A `-` before a literal forms a constant, which has
+//! no flags.
+
+fn main() -> int
+{
+	let (r, f) = -2.5;
+	return 0;
+}

@@ -1,0 +1,19 @@
+//! `let m: ?*int = p else { }` on a `?*int`. The `else` leaves `m` bound to the
+//! pointer, which the program reads without a check.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn read(p: ?*int) -> int
+{
+	let m: ?*int = p else {
+		return -1;
+	};
+	return *m;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	printf("%d %d\n".ptr, read(none) as c_int, read(&n) as c_int);
+	return 0;
+}

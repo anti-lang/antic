@@ -1,0 +1,29 @@
+//! A class declared twice before an abstract class that another class fills.
+//! The one message is that of the second declaration, and the abstract class is
+//! filled.
+
+class Mark
+{
+}
+
+class Mark
+{
+}
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 4;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

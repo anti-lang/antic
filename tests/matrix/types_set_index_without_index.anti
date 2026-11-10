@@ -1,0 +1,24 @@
+//! A class with `operator fn set_index` and no `operator fn index`. `c[3] = 4`
+//! is the call `c.set_index(3, 4)`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cells
+{
+	pub last: int = 0,
+
+	operator fn set_index(self, i: int, v: int)
+	{
+		self.last = i * 10 + v;
+	}
+}
+
+fn main() -> int
+{
+	let c = Cells { };
+	c[3] = 4;
+	printf("%d\n".ptr, c.last as c_int);
+	return 0;
+}

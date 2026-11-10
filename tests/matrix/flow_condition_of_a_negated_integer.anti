@@ -1,0 +1,9 @@
+//! `if -n` on an integer. A condition has type `bool`.
+
+fn main() -> int
+{
+	let n = 1;
+	if -n {
+	}
+	return 0;
+}

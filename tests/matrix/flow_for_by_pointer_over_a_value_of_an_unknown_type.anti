@@ -1,0 +1,26 @@
+//! `for x in &c` over an iterator whose `operator fn value` gives a type that
+//! nothing declares. The one message is that of the type.
+
+class Count
+{
+	pub at: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at <= 3;
+	}
+
+	operator fn value(self) -> Nope
+	{
+		return self.at;
+	}
+}
+
+fn main() -> int
+{
+	let c = Count { };
+	for x in &c {
+	}
+	return 0;
+}

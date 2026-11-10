@@ -1,0 +1,25 @@
+//! `take(h.head)` where `h` is the copy of each element that `for h in holders`
+//! gives. The `none` that `take` leaves would reach the copy alone, so it is
+//! refused as a change of the copy is.
+
+import anti.lang;
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let holders = [Holder { }, Holder { }];
+	for h in holders {
+		let n = take(h.head);
+		delete(n);
+	}
+	return 0;
+}

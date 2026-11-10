@@ -1,0 +1,10 @@
+//! An arm of a `select` that names nothing. The one message is that of the
+//! name.
+
+fn main() -> int
+{
+	select {
+		nope x => { },
+	}
+	return 0;
+}

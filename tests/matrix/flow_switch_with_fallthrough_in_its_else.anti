@@ -1,0 +1,19 @@
+//! A `fallthrough` in the `else` of a `switch`, which is the last arm and has
+//! no arm after it. The one message is that of the `fallthrough`.
+
+fn pick(n: int) -> int
+{
+	switch n {
+		1 => {
+			return 1;
+		},
+		else => {
+			fallthrough;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return pick(1);
+}

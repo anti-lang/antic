@@ -1,0 +1,10 @@
+//! A slice of the pointer that `&x as *u8` gives. A pointer has no length to
+//! slice.
+
+fn main() -> int
+{
+	let x: u32 = 0x04030201;
+	let p = &x as *u8;
+	let bytes = p[0..4];
+	return 0;
+}

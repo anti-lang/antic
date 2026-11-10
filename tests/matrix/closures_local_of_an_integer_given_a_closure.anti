@@ -1,0 +1,11 @@
+//! `let g: int = fn() -> int { }` with a closure that captures `n`. The
+//! declared type is no function.
+
+fn main() -> int
+{
+	let n = 1;
+	let g: int = fn() -> int {
+		return n;
+	};
+	return 0;
+}

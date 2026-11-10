@@ -1,0 +1,1 @@
+closures_local_of_an_integer_given_a_closure.anti:7:15: error: expected `int`, found `fn() -> int`

@@ -1,0 +1,10 @@
+//! `for i, i in xs`, whose index and element have one name. The one message is
+//! that of the second name.
+
+fn main() -> int
+{
+	let xs = [1, 2];
+	for i, i in xs {
+	}
+	return 0;
+}

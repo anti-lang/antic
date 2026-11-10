@@ -1,0 +1,15 @@
+//! An anonymous function that returns `never` and holds a `return`. The message
+//! names the anonymous function.
+
+fn run(f: fn() -> never)
+{
+	f();
+}
+
+fn main() -> int
+{
+	run(fn() -> never {
+		return;
+	});
+	return 0;
+}

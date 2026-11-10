@@ -1,0 +1,1 @@
+flow_condition_of_a_negated_integer.anti:6:5: error: a condition has type `bool`, found `int`

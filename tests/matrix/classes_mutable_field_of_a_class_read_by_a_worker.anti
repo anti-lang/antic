@@ -1,0 +1,17 @@
+//! A `mutable` field of a class that is no singleton, read by a worker. The one
+//! message is that of the field.
+
+class Task
+{
+	pub mutable n: int = 0,
+}
+
+worker fn work(t: *Task) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	return 0;
+}

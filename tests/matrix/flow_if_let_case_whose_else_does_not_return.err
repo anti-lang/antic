@@ -1,0 +1,1 @@
+flow_if_let_case_whose_else_does_not_return.anti:11:4: error: `radius` can reach its end without `return`

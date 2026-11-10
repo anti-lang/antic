@@ -1,0 +1,9 @@
+//! `if nope != none`, whose name nothing declares. The one message is that of
+//! the name.
+
+fn main() -> int
+{
+	if nope != none {
+	}
+	return 0;
+}

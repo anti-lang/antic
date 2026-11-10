@@ -1,0 +1,46 @@
+//! A function whose last statement is a `try` block. Its body returns, and its
+//! handler holds a `yield;` of a call's handler, a `yield;` of the handler of a
+//! `try` inside it and a `yield` of the `catch` of a `let`. Each `yield`
+//! belongs to its own handler, so the handler of the outer block ends the
+//! function and it needs no `return` after the block.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn step(n: int) may fail
+{
+	if n == 0 {
+		fail "no step";
+	}
+}
+
+fn handled(n: int) -> int
+{
+	let found: ?*int = none;
+	let other = 7;
+	try {
+		step(n);
+		return 1;
+	} catch {
+		step(n + 1) catch {
+			yield;
+		};
+		try {
+			step(n + 2);
+		} catch {
+			yield;
+		}
+		let plain = 3;
+		let m = found catch {
+			yield &other;
+		};
+		return 2 + plain + *m;
+	}
+}
+
+fn main() -> int
+{
+	printf("handled %d %d\n".ptr, handled(0) as c_int, handled(1) as c_int);
+	return 0;
+}

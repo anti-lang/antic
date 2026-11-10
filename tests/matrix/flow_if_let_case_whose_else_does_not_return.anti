@@ -1,0 +1,22 @@
+//! An `if let` of a case of a variant at the end of a function, whose arm
+//! returns and whose `else` does not, so the function can reach its end without
+//! `return`.
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn radius(s: Shape) -> int
+{
+	if let Circle c = s {
+		return c.r;
+	} else {
+	}
+}
+
+fn main() -> int
+{
+	return radius(Shape.Empty);
+}

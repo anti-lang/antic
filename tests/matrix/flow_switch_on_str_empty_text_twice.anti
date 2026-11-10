@@ -1,0 +1,24 @@
+//! A `switch` on a `str` with two arms of the empty text. The two arms hold one
+//! value, and the second is refused.
+
+import anti.text;
+
+fn pick(s: str) -> int
+{
+	switch s {
+		"" => {
+			return 1;
+		},
+		"" => {
+			return 2;
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn main() -> int
+{
+	return pick("");
+}

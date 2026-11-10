@@ -4844,6 +4844,9 @@ foreach(case
         "regex_split_damaged||"
         "text_builder_older|text_older|text"
         "text_equal_older|text_older|text"
+        "text_equal_three|text_equal_three|text"
+        "text_equal_int_first|text_equal_int_first|text"
+        "text_equal_int_second|text_equal_int_second|text"
         "text_to_bytes_older|text_older|text")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
@@ -5250,7 +5253,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "final_replace|-S,-o,${LISTINGS}/final_replace.s,final_replace.anti"
         "refused_base_uses|-S,-o,${LISTINGS}/refused_base_uses.s,refused_base_uses.anti"
         "worker_walk|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/worker_walk.s,worker_walk.anti"
-        "assert_call|-S,-o,${LISTINGS}/assert_call.s,assert_call.anti"
+        "assert_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/assert_call.s,assert_call.anti"
         "qualified_bodies|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_bodies.s,qualified_bodies.anti"
         "qualified_calls|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/qualified_calls.s,qualified_calls.anti"
         "abstract_call|-S,--runtime,${ANTIC_RUNTIME_DIR},-o,${LISTINGS}/abstract_call.s,abstract_call.anti"
@@ -5369,6 +5372,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "simd_lanes_compared|--front-end,simd_lanes_compared.anti"
         "switch_refused_returns|--front-end,switch_refused_returns.anti"
         "tests_setup|--front-end,--tests,tests_setup.anti"
+        "tests_teardown|--front-end,--tests,tests_teardown.anti"
         "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti"
         "tests_block_holds_a_struct|--front-end,--tests,tests_block_holds_a_struct.anti"
         "tests_block_twice|--front-end,--tests,tests_block_twice.anti"

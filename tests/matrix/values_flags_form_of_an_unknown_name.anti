@@ -1,0 +1,8 @@
+//! The flags form as a `let` whose operation names an unknown variable. The one
+//! message is that of the name.
+
+fn main() -> int
+{
+	let (r, f) = nope + 1;
+	return 0;
+}

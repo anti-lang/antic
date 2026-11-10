@@ -1,6 +1,57 @@
 //! A condition of `assert` that calls a function is a warning wherever the call
 //! stands, since a release build drops the condition and the call with it. A
-//! release build refuses each.
+//! release build refuses each. Every form that runs code counts as a call:
+//! `alloc`, `dup`, an atomic operation, `parallel`, `dispatch`, `join`,
+//! `f"..."`, `to_slice` of an iterator, an operation of a channel and a
+//! built-in of a simd struct.
+
+import anti.lang;
+import anti.text;
+
+simd struct V4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn work(t: *Task) -> int
+{
+	return t.n;
+}
+
+worker fn tally(part: []int) -> int
+{
+	return part[0];
+}
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Count
+{
+	pub at: int = 0,
+	pub end: int = 0,
+
+	operator fn next(self) -> bool
+	{
+		self.at += 1;
+		return self.at <= self.end;
+	}
+
+	operator fn value(self) -> int
+	{
+		return self.at;
+	}
+}
 
 fn count() -> int
 {
@@ -9,8 +60,27 @@ fn count() -> int
 
 fn main() -> int
 {
+	let t = alloc Task { };
+	let n: atomic int = 0;
+	let c = chan int(1);
+	let v = V4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let k = 2;
+	let node = Node { };
+	let xs = [1, 2];
 	assert(count() == 1);
 	assert((count(), 1).1 == 1);
 	assert(1 == 1);
+	assert((alloc Node { value: 1 }).value == 1);
+	assert(dup(node).value == 0);
+	assert(n.load() == 0);
+	assert((parallel xs[0..2] by 2 -> tally).len == 2);
+	assert((dispatch t -> work(), 1).1 == 1);
+	assert(join(dispatch t -> work()) == 0);
+	assert(f"a{k}".len == 2);
+	assert(Count { at: 0, end: 2 }.to_slice().len == 2);
+	assert(recv(c) == none);
+	assert(v.sum() > 0.0);
+	delete(c);
+	delete(t);
 	return 0;
 }

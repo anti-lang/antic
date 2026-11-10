@@ -1,0 +1,9 @@
+//! `p += 1` on a `?*int`. The assignment takes the declared type of `p`, which
+//! an integer is not.
+
+fn main() -> int
+{
+	let p: ?*int = none;
+	p += 1;
+	return 0;
+}

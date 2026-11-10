@@ -1,0 +1,26 @@
+//! A `switch` on a `u8` with the arm `size_of(i64) as u8` before the arm `8`.
+//! The size of an `i64` is 8 on every target and the conversion keeps it, so
+//! the two arms hold one value, and the second is refused, by R010 of the rules
+//! of 2026-10-13.
+
+fn kind(n: u8) -> int
+{
+	let k = 0;
+	switch n {
+		size_of(i64) as u8 => {
+			k = 1;
+		},
+		8 => {
+			k = 2;
+		},
+		else => {
+			k = 3;
+		},
+	}
+	return k;
+}
+
+fn main() -> int
+{
+	return kind(8);
+}

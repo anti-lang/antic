@@ -1,0 +1,8 @@
+//! An atomic local of a type that nothing declares. The one message is that of
+//! the type.
+
+fn main() -> int
+{
+	let n: atomic Nope = 0;
+	return 0;
+}

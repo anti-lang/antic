@@ -1,0 +1,25 @@
+//! `let (s, n) = (*sp, 1);` where `sp` points at an abstract class. The local
+//! `s` would hold a value of `Shape`, which has no complete value.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	pub side: int = 2,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn main() -> int
+{
+	let sq = Square { };
+	let sp: *Shape = &sq;
+	let (s, n) = (*sp, 1);
+	return 0;
+}

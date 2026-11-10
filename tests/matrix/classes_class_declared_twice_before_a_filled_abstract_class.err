@@ -1,0 +1,1 @@
+classes_class_declared_twice_before_a_filled_abstract_class.anti:9:7: error: `Mark` is already declared

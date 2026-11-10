@@ -1,0 +1,15 @@
+//! `sync a, b` whose second operand names nothing. The one message is that of
+//! the name.
+
+synchronized class Box
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	sync b, nope {
+	}
+	return 0;
+}

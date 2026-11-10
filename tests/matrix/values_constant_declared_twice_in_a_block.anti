@@ -1,0 +1,8 @@
+//! Two `const` statements of one name in one block. The second is refused.
+
+fn main() -> int
+{
+	const A: int = 1;
+	const A: int = 2;
+	return A;
+}

@@ -1,0 +1,1 @@
+ownership_take_of_a_field_of_a_singleton.anti:20:15: error: `head` of singleton `Registry` is read-only after creation, and `mutable` marks a field the program writes

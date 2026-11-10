@@ -1,0 +1,17 @@
+//! `if let Circle c = p` where `p` is a `?*Shape`. A case binds the fields of a
+//! variant, and `p` is a pointer.
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn main() -> int
+{
+	let s = Shape.Empty;
+	let p: ?*Shape = &s;
+	if let Circle c = p {
+	}
+	return 0;
+}

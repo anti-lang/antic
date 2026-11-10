@@ -1,0 +1,14 @@
+//! A `while false` as the last statement of a function with a result. Only a
+//! `while true` without a `break` ends the path, so the function can reach its
+//! end without `return`.
+
+fn spin() -> int
+{
+	while false do {
+	}
+}
+
+fn main() -> int
+{
+	return spin();
+}

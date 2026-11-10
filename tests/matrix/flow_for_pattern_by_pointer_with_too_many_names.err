@@ -1,0 +1,1 @@
+flow_for_pattern_by_pointer_with_too_many_names.anti:7:7: error: `(int, int)` has 2 elements, and the pattern names 3

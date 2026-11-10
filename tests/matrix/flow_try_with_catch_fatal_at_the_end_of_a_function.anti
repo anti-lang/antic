@@ -1,0 +1,28 @@
+//! A function whose last statement is a `try` block with `catch fatal`. The
+//! body returns and the handler stops the program, so the function needs no
+//! `return` after the block.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn half(n: int) -> int may fail
+{
+	if n % 2 != 0 {
+		fail "odd";
+	}
+	return n / 2;
+}
+
+fn halved(n: int) -> int
+{
+	try {
+		return half(n);
+	} catch fatal
+}
+
+fn main() -> int
+{
+	printf("halved %d\n".ptr, halved(8) as c_int);
+	return 0;
+}
