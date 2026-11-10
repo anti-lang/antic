@@ -357,6 +357,9 @@ bool driver_link_inputs_of(const struct options *o, const struct extras *extras,
         text_appendf(&dir, "%s/%s/", o->runtime, RUNTIME_LIB_DIR);
         link_target_dir(&dir, o->target, false);
         ok = platform_absolute_path(text_cstr(&dir), &f->rpath);
+        if (!ok) {
+            say_antic("cannot find the directory of %s\n", text_cstr(&dir));
+        }
         text_free(&dir);
         in->rpath = text_cstr(&f->rpath);
     }
