@@ -114,3 +114,130 @@ anti_message(runtime_of_the_data_directory
     ENV "XDG_DATA_HOME=${PROJECT}/data" "LOCALAPPDATA=${PROJECT}/data"
     ARGS test --work ../test -I src src/com/example/one.anti
     ERR "src/com/example/one.anti:6:9: error: expected `int`, found `bool`")
+# A module the parser refuses, read_unit of test.c, fails the run before
+# it compiles anything.
+anti_message(source_not_parsed
+    FILES com/example/bad.anti "//! Broken.\n\nfn (\n"
+    ARGS test --work ../test --runtime "${RUNTIME}" com/example/bad.anti
+    ERR "com/example/bad.anti:3:4: error: expected identifier")
+
+# A project of two modules, whose tests block imports the other, for the
+# cases of a run over a project below. The run reuses the files of the
+# build of the project in build/<host>/dev/ and caches its own there.
+function(write_project)
+    write_bytes("${PROJECT}/anti.toml"
+                "[package]\nname = \"com.example\"\nversion = \"0.1.0\"\n")
+    write_bytes("${PROJECT}/src/com/example.anti"
+                "//! The package.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+    write_bytes("${PROJECT}/src/com/example/half.anti"
+                "//! Halving.\n\n/// Half n.\npub fn half(n: int) -> int\n{\n\treturn n / 2;\n}\n")
+    write_bytes("${PROJECT}/src/com/example/twice.anti"
+                "//! Doubling.\n\nimport com.example.half;\n\n/// Twice n.\npub fn twice(n: int) -> int\n{\n\treturn n * 2;\n}\n\ntests\n{\n\tfn doubles()\n\t{\n\t\tlet n = half.half(twice(2));\n\t\tassert(n == 2);\n\t}\n}\n")
+endfunction()
+set(built "./build/${HOST}/dev")
+set(failed_module "anti test: 1 tests in 1 modules, 1 module failed")
+# The library directory of the run, test_run of test.c, which it empties
+# first: the stat of the walk that removes it, and then its mkdir.
+anti_message(project_library_directory_not_replaced
+    SETUP write_project
+    FAULT stat:38:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot replace build/tests/lib")
+anti_message(project_library_directory_not_made
+    SETUP write_project
+    FAULT mkdir:31:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot make build/tests/lib")
+# The library file of the module with its tests, compile_library of
+# test.c: the directory of its cache in obj/, its compile, the library
+# files it imports, read for the key, the key beside it and the copy
+# into the library directory of the run.
+anti_message(project_library_cache_not_made
+    SETUP write_project
+    FAULT mkdir:50:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot make ${built}/obj/com/example")
+anti_message(project_library_not_compiled
+    SETUP write_project
+    FAULT write:8:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "antic: cannot write ${built}/obj/com/example/twice.tests.antl")
+anti_message(project_library_imports_unread
+    SETUP write_project
+    FAULT open:58:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot read ${built}/lib/com/example/half.antl")
+anti_message(project_library_key_not_written
+    SETUP write_project
+    FAULT write:9:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot write ${built}/obj/com/example/twice.tests.antl.key")
+anti_message(project_library_not_copied
+    SETUP write_project
+    FAULT write:10:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot write build/tests/lib/com/example/twice.antl")
+# The object of the module, compile_object of test.c: the directory of its
+# cache, the library files it imports and the key beside it.
+anti_message(project_object_cache_not_made
+    SETUP write_project
+    FAULT mkdir:59:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot make ${built}/obj/com/example")
+anti_message(project_object_imports_unread
+    SETUP write_project
+    FAULT open:68:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot read ${built}/lib/com/example/half.antl")
+anti_message(project_object_key_not_written
+    SETUP write_project
+    FAULT write:12:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot write ${built}/obj/com/example/twice.tests.o.key")
+# The object of the import that the dev link of the runner takes from the
+# build, compile_imports of test.c.
+anti_message(project_import_not_compiled
+    SETUP write_project
+    FAULT write:14:EACCES
+    OUT "${failed_module}"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "antic: cannot write ${built}/obj/com/example/half.ll")
+# The runner, run_unit of test.c: the directory of its cache, the files
+# its key reads, which are the library file of the run, the library files
+# it imports and the key of an object it links, its link and its key.
+anti_message(project_runner_cache_not_made
+    SETUP write_project
+    FAULT mkdir:70:EACCES
+    OUT "${failed_module}"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot make ${built}/obj/com/example")
+anti_message(project_runner_library_unread
+    SETUP write_project
+    FAULT open:114:EACCES
+    OUT "${failed_module}"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot read build/tests/lib/com/example/twice.antl")
+anti_message(project_runner_imports_unread
+    SETUP write_project
+    FAULT open:120:EACCES
+    OUT "${failed_module}"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot read ${built}/lib/com/example/half.antl")
+anti_message(project_runner_object_key_unread
+    SETUP write_project
+    FAULT open:121:EACCES
+    OUT "${failed_module}"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot read ${built}/obj/com/example/twice.tests.o.key")
+anti_message(project_runner_not_linked
+    SETUP write_project
+    FAULT write:16:EACCES
+    OUT "${failed_module}"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "antic: cannot write ${built}/obj/com/example/twice.runner.ll")
+anti_message(project_runner_key_not_written
+    SETUP write_project
+    FAULT write:17:EACCES
+    OUT "${failed_module}"
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot write ${built}/obj/com/example/twice.runner.key")

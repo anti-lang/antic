@@ -5,9 +5,11 @@
 # cmake -P and these values:
 #   ANTI      the anti executable
 #   RUNTIME   the runtime archive
-#   PROJECT   tests/anti-test/project
+#   PROJECT   tests/anti-test/project, and tests/inject/project for the
+#             case injections
 #   WORK      a directory this run writes into
 #   CASE      one of the cases below
+#   HOST      the target name of this host, for the case unreadable_runtime
 #
 # Cases:
 #   all_dev, all_release  `anti test` without a file runs the tests of
@@ -23,6 +25,16 @@
 #   dependency_dev, dependency_release  a module that imports a module of
 #                         a path dependency, whose library file stands
 #                         under no root of the run
+#   injections            the manifest names providers in `[inject]` and
+#                         `[inject.test]`, which the key of every file the
+#                         run caches holds
+#   links                 a module that links a framework of macOS and a
+#                         library of Linux, which the key of its runner
+#                         holds on every host
+#   unreadable_runtime    an archive of the runtime archive that cannot be
+#                         read, which the key of the runner reads. The run
+#                         names it and fails the module. Not on Windows,
+#                         which keeps no permission bits
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -172,6 +184,61 @@ elseif(CASE STREQUAL "dependency_dev" OR CASE STREQUAL "dependency_release")
     passes("${status}" "${text}" "anti test of a module of a dependency")
     expect("${text}" "ok shapes.measure.doubles_through_the_dependency"
            "the test through the dependency")
+elseif(CASE STREQUAL "injections")
+    run_tests(status text)
+    passes("${status}" "${text}" "anti test of a project with injections")
+    expect("${text}" "ok com.example.app.the_test_table_replaces_one_provider"
+           "the test of the provider of the test table")
+    expect("${text}" "anti test: 1 tests in 1 modules, 0 modules failed"
+           "the count of the run")
+elseif(CASE STREQUAL "links")
+    file(WRITE "${here}/src/shapes/linked.anti"
+         "//! Linked libraries of two systems.\n\n"
+         "link framework \"CoreFoundation\";\nlink linux \"m\";\n\n"
+         "/// Three.\npub fn three() -> int\n{\n\treturn 3;\n}\n\n"
+         "tests\n{\n\tfn gives_three()\n\t{\n"
+         "\t\tlet n = three();\n\t\tassert(n == 3);\n\t}\n}\n")
+    run_tests(status text src/shapes/linked.anti)
+    passes("${status}" "${text}" "anti test of a module that links")
+    expect("${text}" "ok shapes.linked.gives_three" "the test of the module")
+elseif(CASE STREQUAL "unreadable_runtime")
+    # A stand-in runtime archive of links into RUNTIME, whose lib/HOST/
+    # holds an archive more that nobody may read.
+    set(runtime "${WORK}/runtime")
+    file(MAKE_DIRECTORY "${runtime}/lib/${HOST}")
+    file(GLOB parts RELATIVE "${RUNTIME}" "${RUNTIME}/*")
+    foreach(part IN LISTS parts)
+        if(NOT part STREQUAL "lib")
+            file(CREATE_LINK "${RUNTIME}/${part}" "${runtime}/${part}"
+                 SYMBOLIC)
+        endif()
+    endforeach()
+    file(GLOB targets RELATIVE "${RUNTIME}/lib" "${RUNTIME}/lib/*")
+    foreach(target IN LISTS targets)
+        if(NOT target STREQUAL HOST)
+            file(CREATE_LINK "${RUNTIME}/lib/${target}"
+                 "${runtime}/lib/${target}" SYMBOLIC)
+        endif()
+    endforeach()
+    file(GLOB entries RELATIVE "${RUNTIME}/lib/${HOST}"
+         "${RUNTIME}/lib/${HOST}/*")
+    foreach(entry IN LISTS entries)
+        file(CREATE_LINK "${RUNTIME}/lib/${HOST}/${entry}"
+             "${runtime}/lib/${HOST}/${entry}" SYMBOLIC)
+    endforeach()
+    set(unreadable "${runtime}/lib/${HOST}/unreadable.a")
+    file(WRITE "${unreadable}" "")
+    file(CHMOD "${unreadable}" PERMISSIONS OWNER_WRITE)
+    set(RUNTIME "${runtime}")
+    run_tests(status text src/shapes/area.anti)
+    if(status EQUAL 0)
+        message(FATAL_ERROR "the run over an unreadable archive passed\n"
+                "${text}")
+    endif()
+    expect("${text}" "anti: cannot read ${unreadable}"
+           "the archive that cannot be read")
+    expect("${text}" "anti test: 1 tests in 1 modules, 1 module failed"
+           "the count of the run")
 elseif(CASE STREQUAL "outside")
     file(REMOVE "${here}/anti.toml")
     run_tests(status text)

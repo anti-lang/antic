@@ -6649,16 +6649,25 @@ add_test(NAME anti_test
 # `anti test` in a project finds the library files of its modules without
 # -I, by Q4 of "Answers of 2026-11-06, second set" in docs/decisions.md.
 # The header of the runner states each case.
-foreach(case all_dev all_release file_dev file_release import_changed
-             earlier_run include_roots outside dependency_dev
-             dependency_release)
+set(anti_test_project_cases all_dev all_release file_dev file_release
+    import_changed earlier_run include_roots outside dependency_dev
+    dependency_release injections links)
+if(NOT ANTIC_HOST_OS STREQUAL "windows")
+    list(APPEND anti_test_project_cases unreadable_runtime)
+endif()
+foreach(case IN LISTS anti_test_project_cases)
+    set(project "${CMAKE_CURRENT_SOURCE_DIR}/anti-test/project")
+    if(case STREQUAL "injections")
+        set(project "${INJECT}/project")
+    endif()
     add_test(NAME anti_test_project_${case}
         COMMAND "${CMAKE_COMMAND}"
             "-DANTI=$<TARGET_FILE:anti>"
             "-DRUNTIME=${ANTIC_RUNTIME_DIR}"
-            "-DPROJECT=${CMAKE_CURRENT_SOURCE_DIR}/anti-test/project"
+            "-DPROJECT=${project}"
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/anti-test-project-${case}"
             "-DCASE=${case}"
+            "-DHOST=${ANTIC_HOST_TARGET}"
             -P "${ANTIC_RUNNERS}/run_anti_test_project.cmake")
 endforeach()
 
