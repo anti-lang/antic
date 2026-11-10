@@ -552,3 +552,160 @@ anti_message(fault_runtime_license_unread
     FAULT open:4:EACCES
     ARGS ${tools} main.anti
     ERR "antic: cannot open ${RUNTIME}/licenses/anti_rt.txt")
+
+# The links of driver_link.c.
+
+# A stand-in runtime archive at WORK/runtime: every entry of the archive
+# is a link into RUNTIME, but for the path that path names below it, whose
+# directories hold links of every entry but the last part. The caller
+# writes that last part.
+set(stand_in "${WORK}/runtime")
+function(stand_in_runtime path)
+    set(from "${RUNTIME}")
+    set(to "${stand_in}")
+    string(REPLACE "/" ";" parts "${path}")
+    foreach(part IN LISTS parts)
+        file(MAKE_DIRECTORY "${to}")
+        file(GLOB entries RELATIVE "${from}" "${from}/*")
+        foreach(entry IN LISTS entries)
+            if(NOT entry STREQUAL part)
+                file(CREATE_LINK "${from}/${entry}" "${to}/${entry}"
+                     SYMBOLIC)
+            endif()
+        endforeach()
+        set(from "${from}/${part}")
+        set(to "${to}/${part}")
+    endforeach()
+endfunction()
+
+if(CMAKE_HOST_APPLE)
+    # The second call of xcrun, for the version of the SDK, is the fifth
+    # program of the run, after its pipe.
+    anti_message(fault_xcrun_version_no_pipe
+        FILES main.anti "${program}"
+        FAULT run:5:EACCES
+        ARGS ${tools} --linker platform main.anti
+        ERR "antic: pipe: Permission denied"
+            "antic: xcrun --show-sdk-version failed")
+    # An xcrun that prints nothing, and an ld that fails, on PATH.
+    function(empty_xcrun)
+        foreach(tool xcrun ld)
+            set(status 0)
+            if(tool STREQUAL "ld")
+                set(status 1)
+            endif()
+            file(WRITE "${PROJECT}/bin/${tool}" "#!/bin/sh\nexit ${status}\n")
+            file(CHMOD "${PROJECT}/bin/${tool}"
+                 PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+        endforeach()
+    endfunction()
+    anti_message(xcrun_without_output
+        FILES main.anti "${program}"
+        SETUP empty_xcrun
+        ENV "PATH=${PROJECT}/bin"
+        ARGS ${tools} --linker platform main.anti
+        ERR "antic: the linker failed")
+    # The version of the SDK in the sysroot of the Mac, link_facts of
+    # driver_link.c, which the thirteenth open reads.
+    anti_message(fault_sysroot_version_unread
+        FILES main.anti "${program}"
+        FAULT open:13:EACCES
+        ARGS ${tools} main.anti
+        ERR "antic: cannot open ${RUNTIME}/sysroot/${HOST}/sdk-version"
+            "antic: linking for ${HOST} needs the sysroot ${RUNTIME}/sysroot/${HOST} of the package")
+    # A version written with a carriage return, as a Windows editor
+    # leaves it, links as the version alone.
+    function(version_with_a_carriage_return)
+        stand_in_runtime("sysroot/${HOST}/sdk-version")
+        file(READ "${RUNTIME}/sysroot/${HOST}/sdk-version" version)
+        string(STRIP "${version}" version)
+        file(WRITE "${stand_in}/sysroot/${HOST}/sdk-version" "${version}\r\n")
+    endfunction()
+    anti_message(sdk_version_with_a_carriage_return STATUS 0
+        FILES main.anti "${program}"
+        SETUP version_with_a_carriage_return
+        ARGS --runtime "${stand_in}" main.anti)
+    # An SDK that anti sdk import laid into the sysroot, apple_sdk of
+    # driver_link.c. When its version cannot be read, the fifteenth open,
+    # the link takes the SDK of the Command Line Tools.
+    function(imported_sdk)
+        stand_in_runtime("sysroot/${HOST}/sdk")
+        file(WRITE "${stand_in}/sysroot/${HOST}/sdk/sdk-version" "9.9\n")
+    endfunction()
+    anti_message(fault_imported_sdk_unread STATUS 0
+        FILES main.anti "${program}"
+        SETUP imported_sdk
+        FAULT open:15:EACCES
+        ARGS --runtime "${stand_in}" --framework CoreFoundation main.anti
+        ERR "antic: cannot open ${stand_in}/sysroot/${HOST}/sdk/sdk-version")
+endif()
+
+# A native library built for the default level of an ARM64 target, and a
+# program below it, native_level of driver_link.c.
+anti_message(native_level_arm64
+    FILES main.anti "${pattern_program}"
+    ARGS ${tools} --target macos-arm64 --cpu armv8.2 main.anti
+    ERR "antic: anti.regex is built for armv8.5, this program targets armv8.2")
+
+# A Windows program that can host a plugin, host_exports and
+# driver_windows_link_paths of driver_link.c. It links its object, not
+# bitcode, and writes the .def file of its exports beside it.
+include("${CMAKE_CURRENT_LIST_DIR}/../tools/cpu-levels.cmake")
+antic_read_cpu_levels("${CMAKE_CURRENT_LIST_DIR}/../tools/cpu-levels")
+set(windows_level "${ANTIC_CPU_LEVEL_windows-x86_64}")
+set(plugin_host "import anti.plugin;\n\nfn main(args: []str) -> int\n{\n\tlet lib = plugin.load(args[1]) catch {\n\t\treturn 1;\n\t};\n\tdelete(lib);\n\treturn 0;\n}\n")
+set(windows_host --target windows-x86_64)
+# The directory of the program, the third and the fourth stat, and a path
+# of the link that keeps its form when the fifth and the sixth fail.
+anti_message(fault_windows_directory_not_found
+    FILES host.anti "${plugin_host}"
+    FAULT stat:3:EACCES,stat:4:EACCES
+    ARGS ${tools} ${windows_host} -o host.exe host.anti
+    ERR "antic: cannot find the directory of host.exe")
+anti_message(fault_windows_path_kept STATUS 0
+    FILES host.anti "${plugin_host}"
+    FAULT stat:5:EACCES,stat:6:EACCES
+    ARGS ${tools} ${windows_host} -o host.exe host.anti)
+# The runtime library and the object, whose symbols the .def file lists,
+# the nineteenth and the twentieth open, and the .def file, the second
+# write. The program has no .exe, so the .def file takes its whole name.
+anti_message(fault_windows_host_runtime_unread
+    FILES host.anti "${plugin_host}"
+    FAULT open:19:EACCES
+    ARGS ${tools} ${windows_host} -o host.exe host.anti
+    ERR "antic: cannot open ${RUNTIME}/lib/windows-x86_64/${windows_level}/anti_rt.lib")
+anti_message(fault_windows_host_object_unread
+    FILES host.anti "${plugin_host}"
+    FAULT open:20:EACCES
+    ARGS ${tools} ${windows_host} -o host.exe host.anti
+    ERR "antic: cannot open host.exe.obj")
+anti_message(fault_windows_host_exports_not_written
+    FILES host.anti "${plugin_host}"
+    FAULT write:2:EACCES
+    ARGS ${tools} ${windows_host} -o host host.anti
+    ERR "antic: cannot write host.def")
+# A runtime library that is no COFF archive.
+if(NOT CMAKE_HOST_WIN32)
+    function(runtime_without_symbols)
+        stand_in_runtime("lib/windows-x86_64/${windows_level}/anti_rt.lib")
+        file(WRITE "${stand_in}/lib/windows-x86_64/${windows_level}/anti_rt.lib" "")
+    endfunction()
+    anti_message(windows_host_runtime_without_symbols
+        FILES host.anti "${plugin_host}"
+        SETUP runtime_without_symbols
+        ARGS --runtime "${stand_in}" ${windows_host} -o host.exe host.anti
+        ERR "antic: cannot read the symbols of ${stand_in}/lib/windows-x86_64/${windows_level}/anti_rt.lib and host.exe.obj")
+endif()
+# A Windows program of --memory-checks in the directory of the run, beside
+# which the link copies the DLL of AddressSanitizer: its open, the
+# eleventh, and its write, the second.
+anti_message(fault_memory_dll_unread
+    FILES main.anti "${program}"
+    FAULT open:11:EACCES
+    ARGS ${tools} ${windows_host} --memory-checks -o main.exe main.anti
+    ERR "antic: cannot open ${RUNTIME}/lib/windows-x86_64/clang_rt.asan_dynamic.dll")
+anti_message(fault_memory_dll_not_written
+    FILES main.anti "${program}"
+    FAULT write:2:EACCES
+    ARGS ${tools} ${windows_host} --memory-checks -o main.exe main.anti
+    ERR "antic: cannot write clang_rt.asan_dynamic.dll")

@@ -1010,6 +1010,51 @@ if(CMAKE_HOST_APPLE)
         SETUP dsymutil_without_lines
         ARGS build --release --runtime "${stand_in}"
         ERR "antic: dsymutil wrote no line table for the code of ${release_dir}/app")
+    # A dsymutil whose standard error holds lines of other kinds: a line
+    # that is no warning, a warning without a path and one of another
+    # reason, which ends without a line feed. The build passes, and the
+    # lines go on as dsymutil wrote them, dsymutil_unopened of
+    # driver_link.c.
+    function(dsymutil_other_lines)
+        stand_in_dsymutil("printf 'note: a line of another kind\\nwarning: (${host_arch})\\nwarning: (${host_arch}) a warning of another kind' >&2\nexec \"${RUNTIME}/bin/dsymutil\" \"$@\"\n")
+    endfunction()
+    anti_message(dsymutil_other_lines STATUS 0
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        SETUP dsymutil_other_lines
+        ARGS build --release --runtime "${stand_in}"
+        ERR_MATCH "note: a line of another kind\nwarning: \\(${host_arch}\\)\nwarning: \\(${host_arch}\\) a warning of another kind")
+    # A dSYM whose link then lost what dsym_has_lines of driver_link.c
+    # reads: its bytes, the symbol of the entry, or the debug map.
+    function(dsymutil_then_empty_link)
+        stand_in_dsymutil("\"${RUNTIME}/bin/dsymutil\" \"$@\" || exit 1\n: > \"$1\"\n")
+    endfunction()
+    function(dsymutil_then_strip_symbols)
+        stand_in_dsymutil("\"${RUNTIME}/bin/dsymutil\" \"$@\" || exit 1\nexec \"${RUNTIME}/bin/llvm-strip\" --strip-all \"$1\"\n")
+    endfunction()
+    function(dsymutil_then_strip_debug_map)
+        stand_in_dsymutil("\"${RUNTIME}/bin/dsymutil\" \"$@\" || exit 1\nexec \"${RUNTIME}/bin/llvm-strip\" -S \"$1\"\n")
+    endfunction()
+    foreach(lost empty_link strip_symbols strip_debug_map)
+        anti_message(dsym_link_${lost}
+            FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+            SETUP dsymutil_then_${lost}
+            ARGS build --release --runtime "${stand_in}"
+            ERR "antic: dsymutil wrote no line table for the code of ${release_dir}/app")
+    endforeach()
+    # The debug map names its object from the build directory, which the
+    # link makes absolute, link_facts of driver_link.c: the twentieth and
+    # the twenty-first stat. Under --lto none it names the object of the
+    # program, the twenty-third and the twenty-fourth.
+    anti_message(fault_debug_map_root_not_found
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT stat:20:EACCES,stat:21:EACCES
+        ARGS build --release ${tools}
+        ERR "antic: cannot find the directory of ${release_dir}/app")
+    anti_message(fault_debug_map_object_not_found
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        FAULT stat:23:EACCES,stat:24:EACCES
+        ARGS build --release --lto none ${tools}
+        ERR "antic: cannot find the directory of ${release_dir}/app.o")
 endif()
 # A library project copies each library file into dist/, build.c.
 anti_message(fault_library_not_copied
