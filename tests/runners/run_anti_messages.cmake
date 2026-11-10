@@ -32,6 +32,12 @@
 #                                 no pinned clang beside its tree and takes
 #                                 the first clang on PATH
 #       [OUT <line>...]           the whole standard output, empty without it
+#       [OUT_FILE <file>]         instead of OUT, the whole standard output
+#                                 as the text of <file>, a path from the
+#                                 directory of the table, in which
+#                                 @<name>@ stands for the value <name> of
+#                                 this run, as configure_file writes it
+#                                 with @ONLY
 #       ARGS <argument>...        the arguments of anti
 #       [ERR <line>...]           the whole standard error, empty without it
 #       [ERR_MATCH <pattern>])    instead of ERR, a pattern of the whole
@@ -45,6 +51,12 @@
 # so a message that names a file of the project names it without the
 # directory of the build tree. A line names another path through
 # ${WORK}, ${PROJECT}, ${USER_CACHE} or ${RUNTIME}.
+#
+# DESIGN: OUT_FILE is the form of an output that holds an empty line,
+# which OUT drops, such as a licence text. Eddie decided it by Q7 of
+# "Answers of 2026-11-10, second set" in docs/decisions.md. The file
+# stands beside its table and is named after its test,
+# <command>_message_<case>.out.
 #
 # DESIGN: the name of a case stands in its table alone. With LIST set
 # and TABLE, the script runs no case and prints the name of each, one per
@@ -127,7 +139,7 @@ function(anti_message name)
         return()
     endif()
     cmake_parse_arguments(PARSE_ARGV 1 arg "ANY_OUT;COPY"
-                          "STATUS;SETUP;ERR_MATCH;FAULT"
+                          "STATUS;SETUP;ERR_MATCH;FAULT;OUT_FILE"
                           "FILES;DIRECTORIES;ENV;OUT;ARGS;ERR")
     if(DEFINED arg_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "${name}: `${arg_UNPARSED_ARGUMENTS}` follows "
@@ -180,7 +192,17 @@ function(anti_message name)
            "==[0-9]+==WARN: No external symbolizers found[^\n]*\n==[0-9]+==HINT: Is PATH set[^\n]*\n"
            "" err "${err}")
     lines_of(expected_err ${arg_ERR})
-    lines_of(expected_out ${arg_OUT})
+    if(DEFINED arg_OUT_FILE)
+        if(DEFINED arg_OUT)
+            message(FATAL_ERROR "${name}: OUT and OUT_FILE both give the "
+                                "standard output")
+        endif()
+        get_filename_component(table_dir "${TABLE}" DIRECTORY)
+        file(READ "${table_dir}/${arg_OUT_FILE}" expected_out)
+        string(CONFIGURE "${expected_out}" expected_out @ONLY)
+    else()
+        lines_of(expected_out ${arg_OUT})
+    endif()
     if(NOT status STREQUAL arg_STATUS)
         message(FATAL_ERROR "${name}: anti exited with ${status}, and the "
                             "case expects ${arg_STATUS}\n${out}${err}")

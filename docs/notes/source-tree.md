@@ -456,6 +456,8 @@ The files directly under `tests/`.
 | File | Purpose |
 |---|---|
 | `tests/CMakeLists.txt` | Builds the C programs of the tests and registers every test of the suite but those of `src/native/`, in sections by kind after the helpers they share. |
+| `tests/anti_message_license_project_sources_without_a_last_newline.out` | The standard output of the case of `tests/anti_messages.cmake` whose record of sources ends without its newline, with the licence text of the standard library. |
+| `tests/anti_message_license_project_sources_without_the_library.out` | The standard output of the case of `tests/anti_messages.cmake` whose record of sources names no pcre2, with the licence text of the standard library. |
 | `tests/anti_messages.cmake` | The cases of the messages of `anti new`, `anti license` and `anti sdk`, which have no directory under `tests/`. |
 | `tests/antic_messages.cmake` | The cases of the messages of the driver of antic that stand at no position of a source. |
 | `tests/binary_stdio.h` | Puts the standard output and error of a C test program into binary mode on Windows before `main`. |

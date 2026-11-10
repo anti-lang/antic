@@ -111,6 +111,58 @@ anti_message(license_project_all_targets STATUS 2
 anti_message(license_project_static_library STATUS 2
     ARGS license --project --lib static
     ERR "anti: the build of a static library prints the line that links it, so license --project --lib static takes --notice")
+# The notice of a project takes the version of a native library from the
+# record of sources of the runtime archive, which source_version of
+# driver.c reads. Each case runs a stand-in archive that links every
+# part of the real one but licenses/, which holds short texts and a
+# record of its own. The output holds the licence text of the standard
+# library with its empty lines, so it stands in a file beside this table.
+# The stand-in needs the links of the Mac, and the notice of a Linux
+# program names musl and mimalloc as well.
+if(CMAKE_HOST_APPLE)
+    set(license_stand_in "${WORK}/runtime")
+    set(license_manifest "[package]\nname = \"com.example.app\"\nversion = \"0.1.0\"\nlicense = \"MIT\"\n")
+    set(license_program "//! A program of anti.regex.\n\nimport anti.regex;\n\nfn main() -> int\n{\n\treturn 0;\n}\n")
+    function(license_stand_in_archive record)
+        file(MAKE_DIRECTORY "${license_stand_in}/licenses")
+        file(GLOB parts RELATIVE "${RUNTIME}" "${RUNTIME}/*")
+        foreach(part IN LISTS parts)
+            if(NOT part STREQUAL "licenses")
+                file(CREATE_LINK "${RUNTIME}/${part}"
+                     "${license_stand_in}/${part}" SYMBOLIC)
+            endif()
+        endforeach()
+        file(WRITE "${license_stand_in}/licenses/anti_rt.txt"
+             "The licence of the runtime.\n")
+        file(WRITE "${license_stand_in}/licenses/pcre2.txt"
+             "The licence of PCRE2.\n")
+        file(WRITE "${license_stand_in}/licenses/sources.txt" "${record}")
+    endfunction()
+    # The line of pcre2 ends the record without its newline and without
+    # a URL.
+    function(license_record_without_a_last_newline)
+        license_stand_in_archive("# The record.\npcre2 10.48")
+    endfunction()
+    anti_message(license_project_sources_without_a_last_newline
+        STATUS 0
+        FILES anti.toml "${license_manifest}"
+              src/com/example/app.anti "${license_program}"
+        SETUP license_record_without_a_last_newline
+        ARGS license --project --runtime "${license_stand_in}"
+        OUT_FILE anti_message_license_project_sources_without_a_last_newline.out)
+    # A record that names no pcre2 gives the library the version `-`. Its
+    # empty line is no line of a component.
+    function(license_record_without_the_library)
+        license_stand_in_archive("# The record.\n\nmusl 1.2.6 https://musl.libc.org/releases/musl-1.2.6.tar.gz")
+    endfunction()
+    anti_message(license_project_sources_without_the_library
+        STATUS 0
+        FILES anti.toml "${license_manifest}"
+              src/com/example/app.anti "${license_program}"
+        SETUP license_record_without_the_library
+        ARGS license --project --runtime "${license_stand_in}"
+        OUT_FILE anti_message_license_project_sources_without_the_library.out)
+endif()
 
 # anti sdk import.
 function(pack_bundle)
