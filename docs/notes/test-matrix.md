@@ -1927,6 +1927,12 @@ What the guards do not see:
 - An option that anti passes to antic by itself, such as `--dependency`.
   A test must pass it to antic to count.
 
+## What no test reaches
+
+`./c coverage` measures what the suite reaches. The guards that the
+coverage steps found reached by no input, and that Eddie kept, stand in
+`docs/notes/unreached-guards.md` with the reason for each.
+
 ## Counts
 
 On 2026-10-12, at antic 0.2.0:
