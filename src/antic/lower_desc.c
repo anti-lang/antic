@@ -748,10 +748,15 @@ static const struct ir_global *array_descriptor(struct lowerer *l,
 
 /* The descriptor that the record of a type argument t carries. It is
    that of a class or a struct, or of the class or struct that a pointer,
-   a slice or an array reaches. */
+   a slice or an array of one level reaches. An array of arrays carries
+   the descriptor of the array with the length of each level, as a field
+   record does, by Q1 of "Answers of 2026-11-10". */
 static const struct ir_global *arg_descriptor(struct lowerer *l,
                                               const struct type *t)
 {
+    if (t->kind == TYPE_ARRAY && t->element->kind == TYPE_ARRAY) {
+        return array_descriptor(l, t);
+    }
     while (t->kind == TYPE_ARRAY) {
         t = t->element;
     }

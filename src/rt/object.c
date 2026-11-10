@@ -809,7 +809,11 @@ void anti_rt_element_serialize(void *out, void *bytes,
         serialize_object(b, bytes);
         return;
     }
-    if (t == ANTI_TYPE_ARRAY) {
+    /* An array of arrays carries the descriptor of its levels, as a
+       field of its type does, and is written as that field is, by Q1 of
+       "Answers of 2026-11-10" in docs/decisions.md. */
+    if (t == ANTI_TYPE_ARRAY &&
+        ANTI_TYPE_ELEMENT(arg->type) != ANTI_TYPE_ARRAY) {
         size_t size = anti_rt_element_size(arg->type, arg->descriptor);
         /* An array whose elements no walk reads is null, as a field of
            its type is, T218 of docs/audit/tests-findings.md. */
@@ -987,7 +991,13 @@ void anti_rt_element_text(void *out, void *bytes, const struct anti_field *arg)
         put(out, "?");
         return;
     }
-    show_value(out, bytes, arg->type, arg->descriptor, arg->offset);
+    /* An array of arrays stands as a field of its type does, through
+       the lengths of the levels its descriptor holds. */
+    show_value(out, bytes, arg->type, arg->descriptor,
+               anti_rt_type_scalar(arg->type) == ANTI_TYPE_ARRAY &&
+                       ANTI_TYPE_ELEMENT(arg->type) == ANTI_TYPE_ARRAY
+                   ? 0
+                   : arg->offset);
 }
 
 /* The root frees nothing. The teardown the compiler writes for a class
