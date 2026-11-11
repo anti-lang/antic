@@ -1,0 +1,60 @@
+//! Calls of generics whose arguments leave a type parameter unbound, one per
+//! line. An operator of a module and an operator of a class take an `int` where
+//! `[2]T` stands. A call walks a tuple that names one copy twice, and a variant
+//! of a type parameter, before the argument that misses its shape.
+
+struct Box
+{
+	n: int,
+}
+
+operator fn add<T>(a: Box, b: [2]T) -> Box
+{
+	return a;
+}
+
+class Vec<T: Number>
+{
+	pub x: T,
+
+	operator fn add<U>(self, other: [2]U) -> Vec<T>
+	{
+		return Vec<T> { x: self.x };
+	}
+}
+
+struct Pair<A, B>
+{
+	a: A,
+	b: B,
+}
+
+variant Shape<T>
+{
+	Circle { r: T },
+	Empty,
+}
+
+fn pick<T, U>(both: (Pair < int, int >, Pair < int, int >, U), cells: [2]T) -> int
+{
+	return 0;
+}
+
+fn choose<T, U>(c: Shape<U>, cells: [2]T) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let k = 5;
+	let b = Box { n: 1 };
+	let c = b + k;
+	let v = Vec<int> { x: 3 };
+	let w = v + k;
+	let p = Pair<int, int> { a: 1, b: 2 };
+	let x = pick((p, p, 1), 5);
+	let s = Shape<int>.Circle { r: 1 };
+	let y = choose(s, 5);
+	return 0;
+}

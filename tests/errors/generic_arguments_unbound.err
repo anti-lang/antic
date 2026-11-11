@@ -1,0 +1,4 @@
+generic_arguments_unbound.anti:52:10: error: nothing in the arguments gives `T` of `add`, so the call writes it out after the name
+generic_arguments_unbound.anti:54:10: error: nothing in the arguments gives `U` of `add`, so the call writes it out after the name
+generic_arguments_unbound.anti:56:26: error: `cells` of `pick` takes `[2]T`, found `int`
+generic_arguments_unbound.anti:58:20: error: `cells` of `choose` takes `[2]T`, found `int`

@@ -1,0 +1,28 @@
+//! `equals` of two copies of a generic class whose module gives it `operator fn
+//! eq<T: Float>`. `f64` is a `Float`, so `Box<f64>` compares through the
+//! operator. `int` is none, so `Box<int>` compares its fields.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub item: T,
+	pub stamp: int = 0,
+}
+
+operator fn eq<T: Float>(a: *Box<T>, b: *Box<T>) -> bool
+{
+	return a.item == b.item;
+}
+
+fn main() -> int
+{
+	let a = Box<int> { item: 1, stamp: 1 };
+	let b = Box<int> { item: 1, stamp: 2 };
+	let c = Box<f64> { item: 1.5, stamp: 1 };
+	let d = Box<f64> { item: 1.5, stamp: 2 };
+	printf("%d %d\n".ptr, a.equals(&b) as c_int, c.equals(&d) as c_int);
+	return 0;
+}
