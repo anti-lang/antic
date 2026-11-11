@@ -33,7 +33,7 @@ static bool repeated(const struct package *const *packages, size_t i)
    is LicenseRef-<component>, the form of SPDX for a text that is no
    licence of its list. That is the copyright file of a package of Ubuntu
    and the text of mingw-w64, which each hold the notices of several
-   licences, and the note on the SDK of Apple. */
+   licences. */
 static const struct {
     const char *component;
     const char *license;

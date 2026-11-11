@@ -69,12 +69,12 @@
 #define RUNTIME_NO_VERSION "-"
 /* The components of RUNTIME_LICENSES_DIR whose source the record of
    upstream sources names nowhere, separated by spaces: the APSL of the
-   headers of Apple's C library, the builtins of compiler-rt and the note
-   on Apple's SDK. The plain form of `anti license` gives each
-   RUNTIME_NO_VERSION. tools/upstream-sources.cmake reads this line, so
-   the record writes no line for them and the test runtime_sources holds
-   every other text to a line of the record. */
-#define RUNTIME_UNSOURCED "apsl compiler-rt macos-sdk"
+   headers of Apple's C library and the builtins of compiler-rt. The
+   plain form of `anti license` gives each RUNTIME_NO_VERSION.
+   tools/upstream-sources.cmake reads this line, so the record writes no
+   line for them and the test runtime_sources holds every other text to
+   a line of the record. */
+#define RUNTIME_UNSOURCED "apsl compiler-rt"
 /* The object beside the runtime library that a bundled archive carries
    instead of the licence text of src/rt/license.c. */
 #define RUNTIME_LICENSE_STUB "anti_rt_license_stub"
