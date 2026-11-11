@@ -594,10 +594,25 @@ static void writes_registry(void)
 }
 
 static const char board[] =
+    "pub struct Spot\n"
+    "{\n"
+    "    x: int,\n"
+    "    y: int,\n"
+    "}\n"
     "pub singleton class Board\n"
     "{\n"
     "    pub mutable score: int = 0,\n"
     "    pub atomic hits: int = 0,\n"
+    "    pub mutable spot: Spot = Spot { x: 0, y: 0 },\n"
+    "}\n"
+    "pub fn place()\n"
+    "{\n"
+    "    Board.get().spot.y = 1;\n"
+    "}\n"
+    "pub fn second() -> int\n"
+    "{\n"
+    "    let all = [Spot { x: 1, y: 2 }, Spot { x: 3, y: 4 }];\n"
+    "    return all[1].y;\n"
     "}\n"
     "pub fn bump()\n"
     "{\n"
@@ -655,6 +670,15 @@ static void checks_singletons(void)
             "{\n"
             "    board.hit();\n"
             "    return part.len;\n"
+            "}\n"
+            "worker fn moves(part: []int) -> int\n"
+            "{\n"
+            "    board.place();\n"
+            "    return part.len;\n"
+            "}\n"
+            "worker fn reads(part: []int) -> int\n"
+            "{\n"
+            "    return board.second() + part.len;\n"
             "}\n",
             &p.ir);
     memset(&options, 0, sizeof options);
@@ -663,7 +687,9 @@ static void checks_singletons(void)
               "`score` is `mutable` in singleton `Board` and `worker fn "
               "tally` reaches it\n"
               "`score` is `mutable` in singleton `Board` and `worker fn "
-              "spin` reaches it\n");
+              "spin` reaches it\n"
+              "`spot` is `mutable` in singleton `Board` and `worker fn "
+              "moves` reaches it\n");
     text_free(&errors);
     close_program(&p);
 }
@@ -1101,6 +1127,133 @@ static void reach_takes_the_unit(void)
     arena_free(&arena);
 }
 
+/* The index of the function of module main named name. */
+static uint32_t function_index(const struct ir_module *m, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->function_count; i++) {
+        const struct ir_function *f = m->functions[i];
+        if (f->module != NULL && strcmp(f->module, "main") == 0 &&
+            strcmp(f->name, name) == 0) {
+            return (uint32_t)i;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no function main.%s\n", name);
+    return 0;
+}
+
+/* DESIGN: a release build keeps one of each set of copies whose code is
+   identical. The two copies of `width` differ in their type argument
+   alone, a pointer each, and the length of the array of Pack is a
+   product of two symbolic values. Every reference to the second copy
+   then names the first, the address a global holds among them, which
+   only a library file written by hand gives the IR before the back end
+   lays it out. */
+static void merges_copies(void)
+{
+    static const uint8_t zero[8];
+    struct program p;
+    struct text errors = {0};
+    struct whole_options options;
+    struct ir_global *hook;
+    uint32_t first;
+    uint32_t second;
+
+    open_program(&p);
+    /* antic compiles the copies of every build that dumps no types. */
+    p.front.compile_copies = true;
+    compile(&p, "main",
+            "struct Pack<T>\n"
+            "{\n"
+            "    items: [size_of(T) * 2]u8,\n"
+            "}\n"
+            "fn width<T>(p: ?*Pack<T>) -> int\n"
+            "{\n"
+            "    return size_of(Pack<T>);\n"
+            "}\n"
+            "fn main() -> int\n"
+            "{\n"
+            "    return width<*int>(none) + width<*u8>(none);\n"
+            "}\n",
+            &p.ir);
+    first = function_index(&p.ir, "width<*int>");
+    second = function_index(&p.ir, "width<*byte>");
+    hook = ir_global_add(&p.ir, "main", "hook", zero, 8, 8);
+    ir_global_reloc_fn(&p.ir, hook, 0, second);
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.release = true;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    CHECK_STR(text_cstr(&errors), "");
+    CHECK(hook->reloc_count == 1 && hook->relocs[0].fn &&
+          hook->relocs[0].global == first);
+    text_free(&errors);
+    close_program(&p);
+}
+
+/* DESIGN: the reach that decides the default of the backtraces is taken
+   again with the table of the injections in it, by T104. The provider
+   alone reads whether backtraces are on, as a provider that may fail
+   does, and a program whose start reaches every function, one that can
+   host a plugin, never gets this far. The pass writes the default from
+   the second reach. */
+static void defaults_backtraces_for_a_provider(void)
+{
+    static const char *const inject[] = {"main.Clock=main.the_clock"};
+    struct program p;
+    struct text errors = {0};
+    struct whole_options options;
+
+    open_program(&p);
+    compile(&p, "main",
+            "extern fn anti_rt_backtrace_on() -> bool;\n"
+            "abstract class Clock\n"
+            "{\n"
+            "    abstract fn now(self) -> int;\n"
+            "}\n"
+            "singleton class Watch inherits Clock\n"
+            "{\n"
+            "    concrete fn now(self) -> int\n"
+            "    {\n"
+            "        return 12;\n"
+            "    }\n"
+            "}\n"
+            "fn the_clock() -> *Clock\n"
+            "{\n"
+            "    if anti_rt_backtrace_on() {\n"
+            "        return Watch.get();\n"
+            "    }\n"
+            "    return Watch.get();\n"
+            "}\n"
+            "class Timer\n"
+            "{\n"
+            "    inject clock: *Clock,\n"
+            "    pub fn now(self) -> int\n"
+            "    {\n"
+            "        return self.clock.now();\n"
+            "    }\n"
+            "}\n"
+            "fn main() -> int\n"
+            "{\n"
+            "    let t = Timer { };\n"
+            "    return t.now();\n"
+            "}\n",
+            &p.ir);
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.release = true;
+    options.closed = true;
+    options.inject = inject;
+    options.inject_count = 1;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    CHECK_STR(text_cstr(&errors), "");
+    CHECK(has_runtime_global(&p.ir, "anti_rt_backtrace_default"));
+    text_free(&errors);
+    close_program(&p);
+}
+
 void test_whole(void)
 {
     reach_follows_declarations();
@@ -1115,4 +1268,6 @@ void test_whole(void)
     writes_trampolines();
     reflection_marks_the_table();
     checks_provided_interfaces();
+    merges_copies();
+    defaults_backtraces_for_a_provider();
 }
