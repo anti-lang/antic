@@ -3480,7 +3480,7 @@ Eddie took these decisions on 2026-11-11. They answer questions 1 to 6 of "Quest
 - Q2 of the report of 2c. `driver_run` returns `DRIVER_OBJECT_ONLY` for a dev object of a module without `main`, as `src/antic/driver.h` says. `test.c` and `build.c` test for that status, and no caller takes it for a failure.
 - Q5 of the report of 2c. A run of `anti test` whose cache cannot be read is silent and compiles the file again. It reports nothing, since the run loses nothing.
 - Q6 of the report of 2c. When the root of the debug map cannot be made absolute, the message names the root and not the program.
-- Q1 of the report of batch 5. The `EXPR_FREE` arm of `visit_call` in `src/antic/sema_stmt.c` stays as a guard, with the other guards of the file that Q9 of the report of 2b kept.
+- Q1 of the report of batch 5. The `EXPR_FREE` arm of `visit_call` in `src/antic/sema_stmt.c` stays as a guard, with the other guards of the file that Q5 of the report of 2b kept.
 - Q2 of the report of batch 5. `ERR` of `tests/runners/run_anti_messages.cmake` takes no file. Q7 of the report of 2b asked for the standard output alone, and no case needs a file of the standard error.
 - Q3 of the report of batch 5. A record of `licenses/sources.txt` without the line of a library that the program links ends the run with status 1. It is a defect, as T151 was: a notice without the version of a component is incomplete.
 

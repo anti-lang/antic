@@ -4,17 +4,22 @@ The coverage steps of 2026-11-09 and 2026-11-10 sorted the regions that
 `./c coverage` showed unreached. Most of what stays unreached is a guard.
 A guard tests for a state that the code before it never lets through.
 Eddie kept the guards of this note. `stub` stays by Q2 of "Answers
-of 2026-11-09, third set" in `docs/decisions.md`, and the others by
-"Answers of 2026-11-10, second set". A guard stays in the code as it is.
-A later coverage step that finds one unreached reads its row here before
-it asks again.
+of 2026-11-09, third set" in `docs/decisions.md`, the guards of
+`test.c`, `sema_copies.c` and `driver_link.c` and the `EXPR_FREE` arm of
+`visit_call` by "Answers of 2026-11-11", and the others by "Answers of
+2026-11-10, second set". A guard stays in the code as it is. A later
+coverage step that finds one unreached reads its row here before it asks
+again.
 
 Each row names the function, what the guard turns away and why no input
 of a test reaches it. The rows were checked against the source and the
-coverage run of `docs/reports/2026-11-10-coverage-batch-5.md`. A guard
-named "the report of the first batch" stands in
-`docs/reports/2026-11-09-coverage-phase-2a.md`, and one of "the report of
-the second batch" in `docs/reports/2026-11-10-coverage-phase-2b.md`.
+coverage run of `docs/reports/2026-11-10-coverage-batch-5.md`, and those
+of the third batch against the source of
+`docs/reports/2026-11-11-coverage-batch-6.md`. A guard named "the report
+of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
+one of "the report of the second batch" in
+`docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
+the third batch" in `docs/reports/2026-11-10-coverage-phase-2c.md`.
 
 ## `src/antic/llvm_emit_function.c`
 
@@ -86,7 +91,9 @@ Q3 of the report of the second batch.
 
 ## `src/antic/sema_stmt.c`
 
-Q5 of the report of the second batch.
+Q5 of the report of the second batch, and Q1 of
+`docs/reports/2026-11-10-coverage-batch-5.md` for the `EXPR_FREE` arm of
+`visit_call`.
 
 | Function | What it guards against | Why no input reaches it |
 |---|---|---|
@@ -97,6 +104,7 @@ Q5 of the report of the second batch.
 | `sema_check_function` | An anonymous function that reaches its end without `return`. | Its two callers pass the functions of a module and of a class body. `sema_closure.c` checks an anonymous function and gives the same message. |
 | `visit_call` | `take` inside an `assert`. | The check of `take` gives the node the kind `EXPR_TAKE` after its last refusal, and it refuses a `take` whose object the expression drops, as a condition does. The walk then meets a call. |
 | `sema_refuse_write` | A read-only name as the operand of `take`. | Its one caller is the check of `take`, which refuses every operand but an `own` field first. |
+| `visit_call` | `free` inside the condition of an `assert`. | `free` gives no value, and the checker refuses a value of `void` wherever one stands, in a tuple literal too since the fix of T224. |
 
 ## `src/antic/driver.c`
 
@@ -118,21 +126,53 @@ Q9 of the report of the second batch.
 | `report_diagnostics` | The count of a warning that is not promoted. | `anti check` alone asks for the counts, and it passes `--warnings-as-errors`, which promotes every warning. |
 | `module_name` | A library file read without a list of diagnostics. | `interface_of`, the one caller without a list, reads a source for a doc page, and a library file takes another path. |
 
+## `src/anti/test.c`
+
+Q1 of the report of the third batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `base_options` and `test_run` | A host that `unit_host` cannot name, after which the run ends with 2. | anti builds for the six hosts alone, and `unit_host` names each of them. |
+| `test_options_key` | A version that is NULL, which it writes as an empty word. | A key is written for a run over a project alone, and that run takes the version of the manifest, an empty text where the manifest names none. |
+| `compile_imports` | A library file of the graph that is the input, which leaves the list. | Outside a project the run names no library file of the graph, so the list is empty. |
+
+## `src/antic/sema_copies.c`
+
+Q3 of the report of the third batch. Each guard stands behind the checker,
+which refuses the form first or never builds it.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `member_of_receiver`, `own_params_copy` and `callee_copy` | A call that names no copy, which `copy_failed` refuses. | The checker gives every call of a generic its copy. |
+| `own_params_copy` and `callee_copy` | A class nested in a generic, and a copy of its class that lacks the member. | A library file carries no function of a class with type parameters of its own, so a client gets `` `Stack<int>` has no function `map` `` first. |
+| `xe` | A generic named as a value. | The checker refuses `let f = id;` with `` `id` is generic, and names a function where it is called ``. |
+| `copy_failed` | A copy of a generic of the module itself that fails, which keeps the position in the body of the generic. | The one form that fails, that of T095, is a copy of a generic of another module. |
+| `type_item` and `member_of_copy` | A type item without its generic, and a member without a symbol, a type or a copy. | The checker binds each one before the copies are made. |
+| `redirect`, `xassign` and `xfor` | An open index, `set_index` and `for` over a slice or an array. | No slice or array meets `index`, so the copy turns every open index into a call. |
+| `recheck`, `receiver`, `xparams` and `xi` | A recheck that fails, a receiver without its types, a clone that is not fresh and an item that has its clone already. | The checked tree passed the same checks, and each item is asked for once. |
+| `ty`, `map_add`, `xf`, `xsym`, `symbol_open`, `generic_home`, `copy_function`, `direct_callee`, `walked_param`, `xcall`, `xi`, `defaults_of_copies` and `generic_type_item` | An operand that is NULL and a map of the type arguments that is empty. | Every caller passes the operand, and a copy has at least one type argument. |
+| `refuse` and `xs` | A value outside the cases of the `switch`. | The `switch` of `refuse` names every refusal, and that of `xs` every kind of statement. |
+
+## `src/antic/driver_link.c`
+
+Q4 of the report of the third batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `driver_archive_tool` | A host that is none of the six targets, which takes no suffix. | antic builds for the six hosts alone. |
+| `link_facts` | An object of `--lto none` that is NULL. | A link of a program always names its object. |
+| `driver_windows_link_paths` | A call without a `.def` file. | Both callers pass one. |
+| `native_level` | A level of another architecture than the target's. | The driver checks the level against the target before the link. |
+| `driver_strip_debug` | A strip of Mach-O without the root of the debug map. | `anti build` always gives the root. |
+
 ## Not in this note
 
-- The guards of `src/anti/test.c`, `src/antic/sema_copies.c` and
-  `src/antic/driver_link.c`, which
-  `docs/reports/2026-11-10-coverage-phase-2c.md` lists. They wait for
-  Eddie's answer.
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
   symbolizers of `src/rt/trace.c` and `anti_rt_fault_system_error`.
 - `work_not_waited`, which a test reaches, and which ends through `_Exit`
   before it writes its counts.
 - The failure of `vsnprintf` in `fitted`, which needs a message of more
   than `INT_MAX` bytes.
-- The `EXPR_FREE` arm of `visit_call`, which no input reaches since the
-  fix of T224 refused a tuple of a `void` call.
-  `docs/reports/2026-11-10-coverage-batch-5.md` asks Eddie about it.
 - The paths of `sema_stmt.c` that the report of the second batch did not
   sort, and the `SYMBOLIC_INT` arm of `size_on_every_target`.
 - A `}` after a `return` and the other regions that belong to the
