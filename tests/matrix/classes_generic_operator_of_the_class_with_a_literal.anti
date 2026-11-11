@@ -1,6 +1,7 @@
 //! A literal as the second operand of an `operator fn mul(self, k: T)` of the
 //! generic class `Vec<T>`. `v * 2.0` with `v` a `Vec<f64>` gives the literal
-//! the type `f64`, as a variable of that type does, by T176.
+//! the type `f64`, as a variable of that type does, by T176. `Grid<T, N: int>`
+//! does the same with a constant parameter beside `T`.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -14,10 +15,23 @@ class Vec<T: Number>
 	}
 }
 
+class Grid<T: Number, N: int>
+{
+	pub x: T,
+
+	operator fn mul(self, k: T) -> Grid<T, N>
+	{
+		return Grid<T, N> { x: self.x * k };
+	}
+}
+
 fn main() -> int
 {
 	let v = Vec<f64> { x: 1.5 };
 	let w = v * 2.0;
 	printf("%.1f\n".ptr, w.x);
+	let g = Grid<f64, 3> { x: 2.5 };
+	let h = g * 2.0;
+	printf("%.1f\n".ptr, h.x);
 	return 0;
 }

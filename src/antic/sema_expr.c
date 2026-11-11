@@ -928,9 +928,6 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         if (operand->kind == EXPR_FLOAT) {
             return float_literal(c, e, operand, expected);
         }
-        if (!checked) {
-            t = sema_check_expr(c, operand, expected);
-        }
         if (sema_refuses_half(c, e->pos, t)) {
             return sema_builtin(c, TYPE_ERROR);
         }

@@ -1,7 +1,8 @@
 //! A function and an operator of the generic class `Vec<T>` with a type
 //! parameter `U` of their own, called in the body of the class with `*self`.
 //! The value of the class in its body is a `Vec<T>`, so the call binds `U` to
-//! `T`.
+//! `T`. `Cells<T, N: int>` does the same with a constant parameter, which binds
+//! the `N` of the copy to the `N` of the class.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -30,11 +31,29 @@ class Vec<T: Number>
 	}
 }
 
+class Cells<T: Number, N: int>
+{
+	pub x: T,
+
+	pub fn plus<U: Number>(self, other: Cells<U, N>) -> Cells<T, N>
+	{
+		return Cells<T, N> { x: self.x + self.x };
+	}
+
+	pub fn twice(self) -> Cells<T, N>
+	{
+		return self.plus(*self);
+	}
+}
+
 fn main() -> int
 {
 	let v = Vec<int> { x: 3 };
 	let w = v.twice();
 	let t = v.thrice();
 	printf("%lld %lld\n".ptr, w.x, t.x);
+	let c = Cells<int, 2> { x: 4 };
+	let d = c.twice();
+	printf("%lld\n".ptr, d.x);
 	return 0;
 }
