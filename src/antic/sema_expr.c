@@ -881,17 +881,21 @@ static struct type *check_unary(struct checker *c, struct expr *e,
                                 struct type *expected)
 {
     struct expr *operand = e->as.unary.operand;
-    struct type *t;
+    struct type *t = NULL;
     bool ending;
+    bool checked = false;
 
     /* Unary `-` and `~` call `neg` and `not` on a type that declares
-       them, as the binary operators call their own. */
+       them, as the binary operators call their own. The operand is
+       checked once, with the type the context expects, so a mistake in
+       it has one message, T232 of docs/audit/tests-findings.md. */
     if (e->as.unary.op == TOKEN_MINUS || e->as.unary.op == TOKEN_TILDE) {
         const char *called = e->as.unary.op == TOKEN_MINUS ? "neg" : "not";
         struct symbol *fn;
         if (operand->kind != EXPR_INT && operand->kind != EXPR_FLOAT) {
-            t = sema_check_expr(c, operand, NULL);
+            t = sema_check_expr(c, operand, expected);
             operand->type = t;
+            checked = true;
             if (!sema_is_error(t) && types_is_simd(t)) {
                 return sema_check_simd_unary(c, e, t);
             }
@@ -924,7 +928,9 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         if (operand->kind == EXPR_FLOAT) {
             return float_literal(c, e, operand, expected);
         }
-        t = sema_check_expr(c, operand, expected);
+        if (!checked) {
+            t = sema_check_expr(c, operand, expected);
+        }
         if (sema_refuses_half(c, e->pos, t)) {
             return sema_builtin(c, TYPE_ERROR);
         }
@@ -949,7 +955,9 @@ static struct type *check_unary(struct checker *c, struct expr *e,
         }
         return t;
     case TOKEN_TILDE:
-        t = sema_check_expr(c, operand, expected);
+        if (!checked) {
+            t = sema_check_expr(c, operand, expected);
+        }
         if (!sema_is_error(t) && !types_is_integer(t)) {
             sema_error_at(c, e->pos, "unary `~` needs an integer, found `%s`",
                           sema_tn(t));
