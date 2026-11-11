@@ -1,0 +1,40 @@
+//! A function and an operator of the generic class `Vec<T>` with a type
+//! parameter `U` of their own, called in the body of the class with `*self`.
+//! The value of the class in its body is a `Vec<T>`, so the call binds `U` to
+//! `T`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Vec<T: Number>
+{
+	pub x: T,
+
+	pub fn plus<U: Number>(self, other: Vec<U>) -> Vec<T>
+	{
+		return Vec<T> { x: self.x + self.x };
+	}
+
+	operator fn add<U: Number>(self, other: Vec<U>) -> Vec<T>
+	{
+		return Vec<T> { x: self.x + self.x + self.x };
+	}
+
+	pub fn twice(self) -> Vec<T>
+	{
+		return self.plus(*self);
+	}
+
+	pub fn thrice(self) -> Vec<T>
+	{
+		return *self + *self;
+	}
+}
+
+fn main() -> int
+{
+	let v = Vec<int> { x: 3 };
+	let w = v.twice();
+	let t = v.thrice();
+	printf("%lld %lld\n".ptr, w.x, t.x);
+	return 0;
+}
