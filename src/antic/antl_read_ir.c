@@ -892,6 +892,26 @@ static bool same_signature(struct reader *r, struct ir_module *program,
     return same;
 }
 
+/* The declaration f of a copy of a generic, which an earlier file made,
+   takes the definition of signature s. Its parameters get the
+   temporaries a body starts with, and it belongs to the object of this
+   file, as new_function makes a definition. */
+static void take_definition(const struct reader *r, struct ir_function *f,
+                            const struct signature *s)
+{
+    size_t i;
+
+    f->is_extern = false;
+    for (i = 0; i < f->param_count; i++) {
+        enum ir_type type = f->params[i].type;
+        f->params[i].temp = ir_temp(f, type == IR_AGG ? IR_PTR : type);
+    }
+    f->exported = (s->flags & 4) != 0;
+    if (strcmp(s->module, r->iface->module) != 0) {
+        f->unit = r->iface->module;
+    }
+}
+
 /* A function signature, mapped to a function of the program. A C function
    and a declaration share an existing entry of the same name. */
 static uint32_t read_signature(struct reader *r, struct ir_module *program,
@@ -914,7 +934,7 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     if (f != NULL && (s.flags & 1) == 0 && s.module != NULL &&
         ir_is_copy_name(s.name)) {
         if (f->is_extern) {
-            f->is_extern = false;
+            take_definition(r, f, &s);
             *has_body = true;
         } else {
             *skip = true;
