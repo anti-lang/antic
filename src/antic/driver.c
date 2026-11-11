@@ -1009,8 +1009,14 @@ static bool archive_package(const char *runtime, const char *name,
 /* The version that the record of upstream sources of the runtime archive
    gives the component, the second word of its line `<component>
    <version> <url>`, in the memory pool. RUNTIME_NO_VERSION stands where
-   runtime is NULL or the record names no such component. Returns false
-   after a record that cannot be read. */
+   runtime is NULL. Returns false after a record that cannot be read or
+   that names no such component.
+
+   DESIGN: a record without the line of a library that the program links
+   ends the run, as a licence text that cannot be read does by T151, since
+   a notice without the version of a component is incomplete. Eddie
+   decided this by Q3 of "Answers of 2026-11-11" in docs/decisions.md,
+   T229 of docs/audit/tests-findings.md. */
 static bool source_version(const char *runtime, const char *component,
                            struct arena *arena, const char **out)
 {
@@ -1020,6 +1026,7 @@ static bool source_version(const char *runtime, const char *component,
     const char *at;
     const char *end;
     bool ok = true;
+    bool found = false;
 
     *out = RUNTIME_NO_VERSION;
     if (runtime == NULL) {
@@ -1043,9 +1050,14 @@ static bool source_version(const char *runtime, const char *component,
             memcpy(copy, version, n);
             copy[n] = '\0';
             *out = copy;
+            found = true;
             break;
         }
         at = stop != NULL ? stop + 1 : end;
+    }
+    if (ok && !found) {
+        say_antic("%s holds no line of %s\n", text_cstr(&path), component);
+        ok = false;
     }
     text_free(&path);
     text_free(&record);

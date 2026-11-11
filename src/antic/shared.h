@@ -64,7 +64,8 @@
 #define RAYLIB_PACKAGE "raylib"
 #define MINIAUDIO_PACKAGE "miniaudio"
 /* The version of a component that the record of upstream sources does not
-   name, in a notice and in the plain form of `anti license`. */
+   name, in the plain form of `anti license`, and of a native library in a
+   notice written without a runtime archive. */
 #define RUNTIME_NO_VERSION "-"
 /* The object beside the runtime library that a bundled archive carries
    instead of the licence text of src/rt/license.c. */
