@@ -68,6 +68,13 @@ bool cache_key_of(const char *output, struct text *out);
 bool cache_imports(const struct options *search, const char *library,
                    struct text *out);
 
+/* cache_imports without a message, for the check of a library file that a
+   run cached. A check that fails compiles the file again, by Q5 of
+   "Answers of 2026-11-11" in docs/decisions.md: the run loses nothing,
+   and the compile names a file that it cannot read. */
+bool cache_imports_quietly(const struct options *search, const char *library,
+                           struct text *out);
+
 /* Append to out the line `archive <path> <digest>` of every archive and
    object of the runtime archive at runtime that a link of target t at
    level cpu may take, with the path below the archive, or the line

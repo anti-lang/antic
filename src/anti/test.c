@@ -148,10 +148,12 @@ static bool compile_library(const struct test_request *r,
     cache_key(u->unit.source, &flags, &start);
     test_options_key(base, &start);
     /* The imports of the library file that stands are those of its
-       source, which the digest of the source holds, as in build.c. */
+       source, which the digest of the source holds, as in build.c. A
+       check that cannot read the file or its imports says nothing and
+       compiles it again. */
     text_append(&key, text_cstr(&start));
     if (!(files_exists(text_cstr(&cached)) &&
-          cache_imports(base, text_cstr(&cached), &key) &&
+          cache_imports_quietly(base, text_cstr(&cached), &key) &&
           cache_holds(text_cstr(&cached), &key))) {
         cache_drop(text_cstr(&cached));
         if (driver_run(&o) != 0) {

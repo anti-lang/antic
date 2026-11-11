@@ -81,16 +81,25 @@ bool cache_store(const char *output, const struct text *key)
     return ok;
 }
 
-bool cache_file(const char *label, const char *path, struct text *out)
+/* cache_file, which names a file it cannot read when say is set. */
+static bool file_line(const char *label, const char *path, struct text *out,
+                      bool say)
 {
     char hex[65];
 
     if (!sha256_file(path, hex)) {
-        say_anti("cannot read %s\n", path);
+        if (say) {
+            say_anti("cannot read %s\n", path);
+        }
         return false;
     }
     text_appendf(out, "%s %s %s\n", label, path, hex);
     return true;
+}
+
+bool cache_file(const char *label, const char *path, struct text *out)
+{
+    return file_line(label, path, out, true);
 }
 
 bool cache_key_of(const char *output, struct text *out)
@@ -111,8 +120,9 @@ bool cache_key_of(const char *output, struct text *out)
     return ok;
 }
 
-bool cache_imports(const struct options *search, const char *library,
-                   struct text *out)
+/* cache_imports, which names a file it cannot read when say is set. */
+static bool imports(const struct options *search, const char *library,
+                    struct text *out, bool say)
 {
     struct arena arena = {0};
     struct options walk = *search;
@@ -129,15 +139,28 @@ bool cache_imports(const struct options *search, const char *library,
     walk.input = NULL;
     walk.libraries = seed;
     walk.library_count = search->library_count + 1;
-    ok = driver_libraries(&walk, &arena, &closure, &count);
+    ok = say ? driver_libraries(&walk, &arena, &closure, &count)
+             : driver_libraries_quietly(&walk, &arena, &closure, &count);
     for (i = 0; ok && i < count; i++) {
         if (strcmp(closure[i], library) != 0) {
-            ok = cache_file("import", closure[i], out);
+            ok = file_line("import", closure[i], out, say);
         }
     }
     free((void *)seed);
     arena_free(&arena);
     return ok;
+}
+
+bool cache_imports(const struct options *search, const char *library,
+                   struct text *out)
+{
+    return imports(search, library, out, true);
+}
+
+bool cache_imports_quietly(const struct options *search, const char *library,
+                           struct text *out)
+{
+    return imports(search, library, out, false);
 }
 
 /* The file of the cache of the user that keeps the digest of each

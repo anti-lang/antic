@@ -238,6 +238,12 @@ bool driver_runtime_packages(const char *runtime, bool musl,
 bool driver_libraries(const struct options *options, struct arena *arena,
                       const char ***paths, size_t *count);
 
+/* driver_libraries without a message, for a check of a cache, which
+   compiles its file again when a file cannot be read. */
+bool driver_libraries_quietly(const struct options *options,
+                              struct arena *arena, const char ***paths,
+                              size_t *count);
+
 /* The frameworks that the `link framework` lines of the library files
    name, each once, in the order the files give them. `anti` passes them
    to antic as --framework, so a program that imports a binding links

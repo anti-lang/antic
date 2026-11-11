@@ -95,8 +95,10 @@ static bool ends_with(const char *s, const char *suffix)
 /* Read the whole file into out. A source stops at LEX_SOURCE_MAX, and a
    larger one is refused before more of it is read. A read that fails
    leaves out as it was, so no caller reads the part before the failure,
-   T152 of docs/audit/tests-findings.md. */
-static bool read_file(const char *path, struct text *out, bool source)
+   T152 of docs/audit/tests-findings.md. A failure is named when say is
+   set. */
+static bool read_file(const char *path, struct text *out, bool source,
+                      bool say)
 {
     size_t limit = source ? LEX_SOURCE_MAX : SIZE_MAX;
     FILE *f = platform_open(path, false);
@@ -107,13 +109,17 @@ static bool read_file(const char *path, struct text *out, bool source)
     bool ok = true;
 
     if (f == NULL) {
-        say_antic("cannot open %s\n", path);
+        if (say) {
+            say_antic("cannot open %s\n", path);
+        }
         return false;
     }
     while ((n = ANTI_FREAD(buffer, 1, sizeof buffer, f)) > 0) {
         if (n > limit - total) {
-            say_antic("%s is larger than " LEX_SOURCE_MAX_TEXT "\n",
-                      path);
+            if (say) {
+                say_antic("%s is larger than " LEX_SOURCE_MAX_TEXT "\n",
+                          path);
+            }
             ok = false;
             break;
         }
@@ -121,7 +127,9 @@ static bool read_file(const char *path, struct text *out, bool source)
         text_append_bytes(out, buffer, n);
     }
     if (ANTI_FERROR(f)) {
-        say_antic("cannot read %s\n", path);
+        if (say) {
+            say_antic("cannot read %s\n", path);
+        }
         ok = false;
     }
     ANTI_FCLOSE(f);
@@ -134,14 +142,19 @@ static bool read_file(const char *path, struct text *out, bool source)
 
 bool driver_read_bytes(const char *path, struct text *out)
 {
-    return read_file(path, out, false);
+    return read_file(path, out, false, true);
+}
+
+bool driver_read_bytes_quietly(const char *path, struct text *out)
+{
+    return read_file(path, out, false, false);
 }
 
 /* Read a source file. The lexer holds the rules on its bytes, NUL among
    them, and reading stops at the size the lexer refuses. */
 static bool read_source(const char *path, struct text *out)
 {
-    return read_file(path, out, true);
+    return read_file(path, out, true, true);
 }
 
 /* Read a text that antic keeps as a C string, such as a licence text. A

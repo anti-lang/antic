@@ -178,9 +178,11 @@ anti_message(project_library_not_copied
     ARGS test --runtime "${RUNTIME}"
     ERR "anti: cannot write build/tests/lib/com/example/twice.antl")
 # A second run finds the library file of the module that the first one
-# cached, and reads the library files it imports for the key. When that
-# read fails, the forty-first open, the run says so, compiles the library
-# file again and passes.
+# cached, and reads it and the library files it imports for the key. When
+# a read fails, the run compiles the library file again and passes, and
+# says nothing, by Q5 of "Answers of 2026-11-11": the cached file, the
+# thirty-sixth open, the import that the walk opens, the fortieth, and
+# the digest of the import, the forty-first.
 function(write_project_and_run)
     write_project()
     execute_process(COMMAND "${ANTI}" test --runtime "${RUNTIME}"
@@ -191,13 +193,24 @@ function(write_project_and_run)
         message(FATAL_ERROR "the first run ended with ${status}\n${out}${err}")
     endif()
 endfunction()
+anti_message(project_cached_library_unread STATUS 0
+    SETUP write_project_and_run
+    FAULT open:36:EACCES
+    OUT "ok com.example.twice.doubles"
+        "anti test: 1 tests in 1 modules, 0 modules failed"
+    ARGS test --runtime "${RUNTIME}")
+anti_message(project_cached_library_import_unopened STATUS 0
+    SETUP write_project_and_run
+    FAULT open:40:EACCES
+    OUT "ok com.example.twice.doubles"
+        "anti test: 1 tests in 1 modules, 0 modules failed"
+    ARGS test --runtime "${RUNTIME}")
 anti_message(project_cached_library_imports_unread STATUS 0
     SETUP write_project_and_run
     FAULT open:41:EACCES
     OUT "ok com.example.twice.doubles"
         "anti test: 1 tests in 1 modules, 0 modules failed"
-    ARGS test --runtime "${RUNTIME}"
-    ERR "anti: cannot read ${built}/lib/com/example/half.antl")
+    ARGS test --runtime "${RUNTIME}")
 # The object of the module, compile_object of test.c: the directory of its
 # cache, the library files it imports and the key beside it.
 anti_message(project_object_cache_not_made

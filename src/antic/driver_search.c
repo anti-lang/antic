@@ -90,8 +90,10 @@ const char **driver_libraries_with_input(const struct options *o)
     return list;
 }
 
-bool driver_find_libraries(const struct options *o, const struct module *tree,
-                           struct arena *arena, struct paths *out)
+/* driver_find_libraries, which names a file it cannot read when say is
+   set. */
+static bool find_libraries(const struct options *o, const struct module *tree,
+                           struct arena *arena, struct paths *out, bool say)
 {
     struct paths modules = {0};
     struct paths wanted = {0};
@@ -114,10 +116,13 @@ bool driver_find_libraries(const struct options *o, const struct module *tree,
         for (; ok && read < out->count; read++) {
             struct text bytes = {0};
             struct interface header;
-            ok = driver_read_bytes(out->items[read], &bytes);
+            ok = say ? driver_read_bytes(out->items[read], &bytes)
+                     : driver_read_bytes_quietly(out->items[read], &bytes);
             if (ok && !antl_header((const uint8_t *)bytes.data, bytes.length,
                                    arena, &header, error, sizeof error)) {
-                say_antic("%s %s\n", out->items[read], error);
+                if (say) {
+                    say_antic("%s %s\n", out->items[read], error);
+                }
                 ok = false;
             }
             text_free(&bytes);
@@ -146,8 +151,15 @@ bool driver_find_libraries(const struct options *o, const struct module *tree,
     return ok;
 }
 
-bool driver_libraries(const struct options *options, struct arena *arena,
-                      const char ***paths, size_t *count)
+bool driver_find_libraries(const struct options *o, const struct module *tree,
+                           struct arena *arena, struct paths *out)
+{
+    return find_libraries(o, tree, arena, out, true);
+}
+
+/* driver_libraries, which names a file it cannot read when say is set. */
+static bool libraries(const struct options *options, struct arena *arena,
+                      const char ***paths, size_t *count, bool say)
 {
     struct module empty = {0};
     struct paths found = {0};
@@ -155,7 +167,7 @@ bool driver_libraries(const struct options *options, struct arena *arena,
     size_t n;
     size_t i;
 
-    if (!driver_find_libraries(options, &empty, arena, &found)) {
+    if (!find_libraries(options, &empty, arena, &found, say)) {
         free((void *)found.items);
         return false;
     }
@@ -168,6 +180,19 @@ bool driver_libraries(const struct options *options, struct arena *arena,
     *paths = list;
     *count = n;
     return true;
+}
+
+bool driver_libraries(const struct options *options, struct arena *arena,
+                      const char ***paths, size_t *count)
+{
+    return libraries(options, arena, paths, count, true);
+}
+
+bool driver_libraries_quietly(const struct options *options,
+                              struct arena *arena, const char ***paths,
+                              size_t *count)
+{
+    return libraries(options, arena, paths, count, false);
 }
 
 /* The names of the `link framework` lines, or with linux of the `link

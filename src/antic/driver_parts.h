@@ -130,6 +130,7 @@ struct types;
 /* driver.c */
 
 bool driver_read_bytes(const char *path, struct text *out);
+bool driver_read_bytes_quietly(const char *path, struct text *out);
 bool driver_write_file(const char *path, const struct text *content);
 bool driver_is_plugin(const struct options *o);
 bool driver_file_exists(const char *path);
