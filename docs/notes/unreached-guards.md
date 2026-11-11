@@ -8,8 +8,8 @@ of 2026-11-09, third set" in `docs/decisions.md`, the guards of
 `test.c`, `sema_copies.c` and `driver_link.c` and the `EXPR_FREE` arm of
 `visit_call` by "Answers of 2026-11-11", and the others by "Answers of
 2026-11-10, second set". Those answers keep every guard that no input
-reaches, and the guards of `sema_const.c`, `sema_expr.c` and
-`sema_generic.c` stay by them. A guard stays in the code as it is. A later
+reaches, and the guards of `sema_const.c`, `sema_expr.c`,
+`sema_generic.c` and `antl_tree.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -19,7 +19,9 @@ coverage run of `docs/reports/2026-11-10-coverage-batch-5.md`, and those
 of the third batch against the source of
 `docs/reports/2026-11-11-coverage-batch-6.md`. Those of the three files
 of the checker were checked against the source of
-`docs/reports/2026-11-11-coverage-phase-3a.md`. A guard named "the report
+`docs/reports/2026-11-11-coverage-phase-3a.md`, and those of
+`antl_tree.c` against the source of
+`docs/reports/2026-11-11-coverage-phase-3b.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -220,6 +222,23 @@ The checker of generics, sorted by batch 3a of the third phase.
 | `names_param` | A case of a variant as the type of a parameter, and the generic itself, whose own parameters it names. | No type expression names a case. The generic itself stands as a type in its own body alone, where its parameters are bound to themselves. |
 | `sema_generic_call` | A parameter of the class left open where the receiver is the generic itself. | `class_args` binds each parameter of the class to itself there, and a constant one to its value. |
 
+## `src/antic/antl_tree.c`
+
+The section of the generics of a library file, sorted by batch 3b of the
+third phase. A file that a user hands antic reaches the reader, and every
+line of the reader that such a file reaches has a case in `unit_modules`.
+The rows below guard the writer and the collecting pass, which see only
+the trees the checker builds.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `io_size` | A count or an index above `UINT32_MAX`, which the writer refuses. | No list of a tree holds four billion records, and an index points into one. |
+| `io_char` | A character of a format specification outside ASCII, which the writer refuses. | `format_spec` of `parser_expr.c` takes `<`, `>` and `^` as the alignment and one of `xXboef` as the kind, and nothing else. |
+| `field_owner` and `io_field` | A field whose `home` is not the type that holds it, which `field_owner` looks for along the chain of the hint, and a field that no type holds, which the writer refuses. | `types_set_fields` sets `home` on every field of a type, and the other arrays of fields are those of the reader and of the IR and a list of `sema_class.c`, which no tree names. |
+| `io_ref` and `io_sym` | A record, a local symbol or an extern that the collecting pass did not put in its table, which the writer refuses. | The writer runs the walkers of the collecting pass over the same tree, so every record it meets has its index, and `add_extern` puts every symbol that is not local in the table of externs. |
+| `local_symbol` | The symbol of a type parameter, which belongs to the tree. | A name of a type in an expression is refused with "`T` is a type, not a value", so no checked tree names a type parameter by its symbol. |
+| `collect` | A kind of table outside the six. | Every caller passes one of `T_SYM` to `T_TYPEX`. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -232,5 +251,7 @@ The checker of generics, sorted by batch 3a of the third phase.
   sort, and the `SYMBOLIC_INT` arm of `size_on_every_target`.
 - The sides of a condition in `sema_const.c`, `sema_expr.c` and
   `sema_generic.c` that the report of batch 3a did not sort.
+- The sides of a condition in the three readers of a library file that
+  the report of batch 3b did not sort.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
