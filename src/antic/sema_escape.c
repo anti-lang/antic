@@ -382,6 +382,15 @@ static void refuse(struct escape_walk *w, struct pos pos,
                       n->text, len, n->text, root->ends);
         return;
     case ESCAPE_CONCURRENT:
+        /* A function value has no item, and its type names no
+           parameter, so the message names none. */
+        if (other == NULL) {
+            sema_check_at(c, NAME_ESCAPING_LOCAL, pos, "a closure passed "
+                          "to a concurrent parameter captures a reference "
+                          "to `%.*s`, and `%.*s` ends at line %d", len,
+                          n->text, len, n->text, root->ends);
+            return;
+        }
         sema_check_at(c, NAME_ESCAPING_LOCAL, pos, "a closure passed to the "
                       "concurrent parameter `%.*s` captures a reference to "
                       "`%.*s`, and `%.*s` ends at line %d", olen, o, len,
