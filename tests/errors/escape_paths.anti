@@ -1,0 +1,266 @@
+//! The paths of the safety check `escaping-local` that the matrix leaves out,
+//! one function each. A refused function gets its one message. The functions
+//! hold a reference in a tuple field of a local struct and the deeper of two in
+//! a tuple, an element of an array behind a parameter, a constant pointer, the
+//! statements between a `dispatch` and its `join`, a `join` that may not run, a
+//! closure that returns the address of a local of its function, a closure at a
+//! `concurrent` parameter of a class and of a field, and a collection reached
+//! through a call.
+
+import anti.lang;
+import anti.text;
+import anti.collection.list;
+
+const NOTHING: ?*int = none;
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn next_of(self, k: int) -> ?*Counter
+	{
+		return none;
+	}
+}
+
+class Runner
+{
+	pub k: int = 0,
+
+	pub fn run(self, concurrent f: fn(int) -> int) -> int
+	{
+		return f(self.k);
+	}
+}
+
+struct Pair
+{
+	t: (*int, int),
+}
+
+struct Hooks
+{
+	g: fn(concurrent fn(int) -> int) -> int,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn checked(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn show(t: str)
+{
+}
+
+fn twice(k: int) -> ?*int
+{
+	return none;
+}
+
+fn tuple_field() -> (*int, int)
+{
+	let x = 1;
+	let h = Pair { t: (&x, 2) };
+	return h.t;
+}
+
+fn deeper_second() -> (*int, *int)
+{
+	let a = 1;
+	{
+		let b = 2;
+		return (&a, &b);
+	}
+}
+
+fn nested_element(p: *[2][2]?*int)
+{
+	let x = 1;
+	(*p)[0][1] = &x;
+}
+
+fn constant_pointer() -> ?*int
+{
+	let p = NOTHING;
+	return p;
+}
+
+fn text_between()
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	show(f"{c.n}");
+	let r = join(job);
+}
+
+fn never_joined()
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+}
+
+fn bare_return()
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	return;
+}
+
+fn guard_between(q: ?*int) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	let m = q catch {
+		yield &c.n;
+	};
+	return join(job) + *m;
+}
+
+fn handler_returns(n: int) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	let k = checked(n) catch {
+		return 0;
+	};
+	return join(job) + k;
+}
+
+fn loop_returns(n: int) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	do {
+		if n > 3 {
+			return 0;
+		}
+	} while false
+	return join(job);
+}
+
+fn guard_returns(q: ?*int) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	let m = q catch {
+		return 0;
+	};
+	return join(job) + *m;
+}
+
+fn nested_handlers(n: int, q: ?*int) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	let k = checked(n) catch {
+		let m = q catch {
+			yield &c.n;
+		};
+		let j = checked(*m) catch {
+			yield 1;
+		};
+		yield j;
+	};
+	return join(job) + k;
+}
+
+fn yield_before_join(n: int) -> int
+{
+	let k = checked(n) catch {
+		let c = Counter { };
+		let job = dispatch &c -> bump(1);
+		if n > 0 {
+			yield 0;
+		}
+		yield join(job);
+	};
+	return k;
+}
+
+fn join_right_of_and(flag: bool) -> bool
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	return flag && join(job) > 0;
+}
+
+fn join_right_of_or(flag: bool) -> bool
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	return flag || join(job) > 0;
+}
+
+fn join_right_of_coalesce(q: ?*int) -> ?*int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	return q ?? twice(join(job));
+}
+
+fn join_after_optional_call(r: ?*Counter) -> ?*Counter
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(1);
+	return r?.next_of(join(job));
+}
+
+fn closure_returns_outer() -> int
+{
+	let x = 1;
+	let f = fn() -> *int {
+		return &x;
+	};
+	return *f();
+}
+
+fn concurrent_of_a_class() -> int
+{
+	let r = Runner { };
+	let x = 5;
+	let p = &x;
+	return r.run(fn(i) {
+		return *p + i;
+	});
+}
+
+fn concurrent_of_a_field(h: Hooks) -> int
+{
+	let x = 5;
+	let p = &x;
+	return h.g(fn(i) {
+		return *p + i;
+	});
+}
+
+fn same(all: *list.List<*int>) -> *list.List<*int>
+{
+	return all;
+}
+
+fn collection_of_a_call(all: *list.List<*int>)
+{
+	let x = 1;
+	same(all).push(&x);
+}
+
+fn collection_of_a_local(all: *list.List<*int>)
+{
+	let x = 1;
+	let held = same(all);
+	held.push(&x);
+}
+
+fn main() -> int
+{
+	return 0;
+}
