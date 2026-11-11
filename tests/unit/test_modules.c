@@ -12,6 +12,7 @@
 #include "arena.h"
 #include "ast.h"
 #include "diagnostic.h"
+#include "files.h"
 #include "ir.h"
 #include "lexer.h"
 #include "lower.h"
@@ -4723,8 +4724,306 @@ static void damaged_class_records(void)
     }
 }
 
+/* The functions of `anti.text.Builder` that an `f"..."` calls, with empty
+   bodies, for the interpolation of ops_source. */
+static const char text_stub[] =
+    "pub enum Align: u8 { Left, Right, Center }\n"
+    "pub class Builder\n"
+    "{\n"
+    "    length: int = 0,\n"
+    "    pub fn new() -> Builder\n"
+    "    {\n"
+    "        return Builder { length: 0 };\n"
+    "    }\n"
+    "    pub fn append(self, s: str)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn append_int(self, value: int, radix: int = 10,\n"
+    "        upper: bool = false, width: int = 0,\n"
+    "        align: Align = Align.Right, zero: bool = false)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn append_uint(self, value: u64, radix: int = 10,\n"
+    "        upper: bool = false, width: int = 0,\n"
+    "        align: Align = Align.Right, zero: bool = false)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn append_float(self, value: f64, precision: int = -1,\n"
+    "        exponent: bool = false, width: int = 0,\n"
+    "        align: Align = Align.Right, zero: bool = false)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn append_f32(self, value: f32, precision: int = -1,\n"
+    "        exponent: bool = false, width: int = 0,\n"
+    "        align: Align = Align.Right, zero: bool = false)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn append_bool(self, value: bool, width: int = 0,\n"
+    "        align: Align = Align.Left)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn append_char(self, value: char, width: int = 0,\n"
+    "        align: Align = Align.Left)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn append_text(self, value: str, width: int = 0,\n"
+    "        align: Align = Align.Left)\n"
+    "    {\n"
+    "    }\n"
+    "    pub fn take(self) -> str\n"
+    "    {\n"
+    "        return \"\";\n"
+    "    }\n"
+    "}\n";
+
+/* The source of anti.lang, whose `Error` a function that may fail
+   gives. */
+static struct text lang_text;
+
+/* A generic `tree` whose body holds the records tree_source lacks: an
+   atomic operation, an operation of a channel, a built-in of a simd
+   struct, the handler of a call that can fail and an interpolation with
+   an alignment and a kind. */
+static const char ops_source[] =
+    "import anti.text;\n"
+    "pub simd struct TLanes { x: f32, y: f32, z: f32, w: f32 }\n"
+    "fn tfail(k: int) -> int may fail {\n"
+    "    return k;\n"
+    "}\n"
+    "pub fn tree<T>(own x: T, n: int, c: chan int, l: TLanes) -> int {\n"
+    "    let counter: atomic int = 0;\n"
+    "    let added = counter.add(1);\n"
+    "    send(c, n);\n"
+    "    let turned = l.shuffle(3, 2, 1, 0);\n"
+    "    let caught = tfail(n) catch {\n"
+    "        return 0;\n"
+    "    };\n"
+    "    let shown = f\"{n:>7x}\";\n"
+    "    free(shown.ptr);\n"
+    "    return added + caught + turned.sum() as int;\n"
+    "}\n";
+
+/* Write the files of anti.lang, of anti.text and of the library of
+   ops_source with damage, in the order they read. */
+static bool build_ops(void (*damage)(struct damaged *), struct text *files)
+{
+    struct compilation s;
+    bool ok;
+
+    compilation_open(&s);
+    ok = build_library(&s, "anti.lang", text_cstr(&lang_text), &files[0]) &&
+         build_library(&s, "anti.text", text_stub, &files[1]) &&
+         build_damaged(&s, "to", ops_source, damage, &files[2]);
+    compilation_close(&s);
+    return ok;
+}
+
+/* Whether the files read in order, the last with the count bytes of value
+   at byte at. A refusal names the damage. */
+static bool ops_read(const struct text *files, size_t at, const void *value,
+                     size_t count)
+{
+    struct text poked[3] = {{0}, {0}, {0}};
+    struct compilation s;
+    struct ir_module program;
+    char error[160] = "";
+    bool ok;
+    size_t i;
+
+    for (i = 0; i < 3; i++) {
+        text_append_bytes(&poked[i], files[i].data, files[i].length);
+    }
+    if (at != SIZE_MAX && at + count <= poked[2].length) {
+        memcpy(poked[2].data + at, value, count);
+    } else if (count > 0) {
+        check_failures++;
+        fprintf(stderr, "no place to poke at %zu\n", at);
+    }
+    compilation_open(&s);
+    ir_module_init(&program, &s.arena, "main");
+    ok = read_in_order(&s, &program, poked, 3, error, sizeof error);
+    if (!ok && strstr(error, "is damaged at byte") == NULL) {
+        check_failures++;
+        fprintf(stderr, "refused for another reason: %s\n", error);
+    }
+    ir_module_free(&program);
+    compilation_close(&s);
+    for (i = 0; i < 3; i++) {
+        text_free(&poked[i]);
+    }
+    return ok;
+}
+
+/* The library of ops_source written with damage reads, or is refused. */
+static void ops_file(void (*damage)(struct damaged *), bool reads)
+{
+    struct text files[3] = {{0}, {0}, {0}};
+    size_t i;
+
+    if (build_ops(damage, files)) {
+        CHECK(ops_read(files, SIZE_MAX, NULL, 0) == reads);
+    }
+    for (i = 0; i < 3; i++) {
+        text_free(&files[i]);
+    }
+}
+
+/* Each enumeration of a tree one past its last value. */
+static void token_past_kinds(struct damaged *s)
+{
+    tree_let(s, "neg")->as.unary.op = TOKEN_KIND_COUNT;
+}
+
+static void state_past_states(struct damaged *s)
+{
+    tree_let(s, "sum")->as.binary.right->symbol->state = EVAL_DONE + 1;
+}
+
+static void atomic_past_ops(struct damaged *s)
+{
+    tree_let(s, "added")->as.atomic.op = ATOMIC_CAS + 1;
+}
+
+static void sync_past_ops(struct damaged *s)
+{
+    tree_stmt(s, STMT_EXPR, 0)->as.expr->as.sync_op.op = SYNC_CHAN_DELETE + 1;
+}
+
+static void simd_past_ops(struct damaged *s)
+{
+    tree_let(s, "turned")->as.simd.op = SIMD_OP_ALL + 1;
+}
+
+static void handler_past_kinds(struct damaged *s)
+{
+    tree_let(s, "caught")->as.call.handler.kind = HANDLE_ENCLOSING + 1;
+}
+
+/* The first offset of the count bytes of pattern in bytes, which must
+   hold them. */
+static size_t bytes_at(const struct text *bytes, const uint8_t *pattern,
+                       size_t count)
+{
+    size_t at;
+
+    for (at = 0; at + count <= bytes->length; at++) {
+        if (memcmp(bytes->data + at, pattern, count) == 0) {
+            return at;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no such bytes in the file\n");
+    return SIZE_MAX;
+}
+
+/* The bytes of a tree the writer never puts. The alignment and the kind
+   of `{n:>7x}` take ASCII alone, and the lanes of `l.shuffle(3, 2, 1, 0)`
+   are as many as the fields of `TLanes`. */
+static void damaged_ops_bytes(void)
+{
+    /* The alignment, `0`, the width 7, no precision and the kind. */
+    static const uint8_t spec[] = {'>', 0, 7, 0, 0, 0, 0xff, 0xff, 0xff,
+                                   0xff, 'x'};
+    static const uint8_t lanes[] = {4, 0, 0, 0, 3, 0, 0, 0, 2, 0, 0, 0,
+                                    1, 0, 0, 0, 0, 0, 0, 0};
+    static const uint8_t wide = 200;
+    static const uint8_t three = 3;
+    struct text files[3] = {{0}, {0}, {0}};
+    size_t i;
+
+    if (build_ops(NULL, files)) {
+        size_t at = bytes_at(&files[2], spec, sizeof spec);
+        CHECK(ops_read(files, SIZE_MAX, NULL, 0));
+        CHECK(!ops_read(files, at, &wide, 1));
+        CHECK(!ops_read(files, at == SIZE_MAX ? at : at + 10, &wide, 1));
+        CHECK(!ops_read(files, bytes_at(&files[2], lanes, sizeof lanes),
+                        &three, 1));
+    }
+    for (i = 0; i < 3; i++) {
+        text_free(&files[i]);
+    }
+}
+
+static void damaged_enums(void)
+{
+    void (*const damages[])(struct damaged *) = {
+        atomic_past_ops, sync_past_ops, simd_past_ops, handler_past_kinds};
+    size_t i;
+
+    tree_file(token_past_kinds, false);
+    tree_file(state_past_states, false);
+    ops_file(NULL, true);
+    for (i = 0; i < sizeof damages / sizeof damages[0]; i++) {
+        ops_file(damages[i], false);
+    }
+}
+
+/* DESIGN of library_symbol: a generic of one library calls a function of
+   a class of another, read beside a later file of that library whose
+   class no longer has it. The reader takes the symbol from the record, as
+   it does for an item the later file lacks, and the link of a copy then
+   finds no such function. */
+static void member_gone(void)
+{
+    static const char before[] = "pub class Counter\n"
+                                 "{\n"
+                                 "    pub v: int = 0,\n"
+                                 "    pub fn bump(self) -> int\n"
+                                 "    {\n"
+                                 "        return self.v + 1;\n"
+                                 "    }\n"
+                                 "}\n";
+    static const char after[] = "pub class Counter\n"
+                                "{\n"
+                                "    pub v: int = 0,\n"
+                                "}\n";
+    static const char user[] = "import mg;\n"
+                               "pub fn twice<T>(own x: T, c: *mg.Counter) -> int {\n"
+                               "    return c.bump() + c.bump();\n"
+                               "}\n";
+    struct compilation a;
+    struct compilation b;
+    struct text files[2] = {{0}, {0}};
+    struct text user_bytes = {0};
+    struct ir_module program;
+    char error[160] = "";
+
+    compilation_open(&a);
+    compilation_open(&b);
+    if (build_library(&a, "mg", before, &user_bytes) &&
+        build_library(&a, "mu", user, &files[1]) &&
+        build_library(&b, "mg", after, &files[0])) {
+        struct compilation c;
+        compilation_open(&c);
+        ir_module_init(&program, &c.arena, "main");
+        CHECK(read_in_order(&c, &program, files, 2, error, sizeof error));
+        CHECK_STR(error, "");
+        ir_module_free(&program);
+        compilation_close(&c);
+    }
+    text_free(&files[0]);
+    text_free(&files[1]);
+    text_free(&user_bytes);
+    compilation_close(&b);
+    compilation_close(&a);
+}
+
+static void damaged_ops(void)
+{
+    member_gone();
+    if (!files_read(ANTIC_SOURCE_DIR "/src/std/anti/lang.anti", &lang_text)) {
+        check_failures++;
+        fprintf(stderr, "cannot read the source of anti.lang\n");
+        return;
+    }
+    damaged_enums();
+    damaged_ops_bytes();
+    text_free(&lang_text);
+}
+
 void test_modules(void)
 {
+    damaged_ops();
     deep_ir_constants();
     merged_declarations();
     copies_declared_first();
