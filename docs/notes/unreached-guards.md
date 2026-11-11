@@ -7,7 +7,9 @@ Eddie kept the guards of this note. `stub` stays by Q2 of "Answers
 of 2026-11-09, third set" in `docs/decisions.md`, the guards of
 `test.c`, `sema_copies.c` and `driver_link.c` and the `EXPR_FREE` arm of
 `visit_call` by "Answers of 2026-11-11", and the others by "Answers of
-2026-11-10, second set". A guard stays in the code as it is. A later
+2026-11-10, second set". Those answers keep every guard that no input
+reaches, and the guards of `sema_const.c`, `sema_expr.c` and
+`sema_generic.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -15,7 +17,9 @@ Each row names the function, what the guard turns away and why no input
 of a test reaches it. The rows were checked against the source and the
 coverage run of `docs/reports/2026-11-10-coverage-batch-5.md`, and those
 of the third batch against the source of
-`docs/reports/2026-11-11-coverage-batch-6.md`. A guard named "the report
+`docs/reports/2026-11-11-coverage-batch-6.md`. Those of the three files
+of the checker were checked against the source of
+`docs/reports/2026-11-11-coverage-phase-3a.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -165,6 +169,57 @@ Q4 of the report of the third batch.
 | `native_level` | A level of another architecture than the target's. | The driver checks the level against the target before the link. |
 | `driver_strip_debug` | A strip of Mach-O without the root of the debug map. | `anti build` always gives the root. |
 
+## `src/antic/sema_const.c`
+
+The evaluator of constants, sorted by batch 3a of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `float_as_literal` | Digits of the shortest form that end in 0, which it drops. | The loop stops at the fewest digits that read back as the float, and a last digit 0 reads back with one digit less. |
+| `float_as_literal` | A float below 1 in magnitude, which it writes as `0.` and its digits. | A float is spelled only in the message of an `as` to an integer type that it does not fit, and every float below 1 in magnitude fits every integer type. |
+| `const_elements` | A type that is NULL. | Every element and field of a checked type has a type. |
+| `const_as` and `const_unary` | A conversion and a unary `-` whose value leaves its type. | The check of the expression refuses both through `sema_undefined_on_constants` before the evaluator reads them. |
+| `const_integer` | An operator outside its `switch`. | `const_binary` hands it the integer operators alone. A comparison goes to `const_compare`, and `&&`, `||` and `??` return before. |
+| `defined_integer` | `mul_high` of `c_long`, `c_ulong` or `c_wchar` in a copy. | `const_binary` refuses it in the generic, so no copy holds the node. |
+| `const_repeat` | `[v; n]` whose length comes from `size_of` outside the default of a field. | The checker allows such a length in a field and a local variable alone, and a constant of either form is refused first. |
+| `const_field` | A field of a call that the evaluator takes as a constant. | The evaluator refuses every call. |
+| `const_field` | A constant of a class that failed. | The check of `Name.NAME` gives the error type for it, so the evaluator never reads it. |
+| `const_field` | A field that the value of a struct constant does not hold, and a constant `str` whose value is no text. | The checker finds the field, the value of a struct constant holds every field, and a constant of `str` holds a string or another such constant. |
+| `const_index` | An index past the end of a constant array. | `sema_index_outside` refuses it where the checker checks the expression. |
+| `sema_eval_const` | A name without a symbol, `free`, a descriptor and `take` in a constant, and a kind outside the `switch`. | The checker binds every name it accepts. `free` gives no value, a descriptor stands among the arguments of a call, and the check of `take` refuses a value that a constant drops. The `switch` names every kind. |
+| `const_deps_of` and `sema_refuse_runtime_parts` | An expression that is NULL, and an atomic operation in a default. | The parser gives every constant its value, and every operand the walks follow is set. The walk runs before the check, which makes the atomic node from a call. |
+| `sema_bitfield_constant` | A bitfield of no integer type. | The declaration refuses it with `a bitfield has a sized integer type`. |
+| `sema_const_symbol` | A `static` item of a class that is not `atomic`. | The parser refuses it with `` `n` is `static` and must be `atomic` ``. |
+| `sema_fold_symbolic` | A node that is no operation, and an operation without its operand. | `subst_symbolic` of `sema_generic.c` calls it for an operation alone, and each operation has its operand. |
+
+## `src/antic/sema_expr.c`
+
+The checker of expressions, sorted by batch 3a of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `check_unary` | A unary operator outside `-`, `!`, `~`, `*` and `&`. | The parser makes a unary node of these five alone. |
+| `watch_changes` | A read of the fields of `anti.lang.Watch` that the check refuses. | The compiler writes the reads from the fields of `Watch` and `Changes`, which the checker takes. |
+| `sema_iterate` | An `iter` that gives the error type or no iterator, and a call of `next` on the cursor that fails. | `sema_hook_well_formed` refuses such a hook first, by T096 and T161, and a well formed `next` takes the cursor, a local of its type. |
+| `check_optional` | `sema_declare` giving NULL for the hidden object of `?.`. | The name is declared in a scope opened for it, as the row of `sema_stmt.c` says for `self`. |
+| `check_expr_inner` | A node of `to_slice`, of `?.`, of an atomic operation, of a simd operation or of `take`, checked a second time, and a kind outside the `switch`. | The checker gives each such node its type where it makes it from a call or a field, and no later check reaches the node again. The `switch` names every kind. |
+
+## `src/antic/sema_generic.c`
+
+The checker of generics, sorted by batch 3a of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `builtin_meets` | A hook outside the table of hooks. | `hook_names` lists every hook, and each has its arm above. |
+| `hook_result` and `walks_as` | A type without `iter`, and an `iter` that gives no type. | `check_meets` and `sema_meets_param` test the hooks of `Iterable` and `Iterator` before the interface, so a type without them is refused first. |
+| `check_meets` | A type argument of the error type. | A type argument that does not resolve stops the use before its constraints are read. |
+| `has_params` and `names_param` | A type that is NULL. | Every caller passes a type, and every part they walk has one. |
+| `subst_case` | A case that the copy of its variant lacks. | The copy of a variant holds every case of its generic, in order. |
+| `sema_subst_const` | A constant that is NULL. | Every caller passes the value of a constant that has one. |
+| `chan_field_pos` | A channel field of a copy that the declaration of its generic does not list. | Every field of a copy is a field of its generic, which the item lists. |
+| `names_param` | A case of a variant as the type of a parameter, and the generic itself, whose own parameters it names. | No type expression names a case. The generic itself stands as a type in its own body alone, where its parameters are bound to themselves. |
+| `sema_generic_call` | A parameter of the class left open where the receiver is the generic itself. | `class_args` binds each parameter of the class to itself there, and a constant one to its value. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -175,5 +230,7 @@ Q4 of the report of the third batch.
   than `INT_MAX` bytes.
 - The paths of `sema_stmt.c` that the report of the second batch did not
   sort, and the `SYMBOLIC_INT` arm of `size_on_every_target`.
+- The sides of a condition in `sema_const.c`, `sema_expr.c` and
+  `sema_generic.c` that the report of batch 3a did not sort.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
