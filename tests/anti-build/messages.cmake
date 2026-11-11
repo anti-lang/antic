@@ -1043,13 +1043,14 @@ if(CMAKE_HOST_APPLE)
     endforeach()
     # The debug map names its object from the build directory, which the
     # link makes absolute, link_facts of driver_link.c: the twentieth and
-    # the twenty-first stat. Under --lto none it names the object of the
+    # the twenty-first stat. The message names the root, by Q6 of
+    # "Answers of 2026-11-11". Under --lto none it names the object of the
     # program, the twenty-third and the twenty-fourth.
     anti_message(fault_debug_map_root_not_found
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
         FAULT stat:20:EACCES,stat:21:EACCES
         ARGS build --release ${tools}
-        ERR "antic: cannot find the directory of ${release_dir}/app")
+        ERR "antic: cannot find the directory of ${release_dir}")
     anti_message(fault_debug_map_object_not_found
         FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
         FAULT stat:23:EACCES,stat:24:EACCES

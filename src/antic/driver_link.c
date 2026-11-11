@@ -216,8 +216,11 @@ static bool link_facts(const struct options *o, struct link_inputs *in,
     in->cpu = o->cpu;
     in->debug = o->debug;
     if (o->debug_map_root != NULL) {
+        /* The message names the root, by Q6 of "Answers of 2026-11-11"
+           in docs/decisions.md. */
         if (!platform_absolute_path(o->debug_map_root, &f->debug_map_root)) {
-            say_antic("cannot find the directory of %s\n", o->output);
+            say_antic("cannot find the directory of %s\n",
+                      o->debug_map_root);
             return false;
         }
         in->debug_map_root = text_cstr(&f->debug_map_root);
