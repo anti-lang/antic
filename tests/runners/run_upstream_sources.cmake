@@ -12,6 +12,9 @@
 # tools/sysroot-pins in their URL, musl and mingw-w64 name their version
 # there as well, and the line of every pinned library carries the version
 # of its pin.
+# Every other text beside the file but that of the runtime has a line,
+# apart from the components of RUNTIME_UNSOURCED of src/antic/shared.h,
+# which have none.
 # The lines end in LF on every host, so the file of a package built on
 # Windows is the file of a package built anywhere else, and the line
 # `anti license` prints after a text carries no carriage return.
@@ -19,6 +22,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../tools/pins.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../../tools/upstream-sources.cmake")
 
 if(NOT EXISTS "${SOURCES}")
     message(FATAL_ERROR "${SOURCES} is missing")
@@ -53,6 +57,28 @@ foreach(line IN LISTS lines)
     set("line_${name}" "${line}")
 endforeach()
 
+# The plain form of `anti license` refuses a text without a line, and a
+# component of RUNTIME_UNSOURCED takes the version - there. The runtime's
+# text, RUNTIME_LICENSE_NAME of src/antic/shared.h, has no line either,
+# since its source is this repository.
+antic_unsourced_components(unsourced)
+foreach(name IN LISTS unsourced)
+    if(name IN_LIST names)
+        message(FATAL_ERROR "${SOURCES} names ${name}, which "
+                            "RUNTIME_UNSOURCED of src/antic/shared.h lists")
+    endif()
+endforeach()
+get_filename_component(record "${SOURCES}" NAME_WE)
+file(GLOB texts RELATIVE "${licenses}" "${licenses}/*.txt")
+foreach(text IN LISTS texts)
+    string(REGEX REPLACE "\\.txt$" "" name "${text}")
+    if(NOT name STREQUAL record AND NOT name STREQUAL "anti_rt" AND
+       NOT name IN_LIST names AND NOT name IN_LIST unsourced)
+        message(FATAL_ERROR "${SOURCES} has no line for ${name}, and "
+                            "RUNTIME_UNSOURCED of src/antic/shared.h does "
+                            "not list it")
+    endif()
+endforeach()
 
 # The line of <name> holds <version> as its version and, when <in_url> is
 # ON, in its URL.

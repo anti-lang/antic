@@ -288,12 +288,37 @@ static bool component_of(const char *path, struct text *name)
     return true;
 }
 
+/* Whether component is one of the names of RUNTIME_UNSOURCED. */
+static bool unsourced(const char *component)
+{
+    size_t length = strlen(component);
+    const char *at = RUNTIME_UNSOURCED;
+
+    while (*at != '\0') {
+        const char *space = strchr(at, ' ');
+        size_t n = space != NULL ? (size_t)(space - at) : strlen(at);
+        if (n == length && memcmp(at, component, n) == 0) {
+            return true;
+        }
+        at += space != NULL ? n + 1 : n;
+    }
+    return false;
+}
+
 /* The package of the component whose text stands at path: its name, the
-   version of the record of upstream sources, its identifier and its
-   text. */
+   version of the record of upstream sources at record, read into
+   sources, its identifier and its text.
+
+   DESIGN: a record without the line of a component ends the plain form,
+   as it ends the notice of a program by T229, since the version of the
+   component is unknown. The components of RUNTIME_UNSOURCED have no
+   source that the record names and take RUNTIME_NO_VERSION. Eddie
+   decided this by Q1 of the report of batch 6 under "Answers of
+   2026-11-11" in docs/decisions.md, T230 of
+   docs/audit/tests-findings.md. */
 static bool component_package(const char *path, const char *component,
-                              const struct text *sources, struct arena *arena,
-                              struct package *out)
+                              const char *record, const struct text *sources,
+                              struct arena *arena, struct package *out)
 {
     struct text text = {0};
     struct text field = {0};
@@ -306,8 +331,15 @@ static bool component_package(const char *path, const char *component,
         out->name = pooled(arena, &field);
         field.length = 0;
         if (!licensing_source_version(sources, component, &field)) {
-            text_append(&field, RUNTIME_NO_VERSION);
+            if (unsourced(component)) {
+                text_append(&field, RUNTIME_NO_VERSION);
+            } else {
+                say_anti("%s holds no line of %s\n", record, component);
+                ok = false;
+            }
         }
+    }
+    if (ok) {
         out->version = pooled(arena, &field);
         field.length = 0;
         antic_component_license(component, &field);
@@ -327,6 +359,7 @@ int licensing_plain(const char *runtime)
     struct text own = {0};
     struct text runtime_text = {0};
     struct text sources = {0};
+    struct text record = {0};
     struct text notice = {0};
     struct package *packages = NULL;
     const struct package **list = NULL;
@@ -342,9 +375,8 @@ int licensing_plain(const char *runtime)
         ok = false;
     }
     if (ok) {
-        text_appendf(&path, "%s/%s", text_cstr(&dir), RUNTIME_SOURCES_FILE);
-        ok = files_read_reported(text_cstr(&path), &sources);
-        path.length = 0;
+        text_appendf(&record, "%s/%s", text_cstr(&dir), RUNTIME_SOURCES_FILE);
+        ok = files_read_reported(text_cstr(&record), &sources);
         text_appendf(&path, "%s/%s", runtime, RUNTIME_OWN_LICENSE);
         ok = ok && files_read_reported(text_cstr(&path), &own);
         /* R188 of "Rules of 2026-10-13": the text of the runtime stands in
@@ -375,8 +407,8 @@ int licensing_plain(const char *runtime)
             if (component_of(text_cstr(&found.items[i]), &name) &&
                 strcmp(text_cstr(&name), RUNTIME_LICENSE_NAME) != 0) {
                 ok = component_package(text_cstr(&found.items[i]),
-                                       text_cstr(&name), &sources, &arena,
-                                       &packages[count++]);
+                                       text_cstr(&name), text_cstr(&record),
+                                       &sources, &arena, &packages[count++]);
             }
             text_free(&name);
         }
@@ -399,6 +431,7 @@ int licensing_plain(const char *runtime)
     text_free(&own);
     text_free(&runtime_text);
     text_free(&sources);
+    text_free(&record);
     text_free(&notice);
     arena_free(&arena);
     return ok ? 0 : 1;

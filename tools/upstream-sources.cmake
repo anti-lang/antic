@@ -27,6 +27,19 @@ function(antic_deb_source out_version out_url base file)
         PARENT_SCOPE)
 endfunction()
 
+# The components of licenses/ that the record names nowhere, the names of
+# RUNTIME_UNSOURCED of src/antic/shared.h, as a list in out. The plain
+# form of `anti license` reads the same line, so the list stands once.
+function(antic_unsourced_components out)
+    set(header "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/antic/shared.h")
+    file(STRINGS "${header}" line REGEX "^#define RUNTIME_UNSOURCED ")
+    if(NOT line MATCHES "^#define RUNTIME_UNSOURCED \"([a-z0-9 -]+)\"$")
+        message(FATAL_ERROR "${header} defines no RUNTIME_UNSOURCED")
+    endif()
+    string(REPLACE " " ";" names "${CMAKE_MATCH_1}")
+    set(${out} "${names}" PARENT_SCOPE)
+endfunction()
+
 function(antic_write_sources path)
     set(tools "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
     antic_read_pins("${tools}/sysroot-pins")
@@ -80,6 +93,16 @@ function(antic_write_sources path)
         antic_read_pins("${tools}/${name}-pin")
         antic_pin_url(url "${name}")
         string(APPEND record "${name} ${${key}_VERSION} ${url}\n")
+    endforeach()
+    # A component of RUNTIME_UNSOURCED has no line, or the plain form of
+    # `anti license` would read two answers for it.
+    antic_unsourced_components(unsourced)
+    foreach(name IN LISTS unsourced)
+        if(record MATCHES "\n${name} ")
+            message(FATAL_ERROR "the record of upstream sources names "
+                                "${name}, which RUNTIME_UNSOURCED of "
+                                "src/antic/shared.h lists")
+        endif()
     endforeach()
     # DESIGN: file(WRITE) ends a line as the host does, which is CRLF on
     # Windows, and the line of the record that anti prints after a text
