@@ -14,6 +14,7 @@
 #include "lower.h"
 #include "optimize.h"
 #include "parser.h"
+#include "rt_abi.h"
 #include "pipeline.h"
 #include "sema.h"
 #include "types.h"
@@ -38,9 +39,11 @@ static void close_program(struct program *p)
     compilation_close(&p->front);
 }
 
-/* Check and lower source as module name into out. */
-static struct module *compile(struct program *p, const char *name,
-                              const char *source, struct ir_module *out)
+/* Check and lower source as module name into out, with the options of
+   lowering given. */
+static struct module *compile_with(struct program *p, const char *name,
+                                   const char *source, struct ir_module *out,
+                                   unsigned options)
 {
     bool ok;
     struct module *module =
@@ -54,8 +57,15 @@ static struct module *compile(struct program *p, const char *name,
                 source);
         return NULL;
     }
-    lower_as(module, name, out, 0);
+    lower_as(module, name, out, options);
     return module;
+}
+
+/* Check and lower source as module name into out. */
+static struct module *compile(struct program *p, const char *name,
+                              const char *source, struct ir_module *out)
+{
+    return compile_with(p, name, source, out, 0);
 }
 
 /* Compile a library on its own, write its library file and read the
@@ -801,7 +811,10 @@ static void reflect_calls(bool calls, bool reflect, const char *prefix,
     }
     text_append(&source, "    return 0;\n"
                          "}\n");
-    compile(&p, "main", text_cstr(&source), &p.ir);
+    /* `--no-reflect` drops the function lists where lowering writes
+       them, and the pass then finds none. */
+    compile_with(&p, "main", text_cstr(&source), &p.ir,
+                 reflect ? 0 : LOWER_NO_REFLECT);
     memset(&options, 0, sizeof options);
     options.entry = "main";
     options.reflect = reflect;
@@ -873,7 +886,12 @@ enum damage {
     CHAIN_ITEM_ADDRESS,     /* a hash of the chain is an address. */
     SIZE_FLOAT,             /* the size of the interface is a float. */
     FIELDS_ADDRESS,         /* the field count is an address. */
-    VERSION_TOO_LONG        /* the version length passes its bytes. */
+    VERSION_TOO_LONG,       /* the version length passes its bytes. */
+    CHAIN_EMPTY,            /* the length of the chain is zero. */
+    LENGTH_FLOAT,           /* the length of the chain is a float. */
+    VERSIONS_INTEGER,       /* the record of the versions is an integer. */
+    VERSION_INTEGER,        /* the version of the package is no text. */
+    NO_INIT                 /* the class that provides has no init. */
 };
 
 /* The global named name that holds a constant. */
@@ -941,6 +959,8 @@ static void provides_from_library(enum damage damage)
     struct ir_global *descriptor;
     struct ir_const *record;
     struct ir_const *chain;
+    const char *expected;
+    size_t i;
     bool ok;
 
     open_program(&p);
@@ -978,6 +998,25 @@ static void provides_from_library(enum damage damage)
     case VERSION_TOO_LONG:
         descriptor->value->items[13].integer = 1000;
         break;
+    case CHAIN_EMPTY:
+        record->items[1].integer = 0;
+        break;
+    case LENGTH_FLOAT:
+        record->items[1].kind = IR_CONST_FLOAT;
+        break;
+    case VERSIONS_INTEGER:
+        descriptor->value->items[RT_DESCRIPTOR_VERSIONS].kind = IR_CONST_INT;
+        break;
+    case VERSION_INTEGER:
+        descriptor->value->items[RT_DESCRIPTOR_VERSION].kind = IR_CONST_INT;
+        break;
+    case NO_INIT:
+        for (i = 0; i < p.ir.class_count; i++) {
+            if (strcmp(p.ir.classes[i]->name, "Fancy") == 0) {
+                p.ir.classes[i]->init = IR_NO_INDEX;
+            }
+        }
+        break;
     }
     memset(&options, 0, sizeof options);
     options.entry = "fancy";
@@ -985,12 +1024,28 @@ static void provides_from_library(enum damage damage)
     options.plugin = true;
     ok = whole_program(&p.ir, &options, &errors);
     CHECK(ok == (damage == INTACT));
-    CHECK_STR(text_cstr(&errors),
-              damage == INTACT
-                  ? ""
-                  : "`fancy.Fancy` provides `greet.Greeter`, and the "
-                    "library file that describes it is damaged\n"
-                    "a plugin has at least one `provides` line\n");
+    switch (damage) {
+    case INTACT:
+        expected = "";
+        break;
+    case VERSIONS_INTEGER:
+    case VERSION_INTEGER:
+        expected = "`fancy.Fancy` provides `greet.Greeter`, and this build "
+                   "reads no version of it\n"
+                   "a plugin has at least one `provides` line\n";
+        break;
+    case NO_INIT:
+        expected = "`fancy.Fancy` provides `greet.Greeter` and is no such "
+                   "interface\n"
+                   "a plugin has at least one `provides` line\n";
+        break;
+    default:
+        expected = "`fancy.Fancy` provides `greet.Greeter`, and the "
+                   "library file that describes it is damaged\n"
+                   "a plugin has at least one `provides` line\n";
+        break;
+    }
+    CHECK_STR(text_cstr(&errors), expected);
     text_free(&errors);
     close_program(&p);
 }
@@ -1005,6 +1060,11 @@ static void checks_provided_interfaces(void)
     provides_from_library(SIZE_FLOAT);
     provides_from_library(FIELDS_ADDRESS);
     provides_from_library(VERSION_TOO_LONG);
+    provides_from_library(CHAIN_EMPTY);
+    provides_from_library(LENGTH_FLOAT);
+    provides_from_library(VERSIONS_INTEGER);
+    provides_from_library(VERSION_INTEGER);
+    provides_from_library(NO_INIT);
 }
 
 /* Whether the program holds a global of that name without a module. */
@@ -1193,6 +1253,174 @@ static void merges_copies(void)
     close_program(&p);
 }
 
+/* Rewrite the text of the global whose bytes are from, with its NUL, to
+   to, which has the same length. */
+static void rewrite_text(struct ir_module *m, const char *from,
+                         const char *to)
+{
+    size_t length = strlen(from) + 1;
+    size_t i;
+
+    for (i = 0; i < m->global_count; i++) {
+        struct ir_global *g = m->globals[i];
+        if (g->bytes != NULL && g->size == length &&
+            memcmp(g->bytes, from, length) == 0) {
+            memcpy(g->bytes, to, length);
+            return;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no global holds the text %s\n", from);
+}
+
+/* DESIGN: a signature that a reflect.Value cannot carry has no text, and
+   reflect.call refuses its function. The pass writes no trampoline for a
+   text that names more than the result and 63 parameters, or a name that
+   no Value carries. Lowering writes no such text, and a library file
+   written by hand does, which the two texts rewritten here stand for:
+   `i9` is no name, and `void` names no parameter. The functions of
+   `Object` keep their trampolines, and those of Odd get none. */
+static void skips_signatures(void)
+{
+    struct program p;
+    struct text errors = {0};
+    struct text out = {0};
+    struct text source = {0};
+    struct whole_options options;
+    size_t i;
+
+    text_append(&source, "import anti.reflect;\n"
+                         "struct Pair\n"
+                         "{\n"
+                         "    a: int,\n"
+                         "}\n"
+                         "pub class Odd\n"
+                         "{\n"
+                         "    pub fn take(self, p: Pair) -> int\n"
+                         "    {\n"
+                         "        return p.a;\n"
+                         "    }\n"
+                         "    pub fn pick(self, a: f32, b: u16) -> i8\n"
+                         "    {\n"
+                         "        return 1;\n"
+                         "    }\n"
+                         "    pub fn mark(self, a: u32, b: i16) -> u8\n"
+                         "    {\n"
+                         "        return 2;\n"
+                         "    }\n"
+                         "    pub fn wide(self");
+    for (i = 0; i < 64; i++) {
+        text_appendf(&source, ", a%zu: int", i);
+    }
+    text_append(&source, ") -> int\n"
+                         "    {\n"
+                         "        return a0;\n"
+                         "    }\n"
+                         "}\n"
+                         "fn main() -> int\n"
+                         "{\n"
+                         "    let t = alloc Odd { };\n"
+                         "    let v = reflect.Value { kind: "
+                         "reflect.ValueKind.None, data: reflect.Payload "
+                         "{ i: 0 } };\n"
+                         "    let no_args = []reflect.Value { ptr: none, "
+                         "len: 0 };\n"
+                         "    reflect.call(t, 7, no_args, &v);\n"
+                         "    return 0;\n"
+                         "}\n");
+    open_program(&p);
+    load_library(&p, "anti.reflect", reflect_module);
+    compile(&p, "main", text_cstr(&source), &p.ir);
+    rewrite_text(&p.ir, "i8.f32.u16", "i9.f32.u16");
+    rewrite_text(&p.ir, "u8.u32.i16", "u8.void.i1");
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.reflect = true;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    print_lines(&out, &p.ir, "fn anti.rt.trampoline.");
+    CHECK_STR(text_cstr(&out),
+              "fn anti.rt.trampoline.str(%0: ptr, %1: ptr, %2: ptr, "
+              "%3: i64, %4: ptr) -> i8 {\n"
+              "fn anti.rt.trampoline.bool.ptr(%0: ptr, %1: ptr, %2: ptr, "
+              "%3: i64, %4: ptr) -> i8 {\n"
+              "fn anti.rt.trampoline.u64(%0: ptr, %1: ptr, %2: ptr, "
+              "%3: i64, %4: ptr) -> i8 {\n"
+              "fn anti.rt.trampoline.void.ptr(%0: ptr, %1: ptr, %2: ptr, "
+              "%3: i64, %4: ptr) -> i8 {\n"
+              "fn anti.rt.trampoline.void(%0: ptr, %1: ptr, %2: ptr, "
+              "%3: i64, %4: ptr) -> i8 {\n"
+              "fn anti.rt.trampoline.void.str(%0: ptr, %1: ptr, %2: ptr, "
+              "%3: i64, %4: ptr) -> i8 {\n"
+              "fn anti.rt.trampoline.void.str.ptr(%0: ptr, %1: ptr, "
+              "%2: ptr, %3: i64, %4: ptr) -> i8 {\n");
+    text_free(&errors);
+    text_free(&out);
+    text_free(&source);
+    close_program(&p);
+}
+
+/* DESIGN: lowering writes the slot of an interface where a module
+   injects it, and a program whose slot is missing, as one read from a
+   library file written by hand may be, gets the slot from the pass. The
+   slot here is renamed, so the pass adds one of the right name and
+   fills it with the provider. */
+static void adds_a_missing_slot(void)
+{
+    static const char *const inject[] = {"main.Clock=main.Watch"};
+    struct program p;
+    struct text errors = {0};
+    struct text out = {0};
+    struct whole_options options;
+    size_t i;
+
+    open_program(&p);
+    compile(&p, "main",
+            "abstract class Clock\n"
+            "{\n"
+            "    abstract fn now(self) -> int;\n"
+            "}\n"
+            "singleton class Watch inherits Clock\n"
+            "{\n"
+            "    concrete fn now(self) -> int\n"
+            "    {\n"
+            "        return 12;\n"
+            "    }\n"
+            "}\n"
+            "class Timer\n"
+            "{\n"
+            "    inject clock: *Clock,\n"
+            "    pub fn now(self) -> int\n"
+            "    {\n"
+            "        return self.clock.now();\n"
+            "    }\n"
+            "}\n"
+            "fn main() -> int\n"
+            "{\n"
+            "    let t = Timer { };\n"
+            "    return t.now();\n"
+            "}\n",
+            &p.ir);
+    for (i = 0; i < p.ir.global_count; i++) {
+        struct ir_global *g = p.ir.globals[i];
+        if (g->module != NULL && strcmp(g->module, RUNTIME_MODULE) == 0 &&
+            strcmp(g->name, INJECT_SLOT_PREFIX "main.Clock") == 0) {
+            g->name = "renamed.main.Clock";
+        }
+    }
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.inject = inject;
+    options.inject_count = 1;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    CHECK_STR(text_cstr(&errors), "");
+    print_lines(&out, &p.ir, "global anti.rt.inject.");
+    CHECK_STR(text_cstr(&out), "global anti.rt.inject.main.Clock "
+                               "anti.rt.InjectSlot { @main.Watch.get }\n");
+    text_free(&errors);
+    text_free(&out);
+    close_program(&p);
+}
+
 /* DESIGN: the reach that decides the default of the backtraces is taken
    again with the table of the injections in it, by T104. The provider
    alone reads whether backtraces are on, as a provider that may fail
@@ -1254,6 +1482,66 @@ static void defaults_backtraces_for_a_provider(void)
     close_program(&p);
 }
 
+/* A provider that is a copy of a generic function holds a dot inside its
+   type argument. The part before that dot names no class, so the pass
+   takes the copy as a function of its module. */
+static void takes_a_copy_as_provider(void)
+{
+    static const char *const inject[] = {
+        "main.Clock=main.provide<main.Watch>"};
+    struct program p;
+    struct text errors = {0};
+    struct text out = {0};
+    struct whole_options options;
+
+    open_program(&p);
+    p.front.compile_copies = true;
+    compile(&p, "main",
+            "abstract class Clock\n"
+            "{\n"
+            "    abstract fn now(self) -> int;\n"
+            "}\n"
+            "singleton class Watch inherits Clock\n"
+            "{\n"
+            "    concrete fn now(self) -> int\n"
+            "    {\n"
+            "        return 12;\n"
+            "    }\n"
+            "}\n"
+            "fn provide<T>() -> *Clock\n"
+            "{\n"
+            "    return Watch.get();\n"
+            "}\n"
+            "class Timer\n"
+            "{\n"
+            "    inject clock: *Clock,\n"
+            "    pub fn now(self) -> int\n"
+            "    {\n"
+            "        return self.clock.now();\n"
+            "    }\n"
+            "}\n"
+            "fn main() -> int\n"
+            "{\n"
+            "    let t = Timer { };\n"
+            "    let c = provide<Watch>();\n"
+            "    return t.now() + c.now();\n"
+            "}\n",
+            &p.ir);
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.inject = inject;
+    options.inject_count = 1;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    CHECK_STR(text_cstr(&errors), "");
+    print_lines(&out, &p.ir, "global anti.rt.inject.");
+    CHECK_STR(text_cstr(&out), "global anti.rt.inject.main.Clock "
+                               "anti.rt.InjectSlot "
+                               "{ @main.provide<main.Watch> }\n");
+    text_free(&errors);
+    text_free(&out);
+    close_program(&p);
+}
+
 void test_whole(void)
 {
     reach_follows_declarations();
@@ -1269,5 +1557,8 @@ void test_whole(void)
     reflection_marks_the_table();
     checks_provided_interfaces();
     merges_copies();
+    skips_signatures();
+    adds_a_missing_slot();
     defaults_backtraces_for_a_provider();
+    takes_a_copy_as_provider();
 }
