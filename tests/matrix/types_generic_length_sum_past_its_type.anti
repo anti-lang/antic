@@ -1,0 +1,17 @@
+//! A length of a copy of a generic struct adds past the range of `int`. The
+//! copy puts 1 in place of `N`, and `1 + 9223372036854775807` has no value in
+//! `int`, so the copy refuses it as a constant does, by R029 of "Rules of
+//! 2026-10-13".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Box<N: int>
+{
+	cells: [N + 9223372036854775807 - 9223372036854775807 + 2]int,
+}
+
+fn main() -> int
+{
+	printf("size %d\n".ptr, size_of(Box<1>) as c_int);
+	return 0;
+}

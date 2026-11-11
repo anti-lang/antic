@@ -1,0 +1,16 @@
+//! A length of a copy of a generic struct negates the least value of `int`,
+//! which has no value in `int`. The copy refuses it as a constant does, by R031
+//! of "Rules of 2026-10-13".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Box<N: int>
+{
+	cells: [-(N - 9223372036854775807 - 1) / 4611686018427387904 + 3]int,
+}
+
+fn main() -> int
+{
+	printf("size %d\n".ptr, size_of(Box<0>) as c_int);
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_generic_length_sum_past_its_type.anti:10:2: error: `1 + 9223372036854775807` does not fit `int`

@@ -1,0 +1,16 @@
+//! A length of a copy of a generic struct converts its constant parameter to
+//! `u8`, and 300 does not fit. The copy refuses the conversion as a constant
+//! does, by R026 of "Rules of 2026-10-13".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Box<N: int>
+{
+	cells: [(N as u8) as int]int,
+}
+
+fn main() -> int
+{
+	printf("size %d\n".ptr, size_of(Box<300>) as c_int);
+	return 0;
+}
