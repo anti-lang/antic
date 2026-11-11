@@ -1945,9 +1945,25 @@ static void unify(struct type *param, struct type *arg,
            none, since a class may implement more than one. */
         if (param->generic != NULL && param->kind == TYPE_CLASS) {
             arg = sema_copy_in_chain(arg, param->generic);
-            if (arg == NULL || arg->generic != param->generic) {
+            if (arg == NULL) {
                 return;
             }
+        }
+        /* DESIGN: a value of the class in the body of a generic class has
+           the generic itself as its type, which stands for the copy of its
+           own parameters. A copy of the class as a parameter then takes
+           those parameters, so `self.plus(*self)` against `other: Vec<U>`
+           binds `U` to `T`, T235 of docs/audit/tests-findings.md. */
+        if (param->generic != NULL && arg == param->generic) {
+            for (i = 0; i < arg->type_param_count; i++) {
+                struct type *p = arg->type_params[i];
+                if (p->param->constant) {
+                    unify_value(param->values[i], param_value(p), map);
+                } else {
+                    unify(param->args[i], p, map);
+                }
+            }
+            return;
         }
         if (param->generic != NULL && param->generic == arg->generic) {
             for (i = 0; i < param->generic->type_param_count; i++) {
