@@ -247,8 +247,11 @@ struct module *compilation_check(struct compilation *c, const char *name,
     in.arena = &c->arena;
     in.diags = &c->diags;
     *ok = lexer_lex(source, strlen(source), &c->arena, &c->diags, tokens) &&
-          parser_parse(source, tokens, &c->arena, &c->diags, &module) &&
-          sema_check(module, &in, program);
+          parser_parse(source, tokens, &c->arena, &c->diags, &module);
+    if (*ok) {
+        module->compile_copies = c->compile_copies;
+        *ok = sema_check(module, &in, program);
+    }
     return module;
 }
 

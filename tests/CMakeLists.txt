@@ -498,14 +498,19 @@ target_compile_definitions(antic_unit_tests PRIVATE
     ANTIC_TEST_LLC="${ANTIC_RUNTIME_DIR}/bin/llc${CMAKE_EXECUTABLE_SUFFIX}")
 # One test per file of the unit tests, unit_<name> for test_<name>.c, each
 # in a directory of its own for the files it writes.
+# DESIGN: each runs through run_expect.cmake, so a group that crashes
+# fails as an ordinary failure, which WILL_FAIL of tests/known-failures.txt
+# expects. The status says whether every check passed, and the pattern
+# takes any output.
 get_target_property(unit_sources antic_unit_tests SOURCES)
 foreach(source IN LISTS unit_sources)
     if(source MATCHES "^unit/test_(.+)\\.c$" AND
        NOT CMAKE_MATCH_1 STREQUAL "main")
         set(group "${CMAKE_MATCH_1}")
         file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
-        add_test(NAME unit_${group} COMMAND antic_unit_tests ${group}
-            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}")
+        add_expect_test(unit_${group} STATUS 0 PATTERN ".*"
+            DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/unit/${group}"
+            COMMAND "$<TARGET_FILE:antic_unit_tests>" ${group})
     endif()
 endforeach()
 # The messages four groups write to the standard error, which the group

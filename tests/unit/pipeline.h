@@ -131,6 +131,9 @@ struct compilation {
     size_t token_lists;
     const struct interface *libraries[COMPILATION_MODULES];
     size_t library_count;
+    /* The checker compiles the copies of the generics a module uses, as
+       the driver has it do for a library. */
+    bool compile_copies;
 };
 
 /* Set up c, which needs no setup before. */

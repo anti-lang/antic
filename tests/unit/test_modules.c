@@ -4482,6 +4482,123 @@ static void merged_declarations(void)
     compilation_close(&a);
 }
 
+static size_t copies_declared;
+
+/* Every copy of a generic that the module defines, a function or a
+   datum, written as a declaration. */
+static void declare_copies(struct ir_module *ir)
+{
+    size_t i;
+
+    for (i = 0; i < ir->function_count; i++) {
+        if (ir->functions[i]->module != NULL &&
+            ir_is_copy_name(ir->functions[i]->name)) {
+            ir->functions[i]->is_extern = true;
+            copies_declared++;
+        }
+    }
+    for (i = 0; i < ir->global_count; i++) {
+        if (ir->globals[i]->module != NULL &&
+            ir_is_copy_name(ir->globals[i]->name)) {
+            ir->globals[i]->is_extern = true;
+            copies_declared += 1000;
+        }
+    }
+}
+
+/* Compile the library name against the module whose file is used, read
+   from that file as the driver reads it, so the checker makes the copies
+   of its generics. */
+static bool build_user(const struct text *used, const char *name,
+                       const char *source,
+                       void (*ir_damage)(struct ir_module *),
+                       struct text *bytes)
+{
+    struct compilation s;
+    struct ir_module program;
+    struct interface *lib;
+    char error[160] = "";
+    bool ok = false;
+
+    compilation_open(&s);
+    ir_module_init(&program, &s.arena, "main");
+    lib = compilation_read(&s, (const uint8_t *)used->data, used->length,
+                           &program, error, sizeof error);
+    CHECK_STR(error, "");
+    if (lib != NULL) {
+        compilation_add(&s, lib);
+        s.compile_copies = true;
+        ok = build_changed(&s, name, source, NULL, ir_damage, bytes);
+    }
+    ir_module_free(&program);
+    compilation_close(&s);
+    return ok;
+}
+
+/* DESIGN of read_signature and merge_copy_global: a copy of a generic
+   that a file declares and a later file defines takes the definition, a
+   function with its body and a datum with its bytes. */
+static void copies_declared_first(void)
+{
+    static const char generic[] = "pub struct Box<T> { v: T }\n"
+                                  "pub fn size<T>(b: Box<T>) -> int {\n"
+                                  "    return 1;\n"
+                                  "}\n";
+    static const char first[] = "import ca;\n"
+                                "pub fn one(b: ca.Box<int>) -> int {\n"
+                                "    return ca.size(b);\n"
+                                "}\n";
+    static const char second[] = "import ca;\n"
+                                 "pub fn two(b: ca.Box<int>) -> int {\n"
+                                 "    return ca.size(b);\n"
+                                 "}\n";
+    struct compilation a;
+    struct compilation b;
+    struct text files[3] = {{0}, {0}, {0}};
+    struct ir_module program;
+    char error[160] = "";
+
+    compilation_open(&a);
+    copies_declared = 0;
+    if (build_library(&a, "ca", generic, &files[0]) &&
+        build_user(&files[0], "cb", first, declare_copies, &files[1]) &&
+        build_user(&files[0], "cc", second, NULL, &files[2])) {
+        size_t i;
+        size_t defined = 0;
+        size_t data = 0;
+        CHECK(copies_declared % 1000 > 0 && copies_declared / 1000 > 0);
+        compilation_open(&b);
+        ir_module_init(&program, &b.arena, "main");
+        CHECK(read_in_order(&b, &program, files, 3, error, sizeof error));
+        CHECK_STR(error, "");
+
+        for (i = 0; i < program.function_count; i++) {
+            const struct ir_function *f = program.functions[i];
+            if (f->module != NULL && ir_is_copy_name(f->name)) {
+                CHECK(!f->is_extern && f->block_count > 0);
+                CHECK(f->unit != NULL && strcmp(f->unit, "cc") == 0);
+                defined++;
+            }
+        }
+        for (i = 0; i < program.global_count; i++) {
+            const struct ir_global *g = program.globals[i];
+            if (g->module != NULL && ir_is_copy_name(g->name)) {
+                CHECK(!g->is_extern);
+                CHECK(g->unit != NULL && strcmp(g->unit, "cc") == 0);
+                data++;
+            }
+        }
+        CHECK(defined == copies_declared % 1000);
+        CHECK(data == copies_declared / 1000);
+        ir_module_free(&program);
+        compilation_close(&b);
+    }
+    text_free(&files[0]);
+    text_free(&files[1]);
+    text_free(&files[2]);
+    compilation_close(&a);
+}
+
 /* The function `g` of the module written as the function `f` of `da`. */
 static void define_other(struct ir_module *ir)
 {
@@ -4610,6 +4727,7 @@ void test_modules(void)
 {
     deep_ir_constants();
     merged_declarations();
+    copies_declared_first();
     defined_twice();
     damaged_class_records();
     damaged_struct_entries();
