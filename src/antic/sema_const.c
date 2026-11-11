@@ -874,8 +874,10 @@ static bool defined_integer(enum token_kind op, const struct type *t,
    in place of it, and an operation whose operands are then numbers is
    the number the evaluator gives it, by T107 of
    docs/audit/tests-findings.md. `[-(-N)]int` of `Row<3>` is `[3]int`. An
-   operation without a value in its type stays as it is, and the back
-   end refuses it on each target. */
+   operation without a value in its type stays as it is.
+   sema_refuse_copy_without_value refuses the forms that the back end
+   would wrap, and the back end refuses a division by zero and a shift
+   out of range on each target. */
 const struct symbolic *sema_fold_symbolic(struct checker *c,
                                           const struct symbolic *s)
 {
@@ -956,9 +958,51 @@ const struct symbolic *sema_fold_symbolic(struct checker *c,
     return one_value(&out) ? as_symbolic(c, &out) : s;
 }
 
-/* The first `<<%` of s, in the order of its operands, whose operands are
-   numbers and whose signed count is below zero. NULL without one. */
-static const struct symbolic *shift_below_zero(const struct symbolic *s)
+/* The bits an operation of type t computes in: a target-sized type at 64,
+   as its constants are computed. */
+static int folded_bits(const struct type *t)
+{
+    return types_is_target_sized(t) ? 64 : types_bits(t);
+}
+
+/* Whether s, an operation whose operands are numbers, has no value in its
+   type by the rules a constant is held to: `<<%` by a signed count below
+   zero, a sum, a difference or a product past the range, unary `-` of the
+   least value and a conversion to an integer type that does not hold the
+   value. A division by zero and a shift out of range are left to the back
+   end, which refuses them on each target. */
+static bool without_value(const struct symbolic *s)
+{
+    struct const_value a;
+    const struct type *t = s->a->type;
+    char sign = s->op == TOKEN_PLUS    ? '+'
+                : s->op == TOKEN_MINUS ? '-'
+                : s->op == TOKEN_STAR  ? '*'
+                                       : 0;
+
+    if (s->kind == SYMBOLIC_CAST) {
+        symbolic_number(s->a, &a);
+        return types_is_integer(t) && types_is_integer(s->type) &&
+               !integer_fits(&a, s->type);
+    }
+    if (s->kind == SYMBOLIC_UNARY) {
+        return s->op == TOKEN_MINUS && types_is_signed(t) &&
+               arith_overflows('-', 0, s->a->value, folded_bits(t), true);
+    }
+    if (s->b == NULL || s->b->kind != SYMBOLIC_INT ||
+        !types_is_integer(t)) {
+        return false;
+    }
+    if (s->op == TOKEN_SHL_WRAP) {
+        return types_is_signed(t) && sema_signed_bits(s->b->value) < 0;
+    }
+    return sign != 0 && arith_overflows(sign, s->a->value, s->b->value,
+                                        folded_bits(t), types_is_signed(t));
+}
+
+/* The first operation of s, in the order of its operands, whose operands
+   are numbers and which has no value in its type. NULL without one. */
+static const struct symbolic *first_without_value(const struct symbolic *s)
 {
     const struct symbolic *found;
 
@@ -966,46 +1010,58 @@ static const struct symbolic *shift_below_zero(const struct symbolic *s)
                       s->kind != SYMBOLIC_CAST)) {
         return NULL;
     }
-    found = shift_below_zero(s->a);
+    found = first_without_value(s->a);
     if (found == NULL && s->kind == SYMBOLIC_BINARY) {
-        found = shift_below_zero(s->b);
+        found = first_without_value(s->b);
     }
-    if (found == NULL && s->kind == SYMBOLIC_BINARY &&
-        s->op == TOKEN_SHL_WRAP && s->a != NULL &&
-        s->a->kind == SYMBOLIC_INT && s->b != NULL &&
-        s->b->kind == SYMBOLIC_INT && types_is_signed(s->a->type) &&
-        sema_signed_bits(s->b->value) < 0) {
+    if (found == NULL && s->a != NULL && s->a->kind == SYMBOLIC_INT &&
+        without_value(s)) {
         found = s;
     }
     return found;
 }
 
-/* DESIGN: a copy of a generic refuses `<<%` by a count below zero as a
-   constant does, by Q13 of "Answers of 2026-10-24" in docs/decisions.md.
-   sema_fold_symbolic leaves such an operation open, since it has no
-   value, and the back end took the count as one at or above the width
-   and gave the length 0. */
-bool sema_refuse_copy_shift(struct checker *c, struct pos pos,
-                            const struct type *t)
+/* DESIGN: a copy of a generic refuses an operation of a length that has
+   no value in its type as a constant does. Q13 of "Answers of 2026-10-24"
+   in docs/decisions.md names `<<%` by a count below zero, and T231 of
+   docs/audit/tests-findings.md a sum, a difference, a product, a negation
+   and a conversion that leave the range. sema_fold_symbolic leaves each
+   open, since it has no value, and the back end took the count as one at
+   or above the width and wrapped the others. */
+bool sema_refuse_copy_without_value(struct checker *c, struct pos pos,
+                                    const struct type *t)
 {
     const struct symbolic *found = NULL;
     struct text spelled = {0};
 
     while (t != NULL && found == NULL) {
         if (t->kind == TYPE_ARRAY) {
-            found = shift_below_zero(t->length_of);
+            found = first_without_value(t->length_of);
         } else if (t->kind != TYPE_POINTER && t->kind != TYPE_SLICE &&
                    t->kind != TYPE_OPTIONAL) {
             break;
         }
         t = t->element;
     }
-    if (found == NULL || found == c->copy_shift_refused) {
+    if (found == NULL || found == c->copy_value_refused) {
         return found != NULL;
     }
-    c->copy_shift_refused = found;
-    types_symbolic_print(&spelled, found, false);
-    sema_error_at(c, pos, "`%s` shifts out of range", text_cstr(&spelled));
+    c->copy_value_refused = found;
+    /* A conversion names its type as the file spells it, as the message
+       of a constant does. Its operand is a number. */
+    if (found->kind == SYMBOLIC_CAST) {
+        types_symbolic_print(&spelled, found->a, false);
+        text_appendf(&spelled, " as %s", sema_tn(found->type));
+    } else {
+        types_symbolic_print(&spelled, found, false);
+    }
+    if (found->op == TOKEN_SHL_WRAP && found->kind == SYMBOLIC_BINARY) {
+        sema_error_at(c, pos, "`%s` shifts out of range", text_cstr(&spelled));
+    } else {
+        sema_error_at(c, pos, "`%s` does not fit `%s`", text_cstr(&spelled),
+                      sema_tn(found->kind == SYMBOLIC_CAST ? found->type
+                                                           : found->a->type));
+    }
     text_free(&spelled);
     return true;
 }

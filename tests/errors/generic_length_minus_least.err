@@ -1,1 +1,1 @@
-antic: the array length `-(-(-9223372036854775808))` is -9223372036854775808 on linux-x86_64, and an array length is at least 1
+generic_length_minus_least.anti:8:2: error: `-(-9223372036854775808)` does not fit `int`

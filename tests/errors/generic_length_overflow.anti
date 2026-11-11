@@ -1,5 +1,5 @@
 //! The length of a copy of a generic multiplies past the range of `int`, which
-//! the copy leaves as it stands and the back end refuses.
+//! the copy refuses as a constant does, by T231.
 
 struct S<N: int, Z: int>
 {
