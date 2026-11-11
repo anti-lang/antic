@@ -516,6 +516,31 @@ if(CMAKE_HOST_APPLE)
         FAULT open:12:EACCES
         ARGS ${tools} main.anti
         ERR "antic: cannot open ${RUNTIME}/licenses/pcre2.txt")
+    # A record without the line of pcre2 ends the link of a program of
+    # anti.regex, by Q3 of "Answers of 2026-11-11". The stand-in runtime
+    # archive links every part of the real one but licenses/, which holds
+    # the texts and the record.
+    set(stand_in "${WORK}/runtime")
+    function(stand_in_without_pcre2)
+        file(MAKE_DIRECTORY "${stand_in}/licenses")
+        file(GLOB parts RELATIVE "${RUNTIME}" "${RUNTIME}/*")
+        foreach(part IN LISTS parts)
+            if(NOT part STREQUAL "licenses")
+                file(CREATE_LINK "${RUNTIME}/${part}" "${stand_in}/${part}"
+                     SYMBOLIC)
+            endif()
+        endforeach()
+        file(WRITE "${stand_in}/licenses/anti_rt.txt"
+             "The licence of the runtime.\n")
+        file(WRITE "${stand_in}/licenses/pcre2.txt" "The licence of PCRE2.\n")
+        file(WRITE "${stand_in}/licenses/sources.txt"
+             "# The record.\nmusl 1.2.6 https://musl.libc.org/releases/musl-1.2.6.tar.gz\n")
+    endfunction()
+    anti_message(runtime_sources_without_the_library
+        FILES main.anti "${pattern_program}"
+        SETUP stand_in_without_pcre2
+        ARGS --runtime "${stand_in}" main.anti
+        ERR "antic: ${stand_in}/licenses/sources.txt holds no line of pcre2")
     anti_message(fault_xcrun_no_pipe
         FILES main.anti "${program}"
         FAULT run:3:EACCES

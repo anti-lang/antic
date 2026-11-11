@@ -150,18 +150,18 @@ if(CMAKE_HOST_APPLE)
         SETUP license_record_without_a_last_newline
         ARGS license --project --runtime "${license_stand_in}"
         OUT_FILE anti_message_license_project_sources_without_a_last_newline.out)
-    # A record that names no pcre2 gives the library the version `-`. Its
-    # empty line is no line of a component.
+    # A record that names no pcre2 ends the run, by Q3 of "Answers of
+    # 2026-11-11", since a notice without the version of a component is
+    # incomplete. Its empty line is no line of a component.
     function(license_record_without_the_library)
         license_stand_in_archive("# The record.\n\nmusl 1.2.6 https://musl.libc.org/releases/musl-1.2.6.tar.gz")
     endfunction()
     anti_message(license_project_sources_without_the_library
-        STATUS 0
         FILES anti.toml "${license_manifest}"
               src/com/example/app.anti "${license_program}"
         SETUP license_record_without_the_library
         ARGS license --project --runtime "${license_stand_in}"
-        OUT_FILE anti_message_license_project_sources_without_the_library.out)
+        ERR "antic: ${license_stand_in}/licenses/sources.txt holds no line of pcre2")
 endif()
 
 # anti sdk import.
