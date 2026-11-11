@@ -444,6 +444,11 @@ not re-open a settled decision without asking Eddie.
   each sanitizer suite in the six parts of `asan`, the last up to test
   7176: `asan` 247 s, 186 s, 263 s, 185 s, 445 s and 428 s, `ubsan`
   251 s, 187 s, 263 s, 197 s, 468 s and 454 s.
+  The step of the text of the macOS SDK measured `host` in the same
+  three parts, up to test 7178: 378 s, 263 s and 302 s before its
+  commit. It ran each sanitizer suite in the six parts of `asan`, the
+  last up to test 7176: `asan` 247 s, 191 s, 261 s, 187 s, 452 s and
+  453 s, `ubsan` 254 s, 191 s, 262 s, 204 s, 470 s and 469 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
