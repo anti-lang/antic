@@ -1,0 +1,10 @@
+//! A conversion of one pointer type to another in a constant. A pointer is read
+//! at run time, so the conversion is no constant expression.
+
+const P: ?*int = none;
+const Q: ?*u8 = P as ?*u8;
+
+fn main() -> int
+{
+	return 0;
+}

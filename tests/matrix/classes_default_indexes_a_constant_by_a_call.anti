@@ -1,0 +1,19 @@
+//! The default of a field indexes a constant array at an index that a call
+//! gives, which is no constant expression.
+
+const TABLE: [2]int = [1, 2];
+
+fn pick() -> int
+{
+	return 0;
+}
+
+class Pair
+{
+	pub x: int = TABLE[pick()],
+}
+
+fn main() -> int
+{
+	return 0;
+}

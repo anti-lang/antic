@@ -1,0 +1,11 @@
+//! A float constant that needs seventeen digits to read back, converted to an
+//! integer type it does not fit. The message spells the value with all
+//! seventeen, since no shorter literal names the same `f64`.
+
+const K: f64 = 1000.0;
+const B: i8 = (K + 0.0000000000001) as i8;
+
+fn main() -> int
+{
+	return 0;
+}

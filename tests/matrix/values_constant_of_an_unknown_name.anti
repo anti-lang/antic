@@ -1,0 +1,8 @@
+//! A constant whose value names nothing the module declares.
+
+const A: int = missing + 1;
+
+fn main() -> int
+{
+	return A;
+}

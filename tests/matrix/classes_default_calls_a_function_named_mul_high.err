@@ -1,0 +1,1 @@
+classes_default_calls_a_function_named_mul_high.anti:12:15: error: a call is not a constant expression

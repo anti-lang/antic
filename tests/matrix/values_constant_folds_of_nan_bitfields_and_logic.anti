@@ -1,0 +1,54 @@
+//! Constants that fold in forms the other programs leave out. A comparison with
+//! NaN on either side is false, and `!=` with it is true. A value of `size_of`
+//! stored in a bitfield is no number the checker knows, so it is stored at run
+//! time. The logic of `&&` and `||` folds in a copy of a generic for each pair
+//! of sides, and a length of a copy that multiplies `size_of` of a type
+//! parameter by a constant parameter folds on the target.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const NAN: f64 = 0.0 / 0.0;
+const NAN_EQ: bool = NAN == NAN;
+const NAN_NE: bool = NAN != NAN;
+const NAN_LT: bool = NAN < 1.0;
+const ONE_LT_NAN: bool = 1.0 < NAN;
+
+struct Bits
+{
+	low: u8 : 3,
+	high: u8 : 5,
+}
+
+struct Logic<N: int>
+{
+	and_false_left: [(N > 5 && N > 1) as int + 1]int,
+	and_false_right: [(N > 1 && N > 5) as int + 1]int,
+	or_true_left: [(N > 1 || N > 5) as int + 1]int,
+	or_false_both: [(N > 5 || N > 6) as int + 1]int,
+}
+
+struct Packed<T, N: int>
+{
+	front: [size_of(T) * N]u8,
+	back: [N * size_of(T)]u8,
+}
+
+fn main() -> int
+{
+	printf("nan %d %d %d %d\n".ptr, NAN_EQ as c_int, NAN_NE as c_int,
+		NAN_LT as c_int, ONE_LT_NAN as c_int);
+	let b = Bits { low: 0, high: 0 };
+	b.low = size_of(u16) as u8;
+	printf("bitfield %d\n".ptr, b.low as c_int);
+	let l = Logic<3> {
+		and_false_left: [0; 1],
+		and_false_right: [0; 1],
+		or_true_left: [0; 2],
+		or_false_both: [0; 1],
+	};
+	printf("logic %d %d %d %d\n".ptr, l.and_false_left.len as c_int,
+		l.and_false_right.len as c_int, l.or_true_left.len as c_int,
+		l.or_false_both.len as c_int);
+	printf("packed %d\n".ptr, size_of(Packed<int, 3>) as c_int);
+	return 0;
+}

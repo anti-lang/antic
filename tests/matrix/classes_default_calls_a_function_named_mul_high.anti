@@ -1,0 +1,18 @@
+//! The default of a field calls a function of the module that is named
+//! `mul_high`. The name is then no built-in operator, so the default holds a
+//! call, which is no constant expression.
+
+fn mul_high(a: int, b: int) -> int
+{
+	return a + b;
+}
+
+class Pair
+{
+	pub x: int = mul_high(2, 3),
+}
+
+fn main() -> int
+{
+	return 0;
+}

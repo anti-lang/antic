@@ -1,0 +1,1 @@
+values_pointer_conversion_in_a_constant.anti:5:17: error: a pointer conversion is not a constant expression

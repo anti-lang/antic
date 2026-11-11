@@ -1,0 +1,5 @@
+exit 0
+nan 0 1 0 0
+bitfield 2
+logic 1 1 2 1
+packed 48
