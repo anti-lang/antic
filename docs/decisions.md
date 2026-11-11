@@ -3141,7 +3141,7 @@ Eddie took this decision on 2026-10-14. It holds until Eddie lifts it, and it is
 - On 2026-11-09 Eddie answered the three questions of the first phase of coverage, under "Answers of 2026-11-09, third set". The three answers remove code, test a guard and correct the name of a tool in a message. The freeze needs no change for them.
 - On 2026-11-10 Eddie answered five questions of the second phase of coverage, under "Answers of 2026-11-10". Each answer is a fix of a defect, and the freeze lets the fixes in as fixes. The refusals and the message they add come with no option and no form.
 - On 2026-11-10 Eddie answered the questions of the guards of the second phase of coverage and two questions of its tests, under "Answers of 2026-11-10, second set". The answers keep code, give a runner of the tests a file of expected output and add a program to the coverage report. None of them reaches antic, anti, the runtime or the standard library, so the freeze needs no change for them.
-- On 2026-11-11 Eddie answered the questions of the third batch of coverage and of batch 5, under "Answers of 2026-11-11". The answers keep guards, fix two defects and change two messages. They add no option and no form, so the freeze lets them in as fixes.
+- On 2026-11-11 Eddie answered the questions of the third batch of coverage and of batch 5, under "Answers of 2026-11-11". The answers keep guards, fix two defects and change two messages. They add no option and no form, so the freeze lets them in as fixes. The same day he answered the question of batch 6, and that answer fixes a defect as well.
 
 ## What the solid run decided
 
@@ -3474,7 +3474,7 @@ Eddie took these decisions on 2026-11-10, with the recommendations of the steps 
 
 ## Answers of 2026-11-11
 
-Eddie took these decisions on 2026-11-11. They answer questions 1 to 6 of "Questions for Eddie" in `docs/reports/2026-11-10-coverage-phase-2c.md` and questions 1 to 3 of the same section in `docs/reports/2026-11-10-coverage-batch-5.md`, numbered as there. None is provisional. `docs/reports/2026-11-11-coverage-batch-6.md` reports the step that builds them.
+Eddie took these decisions on 2026-11-11. They answer questions 1 to 6 of "Questions for Eddie" in `docs/reports/2026-11-10-coverage-phase-2c.md` and questions 1 to 3 of the same section in `docs/reports/2026-11-10-coverage-batch-5.md`, numbered as there. The last item answers question 1 of the same section in `docs/reports/2026-11-11-coverage-batch-6.md`. None is provisional. `docs/reports/2026-11-11-coverage-batch-6.md` reports the step that builds the answers to the reports of 2c and batch 5, and `docs/reports/2026-11-11-license-plain-sources.md` the step that builds the answer to batch 6.
 
 - Q1, Q3 and Q4 of the report of 2c. The guards of `test.c`, `sema_copies.c` and `driver_link.c` that the report lists as reached by no input stay, as the guards of the reports of 2a and 2b stay by "Answers of 2026-11-10, second set". `docs/notes/unreached-guards.md` names them.
 - Q2 of the report of 2c. `driver_run` returns `DRIVER_OBJECT_ONLY` for a dev object of a module without `main`, as `src/antic/driver.h` says. `test.c` and `build.c` test for that status, and no caller takes it for a failure.
@@ -3483,6 +3483,7 @@ Eddie took these decisions on 2026-11-11. They answer questions 1 to 6 of "Quest
 - Q1 of the report of batch 5. The `EXPR_FREE` arm of `visit_call` in `src/antic/sema_stmt.c` stays as a guard, with the other guards of the file that Q5 of the report of 2b kept.
 - Q2 of the report of batch 5. `ERR` of `tests/runners/run_anti_messages.cmake` takes no file. Q7 of the report of 2b asked for the standard output alone, and no case needs a file of the standard error.
 - Q3 of the report of batch 5. A record of `licenses/sources.txt` without the line of a library that the program links ends the run with status 1. It is a defect, as T151 was: a notice without the version of a component is incomplete.
+- Q1 of the report of batch 6. The plain form of `anti license` ends with status 1 and `anti: <runtime>/licenses/sources.txt holds no line of <component>` when the record lacks the line of a component that it is meant to name. It follows Q3 of the report of batch 5 and T229. `apsl`, `compiler-rt` and `macos-sdk` keep the version `-`, since they have no source that the record names, by the entry on the record under "Binary distribution". Their names stand in one place, which the writer of the record and the check of the plain form both read.
 
 ## Open
 

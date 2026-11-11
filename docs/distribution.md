@@ -525,7 +525,9 @@ the record names.
 
 The plain form reads the package it runs from: `LICENSE` in its root for `antic` and
 `anti`, then `licenses/` with `sources.txt`. The version of a component is the one of the
-record, and `-` where the record names none. The identifier is the SPDX expression that
+record. `apsl`, `compiler-rt` and `macos-sdk` have no source the record names and take
+`-`. A record without the line of any other component ends the form with status 1. The
+identifier is the SPDX expression that
 the text of the component names. A text that holds the notices of more than one
 licence, as the copyright file of a package of Ubuntu does, has `LicenseRef-<name>`.
 
