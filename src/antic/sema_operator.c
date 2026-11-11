@@ -189,6 +189,37 @@ static bool takes_first(const struct symbol *sym, const struct type *t)
                           sema_has_params(first));
 }
 
+/* Whether sym, a free function whose signature the checker refused, takes
+   t, or a pointer to it, first. Its type holds no parameters, so the type
+   of its first parameter is read again, quietly, in the context of its
+   declaration. A hook so refused has the one message of its declaration,
+   and a construct that would call it gives none, T233 of
+   docs/audit/tests-findings.md, as T161 holds for a hook of a class. */
+static bool refused_takes_first(struct checker *c, const struct symbol *sym,
+                                const struct type *t)
+{
+    struct context at;
+    struct context saved;
+    struct context quiet;
+    const struct type *first;
+
+    if (sym->type == NULL || sym->type->kind != TYPE_ERROR ||
+        sym->item == NULL || sym->item->param_count == 0 ||
+        sym->item->params[0].type == NULL) {
+        return false;
+    }
+    at = sema_declaration_context(c, sema_within(sym->item));
+    sema_enter(c, &at, &saved);
+    sema_enter_quiet(c, &quiet);
+    first = sema_resolve_type(c, sym->item->params[0].type);
+    sema_leave(c, &quiet);
+    sema_leave(c, &saved);
+    if (first->kind == TYPE_POINTER) {
+        first = first->element;
+    }
+    return first == t;
+}
+
 /* DESIGN: an operator of a struct is a free function of its module, and
    one module declares one function of a name. The `operator fn eq` of
    one struct is therefore no operator of another struct of the module,
@@ -259,7 +290,8 @@ struct symbol *sema_hook(struct checker *c, struct type *t, const char *text)
         return m->kind == ITEM_FN && m->is_operator ? m->symbol : NULL;
     }
     sym = sema_method_symbol(c, t, &name);
-    if (sym == NULL || !symbol_is_operator(sym) || !takes_first(sym, t)) {
+    if (sym == NULL || !symbol_is_operator(sym) ||
+        (!takes_first(sym, t) && !refused_takes_first(c, sym, t))) {
         return NULL;
     }
     return sym;
