@@ -1,0 +1,12 @@
+expression_operands.anti:30:14: error: `dup` needs a class pointer, found `Bits`
+expression_operands.anti:32:14: error: `dup` needs a class pointer, found `Mutex`
+expression_operands.anti:34:10: error: `?.` follows a value of type `?*T` or `?T`, found `int`
+expression_operands.anti:35:10: error: `?.` on `n`, which is not a pointer
+expression_operands.anti:37:15: error: unknown name `missing_high`
+expression_operands.anti:38:10: error: unknown name `missing_base`
+expression_operands.anti:39:21: error: expected `int`, found `str`
+expression_operands.anti:40:22: error: expected `(int, int)`, found `(int, int, int)`
+expression_operands.anti:41:11: error: unknown name `missing_element`
+expression_operands.anti:42:10: error: unknown name `missing_operand`
+expression_operands.anti:43:13: error: unknown name `missing_part`
+expression_operands.anti:45:10: error: `try` forwards an error, and a value that may be `none` has none: use `let ... else` or `??`

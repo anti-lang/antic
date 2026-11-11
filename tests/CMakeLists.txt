@@ -5399,6 +5399,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "plugin_instance_of_a_long_path|--front-end,--runtime,${ANTIC_RUNTIME_DIR},plugin_instance_of_a_long_path.anti"
         "simd_lanes_compared|--front-end,simd_lanes_compared.anti"
         "switch_refused_returns|--front-end,switch_refused_returns.anti"
+        "expression_operands|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_operands.anti"
         "tests_setup|--front-end,--tests,tests_setup.anti"
         "tests_teardown|--front-end,--tests,tests_teardown.anti"
         "tests_may_fail|--front-end,--tests,--runtime,${ANTIC_RUNTIME_DIR},tests_may_fail.anti"

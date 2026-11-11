@@ -1,0 +1,1 @@
+closures_own_field_given_a_parameter_through_a_default.anti:12:9: error: an `own fn` value is not copied by `=`, use `dup`

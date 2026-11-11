@@ -1,0 +1,47 @@
+//! Operands that the checker refuses, one mistake per line. Each gets its one
+//! message: a `dup` of a union and of a Mutex value, `?.` after an `int` and on
+//! a field of a call that is no pointer, a slice whose bound or base is no name
+//! of the program, `alloc` with a count of text, a tuple of one element too
+//! many, an array literal, a conversion and an interpolation of a name that is
+//! not there, and `try` before a local that may be `none`.
+
+import anti.lang;
+import anti.text;
+
+union Bits
+{
+	i: int,
+	f: f64,
+}
+
+struct Holder
+{
+	n: int,
+}
+
+fn make() -> ?*Holder
+{
+	return none;
+}
+
+fn main() -> int
+{
+	let u = Bits { i: 1 };
+	let v = dup(u);
+	let m = Mutex.new();
+	let w = dup(m);
+	let n = 3;
+	let x = n?.p;
+	let y = make()?.n;
+	let s = [1, 2];
+	let z = s[0..missing_high];
+	let q = missing_base[0..1];
+	let r = alloc(int, "a");
+	let t: (int, int) = (1, 2, 3);
+	let a = [missing_element, 1];
+	let k = missing_operand as int;
+	let f = f"{missing_part}";
+	let p: ?*int = none;
+	let g = try p;
+	return 0;
+}

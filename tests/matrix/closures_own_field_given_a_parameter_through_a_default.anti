@@ -1,0 +1,23 @@
+//! An `own fn` field given `h.cb ?? f`, where `f` is a `keep own` parameter.
+//! The value of `??` is no fresh value: it is the field itself or the
+//! parameter, so `=` would copy an owned value.
+
+class Holder
+{
+	pub own cb: ?fn() -> int = none,
+}
+
+fn set(h: *Holder, keep own f: fn() -> int)
+{
+	h.cb = h.cb ?? f;
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	let n = 41;
+	set(&h, snapshot fn() -> int {
+		return n + 1;
+	});
+	return 0;
+}
