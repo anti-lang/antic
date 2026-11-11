@@ -79,6 +79,16 @@ anti_message(license_sources_without_a_last_newline
         "text for mimalloc"
         "The licence of mimalloc."
         "source mimalloc 2.1.7")
+# A record without the line of a component that it is meant to name ends
+# the plain form, by Q1 of the report of batch 6 under "Answers of
+# 2026-11-11", since the version of the component is unknown.
+anti_message(license_sources_without_a_component
+    FILES archive/LICENSE "The licence of Anti.\n"
+          archive/licenses/anti_rt.txt "The licence of the runtime.\n"
+          archive/licenses/mimalloc.txt "The licence of mimalloc.\n"
+          archive/licenses/sources.txt "# The record.\nmusl 1.2.5 https://musl.libc.org/releases/musl-1.2.5.tar.gz\n"
+    ARGS license --runtime archive
+    ERR "anti: archive/licenses/sources.txt holds no line of mimalloc")
 # R188 of "Rules of 2026-10-13" in docs/decisions.md: an archive without
 # the licence of the runtime is named by anti, which ends with 1.
 anti_message(license_runtime_without_its_text
