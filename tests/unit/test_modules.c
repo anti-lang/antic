@@ -3954,8 +3954,360 @@ static void pattern_lines(void)
     compilation_close(&s);
 }
 
+/* scale_antl with count entries after its two types, the bytes of extra,
+   and after the table the defaults of the structs among them. */
+static void scale_types(struct text *b, uint32_t count,
+                        const uint8_t *extra, size_t extra_length,
+                        const uint8_t *defaults, size_t defaults_length)
+{
+    text_append_bytes(b, scale_antl, SCALE_TYPES);
+    put_u32(b, 2 + count);
+    text_append_bytes(b, scale_antl + SCALE_TYPES + 4,
+                      SCALE_ITEMS - SCALE_TYPES - 4);
+    text_append_bytes(b, extra, extra_length);
+    text_append_bytes(b, defaults, defaults_length);
+    text_append_bytes(b, scale_antl + SCALE_ITEMS,
+                      sizeof scale_antl - SCALE_ITEMS);
+}
+
+/* Whether scale_antl with the entries of extra reads. */
+static bool scale_reads(uint32_t count, const struct text *extra,
+                        const struct text *defaults)
+{
+    struct text b = {0};
+    bool ok;
+    struct compilation s;
+    struct ir_module program;
+    char error[160] = "";
+
+    scale_types(&b, count, (const uint8_t *)extra->data, extra->length,
+                defaults != NULL ? (const uint8_t *)defaults->data : NULL,
+                defaults != NULL ? defaults->length : 0);
+    compilation_open(&s);
+    ir_module_init(&program, &s.arena, "main");
+    ok = compilation_read(&s, (const uint8_t *)b.data, b.length, &program,
+                          error, sizeof error) != NULL;
+    ir_module_free(&program);
+    compilation_close(&s);
+    text_free(&b);
+    return ok;
+}
+
+/* The marks of the struct `s0` that struct_entry writes. */
+struct scale_struct {
+    uint8_t flags;
+    uint8_t safety;
+    bool value;                         /* a constant `K` of its body */
+    uint32_t value_type;
+    uint8_t value_static;               /* 1 for a static field */
+    uint8_t value_vis;                  /* its visibility */
+};
+
+/* A struct `s0` of one field `f: uint`, the type at index 0. */
+static void struct_entry(struct text *e, const struct scale_struct *s)
+{
+    put_u8(e, TYPE_STRUCT);
+    put_str(e, "scale");
+    put_str(e, "s0");
+    put_u8(e, 0);                       /* a plain struct */
+    put_u8(e, s->flags);
+    put_u8(e, s->safety);
+    put_str(e, "");
+    put_u64(e, 0);
+    put_u32(e, 1);
+    put_str(e, "f");
+    put_u32(e, 0);
+    put_u8(e, 0);
+    put_u8(e, FIELD_PLAIN);
+    put_u8(e, VIS_PUB);
+    put_u8(e, 0);
+    put_str(e, "");
+    put_str(e, "");
+    put_u32(e, 0);                      /* no functions */
+    put_u32(e, 0);                      /* no private functions */
+    put_u32(e, s->value ? 1 : 0);
+    if (s->value) {
+        put_str(e, "K");
+        put_u8(e, s->value_static);
+        put_u8(e, s->value_vis);
+        put_u32(e, s->value_type);
+        put_str(e, "");
+    }
+}
+
+/* Whether scale_antl with the struct s and the defaults of its field and
+   its constant reads. */
+static bool struct_reads(const struct scale_struct *s,
+                         const struct text *defaults)
+{
+    struct text e = {0};
+    bool ok;
+
+    struct_entry(&e, s);
+    ok = scale_reads(1, &e, defaults);
+    text_free(&e);
+    return ok;
+}
+
+/* The marks of a struct of the type table: a thread safety of three
+   values and the bit of `unchecked`, and flags of seven bits. A constant
+   of the body has a type of the table and a value of that type, and a
+   field that takes a function by default names one. */
+static void damaged_struct_entries(void)
+{
+    struct scale_struct plain = {0, 0, false, 0, 0, VIS_PUB};
+    struct scale_struct s = plain;
+    struct text d = {0};
+
+    put_u8(&d, 0);                      /* the field takes no default */
+    CHECK(struct_reads(&s, &d));
+    s.safety = SAFETY_CONCURRENT | 4;
+    CHECK(struct_reads(&s, &d));
+    s.safety = 3;
+    CHECK(!struct_reads(&s, &d));
+    s.safety = 8;
+    CHECK(!struct_reads(&s, &d));
+    s = plain;
+    s.flags = 128;
+    CHECK(!struct_reads(&s, &d));
+    /* The constant `K: uint = 7`, then one of a type past the table, and
+       one whose value is text. */
+    s = plain;
+    s.value = true;
+    put_u8(&d, CONST_INT);
+    put_u64(&d, 7);
+    CHECK(struct_reads(&s, &d));
+    /* A static field reads, and a mark of two, a visibility past `pub` and
+       a private constant do not. */
+    s.value_static = 1;
+    CHECK(struct_reads(&s, &d));
+    s.value_static = 2;
+    CHECK(!struct_reads(&s, &d));
+    s.value_static = 0;
+    s.value_vis = VIS_PUB + 1;
+    CHECK(!struct_reads(&s, &d));
+    s.value_vis = VIS_PRIVATE;
+    CHECK(!struct_reads(&s, &d));
+    s.value_vis = VIS_PUB;
+    s.value_type = 3;
+    CHECK(!struct_reads(&s, &d));
+    text_free(&d);
+    /* A value of `uint` is no float, no character, no array and no
+       symbolic value of a type that is no integer. */
+    s.value_type = 0;
+    put_u8(&d, 0);
+    put_u8(&d, CONST_FLOAT);
+    put_u64(&d, 0);
+    CHECK(!struct_reads(&s, &d));
+    text_free(&d);
+    put_u8(&d, 0);
+    put_u8(&d, CONST_CHAR);
+    put_u32(&d, 'a');
+    CHECK(!struct_reads(&s, &d));
+    text_free(&d);
+    put_u8(&d, 0);
+    put_u8(&d, CONST_ARRAY);
+    put_u32(&d, 1);
+    put_u8(&d, CONST_INT);
+    put_u64(&d, 7);
+    CHECK(!struct_reads(&s, &d));
+    text_free(&d);
+    put_u8(&d, 0);
+    put_u8(&d, CONST_SYMBOLIC);
+    put_u8(&d, SYMBOLIC_INT);
+    put_u32(&d, 1);
+    put_u64(&d, 7);
+    CHECK(!struct_reads(&s, &d));
+    text_free(&d);
+    s.value_type = 0;
+    put_u8(&d, 0);
+    put_u8(&d, CONST_TEXT);
+    put_str(&d, "7");
+    CHECK(!struct_reads(&s, &d));
+    text_free(&d);
+    /* The field takes the function `zz` by default, of the type of
+       `scale` and then of `uint`. */
+    put_u8(&d, 2);
+    put_str(&d, "zz");
+    put_u32(&d, 1);
+    CHECK(struct_reads(&plain, &d));
+    text_free(&d);
+    put_u8(&d, 2);
+    put_str(&d, "zz");
+    put_u32(&d, 0);
+    CHECK(!struct_reads(&plain, &d));
+    text_free(&d);
+}
+
+/* A pointer whose marks take two bits, a `?T` of a pointer that may be
+   none and not of one that may not, and `anti.lang.Job` over a type of
+   the table as a struct and no other kind. */
+static void damaged_type_entries(void)
+{
+    struct text e = {0};
+    uint8_t form;
+
+    for (form = 0; form < 5; form++) {
+        put_u8(&e, TYPE_POINTER);
+        put_u32(&e, 0);
+        put_u8(&e, form);
+        CHECK(scale_reads(1, &e, NULL) == (form < 4));
+        text_free(&e);
+    }
+    for (form = 0; form < 2; form++) {
+        put_u8(&e, TYPE_POINTER);
+        put_u32(&e, 0);
+        put_u8(&e, form);
+        put_u8(&e, TYPE_OPTIONAL);
+        put_u32(&e, 2);
+        CHECK(scale_reads(2, &e, NULL) == (form == 1));
+        text_free(&e);
+    }
+    put_u8(&e, TYPE_STRUCT);
+    put_str(&e, "anti.lang");
+    put_str(&e, "Job");
+    put_u8(&e, 0);
+    put_u32(&e, 0);
+    CHECK(scale_reads(1, &e, NULL));
+    e.data[0] = TYPE_CLASS;
+    CHECK(!scale_reads(1, &e, NULL));
+    e.data[0] = TYPE_STRUCT;
+    e.data[e.length - 4] = 9;
+    CHECK(!scale_reads(1, &e, NULL));
+    text_free(&e);
+}
+
+/* The marks of an item take seven bits. An alias is a type, and a
+   generic and an operator are functions. The marks of `SCALE`, the first
+   item, follow its kind, its name and its type. */
+static void damaged_item_marks(void)
+{
+    static const uint8_t refused[] = {128, 16, 32, 64};
+    enum { MARKS = SCALE_ITEMS + 4 + 1 + 4 + 5 + 4 };
+    uint8_t copy[sizeof scale_antl];
+    size_t i;
+
+    CHECK(memcmp(scale_antl + SCALE_ITEMS + 9, "SCALE", 5) == 0);
+    CHECK(scale_antl[MARKS] <= 1);
+    for (i = 0; i < sizeof refused; i++) {
+        memcpy(copy, scale_antl, sizeof copy);
+        copy[MARKS] = (uint8_t)(copy[MARKS] | refused[i]);
+        refuses_file(copy, sizeof copy, NULL);
+    }
+}
+
+/* `[L]uint`, whose length L is the symbolic value of kind and op over the
+   integer 2. */
+static bool symbolic_length_reads(uint8_t kind, uint8_t op)
+{
+    struct text e = {0};
+    bool ok;
+
+    put_u8(&e, TYPE_ARRAY);
+    put_u32(&e, 0);
+    put_u8(&e, 1);                      /* a symbolic length */
+    put_u8(&e, kind);
+    put_u32(&e, 0);
+    if (kind == SYMBOLIC_INT) {
+        put_u64(&e, 2);
+    } else {
+        put_u8(&e, op);
+        put_u8(&e, SYMBOLIC_INT);
+        put_u32(&e, 0);
+        put_u64(&e, 2);
+    }
+    if (kind == SYMBOLIC_BINARY) {
+        put_u8(&e, SYMBOLIC_INT);
+        put_u32(&e, 0);
+        put_u64(&e, 3);
+    }
+    ok = scale_reads(1, &e, NULL);
+    text_free(&e);
+    return ok;
+}
+
+/* A symbolic value of the type table has one of the six kinds, and an
+   operation the checker folds: `-`, `~` and `!` before an operand, `as`
+   and the arithmetic, the shifts and the comparisons between two. */
+static void damaged_symbolic_ops(void)
+{
+    CHECK(symbolic_length_reads(SYMBOLIC_INT, 0));
+    CHECK(!symbolic_length_reads(SYMBOLIC_PARAM + 1, 0));
+    CHECK(symbolic_length_reads(SYMBOLIC_UNARY, TOKEN_MINUS));
+    CHECK(symbolic_length_reads(SYMBOLIC_UNARY, TOKEN_BANG));
+    CHECK(!symbolic_length_reads(SYMBOLIC_UNARY, TOKEN_PLUS));
+    CHECK(symbolic_length_reads(SYMBOLIC_CAST, TOKEN_AS));
+    CHECK(!symbolic_length_reads(SYMBOLIC_CAST, TOKEN_MINUS));
+    CHECK(symbolic_length_reads(SYMBOLIC_BINARY, TOKEN_SHL));
+    CHECK(!symbolic_length_reads(SYMBOLIC_BINARY, TOKEN_TILDE));
+    CHECK(!symbolic_length_reads(SYMBOLIC_BINARY, TOKEN_ASSIGN));
+}
+
+/* A library built against a module that declared a struct, read beside a
+   later file of that module that no longer does. The generics of the
+   later file do not stand for the struct either. */
+static void missing_struct(void)
+{
+    static const char before[] = "pub struct Gone { v: int }\n"
+                                 "pub struct Kept<T> { v: T }\n"
+                                 "pub fn same<T>(own x: T) -> T {\n"
+                                 "    return x;\n"
+                                 "}\n";
+    static const char after[] = "pub struct Kept<T> { v: T }\n"
+                                "pub fn same<T>(own x: T) -> T {\n"
+                                "    return x;\n"
+                                "}\n";
+    static const char user[] = "import gm;\n"
+                               "pub fn width(g: gm.Gone) -> int {\n"
+                               "    return g.v;\n"
+                               "}\n";
+    struct compilation a;
+    struct compilation b;
+    struct compilation c;
+    struct text old_bytes = {0};
+    struct text new_bytes = {0};
+    struct text user_bytes = {0};
+    struct ir_module program;
+    const struct interface *libs[1];
+    struct antl_context with_gm;
+    char error[160] = "";
+
+    compilation_open(&a);
+    compilation_open(&b);
+    if (build_library(&a, "gm", before, &old_bytes) &&
+        build_library(&a, "gu", user, &user_bytes) &&
+        build_library(&b, "gm", after, &new_bytes)) {
+        compilation_open(&c);
+        ir_module_init(&program, &c.arena, "main");
+        libs[0] = compilation_read(&c, (const uint8_t *)new_bytes.data,
+                                   new_bytes.length, &program, error,
+                                   sizeof error);
+        CHECK(libs[0] != NULL);
+        with_gm.libraries = libs;
+        with_gm.library_count = 1;
+        with_gm.types = &c.types;
+        with_gm.arena = &c.arena;
+        with_gm.program = &program;
+        CHECK(antl_read((const uint8_t *)user_bytes.data, user_bytes.length,
+                        &with_gm, error, sizeof error) == NULL);
+        CHECK_STR(error, "needs struct `gm.Gone`");
+        ir_module_free(&program);
+        compilation_close(&c);
+    }
+    text_free(&old_bytes);
+    text_free(&new_bytes);
+    text_free(&user_bytes);
+    compilation_close(&b);
+    compilation_close(&a);
+}
+
 void test_modules(void)
 {
+    damaged_struct_entries();
+    damaged_item_marks();
+    damaged_type_entries();
+    damaged_symbolic_ops();
+    missing_struct();
     deep_types();
     copy_depths();
     deep_values();
