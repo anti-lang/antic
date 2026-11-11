@@ -253,10 +253,11 @@ static void lowers_imports(void)
 
 /* Compile a library, add its interface and write its file. damage, when
    set, changes the checked trees of its generics before the writer reads
-   them. */
-static bool build_damaged(struct compilation *s, const char *name,
+   them, and ir_damage the IR of the module. */
+static bool build_changed(struct compilation *s, const char *name,
                           const char *source,
                           void (*damage)(struct damaged *),
+                          void (*ir_damage)(struct ir_module *),
                           struct text *bytes)
 {
     struct interface *iface = arena_alloc(&s->arena, sizeof *iface);
@@ -284,10 +285,21 @@ static bool build_damaged(struct compilation *s, const char *name,
             struct damaged d = {iface, &s->arena};
             damage(&d);
         }
+        if (ir_damage != NULL) {
+            ir_damage(&ir);
+        }
         antl_write(bytes, iface, &ir, false);
     }
     ir_module_free(&ir);
     return ok;
+}
+
+static bool build_damaged(struct compilation *s, const char *name,
+                          const char *source,
+                          void (*damage)(struct damaged *),
+                          struct text *bytes)
+{
+    return build_changed(s, name, source, damage, NULL, bytes);
 }
 
 static bool build_library(struct compilation *s, const char *name,
@@ -2376,9 +2388,10 @@ static void damaged_constants(void)
 
 /* bytes with the relocations of the global named name, which has none,
    replaced by count addresses at offsets, each of global 0. */
-static void with_relocations(const struct text *bytes, const char *name,
-                             const uint64_t *offsets, uint32_t count,
-                             uint8_t to_function, struct text *out)
+static void with_targets(const struct text *bytes, const char *name,
+                         const uint64_t *offsets, uint32_t count,
+                         uint8_t to_function, uint32_t target,
+                         struct text *out)
 {
     size_t at = name_end(bytes, name, false);
     uint64_t size = (uint64_t)u32_at(bytes, at) |
@@ -2398,13 +2411,22 @@ static void with_relocations(const struct text *bytes, const char *name,
             word[k] = (uint8_t)(offsets[i] >> (8 * k));
         }
         text_append_bytes(out, word, 8);
-        poke_u32(word, 0);
+        poke_u32(word, target);
         text_append_bytes(out, word, 4);
         word[0] = to_function;
         text_append_bytes(out, word, 1);
     }
     text_append_bytes(out, bytes->data + relocs + 4,
                       bytes->length - relocs - 4);
+}
+
+/* bytes with the addresses at offsets inside the data of the global name,
+   each of global or function 0. */
+static void with_relocations(const struct text *bytes, const char *name,
+                             const uint64_t *offsets, uint32_t count,
+                             uint8_t to_function, struct text *out)
+{
+    with_targets(bytes, name, offsets, count, to_function, 0, out);
 }
 
 /* The addresses of a global each take eight bytes inside its data, apart
@@ -2439,6 +2461,14 @@ static void damaged_relocations(void)
     /* Rule 14: whether the target is a function is a flag, and the marks
        of a global take bits 0 to 3. */
     with_relocations(&bytes, "0", apart, 2, 2, &changed);
+    refuses_file((const uint8_t *)changed.data, changed.length, NULL);
+    /* An address of the one function of the file, and of a function and
+       a global past those the file holds. */
+    with_relocations(&bytes, "0", apart, 1, 1, &changed);
+    CHECK(reads_file(&changed));
+    with_targets(&bytes, "0", apart, 1, 1, 1, &changed);
+    refuses_file((const uint8_t *)changed.data, changed.length, NULL);
+    with_targets(&bytes, "0", apart, 1, 0, 99, &changed);
     refuses_file((const uint8_t *)changed.data, changed.length, NULL);
     {
         size_t at = name_end(&bytes, "0", false);
@@ -4301,8 +4331,287 @@ static void missing_struct(void)
     compilation_close(&a);
 }
 
+/* A link of the chain deep_constant gives a global: an aggregate of one
+   item of aggregate 0. */
+enum { CHAIN_LINKS = TYPES_NEST_MAX + 40 };
+
+static void deep_constant(struct ir_module *ir)
+{
+    struct ir_const *links = arena_alloc(ir->arena,
+                                         CHAIN_LINKS * sizeof *links);
+    size_t k;
+
+    memset(links, 0, CHAIN_LINKS * sizeof *links);
+    for (k = 0; k < CHAIN_LINKS; k++) {
+        links[k].kind = IR_CONST_AGG;
+        links[k].scalar = IR_I64;
+        links[k].type.type = IR_AGG;
+        links[k].type.agg = 0;
+        links[k].items = k + 1 < CHAIN_LINKS ? &links[k + 1] : NULL;
+        links[k].item_count = k + 1 < CHAIN_LINKS ? 1 : 0;
+    }
+    ir->globals[0]->value = links;
+}
+
+/* A constant of the IR nests no deeper than TYPES_NEST_MAX, which no
+   aggregate exceeds either. The reader refuses the link past it before it
+   reads the link, so before the chain recurses further. */
+static void deep_ir_constants(void)
+{
+    static const char source[] = "pub struct P { a: int }\n"
+                                 "pub fn get() -> P {\n"
+                                 "    return P { a: 1 };\n"
+                                 "}\n";
+    static const uint8_t link[] = {IR_CONST_AGG, IR_I64, 1, 0, 0, 0, 0, 0,
+                                   0, 0, IR_AGG, 0, 0, 0, 0};
+    struct compilation s;
+    struct text bytes = {0};
+    char expected[64];
+    size_t at;
+
+    compilation_open(&s);
+    if (build_changed(&s, "dc", source, NULL, deep_constant, &bytes)) {
+        for (at = 0; at + sizeof link <= bytes.length; at++) {
+            if (memcmp(bytes.data + at, link, sizeof link) == 0) {
+                break;
+            }
+        }
+        CHECK(at + sizeof link <= bytes.length);
+        snprintf(expected, sizeof expected, "is damaged at byte %zu",
+                 at + (TYPES_NEST_MAX + 1) * sizeof link);
+        refuses_file((const uint8_t *)bytes.data, bytes.length, expected);
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
+/* The C function of name among the functions of program, or NULL. */
+static const struct ir_function *c_function_named(
+    const struct ir_module *program, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < program->function_count; i++) {
+        const struct ir_function *f = program->functions[i];
+        if (f->module == NULL && strcmp(f->name, name) == 0) {
+            return f;
+        }
+    }
+    return NULL;
+}
+
+/* Read the files of count libraries into s and program, each against
+   those before it. Returns whether every one reads, with the message of
+   the first that does not in error. */
+static bool read_in_order(struct compilation *s, struct ir_module *program,
+                          const struct text *files, size_t count,
+                          char *error, size_t error_size)
+{
+    const struct interface *libs[8];
+    struct antl_context context;
+    size_t i;
+
+    context.types = &s->types;
+    context.arena = &s->arena;
+    context.program = program;
+    for (i = 0; i < count && i < 8; i++) {
+        context.libraries = libs;
+        context.library_count = i;
+        libs[i] = antl_read((const uint8_t *)files[i].data, files[i].length,
+                            &context, error, error_size);
+        if (libs[i] == NULL) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* DESIGN of merge_declaration: two libraries declare one C function. It
+   never returns only where both say so, and its result extends only where
+   both extend it alike. `i8` and `u8` pass as the same C type. */
+static void merged_declarations(void)
+{
+    static const char first[] = "pub extern fn getb() -> i8;\n"
+                                "pub extern fn quit(c: i32) -> never;\n"
+                                "pub fn one() -> i8 {\n"
+                                "    return getb();\n"
+                                "}\n"
+                                "pub fn stop() {\n"
+                                "    quit(1);\n"
+                                "}\n";
+    static const char second[] = "pub extern fn getb() -> u8;\n"
+                                 "pub extern fn quit(c: i32);\n"
+                                 "pub fn two() -> u8 {\n"
+                                 "    return getb();\n"
+                                 "}\n"
+                                 "pub fn halt() {\n"
+                                 "    quit(2);\n"
+                                 "}\n";
+    struct compilation a;
+    struct compilation b;
+    struct text files[2] = {{0}, {0}};
+    struct ir_module program;
+    char error[160] = "";
+
+    compilation_open(&a);
+    if (build_library(&a, "ma", first, &files[0]) &&
+        build_library(&a, "mb", second, &files[1])) {
+        const struct ir_function *getb;
+        const struct ir_function *quit;
+        compilation_open(&b);
+        ir_module_init(&program, &b.arena, "main");
+        CHECK(read_in_order(&b, &program, files, 1, error, sizeof error));
+        getb = c_function_named(&program, "getb");
+        quit = c_function_named(&program, "quit");
+        CHECK(getb != NULL && getb->result_ext == IR_EXT_SIGN);
+        CHECK(quit != NULL && quit->never_returns);
+        ir_module_free(&program);
+        compilation_close(&b);
+        compilation_open(&b);
+        ir_module_init(&program, &b.arena, "main");
+        CHECK(read_in_order(&b, &program, files, 2, error, sizeof error));
+        getb = c_function_named(&program, "getb");
+        quit = c_function_named(&program, "quit");
+        CHECK(getb != NULL && getb->result_ext == IR_EXT_NONE);
+        CHECK(quit != NULL && !quit->never_returns);
+        ir_module_free(&program);
+        compilation_close(&b);
+    }
+    text_free(&files[0]);
+    text_free(&files[1]);
+    compilation_close(&a);
+}
+
+/* The function `g` of the module written as the function `f` of `da`. */
+static void define_other(struct ir_module *ir)
+{
+    size_t i;
+
+    for (i = 0; i < ir->function_count; i++) {
+        if (strcmp(ir->functions[i]->name, "g") == 0) {
+            ir->functions[i]->module = "da";
+            ir->functions[i]->name = "f";
+        }
+    }
+}
+
+/* A function that two library files define. */
+static void defined_twice(void)
+{
+    struct compilation a;
+    struct compilation b;
+    struct text files[2] = {{0}, {0}};
+    struct ir_module program;
+    char error[160] = "";
+
+    compilation_open(&a);
+    if (build_library(&a, "da", "pub fn f() -> int {\n    return 1;\n}\n",
+                      &files[0]) &&
+        build_changed(&a, "db", "pub fn g() -> int {\n    return 2;\n}\n",
+                      NULL, define_other, &files[1])) {
+        compilation_open(&b);
+        ir_module_init(&program, &b.arena, "main");
+        CHECK(!read_in_order(&b, &program, files, 2, error, sizeof error));
+        CHECK_STR(error, "defines `da.f`, which another library defines");
+        ir_module_free(&program);
+        compilation_close(&b);
+    }
+    text_free(&files[0]);
+    text_free(&files[1]);
+    compilation_close(&a);
+}
+
+/* The class records of the IR, each with one part that names nothing:
+   the sub-object of an interface and a `mutable` field past the fields of
+   the class, and an `inject` field and a `provides` line of an empty
+   path. */
+/* The record of `Cell`, the one class of the module. */
+static struct ir_class *cell_record(struct ir_module *ir)
+{
+    static struct ir_class none;
+
+    if (ir->class_count != 1) {
+        check_failures++;
+        fprintf(stderr, "the module has %zu class records\n",
+                ir->class_count);
+        return &none;
+    }
+    return ir->classes[0];
+}
+
+static void subtable_past_fields(struct ir_module *ir)
+{
+    struct ir_class *c = cell_record(ir);
+
+    ir_class_subtable(c, c->descriptor, c->descriptor, c->agg, 99);
+}
+
+static void mutable_past_fields(struct ir_module *ir)
+{
+    ir_class_mutable(cell_record(ir), 99);
+}
+
+static void inject_without_path(struct ir_module *ir)
+{
+    struct ir_class *c = cell_record(ir);
+
+    ir_class_inject(ir, c, "", "log", c->descriptor, false);
+}
+
+static void provides_without_path(struct ir_module *ir)
+{
+    struct ir_class *c = cell_record(ir);
+
+    ir_class_provides(ir, c, "", c->descriptor);
+}
+
+static void init_past_functions(struct ir_module *ir)
+{
+    cell_record(ir)->init = 99;
+}
+
+static void class_without_module(struct ir_module *ir)
+{
+    cell_record(ir)->module = "";
+}
+
+static void damaged_class_records(void)
+{
+    static const char source[] = "pub class Cell\n"
+                                 "{\n"
+                                 "    pub v: int = 0,\n"
+                                 "}\n"
+                                 "pub fn make() -> int {\n"
+                                 "    let c = Cell { v: 1 };\n"
+                                 "    return c.v;\n"
+                                 "}\n";
+    void (*const damages[])(struct ir_module *) = {
+        NULL, subtable_past_fields, mutable_past_fields, inject_without_path,
+        provides_without_path, init_past_functions, class_without_module};
+    size_t i;
+
+    for (i = 0; i < sizeof damages / sizeof damages[0]; i++) {
+        struct compilation s;
+        struct text bytes = {0};
+        compilation_open(&s);
+        if (build_changed(&s, "cl", source, NULL, damages[i], &bytes)) {
+            if (damages[i] == NULL) {
+                CHECK(reads_file(&bytes));
+            } else {
+                refuses_file((const uint8_t *)bytes.data, bytes.length, NULL);
+            }
+        }
+        text_free(&bytes);
+        compilation_close(&s);
+    }
+}
+
 void test_modules(void)
 {
+    deep_ir_constants();
+    merged_declarations();
+    defined_twice();
+    damaged_class_records();
     damaged_struct_entries();
     damaged_item_marks();
     damaged_type_entries();
