@@ -1916,6 +1916,28 @@ static void unify(struct type *param, struct type *arg,
             unify(param->element, arg->element, map);
             return;
         }
+        /* DESIGN: in the body of a generic class, `self` has the generic
+           itself as its type, which stands for the copy of its own
+           parameters. A parameter of the generic itself takes the
+           arguments of the copy that stands there, so `v * 2.0` against
+           `operator fn mul(self, k: T)` of a `Vec<f64>` gives the literal
+           the type `f64`, T234 of docs/audit/tests-findings.md. */
+        if (param->generic == NULL && param->type_param_count > 0) {
+            struct type *copy = param->kind == TYPE_CLASS
+                                    ? sema_copy_in_chain(arg, param)
+                                    : arg;
+            if (copy != NULL && copy->generic == param) {
+                for (i = 0; i < param->type_param_count; i++) {
+                    struct type *p = param->type_params[i];
+                    if (p->param->constant) {
+                        unify_value(param_value(p), copy->values[i], map);
+                    } else {
+                        unify(p, copy->args[i], map);
+                    }
+                }
+            }
+            return;
+        }
         /* DESIGN: Q19 of "Answers of 2026-10-24". A class gives the
            type arguments of the first class up its `inherits` chain that
            is a copy of the generic the parameter names. Inheritance is
