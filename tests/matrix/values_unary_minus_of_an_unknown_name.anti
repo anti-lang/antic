@@ -1,0 +1,8 @@
+//! Unary `-` of a name that the program does not declare. The mistake is the
+//! name, and it gets the one message.
+
+fn main() -> int
+{
+	let a = -missing;
+	return 0;
+}
