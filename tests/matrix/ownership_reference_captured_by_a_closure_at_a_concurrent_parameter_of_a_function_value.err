@@ -1,0 +1,1 @@
+ownership_reference_captured_by_a_closure_at_a_concurrent_parameter_of_a_function_value.anti:14:11: error: a closure passed to a concurrent parameter captures a reference to `x`, and `x` ends at line 17 [escaping-local]

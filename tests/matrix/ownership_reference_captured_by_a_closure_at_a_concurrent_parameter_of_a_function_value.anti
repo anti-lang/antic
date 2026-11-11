@@ -1,0 +1,22 @@
+//! A closure passed to a `concurrent` parameter of a function value reaches
+//! other threads as well, so it captures no local that holds the address of a
+//! local. A function type names no parameter, so the message names none.
+
+fn each(concurrent f: fn(int) -> int) -> int
+{
+	return f(1);
+}
+
+fn run(g: fn(concurrent fn(int) -> int) -> int) -> int
+{
+	let x = 5;
+	let p = &x;
+	return g(fn(i) {
+		return *p + i;
+	});
+}
+
+fn main() -> int
+{
+	return run(each) - 6;
+}
