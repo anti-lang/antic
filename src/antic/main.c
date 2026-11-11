@@ -549,7 +549,9 @@ static int run(int argc, char **argv, const struct lists *l)
     }
     status = driver_run(&options);
     text_free(&home);
-    return status;
+    /* A dev object of a module without main is a success, and antic
+       exits with 0 for it. */
+    return status == DRIVER_OBJECT_ONLY ? 0 : status;
 }
 
 /* The arguments of main and the status of run, handed to the thread of

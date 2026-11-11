@@ -2122,7 +2122,8 @@ int driver_run(const struct options *given)
     case 2: /* a dump or a library file finished the command */
         status = 0;
         goto done;
-    case 3: /* dev mode: a module without main stops at its object */
+    case DRIVER_OBJECT_ONLY:
+        /* dev mode: a module without main stops at its object */
         object_only = true;
         break;
     default:
@@ -2164,7 +2165,7 @@ int driver_run(const struct options *given)
         goto done;
     }
     if (object_only) {
-        status = 0;
+        status = DRIVER_OBJECT_ONLY;
         goto done;
     }
     if (o->lib != LIB_NONE) {

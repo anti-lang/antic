@@ -183,13 +183,14 @@ struct options {
 };
 
 /* The status of driver_run for a dev object of a module without main,
-   which stops at its object. antic exits with it, and anti counts it as
-   a success. */
+   which stops at its object. antic exits with 0 for it, and anti counts
+   it as a success. */
 #define DRIVER_OBJECT_ONLY 3
 
-/* Compile options->input and return the process exit status for antic:
-   0, DRIVER_OBJECT_ONLY, 2 after a dump or a refused option and 1 after
-   an error. */
+/* Compile options->input and return 0, DRIVER_OBJECT_ONLY for a dev
+   object of a module without main, 2 after a dump or a refused option
+   and 1 after an error. main of antic exits with the status, and with 0
+   for DRIVER_OBJECT_ONLY. */
 int driver_run(const struct options *options);
 
 /* Whether path, whose suffix gave the kind of its file, names a file
