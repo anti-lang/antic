@@ -4,7 +4,8 @@
    of test.c. Each compiles through driver_run of antic, so the search of
    the library files, the run of opt and llc and the link of a program
    run as well. A plugin built through driver_run writes its library and
-   the index beside it. ANTIC_TEST_RUNTIME is the runtime archive of the
+   the index beside it, and a dev object of a module without main gives
+   DRIVER_OBJECT_ONLY. ANTIC_TEST_RUNTIME is the runtime archive of the
    build. */
 
 #include <stdio.h>
@@ -140,6 +141,28 @@ static void plugin(void)
     text_free(&index);
 }
 
+/* A dev build of a module without main stops at its object, and
+   driver_run says so with DRIVER_OBJECT_ONLY, by Q2 of "Answers of
+   2026-11-11". */
+static void dev_object_only(void)
+{
+    struct options o;
+    struct text object = {0};
+
+    write_text("shelf.anti", "pub fn width() -> int { return 3; }\n");
+    memset(&o, 0, sizeof o);
+    o.input = "shelf.anti";
+    o.output = "shelf";
+    o.runtime = ANTIC_TEST_RUNTIME;
+    o.dev = true;
+    CHECK(target_host(&o.target));
+    o.cpu = cpu_default(o.target);
+    CHECK(driver_run(&o) == DRIVER_OBJECT_ONLY);
+    text_appendf(&object, "shelf%s", target_info(o.target)->object_suffix);
+    CHECK(files_exists(text_cstr(&object)));
+    text_free(&object);
+}
+
 void test_commands(void)
 {
     CHECK(files_remove_tree(PROJECT));
@@ -147,4 +170,5 @@ void test_commands(void)
     checks_and_docs();
     builds_and_tests();
     plugin();
+    dev_object_only();
 }
