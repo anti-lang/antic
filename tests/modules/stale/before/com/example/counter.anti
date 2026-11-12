@@ -30,3 +30,46 @@ pub fn next(n: int) -> int
 {
 	return n + 1;
 }
+
+/// A count whose function stands at another slot in the later file.
+pub class Mover
+{
+	pub v: int = 0,
+
+	/// The next count, called through the table of the class.
+	pub fn bump(self) -> int
+	{
+		return self.v + 1;
+	}
+}
+
+/// An interface whose function stands at another slot in the later file.
+pub abstract class Source
+{
+	/// The count of the source.
+	pub abstract fn get(self) -> int;
+}
+
+/// A class that fills the table of `Source` as a sub-object.
+pub class Holder
+{
+	implements s: Source,
+
+	/// The count, reached through the table of `Source`.
+	concrete fn Source::get(self) -> int
+	{
+		return 5;
+	}
+}
+
+/// A class that the later file lacks.
+pub class Gone
+{
+	pub v: int = 0,
+
+	/// The next count, called through the table of the class.
+	pub fn bump(self) -> int
+	{
+		return self.v + 1;
+	}
+}

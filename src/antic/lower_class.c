@@ -491,6 +491,8 @@ struct ir_function *lower_reach_thunk(struct lowerer *l,
     for (i = 1; i < f->param_count; i++) {
         args[i] = lower_temp(l, f->params[i].temp);
     }
+    lower_note_table_read(l, sub->type, &sym->item->name, sig->param_count,
+                          index);
     table = lower_load_table(l, args[0], sub->type);
     target = lower_temp(
         l, ir_load_access(l->f, l->b,

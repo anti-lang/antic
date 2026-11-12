@@ -536,6 +536,11 @@ struct ir_function *lower_interface_thunk(struct lowerer *l,
 bool lower_same_name(const struct name *a, const struct name *b);
 size_t lower_table_index(const struct type *t, const struct name *name,
                          size_t params);
+/* Record in the module that the code reads entry slot, the function
+   name with params parameters, from the table of the class t. */
+void lower_note_table_read(struct lowerer *l, const struct type *t,
+                           const struct name *name, size_t params,
+                           size_t slot);
 struct ir_operand lower_entry_offset(struct lowerer *l, size_t index);
 uint32_t lower_fields_agg(struct lowerer *l, size_t n);
 uint32_t lower_descriptor_agg(struct lowerer *l);

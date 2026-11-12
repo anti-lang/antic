@@ -1,0 +1,11 @@
+//! A user of the first version of `counter` that takes a function of a class
+//! from its table as a bound function.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used(c: *counter.Counter) -> int
+{
+	let f = c.bump;
+	return f();
+}

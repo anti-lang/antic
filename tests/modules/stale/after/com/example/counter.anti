@@ -12,3 +12,49 @@ pub fn other(n: int) -> int
 {
 	return n + 2;
 }
+
+/// A count with a function before `bump`, which moves it to the next slot.
+pub class Mover
+{
+	pub v: int = 0,
+
+	/// The count itself.
+	pub fn first(self) -> int
+	{
+		return self.v;
+	}
+
+	/// The next count.
+	pub fn bump(self) -> int
+	{
+		return self.v + 1;
+	}
+}
+
+/// An interface with a function before `get`, which moves it to the next slot.
+pub abstract class Source
+{
+	/// The first count of the source.
+	pub abstract fn first(self) -> int;
+
+	/// The count of the source.
+	pub abstract fn get(self) -> int;
+}
+
+/// A class that fills the table of `Source` as a sub-object.
+pub class Holder
+{
+	implements s: Source,
+
+	/// The first count.
+	concrete fn Source::first(self) -> int
+	{
+		return 4;
+	}
+
+	/// The count.
+	concrete fn Source::get(self) -> int
+	{
+		return 5;
+	}
+}

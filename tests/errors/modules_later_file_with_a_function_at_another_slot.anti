@@ -1,0 +1,12 @@
+//! A library file calls a function of a class of `counter` through its table,
+//! and the later file of `counter` holds it at another slot. By the second
+//! answer of "Answers of 2026-11-12" the read refuses the library file.
+
+import com.example.counter;
+import com.example.moved_user;
+
+fn main() -> int
+{
+	let m = counter.Mover { };
+	return moved_user.used(&m);
+}

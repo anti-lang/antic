@@ -565,6 +565,22 @@ struct ir_class {
     size_t provides_count;
 };
 
+/* DESIGN: by the second answer of "Answers of 2026-11-12" in
+   docs/decisions.md, a library file names each function its code reads
+   from the table of a class of another module. A call through a table
+   names the descriptor and the slot alone, so without the name the read
+   of the file cannot see that a later file of the class lacks the
+   function or holds it at another slot. The record names the class by
+   its module and its name, as the type table of a library file does, so
+   the reader finds it as it finds a struct of another module. */
+struct ir_table_read {
+    const char *module;             /* the module of the class */
+    const char *class_name;         /* the class whose table is read */
+    const char *function;           /* the name of the entry */
+    uint32_t params;                /* its parameters, `self` among them */
+    uint32_t slot;                  /* the entry the read takes */
+};
+
 struct ir_module {
     struct arena *arena;
     const char *name;
@@ -615,12 +631,23 @@ struct ir_module {
        finds it and the driver refuses it, by R127 of "Rules of
        2026-10-13". */
     const char *extern_clash;
+    /* The functions the module reads from the tables of classes of other
+       modules, each once, which its library file carries. */
+    struct ir_table_read *table_reads;
+    size_t table_read_count;
 };
 
 /* Make m an empty module named name, whose names, globals and constants
    live in arena. */
 void ir_module_init(struct ir_module *m, struct arena *arena,
                     const char *name);
+
+/* Add to m the read of the entry slot of the table of the class
+   class_name of module, which holds the function of that name and that
+   count of parameters, unless m holds the same read already. */
+void ir_table_read_add(struct ir_module *m, const char *module,
+                       const char *class_name, const char *function,
+                       uint32_t params, uint32_t slot);
 
 /* Release the heap memory of m, its functions and class records among it,
    and leave m zeroed. arena keeps the rest. */

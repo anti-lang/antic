@@ -50,6 +50,37 @@ size_t lower_table_index(const struct type *t, const struct name *name,
     return found;
 }
 
+/* DESIGN: by the second answer of "Answers of 2026-11-12" in
+   docs/decisions.md, the library file of the module names each function
+   its code reads from the table of a class of another module, so the
+   read of the file refuses a later file of the class that lacks the
+   function or holds it at another slot. A class of the module itself
+   comes from the same file. The root's table and those of the types the
+   compiler declares belong to the compiler, and a copy of a generic is
+   made by each of its users from the tree of the later file, so none of
+   them takes a record. */
+void lower_note_table_read(struct lowerer *l, const struct type *t,
+                           const struct name *name, size_t params,
+                           size_t slot)
+{
+    char *module;
+    char *class_name;
+    char *function;
+
+    if (t->base == NULL || t->generic != NULL || types_is_declared(t) ||
+        lower_name_is(&t->module, l->module_name)) {
+        return;
+    }
+    module = lower_cstr(&t->module);
+    class_name = lower_cstr(&t->name);
+    function = lower_cstr(name);
+    ir_table_read_add(l->m, module, class_name, function, (uint32_t)params,
+                      (uint32_t)slot);
+    free(module);
+    free(class_name);
+    free(function);
+}
+
 /* The offset of table entry index. The IR holds no sizes, so the width
    of a pointer stays symbolic. */
 struct ir_operand lower_entry_offset(struct lowerer *l, size_t index)

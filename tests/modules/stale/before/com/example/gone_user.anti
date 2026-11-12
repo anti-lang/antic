@@ -1,0 +1,12 @@
+//! A user of the first version of `counter` that calls a function through the
+//! table of a class that no signature of the user names.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used() -> int
+{
+	let g = counter.Gone { };
+	let p = &g;
+	return p.bump();
+}

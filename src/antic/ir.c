@@ -104,6 +104,7 @@ void ir_module_free(struct ir_module *m)
     free(m->aggs);
     free(m->syms);
     free(m->files);
+    free(m->table_reads);
     memset(m, 0, sizeof *m);
 }
 
@@ -572,6 +573,34 @@ void ir_class_provides(struct ir_module *m, struct ir_class *c,
     c->provides[c->provides_count].interface = keep(m->arena, interface);
     c->provides[c->provides_count].descriptor = descriptor;
     c->provides_count++;
+}
+
+void ir_table_read_add(struct ir_module *m, const char *module,
+                       const char *class_name, const char *function,
+                       uint32_t params, uint32_t slot)
+{
+    struct ir_table_read *grown;
+    struct ir_table_read *r;
+    size_t i;
+
+    for (i = 0; i < m->table_read_count; i++) {
+        r = &m->table_reads[i];
+        if (r->slot == slot && r->params == params &&
+            strcmp(r->module, module) == 0 &&
+            strcmp(r->class_name, class_name) == 0 &&
+            strcmp(r->function, function) == 0) {
+            return;
+        }
+    }
+    grown = alloc_resize(m->table_reads, m->table_read_count + 1,
+                         sizeof *grown);
+    m->table_reads = grown;
+    r = &m->table_reads[m->table_read_count++];
+    r->module = keep(m->arena, module);
+    r->class_name = keep(m->arena, class_name);
+    r->function = keep(m->arena, function);
+    r->params = params;
+    r->slot = slot;
 }
 
 void ir_class_mutable(struct ir_class *c, uint32_t field)

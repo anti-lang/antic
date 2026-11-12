@@ -1,0 +1,13 @@
+//! A library file reaches a body of a class of `counter` through the table of
+//! an interface, and the later file of `counter` holds it at another slot. By
+//! the second answer of "Answers of 2026-11-12" the read refuses the library
+//! file.
+
+import com.example.counter;
+import com.example.reach_user;
+
+fn main() -> int
+{
+	let h = counter.Holder { };
+	return reach_user.used(&h);
+}

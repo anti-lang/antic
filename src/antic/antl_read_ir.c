@@ -1351,6 +1351,103 @@ static void read_functions(struct reader *r, struct ir_module *program,
     }
 }
 
+/* The class class_name of lib, or NULL. */
+static const struct type *library_class(const struct interface *lib,
+                                        const char *class_name)
+{
+    size_t i;
+
+    for (i = 0; i < lib->item_count; i++) {
+        const struct symbol *sym = lib->items[i];
+        if (sym->kind == SYMBOL_STRUCT && !sym->alias && sym->type != NULL &&
+            sym->type->kind == TYPE_CLASS &&
+            antl_name_equals(&sym->name, class_name)) {
+            return sym->type;
+        }
+    }
+    return NULL;
+}
+
+/* DESIGN: by the second answer of "Answers of 2026-11-12" in
+   docs/decisions.md, the file names each function its code reads from
+   the table of a class of another module, and the slot it reads. The
+   file of that module was read before, as every import is, so its
+   interface holds the class of the later file. The read lays out the
+   table of that class as lowering lays it out, through sema_table_of,
+   and finds the entry as lower_table_index finds it. It refuses a class
+   that lacks the function, and one that holds it at another slot, since
+   the code of the file reads the slot it was built with. It never binds
+   the call to the other slot. The IR of the file holds the slot in the
+   offset of a load, and a slot that moved means the table changed in a
+   way the file was not built for, as a chain that diverges does for a
+   plugin under "Versions". A module that no file of the program holds
+   is not judged here, as declares_missing does not judge it. */
+static void check_table_read(struct reader *r, const char *module,
+                             const char *class_name, const char *function,
+                             uint32_t params, uint32_t slot)
+{
+    struct name path;
+    const struct interface *lib;
+    const struct type *t;
+    struct table_entry *entries;
+    size_t count;
+    size_t found = 0;
+    size_t i;
+
+    if (strcmp(module, r->iface->module) == 0) {
+        return;
+    }
+    path.text = module;
+    path.length = strlen(module);
+    lib = antl_library(r, &path);
+    if (lib == NULL) {
+        return;
+    }
+    t = library_class(lib, class_name);
+    if (t == NULL) {
+        antl_fail(r, "needs struct `%s.%s`", module, class_name);
+        return;
+    }
+    entries = alloc_zeroed(sema_table_bound(t) + 1, sizeof *entries);
+    count = sema_table_of(t, entries);
+    for (i = 0; i < count; i++) {
+        if (entries[i].params == params &&
+            antl_name_equals(&entries[i].name, function)) {
+            found = i + 1;
+            break;
+        }
+    }
+    free(entries);
+    if (found == 0) {
+        antl_fail(r, "needs function `%s.%s.%s`", module, class_name,
+                  function);
+    } else if (found != slot) {
+        antl_fail(r, "calls `%s.%s.%s` at slot %u of its table, and the "
+                     "library holds it at slot %zu",
+                  module, class_name, function, (unsigned)slot, found);
+    }
+}
+
+/* The functions the file reads from the tables of classes of other
+   modules, each a module, a class, a function, the count of its
+   parameters and the slot. */
+static void read_table_reads(struct reader *r)
+{
+    uint32_t count = antl_get_count(r, 20);
+    uint32_t i;
+
+    for (i = 0; i < count && !r->failed; i++) {
+        const char *module = antl_get_cstr(r);
+        const char *class_name = antl_get_cstr(r);
+        const char *function = antl_get_cstr(r);
+        uint32_t params = antl_get_u32(r);
+        uint32_t slot = antl_get_u32(r);
+        if (!r->failed) {
+            check_table_read(r, module, class_name, function, params, slot);
+        }
+    }
+}
+
 void antl_read_ir(struct reader *r, struct ir_module *program)
 {
     struct ir_maps maps;
@@ -1374,5 +1471,8 @@ void antl_read_ir(struct reader *r, struct ir_module *program)
     place_addresses(r, program, &maps, relocs, twins, true);
     if (!r->failed) {
         read_classes(r, program, &maps);
+    }
+    if (!r->failed) {
+        read_table_reads(r);
     }
 }

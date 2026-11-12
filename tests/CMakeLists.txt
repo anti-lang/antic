@@ -4435,7 +4435,7 @@ add_test(NAME antl_stale_counter_before
 set_tests_properties(antl_stale_counter_before PROPERTIES
     FIXTURES_SETUP stale_before_antl)
 set(stale_users "")
-foreach(user item final static table)
+foreach(user item final static table bound moved reach gone)
     add_test(NAME antl_stale_${user}_user
         COMMAND antic -c -I "${STALE}/before" -I "${LIBS}/stale_before"
                 --runtime "${ANTIC_RUNTIME_DIR}"
@@ -4456,7 +4456,8 @@ foreach(case
         "modules_later_file_without_a_function|item_user|com\\.example\\.counter\\.next"
         "modules_later_file_without_a_final_function|final_user|com\\.example\\.counter\\.Counter\\.step"
         "modules_later_file_without_a_static_function|static_user|com\\.example\\.counter\\.Counter\\.start"
-        "modules_later_file_without_a_function_of_the_table|table_user|com\\.example\\.counter\\.Counter\\.bump")
+        "modules_later_file_without_a_function_of_the_table|table_user|com\\.example\\.counter\\.Counter\\.bump"
+        "modules_later_file_without_a_bound_function|bound_user|com\\.example\\.counter\\.Counter\\.bump")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 user)
@@ -4470,6 +4471,36 @@ foreach(case
     set_tests_properties(error_${name} PROPERTIES
         FIXTURES_REQUIRED stale_antl)
 endforeach()
+# The second answer of "Answers of 2026-11-12": a later file whose class
+# holds the function at another slot is refused as well. The later file of
+# `counter` adds a function before `Mover.bump` and one before `Source.get`.
+foreach(case
+        "modules_later_file_with_a_function_at_another_slot|moved_user|com\\.example\\.counter\\.Mover\\.bump"
+        "modules_later_file_with_a_function_of_an_interface_at_another_slot|reach_user|com\\.example\\.counter\\.Source\\.get")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 user)
+    list(GET parts 2 function)
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        PATTERN "${user}\\.antl calls `${function}` at slot 17 of its table, and the library holds it at slot 18"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED stale_antl)
+endforeach()
+# A class that no signature of the user names stands in no type table, so
+# the read of the table finds that the later file lacks it.
+add_expect_test(error_modules_later_file_without_a_class_of_the_table STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "gone_user\\.antl needs struct `com\\.example\\.counter\\.Gone`"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_later_file_without_a_class_of_the_table.s"
+            modules_later_file_without_a_class_of_the_table.anti)
+set_tests_properties(error_modules_later_file_without_a_class_of_the_table
+    PROPERTIES FIXTURES_REQUIRED stale_antl)
 
 # A library file whose own import no search root holds. The command names
 # the file of the left side of the diamond and no root, so the base is

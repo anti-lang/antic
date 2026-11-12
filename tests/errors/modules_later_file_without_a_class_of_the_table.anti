@@ -1,0 +1,11 @@
+//! A library file calls a function through the table of a class of `counter`
+//! that the later file of `counter` lacks. No signature of the library file
+//! names the class, so its type table does not hold it. By the second answer of
+//! "Answers of 2026-11-12" the read refuses the library file.
+
+import com.example.gone_user;
+
+fn main() -> int
+{
+	return gone_user.used();
+}

@@ -1,0 +1,11 @@
+//! A user of the first version of `counter` that takes a body reached through
+//! the table of an interface, which the later file holds at another slot.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used(h: *counter.Holder) -> int
+{
+	let f = counter.Holder.get;
+	return f(h);
+}

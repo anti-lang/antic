@@ -1,0 +1,12 @@
+//! A library file takes a function of a class of `counter` from its table as a
+//! bound function, and the later file of `counter` lacks it. By "Answers of
+//! 2026-11-12" the read refuses the library file.
+
+import com.example.counter;
+import com.example.bound_user;
+
+fn main() -> int
+{
+	let c = counter.Counter { };
+	return bound_user.used(&c);
+}

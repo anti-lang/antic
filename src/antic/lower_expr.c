@@ -412,6 +412,8 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
             struct ir_operand entry;
             if (index > 0 && !lower_bound_is_direct(e, s)) {
                 struct ir_operand table = lower_load_table(l, object, s);
+                lower_note_table_read(l, s, &e->as.field.name,
+                                      t->param_count + 1, index);
                 entry = lower_temp(
                     l, ir_load_access(l->f, l->b,
                                       lower_offset_address(
@@ -1768,16 +1770,19 @@ static uint32_t table_target(struct lowerer *l, const struct expr *e,
                              struct ir_operand object, struct call_target *to)
 {
     size_t index;
+    size_t params;
     struct ir_operand table;
 
     if (e->as.call.dispatch == NULL || n == 0) {
         return 0;
     }
-    index = lower_table_index(e->as.call.dispatch, &e->as.call.entry,
-                              dispatched_params(e, sym, n));
+    params = dispatched_params(e, sym, n);
+    index = lower_table_index(e->as.call.dispatch, &e->as.call.entry, params);
     if (index == 0) {
         return 0;
     }
+    lower_note_table_read(l, e->as.call.dispatch, &e->as.call.entry, params,
+                          index);
     table = lower_load_table(l, object, e->as.call.dispatch);
     to->target = lower_temp(
         l, ir_load_access(l->f, l->b,

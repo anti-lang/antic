@@ -1054,6 +1054,17 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
             antl_put_u32(w, c->provides[j].descriptor);
         }
     }
+    /* The functions the code reads from the tables of classes of other
+       modules, by the DESIGN of struct ir_table_read. */
+    antl_put_count(w, ir->table_read_count);
+    for (i = 0; i < ir->table_read_count; i++) {
+        const struct ir_table_read *t = &ir->table_reads[i];
+        put_str(w, t->module);
+        put_str(w, t->class_name);
+        put_str(w, t->function);
+        antl_put_u32(w, t->params);
+        antl_put_u32(w, t->slot);
+    }
 }
 
 /* The magic, the version, the package header, the module path, the
