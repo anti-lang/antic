@@ -229,7 +229,7 @@ static void graph_libraries(const struct build *b, struct strings *out)
 /* Append to out the digest of every library file that the library file
    library reaches through its imports, and of every library file of the
    dependency graph, apart from library itself. Returns false when one
-   cannot be read.
+   cannot be read, which it names when say is set.
 
    DESIGN: decision 15 of "Decisions of 2026-10-11", which cache_imports
    holds. The search finds a module of the project under lib/ of the
@@ -238,7 +238,7 @@ static void graph_libraries(const struct build *b, struct strings *out)
    so every one of them is in the key. A new version of a dependency then
    builds every module again, which the lock file makes rare. */
 static bool imports_key(const struct build *b, enum target t,
-                        enum cpu_level cpu, const char *library,
+                        enum cpu_level cpu, const char *library, bool say,
                         struct text *out)
 {
     struct options search;
@@ -252,7 +252,8 @@ static bool imports_key(const struct build *b, enum target t,
                  1, t, cpu);
     search.libraries = graph.items;
     search.library_count = graph.count;
-    ok = cache_imports(&search, library, out);
+    ok = say ? cache_imports(&search, library, out)
+             : cache_imports_quietly(&search, library, out);
     strings_free(&graph);
     return ok;
 }
@@ -314,10 +315,13 @@ static bool module_library(struct build *b, const struct unit *u,
     }
     /* The imports of the library file that stands are those of its
        source, which the digest of the source holds. A new library file
-       takes its key from the imports it names after the compile. */
+       takes its key from the imports it names after the compile. A
+       check that cannot read the file or its imports says nothing and
+       compiles it again, as in test.c, by T240 of
+       docs/audit/tests-findings.md. */
     text_append(&key, text_cstr(&base));
     if (library_readable(text_cstr(output)) &&
-        imports_key(b, t, cpu, text_cstr(output), &key) &&
+        imports_key(b, t, cpu, text_cstr(output), false, &key) &&
         cache_holds(text_cstr(output), &key)) {
         ok = true;
         goto done;
@@ -328,7 +332,7 @@ static bool module_library(struct build *b, const struct unit *u,
     }
     key.length = 0;
     text_append(&key, text_cstr(&base));
-    ok = imports_key(b, t, cpu, text_cstr(output), &key) &&
+    ok = imports_key(b, t, cpu, text_cstr(output), true, &key) &&
          cache_store(text_cstr(output), &key);
 done:
     text_free(&base);
@@ -821,7 +825,7 @@ static bool program_reuse(struct build *b, enum target t, enum cpu_level cpu,
     text_appendf(&b->program_key, "program %s\n",
                  b->r->release ? "release" : "dev");
     if (!options_key(o, &b->program_key) ||
-        !imports_key(b, t, cpu, library, &b->program_key)) {
+        !imports_key(b, t, cpu, library, true, &b->program_key)) {
         return false;
     }
     for (i = 0; i < o->object_count; i++) {
