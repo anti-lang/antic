@@ -1,0 +1,14 @@
+//! A library file writes the table of an interface of `counter` that a class of
+//! the file implements, and the later file of `counter` holds a function of the
+//! interface at another slot. By "Answers of 2026-11-12" the read refuses the
+//! library file.
+
+import com.example.counter;
+import com.example.filler_user;
+
+fn main() -> int
+{
+	let f = filler_user.make();
+	let s: *counter.Source = f;
+	return s.get();
+}

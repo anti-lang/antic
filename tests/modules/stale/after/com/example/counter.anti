@@ -58,3 +58,33 @@ pub class Holder
 		return 5;
 	}
 }
+
+/// A class with a function after `get`, at the end of its table.
+pub class Grower
+{
+	pub v: int = 0,
+
+	/// The count.
+	pub fn get(self) -> int
+	{
+		return self.v;
+	}
+
+	/// The count after the next.
+	pub fn more(self) -> int
+	{
+		return self.v + 2;
+	}
+}
+
+/// A class without `gone`, which moves `get` to slot 17.
+pub class Shrinker
+{
+	pub v: int = 0,
+
+	/// The count.
+	pub fn get(self) -> int
+	{
+		return self.v;
+	}
+}

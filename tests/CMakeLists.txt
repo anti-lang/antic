@@ -4435,7 +4435,8 @@ add_test(NAME antl_stale_counter_before
 set_tests_properties(antl_stale_counter_before PROPERTIES
     FIXTURES_SETUP stale_before_antl)
 set(stale_users "")
-foreach(user item final static table bound moved reach gone)
+foreach(user item final static table bound moved reach gone pusher filler
+        keeper grower)
     add_test(NAME antl_stale_${user}_user
         COMMAND antic -c -I "${STALE}/before" -I "${LIBS}/stale_before"
                 --runtime "${ANTIC_RUNTIME_DIR}"
@@ -4457,7 +4458,8 @@ foreach(case
         "modules_later_file_without_a_final_function|final_user|com\\.example\\.counter\\.Counter\\.step"
         "modules_later_file_without_a_static_function|static_user|com\\.example\\.counter\\.Counter\\.start"
         "modules_later_file_without_a_function_of_the_table|table_user|com\\.example\\.counter\\.Counter\\.bump"
-        "modules_later_file_without_a_bound_function|bound_user|com\\.example\\.counter\\.Counter\\.bump")
+        "modules_later_file_without_a_bound_function|bound_user|com\\.example\\.counter\\.Counter\\.bump"
+        "modules_later_file_without_a_function_of_a_base|keeper_user|com\\.example\\.counter\\.Shrinker\\.gone")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 user)
@@ -4490,6 +4492,36 @@ foreach(case
     set_tests_properties(error_${name} PROPERTIES
         FIXTURES_REQUIRED stale_antl)
 endforeach()
+# The same answers reach a table that a library file writes. A class of the
+# user inherits `Mover` or `Grower`, or implements `Source`, of the first
+# file of `counter`. The later file moves a function of `Mover` and of
+# `Source` to the next slot and adds one at the end of `Grower`.
+foreach(case
+        "modules_later_file_with_a_function_of_a_base_at_another_slot|pusher_user|Pusher|com\\.example\\.counter\\.Mover\\.bump"
+        "modules_later_file_with_a_function_of_an_implemented_interface_at_another_slot|filler_user|Filler|com\\.example\\.counter\\.Source\\.get")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 user)
+    list(GET parts 2 class)
+    list(GET parts 3 function)
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        PATTERN "${user}\\.antl fills the table of `com\\.example\\.${user}\\.${class}` with `${function}` at slot 17, and the library holds it at slot 18"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED stale_antl)
+endforeach()
+add_expect_test(error_modules_later_file_with_a_new_function_of_a_base STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "grower_user\\.antl fills the table of `com\\.example\\.grower_user\\.Bigger` without `com\\.example\\.counter\\.Grower\\.more`, and the library holds it at slot 18"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_later_file_with_a_new_function_of_a_base.s"
+            modules_later_file_with_a_new_function_of_a_base.anti)
+set_tests_properties(error_modules_later_file_with_a_new_function_of_a_base
+    PROPERTIES FIXTURES_REQUIRED stale_antl)
 # A class that no signature of the user names stands in no type table, so
 # the read of the table finds that the later file lacks it.
 add_expect_test(error_modules_later_file_without_a_class_of_the_table STATUS 1

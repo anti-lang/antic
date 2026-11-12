@@ -1,0 +1,22 @@
+//! A user of the first version of `counter` whose class implements `Source`, so
+//! this file writes a table laid out against the first table of `Source`.
+
+import com.example.counter;
+
+/// A class that fills the table of `Source` as a sub-object.
+pub class Filler
+{
+	implements s: counter.Source,
+
+	/// The count, reached through the table of `Source`.
+	concrete fn Source::get(self) -> int
+	{
+		return 6;
+	}
+}
+
+/// A new filler.
+pub fn make() -> *Filler
+{
+	return alloc Filler { };
+}

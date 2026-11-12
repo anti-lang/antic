@@ -1,0 +1,12 @@
+//! A library file writes the table of a class that inherits a class of
+//! `counter`, and the later file of `counter` holds a function of that base at
+//! another slot. By "Answers of 2026-11-12" the read refuses the library file.
+
+import com.example.counter;
+import com.example.pusher_user;
+
+fn main() -> int
+{
+	let m: *counter.Mover = pusher_user.make();
+	return m.bump();
+}
