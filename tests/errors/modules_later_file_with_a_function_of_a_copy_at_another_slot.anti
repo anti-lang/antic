@@ -1,0 +1,12 @@
+//! A library file holds a copy of a generic class of `counter` with its table,
+//! made from the first tree of the generic. The later file of `counter` holds a
+//! function of the generic at another slot. By "Answers of 2026-11-12" the read
+//! refuses the library file.
+
+import com.example.copy_user;
+
+fn main() -> int
+{
+	let b = copy_user.make();
+	return b.get();
+}

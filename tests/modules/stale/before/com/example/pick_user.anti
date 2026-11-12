@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that calls a copy of the generic
+//! function `pick`, which the later file of `counter` lacks.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used() -> int
+{
+	return counter.pick<int>(8);
+}

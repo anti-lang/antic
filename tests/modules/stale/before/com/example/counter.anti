@@ -103,3 +103,33 @@ pub class Shrinker
 		return self.v;
 	}
 }
+/// A generic class whose later file adds a function before `get`, which moves
+/// it to the next slot of the table of every copy.
+pub class Bag<T>
+{
+	pub v: T,
+
+	/// The count, called through the table of a copy.
+	pub fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+/// A generic class whose later file lacks `fin`.
+pub class Tin<T>
+{
+	pub v: T,
+
+	/// The count, called by its name.
+	pub final fn fin(self) -> int
+	{
+		return 4;
+	}
+}
+
+/// A generic function that the later file lacks.
+pub fn pick<T>(n: int) -> int
+{
+	return n;
+}

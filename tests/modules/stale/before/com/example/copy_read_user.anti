@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that calls a function of a copy of
+//! `Bag` through its table.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used(b: *counter.Bag<int>) -> int
+{
+	return b.get();
+}

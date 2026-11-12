@@ -1,0 +1,10 @@
+//! A library file calls a final function of a copy of a generic class of
+//! `counter` by its name, and the later file of `counter` lacks it. By "Answers
+//! of 2026-11-12" the read refuses the library file.
+
+import com.example.tin_user;
+
+fn main() -> int
+{
+	return tin_user.used();
+}

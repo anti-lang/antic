@@ -4436,7 +4436,7 @@ set_tests_properties(antl_stale_counter_before PROPERTIES
     FIXTURES_SETUP stale_before_antl)
 set(stale_users "")
 foreach(user item final static table bound moved reach gone pusher filler
-        keeper grower)
+        keeper grower copy copy_read tin pick)
     add_test(NAME antl_stale_${user}_user
         COMMAND antic -c -I "${STALE}/before" -I "${LIBS}/stale_before"
                 --runtime "${ANTIC_RUNTIME_DIR}"
@@ -4459,7 +4459,8 @@ foreach(case
         "modules_later_file_without_a_static_function|static_user|com\\.example\\.counter\\.Counter\\.start"
         "modules_later_file_without_a_function_of_the_table|table_user|com\\.example\\.counter\\.Counter\\.bump"
         "modules_later_file_without_a_bound_function|bound_user|com\\.example\\.counter\\.Counter\\.bump"
-        "modules_later_file_without_a_function_of_a_base|keeper_user|com\\.example\\.counter\\.Shrinker\\.gone")
+        "modules_later_file_without_a_function_of_a_base|keeper_user|com\\.example\\.counter\\.Shrinker\\.gone"
+        "modules_later_file_without_a_function_of_a_copy|tin_user|com\\.example\\.counter\\.Tin\\.fin")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 user)
@@ -4521,6 +4522,42 @@ add_expect_test(error_modules_later_file_with_a_new_function_of_a_base STATUS 1
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_later_file_with_a_new_function_of_a_base.s"
             modules_later_file_with_a_new_function_of_a_base.anti)
 set_tests_properties(error_modules_later_file_with_a_new_function_of_a_base
+    PROPERTIES FIXTURES_REQUIRED stale_antl)
+# A user holds the code and the table of each copy of a generic it uses,
+# made from the tree of the first file of `counter`. The later file moves
+# `Bag.get` to the next slot and lacks `Tin.fin` and the generic `pick`.
+# fresh_user holds a copy of `Bag` made from the later tree, which the
+# program keeps when it reads that file first.
+add_test(NAME antl_stale_fresh_user
+    COMMAND antic -c -I "${STALE}/after" -I "${LIBS}/stale"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${LIBS}/stale/com/example/fresh_user.antl"
+            "${STALE}/after/com/example/fresh_user.anti")
+set_tests_properties(antl_stale_fresh_user PROPERTIES
+    FIXTURES_REQUIRED stale_antl FIXTURES_SETUP stale_fresh_antl)
+foreach(case
+        "modules_later_file_with_a_function_of_a_copy_at_another_slot|copy_user"
+        "modules_later_file_with_a_function_of_a_copy_read_at_another_slot|copy_read_user")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 user)
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        PATTERN "${user}\\.antl fills the table of `com\\.example\\.counter\\.Bag<int>` with `com\\.example\\.counter\\.Bag\\.get` at slot 17, and the library holds it at slot 18"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED "stale_antl;stale_fresh_antl")
+endforeach()
+add_expect_test(error_modules_later_file_without_a_generic_function STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "pick_user\\.antl needs generic `com\\.example\\.counter\\.pick`"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_later_file_without_a_generic_function.s"
+            modules_later_file_without_a_generic_function.anti)
+set_tests_properties(error_modules_later_file_without_a_generic_function
     PROPERTIES FIXTURES_REQUIRED stale_antl)
 # A class that no signature of the user names stands in no type table, so
 # the read of the table finds that the later file lacks it.

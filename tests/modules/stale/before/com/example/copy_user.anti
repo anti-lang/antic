@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that holds a copy of `Bag`, made
+//! from the first tree of the generic, with its table.
+
+import com.example.counter;
+
+/// A new bag.
+pub fn make() -> *counter.Bag<int>
+{
+	return alloc counter.Bag<int> { v: 0 };
+}

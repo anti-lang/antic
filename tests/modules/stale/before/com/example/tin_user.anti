@@ -1,0 +1,11 @@
+//! A user of the first version of `counter` that calls a final function of a
+//! copy of `Tin` by its name, which the later file of `counter` lacks.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used() -> int
+{
+	let t = counter.Tin<int> { v: 0 };
+	return t.fin();
+}

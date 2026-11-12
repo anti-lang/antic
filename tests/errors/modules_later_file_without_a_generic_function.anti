@@ -1,0 +1,10 @@
+//! A library file calls a copy of a generic function of `counter`, made from
+//! the first tree of the generic, and the later file of `counter` lacks the
+//! generic. By "Answers of 2026-11-12" the read refuses the library file.
+
+import com.example.pick_user;
+
+fn main() -> int
+{
+	return pick_user.used();
+}
