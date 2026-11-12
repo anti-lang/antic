@@ -95,9 +95,6 @@ anti: bind wrote %s, and it does not lex\n
 # src/anti/bindwrite.c
 
 # src/anti/build.c
-# Stays: no build reaches it. Every Windows link passes /DEBUG, so
-# lld-link writes the PDB or the link fails first.
-anti: the link of %s wrote no %s\n
 # Stays: no host of the suite reaches the next two. target_host fails on
 # a system or a processor that is no target of Anti, and anti is built for
 # the six targets alone.

@@ -1262,3 +1262,209 @@ anti_message(fault_closure_unopened
     FAULT open:17:EACCES
     ARGS build ${tools}
     ERR "antic: cannot open ${dev_dir}/lib/com/example/app.antl")
+
+# The paths of build.c that batch 3d of the third phase of coverage sorted.
+# program_reuse of build.c makes the key of the program from the import
+# closure of the module that links, its nineteenth open, and from the
+# objects and the licence text of a program of two modules. The key and
+# the facts of the link go beside the program, program_store.
+anti_message(fault_imports_unread_for_the_program_key
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:19:EACCES
+    ARGS build ${tools}
+    ERR "antic: cannot open ${dev_dir}/lib/com/example/app.antl")
+set(two_text "//! The program.\n\nimport com.example.one;\n\nfn main() -> int\n{\n\treturn one.one() - 1;\n}\n")
+anti_message(fault_license_text_unread_for_the_program_key
+    FILES anti.toml "${manifest_package}license_text = \"LICENSE\"\n"
+          LICENSE "MIT\n" ${app_source} "${two_text}"
+          src/com/example/one.anti "${library_text}"
+    FAULT open:51:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot read ./LICENSE")
+anti_message(fault_object_key_unread_for_the_program_key
+    FILES anti.toml "${manifest_package}license_text = \"LICENSE\"\n"
+          LICENSE "MIT\n" ${app_source} "${two_text}"
+          src/com/example/one.anti "${library_text}"
+    FAULT open:56:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot read ${dev_dir}/obj/com/example/one.o.key")
+anti_message(fault_object_key_not_written
+    FILES anti.toml "${manifest_package}license_text = \"LICENSE\"\n"
+          LICENSE "MIT\n" ${app_source} "${two_text}"
+          src/com/example/one.anti "${library_text}"
+    FAULT open:49:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ${dev_dir}/obj/com/example/one.o.key")
+anti_message(fault_links_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:31:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ${dev_dir}/app.links")
+anti_message(fault_program_key_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:32:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ${dev_dir}/app.key")
+# deliver_notice of build.c reads the import closure of the program.
+anti_message(fault_imports_unread_for_the_notice
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:35:EACCES
+    ARGS build ${tools}
+    ERR "antic: cannot open ${dev_dir}/lib/com/example/app.antl")
+# copy_into of build.c makes the directory of dist/ before the copy.
+anti_message(fault_dist_directory_not_made
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT mkdir:19:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
+# An unnamed project takes the name of its directory, which a project
+# whose path cannot be made absolute names as `.`, name_program of
+# build.c: the eleventh and the twelfth stat.
+anti_message(fault_project_directory_not_found
+    FILES anti.toml "" ${app_source} "${app_text}"
+    FAULT stat:11:EACCES,stat:12:EACCES
+    ARGS build ${tools}
+    ERR "anti: the project directory `.` is no file name on every target, and `program` of [package] names the program")
+# The same reads and writes of a release build. On macOS the facts of the
+# link are written after the two reads of the check of the dSYM.
+anti_message(fault_release_imports_unread_for_the_program_key
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:18:EACCES
+    ARGS build --release ${tools}
+    ERR "antic: cannot open ${release_dir}/lib/com/example/app.antl")
+math(EXPR open_links "50 + ${dsym_opens}")
+anti_message(fault_release_links_not_written
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT open:${open_links}:EACCES
+    ARGS build --release ${tools}
+    ERR "anti: cannot write ${release_dir}/app.links")
+# A Windows release link writes the PDB beside the program, which the
+# symbols archive takes, build_symbols of build.c: the twenty-seventh
+# stat.
+anti_message(fault_pdb_not_found
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT stat:27:EACCES
+    ARGS build --release --target windows-x86_64 ${tools}
+    ERR "anti: the link of ./build/windows-x86_64/release/app.exe wrote no ./build/windows-x86_64/release/app.pdb")
+# A build after a build reuses what the cache holds, and compiles or
+# links again what it cannot read. Each setup builds the project once,
+# with the arguments of the case, and then takes a file of the cache
+# away or damages it.
+function(built_once)
+    execute_process(COMMAND "${ANTI}" build ${ARGN} ${tools}
+                    WORKING_DIRECTORY "${PROJECT}" RESULT_VARIABLE status
+                    OUTPUT_QUIET ERROR_QUIET)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the first build gave ${status}")
+    endif()
+endfunction()
+# library_readable of build.c: a library file of another format is no
+# cache.
+function(library_file_damaged)
+    built_once()
+    file(WRITE "${PROJECT}/${dev_dir}/lib/com/example/app.antl" "no library file\n")
+endfunction()
+anti_message(reuse_library_file_damaged STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP library_file_damaged
+    ARGS build ${tools})
+# links_read of build.c: the facts of the link beside the program.
+function(links_removed)
+    built_once()
+    file(REMOVE "${PROJECT}/${dev_dir}/app.links")
+endfunction()
+anti_message(reuse_links_removed STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP links_removed
+    ARGS build ${tools})
+function(links_damaged)
+    built_once()
+    file(WRITE "${PROJECT}/${dev_dir}/app.links" "musl\n")
+endfunction()
+anti_message(reuse_links_damaged STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP links_damaged
+    ARGS build ${tools})
+# symbols_stand of build.c: a release program is reused with its twin,
+# the map of its sections and, on macOS, the DWARF of its dSYM.
+function(release_twin_removed)
+    built_once(--release)
+    file(REMOVE "${PROJECT}/${release_dir}/app.debug${EXE}")
+endfunction()
+anti_message(reuse_release_twin_removed STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP release_twin_removed
+    ARGS build --release ${tools})
+function(release_map_removed)
+    built_once(--release)
+    file(REMOVE "${PROJECT}/${release_dir}/app.map")
+endfunction()
+anti_message(reuse_release_map_removed STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP release_map_removed
+    ARGS build --release ${tools})
+if(CMAKE_HOST_APPLE)
+    function(release_dwarf_removed)
+        built_once(--release)
+        file(REMOVE "${PROJECT}/${release_dir}/app.debug.dSYM/Contents/Resources/DWARF/app.debug")
+    endfunction()
+    anti_message(reuse_release_dwarf_removed STATUS 0
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        SETUP release_dwarf_removed
+        ARGS build --release ${tools})
+endif()
+# A release program of Linux has no dSYM, and the second build reuses it.
+function(linux_release_built)
+    built_once(--release --target linux-x86_64)
+endfunction()
+anti_message(reuse_release_without_a_dsym STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP linux_release_built
+    ARGS build --release --target linux-x86_64 ${tools})
+# A library project writes its library files into dist/, and the notice
+# that `anti license --project` prints reads the record of the sources of
+# the runtime archive.
+anti_message(fault_library_directory_in_dist_not_made
+    FILES anti.toml "${manifest_package}" ${app_source} "${library_text}"
+    FAULT mkdir:20:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot make ./dist/${HOST}/dev/com/example"
+        "anti: cannot write ./dist/${HOST}/dev/com/example/app.antl")
+anti_message(fault_library_project_notice_sources_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${library_text}"
+    FAULT open:18:EACCES
+    ARGS license --project ${tools}
+    ERR "anti: cannot read ${RUNTIME}/licenses/sources.txt")
+# A library for C: the compile of the library itself, and the copies of
+# its header and of the file its soname names into dist/.
+anti_message(lib_static_release_exports_nothing
+    FILES anti.toml "${manifest_package}" ${app_source} "${library_text}"
+    ARGS build --lib static --release ${tools}
+    ERR "./${app_source}:1:1: error: the module exports nothing, and `--lib static` writes a library for C [nothing-exported]")
+set(exporting_text "//! A library for C.\n\nexport fn twice(x: c_int) -> c_int\n{\n\treturn x * 2;\n}\n")
+anti_message(lib_static_release STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${exporting_text}"
+    ANY_OUT
+    ARGS build --lib static --release ${tools})
+anti_message(lib_static_memory_checks STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${exporting_text}"
+    ANY_OUT
+    ARGS build --lib static --memory-checks ${tools})
+anti_message(fault_soname_header_not_copied
+    FILES anti.toml "${manifest_package}" ${app_source} "${library_text}"
+    FAULT open:29:EACCES
+    ARGS build --lib shared --soname --target linux-x86_64 ${tools}
+    ERR "anti: cannot write ./dist/linux-x86_64/dev/app.h")
+anti_message(fault_soname_library_not_copied
+    FILES anti.toml "${manifest_package}" ${app_source} "${library_text}"
+    FAULT open:31:EACCES
+    ARGS build --lib shared --soname --target linux-x86_64 ${tools}
+    ERR "anti: cannot write ./dist/linux-x86_64/dev/libapp.so.0")
+# The targets of [targets] that --target all builds, and an antic of the
+# manifest that this antic satisfies.
+anti_message(targets_all_listed STATUS 0
+    FILES anti.toml "${manifest_package}\n[targets]\nall = [\"${HOST}\"]\n" ${app_source} "${app_text}"
+    ARGS build --target all ${tools})
+anti_message(antic_version_satisfied STATUS 0
+    FILES anti.toml "${manifest_package}antic = \"0.1.0\"\n" ${app_source} "${app_text}"
+    ARGS build ${tools})
