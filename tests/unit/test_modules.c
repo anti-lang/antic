@@ -4961,21 +4961,22 @@ static void damaged_enums(void)
 /* A generic of the library mu calls a function of the library mg, and
    is read beside a later file of mg that lacks the function. By "Answers
    of 2026-11-12" in docs/decisions.md the read of mu stops with expected,
-   as it stops for a struct or a generic the later file lacks. */
+   as it stops for a struct or a generic the later file lacks. mu is
+   compiled against the first file of mg, as the driver compiles it. */
 static void gone_from_later_file(const char *before, const char *after,
                                  const char *user, const char *expected)
 {
     struct compilation a;
     struct compilation b;
     struct text files[2] = {{0}, {0}};
-    struct text user_bytes = {0};
+    struct text first = {0};
     struct ir_module program;
     char error[160] = "";
 
     compilation_open(&a);
     compilation_open(&b);
-    if (build_library(&a, "mg", before, &user_bytes) &&
-        build_library(&a, "mu", user, &files[1]) &&
+    if (build_library(&a, "mg", before, &first) &&
+        build_user(&first, "mu", user, NULL, &files[1]) &&
         build_library(&b, "mg", after, &files[0])) {
         struct compilation c;
         compilation_open(&c);
@@ -4987,33 +4988,81 @@ static void gone_from_later_file(const char *before, const char *after,
     }
     text_free(&files[0]);
     text_free(&files[1]);
-    text_free(&user_bytes);
+    text_free(&first);
     compilation_close(&b);
     compilation_close(&a);
 }
 
-/* A function of a class of mg, which the later file of mg leaves out. */
+static const char counter_before[] = "pub class Counter\n"
+                                     "{\n"
+                                     "    pub v: int = 0,\n"
+                                     "    pub fn bump(self) -> int\n"
+                                     "    {\n"
+                                     "        return self.v + 1;\n"
+                                     "    }\n"
+                                     "}\n";
+static const char counter_after[] = "pub class Counter\n"
+                                    "{\n"
+                                    "    pub v: int = 0,\n"
+                                    "}\n";
+static const char counter_user[] =
+    "import mg;\n"
+    "pub fn twice<T>(own x: T, c: *mg.Counter) -> int {\n"
+    "    return c.bump() + c.bump();\n"
+    "}\n";
+
+/* A function of a class of mg, which the later file of mg leaves out.
+   The record of a function of a class read from a library file names no
+   owner. */
 static void member_gone(void)
 {
-    static const char before[] = "pub class Counter\n"
-                                 "{\n"
-                                 "    pub v: int = 0,\n"
-                                 "    pub fn bump(self) -> int\n"
-                                 "    {\n"
-                                 "        return self.v + 1;\n"
-                                 "    }\n"
-                                 "}\n";
-    static const char after[] = "pub class Counter\n"
-                                "{\n"
-                                "    pub v: int = 0,\n"
-                                "}\n";
-    static const char user[] = "import mg;\n"
-                               "pub fn twice<T>(own x: T, c: *mg.Counter) -> int {\n"
-                               "    return c.bump() + c.bump();\n"
-                               "}\n";
-
-    gone_from_later_file(before, after, user,
+    gone_from_later_file(counter_before, counter_after, counter_user,
                          "needs function `mg.Counter.bump`");
+}
+
+/* The record of a function of a class that names its owner, as the
+   writer puts it for a class it compiled from source, with the home of
+   the record turned from mu to mg. The reader looks the function up
+   among the functions of the owner the later file of mg declares. */
+static void owner_gone(void)
+{
+    static const uint8_t record[] = {12, 0, 0, 0, 'C', 'o', 'u', 'n', 't',
+                                     'e', 'r', '.', 'b', 'u', 'm', 'p'};
+    struct compilation a;
+    struct compilation b;
+    struct text files[2] = {{0}, {0}};
+    struct text first = {0};
+    struct ir_module program;
+    char error[160] = "";
+
+    compilation_open(&a);
+    compilation_open(&b);
+    if (build_library(&a, "mg", counter_before, &first) &&
+        build_library(&a, "mu", counter_user, &files[1]) &&
+        build_library(&b, "mg", counter_after, &files[0])) {
+        struct compilation c;
+        /* The name, the type and the length of the home. */
+        size_t at = bytes_at(&files[1], record, sizeof record);
+        size_t home = at + sizeof record + 4 + 4;
+        if (at != SIZE_MAX && home + 2 <= files[1].length &&
+            memcmp(files[1].data + home, "mu", 2) == 0) {
+            files[1].data[home + 1] = 'g';
+        } else {
+            check_failures++;
+            fprintf(stderr, "no home `mu` after the record\n");
+        }
+        compilation_open(&c);
+        ir_module_init(&program, &c.arena, "main");
+        CHECK(!read_in_order(&c, &program, files, 2, error, sizeof error));
+        CHECK_STR(error, "needs function `mg.Counter.bump`");
+        ir_module_free(&program);
+        compilation_close(&c);
+    }
+    text_free(&files[0]);
+    text_free(&files[1]);
+    text_free(&first);
+    compilation_close(&b);
+    compilation_close(&a);
 }
 
 /* A function at module level of mg, which the later file of mg leaves
@@ -5037,6 +5086,7 @@ static void item_gone(void)
 static void damaged_ops(void)
 {
     member_gone();
+    owner_gone();
     item_gone();
     if (!files_read(ANTIC_SOURCE_DIR "/src/std/anti/lang.anti", &lang_text)) {
         check_failures++;

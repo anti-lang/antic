@@ -1426,6 +1426,45 @@ static void read_extern_fn(struct reader *r, struct symbol *sym,
     sym->item = it;
 }
 
+/* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, every
+   function a program uses is found in the library file of its module. A
+   generic of this file that calls a function of another library, which
+   the file of that library lacks, stops the read here, as a struct and a
+   generic it lacks stop it. Only the record of a function of this file's
+   own module stands for it, since the library leaves out the private
+   functions that only the module sees. A function of the root lives in
+   the runtime and in no library file. */
+static bool must_be_found(const struct reader *r, const struct symbol *sym,
+                          const struct interface *lib)
+{
+    return lib != r->iface && sym->kind == SYMBOL_FN &&
+           (sym->item == NULL || sym->item->runtime == NULL);
+}
+
+/* Whether a class of lib has a function whose symbol is named name, as
+   `T.f` or `T.Q.f`. The record of a function of a class read from a
+   library file names no owner, so it stands as an item does. */
+static bool class_has(const struct interface *lib, const struct name *name)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < lib->item_count; i++) {
+        const struct symbol *s = lib->items[i];
+        if (s->kind != SYMBOL_STRUCT || s->alias || s->type == NULL) {
+            continue;
+        }
+        for (j = 0; j < s->type->member_count; j++) {
+            const struct item *m = s->type->members[j];
+            if (m->symbol != NULL &&
+                types_same_name(&m->symbol->name, name)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /* The library's own symbol for the extern sym of lib, where it carries
    one, found as lookup says: a member of owner, a generic or an item. */
 static struct symbol *library_symbol(struct reader *r, struct symbol *sym,
@@ -1441,6 +1480,11 @@ static struct symbol *library_symbol(struct reader *r, struct symbol *sym,
                 types_same_name(&m->symbol->name, &sym->name)) {
                 return m->symbol;
             }
+        }
+        if (must_be_found(r, sym, lib)) {
+            antl_fail(r, "needs function `%s.%.*s`", lib->module,
+                      (int)sym->name.length, sym->name.text);
+            return NULL;
         }
         return sym;
     }
@@ -1458,6 +1502,11 @@ static struct symbol *library_symbol(struct reader *r, struct symbol *sym,
         if (s->kind == sym->kind && types_same_name(&s->name, &sym->name)) {
             return s;
         }
+    }
+    if (must_be_found(r, sym, lib) && !class_has(lib, &sym->name)) {
+        antl_fail(r, "needs function `%s.%.*s`", lib->module,
+                  (int)sym->name.length, sym->name.text);
+        return NULL;
     }
     return sym;
 }
