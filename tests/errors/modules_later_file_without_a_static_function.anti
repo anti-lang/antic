@@ -1,0 +1,10 @@
+//! A library file calls a function of a class without `self` of `counter`, and
+//! the later file of `counter` lacks it. By "Answers of 2026-11-12" the read
+//! refuses the library file.
+
+import com.example.static_user;
+
+fn main() -> int
+{
+	return static_user.used();
+}

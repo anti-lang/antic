@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that calls a function of a class
+//! without `self`.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used() -> int
+{
+	return counter.Counter.start();
+}

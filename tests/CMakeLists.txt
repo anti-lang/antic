@@ -4421,6 +4421,56 @@ set_tests_properties(error_modules_extern_function_with_two_signatures
     error_modules_extern_function_with_another_signature_than_a_library_dump
     PROPERTIES FIXTURES_REQUIRED externs_antl)
 
+# "Answers of 2026-11-12": every function a program uses stands in the
+# library file of its module. The users of tests/modules/stale/before
+# compile against the first file of `counter`, and the later file of
+# tests/modules/stale/after takes its place beside them. Each program
+# imports one user, whose read names the function the later file lacks.
+set(STALE "${MODULES}/stale")
+file(MAKE_DIRECTORY "${LIBS}/stale_before/com/example" "${LIBS}/stale/com/example")
+add_test(NAME antl_stale_counter_before
+    COMMAND antic -c -I "${STALE}/before" --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${LIBS}/stale_before/com/example/counter.antl"
+            "${STALE}/before/com/example/counter.anti")
+set_tests_properties(antl_stale_counter_before PROPERTIES
+    FIXTURES_SETUP stale_before_antl)
+set(stale_users "")
+foreach(user item final static table)
+    add_test(NAME antl_stale_${user}_user
+        COMMAND antic -c -I "${STALE}/before" -I "${LIBS}/stale_before"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${LIBS}/stale/com/example/${user}_user.antl"
+                "${STALE}/before/com/example/${user}_user.anti")
+    set_tests_properties(antl_stale_${user}_user PROPERTIES
+        FIXTURES_REQUIRED stale_before_antl
+        FIXTURES_SETUP stale_users_antl)
+    list(APPEND stale_users antl_stale_${user}_user)
+endforeach()
+add_test(NAME antl_stale_counter_after
+    COMMAND antic -c -I "${STALE}/after" --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${LIBS}/stale/com/example/counter.antl"
+            "${STALE}/after/com/example/counter.anti")
+set_tests_properties(antl_stale_counter_after PROPERTIES
+    FIXTURES_REQUIRED stale_users_antl FIXTURES_SETUP stale_antl)
+foreach(case
+        "modules_later_file_without_a_function|item_user|com\\.example\\.counter\\.next"
+        "modules_later_file_without_a_final_function|final_user|com\\.example\\.counter\\.Counter\\.step"
+        "modules_later_file_without_a_static_function|static_user|com\\.example\\.counter\\.Counter\\.start"
+        "modules_later_file_without_a_function_of_the_table|table_user|com\\.example\\.counter\\.Counter\\.bump")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 user)
+    list(GET parts 2 function)
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        PATTERN "${user}\\.antl needs function `${function}`"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED stale_antl)
+endforeach()
+
 # A library file whose own import no search root holds. The command names
 # the file of the left side of the diamond and no root, so the base is
 # missing, and the driver says which module the file needs.

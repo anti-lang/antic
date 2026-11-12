@@ -1,0 +1,14 @@
+//! The later version of the library of before/, without the functions that the
+//! users built against the first version call.
+
+/// A count without its functions.
+pub class Counter
+{
+	pub v: int = 0,
+}
+
+/// The count two after n.
+pub fn other(n: int) -> int
+{
+	return n + 2;
+}

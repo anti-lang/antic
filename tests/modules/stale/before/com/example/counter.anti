@@ -1,0 +1,32 @@
+//! The first version of a library, whose later file in after/ lacks the
+//! functions the users of this tree call.
+
+/// A count that a user reads through its functions.
+pub class Counter
+{
+	pub v: int = 0,
+
+	/// The next count, called through the table of the class.
+	pub fn bump(self) -> int
+	{
+		return self.v + 1;
+	}
+
+	/// The next count, called by its name.
+	pub final fn step(self) -> int
+	{
+		return self.v + 2;
+	}
+
+	/// A count without an object.
+	pub fn start() -> int
+	{
+		return 4;
+	}
+}
+
+/// The count after n.
+pub fn next(n: int) -> int
+{
+	return n + 1;
+}

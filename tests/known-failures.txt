@@ -19,3 +19,8 @@
 # The test known_failures checks the list against the table of the findings.
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
+unit_modules T241 The reader takes the record of a function that a generic calls when the later file of its module lacks the function.
+error_modules_later_file_without_a_function T242 The reader adds the declaration of a function that the file of its module, read before, does not define.
+error_modules_later_file_without_a_final_function T242 The reader adds the declaration of a final function of a class that the file of its module does not define.
+error_modules_later_file_without_a_static_function T242 The reader adds the declaration of a function of a class without self that the file of its module does not define.
+error_modules_later_file_without_a_function_of_the_table T243 A call through the table of a class names its slot alone, so the reader cannot see that the later file of the class lacks the function.

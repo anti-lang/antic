@@ -4958,11 +4958,41 @@ static void damaged_enums(void)
     }
 }
 
-/* DESIGN of library_symbol: a generic of one library calls a function of
-   a class of another, read beside a later file of that library whose
-   class no longer has it. The reader takes the symbol from the record, as
-   it does for an item the later file lacks, and the link of a copy then
-   finds no such function. */
+/* A generic of the library mu calls a function of the library mg, and
+   is read beside a later file of mg that lacks the function. By "Answers
+   of 2026-11-12" in docs/decisions.md the read of mu stops with expected,
+   as it stops for a struct or a generic the later file lacks. */
+static void gone_from_later_file(const char *before, const char *after,
+                                 const char *user, const char *expected)
+{
+    struct compilation a;
+    struct compilation b;
+    struct text files[2] = {{0}, {0}};
+    struct text user_bytes = {0};
+    struct ir_module program;
+    char error[160] = "";
+
+    compilation_open(&a);
+    compilation_open(&b);
+    if (build_library(&a, "mg", before, &user_bytes) &&
+        build_library(&a, "mu", user, &files[1]) &&
+        build_library(&b, "mg", after, &files[0])) {
+        struct compilation c;
+        compilation_open(&c);
+        ir_module_init(&program, &c.arena, "main");
+        CHECK(!read_in_order(&c, &program, files, 2, error, sizeof error));
+        CHECK_STR(error, expected);
+        ir_module_free(&program);
+        compilation_close(&c);
+    }
+    text_free(&files[0]);
+    text_free(&files[1]);
+    text_free(&user_bytes);
+    compilation_close(&b);
+    compilation_close(&a);
+}
+
+/* A function of a class of mg, which the later file of mg leaves out. */
 static void member_gone(void)
 {
     static const char before[] = "pub class Counter\n"
@@ -4981,36 +5011,33 @@ static void member_gone(void)
                                "pub fn twice<T>(own x: T, c: *mg.Counter) -> int {\n"
                                "    return c.bump() + c.bump();\n"
                                "}\n";
-    struct compilation a;
-    struct compilation b;
-    struct text files[2] = {{0}, {0}};
-    struct text user_bytes = {0};
-    struct ir_module program;
-    char error[160] = "";
 
-    compilation_open(&a);
-    compilation_open(&b);
-    if (build_library(&a, "mg", before, &user_bytes) &&
-        build_library(&a, "mu", user, &files[1]) &&
-        build_library(&b, "mg", after, &files[0])) {
-        struct compilation c;
-        compilation_open(&c);
-        ir_module_init(&program, &c.arena, "main");
-        CHECK(read_in_order(&c, &program, files, 2, error, sizeof error));
-        CHECK_STR(error, "");
-        ir_module_free(&program);
-        compilation_close(&c);
-    }
-    text_free(&files[0]);
-    text_free(&files[1]);
-    text_free(&user_bytes);
-    compilation_close(&b);
-    compilation_close(&a);
+    gone_from_later_file(before, after, user,
+                         "needs function `mg.Counter.bump`");
+}
+
+/* A function at module level of mg, which the later file of mg leaves
+   out. */
+static void item_gone(void)
+{
+    static const char before[] = "pub fn next(n: int) -> int {\n"
+                                 "    return n + 1;\n"
+                                 "}\n";
+    static const char after[] = "pub fn other(n: int) -> int {\n"
+                                "    return n + 2;\n"
+                                "}\n";
+    static const char user[] = "import mg;\n"
+                               "pub fn plus<T>(own x: T) -> int {\n"
+                               "    return mg.next(1);\n"
+                               "}\n";
+
+    gone_from_later_file(before, after, user, "needs function `mg.next`");
 }
 
 static void damaged_ops(void)
 {
     member_gone();
+    item_gone();
     if (!files_read(ANTIC_SOURCE_DIR "/src/std/anti/lang.anti", &lang_text)) {
         check_failures++;
         fprintf(stderr, "cannot read the source of anti.lang\n");
