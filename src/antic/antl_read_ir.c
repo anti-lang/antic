@@ -912,6 +912,30 @@ static void take_definition(const struct reader *r, struct ir_function *f,
     }
 }
 
+/* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, every
+   function a program uses is found in the library file of its module.
+   Each file reads after the files of its imports, so the program holds
+   every function of theirs when this file declares one. A declaration of
+   a function of another library that the program lacks stops the read,
+   and the link never reports it as an undefined symbol. A copy of a
+   generic is the exception, since each of its users defines it and a
+   later file may bring the definition, by the DESIGN of read_signature.
+   A module that no file of the program holds is not judged here. */
+static bool declares_missing(const struct reader *r,
+                             const struct signature *s)
+{
+    struct name module;
+
+    if ((s->flags & 1) == 0 || s->module == NULL ||
+        strcmp(s->module, r->iface->module) == 0 ||
+        ir_is_copy_name(s->name)) {
+        return false;
+    }
+    module.text = s->module;
+    module.length = strlen(s->module);
+    return antl_library(r, &module) != NULL;
+}
+
 /* A function signature, mapped to a function of the program. A C function
    and a declaration share an existing entry of the same name. */
 static uint32_t read_signature(struct reader *r, struct ir_module *program,
@@ -946,6 +970,10 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     }
     if (s.file != IR_NO_INDEX && s.file >= maps->file_count) {
         antl_damaged(r);
+        return 0;
+    }
+    if (f == NULL && declares_missing(r, &s)) {
+        antl_fail(r, "needs function `%s.%s`", s.module, s.name);
         return 0;
     }
     if (f == NULL) {
