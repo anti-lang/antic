@@ -936,6 +936,65 @@ static bool declares_missing(const struct reader *r,
     return antl_library(r, &module) != NULL;
 }
 
+/* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, a library
+   file holds the code of each copy of a generic function of another
+   module that it calls, made from the tree of the generic in the file it
+   was built against. The program keeps the first copy it reads, so the
+   code of the file runs whether the later file of the module still holds
+   the generic or not. The read refuses a copy whose generic the later
+   file lacks, with the message library_symbol of antl_tree.c gives a tree
+   that names it. The name of such a copy is the generic and the list of
+   its arguments, `pick<int>`, and an argument may itself hold `<`, `>`
+   and the `->` of a function type. A copy of a function of a generic
+   class, `Bag<int>.get`, has a name after the list and stands in the
+   table the file writes for the copy, which the DESIGN of struct
+   ir_table_write covers. A module that no file of the program holds is
+   not judged here, as declares_missing does not judge it. */
+static bool copy_of_missing_generic(struct reader *r,
+                                    const struct signature *s)
+{
+    const char *open;
+    const char *p;
+    size_t depth = 0;
+    struct name module;
+    const struct interface *lib;
+    size_t i;
+
+    if (s->module == NULL || strcmp(s->module, r->iface->module) == 0) {
+        return false;
+    }
+    open = strchr(s->name, '<');
+    if (open == NULL) {
+        return false;
+    }
+    for (p = open; *p != '\0'; p++) {
+        if (*p == '<') {
+            depth++;
+        } else if (*p == '>' && p[-1] != '-' && --depth == 0) {
+            break;
+        }
+    }
+    if (*p != '>' || p[1] != '\0') {
+        return false;
+    }
+    module.text = s->module;
+    module.length = strlen(s->module);
+    lib = antl_library(r, &module);
+    if (lib == NULL) {
+        return false;
+    }
+    for (i = 0; i < lib->generic_count; i++) {
+        const struct item *it = lib->generics[i];
+        if (it->kind == ITEM_FN && it->name.length == (size_t)(open - s->name) &&
+            memcmp(it->name.text, s->name, it->name.length) == 0) {
+            return false;
+        }
+    }
+    antl_fail(r, "needs generic `%s.%.*s`", s->module, (int)(open - s->name),
+              s->name);
+    return true;
+}
+
 /* A function signature, mapped to a function of the program. A C function
    and a declaration share an existing entry of the same name. */
 static uint32_t read_signature(struct reader *r, struct ir_module *program,
@@ -948,6 +1007,9 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     *has_body = false;
     *skip = false;
     if (!read_signature_head(r, program, maps, &s)) {
+        return 0;
+    }
+    if (copy_of_missing_generic(r, &s)) {
         return 0;
     }
     f = find_function(program, s.module, s.name);
