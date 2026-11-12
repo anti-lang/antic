@@ -1468,3 +1468,12 @@ anti_message(targets_all_listed STATUS 0
 anti_message(antic_version_satisfied STATUS 0
     FILES anti.toml "${manifest_package}antic = \"0.1.0\"\n" ${app_source} "${app_text}"
     ARGS build ${tools})
+# module_library of build.c checks the library file that stands with the
+# imports it names, which the check reads without a message, as test.c
+# reads them. One that it cannot read compiles the module again, the
+# ninth open of the second build. T240 of docs/audit/tests-findings.md.
+anti_message(fault_reuse_imports_unread STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP built_once
+    FAULT open:9:EACCES
+    ARGS build ${tools})
