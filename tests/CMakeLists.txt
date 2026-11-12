@@ -4119,6 +4119,16 @@ antic_modules_test(optional_class_field
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/optional-class-field-modules")
 
+# A field `own ?fn` of a class of a library with the default `none`, which
+# a client that derives from the class and one that builds it take from
+# the library file and free at `delete`. T239 of
+# docs/audit/tests-findings.md.
+antic_modules_test(own_function_default
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/own_function_default"
+    LIBRARIES held
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/own-function-default-modules")
+
 # A field of a class of a library whose default is a literal of a class
 # that the library declares after it.
 antic_modules_test(later_class_default

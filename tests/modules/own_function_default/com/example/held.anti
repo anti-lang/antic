@@ -1,0 +1,16 @@
+//! A class whose `own ?fn` field holds `none` until it is set.
+
+/// Twice `x`.
+pub fn twice(x: int) -> int
+{
+	return x * 2;
+}
+
+/// A class that may own a function.
+pub class Base
+{
+	/// A plain field beside it.
+	pub code: int = 0,
+	/// The function, or `none`.
+	pub own maybe: ?fn(int) -> int = none,
+}
