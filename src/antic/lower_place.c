@@ -566,16 +566,20 @@ void lower_store_constant(struct lowerer *l, const struct type *t,
         }
         return;
     }
-    if (lower_is_aggregate(t)) {
-        ir_memcopy(l->f, l->b, dest, lower_const_address(l, v, t),
-                   lower_vtype_of(l, t));
-        return;
-    }
-    /* A named function as an `own fn` is its code with no snapshot. */
+    /* A named function as an `own fn` is its code with no snapshot, and
+       `none` of an `own ?fn` two null words. The test stands before that
+       of an aggregate, whose copy read the two words from a constant
+       that const_tree writes as one pointer, by T239 of
+       docs/audit/tests-findings.md. */
     if (t->kind == TYPE_FN && t->context) {
         ir_store(l->f, l->b, IR_PTR, lower_constant(l, v, IR_PTR), dest);
         ir_store(l->f, l->b, IR_PTR, ir_int_op(IR_PTR, 0),
                  lower_context_word(l, t, dest));
+        return;
+    }
+    if (lower_is_aggregate(t)) {
+        ir_memcopy(l->f, l->b, dest, lower_const_address(l, v, t),
+                   lower_vtype_of(l, t));
         return;
     }
     ir_store(l->f, l->b, lower_ir_type_of(t),
