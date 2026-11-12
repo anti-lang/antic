@@ -1,0 +1,42 @@
+//! A call through a function that a field of the base holds, on a value of the
+//! derived class, through a pointer to it and through `self` in a function of
+//! the derived class. The field holds a plain function and an `own fn`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
+}
+
+class Holder
+{
+	pub f: fn(int) -> int = twice,
+	pub own g: fn(int) -> int = thrice,
+}
+
+class Derived inherits Holder
+{
+	pub extra: int = 1,
+
+	pub fn both(self, n: int) -> int
+	{
+		return self.f(n) + self.g(n);
+	}
+}
+
+fn main() -> int
+{
+	let d = Derived { };
+	printf("value %d %d\n".ptr, d.f(3) as c_int, d.g(3) as c_int);
+	let p = alloc Derived { };
+	printf("pointer %d %d\n".ptr, p.f(4) as c_int, p.g(4) as c_int);
+	printf("self %d\n".ptr, p.both(5) as c_int);
+	delete(p);
+	return 0;
+}
