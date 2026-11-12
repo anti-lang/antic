@@ -2440,6 +2440,279 @@ static void temporaries_unresolved(void)
     end(&x);
 }
 
+/* The operands of a call and of a return that have no translation, each
+   of which fails the module: a scalar argument, the address of an
+   aggregate argument, the aggregate a function returns, the address and
+   the value of an atomic call and the context of a call through a
+   function with its context. */
+static void calls_untranslated(void)
+{
+    static const enum ir_type pair[] = {IR_I64, IR_I64, IR_I64};
+    struct ir_operand none = odd_operand(IR_NONE, IR_I64);
+    struct ir_operand ptr_none = odd_operand(IR_NONE, IR_PTR);
+    struct ir_operand args[3];
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_function *sig;
+    struct ir_block *b;
+    uint32_t agg;
+    uint32_t p;
+    uint32_t q;
+
+    /* A scalar argument, then a second argument the loop never reaches. */
+    begin(&x);
+    g = ir_function_add(&x.m, "main", "g", IR_I64, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    ir_ret(g, ir_block_add(g), IR_I64, ir_int_op(IR_I64, 0));
+    f = two_params(&x, IR_I64, &p, &q);
+    args[0] = none;
+    args[1] = ir_temp_op(f, q);
+    ir_call(f, f->blocks[0], IR_I64, ir_func_op(g), args, 2);
+    ir_ret(f, f->blocks[0], IR_I64, ir_temp_op(f, p));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    /* An aggregate of 24 bytes, which passes in memory. */
+    begin(&x);
+    agg = record(&x, "main.Three", pair, 3);
+    g = ir_function_add(&x.m, "main", "g", IR_VOID, IR_NO_AGG);
+    ir_param_add(g, IR_AGG, agg);
+    ir_ret(g, ir_block_add(g), IR_VOID, ir_int_op(IR_VOID, 0));
+    f = two_params(&x, IR_PTR, &p, &q);
+    args[0] = ptr_none;
+    args[0].type = IR_AGG;
+    ir_call(f, f->blocks[0], IR_VOID, ir_func_op(g), args, 1);
+    ir_ret(f, f->blocks[0], IR_PTR, ir_temp_op(f, p));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    /* The aggregate a function returns. */
+    begin(&x);
+    agg = record(&x, "main.Three", pair, 3);
+    f = ir_function_add(&x.m, "main", "f", IR_AGG, agg);
+    ir_ret(f, ir_block_add(f), IR_AGG, ptr_none);
+    CHECK(untranslated_as(&x, "this operand"));
+
+    /* The address of an atomic load, and the value of an atomic store of
+       four bytes. */
+    begin(&x);
+    g = ir_extern_add(&x.m, "anti_rt_atomic_load", IR_I64, false);
+    ir_param_add(g, IR_PTR, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    f = two_params(&x, IR_PTR, &p, &q);
+    args[0] = ptr_none;
+    args[1] = ir_int_op(IR_I64, 4);
+    ir_call(f, f->blocks[0], IR_I64, ir_func_op(g), args, 2);
+    ir_ret(f, f->blocks[0], IR_PTR, ir_temp_op(f, p));
+    CHECK(untranslated_as(&x, "this operand"));
+    begin(&x);
+    g = ir_extern_add(&x.m, "anti_rt_atomic_store", IR_VOID, false);
+    ir_param_add(g, IR_PTR, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    f = two_params(&x, IR_PTR, &p, &q);
+    args[0] = ir_temp_op(f, p);
+    args[1] = ir_int_op(IR_I64, 4);
+    args[2] = none;
+    ir_call(f, f->blocks[0], IR_VOID, ir_func_op(g), args, 3);
+    ir_ret(f, f->blocks[0], IR_PTR, ir_temp_op(f, p));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    /* The context of a call through a function with its context, after a
+       float that C may read. */
+    begin(&x);
+    sig = ir_declare_add(&x.m, "main", "fn.0", IR_F64, IR_NO_AGG);
+    ir_param_add(sig, IR_F64, IR_NO_AGG);
+    ir_param_add(sig, IR_PTR, IR_NO_AGG);
+    f = ir_function_add(&x.m, "main", "f", IR_F64, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    q = ir_param_add(f, IR_F64, IR_NO_AGG);
+    b = ir_block_add(f);
+    args[0] = ir_temp_op(f, q);
+    args[1] = ptr_none;
+    ir_call_indirect(f, b, IR_F64, ir_temp_op(f, p), sig, args, 2);
+    b->insts[b->count - 1].field = IR_CALL_CONTEXT;
+    ir_ret(f, b, IR_F64, ir_temp_op(f, q));
+    CHECK(untranslated_as(&x, "this operand"));
+
+    /* An aggregate past the parameters of a variadic function. */
+    begin(&x);
+    g = ir_extern_add(&x.m, "printf", IR_I32, true);
+    ir_param_add(g, IR_PTR, IR_NO_AGG);
+    f = two_params(&x, IR_PTR, &p, &q);
+    args[0] = ir_temp_op(f, p);
+    args[1] = ir_temp_op(f, q);
+    args[1].type = IR_AGG;
+    ir_call(f, f->blocks[0], IR_I32, ir_func_op(g), args, 2);
+    ir_ret(f, f->blocks[0], IR_PTR, ir_temp_op(f, p));
+    CHECK(untranslated_as(&x, "an aggregate value"));
+}
+
+/* A call whose instruction gives the result another type than the callee
+   declares, as a library file may write it: a pointer read as an i64, an
+   i64 as an i32, an i32 as an i64 and an f64 as an i64. */
+static void call_results_reinterpreted(void)
+{
+    static const enum ir_type from[] = {IR_PTR, IR_I64, IR_I32, IR_F64,
+                                        IR_I64};
+    static const enum ir_type to[] = {IR_I64, IR_I32, IR_I64, IR_I64, IR_F64};
+    static const char *const ops[] = {
+        "  %v1 = ptrtoint ptr %v0 to i64\n",
+        "  %v1 = trunc i64 %v0 to i32\n",
+        "  %v1 = zext i32 %v0 to i64\n",
+        "  %v1 = bitcast double %v0 to i64\n",
+        "  %v1 = bitcast i64 %v0 to double\n",
+    };
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_block *b;
+    uint32_t t;
+    size_t i;
+
+    for (i = 0; i < sizeof ops / sizeof ops[0]; i++) {
+        begin(&x);
+        g = ir_extern_add(&x.m, "g", from[i], false);
+        f = ir_function_add(&x.m, "main", "f", to[i], IR_NO_AGG);
+        b = ir_block_add(f);
+        t = ir_call(f, b, to[i], ir_func_op(g), NULL, 0);
+        ir_ret(f, b, to[i], ir_temp_op(f, t));
+        CHECK(run(&x, TARGET_LINUX_X86_64));
+        CHECK(holds(&x, ops[i]));
+        end(&x);
+    }
+}
+
+/* The atomic calls that stay calls or write no result: a width of three
+   bytes, which no instruction has, and a store whose instruction has a
+   result temporary. The value of a store of eight bytes is not cut. */
+static void atomic_forms(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_operand args[3];
+    uint32_t p;
+    uint32_t q;
+
+    begin(&x);
+    g = ir_extern_add(&x.m, "anti_rt_atomic_store", IR_VOID, false);
+    ir_param_add(g, IR_PTR, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    ir_param_add(g, IR_I64, IR_NO_AGG);
+    f = two_params(&x, IR_I64, &p, &q);
+    args[0] = ir_temp_op(f, p);
+    args[0].type = IR_PTR;
+    args[1] = ir_int_op(IR_I64, 3);
+    args[2] = ir_temp_op(f, q);
+    ir_call(f, f->blocks[0], IR_VOID, ir_func_op(g), args, 3);
+    args[1] = ir_int_op(IR_I64, 8);
+    ir_call(f, f->blocks[0], IR_I64, ir_func_op(g), args, 3);
+    ir_ret(f, f->blocks[0], IR_I64, ir_temp_op(f, q));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "call void (ptr, i64, i64) @anti_rt_atomic_store("));
+    CHECK(holds(&x, "  store atomic i64 %v"));
+    end(&x);
+}
+
+/* A call through a function with its context whose context the IR gives
+   as a constant, as a library file may write it. A null context takes
+   the canonical NaN of the float in the argument itself, and any other
+   constant hands the float on as it is, with no test of the context. A
+   signature without the context word passes it in its own type, and a
+   call that passes no float tests nothing. */
+static void constant_contexts(void)
+{
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *sig;
+    struct ir_block *b;
+    struct ir_operand args[2];
+    uint32_t p;
+    uint32_t q;
+    uint64_t context;
+
+    for (context = 0; context < 2; context++) {
+        begin(&x);
+        sig = ir_declare_add(&x.m, "main", "fn.0", IR_F64, IR_NO_AGG);
+        ir_param_add(sig, IR_F64, IR_NO_AGG);
+        f = ir_function_add(&x.m, "main", "f", IR_F64, IR_NO_AGG);
+        p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+        q = ir_param_add(f, IR_F64, IR_NO_AGG);
+        b = ir_block_add(f);
+        args[0] = ir_temp_op(f, q);
+        args[1] = ir_int_op(IR_PTR, context);
+        ir_call_indirect(f, b, IR_F64, ir_temp_op(f, p), sig, args, 2);
+        b->insts[b->count - 1].field = IR_CALL_CONTEXT;
+        ir_ret(f, b, IR_F64, ir_temp_op(f, q));
+        CHECK(run(&x, TARGET_LINUX_X86_64));
+        CHECK(lacks(&x, "icmp eq ptr"));
+        CHECK(context == 0 ? holds(&x, "fcmp uno double")
+                           : lacks(&x, "fcmp uno double"));
+        CHECK(holds(&x, context == 0 ? "(double %v3, ptr null)\n"
+                                     : "(double %v1, ptr inttoptr (i64 1 to ptr))\n"));
+        end(&x);
+    }
+    begin(&x);
+    sig = ir_declare_add(&x.m, "main", "fn.0", IR_I64, IR_NO_AGG);
+    ir_param_add(sig, IR_I64, IR_NO_AGG);
+    f = ir_function_add(&x.m, "main", "f", IR_I64, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    q = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b = ir_block_add(f);
+    args[0] = ir_temp_op(f, q);
+    args[1] = ir_int_op(IR_PTR, 0);
+    ir_call_indirect(f, b, IR_I64, ir_temp_op(f, p), sig, args, 2);
+    b->insts[b->count - 1].field = IR_CALL_CONTEXT;
+    ir_ret(f, b, IR_I64, ir_temp_op(f, q));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "call i64 (i64, ptr) %v0(i64 %v1, ptr null)\n"));
+    end(&x);
+}
+
+/* The facts a call and a signature leave out, as a library file may ask
+   for them: the range of a result that is void or a coerced aggregate,
+   and dereferenceable on a pointer to a type of no bytes. */
+static void facts_left_out(void)
+{
+    static const enum ir_type word[] = {IR_I64};
+    struct fixture x;
+    struct ir_function *f;
+    struct ir_function *g;
+    struct ir_function *h;
+    struct ir_block *b;
+    uint32_t agg;
+    uint32_t empty;
+
+    begin(&x);
+    agg = record(&x, "main.Word", word, 1);
+    empty = record(&x, "main.Empty", NULL, 0);
+    g = ir_function_add(&x.m, "main", "g", IR_VOID, IR_NO_AGG);
+    g->result_range = true;
+    g->result_high = 4;
+    ir_param_add(g, IR_PTR, IR_NO_AGG);
+    g->params[0].nonnull = true;
+    g->params[0].deref_size = ir_sym_size_of(&x.m, ir_aggregate(empty));
+    ir_ret(g, ir_block_add(g), IR_VOID, ir_int_op(IR_VOID, 0));
+    h = ir_function_add(&x.m, "main", "h", IR_AGG, agg);
+    h->result_range = true;
+    h->result_high = 4;
+    b = ir_block_add(h);
+    ir_ret(h, b, IR_AGG, ir_temp_op(h, ir_entry_slot(h, ir_aggregate(agg))));
+    f = ir_function_add(&x.m, "main", "f", IR_VOID, IR_NO_AGG);
+    b = ir_block_add(f);
+    {
+        struct ir_operand arg = ir_int_op(IR_PTR, 0);
+        ir_call(f, b, IR_VOID, ir_func_op(g), &arg, 1);
+    }
+    ir_call(f, b, IR_AGG, ir_func_op(h), NULL, 0);
+    ir_ret(f, b, IR_VOID, ir_int_op(IR_VOID, 0));
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "define internal void @main.g(ptr noundef nonnull %p0)"));
+    CHECK(lacks(&x, "range("));
+    end(&x);
+}
+
 void test_llvm_emit(void)
 {
     module_text();
@@ -2490,4 +2763,9 @@ void test_llvm_emit(void)
     forms_untranslated();
     vector_rest();
     temporaries_unresolved();
+    calls_untranslated();
+    call_results_reinterpreted();
+    atomic_forms();
+    constant_contexts();
+    facts_left_out();
 }
