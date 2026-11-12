@@ -56,9 +56,10 @@ size_t lower_table_index(const struct type *t, const struct name *name,
    read of the file refuses a later file of the class that lacks the
    function or holds it at another slot. A class of the module itself
    comes from the same file. The root's table and those of the types the
-   compiler declares belong to the compiler, and a copy of a generic is
-   made by each of its users from the tree of the later file, so none of
-   them takes a record. */
+   compiler declares belong to the compiler, so neither takes a record. A
+   copy of a generic takes none either. Each module that reads the table
+   of a copy writes the copy and its table as well, so the record of
+   that table, by the DESIGN of note_table_write, covers the read. */
 void lower_note_table_read(struct lowerer *l, const struct type *t,
                            const struct name *name, size_t params,
                            size_t slot)
@@ -94,13 +95,17 @@ static bool foreign_class(const struct lowerer *l, const struct type *t)
    file of the module carries the table of each class of another module
    that a table it writes was laid out against, the DESIGN of struct
    ir_table_write. The table of t takes its entries from the chain of
-   from, its base or the interface of one of its sub-objects. The record
+   from, t itself or the interface of one of its sub-objects. The record
    names the nearest class of another module in that chain. Every class
    between t and it belongs to the module, whose file the later file of
    no other module changes, and the table of that class holds the
    entries of every class above it. The root and the types the compiler
-   declares take none, as they take no read, and neither does a copy of
-   a generic. */
+   declares take none, as they take no read. A copy of a generic of
+   another module is itself such a class. The module writes its table,
+   laid out against the generic of the file it was built against, and
+   the program keeps the first copy it reads. Its record names the
+   generic, whose table holds the entries of every copy, since a copy
+   takes the functions of its generic. */
 static void note_table_write(struct lowerer *l, const struct type *t,
                              const struct type *from)
 {
@@ -116,7 +121,7 @@ static void note_table_write(struct lowerer *l, const struct type *t,
            !foreign_class(l, b)) {
         b = b->base;
     }
-    if (!foreign_class(l, b) || b->generic != NULL || t->generic != NULL) {
+    if (!foreign_class(l, b)) {
         return;
     }
     table_of(b, &table);
@@ -127,6 +132,9 @@ static void note_table_write(struct lowerer *l, const struct type *t,
     }
     text_appendf(&class_name, "%.*s.", (int)t->module.length, t->module.text);
     types_symbol_name(&class_name, t);
+    if (b->generic != NULL) {
+        b = b->generic;
+    }
     module = lower_cstr(&b->module);
     base = lower_cstr(&b->name);
     ir_table_write_add(l->m, text_cstr(&class_name), module, base, slots,
@@ -1592,7 +1600,7 @@ struct ir_global *lower_class_table(struct lowerer *l, const struct type *t)
     if (g != NULL) {
         return g;
     }
-    note_table_write(l, t, t->base);
+    note_table_write(l, t, t);
     table_of(t, &table);
     value = ir_const_agg(m, ir_aggregate(lower_table_agg(l, table.count + 1)),
                          table.count + 1);

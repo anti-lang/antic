@@ -1351,7 +1351,10 @@ static void read_functions(struct reader *r, struct ir_module *program,
     }
 }
 
-/* The class class_name of lib, or NULL. */
+/* The class class_name of lib, or NULL. A record of a copy of a generic
+   class names the generic, which the section of the generics of lib
+   declares when it is private, as foreign_struct of antl_read.c finds
+   it. */
 static const struct type *library_class(const struct interface *lib,
                                         const char *class_name)
 {
@@ -1363,6 +1366,14 @@ static const struct type *library_class(const struct interface *lib,
             sym->type->kind == TYPE_CLASS &&
             antl_name_equals(&sym->name, class_name)) {
             return sym->type;
+        }
+    }
+    for (i = 0; i < lib->generic_count; i++) {
+        const struct item *it = lib->generics[i];
+        if (it->kind != ITEM_FN && it->symbol != NULL &&
+            it->symbol->type != NULL && it->symbol->type->kind == TYPE_CLASS &&
+            antl_name_equals(&it->name, class_name)) {
+            return it->symbol->type;
         }
     }
     return NULL;
