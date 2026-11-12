@@ -1,6 +1,8 @@
 //! The client of the held library. It builds the class of the library and a
-//! class below it, which take the default `none` of the `?Handle` field from
-//! the library file.
+//! class below it, which take the defaults of the fields from the library file:
+//! the default `none` of the `?Handle` field, a `?Handle` that holds a handle,
+//! a struct of a handle and bitfields in two units, and an `own fn`, which the
+//! derived class calls as a field of its base.
 
 import com.example.held;
 
@@ -16,9 +18,16 @@ fn main() -> int
 	let d = alloc Derived { };
 	printf("derived %d %d %d\n".ptr, d.code as c_int, d.extra as c_int,
 		(d.held == none) as c_int);
+	if let g = d.given {
+		printf("given %d\n".ptr, g.n as c_int);
+	}
+	printf("packed %d %d %d\n".ptr, d.packed.h.n as c_int, d.packed.low as c_int,
+		d.packed.high as c_int);
+	printf("function %d\n".ptr, d.f(5) as c_int);
 	delete(d);
 	let b = alloc held.Base { code: 5 };
-	printf("base %d %d\n".ptr, b.code as c_int, (b.held == none) as c_int);
+	printf("base %d %d %d\n".ptr, b.code as c_int, (b.held == none) as c_int,
+		b.f(6) as c_int);
 	delete(b);
 	return 0;
 }

@@ -1,0 +1,10 @@
+//! A library that compiles a copy of a generic function of the tally library,
+//! which changes the `static atomic` field of a class of that library.
+
+import com.example.tally;
+
+/// Twice `x`, counted by the tally library.
+pub fn twice(x: int) -> int
+{
+	return tally.note<int>(x) * 2;
+}

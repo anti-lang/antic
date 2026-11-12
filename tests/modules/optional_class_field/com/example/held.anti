@@ -1,10 +1,30 @@
-//! A class whose field is a `?T` of a class value, with the default `none`.
+//! A class whose fields take defaults that hold a class value or a function: a
+//! `?T` of a class value with the default `none` and with a handle, a struct of
+//! a class value and bitfields, and an `own fn`.
 
 /// A class value that a field may hold.
 pub class Handle
 {
 	/// The number the handle holds.
 	pub n: int = 0,
+}
+
+/// A struct that holds a class value beside bitfields split in two units.
+pub struct Packed
+{
+	/// The class value.
+	h: Handle,
+	/// Three bits of the first unit.
+	low: u8 : 3,
+	_: u8 : 0,
+	/// Four bits of the second unit.
+	high: u8 : 4,
+}
+
+/// Twice `x`.
+pub fn twice(x: int) -> int
+{
+	return x * 2;
 }
 
 /// A class with a `?Handle` field, which holds `none` until it is set.
@@ -14,4 +34,10 @@ pub class Base
 	pub code: int = 0,
 	/// The handle, or `none`.
 	pub held: ?Handle = none,
+	/// A handle that is there from the start.
+	pub given: ?Handle = Handle { n: 7 },
+	/// A struct of a class value and bitfields.
+	pub packed: Packed = Packed { h: Handle { n: 4 }, low: 3, high: 5 },
+	/// A function the class owns.
+	pub own f: fn(int) -> int = twice,
 }

@@ -4020,10 +4020,11 @@ antic_modules_test(generic_origin
 
 # A generic function and a generic class of a library module that change
 # a `static atomic` field. The client makes its copies from the library
-# file. T029 of docs/audit/tests-findings.md.
+# file, and so does a second library, mid, whose library file then names
+# the field of the first. T029 of docs/audit/tests-findings.md.
 antic_modules_test(generic_atomic
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_atomic"
-    LIBRARIES tally
+    LIBRARIES tally mid
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_atomic")
 
@@ -4110,9 +4111,11 @@ antic_modules_test(field_defaults
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/field-defaults-modules")
 
-# A field of a class of a library that is a `?T` of a class value with
-# the default `none`, read by a client that derives from the class and by
-# one that builds it.
+# Fields of a class of a library whose defaults hold a class value or a
+# function: a `?T` of a class value with the default `none` and with a
+# handle, a struct of a class value and bitfields in two units and an
+# `own fn`, read by a client that derives from the class and by one that
+# builds it.
 antic_modules_test(optional_class_field
     ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/optional_class_field"
     LIBRARIES held
