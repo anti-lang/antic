@@ -475,9 +475,10 @@ static void test_codeview(void)
 }
 
 /* A type stream alone counts as the debug information of its object, so
-   the second object loses its own. A .debug$S whose one table runs past
-   its section holds no line table, and the object after it keeps its
-   debug sections. */
+   the second object loses its own, as a precompiled type stream and a
+   table of type hashes do. A .debug$S whose one table runs past its
+   section holds no line table, nor does an empty type stream, and the
+   object after either keeps its debug sections. */
 static void test_codeview_kinds(void)
 {
     static const char lines[] = "\4\0\0\0\xf3\0\0\0\4\0\0\0\0\0\0\0";
@@ -492,8 +493,17 @@ static void test_codeview_kinds(void)
                                  {".debug$S", DEBUG, lines, 16, {{0}}, 0},
                                  {".debug$T", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 3,
                          {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
-    const struct t_object *firsts[2];
-    static const int kept[2] = {1, 3};
+    struct t_object precompiled = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                           {".debug$P", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 2,
+                                   {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object hashes = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                      {".debug$H", DEBUG, "\4\0\0\0", 4, {{0}}, 0}}, 2,
+                              {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object empty_types = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                           {".debug$T", DEBUG, "", 0, {{0}}, 0}}, 2,
+                                   {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    const struct t_object *firsts[5];
+    static const int kept[5] = {1, 3, 1, 1, 3};
     struct text out = {0};
     struct text error = {0};
     char name[NAME_SIZE];
@@ -502,7 +512,10 @@ static void test_codeview_kinds(void)
 
     firsts[0] = &types;
     firsts[1] = &short_table;
-    for (k = 0; k < 2; k++) {
+    firsts[2] = &precompiled;
+    firsts[3] = &hashes;
+    firsts[4] = &empty_types;
+    for (k = 0; k < 5; k++) {
         int debug = 0;
         out.length = 0;
         CHECK(join(firsts[k], &b, &out, &error));
@@ -607,7 +620,8 @@ static void test_uninitialised(void)
    refused, where strtoul would skip a space, take a sign or stop early. */
 static void test_long_names(void)
 {
-    static const char *const refused[] = {" 4", "+4", "4x", "4 ", "", "0x4"};
+    static const char *const refused[] = {" 4", "+4", "4x", "4 ", "",
+                                          "0x4", "3", "99"};
     struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
                                  {".rdata$long_name", DATA, "u", 1, {{0}}, 0}}, 2,
                          {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
@@ -638,6 +652,13 @@ static void test_long_names(void)
         CHECK(!join_bytes(&first, &second, &out, &error));
         CHECK(strstr(text_cstr(&error), "names a section it lacks") != NULL);
     }
+    /* A string table that ends before the NUL of the name. */
+    memcpy(first.data + h, "/4\0\0\0\0\0\0", 8);
+    patch32(&first, strings_at(&first), get(&first, strings_at(&first), 4) - 1);
+    out.length = 0;
+    error.length = 0;
+    CHECK(!join_bytes(&first, &second, &out, &error));
+    CHECK(strstr(text_cstr(&error), "names a section it lacks") != NULL);
     text_free(&first);
     text_free(&second);
     text_free(&out);
@@ -957,7 +978,8 @@ static void member_header(struct text *t, const char *name, const char *size)
 }
 
 /* An archive whose index names foo in one member and bar in the next. The
-   member of foo needs bar. Its members follow without padding, since
+   member of foo needs bar, and the member of bar defines the absolute
+   symbol limit as well. Its members follow without padding, since
    both objects are of even size. */
 static void build_archive(struct text *out, size_t *index_at, size_t *foo_at,
                           size_t *bar_at)
@@ -967,7 +989,8 @@ static void build_archive(struct text *out, size_t *index_at, size_t *foo_at,
                             {"bar", 0, 0, EXTERNAL, false, 0, 0}}, 2};
     struct t_object bar = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
                            {{"bar", 0, 1, EXTERNAL, false, 0, 0},
-                            {"baz", 0, 1, STATIC, false, 0, 0}}, 2};
+                            {"baz", 0, 1, STATIC, false, 0, 0},
+                            {"limit", 0x40, -1, EXTERNAL, false, 0, 0}}, 3};
     struct text first = {0};
     struct text second = {0};
     char size[16];
@@ -1135,6 +1158,317 @@ static void test_archive_index(void)
     text_free(&out);
 }
 
+/* A join where no object defines a symbol, so the table of definitions
+   stays empty and a lookup in it finds nothing. An object of machine 0
+   with one section is an ordinary object, and no big object. */
+static void test_nothing_defined(void)
+{
+    struct t_object a = {0, {{".text", CODE, call, 8, {{1, 2}}, 1}}, 1,
+                         {{".text", 0, 1, STATIC, true, 0, 0},
+                          {"printf", 0, 0, EXTERNAL, false, 0, 0}}, 2};
+    struct t_object b = {0, {{".text", CODE, call, 8, {{1, 2}}, 1}}, 1,
+                         {{".text", 0, 1, STATIC, true, 0, 0},
+                          {"printf", 0, 0, EXTERNAL, false, 0, 0}}, 2};
+    struct text out = {0};
+    struct text error = {0};
+
+    CHECK(join(&a, &b, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    if (out.length > 0) {
+        CHECK(get(&out, 0, 2) == 0);
+        CHECK(find_symbol(&out, "printf", 1) == -1);
+        CHECK(reloc_symbol(&out, 1, 0) == find_symbol(&out, "printf", 0));
+        CHECK(reloc_symbol(&out, 2, 0) == find_symbol(&out, "printf", 0));
+    }
+    text_free(&out);
+    text_free(&error);
+}
+
+/* A directive that starts like one the join holds is another directive,
+   and a tab parts two directives as a space does. The last directive of
+   the join, as any other, stands once. */
+static void test_directive_tokens(void)
+{
+    static const char da[] = " /x:ab";
+    static const char db[] = " /x:a\t/y:1\t/x:ab\t/y:1";
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                 {".drectve", INFO, da, sizeof da - 1, {{0}}, 0}}, 2,
+                         {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                 {".drectve", INFO, db, sizeof db - 1, {{0}}, 0}}, 2,
+                         {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct text out = {0};
+    struct text error = {0};
+    size_t h;
+
+    CHECK(join(&a, &b, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    if (out.length > 0) {
+        h = section_at(sections_of(&out));
+        CHECK(get(&out, h + 16, 4) == 16);
+        CHECK(memcmp(out.data + get(&out, h + 20, 4), " /x:ab /x:a /y:1", 16) ==
+              0);
+    }
+    text_free(&out);
+    text_free(&error);
+}
+
+/* An absolute symbol: an external one is a definition of the join, and a
+   static one other than @feat.00 stays as it is. */
+static void test_absolute(void)
+{
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                         {{"limit", 0x40, -1, EXTERNAL, false, 0, 0},
+                          {"@comp.id", 0x7, -1, STATIC, false, 0, 0}}, 2};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{1, 0}}, 1}}, 1,
+                         {{"limit", 0, 0, EXTERNAL, false, 0, 0},
+                          {"@comp.id", 0x9, -1, STATIC, false, 0, 0}}, 2};
+    struct text out = {0};
+    struct text error = {0};
+    long limit;
+
+    CHECK(join(&a, &b, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    if (out.length > 0) {
+        limit = find_symbol(&out, "limit", 0);
+        CHECK(find_symbol(&out, "limit", 1) == -1);
+        CHECK(symbol_section(&out, limit) == -1);
+        CHECK(symbol_value(&out, limit) == 0x40);
+        CHECK(reloc_symbol(&out, 2, 0) == limit);
+        CHECK(symbol_value(&out, find_symbol(&out, "@comp.id", 0)) == 7);
+        CHECK(symbol_value(&out, find_symbol(&out, "@comp.id", 1)) == 9);
+    }
+    text_free(&out);
+    text_free(&error);
+}
+
+/* A COMDAT of selection `any` after one of another selection of the same
+   name is a second COMDAT, as the reverse order is. */
+static void test_comdat_after_another_selection(void)
+{
+    struct t_object single = {AMD64,
+                              {{".rdata", RDATA | COMDAT, "u", 1, {{0}}, 0}}, 1,
+                              {{".rdata", 0, 1, STATIC, true, NODUPLICATES, 0},
+                               {"once", 0, 1, EXTERNAL, false, 0, 0}}, 2};
+    struct t_object any = {AMD64,
+                           {{".rdata", RDATA | COMDAT, "u", 1, {{0}}, 0}}, 1,
+                           {{".rdata", 0, 1, STATIC, true, ANY, 0},
+                            {"once", 0, 1, EXTERNAL, false, 0, 0}}, 2};
+    struct text out = {0};
+    struct text error = {0};
+
+    CHECK(!join(&single, &any, &out, &error));
+    CHECK(strstr(text_cstr(&error), "a second COMDAT") != NULL);
+    CHECK(strstr(text_cstr(&error), "once") != NULL);
+    text_free(&out);
+    text_free(&error);
+}
+
+/* The COMDAT `f` of the second object goes, and with it the section
+   associated with it. An external symbol of that section that no object
+   keeps goes too, and a relocation of a kept section that names the
+   symbol of a dropped section is refused. */
+static void test_dropped_with_its_comdat(void)
+{
+    struct t_object a = {AMD64, {{".text$f", CODE | COMDAT, call, 8, {{0}}, 0}}, 1,
+                         {{".text$f", 0, 1, STATIC, true, ANY, 0},
+                          {"f", 0, 1, EXTERNAL, false, 0, 0}}, 2};
+    struct t_object b = {AMD64, {{".text$f", CODE | COMDAT, call, 8, {{0}}, 0},
+                                 {".xdata$f", RDATA | COMDAT, "u", 1, {{0}}, 0}}, 2,
+                         {{".text$f", 0, 1, STATIC, true, ANY, 0},
+                          {"f", 0, 1, EXTERNAL, false, 0, 0},
+                          {".xdata$f", 0, 2, STATIC, true, ASSOCIATIVE, 1},
+                          {"unwind_f", 0, 2, EXTERNAL, false, 0, 0}}, 4};
+    struct t_object user = {AMD64, {{".text$f", CODE | COMDAT, call, 8, {{0}}, 0},
+                                    {".text", CODE, call, 8, {{1, 0}}, 1}}, 2,
+                            {{".text$f", 0, 1, STATIC, true, ANY, 0},
+                             {"f", 0, 1, EXTERNAL, false, 0, 0},
+                             {"g", 0, 2, EXTERNAL, false, 0, 0}}, 3};
+    struct text out = {0};
+    struct text error = {0};
+
+    CHECK(join(&a, &b, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    if (out.length > 0) {
+        CHECK(sections_of(&out) == 1);
+        CHECK(find_symbol(&out, "f", 1) == -1);
+        CHECK(find_symbol(&out, "unwind_f", 0) == -1);
+    }
+    out.length = 0;
+    CHECK(!join(&a, &user, &out, &error));
+    CHECK(strstr(text_cstr(&error), "names a symbol the join drops") != NULL);
+    text_free(&out);
+    text_free(&error);
+}
+
+/* The joined object names a long section `/` and up to 7 digits. A long
+   name that the first 9999999 bytes of its string table do not hold is
+   refused. The section of the first object takes a name of 10000000
+   bytes, so the long name of the second stands past them. */
+static void test_long_names_full(void)
+{
+    char *name = alloc_zeroed(10000001, 1);
+    struct t_object a = {AMD64, {{NULL, DATA, "u", 1, {{0}}, 0}}, 1,
+                         {{"foo", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct t_object b = {AMD64, {{".rdata$second_long", DATA, "v", 1, {{0}}, 0}}, 1,
+                         {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+    struct text out = {0};
+    struct text error = {0};
+
+    memset(name, 'n', 10000000);
+    a.sections[0].name = name;
+    CHECK(!join(&a, &b, &out, &error));
+    CHECK(strstr(text_cstr(&error), "too many long section names") != NULL);
+    free(name);
+    text_free(&out);
+    text_free(&error);
+}
+
+/* The overflow form of the count of relocations: the count field holds
+   0xFFFF and the first relocation the count, itself among it. The join
+   copies that record as it stands and renumbers the others. */
+static void test_reloc_overflow(void)
+{
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{3, 0}, {1, 1}, {1, 2}}, 3}}, 1,
+                         {{"foo", 0, 1, EXTERNAL, false, 0, 0},
+                          {"printf", 0, 0, EXTERNAL, false, 0, 0},
+                          {"puts", 0, 0, EXTERNAL, false, 0, 0}}, 3};
+    struct t_object b = {AMD64, {{".text", CODE, call, 8, {{1, 0}}, 1}}, 1,
+                         {{"puts", 0, 0, EXTERNAL, false, 0, 0}}, 1};
+    struct text first = {0};
+    struct text second = {0};
+    struct text out = {0};
+    struct text error = {0};
+    size_t h = section_at(1);
+
+    build(&a, &first);
+    build(&b, &second);
+    patch32(&first, h + 32, 0xFFFF);
+    patch32(&first, h + 36, CODE | 0x01000000u);
+    CHECK(join_bytes(&first, &second, &out, &error));
+    CHECK_STR(text_cstr(&error), "");
+    if (out.length > 0) {
+        CHECK(get(&out, h + 32, 2) == 0xFFFF);
+        CHECK(get(&out, get(&out, h + 24, 4), 4) == 3);
+        CHECK(reloc_symbol(&out, 1, 1) == find_symbol(&out, "printf", 0));
+        CHECK(reloc_symbol(&out, 1, 2) == find_symbol(&out, "puts", 0));
+        CHECK(reloc_symbol(&out, 2, 0) == find_symbol(&out, "puts", 0));
+        CHECK(find_symbol(&out, "puts", 1) == -1);
+    }
+    text_free(&first);
+    text_free(&second);
+    text_free(&out);
+    text_free(&error);
+}
+
+/* A file symbol of two auxiliary records keeps both as they are. A weak
+   external whose default stands in a dropped COMDAT is refused. Each
+   object is built with records that the test then turns into auxiliary
+   ones: the section symbol .file and the symbol after it, and the symbol
+   after w. */
+static void test_auxiliary_records(void)
+{
+    struct t_object a = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                 {".rdata", RDATA | COMDAT, "u", 1, {{0}}, 0}}, 2,
+                         {{".file", 0, 1, STATIC, true, 0, 0},
+                          {"pad", 0, 0, STATIC, false, 0, 0},
+                          {"foo", 0, 1, EXTERNAL, false, 0, 0},
+                          {".rdata", 0, 2, STATIC, true, ANY, 0},
+                          {"once", 0, 2, EXTERNAL, false, 0, 0}}, 5};
+    struct t_object weak = {AMD64, {{".text", CODE, call, 8, {{0}}, 0},
+                                    {".rdata", RDATA | COMDAT, "u", 1, {{0}}, 0}}, 2,
+                            {{"bar", 0, 1, EXTERNAL, false, 0, 0},
+                             {".rdata", 0, 2, STATIC, true, ANY, 0},
+                             {"once", 0, 2, EXTERNAL, false, 0, 0},
+                             {"w", 0, 0, EXTERNAL, false, 0, 0},
+                             {"pad", 0, 0, STATIC, false, 0, 0}}, 5};
+    struct text first = {0};
+    struct text second = {0};
+    struct text out = {0};
+    struct text error = {0};
+    size_t symbols;
+
+    build(&a, &first);
+    build(&weak, &second);
+    /* .file: the section number -2, the storage class of a file and two
+       auxiliary records. */
+    symbols = get(&first, 8, 4);
+    first.data[symbols + 12] = (char)0xFE;
+    first.data[symbols + 13] = (char)0xFF;
+    first.data[symbols + 16] = 103;
+    first.data[symbols + 17] = 2;
+    /* w: a weak external whose record names symbol 1, the section symbol
+       of the COMDAT that the join drops. */
+    symbols = get(&second, 8, 4);
+    second.data[symbols + 18 * 4 + 16] = 105;
+    second.data[symbols + 18 * 4 + 17] = 1;
+    patch32(&second, symbols + 18 * 5, 1);
+    patch32(&second, symbols + 18 * 5 + 4, 3);
+    {
+        struct t_object b = {AMD64, {{".text", CODE, call, 8, {{0}}, 0}}, 1,
+                             {{"bar", 0, 1, EXTERNAL, false, 0, 0}}, 1};
+        struct text plain = {0};
+        build(&b, &plain);
+        CHECK(join_bytes(&first, &plain, &out, &error));
+        CHECK_STR(text_cstr(&error), "");
+        if (out.length > 0) {
+            CHECK(find_symbol(&out, ".file", 0) == 0);
+            CHECK(out.data[get(&out, 8, 4) + 17] == 2);
+            CHECK(find_symbol(&out, "foo", 0) == 3);
+        }
+        text_free(&plain);
+    }
+    out.length = 0;
+    CHECK(!join_bytes(&first, &second, &out, &error));
+    CHECK(strstr(text_cstr(&error), "a weak external without its default") !=
+          NULL);
+    text_free(&first);
+    text_free(&second);
+    text_free(&out);
+    text_free(&error);
+}
+
+/* The exports of the archive for the object user, which may be damaged. */
+static bool exports_for(const struct text *archive, const struct text *user,
+                        struct text *out)
+{
+    out->length = 0;
+    return coff_archive_exports((const unsigned char *)archive->data,
+                                archive->length,
+                                (const unsigned char *)user->data,
+                                user->length, out);
+}
+
+/* The object a program links names what it needs by its undefined
+   symbols. A common symbol, undefined with a size, needs no member, and
+   an object shorter than its header or with more symbols than its table
+   holds is refused. The absolute symbol of the member of bar is no
+   export. */
+static void test_archive_object(void)
+{
+    struct t_object user = {AMD64, {{".text", CODE, call, 8, {{1, 0}}, 1}}, 1,
+                            {{"foo", 0, 0, EXTERNAL, false, 0, 0},
+                             {"bar", 8, 0, EXTERNAL, false, 0, 0}}, 2};
+    struct text archive = {0};
+    struct text object = {0};
+    struct text out = {0};
+    size_t index_at;
+    size_t foo_at;
+    size_t bar_at;
+
+    build_archive(&archive, &index_at, &foo_at, &bar_at);
+    build(&user, &object);
+    CHECK(exports_for(&archive, &object, &out));
+    CHECK_STR(text_cstr(&out), "foo\nbar\n");
+    patch32(&object, 12, (uint32_t)((object.length - get(&object, 8, 4)) / 18 + 1));
+    CHECK(!exports_for(&archive, &object, &out));
+    object.length = 19;
+    CHECK(!exports_for(&archive, &object, &out));
+    text_free(&archive);
+    text_free(&object);
+    text_free(&out);
+}
+
 void test_coff(void)
 {
     test_across();
@@ -1152,4 +1486,13 @@ void test_coff(void)
     test_associative_parent();
     test_archive_index();
     test_no_input();
+    test_nothing_defined();
+    test_directive_tokens();
+    test_absolute();
+    test_comdat_after_another_selection();
+    test_dropped_with_its_comdat();
+    test_long_names_full();
+    test_reloc_overflow();
+    test_auxiliary_records();
+    test_archive_object();
 }
