@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that calls a function of a class
+//! through its table, whose later file gives the function another result.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used(c: *counter.Changer) -> int
+{
+	return c.get();
+}

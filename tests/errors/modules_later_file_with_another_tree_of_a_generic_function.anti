@@ -1,0 +1,10 @@
+//! A library file holds a copy of a generic function of `counter`, made from
+//! the first tree of the generic. The later file of `counter` changes its body
+//! alone. By "Answers of 2026-11-12" the read refuses the library file.
+
+import com.example.tally_user;
+
+fn main() -> int
+{
+	return tally_user.used();
+}

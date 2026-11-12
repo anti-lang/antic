@@ -1,0 +1,12 @@
+//! A class of a library file replaces a function of a base of `counter`, and
+//! the file writes its table against that base. The later file of `counter`
+//! gives the function another result. By "Answers of 2026-11-12" the read
+//! refuses the library file.
+
+import com.example.turner_user;
+
+fn main() -> int
+{
+	let t = turner_user.make();
+	return t.get();
+}

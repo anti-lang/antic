@@ -1,0 +1,20 @@
+//! A user of the first version of `counter` whose class replaces a function of
+//! a base, whose later file gives the function another result.
+
+import com.example.counter;
+
+/// A class that writes its table against `Changer`.
+pub class Turner inherits counter.Changer
+{
+	/// The count of the user.
+	concrete fn get(self) -> int
+	{
+		return 9;
+	}
+}
+
+/// A new turner.
+pub fn make() -> *Turner
+{
+	return alloc Turner { };
+}

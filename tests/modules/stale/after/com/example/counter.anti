@@ -112,3 +112,39 @@ pub class Tin<T>
 {
 	pub v: T,
 }
+
+/// A generic function with another body than the first file gives it.
+pub fn tally<T>(n: int) -> int
+{
+	return 2;
+}
+
+/// A generic class whose `get` has another body than the first file gives it.
+pub class Jar<T>
+{
+	pub v: T,
+
+	/// The count.
+	pub fn get(self) -> int
+	{
+		return 2;
+	}
+}
+
+/// A class whose `get` gives an `f64`, where the first file gives an `int`.
+pub class Changer
+{
+	pub v: int = 0,
+
+	/// The count.
+	pub fn get(self) -> f64
+	{
+		return 3.5;
+	}
+}
+
+/// The half of n as an `f64`, where the first file gives an `int`.
+pub fn half(n: int) -> f64
+{
+	return 2.5;
+}

@@ -4436,7 +4436,8 @@ set_tests_properties(antl_stale_counter_before PROPERTIES
     FIXTURES_SETUP stale_before_antl)
 set(stale_users "")
 foreach(user item final static table bound moved reach gone pusher filler
-        keeper grower copy copy_read tin pick)
+        keeper grower copy copy_read tin pick tally jar changer turner half
+        halver)
     add_test(NAME antl_stale_${user}_user
         COMMAND antic -c -I "${STALE}/before" -I "${LIBS}/stale_before"
                 --runtime "${ANTIC_RUNTIME_DIR}"
@@ -4558,6 +4559,60 @@ add_expect_test(error_modules_later_file_without_a_generic_function STATUS 1
             -o "${CMAKE_CURRENT_BINARY_DIR}/modules_later_file_without_a_generic_function.s"
             modules_later_file_without_a_generic_function.anti)
 set_tests_properties(error_modules_later_file_without_a_generic_function
+    PROPERTIES FIXTURES_REQUIRED stale_antl)
+# The third answer of "Answers of 2026-11-12": a library file carries a
+# digest of the tree of each generic it copied, and the signature of each
+# function it reaches in another library. The later file of `counter`
+# changes the bodies of `tally` and `Jar.get` alone, and gives `Changer.get`
+# and `half` an `f64` in place of an `int`.
+foreach(case
+        "modules_later_file_with_another_tree_of_a_generic_function|tally_user|tally"
+        "modules_later_file_with_another_tree_of_a_generic_class|jar_user|Jar")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 user)
+    list(GET parts 2 generic)
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        PATTERN "${user}\\.antl holds a copy of `com\\.example\\.counter\\.${generic}` made from another tree than the library holds"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED stale_antl)
+endforeach()
+add_expect_test(error_modules_later_file_with_another_signature_of_a_function_of_the_table STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "changer_user\\.antl calls `com\\.example\\.counter\\.Changer\\.get` as `fn\\(\\) -> int`, and the library holds it as `fn\\(\\) -> float`"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_later_file_with_another_signature_of_a_function_of_the_table.s"
+            modules_later_file_with_another_signature_of_a_function_of_the_table.anti)
+add_expect_test(error_modules_later_file_with_another_signature_of_a_function_of_a_base STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "turner_user\\.antl fills the table of `com\\.example\\.turner_user\\.Turner` with `com\\.example\\.counter\\.Changer\\.get` as `fn\\(\\) -> int`, and the library holds it as `fn\\(\\) -> float`"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+            --runtime "${ANTIC_RUNTIME_DIR}"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_later_file_with_another_signature_of_a_function_of_a_base.s"
+            modules_later_file_with_another_signature_of_a_function_of_a_base.anti)
+foreach(case
+        "modules_later_file_with_another_signature_of_a_function|half_user"
+        "modules_later_file_with_another_signature_of_a_function_of_a_generic|halver_user")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 user)
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        PATTERN "${user}\\.antl needs function `com\\.example\\.counter\\.half` as `fn\\(int\\) -> int`, and the library holds it as `fn\\(int\\) -> float`"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED stale_antl)
+endforeach()
+set_tests_properties(
+    error_modules_later_file_with_another_signature_of_a_function_of_the_table
+    error_modules_later_file_with_another_signature_of_a_function_of_a_base
     PROPERTIES FIXTURES_REQUIRED stale_antl)
 # A class that no signature of the user names stands in no type table, so
 # the read of the table finds that the later file lacks it.

@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that holds a copy of `Jar`, whose
+//! later file changes the body of a function alone.
+
+import com.example.counter;
+
+/// A new jar.
+pub fn make() -> *counter.Jar<int>
+{
+	return alloc counter.Jar<int> { v: 0 };
+}

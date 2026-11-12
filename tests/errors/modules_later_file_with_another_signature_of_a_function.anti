@@ -1,0 +1,10 @@
+//! A library file calls a function of `counter` by its name. The later file of
+//! `counter` gives the function another result. By "Answers of 2026-11-12" the
+//! read refuses the library file.
+
+import com.example.half_user;
+
+fn main() -> int
+{
+	return half_user.used();
+}

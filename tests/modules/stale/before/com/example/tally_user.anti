@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that holds a copy of the generic
+//! function `tally`, whose later file changes the body alone.
+
+import com.example.counter;
+
+/// What the call gives.
+pub fn used() -> int
+{
+	return counter.tally<int>(3);
+}

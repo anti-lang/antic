@@ -133,3 +133,39 @@ pub fn pick<T>(n: int) -> int
 {
 	return n;
 }
+
+/// A generic function whose later file changes its body alone.
+pub fn tally<T>(n: int) -> int
+{
+	return 1;
+}
+
+/// A generic class whose later file changes the body of `get` alone.
+pub class Jar<T>
+{
+	pub v: T,
+
+	/// The count, called through the table of a copy.
+	pub fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+/// A class whose later file gives `get` another result.
+pub class Changer
+{
+	pub v: int = 0,
+
+	/// The count, called through the table of the class.
+	pub fn get(self) -> int
+	{
+		return self.v + 3;
+	}
+}
+
+/// The half of n, whose later file gives another result.
+pub fn half(n: int) -> int
+{
+	return n / 2;
+}

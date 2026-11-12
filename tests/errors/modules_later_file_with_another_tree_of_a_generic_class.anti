@@ -1,0 +1,12 @@
+//! A library file holds a copy of a generic class of `counter`, made from the
+//! first tree of the generic. The later file of `counter` changes the body of a
+//! function alone. By "Answers of 2026-11-12" the read refuses the library
+//! file.
+
+import com.example.jar_user;
+
+fn main() -> int
+{
+	let j = jar_user.make();
+	return j.get();
+}
