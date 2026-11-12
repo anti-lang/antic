@@ -9,8 +9,9 @@ of 2026-11-09, third set" in `docs/decisions.md`, the guards of
 `visit_call` by "Answers of 2026-11-11", and the others by "Answers of
 2026-11-10, second set". Those answers keep every guard that no input
 reaches, and the guards of `sema_const.c`, `sema_expr.c`,
-`sema_generic.c`, `antl_tree.c`, `sema_escape.c`, `whole.c` and
-`whole_tables.c` stay by them. A guard stays in the code as it is. A later
+`sema_generic.c`, `antl_tree.c`, `sema_escape.c`, `whole.c`,
+`whole_tables.c`, `lower_place.c`, `coff.c`, `llvm_emit_call.c` and
+`build.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -24,7 +25,9 @@ of the checker were checked against the source of
 `antl_tree.c` against the source of
 `docs/reports/2026-11-11-coverage-phase-3b.md`. Those of
 `sema_escape.c`, `whole.c` and `whole_tables.c` were checked against the
-source of `docs/reports/2026-11-11-coverage-phase-3c.md`. A guard named "the report
+source of `docs/reports/2026-11-11-coverage-phase-3c.md`, and those of
+`lower_place.c`, `coff.c`, `llvm_emit_call.c` and `build.c` against the
+source of `docs/reports/2026-11-12-coverage-phase-3d.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -281,6 +284,66 @@ The writers of the runtime tables, sorted by batch 3c of the third phase.
 | `reach_calls` | A provider whose walk ran before. | `check_cycles` clears what the walk saw before it walks each provider. |
 | `global_value` | A global past the globals of the program. | The reader bounds every address of a library file, and lowering names globals of the program. |
 
+## `src/antic/lower_place.c`
+
+The places and the constants of lowering, sorted by batch 3d of the
+third phase. Lowering reads a tree that the checker has checked without
+an error.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `bitfield_of` | An expression that is no field, or a field that names a symbol, and a field that its class lacks. | `place_address` asks for an `EXPR_FIELD` alone, after a static field took its own path, and `lower_field_owner` gives the class of the chain that declares the field the checker took. |
+| `type_place` | A static field, a field of a union, a field the struct lacks, and a field past the aggregate of the struct, a bitfield or one of another type there. | A static field is `atomic`, and the checker refuses it as a place, so its functions take its address through `lower_address`. `names_union` returns before for a union, and the aggregate of a struct holds each of its fields in order with its type, a bitfield in its unit, which `place_address` sends elsewhere. |
+| `place_address` | A static field as a place. | As in `type_place`. |
+| `lower_place` | A place that `place_address` cannot give. | `place_address` gives one on every path. |
+| `place_address` | A name that is a scalar in its temporary but an aggregate where it is read. | A name is read as an aggregate only where it is declared one, and a `?T` narrowed to a scalar is declared an aggregate. |
+| `const_tree` | A field of a `?T` of the length of `has` with another name. | A `?T` holds the fields `value` and `has` alone. |
+| `lower_location_value` | A position outside a function, and a field of `SourceLocation` that it does not know. | `here` and `fail` stand in a function, and `anti.lang` gives `SourceLocation` its five fields, each of which it names. |
+
+## `src/antic/coff.c`
+
+The join of COFF objects, sorted by batch 3d of the third phase.
+`unit_coff` builds the objects by hand, so every byte a damaged object
+can hold is an input.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `put_size` | An offset or a size of the joined object past 4 GiB, the refusal of `put_size` at each of its callers. | The objects lie in memory beside the join, which then needs more than 4 GiB more, and no test holds that. |
+| `name_field` | A long name of a section whose `/` and digits do not fit 8 bytes. | The test before it takes offsets up to 9999999 alone, which `/` and 7 digits hold. |
+| `write_symbols` | An auxiliary record of a static symbol outside a section, and an associative selection of a section that is no COMDAT. | `read_comdats` refuses an auxiliary record of a static symbol outside a section, and reads a selection only from a COMDAT. |
+| `coff_join` | A failure of `read_sections`, and a symbol table whose records do not add up to the count. | `read_sections` returns true on every path, and `write_symbols` writes the records that `number_symbols` counted. |
+
+## `src/antic/llvm_emit_call.c`
+
+The calls, the parameters and the results of the LLVM text, sorted by
+batch 3d of the third phase. `unit_llvm_emit` builds the IR by hand where
+a library file written by hand could, which the verifier passes.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `param_facts` | A size of a parameter's type that does not fold. | Every size the IR names folds once the back end lays the module out. |
+| `store_params` | A failure before the parameters, and a parameter that passes as the hidden pointer of a result. | The parameters are stored first in the entry block, before any slot that can fail, and `abi_classify` gives `ABI_SRET` to a result alone. |
+| `reinterpret` | A callee result or an instruction with no LLVM type, and two integer types of one size with two names. | An aggregate result goes to `keep_result` before, an instruction of an aggregate type names its aggregate only where its callee returns one, and an integer type of one size has one LLVM name. |
+| `context_floats` | A float argument that does not translate, before the context. | A float that C may read stands in a temporary, and a temporary always translates. |
+| `result_range` | A direct result whose word is not the LLVM type of the result. | `abi_classify` names a direct result with the type `llvm_emit_value_type` gives it. |
+| `llvm_emit_local_export` | An export fn of another module in the object of one module. | The object of one module defines the functions of that module, and a copy of a generic is no export fn. |
+
+## `src/anti/build.c`
+
+The build command, sorted by batch 3d of the third phase. The fault
+cases of `tests/anti-build/messages.cmake` make a call of the system
+fail. Each failure of a read or a write that a count can name is then an
+input.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `options_key` | Options without the name of a package. | `name_project` names every project, by its manifest or by the path of its root module. |
+| `object_compile` | A licence text that it cannot read, and an object compile that links. | The object of a library file takes no options of the header, and it is the object of a module that the program imports, which holds no `main`, so antic stops at the object with status 3. |
+| `soname_link` | `--soname` on a library that is not shared, and a Linux library without a version. | antic refuses `--soname` beside `--lib static` and without `--package-version`, so the build that asks fails first. |
+| `deliver_notice` | A notice printed by a path dependency. | A path dependency builds with `BUILD_NOTICE_BUILD`. |
+| `root_module` | A project without a module. | The build refuses a `src/` that holds no `.anti` file. |
+| `build_path_dependency`, `build_targets`, `run_built` | A host that is no target of Anti. | anti runs on the six hosts of its targets alone. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -297,5 +360,8 @@ The writers of the runtime tables, sorted by batch 3c of the third phase.
   the report of batch 3b did not sort.
 - The sides of a condition in `sema_escape.c`, `whole.c` and
   `whole_tables.c` that the report of batch 3c did not sort.
+- The sides of a condition in `lower_place.c`, `coff.c`,
+  `llvm_emit_call.c` and `build.c` that the report of batch 3d did not
+  sort.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
