@@ -9,7 +9,8 @@ of 2026-11-09, third set" in `docs/decisions.md`, the guards of
 `visit_call` by "Answers of 2026-11-11", and the others by "Answers of
 2026-11-10, second set". Those answers keep every guard that no input
 reaches, and the guards of `sema_const.c`, `sema_expr.c`,
-`sema_generic.c` and `antl_tree.c` stay by them. A guard stays in the code as it is. A later
+`sema_generic.c`, `antl_tree.c`, `sema_escape.c`, `whole.c` and
+`whole_tables.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -21,7 +22,9 @@ of the third batch against the source of
 of the checker were checked against the source of
 `docs/reports/2026-11-11-coverage-phase-3a.md`, and those of
 `antl_tree.c` against the source of
-`docs/reports/2026-11-11-coverage-phase-3b.md`. A guard named "the report
+`docs/reports/2026-11-11-coverage-phase-3b.md`. Those of
+`sema_escape.c`, `whole.c` and `whole_tables.c` were checked against the
+source of `docs/reports/2026-11-11-coverage-phase-3c.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -239,6 +242,45 @@ the trees the checker builds.
 | `local_symbol` | The symbol of a type parameter, which belongs to the tree. | A name of a type in an expression is refused with "`T` is a type, not a value", so no checked tree names a type parameter by its symbol. |
 | `collect` | A kind of table outside the six. | Every caller passes one of `T_SYM` to `T_TYPEX`. |
 
+## `src/antic/sema_escape.c`
+
+The safety check `escaping-local`, sorted by batch 3c of the third phase.
+The pass walks a body that the checker has checked without an error, so
+it sees only the places and the types the checker accepts.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `place_root` | A unary operator other than `*`, and any other kind of expression, as a place. | The checker refuses `&` of anything but a place with "unary `&` needs a place" and a slice of an array that is no place with "slicing an array needs a place", so the pass meets a name, a field, an index or a `*` alone. |
+| `root_of` | The `ptr` of an array. | `check_builtin_field` of `sema_call.c` gives `ptr` to a `str` and a slice alone, and refuses it on an array. |
+| `place_name` | A place that is no name, field, index or `*`, and an operand that is NULL. | Its callers pass the target of a store the checker accepted and the receiver of a collection, which are such places, and the parser gives every operand its node. |
+| `anchor_of` | A unary operator other than `*` as the target of a store. | The checker refuses an assignment to anything but a place, and the place of an atomic operation and the receiver of a collection are places as well. |
+| `sema_check_escapes` | A body that is missing, and a body that the checker checks quietly. | The checker calls the pass for a function with a body, and never inside a quiet check. |
+
+## `src/antic/whole.c`
+
+The pass over the whole program, sorted by batch 3c of the third phase.
+It reads the IR that lowering and the reader of a library file give it.
+`unit_whole` changes that IR where a library file written by hand could.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `whole_class_of` | A global past the globals of the program. | Every caller passes the descriptor or the base of a class record, or the interface of a subtable, which lowering and the reader set to a global of the program. |
+| `whole_free` | No pass to free. | `whole_build` never gives NULL, and its one caller frees what it built. |
+| `entry_at` | A table that holds no list of functions, a slot past its end and an entry that is no function. | Lowering writes every table as a list of the functions of its class, a stub in every abstract slot, and a call names a slot of the class it calls through. |
+| `same_sym` | A symbolic value past the list, or none, two values of different kinds or types, and a kind outside the four. | The values of two copies whose instructions match come from the same expression of the generic, so they are of one kind and one type, and lowering names a value of the list. |
+| `same_agg` | An aggregate that is none. | `same_vtype` asks only where the type is an aggregate, and lowering then names one. |
+| `names_field` | A symbolic value past the list, a value that is no offset, an operation over offsets and a chain of more than 64 of them. | Lowering adds each offset of an address as a `ptradd` of one `offset_of`, and the offset of an element as a `mul` instruction, so a `ptradd` by a symbolic value names one field of the list. |
+
+## `src/antic/whole_tables.c`
+
+The writers of the runtime tables, sorted by batch 3c of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `whole_write_trampolines` | A count of the items of the function lists that no `size_t` holds. | The lists lie in memory, so their items add up to less than the address space. |
+| `reach_calls` | A provider whose walk ran before. | `check_cycles` clears what the walk saw before it walks each provider. |
+| `global_value` | A global past the globals of the program. | The reader bounds every address of a library file, and lowering names globals of the program. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -253,5 +295,7 @@ the trees the checker builds.
   `sema_generic.c` that the report of batch 3a did not sort.
 - The sides of a condition in the three readers of a library file that
   the report of batch 3b did not sort.
+- The sides of a condition in `sema_escape.c`, `whole.c` and
+  `whole_tables.c` that the report of batch 3c did not sort.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
