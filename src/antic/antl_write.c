@@ -1065,6 +1065,20 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         antl_put_u32(w, t->params);
         antl_put_u32(w, t->slot);
     }
+    /* The tables the module writes against classes of other modules, by
+       the DESIGN of struct ir_table_write. */
+    antl_put_count(w, ir->table_write_count);
+    for (i = 0; i < ir->table_write_count; i++) {
+        const struct ir_table_write *t = &ir->table_writes[i];
+        put_str(w, t->class_name);
+        put_str(w, t->module);
+        put_str(w, t->base);
+        antl_put_count(w, t->slot_count);
+        for (j = 0; j < t->slot_count; j++) {
+            put_str(w, t->slots[j].function);
+            antl_put_u32(w, t->slots[j].params);
+        }
+    }
 }
 
 /* The magic, the version, the package header, the module path, the

@@ -581,6 +581,33 @@ struct ir_table_read {
     uint32_t slot;                  /* the entry the read takes */
 };
 
+/* One entry of a table that a module writes, as the class it was laid
+   out against held it: the name of the function and its parameters,
+   `self` among them. */
+struct ir_table_slot {
+    const char *function;
+    uint32_t params;
+};
+
+/* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, a library
+   file carries the table of each class of another module that a table it
+   writes was laid out against. A class of the file that inherits a class
+   of another library, or implements an interface of one, takes its
+   entries from the table of that base as the file of the base held it at
+   the build. A later file of the base whose table changed leaves the
+   table of the class wrong, and a call through it reaches past it or the
+   wrong function. The record names the class whose table the module
+   writes, for the message, and the base by its module and its name, as
+   struct ir_table_read names a class, so the reader lays out the table
+   of the base of the later file and compares the entries in order. */
+struct ir_table_write {
+    const char *class_name;         /* the class whose table is written */
+    const char *module;             /* the module of the base */
+    const char *base;               /* the base it is laid out against */
+    struct ir_table_slot *slots;    /* the entries of the base, in order */
+    size_t slot_count;
+};
+
 struct ir_module {
     struct arena *arena;
     const char *name;
@@ -635,6 +662,10 @@ struct ir_module {
        modules, each once, which its library file carries. */
     struct ir_table_read *table_reads;
     size_t table_read_count;
+    /* The tables the module writes against classes of other modules,
+       each once, which its library file carries. */
+    struct ir_table_write *table_writes;
+    size_t table_write_count;
 };
 
 /* Make m an empty module named name, whose names, globals and constants
@@ -648,6 +679,13 @@ void ir_module_init(struct ir_module *m, struct arena *arena,
 void ir_table_read_add(struct ir_module *m, const char *module,
                        const char *class_name, const char *function,
                        uint32_t params, uint32_t slot);
+
+/* Add to m the table of class_name, laid out against the class base of
+   module, whose entries slots holds in order, unless m holds the same
+   record already. The record keeps a copy of slots in the arena of m. */
+void ir_table_write_add(struct ir_module *m, const char *class_name,
+                        const char *module, const char *base,
+                        const struct ir_table_slot *slots, size_t count);
 
 /* Release the heap memory of m, its functions and class records among it,
    and leave m zeroed. arena keeps the rest. */

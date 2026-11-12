@@ -316,7 +316,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 95, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 96, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -375,6 +375,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0,
     0, 0, 0, 0,                                     /* classes */
     0, 0, 0, 0,                                     /* no reads of tables */
+    0, 0, 0, 0,                                     /* no writes of tables */
     0, 0, 0, 0,                                     /* no locks of functions */
     0, 0, 0, 0,                                     /* no edges of lock orders */
     0, 0, 0, 0,                                     /* no functions that wait */
@@ -1638,13 +1639,14 @@ static void damaged_files(void)
 {
     /* Where the fields a poke below reaches sit, counted back from the
        end of the file. First the three counts of the lock orders, the
-       count of the reads of tables and the count of the classes, two
-       instructions of 53 bytes each and the 15 bytes that open the body.
+       counts of the writes and the reads of tables and the count of the
+       classes, two instructions of 53 bytes each and the 15 bytes that
+       open the body.
        Then the one parameter of the signature with its facts, its count,
        the source of the function and its result with its extension. */
     enum {
-        TAIL = 12 + 4 + 4 + 2 * 53 + 15,
-        MUL_OPERAND = 12 + 4 + 4 + 2 * 53 - 12,
+        TAIL = 12 + 4 + 4 + 4 + 2 * 53 + 15,
+        MUL_OPERAND = 12 + 4 + 4 + 4 + 2 * 53 - 12,
         PARAM_FACTS = TAIL + 4 + 1,
         PARAM_DEREF = TAIL + 4,
         PARAM_EXT = PARAM_FACTS + 4 + 1,
@@ -1662,9 +1664,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 96;
+    copy[4] = 97;
     refuses_file(copy, sizeof copy,
-                 "has format version 96, and antic reads version 95");
+                 "has format version 97, and antic reads version 96");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

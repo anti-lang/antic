@@ -1368,6 +1368,22 @@ static const struct type *library_class(const struct interface *lib,
     return NULL;
 }
 
+/* The slot of the entry of function and params among the count entries
+   of a table, counted from 1 as a slot is, or 0 when none holds it. */
+static size_t entry_slot(const struct table_entry *entries, size_t count,
+                         const char *function, uint32_t params)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (entries[i].params == params &&
+            antl_name_equals(&entries[i].name, function)) {
+            return i + 1;
+        }
+    }
+    return 0;
+}
+
 /* DESIGN: by the second answer of "Answers of 2026-11-12" in
    docs/decisions.md, the file names each function its code reads from
    the table of a class of another module, and the slot it reads. The
@@ -1391,8 +1407,7 @@ static void check_table_read(struct reader *r, const char *module,
     const struct type *t;
     struct table_entry *entries;
     size_t count;
-    size_t found = 0;
-    size_t i;
+    size_t found;
 
     if (strcmp(module, r->iface->module) == 0) {
         return;
@@ -1410,13 +1425,7 @@ static void check_table_read(struct reader *r, const char *module,
     }
     entries = alloc_zeroed(sema_table_bound(t) + 1, sizeof *entries);
     count = sema_table_of(t, entries);
-    for (i = 0; i < count; i++) {
-        if (entries[i].params == params &&
-            antl_name_equals(&entries[i].name, function)) {
-            found = i + 1;
-            break;
-        }
-    }
+    found = entry_slot(entries, count, function, params);
     free(entries);
     if (found == 0) {
         antl_fail(r, "needs function `%s.%s.%s`", module, class_name,
@@ -1448,6 +1457,98 @@ static void read_table_reads(struct reader *r)
     }
 }
 
+/* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, the file
+   carries the table of each class of another module that a table it
+   writes was laid out against, the DESIGN of struct ir_table_write. The
+   reader lays out the table of that class in the later file, which was
+   read before, through sema_table_of, and compares it entry by entry
+   with the one the file was built against. The table the file writes
+   holds the entries of the first table in their slots, so a later base
+   that lacks an entry, holds one at another slot or holds one more is
+   refused, as check_table_read refuses a read. It names the first entry
+   that differs. It never rewrites the table of the file, which the IR
+   holds as constants, to fit the later base. A module that no file of
+   the program holds is not judged here, as check_table_read does not
+   judge it. */
+static void check_table_write(struct reader *r, const char *class_name,
+                              const char *module, const char *base,
+                              const struct ir_table_slot *slots,
+                              uint32_t slot_count)
+{
+    struct name path;
+    const struct interface *lib;
+    const struct type *t;
+    struct table_entry *entries;
+    size_t count;
+    uint32_t i;
+
+    if (strcmp(module, r->iface->module) == 0) {
+        return;
+    }
+    path.text = module;
+    path.length = strlen(module);
+    lib = antl_library(r, &path);
+    if (lib == NULL) {
+        return;
+    }
+    t = library_class(lib, base);
+    if (t == NULL) {
+        antl_fail(r, "needs struct `%s.%s`", module, base);
+        return;
+    }
+    entries = alloc_zeroed(sema_table_bound(t) + 1, sizeof *entries);
+    count = sema_table_of(t, entries);
+    for (i = 0; i < slot_count && !r->failed; i++) {
+        size_t found = entry_slot(entries, count, slots[i].function,
+                                  slots[i].params);
+        if (found == 0) {
+            antl_fail(r, "needs function `%s.%s.%s`", module, base,
+                      slots[i].function);
+        } else if (found != (size_t)i + 1) {
+            antl_fail(r, "fills the table of `%s` with `%s.%s.%s` at slot "
+                         "%u, and the library holds it at slot %zu",
+                      class_name, module, base, slots[i].function,
+                      (unsigned)i + 1, found);
+        }
+    }
+    if (!r->failed && count > slot_count) {
+        antl_fail(r, "fills the table of `%s` without `%s.%s.%.*s`, and the "
+                     "library holds it at slot %u",
+                  class_name, module, base,
+                  (int)entries[slot_count].name.length,
+                  entries[slot_count].name.text, (unsigned)slot_count + 1);
+    }
+    free(entries);
+}
+
+/* The tables the file writes against classes of other modules, each the
+   class whose table it writes, the module and the name of the class it
+   was laid out against and the entries of that class in order, each a
+   name and the count of its parameters. */
+static void read_table_writes(struct reader *r)
+{
+    uint32_t count = antl_get_count(r, 16);
+    uint32_t i;
+
+    for (i = 0; i < count && !r->failed; i++) {
+        const char *class_name = antl_get_cstr(r);
+        const char *module = antl_get_cstr(r);
+        const char *base = antl_get_cstr(r);
+        uint32_t slot_count = antl_get_count(r, 8);
+        struct ir_table_slot *slots =
+            antl_allocate(r, slot_count, sizeof *slots);
+        uint32_t j;
+        for (j = 0; j < slot_count && !r->failed; j++) {
+            slots[j].function = antl_get_cstr(r);
+            slots[j].params = antl_get_u32(r);
+        }
+        if (!r->failed) {
+            check_table_write(r, class_name, module, base, slots,
+                              slot_count);
+        }
+    }
+}
+
 void antl_read_ir(struct reader *r, struct ir_module *program)
 {
     struct ir_maps maps;
@@ -1474,5 +1575,8 @@ void antl_read_ir(struct reader *r, struct ir_module *program)
     }
     if (!r->failed) {
         read_table_reads(r);
+    }
+    if (!r->failed) {
+        read_table_writes(r);
     }
 }

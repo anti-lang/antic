@@ -18,7 +18,7 @@
    of all its functions. Its bytes depend only on the source, so every
    host writes the same file. */
 
-#define ANTL_VERSION 95
+#define ANTL_VERSION 96
 
 /* How deep the checked tree of a generic in a library file may nest,
    counted in its blocks, statements, expressions, written types and

@@ -105,6 +105,7 @@ void ir_module_free(struct ir_module *m)
     free(m->syms);
     free(m->files);
     free(m->table_reads);
+    free(m->table_writes);
     memset(m, 0, sizeof *m);
 }
 
@@ -601,6 +602,36 @@ void ir_table_read_add(struct ir_module *m, const char *module,
     r->function = keep(m->arena, function);
     r->params = params;
     r->slot = slot;
+}
+
+void ir_table_write_add(struct ir_module *m, const char *class_name,
+                        const char *module, const char *base,
+                        const struct ir_table_slot *slots, size_t count)
+{
+    struct ir_table_write *grown;
+    struct ir_table_write *w;
+    size_t i;
+
+    for (i = 0; i < m->table_write_count; i++) {
+        w = &m->table_writes[i];
+        if (strcmp(w->class_name, class_name) == 0 &&
+            strcmp(w->module, module) == 0 && strcmp(w->base, base) == 0) {
+            return;
+        }
+    }
+    grown = alloc_resize(m->table_writes, m->table_write_count + 1,
+                         sizeof *grown);
+    m->table_writes = grown;
+    w = &m->table_writes[m->table_write_count++];
+    w->class_name = keep(m->arena, class_name);
+    w->module = keep(m->arena, module);
+    w->base = keep(m->arena, base);
+    w->slots = arena_alloc(m->arena, (count + 1) * sizeof *w->slots);
+    w->slot_count = count;
+    for (i = 0; i < count; i++) {
+        w->slots[i].function = keep(m->arena, slots[i].function);
+        w->slots[i].params = slots[i].params;
+    }
 }
 
 void ir_class_mutable(struct ir_class *c, uint32_t field)

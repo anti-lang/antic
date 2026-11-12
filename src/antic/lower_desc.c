@@ -81,6 +81,66 @@ void lower_note_table_read(struct lowerer *l, const struct type *t,
     free(function);
 }
 
+/* Whether the class t comes from a module other than the one being
+   lowered. The root and the types the compiler declares belong to the
+   compiler and come from none. */
+static bool foreign_class(const struct lowerer *l, const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_CLASS && t->base != NULL &&
+           !types_is_declared(t) && !lower_name_is(&t->module, l->module_name);
+}
+
+/* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, the library
+   file of the module carries the table of each class of another module
+   that a table it writes was laid out against, the DESIGN of struct
+   ir_table_write. The table of t takes its entries from the chain of
+   from, its base or the interface of one of its sub-objects. The record
+   names the nearest class of another module in that chain. Every class
+   between t and it belongs to the module, whose file the later file of
+   no other module changes, and the table of that class holds the
+   entries of every class above it. The root and the types the compiler
+   declares take none, as they take no read, and neither does a copy of
+   a generic. */
+static void note_table_write(struct lowerer *l, const struct type *t,
+                             const struct type *from)
+{
+    const struct type *b = from;
+    struct table table = {0};
+    struct ir_table_slot *slots;
+    struct text class_name = {0};
+    char *module;
+    char *base;
+    size_t i;
+
+    while (b != NULL && b->kind == TYPE_CLASS && b->base != NULL &&
+           !foreign_class(l, b)) {
+        b = b->base;
+    }
+    if (!foreign_class(l, b) || b->generic != NULL || t->generic != NULL) {
+        return;
+    }
+    table_of(b, &table);
+    slots = alloc_zeroed(table.count + 1, sizeof *slots);
+    for (i = 0; i < table.count; i++) {
+        slots[i].function = lower_cstr(&table.entries[i].name);
+        slots[i].params = (uint32_t)table.entries[i].params;
+    }
+    text_appendf(&class_name, "%.*s.", (int)t->module.length, t->module.text);
+    types_symbol_name(&class_name, t);
+    module = lower_cstr(&b->module);
+    base = lower_cstr(&b->name);
+    ir_table_write_add(l->m, text_cstr(&class_name), module, base, slots,
+                       table.count);
+    for (i = 0; i < table.count; i++) {
+        free((char *)slots[i].function);
+    }
+    free(slots);
+    free(table.entries);
+    text_free(&class_name);
+    free(module);
+    free(base);
+}
+
 /* The offset of table entry index. The IR holds no sizes, so the width
    of a pointer stays symbolic. */
 struct ir_operand lower_entry_offset(struct lowerer *l, size_t index)
@@ -1532,6 +1592,7 @@ struct ir_global *lower_class_table(struct lowerer *l, const struct type *t)
     if (g != NULL) {
         return g;
     }
+    note_table_write(l, t, t->base);
     table_of(t, &table);
     value = ir_const_agg(m, ir_aggregate(lower_table_agg(l, table.count + 1)),
                          table.count + 1);
@@ -1599,6 +1660,7 @@ struct ir_global *lower_interface_table(struct lowerer *l,
     if (g != NULL) {
         return g;
     }
+    note_table_write(l, t, sub->type);
     table_of(sub->type, &table);
     value = ir_const_agg(m, ir_aggregate(lower_table_agg(l, table.count + 1)),
                          table.count + 1);
