@@ -766,6 +766,29 @@ static bool field_shadows_function(const struct type *s,
            m != NULL && m->kind == ITEM_FN;
 }
 
+/* DESIGN: v.f(args) calls the function that the field f of the class of
+   v holds, or the field f of a class of its chain, which the derived
+   class keeps, by T238 of docs/audit/tests-findings.md. A function of
+   the name that a call reaches takes the call instead, as it does over
+   a field of the class itself that holds no function. */
+static bool calls_field(const struct type *s, const struct name *name)
+{
+    const struct type *level;
+    const struct item *m;
+
+    if (types_find_field(s, name) != NULL) {
+        return !field_shadows_function(s, name);
+    }
+    for (level = s->kind == TYPE_CLASS ? s->base : NULL; level != NULL;
+         level = level->kind == TYPE_CLASS ? level->base : NULL) {
+        if (types_find_field(level, name) != NULL) {
+            m = reached_member(s, name);
+            return m == NULL || m->kind != ITEM_FN;
+        }
+    }
+    return false;
+}
+
 /* The class of the chain of t whose library file names name among its
    private functions, NULL for none. */
 static const struct type *private_owner(const struct type *t,
@@ -2069,8 +2092,7 @@ static bool method_callee(struct checker *c, struct expr *e,
        by T185 of docs/audit/tests-findings.md, and the call then reaches
        the function rather than give a second message. */
     if (s != NULL && !s->is_union &&
-        (types_find_field(s, &callee->as.field.name) == NULL ||
-         field_shadows_function(s, &callee->as.field.name))) {
+        !calls_field(s, &callee->as.field.name)) {
         if (!method_call(c, e)) {
             form->result = sema_builtin(c, TYPE_ERROR);
             return true;
