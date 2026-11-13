@@ -1,6 +1,8 @@
 //! A derived `construct` that fails after the `construct` of its base succeeded
 //! leaves no object behind, and what the base took is given back: the part of
-//! the `Machine` does not stay alive, although the `Robot` was never made.
+//! the `Machine` does not stay alive, although the `Robot` was never made. The
+//! same holds for a base whose `construct` cannot fail, which the `Drone` calls
+//! without `try`.
 
 import anti.lang;
 
@@ -52,6 +54,32 @@ class Robot inherits Machine
 	}
 }
 
+class Frame
+{
+	pub n: int = 0,
+	own part: ?*Part = none,
+
+	fn construct(self, n: int)
+	{
+		self.part = alloc Part { };
+		self.n = n;
+	}
+}
+
+class Drone inherits Frame
+{
+	pub rotors: int = 0,
+
+	fn construct(self, n: int, rotors: int) may fail
+	{
+		self.super.construct(n);
+		if rotors > 8 {
+			fail lang.Error.new(80 + rotors, "too many rotors");
+		}
+		self.rotors = rotors;
+	}
+}
+
 fn alive() -> int
 {
 	return Part.live.load();
@@ -67,8 +95,20 @@ fn derived(n: int, arms: int) -> int
 	return got;
 }
 
+fn plain_base(n: int, rotors: int) -> int
+{
+	let d = alloc Drone(n, rotors) catch e {
+		return -e.code;
+	};
+	let got = d.n * 10 + d.rotors;
+	delete(d);
+	return got;
+}
+
 fn main() -> int
 {
 	printf("%d, alive %d\n".ptr, derived(2, 3) as c_int, alive() as c_int);
+	printf("%d, alive %d\n".ptr, plain_base(2, 9) as c_int, alive() as c_int);
+	printf("%d, alive %d\n".ptr, plain_base(2, 4) as c_int, alive() as c_int);
 	return 0;
 }
