@@ -11,7 +11,8 @@ of 2026-11-09, third set" in `docs/decisions.md`, the guards of
 reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `sema_generic.c`, `antl_tree.c`, `sema_escape.c`, `whole.c`,
 `whole_tables.c`, `lower_place.c`, `coff.c`, `llvm_emit_call.c`,
-`build.c` and `sema_lock.c` stay by them. A guard stays in the code as it is. A later
+`build.c`, `sema_lock.c`, `lower_stmt.c`, `lower_expr.c`, `lower_desc.c`
+and `platform.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -29,7 +30,9 @@ source of `docs/reports/2026-11-11-coverage-phase-3c.md`, and those of
 `lower_place.c`, `coff.c`, `llvm_emit_call.c` and `build.c` against the
 source of `docs/reports/2026-11-12-coverage-phase-3d.md`. Those of
 `sema_copies.c`, `sema_index.c` and `sema_lock.c` were checked against
-the source of `docs/reports/2026-11-13-coverage-phase-3e.md`. A guard named "the report
+the source of `docs/reports/2026-11-13-coverage-phase-3e.md`, and those
+of the four files of batch 3f against the source of
+`docs/reports/2026-11-13-coverage-phase-3f.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -360,12 +363,73 @@ sorted by batch 3e of the third phase.
 | `first_wait` | A walk that reaches no wait, which returns false. | A function waits when one of its sites waits or calls a function that waits, and the walk enters each such callee that it has not entered yet. |
 | `warn_waits` | A quiet check, after which it warns of nothing. | The pass runs once per module after the checker, never inside a quiet check. |
 
+## `src/antic/lower_stmt.c`
+
+The statements of lowering, sorted by batch 3f of the third phase.
+Lowering reads a tree that the checker has checked without an error.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lower_forget_received` | A value that another function received. | The list of the received values starts empty for each function, and the body of an anonymous function is lowered as a function of its own. |
+| `lower_assign`, `lower_flags_assign` | A place that `lower_place` cannot give. | As in `lower_place` of `src/antic/lower_place.c`. |
+| `destructure` | A name of a pattern without a symbol. | The checker declares every name of a pattern, and `_` is a name like any other. |
+| `lower_let_unwrap` | A value that ends its path, and a name without a symbol. | The value of `let ... else` is a `?T` of a value, and no such expression ends its path. The checker declares the name. |
+| `lower_let_unwrap`, `lower_let_value` | An `else` block that falls through to the rest. | The checker refuses an `else` block whose end can be reached. |
+| `in_slot` | A name without a symbol. | Every caller passes the symbol of a name the checker declared. |
+| `lower_stmt_kind` | A `yield` outside a handler, and a `yield` with a value in the handler of a call that writes no result. | The checker refuses both, the second with ``the call writes no result, so `yield` takes no value``. |
+| `reserve_call_handler` | A statement without an expression. | A `let` always takes a value, and a statement of an expression and an assignment always hold one. |
+
+## `src/antic/lower_expr.c`
+
+The expressions of lowering, sorted by batch 3f of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `flag_op` | The negation of the flags form. | Each caller passes a binary operator, and `lower_flag_operation` takes `IR_NEG_FL` for a negation itself. |
+| `lower_cast` | `as` between two `f16` types, and between two floats of one IR type. | `f16`, `f32` and `f64` are one type each, so either pair is the same type, which the test of the same type before took. |
+| `lower_sym_of` | A type parameter in a symbolic value. | The comment of the arm gives it: a copy of a generic replaces every parameter before lowering, and the driver refuses a program that needs one. |
+| `keep_address_argument` | A value at a pointer parameter that is no `&` of a place. | The checker passes a pointer or the address of a place to every pointer parameter, a receiver among them. |
+| `dispatched_params` | A call through a table without the symbol of its function. | A call through a table names the function the checker found in the class, whose symbol has a type. |
+| `table_target` | An entry that the table lacks. | The checker names an entry that the table of the class holds, so its index is above 0. |
+| `lower_expr_value` | `parallel` and `dispatch` as a scalar, and a bound function there. | Each gives an aggregate, which `lower_address` builds before the switch of the scalar values. |
+| `lower_expr_value` | A kind of expression without an arm. | Every kind has its arm, and the literals of aggregates take `lower_address`. |
+
+## `src/antic/lower_desc.c`
+
+The descriptors and the tables of lowering, sorted by batch 3f of the
+third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `class_type_args`, `class_ancestors`, `class_functions`, `class_chain`, `class_versions` | A part of a descriptor that the module holds already. | `lower_class_descriptor` builds each part once, after it found no descriptor. A class of another module stops there with a reference. |
+| `class_ancestors` | The ancestors of the root. | `lower_class_descriptor` returns the descriptor of the runtime for the root before it asks for any part. |
+| `class_functions` | A class whose table holds no entry. | Every table holds the seven functions of the root. |
+| `interface_descriptor` | A descriptor of a sub-object that the module holds already. | `lower_interface_table` asks for it once, after it found no table of its own. |
+| `lower_interface_table` | An entry of the interface that neither the class nor the interface fills. | The checker refuses a class that leaves an abstract function of its interface without a body. |
+
+## `src/antic/platform.c`
+
+The layer of the host of antic and anti, sorted by batch 3f of the
+third phase. The paths of the other hosts are compiled out on the Mac,
+and the measurement holds those of macOS.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `self_path` | A path of the executable of length 0, and one that `realpath` cannot resolve. | The system gives the path of every running executable, and the path names that file. |
+| `platform_self_directory` | A path of the executable without a directory. | The path that `self_path` resolves is absolute and names a file below a directory. |
+| `wait_for` | A wait that a signal interrupts, which it repeats. | No test sends a tool a signal while it waits. |
+| `environment_with` | No environment. | A process of macOS starts with `environ` set. |
+| `platform_run_on_stack` | Attributes of a thread that the system cannot set up. | The system sets them up, and it takes the size of `PLATFORM_WORK_STACK`. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
   symbolizers of `src/rt/trace.c` and `anti_rt_fault_system_error`.
 - `work_not_waited`, which a test reaches, and which ends through `_Exit`
-  before it writes its counts.
+  before it writes its counts, with the message of
+  `platform_run_on_stack` before it.
+- The child of `platform_run_in` between `fork` and `exec`, which ends
+  through `execvp` or `_exit` before it writes its counts.
 - The failure of `vsnprintf` in `fitted`, which needs a message of more
   than `INT_MAX` bytes.
 - The paths of `sema_stmt.c` that the report of the second batch did not
@@ -381,5 +445,8 @@ sorted by batch 3e of the third phase.
   sort.
 - The sides of a condition in `sema_copies.c`, `sema_index.c` and
   `sema_lock.c` that the report of batch 3e did not sort.
+- The sides of a condition in `lower_stmt.c`, `lower_expr.c`,
+  `lower_desc.c` and `platform.c` that the report of batch 3f did not
+  sort.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
