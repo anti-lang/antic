@@ -10,8 +10,8 @@ of 2026-11-09, third set" in `docs/decisions.md`, the guards of
 2026-11-10, second set". Those answers keep every guard that no input
 reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `sema_generic.c`, `antl_tree.c`, `sema_escape.c`, `whole.c`,
-`whole_tables.c`, `lower_place.c`, `coff.c`, `llvm_emit_call.c` and
-`build.c` stay by them. A guard stays in the code as it is. A later
+`whole_tables.c`, `lower_place.c`, `coff.c`, `llvm_emit_call.c`,
+`build.c` and `sema_lock.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -27,7 +27,9 @@ of the checker were checked against the source of
 `sema_escape.c`, `whole.c` and `whole_tables.c` were checked against the
 source of `docs/reports/2026-11-11-coverage-phase-3c.md`, and those of
 `lower_place.c`, `coff.c`, `llvm_emit_call.c` and `build.c` against the
-source of `docs/reports/2026-11-12-coverage-phase-3d.md`. A guard named "the report
+source of `docs/reports/2026-11-12-coverage-phase-3d.md`. Those of
+`sema_copies.c`, `sema_index.c` and `sema_lock.c` were checked against
+the source of `docs/reports/2026-11-13-coverage-phase-3e.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -158,10 +160,11 @@ which refuses the form first or never builds it.
 | `member_of_receiver`, `own_params_copy` and `callee_copy` | A call that names no copy, which `copy_failed` refuses. | The checker gives every call of a generic its copy. |
 | `own_params_copy` and `callee_copy` | A class nested in a generic, and a copy of its class that lacks the member. | A library file carries no function of a class with type parameters of its own, so a client gets `` `Stack<int>` has no function `map` `` first. |
 | `xe` | A generic named as a value. | The checker refuses `let f = id;` with `` `id` is generic, and names a function where it is called ``. |
-| `copy_failed` | A copy of a generic of the module itself that fails, which keeps the position in the body of the generic. | The one form that fails, that of T095, is a copy of a generic of another module. |
-| `type_item` and `member_of_copy` | A type item without its generic, and a member without a symbol, a type or a copy. | The checker binds each one before the copies are made. |
+| `copy_failed` | A copy of a generic of the module itself that fails, which keeps the position in the body of the generic, and a refusal without a name, which names no generic. | The one form that fails, that of T095, is a copy of a generic of another module, and every clone names the generic it copies. |
+| `type_item` and `member_of_copy` | A type item without its generic, a member without a symbol, a type or a copy, and a member that the generic class lacks. | The checker binds each one before the copies are made, and the member is one of the class of the generic. |
+| `xf` | A field that no level of the chain of its type declares, which it keeps. | The checker took the field from that chain. |
 | `redirect`, `xassign` and `xfor` | An open index, `set_index` and `for` over a slice or an array. | No slice or array meets `index`, so the copy turns every open index into a call. |
-| `recheck`, `receiver`, `xparams` and `xi` | A recheck that fails, a receiver without its types, a clone that is not fresh and an item that has its clone already. | The checked tree passed the same checks, and each item is asked for once. |
+| `recheck`, `receiver`, `xparams`, `xi` and `xfor` | A recheck that fails, a receiver without its types, a clone that is not fresh, an item that has its clone already and a walk of a collection that fails. | The checked tree passed the same checks, the argument met the constraint of the walk, and each item is asked for once. |
 | `ty`, `map_add`, `xf`, `xsym`, `symbol_open`, `generic_home`, `copy_function`, `direct_callee`, `walked_param`, `xcall`, `xi`, `defaults_of_copies` and `generic_type_item` | An operand that is NULL and a map of the type arguments that is empty. | Every caller passes the operand, and a copy has at least one type argument. |
 | `refuse` and `xs` | A value outside the cases of the `switch`. | The `switch` of `refuse` names every refusal, and that of `xs` every kind of statement. |
 
@@ -344,6 +347,19 @@ input.
 | `root_module` | A project without a module. | The build refuses a `src/` that holds no `.anti` file. |
 | `build_path_dependency`, `build_targets`, `run_built` | A host that is no target of Anti. | anti runs on the six hosts of its targets alone. |
 
+## `src/antic/sema_lock.c`
+
+The safety check `lock-order` and the warning `blocking-under-lock`,
+sorted by batch 3e of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `declaring` | A field that no level of the chain declares, after which it names the type itself. | The checker accepts a field that the type of the place or a base declares, and the first level the walk asks holds it. |
+| `mutex_lock` | A static field that is a Mutex. | A static field is atomic, and an atomic field holds no Mutex. The provisional entry on the names of the locks of C4 names one all the same. |
+| `function_of` | A function asked for a second time, which gives its index. | The walk asks for each function of the module once, and for each anonymous function once, where it stands. |
+| `first_wait` | A walk that reaches no wait, which returns false. | A function waits when one of its sites waits or calls a function that waits, and the walk enters each such callee that it has not entered yet. |
+| `warn_waits` | A quiet check, after which it warns of nothing. | The pass runs once per module after the checker, never inside a quiet check. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -363,5 +379,7 @@ input.
 - The sides of a condition in `lower_place.c`, `coff.c`,
   `llvm_emit_call.c` and `build.c` that the report of batch 3d did not
   sort.
+- The sides of a condition in `sema_copies.c`, `sema_index.c` and
+  `sema_lock.c` that the report of batch 3e did not sort.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
