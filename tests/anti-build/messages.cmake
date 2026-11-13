@@ -780,6 +780,50 @@ anti_message(soname_without_lib STATUS 2
 anti_message(bundle_runtime_without_lib STATUS 2
     ARGS build --bundle-runtime
     ERR "anti: --bundle-runtime builds a library, with --lib")
+# The profile that --profile-use names is a part of the key of the
+# program, program_key of build.c, so a file it cannot read stops the
+# build there.
+anti_message(profile_use_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    ARGS build --release --profile-use missing.profdata ${tools}
+    ERR "anti: cannot read missing.profdata")
+# The key of the program holds the digest of every archive of the
+# runtime archive that the link may take, cache_runtime of cache.c, so a
+# directory of the level that cannot be read stops the build there. The
+# stand-in archive links every part of the real one, and the directory of
+# the level is a file. A Windows host makes no symbolic link without the
+# right to, so the case stands on the other hosts.
+if(NOT CMAKE_HOST_WIN32)
+    if(HOST MATCHES "arm64")
+        set(unread_level armv8.0)
+    else()
+        set(unread_level v1)
+    endif()
+    set(level_stand_in "${WORK}/runtime")
+    # Link each entry of the directory from below the real archive into
+    # the stand-in, all but the one named skip.
+    function(link_entries from skip)
+        file(MAKE_DIRECTORY "${level_stand_in}/${from}")
+        file(GLOB entries RELATIVE "${RUNTIME}/${from}" "${RUNTIME}/${from}/*")
+        foreach(entry IN LISTS entries)
+            if(NOT entry STREQUAL skip)
+                file(CREATE_LINK "${RUNTIME}/${from}/${entry}"
+                     "${level_stand_in}/${from}/${entry}" SYMBOLIC)
+            endif()
+        endforeach()
+    endfunction()
+    function(runtime_level_unread)
+        link_entries("" lib)
+        link_entries(lib "${HOST}")
+        link_entries("lib/${HOST}" "${unread_level}")
+        file(WRITE "${level_stand_in}/lib/${HOST}/${unread_level}" "")
+    endfunction()
+    anti_message(runtime_level_unread
+        FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+        SETUP runtime_level_unread
+        ARGS build --cpu ${unread_level} --runtime "${level_stand_in}"
+        ERR "anti: cannot read ${level_stand_in}/lib/${HOST}/${unread_level}")
+endif()
 
 # Fault injection: each case makes one call of the system fail in
 # anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. A count
@@ -1325,6 +1369,20 @@ anti_message(fault_project_directory_not_found
     FAULT stat:11:EACCES,stat:12:EACCES
     ARGS build ${tools}
     ERR "anti: the project directory `.` is no file name on every target, and `program` of [package] names the program")
+# A path dependency whose manifest names no package takes the name of
+# its directory, as its path in the manifest writes it, `../one/`. When
+# both calls of realpath fail for it in name_program, the fourteenth and
+# the fifteenth stat, the name keeps that path and drops the `/` at its
+# end, so the program is `one` as it is without the faults. A dependency
+# that holds `main` is a program, and gives the build no library file.
+anti_message(fault_path_dependency_named_with_a_slash
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.one\" = { path = \"../one/\" }\n"
+          ${app_source} "${app_text}"
+          ../one/anti.toml ""
+          ../one/src/com/example/one.anti "${app_text}"
+    FAULT stat:14:EACCES,stat:15:EACCES
+    ARGS build ${tools}
+    ERR "anti: ./../one//dist/${HOST}/dev holds no library file of the package com.example.one")
 # The same reads and writes of a release build. On macOS the facts of the
 # link are written after the two reads of the check of the dSYM.
 anti_message(fault_release_imports_unread_for_the_program_key
