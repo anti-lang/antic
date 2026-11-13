@@ -1,6 +1,7 @@
 //! The safety check `lock-order` stops a dev build as it stops a release build,
 //! and `unchecked(lock-order, "reason")` overrules it before a statement and
-//! last in the header of a function.
+//! last in the header of a function. A Mutex of a tuple is a local and no lock
+//! of the graph, so `tuple` takes it and `Pair.a` both ways unrefused.
 
 struct Pair
 {
@@ -49,6 +50,21 @@ fn refused(p: *Pair)
 	}
 }
 
+fn tuple(p: *Pair)
+{
+	let t = (Mutex.new(), 0);
+	sync t.0 {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+	sync p.a {
+		sync t.0 {
+			p.n += 1;
+		}
+	}
+}
+
 fn main() -> int
 {
 	let p = Pair { n: 0 };
@@ -56,5 +72,6 @@ fn main() -> int
 	statement(&p);
 	function(&p);
 	refused(&p);
-	return p.n - 4;
+	tuple(&p);
+	return p.n - 6;
 }

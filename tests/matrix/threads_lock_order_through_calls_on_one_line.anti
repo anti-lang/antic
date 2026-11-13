@@ -1,0 +1,85 @@
+//! C4 among edges that stand at one place. `same_field` holds `c` of two
+//! objects, one lock twice, when it takes `d`. `one_line` takes `a` and `b`
+//! through two calls on one line while it holds `c`. `two_held` calls `both`,
+//! which takes `a` and `b`, while it holds `c` and `d`. `back` takes `c` while
+//! it holds `a`, which closes the cycle with the first call of `one_line`.
+
+struct Locks
+{
+	a: Mutex,
+	b: Mutex,
+	c: Mutex,
+	d: Mutex,
+	n: int,
+}
+
+fn take_a(p: *Locks) -> int
+{
+	sync p.a {
+		return p.n;
+	}
+}
+
+fn take_b(p: *Locks) -> int
+{
+	sync p.b {
+		return p.n;
+	}
+}
+
+fn both(p: *Locks)
+{
+	sync p.a {
+		p.n += 1;
+	}
+	sync p.b {
+		p.n += 1;
+	}
+}
+
+fn same_field(x: *Locks, y: *Locks)
+{
+	sync x.c {
+		sync y.c {
+			sync x.d {
+				x.n += 1;
+			}
+		}
+	}
+}
+
+fn one_line(p: *Locks)
+{
+	sync p.c {
+		p.n = take_a(p) + take_b(p);
+	}
+}
+
+fn two_held(p: *Locks)
+{
+	sync p.c {
+		sync p.d {
+			both(p);
+		}
+	}
+}
+
+fn back(p: *Locks)
+{
+	sync p.a {
+		sync p.c {
+			p.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Locks { n: 0 };
+	let q = Locks { n: 0 };
+	same_field(&p, &q);
+	one_line(&p);
+	two_held(&p);
+	back(&p);
+	return 0;
+}

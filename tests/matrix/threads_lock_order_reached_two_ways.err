@@ -1,0 +1,1 @@
+threads_lock_order_reached_two_ways.anti:39:3: error: `Locks.a` is locked here while `Locks.d` is held, and line 18 locks them in the other order [lock-order]

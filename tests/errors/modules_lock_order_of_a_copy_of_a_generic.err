@@ -1,0 +1,1 @@
+modules_lock_order_of_a_copy_of_a_generic.anti:24:3: error: `Pair.a` is locked here while `Pair.b` is held, and line 20 of `com.example.pairs` locks them in the other order [lock-order]

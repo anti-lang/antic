@@ -1,0 +1,26 @@
+//! C5 in two copies of one generic: each copy holds the `send` under the lock
+//! at the same place, and the warning stands there once.
+
+struct Inbox
+{
+	lock: Mutex,
+	c: chan int,
+}
+
+fn work<T>(box: *Inbox, x: *T)
+{
+	sync box.lock {
+		send(box.c, 1);
+	}
+}
+
+fn main() -> int
+{
+	let box = Inbox { c: chan int(2) };
+	let n = 1;
+	let b = true;
+	work(&box, &n);
+	work(&box, &b);
+	delete(box.c);
+	return 0;
+}

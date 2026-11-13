@@ -1,0 +1,33 @@
+//! C5 through two functions that call each other: `ping` calls `pong` before
+//! its `send`, and `pong` calls `ping` alone. The walk that finds the first
+//! wait of `ping` enters `pong`, finds no wait there it has not entered, and
+//! goes back to the `send` of `ping`, which the message names.
+
+struct Box
+{
+	lock: Mutex,
+	c: chan int,
+}
+
+fn ping(b: *Box, n: int)
+{
+	if n > 0 {
+		pong(b, n - 1);
+	}
+	send(b.c, n);
+}
+
+fn pong(b: *Box, n: int)
+{
+	ping(b, n);
+}
+
+fn main() -> int
+{
+	let b = Box { c: chan int(4) };
+	sync b.lock {
+		ping(&b, 1);
+	}
+	delete(b.c);
+	return 0;
+}

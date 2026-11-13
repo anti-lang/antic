@@ -1,0 +1,1 @@
+threads_lock_order_through_calls_on_one_line.anti:70:3: error: `Locks.c` is locked here while `Locks.a` is held, and line 54 locks them in the other order [lock-order]

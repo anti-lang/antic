@@ -1621,6 +1621,59 @@ static bool reads_file(const struct text *bytes);
 /* A function that waits, appended to the last count of scale_antl: the
    name `f`, the kind, line 1 and the module `m`. A kind past the last of
    enum wait_kind is damage. */
+/* A library file written by hand may record an edge from a lock to the
+   same lock, which the graph of a client leaves out, sema_lock.c. The
+   library takes `a` and then `b`, and the edge it keeps then leads from
+   `a` to `a`, so the client that takes `b` and then `a` closes no cycle
+   and is accepted. */
+static void lock_edge_to_itself(void)
+{
+    static const char pairs[] = "pub struct Pair { a: Mutex, b: Mutex, n: int }\n"
+                                "pub fn forward(p: *Pair) {\n"
+                                "    sync p.a {\n"
+                                "        sync p.b {\n"
+                                "            p.n += 1;\n"
+                                "        }\n"
+                                "    }\n"
+                                "}\n";
+    static const char client[] = "import pairs;\n"
+                                 "fn backward(p: *pairs.Pair) {\n"
+                                 "    sync p.b {\n"
+                                 "        sync p.a {\n"
+                                 "            p.n += 1;\n"
+                                 "        }\n"
+                                 "    }\n"
+                                 "}\n";
+    struct compilation s;
+    struct interface *iface;
+    struct lock_facts *facts;
+    struct lock_edge *edges;
+    struct module *module;
+    bool ok;
+
+    compilation_open(&s);
+    iface = arena_alloc(&s.arena, sizeof *iface);
+    module = compilation_check(&s, "pairs", pairs, true, &ok);
+    CHECK(ok);
+    if (ok) {
+        sema_interface(module, "pairs", &s.arena, iface);
+    }
+    CHECK(ok && iface->locks != NULL && iface->locks->edge_count == 1);
+    if (ok && iface->locks != NULL && iface->locks->edge_count == 1) {
+        facts = arena_alloc(&s.arena, sizeof *facts);
+        *facts = *iface->locks;
+        edges = arena_alloc(&s.arena, sizeof *edges);
+        edges[0] = facts->edges[0];
+        edges[0].taken = edges[0].held;
+        facts->edges = edges;
+        iface->locks = facts;
+        compilation_add(&s, iface);
+        compilation_check(&s, "main", client, true, &ok);
+        expect_accepted(ok, &s.diags, client);
+    }
+    compilation_close(&s);
+}
+
 static void damaged_wait(void)
 {
     uint8_t longer[sizeof scale_antl + 18];
@@ -5162,6 +5215,7 @@ void test_modules(void)
     dependencies();
     damaged_files();
     damaged_wait();
+    lock_edge_to_itself();
     damaged_records();
     damaged_simd();
     damaged_constants();

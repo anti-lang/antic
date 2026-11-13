@@ -1,0 +1,39 @@
+//! A copy of the generic `ordered` of a library takes `a` and then `b` of a
+//! pair, and its edge stands at a line of that library. The program takes them
+//! the other way round, before its copy in the order of the text. Its own
+//! struct of the same name holds locks of its own.
+
+import com.example.pairs;
+
+struct Pair
+{
+	a: Mutex,
+	n: int,
+}
+
+fn own(p: *Pair)
+{
+	sync p.a {
+		p.n += 1;
+	}
+}
+
+fn backward(p: *pairs.Pair)
+{
+	sync p.b {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = pairs.pair();
+	let q = Pair { a: Mutex.new(), n: 0 };
+	let one = 1;
+	own(&q);
+	backward(&p);
+	pairs.ordered(&p, &one);
+	return 0;
+}

@@ -1,0 +1,19 @@
+//! Imports the two libraries that take the locks of a pair in opposite orders.
+//! A library holds no `main`, so their cycle stands unrefused there. The locks
+//! of its own stand in a closure alone, so no function of it takes a lock.
+
+import com.example.left;
+import com.example.pairs;
+import com.example.right;
+
+pub fn both(p: *pairs.Pair)
+{
+	let f = fn(q: *pairs.Pair) {
+		sync q.a {
+			sync q.b {
+				q.n += 1;
+			}
+		}
+	};
+	f(p);
+}

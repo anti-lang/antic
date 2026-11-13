@@ -1,4 +1,5 @@
-//! A struct of two Mutex fields, which two libraries take in opposite orders.
+//! A struct of two Mutex fields, which two libraries take in opposite orders,
+//! and a generic whose copies take them `a` first.
 
 pub struct Pair
 {
@@ -10,4 +11,14 @@ pub struct Pair
 pub fn pair() -> Pair
 {
 	return Pair { a: Mutex.new(), b: Mutex.new(), n: 0 };
+}
+
+/// Takes `p.a` and then `p.b`, in the copy for each type of `x`.
+pub fn ordered<T>(p: *Pair, x: *T)
+{
+	sync p.a {
+		sync p.b {
+			p.n += 1;
+		}
+	}
 }

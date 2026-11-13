@@ -1,0 +1,1 @@
+threads_blocking_send_after_two_functions_that_call_each_other.anti:29:3: error: `ping` may wait in `send` on line 17 while the `sync` of line 28 holds its lock [blocking-under-lock]

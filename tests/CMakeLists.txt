@@ -4298,7 +4298,7 @@ antic_library_files(exports LIBRARIES exports)
 antic_library_files(generic_limits LIBRARIES gen)
 antic_library_files(externs LIBRARIES first second)
 antic_library_files(lock_orders LIBRARIES locks)
-antic_library_files(lock_sides LIBRARIES pairs left right)
+antic_library_files(lock_sides LIBRARIES pairs left right top)
 antic_library_files(waits LIBRARIES waits)
 
 # The refusals at the boundary of a module, one message each. A case names
@@ -4336,6 +4336,7 @@ foreach(case
         "modules_internal_variant|levels|org.other"
         "modules_blocking_under_lock|waits|"
         "modules_lock_order|lock_orders|"
+        "modules_lock_order_of_a_copy_of_a_generic|lock_sides|"
         "modules_lock_order_of_a_synchronized_class|lock_orders|"
         "modules_lock_order_of_two_libraries|lock_sides|"
         "modules_lock_order_through_a_call|lock_orders|"

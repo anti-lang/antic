@@ -1,0 +1,52 @@
+//! C4 where the walk of the graph reaches one lock two ways: `left` and `right`
+//! each hold `a` and take `d`, through `b` and through `c`. `back` takes `a`
+//! while it holds `d`, against the order of `left`.
+
+struct Locks
+{
+	a: Mutex,
+	b: Mutex,
+	c: Mutex,
+	d: Mutex,
+	n: int,
+}
+
+fn left(p: *Locks)
+{
+	sync p.a {
+		sync p.b {
+			sync p.d {
+				p.n += 1;
+			}
+		}
+	}
+}
+
+fn right(p: *Locks)
+{
+	sync p.a {
+		sync p.c {
+			sync p.d {
+				p.n += 1;
+			}
+		}
+	}
+}
+
+fn back(p: *Locks)
+{
+	sync p.d {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Locks { n: 0 };
+	left(&p);
+	right(&p);
+	back(&p);
+	return p.n - 3;
+}
