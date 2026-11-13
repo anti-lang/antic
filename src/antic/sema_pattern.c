@@ -897,11 +897,21 @@ void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
     struct scope scope;
     struct scope inner;
     struct symbol *sym;
+    bool bind = true;
 
     sema_check_block(c, otherwise);
     let->as.let.name = arm->value->as.name;
     let->as.let.name_pos = arm->pos;
     let->as.let.value = value;
+    /* A local never owns a function, as for `let`: m borrows an `own fn`
+       in the form of two words, and its owner frees the snapshot. T255
+       of docs/audit/tests-findings.md. The check of `let` refuses a value
+       that nothing would own then, as the copy of `dup`. */
+    if (t->kind == TYPE_FN && t->owned) {
+        struct type *borrowed = types_fn_form(c->types, t, true, true);
+        bind = sema_require(c, value, t, borrowed);
+        t = borrowed;
+    }
     sema_enter_scope(c, &scope);
     sym = sema_declare(c, SYMBOL_LOCAL, &let->as.let.name, arm->pos,
                        "`%.*s` is already declared in this block");
@@ -909,7 +919,9 @@ void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
         sym->type = t;
         sym->stmt = let;
         let->as.let.symbol = sym;
-        sema_bind_value(c, value, let->as.let.name, t);
+        if (bind) {
+            sema_bind_value(c, value, let->as.let.name, t);
+        }
         /* A failing call writes its result through a pointer into the
            local, as it does for any `let`. */
         if (value->kind == EXPR_CALL && value->as.call.out != NULL) {

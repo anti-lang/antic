@@ -1,0 +1,18 @@
+//! `if let` on `dup` of an `own` field of type `?fn(...)`. The binding borrows
+//! a function, as `let` does, so nothing would own the copy, and it is refused.
+
+class Hold
+{
+	pub own f: ?fn(int) -> int = none,
+}
+
+fn main() -> int
+{
+	let base = 40;
+	let h = Hold { };
+	h.f = snapshot fn(n: int) -> int { return n + base; };
+	if let g = dup(h.f) {
+		return g(2);
+	}
+	return 0;
+}

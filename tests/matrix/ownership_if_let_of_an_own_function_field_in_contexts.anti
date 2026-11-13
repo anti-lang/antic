@@ -1,0 +1,61 @@
+//! `if let` on an `own` field of type `?fn(...)` in each place it stands: on
+//! `self.f` in a function of the class, on the field through a `*Hold`, on a
+//! field of an owned object, on a field that holds `none` and in a loop. The
+//! binding borrows the function each time, and the owner frees the snapshot
+//! once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Hold
+{
+	pub own f: ?fn(int) -> int = none,
+
+	pub fn apply(self, n: int) -> int
+	{
+		if let g = self.f {
+			return g(n);
+		}
+		return -1;
+	}
+}
+
+class Outer
+{
+	pub own inner: *Hold,
+}
+
+fn through(h: *Hold, n: int) -> int
+{
+	if let g = h.f {
+		return g(n);
+	}
+	return -1;
+}
+
+fn main() -> int
+{
+	let base = 40;
+	let h = Hold { };
+	h.f = snapshot fn(n: int) -> int { return n + base; };
+	printf("self: %d\n".ptr, h.apply(2) as c_int);
+	printf("pointer: %d\n".ptr, through(&h, 3) as c_int);
+	let o = Outer { inner: alloc Hold { } };
+	o.inner.f = snapshot fn(n: int) -> int { return n * base; };
+	if let g = o.inner.f {
+		printf("owned object: %d\n".ptr, g(2) as c_int);
+	}
+	let empty = Hold { };
+	if let g = empty.f {
+		printf("none: %d\n".ptr, g(2) as c_int);
+	} else {
+		printf("none: else\n".ptr);
+	}
+	let total = 0;
+	for i in 0..3 {
+		if let g = h.f {
+			total = total + g(i);
+		}
+	}
+	printf("loop: %d\n".ptr, total as c_int);
+	return 0;
+}

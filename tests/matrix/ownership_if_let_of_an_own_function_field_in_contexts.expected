@@ -1,0 +1,6 @@
+exit 0
+self: 42
+pointer: 43
+owned object: 80
+none: else
+loop: 123
