@@ -462,6 +462,7 @@ static struct item *type_item(struct copies *k, struct type *copy)
     made->symbol = sym;
     made->name = copy->name;
     made->home_module = generic_home(generic);
+    made->copied_from = generic;
     made->type_params = NULL;
     made->type_param_count = 0;
     /* A copy stands in no interface: each module that uses the generic
@@ -574,6 +575,7 @@ static struct item *copy_function(struct copies *k, const struct item *generic,
     } else {
         n->home_module = generic_home(generic);
         n->vis = VIS_PRIVATE;
+        n->copied_from = generic;
     }
     k->fns = alloc_grow(k->fns, &k->fn_capacity, k->fn_count, sizeof *k->fns);
     k->fns[k->fn_count].generic = generic;

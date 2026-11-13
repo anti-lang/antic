@@ -379,6 +379,14 @@ struct ir_function {
     uint32_t at_line;               /* the line the appenders stamp */
     const char *module;             /* NULL for a C function */
     const char *name;
+    /* DESIGN: the signature of a function of a module as its source
+       declares it, by types_signature without `self`, which a library
+       file carries. By the third answer of "Answers of 2026-11-12" in
+       docs/decisions.md the read refuses a declaration of a function of
+       another library whose signature differs from that of the
+       definition the program holds. NULL for a function that no item
+       declares. */
+    const char *signature;
     /* DESIGN: the module whose object defines the function when that is
        not module. A module that uses a generic of another module makes
        the copy under the path of that module. Every module that makes it
@@ -579,14 +587,19 @@ struct ir_table_read {
     const char *function;           /* the name of the entry */
     uint32_t params;                /* its parameters, `self` among them */
     uint32_t slot;                  /* the entry the read takes */
+    /* Its signature, by sema_entry_signature, empty for an entry of the
+       root. By the third answer of "Answers of 2026-11-12" the read
+       refuses a later entry with another. */
+    const char *signature;
 };
 
 /* One entry of a table that a module writes, as the class it was laid
-   out against held it: the name of the function and its parameters,
-   `self` among them. */
+   out against held it: the name of the function, its parameters, `self`
+   among them, and its signature, as struct ir_table_read holds one. */
 struct ir_table_slot {
     const char *function;
     uint32_t params;
+    const char *signature;
 };
 
 /* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, a library
@@ -606,6 +619,21 @@ struct ir_table_write {
     const char *base;               /* the base it is laid out against */
     struct ir_table_slot *slots;    /* the entries of the base, in order */
     size_t slot_count;
+};
+
+/* DESIGN: by the third answer of "Answers of 2026-11-12" in
+   docs/decisions.md, a library file carries a digest of the tree of each
+   generic of another module that it made a copy from. The program keeps
+   the first copy of a generic it reads, so a copy made from an earlier
+   tree would run a body the later file no longer holds. The reader of
+   a library file computes the digest of each generic it reads, see
+   struct antl_digest of antl_io.h, and the record holds the one the
+   module was built against. */
+struct ir_generic_copy {
+    const char *module;             /* the module of the generic */
+    const char *name;               /* the name of the generic */
+    bool fn;                        /* a generic function, not a type */
+    uint64_t digest;
 };
 
 struct ir_module {
@@ -666,6 +694,10 @@ struct ir_module {
        each once, which its library file carries. */
     struct ir_table_write *table_writes;
     size_t table_write_count;
+    /* The generics of other modules the module copied, each once, which
+       its library file carries. */
+    struct ir_generic_copy *generic_copies;
+    size_t generic_copy_count;
 };
 
 /* Make m an empty module named name, whose names, globals and constants
@@ -678,7 +710,7 @@ void ir_module_init(struct ir_module *m, struct arena *arena,
    count of parameters, unless m holds the same read already. */
 void ir_table_read_add(struct ir_module *m, const char *module,
                        const char *class_name, const char *function,
-                       uint32_t params, uint32_t slot);
+                       uint32_t params, uint32_t slot, const char *signature);
 
 /* Add to m the table of class_name, laid out against the class base of
    module, whose entries slots holds in order, unless m holds the same
@@ -686,6 +718,11 @@ void ir_table_read_add(struct ir_module *m, const char *module,
 void ir_table_write_add(struct ir_module *m, const char *class_name,
                         const char *module, const char *base,
                         const struct ir_table_slot *slots, size_t count);
+
+/* Add to m the copy of the generic name of module, a function when fn
+   is set, made from the tree of that digest, unless m holds it already. */
+void ir_generic_copy_add(struct ir_module *m, const char *module,
+                         const char *name, bool fn, uint64_t digest);
 
 /* Release the heap memory of m, its functions and class records among it,
    and leave m zeroed. arena keeps the rest. */

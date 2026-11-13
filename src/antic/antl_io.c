@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include "ir.h"
 #include "text.h"
 
 /* DESIGN: the primitives of the library file, which every other file of
@@ -60,6 +61,38 @@ void antl_put_bytes(struct writer *w, const char *s, size_t length)
 
 /* Reading */
 
+void antl_digest_bytes(struct reader *r, const void *bytes, size_t length)
+{
+    if (r->digest != NULL && r->digest->hold == 0) {
+        r->digest->hash = ir_hash_bytes(r->digest->hash, bytes, length);
+    }
+}
+
+void antl_digest_u64(struct reader *r, uint64_t v)
+{
+    uint8_t b[8];
+    int i;
+
+    for (i = 0; i < 8; i++) {
+        b[i] = (uint8_t)(v >> (8 * i));
+    }
+    antl_digest_bytes(r, b, sizeof b);
+}
+
+void antl_digest_hold(struct reader *r)
+{
+    if (r->digest != NULL) {
+        r->digest->hold++;
+    }
+}
+
+void antl_digest_release(struct reader *r)
+{
+    if (r->digest != NULL) {
+        r->digest->hold--;
+    }
+}
+
 void antl_fail(struct reader *r, const char *format, ...)
 {
     va_list args;
@@ -101,6 +134,7 @@ static uint64_t get_uint(struct reader *r, int bytes)
     for (i = 0; i < bytes; i++) {
         v |= (uint64_t)r->data[r->pos + (size_t)i] << (8 * i);
     }
+    antl_digest_bytes(r, r->data + r->pos, (size_t)bytes);
     r->pos += (size_t)bytes;
     return v;
 }
@@ -195,6 +229,7 @@ struct name antl_get_name(struct reader *r)
     }
     text = antl_allocate(r, length, 1);
     memcpy(text, r->data + r->pos, length);
+    antl_digest_bytes(r, r->data + r->pos, length);
     r->pos += length;
     n.text = text;
     n.length = length;

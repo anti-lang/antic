@@ -380,6 +380,12 @@ size_t sema_table_bound(const struct type *t);
 /* The entries of the primary table of t in order, base first, into out,
    which holds sema_table_bound(t) of them. Returns their count. */
 size_t sema_table_of(const struct type *t, struct table_entry *out);
+/* The signature of the function of e, which types_signature writes
+   without `self`, into out. An entry of the root that no function of the
+   chain declares has none, and out stays as it is. The compiler fixes the
+   signature of such an entry, and a function that replaces it has the
+   same. */
+void sema_entry_signature(const struct table_entry *e, struct text *out);
 /* Whether name is one of the nine hooks of anti.lang.Object, which take
    the entries after its seven functions. */
 bool sema_root_hook(const struct name *name);

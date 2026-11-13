@@ -1050,6 +1050,15 @@ struct item {
        every module that makes the copy writes the same ones. NULL for
        every other item. */
     const char *home_module;
+    /* DESIGN: by the third answer of "Answers of 2026-11-12" in
+       docs/decisions.md, a generic read from a library file carries the
+       digest of its declaration and its trees, which the reader computes,
+       see struct antl_digest of antl_io.h. 0 for every other item. A copy
+       of a generic function or type names its generic in copied_from, so
+       the library file of the module names the tree it was made from.
+       NULL for every other item. */
+    uint64_t digest;
+    const struct item *copied_from;
 };
 
 /* One name of the list of a direct import. */

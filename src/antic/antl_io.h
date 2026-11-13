@@ -38,6 +38,21 @@ struct writer {
     void *trees;
 };
 
+/* DESIGN: the digest of a generic, by the third answer of "Answers of
+   2026-11-12" in docs/decisions.md. While the reader reads the
+   declaration and the trees of a generic, every byte it takes goes into
+   the FNV-1a hash of the generic. A reference into a table of the file
+   would tie the hash to the indices of the file, so each one stands in
+   the hash as what it names. A type stands as its qualified name, and a
+   symbol of another item as the digest of its record. The doc text
+   stays out. Two files then give the same digest for a generic whose
+   declaration and trees are the same, whatever else either holds. hold
+   counts the reads that stand in the hash by another text. */
+struct antl_digest {
+    uint64_t hash;
+    unsigned hold;
+};
+
 /* A field whose default names the function name of the file. */
 struct antl_fn_default {
     struct struct_field *field;
@@ -67,6 +82,8 @@ struct reader {
     struct antl_fn_default *fn_defaults;
     size_t fn_count;
     size_t fn_capacity;
+    /* The digest the bytes the reader takes go into, or NULL. */
+    struct antl_digest *digest;
 };
 
 /* Give each field of r->fn_fields the default that names its function
@@ -104,6 +121,16 @@ void antl_put_u64(struct writer *w, uint64_t v);
 void antl_put_count(struct writer *w, size_t n);
 /* Write length bytes of s after their count. */
 void antl_put_bytes(struct writer *w, const char *s, size_t length);
+
+/* Add length bytes to the digest of r when one is open and holds no
+   read. The primitives below add every byte they take. */
+void antl_digest_bytes(struct reader *r, const void *bytes, size_t length);
+/* Add v to the digest of r as eight bytes, little-endian, so every host
+   gives the same digest. */
+void antl_digest_u64(struct reader *r, uint64_t v);
+/* Open and close a read that stands in the digest by another text. */
+void antl_digest_hold(struct reader *r);
+void antl_digest_release(struct reader *r);
 
 /* Refuse the file with the message format gives, unless it is refused
    already. The first message stands. */
@@ -181,6 +208,9 @@ void antl_put_param_owned(struct writer *w, const struct symbol *sym);
 struct type *antl_type_ref(struct reader *r, uint32_t limit);
 /* The same below the count of the type table, or NULL for ANTL_NO_TYPE. */
 struct type *antl_type_or_none(struct reader *r);
+/* Add the qualified name of t to the digest of r, in place of the index
+   of t. */
+void antl_digest_type(struct reader *r, const struct type *t);
 /* Read a constant of type t into v. depth counts the values around it,
    0 for one that stands alone. Its parts are memory of the pool. */
 bool antl_read_value(struct reader *r, struct type *t, struct const_value *v,

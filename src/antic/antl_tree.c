@@ -7,6 +7,7 @@
 
 #include "alloc.h"
 #include "antl_io.h"
+#include "ir.h"
 #include "ptrset.h"
 
 /* DESIGN: the section of the generics. A library file stores each
@@ -98,8 +99,9 @@ struct io {
     struct reader *r;
     struct tree *t;
     struct trees *all;
-    /* The reader's extern table. */
+    /* The reader's extern table, and the digest of each record. */
     struct symbol **externs;
+    uint64_t *extern_digests;
     uint32_t extern_count;
 };
 
@@ -577,7 +579,14 @@ static void io_sym(struct io *io, struct symbol **s)
         antl_put_u32(io->w, index);
         break;
     case IO_READ:
+        /* The digest of a generic takes a symbol of another item as the
+           digest of its record, by the DESIGN of struct antl_digest. */
+        antl_digest_hold(io->r);
         index = antl_get_u32(io->r);
+        antl_digest_release(io->r);
+        if (index == 0 || (index & SYM_EXTERN) == 0) {
+            antl_digest_u64(io->r, index);
+        }
         if (index == 0) {
             *s = NULL;
         } else if ((index & SYM_EXTERN) != 0) {
@@ -587,6 +596,7 @@ static void io_sym(struct io *io, struct symbol **s)
                 *s = NULL;
             } else {
                 *s = io->externs[index];
+                antl_digest_u64(io->r, io->extern_digests[index]);
             }
         } else if (index > t->count) {
             bad(io);
@@ -1441,10 +1451,12 @@ static bool must_be_found(const struct reader *r, const struct symbol *sym,
            (sym->item == NULL || sym->item->runtime == NULL);
 }
 
-/* Whether a class of lib has a function whose symbol is named name, as
-   `T.f` or `T.Q.f`. The record of a function of a class read from a
-   library file names no owner, so it stands as an item does. */
-static bool class_has(const struct interface *lib, const struct name *name)
+/* The symbol of the function of a class of lib whose symbol is named
+   name, as `T.f` or `T.Q.f`, or NULL. The record of a function of a
+   class read from a library file names no owner, so it stands as an item
+   does. */
+static const struct symbol *class_has(const struct interface *lib,
+                                      const struct name *name)
 {
     size_t i;
     size_t j;
@@ -1458,11 +1470,46 @@ static bool class_has(const struct interface *lib, const struct name *name)
             const struct item *m = s->type->members[j];
             if (m->symbol != NULL &&
                 types_same_name(&m->symbol->name, name)) {
-                return true;
+                return m->symbol;
             }
         }
     }
-    return false;
+    return NULL;
+}
+
+/* DESIGN: by the third answer of "Answers of 2026-11-12" in
+   docs/decisions.md, a generic of this file that calls a function of
+   another library was checked against the signature the record of the
+   function carries, the one of the file of that library at the build.
+   A copy the program makes of it calls the function of the later file,
+   so a later signature that differs stops the read, as R127 stops a C
+   function with two. The signatures are compared as types_signature
+   writes them. Returns false when the read stops. */
+static bool same_function(struct reader *r, const struct symbol *sym,
+                          const struct symbol *found,
+                          const struct interface *lib)
+{
+    struct text was = {0};
+    struct text is = {0};
+    bool self = sym->item != NULL && sym->item->has_self;
+    bool same;
+
+    if (found == NULL || found == sym || !must_be_found(r, sym, lib) ||
+        found->type == NULL || sym->type == NULL) {
+        return true;
+    }
+    types_signature(&was, sym->type, self);
+    types_signature(&is, found->type, self);
+    same = strcmp(text_cstr(&was), text_cstr(&is)) == 0;
+    if (!same) {
+        antl_fail(r, "needs function `%s.%.*s` as `%s`, and the library "
+                     "holds it as `%s`",
+                  lib->module, (int)sym->name.length, sym->name.text,
+                  text_cstr(&was), text_cstr(&is));
+    }
+    text_free(&was);
+    text_free(&is);
+    return same;
 }
 
 /* The library's own symbol for the extern sym of lib, where it carries
@@ -1478,7 +1525,8 @@ static struct symbol *library_symbol(struct reader *r, struct symbol *sym,
             const struct item *m = owner->members[i];
             if (m->symbol != NULL &&
                 types_same_name(&m->symbol->name, &sym->name)) {
-                return m->symbol;
+                return same_function(r, sym, m->symbol, lib) ? m->symbol
+                                                             : NULL;
             }
         }
         if (must_be_found(r, sym, lib)) {
@@ -1495,18 +1543,24 @@ static struct symbol *library_symbol(struct reader *r, struct symbol *sym,
                       (int)sym->name.length, sym->name.text);
             return NULL;
         }
-        return g->symbol;
+        return same_function(r, sym, g->symbol, lib) ? g->symbol : NULL;
     }
     for (i = 0; lib != r->iface && i < lib->item_count; i++) {
         struct symbol *s = lib->items[i];
         if (s->kind == sym->kind && types_same_name(&s->name, &sym->name)) {
-            return s;
+            return same_function(r, sym, s, lib) ? s : NULL;
         }
     }
-    if (must_be_found(r, sym, lib) && !class_has(lib, &sym->name)) {
-        antl_fail(r, "needs function `%s.%.*s`", lib->module,
-                  (int)sym->name.length, sym->name.text);
-        return NULL;
+    if (must_be_found(r, sym, lib)) {
+        const struct symbol *member = class_has(lib, &sym->name);
+        if (member == NULL) {
+            antl_fail(r, "needs function `%s.%.*s`", lib->module,
+                      (int)sym->name.length, sym->name.text);
+            return NULL;
+        }
+        if (!same_function(r, sym, member, lib)) {
+            return NULL;
+        }
     }
     return sym;
 }
@@ -1524,7 +1578,9 @@ static struct symbol *read_extern(struct reader *r)
     struct type *owner = NULL;
 
     sym->name = antl_get_name(r);
+    antl_digest_hold(r);
     type_index = antl_get_u32(r);
+    antl_digest_release(r);
     home = antl_get_name(r);
     marks = antl_get_u8(r);
     lookup = antl_get_u8(r);
@@ -1541,6 +1597,7 @@ static struct symbol *read_extern(struct reader *r)
     runtime = antl_get_cstr(r);
     sym->kind = (enum symbol_kind)kind;
     sym->type = r->table[type_index];
+    antl_digest_type(r, sym->type);
     sym->exported = (marks & 1) != 0;
     sym->variadic = (marks >> 1 & 1) != 0;
     sym->may_fail = (marks >> 2 & 1) != 0;
@@ -1821,7 +1878,12 @@ static struct item *read_declaration(struct reader *r)
         return NULL;
     }
     {
-        struct name doc = antl_get_name(r);
+        /* The doc text stays out of the digest, which --strip-docs
+           would change. */
+        struct name doc;
+        antl_digest_hold(r);
+        doc = antl_get_name(r);
+        antl_digest_release(r);
         it->doc.text = doc.text;
         it->doc.length = doc.length;
         sym->doc = it->doc;
@@ -2028,7 +2090,8 @@ static struct item *tree_owner(struct reader *r, uint8_t kind, uint32_t owner,
    records, in the order of the file. The verifier then finds the mark of
    a record from its address alone. */
 static void read_tree(struct reader *r, struct symbol **externs,
-                      uint32_t extern_count)
+                      uint64_t *extern_digests, uint32_t extern_count,
+                      struct antl_digest *digests)
 {
     static const size_t sizes[T_COUNT] = {
         sizeof(struct symbol), sizeof(struct item), sizeof(struct block),
@@ -2071,6 +2134,8 @@ static void read_tree(struct reader *r, struct symbol **externs,
         antl_damaged(r);
         return;
     }
+    r->digest = &digests[owner];
+    antl_digest_u64(r, member);
     memset(&t, 0, sizeof t);
     memset(counts, 0, sizeof counts);
     memset(records, 0, sizeof records);
@@ -2095,6 +2160,7 @@ static void read_tree(struct reader *r, struct symbol **externs,
     io.r = r;
     io.t = &t;
     io.externs = externs;
+    io.extern_digests = extern_digests;
     io.extern_count = extern_count;
     if (!r->failed) {
         io_root(&io, fn);
@@ -2143,21 +2209,73 @@ static void read_tree(struct reader *r, struct symbol **externs,
     }
 }
 
+/* The digest of what the type table holds of the generic type t, which
+   the section of the generics does not: its base, its fields and the
+   declarations of its functions. Each name ends at a byte no name holds. */
+static void digest_type_entry(struct reader *r, const struct type *t)
+{
+    size_t i;
+
+    if (t->kind == TYPE_CLASS && t->base != NULL) {
+        antl_digest_type(r, t->base);
+    }
+    antl_digest_u64(r, t->field_count);
+    for (i = 0; i < t->field_count; i++) {
+        const struct struct_field *f = &t->fields[i];
+        antl_digest_bytes(r, f->name.text, f->name.length);
+        antl_digest_bytes(r, "", 1);
+        antl_digest_type(r, f->type);
+        antl_digest_u64(r, (uint64_t)f->bits | (uint64_t)f->form << 8 |
+                               (uint64_t)f->owned << 16 |
+                               (uint64_t)f->atomic << 17);
+    }
+    antl_digest_u64(r, t->member_count);
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        antl_digest_bytes(r, m->name.text, m->name.length);
+        antl_digest_bytes(r, "", 1);
+        antl_digest_u64(r, (uint64_t)m->kind | (uint64_t)m->pub << 8 |
+                               (uint64_t)m->is_final << 9 |
+                               (uint64_t)m->is_abstract << 10 |
+                               (uint64_t)m->has_self << 11 |
+                               (uint64_t)m->contract << 12);
+        if (m->symbol != NULL && m->symbol->type != NULL) {
+            antl_digest_type(r, m->symbol->type);
+        }
+    }
+}
+
 void antl_read_generics(struct reader *r)
 {
     struct interface *iface = r->iface;
     uint32_t count = antl_get_count(r, 12);
     struct symbol **externs;
+    uint64_t *extern_digests;
+    struct antl_digest *digests;
+    struct antl_digest each;
     uint32_t extern_count;
     uint32_t trees;
     uint32_t i;
 
+    /* DESIGN: the digest of each generic, by the DESIGN of struct
+       antl_digest. It takes the declaration, what the type table holds
+       of a generic type and each tree of the generic, in the order of
+       the file. */
     iface->generics = antl_allocate(r, count, sizeof *iface->generics);
+    digests = antl_allocate(r, count, sizeof *digests);
     for (i = 0; i < count && !r->failed; i++) {
-        struct item *it = read_declaration(r);
+        struct item *it;
+        r->digest = &digests[iface->generic_count];
+        r->digest->hash = IR_HASH_START;
+        it = read_declaration(r);
         if (it != NULL) {
+            if (it->kind != ITEM_FN && it->symbol != NULL &&
+                it->symbol->type != NULL) {
+                digest_type_entry(r, it->symbol->type);
+            }
             iface->generics[iface->generic_count++] = it;
         }
+        r->digest = NULL;
     }
     /* Every generic function among the items has its declaration. */
     for (i = 0; i < iface->item_count && !r->failed; i++) {
@@ -2169,11 +2287,21 @@ void antl_read_generics(struct reader *r)
     }
     extern_count = antl_get_count(r, 12);
     externs = antl_allocate(r, extern_count, sizeof *externs);
+    extern_digests = antl_allocate(r, extern_count, sizeof *extern_digests);
     for (i = 0; i < extern_count && !r->failed; i++) {
+        each.hash = IR_HASH_START;
+        each.hold = 0;
+        r->digest = &each;
         externs[i] = read_extern(r);
+        r->digest = NULL;
+        extern_digests[i] = each.hash;
     }
     trees = antl_get_count(r, 33);
     for (i = 0; i < trees && !r->failed; i++) {
-        read_tree(r, externs, extern_count);
+        read_tree(r, externs, extern_digests, extern_count, digests);
+        r->digest = NULL;
+    }
+    for (i = 0; i < iface->generic_count; i++) {
+        iface->generics[i]->digest = digests[i].hash;
     }
 }

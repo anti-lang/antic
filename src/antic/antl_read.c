@@ -28,23 +28,45 @@ static bool bitfield_fits(const struct struct_field *f)
 }
 
 /* The type of the index the file holds next, below limit. ANTL_NO_TYPE
-   gives NULL where none is allowed. */
+   gives NULL where none is allowed. The digest of a generic takes the
+   qualified name of the type in place of the index, by the DESIGN of
+   struct antl_digest. */
 static struct type *read_type_index(struct reader *r, uint32_t limit,
                                     bool none)
 {
-    uint32_t index = antl_get_u32(r);
+    uint32_t index;
 
+    antl_digest_hold(r);
+    index = antl_get_u32(r);
+    antl_digest_release(r);
     if (r->failed) {
         return NULL;
     }
     if (none && index == ANTL_NO_TYPE) {
+        antl_digest_bytes(r, "-", 1);
         return NULL;
     }
     if (index >= limit) {
         antl_damaged(r);
         return NULL;
     }
+    antl_digest_type(r, r->table[index]);
     return r->table[index];
+}
+
+void antl_digest_type(struct reader *r, const struct type *t)
+{
+    struct text name = {0};
+
+    if (r->digest == NULL || r->digest->hold > 0) {
+        return;
+    }
+    types_name_qualified(&name, t);
+    /* The name ends at a byte no name holds, so two names in a row
+       stand apart. */
+    text_append_bytes(&name, "", 1);
+    antl_digest_bytes(r, text_cstr(&name), name.length);
+    text_free(&name);
 }
 
 struct type *antl_type_ref(struct reader *r, uint32_t limit)

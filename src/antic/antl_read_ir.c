@@ -691,6 +691,7 @@ struct signature {
     uint8_t effects;
     const char *module;             /* NULL for a function of C */
     const char *name;
+    const char *signature;          /* by types_signature, or empty */
     uint8_t result;
     uint32_t result_agg;
     uint8_t result_ext;
@@ -710,6 +711,7 @@ static bool read_signature_head(struct reader *r, struct ir_module *program,
     s->effects = antl_get_u8(r);
     s->module = antl_get_cstr(r);
     s->name = antl_get_cstr(r);
+    s->signature = antl_get_cstr(r);
     s->result = antl_get_u8(r);
     s->result_agg = read_agg_ref(r, program, maps, s->result);
     s->result_ext = antl_get_u8(r);
@@ -825,6 +827,7 @@ static struct ir_function *new_function(struct reader *r,
     f->worker = (s->flags & 8) != 0;
     f->file = s->file == IR_NO_INDEX ? IR_NO_INDEX : maps->files[s->file];
     f->decl_line = s->decl_line;
+    f->signature = s->signature[0] != '\0' ? s->signature : NULL;
     return f;
 }
 
@@ -936,6 +939,25 @@ static bool declares_missing(const struct reader *r,
     return antl_library(r, &module) != NULL;
 }
 
+/* DESIGN: by the third answer of "Answers of 2026-11-12" in
+   docs/decisions.md, a declaration of a function of another library
+   carries the signature the file was built against, and the definition
+   the file of that library brought carries its own. A declaration whose
+   signature differs stops the read, as R127 stops a C function that two
+   files declare apart, since the code of the file passes the arguments
+   and reads the result as the declaration says. A copy of a generic is
+   left to the digest of its tree, read_generic_copies. A function that
+   no item declares carries no signature and is not judged. */
+static bool declares_another(const struct reader *r,
+                             const struct ir_function *f,
+                             const struct signature *s)
+{
+    return (s->flags & 1) != 0 && s->module != NULL && !f->is_extern &&
+           strcmp(s->module, r->iface->module) != 0 &&
+           !ir_is_copy_name(s->name) && s->signature[0] != '\0' &&
+           f->signature != NULL && strcmp(s->signature, f->signature) != 0;
+}
+
 /* DESIGN: by "Answers of 2026-11-12" in docs/decisions.md, a library
    file holds the code of each copy of a generic function of another
    module that it calls, made from the tree of the generic in the file it
@@ -1015,8 +1037,13 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
     f = find_function(program, s.module, s.name);
     /* DESIGN: each module that uses a copy of a generic defines it, so
        two library files may both define one. The program keeps the
-       first, and the second stands for it. The copies are made from one
-       tree with the same arguments, so they are the same code. */
+       first, and the second stands for it. Every file names the tree of
+       each generic it copied by its digest, and the read refuses a file
+       whose digest differs from that of the tree of the later file, by
+       the third answer of "Answers of 2026-11-12" in docs/decisions.md,
+       read_generic_copies. Every copy the program reads is then made
+       from that one tree, so two copies with the same arguments are the
+       same code. */
     if (f != NULL && (s.flags & 1) == 0 && s.module != NULL &&
         ir_is_copy_name(s.name)) {
         if (f->is_extern) {
@@ -1048,6 +1075,12 @@ static uint32_t read_signature(struct reader *r, struct ir_module *program,
         antl_fail(r, "declares `extern fn %s` with another signature "
                      "than a library before it",
                   s.name);
+        return 0;
+    }
+    if (!r->failed && declares_another(r, f, &s)) {
+        antl_fail(r, "needs function `%s.%s` as `%s`, and the library holds "
+                     "it as `%s`",
+                  s.module, s.name, s.signature, f->signature);
         return 0;
     }
     return f->index;
@@ -1457,6 +1490,17 @@ static size_t entry_slot(const struct table_entry *entries, size_t count,
     return 0;
 }
 
+/* DESIGN: by the third answer of "Answers of 2026-11-12" in
+   docs/decisions.md, an entry of a table that the file reads or writes
+   carries its signature, and the later entry must have the same. An
+   entry of the root that no function of a chain declares has none on
+   either side, since the compiler fixes it, and is not judged. */
+static bool same_entry(const char *signature, const struct text *later)
+{
+    return signature[0] == '\0' || later->length == 0 ||
+           strcmp(signature, text_cstr(later)) == 0;
+}
+
 /* DESIGN: by the second answer of "Answers of 2026-11-12" in
    docs/decisions.md, the file names each function its code reads from
    the table of a class of another module, and the slot it reads. The
@@ -1473,7 +1517,8 @@ static size_t entry_slot(const struct table_entry *entries, size_t count,
    is not judged here, as declares_missing does not judge it. */
 static void check_table_read(struct reader *r, const char *module,
                              const char *class_name, const char *function,
-                             uint32_t params, uint32_t slot)
+                             uint32_t params, uint32_t slot,
+                             const char *signature)
 {
     struct name path;
     const struct interface *lib;
@@ -1499,7 +1544,6 @@ static void check_table_read(struct reader *r, const char *module,
     entries = alloc_zeroed(sema_table_bound(t) + 1, sizeof *entries);
     count = sema_table_of(t, entries);
     found = entry_slot(entries, count, function, params);
-    free(entries);
     if (found == 0) {
         antl_fail(r, "needs function `%s.%s.%s`", module, class_name,
                   function);
@@ -1507,12 +1551,23 @@ static void check_table_read(struct reader *r, const char *module,
         antl_fail(r, "calls `%s.%s.%s` at slot %u of its table, and the "
                      "library holds it at slot %zu",
                   module, class_name, function, (unsigned)slot, found);
+    } else {
+        struct text later = {0};
+        sema_entry_signature(&entries[found - 1], &later);
+        if (!same_entry(signature, &later)) {
+            antl_fail(r, "calls `%s.%s.%s` as `%s`, and the library holds "
+                         "it as `%s`",
+                      module, class_name, function, signature,
+                      text_cstr(&later));
+        }
+        text_free(&later);
     }
+    free(entries);
 }
 
 /* The functions the file reads from the tables of classes of other
    modules, each a module, a class, a function, the count of its
-   parameters and the slot. */
+   parameters, the slot and the signature. */
 static void read_table_reads(struct reader *r)
 {
     uint32_t count = antl_get_count(r, 20);
@@ -1524,8 +1579,10 @@ static void read_table_reads(struct reader *r)
         const char *function = antl_get_cstr(r);
         uint32_t params = antl_get_u32(r);
         uint32_t slot = antl_get_u32(r);
+        const char *signature = antl_get_cstr(r);
         if (!r->failed) {
-            check_table_read(r, module, class_name, function, params, slot);
+            check_table_read(r, module, class_name, function, params, slot,
+                             signature);
         }
     }
 }
@@ -1582,6 +1639,16 @@ static void check_table_write(struct reader *r, const char *class_name,
                          "%u, and the library holds it at slot %zu",
                       class_name, module, base, slots[i].function,
                       (unsigned)i + 1, found);
+        } else {
+            struct text later = {0};
+            sema_entry_signature(&entries[found - 1], &later);
+            if (!same_entry(slots[i].signature, &later)) {
+                antl_fail(r, "fills the table of `%s` with `%s.%s.%s` as "
+                             "`%s`, and the library holds it as `%s`",
+                          class_name, module, base, slots[i].function,
+                          slots[i].signature, text_cstr(&later));
+            }
+            text_free(&later);
         }
     }
     if (!r->failed && count > slot_count) {
@@ -1597,7 +1664,7 @@ static void check_table_write(struct reader *r, const char *class_name,
 /* The tables the file writes against classes of other modules, each the
    class whose table it writes, the module and the name of the class it
    was laid out against and the entries of that class in order, each a
-   name and the count of its parameters. */
+   name, the count of its parameters and the signature. */
 static void read_table_writes(struct reader *r)
 {
     uint32_t count = antl_get_count(r, 16);
@@ -1614,10 +1681,76 @@ static void read_table_writes(struct reader *r)
         for (j = 0; j < slot_count && !r->failed; j++) {
             slots[j].function = antl_get_cstr(r);
             slots[j].params = antl_get_u32(r);
+            slots[j].signature = antl_get_cstr(r);
         }
         if (!r->failed) {
             check_table_write(r, class_name, module, base, slots,
                               slot_count);
+        }
+    }
+}
+
+/* DESIGN: by the third answer of "Answers of 2026-11-12" in
+   docs/decisions.md, the file names each generic of another module it
+   copied with the digest of the tree it made the copies from, the DESIGN
+   of struct ir_generic_copy. The file of that module was read before, as
+   every import is, and its reader gave each generic the digest of its
+   tree. A later tree with another digest is refused, a change of a body
+   alone among them, since the program keeps the copy the file holds. The
+   read never makes a copy of its own in place of the one of the file. A
+   generic the later file lacks is refused as a struct and a generic are
+   refused elsewhere. The checks of the tables and of the functions run
+   before, so a file that differs there gets their message, which names
+   what differs. A module that no file of the program holds is not judged
+   here, as check_table_read does not judge it. */
+static void check_generic_copy(struct reader *r, const char *module,
+                               const char *name, bool fn, uint64_t digest)
+{
+    struct name path;
+    const struct interface *lib;
+    size_t i;
+
+    if (strcmp(module, r->iface->module) == 0) {
+        return;
+    }
+    path.text = module;
+    path.length = strlen(module);
+    lib = antl_library(r, &path);
+    if (lib == NULL) {
+        return;
+    }
+    for (i = 0; i < lib->generic_count; i++) {
+        const struct item *it = lib->generics[i];
+        if ((it->kind == ITEM_FN) == fn && antl_name_equals(&it->name, name)) {
+            if (it->digest != digest) {
+                antl_fail(r, "holds a copy of `%s.%s` made from another tree "
+                             "than the library holds",
+                          module, name);
+            }
+            return;
+        }
+    }
+    antl_fail(r, fn ? "needs generic `%s.%s`" : "needs struct `%s.%s`",
+              module, name);
+}
+
+/* The generics of other modules the file copied, each a module, a name,
+   whether it is a function and the digest of its tree. */
+static void read_generic_copies(struct reader *r)
+{
+    uint32_t count = antl_get_count(r, 17);
+    uint32_t i;
+
+    for (i = 0; i < count && !r->failed; i++) {
+        const char *module = antl_get_cstr(r);
+        const char *name = antl_get_cstr(r);
+        uint8_t fn = antl_get_u8(r);
+        uint64_t digest = antl_get_u64(r);
+        if (!r->failed && fn > 1) {
+            antl_damaged(r);
+        }
+        if (!r->failed) {
+            check_generic_copy(r, module, name, fn == 1, digest);
         }
     }
 }
@@ -1651,5 +1784,8 @@ void antl_read_ir(struct reader *r, struct ir_module *program)
     }
     if (!r->failed) {
         read_table_writes(r);
+    }
+    if (!r->failed) {
+        read_generic_copies(r);
     }
 }

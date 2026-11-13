@@ -477,6 +477,22 @@ struct ir_function *lower_c_function(struct lowerer *l, const char *name,
     return f;
 }
 
+/* The signature of a function of type t, by types_signature, in the
+   arena of the module, for its library file. self leaves out the first
+   parameter. */
+static const char *fn_signature(struct lowerer *l, const struct type *t,
+                                bool self)
+{
+    struct text text = {0};
+    char *copy;
+
+    types_signature(&text, t, self);
+    copy = arena_alloc(l->m->arena, text.length + 1);
+    memcpy(copy, text_cstr(&text), text.length + 1);
+    text_free(&text);
+    return copy;
+}
+
 /* The IR function of a function symbol. An imported function is found by
    its module and name, or declared at its first call. */
 struct ir_function *lower_callee_function(struct lowerer *l,
@@ -520,6 +536,8 @@ struct ir_function *lower_callee_function(struct lowerer *l,
             f = ir_declare_add(l->m, module, name, lower_ir_type_of(t->result),
                                lower_result_agg(l, t->result));
             f->exported = sym->exported;
+            f->signature = fn_signature(l, t, sym->item != NULL &&
+                                                  sym->item->has_self);
         }
         f->never_returns = t->never;
         lower_add_params(l, f, t, sym);
@@ -1153,6 +1171,9 @@ static void declare_function(struct lowerer *l, const struct item *it)
         f->exported = it->exported;
         f->worker = it->worker;
         f->never_returns = t->never;
+        if (it->kind == ITEM_FN) {
+            f->signature = fn_signature(l, t, it->has_self);
+        }
         if (f->is_extern) {
             lower_mark_allocates(f);
         }
@@ -1308,6 +1329,28 @@ static bool known_copy(struct lowerer *l, const struct item *it)
     return g != NULL && g->index < l->first_global && !g->is_extern;
 }
 
+/* DESIGN: by the third answer of "Answers of 2026-11-12" in
+   docs/decisions.md, the library file of the module names each generic
+   of another library that it copied, with the digest of the tree the
+   copy was made from, struct ir_generic_copy. Every copy the module uses
+   counts, one that a library file of the program holds already among
+   them, since the code of the module calls it. A generic of the module
+   itself comes from the same file. */
+static void note_generic_copy(struct lowerer *l, const struct item *it)
+{
+    const struct item *g = it->copied_from;
+    char *name;
+
+    if (g == NULL || g->symbol == NULL || g->symbol->home == NULL ||
+        strcmp(g->symbol->home->module, l->module_name) == 0) {
+        return;
+    }
+    name = lower_cstr(&g->name);
+    ir_generic_copy_add(l->m, g->symbol->home->module, name,
+                        g->kind == ITEM_FN, g->digest);
+    free(name);
+}
+
 void lower_module(struct module *module, const char *module_name,
                   struct ir_module *out, unsigned options,
                   const char *const *patterns, size_t pattern_count,
@@ -1358,6 +1401,7 @@ void lower_module(struct module *module, const char *module_name,
        value and therefore no table. */
     for (i = 0; i < module->item_count; i++) {
         const struct item *it = module->items[i];
+        note_generic_copy(&l, it);
         if (known_copy(&l, it)) {
             continue;
         }

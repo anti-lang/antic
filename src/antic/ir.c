@@ -106,6 +106,7 @@ void ir_module_free(struct ir_module *m)
     free(m->files);
     free(m->table_reads);
     free(m->table_writes);
+    free(m->generic_copies);
     memset(m, 0, sizeof *m);
 }
 
@@ -578,7 +579,7 @@ void ir_class_provides(struct ir_module *m, struct ir_class *c,
 
 void ir_table_read_add(struct ir_module *m, const char *module,
                        const char *class_name, const char *function,
-                       uint32_t params, uint32_t slot)
+                       uint32_t params, uint32_t slot, const char *signature)
 {
     struct ir_table_read *grown;
     struct ir_table_read *r;
@@ -602,6 +603,7 @@ void ir_table_read_add(struct ir_module *m, const char *module,
     r->function = keep(m->arena, function);
     r->params = params;
     r->slot = slot;
+    r->signature = keep(m->arena, signature);
 }
 
 void ir_table_write_add(struct ir_module *m, const char *class_name,
@@ -631,7 +633,32 @@ void ir_table_write_add(struct ir_module *m, const char *class_name,
     for (i = 0; i < count; i++) {
         w->slots[i].function = keep(m->arena, slots[i].function);
         w->slots[i].params = slots[i].params;
+        w->slots[i].signature = keep(m->arena, slots[i].signature);
     }
+}
+
+void ir_generic_copy_add(struct ir_module *m, const char *module,
+                         const char *name, bool fn, uint64_t digest)
+{
+    struct ir_generic_copy *grown;
+    struct ir_generic_copy *c;
+    size_t i;
+
+    for (i = 0; i < m->generic_copy_count; i++) {
+        c = &m->generic_copies[i];
+        if (c->fn == fn && strcmp(c->module, module) == 0 &&
+            strcmp(c->name, name) == 0) {
+            return;
+        }
+    }
+    grown = alloc_resize(m->generic_copies, m->generic_copy_count + 1,
+                         sizeof *grown);
+    m->generic_copies = grown;
+    c = &m->generic_copies[m->generic_copy_count++];
+    c->module = keep(m->arena, module);
+    c->name = keep(m->arena, name);
+    c->fn = fn;
+    c->digest = digest;
 }
 
 void ir_class_mutable(struct ir_class *c, uint32_t field)

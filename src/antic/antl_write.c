@@ -975,6 +975,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
                                  (unsigned)f->guarantees << 2));
         put_str(w, f->module);
         put_str(w, f->name);
+        put_str(w, f->signature != NULL ? f->signature : "");
         antl_put_u8(w, (uint8_t)f->result);
         antl_put_u32(w, f->result_agg);
         antl_put_u8(w, (uint8_t)f->result_ext);
@@ -1064,6 +1065,7 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         put_str(w, t->function);
         antl_put_u32(w, t->params);
         antl_put_u32(w, t->slot);
+        put_str(w, t->signature);
     }
     /* The tables the module writes against classes of other modules, by
        the DESIGN of struct ir_table_write. */
@@ -1077,7 +1079,18 @@ static void put_ir(struct writer *w, const struct ir_module *ir)
         for (j = 0; j < t->slot_count; j++) {
             put_str(w, t->slots[j].function);
             antl_put_u32(w, t->slots[j].params);
+            put_str(w, t->slots[j].signature);
         }
+    }
+    /* The generics of other modules the module copied, with the digest
+       of each tree, by the DESIGN of struct ir_generic_copy. */
+    antl_put_count(w, ir->generic_copy_count);
+    for (i = 0; i < ir->generic_copy_count; i++) {
+        const struct ir_generic_copy *c = &ir->generic_copies[i];
+        put_str(w, c->module);
+        put_str(w, c->name);
+        antl_put_u8(w, (uint8_t)(c->fn ? 1 : 0));
+        antl_put_u64(w, c->digest);
     }
 }
 

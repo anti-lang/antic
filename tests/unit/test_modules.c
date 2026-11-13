@@ -316,7 +316,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 96, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 97, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -353,6 +353,8 @@ static const uint8_t scale_antl[] = {
     1, 0, 0, 0,                                     /* functions */
     0, 0, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',      /* flags, effects */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* scale.scale */
+    14, 0, 0, 0, 'f', 'n', '(', 'u', '6', '4', ')', /* its signature */
+    ' ', '-', '>', ' ', 'u', '6', '4',
     4, 255, 255, 255, 255, 0,                       /* -> i64 */
     0, 0, 0, 0, 2, 0, 0, 0,                         /* file 0, line 2 */
     1, 0, 0, 0, 4, 0, 255, 255, 255, 255,           /* one i64 parameter */
@@ -376,6 +378,7 @@ static const uint8_t scale_antl[] = {
     0, 0, 0, 0,                                     /* classes */
     0, 0, 0, 0,                                     /* no reads of tables */
     0, 0, 0, 0,                                     /* no writes of tables */
+    0, 0, 0, 0,                                     /* no copies of generics */
     0, 0, 0, 0,                                     /* no locks of functions */
     0, 0, 0, 0,                                     /* no edges of lock orders */
     0, 0, 0, 0,                                     /* no functions that wait */
@@ -1639,22 +1642,23 @@ static void damaged_files(void)
 {
     /* Where the fields a poke below reaches sit, counted back from the
        end of the file. First the three counts of the lock orders, the
-       counts of the writes and the reads of tables and the count of the
-       classes, two instructions of 53 bytes each and the 15 bytes that
-       open the body.
+       counts of the copies of generics, of the writes and of the reads of
+       tables and the count of the classes, two instructions of 53 bytes
+       each and the 15 bytes that open the body.
        Then the one parameter of the signature with its facts, its count,
        the source of the function and its result with its extension. */
     enum {
-        TAIL = 12 + 4 + 4 + 4 + 2 * 53 + 15,
-        MUL_OPERAND = 12 + 4 + 4 + 4 + 2 * 53 - 12,
+        TAIL = 12 + 4 + 4 + 4 + 4 + 2 * 53 + 15,
+        MUL_OPERAND = 12 + 4 + 4 + 4 + 4 + 2 * 53 - 12,
         PARAM_FACTS = TAIL + 4 + 1,
         PARAM_DEREF = TAIL + 4,
         PARAM_EXT = PARAM_FACTS + 4 + 1,
         RESULT_EXT = TAIL + 11 + 4 + 8 + 1,
         RESULT_AGG = RESULT_EXT + 4,
         /* The memory effects of the function, before its module and its
-           name, each a count and five bytes, and its result type. */
-        FN_EFFECTS = RESULT_AGG + 1 + 2 * 9 + 1,
+           name, each a count and five bytes, its signature, a count and
+           fourteen bytes, and its result type. */
+        FN_EFFECTS = RESULT_AGG + 1 + 2 * 9 + 18 + 1,
         /* The flags, the last byte of type 1, which starts at byte 72
            after the header and the one byte of type 0. */
         FN_FLAGS = 85
@@ -1664,9 +1668,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 97;
+    copy[4] = 98;
     refuses_file(copy, sizeof copy,
-                 "has format version 97, and antic reads version 96");
+                 "has format version 98, and antic reads version 97");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

@@ -1535,6 +1535,14 @@ size_t sema_table_of(const struct type *t, struct table_entry *out)
     return count;
 }
 
+void sema_entry_signature(const struct table_entry *e, struct text *out)
+{
+    if (e->fn != NULL && e->fn->symbol != NULL &&
+        e->fn->symbol->type != NULL) {
+        types_signature(out, e->fn->symbol->type, e->fn->has_self);
+    }
+}
+
 bool sema_root_hook(const struct name *name)
 {
     size_t i;

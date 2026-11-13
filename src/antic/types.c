@@ -364,6 +364,8 @@ static const char *operator_spelling(enum token_kind op)
 }
 
 static void print_type(struct text *out, const struct type *t, bool qualified);
+static void print_fn(struct text *out, const struct type *t, bool qualified,
+                     size_t first);
 
 /* An operand in parentheses when it is itself an operation, so the text
    keeps the grouping of the value. */
@@ -1831,6 +1833,15 @@ void types_name_qualified(struct text *out, const struct type *t)
     print_type(out, t, true);
 }
 
+void types_signature(struct text *out, const struct type *fn, bool self)
+{
+    if (fn == NULL || fn->kind != TYPE_FN) {
+        print_type(out, fn, true);
+        return;
+    }
+    print_fn(out, fn, true, self && fn->param_count > 0 ? 1 : 0);
+}
+
 /* The spelling print_type follows, set for the length of one call of
    types_name_spelled. DESIGN: a variable of the file, not a parameter,
    since print_type and the printer of symbolic values call each other
@@ -1966,6 +1977,58 @@ static const char *second_name(enum type_kind kind)
     return NULL;
 }
 
+/* The name of the type of a function t, its parameters from the one at
+   first on. */
+static void print_fn(struct text *out, const struct type *t, bool qualified,
+                     size_t first)
+{
+    /* A failing type is written as the program writes it, without
+       the out pointer and the error of its ABI form. */
+    size_t shown = t->param_count - (t->has_out ? 1 : 0);
+    const struct type *result =
+        t->has_out ? t->params[shown]->element : t->result;
+    size_t i;
+
+    /* The owned form is a type of its own, `own fn(...)`, by Eddie's
+       entry of 2026-09-24 under "Anonymous functions and closures"
+       in docs/decisions.md, so its name says so, T177 of
+       docs/audit/tests-findings.md. */
+    if (t->owned) {
+        text_append(out, "own ");
+    }
+    if (t->nullable) {
+        text_append(out, "?");
+    }
+    text_append(out, t->bound ? "bound fn(" : "fn(");
+    /* A parameter of function type keeps its argument only when it
+       says so. A list therefore marks the plain form, the owned one
+       and the `concurrent` one. */
+    for (i = first; i < shown; i++) {
+        const struct type *p = t->params[i];
+        if (i > first) {
+            text_append(out, ", ");
+        }
+        if (p->kind == TYPE_FN && !p->bound) {
+            text_append(out, p->owned        ? "keep "
+                             : !p->context   ? "keep "
+                             : p->concurrent ? "concurrent "
+                                             : "");
+        }
+        print_type(out, p, qualified);
+    }
+    text_append(out, ")");
+    if (t->never) {
+        text_append(out, " -> never");
+    }
+    if (t->has_out || (!t->may_fail && result->kind != TYPE_VOID)) {
+        text_append(out, " -> ");
+        print_type(out, result, qualified);
+    }
+    if (t->may_fail) {
+        text_append(out, " may fail");
+    }
+}
+
 static void print_type(struct text *out, const struct type *t, bool qualified)
 {
     static const char *const builtin_names[TYPE_BUILTIN_COUNT] = {
@@ -2012,52 +2075,9 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
         }
         print_type(out, t->element, qualified);
         return;
-    case TYPE_FN: {
-        /* A failing type is written as the program writes it, without
-           the out pointer and the error of its ABI form. */
-        size_t shown = t->param_count - (t->has_out ? 1 : 0);
-        const struct type *result =
-            t->has_out ? t->params[shown]->element : t->result;
-        /* The owned form is a type of its own, `own fn(...)`, by Eddie's
-           entry of 2026-09-24 under "Anonymous functions and closures"
-           in docs/decisions.md, so its name says so, T177 of
-           docs/audit/tests-findings.md. */
-        if (t->owned) {
-            text_append(out, "own ");
-        }
-        if (t->nullable) {
-            text_append(out, "?");
-        }
-        text_append(out, t->bound ? "bound fn(" : "fn(");
-        /* A parameter of function type keeps its argument only when it
-           says so. A list therefore marks the plain form, the owned one
-           and the `concurrent` one. */
-        for (i = 0; i < shown; i++) {
-            const struct type *p = t->params[i];
-            if (i > 0) {
-                text_append(out, ", ");
-            }
-            if (p->kind == TYPE_FN && !p->bound) {
-                text_append(out, p->owned        ? "keep "
-                                 : !p->context   ? "keep "
-                                 : p->concurrent ? "concurrent "
-                                                 : "");
-            }
-            print_type(out, p, qualified);
-        }
-        text_append(out, ")");
-        if (t->never) {
-            text_append(out, " -> never");
-        }
-        if (t->has_out || (!t->may_fail && result->kind != TYPE_VOID)) {
-            text_append(out, " -> ");
-            print_type(out, result, qualified);
-        }
-        if (t->may_fail) {
-            text_append(out, " may fail");
-        }
+    case TYPE_FN:
+        print_fn(out, t, qualified, 0);
         return;
-    }
     case TYPE_OPTIONAL:
         text_append(out, "?");
         print_type(out, t->element, qualified);

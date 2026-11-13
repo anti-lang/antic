@@ -59,11 +59,15 @@ size_t lower_table_index(const struct type *t, const struct name *name,
    compiler declares belong to the compiler, so neither takes a record. A
    copy of a generic takes none either. Each module that reads the table
    of a copy writes the copy and its table as well, so the record of
-   that table, by the DESIGN of note_table_write, covers the read. */
+   that table, by the DESIGN of note_table_write, covers the read. By the
+   third answer of the same answers, the record carries the signature of
+   the entry as well. */
 void lower_note_table_read(struct lowerer *l, const struct type *t,
                            const struct name *name, size_t params,
                            size_t slot)
 {
+    struct table table = {0};
+    struct text signature = {0};
     char *module;
     char *class_name;
     char *function;
@@ -72,14 +76,20 @@ void lower_note_table_read(struct lowerer *l, const struct type *t,
         lower_name_is(&t->module, l->module_name)) {
         return;
     }
+    table_of(t, &table);
+    if (slot >= 1 && slot <= table.count) {
+        sema_entry_signature(&table.entries[slot - 1], &signature);
+    }
+    free(table.entries);
     module = lower_cstr(&t->module);
     class_name = lower_cstr(&t->name);
     function = lower_cstr(name);
     ir_table_read_add(l->m, module, class_name, function, (uint32_t)params,
-                      (uint32_t)slot);
+                      (uint32_t)slot, text_cstr(&signature));
     free(module);
     free(class_name);
     free(function);
+    text_free(&signature);
 }
 
 /* Whether the class t comes from a module other than the one being
@@ -105,12 +115,16 @@ static bool foreign_class(const struct lowerer *l, const struct type *t)
    laid out against the generic of the file it was built against, and
    the program keeps the first copy it reads. Its record names the
    generic, whose table holds the entries of every copy, since a copy
-   takes the functions of its generic. */
+   takes the functions of its generic. Each entry carries its signature,
+   by the third answer of the same answers. That of a copy is the one of
+   its generic, whose types the reader compares, since the arguments
+   stand in the types of the copy alone. */
 static void note_table_write(struct lowerer *l, const struct type *t,
                              const struct type *from)
 {
     const struct type *b = from;
     struct table table = {0};
+    struct table generic = {0};
     struct ir_table_slot *slots;
     struct text class_name = {0};
     char *module;
@@ -125,10 +139,20 @@ static void note_table_write(struct lowerer *l, const struct type *t,
         return;
     }
     table_of(b, &table);
+    table_of(b->generic != NULL ? b->generic : b, &generic);
     slots = alloc_zeroed(table.count + 1, sizeof *slots);
     for (i = 0; i < table.count; i++) {
+        struct text signature = {0};
+        char *copy;
+        if (i < generic.count) {
+            sema_entry_signature(&generic.entries[i], &signature);
+        }
+        copy = alloc_zeroed(signature.length + 1, 1);
+        memcpy(copy, text_cstr(&signature), signature.length);
+        text_free(&signature);
         slots[i].function = lower_cstr(&table.entries[i].name);
         slots[i].params = (uint32_t)table.entries[i].params;
+        slots[i].signature = copy;
     }
     text_appendf(&class_name, "%.*s.", (int)t->module.length, t->module.text);
     types_symbol_name(&class_name, t);
@@ -141,9 +165,11 @@ static void note_table_write(struct lowerer *l, const struct type *t,
                        table.count);
     for (i = 0; i < table.count; i++) {
         free((char *)slots[i].function);
+        free((char *)slots[i].signature);
     }
     free(slots);
     free(table.entries);
+    free(generic.entries);
     text_free(&class_name);
     free(module);
     free(base);

@@ -968,6 +968,14 @@ void types_name_spelled(struct text *out, const struct type *t,
 /* The name of t with the module of every struct in it, as main.Vec2. A
    copy of a generic qualifies its arguments as well. */
 void types_name_qualified(struct text *out, const struct type *t);
+/* DESIGN: the signature of a function as a library file carries it, by
+   the third answer of "Answers of 2026-11-12" in docs/decisions.md. It
+   is the type of the function as types_name_qualified writes it, its
+   parameters, its result and its `may fail` mark with the module of
+   every struct, `fn(int) -> float may fail`. With self set the first
+   parameter stays out, since a function of a table and the one that
+   replaces it in a class below differ in the type of `self` alone. */
+void types_signature(struct text *out, const struct type *fn, bool self);
 /* DESIGN: the name of a struct, a class or a variant in a symbol of its
    module. It is the name of t, and for a copy of a generic the name of
    the generic with the arguments qualified by their modules,
