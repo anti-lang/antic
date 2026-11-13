@@ -1,0 +1,8 @@
+//! A length that the target decides names each wrapping and saturating operator
+//! as the source writes it, with the grouping of its value in parentheses.
+
+fn main() -> int
+{
+	let a: [(size_of(c_long) +% 1 -% 2) *% 3 -| size_of(c_long) *| 2]int = 5;
+	return 0;
+}
