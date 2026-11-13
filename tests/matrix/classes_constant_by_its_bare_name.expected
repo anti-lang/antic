@@ -10,3 +10,4 @@ parameter 7
 local 3
 generic class 9 12
 outside 64 5
+outside a struct 3 4

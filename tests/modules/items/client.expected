@@ -4,6 +4,7 @@ const str items u64 18446744073709551615 product 80
 fn 2 4 6
 generic fn 1 4 5
 extern fn 1 2 3
+extern fn value 4 5
 variadic extern fn 3 3 3 8*9
 struct and operator 111 222
 generic struct 1 1 2 2.5 three 3

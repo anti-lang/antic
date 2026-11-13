@@ -1,6 +1,7 @@
 //! The client of the items library. It reaches every kind of public item three
 //! ways: as `items.name` through the name of the module, as `it.name` through
-//! an alias of the module, and by the bare name a direct import lists.
+//! an alias of the module, and by the bare name a direct import lists. An
+//! `extern fn` is taken as a value through the module and its alias as well.
 
 import com.example.items as it;
 import com.example.items.{Counter, IntPair, Key, LIMIT, Level, Maybe, Named, Pair, Point, Points, Settings, Shape, Source, Stack, Tag, Word, abs, pick, snprintf, twice};
@@ -59,6 +60,9 @@ fn main() -> int
 	printf("generic fn %lld %lld %lld\n".ptr, items.pick(1, 2, true),
 		it.pick<int>(3, 4, false), pick(5, 6, true));
 	printf("extern fn %d %d %d\n".ptr, items.abs(-1), it.abs(-2), abs(-3));
+	let held = items.abs;
+	let aliased = it.abs;
+	printf("extern fn value %d %d\n".ptr, held(-4), aliased(-5));
 	let text: [16]byte = [0; 16];
 	let wrote = snprintf(&text[0], 16, "%d-%d".ptr, 4 as c_int, 5 as c_int);
 	let again = items.snprintf(&text[0], 16, "%d+%d".ptr, 6 as c_int, 7 as c_int);

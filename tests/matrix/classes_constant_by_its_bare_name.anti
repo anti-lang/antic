@@ -3,16 +3,24 @@
 //! default of a field, a type nested in the class, a function, a static
 //! function, an anonymous function and the body of a generic class. A local or
 //! a parameter of the same name wins, the constant hides a constant of the
-//! module of the same name, and outside the class `Limits.MAX` names it. The
-//! program prints one line per form.
+//! module of the same name, and outside the class `Limits.MAX` names it, as
+//! `Limits.ORIGIN` names a constant of a struct. The program prints one line
+//! per form.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
 const MAX: int = 5;
 
+struct Corner
+{
+	x: int,
+	y: int,
+}
+
 class Limits
 {
 	pub const MAX: int = 64;
+	pub const ORIGIN: Corner = Corner { x: 3, y: 4 };
 	const HALF: int = MAX / 2;
 
 	struct Slot
@@ -102,5 +110,7 @@ fn main() -> int
 	let w = Buffer<i32> { items: [0; 4] };
 	printf("generic class %lld %lld\n".ptr, b.size(), w.size());
 	printf("outside %lld %lld\n".ptr, Limits.MAX, MAX);
+	let o = Limits.ORIGIN;
+	printf("outside a struct %lld %lld\n".ptr, o.x, o.y);
 	return 0;
 }
