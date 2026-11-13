@@ -1,0 +1,34 @@
+//! A call result passed through a function value that a local holds, to a
+//! function whose parameter is `own`. A value that needs a teardown keeps one
+//! owner, by "Ownership at a call", so it is torn down once. Each `Key` prints
+//! its teardown.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("  teardown of key %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n };
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let call = take;
+	printf("through a local: %d\n".ptr, call(key(2)) as c_int);
+	printf("after the call\n".ptr);
+	return 0;
+}

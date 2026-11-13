@@ -1,0 +1,39 @@
+//! A call result passed through a function value that a field holds, to a
+//! function whose parameter is not `own`. The caller owns the value, so it is
+//! torn down once, after the call returns, by "Ownership at a call" and the
+//! decision on temporaries of 2026-09-28. Each `Key` prints its teardown.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("  teardown of key %d\n".ptr, self.n as c_int);
+	}
+}
+
+struct Ops
+{
+	f: fn(Key) -> int,
+}
+
+fn key(n: int) -> Key
+{
+	return Key { n: n };
+}
+
+fn number(k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let ops = Ops { f: number };
+	printf("through a field: %d\n".ptr, ops.f(key(1)) as c_int);
+	printf("after the call\n".ptr);
+	return 0;
+}
