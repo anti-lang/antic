@@ -1644,18 +1644,21 @@ struct ir_operand lower_argument(struct lowerer *l,
    pointer type, `self` among them, takes the address of the value and
    never its ownership, and an `own` parameter takes the value, which the
    callee tears down. A call through a function value carries no `own`
-   marks, so its arguments are left alone. sym is the function called,
-   fn its type, arg the argument at the parameter index. */
+   marks, and by "Answers of 2026-11-13" in docs/decisions.md no function
+   whose `own` parameter needs a teardown is a value. Its arguments
+   therefore stay with the caller, which tears them down. sym is the
+   function called, or NULL for a call through a function value, fn its
+   type, arg the argument at the parameter index. */
 static const struct type *fresh_argument(const struct symbol *sym,
                                          const struct type *fn, size_t index,
                                          const struct expr *arg)
 {
     const struct type *t;
 
-    if (sym == NULL || fn == NULL || index >= fn->param_count ||
-        fn->params[index]->kind == TYPE_POINTER || arg->to_iface != NULL ||
-        arg->to_context || arg->moves ||
-        (index < sym->owned_count && sym->owned[index])) {
+    if (fn == NULL || index >= fn->param_count ||
+        fn->params[index]->kind == TYPE_POINTER ||
+        arg->to_iface != NULL || arg->to_context || arg->moves ||
+        (sym != NULL && index < sym->owned_count && sym->owned[index])) {
         return NULL;
     }
     if (!lower_is_fresh(arg)) {
@@ -1793,6 +1796,24 @@ static uint32_t table_target(struct lowerer *l, const struct expr *e,
     return ir_index(index);
 }
 
+/* The function whose `own` marks decide the arguments of a call of
+   callee: the function a name or `T.f` names, or NULL for a call through
+   a function value, a bound function among them. sym is the symbol of a
+   callee that is a name. */
+static const struct symbol *own_marks(const struct expr *callee,
+                                      const struct symbol *sym)
+{
+    const struct symbol *named = sym != NULL ? sym : callee->symbol;
+
+    if (named == NULL ||
+        (named->kind != SYMBOL_FN && named->kind != SYMBOL_EXTERN_FN) ||
+        (callee->type != NULL && callee->type->kind == TYPE_FN &&
+         callee->type->bound)) {
+        return NULL;
+    }
+    return named;
+}
+
 struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
 {
     const struct expr *callee = e->as.call.callee;
@@ -1812,6 +1833,7 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
     struct ir_operand *values;
     uint32_t result;
     uint32_t slot;
+    const struct symbol *marks;
     enum ir_type declared;
     bool ends = fn != NULL && fn->never;
     size_t given;
@@ -1895,8 +1917,12 @@ struct ir_operand lower_call(struct lowerer *l, const struct expr *e)
         ir_unreachable(l->f, l->b);
         l->b = lower_new_block(l);
     }
-    if (to.bound.kind == IR_NONE && to.context.kind == IR_NONE) {
-        lower_drop_arguments(l, callee->symbol, fn,
+    /* A call through the table without the function's symbol keeps its
+       arguments, since it cannot read the marks. Any other call that
+       names no function goes through a function value. */
+    marks = own_marks(callee, sym);
+    if (marks != NULL || slot == 0) {
+        lower_drop_arguments(l, marks, fn,
                              (const struct expr *const *)e->as.call.args,
                              values, e->as.call.arg_count, 0);
     }

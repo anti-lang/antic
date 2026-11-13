@@ -1,0 +1,17 @@
+exit 0
+  teardown of key 1
+through a local: 1
+  teardown of key 2
+through a parameter: 2
+  teardown of key 3
+through a keep parameter: 3
+  teardown of key 4
+through a bound function: 4
+  teardown of key 5
+through a closure: 5
+  teardown of key 6
+through a result: 6
+  teardown of key 7
+through an element: 7
+  teardown of key 8
+through an own field: 8
