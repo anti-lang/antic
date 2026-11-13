@@ -162,6 +162,39 @@ file(READ "${cached}" index)
 if(NOT index MATCHES "revision = 2")
     message(FATAL_ERROR "a stamp below 0 kept the cached index:\n${index}")
 endif()
+# An empty stamp, one that no 64 bits hold and one after the present time
+# are no stamps either, and each build fetches the index again.
+set(revision 2)
+foreach(stamp "" "99999999999999999999" "9000000000000000000")
+    math(EXPR revision "${revision} + 1")
+    file(WRITE "${stamps}" "${stamp}")
+    file(READ "${repo}/index.toml" index)
+    string(REGEX REPLACE "revision = [0-9]+" "revision = ${revision}" index
+           "${index}")
+    file(WRITE "${repo}/index.toml" "${index}")
+    file(WRITE "${WORK}/fetched/consumer/anti.lock" "version = 1\n")
+    build("the build after the stamp '${stamp}'" "${WORK}/fetched/consumer"
+          build)
+    file(READ "${cached}" index)
+    if(NOT index MATCHES "revision = ${revision}")
+        message(FATAL_ERROR "the stamp '${stamp}' kept the cached index:\n"
+                            "${index}")
+    endif()
+endforeach()
+# --offline reads the cached index whatever its stamp says, so a stamp of
+# 1970 and a new revision in the repository leave it as it was.
+file(WRITE "${stamps}" "0\n")
+file(READ "${repo}/index.toml" index)
+string(REGEX REPLACE "revision = [0-9]+" "revision = 9" index "${index}")
+file(WRITE "${repo}/index.toml" "${index}")
+file(WRITE "${WORK}/fetched/consumer/anti.lock" "version = 1\n")
+build("the offline build over the cached index" "${WORK}/fetched/consumer"
+      build --offline)
+file(READ "${cached}" index)
+if(NOT index MATCHES "revision = ${revision}")
+    message(FATAL_ERROR "the offline build fetched the index again:\n"
+                        "${index}")
+endif()
 
 # The second build reads the lock file and contacts no repository, which
 # --offline proves.

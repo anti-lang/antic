@@ -20,6 +20,7 @@
 #   redirect_to_http        a redirect of an https:// repository to plain
 #                           http:// of another host is refused (defect 11)
 #   redirect_followed       and one to https:// is followed
+#   redirect_to_loopback    and one to http:// of 127.0.0.1 as well
 #   redirect_loop           and a server that redirects to itself is left
 #                           after ten redirects
 #   index_unchanged         an index checked again after the hour, which
@@ -27,6 +28,7 @@
 #                           tag, stays in the cache as it was
 #   index_absent            an index the server does not hold gives the
 #                           repository no version of the package
+#   index_gone              and one the server answers with 410 as gone
 #   lock_dropped            a package of the lock file that the manifest no
 #                           longer reaches leaves the graph, the lock file
 #                           and the notice, and is not fetched (defect 9)
@@ -199,8 +201,8 @@ while :; do
     https://repo.example/*)
         code=302
         location="$FAKE_REDIRECT/${url#https://repo.example/}" ;;
-    *://mirror.example/*)
-        file="$FAKE_SERVED/${url#*://mirror.example/}"
+    *://mirror.example/*|http://127.0.0.1/*)
+        file="$FAKE_SERVED/${url#*://*/}"
         if [ -f "$file" ]; then
             tag=$(cksum < "$file")
             if [ -n "$compare" ] && [ -f "$compare" ] &&
@@ -213,7 +215,7 @@ while :; do
                 [ -z "$save" ] || printf '%s' "$tag" > "$save"
             fi
         else
-            code=404
+            code=${FAKE_ABSENT:-404}
         fi ;;
     *) code=404 ;;
     esac
@@ -306,14 +308,20 @@ if(CASE STREQUAL "redirect_loop")
     return()
 endif()
 
-if(CASE STREQUAL "redirect_followed")
-    redirect_project("https://mirror.example")
-    anti_passes("the build over a redirect to https://" "${WORK}/app" build
+# redirect_to_loopback follows a redirect to http:// of the machine as
+# redirect_followed follows one to https://.
+if(CASE STREQUAL "redirect_followed" OR CASE STREQUAL "redirect_to_loopback")
+    set(target "https://mirror.example")
+    if(CASE STREQUAL "redirect_to_loopback")
+        set(target "http://127.0.0.1")
+    endif()
+    redirect_project("${target}")
+    anti_passes("the build over a redirect to ${target}" "${WORK}/app" build
                 ${tools} ENV ${redirect_env})
     program_expect("the program" COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
                    STATUS 1 OUT "")
     file(READ "${WORK}/curl.log" asked)
-    if(NOT asked MATCHES "https://mirror.example/com.example.units/1.0.0/")
+    if(NOT asked MATCHES "${target}/com.example.units/1.0.0/")
         message(FATAL_ERROR "the build fetched no library file from the "
                             "target of the redirect:\n${asked}")
     endif()
@@ -347,10 +355,14 @@ if(CASE STREQUAL "index_unchanged")
     return()
 endif()
 
-# The server of index_absent holds no index of the package.
-if(CASE STREQUAL "index_absent")
+# The server of index_absent holds no index of the package and answers
+# 404, and that of index_gone answers 410.
+if(CASE STREQUAL "index_absent" OR CASE STREQUAL "index_gone")
     redirect_project("https://mirror.example")
     file(REMOVE "${WORK}/served/com.example.units/index.toml")
+    if(CASE STREQUAL "index_gone")
+        list(APPEND redirect_env "FAKE_ABSENT=410")
+    endif()
     anti("${WORK}/app" status text build ${tools} ENV ${redirect_env})
     set(expected "anti: https://repo.example has no version of com.example.units that satisfies every constraint on it\n")
     if(NOT status STREQUAL "1" OR NOT text STREQUAL expected)

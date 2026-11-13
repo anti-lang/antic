@@ -125,6 +125,7 @@ static void urls(void)
     CHECK(!repo_url_allowed("http://127.0.0.1@repo.example.com/"));
     CHECK(!repo_url_allowed("http://localhost:80@repo.example.com/"));
     CHECK(!repo_url_allowed("http://localhost:x/repo"));
+    CHECK(!repo_url_allowed("http://localhost:-1/repo"));
     CHECK(!repo_url_allowed("http://localhost.example.com/repo"));
 }
 

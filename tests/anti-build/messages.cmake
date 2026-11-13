@@ -350,6 +350,16 @@ anti_message(index_version
     ARGS build ${tools}
     ERR "anti: ${cached_index} names the version 1.x of com.example.units, which is no version"
         "${no_version}")
+# A repository whose index of the package is empty holds no version of
+# it.
+function(write_empty_index)
+    file(WRITE "${PROJECT}/${units_index}" "")
+endfunction()
+anti_message(index_empty
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+    SETUP write_empty_index
+    ARGS build ${tools}
+    ERR "${no_version}")
 anti_message(index_no_module
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           ${units_index} "${index_head}version = \"1.2.0\"\nmodules = []\n"
@@ -682,6 +692,14 @@ anti_message(lock_needs_name
     ERR "anti: ./anti.lock names Com/Example, which is no package name, so ./anti.lock is not read"
         "anti: --offline and no cached index of com.example.units from ${repo_url}"
         "${no_version}")
+# A lock file that answers the manifest takes the library file from the
+# cache of the user, and the environment names none.
+anti_message(lock_cache_unknown
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          anti.lock "${lock_head}${lock_units}"
+    ENV --unset=HOME --unset=XDG_CACHE_HOME --unset=LOCALAPPDATA
+    ARGS build ${tools}
+    ERR "anti: the environment does not say where the cache of the user is")
 anti_message(lock_repository_with_a_quote
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           anti.lock "${lock_head}name = \"com.example.units\"\nversion = \"1.2.0\"\nrepo = 'file:///re\"po'\nmodules = [\n    ${units_module},\n]\n"
