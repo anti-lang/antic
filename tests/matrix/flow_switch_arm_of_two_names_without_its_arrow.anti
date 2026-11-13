@@ -1,0 +1,10 @@
+//! An `=>` follows the case and the name of an arm of a `switch`.
+
+fn main() -> int
+{
+	let n = 1;
+	switch n {
+		one two n = 2,
+	}
+	return 0;
+}

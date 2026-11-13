@@ -1,0 +1,10 @@
+//! An `=>` follows the `else` of a `switch`.
+
+fn main() -> int
+{
+	let n = 1;
+	switch n {
+		else return,
+	}
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! A block follows the value of an `if let`.
+
+fn main() -> int
+{
+	let p: ?*int = none;
+	if let q = p return 1;
+	return 0;
+}

@@ -1,0 +1,9 @@
+//! A block follows the `catch` that guards the value of a `let`, as it follows
+//! that of a call.
+
+fn main() -> int
+{
+	let n = 1;
+	let m = n catch 5;
+	return m;
+}

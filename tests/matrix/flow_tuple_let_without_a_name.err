@@ -1,0 +1,1 @@
+flow_tuple_let_without_a_name.anti:6:7: error: a destructuring names two elements or more

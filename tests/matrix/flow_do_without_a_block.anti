@@ -1,0 +1,7 @@
+//! A block follows `do`.
+
+fn main() -> int
+{
+	do 1;
+	return 0;
+}

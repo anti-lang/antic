@@ -1,0 +1,15 @@
+//! The `catch` after `alloc` of a literal guards a pointer that may be `none`,
+//! and `alloc` gives one that is never `none`.
+
+struct Point
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	let p = alloc Point { x: 1 } catch {
+		return 1;
+	};
+	return p.x;
+}

@@ -1,0 +1,8 @@
+//! A `while` follows the block of a `do`.
+
+fn main() -> int
+{
+	do {
+	} until true;
+	return 0;
+}

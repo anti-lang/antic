@@ -1,0 +1,8 @@
+//! A destructuring names two elements or more, and `let ()` names none.
+
+fn main() -> int
+{
+	let t = (1, 2);
+	let () = t;
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! A value follows `switch`.
+
+fn main() -> int
+{
+	switch {
+	}
+	return 0;
+}

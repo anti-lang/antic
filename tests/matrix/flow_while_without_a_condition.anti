@@ -1,0 +1,8 @@
+//! A condition follows `while`.
+
+fn main() -> int
+{
+	while) {
+	}
+	return 0;
+}

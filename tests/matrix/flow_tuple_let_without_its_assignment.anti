@@ -1,0 +1,8 @@
+//! An `=` follows the names of a `let` that takes a tuple apart.
+
+fn main() -> int
+{
+	let t = (1, 2);
+	let (a, b) t;
+	return a + b;
+}
