@@ -1037,15 +1037,73 @@ static size_t find_path(const struct graph *g, size_t lock_count,
     return count;
 }
 
-/* Write the name of lock as a message names it into out: `Type` for the
-   hidden lock of a synchronized class, `Type.field` for a Mutex. */
-static void lock_text(char *out, size_t size, const struct lock_name *lock)
+/* DESIGN: R136 of "Rules of 2026-10-13" names a type as the source
+   spells it, so a message names the type of a lock of another module
+   with the name the module that compiles gives that module: the alias of
+   its import, or the last segment of its path. A type that a direct
+   import lists is named bare, as the source names it there, and the type
+   of a module that the module does not import takes the whole path of
+   that module, the one name the source could give it. A lock of the
+   module itself is named bare. T252 of docs/audit/tests-findings.md. */
+static struct name module_spelling(const struct checker *c,
+                                   const struct lock_name *lock)
 {
+    struct name bare = {"", 0};
+    struct name head = lock->type;
+    size_t i;
+    size_t k;
+
+    if (lock->module.length == 0 ||
+        same_text(&lock->module, &c->module_name)) {
+        return bare;
+    }
+    for (i = 0; i < lock->type.length; i++) {
+        if (lock->type.text[i] == '.') {
+            head.length = i;
+            break;
+        }
+    }
+    for (i = 0; i < c->module->import_count; i++) {
+        const struct import *imp = &c->module->imports[i];
+        struct name last = imp->module;
+        if (!same_text(&imp->module, &lock->module)) {
+            continue;
+        }
+        for (k = 0; k < imp->name_count; k++) {
+            if (same_text(&imp->names[k].name, &head)) {
+                return bare;
+            }
+        }
+        if (imp->alias.length > 0) {
+            return imp->alias;
+        }
+        for (k = 0; k < imp->module.length; k++) {
+            if (imp->module.text[k] == '.') {
+                last.text = imp->module.text + k + 1;
+                last.length = imp->module.length - k - 1;
+            }
+        }
+        return last;
+    }
+    return lock->module;
+}
+
+/* Write the name of lock as a message names it into out: `Type` for the
+   hidden lock of a synchronized class, `Type.field` for a Mutex, each
+   after the module as module_spelling gives it. */
+static void lock_text(const struct checker *c, char *out, size_t size,
+                      const struct lock_name *lock)
+{
+    struct name module = module_spelling(c, lock);
+    const char *dot = module.length > 0 ? "." : "";
+
     if (same_text(&lock->field, &hidden_lock)) {
-        text_format_name(out, size, "`%.*s`", (int)lock->type.length,
+        text_format_name(out, size, "`%.*s%s%.*s`", (int)module.length,
+                         module.text, dot, (int)lock->type.length,
                          lock->type.text);
     } else {
-        text_format_name(out, size, "`%.*s.%.*s`", (int)lock->type.length,
+        text_format_name(out, size, "`%.*s%s%.*s.%.*s`", (int)module.length,
+                         module.text, dot, (int)lock->type.length,
                          lock->type.text, (int)lock->field.length,
                          lock->field.text);
     }
@@ -1076,9 +1134,9 @@ static void refuse_cycle(struct lock_walk *w, const struct graph *g,
     char here[LOCK_TEXT];
     char there[LOCK_TEXT];
 
-    lock_text(taken, sizeof taken, &w->locks[e->taken]);
-    lock_text(held, sizeof held, &w->locks[e->held]);
-    lock_text(other, sizeof other, &w->locks[next->taken]);
+    lock_text(w->c, taken, sizeof taken, &w->locks[e->taken]);
+    lock_text(w->c, held, sizeof held, &w->locks[e->held]);
+    lock_text(w->c, other, sizeof other, &w->locks[next->taken]);
     if (e->module == NULL) {
         text_format_name(here, sizeof here, "here");
     } else {

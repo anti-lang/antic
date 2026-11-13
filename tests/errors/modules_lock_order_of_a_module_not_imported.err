@@ -1,1 +1,1 @@
-modules_lock_order_of_a_module_not_imported.anti:7:1: error: `com.example.pairs.Pair.a` is locked on line 10 of `com.example.right` while `com.example.pairs.Pair.b` is held, and line 8 of `com.example.left` locks them in the other order [lock-order]
+modules_lock_order_of_a_module_not_imported.anti:7:1: error: `com.example.pairs.Pair.a` is locked on line 10 of `com.example.right` while `com.example.pairs.Pair.b` is held, and line 8 of `com.example.left` locks them... [lock-order]
