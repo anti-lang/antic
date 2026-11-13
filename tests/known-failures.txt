@@ -22,3 +22,6 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 matrix_ownership_if_let_of_an_own_function_field_dev T255 `if let` on an `own ?fn` field that holds a snapshot frees the snapshot a second time.
 matrix_ownership_if_let_of_an_own_function_field_release T255 `if let` on an `own ?fn` field that holds a snapshot frees the snapshot a second time.
 matrix_ownership_if_let_of_an_own_function_field_memory_checks T255 `if let` on an `own ?fn` field that holds a snapshot frees the snapshot a second time.
+matrix_ownership_optional_access_of_an_own_function_field_dev T256 `p?.f` on an `own ?fn` field makes antic recurse in lowering until its stack overflows.
+matrix_ownership_optional_access_of_an_own_function_field_release T256 `p?.f` on an `own ?fn` field makes antic recurse in lowering until its stack overflows.
+matrix_ownership_optional_access_of_an_own_function_field_memory_checks T256 `p?.f` on an `own ?fn` field makes antic recurse in lowering until its stack overflows.

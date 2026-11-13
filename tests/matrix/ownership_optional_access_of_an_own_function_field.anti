@@ -1,0 +1,24 @@
+//! `p?.f` on an `own` field of type `?fn(...)` that holds a snapshot, read into
+//! a local. The local borrows the function, as `let` of `h.f` does, so the
+//! field frees the snapshot once, when its owner is torn down.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Hold
+{
+	pub own f: ?fn(int) -> int = none,
+}
+
+fn main() -> int
+{
+	let base = 40;
+	let h = Hold { };
+	h.f = snapshot fn(n: int) -> int { return n + base; };
+	let p: ?*Hold = &h;
+	let q = p?.f;
+	if let g = q {
+		printf("kept: %d\n".ptr, g(2) as c_int);
+	}
+	printf("after the binding\n".ptr);
+	return 0;
+}
