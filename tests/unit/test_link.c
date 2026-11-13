@@ -278,6 +278,8 @@ static void relative_paths(void)
         {"C:/w/prog.obj", "C:/w", "prog.obj"},
         {"c:/rt/anti_rt.lib", "C:/w/out", "../../rt/anti_rt.lib"},
         {"//host/share/a/x.obj", "//host/share/b", "../a/x.obj"},
+        {"/a/b", "/a/b", "."},
+        {"//host", "//host", "."},
     };
     static const char *const apart[][2] = {
         {"C:/w/prog.obj", "D:/w"},

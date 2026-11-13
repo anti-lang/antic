@@ -240,6 +240,72 @@ static void deep_stack(void)
     CHECK(levels == 511);
 }
 
+/* A name that is a suffix alone starts with its one dot. A path that
+   holds a file is no directory. On a POSIX system a link replaces the
+   link at its path. */
+static void names_and_links(void)
+{
+    static const char file[] = "tool_platform_file.bin";
+
+    CHECK(platform_suffix_alone("dir/.anti"));
+    CHECK(!platform_suffix_alone("dir/.tar.gz"));
+    CHECK(!platform_suffix_alone("dir/app.anti"));
+    write_all(file, "f", 1);
+    CHECK(!platform_directory_exists(file));
+#if !defined(_WIN32)
+    {
+        char target[64];
+        ssize_t n;
+
+        CHECK(platform_symlink(file, "tool_platform_link"));
+        CHECK(platform_symlink("tool_platform_other", "tool_platform_link"));
+        n = readlink("tool_platform_link", target, sizeof target - 1);
+        CHECK(n == (ssize_t)strlen("tool_platform_other"));
+        if (n > 0) {
+            target[n] = '\0';
+            CHECK(strcmp(target, "tool_platform_other") == 0);
+        }
+        CHECK(platform_remove("tool_platform_link"));
+    }
+#endif
+    CHECK(platform_remove(file));
+}
+
+#if !defined(_WIN32)
+/* Append a line of the standard error of a run to the buffer context. */
+static void keep_line(void *context, const char *line, size_t length)
+{
+    char *kept = context;
+    size_t at = strlen(kept);
+
+    if (at + length < 64) {
+        memcpy(kept + at, line, length);
+        kept[at + length] = '\0';
+    }
+}
+#endif
+
+/* A run with a variable set gives it its value and keeps a variable
+   whose name only starts with that name. */
+static void run_with_a_variable(void)
+{
+#if !defined(_WIN32)
+    static const char *const argv[] = {
+        "/bin/sh", "-c",
+        "echo \"$ANTIC_TOOL_PLATFORM_RUN\" "
+        "\"$ANTIC_TOOL_PLATFORM_RUN_LONGER\" >&2",
+        NULL,
+    };
+    char kept[64] = {0};
+
+    put("ANTIC_TOOL_PLATFORM_RUN", "old");
+    put("ANTIC_TOOL_PLATFORM_RUN_LONGER", "kept");
+    CHECK(platform_run_lines(argv, "ANTIC_TOOL_PLATFORM_RUN", "new", keep_line,
+                             kept) == 0);
+    CHECK(strcmp(kept, "new kept\n") == 0);
+#endif
+}
+
 void test_tool_platform(void)
 {
     static const char path[] = "tool_platform.bin";
@@ -269,5 +335,7 @@ void test_tool_platform(void)
 
     path_rules_of_host();
     list_directory();
+    names_and_links();
+    run_with_a_variable();
     deep_stack();
 }
