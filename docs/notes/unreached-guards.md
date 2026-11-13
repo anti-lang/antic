@@ -11,8 +11,9 @@ of 2026-11-09, third set" in `docs/decisions.md`, the guards of
 reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `sema_generic.c`, `antl_tree.c`, `sema_escape.c`, `whole.c`,
 `whole_tables.c`, `lower_place.c`, `coff.c`, `llvm_emit_call.c`,
-`build.c`, `sema_lock.c`, `lower_stmt.c`, `lower_expr.c`, `lower_desc.c`
-and `platform.c` stay by them. A guard stays in the code as it is. A later
+`build.c`, `sema_lock.c`, `lower_stmt.c`, `lower_expr.c`, `lower_desc.c`,
+`platform.c`, `parser_stmt.c`, `types.c`, `patterns.c` and `repo.c` stay
+by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -32,7 +33,9 @@ source of `docs/reports/2026-11-12-coverage-phase-3d.md`. Those of
 `sema_copies.c`, `sema_index.c` and `sema_lock.c` were checked against
 the source of `docs/reports/2026-11-13-coverage-phase-3e.md`, and those
 of the four files of batch 3f against the source of
-`docs/reports/2026-11-13-coverage-phase-3f.md`. A guard named "the report
+`docs/reports/2026-11-13-coverage-phase-3f.md`. Those of the four files
+of batch 3g were checked against the source of
+`docs/reports/2026-11-13-coverage-phase-3g.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -421,6 +424,54 @@ and the measurement holds those of macOS.
 | `environment_with` | No environment. | A process of macOS starts with `environ` set. |
 | `platform_run_on_stack` | Attributes of a thread that the system cannot set up. | The system sets them up, and it takes the size of `PLATFORM_WORK_STACK`. |
 
+## `src/antic/parser_stmt.c`
+
+The statements of the parser, sorted by batch 3g of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `parser_read_handler` | No `catch` where the handler is not required, which reads no handler. | Every caller that passes `false` checks for `catch` first. |
+| `parser_read_handler` | A name after `catch` that is no name. | It reads a name only where the next token is one. |
+| `arm_body` and `expression_statement` | A `catch` after a call whose handler does not parse, and a `catch` after the call that fills a place. | The expression parser reads the `catch` after a call as part of the call, so the statement sees a call without one. |
+| `for_statement` | A name of the loop that is no name. | The lookahead that chose the bound form and the tuple pattern found names at each place. |
+
+## `src/antic/types.c`
+
+The types of a compilation, sorted by batch 3g of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `types_copy_of_parts` | A type that holds no lent part, which it gives back as it is. | The one caller tests `types_holds_lent` first. |
+| `types_fn_form`, `types_fn_owned` and `types_fn_never` | An operand that is NULL, no function type or a bound function, which each gives back as it is. | Every caller passes a function type it built or tested, and a bound function takes neither the form of two words nor `own`. |
+| `types_member_level` and `types_holds_entry` | A member that no level of the chain declares. | Every caller passes a member that a lookup on the same chain found. |
+| `types_make_declared` | A name that no type of `anti.lang` that the compiler declares has. | The reader of a library file looked the name up before, and a damaged file stops there. |
+| `types_signature` | An operand that is no function type. | Every caller passes the type of a function. |
+| `types_item_spelled` | An item that is NULL. | Every caller and the walk over the members pass an item. |
+| `holds_walk` | A type that is NULL. | Every type that the walk reaches is the type of a value or of a field. |
+| `types_hash_call_type` | A hash call whose callee is no name of a function with a parameter. | `sema_hash.c` builds each call as `x.hash()` and the checker binds its callee to the function. |
+| `operator_spelling` | An operator outside its table, which gives `?`. | A symbolic value holds the operators of an integer alone, and the table names each. |
+
+## `src/rt/patterns.c`
+
+The searches of a pattern, sorted by batch 3g of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `literal` | A pattern literal that does not compile at start. | antic compiled every literal with the same PCRE2 when it checked it. |
+| `anti_rt_regex_message` | An error number outside the table of PCRE2, which gives an empty text. | `anti.regex` passes the number that a compile of PCRE2 gave. |
+| `failure` | A failure of a search that no limit explains, which stops the program. | The text of a search is a `str`, which holds UTF-8 alone. A slice of a `str` is a `[]byte`, which a pattern of bytes searches. |
+| `slice` | An end before the start. | A match ends at or after its start, since `\K` in a lookaround is refused. |
+| `search_again` | A search that no longer finds the match it found. | The search runs again on the same text with the same options. |
+
+## `src/anti/repo.c`
+
+The repositories of `anti build`, sorted by batch 3g of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `index_dir` | A name that is no package name. | The manifest reader refuses the name of a dependency by R164, and `deps.c` the name of an index and of a lock file, as `tests/diagnostics-open.txt` says. |
+| `repo_module` | A name, a version, a module path or a digest that the rules refuse. | `deps.c` checks each of an index and of a lock file before it calls `repo_module`. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -448,5 +499,7 @@ and the measurement holds those of macOS.
 - The sides of a condition in `lower_stmt.c`, `lower_expr.c`,
   `lower_desc.c` and `platform.c` that the report of batch 3f did not
   sort.
+- The sides of a condition in `parser_stmt.c`, `types.c`, `patterns.c`
+  and `repo.c` that the report of batch 3g did not sort.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
