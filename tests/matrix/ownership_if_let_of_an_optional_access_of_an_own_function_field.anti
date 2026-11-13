@@ -1,0 +1,32 @@
+//! `if let g = p?.f` on an `own` field of type `?fn(...)`, with `p` holding an
+//! object whose field holds a snapshot, an object whose field holds `none`, and
+//! `none`. The binding borrows the function, and the owner frees the snapshot
+//! once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Hold
+{
+	pub own f: ?fn(int) -> int = none,
+}
+
+fn read(p: ?*Hold, name: str)
+{
+	if let g = p?.f {
+		printf("%s: %d\n".ptr, name.ptr, g(2) as c_int);
+	} else {
+		printf("%s: none\n".ptr, name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let base = 40;
+	let h = Hold { };
+	h.f = snapshot fn(n: int) -> int { return n + base; };
+	let empty = Hold { };
+	read(&h, "kept");
+	read(&empty, "empty field");
+	read(none, "no object");
+	return 0;
+}

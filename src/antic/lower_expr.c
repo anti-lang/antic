@@ -610,6 +610,8 @@ static struct ir_operand lower_format(struct lowerer *l, const struct expr *e)
 }
 
 static struct ir_operand coalesce(struct lowerer *l, const struct expr *e);
+static struct ir_operand lower_optional(struct lowerer *l,
+                                        const struct expr *e);
 
 /* The address of the memory that holds the aggregate value of e. A
    literal gets a slot of its own, and a constant is read-only data. */
@@ -658,6 +660,9 @@ struct ir_operand lower_address(struct lowerer *l,
         (lower_none_in_first_word(e->type) ||
          e->as.binary.left->type->kind == TYPE_OPTIONAL)) {
         return coalesce(l, e);
+    }
+    if (e->kind == EXPR_OPTIONAL && lower_none_in_first_word(e->type)) {
+        return lower_optional(l, e);
     }
     switch (e->kind) {
     case EXPR_SIMD:
@@ -940,13 +945,18 @@ static struct ir_operand coalesce(struct lowerer *l, const struct expr *e)
    the checker bound to p, and runs only when p is not `none`. The result
    is `none` otherwise. */
 /* DESIGN: a `?T` of a value as the base of `?.` binds the address of
-   the value it holds, and its flag decides. */
+   the value it holds, and its flag decides. Of a function with its
+   context, an `own` field of type `?fn(...)`, the result is the address
+   of a pair, as for `??`: the pair of the field, or a pair of `none`
+   when the base is `none`. T256 of docs/audit/tests-findings.md. */
 static struct ir_operand lower_optional(struct lowerer *l,
                                         const struct expr *e)
 {
     const struct type *base = e->as.optional.base->type;
-    enum ir_type type = lower_ir_type_of(e->type);
+    bool pair = lower_none_in_first_word(e->type);
+    enum ir_type type = pair ? IR_PTR : lower_ir_type_of(e->type);
     struct ir_operand p = lower_expr(l, e->as.optional.base);
+    struct ir_operand empty;
     struct ir_operand v;
     struct ir_operand is_none;
     struct ir_block *rest;
@@ -954,7 +964,10 @@ static struct ir_operand lower_optional(struct lowerer *l,
     uint32_t result;
 
     lower_bind_value(l, e->as.optional.bound, p);
-    result = ir_unary(l->f, l->b, IR_COPY, type, ir_int_op(type, 0));
+    empty = pair ? lower_pair(l, e->type, ir_int_op(IR_PTR, 0),
+                              ir_int_op(IR_PTR, 0))
+                 : ir_int_op(type, 0);
+    result = ir_unary(l->f, l->b, IR_COPY, type, empty);
     is_none = base->kind == TYPE_OPTIONAL
                   ? lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8,
                                             lower_optional_flag(l, base, p),
