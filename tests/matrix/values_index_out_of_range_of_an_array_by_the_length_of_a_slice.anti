@@ -1,0 +1,14 @@
+//! The length of a slice is 0 or more, so an index of an array of three
+//! elements at the length of a slice plus three is past its end on every run.
+
+fn pick(s: []int) -> int
+{
+	let xs = [1, 2, 3];
+	return xs[s.len + 3];
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	return pick(xs[0..0]);
+}

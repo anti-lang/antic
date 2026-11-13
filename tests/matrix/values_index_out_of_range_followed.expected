@@ -12,3 +12,24 @@ with a carry: 3
 with a try: 9
 with a walk: 24
 a walked body: 20
+constants past the bound: 0
+the length of a slice on an array: 3
+sums past the bound: 0
+bounds of a variable: 22
+parts of a slice: 5
+a changed copy: 3
+products: 16
+a field named len: 2
+left by a try block: 9
+left by a fatal handler: 9
+left by a call that never returns: 6
+left by a failure: -1
+left by a while: 6
+left by a do: 6
+left by a fallthrough: 6
+left by a yield: 9
+a captured copy: 6
+a complement: 2
+the least step: 1
+a slice literal in a loop: 2
+many indices: 81
