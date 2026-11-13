@@ -1,0 +1,11 @@
+//! A function of `com.example.parts` whose parameter is `own` and needs a
+//! teardown is no function value, by "Answers of 2026-11-13". The mark comes
+//! through the library file.
+
+import com.example.parts;
+
+fn main() -> int
+{
+	let call = parts.take;
+	return 0;
+}

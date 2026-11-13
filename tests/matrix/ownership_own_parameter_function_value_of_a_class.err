@@ -1,0 +1,1 @@
+ownership_own_parameter_function_value_of_a_class.anti:25:13: error: `Box.take` takes `k` as `own`, and a function value moves nothing

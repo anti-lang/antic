@@ -1,0 +1,1 @@
+ownership_own_parameter_function_value_bound_on_a_copy.anti:27:13: error: `Bag<Key>.put` takes `x` as `own`, and a function value moves nothing

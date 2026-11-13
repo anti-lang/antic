@@ -1,0 +1,28 @@
+//! A bound function whose parameter is `own` and needs a teardown is no
+//! function value, by "Answers of 2026-11-13".
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Box
+{
+	pub m: int = 0,
+
+	pub fn take(self, own k: Key) -> int
+	{
+		return k.n;
+	}
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	let call = b.take;
+	return 0;
+}

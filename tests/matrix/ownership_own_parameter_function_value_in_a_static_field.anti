@@ -1,0 +1,27 @@
+//! A static field, a global, refuses a function whose parameter is `own` and
+//! needs a teardown, by "Answers of 2026-11-13".
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Hold
+{
+	pub static atomic f: ?fn(Key) -> int = none;
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	Hold.f.store(take);
+	return 0;
+}

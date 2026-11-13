@@ -1,0 +1,1 @@
+modules_own_parameter_function_value.anti:9:13: error: `parts.take` takes `p` as `own`, and a function value moves nothing

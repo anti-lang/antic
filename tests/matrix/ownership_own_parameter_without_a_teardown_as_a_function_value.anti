@@ -1,0 +1,51 @@
+//! A function whose `own` parameter takes a type without a teardown stays a
+//! function value, by "Answers of 2026-11-13": an `int`, a plain pointer and
+//! the `T` of a copy whose argument owns nothing. The function that takes the
+//! pointer deletes the key, once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("  teardown of key %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Bag<T>
+{
+	pub count: int = 0,
+
+	pub fn put(self, own x: T)
+	{
+		self.count += 1;
+	}
+}
+
+fn twice(own n: int) -> int
+{
+	return n * 2;
+}
+
+fn drop_key(own k: *Key) -> int
+{
+	let n = k.n;
+	delete(k);
+	return n;
+}
+
+fn main() -> int
+{
+	let a = twice;
+	printf("an int: %d\n".ptr, a(4) as c_int);
+	let b = drop_key;
+	printf("a pointer: %d\n".ptr, b(alloc Key { n: 5 }) as c_int);
+	let bag = Bag<int> { };
+	let put = bag.put;
+	put(6);
+	printf("a copy of int: %d\n".ptr, bag.count as c_int);
+	return 0;
+}

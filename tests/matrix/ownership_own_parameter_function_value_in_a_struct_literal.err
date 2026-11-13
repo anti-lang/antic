@@ -1,0 +1,1 @@
+ownership_own_parameter_function_value_in_a_struct_literal.anti:25:21: error: `take` takes `k` as `own`, and a function value moves nothing

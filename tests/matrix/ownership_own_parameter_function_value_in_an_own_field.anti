@@ -1,0 +1,28 @@
+//! An `own fn` field refuses a function whose parameter is `own` and needs a
+//! teardown, by "Answers of 2026-11-13".
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Holder
+{
+	pub own f: ?fn(Key) -> int = none,
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	h.f = take;
+	return 0;
+}

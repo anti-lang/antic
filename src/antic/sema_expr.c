@@ -2027,6 +2027,14 @@ static struct type *check_name(struct checker *c, struct expr *e)
         sema_refuse_type_args(c, e, &e->as.name);
         return sema_builtin(c, TYPE_ERROR);
     }
+    if (c->callee != e && sym->kind == SYMBOL_FN) {
+        char shown[128];
+        text_format(shown, sizeof shown, "%.*s", (int)e->as.name.length,
+                    e->as.name.text);
+        if (sema_refuse_own_value(c, e->pos, shown, sym, sym->type)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
+    }
     /* A local of another frame is a variable an anonymous function
        captures. */
     if ((sym->kind == SYMBOL_LOCAL || sym->kind == SYMBOL_PARAM) &&

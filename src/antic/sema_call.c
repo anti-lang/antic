@@ -150,6 +150,24 @@ static bool refuse_abstract_call(struct checker *c, struct pos pos,
     return true;
 }
 
+/* A function m of the type t named as a value, `T.f` or the bound
+   function `v.f`, that takes an `own` parameter which needs a teardown,
+   by "Answers of 2026-11-13". The type of a copy of a generic has its
+   arguments in place. Returns whether it reported. */
+static bool refuse_own_member(struct checker *c, const struct expr *e,
+                              const struct type *t, const struct item *m)
+{
+    char shown[128];
+
+    if (m->symbol == NULL || m->symbol->type == NULL) {
+        return false;
+    }
+    text_format(shown, sizeof shown, "%s.%.*s", sema_tn(t),
+                (int)m->name.length, m->name.text);
+    return sema_refuse_own_value(c, e->pos, shown, m->symbol,
+                                 sema_member_type(c, m->symbol->type, t));
+}
+
 /* DESIGN: a use of a function on a class reaches it through a table.
    Two kinds hold no entry of the primary table: a body qualified by an
    interface, and a plain body beside one qualified by a base. Each fills
@@ -193,6 +211,58 @@ bool sema_refuse_abstract_value(struct checker *c, struct pos pos,
     sema_error_at(c, pos, "`%s` is abstract and has no complete value, and %s "
                   "needs one", sema_tn(t), what);
     return true;
+}
+
+/* The name the declaration of the function sym gives its parameter at
+   index of its type, `self` included, or NULL. An item lists the
+   parameters after `self`, and a function at module level of a library
+   file lists every one in its symbol. */
+static const struct name *param_name(const struct symbol *sym, size_t index)
+{
+    const struct item *it = sym->item;
+
+    if (it != NULL && it->params != NULL) {
+        size_t self = it->has_self ? 1 : 0;
+        return index >= self && index - self < it->param_count
+                   ? &it->params[index - self].name
+                   : NULL;
+    }
+    return sym->params != NULL ? &sym->params[index] : NULL;
+}
+
+/* DESIGN: a function with an `own` parameter of a type that needs a
+   teardown is no function value, by "Answers of 2026-11-13" in
+   docs/decisions.md. The marks belong to the function and not to its
+   type, so a call through a function value moves nothing, and the caller
+   tears a fresh argument down once the call returns. Such a function
+   stands as the callee of a call alone. A parameter of a type without a
+   teardown, a plain pointer among them, leaves the function a value. So
+   does a `keep own` parameter, whose type `own fn(...)` the type of the
+   function carries, so a call through the value hands it over too.
+   sym is the function, fn its type with the arguments of a copy in place
+   and shown its name as the use writes it. Returns whether it reported. */
+bool sema_refuse_own_value(struct checker *c, struct pos pos,
+                           const char *shown, const struct symbol *sym,
+                           const struct type *fn)
+{
+    size_t i;
+
+    if (sym == NULL || sym->kind != SYMBOL_FN || sym->owned == NULL ||
+        fn == NULL || fn->kind != TYPE_FN) {
+        return false;
+    }
+    for (i = 0; i < sym->owned_count && i < fn->param_count; i++) {
+        const struct name *p = param_name(sym, i);
+        const struct type *t = fn->params[i];
+        if (sym->owned[i] && p != NULL && t->kind != TYPE_FN &&
+            sema_needs_teardown(t)) {
+            sema_error_at(c, pos, "`%s` takes `%.*s` as `own`, and a "
+                          "function value moves nothing", shown,
+                          (int)p->length, p->text);
+            return true;
+        }
+    }
+    return false;
 }
 
 /* The class that t inherits, or NULL. */
@@ -691,6 +761,14 @@ static struct type *check_qualified(struct checker *c, struct expr *e,
         sema_error_at(c, e->pos, "a variadic function has no function pointer "
                       "type");
         return sema_builtin(c, TYPE_ERROR);
+    }
+    if (!callee) {
+        char shown[128];
+        text_format(shown, sizeof shown, "%.*s.%.*s", (int)base.length,
+                    base.text, (int)name.length, name.text);
+        if (sema_refuse_own_value(c, e->pos, shown, item, item->type)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
     }
     e->kind = EXPR_NAME;
     e->as.name = name;
@@ -2608,6 +2686,10 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (refuse_abstract_call(c, e->pos, t, m)) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    if (m->kind == ITEM_FN && c->callee != e &&
+        refuse_own_member(c, e, t, m)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (m->kind == ITEM_FN && types_member_level(t, m) != NULL &&
         types_body_table(types_member_level(t, m), m) == BODY_INTERFACE) {
         e->as.field.through = table_sub_object(t, m);
@@ -2716,6 +2798,9 @@ static struct type *check_member_name(struct checker *c, struct expr *e,
         m->symbol != NULL && m->symbol->type != NULL &&
         m->symbol->type->kind == TYPE_FN &&
         m->symbol->type->param_count > 0) {
+        if (c->callee != e && refuse_own_member(c, e, s, m)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
         e->symbol = m->symbol;
         return types_bound_of(
             c->types,

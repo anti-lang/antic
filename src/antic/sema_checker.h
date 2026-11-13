@@ -573,6 +573,9 @@ void sema_append_defaults(struct checker *c, struct expr *e,
 struct type *sema_struct_of(struct type *t);
 bool sema_refuse_abstract_value(struct checker *c, struct pos pos,
                                 const char *what, const struct type *t);
+bool sema_refuse_own_value(struct checker *c, struct pos pos,
+                           const char *shown, const struct symbol *sym,
+                           const struct type *fn);
 const struct type *sema_inherited(const struct type *t);
 const struct type *sema_declaring_class(const struct item *m);
 const struct type *sema_checking_class(const struct checker *c);

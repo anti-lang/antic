@@ -1,0 +1,29 @@
+//! A bound function of a copy of a generic class, whose `own` parameter takes a
+//! type that needs a teardown, is no function value, by "Answers of
+//! 2026-11-13".
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Bag<T>
+{
+	pub count: int = 0,
+
+	pub fn put(self, own x: T)
+	{
+		self.count += 1;
+	}
+}
+
+fn main() -> int
+{
+	let b = Bag<Key> { };
+	let call = b.put;
+	return 0;
+}

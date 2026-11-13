@@ -1,0 +1,26 @@
+//! A `concurrent` parameter refuses a function whose parameter is `own` and
+//! needs a teardown, by "Answers of 2026-11-13".
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn through(concurrent f: fn(Key) -> int)
+{
+}
+
+fn main() -> int
+{
+	through(take);
+	return 0;
+}

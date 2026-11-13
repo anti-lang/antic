@@ -22,6 +22,3 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 matrix_ownership_fresh_value_through_a_function_value_in_a_field_dev T253 A call result passed through a function value in a field to a parameter that is not own is never torn down.
 matrix_ownership_fresh_value_through_a_function_value_in_a_field_release T253 A call result passed through a function value in a field to a parameter that is not own is never torn down.
 matrix_ownership_fresh_value_through_a_function_value_in_a_field_memory_checks T253 A call result passed through a function value in a field to a parameter that is not own is never torn down.
-matrix_ownership_fresh_value_through_a_function_value_to_an_own_parameter_dev T254 A call result passed through a function value in a local to an own parameter is torn down twice.
-matrix_ownership_fresh_value_through_a_function_value_to_an_own_parameter_release T254 A call result passed through a function value in a local to an own parameter is torn down twice.
-matrix_ownership_fresh_value_through_a_function_value_to_an_own_parameter_memory_checks T254 A call result passed through a function value in a local to an own parameter is torn down twice.

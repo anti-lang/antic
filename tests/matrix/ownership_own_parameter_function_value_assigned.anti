@@ -1,0 +1,28 @@
+//! `=` refuses a function whose parameter is `own` and needs a teardown, by
+//! "Answers of 2026-11-13".
+
+class Key
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+fn take(own k: Key) -> int
+{
+	return k.n;
+}
+
+fn number(k: Key) -> int
+{
+	return k.n;
+}
+
+fn main() -> int
+{
+	let call = number;
+	call = take;
+	return 0;
+}

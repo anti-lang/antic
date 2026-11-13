@@ -4827,6 +4827,16 @@ add_expect_test(error_own_modules STATUS 1
             -o "${CMAKE_CURRENT_BINARY_DIR}/own_modules.s" own_modules.anti)
 set_tests_properties(error_own_modules PROPERTIES
     FIXTURES_REQUIRED parts_antl)
+# A function of the library whose `own` parameter needs a teardown is no
+# function value, by "Answers of 2026-11-13" in docs/decisions.md.
+add_expect_test(error_modules_own_parameter_function_value STATUS 1
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/errors/modules_own_parameter_function_value.err"
+    COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/owned"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/modules_own_parameter_function_value.s"
+            modules_own_parameter_function_value.anti)
+set_tests_properties(error_modules_own_parameter_function_value PROPERTIES
+    FIXTURES_REQUIRED parts_antl)
 
 # The kinds of the fields of a concurrent class and the fields of a
 # synchronized class reach the importer through the library file.

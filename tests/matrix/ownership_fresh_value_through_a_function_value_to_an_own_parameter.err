@@ -1,0 +1,1 @@
+ownership_fresh_value_through_a_function_value_to_an_own_parameter.anti:21:13: error: `take` takes `k` as `own`, and a function value moves nothing
