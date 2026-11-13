@@ -1,7 +1,7 @@
 //! The program lists the struct of the library in a direct import and names it
 //! without its module, so the message names its locks so as well.
 
-import com.example.locks.{Pair};
+import com.example.locks.{Pair, forward};
 
 fn backward(p: *Pair)
 {
@@ -15,7 +15,7 @@ fn backward(p: *Pair)
 fn main() -> int
 {
 	let p = locks.pair();
-	locks.forward(&p);
+	forward(&p);
 	backward(&p);
 	return 0;
 }

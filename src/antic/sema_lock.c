@@ -1041,27 +1041,22 @@ static size_t find_path(const struct graph *g, size_t lock_count,
    spells it, so a message names the type of a lock of another module
    with the name the module that compiles gives that module: the alias of
    its import, or the last segment of its path. A type that a direct
-   import lists is named bare, as the source names it there, and the type
-   of a module that the module does not import takes the whole path of
-   that module, the one name the source could give it. A lock of the
-   module itself is named bare. T252 of docs/audit/tests-findings.md. */
+   import lists is named bare, as the source names it there. A type
+   nested in a listed class is no listed name, so it keeps its module,
+   which the source may write as well. The type of a module that the
+   module does not import takes the whole path of that module, the one
+   name the source could give it. A lock of the module itself is named
+   bare. T252 of docs/audit/tests-findings.md. */
 static struct name module_spelling(const struct checker *c,
                                    const struct lock_name *lock)
 {
     struct name bare = {"", 0};
-    struct name head = lock->type;
     size_t i;
     size_t k;
 
     if (lock->module.length == 0 ||
         same_text(&lock->module, &c->module_name)) {
         return bare;
-    }
-    for (i = 0; i < lock->type.length; i++) {
-        if (lock->type.text[i] == '.') {
-            head.length = i;
-            break;
-        }
     }
     for (i = 0; i < c->module->import_count; i++) {
         const struct import *imp = &c->module->imports[i];
@@ -1070,7 +1065,7 @@ static struct name module_spelling(const struct checker *c,
             continue;
         }
         for (k = 0; k < imp->name_count; k++) {
-            if (same_text(&imp->names[k].name, &head)) {
+            if (same_text(&imp->names[k].name, &lock->type)) {
                 return bare;
             }
         }
