@@ -1,0 +1,18 @@
+//! The literal form of a search takes the text of its pattern for the stop at
+//! the match limit. A call of it that gives an empty text stops the program
+//! with the line alone. The pattern lowers the limit of PCRE2 with
+//! `(*LIMIT_MATCH=1000)`, and the text makes it backtrack past that.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let text = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!";
+	let r = Regex.compile(r"(*LIMIT_MATCH=1000)^(\w+\s?)*$") catch fatal;
+	let m = regex.matches_literal(text, r, "");
+	if m != none {
+		return 0;
+	}
+	return 1;
+}

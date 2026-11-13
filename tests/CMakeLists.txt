@@ -2125,8 +2125,9 @@ add_test(NAME trap_table
 # is fatal for `alloc T { }`, `alloc T(args)` and the first `get` of a
 # singleton, which stop with the failure routine instead of writing
 # through a null pointer. pattern_limit: a search with a pattern literal
-# that reaches the match limit stops with the pattern and the line.
-# pattern_group_count: a match whose `count` the program raised reads no
+# that reaches the match limit stops with the pattern and the line, and
+# pattern_limit_without_its_text with the line alone where the call gives
+# no text of the pattern. pattern_group_count: a match whose `count` the program raised reads no
 # group past those of its pattern, and stops with the count of the
 # pattern. pattern_patch_into: a `patch` whose computed `into` names no
 # group of its pattern literal stops with the count of the pattern and the
@@ -2147,7 +2148,8 @@ add_test(NAME trap_table
 # holds stops the program as memory that runs out, finding S316, in a
 # product, a sum, a doubling and a shift of the room of each collection.
 foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
-        singleton_memory pattern_limit pattern_group_count pattern_patch_into
+        singleton_memory pattern_limit pattern_limit_without_its_text
+        pattern_group_count pattern_patch_into
         pattern_patch_into_two_groups
         chan_capacity cast_failed pattern_group_name pattern_group_name_empty
         pattern_template pattern_group_bytes
