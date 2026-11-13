@@ -1,0 +1,22 @@
+//! `if let` on an `own` field of type `?fn(...)` that holds a snapshot. The
+//! binding borrows the function, as `let` does, so the field frees the snapshot
+//! once, when its owner is torn down.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Hold
+{
+	pub own f: ?fn(int) -> int = none,
+}
+
+fn main() -> int
+{
+	let base = 40;
+	let h = Hold { };
+	h.f = snapshot fn(n: int) -> int { return n + base; };
+	if let g = h.f {
+		printf("kept: %d\n".ptr, g(2) as c_int);
+	}
+	printf("after the binding\n".ptr);
+	return 0;
+}
