@@ -1,0 +1,13 @@
+//! The program takes a pair from a library and never imports the module of its
+//! struct, so the message names the locks with the path of that module.
+
+import com.example.left;
+import com.example.right;
+
+fn main() -> int
+{
+	let p = left.pair();
+	left.forward(&p);
+	right.backward(&p);
+	return 0;
+}

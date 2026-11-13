@@ -10,3 +10,10 @@ pub fn forward(p: *pairs.Pair)
 		}
 	}
 }
+
+/// A pair, for a program that imports the module of the struct only through
+/// this one.
+pub fn pair() -> pairs.Pair
+{
+	return pairs.pair();
+}

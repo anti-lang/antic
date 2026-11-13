@@ -1,0 +1,21 @@
+//! The program imports the library under an alias, so the message names the
+//! locks of its struct with the alias.
+
+import com.example.locks as l;
+
+fn backward(p: *l.Pair)
+{
+	sync p.b {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = l.pair();
+	l.forward(&p);
+	backward(&p);
+	return 0;
+}
