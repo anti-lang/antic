@@ -1,0 +1,8 @@
+//! `take(x.f)` of a name that nothing declares gives the one message of the
+//! name.
+
+fn main() -> int
+{
+	let n = take(nothing.head);
+	return 0;
+}

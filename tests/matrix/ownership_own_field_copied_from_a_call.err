@@ -1,0 +1,1 @@
+ownership_own_field_copied_from_a_call.anti:24:12: error: the value is held by an `own` field, use `take` to move it or `dup` to copy it

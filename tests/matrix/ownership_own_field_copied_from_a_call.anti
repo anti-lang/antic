@@ -1,0 +1,26 @@
+//! `=` that reads an `own` field of an object that a call gives into another
+//! `own` field gives the memory two owners, and is refused. The message names
+//! the value in words, since the read is no place with a name.
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+	pub own spare: ?*Node = none,
+}
+
+fn other() -> *Holder
+{
+	return alloc Holder { };
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	h.spare = other().head;
+	return 0;
+}
