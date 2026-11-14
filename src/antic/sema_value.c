@@ -437,9 +437,14 @@ void sema_refuse_own_field_copy(struct checker *c,
     if (from == NULL || !from->owned) {
         return;
     }
+    /* A read without a spelling is named in words, outside the backticks
+       that hold code, by T257 of docs/audit/tests-findings.md. It is no
+       place, so it cannot be the target. */
     if (!sema_spell(&spelled, value)) {
         text_free(&spelled);
-        text_appendf(&spelled, "the value");
+        sema_error_at(c, value->pos, "the value is held by an `own` field, "
+                      "use `take` to move it or `dup` to copy it");
+        return;
     }
     if (target != NULL && sema_spell(&place, target) &&
         strcmp(text_cstr(&place), text_cstr(&spelled)) == 0) {
