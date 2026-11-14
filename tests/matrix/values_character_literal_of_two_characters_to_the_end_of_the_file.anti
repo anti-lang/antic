@@ -1,0 +1,9 @@
+//! A character literal holds one character, and one that runs to the end of
+//! the file without its quote is unterminated.
+
+fn main() -> int
+{
+	return 0;
+}
+
+const C: char = 'ab

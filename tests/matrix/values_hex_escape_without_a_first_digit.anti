@@ -1,0 +1,7 @@
+//! `\xHH` takes two hexadecimal digits, and `g` is none.
+
+fn main() -> int
+{
+	let s = "\xg1";
+	return 0;
+}

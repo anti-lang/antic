@@ -25,6 +25,13 @@ set(SKIP
     "${TESTS}/matrix/classes_call_in_an_inherited_field_of_a_default_parameter.anti"
     "${TESTS}/matrix/types_as_with_a_question_mark_before_a_number_type.anti"
     "${TESTS}/matrix/types_as_with_a_question_mark_before_its_type.anti"
+    "${TESTS}/matrix/values_character_literal_before_a_carriage_return.anti"
+    "${TESTS}/matrix/values_character_literal_of_two_characters_to_the_end_of_the_file.anti"
+    "${TESTS}/matrix/values_character_literal_of_two_characters_to_the_end_of_the_line.anti"
+    "${TESTS}/matrix/values_hex_bytes_with_a_byte_outside_ascii.anti"
+    "${TESTS}/matrix/values_hex_escape_without_a_first_digit.anti"
+    "${TESTS}/matrix/values_unicode_escape_of_seven_digits.anti"
+    "${TESTS}/matrix/values_unicode_escape_without_its_brace.anti"
     "${TESTS}/modules/lines/com/example/geo.anti")
 
 file(GLOB_RECURSE sources "${STD}/*.anti" "${TESTS}/*.anti")

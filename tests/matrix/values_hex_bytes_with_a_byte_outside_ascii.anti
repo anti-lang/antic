@@ -1,0 +1,8 @@
+//! A text of hexadecimal bytes holds digits alone, and a byte outside ASCII is
+//! named by its column.
+
+fn main() -> int
+{
+	let b = x"0é1";
+	return 0;
+}

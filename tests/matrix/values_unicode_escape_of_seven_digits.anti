@@ -1,0 +1,7 @@
+//! `\u{}` takes 1 to 6 hexadecimal digits, and this one holds seven.
+
+fn main() -> int
+{
+	let s = "\u{1234567}";
+	return 0;
+}

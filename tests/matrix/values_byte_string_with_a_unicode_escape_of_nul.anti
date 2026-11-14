@@ -1,0 +1,11 @@
+//! A byte string takes `\u{0}`, the byte 0, which a text refuses. The program
+//! prints the length and the byte.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = b"\u{0}A";
+	printf("%lld %d %d\n".ptr, b.len, b[0] as c_int, b[1] as c_int);
+	return 0;
+}

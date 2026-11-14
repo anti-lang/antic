@@ -1,0 +1,8 @@
+//! A character literal ends on its line, and a carriage return stands outside
+//! it as a blank.
+
+fn main() -> int
+{
+	let c = ';
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! `\u{}` ends its digits with `}`.
+
+fn main() -> int
+{
+	let s = "\u{41";
+	return 0;
+}

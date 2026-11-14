@@ -1,0 +1,1 @@
+values_hex_bytes_with_a_byte_outside_ascii.anti:6:13: error: non-hex character in `x"..."` at column 13

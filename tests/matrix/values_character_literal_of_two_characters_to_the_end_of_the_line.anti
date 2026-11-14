@@ -1,0 +1,8 @@
+//! A character literal holds one character, and one that runs to the end of
+//! its line without its quote is unterminated.
+
+fn main() -> int
+{
+	let c = 'ab
+	return 0;
+}
