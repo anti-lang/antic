@@ -1,0 +1,8 @@
+//! A character literal whose `\xHH` escape has one hexadecimal digit. The
+//! escape is the mistake and gets the one message.
+
+fn main() -> int
+{
+	let c = '\x8';
+	return 0;
+}

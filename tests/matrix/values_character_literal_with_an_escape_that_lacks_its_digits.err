@@ -1,0 +1,1 @@
+values_character_literal_with_an_escape_that_lacks_its_digits.anti:6:11: error: `\xHH` needs two hexadecimal digits

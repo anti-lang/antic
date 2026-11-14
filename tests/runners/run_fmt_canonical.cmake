@@ -28,6 +28,7 @@ set(SKIP
     "${TESTS}/matrix/values_character_literal_before_a_carriage_return.anti"
     "${TESTS}/matrix/values_character_literal_of_two_characters_to_the_end_of_the_file.anti"
     "${TESTS}/matrix/values_character_literal_of_two_characters_to_the_end_of_the_line.anti"
+    "${TESTS}/matrix/values_character_literal_with_an_escape_that_lacks_its_digits.anti"
     "${TESTS}/matrix/values_hex_bytes_with_a_byte_outside_ascii.anti"
     "${TESTS}/matrix/values_hex_escape_without_a_first_digit.anti"
     "${TESTS}/matrix/values_unicode_escape_of_seven_digits.anti"
