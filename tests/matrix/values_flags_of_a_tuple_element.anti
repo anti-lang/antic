@@ -1,0 +1,19 @@
+//! The flags of the flags form travel in a tuple, and a read of `carry` through
+//! the element gives the bit. The program adds without and with a carry out.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn add(a: u64, b: u64) -> (u64, Flags)
+{
+	let (r, f) = a + b;
+	return (r, f);
+}
+
+fn main() -> int
+{
+	let small = add(1, 2);
+	let large = add(18446744073709551615, 2);
+	printf("%llu %d, %llu %d\n".ptr, small.0, small.1.carry as c_int, large.0,
+		large.1.carry as c_int);
+	return 0;
+}

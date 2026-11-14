@@ -1,0 +1,36 @@
+//! A class nested in a generic class reaches the private fields of a copy of
+//! the generic, by R100 of "Answers of 2026-10-18". `Peek` reads `value` of a
+//! `Box<int>`, and the program prints it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	value: int,
+
+	class Peek
+	{
+		fn read(self, b: *Box<int>) -> int
+		{
+			return b.value;
+		}
+	}
+
+	pub fn make(v: int) -> Box<T>
+	{
+		return Box<T> { value: v };
+	}
+
+	pub fn peek(self, b: *Box<int>) -> int
+	{
+		let p = Peek { };
+		return p.read(b);
+	}
+}
+
+fn main() -> int
+{
+	let b = Box<int>.make(7);
+	printf("peek %lld\n".ptr, b.peek(&b));
+	return 0;
+}

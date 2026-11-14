@@ -1,0 +1,8 @@
+//! A slice and a str have `.ptr`, and an array has `.len` alone.
+
+fn main() -> int
+{
+	let a: [3]int = [1, 2, 3];
+	let p = a.ptr;
+	return 0;
+}

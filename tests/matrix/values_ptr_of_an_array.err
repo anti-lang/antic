@@ -1,0 +1,1 @@
+values_ptr_of_an_array.anti:6:10: error: `[3]int` has no field `ptr`

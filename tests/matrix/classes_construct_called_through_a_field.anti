@@ -1,0 +1,29 @@
+//! `construct` runs once, after the literal or the `alloc` that made the
+//! object. A call through a field that holds another object is refused as well.
+
+class Part
+{
+	pub n: int = 0,
+
+	pub fn construct(self)
+	{
+		self.n += 1;
+	}
+}
+
+class Whole
+{
+	pub part: Part = Part { },
+
+	pub fn again(self)
+	{
+		self.part.construct();
+	}
+}
+
+fn main() -> int
+{
+	let w = Whole { };
+	w.again();
+	return 0;
+}

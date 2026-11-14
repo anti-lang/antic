@@ -1,0 +1,1 @@
+classes_construct_called_through_a_field.anti:20:3: error: `construct` runs after a literal and after `alloc`, and is not called directly

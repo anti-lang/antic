@@ -1,0 +1,20 @@
+//! A function of a class takes a literal of the class as its receiver, which
+//! lives to the end of its statement. The program prints what `get` gives.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.x;
+	}
+}
+
+fn main() -> int
+{
+	printf("x %lld\n".ptr, Point { x: 3 }.get());
+	return 0;
+}
