@@ -961,8 +961,13 @@ static void character(struct lexer *lx, size_t start, int line, int column)
             i++;
         }
         if (i < lx->length && lx->src[i] == '\'') {
-            error_at(lx, line, column,
-                     "a character literal holds one character");
+            /* A malformed escape or a NUL byte got its message, and what
+               the escape left before the quote is part of that mistake,
+               by T258 of docs/audit/tests-findings.md. */
+            if (valid) {
+                error_at(lx, line, column,
+                         "a character literal holds one character");
+            }
             while (lx->pos <= i) {
                 advance(lx);
             }
